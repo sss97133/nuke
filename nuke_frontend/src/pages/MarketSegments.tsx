@@ -1,34 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useMarketSegments, type SegmentIndexRow } from '../hooks/useMarketSegments';
 
-type SegmentSubcategory = {
-  id: string;
-  segment_id: string;
-  slug: string;
-  name: string;
-  description: string | null;
-};
-
-type SegmentIndexRow = {
-  segment_id: string;
-  slug: string;
-  name: string;
-  description: string | null;
-  manager_type: 'ai' | 'human';
-  status?: 'active' | 'draft' | 'archived';
-  year_min: number | null;
-  year_max: number | null;
-  makes: string[] | null;
-  model_keywords: string[] | null;
-  vehicle_count: number;
-  market_cap_usd: number;
-  change_7d_pct: number | null;
-  change_30d_pct: number | null;
-  subcategory_count?: number;
-  subcategories?: SegmentSubcategory[];
-};
 
 const formatUSD0 = (value: number) =>
   new Intl.NumberFormat('en-US', {
@@ -56,56 +30,12 @@ const getDefinitionSubcategory = (r: SegmentIndexRow) => {
 };
 
 export default function MarketSegments() {
-  const navigate = useNavigate();
-  // Read from global AuthContext — synchronous, no getSession() needed
   const { user } = useAuth();
   const hasSession = Boolean(user);
-  const [rows, setRows] = useState<SegmentIndexRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: rows = [], isLoading: loading, error: queryError } = useMarketSegments();
+  const error = queryError ? (queryError as Error).message : null;
   const [query, setQuery] = useState('');
   const [managerFilter, setManagerFilter] = useState<'all' | 'ai' | 'human'>('all');
-
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const { data, error } = await supabase
-          .from('market_segments_index')
-          .select(
-            'segment_id, slug, name, description, manager_type, status, year_min, year_max, makes, model_keywords, vehicle_count, market_cap_usd, change_7d_pct, change_30d_pct, subcategory_count, subcategories'
-          )
-          .order('market_cap_usd', { ascending: false });
-
-        if (error) throw error;
-        const normalized = (data || []).map((r: any) => ({
-          segment_id: r.segment_id,
-          slug: r.slug,
-          name: r.name,
-          description: r.description ?? null,
-          manager_type: r.manager_type,
-          status: r.status ?? undefined,
-          year_min: r.year_min ?? null,
-          year_max: r.year_max ?? null,
-          makes: r.makes ?? null,
-          model_keywords: r.model_keywords ?? null,
-          vehicle_count: Number(r.vehicle_count || 0),
-          market_cap_usd: Number(r.market_cap_usd || 0),
-          change_7d_pct: r.change_7d_pct === null ? null : Number(r.change_7d_pct),
-          change_30d_pct: r.change_30d_pct === null ? null : Number(r.change_30d_pct),
-          subcategory_count: r.subcategory_count === null || r.subcategory_count === undefined ? undefined : Number(r.subcategory_count),
-          subcategories: Array.isArray(r.subcategories) ? (r.subcategories as SegmentSubcategory[]) : undefined
-        })) as SegmentIndexRow[];
-        setRows(normalized);
-      } catch (e: any) {
-        console.error('Failed to load market segments:', e);
-        setError(e?.message || 'Failed to load market segments');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -184,12 +114,12 @@ export default function MarketSegments() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="button button-secondary" onClick={() => navigate('/')}>
+            <Link to="/" className="button button-secondary" style={{ textDecoration: 'none', color: 'inherit' }}>
               Back
-            </button>
-            <button className="button button-secondary" onClick={() => navigate('/market/portfolio')}>
+            </Link>
+            <Link to="/market/portfolio" className="button button-secondary" style={{ textDecoration: 'none', color: 'inherit' }}>
               Portfolio
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -239,13 +169,13 @@ export default function MarketSegments() {
             </div>
             <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {!hasSession && (
-                <button className="button button-secondary" onClick={() => navigate('/login')}>
+                <Link to="/login" className="button button-secondary" style={{ textDecoration: 'none', color: 'inherit' }}>
                   Sign in
-                </button>
+                </Link>
               )}
-              <button className="button button-secondary" onClick={() => navigate('/')}>
+              <Link to="/" className="button button-secondary" style={{ textDecoration: 'none', color: 'inherit' }}>
                 Home
-              </button>
+              </Link>
             </div>
           </div>
         )}
@@ -259,15 +189,16 @@ export default function MarketSegments() {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
                 {items.map((r) => (
-                  <button
+                  <Link
                     key={r.segment_id}
-                    onClick={() => navigate(`/market/segments/${r.slug}`)}
+                    to={`/market/segments/${r.slug}`}
                     style={{
+                      textDecoration: 'none', color: 'inherit',
                       textAlign: 'left',
-                      cursor: 'pointer',
                       padding: '14px',
                       border: '2px solid var(--border)', background: tileBg(r.change_7d_pct),
-                      transition: 'transform 0.12s ease'
+                      transition: 'transform 0.12s ease',
+                      display: 'block'
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-1px)')}
                     onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
@@ -294,7 +225,7 @@ export default function MarketSegments() {
                     {r.description && (
                       <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '16px' }}>{r.description}</div>
                     )}
-                  </button>
+                  </Link>
                 ))}
               </div>
             </div>

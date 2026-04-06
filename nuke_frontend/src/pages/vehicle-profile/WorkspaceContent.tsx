@@ -9,7 +9,7 @@ const WorkMemorySection = React.lazy(() => import('./WorkMemorySection'));
 const VehicleDossierPanel = React.lazy(() => import('./VehicleDossierPanel'));
 const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/vehicle/VehicleLedgerDocumentsCard').then(m => ({ default: m.VehicleLedgerDocumentsCard })));
 // Deal Jacket Forensics removed — no pipeline exists yet, re-add when data available
-import WiringQueryContextBar from '../../components/wiring/WiringQueryContextBar';
+// WiringQueryContextBar removed — wiring canvas replaced with data view
 const PartsQuoteGenerator = React.lazy(() => import('../../components/PartsQuoteGenerator').then(m => ({ default: m.PartsQuoteGenerator })));
 const VehicleROISummaryCard = React.lazy(() => import('../../components/vehicle/VehicleROISummaryCard'));
 const NukeEstimatePanel = React.lazy(() => import('../../components/vehicle/NukeEstimatePanel'));
@@ -32,6 +32,7 @@ const BuildTimelineChart = React.lazy(() => import('./BuildTimelineChart'));
 const BuildSpendSummary = React.lazy(() => import('./BuildSpendSummary'));
 const VehicleListingDetailsCard = React.lazy(() => import('../../components/vehicle/VehicleListingDetailsCard'));
 const SimilarSalesSection = React.lazy(() => import('../../components/vehicle/SimilarSalesSection').then(m => ({ default: m.SimilarSalesSection })));
+const PriceHistoryChart = React.lazy(() => import('../../components/vehicle/PriceHistoryChart'));
 const ObservationTimeline = React.lazy(() => import('./ObservationTimeline'));
 const OwnerIdentityCard = React.lazy(() => import('./OwnerIdentityCard'));
 const BuildStatusPanel = React.lazy(() => import('./BuildStatusPanel'));
@@ -197,6 +198,19 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           <React.Suspense fallback={null}>
             <VehicleDossierPanel />
           </React.Suspense>
+
+          {/* Price History Chart — scatter plot of this vehicle + cohort comps */}
+          {vehicle.year && vehicle.make && vehicle.model && (
+            <React.Suspense fallback={null}>
+              <PriceHistoryChart
+                vehicleId={vehicle.id}
+                make={vehicle.make}
+                model={vehicle.model}
+                year={vehicle.year}
+                salePrice={vehicle.sale_price}
+              />
+            </React.Suspense>
+          )}
 
           {/* Analysis Signals — computed alerts from analysis engine */}
           <React.Suspense fallback={null}>
@@ -406,7 +420,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
                   >
                     OPEN HARNESS BUILDER
                   </a>
-                  <WiringQueryContextBar vehicleId={vehicle.id} vehicleInfo={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }} onQuoteGenerated={() => {}} />
+                  {/* WiringQueryContextBar removed — see full wiring data view at /vehicle/:id/wiring */}
                 </div>
               </CollapsibleWidget>
               <CollapsibleWidget variant="profile" title="AI Parts Quote Generator" defaultCollapsed={true}>

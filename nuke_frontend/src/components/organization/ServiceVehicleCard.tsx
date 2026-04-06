@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 
 interface Receipt {
@@ -48,8 +48,6 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
   currentStatus,
   primaryImageUrl
 }) => {
-  const navigate = useNavigate();
-
   const statusColors = {
     in_progress: 'var(--info)',
     completed: 'var(--success)',
@@ -74,11 +72,11 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
   };
 
   return (
+    <Link to={`/vehicle/${vehicleId}`} style={{ textDecoration: 'none', color: 'inherit' }}>
     <div
       className="card"
       style={{
         marginBottom: '16px',
-        cursor: 'pointer',
         transition: 'transform 0.12s ease'
       }}
       onMouseEnter={(e) => {
@@ -87,7 +85,6 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)';
       }}
-      onClick={() => navigate(`/vehicle/${vehicleId}`)}
     >
       <div className="card-header" style={{ fontSize: '15px', fontWeight: 700 }}>
         SERVICE
@@ -275,6 +272,7 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
         )}
       </div>
     </div>
+    </Link>
   );
 };
 

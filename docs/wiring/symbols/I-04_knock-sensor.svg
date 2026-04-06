@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <title>I-04 Knock Sensor (Piezoelectric)</title>
+  <desc>Knock sensor symbol. Hexagon shape with KS inside, 2 terminals (signal, ground), mounting bolt indicator. Used for knock sensor bank 1 and knock sensor bank 2. 6mm x 6mm per spec.</desc>
+
+  <!-- Hexagon body -->
+  <polygon points="20,6 32,13 32,27 20,34 8,27 8,13" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/>
+
+  <!-- KS label -->
+  <text x="20" y="22" font-family="Courier New, monospace" font-size="8" font-weight="bold" fill="black" text-anchor="middle" dominant-baseline="middle">KS</text>
+
+  <!-- Mounting bolt indicator (center dot) -->
+  <circle cx="20" cy="13" r="2" fill="none" stroke="black" stroke-width="1"/>
+  <circle cx="20" cy="13" r="0.8" fill="black" stroke="none"/>
+
+  <!-- Terminal 1: Signal (left) -->
+  <line x1="8" y1="20" x2="2" y2="20" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Terminal 2: Ground (right) -->
+  <line x1="32" y1="20" x2="38" y2="20" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

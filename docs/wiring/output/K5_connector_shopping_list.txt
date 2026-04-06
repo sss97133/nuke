@@ -1,0 +1,143 @@
+CONNECTOR & PIGTAIL SHOPPING LIST — 1977 Chevrolet K5 Blazer
+Generated: 4/5/2026 | Based on component_connectors audit
+==========================================================================================
+
+This list covers every mating connector and pigtail needed to build the harness.
+Grouped by supplier for efficient ordering. Quantities account for the actual build
+(e.g., 8 coils, 8 injectors, 2 knock sensors).
+
+>> ECU & PDM MATING CONNECTORS (4 items)
+------------------------------------------------------------------------------------------
+QTY  PART NUMBER         DESCRIPTION                              MATES TO         EST PRICE  SUPPLIER
+2x   MoTeC #65044        Tyco Superseal 34-pin mating connector   M130-A, PDM30-A  $35 ea     Motec / Desert Performance
+2x   Tyco Superseal 26   Tyco Superseal 26-pin mating connector   M130-B, PDM30-B  $30 ea     Motec / Desert Performance
+                          (ask Motec dealer for exact PN —
+                           same series as #65044 but 26-pin)
+1x   M6 ring terminal    6 AWG crimp ring terminal                PDM30-C stud     $2         Any electrical supply
+     SUBTOTAL: ~$132
+
+NOTE: The M130 Connector Kit [M130-CONN-KIT, $35] in the BOM may already include
+the M130-A mating connector. Verify before ordering duplicates. PDM30 mating
+connectors are typically sold separately.
+
+
+>> ICT BILLET PIGTAILS — ENGINE SENSORS (7 items, 14 pigtails)
+------------------------------------------------------------------------------------------
+QTY  PART NUMBER    DESCRIPTION                     MATES TO                    EST PRICE  SUPPLIER
+8x   WPCOL40        D510C 4-pin coil pigtail        LS3 Ignition Coils 1-8      $12 ea     ICT Billet
+                     Alt: GM 12162000                (4-pin blade push-to-seat)
+8x   WPINJ40        EV6/USCAR injector pigtail      LS3 Fuel Injectors 1-8      $8 ea      ICT Billet
+                     Alt: GM 13352241                (2-pin USCAR)
+1x   WPCKP40        Crank position sensor pigtail   CKP 58X (GM 12615626)       $12        ICT Billet
+                     Metri-Pack 3-pin gray           M130:B01 (UDIG1)
+1x   WPCMP30        Cam position sensor pigtail     CMP (GM 12591720)           $12        ICT Billet
+                     Metri-Pack 3-pin                M130:B02 (UDIG2)
+2x   WPKN040        Knock sensor pigtail            KS Bank 1+2 (GM 12623730)  $10 ea     ICT Billet
+                     2-pin sealed metric             M130:B07, B13
+1x   WPCTS30        Coolant temp sensor pigtail     CLT (GM 19236568)           $10        ICT Billet
+                     Metri-Pack 2-pin sealed         M130:B04 (AN_TEMP3)
+1x   WP0IL40        Oil pressure sensor pigtail     OPS (GM 12673134)           $10        ICT Billet
+                     3-pin oval sealed               M130:A14 (AV1)
+     SUBTOTAL: ~$226  (96 + 64 + 12 + 12 + 20 + 10 + 10 + spare buffer)
+
+ICT BILLET ORDER URL: https://www.ictbillet.com (search "LS pigtail wire connector")
+ALT SUPPLIER: Wiring Specialties, Speedway Motors, Summit Racing
+
+
+>> OTHER SENSOR CONNECTORS (2 items)
+------------------------------------------------------------------------------------------
+QTY  PART NUMBER    DESCRIPTION                     MATES TO                    EST PRICE  SUPPLIER
+1x   GM 13580085    ETB 6-pin mating connector      LS3 Throttle Body           $25        GM dealer / NZEFI
+                     6-pin sealed connector           (GM 12605109)
+                     Alt: NZEFI ETB harness plug
+1x   (Bosch 3-pin) MAP sensor mating connector      MAP (GM 55573248)           $12        Bosch / Summit
+                     Bosch 3-pin sealed bolt-mount    M130:A15 (AV2)
+                     Search: "Bosch 3-pin MAP pigtail"
+                     or use ACDelco PT2293
+     SUBTOTAL: ~$37
+
+
+>> TRANSMISSION CONNECTOR (1 item)
+------------------------------------------------------------------------------------------
+QTY  PART NUMBER    DESCRIPTION                     MATES TO                    EST PRICE  SUPPLIER
+1x   19303772       Kostal LKS 1.5 16-pin harness   6L80E T43 TCM               $45        GM dealer
+                     connector (harness side)         (component side: 15131300)
+                     Alt: Holley 558-499 kit
+                     includes this connector
+     SUBTOTAL: ~$45
+
+NOTE: If using Holley 558-499 Transmission Control Kit, the T43 connector and
+wiring are included. Check before ordering separately.
+
+
+>> INLINE & SPLICE CONNECTORS (estimated)
+------------------------------------------------------------------------------------------
+QTY  PART NUMBER        DESCRIPTION                              EST PRICE  SUPPLIER
+15x  DTM 2/3/4-pin kits Deutsch DTM inline connectors            $7 ea      Waytek / TE
+                          For sensor extensions, loom breakouts
+4x   Raychem DR-25       Heat shrink splice covers               $5 ea      TE Connectivity
+20x  Superseal terminals Spare pins for M130/PDM30 connectors    $1 ea      TE / Motec
+     SUBTOTAL: ~$145
+
+
+>> SHIELDED CABLE CONNECTORS (4 items)
+------------------------------------------------------------------------------------------
+The CKP, CMP, KS1, KS2 wires use 2-conductor shielded cable. The shield drain
+wire must be grounded at the ECU end (M130 B15/B16 SEN_0V) and left floating at
+the sensor end. No additional connector needed — the ICT pigtails above include
+the sensor-side termination. The ECU-side terminates into the Superseal pins.
+
+
+==========================================================================================
+ORDER SUMMARY BY SUPPLIER
+------------------------------------------------------------------------------------------
+
+MOTEC / DESERT PERFORMANCE:
+  2x  MoTeC #65044 (Superseal 34-pin)              $70
+  2x  Tyco Superseal 26-pin mating                 $60
+  20x Superseal spare terminals                     $20
+  SUPPLIER SUBTOTAL: ~$150
+
+ICT BILLET:
+  8x  WPCOL40 (coil pigtail)                       $96
+  8x  WPINJ40 (injector pigtail)                   $64
+  1x  WPCKP40 (crank position)                     $12
+  1x  WPCMP30 (cam position)                       $12
+  2x  WPKN040 (knock sensor)                       $20
+  1x  WPCTS30 (coolant temp)                       $10
+  1x  WP0IL40 (oil pressure)                       $10
+  SUPPLIER SUBTOTAL: ~$224
+
+GM DEALER:
+  1x  13580085 (ETB 6-pin)                         $25
+  1x  19303772 (T43 TCM 16-pin)                    $45
+  SUPPLIER SUBTOTAL: ~$70
+
+BOSCH / SUMMIT RACING:
+  1x  MAP sensor 3-pin pigtail (ACDelco PT2293)    $12
+  SUPPLIER SUBTOTAL: ~$12
+
+WAYTEK / TE CONNECTIVITY:
+  15x DTM connector kits                           $105
+  4x  DR-25 splice covers                          $20
+  1x  M6 ring terminal (6 AWG)                     $2
+  SUPPLIER SUBTOTAL: ~$127
+
+==========================================================================================
+GRAND TOTAL: ~$583
+
+NOTES:
+- Prices are estimated from Summit Racing, ICT Billet website, and Motec dealer
+  quotes as of March 2026.
+- The BOM already includes $35 for "M130 Connector Kit" and $105 for "DTM Connector
+  Kits" — subtract those if already ordered to avoid duplication.
+- ICT Billet pigtails come with 12" leads pre-terminated. Plan wire lengths accordingly
+  (pigtail lead + extension to reach ECU/PDM).
+- Consider ordering 1-2 extra of each ICT pigtail as spares for rework.
+- All sealed connectors require proper crimping with Metri-Pack or Superseal crimp
+  tools (W-tool for Superseal, not generic ratchet crimpers).
+
+CROSS-REFERENCE: PIN ASSIGNMENTS
+  See component_connectors table in Supabase for full pin-level detail.
+  See K5_connector_schedule.txt for M130 and PDM30 assignments.
+  See M130 Connector A notes for coil numbering cross-reference.

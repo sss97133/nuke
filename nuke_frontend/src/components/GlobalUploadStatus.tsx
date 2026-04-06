@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 interface UploadFile {
   id: string;
@@ -25,7 +25,6 @@ declare global {
 const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className ='' }) => {
   const [allUploads, setAllUploads] = useState<Map<string, UploadFile[]>>(new Map());
   const [isExpanded, setIsExpanded] = useState(false);
-  const navigate = useNavigate();
 
   useEffect(() => {
     // For now, let's create a simple global event system
@@ -153,12 +152,13 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className ='' }
             return (
               <div key={vehicleId} className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
                 <div className="flex items-center justify-between mb-2">
-                  <button
-                    onClick={() => navigate(`/vehicle/${vehicleId}`)}
+                  <Link
+                    to={`/vehicle/${vehicleId}`}
                     className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                    style={{ textDecoration: 'none' }}
                   >
                     Vehicle {vehicleId.slice(0, 8)}...
-                  </button>
+                  </Link>
                   <span className="text-xs text-gray-500 dark:text-gray-400">
                     {vehicleCompleted}/{files.length} completed ({vehicleProgress}%)
                   </span>

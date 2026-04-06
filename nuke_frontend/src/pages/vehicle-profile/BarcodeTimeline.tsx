@@ -14,6 +14,7 @@ interface EventDay {
   group?: string;
   groupDay?: number;
   groupTotal?: string;
+  areas?: string[];
   hasWorkSession?: boolean;
   workMeta?: {
     work_type: string;
@@ -210,6 +211,29 @@ const BARCODE_COLORS: Record<number, string> = {
 
 const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
+/** Extract work area keywords from a description string. */
+const AREA_PATTERNS: [RegExp, string][] = [
+  [/exhaust|header|collector|muffler|y-pipe|cutout|catalytic/i, 'exhaust'],
+  [/brake|drum|caliper|rotor|wheel.cylinder|e-brake/i, 'brakes'],
+  [/suspension|spring|shock|leaf|lift/i, 'suspension'],
+  [/transmission|trans.seal|torque.converter/i, 'transmission'],
+  [/engine|carb|intake|alternator|distributor|ignition/i, 'engine'],
+  [/paint|body|rust|fender|quarter.panel|bed/i, 'body'],
+  [/electrical|wiring|gauge|light|switch/i, 'electrical'],
+  [/interior|seat|carpet|dash|headliner/i, 'interior'],
+];
+
+function extractAreas(description: string): string[] {
+  if (!description) return [];
+  const areas: string[] = [];
+  for (const [pattern, area] of AREA_PATTERNS) {
+    if (pattern.test(description) && !areas.includes(area)) {
+      areas.push(area);
+    }
+  }
+  return areas;
+}
+
 // Lazy-load DayCard for popup rendering
 const DayCardPopupContent = React.lazy(() => import('./DayCard'));
 
@@ -301,6 +325,12 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
           total_job_cost: ev.metadata.total_job_cost || 0,
           work_description: ev.metadata.work_description || '',
         };
+        // Extract work areas from description for multi-day project linking
+        const areas = extractAreas(ev.metadata.work_description || '');
+        if (areas.length > 0) {
+          const existing = map[ds].areas || [];
+          map[ds].areas = [...new Set([...existing, ...areas])];
+        }
       }
 
       // Accumulate cost (only dollar amounts; photo counts don't add to total)
@@ -388,6 +418,25 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     return wks;
   }, [startDate, endDate]);
 
+  // Precompute which week indices get month labels (avoids pixel-math drift)
+  const monthLabelMap = useMemo(() => {
+    const map = new Map<number, string>();
+    const seen = new Set<string>();
+    heatmapWeeks.forEach((week, wi) => {
+      const firstDay = week.find((d) => d.inRange && d.d.getDate() <= 7);
+      if (firstDay && firstDay.d.getDate() <= 7) {
+        const month = firstDay.d.getMonth();
+        const year = firstDay.d.getFullYear();
+        const key = `${year}-${month}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          map.set(wi, month === 0 ? `${MONTH_NAMES[month]} ${year}` : MONTH_NAMES[month]);
+        }
+      }
+    });
+    return map;
+  }, [heatmapWeeks]);
+
   // Year range label
   const yearRange = useMemo(() => {
     const s = startDate.getFullYear();
@@ -474,52 +523,6 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     setTooltipContent(null);
   }, []);
 
-  // Heatmap cell click
-  const onCellClick = useCallback(
-    (ds: string, e: React.MouseEvent) => {
-      const ev = eventMap[ds];
-      if (!ev) return;
-      setReceiptDate(ds);
-      // Position receipt using viewport-relative coords (fixed positioning)
-      const rect = (e.target as HTMLElement).getBoundingClientRect();
-      const POPUP_WIDTH = 290;
-      setReceiptPos({
-        x: Math.min(rect.left + rect.width + 4, window.innerWidth - POPUP_WIDTH - 8),
-        y: rect.top,
-      });
-      // Highlight group if multi-day
-      if (ev.group) {
-        setHighlightGroup(ev.group);
-      } else {
-        setHighlightGroup(null);
-      }
-      // Emit gallery filter for this day's photos
-      setGalleryFilter({ dateRange: [ds, ds] });
-    },
-    [eventMap, setGalleryFilter]
-  );
-
-  // Receipt navigation
-  const navigateReceipt = useCallback(
-    (dir: -1 | 1) => {
-      if (!receiptDate) return;
-      const idx = sortedDates.indexOf(receiptDate);
-      if (idx === -1) return;
-      const nextIdx = idx + dir;
-      if (nextIdx >= 0 && nextIdx < sortedDates.length) {
-        const nextDate = sortedDates[nextIdx];
-        setReceiptDate(nextDate);
-        const nextEv = eventMap[nextDate];
-        if (nextEv?.group) setHighlightGroup(nextEv.group);
-        else setHighlightGroup(null);
-        setGalleryFilter({ dateRange: [nextDate, nextDate] });
-      }
-    },
-    [receiptDate, sortedDates, eventMap, setGalleryFilter]
-  );
-
-  const receiptEvent = receiptDate ? eventMap[receiptDate] : null;
-
   // Open full Day Card detail in a popup
   const openDayCardPopup = useCallback(
     (date: string) => {
@@ -556,6 +559,63 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     },
     [eventMap, vehicleId, openPopup]
   );
+
+  // Heatmap cell click
+  const onCellClick = useCallback(
+    (ds: string, e: React.MouseEvent) => {
+      const ev = eventMap[ds];
+      if (!ev) return;
+
+      // Set area highlight for multi-day project linking (Fix 3)
+      if (ev.areas && ev.areas.length > 0) {
+        setHighlightGroup(`area:${ev.areas[0]}`);
+      } else if (ev.group) {
+        setHighlightGroup(ev.group);
+      } else {
+        setHighlightGroup(null);
+      }
+
+      // Emit gallery filter for this day's photos
+      setGalleryFilter({ dateRange: [ds, ds] });
+
+      // Work session days → open DayCard popup directly (Fix 2)
+      if (ev.hasWorkSession) {
+        openDayCardPopup(ds);
+        return;
+      }
+
+      // Non-work days → show inline receipt
+      setReceiptDate(ds);
+      const rect = (e.target as HTMLElement).getBoundingClientRect();
+      const POPUP_WIDTH = 290;
+      setReceiptPos({
+        x: Math.min(rect.left + rect.width + 4, window.innerWidth - POPUP_WIDTH - 8),
+        y: rect.top,
+      });
+    },
+    [eventMap, setGalleryFilter, openDayCardPopup]
+  );
+
+  // Receipt navigation
+  const navigateReceipt = useCallback(
+    (dir: -1 | 1) => {
+      if (!receiptDate) return;
+      const idx = sortedDates.indexOf(receiptDate);
+      if (idx === -1) return;
+      const nextIdx = idx + dir;
+      if (nextIdx >= 0 && nextIdx < sortedDates.length) {
+        const nextDate = sortedDates[nextIdx];
+        setReceiptDate(nextDate);
+        const nextEv = eventMap[nextDate];
+        if (nextEv?.group) setHighlightGroup(nextEv.group);
+        else setHighlightGroup(null);
+        setGalleryFilter({ dateRange: [nextDate, nextDate] });
+      }
+    },
+    [receiptDate, sortedDates, eventMap, setGalleryFilter]
+  );
+
+  const receiptEvent = receiptDate ? eventMap[receiptDate] : null;
 
   // If no timeline events at all, hide the section entirely
   if (timelineEvents.length === 0) {
@@ -636,7 +696,12 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
                         }
                         const ev = eventMap[day.s];
                         const level = ev ? ev.level : 0;
-                        const isHighlighted = highlightGroup && ev?.group === highlightGroup;
+                        const isHighlighted = highlightGroup && (
+                          // Area-based highlight: "area:exhaust" matches any day with "exhaust" in areas
+                          (highlightGroup.startsWith('area:') && ev?.areas?.includes(highlightGroup.slice(5))) ||
+                          // Group-based highlight (multi-day sessions)
+                          ev?.group === highlightGroup
+                        );
                         return (
                           <div
                             key={di}
@@ -647,30 +712,15 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
                           />
                         );
                       })}
+                      {monthLabelMap.has(wi) && (
+                        <span className="hm-month-inline">{monthLabelMap.get(wi)}</span>
+                      )}
                     </div>
                   </React.Fragment>
                 );
               })}
             </div>
-            <div className="hm-months">
-              {heatmapWeeks.reduce<React.ReactNode[]>((acc, week, wi) => {
-                const firstDay = week.find((d) => d.inRange && d.d.getDate() <= 7);
-                if (firstDay && firstDay.d.getDate() <= 7) {
-                  const month = firstDay.d.getMonth();
-                  const year = firstDay.d.getFullYear();
-                  const key = `${year}-${month}`;
-                  if (!acc.find((n) => n && (n as React.ReactElement).key === key)) {
-                    acc.push(
-                      <span key={key} style={{ left: `${wi * 11 + 22}px` }}>
-                        {MONTH_NAMES[month]}
-                        {month === 0 ? ` ${year}` : ''}
-                      </span>
-                    );
-                  }
-                }
-                return acc;
-              }, [])}
-            </div>
+            {/* Month labels are now rendered inline inside each .hm-week column */}
           </div>
 
           {/* Receipt popup */}

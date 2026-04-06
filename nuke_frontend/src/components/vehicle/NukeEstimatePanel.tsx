@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrencyAmount } from '../../utils/currency';
 import { DEAL_SCORE_CONFIG, type DealScoreLabel } from '../../constants/dealScore';
+import { useNukeEstimate, type NukeEstimate } from '../../hooks/useNukeEstimate';
 
 interface NukeEstimatePanelProps {
   vehicleId: string;
@@ -14,37 +15,6 @@ interface NukeEstimatePanelProps {
   canCompute?: boolean;
 }
 
-interface NukeEstimate {
-  estimated_value: number;
-  value_low: number;
-  value_high: number;
-  confidence_score: number;
-  price_tier: string;
-  confidence_interval_pct: number;
-  signal_weights: Record<string, { weight: number; multiplier: number; sourceCount: number }>;
-  deal_score: number | null;
-  deal_score_label: string | null;
-  heat_score: number | null;
-  heat_score_label: string | null;
-  model_version: string;
-  input_count: number;
-  calculated_at: string;
-}
-
-interface RecordPrice {
-  record_price: number;
-  record_sale_date: string | null;
-  previous_record_price: number | null;
-  times_record_broken: number;
-}
-
-interface SurvivalRate {
-  total_produced: number | null;
-  estimated_surviving: number | null;
-  survival_rate: number | null;
-  estimation_method: string;
-  confidence_score: number | null;
-}
 
 const DEAL_COLORS: Record<string, string> = Object.fromEntries(
   Object.entries(DEAL_SCORE_CONFIG).map(([k, v]) => [k, v.color])
@@ -70,82 +40,22 @@ const SIGNAL_LABELS: Record<string, string> = {
 };
 
 const NukeEstimatePanel: React.FC<NukeEstimatePanelProps> = ({ vehicleId, vehicle, canCompute = true }) => {
-  const [estimate, setEstimate] = useState<NukeEstimate | null>(null);
-  const [record, setRecord] = useState<RecordPrice | null>(null);
-  const [survival, setSurvival] = useState<SurvivalRate | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading: loading } = useNukeEstimate(vehicleId, vehicle);
+  const [estimateOverride, setEstimateOverride] = useState<NukeEstimate | null>(null);
   const [computing, setComputing] = useState(false);
 
-  useEffect(() => {
-    if (!vehicleId) return;
-    let cancelled = false;
-
-    const load = async () => {
-      setLoading(true);
-
-      // Load estimate
-      const { data: est } = await supabase
-        .from('nuke_estimates')
-        .select('*')
-        .eq('vehicle_id', vehicleId)
-        .maybeSingle();
-      if (!cancelled && est) setEstimate(est as NukeEstimate);
-
-      // Load record price for this make/model
-      if (vehicle.make && vehicle.model && vehicle.year) {
-        const { data: rec } = await supabase
-          .from('record_prices')
-          .select('record_price, record_sale_date, previous_record_price, times_record_broken')
-          .ilike('make', vehicle.make)
-          .ilike('model', `%${vehicle.model}%`)
-          .lte('year_start', vehicle.year)
-          .gte('year_end', vehicle.year)
-          .maybeSingle();
-        if (!cancelled && rec) setRecord(rec as RecordPrice);
-
-        // Load survival rate
-        const { data: surv } = await supabase
-          .from('survival_rate_estimates')
-          .select('total_produced, estimated_surviving, survival_rate, estimation_method, confidence_score')
-          .ilike('make', vehicle.make)
-          .ilike('model', `%${vehicle.model}%`)
-          .lte('year_start', vehicle.year)
-          .gte('year_end', vehicle.year)
-          .maybeSingle();
-        if (!cancelled && surv) setSurvival(surv as SurvivalRate);
-      }
-
-      if (!cancelled) setLoading(false);
-
-      // Auto-compute if no estimate exists
-      if (!cancelled && !est) {
-        setComputing(true);
-        try {
-          const { data, error } = await supabase.functions.invoke('compute-vehicle-valuation', {
-            body: { vehicle_id: vehicleId, force: false },
-          });
-          if (!cancelled && !error && data?.results?.[0]) {
-            setEstimate(data.results[0] as NukeEstimate);
-          }
-        } catch {
-          // silent — user can still click Compute manually
-        }
-        if (!cancelled) setComputing(false);
-      }
-    };
-
-    void load();
-    return () => { cancelled = true; };
-  }, [vehicleId, vehicle.make, vehicle.model, vehicle.year]);
+  const estimate = estimateOverride ?? data?.estimate ?? null;
+  const record = data?.record ?? null;
+  const survival = data?.survival ?? null;
 
   const handleCompute = async () => {
     setComputing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('compute-vehicle-valuation', {
+      const { data: result, error } = await supabase.functions.invoke('compute-vehicle-valuation', {
         body: { vehicle_id: vehicleId, force: true },
       });
-      if (!error && data?.results?.[0]) {
-        setEstimate(data.results[0] as NukeEstimate);
+      if (!error && result?.results?.[0]) {
+        setEstimateOverride(result.results[0] as NukeEstimate);
       }
     } catch {
       // ignore

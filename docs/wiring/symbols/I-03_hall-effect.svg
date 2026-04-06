@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <title>I-03 Hall Effect Sensor</title>
+  <desc>Hall effect sensor symbol. Rectangle with H inside, 3 terminals (5V ref, signal, ground), and arrow indicating magnetic sensing direction. Used for crank position sensor (58X) and cam position sensor. 5mm x 8mm per spec.</desc>
+
+  <!-- Sensor rectangle -->
+  <rect x="10" y="8" width="20" height="24" rx="1" ry="1" fill="white" stroke="black" stroke-width="1.5"/>
+
+  <!-- H label -->
+  <text x="20" y="22" font-family="Courier New, monospace" font-size="10" font-weight="bold" fill="black" text-anchor="middle" dominant-baseline="middle">H</text>
+
+  <!-- Magnetic sensing arrow (right side) -->
+  <line x1="32" y1="20" x2="36" y2="20" stroke="black" stroke-width="1" stroke-linecap="round"/>
+  <polygon points="36,20 33,18 33,22" fill="black" stroke="none"/>
+
+  <!-- Terminal 1: 5V ref (top-left) -->
+  <line x1="10" y1="13" x2="4" y2="13" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Terminal 2: Signal (middle-left) -->
+  <line x1="10" y1="20" x2="4" y2="20" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Terminal 3: Ground (bottom-left) -->
+  <line x1="10" y1="27" x2="4" y2="27" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Pin labels -->
+  <text x="7" y="11" font-family="Courier New, monospace" font-size="3.5" fill="black" text-anchor="middle">5V</text>
+  <text x="6" y="18" font-family="Courier New, monospace" font-size="3.5" fill="black" text-anchor="middle">SIG</text>
+  <text x="6.5" y="30" font-family="Courier New, monospace" font-size="3.5" fill="black" text-anchor="middle">GND</text>
+</svg>

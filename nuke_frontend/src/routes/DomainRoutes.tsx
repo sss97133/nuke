@@ -14,6 +14,16 @@ const Extension = React.lazy(() => import('../pages/Extension'));
 // Search: lazy-loaded (chunk retry logic in main.tsx handles failures)
 const Search = React.lazy(() => import('../pages/Search'));
 const BrowseVehicles = React.lazy(() => import('../pages/BrowseVehicles'));
+const PublicMap = React.lazy(() => import('../components/map/PublicMap'));
+
+// Public map page — no auth, no DeckGL
+function MapPage() {
+  return (
+    <React.Suspense fallback={<div style={{ height: '100vh', background: '#111' }} />}>
+      <PublicMap />
+    </React.Suspense>
+  );
+}
 
 // Lazy load domain modules
 const VehicleRoutes = React.lazy(() => import('./modules/vehicle/routes'));
@@ -83,10 +93,6 @@ const DeveloperDashboard = React.lazy(() => import('../pages/DeveloperDashboard'
 // Transfer party page (buyer/seller, no auth required)
 const TransferPartyPage = React.lazy(() => import('../pages/TransferPartyPage'));
 
-// Stripe Connect
-const StripeConnect = React.lazy(() => import('../pages/StripeConnect'));
-const StripeConnectStore = React.lazy(() => import('../pages/StripeConnectStore'));
-
 export const DomainRoutes = () => {
   return (
     <Suspense fallback={<div style={{ height: '100vh', background: 'var(--bg)' }} />}>
@@ -135,9 +141,10 @@ export const DomainRoutes = () => {
         {/* /feed-v2 promoted to main feed tab — redirect for any bookmarks */}
         <Route path="/feed-v2" element={<Navigate to="/?tab=feed" replace />} />
 
-        {/* Search + Browse: public */}
+        {/* Search + Browse + Map: public */}
         <Route path="/search" element={<Search />} />
         <Route path="/browse" element={<BrowseVehicles />} />
+        <Route path="/map" element={<MapPage />} />
         {/* Public auction listings */}
         <Route path="/auctions" element={<AuctionMarketplace />} />
         <Route path="/auction/:listingId" element={<AuctionListing />} />
@@ -215,8 +222,6 @@ export const DomainRoutes = () => {
             <Route path="/developers/dashboard" element={<DeveloperDashboard />} />
             <Route path="/business/settings" element={<BusinessSettings />} />
             <Route path="/api/quickbooks/callback" element={<QuickBooksCallback />} />
-            <Route path="/stripe-connect" element={<StripeConnect />} />
-            <Route path="/stripe-connect/store/:accountId" element={<StripeConnectStore />} />
           </Route>
         </Route>
 

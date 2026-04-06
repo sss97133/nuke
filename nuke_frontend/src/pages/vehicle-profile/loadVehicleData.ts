@@ -360,7 +360,39 @@ export async function loadVehicleImpl({
         rpcLoaded.images = true;
       }
       if (rpcData.timeline_events) {
-        setTimelineEvents(rpcData.timeline_events);
+        // Merge work_sessions into timeline events (work_sessions table has RLS,
+        // so the RPC returns them separately via SECURITY DEFINER)
+        const events = [...rpcData.timeline_events];
+        if (Array.isArray(rpcData.work_sessions)) {
+          for (const ws of rpcData.work_sessions) {
+            events.push({
+              id: ws.id,
+              vehicle_id: vehicleId,
+              event_date: ws.session_date,
+              event_type: 'work_session',
+              title: ws.title,
+              category: ws.work_type,
+              cost_amount: (ws.total_job_cost || 0) + (ws.total_parts_cost || 0),
+              metadata: {
+                work_type: ws.work_type,
+                image_count: ws.image_count,
+                duration_minutes: ws.duration_minutes,
+                total_parts_cost: ws.total_parts_cost,
+                total_labor_cost: ws.total_labor_cost,
+                total_job_cost: ws.total_job_cost,
+                work_description: ws.work_description,
+                status: ws.status,
+                source: 'work_sessions',
+              },
+            });
+          }
+        }
+        events.sort((a: any, b: any) => {
+          const da = a.event_date || '';
+          const db = b.event_date || '';
+          return db.localeCompare(da);
+        });
+        setTimelineEvents(events);
         rpcLoaded.timeline = true;
       }
       // Extract counts from RPC stats to avoid separate count queries

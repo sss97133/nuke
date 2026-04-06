@@ -12,7 +12,7 @@
  */
 
 import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 // ── Inline helper ────────────────────────────────────────────────────────────
 
@@ -39,7 +39,6 @@ interface AuthErrorCardProps {
 }
 
 export function AuthErrorCard({ message }: AuthErrorCardProps) {
-  const navigate = useNavigate();
   const location = useLocation();
   const next = encodeURIComponent(location.pathname + location.search);
 
@@ -64,18 +63,20 @@ export function AuthErrorCard({ message }: AuthErrorCardProps) {
           {message ?? 'You need to be signed in to view this page.'}
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button
+          <Link
+            to={`/login?next=${next}`}
             className="button"
-            onClick={() => navigate(`/login?next=${next}`)}
+            style={{ textDecoration: 'none', color: 'inherit' }}
           >
             Sign in
-          </button>
-          <button
+          </Link>
+          <Link
+            to="/"
             className="button button-secondary"
-            onClick={() => navigate('/')}
+            style={{ textDecoration: 'none', color: 'inherit' }}
           >
             Go home
-          </button>
+          </Link>
         </div>
       </div>
     </div>

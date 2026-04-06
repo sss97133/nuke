@@ -1,0 +1,404 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     viewBox="0 0 2486 1720" width="2486" height="1720">
+<defs>
+  <style>
+    /* Wire styles */
+    .trunk { stroke: #C00; stroke-width: 5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .coil-wire { stroke: #0066CC; stroke-width: 2.5; fill: none; stroke-linecap: round; }
+    .inj-wire { stroke: #008800; stroke-width: 2.5; fill: none; stroke-linecap: round; }
+    .sensor-wire { stroke: #6600AA; stroke-width: 2; fill: none; stroke-linecap: round; }
+    .shield-wire { stroke: #6600AA; stroke-width: 2; fill: none; stroke-dasharray: 4,2; }
+    .power-wire { stroke: #CC0000; stroke-width: 4; fill: none; stroke-linecap: round; }
+    .ground-wire { stroke: #000; stroke-width: 3; fill: none; stroke-dasharray: 8,4; }
+    .can-wire { stroke: #FF6600; stroke-width: 2; fill: none; }
+
+    /* Component markers */
+    .ecu-box { fill: rgba(200,0,0,0.15); stroke: #C00; stroke-width: 2.5; }
+    .comp-dot { stroke: #000; stroke-width: 1.5; }
+    .coil-mark { fill: rgba(0,102,204,0.25); stroke: #0066CC; stroke-width: 1.5; }
+    .inj-mark { fill: rgba(0,136,0,0.25); stroke: #008800; stroke-width: 1.5; }
+    .sensor-mark { fill: rgba(102,0,170,0.25); stroke: #6600AA; stroke-width: 1.5; }
+
+    /* Labels */
+    .lbl { font-family: 'Arial', sans-serif; font-size: 14px; font-weight: bold; }
+    .lbl-sm { font-family: 'Courier New', monospace; font-size: 11px; }
+    .lbl-wire { font-family: 'Courier New', monospace; font-size: 9px; }
+    .title { font-family: 'Arial', sans-serif; font-size: 18px; font-weight: bold; }
+  </style>
+
+  <!-- Arrowhead marker -->
+  <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6 Z" fill="#C00"/>
+  </marker>
+</defs>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- LAYER 0: FACTORY BASE IMAGE                        -->
+<!-- ═══════════════════════════════════════════════════ -->
+<image href="engine_bay_cropped.png" x="0" y="0" width="2486" height="1720" opacity="0.35"/>
+
+<!-- Fade the factory callout text so our overlay is primary -->
+<!-- The base image shows: junction block, wiper motor, battery, starter, generator, temp sender, engine harness -->
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- LAYER 1: LS3 ENGINE OUTLINE                        -->
+<!-- ═══════════════════════════════════════════════════ -->
+<g id="engine-outline" opacity="0.9">
+  <!-- LS3 block outline (approximate, sitting where factory engine was) -->
+  <path d="M320,350 L1050,280 L1100,650 L1050,750 L350,780 Z"
+        fill="none" stroke="#444" stroke-width="1.5" stroke-dasharray="6,4"/>
+  <text x="680" y="770" class="lbl" fill="#666" font-size="12">LS3 6.2L BLOCK</text>
+
+  <!-- Driver's side valve cover -->
+  <rect x="340" y="290" width="630" height="55" rx="6"
+        fill="rgba(180,180,180,0.2)" stroke="#888" stroke-width="1"/>
+  <text x="655" y="275" class="lbl-sm" fill="#888">DRIVER VALVE COVER</text>
+
+  <!-- Passenger side valve cover -->
+  <rect x="440" y="500" width="580" height="50" rx="6"
+        fill="rgba(180,180,180,0.2)" stroke="#888" stroke-width="1"/>
+  <text x="740" y="565" class="lbl-sm" fill="#888">PASSENGER VALVE COVER</text>
+
+  <!-- Intake manifold -->
+  <rect x="480" y="360" width="320" height="80" rx="4"
+        fill="rgba(200,200,200,0.15)" stroke="#AAA" stroke-width="1"/>
+  <text x="560" y="410" class="lbl-sm" fill="#999">INTAKE</text>
+</g>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- LAYER 2: ECU + PDM (FIREWALL)                      -->
+<!-- ═══════════════════════════════════════════════════ -->
+<g id="ecu-pdm">
+  <!-- Firewall reference line -->
+  <line x1="1250" y1="150" x2="1250" y2="800" stroke="#666" stroke-width="1" stroke-dasharray="10,5"/>
+  <text x="1260" y="165" class="lbl" fill="#666" font-size="13">FIREWALL</text>
+
+  <!-- M130 ECU -->
+  <rect x="1300" y="210" width="160" height="100" rx="4" class="ecu-box"/>
+  <text x="1380" y="245" text-anchor="middle" class="lbl" fill="#C00" font-size="13">MOTEC</text>
+  <text x="1380" y="262" text-anchor="middle" class="lbl" fill="#C00" font-size="16">M130</text>
+  <text x="1380" y="280" text-anchor="middle" class="lbl-sm" fill="#C00">34+26 PIN</text>
+  <text x="1380" y="298" text-anchor="middle" class="lbl-wire" fill="#C00">CONN A (TOP)</text>
+  <!-- Connector exit point (left edge = toward engine) -->
+  <circle cx="1300" cy="260" r="5" fill="#C00"/>
+
+  <!-- PDM30 -->
+  <rect x="1300" y="340" width="160" height="90" rx="4"
+        fill="rgba(0,100,200,0.12)" stroke="#0066CC" stroke-width="2.5"/>
+  <text x="1380" y="370" text-anchor="middle" class="lbl" fill="#0066CC" font-size="13">MOTEC</text>
+  <text x="1380" y="390" text-anchor="middle" class="lbl" fill="#0066CC" font-size="16">PDM30</text>
+  <text x="1380" y="410" text-anchor="middle" class="lbl-sm" fill="#0066CC">30 OUTPUTS</text>
+  <circle cx="1300" cy="385" r="5" fill="#0066CC"/>
+
+  <!-- CAN bus between M130 and PDM30 -->
+  <line x1="1380" y1="310" x2="1380" y2="340" class="can-wire" stroke-width="3"/>
+  <text x="1470" y="330" class="lbl-wire" fill="#FF6600">CAN H/L</text>
+  <text x="1470" y="342" class="lbl-wire" fill="#FF6600">22AWG WHT/GRN</text>
+
+  <!-- Bulkhead connector (center firewall pass-through to cab) -->
+  <rect x="1280" y="480" width="50" height="40" rx="3"
+        fill="rgba(100,100,100,0.3)" stroke="#555" stroke-width="2"/>
+  <text x="1305" y="505" text-anchor="middle" class="lbl-wire" fill="#333">BLKHD</text>
+  <text x="1305" y="540" text-anchor="middle" class="lbl-sm" fill="#555">TO CAB</text>
+</g>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- LAYER 3: MAIN HARNESS TRUNK                        -->
+<!-- ═══════════════════════════════════════════════════ -->
+<g id="harness-trunk">
+  <!-- Main engine harness trunk: M130 → along firewall header → across engine top → forward -->
+  <!-- This is the primary routing channel. All wires travel inside this trunk. -->
+  <polyline points="
+    1300,260
+    1200,255
+    1100,260
+    900,280
+    700,300
+    500,320
+    380,340
+  " class="trunk" marker-end="url(#arrow)"/>
+
+  <text x="900" y="260" class="lbl" fill="#C00" font-size="12">MAIN ENGINE HARNESS TRUNK</text>
+  <text x="900" y="275" class="lbl-wire" fill="#C00">28 WIRES — TXL 18-22AWG</text>
+</g>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- LAYER 4: IGNITION COILS (8x, on valve covers)      -->
+<!-- ═══════════════════════════════════════════════════ -->
+<g id="ignition-coils">
+  <!-- DRIVER'S SIDE: Coils 1, 3, 5, 7 (front to rear) -->
+  <!-- LS3 firing order: 1-8-7-2-6-5-4-3 -->
+  <!-- Cylinder layout driver's: 1-3-5-7 front to rear -->
+
+  <!-- Coil 1 — front driver's -->
+  <rect x="370" y="293" width="36" height="25" rx="3" class="coil-mark"/>
+  <text x="388" y="310" text-anchor="middle" class="lbl-wire" fill="#0066CC" font-weight="bold">C1</text>
+  <!-- Branch from trunk at x=420 down to coil -->
+  <polyline points="420,330 420,318 406,305" class="coil-wire"/>
+  <text x="340" y="288" class="lbl-wire" fill="#0066CC">A03 20AWG WHT</text>
+
+  <!-- Coil 3 — 2nd driver's -->
+  <rect x="500" y="293" width="36" height="25" rx="3" class="coil-mark"/>
+  <text x="518" y="310" text-anchor="middle" class="lbl-wire" fill="#0066CC" font-weight="bold">C3</text>
+  <polyline points="518,325 518,318" class="coil-wire"/>
+  <text x="470" y="288" class="lbl-wire" fill="#0066CC">A04 20AWG WHT/BLK</text>
+
+  <!-- Coil 5 — 3rd driver's -->
+  <rect x="630" y="290" width="36" height="25" rx="3" class="coil-mark"/>
+  <text x="648" y="307" text-anchor="middle" class="lbl-wire" fill="#0066CC" font-weight="bold">C5</text>
+  <polyline points="648,308 648,315" class="coil-wire"/>
+  <text x="600" y="283" class="lbl-wire" fill="#0066CC">A05 20AWG WHT/WHT</text>
+
+  <!-- Coil 7 — rear driver's -->
+  <rect x="760" y="287" width="36" height="25" rx="3" class="coil-mark"/>
+  <text x="778" y="304" text-anchor="middle" class="lbl-wire" fill="#0066CC" font-weight="bold">C7</text>
+  <polyline points="778,305 778,295 800,290" class="coil-wire"/>
+  <text x="730" y="280" class="lbl-wire" fill="#0066CC">A12 20AWG WHT/VIO</text>
+
+  <!-- PASSENGER SIDE: Coils 2, 4, 6, 8 (front to rear) -->
+  <!-- These branch DOWN from the trunk, across the intake, to the far valve cover -->
+
+  <!-- Coil 2 — front passenger -->
+  <rect x="460" y="502" width="36" height="25" rx="3" class="coil-mark"/>
+  <text x="478" y="519" text-anchor="middle" class="lbl-wire" fill="#0066CC" font-weight="bold">C2</text>
+  <polyline points="478,330 478,380 478,502" class="coil-wire"/>
+  <text x="420" y="497" class="lbl-wire" fill="#0066CC">A06 20AWG WHT/RED</text>
+
+  <!-- Coil 4 — 2nd passenger -->
+  <rect x="580" y="500" width="36" height="25" rx="3" class="coil-mark"/>
+  <text x="598" y="517" text-anchor="middle" class="lbl-wire" fill="#0066CC" font-weight="bold">C4</text>
+  <polyline points="598,315 598,380 598,500" class="coil-wire"/>
+  <text x="540" y="495" class="lbl-wire" fill="#0066CC">A07 20AWG WHT/BLU</text>
+
+  <!-- Coil 6 — 3rd passenger -->
+  <rect x="700" y="498" width="36" height="25" rx="3" class="coil-mark"/>
+  <text x="718" y="515" text-anchor="middle" class="lbl-wire" fill="#0066CC" font-weight="bold">C6</text>
+  <polyline points="718,305 718,380 718,498" class="coil-wire"/>
+  <text x="660" y="493" class="lbl-wire" fill="#0066CC">A08 20AWG WHT/YEL</text>
+
+  <!-- Coil 8 — rear passenger -->
+  <rect x="820" y="496" width="36" height="25" rx="3" class="coil-mark"/>
+  <text x="838" y="513" text-anchor="middle" class="lbl-wire" fill="#0066CC" font-weight="bold">C8</text>
+  <polyline points="838,295 860,340 860,460 838,496" class="coil-wire"/>
+  <text x="780" y="491" class="lbl-wire" fill="#0066CC">A13 20AWG WHT/ORG</text>
+</g>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- LAYER 5: FUEL INJECTORS (8x, on fuel rails)        -->
+<!-- ═══════════════════════════════════════════════════ -->
+<g id="fuel-injectors">
+  <!-- Injectors sit inboard of coils, on fuel rails between valve covers and intake -->
+
+  <!-- Driver's side: INJ 1, 3, 5, 7 -->
+  <circle cx="400" cy="340" r="8" class="inj-mark"/>
+  <text x="400" y="344" text-anchor="middle" class="lbl-wire" fill="#008800" font-weight="bold" font-size="7">I1</text>
+  <text x="360" y="360" class="lbl-wire" fill="#008800">A19 18AWG GRN</text>
+
+  <circle cx="530" cy="335" r="8" class="inj-mark"/>
+  <text x="530" y="339" text-anchor="middle" class="lbl-wire" fill="#008800" font-weight="bold" font-size="7">I3</text>
+
+  <circle cx="660" cy="332" r="8" class="inj-mark"/>
+  <text x="660" y="336" text-anchor="middle" class="lbl-wire" fill="#008800" font-weight="bold" font-size="7">I5</text>
+
+  <circle cx="790" cy="328" r="8" class="inj-mark"/>
+  <text x="790" y="332" text-anchor="middle" class="lbl-wire" fill="#008800" font-weight="bold" font-size="7">I7</text>
+
+  <!-- Passenger side: INJ 2, 4, 6, 8 -->
+  <circle cx="490" cy="490" r="8" class="inj-mark"/>
+  <text x="490" y="494" text-anchor="middle" class="lbl-wire" fill="#008800" font-weight="bold" font-size="7">I2</text>
+
+  <circle cx="620" cy="487" r="8" class="inj-mark"/>
+  <text x="620" y="491" text-anchor="middle" class="lbl-wire" fill="#008800" font-weight="bold" font-size="7">I4</text>
+
+  <circle cx="750" cy="484" r="8" class="inj-mark"/>
+  <text x="750" y="488" text-anchor="middle" class="lbl-wire" fill="#008800" font-weight="bold" font-size="7">I6</text>
+
+  <circle cx="870" cy="481" r="8" class="inj-mark"/>
+  <text x="870" y="485" text-anchor="middle" class="lbl-wire" fill="#008800" font-weight="bold" font-size="7">I8</text>
+
+  <!-- Injector wires branch from trunk same as coils (they share the same harness channel) -->
+</g>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- LAYER 6: ENGINE SENSORS                            -->
+<!-- ═══════════════════════════════════════════════════ -->
+<g id="sensors">
+  <!-- CRANK POSITION SENSOR — rear of block near bellhousing -->
+  <polygon points="1080,640 1095,655 1080,670 1065,655" class="sensor-mark"/>
+  <text x="1080" y="658" text-anchor="middle" class="lbl-wire" fill="#6600AA" font-weight="bold" font-size="8">CKP</text>
+  <!-- Wire route: from trunk rear, down the back of the block -->
+  <polyline points="1050,275 1080,300 1100,450 1095,600 1080,640" class="shield-wire"/>
+  <text x="1110" y="630" class="lbl-wire" fill="#6600AA">B01 22AWG SHIELDED</text>
+  <text x="1110" y="645" class="lbl-wire" fill="#6600AA">BLU/WHT 58x TOOTH</text>
+
+  <!-- CAM POSITION SENSOR — front of engine, timing cover -->
+  <polygon points="340,560 355,575 340,590 325,575" class="sensor-mark"/>
+  <text x="340" y="578" text-anchor="middle" class="lbl-wire" fill="#6600AA" font-weight="bold" font-size="8">CMP</text>
+  <polyline points="390,340 370,400 350,500 340,560" class="shield-wire"/>
+  <text x="260" y="558" class="lbl-wire" fill="#6600AA">B02 22AWG SHIELDED</text>
+  <text x="260" y="573" class="lbl-wire" fill="#6600AA">BLU/BLK 1x TOOTH</text>
+
+  <!-- KNOCK SENSOR BANK 1 — driver's side block, below exhaust -->
+  <polygon points="550,680 565,695 550,710 535,695" class="sensor-mark"/>
+  <text x="550" y="698" text-anchor="middle" class="lbl-wire" fill="#6600AA" font-weight="bold" font-size="8">KS1</text>
+  <polyline points="550,325 545,400 545,600 550,680" class="shield-wire"/>
+  <text x="460" y="680" class="lbl-wire" fill="#6600AA">B07 22AWG SHIELDED GRY</text>
+
+  <!-- KNOCK SENSOR BANK 2 — passenger side block -->
+  <polygon points="700,720 715,735 700,750 685,735" class="sensor-mark"/>
+  <text x="700" y="738" text-anchor="middle" class="lbl-wire" fill="#6600AA" font-weight="bold" font-size="8">KS2</text>
+  <polyline points="700,305 695,400 695,600 700,720" class="shield-wire"/>
+  <text x="610" y="720" class="lbl-wire" fill="#6600AA">B13 22AWG SHIELDED GRY/WHT</text>
+
+  <!-- COOLANT TEMP SENSOR — driver's head, front -->
+  <polygon points="390,410 405,425 390,440 375,425" class="sensor-mark"/>
+  <text x="390" y="428" text-anchor="middle" class="lbl-wire" fill="#6600AA" font-weight="bold" font-size="8">CLT</text>
+  <polyline points="410,338 400,370 390,410" class="sensor-wire"/>
+  <text x="310" y="450" class="lbl-wire" fill="#6600AA">B04 22AWG TAN/WHT</text>
+
+  <!-- OIL PRESSURE SENSOR — driver's block near oil filter -->
+  <polygon points="320,700 335,715 320,730 305,715" class="sensor-mark"/>
+  <text x="320" y="718" text-anchor="middle" class="lbl-wire" fill="#6600AA" font-weight="bold" font-size="8">OPS</text>
+  <polyline points="400,340 380,450 350,600 320,700" class="sensor-wire"/>
+  <text x="220" y="700" class="lbl-wire" fill="#6600AA">A14 22AWG VIO/RED</text>
+
+  <!-- OIL TEMP SENSOR — oil pan area -->
+  <polygon points="600,760 615,775 600,790 585,775" class="sensor-mark"/>
+  <text x="600" y="778" text-anchor="middle" class="lbl-wire" fill="#6600AA" font-weight="bold" font-size="8">OTS</text>
+  <polyline points="600,325 590,450 590,650 600,760" class="sensor-wire"/>
+  <text x="510" y="765" class="lbl-wire" fill="#6600AA">B05 22AWG TAN/BLK</text>
+
+  <!-- MAP SENSOR — on intake manifold or firewall-mounted -->
+  <polygon points="650,370 665,385 650,400 635,385" class="sensor-mark"/>
+  <text x="650" y="388" text-anchor="middle" class="lbl-wire" fill="#6600AA" font-weight="bold" font-size="8">MAP</text>
+  <polyline points="660,310 655,340 650,370" class="sensor-wire"/>
+  <text x="670" y="375" class="lbl-wire" fill="#6600AA">A15 22AWG VIO/WHT</text>
+
+  <!-- IAT — in throttle body / intake -->
+  <polygon points="560,380 575,395 560,410 545,395" class="sensor-mark"/>
+  <text x="560" y="398" text-anchor="middle" class="lbl-wire" fill="#6600AA" font-weight="bold" font-size="8">IAT</text>
+  <polyline points="540,320 550,350 560,380" class="sensor-wire"/>
+  <text x="480" y="418" class="lbl-wire" fill="#6600AA">B03 22AWG TAN</text>
+
+  <!-- FUEL PRESSURE SENSOR — on fuel rail -->
+  <polygon points="750,370 765,385 750,400 735,385" class="sensor-mark"/>
+  <text x="750" y="388" text-anchor="middle" class="lbl-wire" fill="#6600AA" font-weight="bold" font-size="8">FPS</text>
+  <polyline points="740,300 745,340 750,370" class="sensor-wire"/>
+  <text x="770" y="395" class="lbl-wire" fill="#6600AA">A16 22AWG VIO/BLK</text>
+
+  <!-- THROTTLE BODY (motor) — top of intake -->
+  <circle cx="520" cy="365" r="16" fill="rgba(255,102,0,0.2)" stroke="#FF6600" stroke-width="2"/>
+  <text x="520" y="370" text-anchor="middle" class="lbl" fill="#FF6600" font-size="10">ETB</text>
+  <polyline points="520,325 520,349" stroke="#FF6600" stroke-width="2.5" fill="none"/>
+  <text x="440" y="355" class="lbl-wire" fill="#FF6600">18AWG ORG — 6 WIRE</text>
+</g>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- LAYER 7: POWER CIRCUITS                            -->
+<!-- ═══════════════════════════════════════════════════ -->
+<g id="power">
+  <!-- Battery — passenger side, behind headlight -->
+  <rect x="1680" y="420" width="80" height="50" rx="4"
+        fill="rgba(255,0,0,0.1)" stroke="#C00" stroke-width="2"/>
+  <text x="1720" y="440" text-anchor="middle" class="lbl" fill="#C00" font-size="11">BATTERY</text>
+  <text x="1720" y="458" text-anchor="middle" class="lbl-wire" fill="#C00">GROUP 34</text>
+
+  <!-- Battery to M130 power -->
+  <polyline points="1680,445 1500,350 1460,310 1460,260" class="power-wire"/>
+  <text x="1530" y="340" class="lbl-wire" fill="#C00">A26 16AWG BAT_POS</text>
+
+  <!-- Battery to PDM30 power -->
+  <polyline points="1680,455 1520,400 1460,385" class="power-wire"/>
+  <text x="1530" y="415" class="lbl-wire" fill="#0066CC">C01 6AWG MAIN FEED</text>
+
+  <!-- Starter — passenger side rear -->
+  <circle cx="1850" cy="680" r="22" fill="rgba(255,0,0,0.1)" stroke="#C00" stroke-width="2"/>
+  <text x="1850" y="685" text-anchor="middle" class="lbl" fill="#C00" font-size="10">START</text>
+  <polyline points="1760,445 1820,550 1850,658" class="power-wire" stroke-width="5"/>
+  <text x="1870" y="670" class="lbl-wire" fill="#C00">4AWG ORG DIRECT</text>
+
+  <!-- Alternator — front driver's side -->
+  <circle cx="420" cy="720" r="22" fill="rgba(255,0,0,0.1)" stroke="#C00" stroke-width="2"/>
+  <text x="420" y="725" text-anchor="middle" class="lbl" fill="#C00" font-size="10">ALT</text>
+  <text x="420" y="755" text-anchor="middle" class="lbl-wire" fill="#C00">220A HI-OUTPUT</text>
+  <!-- Alt charge wire to battery -->
+  <polyline points="442,720 500,740 900,760 1400,700 1700,500 1720,470" class="power-wire" stroke-width="3"/>
+  <text x="900" y="755" class="lbl-wire" fill="#C00">8AWG ORG/VIO CHARGE</text>
+
+  <!-- Engine ground strap -->
+  <polyline points="450,750 500,780 700,790 900,780" class="ground-wire"/>
+  <text x="600" y="810" class="lbl-wire" fill="#000">4AWG BLK ENGINE GND STRAP TO FRAME</text>
+
+  <!-- Star ground point on block -->
+  <circle cx="900" cy="780" r="10" fill="rgba(0,0,0,0.2)" stroke="#000" stroke-width="2"/>
+  <text x="920" y="785" class="lbl-wire" fill="#000">STAR GND</text>
+  <!-- M130 sensor grounds return here -->
+  <polyline points="1300,280 1200,300 1100,500 950,700 900,780" class="ground-wire" stroke-width="1.5"/>
+  <text x="1050" y="520" class="lbl-wire" fill="#000">B15/B16 SEN GND</text>
+</g>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- LAYER 8: WIDEBAND O2 + LTCD                        -->
+<!-- ═══════════════════════════════════════════════════ -->
+<g id="wideband">
+  <!-- LTCD controller — on firewall near M130 -->
+  <rect x="1300" y="450" width="100" height="35" rx="3"
+        fill="rgba(255,102,0,0.12)" stroke="#FF6600" stroke-width="1.5"/>
+  <text x="1350" y="472" text-anchor="middle" class="lbl-wire" fill="#FF6600" font-weight="bold">LTCD</text>
+  <!-- CAN to M130 -->
+  <line x1="1350" y1="450" x2="1380" y2="430" class="can-wire"/>
+
+  <!-- O2 sensor 1 — driver's exhaust, behind engine -->
+  <text x="1000" y="730" class="lbl-wire" fill="#FF6600">WBO2-1 VIO/BLU 22AWG</text>
+  <circle cx="980" cy="700" r="8" fill="rgba(255,102,0,0.3)" stroke="#FF6600" stroke-width="1.5"/>
+  <text x="980" y="704" text-anchor="middle" class="lbl-wire" fill="#FF6600" font-size="7" font-weight="bold">O2</text>
+  <polyline points="1300,467 1200,500 1050,600 980,700" stroke="#FF6600" stroke-width="1.5" fill="none"/>
+</g>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TITLE BLOCK                                        -->
+<!-- ═══════════════════════════════════════════════════ -->
+<g id="title">
+  <rect x="1700" y="50" width="740" height="120" fill="white" stroke="black" stroke-width="2" rx="4"/>
+  <line x1="1700" y1="85" x2="2440" y2="85" stroke="black" stroke-width="1"/>
+  <line x1="1700" y1="115" x2="2440" y2="115" stroke="black" stroke-width="0.5"/>
+  <text x="2070" y="75" text-anchor="middle" class="title" font-size="16">NUKE LTD — ENGINE BAY WIRING</text>
+  <text x="2070" y="105" text-anchor="middle" class="lbl" font-size="13">1977 K5 BLAZER — LS3 6.2L / MOTEC M130</text>
+  <text x="2070" y="130" text-anchor="middle" class="lbl-sm" fill="#666">VIN CCL187Z210370 | 28 ENGINE WIRES | TXL TIER</text>
+  <text x="2070" y="155" text-anchor="middle" class="lbl-wire" fill="#999">OVERLAY ON GM FIG 6D-16D ENGINE COMPARTMENT</text>
+</g>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- LEGEND                                             -->
+<!-- ═══════════════════════════════════════════════════ -->
+<g id="legend">
+  <rect x="1700" y="190" width="280" height="200" fill="white" stroke="black" stroke-width="1.5" rx="4"/>
+  <text x="1840" y="215" text-anchor="middle" class="lbl" font-size="13">LEGEND</text>
+
+  <line x1="1720" y1="235" x2="1790" y2="235" class="trunk"/>
+  <text x="1800" y="240" class="lbl-sm" fill="#C00">Main harness trunk</text>
+
+  <line x1="1720" y1="260" x2="1790" y2="260" class="coil-wire"/>
+  <rect x="1720" y="253" width="14" height="14" rx="2" class="coil-mark"/>
+  <text x="1800" y="265" class="lbl-sm" fill="#0066CC">Ignition coil (8x D510C)</text>
+
+  <line x1="1720" y1="285" x2="1790" y2="285" class="inj-wire"/>
+  <circle cx="1730" cy="285" r="5" class="inj-mark"/>
+  <text x="1800" y="290" class="lbl-sm" fill="#008800">Fuel injector (8x EV6)</text>
+
+  <line x1="1720" y1="310" x2="1790" y2="310" class="sensor-wire"/>
+  <polygon points="1730,303 1737,310 1730,317 1723,310" class="sensor-mark"/>
+  <text x="1800" y="315" class="lbl-sm" fill="#6600AA">Sensor (analog/temp)</text>
+
+  <line x1="1720" y1="335" x2="1790" y2="335" class="shield-wire"/>
+  <text x="1800" y="340" class="lbl-sm" fill="#6600AA">Shielded (CKP/CMP/KS)</text>
+
+  <line x1="1720" y1="360" x2="1790" y2="360" class="power-wire"/>
+  <text x="1800" y="365" class="lbl-sm" fill="#C00">Power (battery/alt/start)</text>
+
+  <line x1="1720" y1="380" x2="1790" y2="380" class="ground-wire"/>
+  <text x="1800" y="385" class="lbl-sm" fill="#000">Ground circuit</text>
+</g>
+
+</svg>

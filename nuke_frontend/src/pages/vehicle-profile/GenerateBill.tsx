@@ -177,7 +177,7 @@ const GenerateBill: React.FC<Props> = ({ vehicleId, workOrders, totals, contact,
             letterSpacing: '0.1em',
             border: '2px solid var(--vp-ink, #1a1a1a)',
             background: 'var(--vp-ink, #1a1a1a)',
-            color: '#fff',
+            color: 'var(--bg)',
             cursor: 'pointer',
           }}
         >
@@ -513,7 +513,7 @@ const GenerateBill: React.FC<Props> = ({ vehicleId, workOrders, totals, contact,
                   letterSpacing: '0.1em',
                   border: '2px solid var(--vp-ink)',
                   background: sentStatus === 'sent' ? 'var(--vp-brg, #004225)' : 'var(--vp-ink, #1a1a1a)',
-                  color: '#fff',
+                  color: 'var(--bg)',
                   cursor: sending ? 'wait' : sentStatus === 'sent' ? 'default' : 'pointer',
                   opacity: sending ? 0.6 : 1,
                 }}

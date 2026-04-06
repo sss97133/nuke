@@ -7,6 +7,7 @@ const Organizations = React.lazy(() => import('../../../pages/Organizations'));
 const OrganizationProfile = React.lazy(() => import('../../../pages/OrganizationProfile'));
 const CreateOrganization = React.lazy(() => import('../../../pages/CreateOrganization'));
 const Dashboard = React.lazy(() => import('../../../pages/Dashboard'));
+const VLVAFinancialReport = React.lazy(() => import('../../../pages/VLVAFinancialReport'));
 
 const LazyFallback = () => (
   <div style={{ height: '100vh', background: 'var(--bg)' }} />
@@ -24,6 +25,7 @@ const OrganizationModuleRoutes = () => {
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/create" element={<CreateOrganization />} />
+          <Route path="/vlva-report" element={<VLVAFinancialReport />} />
         </Route>
       </Routes>
     </Suspense>

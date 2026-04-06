@@ -15,13 +15,34 @@ import AppLayout from './components/layout/AppLayout';
 import { DomainRoutes } from './routes/DomainRoutes';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AuthErrorBoundary } from './components/auth/AuthErrorBoundary';
+import { useAuth } from './hooks/useAuth';
 const HomePage = React.lazy(() => import('./pages/HomePage'));
+const LandingPage = React.lazy(() => import('./pages/landing/LandingPage'));
+const ProductPage = React.lazy(() => import('./pages/landing/ProductPage'));
+const PublicMap = React.lazy(() => import('./components/map/PublicMap'));
+const DeckPage = React.lazy(() => import('./pages/DeckPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 5 * 60 * 1000, retry: 1 },
   },
 });
+
+const LazyFallback = <div style={{ height: '100vh', background: 'var(--bg)' }} />;
+
+/**
+ * Home route gate — Landing (standalone) for visitors, HomePage (in AppLayout) for logged-in users.
+ */
+function HomeGate() {
+  const { user, loading } = useAuth();
+  if (loading) return LazyFallback;
+  if (!user) return <Suspense fallback={LazyFallback}><LandingPage /></Suspense>;
+  return (
+    <AppLayout>
+      <Suspense fallback={LazyFallback}><HomePage /></Suspense>
+    </AppLayout>
+  );
+}
 
 /**
  * RoutedApp — lives inside <Router> so it can use useLocation().
@@ -38,14 +59,20 @@ function RoutedApp() {
 
       <ErrorBoundary resetKeys={[location.pathname]}>
         <AuthErrorBoundary>
-        <AppLayout>
-          <Routes>
-            {/* Hub: tabbed homepage (Garage, Feed, Map, Market) */}
-            <Route path="/" element={<Suspense fallback={<div style={{ height: '100vh', background: 'var(--bg)' }} />}><HomePage /></Suspense>} />
-            {/* Domain modules + legacy shims */}
-            <Route path="/*" element={<DomainRoutes />} />
-          </Routes>
-        </AppLayout>
+        <Routes>
+          {/* ── Standalone pages (no AppLayout chrome) ── */}
+          <Route path="/" element={<HomeGate />} />
+          <Route path="/products/:slug" element={<Suspense fallback={LazyFallback}><ProductPage /></Suspense>} />
+          <Route path="/map" element={<Suspense fallback={LazyFallback}><PublicMap /></Suspense>} />
+          <Route path="/deck/:deckId" element={<Suspense fallback={LazyFallback}><DeckPage /></Suspense>} />
+
+          {/* ── App shell routes (with AppLayout) ── */}
+          <Route path="/*" element={
+            <AppLayout>
+              <DomainRoutes />
+            </AppLayout>
+          } />
+        </Routes>
         </AuthErrorBoundary>
       </ErrorBoundary>
 

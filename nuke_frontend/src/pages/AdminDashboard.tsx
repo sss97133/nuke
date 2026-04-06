@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import OwnershipVerificationDashboard from '../components/admin/OwnershipVerificationDashboard';
-import AdminAnalytics from './AdminAnalytics';
 import CraigslistQueueDashboard from '../components/admin/CraigslistQueueDashboard';
 import '../styles/unified-design-system.css';
 
@@ -328,7 +327,9 @@ const AdminDashboard: React.FC = () => {
 
       {/* Analytics Tab */}
       {activeTab === 'analytics' && (
-        <AdminAnalytics />
+        <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)', borderStyle: 'dashed' }}>
+          <div style={{ fontSize: '11px' }}>Use /admin/inventory-analytics instead</div>
+        </div>
       )}
 
       {/* Users Tab */}

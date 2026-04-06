@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <title>P-01 Battery</title>
+  <desc>Standard battery symbol with positive (long thin line) and negative (short thick line) terminals. Used at the battery location and at any point representing the battery voltage rail. 6mm wide x 8mm tall per spec.</desc>
+
+  <!-- Positive terminal lead -->
+  <line x1="20" y1="4" x2="20" y2="12" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Positive plate (long thin line) -->
+  <line x1="8" y1="12" x2="32" y2="12" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Negative plate (short thick line) -->
+  <line x1="12" y1="18" x2="28" y2="18" stroke="black" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Negative terminal lead -->
+  <line x1="20" y1="18" x2="20" y2="26" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Plus label -->
+  <text x="34" y="14" font-family="Courier New, monospace" font-size="6" font-weight="bold" fill="black" text-anchor="start">+</text>
+
+  <!-- Minus label -->
+  <text x="34" y="21" font-family="Courier New, monospace" font-size="6" font-weight="bold" fill="black" text-anchor="start">-</text>
+</svg>

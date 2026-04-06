@@ -1,0 +1,842 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8640 5590" width="8640" height="5590">
+  <title>NKW-K5-00-1 Power Distribution — 1977 Chevrolet K5 Blazer / LS3 / Motec M130 / PDM30</title>
+  <desc>Section 0: Power Distribution Diagram. Complete current flow from battery to every load. ANSI D landscape (22x34 inches). Drawing NKW-K5-00-1 Rev --.</desc>
+
+  <defs>
+    <style>
+      text { font-family: "Courier New", monospace; }
+      .title { font-size: 56px; font-weight: bold; fill: #000; }
+      .subtitle { font-size: 36px; fill: #000; }
+      .label { font-size: 28px; fill: #000; }
+      .label-sm { font-size: 22px; fill: #000; }
+      .label-xs { font-size: 18px; fill: #000; }
+      .label-bold { font-size: 28px; font-weight: bold; fill: #000; }
+      .rating { font-size: 24px; font-weight: bold; fill: #C00; }
+      .gauge { font-size: 20px; fill: #005; }
+      .wire-heavy { stroke: #000; stroke-width: 6; fill: none; }
+      .wire-med { stroke: #000; stroke-width: 3; fill: none; }
+      .wire-light { stroke: #000; stroke-width: 2; fill: none; }
+      .wire-ground { stroke: #000; stroke-width: 3; fill: none; stroke-dasharray: 12,6; }
+      .box { fill: #FFF; stroke: #000; stroke-width: 2; }
+      .box-highlight { fill: #F0F0F0; stroke: #000; stroke-width: 3; }
+      .box-pdm { fill: #E8EEF4; stroke: #000; stroke-width: 3; }
+      .box-load { fill: #FFFFF0; stroke: #000; stroke-width: 1.5; }
+      .box-protect { fill: #FFF0F0; stroke: #000; stroke-width: 2; }
+      .circle-alt { fill: #FFF; stroke: #000; stroke-width: 2.5; }
+      .node { fill: #000; }
+      .section-line { stroke: #999; stroke-width: 1; stroke-dasharray: 8,4; }
+    </style>
+
+    <!-- Battery symbol -->
+    <symbol id="battery" viewBox="0 0 80 100">
+      <line x1="40" y1="0" x2="40" y2="25" stroke="#000" stroke-width="3"/>
+      <line x1="10" y1="25" x2="70" y2="25" stroke="#000" stroke-width="3"/>
+      <line x1="20" y1="38" x2="60" y2="38" stroke="#000" stroke-width="6"/>
+      <line x1="10" y1="51" x2="70" y2="51" stroke="#000" stroke-width="3"/>
+      <line x1="20" y1="64" x2="60" y2="64" stroke="#000" stroke-width="6"/>
+      <line x1="40" y1="64" x2="40" y2="100" stroke="#000" stroke-width="3"/>
+      <text x="75" y="32" font-family="Courier New" font-size="16" font-weight="bold">+</text>
+      <text x="75" y="70" font-family="Courier New" font-size="16" font-weight="bold">-</text>
+    </symbol>
+
+    <!-- Ground symbol -->
+    <symbol id="ground" viewBox="0 0 40 30">
+      <line x1="20" y1="0" x2="20" y2="10" stroke="#000" stroke-width="2.5"/>
+      <line x1="5" y1="10" x2="35" y2="10" stroke="#000" stroke-width="2.5"/>
+      <line x1="10" y1="16" x2="30" y2="16" stroke="#000" stroke-width="2.5"/>
+      <line x1="15" y1="22" x2="25" y2="22" stroke="#000" stroke-width="2.5"/>
+    </symbol>
+
+    <!-- Fusible link symbol -->
+    <symbol id="fusible-link" viewBox="0 0 60 20">
+      <line x1="0" y1="10" x2="15" y2="10" stroke="#000" stroke-width="2"/>
+      <rect x="15" y="2" width="30" height="16" rx="3" fill="#FFF0F0" stroke="#C00" stroke-width="2"/>
+      <line x1="45" y1="10" x2="60" y2="10" stroke="#000" stroke-width="2"/>
+    </symbol>
+
+    <!-- Relay symbol -->
+    <symbol id="relay" viewBox="0 0 60 50">
+      <rect x="5" y="5" width="50" height="40" rx="2" fill="#FFF" stroke="#000" stroke-width="2"/>
+      <circle cx="20" cy="25" r="6" fill="none" stroke="#000" stroke-width="1.5"/>
+      <line x1="26" y1="25" x2="42" y2="15" stroke="#000" stroke-width="2"/>
+      <circle cx="42" cy="15" r="3" fill="none" stroke="#000" stroke-width="1.5"/>
+      <circle cx="42" cy="35" r="3" fill="none" stroke="#000" stroke-width="1.5"/>
+    </symbol>
+
+    <!-- Circuit breaker symbol -->
+    <symbol id="circuit-breaker" viewBox="0 0 60 20">
+      <line x1="0" y1="10" x2="15" y2="10" stroke="#000" stroke-width="2"/>
+      <rect x="15" y="2" width="30" height="16" rx="2" fill="#FFFDE0" stroke="#000" stroke-width="2"/>
+      <text x="30" y="14" font-family="Courier New" font-size="9" text-anchor="middle" fill="#000">CB</text>
+      <line x1="45" y1="10" x2="60" y2="10" stroke="#000" stroke-width="2"/>
+    </symbol>
+  </defs>
+
+  <!-- ========== BORDER AND TITLE BLOCK ========== -->
+  <rect x="20" y="20" width="8600" height="5550" fill="none" stroke="#000" stroke-width="4"/>
+  <rect x="40" y="40" width="8560" height="5510" fill="#FAFAFA" stroke="#000" stroke-width="2"/>
+
+  <!-- Title block (bottom right, 800x300) -->
+  <rect x="7780" y="5250" width="800" height="280" class="box" stroke-width="3"/>
+  <line x1="7780" y1="5290" x2="8580" y2="5290" stroke="#000" stroke-width="1"/>
+  <line x1="7780" y1="5330" x2="8580" y2="5330" stroke="#000" stroke-width="1"/>
+  <line x1="7780" y1="5370" x2="8580" y2="5370" stroke="#000" stroke-width="1"/>
+  <line x1="7780" y1="5410" x2="8580" y2="5410" stroke="#000" stroke-width="1"/>
+  <line x1="7780" y1="5450" x2="8580" y2="5450" stroke="#000" stroke-width="1"/>
+  <line x1="7780" y1="5490" x2="8580" y2="5490" stroke="#000" stroke-width="1"/>
+  <text x="7800" y="5282" class="label-sm" font-weight="bold">NUKE LTD</text>
+  <text x="8200" y="5282" class="label-xs">DRAWN: NUKE  2026-04-04</text>
+  <text x="7800" y="5322" class="label-xs">676 Wells Rd, Boulder City NV 89005</text>
+  <text x="7800" y="5362" class="label-sm" font-weight="bold">1977 CHEVROLET K5 BLAZER</text>
+  <text x="7800" y="5402" class="label-xs">LS3 6.2L / MOTEC M130 / PDM30</text>
+  <text x="8200" y="5402" class="label-xs">SCALE: NTS</text>
+  <text x="7800" y="5442" class="label-sm" font-weight="bold">SECTION 0: POWER DISTRIBUTION</text>
+  <text x="8200" y="5442" class="label-xs">SHEET: 1 OF 1</text>
+  <text x="7800" y="5482" class="label-xs">VIN: CCL187Z210370</text>
+  <text x="8200" y="5482" class="label-xs">DWG: NKW-K5-00-1</text>
+  <text x="7800" y="5522" class="label-xs">REV: --  Initial Release</text>
+
+  <!-- Main title -->
+  <text x="4320" y="130" class="title" text-anchor="middle">SECTION 0 — POWER DISTRIBUTION</text>
+  <text x="4320" y="180" class="subtitle" text-anchor="middle">1977 Chevrolet K5 Blazer — LS3 6.2L / Motec M130 / PDM30</text>
+  <text x="4320" y="220" class="label" text-anchor="middle">Complete current flow: Battery → Protection → Distribution → Every Load</text>
+
+  <!-- ========== ROW A: BATTERY (top center) ========== -->
+  <use href="#battery" x="4280" y="280" width="80" height="100"/>
+  <text x="4320" y="275" class="label-bold" text-anchor="middle">BATTERY</text>
+  <text x="4320" y="400" class="label" text-anchor="middle">Group 34</text>
+  <text x="4320" y="430" class="label" text-anchor="middle">12V / 800 CCA</text>
+
+  <!-- Battery positive bus (horizontal line from battery top) -->
+  <line x1="4320" y1="280" x2="4320" y2="260" class="wire-heavy"/>
+  <!-- Horizontal bus bar -->
+  <line x1="1200" y1="260" x2="7400" y2="260" stroke="#C00" stroke-width="8"/>
+  <text x="4320" y="250" class="rating" text-anchor="middle">+12V BATTERY POSITIVE BUS</text>
+
+  <!-- Battery negative bus (bottom) -->
+  <line x1="4320" y1="380" x2="4320" y2="440" class="wire-heavy"/>
+  <line x1="4320" y1="440" x2="4320" y2="460" class="wire-ground"/>
+
+  <!-- ========== BATTERY DISCONNECT ========== -->
+  <rect x="4180" y="470" width="280" height="60" rx="4" class="box-highlight"/>
+  <text x="4320" y="497" class="label-sm" text-anchor="middle" font-weight="bold">MOTEC RBD 190</text>
+  <text x="4320" y="520" class="label-xs" text-anchor="middle">Battery Disconnect Switch</text>
+  <line x1="4320" y1="440" x2="4320" y2="470" class="wire-heavy"/>
+  <line x1="4320" y1="530" x2="4320" y2="560" class="wire-heavy"/>
+
+  <!-- Post-disconnect distribution node -->
+  <circle cx="4320" cy="560" r="8" class="node"/>
+
+  <!-- ========== MAIN FEED BRANCHES FROM BATTERY ========== -->
+  <!-- Horizontal distribution line at Y=560 -->
+  <line x1="700" y1="560" x2="7800" y2="560" stroke="#000" stroke-width="5"/>
+  <text x="4320" y="595" class="label-sm" text-anchor="middle">MAIN DISTRIBUTION BUS (post-disconnect)</text>
+
+  <!-- ========== BRANCH 1: PDM30 MAIN FEED (6 AWG) — center ========== -->
+  <!-- Drop from bus at x=4320 -->
+  <line x1="4320" y1="560" x2="4320" y2="640" class="wire-heavy"/>
+  <text x="4340" y="610" class="gauge">6 AWG RED</text>
+  <text x="4340" y="632" class="rating">80A aggregate</text>
+
+  <!-- ========== BRANCH 2: STARTER (4 AWG) — far left ========== -->
+  <circle cx="1200" cy="560" r="6" class="node"/>
+  <line x1="1200" y1="560" x2="1200" y2="650" class="wire-heavy"/>
+  <text x="1220" y="610" class="gauge">4 AWG ORG</text>
+
+  <!-- Starter relay -->
+  <use href="#relay" x="1170" y="650" width="60" height="50"/>
+  <text x="1200" y="720" class="label-sm" text-anchor="middle">STARTER</text>
+  <text x="1200" y="742" class="label-xs" text-anchor="middle">RELAY</text>
+  <line x1="1200" y1="700" x2="1200" y2="770" class="wire-heavy"/>
+
+  <!-- Starter motor load -->
+  <rect x="1100" y="770" width="200" height="70" rx="4" class="box-load"/>
+  <text x="1200" y="800" class="label-sm" text-anchor="middle" font-weight="bold">STARTER MOTOR</text>
+  <text x="1200" y="825" class="label-xs" text-anchor="middle">4 AWG  |  ~200A cranking</text>
+  <text x="1200" y="860" class="label-xs" text-anchor="middle" fill="#666">SEC 2, ENGINE</text>
+
+  <!-- ========== BRANCH 3: ALTERNATOR (8 AWG) — left of center ========== -->
+  <circle cx="2200" cy="560" r="6" class="node"/>
+  <line x1="2200" y1="560" x2="2200" y2="620" class="wire-heavy"/>
+  <text x="2220" y="600" class="gauge">8 AWG ORG/VIO</text>
+
+  <!-- Fusible link -->
+  <rect x="2130" y="620" width="140" height="40" rx="3" class="box-protect"/>
+  <text x="2200" y="646" class="label-xs" text-anchor="middle" font-weight="bold" fill="#C00">FUSIBLE LINK 100A</text>
+
+  <line x1="2200" y1="660" x2="2200" y2="710" class="wire-heavy"/>
+
+  <!-- Alternator -->
+  <circle cx="2200" cy="750" r="50" class="circle-alt"/>
+  <path d="M2165 750 Q2178 730, 2190 750 Q2202 770, 2215 750 Q2228 730, 2240 750" fill="none" stroke="#000" stroke-width="2.5"/>
+  <text x="2200" y="815" class="label-sm" text-anchor="middle" font-weight="bold">POWERMASTER 47294</text>
+  <text x="2200" y="840" class="label-xs" text-anchor="middle">220A Alternator</text>
+  <text x="2200" y="862" class="rating" text-anchor="middle">220A output</text>
+  <line x1="2200" y1="710" x2="2200" y2="700" class="wire-heavy"/>
+
+  <!-- Alternator ground -->
+  <line x1="2200" y1="800" x2="2200" y2="880" class="wire-ground"/>
+  <use href="#ground" x="2180" y="880" width="40" height="30"/>
+  <text x="2200" y="925" class="label-xs" text-anchor="middle">ENGINE BLOCK GND</text>
+
+  <!-- ========== BRANCH 4: M130 ECU (16 AWG) — right of center ========== -->
+  <circle cx="5800" cy="560" r="6" class="node"/>
+  <line x1="5800" y1="560" x2="5800" y2="700" class="wire-med"/>
+  <text x="5820" y="610" class="gauge">16 AWG ORG</text>
+  <text x="5820" y="632" class="label-xs">M130:A26 BAT_POS</text>
+
+  <rect x="5680" y="700" width="240" height="80" rx="4" class="box-highlight"/>
+  <text x="5800" y="735" class="label-bold" text-anchor="middle">MOTEC M130</text>
+  <text x="5800" y="765" class="label-xs" text-anchor="middle">ECU — Pin A26 BAT_POS</text>
+  <text x="5800" y="800" class="label-xs" text-anchor="middle" fill="#666">SEC 2-3, ENGINE/ECU</text>
+
+  <!-- M130 ground -->
+  <line x1="5800" y1="780" x2="5800" y2="830" class="wire-ground"/>
+  <text x="5820" y="820" class="label-xs">A10/A11 BAT_NEG 16AWG</text>
+  <use href="#ground" x="5780" y="830" width="40" height="30"/>
+  <text x="5800" y="878" class="label-xs" text-anchor="middle">STAR GROUND</text>
+
+  <!-- ========== BRANCH 5: FUEL PUMP (dedicated relay, 30A CB) ========== -->
+  <circle cx="3100" cy="560" r="6" class="node"/>
+  <line x1="3100" y1="560" x2="3100" y2="620" class="wire-heavy"/>
+  <text x="3120" y="600" class="gauge">10 AWG ORG/BLU</text>
+
+  <!-- Aeromotive circuit breaker -->
+  <rect x="3030" y="620" width="140" height="40" rx="3" class="box-protect"/>
+  <text x="3100" y="646" class="label-xs" text-anchor="middle" font-weight="bold" fill="#C00">CIRCUIT BREAKER 30A</text>
+
+  <line x1="3100" y1="660" x2="3100" y2="700" class="wire-heavy"/>
+
+  <!-- Fuel pump relay -->
+  <use href="#relay" x="3070" y="700" width="60" height="50"/>
+  <text x="3100" y="770" class="label-sm" text-anchor="middle">FUEL PUMP</text>
+  <text x="3100" y="792" class="label-xs" text-anchor="middle">RELAY (Aeromotive)</text>
+  <line x1="3100" y1="750" x2="3100" y2="820" class="wire-heavy"/>
+
+  <!-- Fuel pump load -->
+  <rect x="3000" y="820" width="200" height="70" rx="4" class="box-load"/>
+  <text x="3100" y="850" class="label-sm" text-anchor="middle" font-weight="bold">FUEL PUMP</text>
+  <text x="3100" y="875" class="label-xs" text-anchor="middle">10 AWG  |  25A continuous</text>
+  <text x="3100" y="910" class="label-xs" text-anchor="middle" fill="#666">18.4 ft to tank</text>
+
+  <!-- ========== BRANCH 6: iBOOSTER (dedicated relay, 40A) ========== -->
+  <circle cx="6800" cy="560" r="6" class="node"/>
+  <line x1="6800" y1="560" x2="6800" y2="620" class="wire-heavy"/>
+  <text x="6820" y="600" class="gauge">10 AWG ORG</text>
+
+  <!-- 40A protection -->
+  <rect x="6730" y="620" width="140" height="40" rx="3" class="box-protect"/>
+  <text x="6800" y="646" class="label-xs" text-anchor="middle" font-weight="bold" fill="#C00">FUSE 40A</text>
+
+  <line x1="6800" y1="660" x2="6800" y2="700" class="wire-heavy"/>
+
+  <!-- iBooster relay -->
+  <use href="#relay" x="6770" y="700" width="60" height="50"/>
+  <text x="6800" y="770" class="label-sm" text-anchor="middle">iBOOSTER</text>
+  <text x="6800" y="792" class="label-xs" text-anchor="middle">RELAY (dedicated)</text>
+  <line x1="6800" y1="750" x2="6800" y2="820" class="wire-heavy"/>
+
+  <!-- iBooster load -->
+  <rect x="6700" y="820" width="200" height="70" rx="4" class="box-load"/>
+  <text x="6800" y="850" class="label-sm" text-anchor="middle" font-weight="bold">BOSCH iBOOSTER</text>
+  <text x="6800" y="875" class="label-xs" text-anchor="middle">Gen 2  |  35A peak</text>
+  <text x="6800" y="910" class="label-xs" text-anchor="middle" fill="#666">SEC 7, BRAKES</text>
+
+  <!-- ========== BRANCH 7: AMPLIFIER (8 AWG direct) ========== -->
+  <circle cx="7600" cy="560" r="6" class="node"/>
+  <line x1="7600" y1="560" x2="7600" y2="620" class="wire-heavy"/>
+  <text x="7620" y="600" class="gauge">8 AWG ORG/RED</text>
+
+  <!-- Fusible link for amp -->
+  <rect x="7530" y="620" width="140" height="40" rx="3" class="box-protect"/>
+  <text x="7600" y="646" class="label-xs" text-anchor="middle" font-weight="bold" fill="#C00">FUSIBLE LINK 60A</text>
+
+  <line x1="7600" y1="660" x2="7600" y2="720" class="wire-heavy"/>
+
+  <rect x="7500" y="720" width="200" height="70" rx="4" class="box-load"/>
+  <text x="7600" y="750" class="label-sm" text-anchor="middle" font-weight="bold">KICKER AMPLIFIER</text>
+  <text x="7600" y="775" class="label-xs" text-anchor="middle">8 AWG  |  50A peak</text>
+  <text x="7600" y="810" class="label-xs" text-anchor="middle" fill="#666">SEC 9, AUDIO</text>
+
+  <!-- ========== PDM30 MAIN BLOCK ========== -->
+  <rect x="1600" y="960" width="5600" height="220" rx="8" class="box-pdm"/>
+  <rect x="1600" y="960" width="5600" height="50" rx="8" fill="#C0D0E0" stroke="#000" stroke-width="3"/>
+  <text x="4400" y="995" class="title" text-anchor="middle">MOTEC PDM30</text>
+  <text x="2000" y="1040" class="label-sm">Connector C01: VBATT_POS (M6 Stud) — 6 AWG</text>
+  <text x="2000" y="1070" class="label-sm">80A aggregate capacity across 30 output channels</text>
+  <text x="2000" y="1100" class="label-sm">Solid-state protection: auto-retry, current limiting, thermal shutdown</text>
+  <text x="5400" y="1040" class="label-sm">Connectors: A (34-pin) + B (26-pin) Superseal</text>
+  <text x="5400" y="1070" class="label-sm">Ground: A26/B18 (VBATT_NEG) + A28/B22 (GND_0V)</text>
+  <text x="5400" y="1100" class="label-sm">CAN: B25/B26 to M130 B17/B18 (500 kbps)</text>
+  <text x="5400" y="1130" class="label-sm" fill="#666">SEE SEC 4, PDM30 CHANNEL MAP</text>
+
+  <!-- Vertical feed into PDM30 -->
+  <line x1="4320" y1="640" x2="4320" y2="960" class="wire-heavy"/>
+
+  <!-- PDM Ground connections -->
+  <line x1="2000" y1="1180" x2="2000" y2="1230" class="wire-ground"/>
+  <text x="2020" y="1210" class="label-xs">A26+B18 VBATT_NEG 16AWG</text>
+  <use href="#ground" x="1980" y="1230" width="40" height="30"/>
+  <text x="2000" y="1278" class="label-xs" text-anchor="middle">CHASSIS GROUND</text>
+
+  <!-- ===================== PDM30 OUTPUT CHANNELS ===================== -->
+  <!-- Section label: 20A CHANNELS -->
+  <text x="400" y="1320" class="label-bold">20A HIGH-CURRENT CHANNELS (6x, dual-pin solid-state)</text>
+  <line x1="400" y1="1330" x2="8200" y2="1330" class="section-line"/>
+
+  <!-- 20A Channel columns — evenly spaced -->
+  <!-- OUT1: Radiator Fan 1 (18A) -->
+  <line x1="1000" y1="1180" x2="1000" y2="1370" class="wire-med"/>
+  <rect x="900" y="1370" width="200" height="50" rx="3" fill="#E8EEF4" stroke="#000" stroke-width="2"/>
+  <text x="1000" y="1393" class="label-sm" text-anchor="middle" font-weight="bold">OUT1</text>
+  <text x="1000" y="1413" class="rating" text-anchor="middle">20A</text>
+  <line x1="1000" y1="1420" x2="1000" y2="1470" class="wire-med"/>
+  <rect x="880" y="1470" width="240" height="60" rx="4" class="box-load"/>
+  <text x="1000" y="1495" class="label-sm" text-anchor="middle">RADIATOR FAN 1</text>
+  <text x="1000" y="1518" class="label-xs" text-anchor="middle">18A | 12AWG | A01+A10</text>
+
+  <!-- OUT2: Radiator Fan 2 (18A) -->
+  <line x1="1900" y1="1180" x2="1900" y2="1370" class="wire-med"/>
+  <rect x="1800" y="1370" width="200" height="50" rx="3" fill="#E8EEF4" stroke="#000" stroke-width="2"/>
+  <text x="1900" y="1393" class="label-sm" text-anchor="middle" font-weight="bold">OUT2</text>
+  <text x="1900" y="1413" class="rating" text-anchor="middle">20A</text>
+  <line x1="1900" y1="1420" x2="1900" y2="1470" class="wire-med"/>
+  <rect x="1780" y="1470" width="240" height="60" rx="4" class="box-load"/>
+  <text x="1900" y="1495" class="label-sm" text-anchor="middle">RADIATOR FAN 2</text>
+  <text x="1900" y="1518" class="label-xs" text-anchor="middle">18A | 12AWG | A03+A12</text>
+
+  <!-- OUT3: Power Window Left (15A) -->
+  <line x1="2800" y1="1180" x2="2800" y2="1370" class="wire-med"/>
+  <rect x="2700" y="1370" width="200" height="50" rx="3" fill="#E8EEF4" stroke="#000" stroke-width="2"/>
+  <text x="2800" y="1393" class="label-sm" text-anchor="middle" font-weight="bold">OUT3</text>
+  <text x="2800" y="1413" class="rating" text-anchor="middle">20A</text>
+  <line x1="2800" y1="1420" x2="2800" y2="1470" class="wire-med"/>
+  <rect x="2680" y="1470" width="240" height="60" rx="4" class="box-load"/>
+  <text x="2800" y="1495" class="label-sm" text-anchor="middle">WINDOW MOTOR LEFT</text>
+  <text x="2800" y="1518" class="label-xs" text-anchor="middle">15A | 12AWG | A05+A14</text>
+
+  <!-- OUT4: Power Window Right (15A) -->
+  <line x1="3700" y1="1180" x2="3700" y2="1370" class="wire-med"/>
+  <rect x="3600" y="1370" width="200" height="50" rx="3" fill="#E8EEF4" stroke="#000" stroke-width="2"/>
+  <text x="3700" y="1393" class="label-sm" text-anchor="middle" font-weight="bold">OUT4</text>
+  <text x="3700" y="1413" class="rating" text-anchor="middle">20A</text>
+  <line x1="3700" y1="1420" x2="3700" y2="1470" class="wire-med"/>
+  <rect x="3580" y="1470" width="240" height="60" rx="4" class="box-load"/>
+  <text x="3700" y="1495" class="label-sm" text-anchor="middle">WINDOW MOTOR RIGHT</text>
+  <text x="3700" y="1518" class="label-xs" text-anchor="middle">15A | 12AWG | A07+A16</text>
+
+  <!-- OUT5: Heater Blower Motor (12A) -->
+  <line x1="4600" y1="1180" x2="4600" y2="1370" class="wire-med"/>
+  <rect x="4500" y="1370" width="200" height="50" rx="3" fill="#E8EEF4" stroke="#000" stroke-width="2"/>
+  <text x="4600" y="1393" class="label-sm" text-anchor="middle" font-weight="bold">OUT5</text>
+  <text x="4600" y="1413" class="rating" text-anchor="middle">20A</text>
+  <line x1="4600" y1="1420" x2="4600" y2="1470" class="wire-med"/>
+  <rect x="4480" y="1470" width="240" height="60" rx="4" class="box-load"/>
+  <text x="4600" y="1495" class="label-sm" text-anchor="middle">BLOWER MOTOR</text>
+  <text x="4600" y="1518" class="label-xs" text-anchor="middle">12A | 12AWG | A09+A17</text>
+
+  <!-- OUT6: Electric Water Pump (12A) -->
+  <line x1="5500" y1="1180" x2="5500" y2="1370" class="wire-med"/>
+  <rect x="5400" y="1370" width="200" height="50" rx="3" fill="#E8EEF4" stroke="#000" stroke-width="2"/>
+  <text x="5500" y="1393" class="label-sm" text-anchor="middle" font-weight="bold">OUT6</text>
+  <text x="5500" y="1413" class="rating" text-anchor="middle">20A</text>
+  <line x1="5500" y1="1420" x2="5500" y2="1470" class="wire-med"/>
+  <rect x="5380" y="1470" width="240" height="60" rx="4" class="box-load"/>
+  <text x="5500" y="1495" class="label-sm" text-anchor="middle">ELEC WATER PUMP</text>
+  <text x="5500" y="1518" class="label-xs" text-anchor="middle">12A | 14AWG | B03+B09</text>
+
+  <!-- OUT7: Electric Parking Brake (10A) -->
+  <line x1="6400" y1="1180" x2="6400" y2="1370" class="wire-med"/>
+  <rect x="6300" y="1370" width="200" height="50" rx="3" fill="#E8EEF4" stroke="#000" stroke-width="2"/>
+  <text x="6400" y="1393" class="label-sm" text-anchor="middle" font-weight="bold">OUT7</text>
+  <text x="6400" y="1413" class="rating" text-anchor="middle">20A</text>
+  <line x1="6400" y1="1420" x2="6400" y2="1470" class="wire-med"/>
+  <rect x="6280" y="1470" width="240" height="60" rx="4" class="box-load"/>
+  <text x="6400" y="1495" class="label-sm" text-anchor="middle">PARKING BRAKE</text>
+  <text x="6400" y="1518" class="label-xs" text-anchor="middle">10A | 14AWG | B05+B11</text>
+
+  <!-- OUT8: Cigarette Lighter (10A) -->
+  <line x1="7300" y1="1180" x2="7300" y2="1370" class="wire-med"/>
+  <rect x="7200" y="1370" width="200" height="50" rx="3" fill="#E8EEF4" stroke="#000" stroke-width="2"/>
+  <text x="7300" y="1393" class="label-sm" text-anchor="middle" font-weight="bold">OUT8</text>
+  <text x="7300" y="1413" class="rating" text-anchor="middle">20A</text>
+  <line x1="7300" y1="1420" x2="7300" y2="1470" class="wire-med"/>
+  <rect x="7180" y="1470" width="240" height="60" rx="4" class="box-load"/>
+  <text x="7300" y="1495" class="label-sm" text-anchor="middle">CIGARETTE LIGHTER</text>
+  <text x="7300" y="1518" class="label-xs" text-anchor="middle">10A | 14AWG | B07+B13</text>
+
+  <!-- ========== 8A CHANNELS SECTION ========== -->
+  <text x="400" y="1600" class="label-bold">8A STANDARD CHANNELS (22x, single-pin solid-state)</text>
+  <line x1="400" y1="1610" x2="8200" y2="1610" class="section-line"/>
+
+  <!-- Row 1 of 8A channels (OUT9-OUT16) -->
+  <!-- OUT9: AMP Step Left -->
+  <line x1="600" y1="1180" x2="600" y2="1650" class="wire-light"/>
+  <rect x="500" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="600" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT9 (8A)</text>
+  <text x="600" y="1690" class="label-xs" text-anchor="middle">Pin A02</text>
+  <line x1="600" y1="1695" x2="600" y2="1730" class="wire-light"/>
+  <rect x="490" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="600" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">AMP STEP LEFT</text>
+  <text x="600" y="1772" class="label-xs" text-anchor="middle">8A | 14AWG ORG/BLK</text>
+
+  <!-- OUT10: AMP Step Right -->
+  <line x1="1000" y1="1550" x2="1000" y2="1650" class="wire-light"/>
+  <rect x="900" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="1000" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT10 (8A)</text>
+  <text x="1000" y="1690" class="label-xs" text-anchor="middle">Pin A04</text>
+  <line x1="1000" y1="1695" x2="1000" y2="1730" class="wire-light"/>
+  <rect x="890" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="1000" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">AMP STEP RIGHT</text>
+  <text x="1000" y="1772" class="label-xs" text-anchor="middle">8A | 14AWG ORG/BLK/WHT</text>
+
+  <!-- OUT11: AMP Controller -->
+  <line x1="1400" y1="1550" x2="1400" y2="1650" class="wire-light"/>
+  <rect x="1300" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="1400" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT11 (8A)</text>
+  <text x="1400" y="1690" class="label-xs" text-anchor="middle">Pin A06</text>
+  <line x1="1400" y1="1695" x2="1400" y2="1730" class="wire-light"/>
+  <rect x="1290" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="1400" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">AMP CONTROLLER</text>
+  <text x="1400" y="1772" class="label-xs" text-anchor="middle">8A | 14AWG ORG/BLK/BLK</text>
+
+  <!-- OUT12: Wiper Motor -->
+  <line x1="1800" y1="1550" x2="1800" y2="1650" class="wire-light"/>
+  <rect x="1700" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="1800" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT12 (8A)</text>
+  <text x="1800" y="1690" class="label-xs" text-anchor="middle">Pin A08</text>
+  <line x1="1800" y1="1695" x2="1800" y2="1730" class="wire-light"/>
+  <rect x="1690" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="1800" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">WIPER MOTOR</text>
+  <text x="1800" y="1772" class="label-xs" text-anchor="middle">8A | 14AWG PPL</text>
+
+  <!-- OUT13: Horn -->
+  <line x1="2200" y1="1550" x2="2200" y2="1650" class="wire-light"/>
+  <rect x="2100" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="2200" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT13 (8A)</text>
+  <text x="2200" y="1690" class="label-xs" text-anchor="middle">Pin A11</text>
+  <line x1="2200" y1="1695" x2="2200" y2="1730" class="wire-light"/>
+  <rect x="2090" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="2200" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">HORN</text>
+  <text x="2200" y="1772" class="label-xs" text-anchor="middle">5A | 14AWG ORN/ORG</text>
+
+  <!-- OUT14: A/C Clutch -->
+  <line x1="2600" y1="1550" x2="2600" y2="1650" class="wire-light"/>
+  <rect x="2500" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="2600" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT14 (8A)</text>
+  <text x="2600" y="1690" class="label-xs" text-anchor="middle">Pin A13</text>
+  <line x1="2600" y1="1695" x2="2600" y2="1730" class="wire-light"/>
+  <rect x="2490" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="2600" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">A/C CLUTCH</text>
+  <text x="2600" y="1772" class="label-xs" text-anchor="middle">4A | 18AWG ORN/RED</text>
+
+  <!-- OUT15: Headlight Left -->
+  <line x1="3000" y1="1550" x2="3000" y2="1650" class="wire-light"/>
+  <rect x="2900" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="3000" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT15 (8A)</text>
+  <text x="3000" y="1690" class="label-xs" text-anchor="middle">Pin A15</text>
+  <line x1="3000" y1="1695" x2="3000" y2="1730" class="wire-light"/>
+  <rect x="2890" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="3000" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">HEADLIGHT LEFT</text>
+  <text x="3000" y="1772" class="label-xs" text-anchor="middle">3.6A | 16AWG LT GRN</text>
+
+  <!-- OUT16: Headlight Right -->
+  <line x1="3400" y1="1550" x2="3400" y2="1650" class="wire-light"/>
+  <rect x="3300" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="3400" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT16 (8A)</text>
+  <text x="3400" y="1690" class="label-xs" text-anchor="middle">Pin A18</text>
+  <line x1="3400" y1="1695" x2="3400" y2="1730" class="wire-light"/>
+  <rect x="3290" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="3400" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">HEADLIGHT RIGHT</text>
+  <text x="3400" y="1772" class="label-xs" text-anchor="middle">3.6A | 16AWG LT GRN/WHT</text>
+
+  <!-- Row 2 of 8A channels (OUT17-OUT24) -->
+  <!-- OUT17: Lock Left -->
+  <line x1="3800" y1="1550" x2="3800" y2="1650" class="wire-light"/>
+  <rect x="3700" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="3800" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT17 (8A)</text>
+  <text x="3800" y="1690" class="label-xs" text-anchor="middle">Pin A20</text>
+  <line x1="3800" y1="1695" x2="3800" y2="1730" class="wire-light"/>
+  <rect x="3690" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="3800" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">LOCK LEFT</text>
+  <text x="3800" y="1772" class="label-xs" text-anchor="middle">3A | 18AWG BLK</text>
+
+  <!-- OUT18: Radio -->
+  <line x1="4200" y1="1550" x2="4200" y2="1650" class="wire-light"/>
+  <rect x="4100" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="4200" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT18 (8A)</text>
+  <text x="4200" y="1690" class="label-xs" text-anchor="middle">Pin A22</text>
+  <line x1="4200" y1="1695" x2="4200" y2="1730" class="wire-light"/>
+  <rect x="4090" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="4200" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">RADIO/HEAD UNIT</text>
+  <text x="4200" y="1772" class="label-xs" text-anchor="middle">3A | 18AWG ORN/BLK</text>
+
+  <!-- OUT19: Lock Right -->
+  <line x1="4600" y1="1550" x2="4600" y2="1650" class="wire-light"/>
+  <rect x="4500" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="4600" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT19 (8A)</text>
+  <text x="4600" y="1690" class="label-xs" text-anchor="middle">Pin A24</text>
+  <line x1="4600" y1="1695" x2="4600" y2="1730" class="wire-light"/>
+  <rect x="4490" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="4600" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">LOCK RIGHT</text>
+  <text x="4600" y="1772" class="label-xs" text-anchor="middle">3A | 18AWG BLK/WHT</text>
+
+  <!-- OUT20: Transmission Controller -->
+  <line x1="5000" y1="1550" x2="5000" y2="1650" class="wire-light"/>
+  <rect x="4900" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="5000" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT20 (8A)</text>
+  <text x="5000" y="1690" class="label-xs" text-anchor="middle">Pin A25</text>
+  <line x1="5000" y1="1695" x2="5000" y2="1730" class="wire-light"/>
+  <rect x="4890" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="5000" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">TRANS CONTROLLER</text>
+  <text x="5000" y="1772" class="label-xs" text-anchor="middle">3A | 20AWG ORN/YEL</text>
+
+  <!-- OUT21: LTCD (Wideband Lambda) -->
+  <line x1="5400" y1="1550" x2="5400" y2="1650" class="wire-light"/>
+  <rect x="5300" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="5400" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT21 (8A)</text>
+  <text x="5400" y="1690" class="label-xs" text-anchor="middle">Pin B01</text>
+  <line x1="5400" y1="1695" x2="5400" y2="1730" class="wire-light"/>
+  <rect x="5290" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="5400" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">LTCD (WIDEBAND)</text>
+  <text x="5400" y="1772" class="label-xs" text-anchor="middle">3A | 20AWG ORN/BLK</text>
+
+  <!-- OUT22: Tail Light Right -->
+  <line x1="5800" y1="1550" x2="5800" y2="1650" class="wire-light"/>
+  <rect x="5700" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="5800" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT22 (8A)</text>
+  <text x="5800" y="1690" class="label-xs" text-anchor="middle">Pin B02</text>
+  <line x1="5800" y1="1695" x2="5800" y2="1730" class="wire-light"/>
+  <rect x="5690" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="5800" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">TAIL LIGHT RIGHT</text>
+  <text x="5800" y="1772" class="label-xs" text-anchor="middle">2A | 18AWG BRN/YEL</text>
+
+  <!-- OUT23: Tail Light Left -->
+  <line x1="6200" y1="1550" x2="6200" y2="1650" class="wire-light"/>
+  <rect x="6100" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="6200" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT23 (8A)</text>
+  <text x="6200" y="1690" class="label-xs" text-anchor="middle">Pin B04</text>
+  <line x1="6200" y1="1695" x2="6200" y2="1730" class="wire-light"/>
+  <rect x="6090" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="6200" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">TAIL LIGHT LEFT</text>
+  <text x="6200" y="1772" class="label-xs" text-anchor="middle">2A | 18AWG BRN/BLK</text>
+
+  <!-- OUT24: Turn Signal Left -->
+  <line x1="6600" y1="1550" x2="6600" y2="1650" class="wire-light"/>
+  <rect x="6500" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="6600" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT24 (8A)</text>
+  <text x="6600" y="1690" class="label-xs" text-anchor="middle">Pin B06</text>
+  <line x1="6600" y1="1695" x2="6600" y2="1730" class="wire-light"/>
+  <rect x="6490" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="6600" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">TURN SIG LEFT</text>
+  <text x="6600" y="1772" class="label-xs" text-anchor="middle">2A | 18AWG LT BLU</text>
+
+  <!-- OUT25: Turn Signal Right -->
+  <line x1="7000" y1="1550" x2="7000" y2="1650" class="wire-light"/>
+  <rect x="6900" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="7000" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT25 (8A)</text>
+  <text x="7000" y="1690" class="label-xs" text-anchor="middle">Pin B08</text>
+  <line x1="7000" y1="1695" x2="7000" y2="1730" class="wire-light"/>
+  <rect x="6890" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="7000" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">TURN SIG RIGHT</text>
+  <text x="7000" y="1772" class="label-xs" text-anchor="middle">2A | 18AWG DK BLU</text>
+
+  <!-- OUT26: Washer Pump -->
+  <line x1="7400" y1="1550" x2="7400" y2="1650" class="wire-light"/>
+  <rect x="7300" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="7400" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT26 (8A)</text>
+  <text x="7400" y="1690" class="label-xs" text-anchor="middle">Pin B10</text>
+  <line x1="7400" y1="1695" x2="7400" y2="1730" class="wire-light"/>
+  <rect x="7290" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="7400" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">WASHER PUMP</text>
+  <text x="7400" y="1772" class="label-xs" text-anchor="middle">2A | 18AWG ORN/BLK/RED</text>
+
+  <!-- OUT27: Backup Light Right -->
+  <line x1="7800" y1="1550" x2="7800" y2="1650" class="wire-light"/>
+  <rect x="7700" y="1650" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="7800" y="1672" class="label-xs" text-anchor="middle" font-weight="bold">OUT27 (8A)</text>
+  <text x="7800" y="1690" class="label-xs" text-anchor="middle">Pin B12</text>
+  <line x1="7800" y1="1695" x2="7800" y2="1730" class="wire-light"/>
+  <rect x="7690" y="1730" width="220" height="55" rx="3" class="box-load"/>
+  <text x="7800" y="1752" class="label-xs" text-anchor="middle" font-weight="bold">BACKUP LT RIGHT</text>
+  <text x="7800" y="1772" class="label-xs" text-anchor="middle">1.5A | 18AWG BRN/VIO</text>
+
+  <!-- Row 3: OUT28-OUT30 and shared circuits -->
+  <!-- OUT28: Backup Light Left -->
+  <line x1="600" y1="1800" x2="600" y2="1880" class="wire-light"/>
+  <rect x="500" y="1880" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="600" y="1902" class="label-xs" text-anchor="middle" font-weight="bold">OUT28 (8A)</text>
+  <text x="600" y="1920" class="label-xs" text-anchor="middle">Pin B14</text>
+  <line x1="600" y1="1925" x2="600" y2="1960" class="wire-light"/>
+  <rect x="490" y="1960" width="220" height="55" rx="3" class="box-load"/>
+  <text x="600" y="1982" class="label-xs" text-anchor="middle" font-weight="bold">BACKUP LT LEFT</text>
+  <text x="600" y="2002" class="label-xs" text-anchor="middle">1.5A | 18AWG BRN/ORG</text>
+
+  <!-- OUT29: USB Charging -->
+  <line x1="1000" y1="1800" x2="1000" y2="1880" class="wire-light"/>
+  <rect x="900" y="1880" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="1000" y="1902" class="label-xs" text-anchor="middle" font-weight="bold">OUT29 (8A)</text>
+  <text x="1000" y="1920" class="label-xs" text-anchor="middle">Pin B16</text>
+  <line x1="1000" y1="1925" x2="1000" y2="1960" class="wire-light"/>
+  <rect x="890" y="1960" width="220" height="55" rx="3" class="box-load"/>
+  <text x="1000" y="1982" class="label-xs" text-anchor="middle" font-weight="bold">USB CHARGE PORT</text>
+  <text x="1000" y="2002" class="label-xs" text-anchor="middle">1A | 18AWG ORN/YEL</text>
+
+  <!-- OUT30: Parking Light Left -->
+  <line x1="1400" y1="1800" x2="1400" y2="1880" class="wire-light"/>
+  <rect x="1300" y="1880" width="200" height="45" rx="3" fill="#F0F4F8" stroke="#000" stroke-width="1.5"/>
+  <text x="1400" y="1902" class="label-xs" text-anchor="middle" font-weight="bold">OUT30 (8A)</text>
+  <text x="1400" y="1920" class="label-xs" text-anchor="middle">Pin B19</text>
+  <line x1="1400" y1="1925" x2="1400" y2="1960" class="wire-light"/>
+  <rect x="1290" y="1960" width="220" height="55" rx="3" class="box-load"/>
+  <text x="1400" y="1982" class="label-xs" text-anchor="middle" font-weight="bold">PARK LT LEFT</text>
+  <text x="1400" y="2002" class="label-xs" text-anchor="middle">1A | 18AWG BRN/RED</text>
+
+  <!-- ========== SHARED / SPLICED CIRCUITS (from connector schedule) ========== -->
+  <text x="2200" y="1860" class="label-bold">SHARED OUTPUT CIRCUITS (spliced from PDM channels)</text>
+  <line x1="2200" y1="1870" x2="8200" y2="1870" class="section-line"/>
+
+  <!-- OUT13 (tail/park) shared group -->
+  <rect x="2200" y="1900" width="600" height="120" rx="4" fill="#FFFFF8" stroke="#666" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="2500" y="1925" class="label-xs" text-anchor="middle" font-weight="bold">OUT13 SHARED (from Tail Lights)</text>
+  <text x="2500" y="1950" class="label-xs" text-anchor="middle">Park Lt Left (BRN/RED) 4.6ft</text>
+  <text x="2500" y="1970" class="label-xs" text-anchor="middle">Park Lt Right (BRN/BLU) 4.6ft</text>
+  <text x="2500" y="1990" class="label-xs" text-anchor="middle">Side Markers x6 (BRN/*) 3.5-18.4ft</text>
+  <text x="2500" y="2010" class="label-xs" text-anchor="middle">Cab Clearance x3 (BRN/WHT) 3.5ft</text>
+
+  <!-- OUT15 (backup) shared group -->
+  <rect x="3000" y="1900" width="500" height="100" rx="4" fill="#FFFFF8" stroke="#666" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="3250" y="1925" class="label-xs" text-anchor="middle" font-weight="bold">OUT15 SHARED (from Backup Lts)</text>
+  <text x="3250" y="1950" class="label-xs" text-anchor="middle">Third Brake Light (BRN/RED) 18.4ft</text>
+  <text x="3250" y="1970" class="label-xs" text-anchor="middle">Rear Backup Camera (BLU/WHT) 18.4ft</text>
+  <text x="3250" y="1990" class="label-xs" text-anchor="middle">License Plate Light via OUT19</text>
+
+  <!-- OUT25 (courtesy) shared group -->
+  <rect x="3700" y="1900" width="500" height="100" rx="4" fill="#FFFFF8" stroke="#666" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="3950" y="1925" class="label-xs" text-anchor="middle" font-weight="bold">OUT25 SHARED (Courtesy Group)</text>
+  <text x="3950" y="1950" class="label-xs" text-anchor="middle">Dome Light (BRN) 3.5ft</text>
+  <text x="3950" y="1970" class="label-xs" text-anchor="middle">Under-Dash LED (BRN/WHT) 3.5ft</text>
+  <text x="3950" y="1990" class="label-xs" text-anchor="middle">Footwell Lights (BRN/BLK) 3.5ft</text>
+
+  <!-- OUT25 extended -->
+  <rect x="4400" y="1900" width="500" height="80" rx="4" fill="#FFFFF8" stroke="#666" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="4650" y="1925" class="label-xs" text-anchor="middle" font-weight="bold">OUT25 SHARED (Underhood/Cargo)</text>
+  <text x="4650" y="1950" class="label-xs" text-anchor="middle">Underhood Light (BRN/RED) 4.6ft</text>
+  <text x="4650" y="1970" class="label-xs" text-anchor="middle">Cargo/Bed Light (BRN/BLU) 18.4ft</text>
+
+  <!-- ========== GROUND DISTRIBUTION SECTION ========== -->
+  <text x="400" y="2150" class="label-bold">GROUND DISTRIBUTION</text>
+  <line x1="400" y1="2160" x2="8200" y2="2160" class="section-line"/>
+
+  <!-- Engine ground strap -->
+  <rect x="500" y="2200" width="400" height="80" rx="4" fill="#F0F0F0" stroke="#000" stroke-width="2"/>
+  <text x="700" y="2230" class="label-sm" text-anchor="middle" font-weight="bold">ENGINE GROUND STRAP</text>
+  <text x="700" y="2255" class="label-xs" text-anchor="middle">4 AWG braided | Block to Frame</text>
+  <text x="700" y="2275" class="label-xs" text-anchor="middle">M10 bolt both ends | Anti-seize</text>
+  <use href="#ground" x="680" y="2290" width="40" height="30"/>
+
+  <!-- M130 Sensor Ground -->
+  <rect x="1100" y="2200" width="400" height="80" rx="4" fill="#F0F0F0" stroke="#000" stroke-width="2"/>
+  <text x="1300" y="2230" class="label-sm" text-anchor="middle" font-weight="bold">M130 SENSOR GROUND</text>
+  <text x="1300" y="2255" class="label-xs" text-anchor="middle">Pins B15/B16 SEN_0V_A/B (22AWG)</text>
+  <text x="1300" y="2275" class="label-xs" text-anchor="middle">All sensor returns to ECU</text>
+
+  <!-- M130 Battery Ground -->
+  <rect x="1700" y="2200" width="400" height="80" rx="4" fill="#F0F0F0" stroke="#000" stroke-width="2"/>
+  <text x="1900" y="2230" class="label-sm" text-anchor="middle" font-weight="bold">M130 BATTERY GROUND</text>
+  <text x="1900" y="2255" class="label-xs" text-anchor="middle">Pins A10/A11 BAT_NEG1/2 (16AWG)</text>
+  <text x="1900" y="2275" class="label-xs" text-anchor="middle">Star ground to chassis</text>
+
+  <!-- PDM30 Battery Ground -->
+  <rect x="2300" y="2200" width="400" height="80" rx="4" fill="#F0F0F0" stroke="#000" stroke-width="2"/>
+  <text x="2500" y="2230" class="label-sm" text-anchor="middle" font-weight="bold">PDM30 BATTERY GROUND</text>
+  <text x="2500" y="2255" class="label-xs" text-anchor="middle">Pins A26/B18 VBATT_NEG (16AWG)</text>
+  <text x="2500" y="2275" class="label-xs" text-anchor="middle">MUST connect both pins</text>
+
+  <!-- PDM30 Signal Ground -->
+  <rect x="2900" y="2200" width="400" height="80" rx="4" fill="#F0F0F0" stroke="#000" stroke-width="2"/>
+  <text x="3100" y="2230" class="label-sm" text-anchor="middle" font-weight="bold">PDM30 SIGNAL GROUND</text>
+  <text x="3100" y="2255" class="label-xs" text-anchor="middle">Pins A28/B22 GND_0V (20AWG)</text>
+  <text x="3100" y="2275" class="label-xs" text-anchor="middle">Switch returns, 0V reference</text>
+
+  <!-- Body ground strap -->
+  <rect x="3500" y="2200" width="400" height="80" rx="4" fill="#F0F0F0" stroke="#000" stroke-width="2"/>
+  <text x="3700" y="2230" class="label-sm" text-anchor="middle" font-weight="bold">BODY GROUND STRAP</text>
+  <text x="3700" y="2255" class="label-xs" text-anchor="middle">4 AWG braided | Cab to Frame</text>
+  <text x="3700" y="2275" class="label-xs" text-anchor="middle">Behind driver kick panel</text>
+
+  <!-- Ground bus bar -->
+  <line x1="500" y1="2320" x2="4100" y2="2320" stroke="#000" stroke-width="5" stroke-dasharray="15,8"/>
+  <text x="2300" y="2355" class="label-sm" text-anchor="middle">GROUND BUS — SEE SEC 12 (GROUND DISTRIBUTION) FOR COMPLETE DETAIL</text>
+
+  <!-- ========== CURRENT BUDGET TABLE ========== -->
+  <rect x="4600" y="2150" width="3800" height="500" rx="6" fill="#FFF" stroke="#000" stroke-width="2"/>
+  <rect x="4600" y="2150" width="3800" height="45" rx="6" fill="#E0E0E0" stroke="#000" stroke-width="2"/>
+  <text x="6500" y="2182" class="label-bold" text-anchor="middle">CURRENT BUDGET SUMMARY</text>
+
+  <!-- Table headers -->
+  <text x="4680" y="2225" class="label-sm" font-weight="bold">CIRCUIT</text>
+  <text x="5700" y="2225" class="label-sm" font-weight="bold">PROTECTION</text>
+  <text x="6500" y="2225" class="label-sm" font-weight="bold">CONTINUOUS</text>
+  <text x="7300" y="2225" class="label-sm" font-weight="bold">PEAK</text>
+  <text x="7900" y="2225" class="label-sm" font-weight="bold">WIRE</text>
+  <line x1="4620" y1="2235" x2="8360" y2="2235" stroke="#000" stroke-width="1"/>
+
+  <!-- PDM30 20A channels -->
+  <text x="4680" y="2260" class="label-xs">PDM30 OUT1-2 (Rad Fans x2)</text>
+  <text x="5700" y="2260" class="label-xs">SS 20A ea</text>
+  <text x="6500" y="2260" class="label-xs">36A</text>
+  <text x="7300" y="2260" class="label-xs">40A</text>
+  <text x="7900" y="2260" class="label-xs">12 AWG</text>
+
+  <text x="4680" y="2285" class="label-xs">PDM30 OUT3-4 (Windows x2)</text>
+  <text x="5700" y="2285" class="label-xs">SS 20A ea</text>
+  <text x="6500" y="2285" class="label-xs">0A (intermittent)</text>
+  <text x="7300" y="2285" class="label-xs">30A</text>
+  <text x="7900" y="2285" class="label-xs">12 AWG</text>
+
+  <text x="4680" y="2310" class="label-xs">PDM30 OUT5 (Blower)</text>
+  <text x="5700" y="2310" class="label-xs">SS 20A</text>
+  <text x="6500" y="2310" class="label-xs">8A</text>
+  <text x="7300" y="2310" class="label-xs">12A</text>
+  <text x="7900" y="2310" class="label-xs">12 AWG</text>
+
+  <text x="4680" y="2335" class="label-xs">PDM30 OUT6 (Water Pump)</text>
+  <text x="5700" y="2335" class="label-xs">SS 20A</text>
+  <text x="6500" y="2335" class="label-xs">6A</text>
+  <text x="7300" y="2335" class="label-xs">12A</text>
+  <text x="7900" y="2335" class="label-xs">14 AWG</text>
+
+  <text x="4680" y="2360" class="label-xs">PDM30 OUT7 (Parking Brake)</text>
+  <text x="5700" y="2360" class="label-xs">SS 20A</text>
+  <text x="6500" y="2360" class="label-xs">0A (intermittent)</text>
+  <text x="7300" y="2360" class="label-xs">10A</text>
+  <text x="7900" y="2360" class="label-xs">14 AWG</text>
+
+  <text x="4680" y="2385" class="label-xs">PDM30 OUT8 (Cig Lighter)</text>
+  <text x="5700" y="2385" class="label-xs">SS 20A</text>
+  <text x="6500" y="2385" class="label-xs">5A</text>
+  <text x="7300" y="2385" class="label-xs">10A</text>
+  <text x="7900" y="2385" class="label-xs">14 AWG</text>
+
+  <text x="4680" y="2410" class="label-xs">PDM30 OUT9-30 (22x 8A ch)</text>
+  <text x="5700" y="2410" class="label-xs">SS 8A ea</text>
+  <text x="6500" y="2410" class="label-xs">~35A combined</text>
+  <text x="7300" y="2410" class="label-xs">~65A combined</text>
+  <text x="7900" y="2410" class="label-xs">14-20 AWG</text>
+
+  <line x1="4620" y1="2425" x2="8360" y2="2425" stroke="#000" stroke-width="1"/>
+
+  <!-- Non-PDM circuits -->
+  <text x="4680" y="2450" class="label-xs">Starter Motor</text>
+  <text x="5700" y="2450" class="label-xs">Relay</text>
+  <text x="6500" y="2450" class="label-xs">0A (cranking only)</text>
+  <text x="7300" y="2450" class="label-xs">200A</text>
+  <text x="7900" y="2450" class="label-xs">4 AWG</text>
+
+  <text x="4680" y="2475" class="label-xs">Fuel Pump</text>
+  <text x="5700" y="2475" class="label-xs">30A CB + Relay</text>
+  <text x="6500" y="2475" class="label-xs">25A</text>
+  <text x="7300" y="2475" class="label-xs">30A</text>
+  <text x="7900" y="2475" class="label-xs">10 AWG</text>
+
+  <text x="4680" y="2500" class="label-xs">Bosch iBooster</text>
+  <text x="5700" y="2500" class="label-xs">40A Fuse + Relay</text>
+  <text x="6500" y="2500" class="label-xs">2A</text>
+  <text x="7300" y="2500" class="label-xs">35A</text>
+  <text x="7900" y="2500" class="label-xs">10 AWG</text>
+
+  <text x="4680" y="2525" class="label-xs">Amplifier (Kicker)</text>
+  <text x="5700" y="2525" class="label-xs">60A Fusible Link</text>
+  <text x="6500" y="2525" class="label-xs">15A</text>
+  <text x="7300" y="2525" class="label-xs">50A</text>
+  <text x="7900" y="2525" class="label-xs">8 AWG</text>
+
+  <text x="4680" y="2550" class="label-xs">M130 ECU</text>
+  <text x="5700" y="2550" class="label-xs">Via PDM30 CAN</text>
+  <text x="6500" y="2550" class="label-xs">3A</text>
+  <text x="7300" y="2550" class="label-xs">5A</text>
+  <text x="7900" y="2550" class="label-xs">16 AWG</text>
+
+  <!-- Totals -->
+  <line x1="4620" y1="2565" x2="8360" y2="2565" stroke="#000" stroke-width="2"/>
+  <text x="4680" y="2595" class="label-sm" font-weight="bold">TOTAL CONTINUOUS LOAD</text>
+  <text x="6500" y="2595" class="rating" font-weight="bold">~135A</text>
+  <text x="4680" y="2625" class="label-sm" font-weight="bold">TOTAL PEAK LOAD (all simultaneous)</text>
+  <text x="7300" y="2625" class="rating" font-weight="bold">~490A</text>
+
+  <!-- Alternator margin check -->
+  <rect x="4620" y="2635" width="3760" height="30" fill="#E0FFE0" stroke="#060" stroke-width="1"/>
+  <text x="6500" y="2658" class="label-sm" text-anchor="middle" font-weight="bold" fill="#060">ALTERNATOR: 220A OUTPUT vs 135A CONTINUOUS = 85A MARGIN (63% utilization)</text>
+
+  <!-- ========== NOTES ========== -->
+  <rect x="400" y="2400" width="3800" height="290" rx="6" fill="#FFFFF8" stroke="#000" stroke-width="1.5"/>
+  <text x="420" y="2430" class="label-bold">NOTES</text>
+  <text x="420" y="2460" class="label-xs">1. PDM30 provides solid-state protection: no fuses to replace. Channels auto-retry</text>
+  <text x="420" y="2482" class="label-xs">   after thermal shutdown. Current limiting protects wiring at channel rating.</text>
+  <text x="420" y="2510" class="label-xs">2. 20A channels use dual-pin outputs (two connector pins paralleled) for current</text>
+  <text x="420" y="2532" class="label-xs">   capacity. BOTH pins must be wired. Single-pin = 10A max.</text>
+  <text x="420" y="2560" class="label-xs">3. Non-PDM circuits (starter, fuel pump, iBooster, amplifier) require conventional</text>
+  <text x="420" y="2582" class="label-xs">   protection: fusible links, circuit breakers, or relays as shown.</text>
+  <text x="420" y="2610" class="label-xs">4. Battery disconnect (Motec RBD 190) interrupts ALL circuits except starter.</text>
+  <text x="420" y="2632" class="label-xs">   Starter relay is upstream of disconnect for emergency starting.</text>
+  <text x="420" y="2660" class="label-xs">5. CAN bus (M130 B17/B18 to PDM30 B25/B26): 22AWG twisted pair, 120 ohm</text>
+  <text x="420" y="2682" class="label-xs">   termination at each end. PDM channels controlled via CAN, not hardwired switches.</text>
+
+  <!-- ========== REVISION TABLE (top right) ========== -->
+  <rect x="7500" y="80" width="1060" height="120" fill="#FFF" stroke="#000" stroke-width="2"/>
+  <rect x="7500" y="80" width="1060" height="30" fill="#E0E0E0" stroke="#000" stroke-width="2"/>
+  <text x="7600" y="102" class="label-xs" font-weight="bold">REV</text>
+  <text x="7700" y="102" class="label-xs" font-weight="bold">DATE</text>
+  <text x="7900" y="102" class="label-xs" font-weight="bold">BY</text>
+  <text x="8050" y="102" class="label-xs" font-weight="bold">DESCRIPTION</text>
+  <text x="7600" y="132" class="label-xs">--</text>
+  <text x="7700" y="132" class="label-xs">2026-04-04</text>
+  <text x="7900" y="132" class="label-xs">NUKE</text>
+  <text x="8050" y="132" class="label-xs">Initial release</text>
+  <text x="7600" y="162" class="label-xs">A</text>
+  <text x="7700" y="162" class="label-xs">TBD</text>
+  <text x="7900" y="162" class="label-xs">TBD</text>
+  <text x="8050" y="162" class="label-xs">First revision</text>
+
+  <!-- ========== LEGEND ========== -->
+  <rect x="400" y="2720" width="2200" height="280" rx="6" fill="#FFF" stroke="#000" stroke-width="2"/>
+  <text x="420" y="2755" class="label-bold">LEGEND</text>
+
+  <!-- Heavy wire -->
+  <line x1="450" y1="2785" x2="550" y2="2785" stroke="#000" stroke-width="6"/>
+  <text x="570" y="2792" class="label-xs">Heavy power wire (4-10 AWG)</text>
+
+  <!-- Medium wire -->
+  <line x1="450" y1="2815" x2="550" y2="2815" stroke="#000" stroke-width="3"/>
+  <text x="570" y="2822" class="label-xs">Medium wire (12-16 AWG)</text>
+
+  <!-- Light wire -->
+  <line x1="450" y1="2845" x2="550" y2="2845" stroke="#000" stroke-width="2"/>
+  <text x="570" y="2852" class="label-xs">Light wire (18-22 AWG)</text>
+
+  <!-- Ground -->
+  <line x1="450" y1="2875" x2="550" y2="2875" stroke="#000" stroke-width="3" stroke-dasharray="12,6"/>
+  <text x="570" y="2882" class="label-xs">Ground return (dashed)</text>
+
+  <!-- Junction node -->
+  <circle cx="500" cy="2910" r="6" fill="#000"/>
+  <text x="570" y="2917" class="label-xs">Junction / distribution node</text>
+
+  <!-- Protection color key -->
+  <rect x="1500" y="2775" width="80" height="20" rx="2" fill="#FFF0F0" stroke="#C00" stroke-width="1.5"/>
+  <text x="1600" y="2792" class="label-xs">Fusible link / fuse / circuit breaker</text>
+
+  <rect x="1500" y="2805" width="80" height="20" rx="2" fill="#E8EEF4" stroke="#000" stroke-width="1.5"/>
+  <text x="1600" y="2822" class="label-xs">PDM30 solid-state channel (auto-protect)</text>
+
+  <rect x="1500" y="2835" width="80" height="20" rx="2" fill="#FFFFF0" stroke="#000" stroke-width="1.5"/>
+  <text x="1600" y="2852" class="label-xs">Load device</text>
+
+  <rect x="1500" y="2865" width="80" height="20" rx="2" fill="#FFFFF8" stroke="#666" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <text x="1600" y="2882" class="label-xs">Shared / spliced circuit group</text>
+
+  <text x="1520" y="2920" class="rating">RED TEXT</text>
+  <text x="1700" y="2920" class="label-xs">= Current rating or protection value</text>
+
+</svg>

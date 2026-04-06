@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <title>P-08 Alternator</title>
+  <desc>Alternator symbol. Circle with sine wave inside indicating AC generation, with output terminal. Used at the Powermaster 150A alternator location (Section 0). 10mm diameter per spec.</desc>
+
+  <!-- Main circle -->
+  <circle cx="20" cy="20" r="14" fill="white" stroke="black" stroke-width="1.5"/>
+
+  <!-- Sine wave inside circle (AC indicator) -->
+  <path d="M10 20 Q13 13, 16 20 Q19 27, 22 20 Q25 13, 28 20" fill="none" stroke="black" stroke-width="1.2" stroke-linecap="round"/>
+
+  <!-- ALT label -->
+  <text x="20" y="30" font-family="Courier New, monospace" font-size="4.5" font-weight="bold" fill="black" text-anchor="middle">ALT</text>
+
+  <!-- Output terminal lead (top) -->
+  <line x1="20" y1="2" x2="20" y2="6" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Ground terminal lead (bottom) -->
+  <line x1="20" y1="34" x2="20" y2="38" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

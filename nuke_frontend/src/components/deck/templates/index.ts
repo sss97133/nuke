@@ -1,0 +1,13 @@
+export { default as CoverSlide } from './CoverSlide';
+export { default as ThesisSlide } from './ThesisSlide';
+export { default as OpportunitySlide } from './OpportunitySlide';
+export { default as StatsSlide } from './StatsSlide';
+export { default as ProofSlide } from './ProofSlide';
+export { default as ComparisonSlide } from './ComparisonSlide';
+export { default as PartnersSlide } from './PartnersSlide';
+export { default as ContentSlide } from './ContentSlide';
+export { default as AskSlide } from './AskSlide';
+export { default as GallerySlide } from './GallerySlide';
+export { default as CloseSlide } from './CloseSlide';
+export { default as ProductSlide } from './ProductSlide';
+export { default as DividerSlide } from './DividerSlide';

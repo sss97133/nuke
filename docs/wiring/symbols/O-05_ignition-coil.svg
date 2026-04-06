@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <title>O-05 Ignition Coil</title>
+  <desc>Ignition coil symbol. Primary winding (few turns) over secondary winding (many turns), with 4 terminals (B+, IGN command, ground, spark output). Used for D510C ignition coils x8 (coil-near-plug). 6mm x 10mm per spec.</desc>
+
+  <!-- Coil body outline -->
+  <rect x="8" y="4" width="24" height="32" rx="2" ry="2" fill="white" stroke="black" stroke-width="1.5"/>
+
+  <!-- Primary winding (few turns, top) -->
+  <path d="M13,10 Q20,7 27,10 M13,13 Q20,10 27,13 M13,16 Q20,13 27,16" fill="none" stroke="black" stroke-width="1.2" stroke-linecap="round"/>
+
+  <!-- Iron core separator line -->
+  <line x1="12" y1="18" x2="28" y2="18" stroke="black" stroke-width="1" stroke-dasharray="2,1"/>
+
+  <!-- Secondary winding (many turns, bottom) -->
+  <path d="M13,21 Q20,19 27,21 M13,23 Q20,21 27,23 M13,25 Q20,23 27,25 M13,27 Q20,25 27,27 M13,29 Q20,27 27,29 M13,31 Q20,29 27,31" fill="none" stroke="black" stroke-width="0.8" stroke-linecap="round"/>
+
+  <!-- Terminal B+ (top-left) -->
+  <line x1="8" y1="8" x2="2" y2="8" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+  <text x="2" y="6" font-family="Courier New, monospace" font-size="3" fill="black" text-anchor="middle">B+</text>
+
+  <!-- Terminal IGN command (top-right) -->
+  <line x1="32" y1="8" x2="38" y2="8" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+  <text x="37" y="6" font-family="Courier New, monospace" font-size="3" fill="black" text-anchor="middle">IGN</text>
+
+  <!-- Terminal GND (bottom-left) -->
+  <line x1="8" y1="32" x2="2" y2="32" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+  <text x="3" y="35.5" font-family="Courier New, monospace" font-size="3" fill="black" text-anchor="middle">GND</text>
+
+  <!-- Terminal Spark out (bottom-right, to plug) -->
+  <line x1="32" y1="32" x2="38" y2="32" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+  <text x="37" y="35.5" font-family="Courier New, monospace" font-size="3" fill="black" text-anchor="middle">HV</text>
+</svg>

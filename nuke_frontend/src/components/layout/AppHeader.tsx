@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useHeaderHeight } from './hooks/useHeaderHeight';
 import { useSession } from './hooks/useSession';
 import { useNotificationBadge } from './hooks/useNotificationBadge';
@@ -14,13 +14,17 @@ interface AppHeaderProps {
   onOpenNotifications: () => void;
 }
 
+const NAV_LINKS = [
+  { label: 'FEED', to: '/?tab=feed' },
+  { label: 'SEARCH', to: '/search' },
+  { label: 'GARAGE', to: '/?tab=garage' },
+  { label: 'MARKET', to: '/market/trends' },
+];
+
 /**
- * AppHeader — One row, three zones, 40px.
+ * AppHeader — One row, four zones, 40px.
  *
- * [NUKE wordmark]  [command input (1fr)]  [upload + user]
- *
- * No variants. No toolbar slot. No nav links.
- * The command input IS the navigation.
+ * [NUKE wordmark]  [nav links]  [command input (1fr)]  [upload + user]
  */
 export const AppHeader: React.FC<AppHeaderProps> = ({
   onOpenNotifications,
@@ -32,6 +36,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const userId = session?.user?.id;
   const unreadCount = useNotificationBadge(userId);
   const { isAdmin } = useAdminAccess();
+  const location = useLocation();
 
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
@@ -40,14 +45,21 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        // AIDataIngestionSearch manages its own focus internally
-        // Dispatch a custom event it can listen for
         document.dispatchEvent(new CustomEvent('nuke:focus-command'));
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, []);
+
+  const isActive = (to: string) => {
+    if (to.includes('?tab=')) {
+      const tab = new URLSearchParams(to.split('?')[1]).get('tab');
+      const currentTab = new URLSearchParams(location.search).get('tab');
+      return location.pathname === '/' && currentTab === tab;
+    }
+    return location.pathname.startsWith(to);
+  };
 
   return (
     <div className="header-wrapper" ref={headerRef}>
@@ -57,12 +69,25 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           NUKE
         </Link>
 
-        {/* Zone 2: Command Input */}
+        {/* Zone 2: Navigation */}
+        <nav className="header-nav" aria-label="Main navigation">
+          {NAV_LINKS.map(({ label, to }) => (
+            <Link
+              key={to}
+              to={to}
+              className={`header-nav-link${isActive(to) ? ' active' : ''}`}
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
+
+        {/* Zone 3: Command Input */}
         <div className="header-command">
           <AIDataIngestionSearch />
         </div>
 
-        {/* Zone 3: Session */}
+        {/* Zone 4: Session */}
         <div className="header-session">
           <GlobalUploadIndicator />
           {session ? (

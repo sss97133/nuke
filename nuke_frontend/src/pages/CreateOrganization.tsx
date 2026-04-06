@@ -1,6 +1,6 @@
 // Create Organization - Start a new collaborative org profile
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 export default function CreateOrganization() {
@@ -347,14 +347,13 @@ export default function CreateOrganization() {
 
               {/* Actions */}
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-                <button
-                  type="button"
-                  onClick={() => navigate('/org')}
+                <Link
+                  to="/org"
                   className="button button-secondary"
-                  style={{ fontSize: '12px' }}
+                  style={{ textDecoration: 'none', color: 'inherit', fontSize: '12px' }}
                 >
                   Cancel
-                </button>
+                </Link>
                 <button
                   type="submit"
                   disabled={submitting || !businessName}

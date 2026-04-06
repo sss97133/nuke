@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import './MergeProposalsDashboard.css';
 
@@ -46,7 +46,6 @@ interface FieldMerge {
 }
 
 export default function MergeProposalsDashboard() {
-  const navigate = useNavigate();
   const [proposals, setProposals] = useState<MergeProposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedProposals, setExpandedProposals] = useState<Set<string>>(new Set());
@@ -378,12 +377,13 @@ export default function MergeProposalsDashboard() {
                   <div className="vehicle-stats">
                     {primary.image_count} photos • {primary.event_count} events
                   </div>
-                  <button
-                    onClick={() => navigate(`/vehicle/${primary.id}`)}
+                  <Link
+                    to={`/vehicle/${primary.id}`}
                     className="button button-small button-secondary"
+                    style={{ textDecoration: 'none', color: 'inherit' }}
                   >
                     View Profile
-                  </button>
+                  </Link>
                 </div>
 
                 <div className="merge-arrow">
@@ -405,12 +405,13 @@ export default function MergeProposalsDashboard() {
                   <div className="vehicle-stats vehicle-stats-duplicate">
                     {duplicate.image_count} photos • {duplicate.event_count} events
                   </div>
-                  <button
-                    onClick={() => navigate(`/vehicle/${duplicate.id}`)}
+                  <Link
+                    to={`/vehicle/${duplicate.id}`}
                     className="button button-small button-secondary"
+                    style={{ textDecoration: 'none', color: 'inherit' }}
                   >
                     View Profile
-                  </button>
+                  </Link>
                 </div>
               </div>
 

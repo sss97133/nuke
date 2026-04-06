@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { MyOrganization } from '../../services/myOrganizationsService';
 import { LiveAuctionBadge } from '../auction/AuctionBadges';
 import '../../styles/unified-design-system.css';
@@ -80,10 +80,10 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
   };
 
   return (
+    <Link to={`/org/${organization.organization_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
     <div
       className="card"
       style={{
-        cursor: 'pointer',
         transition: 'transform 0.2s',
       }}
       onMouseEnter={(e) => {
@@ -92,7 +92,6 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)';
       }}
-      onClick={() => navigate(`/org/${organization.organization_id}`)}
     >
       <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
@@ -267,6 +266,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
         </div>
       </div>
     </div>
+    </Link>
   );
 };
 

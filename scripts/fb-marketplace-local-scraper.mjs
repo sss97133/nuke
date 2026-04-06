@@ -457,14 +457,14 @@ function deriveBodyStyle(text) {
   if (!text) return null;
   const t = text.toLowerCase();
   const patterns = [
-    [/\b(coupe|coupé|berlinetta|fastback)\b/, "Coupe"],
-    [/\b(convertible|cabriolet|roadster|spider|spyder|targa|speedster)\b/, "Convertible"],
-    [/\b(sedan|saloon|berlina)\b/, "Sedan"],
-    [/\b(wagon|estate|touring|avant|sportwagen)\b/, "Wagon"],
-    [/\b(hatchback)\b/, "Hatchback"],
-    [/\b(pickup|truck|f-150|f-250|f-350|silverado|sierra|ram|ranger|tacoma|tundra|k10|k20|k30|c10|c20|c30|k1500|k2500|k3500|c1500|c2500|c3500|s10|s15|colorado|canyon|el camino|ranchero|power wagon|dakota|comanche)\b/, "Truck"],
-    [/\b(suv|wrangler|bronco|blazer|tahoe|suburban|4runner|land cruiser|defender|range rover|cayenne|k5|scout|jimmy|ramcharger|yukon|expedition|explorer|cherokee|wagoneer|fj40|fj60|fj80|trooper|samurai)\b/, "SUV"],
-    [/\b(van|minivan|bus|transporter|vanagon)\b/, "Van"],
+    [/\b(coupe|coup[eé]|berlinetta|fastback|hardtop)\b/, "Coupe"],
+    [/\b(convertible|cabriolet|roadster|spider|spyder|targa|speedster|drop.?top)\b/, "Convertible"],
+    [/\b(sedan|saloon|berlina|4[- ]?door)\b/i, "Sedan"],
+    [/\b(wagon|estate|touring|avant|sportwagen|squareback|shooting.?brake)\b/, "Wagon"],
+    [/\b(hatchback|liftback)\b/, "Hatchback"],
+    [/\b(pickup|short.?bed|long.?bed|step.?side|fleet.?side|crew.?cab|extended.?cab|single.?cab|regular.?cab|f-?1[05]0|f-?250|f-?350|silverado|sierra|ram\b|ranger|tacoma|tundra|k-?10|k-?20|k-?30|c-?10|c-?20|c-?30|k-?1500|k-?2500|k-?3500|c-?1500|c-?2500|c-?3500|s-?10|s-?15|colorado|canyon|el.?camino|ranchero|power.?wagon|dakota|comanche|dually)\b/, "Truck"],
+    [/\b(suv|wrangler|bronco|blazer|tahoe|suburban|4runner|land.?cruiser|defender|range.?rover|cayenne|k-?5|scout|jimmy|ramcharger|yukon|expedition|explorer|cherokee|wagoneer|fj-?40|fj-?60|fj-?80|trooper|samurai)\b/, "SUV"],
+    [/\b(van|minivan|bus|transporter|vanagon|econoline|westfalia|sprinter)\b/, "Van"],
   ];
   for (const [re, value] of patterns) {
     if (re.test(t)) return value;
@@ -474,7 +474,19 @@ function deriveBodyStyle(text) {
 
 function classifyVehicle(make, model) {
   if (!make) return { isAuto: false, vehicleType: null };
-  const makeLc = make.toLowerCase().trim();
+  let makeLc = make.toLowerCase().trim();
+
+  // Handle split multi-word makes: "Sea" + "Ray" → check "sea ray" first
+  // This prevents single-word fragments like "sea", "john", "boston" from
+  // matching the non-auto blocklist when they're actually the first word of
+  // a two-word make (Sea Ray, John Deere, Boston Whaler)
+  if (model) {
+    const modelFirstWord = model.split(/\s+/)[0]?.toLowerCase() || '';
+    const combinedMake = `${makeLc} ${modelFirstWord}`;
+    if (NON_AUTO_MAKES_LC.has(combinedMake)) {
+      makeLc = combinedMake;
+    }
+  }
 
   // Known non-auto make → classify by category
   if (NON_AUTO_MAKES_LC.has(makeLc)) {
@@ -684,7 +696,7 @@ const MAKES = [
 ];
 
 function parseTitle(title, city, state) {
-  if (!title) return { year: null, make: null, model: null };
+  if (!title) return { year: null, make: null, model: null, fullTitle: null };
 
   // Strip city/state that Facebook appends to listing titles
   let cleaned = title;
@@ -698,19 +710,23 @@ function parseTitle(title, city, state) {
   }
 
   const year = parseYear(cleaned);
-  if (!year) return { year: null, make: null, model: null };
+  if (!year) return { year: null, make: null, model: null, fullTitle: cleaned };
   const rest = cleaned.replace(/^\d{4}\s+/, "").trim();
   const lower = rest.toLowerCase();
   for (const make of MAKES) {
     if (lower.startsWith(make.toLowerCase())) {
-      const afterMake = rest.slice(make.length).trim();
+      let afterMake = rest.slice(make.length).trim();
+      // Strip emoji before model extraction
+      afterMake = afterMake.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}]/gu, "").trim();
       const model =
         afterMake
-          .split(/[\s·•|—]+/)
+          .split(/[\s·•|—,]+/)
           .slice(0, 2)
           .join(" ")
           .trim() || null;
-      return { year, make: make === "Chevy" ? "Chevrolet" : make, model };
+      // Return fullTitle (everything after year) so body_style can be derived from
+      // the text AFTER the separator: "Chevrolet C10 · Pickup, Short Bed"
+      return { year, make: make === "Chevy" ? "Chevrolet" : make, model, fullTitle: rest };
     }
   }
   const words = rest.split(/\s+/);
@@ -718,6 +734,7 @@ function parseTitle(title, city, state) {
     year,
     make: words[0] || null,
     model: words.slice(1, 2).join(" ") || null,
+    fullTitle: rest,
   };
 }
 
@@ -883,7 +900,7 @@ async function upsertSeller(sellerId, sellerName) {
 }
 
 // Create or update a vehicle record from a marketplace listing
-async function createVehicleFromListing({ facebookId, allImages, year, make, model, price, description, imageUrl, city, state, listingLat, listingLng, sellerName }) {
+async function createVehicleFromListing({ facebookId, allImages, year, make, model, fullTitle, price, description, imageUrl, city, state, listingLat, listingLng, sellerName }) {
   const result = { vehicleId: null, imagesInserted: 0 };
   if (!year || !make) return result;
 
@@ -974,8 +991,9 @@ async function createVehicleFromListing({ facebookId, allImages, year, make, mod
     // Classify at extraction time so the feed can filter/sort
     if (vehicleType) insertData.canonical_vehicle_type = vehicleType;
     if (signal > 0) insertData.discovery_priority = signal;
-    // Derive body_style from model name
-    const titleForBody = `${model || ''} ${make || ''}`;
+    // Derive body_style from the FULL title (includes text after separator like "· Pickup, Short Bed")
+    // Fall back to model+make if fullTitle is not available
+    const titleForBody = fullTitle || `${model || ''} ${make || ''}`;
     const bodyStyle = deriveBodyStyle(titleForBody);
     if (bodyStyle) insertData.body_style = bodyStyle;
 
@@ -1251,7 +1269,7 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
 
       const city = listing.location?.reverse_geocode?.city || null;
       const state = listing.location?.reverse_geocode?.state || null;
-      const { year, make, model } = parseTitle(listing.marketplace_listing_title, city, state);
+      const { year, make, model, fullTitle } = parseTitle(listing.marketplace_listing_title, city, state);
       const price = listing.listing_price?.amount
         ? parseFloat(listing.listing_price.amount)
         : null;
@@ -1318,7 +1336,7 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
       });
 
       // Store data for vehicle creation
-      vehicleData.push({ facebookId: listing.id, allImages, year, make, model, price, description, imageUrl, city, state, listingLat, listingLng, sellerName });
+      vehicleData.push({ facebookId: listing.id, allImages, year, make, model, fullTitle, price, description, imageUrl, city, state, listingLat, listingLng, sellerName });
     }
 
     if (rows.length === 0) continue;

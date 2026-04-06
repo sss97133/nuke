@@ -5,14 +5,18 @@ import { corsHeaders } from "../_shared/cors.ts";
  * feed-query — Server-side feed endpoint.
  *
  * Queries the `vehicle_valuation_feed` materialized view with server-side
- * filtering, keyset pagination, pre-resolved thumbnails, and auction state.
+ * filtering, keyset pagination, and denormalized thumbnails + descriptions.
  *
- * Default sort (feed_rank) now boosts for-sale listings +50 points,
- * putting live inventory at the top of the feed.
+ * Performance notes (2026-04-01 rewrite):
+ * - Non-auto make exclusion baked into MV WHERE clause (was runtime query)
+ * - primary_image_url + thumbnail variants denormalized into MV (was 3 enrichment passes)
+ * - description_snippet denormalized into MV (was separate vehicles query)
+ * - portfolio_stats cached module-level with 5-min TTL
+ * - Only remaining enrichment: auction state (live data from vehicle_events)
  */
 
 // ---------------------------------------------------------------------------
-// Module-level caches (avoids re-querying every request, survives warm invocations)
+// Module-level caches (survives warm invocations)
 // ---------------------------------------------------------------------------
 const CACHE_TTL = 5 * 60 * 1000; // 5 min
 
@@ -32,22 +36,43 @@ async function getDealerOrgIds(supabaseClient: any): Promise<string[]> {
   return cachedDealerIds;
 }
 
-let cachedNonAutoMakes: string[] | null = null;
-let cachedNonAutoMakesAt = 0;
+let cachedPortfolioStats: any = null;
+let cachedPortfolioStatsAt = 0;
 
-async function getNonAutoMakes(supabaseClient: any): Promise<string[]> {
-  if (cachedNonAutoMakes && Date.now() - cachedNonAutoMakesAt < CACHE_TTL) {
-    return cachedNonAutoMakes;
+async function getPortfolioStats(supabaseClient: any): Promise<any> {
+  if (cachedPortfolioStats && Date.now() - cachedPortfolioStatsAt < CACHE_TTL) {
+    return cachedPortfolioStats;
   }
-  const { data } = await supabaseClient
-    .from("non_auto_makes_excluded")
-    .select("make");
-  cachedNonAutoMakes = (data ?? []).map((r: any) => r.make as string);
-  cachedNonAutoMakesAt = Date.now();
-  return cachedNonAutoMakes;
+  const { data: cacheRow } = await supabaseClient
+    .from("portfolio_stats_cache")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (cacheRow) {
+    cachedPortfolioStats = {
+      total_vehicles: cacheRow.total_vehicles ?? 0,
+      total_value: cacheRow.total_value ?? 0,
+      for_sale_count: cacheRow.for_sale_count ?? 0,
+      active_auctions: cacheRow.active_auctions ?? 0,
+      avg_price: cacheRow.avg_value || (cacheRow.total_vehicles > 0 ? Math.round(cacheRow.total_value / cacheRow.total_vehicles) : 0),
+      vehicles_added_today: cacheRow.vehicles_added_today ?? 0,
+      sales_count_today: cacheRow.sales_count_today ?? 0,
+      sales_volume_today: cacheRow.sales_volume_today ?? 0,
+    };
+  } else {
+    cachedPortfolioStats = {
+      total_vehicles: 0, total_value: 0, for_sale_count: 0,
+      active_auctions: 0, avg_price: 0, vehicles_added_today: 0,
+      sales_count_today: 0, sales_volume_today: 0,
+    };
+  }
+  cachedPortfolioStatsAt = Date.now();
+  return cachedPortfolioStats;
 }
 
-// Warm-up flag: prime the DB connection pool on first cold-start request
+// Warm-up flag
 let connectionWarmed = false;
 
 function json(data: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
@@ -85,11 +110,10 @@ interface FeedRequest {
   zip?: string;
   radius_miles?: number;
   user_state?: string;
-  // Quality controls — default ON, user can opt out
-  include_non_auto?: boolean;   // false = hide boats/RVs/trailers/motorcycles
-  include_no_photos?: boolean;  // false = hide items without photos
-  include_dealers?: boolean;    // false = hide dealer listings (default false when no search)
-  min_price?: number;           // quality floor (default 500)
+  include_non_auto?: boolean;
+  include_no_photos?: boolean;
+  include_dealers?: boolean;
+  min_price?: number;
 }
 
 // Valid sort fields mapped to MV columns
@@ -123,10 +147,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    // Warm up the DB connection pool on first invocation (cold start).
-    // A lightweight query primes the connection before the heavy feed query.
+    // Warm up DB connection pool on cold start
     if (!connectionWarmed) {
-      await supabase.from("non_auto_makes_excluded").select("make").limit(1);
+      await supabase.from("portfolio_stats_cache").select("updated_at").limit(1);
       connectionWarmed = true;
     }
 
@@ -134,7 +157,6 @@ Deno.serve(async (req) => {
       req.method === "POST" ? await req.json().catch(() => ({})) : {};
 
     const limit = Math.min(Math.max(body.limit ?? 50, 1), 200);
-    // Default to feed_rank (which now boosts for-sale listings)
     const sortKey = body.sort && SORT_MAP[body.sort] ? body.sort : "feed_rank";
     const sortDef = SORT_MAP[sortKey];
     const direction = body.direction === "asc" || body.direction === "desc"
@@ -142,7 +164,7 @@ Deno.serve(async (req) => {
       : sortDef.defaultDir;
     const ascending = direction === "asc";
 
-    // ----- Build the query on vehicle_valuation_feed (or enriched view for finds) -----
+    // ----- Build query on MV (all data pre-joined) -----
     const feedView = sortDef.view ?? "vehicle_valuation_feed";
     const extraCols = sortKey === "find_score"
       ? ", find_score, find_signal_breakdown, find_model_total, find_red_flag_count, find_mod_count, find_cross_platform_count, find_condition_grade"
@@ -159,6 +181,8 @@ Deno.serve(async (req) => {
         discovery_url, discovery_source, profile_origin, origin_organization_id,
         city, state, listing_location,
         canonical_vehicle_type, has_photos,
+        primary_image_url, thumbnail_url, medium_url, full_image_url,
+        description_snippet,
         display_price, price_source, is_sold,
         asking_price, sale_price, current_value,
         nuke_estimate, nuke_estimate_low, nuke_estimate_high, nuke_estimate_confidence,
@@ -170,46 +194,21 @@ Deno.serve(async (req) => {
         ${extraCols}
       `)
       .order(sortDef.column, { ascending })
-      // Secondary sort by vehicle_id for stable keyset pagination
       .order("vehicle_id", { ascending: true });
 
-    // ----- QUALITY GATES (default ON — curated experience) -----
+    // ----- QUALITY GATES -----
 
     const isSearching = !!(body.q && body.q.trim());
 
-    // Exclude non-automobile vehicle types unless explicitly requested
+    // Vehicle type filter (non-auto makes already excluded in MV WHERE clause)
     if (body.include_non_auto !== true) {
-      // Only show CAR, TRUCK, SUV, VAN, MINIVAN, or unclassified (null)
       query = query.or(
         "canonical_vehicle_type.in.(CAR,TRUCK,SUV,VAN,MINIVAN)," +
         "canonical_vehicle_type.is.null"
       );
     }
 
-    // Block known non-auto makes using DB lookup table (non_auto_makes_excluded).
-    // The table stores UPPER-cased canonical makes. We generate both UPPER and
-    // Title-case variants so PostgREST's case-sensitive NOT IN catches both.
-    // This replaces a 130-entry inline array that bloated the query string and
-    // caused cold-start statement timeouts (15s limit on anon role).
-    if (body.include_non_auto !== true) {
-      const canonicalMakes = await getNonAutoMakes(supabase);
-      if (canonicalMakes.length > 0) {
-        // Generate case variants: UPPER + Title Case (covers 99%+ of DB values)
-        const toTitle = (s: string) =>
-          s.toLowerCase().replace(/(^|[\s-])\w/g, (c) => c.toUpperCase());
-        const allVariants = new Set<string>();
-        for (const m of canonicalMakes) {
-          allVariants.add(m);                  // UPPER: "YAMAHA"
-          allVariants.add(toTitle(m));          // Title: "Yamaha"
-          allVariants.add(m.toLowerCase());     // lower: "yamaha"
-        }
-        query = query.not("make", "in", `(${[...allVariants].join(",")})`);
-      }
-    }
-
-    // Dealer penalty: hide actual dealer listings from default feed.
-    // Auction houses (BaT, Mecum, etc.) and marketplaces are NOT dealers.
-    // When user is actively searching or sets include_dealers=true, show all.
+    // Dealer exclusion (runtime — dealer list changes frequently)
     const showDealers = body.include_dealers === true || isSearching;
     if (!showDealers) {
       const dealerIds = await getDealerOrgIds(supabase);
@@ -222,7 +221,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Quality floor: skip scam-price listings (default $500 minimum)
+    // Quality floor
     const qualityMinPrice = body.min_price ?? 500;
     if (qualityMinPrice > 0 && body.price_min === undefined) {
       query = query.or(`display_price.gte.${qualityMinPrice},display_price.is.null`);
@@ -230,7 +229,6 @@ Deno.serve(async (req) => {
 
     // ----- User Filters -----
 
-    // Year range
     if (typeof body.year_min === "number" && Number.isFinite(body.year_min)) {
       query = query.gte("year", body.year_min);
     }
@@ -238,7 +236,6 @@ Deno.serve(async (req) => {
       query = query.lte("year", body.year_max);
     }
 
-    // Make filter — MV has mixed case (PONTIAC + Pontiac), so match both variants
     if (body.makes && body.makes.length > 0 && body.makes.length <= 20) {
       const toTitle = (s: string) =>
         s.toLowerCase().replace(/(^|[\s-])\w/g, (c) => c.toUpperCase());
@@ -251,7 +248,6 @@ Deno.serve(async (req) => {
       query = query.in("make", [...new Set(variants)]);
     }
 
-    // Model (ilike substring for flexibility)
     if (body.models && body.models.length > 0 && body.models.length <= 10) {
       const modelFilters = body.models
         .map((m) => `model.ilike.%${m.replace(/[%_]/g, "")}%`)
@@ -259,12 +255,10 @@ Deno.serve(async (req) => {
       query = query.or(modelFilters);
     }
 
-    // Body style
     if (body.body_styles && body.body_styles.length > 0) {
       query = query.in("canonical_body_style", body.body_styles);
     }
 
-    // Price range
     if (typeof body.price_min === "number" && Number.isFinite(body.price_min)) {
       query = query.gte("display_price", body.price_min);
     }
@@ -272,41 +266,33 @@ Deno.serve(async (req) => {
       query = query.lte("display_price", body.price_max);
     }
 
-    // 4x4 / AWD
     if (body.is_4x4 === true) {
       query = query.or(
         "drivetrain.ilike.%4wd%,drivetrain.ilike.%4x4%,drivetrain.ilike.%awd%",
       );
     }
 
-    // For sale
     if (body.for_sale === true) {
       query = query.eq("is_for_sale", true);
     }
 
-    // Sold only
     if (body.sold_only === true) {
       query = query.eq("is_sold", true);
     }
 
-    // Hide sold
     if (body.hide_sold === true) {
       query = query.or("is_sold.is.null,is_sold.eq.false");
     }
 
-    // Has images — default to only showing vehicles with photos in feed
-    // Pass has_images=false explicitly to include vehicles without photos (e.g. search results)
     if (body.has_images !== false) {
       query = query.eq("has_photos", true);
     }
 
-    // Added today — filter to vehicles created in the last 24 hours
     if (body.added_today === true) {
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       query = query.gte("created_at", yesterday);
     }
 
-    // Excluded sources
     if (body.excluded_sources && body.excluded_sources.length > 0) {
       for (const src of body.excluded_sources) {
         const safe = src.replace(/[%_'"\\]/g, "");
@@ -316,7 +302,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Included sources — only show vehicles from these sources (hero panel)
     if (body.included_sources && body.included_sources.length > 0) {
       const safeSources = body.included_sources
         .map((s) => s.replace(/[%_'"\\]/g, ""))
@@ -354,16 +339,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Limit + 1 to detect hasMore
     query = query.limit(limit + 1);
 
-    // ----- Execute main query (with timeout fallback) -----
+    // ----- Execute main query -----
     let rows: any[];
     const { data: rawRows, error: queryError } = await query;
 
     if (queryError) {
-      // If the main query timed out, try a simpler fallback (no make exclusion,
-      // just vehicle_type filter + basic sort). This ensures the feed always loads.
       const isTimeout = queryError.message?.includes("timeout") ||
         queryError.message?.includes("canceling statement") ||
         queryError.code === "57014";
@@ -380,6 +362,8 @@ Deno.serve(async (req) => {
             discovery_url, discovery_source, profile_origin, origin_organization_id,
             city, state, listing_location,
             canonical_vehicle_type, has_photos,
+            primary_image_url, thumbnail_url, medium_url, full_image_url,
+            description_snippet,
             display_price, price_source, is_sold,
             asking_price, sale_price, current_value,
             nuke_estimate, nuke_estimate_low, nuke_estimate_high, nuke_estimate_confidence,
@@ -410,106 +394,32 @@ Deno.serve(async (req) => {
     const hasMore = rows.length > limit;
     const items = hasMore ? rows.slice(0, limit) : rows;
 
-    // ----- Enrich: thumbnails + auction state (parallel) -----
+    // ----- Enrich: auction state only (images + descriptions now in MV) -----
     const vehicleIds = items.map((r: any) => r.vehicle_id);
 
-    const [thumbResult, auctionResult, descResult] = await Promise.all([
-      vehicleIds.length > 0
-        ? supabase
-            .from("vehicle_images")
-            .select("vehicle_id, image_url, thumbnail_url, medium_url, variants")
-            .in("vehicle_id", vehicleIds)
-            .eq("is_primary", true)
-            .limit(vehicleIds.length)
-        : { data: [], error: null },
-      vehicleIds.length > 0
-        ? supabase
-            .from("vehicle_events")
-            .select(
-              "vehicle_id, current_price, bid_count, event_status, ended_at, source_url",
-            )
-            .in("vehicle_id", vehicleIds)
-            .gt("ended_at", new Date().toISOString())
-            .order("updated_at", { ascending: false })
-            .limit(vehicleIds.length * 2)
-        : { data: [], error: null },
-      // Fetch descriptions (not in MV) — truncated server-side for payload size
-      vehicleIds.length > 0
-        ? supabase
-            .from("vehicles")
-            .select("id, description")
-            .in("id", vehicleIds)
-            .not("description", "is", null)
-            .limit(vehicleIds.length)
-        : { data: [], error: null },
-    ]);
-
-    const thumbMap = new Map<string, any>();
-    for (const img of thumbResult.data ?? []) {
-      if (!thumbMap.has(img.vehicle_id)) {
-        thumbMap.set(img.vehicle_id, img);
-      }
-    }
-
-    // Pass 2: For vehicles missing a primary image, fall back to first usable image
-    const missingThumbIds = vehicleIds.filter((id: string) => !thumbMap.has(id));
-    if (missingThumbIds.length > 0) {
-      const { data: fallbackImages } = await supabase
-        .rpc("get_first_images_for_vehicles", { vehicle_ids: missingThumbIds });
-      for (const img of fallbackImages ?? []) {
-        if (!thumbMap.has(img.vehicle_id)) {
-          thumbMap.set(img.vehicle_id, img);
-        }
-      }
-    }
-
-    // Pass 3: Last resort — vehicles with primary_image_url but NO vehicle_images rows at all.
-    // The RPC only queries vehicle_images, so this catches orphaned legacy URLs.
-    // Skipped when Pass 2 already resolved everything (common case).
-    const stillMissingIds = vehicleIds.filter((id: string) => !thumbMap.has(id));
-    if (stillMissingIds.length > 0) {
-      const { data: vehicleRows } = await supabase
-        .from("vehicles")
-        .select("id, primary_image_url")
-        .in("id", stillMissingIds)
-        .not("primary_image_url", "is", null);
-      for (const v of vehicleRows ?? []) {
-        if (v.primary_image_url) {
-          thumbMap.set(v.id, { vehicle_id: v.id, image_url: v.primary_image_url });
-        }
-      }
-    }
-
     const auctionMap = new Map<string, any>();
-    for (const listing of auctionResult.data ?? []) {
-      if (!auctionMap.has(listing.vehicle_id)) {
-        auctionMap.set(listing.vehicle_id, listing);
-      }
-    }
+    if (vehicleIds.length > 0) {
+      const { data: auctionData } = await supabase
+        .from("vehicle_events")
+        .select("vehicle_id, current_price, bid_count, event_status, ended_at, source_url")
+        .in("vehicle_id", vehicleIds)
+        .gt("ended_at", new Date().toISOString())
+        .order("updated_at", { ascending: false })
+        .limit(vehicleIds.length * 2);
 
-    // Description map — truncate to 300 chars server-side to keep payload lean
-    const descMap = new Map<string, string>();
-    for (const row of descResult.data ?? []) {
-      if (row.description) {
-        descMap.set(row.id, row.description.length > 300 ? row.description.slice(0, 300) : row.description);
+      for (const listing of auctionData ?? []) {
+        if (!auctionMap.has(listing.vehicle_id)) {
+          auctionMap.set(listing.vehicle_id, listing);
+        }
       }
     }
 
     // ----- Transform to response shape -----
     const feedItems = items.map((row: any) => {
-      const thumb = thumbMap.get(row.vehicle_id);
       const auction = auctionMap.get(row.vehicle_id);
 
-      let thumbnail_url: string | null = null;
-      if (thumb) {
-        thumbnail_url =
-          thumb.thumbnail_url ||
-          thumb.medium_url ||
-          thumb.variants?.thumbnail ||
-          thumb.variants?.medium ||
-          thumb.image_url ||
-          null;
-      }
+      // Thumbnail from MV (already resolved: thumbnail > medium > full > legacy primary_image_url)
+      const thumbnail_url = row.primary_image_url ?? null;
 
       // Build location string
       let location: string | null = null;
@@ -559,20 +469,19 @@ Deno.serve(async (req) => {
         profile_origin: row.profile_origin,
         origin_organization_id: row.origin_organization_id,
 
-        // Location
         location,
         city: row.city,
         state: row.state,
 
-        // Auction state (from vehicle_events)
+        // Auction state (live from vehicle_events)
         auction_end_date: auction?.ended_at ?? null,
         current_bid: auction?.current_price ?? null,
         bid_count: auction?.bid_count ?? null,
         listing_status: auction?.event_status ?? null,
         listing_url: auction?.source_url ?? null,
 
-        // Description (from vehicles table, truncated)
-        description: descMap.get(row.vehicle_id) ?? null,
+        // Description from MV (pre-truncated to 300 chars)
+        description: row.description_snippet ?? null,
 
         created_at: row.created_at,
         updated_at: row.updated_at,
@@ -590,11 +499,6 @@ Deno.serve(async (req) => {
       };
     });
 
-    // No longer filtering out vehicles without thumbnails — the two-pass
-    // image resolution (primary + fallback RPC) handles missing primaries,
-    // and CardImage.tsx renders "NO PHOTO" gracefully for any remaining edge cases.
-    const filteredFeedItems = feedItems;
-
     // ----- Build cursor for next page -----
     let next_cursor: string | null = null;
     if (hasMore && items.length > 0) {
@@ -603,43 +507,19 @@ Deno.serve(async (req) => {
       next_cursor = `${sortVal}::${lastItem.vehicle_id}`;
     }
 
-    // ----- Stats -----
-    let stats = {
-      total_vehicles: filteredFeedItems.length,
-      total_value: 0,
-      for_sale_count: 0,
-      active_auctions: 0,
-      avg_price: 0,
-      vehicles_added_today: 0,
-      sales_count_today: 0,
-      sales_volume_today: 0,
-    };
-
+    // ----- Stats (cached module-level) -----
+    let stats;
     try {
-      const { data: cacheRow } = await supabase
-        .from("portfolio_stats_cache")
-        .select("*")
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      if (cacheRow) {
-        stats = {
-          total_vehicles: cacheRow.total_vehicles ?? 0,
-          total_value: cacheRow.total_value ?? 0,
-          for_sale_count: cacheRow.for_sale_count ?? 0,
-          active_auctions: cacheRow.active_auctions ?? 0,
-          avg_price: cacheRow.avg_value || (cacheRow.total_vehicles > 0 ? Math.round(cacheRow.total_value / cacheRow.total_vehicles) : 0),
-          vehicles_added_today: cacheRow.vehicles_added_today ?? 0,
-          sales_count_today: cacheRow.sales_count_today ?? 0,
-          sales_volume_today: cacheRow.sales_volume_today ?? 0,
-        };
-      }
+      stats = await getPortfolioStats(supabase);
     } catch {
-      // Stats are best-effort
+      stats = {
+        total_vehicles: feedItems.length, total_value: 0, for_sale_count: 0,
+        active_auctions: 0, avg_price: 0, vehicles_added_today: 0,
+        sales_count_today: 0, sales_volume_today: 0,
+      };
     }
 
-    // Cache-Control: public for default feed, private for filtered/search requests
+    // Cache-Control
     const isFiltered = !!(
       isSearching ||
       body.cursor ||
@@ -663,7 +543,7 @@ Deno.serve(async (req) => {
       : "public, max-age=60, s-maxage=300";
 
     return json({
-      items: filteredFeedItems,
+      items: feedItems,
       next_cursor,
       total_estimate: stats.total_vehicles,
       stats,

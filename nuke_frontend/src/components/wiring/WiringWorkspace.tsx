@@ -1,611 +1,339 @@
-// WiringWorkspace.tsx — Full-viewport SVG canvas for wiring layout
-// Every electrical device positioned on a vehicle silhouette.
-// Click → detail panel. Drag → reposition. Wire lines between endpoints.
+// WiringWorkspace.tsx — Two-panel data view: reference image + device table
+// Left: zoomable reference images (harness plan, GM diagrams)
+// Right: sortable/filterable device table from vehicle_build_manifest
 
-import React, { useCallback, useRef, useState, useMemo } from 'react';
-import { supabase } from '../../lib/supabase';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useOverlayCompute } from './useOverlayCompute';
 import type { ManifestDevice, WireSpec } from './overlayCompute';
-import { WiringDeviceNode } from './WiringDeviceNode';
-import { WiringWirePath } from './WiringWirePath';
 import { WiringDetailPanel } from './WiringDetailPanel';
-import { SILHOUETTES, type VehicleSilhouette, type VehicleLayer } from './vehicleSilhouettes';
-import { placeLabels, type WireLabelRequest, type LabelPlacement } from './labelPlacer';
-import { routeWires, type RouteRequest, type RoutedWire } from './orthogonalRouter';
-import { computeTerminations, type TerminationRecord } from './terminationCompute';
+import { useWireCatalog, type WireTier } from './useWireCatalog';
+import { useComponentLibrary } from './useComponentLibrary';
+import { WIRE_TIERS } from './harnessConstants';
 
-// ── Constants ──────────────────────────────────────────────────────────
-// Canvas matches the silhouette viewBox (1000x1000 for top-down, 1000x550 for side)
-const CANVAS_INTERNAL_W = 1000;
-const CANVAS_INTERNAL_H = 1000;
+// ── Colors ───────────────────────────────────────────────────────────
+const C = {
+  bg: '#1e1e2e',
+  surface: '#282840',
+  surfaceHover: '#333355',
+  surfaceSelected: '#3d3d6b',
+  border: '#444466',
+  borderLight: '#555577',
+  text: '#e0e0e8',
+  textDim: '#8888aa',
+  textMuted: '#666688',
+  accent: '#6c8cff',
+  white: '#ffffff',
+  engine_bay: '#e05555',
+  dash: '#5588dd',
+  rear: '#44aa77',
+  doors: '#9966cc',
+  underbody: '#cc8833',
+  firewall: '#cc6699',
+  interior: '#44bbcc',
+  roof: '#669977',
+};
 
-// ── Schematic Layout Computation ───────────────────────────────────────
-// Groups devices into logical columns by electrical system
-const SCHEMATIC_COLUMNS: { label: string; match: (d: ManifestDevice) => boolean; xPct: number }[] = [
-  { label: 'POWER', xPct: 10, match: d => d.signal_type === 'power_source' || d.signal_type === 'ground' || d.device_name.includes('Battery') || d.device_name.includes('Alternator') || d.device_name.includes('Ground') },
-  { label: 'ECU + SENSORS', xPct: 30, match: d => d.device_category === 'ecu' || d.device_category === 'sensors' || d.device_name.includes('ECU') || d.device_name.includes('PDM') || d.device_name.includes('CAN') },
-  { label: 'ENGINE', xPct: 50, match: d => d.device_name.includes('Injector') || d.device_name.includes('Coil') || d.device_name.includes('Throttle') || d.device_name.includes('Pump') || d.device_category === 'engine_mgmt' },
-  { label: 'BODY', xPct: 70, match: d => d.device_category === 'lighting' || d.device_category === 'body' || d.device_category === 'brakes' || d.device_category === 'drivetrain' || d.device_category === 'fuel' },
-  { label: 'INTERIOR', xPct: 90, match: d => d.device_category === 'interior' || d.device_category === 'audio' || d.device_category === 'accessories' || d.device_category === 'safety' },
+const ZONE_ACCENT: Record<string, string> = {
+  engine_bay: C.engine_bay, dash: C.dash, rear: C.rear, doors: C.doors,
+  underbody: C.underbody, firewall: C.firewall, interior: C.interior, roof: C.roof,
+};
+
+// ── Reference Images ─────────────────────────────────────────────────
+const REFERENCE_IMAGES: { label: string; file: string }[] = [
+  { label: 'Harness Routing Plan', file: 'K5_harness_routing_plan_view.png' },
+  { label: 'Engine Bay LS3', file: 'K5_engine_bay_ls3_standalone.png' },
+  { label: 'K5 Blazer 4-View', file: 'K5_blazer_1977_4view_orthographic.gif' },
+  { label: 'Body Orthographic', file: 'K5_body_orthographic_rc4wd.jpg' },
+  { label: 'GM Forward Lamp Wiring', file: 'elec_8A14_forward_lamp_wiring_CK_front.png' },
+  { label: 'GM Rear Lighting', file: 'elec_8_12_rear_lighting_CK_all_models.png' },
+  { label: 'GM Underbody Wiring', file: 'elec_8A16_auxiliary_wiring_underbody.png' },
+  { label: 'Engine Compartment Wiring', file: 'engine_6D16D_compartment_wiring_3quarter.png' },
+  { label: 'Headlamp / Front Lighting', file: 'elec_8_9_onvehicle_headlamp_front_lighting.png' },
+  { label: 'Clearance / Interior Lamps', file: 'elec_8_14_clearance_lamps_light_switch_interior.png' },
+  { label: 'Cab Clearance Service', file: 'elec_8A_onvehicle_service_cab_clearance.png' },
 ];
 
-function computeSchematicPositions(devices: ManifestDevice[]): Map<string, { x: number; y: number }> {
-  const positions = new Map<string, { x: number; y: number }>();
-  const columnCounts: number[] = SCHEMATIC_COLUMNS.map(() => 0);
-
-  for (const d of devices) {
-    let colIdx = SCHEMATIC_COLUMNS.length - 1; // default to last column
-    for (let i = 0; i < SCHEMATIC_COLUMNS.length; i++) {
-      if (SCHEMATIC_COLUMNS[i].match(d)) { colIdx = i; break; }
-    }
-    const row = columnCounts[colIdx]++;
-    const ySpacing = Math.min(5, 90 / Math.max(1, devices.filter(dd => {
-      for (let i2 = 0; i2 < SCHEMATIC_COLUMNS.length; i2++) {
-        if (SCHEMATIC_COLUMNS[i2].match(dd)) return i2 === colIdx;
-      }
-      return colIdx === SCHEMATIC_COLUMNS.length - 1;
-    }).length));
-    positions.set(d.id, {
-      x: SCHEMATIC_COLUMNS[colIdx].xPct,
-      y: 5 + row * ySpacing,
-    });
-  }
-  return positions;
-}
-
-// ── Opacity Slider ────────────────────────────────────────────────────
-function OpacitySlider({ label, value, color, onChange }: {
-  label: string; value: number; color?: string; onChange: (v: number) => void;
-}) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 80 }}>
-      <span style={{
-        fontSize: '7px', textTransform: 'uppercase', letterSpacing: '0.5px',
-        color: color || 'var(--text-secondary, #666)', fontWeight: 700, fontFamily: 'Arial',
-        width: 28, textAlign: 'right',
-      }}>{label}</span>
-      <input
-        type="range" min={0} max={100} value={value}
-        onChange={e => onChange(Number(e.target.value))}
-        style={{
-          width: 48, height: 3, appearance: 'none', background: 'var(--border, #bdbdbd)',
-          outline: 'none', cursor: 'pointer',
-        }}
-      />
-      <span style={{
-        fontSize: '7px', fontFamily: '"Courier New", monospace', fontWeight: 700,
-        color: 'var(--text-secondary, #666)', width: 20,
-      }}>{value}%</span>
-    </div>
-  );
-}
-
-// ── Status Bar ─────────────────────────────────────────────────────────
-function StatusBar({
-  result, view, onToggleView, wiresVisible, onToggleWires, zonesVisible, onToggleZones,
-  layers, layerOpacities, onLayerOpacity,
-  layoutMode, onToggleLayout,
-}: {
-  result: ReturnType<typeof useOverlayCompute>['result'];
-  view: string;
-  onToggleView: () => void;
-  wiresVisible: boolean;
-  onToggleWires: () => void;
-  zonesVisible: boolean;
-  onToggleZones: () => void;
-  layers: VehicleLayer[];
-  layerOpacities: Map<string, number>;
-  onLayerOpacity: (id: string, value: number) => void;
-  layoutMode: 'vehicle' | 'schematic';
-  onToggleLayout: () => void;
-}) {
-  const lb = { fontSize: '8px', textTransform: 'uppercase' as const, color: 'var(--text-secondary, #666)', letterSpacing: '0.5px' };
-  const vl = { fontWeight: 700, fontSize: '11px', fontFamily: '"Courier New", monospace' };
-  const btn = (active: boolean, color?: string): React.CSSProperties => ({
-    fontSize: '8px', fontFamily: 'Arial', fontWeight: 700, padding: '3px 8px',
-    border: `2px solid ${active ? (color || 'var(--text, #2a2a2a)') : 'var(--border, #bdbdbd)'}`,
-    background: active ? (color || 'var(--text, #2a2a2a)') : 'var(--surface, #ebebeb)',
-    color: active ? 'var(--bg, #f5f5f5)' : 'var(--text, #2a2a2a)',
-    cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.5px',
-  });
-
-  return (
-    <div style={{
-      display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap',
-      padding: '6px 12px',
-      background: 'var(--surface, #ebebeb)',
-      borderBottom: '2px solid var(--text, #2a2a2a)',
-      fontFamily: 'Arial, sans-serif',
-    }}>
-      <div><span style={lb}>DEVICES </span><span style={vl}>{result.deviceCount}</span></div>
-      <div><span style={lb}>WIRES </span><span style={vl}>{result.wireCount}</span></div>
-      <div><span style={lb}>ECU </span><span style={vl}>{result.recommendedConfig.ecu.model}</span></div>
-      <div><span style={lb}>PDM </span><span style={vl}>{result.recommendedConfig.pdm.config}</span></div>
-      <div><span style={lb}>COST </span><span style={vl}>${Math.round(result.partsCost + result.recommendedConfig.totalCost).toLocaleString()}</span></div>
-      {result.warnings.length > 0 && (
-        <div style={{ color: 'var(--warning, #b05a00)' }}>
-          <span style={lb}>WARNINGS </span><span style={vl}>{result.warnings.length}</span>
-        </div>
-      )}
-
-      <div style={{ flex: 1 }} />
-
-      {/* Layer opacity sliders */}
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ ...lb, marginRight: 2 }}>LAYERS</span>
-        {layers.map(layer => (
-          <OpacitySlider
-            key={layer.id}
-            label={layer.shortLabel}
-            value={layerOpacities.get(layer.id) ?? Math.round((layer.defaultOpacity ?? 1) * 100)}
-            color={layer.color}
-            onChange={v => onLayerOpacity(layer.id, v)}
-          />
-        ))}
-        <div style={{ width: 1, height: 16, background: 'var(--border)', margin: '0 4px' }} />
-        <button onClick={onToggleZones} style={btn(zonesVisible)}>ZONES</button>
-        <button onClick={onToggleWires} style={btn(wiresVisible)}>WIRES</button>
-      </div>
-
-      <button onClick={onToggleLayout} style={btn(layoutMode === 'schematic')}>
-        {layoutMode === 'vehicle' ? 'SCHEMATIC' : 'VEHICLE'}
-      </button>
-      <button onClick={onToggleView} style={btn(false)}>{view === 'top-down' ? 'SIDE' : 'TOP'}</button>
-    </div>
-  );
-}
-
-// ── Props ──────────────────────────────────────────────────────────────
+// ── Component ────────────────────────────────────────────────────────
 interface Props {
   initialDevices: ManifestDevice[];
   vehicleId?: string;
 }
 
 export function WiringWorkspace({ initialDevices, vehicleId }: Props) {
-  const {
-    devices, result, updateDevice,
-    ecuModel, pdmChannels,
-  } = useOverlayCompute(initialDevices);
+  const { devices, result, terminations } = useOverlayCompute(initialDevices);
+  const [tier, setTier] = useState<WireTier>('professional');
+  const { products, gaugeConversions } = useWireCatalog(tier);
+  const { findComponent } = useComponentLibrary();
 
-  // ── View State ──
-  const [viewId, setViewId] = useState<'top-down' | 'side'>('top-down');
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
-  const [selectedWireNum, setSelectedWireNum] = useState<number | null>(null);
-  const [wiresVisible, setWiresVisible] = useState(true);
-  const [zonesVisible, setZonesVisible] = useState(true);
-  const [dirtyPositions, setDirtyPositions] = useState<Set<string>>(new Set());
-  const [layoutMode, setLayoutMode] = useState<'vehicle' | 'schematic'>('vehicle');
+  const [filter, setFilter] = useState('');
+  const [activeImage, setActiveImage] = useState(0);
 
-  // ── Layer Opacities (0-100) ──
-  const silhouetteForLayers = SILHOUETTES[viewId];
-  const [layerOpacities, setLayerOpacities] = useState<Map<string, number>>(() => {
-    const initial = new Map<string, number>();
-    silhouetteForLayers.layers.forEach(l => {
-      // All layers start at their defined opacity; defaultVisible just picks a reasonable initial
-      initial.set(l.id, l.defaultVisible
-        ? Math.round((l.defaultOpacity ?? 0.5) * 100)
-        : Math.round((l.defaultOpacity ?? 0.15) * 100));
-    });
-    return initial;
-  });
-  const handleLayerOpacity = useCallback((id: string, value: number) => {
-    setLayerOpacities(prev => new Map(prev).set(id, value));
-  }, []);
+  // Image pan/zoom
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
 
-  // ── Schematic positions (view-only, computed) ──
-  const schematicPositions = useMemo(() =>
-    layoutMode === 'schematic' ? computeSchematicPositions(devices) : null,
-  [layoutMode, devices]);
+  // Selected device data
+  const selectedDevice = useMemo(() => selectedDeviceId ? devices.find(d => d.id === selectedDeviceId) : null, [devices, selectedDeviceId]);
+  const selectedWire = useMemo(() => selectedDevice ? result.wires.find(w => w.to === selectedDevice.device_name) : undefined, [selectedDevice, result.wires]);
+  const selectedPdmChannel = useMemo(() => selectedDevice ? result.pdmChannels.find(ch => ch.devices.includes(selectedDevice.device_name)) : undefined, [selectedDevice, result.pdmChannels]);
+  const selectedTermination = useMemo(() => selectedDevice ? terminations.find(t => t.deviceName === selectedDevice.device_name) : undefined, [selectedDevice, terminations]);
+  const selectedLibraryComponent = useMemo(() => selectedDevice ? findComponent(selectedDevice.manufacturer || '', selectedDevice.part_number || '') : undefined, [selectedDevice, findComponent]);
+  const selectedWireProduct = useMemo(() => selectedWire ? products.find(p => p.gauge_awg === selectedWire.gauge) : undefined, [selectedWire, products]);
+  const selectedGaugeInfo = useMemo(() => selectedWire ? gaugeConversions.find(g => g.awg === selectedWire.gauge) : undefined, [selectedWire, gaugeConversions]);
 
-  // Effective device positions: schematic overrides spatial
-  const effectiveDevices = useMemo(() => {
-    if (!schematicPositions) return devices;
-    return devices.map(d => {
-      const pos = schematicPositions.get(d.id);
-      return pos ? { ...d, pos_x_pct: pos.x, pos_y_pct: pos.y } : d;
-    });
-  }, [devices, schematicPositions]);
-
-  // ── Batch wire routing (channel grouping + parallel offsets) ──
-  const { routedWireMap, wireLabels } = useMemo(() => {
-    const ecuDev = effectiveDevices.find(d =>
-      d.device_category === 'ecu' || d.device_name.toLowerCase().includes('ecu'));
-    const pdmDev = effectiveDevices.find(d =>
-      d.device_category === 'pdm' || d.device_name.toLowerCase().includes('pdm'));
-
-    const routeRequests: RouteRequest[] = [];
-    const wireGaugeMap = new Map<number, { gauge: number; color: string; name: string }>();
-
-    for (const wire of result.wires) {
-      const toDevice = effectiveDevices.find(d => d.device_name === wire.to || d.device_name === wire.label);
-      if (!toDevice) continue;
-      const toX = (toDevice.pos_x_pct || 50) / 100 * CANVAS_INTERNAL_W;
-      const toY = (toDevice.pos_y_pct || 50) / 100 * CANVAS_INTERNAL_H;
-      const srcDevice = wire.from.startsWith('PDM') ? pdmDev : ecuDev;
-      let fromX = srcDevice ? (srcDevice.pos_x_pct || 50) / 100 * CANVAS_INTERNAL_W : toX;
-      let fromY = srcDevice ? (srcDevice.pos_y_pct || 50) / 100 * CANVAS_INTERNAL_H : toY;
-      if (fromX === toX && fromY === toY) continue;
-      // Per-wire jitter at source to spread wires from same hub (±30px range)
-      const jitterScale = 2;
-      const jitterIdx = wire.wireNumber - 1;
-      const jitterCount = result.wires.length;
-      fromX += (jitterIdx - jitterCount / 2) * jitterScale;
-      fromY += ((jitterIdx % 7) - 3) * jitterScale;
-      routeRequests.push({ wireNumber: wire.wireNumber, fromX, fromY, toX, toY, gauge: wire.gauge });
-      wireGaugeMap.set(wire.wireNumber, { gauge: wire.gauge, color: wire.color, name: wire.to });
-    }
-
-    // Batch route with channel grouping and parallel offsets
-    const routed = routeWires(routeRequests, [], 4);
-    const routedMap = new Map<number, RoutedWire>();
-    const labelRequests: WireLabelRequest[] = [];
-    for (const r of routed) {
-      routedMap.set(r.wireNumber, r);
-      const info = wireGaugeMap.get(r.wireNumber);
-      if (info && r.segments.length > 0) {
-        labelRequests.push({ wireNumber: r.wireNumber, segments: r.segments, gauge: info.gauge, color: info.color, deviceName: info.name });
-      }
-    }
-    const placements = placeLabels(labelRequests);
-    const labelMap = new Map<number, LabelPlacement>();
-    for (const p of placements) labelMap.set(p.wireNumber, p);
-    return { routedWireMap: routedMap, wireLabels: labelMap };
-  }, [result.wires, effectiveDevices]);
-
-  // ── Termination records ──
-  const terminations = useMemo(
-    () => computeTerminations(result.wires, devices),
-    [result.wires, devices],
-  );
-  const terminationMap = useMemo(() => {
-    const m = new Map<number, TerminationRecord>();
-    terminations.forEach(t => m.set(t.wireNumber, t));
-    return m;
-  }, [terminations]);
-
-  // ── Viewport (pan/zoom) ──
-  // Initial zoom to fit vehicle in viewport with padding
-  const [viewport, setViewport] = useState({ x: 40, y: 20, zoom: 0.7 });
-  const svgRef = useRef<SVGSVGElement>(null);
-  const panRef = useRef<{ startX: number; startY: number; vpX: number; vpY: number } | null>(null);
-
-  const silhouette = SILHOUETTES[viewId];
-
-  // ── Device Maps ──
-  const deviceMap = useMemo(() => {
-    const m = new Map<string, ManifestDevice>();
-    devices.forEach(d => m.set(d.id, d));
-    return m;
-  }, [devices]);
-
-  // Build wire → device lookup. ECU and PDM are virtual nodes.
-  // Find the ECU device and PDM device from the manifest (use effectiveDevices for position)
-  const ecuDevice = useMemo(() => effectiveDevices.find(d =>
-    d.device_category === 'ecu' || d.device_name.toLowerCase().includes('ecu')
-  ), [effectiveDevices]);
-  const pdmDevice = useMemo(() => effectiveDevices.find(d =>
-    d.device_category === 'pdm' || d.device_name.toLowerCase().includes('pdm')
-  ), [effectiveDevices]);
-
-  // ── Wire for selected device ──
-  const selectedDevice = selectedDeviceId ? deviceMap.get(selectedDeviceId) : undefined;
-  const selectedWire = selectedDevice
-    ? result.wires.find(w => w.to === selectedDevice.device_name || w.label === selectedDevice.device_name)
-    : selectedWireNum != null
-      ? result.wires.find(w => w.wireNumber === selectedWireNum)
-      : undefined;
-
-  // If a wire is selected, show the target device in the detail panel
-  const detailDevice = selectedDevice || (selectedWire
-    ? devices.find(d => d.device_name === selectedWire.to || d.device_name === selectedWire.label)
-    : undefined);
-
-  const detailPdmChannel = detailDevice
-    ? result.pdmChannels.find(c => c.devices.includes(detailDevice.device_name))
-    : undefined;
-
-  // Termination record for selected wire
-  const detailTermination = selectedWire
-    ? terminationMap.get(selectedWire.wireNumber)
-    : detailDevice
-      ? terminationMap.get(result.wires.find(w => w.to === detailDevice.device_name || w.label === detailDevice.device_name)?.wireNumber ?? -1)
-      : undefined;
-
-  // ── URL swap handler ──
-  const handleUrlSwap = useCallback(async (url: string) => {
-    if (!detailDevice || !vehicleId) return;
-    try {
-      const { data } = await supabase
-        .from('catalog_parts')
-        .select('id, name, part_number, price_current, product_image_url')
-        .or(`product_url.eq.${url},source_url.eq.${url}`)
-        .limit(1)
-        .single();
-      if (data) {
-        updateDevice(detailDevice.id, {
-          part_number: data.part_number || detailDevice.part_number,
-          price: data.price_current || detailDevice.price,
-          product_image_url: data.product_image_url || detailDevice.product_image_url,
-        });
-      }
-    } catch (e) {
-      console.error('URL swap failed:', e);
-    }
-  }, [detailDevice, vehicleId, updateDevice]);
-
-  // ── Pan Handlers ──
-  const handleBgPointerDown = useCallback((e: React.PointerEvent) => {
-    if (e.button !== 0) return;
-    const target = e.target as SVGElement;
-    // Only start pan on background elements
-    if (target.closest('[data-device]') || target.closest('[data-wire]')) return;
-
-    setSelectedDeviceId(null);
-    setSelectedWireNum(null);
-
-    panRef.current = {
-      startX: e.clientX, startY: e.clientY,
-      vpX: viewport.x, vpY: viewport.y,
-    };
-    (e.target as Element).setPointerCapture(e.pointerId);
-  }, [viewport]);
-
-  const handleBgPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!panRef.current) return;
-    const dx = e.clientX - panRef.current.startX;
-    const dy = e.clientY - panRef.current.startY;
-    setViewport(v => ({ ...v, x: panRef.current!.vpX + dx, y: panRef.current!.vpY + dy }));
-  }, []);
-
-  const handleBgPointerUp = useCallback(() => {
-    panRef.current = null;
-  }, []);
-
-  // ── Zoom ──
+  // Pan/zoom handlers
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    const svg = svgRef.current;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const delta = e.deltaY > 0 ? 0.97 : 1.03;  // 3% per tick — smooth, single-digit increments
-    setViewport(v => {
-      const newZoom = Math.max(0.2, Math.min(4, v.zoom * delta));
-      return {
-        x: mouseX - (mouseX - v.x) * (newZoom / v.zoom),
-        y: mouseY - (mouseY - v.y) * (newZoom / v.zoom),
-        zoom: newZoom,
-      };
-    });
+    setScale(s => Math.max(0.15, Math.min(5, s * (e.deltaY < 0 ? 1.1 : 0.91))));
   }, []);
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    setIsPanning(true);
+    panStart.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
+  }, [offset]);
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanning) return;
+    setOffset({ x: panStart.current.ox + (e.clientX - panStart.current.x), y: panStart.current.oy + (e.clientY - panStart.current.y) });
+  }, [isPanning]);
+  const handleMouseUp = useCallback(() => setIsPanning(false), []);
+  const resetView = useCallback(() => { setScale(1); setOffset({ x: 0, y: 0 }); }, []);
 
-  // ── Device Selection ──
-  const handleSelectDevice = useCallback((id: string) => {
-    setSelectedDeviceId(id);
-    setSelectedWireNum(null);
-  }, []);
+  // Stats
+  const totalCost = result.partsCost + result.recommendedConfig.totalCost;
+  const totalLength = result.wires.reduce((s, w) => s + w.lengthFt, 0);
 
-  // ── Wire Selection ──
-  const handleSelectWire = useCallback((wireNum: number) => {
-    setSelectedWireNum(wireNum);
-    setSelectedDeviceId(null);
-  }, []);
-
-  // ── Device Drag ──
-  const handleDragEnd = useCallback((id: string, xPct: number, yPct: number) => {
-    updateDevice(id, { pos_x_pct: xPct, pos_y_pct: yPct });
-    setDirtyPositions(prev => new Set(prev).add(id));
-  }, [updateDevice]);
-
-  // ── Save Position to DB ──
-  const handleSavePosition = useCallback(async () => {
-    if (!detailDevice || !vehicleId) return;
-    try {
-      await supabase
-        .from('vehicle_build_manifest')
-        .update({
-          pos_x_pct: detailDevice.pos_x_pct,
-          pos_y_pct: detailDevice.pos_y_pct,
-        })
-        .eq('id', detailDevice.id);
-      setDirtyPositions(prev => {
-        const next = new Set(prev);
-        next.delete(detailDevice.id);
-        return next;
-      });
-    } catch (e) {
-      console.error('Failed to save position:', e);
+  // Table sort
+  const [sortKey, setSortKey] = useState<string>('device_name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const sortedDevices = useMemo(() => {
+    let list = [...devices];
+    if (filter) {
+      const f = filter.toLowerCase();
+      list = list.filter(d =>
+        d.device_name.toLowerCase().includes(f) ||
+        (d.device_category || '').toLowerCase().includes(f) ||
+        (d.location_zone || '').toLowerCase().includes(f),
+      );
     }
-  }, [detailDevice, vehicleId]);
+    return list.sort((a, b) => {
+      const av = (a as any)[sortKey] ?? '';
+      const bv = (b as any)[sortKey] ?? '';
+      const cmp = typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv));
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [devices, filter, sortKey, sortDir]);
 
-  // ── Toggle View ──
-  const toggleView = useCallback(() => {
-    setViewId(v => v === 'top-down' ? 'side' : 'top-down');
-  }, []);
-
-  const cursorStyle = panRef.current ? 'grabbing' : 'grab';
+  const handleSort = (key: string) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100%',
-      fontFamily: 'Arial, sans-serif', color: 'var(--text, #2a2a2a)',
-    }}>
-      {/* Status Bar */}
-      <StatusBar
-        result={result}
-        view={viewId}
-        onToggleView={toggleView}
-        wiresVisible={wiresVisible}
-        onToggleWires={() => setWiresVisible(v => !v)}
-        zonesVisible={zonesVisible}
-        onToggleZones={() => setZonesVisible(v => !v)}
-        layers={silhouette.layers}
-        layerOpacities={layerOpacities}
-        onLayerOpacity={handleLayerOpacity}
-        layoutMode={layoutMode}
-        onToggleLayout={() => setLayoutMode(m => m === 'vehicle' ? 'schematic' : 'vehicle')}
-      />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', fontFamily: 'Arial, sans-serif', background: C.bg, color: C.text }}>
+      {/* ── Status Bar ────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', height: 36, background: C.surface, borderBottom: `1px solid ${C.border}`, gap: 2, flexShrink: 0 }}>
+        <Stat label="DEVICES" value={String(devices.length)} />
+        <Stat label="WIRES" value={String(result.wireCount)} />
+        <Stat label="LENGTH" value={`${Math.round(totalLength)}ft`} />
+        <Stat label="ECU" value={result.recommendedConfig.ecu.model} />
+        <Stat label="PDM" value={result.recommendedConfig.pdm.config} />
+        <Stat label="COST" value={`$${Math.round(totalCost).toLocaleString()}`} />
 
-      {/* Main area: Canvas + Detail Panel */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
-        {/* SVG Canvas */}
-        <svg
-          ref={svgRef}
-          style={{
-            flex: 1, display: 'block',
-            background: 'var(--bg, #f5f5f5)',
-            cursor: cursorStyle,
-            minWidth: 0,
-          }}
-          onPointerDown={handleBgPointerDown}
-          onPointerMove={handleBgPointerMove}
-          onPointerUp={handleBgPointerUp}
-          onWheel={handleWheel}
-        >
-          {/* Grid pattern */}
-          <defs>
-            <pattern
-              id="wiring-grid"
-              width={20 * viewport.zoom}
-              height={20 * viewport.zoom}
-              patternUnits="userSpaceOnUse"
-              x={viewport.x % (20 * viewport.zoom)}
-              y={viewport.y % (20 * viewport.zoom)}
-            >
-              <circle cx={1} cy={1} r={0.5} fill="var(--border, #bdbdbd)" opacity={0.15} />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#wiring-grid)" pointerEvents="none" />
-
-          {/* Transformed group */}
-          <g transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.zoom})`}>
-
-            {/* Vehicle Layers (rendered in zIndex order, opacity from sliders) */}
-            {[...silhouette.layers]
-              .sort((a, b) => a.zIndex - b.zIndex)
-              .map(layer => {
-                const opacity = (layerOpacities.get(layer.id) ?? 0) / 100;
-                if (opacity <= 0) return null;
-                return (
-                  <g key={layer.id} opacity={opacity} style={{ pointerEvents: 'none' }}>
-                    {layer.paths.map((p, i) => (
-                      <path key={i} d={p.d}
-                        fill={p.fill || 'none'}
-                        stroke={p.stroke || layer.color}
-                        strokeWidth={p.strokeWidth || 1.5}
-                      />
-                    ))}
-                  </g>
-                );
-              })}
-
-            {/* Zone overlays */}
-            {zonesVisible && silhouette.zones.map(zone => (
-              <g key={zone.id}>
-                <path
-                  d={zone.path}
-                  fill={zone.color}
-                  opacity={0.05}
-                  stroke={zone.color}
-                  strokeWidth={0.5}
-                  strokeDasharray="4 4"
-                  style={{ pointerEvents: 'none' }}
-                />
-                {/* Zone label — positioned at center of zone bounds */}
-                <text
-                  x={(zone.xMin + zone.xMax) / 2 / 100 * CANVAS_INTERNAL_W}
-                  y={(zone.yMin + zone.yMax) / 2 / 100 * CANVAS_INTERNAL_H}
-                  style={{
-                    fontSize: '10px', fontFamily: 'Arial', fontWeight: 700,
-                    textTransform: 'uppercase', letterSpacing: '1px',
-                    fill: zone.color, opacity: 0.3, userSelect: 'none',
-                    pointerEvents: 'none',
-                  }}
-                  textAnchor="middle"
-                >
-                  {zone.label}
-                </text>
-              </g>
-            ))}
-
-            {/* Schematic column headers (only in schematic mode) */}
-            {layoutMode === 'schematic' && SCHEMATIC_COLUMNS.map(col => (
-              <text key={col.label}
-                x={col.xPct / 100 * CANVAS_INTERNAL_W}
-                y={20}
-                textAnchor="middle"
-                style={{
-                  fontSize: '8px', fontFamily: 'Arial', fontWeight: 700,
-                  textTransform: 'uppercase', letterSpacing: '1px',
-                  fill: 'var(--text-secondary, #666)', opacity: 0.6,
-                  userSelect: 'none', pointerEvents: 'none',
-                }}
-              >{col.label}</text>
-            ))}
-
-            {/* Wire paths (behind devices) — using batch-routed segments */}
-            {wiresVisible && result.wires.map(wire => {
-              const routed = routedWireMap.get(wire.wireNumber);
-              if (!routed || routed.segments.length === 0) return null;
-              return (
-                <WiringWirePath
-                  key={wire.wireNumber}
-                  wire={wire}
-                  segments={routed.segments}
-                  zoom={viewport.zoom}
-                  isSelected={selectedWireNum === wire.wireNumber}
-                  onSelect={handleSelectWire}
-                  label={wireLabels.get(wire.wireNumber)}
-                />
-              );
-            })}
-
-            {/* Device nodes */}
-            {effectiveDevices.map(device => {
-              const wire = result.wires.find(w => w.to === device.device_name || w.label === device.device_name);
-              return (
-                <WiringDeviceNode
-                  key={device.id}
-                  device={device}
-                  wire={wire}
-                  isSelected={selectedDeviceId === device.id}
-                  canvasWidth={CANVAS_INTERNAL_W}
-                  canvasHeight={CANVAS_INTERNAL_H}
-                  canvasZoom={viewport.zoom}
-                  onSelect={handleSelectDevice}
-                  onDragEnd={layoutMode === 'vehicle' ? handleDragEnd : () => {}}
-                />
-              );
-            })}
-          </g>
-
-          {/* View label */}
-          <text x={8} y={16} style={{
-            fontSize: '8px', fontFamily: 'Arial', fontWeight: 700,
-            textTransform: 'uppercase', letterSpacing: '1px',
-            fill: 'var(--text-muted, #999)', userSelect: 'none', opacity: 0.5,
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: '8px', color: C.textDim, fontWeight: 700, letterSpacing: '0.5px' }}>TIER</span>
+          <select value={tier} onChange={e => setTier(e.target.value as WireTier)} style={{
+            fontSize: '8px', fontFamily: '"Courier New", monospace', fontWeight: 700,
+            padding: '2px 4px', border: `1px solid ${C.border}`, background: C.bg, color: C.text, cursor: 'pointer',
           }}>
-            {silhouette.label} — {devices.length} DEVICES
-          </text>
-        </svg>
+            {WIRE_TIERS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+        </div>
+      </div>
 
-        {/* Detail Panel */}
-        {detailDevice && (
-          <WiringDetailPanel
-            device={detailDevice}
-            wire={selectedWire}
-            pdmChannel={detailPdmChannel}
-            ecuModel={ecuModel}
-            termination={detailTermination}
-            onClose={() => { setSelectedDeviceId(null); setSelectedWireNum(null); }}
-            onSavePosition={handleSavePosition}
-            onUrlSwap={handleUrlSwap}
-            positionDirty={dirtyPositions.has(detailDevice.id)}
-          />
+      {/* ── Two-Panel Layout ──────────────────────────────────────── */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+
+        {/* ═══ LEFT: Reference Image Viewer ═══ */}
+        <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.border}` }}>
+          {/* Image selector bar */}
+          <div style={{ display: 'flex', gap: 4, padding: '6px 12px', borderBottom: `1px solid ${C.border}`, background: C.surface, overflowX: 'auto', flexShrink: 0, alignItems: 'center' }}>
+            <select
+              value={activeImage}
+              onChange={e => { setActiveImage(Number(e.target.value)); resetView(); }}
+              style={{
+                fontSize: '8px', fontWeight: 700, fontFamily: 'Arial', textTransform: 'uppercase', letterSpacing: '0.5px',
+                padding: '3px 6px', border: `1px solid ${C.border}`, background: C.bg, color: C.text, cursor: 'pointer', flex: 1,
+              }}
+            >
+              {REFERENCE_IMAGES.map((img, i) => (
+                <option key={img.file} value={i}>{img.label}</option>
+              ))}
+            </select>
+            <button onClick={resetView} style={{
+              fontSize: '7px', fontFamily: 'Arial', fontWeight: 700, padding: '3px 8px',
+              background: 'transparent', border: `1px solid ${C.border}`, color: C.textDim, cursor: 'pointer',
+              textTransform: 'uppercase', letterSpacing: '0.3px',
+            }}>RESET</button>
+            <span style={{ fontSize: '7px', fontFamily: '"Courier New"', fontWeight: 700, color: C.textDim }}>
+              {Math.round(scale * 100)}%
+            </span>
+          </div>
+
+          {/* Image viewport */}
+          <div
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            style={{
+              flex: 1, overflow: 'hidden', cursor: isPanning ? 'grabbing' : 'grab',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#111',
+            }}
+          >
+            <img
+              src={`/wiring/${REFERENCE_IMAGES[activeImage].file}`}
+              alt={REFERENCE_IMAGES[activeImage].label}
+              draggable={false}
+              style={{
+                maxWidth: 'none',
+                transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+                transformOrigin: 'center center',
+                transition: isPanning ? 'none' : 'transform 0.1s ease-out',
+                userSelect: 'none',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* ═══ RIGHT: Device Table ═══ */}
+        <div style={{ width: '50%', display: 'flex', flexDirection: 'column' }}>
+          {/* Filter bar */}
+          <div style={{ padding: '6px 12px', borderBottom: `1px solid ${C.border}`, background: C.surface }}>
+            <input
+              type="text"
+              value={filter}
+              onChange={e => setFilter(e.target.value)}
+              placeholder="FILTER DEVICES..."
+              style={{
+                width: '100%', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
+                padding: '4px 8px', border: `1px solid ${C.border}`, background: C.bg, color: C.text, outline: 'none', fontFamily: 'Arial',
+              }}
+            />
+          </div>
+
+          {/* Table */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px', fontFamily: 'Arial' }}>
+              <thead>
+                <tr style={{ position: 'sticky', top: 0, zIndex: 2, background: C.surface, borderBottom: `2px solid ${C.accent}` }}>
+                  {[
+                    ['NAME', 'device_name'],
+                    ['ZONE', 'location_zone'],
+                    ['CATEGORY', 'device_category'],
+                    ['AWG', 'wire_gauge_recommended'],
+                    ['AMPS', 'power_draw_amps'],
+                    ['PART #', 'part_number'],
+                    ['COST', 'price'],
+                  ].map(([lbl, key]) => (
+                    <th
+                      key={key}
+                      onClick={() => handleSort(key)}
+                      style={{
+                        padding: '6px 8px', textAlign: 'left', cursor: 'pointer',
+                        fontSize: '7px', textTransform: 'uppercase', letterSpacing: '0.5px',
+                        fontWeight: 700, color: sortKey === key ? C.accent : C.textDim, userSelect: 'none',
+                      }}
+                    >
+                      {lbl}{sortKey === key ? (sortDir === 'asc' ? ' \u25B4' : ' \u25BE') : ''}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sortedDevices.map(d => {
+                  const wire = result.wires.find(w => w.to === d.device_name);
+                  const isSelected = d.id === selectedDeviceId;
+                  return (
+                    <tr
+                      key={d.id}
+                      onClick={() => setSelectedDeviceId(isSelected ? null : d.id)}
+                      style={{
+                        cursor: 'pointer',
+                        background: isSelected ? C.surfaceSelected : undefined,
+                        borderBottom: `1px solid ${C.border}`,
+                      }}
+                      onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = C.surfaceHover; }}
+                      onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = ''; }}
+                    >
+                      <td style={{ padding: '5px 8px', fontWeight: 700 }}>{d.device_name}</td>
+                      <td style={{ padding: '5px 8px' }}>
+                        <span style={{
+                          fontSize: '7px', fontWeight: 700, padding: '1px 5px',
+                          background: ZONE_ACCENT[d.location_zone || ''] || C.textMuted,
+                          color: '#fff', textTransform: 'uppercase', letterSpacing: '0.3px',
+                        }}>
+                          {(d.location_zone || '\u2014').replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td style={{ padding: '5px 8px', color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                        {d.device_category}
+                      </td>
+                      <td style={{ padding: '5px 8px', fontFamily: '"Courier New"', fontWeight: 700, textAlign: 'right', color: C.textDim }}>
+                        {wire?.gauge || d.wire_gauge_recommended || '\u2014'}
+                      </td>
+                      <td style={{ padding: '5px 8px', fontFamily: '"Courier New"', fontWeight: 700, textAlign: 'right' }}>
+                        {d.power_draw_amps != null ? `${d.power_draw_amps}A` : '\u2014'}
+                      </td>
+                      <td style={{ padding: '5px 8px', fontFamily: '"Courier New"', fontSize: '8px', color: C.textDim }}>
+                        {d.part_number || '\u2014'}
+                      </td>
+                      <td style={{ padding: '5px 8px', fontFamily: '"Courier New"', fontWeight: 700, textAlign: 'right' }}>
+                        {d.price ? `$${d.price.toLocaleString()}` : '\u2014'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ── Detail Panel (overlay on right) ──────────────────────── */}
+        {selectedDevice && (
+          <div style={{ position: 'absolute', right: 0, top: 0, height: '100%', zIndex: 10 }}>
+            <WiringDetailPanel
+              device={selectedDevice}
+              wire={selectedWire}
+              pdmChannel={selectedPdmChannel}
+              ecuModel={result.recommendedConfig.ecu.model}
+              termination={selectedTermination}
+              onClose={() => setSelectedDeviceId(null)}
+              onSavePosition={() => {}}
+              positionDirty={false}
+              libraryComponent={selectedLibraryComponent}
+              wireProduct={selectedWireProduct}
+              gaugeInfo={selectedGaugeInfo}
+              tierLabel={WIRE_TIERS.find(t => t.value === tier)?.label}
+              allWires={result.wires}
+            />
+          </div>
         )}
       </div>
     </div>
   );
 }
 
+// ── Stat chip ────────────────────────────────────────────────────────
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, marginRight: 6 }}>
+      <span style={{ fontSize: '7px', fontWeight: 700, letterSpacing: '0.5px', color: C.textMuted }}>{label}</span>
+      <span style={{ fontSize: '10px', fontFamily: '"Courier New", monospace', fontWeight: 700, color: C.text }}>{value}</span>
+    </div>
+  );
+}

@@ -22,6 +22,11 @@ interface OrgVehicle {
   created_at: string;
 }
 
+interface BrandDesignLanguage {
+  colors?: { primary?: string; secondary?: string };
+  logos?: { svg?: string; primary_dark?: string; primary_light?: string };
+}
+
 interface OrgData {
   id: string;
   name: string | null;
@@ -33,6 +38,7 @@ interface OrgData {
   instagram_handle: string | null;
   website: string | null;
   established_date: string | null;
+  brand_design_language: BrandDesignLanguage | null;
   vehicles: OrgVehicle[];
 }
 
@@ -48,7 +54,7 @@ export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
       // Try by slug first, then by id
       let { data: o } = await supabase
         .from('businesses')
-        .select('id, name, entity_type, business_type, city, state, country, instagram_handle, website, established_date')
+        .select('id, name, entity_type, business_type, city, state, country, instagram_handle, website, established_date, brand_design_language')
         .or(`slug.eq.${orgId},id.eq.${orgId}`)
         .limit(1)
         .single();
@@ -132,8 +138,25 @@ export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
       </div>
 
       <div style={{ padding: '12px' }}>
+        {/* Logo */}
+        {(() => {
+          const bdl = org.brand_design_language;
+          const logoUrl = bdl?.logos?.svg || bdl?.logos?.primary_dark || bdl?.logos?.primary_light;
+          return logoUrl ? (
+            <div style={{ marginBottom: 10, padding: '8px 0' }}>
+              <img src={logoUrl} alt={org.name || ''} style={{
+                maxHeight: 36, maxWidth: '80%', objectFit: 'contain',
+                filter: 'brightness(0) invert(1)', opacity: 0.8,
+              }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            </div>
+          ) : null;
+        })()}
+
         {/* Name */}
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{org.name || 'Unknown Organization'}</div>
+        <div style={{
+          fontSize: 16, fontWeight: 700, marginBottom: 4,
+          color: org.brand_design_language?.colors?.primary || 'var(--text)',
+        }}>{org.name || 'Unknown Organization'}</div>
 
         {/* Type badge */}
         {(org.entity_type || org.business_type) && (

@@ -9,10 +9,7 @@ import { MessageCircle, Send, Loader } from 'lucide-react'
 import { SmartInvoiceUploader } from '../SmartInvoiceUploader'
 import ErrorBoundary from '../ErrorBoundary'
 
-// Lazy load the 3D model annotator (2.7MB with Three.js) - only loads when user opens a 3D model
-const ModelHarnessAnnotator = React.lazy(() =>
-  import('../wiring/ModelHarnessAnnotator').then(m => ({ default: m.ModelHarnessAnnotator }))
-)
+// ModelHarnessAnnotator removed — 3D viewer deleted with wiring canvas cleanup
 
 interface Message {
   id: string
@@ -988,17 +985,9 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
               hide
             </button>
           </div>
-          <ErrorBoundary
-            fallback={
-              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-secondary)', border: '1px solid var(--border)'}}>
-                3D model viewer unavailable
-              </div>
-            }
-          >
-            <Suspense fallback={null}>
-              <ModelHarnessAnnotator vehicleId={vehicleId} defaultImportUrl={activeModelSignedUrl} autoImportOnLoad={true} />
-            </Suspense>
-          </ErrorBoundary>
+          <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-secondary)', border: '1px solid var(--border)'}}>
+            3D model viewer removed
+          </div>
         </div>
       )}
 

@@ -2,7 +2,7 @@
   "name": "Nuke",
   "short_name": "Nuke",
   "description": "Vehicle provenance engine",
-  "start_url": "/tech",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "theme_color": "#000000",

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SECTION 2: ENGINE - LS3  |  COMBINED INDEX FILE
+     DWG NO: NKW-K5-02  |  REV: --  |  DATE: 2026-04-04
+
+     This diagram is split into 2 pages for legibility at 22x34" print:
+       Page 1: K5_S2_engine_schematic_p1.svg - Ignition Coils (8) + Fuel Injectors (8) = 16 wires
+       Page 2: K5_S2_engine_schematic_p2.svg - Engine Sensors (10) + Throttle Body = 12 wires
+
+     28 total engine loom wires | 142.6 ft total
+
+     ANSI D (22x34") landscape | viewBox 0 0 3400 2200 per page
+     Grid: A-Z rows, columns 1-37
+     M130 ECU on left (columns 2-8) with Connector A and B as pin blocks
+     Firewall at column 10 (dashed line)
+     Engine components on right (columns 15-35)
+
+     This file shows both pages stacked vertically for on-screen review.
+     Print each page separately at 22x34" for bench use.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3400 4500" width="3400" height="4500">
+<defs>
+  <style>
+    text { font-family: 'Courier New', monospace; }
+    .page-label { font-size: 20px; font-weight: bold; fill: #333; font-family: Arial, sans-serif; text-anchor: middle; }
+    .page-border { fill: none; stroke: #000; stroke-width: 2; }
+    .separator { stroke: #CC0000; stroke-width: 3; stroke-dasharray: 10,5; }
+  </style>
+</defs>
+
+<!-- Background -->
+<rect width="3400" height="4500" fill="#F5F5F5"/>
+
+<!-- PAGE 1 HEADER -->
+<text x="1700" y="30" class="page-label">PAGE 1 OF 2: IGNITION COILS + FUEL INJECTORS (NKW-K5-02-1)</text>
+
+<!-- PAGE 1 FRAME -->
+<rect x="0" y="40" width="3400" height="2200" class="page-border"/>
+
+<!-- Page 1 content is in K5_S2_engine_schematic_p1.svg -->
+<!-- When printed, use the individual page files -->
+<text x="1700" y="1140" font-family="Arial, sans-serif" font-size="36" fill="#CCC" text-anchor="middle" font-weight="bold">
+  SEE: K5_S2_engine_schematic_p1.svg
+</text>
+<text x="1700" y="1180" font-family="Arial, sans-serif" font-size="18" fill="#999" text-anchor="middle">
+  8 Ignition Coils (D510C) + 8 Fuel Injectors (EV6/USCAR)
+</text>
+<text x="1700" y="1210" font-family="Arial, sans-serif" font-size="18" fill="#999" text-anchor="middle">
+  M130 Connector A pins: A03-A08, A12-A13 (IGN) | A19-A22, A27-A30 (INJ)
+</text>
+
+<!-- CUT LINE -->
+<line x1="0" y1="2290" x2="3400" y2="2290" class="separator"/>
+<text x="1700" y="2310" font-family="Arial, sans-serif" font-size="12" fill="#CC0000" text-anchor="middle">CUT HERE FOR SEPARATE SHEETS</text>
+
+<!-- PAGE 2 HEADER -->
+<text x="1700" y="2350" class="page-label">PAGE 2 OF 2: ENGINE SENSORS + THROTTLE BODY (NKW-K5-02-2)</text>
+
+<!-- PAGE 2 FRAME -->
+<rect x="0" y="2360" width="3400" height="2200" class="page-border"/>
+
+<!-- Page 2 content is in K5_S2_engine_schematic_p2.svg -->
+<text x="1700" y="3460" font-family="Arial, sans-serif" font-size="36" fill="#CCC" text-anchor="middle" font-weight="bold">
+  SEE: K5_S2_engine_schematic_p2.svg
+</text>
+<text x="1700" y="3500" font-family="Arial, sans-serif" font-size="18" fill="#999" text-anchor="middle">
+  4 Shielded Sensors (CKP, CMP, KS1, KS2) + 6 Analog Sensors (OPS, MAP, IAT, CLT, FPS, OTS)
+</text>
+<text x="1700" y="3530" font-family="Arial, sans-serif" font-size="18" fill="#999" text-anchor="middle">
+  Electronic Throttle Body (6-pin GM 12605109) + Sensor 5V Ref/Ground Buses
+</text>
+<text x="1700" y="3560" font-family="Arial, sans-serif" font-size="18" fill="#999" text-anchor="middle">
+  M130 Connector B pins: B01-B05, B07, B13 | Connector A: A14-A16
+</text>
+
+<!-- WIRE SUMMARY -->
+<g transform="translate(200, 3700)">
+  <rect x="0" y="0" width="3000" height="320" rx="6" ry="6" fill="white" stroke="#000" stroke-width="1"/>
+  <text x="1500" y="30" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#000" text-anchor="middle">ENGINE LOOM WIRE SUMMARY - 28 WIRES, 142.6 FT</text>
+  <line x1="20" y1="40" x2="2980" y2="40" stroke="#999" stroke-width="0.5"/>
+
+  <text x="40" y="65" font-family="Courier New, monospace" font-size="11" fill="#000" font-weight="bold">PAGE 1 (16 wires):</text>
+  <text x="40" y="82" font-family="Courier New, monospace" font-size="10" fill="#333">  IGN1-IGN8: 8x 20AWG WHT/stripe  M130:A03-A08,A12,A13 -> D510C coils (4 per bank)</text>
+  <text x="40" y="98" font-family="Courier New, monospace" font-size="10" fill="#333">  INJ1-INJ8: 8x 18AWG GRN/stripe  M130:A19-A22,A27-A30 -> EV6/USCAR injectors (4 per bank)</text>
+
+  <text x="40" y="125" font-family="Courier New, monospace" font-size="11" fill="#000" font-weight="bold">PAGE 2 (12 wires):</text>
+  <text x="40" y="142" font-family="Courier New, monospace" font-size="10" fill="#333">  CKP-SIG:   22AWG BLU/WHT/WHT SHIELDED  M130:B01 -> 58X crank sensor (front of block)</text>
+  <text x="40" y="158" font-family="Courier New, monospace" font-size="10" fill="#333">  CMP-SIG:   22AWG BLU/WHT/BLK SHIELDED  M130:B02 -> Gen IV cam sensor (timing cover)</text>
+  <text x="40" y="174" font-family="Courier New, monospace" font-size="10" fill="#333">  KNK1-SIG:  22AWG GRY SHIELDED           M130:B07 -> Knock sensor bank 1 (valley)</text>
+  <text x="40" y="190" font-family="Courier New, monospace" font-size="10" fill="#333">  KNK2-SIG:  22AWG GRY/WHT SHIELDED       M130:B13 -> Knock sensor bank 2 (valley)</text>
+  <text x="40" y="206" font-family="Courier New, monospace" font-size="10" fill="#333">  OPS-SIG:   22AWG VIO                    M130:A14 -> Oil pressure (rear of block)</text>
+  <text x="40" y="222" font-family="Courier New, monospace" font-size="10" fill="#333">  MAP-SIG:   22AWG VIO/WHT                M130:A15 -> MAP sensor (intake manifold)</text>
+  <text x="40" y="238" font-family="Courier New, monospace" font-size="10" fill="#333">  IAT-SIG:   22AWG TAN                    M130:B03 -> Intake air temp (intake manifold)</text>
+  <text x="40" y="254" font-family="Courier New, monospace" font-size="10" fill="#333">  CLT-SIG:   22AWG TAN/WHT                M130:B04 -> Coolant temp (cyl head, driver)</text>
+  <text x="40" y="270" font-family="Courier New, monospace" font-size="10" fill="#333">  FPS-SIG:   22AWG VIO/BLK                M130:A16 -> Fuel pressure (fuel rail)</text>
+  <text x="40" y="286" font-family="Courier New, monospace" font-size="10" fill="#333">  OTS-SIG:   22AWG TAN/BLK                M130:B05 -> Oil temperature (oil pan/block)</text>
+  <text x="40" y="302" font-family="Courier New, monospace" font-size="10" fill="#333">  ETB:       18AWG ORG (6-pin bundle)     M130:A01/A18,AV,SEN -> Throttle body (intake)</text>
+  <text x="40" y="318" font-family="Courier New, monospace" font-size="10" fill="#333">  CAM:       20AWG BLU/WHT                PDM30:OUT15 -> Backup camera (routes thru engine loom)</text>
+</g>
+
+</svg>

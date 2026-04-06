@@ -1,33 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-
-interface SimilarSale {
-  vehicle_id: string | null;
-  year: number | null;
-  make: string | null;
-  model: string | null;
-  trim: string | null;
-  vin: string | null;
-  sale_price: number;
-  mileage: number | null;
-  color: string | null;
-  image_url: string | null;
-  location: string | null;
-  listing_url: string | null;
-  platform: string | null;
-  platform_raw: string | null;
-  sold_date: string | null;
-  source_type: 'auction_event' | 'vehicle_record';
-}
-
-interface SalesSummary {
-  count: number;
-  avg_price: number;
-  median_price: number;
-  min_price: number;
-  max_price: number;
-  auction_event_count: number;
-}
+import React, { useState } from 'react';
+import { useSimilarSales, type SimilarSale } from '../../hooks/useSimilarSales';
 
 interface SimilarSalesSectionProps {
   vehicleId: string;
@@ -90,67 +62,12 @@ export function SimilarSalesSection({
   vehicleMake,
   vehicleModel,
 }: SimilarSalesSectionProps) {
-  const [sales, setSales] = useState<SimilarSale[]>([]);
-  const [summary, setSummary] = useState<SalesSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading: loading, error: queryError } = useSimilarSales(vehicleId, vehicleMake);
   const [showAll, setShowAll] = useState(false);
 
-  useEffect(() => {
-    if (!vehicleId || !vehicleMake) return;
-    loadSales();
-  }, [vehicleId]);
-
-  async function loadSales() {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL as string;
-
-      if (!supabaseUrl) {
-        setError('Configuration error');
-        return;
-      }
-
-      const params = new URLSearchParams({
-        vehicle_id: vehicleId,
-        year_range: '2',
-        limit: '20',
-      });
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'apikey': (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ?? '',
-      };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const res = await fetch(
-        `${supabaseUrl}/functions/v1/api-v1-comps?${params.toString()}`,
-        { headers }
-      );
-
-      if (!res.ok) {
-        const errBody = await res.text();
-        console.error('Similar sales API error:', errBody);
-        setError('Unable to load comparable sales');
-        return;
-      }
-
-      const json = await res.json();
-      setSales(json.data ?? []);
-      setSummary(json.summary ?? null);
-    } catch (err) {
-      console.error('SimilarSalesSection error:', err);
-      setError('Unable to load comparable sales');
-    } finally {
-      setLoading(false);
-    }
-  }
+  const sales = data?.sales ?? [];
+  const summary = data?.summary ?? null;
+  const error = queryError ? 'Unable to load comparable sales' : null;
 
   const displayedSales = showAll ? sales : sales.slice(0, 6);
 

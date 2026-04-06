@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <title>C-02 Connector Face View Template</title>
+  <desc>Connector face view template symbol. Rectangular outline showing cavity layout from mating face, with keying feature, filled circles for populated pins, open circles for empty cavities, and pin labels. Used at every multi-pin device connection. Dimensions vary with pin count per spec.</desc>
+
+  <!-- Connector housing outline -->
+  <rect x="4" y="6" width="32" height="28" rx="2" ry="2" fill="white" stroke="black" stroke-width="1.5"/>
+
+  <!-- Keying feature (locking tab, top center) -->
+  <rect x="16" y="3" width="8" height="4" rx="1" ry="1" fill="white" stroke="black" stroke-width="1.2"/>
+
+  <!-- Pin grid row 1 (populated = filled, empty = open) -->
+  <circle cx="12" cy="14" r="2.5" fill="black" stroke="black" stroke-width="0.8"/>
+  <circle cx="20" cy="14" r="2.5" fill="black" stroke="black" stroke-width="0.8"/>
+  <circle cx="28" cy="14" r="2.5" fill="white" stroke="black" stroke-width="0.8"/>
+
+  <!-- Pin labels row 1 -->
+  <text x="12" y="14.5" font-family="Courier New, monospace" font-size="3" fill="white" text-anchor="middle" dominant-baseline="middle">1</text>
+  <text x="20" y="14.5" font-family="Courier New, monospace" font-size="3" fill="white" text-anchor="middle" dominant-baseline="middle">2</text>
+  <text x="28" y="14.5" font-family="Courier New, monospace" font-size="3" fill="black" text-anchor="middle" dominant-baseline="middle">3</text>
+
+  <!-- Pin grid row 2 -->
+  <circle cx="12" cy="24" r="2.5" fill="black" stroke="black" stroke-width="0.8"/>
+  <circle cx="20" cy="24" r="2.5" fill="white" stroke="black" stroke-width="0.8"/>
+  <circle cx="28" cy="24" r="2.5" fill="black" stroke="black" stroke-width="0.8"/>
+
+  <!-- Pin labels row 2 -->
+  <text x="12" y="24.5" font-family="Courier New, monospace" font-size="3" fill="white" text-anchor="middle" dominant-baseline="middle">4</text>
+  <text x="20" y="24.5" font-family="Courier New, monospace" font-size="3" fill="black" text-anchor="middle" dominant-baseline="middle">5</text>
+  <text x="28" y="24.5" font-family="Courier New, monospace" font-size="3" fill="white" text-anchor="middle" dominant-baseline="middle">6</text>
+
+  <!-- Part number area (below housing) -->
+  <text x="20" y="38" font-family="Courier New, monospace" font-size="3.5" fill="black" text-anchor="middle">P/N</text>
+</svg>

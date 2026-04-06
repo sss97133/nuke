@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../hooks/useAuth';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { supabase } from '../lib/supabase';
@@ -1303,14 +1304,12 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
 
 const FeedPage = lazy(() => import('../feed/components/FeedPage'));
 const GarageTab = lazy(() => import('../components/garage/GarageTab'));
-const UnifiedMap = lazy(() => import('../components/map/NukeMap'));
 
-type TabId = 'garage' | 'feed' | 'map';
+type TabId = 'garage' | 'feed';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'feed', label: 'Feed' },
   { id: 'garage', label: 'Garage' },
-  { id: 'map', label: 'Map' },
 ];
 
 const LS_KEY = 'nuke_hub_tab';
@@ -1426,18 +1425,10 @@ export default function HomePage() {
         </div>
       )}
 
-      {activeTab === 'map' ? (
-        <div style={{ height: 'calc(100vh - var(--header-height, 40px) - 30px)', overflow: 'hidden', position: 'relative' }}>
-          <Suspense fallback={<TabSkeleton />}>
-            <UnifiedMap />
-          </Suspense>
-        </div>
-      ) : (
-        <Suspense fallback={<TabSkeleton />}>
-          {activeTab === 'garage' && <GarageTab dashboard={garage} />}
-          {activeTab === 'feed' && <FeedPage />}
-        </Suspense>
-      )}
+      <Suspense fallback={<TabSkeleton />}>
+        {activeTab === 'garage' && <GarageTab dashboard={garage} />}
+        {activeTab === 'feed' && <FeedPage />}
+      </Suspense>
     </div>
   );
 }

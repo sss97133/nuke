@@ -4,6 +4,10 @@
 import React, { useState } from 'react';
 import type { ManifestDevice, WireSpec, PDMChannel } from './overlayCompute';
 import type { TerminationRecord, WireEndpointBOM } from './terminationCompute';
+import { WireMaterialPopup } from './WireMaterialPopup';
+import { ComponentCard } from './ComponentCard';
+import type { LibraryComponent } from './useComponentLibrary';
+import type { WireProduct, GaugeConversion } from './useWireCatalog';
 
 interface Props {
   device: ManifestDevice;
@@ -15,6 +19,13 @@ interface Props {
   onSavePosition: () => void;
   onUrlSwap?: (url: string) => void;
   positionDirty: boolean;
+  // New: component library + wire catalog data
+  libraryComponent?: LibraryComponent;
+  wireProduct?: WireProduct;
+  gaugeInfo?: GaugeConversion;
+  tierLabel?: string;
+  terminalCompatibility?: { compatible: boolean; terminalSize: string | null; notes: string | null };
+  allWires?: WireSpec[];
 }
 
 // Shared label style
@@ -25,10 +36,14 @@ const label: React.CSSProperties = {
 const val: React.CSSProperties = {
   fontSize: '10px', fontFamily: '"Courier New", monospace', fontWeight: 700,
   color: 'var(--text, #2a2a2a)',
+  textAlign: 'right' as const,
+  wordBreak: 'break-all' as const,
+  minWidth: 0,
 };
 const row: React.CSSProperties = {
   display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
   padding: '3px 0', borderBottom: '1px solid var(--border, #bdbdbd)',
+  gap: 8,
 };
 const section: React.CSSProperties = {
   marginBottom: 12,
@@ -141,7 +156,9 @@ function EndpointBOM({ ep, side }: { ep: WireEndpointBOM; side: string }) {
 
 export function WiringDetailPanel({
   device, wire, pdmChannel, ecuModel, termination, onClose, onSavePosition, onUrlSwap, positionDirty,
+  libraryComponent, wireProduct, gaugeInfo, tierLabel, terminalCompatibility, allWires,
 }: Props) {
+  const [activeConnector, setActiveConnector] = useState<string | undefined>(undefined);
   // Compute completeness
   const fields = [
     'manufacturer', 'model_number', 'part_number', 'pin_count',
@@ -155,15 +172,19 @@ export function WiringDetailPanel({
     <div
       onWheel={(e) => e.stopPropagation()}
       style={{
-        width: 380,
-        minWidth: 380,
+        position: 'absolute',
+        right: 0,
+        top: 0,
+        width: 320,
         height: '100%',
+        zIndex: 10,
         background: 'var(--bg, #f5f5f5)',
         borderLeft: '2px solid var(--text, #2a2a2a)',
         overflowY: 'auto',
         overflowX: 'hidden',
         fontFamily: 'Arial, sans-serif',
         color: 'var(--text, #2a2a2a)',
+        boxShadow: '-4px 0 12px rgba(0,0,0,0.08)',
       }}>
       {/* Header */}
       <div style={{
@@ -472,6 +493,32 @@ export function WiringDetailPanel({
               <span style={label}>WIRE LABEL</span>
               <span style={{ ...val, fontSize: '8px' }}>{termination.sourceEndpoint.termination.label || '—'}</span>
             </div>
+          </div>
+        )}
+
+        {/* Wire Material (from wire_catalog) */}
+        {wire && wireProduct && tierLabel && (
+          <div style={section}>
+            <WireMaterialPopup
+              wire={wire}
+              product={wireProduct}
+              gaugeInfo={gaugeInfo}
+              tierLabel={tierLabel}
+              terminalCompatibility={terminalCompatibility}
+            />
+          </div>
+        )}
+
+        {/* Component Library Card (from component_library DB) */}
+        {libraryComponent && (
+          <div style={section}>
+            <ComponentCard
+              component={libraryComponent}
+              wires={allWires || (wire ? [wire] : [])}
+              ecuModel={ecuModel}
+              activeConnector={activeConnector}
+              onConnectorSelect={setActiveConnector}
+            />
           </div>
         )}
 

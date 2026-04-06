@@ -4,44 +4,16 @@
  * Click "View Changes" to see who changed what and when
  */
 
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import React, { useState } from 'react';
+import { useEditHistory } from '../../hooks/useEditHistory';
 
 interface EditHistoryViewerProps {
   vehicleId: string;
 }
 
 export const EditHistoryViewer: React.FC<EditHistoryViewerProps> = ({ vehicleId }) => {
-  const [history, setHistory] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-
-  useEffect(() => {
-    if (showHistory) {
-      loadHistory();
-    }
-  }, [showHistory, vehicleId]);
-
-  const loadHistory = async () => {
-    setLoading(true);
-    try {
-      const { data } = await supabase
-        .from('vehicle_edit_history')
-        .select(`
-          *,
-          editor:profiles!vehicle_edit_history_edited_by_fkey(full_name, username)
-        `)
-        .eq('vehicle_id', vehicleId)
-        .order('edited_at', { ascending: false })
-        .limit(50);
-
-      setHistory(data || []);
-    } catch (err) {
-      console.error('Error loading edit history:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: history = [], isLoading: loading } = useEditHistory(vehicleId, showHistory);
 
   return (
     <div className="card" style={{ marginBottom: 'var(--space-3)' }}>

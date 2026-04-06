@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <title>G-01 Chassis Ground</title>
+  <desc>Standard chassis ground symbol. Three horizontal lines decreasing in width, with connection lead. Used at every point where a wire is bolted directly to the frame or engine block. 4mm x 5mm per spec.</desc>
+
+  <!-- Connection lead (top) -->
+  <line x1="20" y1="4" x2="20" y2="14" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- First horizontal line (widest) -->
+  <line x1="8" y1="14" x2="32" y2="14" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Second horizontal line (medium) -->
+  <line x1="12" y1="20" x2="28" y2="20" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Third horizontal line (narrowest) -->
+  <line x1="16" y1="26" x2="24" y2="26" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

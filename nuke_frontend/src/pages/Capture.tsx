@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { readCachedSession } from '../utils/cachedSession';
 import { UniversalImageUpload } from '../components/UniversalImageUpload';
@@ -119,10 +119,10 @@ const Capture: React.FC = () => {
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Add</span>
-          <button className="button button-secondary" style={{ fontSize: '12px' }} onClick={() => navigate('/')}
+          <Link to="/" className="button button-secondary" style={{ textDecoration: 'none', color: 'inherit', fontSize: '12px' }}
           >
             Done
-          </button>
+          </Link>
         </div>
         <div className="card-body" style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
           Drop photos here. If the system can’t place them confidently, they’ll stay in your inbox/album until you decide.

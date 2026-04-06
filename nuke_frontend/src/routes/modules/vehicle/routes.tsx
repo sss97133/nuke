@@ -5,7 +5,6 @@ import { ProtectedRoute } from '../../../components/auth/ProtectedRoute';
 
 const VehicleProfile = React.lazy(() => import('../../../pages/VehicleProfile'));
 const VehiclesDashboard = React.lazy(() => import('../../../pages/VehiclesDashboard'));
-const VehiclesLegacy = React.lazy(() => import('../../../pages/Vehicles'));
 const AddVehicle = React.lazy(() => import('../../../pages/add-vehicle/AddVehicle'));
 const EditVehicle = React.lazy(() => import('../../../pages/EditVehicle'));
 const VehicleMailbox = React.lazy(() => import('../../../components/VehicleMailbox/VehicleMailbox'));
@@ -22,9 +21,9 @@ const VehicleModuleRoutes = () => {
         {/* Public: browse vehicle list + individual profiles */}
         <Route path="/" element={<VehiclesDashboard />} />
         <Route path="/list" element={<VehiclesDashboard />} />
-        <Route path="/list/legacy" element={<VehiclesLegacy />} />
         <Route path="/list/from-photos" element={<VehicleListFromPhotos />} />
         <Route path="/:vehicleId" element={<VehicleProfile />} />
+        <Route path="/:vehicleId/wiring" element={<WiringPlan />} />
 
         {/* Protected: write / owner-only actions */}
         <Route element={<ProtectedRoute />}>
@@ -33,7 +32,6 @@ const VehicleModuleRoutes = () => {
           <Route path="/:vehicleId/mailbox" element={<VehicleMailbox />} />
           {/* InvestorDealPortal removed — page deleted */}
           <Route path="/:vehicleId/portfolio" element={<VehiclePortfolio />} />
-          <Route path="/:vehicleId/wiring" element={<WiringPlan />} />
           <Route path="/:vehicleId/work" element={<VehicleJobs />} />
         </Route>
 

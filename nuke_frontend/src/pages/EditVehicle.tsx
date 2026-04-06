@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 // AppLayout now provided globally by App.tsx
 import VehicleMakeModelInput from '../components/forms/VehicleMakeModelInput';
@@ -1334,13 +1334,13 @@ const EditVehicle: React.FC = () => {
                 {/* Submit Buttons */}
                 <div className="card-footer">
                   <div className="flex justify-between">
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/vehicle/${vehicleId}`)}
+                    <Link
+                      to={`/vehicle/${vehicleId}`}
                       className="button button-secondary"
+                      style={{ textDecoration: 'none', color: 'inherit' }}
                     >
                       Cancel
-                    </button>
+                    </Link>
                     <button
                       type="submit"
                       disabled={submitting}

@@ -90,6 +90,24 @@ The product architecture and its design implications. Every element earns its pr
 ### [08 — Dark Mode](./08-dark-mode.md)
 Complete dark mode token mapping (every token, light and dark values, delta). How dark mode is applied (`[data-theme="dark"]` attribute). The four dark mode rules. High contrast modes (light and dark). Greyscale mode. Third-party dark mode handling. Testing checklist.
 
+### [09 — Click-Through Chains](./09-click-through-chains.md)
+How clicks propagate through nested components. The click-through chain model. Badge → panel → detail → source. Every click target, every depth level, every transition.
+
+### [11 — Intelligence Surface](./11-intelligence-surface.md)
+How computed intelligence (scores, estimates, comparisons) renders on the vehicle profile. The seven-level analysis. Signal aggregation. Confidence visualization.
+
+### [12 — Document Generation](./12-documents.md)
+The Layer 0 mechanical skeleton for generated documents. Page tokens (A4, US Letter), slide tokens, bleed/trim/safe zones, type scales, color safety. The parallel `--doc-*` token namespace. Print vs. screen color spaces.
+
+### [13 — Multi-Brand Composition](./13-multi-brand-composition.md)
+How multiple brands coexist in a single document. The three-layer stack (Nuke / Agency / Brands). Deck manifest. Logo hierarchy and sizing. Color dominance and the one-accent rule. Slide ownership. Typography rules. Voice mixing profiles. Image treatment. The agency is the editor, the brands are the subjects.
+
+### [14 — The Deck System](./14-deck-system.md)
+**The most important chapter.** How Nuke generates outward-facing documents that secure partnerships and funding. The deck as a view into the database. The five-stage pipeline (Query → Validate → Compose → Render → Review). The evidence hierarchy. Logo display rules as code. The seven rules for deck generation. The build report and provenance chain. The collaboration model between human and agent. Anti-patterns. The closing principle: the database IS the pitch.
+
+### [Vehicle Profile — Computation Surface](./vehicle-profile-computation-surface.md)
+The vehicle profile as the middle of the data pipeline. Timeline as the atomic unit. Day cards. Seven-level analysis. Progressive density. The bill as a generated view. The anti-pattern of parallel tracking systems.
+
 ### [TOKENS.md](./TOKENS.md)
 **Every CSS variable in the design system.** Font scale, font sizes, typography, backgrounds, text, borders, accents, status colors, spacing, layout, chart palette, heatmap, racing accent colorways (22 colorways), contrast profiles, semantic aliases, grey scale aliases, button system, card system, input system, animation, z-index scale.
 
@@ -130,6 +148,16 @@ Complete dark mode token mapping (every token, light and dark values, delta). Ho
 
 **Every Data Point is a Live Badge:** Design Law 1. Every piece of data is displayable as a badge portal wired to its source and depth.
 
+**Deck Manifest:** The JSON contract that defines a deck: thesis, audience, entity list, brand roles, palette mode, editorial voice, slide definitions with data bindings. The manifest is the single input to the deck generation pipeline.
+
+**Deck Readiness Report:** A per-entity completeness audit produced during validation. Lists blocking errors (missing logos, missing GPS) and warnings (missing brand colors, suboptimal formats). The deck does not render until all blocking items are resolved.
+
+**Build Report:** The provenance chain produced alongside every rendered deck. Records every data binding, its source, confidence tier, and retrieval date. A deck with zero hardcoded values is a deck that can be re-rendered indefinitely.
+
+**Evidence Hierarchy:** The five-tier confidence scale for claims in outward-facing documents. Tier 1 (photo proof) through Tier 4 (qualified assertion) render with appropriate visual treatment. Tier 5 (unverifiable claims) is structurally impossible in a properly built template.
+
+**Deck-as-View:** The foundational principle of Chapter 14. A deck is not a document created in isolation -- it is a rendering of the database at a point in time, re-renderable whenever the underlying data changes.
+
 ---
 
 ## SUPERSESSION NOTICE
@@ -142,6 +170,7 @@ This Design Book supersedes `docs/DESIGN_BIBLE.md` as the canonical design refer
 
 | Date | Change |
 |------|--------|
+| 2026-04-05 | Chapter 14 (The Deck System) written. README TOC updated to include chapters 09, 11, 12, 13, 14, and the Computation Surface chapter. Glossary extended with deck system terms. |
 | 2026-03-24 | Design Interface Encyclopedia created. TOKENS.md, VIOLATIONS.md, 04-screens.md, 06-third-party.md, 07-finder-model.md, 08-dark-mode.md written. All existing chapters (01, 02, 02-arch, 03, 05) updated with cross-references, CSS token references, and expanded specifications. README replaced with comprehensive index. |
 | 2025-10-21 | Original design-book chapters created (01-foundations, 02-components, 03-interactions, 05-the-header). |
 

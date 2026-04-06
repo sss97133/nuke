@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { Link } from 'react-router-dom';
 import { getVehicleIdentityParts } from '../utils/vehicleIdentity';

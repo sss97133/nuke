@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <title>R-08 Twisted Pair Indicator</title>
+  <desc>Twisted pair indicator symbol. Two intertwined lines with periodic twist markers showing the physical twist of the conductors. Used for CAN bus backbone (M130 B17/B18 to PDM30 B25/B26). Small X markers every ~20mm of drawing length per spec.</desc>
+
+  <!-- Conductor 1 (sinusoidal path, offset up) -->
+  <path d="M2,16 Q6,12 10,17 Q14,22 18,17 Q22,12 26,17 Q30,22 34,17 L38,16" fill="none" stroke="black" stroke-width="1.2" stroke-linecap="round"/>
+
+  <!-- Conductor 2 (sinusoidal path, offset down, opposite phase) -->
+  <path d="M2,24 Q6,28 10,23 Q14,18 18,23 Q22,28 26,23 Q30,18 34,23 L38,24" fill="none" stroke="black" stroke-width="1.2" stroke-linecap="round"/>
+
+  <!-- Twist crossing markers (X marks at crossover points) -->
+  <line x1="8" y1="17" x2="12" y2="23" stroke="black" stroke-width="0.8"/>
+  <line x1="12" y1="17" x2="8" y2="23" stroke="black" stroke-width="0.8"/>
+
+  <line x1="18" y1="17" x2="22" y2="23" stroke="black" stroke-width="0.8"/>
+  <line x1="22" y1="17" x2="18" y2="23" stroke="black" stroke-width="0.8"/>
+
+  <line x1="28" y1="17" x2="32" y2="23" stroke="black" stroke-width="0.8"/>
+  <line x1="32" y1="17" x2="28" y2="23" stroke="black" stroke-width="0.8"/>
+</svg>

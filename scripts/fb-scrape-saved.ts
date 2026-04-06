@@ -318,12 +318,29 @@ async function main() {
         platform: "facebook_marketplace",
         status: "active",
         priority: "manual_import",
+        user_saved: true,
         first_seen_at: new Date().toISOString(),
         last_seen_at: new Date().toISOString(),
       }));
       const { error } = await supabase.from("marketplace_listings").insert(rows);
       if (error) console.error("Insert error:", error.message);
       else console.log(`Inserted ${newIds.length} new listing stubs.`);
+    }
+
+    // Mark ALL discovered saved items as user_saved (including previously inserted ones)
+    const { error: markError } = await supabase
+      .from("marketplace_listings")
+      .update({ user_saved: true, last_seen_at: new Date().toISOString() })
+      .in("facebook_id", ids)
+      .eq("user_saved", false);
+    if (markError) console.error("Mark user_saved error:", markError.message);
+    else {
+      // Also mark nulls
+      await supabase
+        .from("marketplace_listings")
+        .update({ user_saved: true })
+        .in("facebook_id", ids)
+        .is("user_saved", null);
     }
   }
 

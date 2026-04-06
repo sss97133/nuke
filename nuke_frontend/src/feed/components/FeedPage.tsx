@@ -282,6 +282,7 @@ export default function FeedPage() {
         vehicle={vehicle}
         viewMode={viewMode}
         compact={viewMode === 'grid' && cardsPerRow > 8}
+        showActions
         showScores={showScores}
         imageFit={resolvedFit}
         viewed={viewedIds.has(vehicle.id)}

@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 
@@ -74,7 +74,6 @@ interface WorkSubmission {
 type TabType = 'setup' | 'invites' | 'submissions';
 
 export default function RestorationIntake() {
-  const navigate = useNavigate();
   // useAuth reads from global AuthContext — synchronous for returning users
   const { session } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -322,13 +321,13 @@ export default function RestorationIntake() {
             <p style={{ fontSize: '11px', marginBottom: 'var(--space-4)' }}>
               Sign in to set up your shop and start receiving work photos from your technicians.
             </p>
-            <button
-              onClick={() => navigate('/login')}
+            <Link
+              to="/login"
               className="button button-primary"
-              style={{ fontSize: '11px' }}
+              style={{ textDecoration: 'none', color: 'inherit', fontSize: '11px' }}
             >
               Sign In
-            </button>
+            </Link>
           </div>
         </div>
       </div>
@@ -802,13 +801,13 @@ export default function RestorationIntake() {
               View documentation
             </a>
           </div>
-          <button
-            onClick={() => navigate('/settings/api-keys')}
+          <Link
+            to="/settings/api-keys"
             className="button button-secondary"
-            style={{ fontSize: '9px' }}
+            style={{ textDecoration: 'none', color: 'inherit', fontSize: '9px' }}
           >
             Manage API Keys
-          </button>
+          </Link>
         </div>
       </div>
 

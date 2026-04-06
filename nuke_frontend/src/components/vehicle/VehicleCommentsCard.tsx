@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import VehicleMemePanel from './VehicleMemePanel';
 import { FallbackAvatar } from '../common/AsciiAvatar';
+import { useVehicleCommentsUnified } from '../../hooks/useVehicleCommentsUnified';
 
 interface Comment {
   id: string;
@@ -46,6 +47,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   containerStyle,
 }) => {
   const navigate = useNavigate();
+  const { data: rawRows, isLoading: rawLoading, refetch } = useVehicleCommentsUnified(vehicleId);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(!collapsed);
@@ -56,10 +58,8 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   const [editingText, setEditingText] = useState<string>('');
   const [updating, setUpdating] = useState(false);
 
+  // Realtime subscription to refresh on changes
   useEffect(() => {
-    loadComments();
-    
-    // Subscribe to underlying tables (VIEWs can't have realtime subs)
     const channel = supabase
       .channel(`vehicle-comments-${vehicleId}`)
       .on('postgres_changes', {
@@ -67,51 +67,27 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
         schema: 'public',
         table: 'auction_comments',
         filter: `vehicle_id=eq.${vehicleId}`
-      }, () => {
-        loadComments();
-      })
+      }, () => { refetch(); })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'user_comments',
         filter: `vehicle_id=eq.${vehicleId}`
-      }, () => {
-        loadComments();
-      })
+      }, () => { refetch(); })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [vehicleId]);
+    return () => { supabase.removeChannel(channel); };
+  }, [vehicleId, refetch]);
 
-  const loadComments = async () => {
+  // Process raw rows into Comment objects when data changes
+  useEffect(() => {
+    if (!rawRows) return;
+    processRows(rawRows);
+  }, [rawRows]);
+
+  const processRows = async (allRows: any[]) => {
     try {
       setLoading(true);
-
-      // Single query against the unified VIEW — replaces 3 separate table fetches
-      const allRows: any[] = [];
-      let offset = 0;
-      const batchSize = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('vehicle_comments_unified')
-          .select('comment_id, vehicle_id, comment_text, observed_at, author_username, comment_type, bid_amount, is_seller, platform, comment_url, external_identity_id, media_urls, auction_event_id, source_category, source_slug, user_id, is_editable')
-          .eq('vehicle_id', vehicleId)
-          .order('observed_at', { ascending: false })
-          .range(offset, offset + batchSize - 1);
-
-        if (error) { console.warn('Error fetching comments:', error); break; }
-        if (data && data.length > 0) {
-          allRows.push(...data);
-          offset += batchSize;
-          hasMore = data.length === batchSize;
-        } else {
-          hasMore = false;
-        }
-      }
 
       const normalizeExternalPlatform = (raw: any): string | null => {
         if (!raw) return null;
@@ -268,7 +244,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
       if (!error) {
         setNewComment('');
         setMemePickerOpen(false);
-        loadComments();
+        refetch();
       }
     } catch (err) {
       console.error('Failed to post comment:', err);
@@ -304,7 +280,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
       if (!error) {
         setEditingCommentId(null);
         setEditingText('');
-        loadComments();
+        refetch();
       } else {
         console.error('Failed to update comment:', error);
       }

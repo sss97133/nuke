@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 interface Contributor {
   user_id: string;
@@ -18,7 +18,6 @@ interface VehicleContributorsProps {
 const VehicleContributors: React.FC<VehicleContributorsProps> = ({ vehicleId }) => {
   const [contributors, setContributors] = useState<Contributor[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     loadContributors();
@@ -108,11 +107,11 @@ const VehicleContributors: React.FC<VehicleContributorsProps> = ({ vehicleId }) 
       <h3 className="text" style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: 'var(--space-1)' }}>Contributors</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
         {contributors.map((contributor) => (
-          <div
+          <Link
             key={contributor.user_id}
+            to={`/profile/${contributor.user_id}`}
             className="card"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2)', cursor: 'pointer' }}
-            onClick={() => navigate(`/profile/${contributor.user_id}`)}
+            style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2)' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
               {contributor.avatar_url ? (
@@ -140,7 +139,7 @@ const VehicleContributors: React.FC<VehicleContributorsProps> = ({ vehicleId }) 
             <div className="text text-muted" style={{ fontSize: '8px' }}>
               {new Date(contributor.latest_upload).toLocaleDateString()}
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>

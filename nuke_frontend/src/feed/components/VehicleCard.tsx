@@ -5,7 +5,7 @@
  * Supports grid / gallery / technical view modes.
  */
 
-import { useCallback, useMemo, type CSSProperties } from 'react';
+import { useCallback, useMemo, useState, type CSSProperties } from 'react';
 import type { FeedVehicle, FeedViewConfig } from '../types/feed';
 import { resolveVehiclePrice } from '../utils/feedPriceResolution';
 import { vehicleTimeLabel } from '../utils/timeAgo';
@@ -17,6 +17,20 @@ import { resolveSourceLabel } from './card/CardSource';
 import { CardActions } from './card/CardActions';
 import { usePopup } from '../../components/popups/usePopup';
 import { VehiclePopup } from '../../components/popups/VehiclePopup';
+
+// ---------------------------------------------------------------------------
+// Local follow state (localStorage-backed until auth wiring is complete)
+// ---------------------------------------------------------------------------
+const FOLLOW_KEY = 'nuke_followed_vehicles';
+function getFollowedSet(): Set<string> {
+  try {
+    const raw = localStorage.getItem(FOLLOW_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch { return new Set(); }
+}
+function persistFollowed(set: Set<string>) {
+  try { localStorage.setItem(FOLLOW_KEY, JSON.stringify([...set])); } catch {}
+}
 
 export interface VehicleCardProps {
   vehicle: FeedVehicle;
@@ -53,6 +67,18 @@ export function VehicleCard({
   const { openPopup } = usePopup();
   const price = useMemo(() => resolveVehiclePrice(vehicle), [vehicle]);
   const timeLabel = useMemo(() => vehicleTimeLabel(vehicle), [vehicle]);
+
+  // Local follow state (used when onToggleFollow is not provided externally)
+  const [localFollowing, setLocalFollowing] = useState(() => getFollowedSet().has(vehicle.id));
+  const handleLocalToggleFollow = useCallback(() => {
+    const set = getFollowedSet();
+    if (set.has(vehicle.id)) { set.delete(vehicle.id); } else { set.add(vehicle.id); }
+    persistFollowed(set);
+    setLocalFollowing(set.has(vehicle.id));
+  }, [vehicle.id]);
+
+  const effectiveFollowing = onToggleFollow ? isFollowing : localFollowing;
+  const effectiveToggle = onToggleFollow ?? handleLocalToggleFollow;
 
   const sourceLabel = useMemo(
     () => resolveSourceLabel(vehicle.discovery_url, vehicle.discovery_source, vehicle.profile_origin),
@@ -500,6 +526,14 @@ export function VehicleCard({
     : price.isResult ? 'var(--warning)'
     : 'var(--text)';
 
+  // Compute card border accent for live vs sold distinction
+  const cardStatusStyle: CSSProperties = price.isSold
+    ? { opacity: 0.85, borderColor: 'var(--success, #16825d)' }
+    : price.isLive
+    ? { borderColor: 'var(--info, #0078d4)' }
+    : {};
+  const mergedStyle = { ...cardStatusStyle, ...style };
+
   // Grid mode (default) — clean image, all info below
   // Click opens centered popup overlay (no grid reflow)
   return (
@@ -515,15 +549,64 @@ export function VehicleCard({
       onHoverStart={onHoverStart}
       onHoverEnd={onHoverEnd}
       onCardClick={handleCardClick}
-      style={style}
+      style={mergedStyle}
     >
       <CardImage thumbnailUrl={vehicle.thumbnail_url} alt={alt} viewMode="grid" fit={imageFit} noImageData={noImageData}>
+        {/* Status badge — live vs sold vs for-sale */}
+        {price.isLive && (
+          <span style={{
+            position: 'absolute', top: '6px', left: '6px', zIndex: 10,
+            fontFamily: 'Arial, sans-serif', fontSize: '8px', fontWeight: 800,
+            textTransform: 'uppercase', letterSpacing: '0.5px',
+            padding: '2px 6px', lineHeight: 1,
+            background: 'var(--info, #0078d4)', color: '#fff',
+            border: '2px solid rgba(255,255,255,0.3)',
+          }}>
+            LIVE
+          </span>
+        )}
+        {!price.isLive && vehicle.is_for_sale && !price.isSold && (
+          <span style={{
+            position: 'absolute', top: '6px', left: '6px', zIndex: 10,
+            fontFamily: 'Arial, sans-serif', fontSize: '8px', fontWeight: 800,
+            textTransform: 'uppercase', letterSpacing: '0.5px',
+            padding: '2px 6px', lineHeight: 1,
+            background: 'var(--info, #0078d4)', color: '#fff',
+            border: '2px solid rgba(255,255,255,0.3)',
+          }}>
+            FOR SALE
+          </span>
+        )}
+        {price.isSold && price.showSoldBadge && (
+          <span style={{
+            position: 'absolute', top: '6px', left: '6px', zIndex: 10,
+            fontFamily: 'Arial, sans-serif', fontSize: '8px', fontWeight: 800,
+            textTransform: 'uppercase', letterSpacing: '0.5px',
+            padding: '2px 6px', lineHeight: 1,
+            background: 'var(--success, #16825d)', color: '#fff',
+            border: '2px solid rgba(255,255,255,0.3)',
+          }}>
+            SOLD
+          </span>
+        )}
+        {price.isResult && !price.isSold && (
+          <span style={{
+            position: 'absolute', top: '6px', left: '6px', zIndex: 10,
+            fontFamily: 'Arial, sans-serif', fontSize: '8px', fontWeight: 800,
+            textTransform: 'uppercase', letterSpacing: '0.5px',
+            padding: '2px 6px', lineHeight: 1,
+            background: 'var(--warning, #b05a00)', color: '#fff',
+            border: '2px solid rgba(255,255,255,0.3)',
+          }}>
+            ENDED
+          </span>
+        )}
         {/* Only interactive elements on image — follow button */}
-        {showActions && onToggleFollow && (
+        {showActions && (
           <CardActions
-            isFollowing={isFollowing}
+            isFollowing={effectiveFollowing}
             isLoading={isFollowLoading}
-            onToggleFollow={onToggleFollow}
+            onToggleFollow={effectiveToggle}
           />
         )}
       </CardImage>

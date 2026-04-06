@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4000 1400" width="4000" height="1400">
+<defs>
+  <style>
+    .rail { fill: none; stroke: #333; stroke-width: 6; stroke-linecap: round; }
+    .rail-inner { fill: none; stroke: #555; stroke-width: 2; stroke-dasharray: 2,4; }
+    .xm { fill: none; stroke: #666; stroke-width: 3; }
+    .xm-heavy { fill: none; stroke: #444; stroke-width: 4; }
+    .mount { fill: #C00; stroke: #800; stroke-width: 1.5; }
+    .mount-lbl { font-family: 'Courier New', monospace; font-size: 9px; fill: #C00; font-weight: bold; }
+    .axle { stroke: #222; stroke-width: 5; stroke-linecap: round; }
+    .tire { fill: none; stroke: #333; stroke-width: 2; }
+    .dim { font-family: 'Courier New', monospace; font-size: 8px; fill: #888; }
+    .dim-line { stroke: #AAA; stroke-width: 0.75; }
+    .dim-arrow { stroke: #AAA; stroke-width: 0.75; fill: #AAA; }
+    .lbl { font-family: 'Courier New', monospace; font-size: 10px; fill: #444; }
+    .lbl-section { font-family: Arial, sans-serif; font-size: 11px; fill: #666; font-weight: bold; }
+    .lbl-ref { font-family: 'Courier New', monospace; font-size: 7px; fill: #999; }
+    .centerline { stroke: #CCC; stroke-width: 0.5; stroke-dasharray: 12,4,2,4; }
+    .body-outline { fill: none; stroke: #BBB; stroke-width: 1.5; stroke-dasharray: 8,4; }
+    .firewall { stroke: #C00; stroke-width: 2; }
+    .zone-fill { opacity: 0.04; }
+    .title { font-family: Arial, sans-serif; font-weight: bold; }
+    .grid { stroke: #EEE; stroke-width: 0.5; }
+  </style>
+  <marker id="arr-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <polygon points="0,0 8,3 0,6" fill="#AAA"/>
+  </marker>
+  <marker id="arr-l" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto">
+    <polygon points="8,0 0,3 8,6" fill="#AAA"/>
+  </marker>
+</defs>
+
+<!-- Background -->
+<rect width="4000" height="1400" fill="#FEFEFE"/>
+
+<!-- Grid (1" = 20px, light) -->
+<g id="grid" opacity="0.3">
+  <!-- Vertical grid every 5" (100px) -->
+  <line x1="200" y1="100" x2="200" y2="1100" class="grid"/>
+  <line x1="400" y1="100" x2="400" y2="1100" class="grid"/>
+  <line x1="600" y1="100" x2="600" y2="1100" class="grid"/>
+  <line x1="800" y1="100" x2="800" y2="1100" class="grid"/>
+  <line x1="1000" y1="100" x2="1000" y2="1100" class="grid"/>
+  <line x1="1200" y1="100" x2="1200" y2="1100" class="grid"/>
+  <line x1="1400" y1="100" x2="1400" y2="1100" class="grid"/>
+  <line x1="1600" y1="100" x2="1600" y2="1100" class="grid"/>
+  <line x1="1800" y1="100" x2="1800" y2="1100" class="grid"/>
+  <line x1="2000" y1="100" x2="2000" y2="1100" class="grid"/>
+  <line x1="2200" y1="100" x2="2200" y2="1100" class="grid"/>
+  <line x1="2400" y1="100" x2="2400" y2="1100" class="grid"/>
+  <line x1="2600" y1="100" x2="2600" y2="1100" class="grid"/>
+  <line x1="2800" y1="100" x2="2800" y2="1100" class="grid"/>
+  <line x1="3000" y1="100" x2="3000" y2="1100" class="grid"/>
+  <line x1="3200" y1="100" x2="3200" y2="1100" class="grid"/>
+  <line x1="3400" y1="100" x2="3400" y2="1100" class="grid"/>
+  <line x1="3600" y1="100" x2="3600" y2="1100" class="grid"/>
+</g>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- FRAME — KA109 (K5 Blazer 4WD, 109" WB variant)       -->
+<!-- Scale: 20px = 1 inch                                   -->
+<!-- Origin: x=100 = front of frame, y=600 = centerline     -->
+<!-- Front = LEFT, Rear = RIGHT                              -->
+<!-- Driver (left) = TOP, Passenger (right) = BOTTOM         -->
+<!-- Overall length: 168.86" = 3377px                        -->
+<!-- Rail outside-to-outside: ~34" front = 680px             -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<g id="frame" transform="translate(100, 600)">
+
+  <!-- CENTERLINE -->
+  <line x1="-50" y1="0" x2="3450" y2="0" class="centerline"/>
+  <text x="3460" y="4" class="dim">CL</text>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- FRAME RAILS                         -->
+  <!-- Front rail spacing: ~34" (17" each side of CL) = 340px each side -->
+  <!-- Rear: rails taper slightly outward behind rear axle -->
+  <!-- ═══════════════════════════════════ -->
+
+  <!-- Driver rail (top) — ref points from Fig 2A-2 -->
+  <!-- V=14" front overhang narrowing, then straight, slight flare at rear -->
+  <polyline points="
+    0,-280
+    60,-310
+    200,-340
+    700,-340
+    2080,-340
+    2600,-340
+    3000,-350
+    3377,-350
+  " class="rail"/>
+
+  <!-- Passenger rail (bottom) -->
+  <polyline points="
+    0,280
+    60,310
+    200,340
+    700,340
+    2080,340
+    2600,340
+    3000,350
+    3377,350
+  " class="rail"/>
+
+  <!-- Inner flanges (show channel section) -->
+  <polyline points="200,-310 700,-310 2080,-310 2600,-310 3000,-320 3377,-320" class="rail-inner"/>
+  <polyline points="200,310 700,310 2080,310 2600,310 3000,320 3377,320" class="rail-inner"/>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- CROSSMEMBERS from Fig 2A-2/2A-3    -->
+  <!-- Lettered reference points A-V      -->
+  <!-- Using KA109 row dimensions          -->
+  <!-- ═══════════════════════════════════ -->
+
+  <!-- Front bumper / radiator support (point A: 13-3/8" = 267px from front) -->
+  <line x1="0" y1="-280" x2="0" y2="280" class="xm-heavy"/>
+  <text x="0" y="-295" text-anchor="middle" class="lbl-section">FRONT</text>
+  <text x="0" y="300" text-anchor="middle" class="lbl-ref">A</text>
+
+  <!-- Point B: 15-1/4" from A = 305px -->
+  <line x1="267" y1="-340" x2="267" y2="340" class="xm" stroke-dasharray="6,3"/>
+  <text x="267" y="370" text-anchor="middle" class="lbl-ref">B (15.25")</text>
+
+  <!-- Point C: 17" from B = 340px from B -->
+  <!-- Cumulative: 267+305 = 572 ... wait let me recalculate -->
+  <!-- A=13.375", B=15.25", C=17" — these are widths at each station, not distances! -->
+  <!-- Actually looking at Fig 2A-2 again: A-V are WIDTHS at each crossmember/point -->
+  <!-- The distances between points aren't in the table — they're the station positions -->
+  <!-- S=110" is the overall frame length reference between two gauge holes -->
+
+  <!-- Let me use the actual frame structure from the side view drawing instead -->
+  <!-- Key known positions on a 104" WB K10/K5: -->
+  <!-- Front axle: ~10" from front = 200px -->
+  <!-- Engine crossmember: ~28" = 560px -->
+  <!-- Firewall: ~35" = 700px -->
+  <!-- Front body mount: ~40" = 800px -->
+  <!-- Trans crossmember: ~52" = 1040px -->
+  <!-- Center crossmember: ~62" = 1240px -->
+  <!-- Rear body mount: ~75" = 1500px -->
+  <!-- Rear axle: 104" WB = 2080px -->
+  <!-- Rear crossmember: ~138" = 2760px -->
+  <!-- Spare tire crossmember: ~155" = 3100px -->
+  <!-- End of frame: 168.86" = 3377px -->
+
+  <!-- CROSSMEMBER 1: Front / Radiator Support (0") -->
+  <rect x="-5" y="-280" width="10" height="560" fill="#888" opacity="0.2"/>
+
+  <!-- CROSSMEMBER 2: Engine mount (28") -->
+  <line x1="560" y1="-340" x2="560" y2="340" class="xm-heavy"/>
+  <text x="560" y="370" text-anchor="middle" class="lbl-ref">ENGINE XM (28")</text>
+
+  <!-- CROSSMEMBER 3: Transmission (52") -->
+  <line x1="1040" y1="-280" x2="1040" y2="280" class="xm"/>
+  <text x="1040" y="370" text-anchor="middle" class="lbl-ref">TRANS XM (52")</text>
+
+  <!-- CROSSMEMBER 4: Center (62") -->
+  <line x1="1240" y1="-310" x2="1240" y2="310" class="xm"/>
+  <text x="1240" y="370" text-anchor="middle" class="lbl-ref">CENTER XM (62")</text>
+
+  <!-- CROSSMEMBER 5: Rear body (near 100") -->
+  <line x1="2000" y1="-340" x2="2000" y2="340" class="xm" stroke-dasharray="6,3"/>
+
+  <!-- CROSSMEMBER 6: Rear spring hanger / axle area -->
+  <line x1="2400" y1="-340" x2="2400" y2="340" class="xm"/>
+
+  <!-- CROSSMEMBER 7: Rear (138") -->
+  <line x1="2760" y1="-340" x2="2760" y2="340" class="xm"/>
+  <text x="2760" y="370" text-anchor="middle" class="lbl-ref">REAR XM (138")</text>
+
+  <!-- CROSSMEMBER 8: Spare tire (155") -->
+  <line x1="3100" y1="-350" x2="3100" y2="350" class="xm"/>
+  <text x="3100" y="380" text-anchor="middle" class="lbl-ref">SPARE XM (155")</text>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- AXLES                               -->
+  <!-- ═══════════════════════════════════ -->
+
+  <!-- Front axle (10" from front = 200px) -->
+  <line x1="200" y1="-440" x2="200" y2="440" class="axle"/>
+  <text x="200" y="-455" text-anchor="middle" class="lbl-section">FRONT AXLE</text>
+  <!-- Tires -->
+  <ellipse cx="200" cy="-440" rx="50" ry="30" class="tire"/>
+  <ellipse cx="200" cy="440" rx="50" ry="30" class="tire"/>
+
+  <!-- Rear axle (104" WB = 2080px) -->
+  <line x1="2080" y1="-440" x2="2080" y2="440" class="axle"/>
+  <text x="2080" y="-455" text-anchor="middle" class="lbl-section">REAR AXLE (104" WB)</text>
+  <!-- Tires -->
+  <ellipse cx="2080" cy="-440" rx="50" ry="30" class="tire"/>
+  <ellipse cx="2080" cy="440" rx="50" ry="30" class="tire"/>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- FIREWALL — x=700 (35" from front)   -->
+  <!-- ═══════════════════════════════════ -->
+  <line x1="700" y1="-400" x2="700" y2="400" class="firewall"/>
+  <text x="700" y="-410" text-anchor="middle" class="title" font-size="13" fill="#C00">FIREWALL (35")</text>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- BODY MOUNTS (from Fig 2D-94)        -->
+  <!-- Blazer (model 14) has 4 mounts      -->
+  <!-- Mount 1: front, on frame rail       -->
+  <!-- Mount 2: mid, on frame rail         -->
+  <!-- Mount 3: rear cab, on frame rail    -->
+  <!-- Mount 4: rear body, on frame rail   -->
+  <!-- ═══════════════════════════════════ -->
+
+  <!-- Mount 1 — front cab mount (~38") -->
+  <rect x="748" y="-355" width="24" height="16" rx="4" class="mount"/>
+  <rect x="748" y="339" width="24" height="16" rx="4" class="mount"/>
+  <text x="760" y="-360" text-anchor="middle" class="mount-lbl">MT1</text>
+  <text x="760" y="370" text-anchor="middle" class="mount-lbl">MT1</text>
+
+  <!-- Mount 2 — mid cab mount (~62") -->
+  <rect x="1228" y="-355" width="24" height="16" rx="4" class="mount"/>
+  <rect x="1228" y="339" width="24" height="16" rx="4" class="mount"/>
+  <text x="1240" y="-360" text-anchor="middle" class="mount-lbl">MT2</text>
+  <text x="1240" y="370" text-anchor="middle" class="mount-lbl">MT2</text>
+
+  <!-- Mount 3 — rear cab mount (~82") -->
+  <rect x="1628" y="-355" width="24" height="16" rx="4" class="mount"/>
+  <rect x="1628" y="339" width="24" height="16" rx="4" class="mount"/>
+  <text x="1640" y="-360" text-anchor="middle" class="mount-lbl">MT3</text>
+  <text x="1640" y="370" text-anchor="middle" class="mount-lbl">MT3</text>
+
+  <!-- Mount 4 — rear body mount (~130") -->
+  <rect x="2588" y="-355" width="24" height="16" rx="4" class="mount"/>
+  <rect x="2588" y="339" width="24" height="16" rx="4" class="mount"/>
+  <text x="2600" y="-360" text-anchor="middle" class="mount-lbl">MT4</text>
+  <text x="2600" y="370" text-anchor="middle" class="mount-lbl">MT4</text>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- BODY OUTLINE (dashed)               -->
+  <!-- K5 Blazer: one-piece body           -->
+  <!-- Front of body at firewall, rear to ~148" -->
+  <!-- Width: ~76" outside body = 1520px   -->
+  <!-- ═══════════════════════════════════ -->
+  <rect x="650" y="-420" width="2300" height="840" rx="30" class="body-outline"/>
+  <text x="1800" y="-430" text-anchor="middle" class="lbl-section" fill="#AAA">BODY SHELL (one-piece K5)</text>
+
+  <!-- Engine bay outline -->
+  <rect x="-60" y="-380" width="760" height="760" rx="15" stroke="#CCC" stroke-width="1" stroke-dasharray="4,4" fill="none"/>
+  <text x="340" y="-390" text-anchor="middle" class="lbl-section" fill="#CCC">ENGINE BAY</text>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- ZONE LABELS                         -->
+  <!-- ═══════════════════════════════════ -->
+
+  <!-- Zone fills -->
+  <rect x="-60" y="-380" width="760" height="760" rx="15" fill="#FCC" class="zone-fill"/>
+  <rect x="700" y="-420" width="900" height="840" fill="#CCF" class="zone-fill"/>
+  <rect x="1600" y="-420" width="1350" height="840" fill="#CFC" class="zone-fill"/>
+
+  <text x="340" y="-60" text-anchor="middle" class="lbl" fill="#C88" font-size="18" opacity="0.4">ENGINE</text>
+  <text x="1150" y="-60" text-anchor="middle" class="lbl" fill="#88C" font-size="18" opacity="0.4">CAB</text>
+  <text x="2275" y="-60" text-anchor="middle" class="lbl" fill="#8C8" font-size="18" opacity="0.4">CARGO / REAR</text>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- DIMENSION LINES                     -->
+  <!-- ═══════════════════════════════════ -->
+
+  <!-- Overall length -->
+  <line x1="0" y1="480" x2="3377" y2="480" class="dim-line" marker-start="url(#arr-l)" marker-end="url(#arr-r)"/>
+  <text x="1688" y="475" text-anchor="middle" class="dim">168.86" OVERALL FRAME</text>
+
+  <!-- Wheelbase -->
+  <line x1="200" y1="510" x2="2080" y2="510" class="dim-line" marker-start="url(#arr-l)" marker-end="url(#arr-r)"/>
+  <text x="1140" y="505" text-anchor="middle" class="dim">104.00" WHEELBASE</text>
+
+  <!-- Front overhang -->
+  <line x1="0" y1="540" x2="200" y2="540" class="dim-line" marker-start="url(#arr-l)" marker-end="url(#arr-r)"/>
+  <text x="100" y="535" text-anchor="middle" class="dim">10"</text>
+
+  <!-- Rear overhang -->
+  <line x1="2080" y1="540" x2="3377" y2="540" class="dim-line" marker-start="url(#arr-l)" marker-end="url(#arr-r)"/>
+  <text x="2728" y="535" text-anchor="middle" class="dim">64.86" REAR</text>
+
+  <!-- Firewall position -->
+  <line x1="0" y1="-480" x2="700" y2="-480" class="dim-line" marker-start="url(#arr-l)" marker-end="url(#arr-r)"/>
+  <text x="350" y="-485" text-anchor="middle" class="dim">35" TO FIREWALL</text>
+
+</g>
+
+<!-- ═══════════════════════════════════ -->
+<!-- LEGEND                              -->
+<!-- ═══════════════════════════════════ -->
+<g id="legend" transform="translate(30, 30)">
+  <rect x="0" y="0" width="260" height="170" fill="white" stroke="#CCC" stroke-width="1" rx="4"/>
+  <text x="130" y="20" text-anchor="middle" class="title" font-size="12">FRAME — TOP VIEW</text>
+
+  <line x1="15" y1="38" x2="55" y2="38" class="rail"/>
+  <text x="65" y="42" class="lbl">Frame rail</text>
+
+  <line x1="15" y1="55" x2="55" y2="55" class="xm-heavy"/>
+  <text x="65" y="59" class="lbl">Crossmember</text>
+
+  <line x1="15" y1="72" x2="55" y2="72" class="axle"/>
+  <text x="65" y="76" class="lbl">Axle</text>
+
+  <line x1="15" y1="89" x2="55" y2="89" class="firewall"/>
+  <text x="65" y="93" class="lbl">Firewall</text>
+
+  <rect x="15" y="100" width="18" height="10" rx="3" class="mount"/>
+  <text x="65" y="110" class="lbl">Body mount (Fig 2D-94)</text>
+
+  <line x1="15" y1="125" x2="55" y2="125" class="body-outline"/>
+  <text x="65" y="129" class="lbl">Body outline (K5)</text>
+
+  <line x1="15" y1="142" x2="55" y2="142" class="centerline"/>
+  <text x="65" y="146" class="lbl">Centerline</text>
+
+  <text x="15" y="163" class="lbl-ref">Scale: 20px = 1 inch</text>
+</g>
+
+<!-- ═══════════════════════════════════ -->
+<!-- TITLE BLOCK                         -->
+<!-- ═══════════════════════════════════ -->
+<g id="titleblock">
+  <rect x="3500" y="1290" width="480" height="95" fill="white" stroke="black" stroke-width="2" rx="4"/>
+  <line x1="3500" y1="1318" x2="3980" y2="1318" stroke="black" stroke-width="1"/>
+  <text x="3740" y="1312" text-anchor="middle" class="title" font-size="14">NUKE LTD — BOULDER CITY NV</text>
+  <text x="3740" y="1338" text-anchor="middle" class="title" font-size="11">1977 K5 BLAZER — FRAME BASE DRAWING</text>
+  <text x="3740" y="1355" text-anchor="middle" class="lbl">KA109 4WD | 104" WB | Fig 2A-2/2A-3 ref</text>
+  <text x="3740" y="1372" text-anchor="middle" class="lbl-ref">VIN CCL187Z210370 | DWG K5-FRAME-001 | 2026-04-05</text>
+</g>
+
+</svg>

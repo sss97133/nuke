@@ -31,10 +31,10 @@ export interface FeedUrlState {
   imageFit: ImageFit;
 }
 
-const DEFAULT_SORT_BY: SortBy = 'popular';
+const DEFAULT_SORT_BY: SortBy = 'newest';
 const DEFAULT_SORT_DIR: SortDirection = 'desc';
 const DEFAULT_VIEW_MODE: ViewMode = 'grid';
-const DEFAULT_CARDS_PER_ROW = 6;
+const DEFAULT_CARDS_PER_ROW = 3;
 
 const VALID_SORT_BY: Set<string> = new Set([
   'year', 'make', 'model', 'mileage', 'newest', 'oldest', 'updated', 'popular',

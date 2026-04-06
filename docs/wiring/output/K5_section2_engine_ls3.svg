@@ -1,0 +1,480 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4520 1462" width="4520" height="1462">
+<style>
+  text { font-family: 'Courier New', monospace; }
+  .grid-line { stroke: #DDD; stroke-width: 0.3; }
+  .zone-line { stroke: #888; stroke-width: 0.6; stroke-dasharray: 6,3; }
+  .wire-hot { stroke: #000; stroke-width: 0.7; fill: none; }
+  .wire-signal { stroke: #000; stroke-width: 0.45; fill: none; }
+  .wire-shield { stroke: #000; stroke-width: 0.45; fill: none; stroke-dasharray: 1,1; }
+  .junction { fill: #000; }
+</style>
+<rect width="4520" height="1462" fill="white"/>
+
+<g id="grid">
+<line x1="40" y1="30" x2="40" y2="1382" class="grid-line"/>
+<line x1="160" y1="30" x2="160" y2="1382" class="grid-line"/>
+<line x1="280" y1="30" x2="280" y2="1382" class="grid-line"/>
+<line x1="400" y1="30" x2="400" y2="1382" class="grid-line"/>
+<line x1="520" y1="30" x2="520" y2="1382" class="grid-line"/>
+<line x1="640" y1="30" x2="640" y2="1382" class="grid-line"/>
+<line x1="760" y1="30" x2="760" y2="1382" class="grid-line"/>
+<line x1="880" y1="30" x2="880" y2="1382" class="grid-line"/>
+<line x1="1000" y1="30" x2="1000" y2="1382" class="grid-line"/>
+<line x1="1120" y1="30" x2="1120" y2="1382" class="grid-line"/>
+<line x1="1240" y1="30" x2="1240" y2="1382" class="grid-line"/>
+<line x1="1360" y1="30" x2="1360" y2="1382" class="grid-line"/>
+<line x1="1480" y1="30" x2="1480" y2="1382" class="grid-line"/>
+<line x1="1600" y1="30" x2="1600" y2="1382" class="grid-line"/>
+<line x1="1720" y1="30" x2="1720" y2="1382" class="grid-line"/>
+<line x1="1840" y1="30" x2="1840" y2="1382" class="grid-line"/>
+<line x1="1960" y1="30" x2="1960" y2="1382" class="grid-line"/>
+<line x1="2080" y1="30" x2="2080" y2="1382" class="grid-line"/>
+<line x1="2200" y1="30" x2="2200" y2="1382" class="grid-line"/>
+<line x1="2320" y1="30" x2="2320" y2="1382" class="grid-line"/>
+<line x1="2440" y1="30" x2="2440" y2="1382" class="grid-line"/>
+<line x1="2560" y1="30" x2="2560" y2="1382" class="grid-line"/>
+<line x1="2680" y1="30" x2="2680" y2="1382" class="grid-line"/>
+<line x1="2800" y1="30" x2="2800" y2="1382" class="grid-line"/>
+<line x1="2920" y1="30" x2="2920" y2="1382" class="grid-line"/>
+<line x1="3040" y1="30" x2="3040" y2="1382" class="grid-line"/>
+<line x1="3160" y1="30" x2="3160" y2="1382" class="grid-line"/>
+<line x1="3280" y1="30" x2="3280" y2="1382" class="grid-line"/>
+<line x1="3400" y1="30" x2="3400" y2="1382" class="grid-line"/>
+<line x1="3520" y1="30" x2="3520" y2="1382" class="grid-line"/>
+<line x1="3640" y1="30" x2="3640" y2="1382" class="grid-line"/>
+<line x1="3760" y1="30" x2="3760" y2="1382" class="grid-line"/>
+<line x1="3880" y1="30" x2="3880" y2="1382" class="grid-line"/>
+<line x1="4000" y1="30" x2="4000" y2="1382" class="grid-line"/>
+<line x1="4120" y1="30" x2="4120" y2="1382" class="grid-line"/>
+<line x1="4240" y1="30" x2="4240" y2="1382" class="grid-line"/>
+<line x1="4360" y1="30" x2="4360" y2="1382" class="grid-line"/>
+<line x1="4480" y1="30" x2="4480" y2="1382" class="grid-line"/>
+<line x1="40" y1="30" x2="4480" y2="30" class="grid-line"/>
+<line x1="40" y1="82" x2="4480" y2="82" class="grid-line"/>
+<line x1="40" y1="134" x2="4480" y2="134" class="grid-line"/>
+<line x1="40" y1="186" x2="4480" y2="186" class="grid-line"/>
+<line x1="40" y1="238" x2="4480" y2="238" class="grid-line"/>
+<line x1="40" y1="290" x2="4480" y2="290" class="grid-line"/>
+<line x1="40" y1="342" x2="4480" y2="342" class="grid-line"/>
+<line x1="40" y1="394" x2="4480" y2="394" class="grid-line"/>
+<line x1="40" y1="446" x2="4480" y2="446" class="grid-line"/>
+<line x1="40" y1="498" x2="4480" y2="498" class="grid-line"/>
+<line x1="40" y1="550" x2="4480" y2="550" class="grid-line"/>
+<line x1="40" y1="602" x2="4480" y2="602" class="grid-line"/>
+<line x1="40" y1="654" x2="4480" y2="654" class="grid-line"/>
+<line x1="40" y1="706" x2="4480" y2="706" class="grid-line"/>
+<line x1="40" y1="758" x2="4480" y2="758" class="grid-line"/>
+<line x1="40" y1="810" x2="4480" y2="810" class="grid-line"/>
+<line x1="40" y1="862" x2="4480" y2="862" class="grid-line"/>
+<line x1="40" y1="914" x2="4480" y2="914" class="grid-line"/>
+<line x1="40" y1="966" x2="4480" y2="966" class="grid-line"/>
+<line x1="40" y1="1018" x2="4480" y2="1018" class="grid-line"/>
+<line x1="40" y1="1070" x2="4480" y2="1070" class="grid-line"/>
+<line x1="40" y1="1122" x2="4480" y2="1122" class="grid-line"/>
+<line x1="40" y1="1174" x2="4480" y2="1174" class="grid-line"/>
+<line x1="40" y1="1226" x2="4480" y2="1226" class="grid-line"/>
+<line x1="40" y1="1278" x2="4480" y2="1278" class="grid-line"/>
+<line x1="40" y1="1330" x2="4480" y2="1330" class="grid-line"/>
+<line x1="40" y1="1382" x2="4480" y2="1382" class="grid-line"/>
+<text x="100" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">1</text>
+<text x="100" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">1</text>
+<text x="220" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">2</text>
+<text x="220" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">2</text>
+<text x="340" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">3</text>
+<text x="340" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">3</text>
+<text x="460" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">4</text>
+<text x="460" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">4</text>
+<text x="580" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">5</text>
+<text x="580" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">5</text>
+<text x="700" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">6</text>
+<text x="700" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">6</text>
+<text x="820" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">7</text>
+<text x="820" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">7</text>
+<text x="940" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">8</text>
+<text x="940" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">8</text>
+<text x="1060" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">9</text>
+<text x="1060" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">9</text>
+<text x="1180" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">10</text>
+<text x="1180" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">10</text>
+<text x="1300" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">11</text>
+<text x="1300" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">11</text>
+<text x="1420" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">12</text>
+<text x="1420" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">12</text>
+<text x="1540" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">13</text>
+<text x="1540" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">13</text>
+<text x="1660" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">14</text>
+<text x="1660" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">14</text>
+<text x="1780" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">15</text>
+<text x="1780" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">15</text>
+<text x="1900" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">16</text>
+<text x="1900" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">16</text>
+<text x="2020" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">17</text>
+<text x="2020" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">17</text>
+<text x="2140" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">18</text>
+<text x="2140" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">18</text>
+<text x="2260" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">19</text>
+<text x="2260" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">19</text>
+<text x="2380" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">20</text>
+<text x="2380" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">20</text>
+<text x="2500" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">21</text>
+<text x="2500" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">21</text>
+<text x="2620" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">22</text>
+<text x="2620" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">22</text>
+<text x="2740" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">23</text>
+<text x="2740" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">23</text>
+<text x="2860" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">24</text>
+<text x="2860" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">24</text>
+<text x="2980" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">25</text>
+<text x="2980" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">25</text>
+<text x="3100" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">26</text>
+<text x="3100" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">26</text>
+<text x="3220" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">27</text>
+<text x="3220" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">27</text>
+<text x="3340" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">28</text>
+<text x="3340" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">28</text>
+<text x="3460" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">29</text>
+<text x="3460" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">29</text>
+<text x="3580" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">30</text>
+<text x="3580" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">30</text>
+<text x="3700" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">31</text>
+<text x="3700" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">31</text>
+<text x="3820" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">32</text>
+<text x="3820" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">32</text>
+<text x="3940" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">33</text>
+<text x="3940" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">33</text>
+<text x="4060" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">34</text>
+<text x="4060" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">34</text>
+<text x="4180" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">35</text>
+<text x="4180" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">35</text>
+<text x="4300" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">36</text>
+<text x="4300" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">36</text>
+<text x="4420" y="22" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">37</text>
+<text x="4420" y="1396" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">37</text>
+<text x="26" y="59" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">A</text>
+<text x="4494" y="59" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">A</text>
+<text x="26" y="111" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">B</text>
+<text x="4494" y="111" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">B</text>
+<text x="26" y="163" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">C</text>
+<text x="4494" y="163" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">C</text>
+<text x="26" y="215" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">D</text>
+<text x="4494" y="215" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">D</text>
+<text x="26" y="267" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">E</text>
+<text x="4494" y="267" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">E</text>
+<text x="26" y="319" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">F</text>
+<text x="4494" y="319" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">F</text>
+<text x="26" y="371" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">G</text>
+<text x="4494" y="371" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">G</text>
+<text x="26" y="423" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">H</text>
+<text x="4494" y="423" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">H</text>
+<text x="26" y="475" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">I</text>
+<text x="4494" y="475" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">I</text>
+<text x="26" y="527" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">J</text>
+<text x="4494" y="527" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">J</text>
+<text x="26" y="579" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">K</text>
+<text x="4494" y="579" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">K</text>
+<text x="26" y="631" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">L</text>
+<text x="4494" y="631" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">L</text>
+<text x="26" y="683" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">M</text>
+<text x="4494" y="683" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">M</text>
+<text x="26" y="735" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">N</text>
+<text x="4494" y="735" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">N</text>
+<text x="26" y="787" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">O</text>
+<text x="4494" y="787" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">O</text>
+<text x="26" y="839" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">P</text>
+<text x="4494" y="839" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">P</text>
+<text x="26" y="891" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">Q</text>
+<text x="4494" y="891" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">Q</text>
+<text x="26" y="943" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">R</text>
+<text x="4494" y="943" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">R</text>
+<text x="26" y="995" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">S</text>
+<text x="4494" y="995" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">S</text>
+<text x="26" y="1047" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">T</text>
+<text x="4494" y="1047" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">T</text>
+<text x="26" y="1099" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">U</text>
+<text x="4494" y="1099" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">U</text>
+<text x="26" y="1151" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">V</text>
+<text x="4494" y="1151" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">V</text>
+<text x="26" y="1203" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">W</text>
+<text x="4494" y="1203" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">W</text>
+<text x="26" y="1255" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">X</text>
+<text x="4494" y="1255" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">X</text>
+<text x="26" y="1307" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">Y</text>
+<text x="4494" y="1307" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">Y</text>
+<text x="26" y="1359" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">Z</text>
+<text x="4494" y="1359" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">Z</text>
+</g>
+<g id="zones">
+<rect x="1600" y="30" width="2860" height="1352" fill="none" class="zone-line"/>
+<text x="3030" y="1374" text-anchor="middle" font-family="Arial" font-size="11" font-weight="bold" fill="#888">LS3 ENGINE — 6.2L V8</text>
+<line x1="1420" y1="30" x2="1420" y2="1382" class="zone-line"/>
+<text x="1420" y="1410" text-anchor="middle" font-family="Arial" font-size="8" font-weight="bold" fill="#888">FIREWALL</text>
+</g>
+<g id="ecu">
+<rect x="220" y="46" width="960" height="1300" fill="#FAFAFA" stroke="black" stroke-width="2"/>
+<text x="700" y="64" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold">MOTEC M130 ECU</text>
+<text x="700" y="76" text-anchor="middle" font-family="Arial" font-size="8" fill="#666">Superseal 34+26 pin</text>
+<text x="240" y="94" font-family="Arial" font-size="8" font-weight="bold" fill="#444">CONNECTOR A</text>
+<circle cx="232" cy="104" r="2.5" fill="black"/>
+<text x="240" y="107" font-family="Courier New" font-size="6.5">A03 IGN_LS1</text>
+<circle cx="1180" cy="104" r="1.5" fill="black"/>
+<circle cx="232" cy="126" r="2.5" fill="black"/>
+<text x="240" y="129" font-family="Courier New" font-size="6.5">A04 IGN_LS2</text>
+<circle cx="1180" cy="126" r="1.5" fill="black"/>
+<circle cx="232" cy="148" r="2.5" fill="black"/>
+<text x="240" y="151" font-family="Courier New" font-size="6.5">A05 IGN_LS3</text>
+<circle cx="1180" cy="148" r="1.5" fill="black"/>
+<circle cx="232" cy="170" r="2.5" fill="black"/>
+<text x="240" y="173" font-family="Courier New" font-size="6.5">A06 IGN_LS4</text>
+<circle cx="1180" cy="170" r="1.5" fill="black"/>
+<circle cx="232" cy="192" r="2.5" fill="black"/>
+<text x="240" y="195" font-family="Courier New" font-size="6.5">A07 IGN_LS5</text>
+<circle cx="1180" cy="192" r="1.5" fill="black"/>
+<circle cx="232" cy="214" r="2.5" fill="black"/>
+<text x="240" y="217" font-family="Courier New" font-size="6.5">A08 IGN_LS6</text>
+<circle cx="1180" cy="214" r="1.5" fill="black"/>
+<circle cx="232" cy="236" r="2.5" fill="black"/>
+<text x="240" y="239" font-family="Courier New" font-size="6.5">A12 IGN_LS7</text>
+<circle cx="1180" cy="236" r="1.5" fill="black"/>
+<circle cx="232" cy="258" r="2.5" fill="black"/>
+<text x="240" y="261" font-family="Courier New" font-size="6.5">A13 IGN_LS8</text>
+<circle cx="1180" cy="258" r="1.5" fill="black"/>
+<circle cx="232" cy="280" r="2.5" fill="black"/>
+<text x="240" y="283" font-family="Courier New" font-size="6.5">A19 INJ_PH1</text>
+<circle cx="1180" cy="280" r="1.5" fill="black"/>
+<circle cx="232" cy="302" r="2.5" fill="black"/>
+<text x="240" y="305" font-family="Courier New" font-size="6.5">A20 INJ_PH2</text>
+<circle cx="1180" cy="302" r="1.5" fill="black"/>
+<circle cx="232" cy="324" r="2.5" fill="black"/>
+<text x="240" y="327" font-family="Courier New" font-size="6.5">A21 INJ_PH3</text>
+<circle cx="1180" cy="324" r="1.5" fill="black"/>
+<circle cx="232" cy="346" r="2.5" fill="black"/>
+<text x="240" y="349" font-family="Courier New" font-size="6.5">A22 INJ_PH4</text>
+<circle cx="1180" cy="346" r="1.5" fill="black"/>
+<circle cx="232" cy="368" r="2.5" fill="black"/>
+<text x="240" y="371" font-family="Courier New" font-size="6.5">A27 INJ_PH5</text>
+<circle cx="1180" cy="368" r="1.5" fill="black"/>
+<circle cx="232" cy="390" r="2.5" fill="black"/>
+<text x="240" y="393" font-family="Courier New" font-size="6.5">A28 INJ_PH6</text>
+<circle cx="1180" cy="390" r="1.5" fill="black"/>
+<circle cx="232" cy="412" r="2.5" fill="black"/>
+<text x="240" y="415" font-family="Courier New" font-size="6.5">A29 INJ_PH7</text>
+<circle cx="1180" cy="412" r="1.5" fill="black"/>
+<circle cx="232" cy="434" r="2.5" fill="black"/>
+<text x="240" y="437" font-family="Courier New" font-size="6.5">A30 INJ_PH8</text>
+<circle cx="1180" cy="434" r="1.5" fill="black"/>
+<circle cx="232" cy="456" r="2.5" fill="black"/>
+<text x="240" y="459" font-family="Courier New" font-size="6.5">A02 SEN_5V_A</text>
+<circle cx="1180" cy="456" r="1.5" fill="black"/>
+<circle cx="232" cy="478" r="2.5" fill="black"/>
+<text x="240" y="481" font-family="Courier New" font-size="6.5">A09 SEN_5V_B</text>
+<circle cx="1180" cy="478" r="1.5" fill="black"/>
+<circle cx="232" cy="500" r="2.5" fill="black"/>
+<text x="240" y="503" font-family="Courier New" font-size="6.5">A10 BAT_NEG1</text>
+<circle cx="1180" cy="500" r="1.5" fill="black"/>
+<circle cx="232" cy="522" r="2.5" fill="black"/>
+<text x="240" y="525" font-family="Courier New" font-size="6.5">A11 BAT_NEG2</text>
+<circle cx="1180" cy="522" r="1.5" fill="black"/>
+<circle cx="232" cy="544" r="2.5" fill="black"/>
+<text x="240" y="547" font-family="Courier New" font-size="6.5">A14 AN_TEMP1</text>
+<circle cx="1180" cy="544" r="1.5" fill="black"/>
+<circle cx="232" cy="566" r="2.5" fill="black"/>
+<text x="240" y="569" font-family="Courier New" font-size="6.5">A15 AN_VOLT1</text>
+<circle cx="1180" cy="566" r="1.5" fill="black"/>
+<circle cx="232" cy="588" r="2.5" fill="black"/>
+<text x="240" y="591" font-family="Courier New" font-size="6.5">A16 AN_VOLT2</text>
+<circle cx="1180" cy="588" r="1.5" fill="black"/>
+<circle cx="232" cy="610" r="2.5" fill="black"/>
+<text x="240" y="613" font-family="Courier New" font-size="6.5">A26 BAT_POS</text>
+<circle cx="1180" cy="610" r="1.5" fill="black"/>
+<text x="720" y="94" font-family="Arial" font-size="8" font-weight="bold" fill="#444">CONNECTOR B</text>
+<circle cx="720" cy="104" r="2.5" fill="black"/>
+<text x="728" y="107" font-family="Courier New" font-size="6.5">B01 UDIG1/CKP</text>
+<circle cx="720" cy="126" r="2.5" fill="black"/>
+<text x="728" y="129" font-family="Courier New" font-size="6.5">B02 UDIG2/CMP</text>
+<circle cx="720" cy="148" r="2.5" fill="black"/>
+<text x="728" y="151" font-family="Courier New" font-size="6.5">B03 AN_TEMP2</text>
+<circle cx="720" cy="170" r="2.5" fill="black"/>
+<text x="728" y="173" font-family="Courier New" font-size="6.5">B04 AN_TEMP3</text>
+<circle cx="720" cy="192" r="2.5" fill="black"/>
+<text x="728" y="195" font-family="Courier New" font-size="6.5">B05 AN_TEMP4</text>
+<circle cx="720" cy="214" r="2.5" fill="black"/>
+<text x="728" y="217" font-family="Courier New" font-size="6.5">B07 KNOCK1</text>
+<circle cx="720" cy="236" r="2.5" fill="black"/>
+<text x="728" y="239" font-family="Courier New" font-size="6.5">B13 KNOCK2</text>
+<circle cx="720" cy="258" r="2.5" fill="black"/>
+<text x="728" y="261" font-family="Courier New" font-size="6.5">B15 SEN_0V_A</text>
+<circle cx="720" cy="280" r="2.5" fill="black"/>
+<text x="728" y="283" font-family="Courier New" font-size="6.5">B16 SEN_0V_B</text>
+<circle cx="720" cy="302" r="2.5" fill="black"/>
+<text x="728" y="305" font-family="Courier New" font-size="6.5">B17 CAN_HI</text>
+<circle cx="720" cy="324" r="2.5" fill="black"/>
+<text x="728" y="327" font-family="Courier New" font-size="6.5">B18 CAN_LO</text>
+</g>
+<g id="wires-and-components">
+<path d="M1180,104 H1540 V56 H3566" class="wire-hot"/>
+<text x="2140" y="52" font-family="Courier New" font-size="6.5" fill="#222">IGN1  20AWG  WHT</text>
+<circle cx="1180" cy="104" r="2" class="junction"/>
+<rect x="3572" y="46" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="60" font-family="Arial" font-size="7" font-weight="bold">Ignition Coil 1</text>
+<path d="M1180,126 H1548 V108 H3566" class="wire-hot"/>
+<text x="2140" y="104" font-family="Courier New" font-size="6.5" fill="#222">IGN2  20AWG  WHT/RED</text>
+<circle cx="1180" cy="126" r="2" class="junction"/>
+<rect x="3572" y="98" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="112" font-family="Arial" font-size="7" font-weight="bold">Ignition Coil 2</text>
+<path d="M1180,148 H1556 V160 H3566" class="wire-hot"/>
+<text x="2140" y="156" font-family="Courier New" font-size="6.5" fill="#222">IGN3  20AWG  WHT/BLK</text>
+<circle cx="1180" cy="148" r="2" class="junction"/>
+<rect x="3572" y="150" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="164" font-family="Arial" font-size="7" font-weight="bold">Ignition Coil 3</text>
+<path d="M1180,170 H1564 V212 H3566" class="wire-hot"/>
+<text x="2140" y="208" font-family="Courier New" font-size="6.5" fill="#222">IGN4  20AWG  WHT/BLU</text>
+<circle cx="1180" cy="170" r="2" class="junction"/>
+<rect x="3572" y="202" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="216" font-family="Arial" font-size="7" font-weight="bold">Ignition Coil 4</text>
+<path d="M1180,192 H1572 V264 H3566" class="wire-hot"/>
+<text x="2140" y="260" font-family="Courier New" font-size="6.5" fill="#222">IGN5  20AWG  WHT/WHT</text>
+<circle cx="1180" cy="192" r="2" class="junction"/>
+<rect x="3572" y="254" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="268" font-family="Arial" font-size="7" font-weight="bold">Ignition Coil 5</text>
+<path d="M1180,214 H1580 V316 H3566" class="wire-hot"/>
+<text x="2140" y="312" font-family="Courier New" font-size="6.5" fill="#222">IGN6  20AWG  WHT/YEL</text>
+<circle cx="1180" cy="214" r="2" class="junction"/>
+<rect x="3572" y="306" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="320" font-family="Arial" font-size="7" font-weight="bold">Ignition Coil 6</text>
+<path d="M1180,236 H1588 V368 H3566" class="wire-hot"/>
+<text x="2140" y="364" font-family="Courier New" font-size="6.5" fill="#222">IGN7  20AWG  WHT/VIO</text>
+<circle cx="1180" cy="236" r="2" class="junction"/>
+<rect x="3572" y="358" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="372" font-family="Arial" font-size="7" font-weight="bold">Ignition Coil 7</text>
+<path d="M1180,258 H1596 V420 H3566" class="wire-hot"/>
+<text x="2140" y="416" font-family="Courier New" font-size="6.5" fill="#222">IGN8  20AWG  WHT/ORG</text>
+<circle cx="1180" cy="258" r="2" class="junction"/>
+<rect x="3572" y="410" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="424" font-family="Arial" font-size="7" font-weight="bold">Ignition Coil 8</text>
+<path d="M1180,280 H1604 V472 H3566" class="wire-hot"/>
+<text x="2140" y="468" font-family="Courier New" font-size="6.5" fill="#222">INJ1  18AWG  GRN</text>
+<circle cx="1180" cy="280" r="2" class="junction"/>
+<rect x="3572" y="462" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="476" font-family="Arial" font-size="7" font-weight="bold">Fuel Injector 1</text>
+<path d="M1180,302 H1612 V524 H3566" class="wire-hot"/>
+<text x="2140" y="520" font-family="Courier New" font-size="6.5" fill="#222">INJ2  18AWG  GRN/WHT</text>
+<circle cx="1180" cy="302" r="2" class="junction"/>
+<rect x="3572" y="514" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="528" font-family="Arial" font-size="7" font-weight="bold">Fuel Injector 2</text>
+<path d="M1180,324 H1620 V576 H3566" class="wire-hot"/>
+<text x="2140" y="572" font-family="Courier New" font-size="6.5" fill="#222">INJ3  18AWG  GRN/BLK</text>
+<circle cx="1180" cy="324" r="2" class="junction"/>
+<rect x="3572" y="566" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="580" font-family="Arial" font-size="7" font-weight="bold">Fuel Injector 3</text>
+<path d="M1180,346 H1628 V628 H3566" class="wire-hot"/>
+<text x="2140" y="624" font-family="Courier New" font-size="6.5" fill="#222">INJ4  18AWG  GRN/RED</text>
+<circle cx="1180" cy="346" r="2" class="junction"/>
+<rect x="3572" y="618" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="632" font-family="Arial" font-size="7" font-weight="bold">Fuel Injector 4</text>
+<path d="M1180,368 H1636 V680 H3566" class="wire-hot"/>
+<text x="2140" y="676" font-family="Courier New" font-size="6.5" fill="#222">INJ5  18AWG  GRN/BLU</text>
+<circle cx="1180" cy="368" r="2" class="junction"/>
+<rect x="3572" y="670" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="684" font-family="Arial" font-size="7" font-weight="bold">Fuel Injector 5</text>
+<path d="M1180,390 H1644 V732 H3566" class="wire-hot"/>
+<text x="2140" y="728" font-family="Courier New" font-size="6.5" fill="#222">INJ6  18AWG  GRN/YEL</text>
+<circle cx="1180" cy="390" r="2" class="junction"/>
+<rect x="3572" y="722" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="736" font-family="Arial" font-size="7" font-weight="bold">Fuel Injector 6</text>
+<path d="M1180,412 H1652 V784 H3566" class="wire-hot"/>
+<text x="2140" y="780" font-family="Courier New" font-size="6.5" fill="#222">INJ7  18AWG  GRN/VIO</text>
+<circle cx="1180" cy="412" r="2" class="junction"/>
+<rect x="3572" y="774" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="788" font-family="Arial" font-size="7" font-weight="bold">Fuel Injector 7</text>
+<path d="M1180,434 H1660 V836 H3566" class="wire-hot"/>
+<text x="2140" y="832" font-family="Courier New" font-size="6.5" fill="#222">INJ8  18AWG  GRN/ORG</text>
+<circle cx="1180" cy="434" r="2" class="junction"/>
+<rect x="3572" y="826" width="16" height="20" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="840" font-family="Arial" font-size="7" font-weight="bold">Fuel Injector 8</text>
+<path d="M1180,456 H1668 V888 H3566" class="wire-shield"/>
+<text x="2140" y="884" font-family="Courier New" font-size="6.5" fill="#222">CKP  22AWG  BLU/WHT</text>
+<circle cx="1180" cy="456" r="2" class="junction"/>
+<circle cx="3580" cy="888" r="10" fill="white" stroke="black" stroke-width="1.2"/>
+<path d="M3574,888 Q3577,883 3580,888 Q3583,893 3586,888" fill="none" stroke="black" stroke-width="0.8"/>
+<text x="3596" y="892" font-family="Arial" font-size="7" font-weight="bold">Crank Position Sensor</text>
+<text x="2380" y="900" font-family="Arial" font-size="5" fill="#888">SHIELDED 2-CONDUCTOR</text>
+<path d="M1180,478 H1676 V940 H3566" class="wire-shield"/>
+<text x="2140" y="936" font-family="Courier New" font-size="6.5" fill="#222">CMP  22AWG  BLU/WHT/BLK</text>
+<circle cx="1180" cy="478" r="2" class="junction"/>
+<circle cx="3580" cy="940" r="10" fill="white" stroke="black" stroke-width="1.2"/>
+<path d="M3574,940 Q3577,935 3580,940 Q3583,945 3586,940" fill="none" stroke="black" stroke-width="0.8"/>
+<text x="3596" y="944" font-family="Arial" font-size="7" font-weight="bold">Cam Position Sensor</text>
+<text x="2380" y="952" font-family="Arial" font-size="5" fill="#888">SHIELDED 2-CONDUCTOR</text>
+<path d="M1180,500 H1684 V992 H3566" class="wire-shield"/>
+<text x="2140" y="988" font-family="Courier New" font-size="6.5" fill="#222">KS1  22AWG  GRY</text>
+<circle cx="1180" cy="500" r="2" class="junction"/>
+<polygon points="3580,982 3590,992 3580,1002 3570,992" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="996" font-family="Arial" font-size="7" font-weight="bold">Knock Sensor Bank 1</text>
+<text x="2380" y="1004" font-family="Arial" font-size="5" fill="#888">SHIELDED 2-CONDUCTOR</text>
+<path d="M1180,522 H1692 V1044 H3566" class="wire-shield"/>
+<text x="2140" y="1040" font-family="Courier New" font-size="6.5" fill="#222">KS2  22AWG  GRY/WHT</text>
+<circle cx="1180" cy="522" r="2" class="junction"/>
+<polygon points="3580,1034 3590,1044 3580,1054 3570,1044" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="1048" font-family="Arial" font-size="7" font-weight="bold">Knock Sensor Bank 2</text>
+<text x="2380" y="1056" font-family="Arial" font-size="5" fill="#888">SHIELDED 2-CONDUCTOR</text>
+<path d="M1180,544 H1700 V1096 H3566" class="wire-signal"/>
+<text x="2140" y="1092" font-family="Courier New" font-size="6.5" fill="#222">MAP  22AWG  VIO/WHT</text>
+<circle cx="1180" cy="544" r="2" class="junction"/>
+<polygon points="3580,1086 3590,1096 3580,1106 3570,1096" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="1100" font-family="Arial" font-size="7" font-weight="bold">MAP Sensor</text>
+<path d="M1180,566 H1708 V1148 H3566" class="wire-signal"/>
+<text x="2140" y="1144" font-family="Courier New" font-size="6.5" fill="#222">IAT  22AWG  TAN</text>
+<circle cx="1180" cy="566" r="2" class="junction"/>
+<polygon points="3580,1138 3590,1148 3580,1158 3570,1148" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="1152" font-family="Arial" font-size="7" font-weight="bold">Intake Air Temp</text>
+<path d="M1180,588 H1716 V1200 H3566" class="wire-signal"/>
+<text x="2140" y="1196" font-family="Courier New" font-size="6.5" fill="#222">CLT  22AWG  TAN/WHT</text>
+<circle cx="1180" cy="588" r="2" class="junction"/>
+<polygon points="3580,1190 3590,1200 3580,1210 3570,1200" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="1204" font-family="Arial" font-size="7" font-weight="bold">Coolant Temp Sensor</text>
+<path d="M1180,610 H1724 V1252 H3566" class="wire-signal"/>
+<text x="2140" y="1248" font-family="Courier New" font-size="6.5" fill="#222">TPS  22AWG  VIO</text>
+<circle cx="1180" cy="610" r="2" class="junction"/>
+<polygon points="3580,1242 3590,1252 3580,1262 3570,1252" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="1256" font-family="Arial" font-size="7" font-weight="bold">Throttle Position</text>
+<path d="M1180,610 H1732 V1304 H3566" class="wire-signal"/>
+<text x="2140" y="1300" font-family="Courier New" font-size="6.5" fill="#222">FPS  22AWG  VIO/BLK</text>
+<circle cx="1180" cy="610" r="2" class="junction"/>
+<polygon points="3580,1294 3590,1304 3580,1314 3570,1304" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="1308" font-family="Arial" font-size="7" font-weight="bold">Fuel Pressure Sensor</text>
+<path d="M1180,610 H1740 V1356 H3566" class="wire-signal"/>
+<text x="2140" y="1352" font-family="Courier New" font-size="6.5" fill="#222">OPS  22AWG  VIO</text>
+<circle cx="1180" cy="610" r="2" class="junction"/>
+<polygon points="3580,1346 3590,1356 3580,1366 3570,1356" fill="white" stroke="black" stroke-width="1.2"/>
+<text x="3596" y="1360" font-family="Arial" font-size="7" font-weight="bold">Oil Pressure Sensor</text>
+</g>
+<g id="power-refs">
+<line x1="1540" y1="836" x2="4180" y2="836" stroke="#CC0000" stroke-width="0.6" stroke-dasharray="3,2"/>
+<text x="1540" y="831" font-family="Courier New" font-size="6" fill="#CC0000">5V REF BUS — M130 A02/A09</text>
+<line x1="1540" y1="1377" x2="4180" y2="1377" stroke="#000" stroke-width="0.6" stroke-dasharray="6,3"/>
+<text x="1540" y="1372" font-family="Courier New" font-size="6">SEN GND BUS — M130 B15/B16</text>
+<line x1="4190" y1="1371" x2="4190" y2="1383" stroke="black" stroke-width="1.5"/>
+<line x1="4193" y1="1373" x2="4193" y2="1381" stroke="black" stroke-width="1.2"/>
+<line x1="4196" y1="1375" x2="4196" y2="1379" stroke="black" stroke-width="0.8"/>
+</g>
+<g id="titleblock">
+<rect x="4200" y="1392" width="300" height="60" fill="white" stroke="black" stroke-width="1.5"/>
+<text x="4350" y="1408" text-anchor="middle" font-family="Arial" font-size="11" font-weight="bold">NUKE LTD — BOULDER CITY NV</text>
+<text x="4350" y="1422" text-anchor="middle" font-family="Arial" font-size="10" font-weight="bold">1977 K5 BLAZER — LS3 6.2L / MOTEC M130</text>
+<text x="4350" y="1434" text-anchor="middle" font-family="Arial" font-size="9">SECTION 2: ENGINE WIRING — PAGE 1</text>
+<text x="4350" y="1446" text-anchor="middle" font-family="Courier New" font-size="7" fill="#888">VIN CCL187Z210370 | TXL WIRE TIER | 2026-04-04</text>
+</g>
+<g id="legend">
+<rect x="50" y="1392" width="280" height="60" fill="white" stroke="black" stroke-width="1"/>
+<text x="60" y="1406" font-family="Arial" font-size="8" font-weight="bold">LEGEND</text>
+<line x1="60" y1="1416" x2="100" y2="1416" class="wire-hot"/>
+<text x="105" y="1419" font-family="Arial" font-size="7">HOT CIRCUIT (POWERED)</text>
+<line x1="60" y1="1428" x2="100" y2="1428" class="wire-signal"/>
+<text x="105" y="1431" font-family="Arial" font-size="7">SIGNAL CIRCUIT</text>
+<line x1="60" y1="1440" x2="100" y2="1440" class="wire-shield"/>
+<text x="105" y="1443" font-family="Arial" font-size="7">SHIELDED CABLE</text>
+<line x1="210" y1="1416" x2="250" y2="1416" stroke="#000" stroke-width="0.6" stroke-dasharray="6,3"/>
+<text x="255" y="1419" font-family="Arial" font-size="7">GROUND</text>
+</g>
+</svg>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import vinDecoderService from '../services/vinDecoder';
@@ -26,7 +26,6 @@ interface BulkVehicle {
 
 const DealerBulkEditor: React.FC = () => {
   const { orgId } = useParams<{ orgId: string }>();
-  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   // useAuth reads from global AuthContext — synchronous, no getSession() needed
   const { session } = useAuth();
@@ -338,18 +337,19 @@ const DealerBulkEditor: React.FC = () => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={() => navigate(`/org/${orgId}`)}
+          <Link
+            to={`/org/${orgId}`}
             style={{
+              textDecoration: 'none',
+              color: 'inherit',
               padding: '6px 12px',
               fontSize: '11px',
               border: '1px solid var(--border)',
               background: 'var(--surface)',
-              cursor: 'pointer'
             }}
           >
             Back to Profile
-          </button>
+          </Link>
           <button
             onClick={addNewRow}
             style={{
