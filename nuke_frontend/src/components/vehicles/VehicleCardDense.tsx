@@ -716,6 +716,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     (vehicle.all_images?.find((img) => img?.is_primary && img?.url)?.url) ||
     (vehicle.all_images?.[0]?.url) ||
     null;
+  const hasAnyImage = !!(
+    vehicle?.image_variants?.large || vehicle?.image_variants?.medium ||
+    vehicle?.image_variants?.thumbnail || primaryFromAllImages ||
+    imageUrl || vehicle.primary_image_url || vehicle.image_url
+  );
   const normalizeStampHost = (raw: unknown): string => {
     const s = String(raw ?? '').trim();
     if (!s) return '';
@@ -1585,23 +1590,40 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             position: 'relative',
           }}
         >
-          <ResilientImage
-            sources={[
-              vehicle?.image_variants?.large,
-              vehicle?.image_variants?.medium,
-              vehicle?.image_variants?.thumbnail,
-              primaryFromAllImages,
-              imageUrl,
-              vehicle.primary_image_url,
-              vehicle.image_url,
-            ]}
-            alt={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
-            fill={true}
-            objectFit={thumbnailFit}
-            placeholderSrc="/nuke.png"
-            placeholderOpacity={0.25}
-            optimizeSize="medium"
-          />
+          {hasAnyImage ? (
+            <ResilientImage
+              sources={[
+                vehicle?.image_variants?.large,
+                vehicle?.image_variants?.medium,
+                vehicle?.image_variants?.thumbnail,
+                primaryFromAllImages,
+                imageUrl,
+                vehicle.primary_image_url,
+                vehicle.image_url,
+              ]}
+              alt={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
+              fill={true}
+              objectFit={thumbnailFit}
+              placeholderSrc="/nuke.png"
+              placeholderOpacity={0.25}
+              optimizeSize="medium"
+            />
+          ) : (
+            <div style={{
+              width: '100%', height: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'var(--surface)',
+              padding: '16px',
+            }}>
+              <span style={{
+                fontSize: 'var(--fs-11)', fontWeight: 700,
+                color: 'var(--text-disabled)', textAlign: 'center',
+                letterSpacing: '1px', textTransform: 'uppercase',
+              }}>
+                {vehicle.year} {vehicle.make}<br />{vehicle.model}
+              </span>
+            </div>
+          )}
           {(showTopLeftBadges || showPriceBadge) && (
             <div
               style={{

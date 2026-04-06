@@ -262,6 +262,8 @@ export function useSearchPage() {
       }
 
       const mapped = (data.results || []).map(mapRawResult);
+      // Prioritize results with images — users see photos, not placeholders
+      mapped.sort((a, b) => (b.image_url ? 1 : 0) - (a.image_url ? 1 : 0));
       setResults(mapped);
 
       const total = data.meta?.total_count ?? mapped.length;

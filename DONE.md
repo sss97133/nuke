@@ -1,6 +1,9 @@
 # DONE — Completed Work Log
 
 
+## 2026-04-06
+- [wiring] generate-harness-spec edge function — complete fabrication document. 8 tables: wire schedule (113 wires, pin-to-pin with M130 connector/pin mapping), ECU pin assignment (60 pins, shows assigned vs unused), PDM channels (30 channels with device/amps/gauge), bulkhead pins (52/61 D38999 pins mapped), component table (119 devices with zones/connectors/notes), trunk routing summary (6 trunk bundles with wire counts), power budget (981A draw, high-current circuits, voltage drop flags), physical reference (GM dimensions, trunk path descriptions). Formats: full JSON, plaintext spec, wire_schedule only. Stored to Supabase storage as .txt. TOOLS.md updated.
+
 ## 2026-04-05
 - [wiring] K5 wire spec & cost analysis: (1) M130 fuel level sender analysis - AV input with 270ohm pull-up reads GM 0-90 ohm sender directly, no signal conditioner needed; (2) AWG-to-mm2 cross-reference table with M22759/32 Tefzel spec (12-28 AWG only, need M22759/16 for 10-8 AWG); (3) ProWire USA catalog indexed with per-gauge pricing, K5 build wire cost calculated at ~,017 vs  TXL; (4) Three-color stripe remapping to two-color M22759/32 equivalents; (5) ProWire USA added to component_library (id: 511395ec). Output: docs/wiring/output/K5_wire_spec_and_costs.md
 
