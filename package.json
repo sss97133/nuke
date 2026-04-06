@@ -195,7 +195,10 @@
     "wo:ingest-zelle": "dotenvx run -- node mcp-servers/nuke-context/ingest-zelle.mjs",
     "wo:ingest-receipts": "dotenvx run -- node mcp-servers/nuke-context/ingest-receipts.mjs",
     "wo:ingest-thread": "dotenvx run -- node mcp-servers/nuke-context/ingest-thread.mjs",
-    "wo:statement": "dotenvx run -- node mcp-servers/nuke-context/statement-html.mjs"
+    "wo:statement": "dotenvx run -- node mcp-servers/nuke-context/statement-html.mjs",
+    "backfill:bat-bids": "dotenvx run -- node scripts/bat-bid-backfill.mjs",
+    "backfill:bat-bids:dry": "dotenvx run -- node scripts/bat-bid-backfill.mjs --dry-run --limit 10",
+    "compute:bat-profiles": "dotenvx run -- node scripts/bat-compute-profiles.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.62",
