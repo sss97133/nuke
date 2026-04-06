@@ -13,7 +13,7 @@ const { Client } = pg;
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
 const LIMIT = args.includes('--limit') ? parseInt(args[args.indexOf('--limit') + 1]) : null;
-const BATCH_SIZE = 20; // Small batches to stay within statement_timeout
+const BATCH_SIZE = 5; // Very small batches — wins computation is expensive for heavy bidders
 
 async function main() {
   console.log(`BaT User Profile Computation${DRY_RUN ? ' [DRY RUN]' : ''}`);
@@ -59,8 +59,11 @@ async function main() {
   for (let i = 0; i < bidders.length; i += BATCH_SIZE) {
     const batchUsernames = bidders.slice(i, i + BATCH_SIZE).map(b => b.author_username);
 
+    let stats, wins, oad, cats;
+    let winsMap = new Map(), oadMap = new Map(), catsMap = new Map();
+    try {
     // Compute bid stats for this batch
-    const { rows: stats } = await db.query(`
+    ({ rows: stats } = await db.query(`
       SELECT
         author_username,
         count(*) AS total_comments,
@@ -85,10 +88,10 @@ async function main() {
       WHERE platform = 'bat'
         AND author_username = ANY($1)
       GROUP BY author_username
-    `, [batchUsernames]);
+    `, [batchUsernames]));
 
     // Compute wins for this batch
-    const { rows: wins } = await db.query(`
+    ({ rows: wins } = await db.query(`
       SELECT ac.author_username, count(DISTINCT ac.vehicle_id) AS total_wins
       FROM auction_comments ac
       INNER JOIN (
@@ -100,11 +103,11 @@ async function main() {
       INNER JOIN bat_listings bl ON bl.vehicle_id = ac.vehicle_id AND bl.listing_status = 'sold'
       WHERE ac.platform = 'bat' AND ac.bid_amount > 0 AND ac.author_username = ANY($1)
       GROUP BY ac.author_username
-    `, [batchUsernames]);
-    const winsMap = new Map(wins.map(w => [w.author_username, parseInt(w.total_wins)]));
+    `, [batchUsernames]));
+    winsMap = new Map(wins.map(w => [w.author_username, parseInt(w.total_wins)]));
 
     // Compute one-and-done ratio for this batch
-    const { rows: oad } = await db.query(`
+    ({ rows: oad } = await db.query(`
       SELECT author_username,
         count(*) FILTER (WHERE bids_on_auction = 1)::float / NULLIF(count(*), 0) AS one_bid_ratio
       FROM (
@@ -114,19 +117,26 @@ async function main() {
         GROUP BY author_username, vehicle_id
       ) sub
       GROUP BY author_username
-    `, [batchUsernames]);
-    const oadMap = new Map(oad.map(o => [o.author_username, o.one_bid_ratio]));
+    `, [batchUsernames]));
+    oadMap = new Map(oad.map(o => [o.author_username, o.one_bid_ratio]));
 
     // Compute preferred categories for this batch
-    const { rows: cats } = await db.query(`
+    ({ rows: cats } = await db.query(`
       SELECT ac.author_username,
         array_agg(DISTINCT v.make ORDER BY v.make) FILTER (WHERE v.make IS NOT NULL) AS makes
       FROM auction_comments ac
       LEFT JOIN vehicles v ON ac.vehicle_id = v.id
       WHERE ac.platform = 'bat' AND ac.bid_amount > 0 AND ac.author_username = ANY($1)
       GROUP BY ac.author_username
-    `, [batchUsernames]);
-    const catsMap = new Map(cats.map(c => [c.author_username, (c.makes || []).slice(0, 5)]));
+    `, [batchUsernames]));
+    catsMap = new Map(cats.map(c => [c.author_username, (c.makes || []).slice(0, 5)]));
+    } catch (batchErr) {
+      errors++;
+      console.error(`  Batch query error at offset ${i} (users: ${batchUsernames.join(', ')}): ${batchErr.message}`);
+      processed += batchUsernames.length;
+      await new Promise(r => setTimeout(r, 1000)); // Cool down after error
+      continue;
+    }
 
     // Build profiles and upsert
     if (!DRY_RUN && stats.length > 0) {

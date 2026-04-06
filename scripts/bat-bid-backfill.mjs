@@ -110,13 +110,12 @@ async function main() {
   await db.connect();
   console.log('Connected to database');
 
-  // Count available snapshots
-  const { rows: [{ count: totalCount }] } = await db.query(
-    `SELECT count(*) as count FROM listing_page_snapshots
-     WHERE platform = 'bat' AND success = true
-     AND (html IS NOT NULL OR html_storage_path IS NOT NULL)`
+  // Fast estimate of available snapshots (exact count is too slow on 241K rows)
+  const { rows: [{ estimate }] } = await db.query(
+    `SELECT reltuples::bigint AS estimate FROM pg_class WHERE relname = 'listing_page_snapshots'`
   );
-  console.log(`Total BaT snapshots: ${totalCount}`);
+  const totalCount = estimate || 241000;
+  console.log(`Estimated BaT snapshots: ~${totalCount}`);
 
   let processed = 0;
   let commentsFound = 0;
