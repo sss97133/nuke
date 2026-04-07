@@ -182,19 +182,19 @@ const VehicleSubHeader: React.FC = () => {
       {/* Dimension badges — every badge is clickable per design spec */}
       <div className="vp-sub-header__badges" style={badgesWrapStyle}>
         {bodyStyle && (
-          <BadgePortal dimension="body" value={bodyStyle} label={toTitleCase(String(bodyStyle))} variant="dimension" />
+          <BadgePortal dimension="body_style" value={bodyStyle} label={toTitleCase(String(bodyStyle))} variant="dimension" static />
         )}
         {engineSize && (
-          <BadgePortal dimension="engine" value={engineSize} label={String(engineSize)} variant="dimension" />
+          <BadgePortal dimension="year" value={engineSize} label={String(engineSize)} variant="dimension" static />
         )}
         {transmission && (
-          <BadgePortal dimension="trans" value={transmission} label={toTitleCase(String(transmission))} variant="dimension" />
+          <BadgePortal dimension="transmission" value={transmission} label={toTitleCase(String(transmission))} variant="dimension" static />
         )}
         {drivetrain && (
-          <BadgePortal dimension="drive" value={drivetrain} label={toTitleCase(String(drivetrain))} variant="dimension" />
+          <BadgePortal dimension="drivetrain" value={drivetrain} label={toTitleCase(String(drivetrain))} variant="dimension" static />
         )}
         {location && (
-          <BadgePortal dimension="source" value={location} label={location} variant="dimension" />
+          <BadgePortal dimension="source" value={location} label={location} variant="dimension" static />
         )}
         {/* THIN badge — sparse vehicle indicator */}
         {(() => {

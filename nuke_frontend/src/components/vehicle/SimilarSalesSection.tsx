@@ -89,20 +89,8 @@ export function SimilarSalesSection({
     );
   }
 
-  if (error) {
-    return (
-      <div style={{
-        padding: '10px',
-        fontFamily: 'Arial, Helvetica, sans-serif',
-        fontSize: '9px',
-        color: 'var(--text-disabled)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-      }}>
-        {error}
-      </div>
-    );
-  }
+  // If query failed, return null — don't show error text to the user
+  if (error) return null;
 
   // Progressive density: don't render at all when no comparable sales exist
   if (sales.length === 0) return null;

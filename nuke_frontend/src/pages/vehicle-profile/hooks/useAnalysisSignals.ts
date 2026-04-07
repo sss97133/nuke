@@ -31,7 +31,23 @@ export function useAnalysisSignals(vehicleId: string | undefined) {
       .order('computed_at', { ascending: false })
       .then(({ data }) => {
         if (!cancelled) {
-          setSignals(data || []);
+          // Filter out signals with errors or missing data — don't show broken widgets
+          const clean = (data || []).filter((s: any) => {
+            if (!s.label) return false;
+            // Check for error indicators in the evidence JSON
+            const evi = s.evidence;
+            if (evi && typeof evi === 'object') {
+              const eviStr = JSON.stringify(evi).toLowerCase();
+              if (eviStr.includes('"error"') || eviStr.includes('404') || eviStr.includes('failed')) return false;
+            }
+            // Check for error in reasons
+            if (Array.isArray(s.reasons) && s.reasons.length === 1) {
+              const r = String(s.reasons[0]).toLowerCase();
+              if (r.includes('error') || r.includes('failed') || r.includes('404') || r.includes('unable to')) return false;
+            }
+            return true;
+          });
+          setSignals(clean);
           setLoading(false);
         }
       });

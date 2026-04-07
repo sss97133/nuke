@@ -1,8 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import { useVehicleProfile } from './VehicleProfileContext';
-import { useBuildProfile } from './hooks/useBuildProfile';
-import { useBuildStatus } from './hooks/useBuildStatus';
 
 // Lazy-load heavy components
 const WorkMemorySection = React.lazy(() => import('./WorkMemorySection'));
@@ -11,10 +9,8 @@ const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/veh
 // Deal Jacket Forensics removed — no pipeline exists yet, re-add when data available
 // WiringQueryContextBar removed — wiring canvas replaced with data view
 const PartsQuoteGenerator = React.lazy(() => import('../../components/PartsQuoteGenerator').then(m => ({ default: m.PartsQuoteGenerator })));
-const VehicleROISummaryCard = React.lazy(() => import('../../components/vehicle/VehicleROISummaryCard'));
-const NukeEstimatePanel = React.lazy(() => import('../../components/vehicle/NukeEstimatePanel'));
+const InvestmentLedger = React.lazy(() => import('./InvestmentLedger'));
 const BuyerQuestionPreview = React.lazy(() => import('../../components/vehicle/BuyerQuestionPreview'));
-const VehiclePricingValueCard = React.lazy(() => import('../../components/vehicle/VehiclePricingValueCard').then(m => ({ default: m.VehiclePricingValueCard })));
 const ExternalListingCard = React.lazy(() => import('../../components/vehicle/ExternalListingCard'));
 const VehicleReferenceLibrary = React.lazy(() => import('../../components/vehicle/VehicleReferenceLibrary'));
 const VehicleDescriptionCard = React.lazy(() => import('../../components/vehicle/VehicleDescriptionCard'));
@@ -28,19 +24,12 @@ const VehicleScoresWidget = React.lazy(() => import('./VehicleScoresWidget'));
 const AuctionReadinessPanel = React.lazy(() => import('./AuctionReadinessPanel'));
 const ColumnDivider = React.lazy(() => import('./ColumnDivider'));
 const BuildManifestPanel = React.lazy(() => import('./BuildManifestPanel'));
-const BuildTimelineChart = React.lazy(() => import('./BuildTimelineChart'));
-const BuildSpendSummary = React.lazy(() => import('./BuildSpendSummary'));
 const VehicleListingDetailsCard = React.lazy(() => import('../../components/vehicle/VehicleListingDetailsCard'));
 const SimilarSalesSection = React.lazy(() => import('../../components/vehicle/SimilarSalesSection').then(m => ({ default: m.SimilarSalesSection })));
 const PriceHistoryChart = React.lazy(() => import('../../components/vehicle/PriceHistoryChart'));
 const ObservationTimeline = React.lazy(() => import('./ObservationTimeline'));
-const OwnerIdentityCard = React.lazy(() => import('./OwnerIdentityCard'));
-const BuildStatusPanel = React.lazy(() => import('./BuildStatusPanel'));
 // BuildLog removed — work sessions now surface via BarcodeTimeline Day Card popups
-const GenerateBill = React.lazy(() => import('./GenerateBill'));
-const WorkOrderProgress = React.lazy(() => import('./WorkOrderProgress'));
 
-const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 export type GalleryViewMode = 'ZONES' | 'GRID' | 'FULL' | 'INFO' | 'SESSIONS' | 'CATEGORY' | 'CHRONO' | 'SOURCE';
 
@@ -85,8 +74,6 @@ export type WorkspaceTabId = 'evidence' | 'gallery' | 'owner';
 
 /** Props that can't come from context (callbacks into VehicleProfile modals, non-context data). */
 export interface WorkspaceContentProps {
-  valuationIntel: any;
-  readinessSnapshot: any;
   referenceLibraryRefreshKey: number;
   onAddEventClick: () => void;
   onDataPointClick: (event: React.MouseEvent, dataType: string, dataValue: string, label: string) => void;
@@ -99,8 +86,6 @@ export interface WorkspaceContentProps {
 const DEFAULT_LEFT_PCT = 38;
 
 const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
-  valuationIntel,
-  readinessSnapshot,
   referenceLibraryRefreshKey,
   onAddEventClick,
   onDataPointClick,
@@ -124,7 +109,6 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
     totalCommentCount,
     observationCount,
     isPublic,
-    auctionPulse,
     galleryFilter,
     setGalleryFilter,
     reloadVehicle,
@@ -135,9 +119,6 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
   const [galleryCols, setGalleryCols] = useState(3);
   const [leftPct, setLeftPct] = useState(DEFAULT_LEFT_PCT);
   const [galleryView, setGalleryView] = useState<GalleryViewMode>('GRID');
-  const { manifestByCategory, manifestStats, snapshots, spendProfile, loading: buildLoading } = useBuildProfile(vehicle?.id);
-  const { data: buildStatus } = useBuildStatus(vehicle?.id);
-
   const handleResize = useCallback((pct: number) => setLeftPct(pct), []);
   const handleReset = useCallback(() => setLeftPct(DEFAULT_LEFT_PCT), []);
 
@@ -199,6 +180,11 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             <VehicleDossierPanel />
           </React.Suspense>
 
+          {/* Build Workspace — harness build tracking, wire status, integration decisions */}
+          <React.Suspense fallback={null}>
+            <BuildManifestPanel vehicleId={vehicle.id} />
+          </React.Suspense>
+
           {/* Price History Chart — scatter plot of this vehicle + cohort comps */}
           {vehicle.year && vehicle.make && vehicle.model && (
             <React.Suspense fallback={null}>
@@ -222,13 +208,10 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             <VehicleIntelligencePanel />
           </React.Suspense>
 
-          {/* Owner Identity — the throne */}
-          {buildStatus?.dealJacket?.contact && (
+          {/* Investment Ledger — unified financial view per owner epoch */}
+          {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
             <React.Suspense fallback={null}>
-              <OwnerIdentityCard
-                dealJacket={buildStatus.dealJacket}
-                isOwnerView={isRowOwner || isVerifiedOwner || hasContributorAccess}
-              />
+              <InvestmentLedger vehicleId={vehicle.id} vehicle={vehicle} isOwnerView />
             </React.Suspense>
           )}
 
@@ -251,12 +234,14 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             </CollapsibleWidget>
           )}
 
-          {/* Buyer Questions — what buyers will ask about this vehicle */}
-          <React.Suspense fallback={null}>
-            <CollapsibleWidget variant="profile" title="Buyer Questions" defaultCollapsed={true}>
-              <BuyerQuestionPreview vehicleId={vehicle.id} make={vehicle.make} />
-            </CollapsibleWidget>
-          </React.Suspense>
+          {/* Buyer Questions — what buyers will ask about this vehicle (hidden post-sale) */}
+          {!(vehicle.sale_price && (vehicle as any).sale_status === 'sold') && (
+            <React.Suspense fallback={null}>
+              <CollapsibleWidget variant="profile" title="Buyer Questions" defaultCollapsed={true}>
+                <BuyerQuestionPreview vehicleId={vehicle.id} make={vehicle.make} />
+              </CollapsibleWidget>
+            </React.Suspense>
+          )}
 
           {/* Listing Details — highlights, equipment, modifications, flaws, service history */}
           <React.Suspense fallback={null}>
@@ -286,122 +271,53 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             </CollapsibleWidget>
           )}
 
-          {/* Pricing & Value — self-guarding: returns null when no price data */}
-          <VehiclePricingValueCard
-            vehicle={vehicle}
-            auctionPulse={auctionPulse}
-            valuationIntel={valuationIntel as any}
-            readinessSnapshot={readinessSnapshot as any}
-          />
+          {/* Build Workspace rendered above, after Dossier */}
 
-          {/* Build Intelligence — owner/contributor only */}
-          {(isRowOwner || isVerifiedOwner || hasContributorAccess) && !buildLoading && manifestStats.total > 0 && (
-            <>
-              <CollapsibleWidget variant="profile" title="Build Manifest" defaultCollapsed={true}
-                badge={<span className="widget__count">{manifestStats.purchased}/{manifestStats.total}</span>}
+          {/* Build Status absorbed into InvestmentLedger.
+               Work order detail, GenerateBill, and WorkOrderProgress now render inside each owner epoch. */}
+
+          {/* Engine Bay Analysis — hidden when all values are unknown or 0% confidence */}
+          {(() => {
+            const eba = (vehicle as any)?.origin_metadata?.engine_bay_analysis;
+            if (!eba?.engine_family) return null;
+            // Check if engine_family itself is "unknown"
+            if (eba.engine_family.toLowerCase() === 'unknown') return null;
+            // Check if confidence is 0%
+            if (eba.engine_family_confidence != null && eba.engine_family_confidence === 0) return null;
+            // Check if all detail fields are unknown/empty
+            const hasDetail =
+              (eba.fuel_system_type && eba.fuel_system_type !== 'unknown') ||
+              (eba.ignition_type && eba.ignition_type !== 'unknown') ||
+              (eba.headers && eba.headers !== 'unknown') ||
+              (eba.condition && eba.condition !== 'unknown') ||
+              (eba.modifications?.length > 0);
+            if (!hasDetail && !eba.estimated_displacement) return null;
+            const confPct = eba.engine_family_confidence != null ? Math.round(eba.engine_family_confidence * 100) : null;
+            return (
+              <CollapsibleWidget variant="profile" title="Engine Bay Analysis" defaultCollapsed={true}
+                badge={<span className="widget__count" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setGalleryFilter({ zone: 'engine_bay' }); }}>{eba.engine_family}</span>}
               >
-                <React.Suspense fallback={null}>
-                  {spendProfile && <BuildSpendSummary spendProfile={spendProfile} manifestStats={manifestStats} />}
-                  <div style={{ marginTop: '8px' }}>
-                    <BuildManifestPanel manifestByCategory={manifestByCategory} manifestStats={manifestStats} />
+                <div style={{ fontFamily: 'var(--vp-font-sans)', fontSize: '9px', lineHeight: '1.6' }}>
+                  <div style={{ fontWeight: 700, fontSize: '9px', marginBottom: '4px' }}>
+                    {eba.engine_family}{eba.estimated_displacement ? ` ${eba.estimated_displacement}` : ''}
+                    {confPct != null && (
+                      <span style={{ marginLeft: '8px', padding: '2px 6px', fontFamily: 'var(--vp-font-mono)', fontSize: '8px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
+                        border: '1px solid var(--vp-ink)',
+                        color: confPct >= 80 ? 'var(--vp-brg)' : confPct >= 50 ? 'var(--vp-gulf-orange)' : 'var(--vp-martini-red)',
+                      }}>{confPct}%</span>
+                    )}
                   </div>
-                </React.Suspense>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 12px', fontSize: '8px' }}>
+                    {eba.fuel_system_type && eba.fuel_system_type !== 'unknown' && (<><span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Fuel System</span><span>{eba.fuel_system_brand && eba.fuel_system_brand !== 'unknown' ? `${eba.fuel_system_brand} ` : ''}{eba.fuel_system_type.replace(/_/g, ' ')}</span></>)}
+                    {eba.ignition_type && eba.ignition_type !== 'unknown' && (<><span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ignition</span><span>{eba.ignition_brand && eba.ignition_brand !== 'unknown' ? `${eba.ignition_brand.replace(/_/g, ' ')} ` : ''}{eba.ignition_type.replace(/_/g, ' ')}</span></>)}
+                    {eba.headers && eba.headers !== 'unknown' && (<><span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Exhaust</span><span>{eba.headers.replace(/_/g, ' ')}</span></>)}
+                    {eba.condition && eba.condition !== 'unknown' && (<><span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Condition</span><span>{eba.condition.replace(/_/g, ' ')}</span></>)}
+                    {eba.modifications?.length > 0 && (<><span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Modifications</span><span>{eba.modifications.length} identified</span></>)}
+                  </div>
+                </div>
               </CollapsibleWidget>
-              {snapshots.length > 0 && (
-                <CollapsibleWidget variant="profile" title="Build Timeline" defaultCollapsed={true}
-                  badge={<span className="widget__count">{snapshots.length} MONTHS</span>}
-                >
-                  <React.Suspense fallback={null}>
-                    <BuildTimelineChart snapshots={snapshots} />
-                  </React.Suspense>
-                </CollapsibleWidget>
-              )}
-            </>
-          )}
-
-          {/* Build Status — work order accounting + invoice generation */}
-          {buildStatus?.hasData && buildStatus.workOrders.length > 0 && (
-            <CollapsibleWidget variant="profile" title="Build Status" defaultCollapsed={false}
-              badge={
-                <span className="widget__count" style={{
-                  color: buildStatus.totals.balance > 0 ? 'var(--vp-martini-red)' : 'var(--vp-brg)',
-                }}>
-                  {buildStatus.totals.balance > 0 ? fmt(buildStatus.totals.balance) + ' DUE' : 'PAID'}
-                </span>
-              }
-            >
-              <React.Suspense fallback={null}>
-                <BuildStatusPanel
-                  workOrders={buildStatus.workOrders}
-                  totals={buildStatus.totals}
-                  isOwnerView={isRowOwner || isVerifiedOwner || hasContributorAccess}
-                />
-              </React.Suspense>
-              {/* Work Order Sign-off — line item checklist (owner view) */}
-              {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
-                <React.Suspense fallback={null}>
-                  <WorkOrderProgress vehicleId={vehicle.id} isOwnerView={isRowOwner || isVerifiedOwner || hasContributorAccess} />
-                </React.Suspense>
-              )}
-              {/* Generate Bill — same data, document render. The bill is a button. */}
-              {(isRowOwner || isVerifiedOwner || hasContributorAccess) && buildStatus.totals.orderCount > 0 && (
-                <React.Suspense fallback={null}>
-                  <GenerateBill
-                    vehicleId={vehicle.id}
-                    workOrders={buildStatus.workOrders}
-                    totals={buildStatus.totals}
-                    contact={buildStatus.dealJacket?.contact}
-                    vehicle={vehicle}
-                    isOwnerView={isRowOwner || isVerifiedOwner || hasContributorAccess}
-                  />
-                </React.Suspense>
-              )}
-            </CollapsibleWidget>
-          )}
-
-          {/* Build Log removed — work sessions now surface through BarcodeTimeline.
-               Click a day on the timeline to open a Day Card popup with full-resolution detail.
-               Build Status panel (above) shows work order accounting + Generate Bill. */}
-
-          {/* Engine Bay Analysis */}
-          {(vehicle as any)?.origin_metadata?.engine_bay_analysis?.engine_family && (
-            <CollapsibleWidget variant="profile" title="Engine Bay Analysis" defaultCollapsed={true}
-              badge={<span className="widget__count" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setGalleryFilter({ zone: 'engine_bay' }); }}>{(vehicle as any).origin_metadata.engine_bay_analysis.engine_family}</span>}
-            >
-              {(() => {
-                const eba = (vehicle as any).origin_metadata.engine_bay_analysis;
-                const confPct = eba.engine_family_confidence != null ? Math.round(eba.engine_family_confidence * 100) : null;
-                return (
-                  <div style={{ fontFamily: 'var(--vp-font-sans)', fontSize: '9px', lineHeight: '1.6' }}>
-                    <div style={{ fontWeight: 700, fontSize: '9px', marginBottom: '4px' }}>
-                      {eba.engine_family}{eba.estimated_displacement ? ` ${eba.estimated_displacement}` : ''}
-                      {confPct != null && (
-                        <span style={{ marginLeft: '8px', padding: '2px 6px', fontFamily: 'var(--vp-font-mono)', fontSize: '8px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
-                          border: '1px solid var(--vp-ink)',
-                          color: confPct >= 80 ? 'var(--vp-brg)' : confPct >= 50 ? 'var(--vp-gulf-orange)' : 'var(--vp-martini-red)',
-                        }}>{confPct}%</span>
-                      )}
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 12px', fontSize: '8px' }}>
-                      {eba.fuel_system_type && (<><span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Fuel System</span><span>{eba.fuel_system_brand && eba.fuel_system_brand !== 'unknown' ? `${eba.fuel_system_brand} ` : ''}{eba.fuel_system_type.replace(/_/g, ' ')}</span></>)}
-                      {eba.ignition_type && (<><span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ignition</span><span>{eba.ignition_brand && eba.ignition_brand !== 'unknown' ? `${eba.ignition_brand.replace(/_/g, ' ')} ` : ''}{eba.ignition_type.replace(/_/g, ' ')}</span></>)}
-                      {eba.headers && eba.headers !== 'unknown' && (<><span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Exhaust</span><span>{eba.headers.replace(/_/g, ' ')}</span></>)}
-                      {eba.condition && eba.condition !== 'unknown' && (<><span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Condition</span><span>{eba.condition.replace(/_/g, ' ')}</span></>)}
-                      {eba.modifications?.length > 0 && (<><span style={{ color: 'var(--vp-pencil)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Modifications</span><span>{eba.modifications.length} identified</span></>)}
-                    </div>
-                  </div>
-                );
-              })()}
-            </CollapsibleWidget>
-          )}
-
-          {/* ROI Summary — self-guarding: returns null when no data */}
-          <VehicleROISummaryCard vehicleId={vehicle.id} />
-
-          {/* Nuke Estimate — self-guarding: returns null when no estimate + not owner */}
-          <React.Suspense fallback={null}>
-            <NukeEstimatePanel vehicleId={vehicle.id} vehicle={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }} canCompute={isRowOwner || isVerifiedOwner || hasContributorAccess} />
-          </React.Suspense>
+            );
+          })()}
 
           {/* Auction History — ExternalListingCard self-guards: returns null when no listings */}
           <React.Suspense fallback={null}>
