@@ -142,6 +142,15 @@ const GenerateBill: React.FC<Props> = ({ vehicleId, workOrders, totals, contact,
           line_items: billableOrders.map(wo => ({
             description: wo.work_order_title,
             amount: wo.invoice_total,
+            details: (lineItems[wo.work_order_id] || [])
+              .filter(li => (li.total_cost_cents || 0) > 0 || li.is_comped)
+              .map(li => ({
+                task_description: li.task_description,
+                hours_labor: li.hours_labor,
+                parts_cost_cents: li.parts_cost_cents,
+                total_cost_cents: li.total_cost_cents,
+                is_comped: li.is_comped,
+              })),
           })),
         },
       });
