@@ -320,9 +320,12 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           })()}
 
           {/* Auction History — ExternalListingCard self-guards: returns null when no listings */}
-          <React.Suspense fallback={null}>
-            <ExternalListingCard vehicleId={vehicle.id} />
-          </React.Suspense>
+          {/* Collapse by default for post-sale vehicles (has sale_price) */}
+          <CollapsibleWidget variant="profile" title="Auction History" defaultCollapsed={!!vehicle.sale_price}>
+            <React.Suspense fallback={null}>
+              <ExternalListingCard vehicleId={vehicle.id} />
+            </React.Suspense>
+          </CollapsibleWidget>
 
           {/* Owner-only tools */}
           {(isRowOwner || isVerifiedOwner) && (
