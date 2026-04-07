@@ -160,7 +160,25 @@ const CommunityIntelSection: React.FC<{ ci: CommentIntel }> = ({ ci }) => {
 // ---------------------------------------------------------------------------
 
 const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
-  const flags = (di.red_flags || []).slice(0, 3);
+  const { vehicle } = useVehicleProfile();
+  const liveTitleStatus = String((vehicle as any)?.title_status || '').toLowerCase();
+
+  // Filter red flags against live vehicle data:
+  // - TMU flags are invalid when the vehicle now has a clean title
+  // - 4x4 conversion is a positive signal when documented (show under mods, not flags)
+  const rawFlags = (di.red_flags || []).slice(0, 5);
+  const flags = rawFlags.filter((rf) => {
+    const text = String(rf.f || '').toLowerCase();
+    // TMU red flag — suppress if vehicle's live title_status is 'clean'
+    if (text.includes('tmu') || text.includes('true mileage unknown')) {
+      if (liveTitleStatus === 'clean') return false;
+    }
+    // 4x4 conversion — suppress as red flag (it's a documented mod, not a concern)
+    if (text.includes('4x4 conversion') || text.includes('4×4 conversion')) {
+      return false;
+    }
+    return true;
+  });
   const mods = di.mods || [];
   const docs = di.documentation || [];
 
@@ -171,16 +189,23 @@ const VehicleIntelSection: React.FC<{ di: DescriptionIntel }> = ({ di }) => {
   return (
     <CollapsibleWidget variant="profile" title="Vehicle Intelligence" defaultCollapsed={false}>
       <div style={{ fontFamily: 'var(--vp-font-sans)', fontSize: '9px', lineHeight: '1.5' }}>
-        {/* Condition Note */}
+        {/* Condition Note — suppress stale TMU references when title is clean */}
         {di.condition_note && (
           <div style={{ marginBottom: '8px' }}>
-            {truncate(di.condition_note, 200)}
+            {truncate(
+              liveTitleStatus === 'clean'
+                ? di.condition_note.replace(/\.\s*Odometer shows approximately \d[\d,]* TMU\.?/i, '.').replace(/\s*TMU\.?/g, '').trim()
+                : di.condition_note,
+              200,
+            )}
           </div>
         )}
 
         {/* Quick Badges */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
-          {di.title_status && <span style={BADGE}>{di.title_status}</span>}
+          {(liveTitleStatus || di.title_status) && (
+            <span style={BADGE}>{liveTitleStatus ? liveTitleStatus.toUpperCase() : di.title_status}</span>
+          )}
           {di.matching_numbers != null && (
             <span style={{ ...BADGE, color: di.matching_numbers ? 'var(--vp-brg, #004225)' : 'var(--vp-danger)' }}>
               {di.matching_numbers ? 'MATCHING #S' : 'NON-MATCHING'}
