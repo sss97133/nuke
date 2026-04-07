@@ -10,7 +10,6 @@
  */
 import React from 'react';
 import { CollapsibleWidget } from '../ui/CollapsibleWidget';
-import { useVehicleProfile } from '../../pages/vehicle-profile/VehicleProfileContext';
 
 interface VehicleListingDetailsCardProps {
   vehicle: {
@@ -133,8 +132,6 @@ const SectionList: React.FC<{ label: string; items: string[]; variant?: 'default
 };
 
 export const VehicleListingDetailsCard: React.FC<VehicleListingDetailsCardProps> = ({ vehicle }) => {
-  const { setGalleryFilter } = useVehicleProfile();
-
   const highlights = parseList(vehicle.highlights);
   const equipment = parseList(vehicle.equipment);
   const modifications = parseList(vehicle.modifications);
@@ -147,8 +144,6 @@ export const VehicleListingDetailsCard: React.FC<VehicleListingDetailsCardProps>
 
   if (totalItems === 0) return null;
 
-  const handleModClick = (item: string) => setGalleryFilter({ tag: item });
-
   return (
     <CollapsibleWidget
       variant="profile"
@@ -159,7 +154,7 @@ export const VehicleListingDetailsCard: React.FC<VehicleListingDetailsCardProps>
       <div style={{ padding: '0' }}>
         <SectionList label="Highlights" items={highlights} />
         <SectionList label="Equipment" items={equipment} />
-        <SectionList label="Modifications" items={modifications} onItemClick={handleModClick} />
+        <SectionList label="Modifications" items={modifications} />
         <SectionList label="Known Flaws" items={knownFlaws} variant="warning" />
         <SectionList label="Recent Service History" items={serviceHistory} />
         {titleStatus && (

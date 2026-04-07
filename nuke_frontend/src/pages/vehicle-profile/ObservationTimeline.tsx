@@ -246,63 +246,36 @@ const ObservationTimeline: React.FC = () => {
     fetchObservations();
   }, [fetchObservations]);
 
+  // Filter out pipeline failures — never show errors to the user
+  const cleanObservations = useMemo(() => {
+    const ERROR_PATTERNS = /classification failed|error|pipeline.?fail|extraction.?fail|unable to (parse|extract|process)/i;
+    return observations.filter(obs => {
+      if (obs.content_text && ERROR_PATTERNS.test(obs.content_text)) return false;
+      return true;
+    });
+  }, [observations]);
+
   // Kind counts for filter badges
   const kindCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const obs of observations) {
+    for (const obs of cleanObservations) {
       counts[obs.kind] = (counts[obs.kind] || 0) + 1;
     }
     return counts;
-  }, [observations]);
+  }, [cleanObservations]);
 
   // Filtered observations
   const filtered = useMemo(() => {
-    if (!activeFilter) return observations;
-    return observations.filter(o => o.kind === activeFilter);
-  }, [observations, activeFilter]);
+    if (!activeFilter) return cleanObservations;
+    return cleanObservations.filter(o => o.kind === activeFilter);
+  }, [cleanObservations, activeFilter]);
 
   const displayed = showAll ? filtered : filtered.slice(0, 25);
 
   if (!vehicle) return null;
 
-  // Empty state
-  if (!loading && observations.length === 0) {
-    return (
-      <div style={{
-        background: 'var(--surface-elevated, var(--surface))',
-        border: '2px solid var(--border)',
-        padding: '16px',
-      }}>
-        <div style={{
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '9px',
-          fontWeight: 700,
-          letterSpacing: '1px',
-          textTransform: 'uppercase',
-          marginBottom: '8px',
-        }}>
-          OBSERVATION HISTORY
-        </div>
-        <div style={{
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '9px',
-          color: 'var(--text-disabled)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-        }}>
-          NO OBSERVATIONS RECORDED YET
-        </div>
-        <div style={{
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '9px',
-          color: 'var(--text-secondary)',
-          marginTop: '4px',
-        }}>
-          Observations are added as the vehicle appears on auction platforms, forums, and marketplaces.
-        </div>
-      </div>
-    );
-  }
+  // If all observations are errors (or no observations), return null — don't render the widget
+  if (!loading && cleanObservations.length === 0) return null;
 
   return (
     <div style={{
@@ -334,7 +307,7 @@ const ObservationTimeline: React.FC = () => {
           color: 'var(--text-secondary)',
           letterSpacing: '0.06em',
         }}>
-          {observationCount || observations.length} TOTAL
+          {cleanObservations.length} TOTAL
         </span>
       </div>
 
@@ -363,7 +336,7 @@ const ObservationTimeline: React.FC = () => {
               cursor: 'pointer',
             }}
           >
-            ALL {observations.length}
+            ALL {cleanObservations.length}
           </button>
           {ALL_KINDS.filter(k => kindCounts[k]).map(kind => {
             const kc = getKindConfig(kind);

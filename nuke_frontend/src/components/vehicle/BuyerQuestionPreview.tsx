@@ -58,8 +58,8 @@ export default function BuyerQuestionPreview({ vehicleId, make }: { vehicleId: s
     })();
   }, [make]);
 
-  if (!loaded) return <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-disabled)', padding: '4px 0' }}>Loading buyer questions...</div>;
-  if (rows.length === 0) return <div style={{ fontSize: 'var(--fs-9)', color: 'var(--text-disabled)', padding: '4px 0' }}>No question data yet for this make</div>;
+  if (!loaded) return null;
+  if (rows.length === 0) return null;
 
   const total = rows.reduce((s, r) => s + r.question_count, 0);
 
