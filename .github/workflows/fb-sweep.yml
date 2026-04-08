@@ -1,0 +1,107 @@
+# FB Marketplace Sweep + Enrichment Pipeline
+# Runs the full fb-sweep-and-enrich.mjs pipeline on a schedule
+# Can also be triggered manually with optional flags
+
+name: FB Sweep
+
+on:
+  schedule:
+    - cron: '0 */8 * * *'  # Every 8 hours (staggered from BAT)
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Pipeline mode'
+        required: false
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - sweep-only
+          - enrich-only
+      metros:
+        description: 'Number of metros to scan (blank = all)'
+        required: false
+        default: ''
+      max_pages:
+        description: 'Max pages per metro (blank = default)'
+        required: false
+        default: ''
+
+jobs:
+  fb-sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          MISSING=0
+          if [ -z "${SUPABASE_URL:-}" ]; then
+            echo "❌ Missing secret: SUPABASE_URL"
+            MISSING=1
+          fi
+          if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "❌ Missing secret: SUPABASE_SERVICE_ROLE_KEY"
+            MISSING=1
+          fi
+          if [ $MISSING -ne 0 ]; then exit 1; fi
+          echo "✅ All required secrets are set"
+
+      - name: Build pipeline flags
+        id: flags
+        run: |
+          FLAGS=""
+          MODE="${{ github.event.inputs.mode || 'full' }}"
+          METROS="${{ github.event.inputs.metros }}"
+          MAX_PAGES="${{ github.event.inputs.max_pages }}"
+
+          if [ "$MODE" = "sweep-only" ]; then FLAGS="$FLAGS --sweep-only"; fi
+          if [ "$MODE" = "enrich-only" ]; then FLAGS="$FLAGS --enrich-only"; fi
+          if [ -n "$METROS" ]; then FLAGS="$FLAGS --metros $METROS"; fi
+          if [ -n "$MAX_PAGES" ]; then FLAGS="$FLAGS --max-pages $MAX_PAGES"; fi
+
+          echo "flags=$FLAGS" >> $GITHUB_OUTPUT
+          echo "🏁 Pipeline flags: $FLAGS"
+
+      - name: Run FB sweep pipeline
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          echo "🚀 Starting FB Marketplace sweep..."
+          node scripts/fb-sweep-and-enrich.mjs ${{ steps.flags.outputs.flags }}
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fb-sweep-logs-${{ github.run_id }}
+          path: |
+            *.log
+            logs/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "📊 FB sweep workflow complete"
+          echo "Run ID: ${{ github.run_id }}"
+          echo "Triggered by: ${{ github.event_name }}"
