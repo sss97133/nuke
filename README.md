@@ -2,7 +2,6 @@
 
 A provenance engine that builds knowledge graphs from the traces physical assets leave as they move through networks of people and organizations.
 
-Automotive is the first ontology loaded. It's not the machine.
 
 ---
 
