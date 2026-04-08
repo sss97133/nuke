@@ -11,12 +11,17 @@
  *   openai     — gpt-4o-mini ($0.15/$0.60 per M tokens)
  *   gemini     — gemini-2.0-flash-lite (free tier: 1000 RPD)
  *   groq       — llama-3.1-8b-instant (free tier: 14,400 RPD)
+ *   perplexity — sonar (pay-per-use)
+ *
+ * Fallback chain (auto mode):
+ *   gemini → groq → perplexity → openai → ollama
+ *   First provider with a valid API key wins. Use --provider auto to enable.
  *
  * Usage:
  *   dotenvx run -- node scripts/local-description-discovery.mjs [options]
  *
  * Options:
- *   --provider <name>    Provider: ollama|openai|gemini|groq (default: ollama)
+ *   --provider <name>    Provider: ollama|openai|gemini|groq|perplexity|auto (default: ollama)
  *   --model <name>       Model name (default: auto per provider)
  *   --batch <n>          Batch size (default: 20)
  *   --parallel <n>       Concurrent calls (default: 2, higher for API providers)
@@ -48,18 +53,17 @@ const args = process.argv.slice(2);
 const getArg = (name, def) => { const i = args.indexOf(`--${name}`); return i === -1 ? def : args[i + 1] || def; };
 const hasFlag = (name) => args.includes(`--${name}`);
 
-const PROVIDER = getArg("provider", "ollama");
+const PROVIDER_ARG = getArg("provider", "ollama");
 const DEFAULT_MODELS = {
   ollama: "qwen2.5:7b",
   openai: "gpt-4o-mini",
   gemini: "gemini-2.0-flash-lite",
   groq: "llama-3.1-8b-instant",
+  perplexity: "sonar",
   modal: "qwen2.5-7b",
 };
-const MODEL = getArg("model", DEFAULT_MODELS[PROVIDER] || "qwen2.5:7b");
 const BATCH_SIZE = parseInt(getArg("batch", "20"), 10);
-const DEFAULT_PARALLEL = { ollama: 2, openai: 10, gemini: 5, groq: 10, modal: 8 };
-const PARALLEL = parseInt(getArg("parallel", String(DEFAULT_PARALLEL[PROVIDER] || 2)), 10);
+const DEFAULT_PARALLEL = { ollama: 2, openai: 10, gemini: 5, groq: 10, perplexity: 5, modal: 8 };
 const MIN_PRICE = parseInt(getArg("min-price", "0"), 10);
 const MAX_TOTAL = parseInt(getArg("max", "1000"), 10);
 const CONTINUE = hasFlag("continue");
@@ -69,10 +73,35 @@ const USE_V3 = hasFlag("v3");
 const PROMPT_VERSION = USE_V3 ? "testimony-v3" : "discovery-v2";
 const USE_LIBRARY = !hasFlag("no-library");
 
+// ─── Fallback chain resolution ──────────────────────────────────────────
+// Order: gemini (free tier) → groq (free tier) → perplexity → openai → ollama (local)
+const FALLBACK_CHAIN = [
+  { name: 'gemini',     keyEnv: 'GOOGLE_AI_API_KEY' },
+  { name: 'groq',       keyEnv: 'GROQ_API_KEY' },
+  { name: 'perplexity', keyEnv: 'PERPLEXITY_API_KEY' },
+  { name: 'openai',     keyEnv: 'OPENAI_API_KEY' },
+  { name: 'ollama',     keyEnv: null }, // no key needed
+];
+
+function resolveProvider() {
+  if (PROVIDER_ARG !== 'auto') return PROVIDER_ARG;
+  for (const { name, keyEnv } of FALLBACK_CHAIN) {
+    if (!keyEnv || process.env[keyEnv]) {
+      console.log(`[fallback] Selected provider: ${name} (key: ${keyEnv || 'N/A'})`);
+      return name;
+    }
+  }
+  return 'ollama';
+}
+
+const PROVIDER = resolveProvider();
+const MODEL = getArg("model", DEFAULT_MODELS[PROVIDER] || "qwen2.5:7b");
+const PARALLEL = parseInt(getArg("parallel", String(DEFAULT_PARALLEL[PROVIDER] || 2)), 10);
+
 // ─── Library context (pg connection for reference data) ─────────────────
 
 let pgClient = null;
-const contextCache = new Map(); // make:year → context string
+const contextCache = new Map();
 
 async function getPgClient() {
   if (!pgClient) {
@@ -140,11 +169,9 @@ async function buildPrompt(description, vehicle) {
   const libraryContext = await getLibraryContext(vehicle.year, vehicle.make, vehicle.model);
 
   if (USE_V3) {
-    // Testimony-grade extraction: structured claims with citations and confidence
     return buildV3Prompt(description, vehicle, libraryContext);
   }
 
-  // Discovery mode: freeform extraction with optional library context
   let prompt = DISCOVERY_PROMPT
     .replace("{year}", String(vehicle.year || "Unknown"))
     .replace("{make}", vehicle.make || "Unknown")
@@ -191,9 +218,7 @@ async function callOpenAI(prompt) {
     throw new Error(`OpenAI ${resp.status}: ${text.slice(0, 200)}`);
   }
   const r = await resp.json();
-  const usage = r.usage || {};
-  const tokensPerSec = usage.completion_tokens ? "api" : "?";
-  return { content: r.choices?.[0]?.message?.content || "", tokensPerSec };
+  return { content: r.choices?.[0]?.message?.content || "", tokensPerSec: "api" };
 }
 
 async function callGemini(prompt) {
@@ -215,8 +240,7 @@ async function callGemini(prompt) {
     throw new Error(`Gemini ${resp.status}: ${text.slice(0, 200)}`);
   }
   const r = await resp.json();
-  const content = r.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  return { content, tokensPerSec: "api" };
+  return { content: r.candidates?.[0]?.content?.parts?.[0]?.text || "", tokensPerSec: "api" };
 }
 
 async function callGroq(prompt) {
@@ -238,10 +262,30 @@ async function callGroq(prompt) {
     throw new Error(`Groq ${resp.status}: ${text.slice(0, 200)}`);
   }
   const r = await resp.json();
-  const usage = r.usage || {};
   const dur = r.usage?.completion_time || 0;
-  const tokensPerSec = dur > 0 ? ((usage.completion_tokens || 0) / dur).toFixed(0) : "?";
+  const tokensPerSec = dur > 0 ? (((r.usage?.completion_tokens || 0) / dur).toFixed(0)) : "?";
   return { content: r.choices?.[0]?.message?.content || "", tokensPerSec };
+}
+
+async function callPerplexity(prompt) {
+  const key = process.env.PERPLEXITY_API_KEY;
+  if (!key) throw new Error("PERPLEXITY_API_KEY not set");
+  const resp = await fetch("https://api.perplexity.ai/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model: MODEL,  // 'sonar' or 'sonar-pro'
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.1,
+      max_tokens: 2048,
+    }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`Perplexity ${resp.status}: ${text.slice(0, 200)}`);
+  }
+  const r = await resp.json();
+  return { content: r.choices?.[0]?.message?.content || "", tokensPerSec: "api" };
 }
 
 const MODAL_URL = process.env.MODAL_LLM_URL || "https://sss97133--nuke-vllm-serve.modal.run";
@@ -262,41 +306,82 @@ async function callModal(prompt) {
     throw new Error(`Modal ${resp.status}: ${text.slice(0, 200)}`);
   }
   const r = await resp.json();
-  const meta = r._meta || {};
-  const tokensPerSec = meta.tokens_per_sec || "?";
-  return { content: r.choices?.[0]?.message?.content || "", tokensPerSec };
+  return { content: r.choices?.[0]?.message?.content || "", tokensPerSec: r._meta?.tokens_per_sec || "?" };
 }
 
-const PROVIDERS = { ollama: callOllama, openai: callOpenAI, gemini: callGemini, groq: callGroq, modal: callModal };
+const PROVIDERS = {
+  ollama: callOllama,
+  openai: callOpenAI,
+  gemini: callGemini,
+  groq: callGroq,
+  perplexity: callPerplexity,
+  modal: callModal,
+};
 
-// ─── Extract + parse ────────────────────────────────────────────────────
+// ─── Extract with per-call fallback ────────────────────────────────────
+// If the chosen provider throws (rate limit, quota, network), automatically
+// tries the next provider in the fallback chain before giving up.
 
-async function extract(description, vehicle) {
+async function extractWithFallback(description, vehicle) {
   const prompt = await buildPrompt(description, vehicle);
-  const startMs = Date.now();
-  const callFn = PROVIDERS[PROVIDER];
-  if (!callFn) throw new Error(`Unknown provider: ${PROVIDER}`);
 
-  const { content, tokensPerSec } = await callFn(prompt);
-  const elapsedMs = Date.now() - startMs;
+  // Build ordered list: chosen provider first, then rest of fallback chain
+  const orderedProviders = [
+    PROVIDER,
+    ...FALLBACK_CHAIN
+      .map(p => p.name)
+      .filter(n => n !== PROVIDER && PROVIDERS[n]),
+  ];
 
-  // Parse JSON
-  const jsonMatch = content.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    return { parsed: { raw_response: content.slice(0, 500), parse_failed: true }, elapsedMs, tokensPerSec };
-  }
+  let lastError;
+  for (const providerName of orderedProviders) {
+    // Skip if no key and not ollama
+    const meta = FALLBACK_CHAIN.find(p => p.name === providerName);
+    if (meta?.keyEnv && !process.env[meta.keyEnv]) continue;
 
-  try {
-    return { parsed: JSON.parse(jsonMatch[0]), elapsedMs, tokensPerSec };
-  } catch {
-    // Fix common local model JSON issues
-    const fixed = jsonMatch[0].replace(/,\s*}/g, "}").replace(/,\s*]/g, "]");
+    const callFn = PROVIDERS[providerName];
+    if (!callFn) continue;
+
+    const startMs = Date.now();
     try {
-      return { parsed: JSON.parse(fixed), elapsedMs, tokensPerSec };
-    } catch {
-      return { parsed: { raw_response: content.slice(0, 500), parse_failed: true }, elapsedMs, tokensPerSec };
+      const { content, tokensPerSec } = await callFn(prompt);
+      const elapsedMs = Date.now() - startMs;
+      if (providerName !== PROVIDER) {
+        console.log(`  [fallback] Used ${providerName} (primary ${PROVIDER} failed: ${lastError?.message?.slice(0, 80)})`);
+      }
+      return { content, tokensPerSec, elapsedMs, usedProvider: providerName };
+    } catch (err) {
+      lastError = err;
+      console.warn(`  [fallback] ${providerName} failed: ${err.message?.slice(0, 100)}`);
     }
   }
+
+  throw new Error(`All providers failed. Last error: ${lastError?.message}`);
+}
+
+// ─── Parse LLM response ─────────────────────────────────────────────────
+
+function parseContent(content) {
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    return { parsed: { raw_response: content.slice(0, 500), parse_failed: true } };
+  }
+  try {
+    return { parsed: JSON.parse(jsonMatch[0]) };
+  } catch {
+    const fixed = jsonMatch[0].replace(/,\s*}/g, "}").replace(/,\s*]/g, "]");
+    try {
+      return { parsed: JSON.parse(fixed) };
+    } catch {
+      return { parsed: { raw_response: content.slice(0, 500), parse_failed: true } };
+    }
+  }
+}
+
+async function extract(description, vehicle) {
+  const { content, tokensPerSec, elapsedMs, usedProvider } = await extractWithFallback(description, vehicle);
+  const { parsed } = parseContent(content);
+  return { parsed, elapsedMs, tokensPerSec, usedProvider };
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────
@@ -332,16 +417,19 @@ async function processOne(vehicle) {
     return { success: false, error: "Description too short" };
   }
 
-  const { parsed, elapsedMs, tokensPerSec } = await extract(vehicle.description, vehicle);
+  const { parsed, elapsedMs, tokensPerSec, usedProvider } = await extract(vehicle.description, vehicle);
   const keysFound = Object.keys(parsed).length;
   const totalFields = countFields(parsed);
+
+  // Tag with actual provider used (may differ from PROVIDER if fallback triggered)
+  const modelTag = usedProvider !== PROVIDER ? `${MODEL}@${usedProvider}` : MODEL;
 
   const { error: insertError } = await supabase
     .from("description_discoveries")
     .upsert({
       vehicle_id: vehicle.id,
       discovered_at: new Date().toISOString(),
-      model_used: MODEL,
+      model_used: modelTag,
       prompt_version: PROMPT_VERSION,
       raw_extraction: parsed,
       keys_found: keysFound,
@@ -357,21 +445,31 @@ async function processOne(vehicle) {
     vehicle: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
     keysFound, totalFields, elapsedMs, tokensPerSec,
     parseFailed: !!parsed.parse_failed,
+    usedProvider,
   };
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────
 
 async function main() {
-  // Provider-specific init checks
   if (PROVIDER === "ollama") {
     try {
       const resp = await fetch(`${OLLAMA_URL}/api/tags`);
       if (!resp.ok) throw new Error(`status ${resp.status}`);
     } catch (e) {
-      console.error(`Cannot connect to Ollama at ${OLLAMA_URL}: ${e.message}`);
-      process.exit(1);
+      console.warn(`[warn] Cannot connect to Ollama at ${OLLAMA_URL}: ${e.message}`);
+      if (PROVIDER_ARG !== 'auto') {
+        console.error('Ollama unavailable and no fallback (use --provider auto to enable fallback)');
+        process.exit(1);
+      }
     }
+  }
+
+  // Show which keys are available
+  console.log(`\n  Provider key status:`);
+  for (const { name, keyEnv } of FALLBACK_CHAIN) {
+    if (!keyEnv) { console.log(`   ${name}: always available (local)`); continue; }
+    console.log(`   ${name}: ${process.env[keyEnv] ? '✅ key set' : '❌ no key'}`);
   }
 
   const costEstimate = {
@@ -379,11 +477,12 @@ async function main() {
     openai: `~$${((MAX_TOTAL * 6000 * 0.15 / 1e6) + (MAX_TOTAL * 1000 * 0.6 / 1e6)).toFixed(2)} (gpt-4o-mini)`,
     gemini: "FREE (1000 RPD limit)",
     groq: "FREE (14,400 RPD limit)",
-    modal: `~$${(MAX_TOTAL * 4 / 3600 * 0.59).toFixed(2)} (T4 GPU, ~$0.59/hr)`,
+    perplexity: "Pay-per-use (sonar)",
+    modal: `~$${(MAX_TOTAL * 4 / 3600 * 0.59).toFixed(2)} (T4 GPU)`,
   };
 
   console.log(`\n  Multi-Model Description Discovery`);
-  console.log(`   Provider: ${PROVIDER} | Model: ${MODEL}`);
+  console.log(`   Provider: ${PROVIDER}${PROVIDER_ARG === 'auto' ? ' (auto-selected)' : ''} | Model: ${MODEL}`);
   console.log(`   Batch: ${BATCH_SIZE} | Parallel: ${PARALLEL} | Max: ${MAX_TOTAL}`);
   console.log(`   Est. cost: ${costEstimate[PROVIDER] || "unknown"}`);
   console.log();
@@ -410,7 +509,8 @@ async function main() {
         if (r.status === "fulfilled" && r.value.success) {
           totalSuccess++;
           const v = r.value;
-          console.log(`  + ${v.vehicle} — ${v.keysFound} keys, ${v.totalFields} fields, ${v.elapsedMs}ms (${v.tokensPerSec} tok/s)`);
+          const providerTag = v.usedProvider !== PROVIDER ? ` [via ${v.usedProvider}]` : '';
+          console.log(`  + ${v.vehicle} — ${v.keysFound} keys, ${v.totalFields} fields, ${v.elapsedMs}ms (${v.tokensPerSec} tok/s)${providerTag}`);
         } else if (r.status === "fulfilled" && r.value.parseFailed) {
           totalParseFailures++;
         } else {
