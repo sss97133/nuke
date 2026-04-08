@@ -1,19 +1,27 @@
 # Automated BAT Scraping via GitHub Actions
 # Runs every 6 hours, can also be triggered manually
-# Runs on GitHub's servers (free, no local resources used)
 
 name: BAT Scrape
 
 on:
   schedule:
     - cron: '0 */6 * * *'  # Every 6 hours (12 AM, 6 AM, 12 PM, 6 PM UTC)
-  workflow_dispatch:  # Allow manual trigger from GitHub UI
+  workflow_dispatch:
+    inputs:
+      chain_depth:
+        description: 'Chain depth for go-grinder'
+        required: false
+        default: '6'
+      max_listings:
+        description: 'Max listings to process'
+        required: false
+        default: '800'
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    
+    timeout-minutes: 15
+
     steps:
       - name: Validate Secrets
         env:
@@ -29,50 +37,68 @@ jobs:
             exit 1
           fi
           echo "✅ All required secrets are set"
-      
-      - name: Trigger BAT Scrape (go-grinder)
+
+      - name: Trigger BAT Scrape (go-grinder) with retry
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          echo "🔍 Starting BaT scrape via go-grinder (proven pattern)..."
-          
-          # Use go-grinder which is the proven, secure pattern for BaT scraping
-          # It handles discovery, self-invocation, and time budgets safely
-          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
-            "${SUPABASE_URL}/functions/v1/go-grinder" \
-            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-            -H "Content-Type: application/json" \
-            --max-time 70 \
-            -d '{
-              "do_seed": true,
-              "chain_depth": 6,
-              "seed_every": 1,
-              "bat_import_batch": 1,
-              "max_listings": 800
-            }')
-          
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-          
-          echo "HTTP Status: $HTTP_CODE"
-          echo "Response: $BODY" | head -c 2000
-          
-          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-            echo ""
-            echo "✅ BaT scrape triggered successfully"
-            # Parse and display key metrics if available
-            echo "$BODY" | grep -o '"discovered_listing_urls":[0-9]*' || echo "Response parsing skipped"
-          else
-            echo ""
-            echo "❌ BaT scrape failed (HTTP $HTTP_CODE)"
+          CHAIN_DEPTH=${{ github.event.inputs.chain_depth || '6' }}
+          MAX_LISTINGS=${{ github.event.inputs.max_listings || '800' }}
+
+          echo "🔍 Starting BaT scrape via go-grinder..."
+          echo "  chain_depth=$CHAIN_DEPTH  max_listings=$MAX_LISTINGS"
+
+          MAX_RETRIES=3
+          ATTEMPT=0
+          SUCCESS=false
+
+          while [ $ATTEMPT -lt $MAX_RETRIES ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "\n🔄 Attempt $ATTEMPT / $MAX_RETRIES"
+
+            RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
+              "${SUPABASE_URL}/functions/v1/go-grinder" \
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "Content-Type: application/json" \
+              --max-time 90 \
+              -d "{
+                \"do_seed\": true,
+                \"chain_depth\": $CHAIN_DEPTH,
+                \"seed_every\": 1,
+                \"bat_import_batch\": 1,
+                \"max_listings\": $MAX_LISTINGS
+              }")
+
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+
+            echo "HTTP Status: $HTTP_CODE"
+            echo "Response: $BODY" | head -c 2000
+
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+              echo "\n✅ BaT scrape triggered successfully (attempt $ATTEMPT)"
+              echo "$BODY" | grep -o '"discovered_listing_urls":[0-9]*' || true
+              SUCCESS=true
+              break
+            else
+              echo "\n⚠️  Attempt $ATTEMPT failed (HTTP $HTTP_CODE)"
+              if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+                SLEEP_TIME=$((ATTEMPT * 15))
+                echo "⏳ Waiting ${SLEEP_TIME}s before retry..."
+                sleep $SLEEP_TIME
+              fi
+            fi
+          done
+
+          if [ "$SUCCESS" = false ]; then
+            echo "\n❌ BaT scrape failed after $MAX_RETRIES attempts"
             exit 1
           fi
-      
+
       - name: Summary
         if: always()
         run: |
           echo "📊 BaT scrape workflow completed"
           echo "The go-grinder function will continue processing via self-invocation"
           echo "Check Supabase logs or scrape_sources table for full results"
-
