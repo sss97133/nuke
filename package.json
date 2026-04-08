@@ -232,7 +232,7 @@
     "tar": "^7.5.11"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.71.2",
+    "@anthropic-ai/sdk": "^0.72.0",
     "@playwright/test": "^1.58.0",
     "glob": "^13.0.0",
     "ts-node": "^10.9.2",
