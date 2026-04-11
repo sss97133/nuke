@@ -387,6 +387,32 @@ export async function loadVehicleImpl({
             });
           }
         }
+        // RPC doesn't include image_sets — supplement with a parallel query
+        try {
+          const { data: imageSets } = await supabase
+            .from('image_sets')
+            .select('id, name, session_start, session_end, session_duration_minutes, metadata, event_date')
+            .eq('vehicle_id', vehicleId)
+            .order('session_start', { ascending: false });
+          if (Array.isArray(imageSets)) {
+            for (const s of imageSets) {
+              events.push({
+                id: s.id,
+                vehicle_id: vehicleId,
+                event_date: s.event_date || (s.session_start ? String(s.session_start).slice(0, 10) : null),
+                event_type: 'photo_session',
+                title: s.name || 'Photo session',
+                metadata: {
+                  ...(s.metadata || {}),
+                  session_start: s.session_start,
+                  session_end: s.session_end,
+                  session_duration_minutes: s.session_duration_minutes,
+                  source: 'context_stitcher',
+                },
+              });
+            }
+          }
+        } catch { /* ignore — image_sets is supplementary */ }
         events.sort((a: any, b: any) => {
           const da = a.event_date || '';
           const db = b.event_date || '';
