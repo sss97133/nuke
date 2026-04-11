@@ -9,7 +9,7 @@
  */
 
 export const config = {
-  matcher: ['/market/competitors', '/vehicle/:path*'],
+  matcher: ['/market/competitors', '/vehicle/:path*', '/api/v1/vehicle/:path*'],
 };
 
 // ── Static OG for /market/competitors ────────────────────────────────────────
@@ -96,6 +96,28 @@ function buildJsonLd(v: Record<string, unknown>): string {
   }
   // Strip undefined values
   return JSON.stringify(ld, (_, val) => (val === undefined ? undefined : val));
+}
+
+// ── Fetch vehicle from PostgREST ─────────────────────────────────────────────
+
+async function fetchVehicle(vehicleId: string): Promise<Record<string, unknown> | null> {
+  const apiUrl = `${SUPABASE_URL}/rest/v1/vehicles?id=eq.${vehicleId}&is_public=eq.true&select=${VEHICLE_SELECT}`;
+  try {
+    const resp = await fetch(apiUrl, {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        Accept: 'application/json',
+      },
+    });
+    if (resp.ok) {
+      const rows = await resp.json();
+      if (rows && rows.length > 0) return rows[0];
+    }
+  } catch {
+    // Return null on fetch error
+  }
+  return null;
 }
 
 // ── Fetch base HTML ──────────────────────────────────────────────────────────
@@ -221,6 +243,83 @@ export default async function middleware(request: Request): Promise<Response | u
     });
   }
 
+  // ── /api/v1/vehicle/:id (REST API) ──
+  const apiMatch = url.pathname.match(/^\/api\/v1\/vehicle\/([^/]+)/);
+  if (apiMatch) {
+    const apiVehicleId = apiMatch[1];
+    if (!UUID_RE.test(apiVehicleId)) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid vehicle ID',
+          message: 'Vehicle ID must be a valid UUID. Example: /api/v1/vehicle/14123fbf-7eb6-4dd6-b0ca-bbc83db06a28',
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } },
+      );
+    }
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      return new Response(JSON.stringify({ error: 'Server misconfigured' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    const vehicle = await fetchVehicle(apiVehicleId);
+    if (!vehicle) {
+      return new Response(
+        JSON.stringify({ error: 'Vehicle not found', message: 'Vehicle does not exist or is not public.' }),
+        { status: 404, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } },
+      );
+    }
+    return new Response(
+      JSON.stringify({
+        data: vehicle,
+        meta: {
+          url: `https://nuke.ag/vehicle/${vehicle.id}`,
+          api_url: `https://nuke.ag/api/v1/vehicle/${vehicle.id}`,
+          mcp_endpoint: 'https://nuke.ag/mcp',
+          mcp_tool: 'get_vehicle',
+          mcp_hint: 'For deeper data (events, images, comments, observations), connect via MCP at the endpoint above.',
+        },
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        },
+      },
+    );
+  }
+
+  // ── /api/v1/vehicle/ (API docs, no ID) ──
+  if (url.pathname === '/api/v1/vehicle' || url.pathname === '/api/v1/vehicle/') {
+    return new Response(
+      JSON.stringify({
+        name: 'Nuke Vehicle API',
+        version: '1.0',
+        usage: {
+          get_vehicle: {
+            method: 'GET',
+            path: '/api/v1/vehicle/{id}',
+            description: 'Returns public vehicle data by UUID.',
+            example: 'https://nuke.ag/api/v1/vehicle/14123fbf-7eb6-4dd6-b0ca-bbc83db06a28',
+          },
+        },
+        mcp: {
+          endpoint: 'https://nuke.ag/mcp',
+          description: 'Model Context Protocol endpoint for deeper vehicle data. Supports 22 tools including get_vehicle, query_vehicle_deep, and search.',
+        },
+        docs: 'https://nuke.ag/developers',
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, s-maxage=3600',
+          'Access-Control-Allow-Origin': '*',
+        },
+      },
+    );
+  }
+
   // ── /vehicle/:id (dynamic vehicle data) ──
   const vehicleMatch = url.pathname.match(/^\/vehicle\/([^/]+)/);
   if (!vehicleMatch) return undefined;
@@ -231,27 +330,7 @@ export default async function middleware(request: Request): Promise<Response | u
   // Check if we can fetch from Supabase
   if (!SUPABASE_URL || !SUPABASE_KEY) return undefined;
 
-  // Fetch vehicle from PostgREST
-  const apiUrl = `${SUPABASE_URL}/rest/v1/vehicles?id=eq.${vehicleId}&is_public=eq.true&select=${VEHICLE_SELECT}`;
-  let vehicle: Record<string, unknown> | null = null;
-
-  try {
-    const resp = await fetch(apiUrl, {
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
-        Accept: 'application/json',
-      },
-    });
-    if (resp.ok) {
-      const rows = await resp.json();
-      if (rows && rows.length > 0) vehicle = rows[0];
-    }
-  } catch {
-    // Fall through to SPA on fetch error
-  }
-
-  // Vehicle not found or not public → fall through to normal SPA
+  const vehicle = await fetchVehicle(vehicleId);
   if (!vehicle) return undefined;
 
   // ── Accept: application/json → return raw JSON ──
