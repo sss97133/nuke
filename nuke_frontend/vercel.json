@@ -17,6 +17,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/api/v1/vehicle/:path*",
+      "destination": "/api/v1/vehicle/:path*"
+    },
+    {
       "source": "/api/:path+",
       "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/:path+"
     },
