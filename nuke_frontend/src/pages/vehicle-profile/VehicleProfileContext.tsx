@@ -246,8 +246,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   const loadTimelineEvents = useCallback(async () => {
     if (!vehicleId) return;
     try {
-      // Load timeline_events and work_sessions in parallel, merge into unified timeline
-      const [tlResult, wsResult] = await Promise.all([
+      // Load timeline_events, work_sessions, and image_sets in parallel, merge into unified timeline
+      const [tlResult, wsResult, isResult] = await Promise.all([
         supabase
           .from('timeline_events')
           .select('*')
@@ -259,6 +259,11 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
           .select('id, session_date, title, work_type, image_count, duration_minutes, total_parts_cost, work_description, status, total_labor_cost, total_job_cost')
           .eq('vehicle_id', vehicleId)
           .order('session_date', { ascending: false }),
+        supabase
+          .from('image_sets')
+          .select('id, name, session_start, session_end, session_duration_minutes, metadata, event_date')
+          .eq('vehicle_id', vehicleId)
+          .order('session_start', { ascending: false }),
       ]);
 
       const events: any[] = [];
@@ -266,7 +271,6 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
 
       // Convert work_sessions to timeline event shape and merge
       if (!wsResult.error && wsResult.data) {
-        const existingDates = new Set(events.map((e: any) => e.event_date?.slice(0, 10)));
         for (const ws of wsResult.data) {
           // Add as a work_session event type so BarcodeTimeline can render it
           events.push({
@@ -287,6 +291,26 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
               work_description: ws.work_description,
               status: ws.status,
               source: 'work_sessions',
+            },
+          });
+        }
+      }
+
+      // Convert image_sets to timeline event shape and merge
+      if (!isResult.error && isResult.data) {
+        for (const s of isResult.data) {
+          events.push({
+            id: s.id,
+            vehicle_id: vehicleId,
+            event_date: s.event_date || (s.session_start ? s.session_start.slice(0, 10) : null),
+            event_type: 'photo_session',
+            title: s.name || 'Photo session',
+            metadata: {
+              ...(s.metadata || {}),
+              session_start: s.session_start,
+              session_end: s.session_end,
+              session_duration_minutes: s.session_duration_minutes,
+              source: 'context_stitcher',
             },
           });
         }
