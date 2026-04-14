@@ -15,6 +15,8 @@ import { SchematicView } from '../components/wiring/SchematicView';
 import { HarnessView3D } from '../components/wiring/HarnessView3D';
 import { DataView } from '../components/wiring/DataView';
 import { CommandPalette } from '../components/wiring/CommandPalette';
+import { TopologyView } from '../components/wiring/TopologyView';
+import { useDRC } from '../components/wiring/useDRC';
 
 // ── Design tokens ─────────────────────────────────────────────────────
 const C = {
@@ -85,6 +87,9 @@ export default function WiringPlan() {
     data: defaultCamera(),
     topology: defaultCamera(),
   });
+
+  // ── DRC ──
+  const drc = useDRC(overlay.devices, overlay.result, pinMaps);
 
   // ── Selected device lookup ──
   const selectedDevice = useMemo(
@@ -279,6 +284,7 @@ export default function WiringPlan() {
     fitRequested,
     vehicleId,
     zoneColors: ZONE_COLORS,
+    drcMap: drc.drcMap,
   };
 
   return (
@@ -316,6 +322,21 @@ export default function WiringPlan() {
             {overlay.result.warnings.length} WARNINGS
           </span>
         )}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, borderLeft: `1px solid ${C.border}`, paddingLeft: 8 }}>
+          <span style={{ color: C.label, fontFamily: 'Arial', fontSize: 7, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700 }}>DRC:</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+            <span style={{ width: 6, height: 6, background: C.pass, display: 'inline-block' }} />
+            <span style={{ color: C.pass, fontFamily: "'Courier New', monospace", fontSize: 10, fontWeight: 700 }}>{drc.summary.pass}</span>
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+            <span style={{ width: 6, height: 6, background: C.warn, display: 'inline-block' }} />
+            <span style={{ color: C.warn, fontFamily: "'Courier New', monospace", fontSize: 10, fontWeight: 700 }}>{drc.summary.warn}</span>
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+            <span style={{ width: 6, height: 6, background: C.fail, display: 'inline-block' }} />
+            <span style={{ color: C.fail, fontFamily: "'Courier New', monospace", fontSize: 10, fontWeight: 700 }}>{drc.summary.fail}</span>
+          </span>
+        </span>
       </div>
 
       {/* ── Tab Bar ── */}
@@ -381,10 +402,18 @@ export default function WiringPlan() {
         <div style={{ position: 'absolute', inset: 0, display: activeTab === 'data' ? 'block' : 'none' }}>
           <DataView {...viewProps} overlay={overlay} />
         </div>
-        <div style={{ position: 'absolute', inset: 0, display: activeTab === 'topology' ? 'flex' : 'none', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ color: C.muted, fontFamily: "'Courier New', monospace", fontSize: 11 }}>
-            TOPOLOGY VIEW — COMING SOON
-          </span>
+        <div style={{ position: 'absolute', inset: 0, display: activeTab === 'topology' ? 'block' : 'none' }}>
+          <TopologyView
+            devices={overlay.devices}
+            wires={overlay.result.wires}
+            result={overlay.result}
+            selectedDeviceId={selectedDeviceId}
+            selectedDeviceIds={selectedDeviceIds}
+            selectedWireId={selectedWireId}
+            onDeviceClick={(id, e) => handleDeviceClick(id, e.shiftKey)}
+            onWireClick={handleWireClick}
+            drcMap={drc.drcMap}
+          />
         </div>
 
         {/* ── Detail Panel (slides in from right) ── */}

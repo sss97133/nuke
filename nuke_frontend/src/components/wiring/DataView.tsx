@@ -36,6 +36,11 @@ type SubTab = 'devices' | 'bom' | 'cutlist';
 type SortKey = 'device_name' | 'location_zone' | 'device_category' | 'wire_gauge_recommended' | 'power_draw_amps' | 'part_number' | 'price' | 'status';
 type SortDir = 'asc' | 'desc';
 
+interface DRCDeviceResult {
+  severity: 'pass' | 'warn' | 'fail';
+  rules: { ruleId: string; label: string; message: string; severity: 'pass' | 'warn' | 'fail' }[];
+}
+
 interface Props {
   devices: ManifestDevice[];
   result: OverlayResult;
@@ -47,6 +52,7 @@ interface Props {
   onDeselect: () => void;
   fitRequested: number;
   zoneColors: Record<string, string>;
+  drcMap?: Map<string, DRCDeviceResult>;
   overlay: {
     devices: ManifestDevice[];
     result: OverlayResult;
@@ -57,7 +63,7 @@ interface Props {
 
 export function DataView({
   devices, result, selectedDeviceId,
-  onDeviceClick, overlay,
+  onDeviceClick, overlay, drcMap,
 }: Props) {
   const [subTab, setSubTab] = useState<SubTab>('devices');
   const [filter, setFilter] = useState('');
@@ -234,6 +240,7 @@ export function DataView({
             sortDir={sortDir}
             onSort={handleSort}
             onDeviceClick={onDeviceClick}
+            drcMap={drcMap}
           />
         )}
         {subTab === 'bom' && bomDoc && <BOMView doc={bomDoc} />}
@@ -260,7 +267,8 @@ export function DataView({
 // Device Table
 // ══════════════════════════════════════════════════════════════════════
 
-const COLUMNS: { key: SortKey; label: string; width?: number }[] = [
+const COLUMNS: { key: SortKey | 'drc'; label: string; width?: number }[] = [
+  { key: 'drc', label: 'DRC', width: 30 },
   { key: 'device_name', label: 'NAME', width: 200 },
   { key: 'location_zone', label: 'ZONE', width: 90 },
   { key: 'device_category', label: 'CATEGORY', width: 100 },
@@ -271,13 +279,16 @@ const COLUMNS: { key: SortKey; label: string; width?: number }[] = [
   { key: 'status', label: 'STATUS', width: 80 },
 ];
 
-function DeviceTable({ devices, selectedDeviceId, sortKey, sortDir, onSort, onDeviceClick }: {
+const DRC_COLORS = { pass: '#22c55e', warn: '#eab308', fail: '#ef4444' } as const;
+
+function DeviceTable({ devices, selectedDeviceId, sortKey, sortDir, onSort, onDeviceClick, drcMap }: {
   devices: ManifestDevice[];
   selectedDeviceId: string | null;
   sortKey: SortKey;
   sortDir: SortDir;
   onSort: (key: SortKey) => void;
   onDeviceClick: (id: string, shiftKey?: boolean) => void;
+  drcMap?: Map<string, DRCDeviceResult>;
 }) {
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -286,11 +297,11 @@ function DeviceTable({ devices, selectedDeviceId, sortKey, sortDir, onSort, onDe
           {COLUMNS.map(col => (
             <th
               key={col.key}
-              onClick={() => onSort(col.key)}
+              onClick={() => col.key !== 'drc' && onSort(col.key as SortKey)}
               style={{
                 ...thStyle,
                 width: col.width,
-                cursor: 'pointer',
+                cursor: col.key !== 'drc' ? 'pointer' : 'default',
                 color: sortKey === col.key ? C.active : C.label,
                 position: 'sticky',
                 top: 0,
@@ -309,6 +320,8 @@ function DeviceTable({ devices, selectedDeviceId, sortKey, sortDir, onSort, onDe
       <tbody>
         {devices.map(d => {
           const isSelected = d.id === selectedDeviceId;
+          const drcResult = drcMap?.get(d.id);
+          const drcColor = drcResult ? DRC_COLORS[drcResult.severity] : undefined;
           return (
             <tr
               key={d.id}
@@ -319,6 +332,18 @@ function DeviceTable({ devices, selectedDeviceId, sortKey, sortDir, onSort, onDe
                 borderLeft: isSelected ? `2px solid ${C.active}` : '2px solid transparent',
               }}
             >
+              <td style={{ ...tdStyle, textAlign: 'center', width: 30 }}>
+                {drcColor && (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 6, height: 6,
+                      background: drcColor,
+                    }}
+                    title={drcResult?.rules.filter(r => r.severity !== 'pass').map(r => r.message).join('; ') || 'All checks pass'}
+                  />
+                )}
+              </td>
               <td style={tdStyle}>{d.device_name}</td>
               <td style={tdStyle}>
                 {d.location_zone && (
