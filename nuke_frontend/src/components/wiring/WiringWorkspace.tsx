@@ -1,14 +1,11 @@
-// WiringWorkspace.tsx — Two-panel data view: reference image + device table
-// Left: zoomable reference images (harness plan, GM diagrams)
-// Right: sortable/filterable device table from vehicle_build_manifest
+// WiringWorkspace.tsx — DATA tab: reference image viewer + sortable device table
+// Now accepts cross-view selection state from WiringPlan parent.
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useOverlayCompute } from './useOverlayCompute';
 import type { ManifestDevice, WireSpec } from './overlayCompute';
-import { WiringDetailPanel } from './WiringDetailPanel';
-import { useWireCatalog, type WireTier } from './useWireCatalog';
-import { useComponentLibrary } from './useComponentLibrary';
 import { WIRE_TIERS } from './harnessConstants';
+import type { DRCDeviceResult } from './useDRC';
 
 // ── Colors ───────────────────────────────────────────────────────────
 const C = {
@@ -38,6 +35,10 @@ const ZONE_ACCENT: Record<string, string> = {
   underbody: C.underbody, firewall: C.firewall, interior: C.interior, roof: C.roof,
 };
 
+const DRC_COLORS: Record<string, string> = {
+  pass: '#22aa44', warn: '#ccaa00', fail: '#cc2222',
+};
+
 // ── Reference Images ─────────────────────────────────────────────────
 const REFERENCE_IMAGES: { label: string; file: string }[] = [
   { label: 'Harness Routing Plan', file: 'K5_harness_routing_plan_view.png' },
@@ -57,15 +58,22 @@ const REFERENCE_IMAGES: { label: string; file: string }[] = [
 interface Props {
   initialDevices: ManifestDevice[];
   vehicleId?: string;
+  // Cross-view state from WiringPlan
+  selectedDeviceId: string | null;
+  selectedDeviceIds: Set<string>;
+  selectedWireId: number | null;
+  drcMap: Map<string, DRCDeviceResult>;
+  onDeviceClick: (id: string, e: React.MouseEvent) => void;
+  onWireClick: (wireNumber: number) => void;
 }
 
-export function WiringWorkspace({ initialDevices, vehicleId }: Props) {
-  const { devices, result, terminations } = useOverlayCompute(initialDevices);
-  const [tier, setTier] = useState<WireTier>('professional');
-  const { products, gaugeConversions } = useWireCatalog(tier);
-  const { findComponent } = useComponentLibrary();
+export function WiringWorkspace({
+  initialDevices, vehicleId,
+  selectedDeviceId, selectedDeviceIds, selectedWireId, drcMap,
+  onDeviceClick, onWireClick,
+}: Props) {
+  const { devices, result } = useOverlayCompute(initialDevices);
 
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [activeImage, setActiveImage] = useState(0);
 
@@ -74,15 +82,6 @@ export function WiringWorkspace({ initialDevices, vehicleId }: Props) {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
-
-  // Selected device data
-  const selectedDevice = useMemo(() => selectedDeviceId ? devices.find(d => d.id === selectedDeviceId) : null, [devices, selectedDeviceId]);
-  const selectedWire = useMemo(() => selectedDevice ? result.wires.find(w => w.to === selectedDevice.device_name) : undefined, [selectedDevice, result.wires]);
-  const selectedPdmChannel = useMemo(() => selectedDevice ? result.pdmChannels.find(ch => ch.devices.includes(selectedDevice.device_name)) : undefined, [selectedDevice, result.pdmChannels]);
-  const selectedTermination = useMemo(() => selectedDevice ? terminations.find(t => t.deviceName === selectedDevice.device_name) : undefined, [selectedDevice, terminations]);
-  const selectedLibraryComponent = useMemo(() => selectedDevice ? findComponent(selectedDevice.manufacturer || '', selectedDevice.part_number || '') : undefined, [selectedDevice, findComponent]);
-  const selectedWireProduct = useMemo(() => selectedWire ? products.find(p => p.gauge_awg === selectedWire.gauge) : undefined, [selectedWire, products]);
-  const selectedGaugeInfo = useMemo(() => selectedWire ? gaugeConversions.find(g => g.awg === selectedWire.gauge) : undefined, [selectedWire, gaugeConversions]);
 
   // Pan/zoom handlers
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -101,10 +100,6 @@ export function WiringWorkspace({ initialDevices, vehicleId }: Props) {
   }, [isPanning]);
   const handleMouseUp = useCallback(() => setIsPanning(false), []);
   const resetView = useCallback(() => { setScale(1); setOffset({ x: 0, y: 0 }); }, []);
-
-  // Stats
-  const totalCost = result.partsCost + result.recommendedConfig.totalCost;
-  const totalLength = result.wires.reduce((s, w) => s + w.lengthFt, 0);
 
   // Table sort
   const [sortKey, setSortKey] = useState<string>('device_name');
@@ -134,26 +129,6 @@ export function WiringWorkspace({ initialDevices, vehicleId }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', fontFamily: 'Arial, sans-serif', background: C.bg, color: C.text }}>
-      {/* ── Status Bar ────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', height: 36, background: C.surface, borderBottom: `1px solid ${C.border}`, gap: 2, flexShrink: 0 }}>
-        <Stat label="DEVICES" value={String(devices.length)} />
-        <Stat label="WIRES" value={String(result.wireCount)} />
-        <Stat label="LENGTH" value={`${Math.round(totalLength)}ft`} />
-        <Stat label="ECU" value={result.recommendedConfig.ecu.model} />
-        <Stat label="PDM" value={result.recommendedConfig.pdm.config} />
-        <Stat label="COST" value={`$${Math.round(totalCost).toLocaleString()}`} />
-
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: '8px', color: C.textDim, fontWeight: 700, letterSpacing: '0.5px' }}>TIER</span>
-          <select value={tier} onChange={e => setTier(e.target.value as WireTier)} style={{
-            fontSize: '8px', fontFamily: '"Courier New", monospace', fontWeight: 700,
-            padding: '2px 4px', border: `1px solid ${C.border}`, background: C.bg, color: C.text, cursor: 'pointer',
-          }}>
-            {WIRE_TIERS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
-        </div>
-      </div>
-
       {/* ── Two-Panel Layout ──────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
 
@@ -231,6 +206,13 @@ export function WiringWorkspace({ initialDevices, vehicleId }: Props) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px', fontFamily: 'Arial' }}>
               <thead>
                 <tr style={{ position: 'sticky', top: 0, zIndex: 2, background: C.surface, borderBottom: `2px solid ${C.accent}` }}>
+                  {/* DRC column */}
+                  <th style={{
+                    padding: '6px 4px', textAlign: 'center', fontSize: '7px',
+                    fontWeight: 700, color: C.textDim, letterSpacing: '0.5px', width: 28,
+                  }}>
+                    DRC
+                  </th>
                   {[
                     ['NAME', 'device_name'],
                     ['ZONE', 'location_zone'],
@@ -257,20 +239,39 @@ export function WiringWorkspace({ initialDevices, vehicleId }: Props) {
               <tbody>
                 {sortedDevices.map(d => {
                   const wire = result.wires.find(w => w.to === d.device_name);
-                  const isSelected = d.id === selectedDeviceId;
+                  const isSelected = d.id === selectedDeviceId || selectedDeviceIds.has(d.id);
+                  const isDimmed = (selectedWireId != null) && !wire?.wireNumber;
+                  const isWireHighlighted = selectedWireId != null && wire?.wireNumber === selectedWireId;
+                  const drc = drcMap.get(d.id);
                   return (
                     <tr
                       key={d.id}
-                      onClick={() => setSelectedDeviceId(isSelected ? null : d.id)}
+                      onClick={(e) => onDeviceClick(d.id, e)}
                       style={{
                         cursor: 'pointer',
                         background: isSelected ? C.surfaceSelected : undefined,
                         borderBottom: `1px solid ${C.border}`,
+                        opacity: isDimmed && !isWireHighlighted ? 0.3 : 1,
+                        transition: 'opacity 200ms',
                       }}
                       onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = C.surfaceHover; }}
                       onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = ''; }}
                     >
-                      <td style={{ padding: '5px 8px', fontWeight: 700 }}>{d.device_name}</td>
+                      {/* DRC dot */}
+                      <td style={{ padding: '5px 4px', textAlign: 'center' }}>
+                        {drc && (
+                          <span style={{
+                            display: 'inline-block', width: 6, height: 6,
+                            background: DRC_COLORS[drc.severity],
+                          }} title={drc.rules.filter(r => r.severity !== 'pass').map(r => r.message).join('\n') || 'All checks pass'} />
+                        )}
+                      </td>
+                      <td style={{ padding: '5px 8px', fontWeight: 700 }}>
+                        {d.device_name}
+                        {isWireHighlighted && (
+                          <span style={{ marginLeft: 6, fontSize: '7px', color: '#00ddff', fontWeight: 700 }}>NET</span>
+                        )}
+                      </td>
                       <td style={{ padding: '5px 8px' }}>
                         <span style={{
                           fontSize: '7px', fontWeight: 700, padding: '1px 5px',
@@ -302,38 +303,7 @@ export function WiringWorkspace({ initialDevices, vehicleId }: Props) {
             </table>
           </div>
         </div>
-
-        {/* ── Detail Panel (overlay on right) ──────────────────────── */}
-        {selectedDevice && (
-          <div style={{ position: 'absolute', right: 0, top: 0, height: '100%', zIndex: 10 }}>
-            <WiringDetailPanel
-              device={selectedDevice}
-              wire={selectedWire}
-              pdmChannel={selectedPdmChannel}
-              ecuModel={result.recommendedConfig.ecu.model}
-              termination={selectedTermination}
-              onClose={() => setSelectedDeviceId(null)}
-              onSavePosition={() => {}}
-              positionDirty={false}
-              libraryComponent={selectedLibraryComponent}
-              wireProduct={selectedWireProduct}
-              gaugeInfo={selectedGaugeInfo}
-              tierLabel={WIRE_TIERS.find(t => t.value === tier)?.label}
-              allWires={result.wires}
-            />
-          </div>
-        )}
       </div>
-    </div>
-  );
-}
-
-// ── Stat chip ────────────────────────────────────────────────────────
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, marginRight: 6 }}>
-      <span style={{ fontSize: '7px', fontWeight: 700, letterSpacing: '0.5px', color: C.textMuted }}>{label}</span>
-      <span style={{ fontSize: '10px', fontFamily: '"Courier New", monospace', fontWeight: 700, color: C.text }}>{value}</span>
     </div>
   );
 }
