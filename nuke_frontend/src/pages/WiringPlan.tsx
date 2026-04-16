@@ -88,7 +88,12 @@ export default function WiringPlan() {
     topology: defaultCamera(),
   });
 
-  // ── DRC ──
+  // ── Supabase queries for detail panel ──
+  const [pinMaps, setPinMaps] = useState<Record<string, unknown[]>>({});
+  const [partsReception, setPartsReception] = useState<unknown[]>([]);
+  const [workOrderParts, setWorkOrderParts] = useState<unknown[]>([]);
+
+  // ── DRC (must be after pinMaps declaration) ──
   const drc = useDRC(overlay.devices, overlay.result, pinMaps);
 
   // ── Selected device lookup ──
@@ -101,11 +106,6 @@ export default function WiringPlan() {
     () => selectedWireId != null ? overlay.result.wires.find(w => w.wireNumber === selectedWireId) ?? null : null,
     [selectedWireId, overlay.result.wires]
   );
-
-  // ── Supabase queries for detail panel ──
-  const [pinMaps, setPinMaps] = useState<Record<string, unknown[]>>({});
-  const [partsReception, setPartsReception] = useState<unknown[]>([]);
-  const [workOrderParts, setWorkOrderParts] = useState<unknown[]>([]);
 
   // ── Load manifest ──
   useEffect(() => {
