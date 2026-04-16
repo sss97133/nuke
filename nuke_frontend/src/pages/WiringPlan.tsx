@@ -88,9 +88,6 @@ export default function WiringPlan() {
     topology: defaultCamera(),
   });
 
-  // ── DRC ──
-  const drc = useDRC(overlay.devices, overlay.result, pinMaps);
-
   // ── Selected device lookup ──
   const selectedDevice = useMemo(
     () => selectedDeviceId ? overlay.devices.find(d => d.id === selectedDeviceId) ?? null : null,
@@ -106,6 +103,9 @@ export default function WiringPlan() {
   const [pinMaps, setPinMaps] = useState<Record<string, unknown[]>>({});
   const [partsReception, setPartsReception] = useState<unknown[]>([]);
   const [workOrderParts, setWorkOrderParts] = useState<unknown[]>([]);
+
+  // ── DRC ──
+  const drc = useDRC(overlay.devices, overlay.result, pinMaps);
 
   // ── Load manifest ──
   useEffect(() => {
