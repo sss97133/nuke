@@ -1,0 +1,340 @@
+/* BuildDashboard — Build Coordinator product. Dogfood: K20. */
+
+.bd-page {
+  background: var(--bg, #0a0a0a);
+  color: var(--text, #e5e5e5);
+  min-height: 100vh;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  padding: 24px 12px 80px;
+}
+
+.bd-container {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.bd-loading,
+.bd-empty {
+  text-align: center;
+  padding: 80px 0;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+}
+
+.bd-error {
+  border: 2px solid #c33;
+  padding: 16px;
+  margin-bottom: 24px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #f99;
+}
+
+/* ── Header ── */
+
+.bd-header {
+  border-bottom: 2px solid #fff;
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.bd-header-left h1 {
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 4px 0;
+}
+
+.bd-header-vin {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #888;
+  letter-spacing: 0.04em;
+}
+
+.bd-header-right {
+  text-align: right;
+}
+
+.bd-header-budget-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+  margin-bottom: 2px;
+}
+
+.bd-header-budget-value {
+  font-family: 'Courier New', monospace;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* ── Section ── */
+
+.bd-section {
+  margin-bottom: 36px;
+}
+
+.bd-section-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+  margin: 0 0 8px 0;
+}
+
+/* ── Cost meter ── */
+
+.bd-meter {
+  border: 2px solid #fff;
+  padding: 16px;
+}
+
+.bd-meter-numbers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.bd-meter-num-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+  margin-bottom: 2px;
+}
+
+.bd-meter-num-value {
+  font-family: 'Courier New', monospace;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.bd-meter-bar {
+  height: 12px;
+  background: #222;
+  border: 1px solid #444;
+  position: relative;
+  overflow: hidden;
+}
+
+.bd-meter-bar-actual,
+.bd-meter-bar-paid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+}
+
+.bd-meter-bar-actual {
+  background: #555;
+}
+
+.bd-meter-bar-paid {
+  background: #fff;
+}
+
+.bd-meter-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  color: #888;
+}
+
+.bd-meter-legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  vertical-align: middle;
+  border: 1px solid #444;
+}
+
+/* ── Decision briefs ── */
+
+.bd-brief {
+  border: 2px solid #444;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.bd-brief-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.bd-brief-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.bd-brief-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 1px solid #fff;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.bd-brief-tldr {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #ccc;
+  margin: 0 0 8px 0;
+}
+
+.bd-brief-link {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #8af;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.bd-brief-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Work orders table ── */
+
+.bd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.bd-table th {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 2px solid #fff;
+}
+
+.bd-table td {
+  padding: 8px;
+  vertical-align: top;
+  border-bottom: 1px solid #333;
+}
+
+.bd-table tr.bd-table-row {
+  cursor: pointer;
+}
+
+.bd-table tr.bd-table-row:hover {
+  background: #1a1a1a;
+}
+
+.bd-table tr.bd-table-row.bd-expanded {
+  background: #1a1a1a;
+}
+
+.bd-num {
+  font-family: 'Courier New', monospace;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.bd-status-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 1px solid #888;
+  padding: 1px 6px;
+  display: inline-block;
+}
+
+/* ── Line items expansion ── */
+
+.bd-expansion {
+  background: #111;
+  padding: 12px 8px;
+}
+
+.bd-expansion-empty {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #666;
+  font-style: italic;
+}
+
+.bd-expansion-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.bd-expansion-table th {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #666;
+  text-align: left;
+  padding: 4px 6px;
+  border-bottom: 1px solid #444;
+}
+
+.bd-expansion-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #222;
+  color: #aaa;
+}
+
+/* ── Payments timeline ── */
+
+.bd-payment {
+  display: grid;
+  grid-template-columns: 100px 1fr 120px;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #333;
+  font-size: 12px;
+}
+
+.bd-payment-date {
+  font-family: 'Courier New', monospace;
+  color: #888;
+  font-size: 11px;
+}
+
+.bd-payment-method {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+}
+
+.bd-payment-amount {
+  font-family: 'Courier New', monospace;
+  text-align: right;
+  font-weight: 700;
+}

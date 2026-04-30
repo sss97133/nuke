@@ -27,6 +27,9 @@ function MapPage() {
 
 // Lazy load domain modules
 const VehicleRoutes = React.lazy(() => import('./modules/vehicle/routes'));
+// Local-first user-centric vehicle view — reads files, not Supabase
+const LocalVehicle = React.lazy(() => import('../pages/LocalVehicle'));
+const LocalDiscover = React.lazy(() => import('../pages/LocalDiscover'));
 const OrganizationRoutes = React.lazy(() => import('./modules/organization/routes'));
 const DealerRoutes = React.lazy(() => import('./modules/dealer/routes'));
 const AdminRoutes = React.lazy(() => import('./modules/admin/routes'));
@@ -54,8 +57,10 @@ const BusinessSettings = React.lazy(() => import('../pages/BusinessSettings'));
 const QuickBooksCallback = React.lazy(() => import('../pages/QuickBooksCallback'));
 const RestorationIntake = React.lazy(() => import('../pages/RestorationIntake'));
 
+// User Profile v2 — two-column workspace
+const UserProfile = React.lazy(() => import('../pages/UserProfile'));
+
 // Legacy pages (still used by navigation components)
-const Profile = React.lazy(() => import('../pages/Profile'));
 const Capture = React.lazy(() => import('../pages/Capture'));
 const Capsule = React.lazy(() => import('../pages/Capsule'));
 const Library = React.lazy(() => import('../pages/Library'));
@@ -76,6 +81,9 @@ const DailyDebrief = React.lazy(() => import('../pages/DailyDebrief'));
 // Acquisition Pipeline
 const AcquisitionPipeline = React.lazy(() => import('../pages/AcquisitionPipeline'));
 
+// Sell Dashboard
+const SellDashboard = React.lazy(() => import('../pages/SellDashboard'));
+
 // Team Inbox
 const TeamInbox = React.lazy(() => import('../pages/TeamInbox'));
 
@@ -92,6 +100,9 @@ const DeveloperDashboard = React.lazy(() => import('../pages/DeveloperDashboard'
 
 // Transfer party page (buyer/seller, no auth required)
 const TransferPartyPage = React.lazy(() => import('../pages/TransferPartyPage'));
+
+// Build Coordinator dashboard (public, vehicle-scoped)
+const BuildDashboard = React.lazy(() => import('../pages/BuildDashboard'));
 
 export const DomainRoutes = () => {
   return (
@@ -114,6 +125,10 @@ export const DomainRoutes = () => {
         <Route path="/extension" element={<Extension />} />
         <Route path="/data-deletion" element={<DataDeletion />} />
 
+        {/* Local-first user views — no Supabase, works offline */}
+        <Route path="/my/discover" element={<LocalDiscover />} />
+        <Route path="/my/:slug" element={<LocalVehicle />} />
+
         {/* ── Domain Modules ────────────────────────────────────────────── */}
         {/* Vehicle + Organization modules have internal ProtectedRoute gates */}
         <Route path="/vehicle/*" element={<VehicleRoutes />} />
@@ -135,7 +150,7 @@ export const DomainRoutes = () => {
         <Route path="/shops/new" element={<Navigate to="/org/create" replace />} />
         <Route path="/database-audit" element={<Navigate to="/admin/database-audit" replace />} />
         <Route path="/data-diagnostic" element={<Navigate to="/admin/data-diagnostic" replace />} />
-        <Route path="/test-contributions" element={<Navigate to="/admin/test-contributions" replace />} />
+
 
         {/* ── Public pages ─────────────────────────────────────────────── */}
         {/* /feed-v2 promoted to main feed tab — redirect for any bookmarks */}
@@ -149,12 +164,10 @@ export const DomainRoutes = () => {
         <Route path="/auctions" element={<AuctionMarketplace />} />
         <Route path="/auction/:listingId" element={<AuctionListing />} />
         <Route path="/listings/:listingId" element={<AuctionListing />} />
-        {/* Community pages */}
-        <Route path="/bat-members" element={<BaTMembers />} />
-        <Route path="/members" element={<BaTMembers />} />
+        {/* Community pages — moved to protected routes below */}
         {/* Public profile views (with userId = public; without = own profile, guarded below) */}
-        <Route path="/profile/:userId" element={<Profile />} />
-        <Route path="/profile/external/:externalIdentityId" element={<Profile />} />
+        <Route path="/profile/:userId" element={<UserProfile />} />
+        <Route path="/profile/external/:externalIdentityId" element={<UserProfile />} />
         {/* Investor offering / data room — semi-public fundraising page */}
         {/* Docs / developers landing */}
         <Route path="/developers" element={<DevelopersPage />} />
@@ -166,12 +179,9 @@ export const DomainRoutes = () => {
         <Route path="/developers/signup" element={<DeveloperSignup />} />
         {/* Transfer party page — public, token-accessible */}
         <Route path="/t/:transferId" element={<TransferPartyPage />} />
-        {/* Tech capture & restoration intake — used by shops/techs, not end users */}
-        <Route path="/tech" element={<TechCapture />} />
-        <Route path="/tech/upload" element={<TechShareUpload />} />
-        <Route path="/restoration" element={<RestorationIntake />} />
-        <Route path="/intake" element={<RestorationIntake />} />
-        <Route path="/work-orders/statement" element={<WorkOrderStatement />} />
+        {/* Build Coordinator dashboard — public, vehicle-scoped */}
+        <Route path="/builds/:vehicleId" element={<BuildDashboard />} />
+        {/* Tech capture, restoration intake, work orders — moved to protected routes below */}
 
         {/* ── Hub convenience redirects → homepage tabs ─────────────────── */}
         <Route path="/garage" element={<Navigate to="/?tab=garage" replace />} />
@@ -181,7 +191,7 @@ export const DomainRoutes = () => {
         {/* ── Protected routes (require sign-in) ───────────────────────── */}
         <Route element={<ProtectedRoute />}>
           {/* Own profile (no userId = current user's profile) */}
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/profile" element={<UserProfile />} />
 
           {/* Personal workspace */}
           <Route path="/capture" element={<Capture />} />
@@ -210,8 +220,20 @@ export const DomainRoutes = () => {
           <Route path="/pipeline" element={<AcquisitionPipeline />} />
           <Route path="/acquisitions" element={<AcquisitionPipeline />} />
 
+          {/* Sell dashboard */}
+          <Route path="/sell" element={<SellDashboard />} />
+
           {/* Identity & social */}
           <Route path="/claim-identity" element={<ClaimExternalIdentity />} />
+
+          {/* Internal tools (moved from public) */}
+          <Route path="/bat-members" element={<BaTMembers />} />
+          <Route path="/members" element={<BaTMembers />} />
+          <Route path="/tech" element={<TechCapture />} />
+          <Route path="/tech/upload" element={<TechShareUpload />} />
+          <Route path="/restoration" element={<RestorationIntake />} />
+          <Route path="/intake" element={<RestorationIntake />} />
+          <Route path="/work-orders/statement" element={<WorkOrderStatement />} />
 
 
           {/* Settings (protected) */}
