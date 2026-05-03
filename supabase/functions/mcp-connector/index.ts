@@ -2764,25 +2764,34 @@ async function handleProjectWorkLog(args: Record<string, unknown>): Promise<Tool
       : filteredParts,
     payments: audience === "public" ? [] : filteredPayments,
     receipts: audience === "public"
-      ? filteredReceipts.map((r) => ({
-          id: r.id,
-          vendor: r.vendor_name,
-          total: r.total_amount,
-          date: r.transaction_date ?? r.purchase_date,
-          vehicle_id: r.vehicle_id,
-          scope_type: r.scope_type,
-          scope_id: r.scope_id,
-        }))
+      ? filteredReceipts
+          // PUBLIC AUDIENCE: only show receipts attributed to a vehicle build (asset story).
+          // Household, personal-1040, NUKE LTD, Viva, 1099_NEC scopes are PRIVATE and never
+          // surface in the public projection — they're tax/business sensitive.
+          .filter((r) => String(r.scope_type ?? "").toLowerCase() === "vehicle" && r.scope_id)
+          .map((r) => ({
+            id: r.id,
+            vendor: r.vendor_name,
+            total: r.total_amount,
+            date: r.transaction_date ?? r.purchase_date,
+            vehicle_id: r.vehicle_id ?? r.scope_id,
+            // scope_type/scope_id intentionally OMITTED for public — internal accounting axis.
+          }))
       : filteredReceipts,
-    summary: {
-      photo_count: photos.length,
-      work_order_count: work_orders.length,
-      labor_lines: filteredLabor.length,
-      parts_lines: filteredParts.length,
-      payment_count: audience === "public" ? null : filteredPayments.length,
-      receipt_count: filteredReceipts.length,
-      receipt_total: filteredReceipts.reduce((s, r) => s + Number(r.total_amount ?? 0), 0),
-    },
+    summary: (() => {
+      const publicReceipts = audience === "public"
+        ? filteredReceipts.filter((r) => String(r.scope_type ?? "").toLowerCase() === "vehicle" && r.scope_id)
+        : filteredReceipts;
+      return {
+        photo_count: photos.length,
+        work_order_count: work_orders.length,
+        labor_lines: filteredLabor.length,
+        parts_lines: filteredParts.length,
+        payment_count: audience === "public" ? null : filteredPayments.length,
+        receipt_count: publicReceipts.length,
+        receipt_total: publicReceipts.reduce((s, r) => s + Number(r.total_amount ?? 0), 0),
+      };
+    })(),
   };
 
   const prompt_text = `Compose shop work-log for date ${date}${vehicle_id_filter ? ` scoped to vehicle ${vehicle_id_filter}` : ""}. Audience: ${audience}. Substrate: vehicle_images + work_order_{labor,parts,payments} for the day, joined to work_orders for context.`;
@@ -2922,7 +2931,17 @@ async function handleProjectMoneyFlow(args: Record<string, unknown>): Promise<To
     }
   }
 
+  // owed_to_me = real external accounts receivable.
+  // Exclude work orders that are settled (status=paid/cancelled/voided), regardless of
+  // payByWo accumulator math — payments may have been recorded externally
+  // (CSV/Numbers ledger) before work_order_payments existed. Trust the status field.
+  // Also exclude self-billed accumulators (customer = Skylar himself) — those are
+  // internal cost-tracking, not real AR.
+  const SETTLED = new Set(["paid", "cancelled", "canceled", "voided", "void", "refunded"]);
+  const SELF_BILLED_NAMES = new Set(["skylar williams", "skylar", "self"]);
   const owed_to_me = wos
+    .filter((w) => !SETTLED.has(String(w.status ?? "").toLowerCase()))
+    .filter((w) => !SELF_BILLED_NAMES.has(String(w.customer_name ?? "").trim().toLowerCase()))
     .map((w) => {
       const billed = Number(w.actual_total ?? w.estimated_total ?? 0);
       const paid = payByWo[String(w.id)] ?? 0;
@@ -2951,14 +2970,22 @@ async function handleProjectMoneyFlow(args: Record<string, unknown>): Promise<To
   if (rcptErr) return toolErr(`receipts: ${rcptErr.message}`);
 
   const rcpts = (rcptRows ?? []) as Array<Record<string, any>>;
+  // INCOME_SCOPES: scope_types that represent inflows wrongly stored in receipts (e.g. 1099-NEC labor income).
+  // These should not appear in expense rollups. Tracked separately as income_in_window in summary.
+  const INCOME_SCOPES = new Set(["income_1099_nec", "income_1099_misc", "income"]);
+  const expense_rcpts = rcpts.filter((r) => !INCOME_SCOPES.has(String(r.scope_type ?? "").toLowerCase()));
+  const income_rcpts = rcpts.filter((r) => INCOME_SCOPES.has(String(r.scope_type ?? "").toLowerCase()));
+
   const scopeMap: Record<string, { scope_type: string | null; scope_id: string | null; total: number; count: number }> = {};
-  for (const r of rcpts) {
+  for (const r of expense_rcpts) {
     const k = `${r.scope_type ?? "null"}|${r.scope_id ?? "null"}`;
     if (!scopeMap[k]) scopeMap[k] = { scope_type: r.scope_type, scope_id: r.scope_id, total: 0, count: 0 };
     scopeMap[k].total += Number(r.total ?? r.total_amount ?? 0);
     scopeMap[k].count += 1;
   }
   const out_by_scope = Object.values(scopeMap).sort((a, b) => b.total - a.total);
+
+  const income_other = income_rcpts.reduce((s, r) => s + Number(r.total ?? r.total_amount ?? 0), 0);
 
   // (3) Monthly income vs expense over the window (trailing 6 months from to_date if window > 30d, else just window)
   const monthAnchor = new Date(`${to_date}T00:00:00Z`);
@@ -3008,8 +3035,10 @@ async function handleProjectMoneyFlow(args: Record<string, unknown>): Promise<To
       total_out: out_by_scope.reduce((s, r) => s + r.total, 0),
       total_in_window: monthly_series
         .filter((m) => m.month >= from_date.slice(0, 7) && m.month <= to_date.slice(0, 7))
-        .reduce((s, m) => s + m.income, 0),
-      receipt_count: rcpts.length,
+        .reduce((s, m) => s + m.income, 0) + income_other,
+      receipt_count: expense_rcpts.length,
+      income_other_count: income_rcpts.length,
+      income_other_total: income_other,
       open_invoice_count: owed_to_me.length,
     },
   };
@@ -5134,12 +5163,28 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  // Auth — optional for now (permissive mode for testing).
-  // When auth is present, it's verified. When absent, requests proceed anyway.
-  // TODO: enforce auth for tools/call once OAuth flow through Vercel proxy is debugged.
+  // Auth — required for write tools, optional for read tools.
+  // When a write tool is called without valid auth, return 401 + WWW-Authenticate
+  // pointing at the OAuth resource metadata. Claude.ai sees this and triggers the
+  // OAuth flow at https://nuke.ag/oauth/authorize. After the user logs in via
+  // magic link, Claude.ai gets a Bearer token that it includes on every retry.
+  const WRITE_TOOLS = new Set([
+    "submit_observation",
+    "submit_attribute_value",
+    "submit_attribute_values",
+    "submit_vehicle_event",
+    "create_profile",
+    "link_account",
+    "verify_account_link",
+    "ingest_photos",
+  ]);
   if (body.method === "tools/call") {
+    const toolName = body?.params?.name as string | undefined;
     const authHeader = req.headers.get("Authorization");
     const apiKey = req.headers.get("X-API-Key");
+    const isWrite = toolName && WRITE_TOOLS.has(toolName);
+
+    // If auth is provided, always validate it (so a bad key fails fast even on read tools).
     if (authHeader || apiKey) {
       const auth = await authenticate(req);
       if (!auth.ok) {
@@ -5150,11 +5195,24 @@ Deno.serve(async (req: Request) => {
             headers: {
               ...CORS,
               "Content-Type": "application/json",
-              "WWW-Authenticate": `Bearer resource_metadata="${BASE_URL}/.well-known/oauth-protected-resource"`,
+              "WWW-Authenticate": `Bearer realm="nuke", resource_metadata="https://nuke.ag/.well-known/oauth-protected-resource"`,
             },
           },
         );
       }
+    } else if (isWrite) {
+      // No auth + write tool → trigger OAuth flow via 401 + WWW-Authenticate.
+      return new Response(
+        JSON.stringify(rpcError(body.id, -32000, `Authentication required for write tool '${toolName}'.`)),
+        {
+          status: 401,
+          headers: {
+            ...CORS,
+            "Content-Type": "application/json",
+            "WWW-Authenticate": `Bearer realm="nuke", resource_metadata="https://nuke.ag/.well-known/oauth-protected-resource"`,
+          },
+        },
+      );
     }
   }
 
