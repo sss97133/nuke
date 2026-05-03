@@ -51,43 +51,20 @@ jobs:
       - name: Check for missing imports
         run: |
           echo "Checking for common build issues..."
-          # Check if parts components exist
-          if [ ! -f "nuke_frontend/src/components/parts/SpatialPartPopup.tsx" ]; then
-            echo "❌ Missing: SpatialPartPopup.tsx"
-            exit 1
-          fi
-          if [ ! -f "nuke_frontend/src/components/parts/PartCheckoutModal.tsx" ]; then
-            echo "❌ Missing: PartCheckoutModal.tsx"
-            exit 1
-          fi
-          if [ ! -f "nuke_frontend/src/components/parts/PartEnrichmentModal.tsx" ]; then
-            echo "❌ Missing: PartEnrichmentModal.tsx"
-            exit 1
-          fi
-          if [ ! -f "nuke_frontend/src/components/parts/ClickablePartModal.tsx" ]; then
-            echo "❌ Missing: ClickablePartModal.tsx"
-            exit 1
-          fi
-          echo "✅ All required files present"
-          
-      - name: Verify critical files exist
-        run: |
-          echo "🔍 Verifying critical component files..."
-          cd nuke_frontend
-          MISSING=0
-          for file in "src/components/parts/SpatialPartPopup.tsx" "src/components/parts/PartCheckoutModal.tsx" "src/components/parts/PartEnrichmentModal.tsx" "src/components/parts/ClickablePartModal.tsx"; do
+          # The required-files list is intentionally narrow: only files actively
+          # imported by entrypoints. PartCheckoutModal / PartEnrichmentModal were
+          # retired with the parts-checkout feature and removed here so the build
+          # check stays in sync with reality.
+          for file in \
+            "nuke_frontend/src/components/parts/SpatialPartPopup.tsx" \
+            "nuke_frontend/src/components/parts/ClickablePartModal.tsx"
+          do
             if [ ! -f "$file" ]; then
               echo "❌ Missing: $file"
-              MISSING=1
-            else
-              echo "✅ Found: $file"
+              exit 1
             fi
           done
-          if [ $MISSING -eq 1 ]; then
-            echo "❌ Critical files missing - build will fail"
-            exit 1
-          fi
-          echo "✅ All critical files present"
+          echo "✅ All required files present"
 
       - name: Verify TypeScript config
         run: |
