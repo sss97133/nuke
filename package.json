@@ -184,6 +184,7 @@
     "taxonomy:vin-decode": "tsx scripts/mass-vin-decode.ts",
     "test:invoice-cashflow": "tsx scripts/integration/test-invoice-cashflow.ts",
     "test:phone-otp": "tsx scripts/test-phone-otp.ts",
+    "test:vision-fill": "dotenvx run -f .env -f .env.local -- tsx scripts/test-vision-fill-loop.ts",
     "trickle-backfill-images": "tsx scripts/trickle-backfill-images.ts",
     "valuation:burndown": "dotenvx run -- node scripts/valuation-burndown.mjs",
     "yono:daily": "dotenvx run -- node yono/daily_progress.mjs",
