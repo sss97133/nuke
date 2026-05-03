@@ -34,6 +34,7 @@ const REVOCATION_ENDPOINT = `${ISSUER}/oauth/revoke`;
 const RESOURCE_METADATA_ENDPOINT = `${ISSUER}/.well-known/oauth-protected-resource`;
 const LOGIN_ENDPOINT = `${ISSUER}/oauth/login`;
 const CALLBACK_ENDPOINT = `${ISSUER}/oauth/callback`;
+const CALLBACK_FINISH_ENDPOINT = `${ISSUER}/oauth/callback-finish`;
 const MCP_RESOURCE = `${ISSUER}/mcp`;
 
 const SCOPES_SUPPORTED = ["events:read", "events:write", "events:write:all", "read", "write"];
@@ -101,6 +102,25 @@ function getEnv(name: string): string {
   return v;
 }
 
+// Structured telemetry. Hard rule: NEVER log secrets in plaintext.
+// For secrets (code, access_token, refresh_token, code_verifier) log lengths only via maskLen().
+// Tail with: supabase functions logs oauth-server --tail | jq 'select(.event)'
+function logEvent(event: string, fields: Record<string, unknown> = {}): void {
+  try {
+    console.log(JSON.stringify({
+      event,
+      timestamp: new Date().toISOString(),
+      ...fields,
+    }));
+  } catch {
+    console.log(JSON.stringify({ event, timestamp: new Date().toISOString(), log_serialize_error: true }));
+  }
+}
+
+function maskLen(v: string | null | undefined): number {
+  return typeof v === "string" ? v.length : 0;
+}
+
 function makeServiceClient() {
   return createClient(getEnv("SUPABASE_URL"), getEnv("SUPABASE_SERVICE_ROLE_KEY"), {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -108,8 +128,17 @@ function makeServiceClient() {
 }
 
 // HMAC key for signing Supabase-compatible JWTs.
+//
+// The signing secret MUST be the same secret Supabase Auth uses to sign its own JWTs,
+// so that supabase.auth.getUser(token) accepts our tokens. In .env this lives under
+// SUPABASE_JWT_SECRET. In deployed edge-function secrets we have to use a non-SUPABASE_
+// prefixed name (Supabase CLI blocks setting SUPABASE_* secrets), so we look up
+// JWT_SIGNING_SECRET first and fall back to SUPABASE_JWT_SECRET for local-dev convenience.
+// The two MUST hold the same value — set via:
+//   dotenvx run -- bash -c 'supabase secrets set JWT_SIGNING_SECRET="$SUPABASE_JWT_SECRET"'
 async function hmacKey(): Promise<CryptoKey> {
-  const secret = getEnv("SUPABASE_JWT_SECRET");
+  const secret = Deno.env.get("JWT_SIGNING_SECRET") ?? Deno.env.get("SUPABASE_JWT_SECRET");
+  if (!secret) throw new Error("Missing env: JWT_SIGNING_SECRET (or SUPABASE_JWT_SECRET for local dev)");
   return crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -149,6 +178,7 @@ async function mintRefreshToken(userId: string, clientId: string): Promise<strin
 // ── Route: GET /.well-known/oauth-authorization-server ───────────────────────
 
 function handleAuthServerMetadata(): Response {
+  logEvent("oauth_authorization_server_metadata");
   return jsonResp({
     issuer: ISSUER,
     authorization_endpoint: AUTHORIZATION_ENDPOINT,
@@ -167,6 +197,7 @@ function handleAuthServerMetadata(): Response {
 // ── Route: GET /.well-known/oauth-protected-resource ─────────────────────────
 
 function handleResourceMetadata(): Response {
+  logEvent("oauth_protected_resource_metadata");
   return jsonResp({
     resource: MCP_RESOURCE,
     authorization_servers: [ISSUER],
@@ -192,8 +223,17 @@ async function handleDcr(req: Request): Promise<Response> {
   try {
     body = await req.json();
   } catch {
+    logEvent("oauth_register", { ok: false, reason: "invalid_json" });
     return jsonResp({ error: "invalid_client_metadata", error_description: "Body must be valid JSON" }, 400);
   }
+  logEvent("oauth_register", {
+    client_name: body.client_name ?? null,
+    redirect_uris_count: Array.isArray(body.redirect_uris) ? body.redirect_uris.length : 0,
+    grant_types: body.grant_types ?? null,
+    token_endpoint_auth_method: body.token_endpoint_auth_method ?? "none",
+    scope: body.scope ?? null,
+    user_agent: req.headers.get("user-agent") ?? null,
+  });
 
   const redirectUris = Array.isArray(body.redirect_uris) ? body.redirect_uris.filter((u) => typeof u === "string") : [];
   if (redirectUris.length === 0) {
@@ -263,6 +303,17 @@ async function handleAuthorize(req: Request): Promise<Response> {
   const codeChallenge = params.get("code_challenge") ?? "";
   const codeChallengeMethod = params.get("code_challenge_method") ?? "S256";
 
+  logEvent("oauth_authorize", {
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: responseType,
+    scope,
+    state_len: maskLen(state),
+    code_challenge_len: maskLen(codeChallenge),
+    code_challenge_method: codeChallengeMethod,
+    user_agent: req.headers.get("user-agent") ?? null,
+  });
+
   if (!clientId) return errorPage("missing client_id");
   if (!redirectUri) return errorPage("missing redirect_uri");
   if (responseType !== "code") return redirectError(redirectUri, state, "unsupported_response_type");
@@ -313,7 +364,7 @@ async function handleAuthorize(req: Request): Promise<Response> {
     <div class="meta">
       <span class="pill">scope</span> ${scope.split(" ").map((s) => `<code>${s}</code>`).join(" ")}
     </div>
-    <form method="post" action="/oauth/login">
+    <form method="post" action="${LOGIN_ENDPOINT}">
       <label for="email">Your NUKE email</label>
       <input id="email" name="email" type="email" required autocomplete="email" placeholder="you@example.com" />
       <input type="hidden" name="oauth_params" value="${params2}" />
@@ -345,6 +396,11 @@ function redirectError(redirectUri: string, state: string, error: string, descri
 // ── Route: POST /oauth/login (initiates magic link) ──────────────────────────
 
 async function handleLogin(req: Request): Promise<Response> {
+  logEvent("oauth_login", {
+    content_type: req.headers.get("content-type") ?? null,
+    user_agent: req.headers.get("user-agent") ?? null,
+    referer: req.headers.get("referer") ?? null,
+  });
   const ct = req.headers.get("content-type") ?? "";
   let email = "";
   let oauthParamsStr = "";
@@ -369,6 +425,13 @@ async function handleLogin(req: Request): Promise<Response> {
   }
 
   const sessionId = randomToken(24);
+  logEvent("oauth_login_session_created", {
+    session_id: sessionId,
+    email_domain: email.split("@")[1] ?? null,
+    client_id: oauthParams.client_id ?? null,
+    redirect_uri: oauthParams.redirect_uri ?? null,
+    code_challenge_len: maskLen(oauthParams.code_challenge),
+  });
   const supabase = makeServiceClient();
   const { error: insErr } = await supabase.from("oauth_login_sessions").insert({
     session_id: sessionId,
@@ -405,6 +468,8 @@ async function handleLogin(req: Request): Promise<Response> {
   // Best-effort: also call signInWithOtp. Idempotent enough.
   await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: callbackUrl } }).catch(() => null);
 
+  logEvent("oauth_login_magic_link_sent", { session_id: sessionId });
+
   return htmlResp(`<!doctype html><meta charset="utf-8"><title>Check your email</title>
     <body style="font-family: Arial, sans-serif; max-width: 420px; margin: 80px auto; padding: 24px; border: 2px solid #111;">
     <h1 style="font-size: 14px; letter-spacing: 2px; text-transform: uppercase;">Check your email</h1>
@@ -418,6 +483,13 @@ async function handleLogin(req: Request): Promise<Response> {
 async function handleCallback(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const sessionId = url.searchParams.get("session") ?? "";
+  logEvent("oauth_callback", {
+    session_id: sessionId || null,
+    has_access_token: !!url.searchParams.get("access_token"),
+    has_token_hash: !!(url.searchParams.get("token_hash") ?? url.searchParams.get("token")),
+    has_code: !!url.searchParams.get("code"),
+    user_agent: req.headers.get("user-agent") ?? null,
+  });
   if (!sessionId) return errorPage("missing session id");
 
   // Supabase magic link redirect appends #access_token=...&refresh_token=... as URL fragment.
@@ -454,6 +526,7 @@ async function handleCallback(req: Request): Promise<Response> {
   // back to /oauth/callback-finish. Supabase magic-link redirects often put the token in
   // the fragment.
   if (!userId) {
+    logEvent("oauth_callback_fragment_fallback", { session_id: sessionId });
     return htmlResp(`<!doctype html><meta charset="utf-8"><title>Finishing login</title>
 <body style="font-family: Arial, sans-serif; max-width: 420px; margin: 80px auto; padding: 24px; border: 2px solid #111;">
 <h1 style="font-size: 14px; letter-spacing: 2px; text-transform: uppercase;">Finishing login</h1>
@@ -469,7 +542,8 @@ async function handleCallback(req: Request): Promise<Response> {
   const u = new URL(location.href);
   u.hash = "";
   const params = new URLSearchParams({ session: ${JSON.stringify(sessionId)}, access_token });
-  const res = await fetch("/oauth/callback-finish?" + params.toString(), { method: "POST" });
+  // Absolute URL — defensive against webview base resolution quirks (anthropics/claude-ai-mcp#8).
+  const res = await fetch("${CALLBACK_FINISH_ENDPOINT}?" + params.toString(), { method: "POST" });
   if (res.redirected) { location.href = res.url; return; }
   if (res.ok) {
     const j = await res.json().catch(() => ({}));
@@ -488,6 +562,10 @@ async function handleCallbackFinish(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const sessionId = url.searchParams.get("session") ?? "";
   const accessToken = url.searchParams.get("access_token") ?? "";
+  logEvent("oauth_callback_finish", {
+    session_id: sessionId || null,
+    access_token_len: maskLen(accessToken),
+  });
   if (!sessionId || !accessToken) return jsonResp({ error: "missing params" }, 400);
   const supabase = makeServiceClient();
   const { data: u } = await supabase.auth.getUser(accessToken);
@@ -525,6 +603,14 @@ async function finishCallback(sessionId: string, userId: string): Promise<Respon
   redir.searchParams.set("code", code);
   if (sess.state) redir.searchParams.set("state", sess.state);
 
+  logEvent("oauth_finish_code_issued", {
+    session_id: sessionId,
+    user_id: userId,
+    client_id: sess.client_id,
+    code_len: maskLen(code),
+    redirect_uri: sess.redirect_uri,
+  });
+
   // For browser flow: redirect. For fetch-based polling, return JSON with redirect URL.
   return new Response(JSON.stringify({ redirect: redir.toString() }), {
     status: 200,
@@ -535,6 +621,10 @@ async function finishCallback(sessionId: string, userId: string): Promise<Respon
 // ── Route: POST /oauth/token ─────────────────────────────────────────────────
 
 async function handleToken(req: Request): Promise<Response> {
+  logEvent("oauth_token", {
+    content_type: req.headers.get("content-type") ?? null,
+    user_agent: req.headers.get("user-agent") ?? null,
+  });
   const ct = req.headers.get("content-type") ?? "";
   let body: Record<string, string> = {};
   if (ct.includes("application/x-www-form-urlencoded")) {
@@ -554,6 +644,13 @@ async function handleToken(req: Request): Promise<Response> {
 
 async function handleTokenAuthCode(body: Record<string, string>): Promise<Response> {
   const { code, client_id, redirect_uri, code_verifier } = body;
+  logEvent("oauth_token_authorization_code", {
+    grant_type: "authorization_code",
+    client_id: client_id ?? null,
+    redirect_uri: redirect_uri ?? null,
+    code_len: maskLen(code),
+    code_verifier_len: maskLen(code_verifier),
+  });
   if (!code || !client_id || !redirect_uri || !code_verifier) {
     return jsonResp({ error: "invalid_request", error_description: "Missing required parameters" }, 400);
   }
@@ -569,6 +666,12 @@ async function handleTokenAuthCode(body: Record<string, string>): Promise<Respon
   // PKCE verification.
   const expected = await base64UrlSha256(code_verifier);
   if (expected !== row.code_challenge) {
+    logEvent("oauth_token_pkce_mismatch", {
+      client_id,
+      code_verifier_len: maskLen(code_verifier),
+      expected_len: maskLen(expected),
+      stored_challenge_len: maskLen(row.code_challenge),
+    });
     return jsonResp({ error: "invalid_grant", error_description: "PKCE verification failed" }, 400);
   }
 
@@ -585,6 +688,16 @@ async function handleTokenAuthCode(body: Record<string, string>): Promise<Respon
 
   await supabase.from("oauth_clients").update({ last_used_at: new Date().toISOString() }).eq("client_id", client_id);
 
+  logEvent("oauth_token_issued", {
+    grant_type: "authorization_code",
+    client_id,
+    user_id: row.user_id,
+    scopes,
+    access_token_len: maskLen(accessToken),
+    refresh_token_len: maskLen(refreshToken),
+    expires_in: ACCESS_TOKEN_TTL_SECONDS,
+  });
+
   return jsonResp({
     access_token: accessToken,
     token_type: "Bearer",
@@ -596,6 +709,11 @@ async function handleTokenAuthCode(body: Record<string, string>): Promise<Respon
 
 async function handleTokenRefresh(body: Record<string, string>): Promise<Response> {
   const { refresh_token, client_id } = body;
+  logEvent("oauth_token_refresh", {
+    grant_type: "refresh_token",
+    client_id: client_id ?? null,
+    refresh_token_len: maskLen(refresh_token),
+  });
   if (!refresh_token) return jsonResp({ error: "invalid_request", error_description: "refresh_token required" }, 400);
 
   const key = await hmacKey();
@@ -616,6 +734,16 @@ async function handleTokenRefresh(body: Record<string, string>): Promise<Respons
   const accessToken = await mintAccessToken(String(payload.sub), email, scopes);
   const refreshNew = await mintRefreshToken(String(payload.sub), String(payload.cid));
 
+  logEvent("oauth_token_issued", {
+    grant_type: "refresh_token",
+    client_id: String(payload.cid),
+    user_id: String(payload.sub),
+    scopes,
+    access_token_len: maskLen(accessToken),
+    refresh_token_len: maskLen(refreshNew),
+    expires_in: ACCESS_TOKEN_TTL_SECONDS,
+  });
+
   return jsonResp({
     access_token: accessToken,
     token_type: "Bearer",
@@ -628,6 +756,7 @@ async function handleTokenRefresh(body: Record<string, string>): Promise<Respons
 // ── Route: POST /oauth/revoke ────────────────────────────────────────────────
 
 async function handleRevoke(_req: Request): Promise<Response> {
+  logEvent("oauth_revoke");
   // Stateless tokens — true revocation requires a denylist. Stub for spec compliance.
   return jsonResp({}, 200);
 }
@@ -673,6 +802,7 @@ Deno.serve(async (req) => {
     return jsonResp({ error: "not_found", path: route }, 404);
   } catch (e) {
     console.error("[oauth-server] handler error:", e);
+    logEvent("oauth_handler_error", { path, error_message: e instanceof Error ? e.message : String(e) });
     return jsonResp({ error: "server_error", error_description: e instanceof Error ? e.message : String(e) }, 500);
   }
 });
