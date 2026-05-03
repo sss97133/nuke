@@ -23,7 +23,14 @@ info:
 
     Subscribe to real-time events by creating webhook endpoints. Events are delivered with
     HMAC-SHA256 signatures for verification.
-  version: 1.4.0
+
+    ## External Agent Write API
+
+    `POST /v1/events` is the canonical write target for external LLM agents (Claude, ChatGPT,
+    bespoke MCP clients). Agents fetch the JSON Schema, prepare a strict envelope, and write
+    on the user's behalf — Nuke is the rails, not the destination. See the
+    `External Agent Write API` tag below for the full contract.
+  version: 1.5.0
   contact:
     name: Nuke Support
     url: https://nuke.ag/support
@@ -81,6 +88,13 @@ tags:
     description: |
       Market exchange read API — funds, vehicle offerings, and holdings.
       The Nuke market exchange enables fractional vehicle ownership backed by collector vehicle assets.
+  - name: External Agent Write API
+    description: |
+      Agent-facing write surface. Any LLM agent (Claude, ChatGPT, MCP client) submits structured
+      vehicle events on the authenticated user's behalf via `POST /v1/events`. The envelope is
+      strict (versioned, scope-checked, append-only); the payload is JSONB, validated against
+      per-event-type JSON Schemas. NUKE is rails for vehicle data — Plaid for cars — and the
+      schema is the moat.
 
 paths:
   /api-v1-vehicles:
@@ -1571,6 +1585,142 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /v1/events:
+    post:
+      tags: [External Agent Write API]
+      summary: Submit a vehicle event (agent-facing write endpoint)
+      description: |
+        Canonical write target for external LLM agents. The agent fetches the JSON Schema,
+        prepares a strict envelope, and POSTs on the authenticated user's behalf.
+
+        ### Envelope contract
+
+        - **Outer envelope is strict** (closed schema, additional properties rejected).
+          Full schema: [envelope.json](https://nuke.ag/api/schemas/v1/envelope.json).
+        - **`payload` is loose** but validated against the per-event-type schema selected
+          by `event_type` (`service` → service.json, `note` → note.json).
+        - **VIN is the canonical key.** `vehicle_ref.vin` is required; `vehicle_ref.vehicle_id`
+          is optional and only used if the agent already knows Nuke's internal UUID.
+        - **Append-only.** Corrections submit a new event with `correction_of` pointing at the
+          prior event id. The prior observation is marked `is_superseded=true`. Nothing is
+          ever destructively edited.
+
+        ### Routing under the hood
+
+        Submissions flow through Nuke's source-agnostic `vehicle_observations` substrate:
+
+        | event_type | observation_kind | source slug |
+        | --- | --- | --- |
+        | `service` | `work_record` | `shop` |
+        | `note`    | `comment`     | `agent-submission` |
+
+        Other event types (`inspection`, `modification`, `ownership_change`, `media`) are reserved
+        in the envelope but not yet routed; submissions for those return `400` until v1.1.
+
+        ### Authentication
+
+        Required: `X-API-Key: nk_live_…` header. The key must carry a write scope that matches
+        the target VIN. Either of these scopes authorizes a write:
+
+        - `events:write:vehicle:{vin}` — narrow grant for one vehicle (preferred for agent integrations)
+        - `events:write:all` — power-user wildcard
+
+        The `auth` block inside the envelope is advisory — Nuke validates the X-API-Key header
+        and rejects submissions where the body's claimed scopes contradict the resolved key.
+
+        ### Pilot example
+
+        See [examples/v1/mustang-session.json](https://nuke.ag/api/examples/v1/mustang-session.json)
+        for a full envelope: 1966 Mustang VIN `6F07C219593`, valve covers pulled, sludge in
+        valve galley, engine pull deferred.
+      operationId: submitEvent
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventEnvelope'
+            examples:
+              mustang-service:
+                summary: Mustang engine refresh session (service event)
+                description: |
+                  Pilot user — 1966 Mustang VIN `6F07C219593`. Pulled valve covers, found
+                  sludge in valve galley, deferred engine pull to morning. Canonical JSON
+                  Schemas (Draft 2020-12) for agent self-validation are mirrored at
+                  `/api/schemas/v1/{envelope,service,note}.json`.
+                externalValue: './examples/v1/mustang-session.json'
+      responses:
+        '201':
+          description: Event accepted and persisted as a vehicle observation.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [event_id, observation_id, vehicle_id]
+                properties:
+                  event_id:
+                    type: string
+                    format: uuid
+                    description: Public-facing event id assigned by Nuke. Use this when submitting a `correction_of` later.
+                  observation_id:
+                    type: string
+                    format: uuid
+                    description: Internal `vehicle_observations.id` for the row this submission produced. Same value as event_id today; reserved as a separate field in case routing changes.
+                  vehicle_id:
+                    type: string
+                    format: uuid
+                    description: Resolved Nuke vehicle UUID for the VIN in `vehicle_ref.vin`.
+                  observation_kind:
+                    type: string
+                    description: How Nuke classified this submission internally (e.g. `work_record`, `comment`).
+                  source_slug:
+                    type: string
+                    description: Source registry slug used (`shop`, `agent-submission`).
+                  superseded_event_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                    description: Set only if this submission included `correction_of` and the prior row was successfully marked superseded.
+              example:
+                event_id: c2e07b3e-3c11-4f67-9a4f-7a8f0d3a1c11
+                observation_id: c2e07b3e-3c11-4f67-9a4f-7a8f0d3a1c11
+                vehicle_id: a1d4ee27-b3a5-4f0f-bf52-9a4d2a8e8c41
+                observation_kind: work_record
+                source_slug: shop
+                superseded_event_id: null
+        '400':
+          description: Validation failed. Envelope or payload did not match the JSON Schema.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "envelope validation failed"
+                details: "vehicle_ref.vin: required property missing"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            Authentication succeeded but the API key's scopes do not authorize a write to this VIN.
+            Required scope: `events:write:vehicle:{vin}` or `events:write:all`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "scope mismatch"
+                details: "key does not carry events:write:vehicle:6F07C219593"
+        '404':
+          description: VIN does not resolve to a known vehicle and auto-create is not enabled for this key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -2612,6 +2762,243 @@ components:
         metadata:
           type: object
           nullable: true
+
+    EventEnvelope:
+      type: object
+      description: |
+        Strict envelope for `POST /v1/events`. Mirrors `docs/api/schemas/v1/envelope.json`
+        (the canonical Draft 2020-12 JSON Schema agents fetch for self-validation).
+        Closed at this layer — unknown properties are rejected so schema evolution stays explicit.
+      additionalProperties: false
+      required:
+        - schema_version
+        - event_type
+        - vehicle_ref
+        - occurred_at
+        - submitted_at
+        - agent
+        - auth
+        - payload
+      properties:
+        schema_version:
+          type: string
+          enum: ['1.0']
+          description: Envelope schema version. Major version bumps are non-additive.
+        event_type:
+          type: string
+          enum: [service, inspection, modification, ownership_change, media, note]
+          description: Discriminator selecting which payload schema applies.
+        vehicle_ref:
+          type: object
+          additionalProperties: false
+          required: [vin]
+          properties:
+            vin:
+              type: string
+              minLength: 5
+              maxLength: 32
+              pattern: '^[A-HJ-NPR-Z0-9]+$'
+              description: |
+                Vehicle Identification Number. 17 chars for post-1981 vehicles; pre-1981
+                VINs may be shorter (e.g. classic Mustang `6F07C219593` is 11 chars).
+            vehicle_id:
+              type: string
+              format: uuid
+              description: Optional Nuke internal UUID. The endpoint resolves VIN→vehicle_id.
+        occurred_at:
+          type: string
+          format: date-time
+          description: When the event happened in the physical world.
+        submitted_at:
+          type: string
+          format: date-time
+          description: When the agent assembled this submission.
+        agent:
+          type: object
+          additionalProperties: false
+          required: [id]
+          properties:
+            id:
+              type: string
+              minLength: 1
+              maxLength: 128
+              description: Stable agent identifier (e.g. `claude-anthropic`).
+            version:
+              type: string
+              maxLength: 128
+            session_id:
+              type: string
+              maxLength: 256
+              description: Opaque correlation id chosen by the agent.
+        auth:
+          type: object
+          additionalProperties: false
+          required: [scopes]
+          properties:
+            user_id:
+              type: string
+              format: uuid
+            token_id:
+              type: string
+            scopes:
+              type: array
+              minItems: 1
+              items:
+                type: string
+                pattern: '^events:(read|write):(all|vehicle:[A-HJ-NPR-Z0-9]+)$'
+              description: |
+                Scopes the agent is asserting. Must include `events:write:vehicle:{vin}`
+                matching `vehicle_ref.vin`, or the wildcard `events:write:all`.
+        payload:
+          oneOf:
+            - $ref: '#/components/schemas/ServicePayload'
+            - $ref: '#/components/schemas/NotePayload'
+          description: |
+            Event-type-specific body. Validated against `ServicePayload` when
+            `event_type=service`, `NotePayload` when `event_type=note`. Other event
+            types are reserved in the envelope but not yet routed.
+        media:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [type, url]
+            properties:
+              type:
+                type: string
+                enum: [image, video, audio, document]
+              url:
+                type: string
+                format: uri
+              sha256:
+                type: string
+                pattern: '^[a-f0-9]{64}$'
+              caption:
+                type: string
+                maxLength: 1024
+        correction_of:
+          type: string
+          format: uuid
+          description: |
+            If present, supersedes a prior event. The prior observation is marked
+            `is_superseded=true` and `superseded_by` points to the new row. Append-only.
+        submission_hash:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+          description: Optional SHA-256 of the canonical envelope (with this field removed) for integrity.
+
+    ServicePayload:
+      type: object
+      description: |
+        Payload for `event_type=service`. Routes internally to `vehicle_observations`
+        with `observation_kind='work_record'`, source slug `shop`. Loose by design —
+        agents add fields liberally; structure hardens in v1.1 once real submissions
+        reveal the missing shape.
+      additionalProperties: true
+      required: [summary]
+      properties:
+        summary:
+          type: string
+          minLength: 1
+          maxLength: 500
+        narrative:
+          type: string
+          maxLength: 32768
+        work_performed:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        work_planned:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        parts:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required: [name]
+            properties:
+              name:
+                type: string
+                minLength: 1
+                maxLength: 200
+              manufacturer:
+                type: string
+                maxLength: 200
+              part_number:
+                type: string
+                maxLength: 200
+              quantity:
+                type: number
+                minimum: 0
+              status:
+                type: string
+                enum: [needed, ordered, installed, considered_rejected]
+        decisions:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required: [question, outcome]
+            properties:
+              question:
+                type: string
+                minLength: 1
+                maxLength: 1000
+              outcome:
+                type: string
+                minLength: 1
+                maxLength: 1000
+              reasoning:
+                type: string
+                maxLength: 4000
+        condition_observations:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required: [finding]
+            properties:
+              system:
+                type: string
+                maxLength: 100
+                description: Vehicle subsystem (open enum — top_end, bottom_end, fuel, ignition, cooling, brakes, electrical, suspension, drivetrain, body, interior, ...).
+              finding:
+                type: string
+                minLength: 1
+                maxLength: 2000
+              severity:
+                type: string
+                enum: [info, monitor, concern, critical]
+        labor_minutes:
+          type: number
+          minimum: 0
+          maximum: 100000
+        shop_ref:
+          type: string
+          maxLength: 200
+
+    NotePayload:
+      type: object
+      description: |
+        Payload for `event_type=note`. Routes internally to `vehicle_observations`
+        with `observation_kind='comment'`, source slug `agent-submission`. Use for
+        free-form remarks that don't fit a structured event type.
+      additionalProperties: true
+      required: [summary]
+      properties:
+        summary:
+          type: string
+          minLength: 1
+          maxLength: 280
+        narrative:
+          type: string
+          maxLength: 32768
 
     Error:
       type: object

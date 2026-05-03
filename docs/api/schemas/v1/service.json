@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nuke.ag/api/schemas/v1/service.json",
+  "title": "External Agent Write API — Service Event Payload (v1.0)",
+  "description": "Payload shape for envelope.event_type='service'. Routes to vehicle_observations with observation_kind='work_record', source slug 'shop'. Loose by design — agents add fields liberally; structure hardens in v1.1 once real submissions reveal the missing shape.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["summary"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "1–2 sentence headline of the session.",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "narrative": {
+      "type": "string",
+      "description": "Free-form, agent-written description of what happened. No length cap beyond the JSONB column limit.",
+      "maxLength": 32768
+    },
+    "work_performed": {
+      "type": "array",
+      "description": "Discrete actions completed in this session.",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "work_planned": {
+      "type": "array",
+      "description": "Actions queued for a future session.",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "parts": {
+      "type": "array",
+      "description": "Parts considered, ordered, or installed during this session.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "manufacturer": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "part_number": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": ["needed", "ordered", "installed", "considered_rejected"]
+          }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "description": "Decisions made during the session. Captures intent, not just outcome.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["question", "outcome"],
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "outcome": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "reasoning": {
+            "type": "string",
+            "maxLength": 4000
+          }
+        }
+      }
+    },
+    "condition_observations": {
+      "type": "array",
+      "description": "Findings about vehicle condition discovered during the session. These are testimony — they will appear on the vehicle profile with the agent's attribution and confidence.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["finding"],
+        "properties": {
+          "system": {
+            "type": "string",
+            "description": "Vehicle subsystem (open enum — examples: top_end, bottom_end, fuel, ignition, cooling, brakes, electrical, suspension, drivetrain, body, interior).",
+            "maxLength": 100
+          },
+          "finding": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["info", "monitor", "concern", "critical"]
+          }
+        }
+      }
+    },
+    "labor_minutes": {
+      "type": "number",
+      "description": "Wrench time consumed, in minutes.",
+      "minimum": 0,
+      "maximum": 100000
+    },
+    "shop_ref": {
+      "type": "string",
+      "description": "Free-form shop or workspace identifier (e.g. 'NUKE LTD bay 2', 'home garage').",
+      "maxLength": 200
+    }
+  }
+}

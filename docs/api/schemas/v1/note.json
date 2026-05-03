@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nuke.ag/api/schemas/v1/note.json",
+  "title": "External Agent Write API — Note Event Payload (v1.0)",
+  "description": "Minimal payload for envelope.event_type='note'. Routes to vehicle_observations with observation_kind='comment', source slug 'agent-submission'. Use for free-form remarks that don't fit a structured event type.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["summary"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "Short headline (1–280 chars).",
+      "minLength": 1,
+      "maxLength": 280
+    },
+    "narrative": {
+      "type": "string",
+      "description": "Optional longer body for the note.",
+      "maxLength": 32768
+    }
+  }
+}
