@@ -202,6 +202,8 @@
     "wo:balance": "dotenvx run -- node mcp-servers/nuke-context/balance.mjs",
     "wo:ingest-zelle": "dotenvx run -- node mcp-servers/nuke-context/ingest-zelle.mjs",
     "wo:ingest-receipts": "dotenvx run -- node mcp-servers/nuke-context/ingest-receipts.mjs",
+    "receipts:attribute-cleanup": "dotenvx run -- node scripts/receipt-attribution-cleanup.mjs",
+    "receipts:attribute-cleanup:dry-run": "dotenvx run -- node scripts/receipt-attribution-cleanup.mjs --dry-run",
     "wo:ingest-thread": "dotenvx run -- node mcp-servers/nuke-context/ingest-thread.mjs",
     "wo:statement": "dotenvx run -- node mcp-servers/nuke-context/statement-html.mjs",
     "backfill:bat-bids": "dotenvx run -- node scripts/bat-bid-backfill.mjs",
