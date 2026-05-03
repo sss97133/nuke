@@ -5,8 +5,24 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/mcp/:path*",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/mcp-connector/:path*"
+    },
+    {
       "source": "/mcp",
-      "destination": "/api/mcp"
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/mcp-connector"
+    },
+    {
+      "source": "/api/mcp",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/mcp-connector"
+    },
+    {
+      "source": "/v1/events",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-events"
+    },
+    {
+      "source": "/v1/events/:path*",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-events/:path*"
     },
     {
       "source": "/api/functions/v1/:path*",
@@ -15,14 +31,6 @@
     {
       "source": "/api/v1/vehicle/:path*",
       "destination": "/api/v1/vehicle/:path*"
-    },
-    {
-      "source": "/v1/events",
-      "destination": "/api/v1/events"
-    },
-    {
-      "source": "/v1/openapi.json",
-      "destination": "/api/v1/openapi.json"
     },
     {
       "source": "/api/docs",
