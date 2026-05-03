@@ -76,11 +76,22 @@ FILENAME_VEHICLE_MAP: dict[str, str] = {
     "C2020 1973 charger.numbers": "f05462f9-4901-4e02-bbed-8d2670de4646",
 }
 
-# Tokens we consider "a vehicle hint" in filenames / sheet names.
+# Tokens we consider "a vehicle hint" in filenames / sheet names. EXPLICIT
+# brand tokens (gmc, dodge, ford, etc.) iterate first so they win over model
+# tokens that could ambiguously imply a make (suburban could be Chevy or GMC;
+# k-prefix could be either). Order matters here.
 MAKE_HINTS = {
+    # Explicit brand tokens — highest priority.
+    "gmc": "GMC",
+    "dodge": "Dodge",
+    "ford": "Ford",
+    "suzuki": "Suzuki",
     "chevrolet": "Chevrolet",
     "chevy": "Chevrolet",
     "chev": "Chevrolet",
+    # Model tokens that imply Chevy or GMC ambiguously — only used when no
+    # explicit brand token was found.
+    "blazer": "Chevrolet",
     "k5": "Chevrolet",
     "k10": "Chevrolet",
     "k20": "Chevrolet",
@@ -89,16 +100,11 @@ MAKE_HINTS = {
     "c20": "Chevrolet",
     "k1500": "Chevrolet",
     "k2500": "Chevrolet",
-    "blazer": "Chevrolet",
     "suburban": "Chevrolet",
-    "gmc": "GMC",
-    "dodge": "Dodge",
     "charger": "Dodge",
-    "ford": "Ford",
     "mustang": "Ford",
     "bronco": "Ford",
     "roadster": "Ford",
-    "suzuki": "Suzuki",
     "jimny": "Suzuki",
 }
 
@@ -163,10 +169,19 @@ def hint_make(name: str) -> str | None:
 
 
 def hint_year(name: str) -> int | None:
-    m = re.search(r"\b(19[3-9]\d|20[0-2]\d)\b", name)
-    if m:
-        return int(m.group(1))
-    return None
+    """Pick the most likely VEHICLE year. Skylar's filename convention is
+    "[transaction_year] [vehicle_year] make model.numbers", e.g.
+    "2021 1978 k10 suburban.numbers". When multiple years appear, prefer
+    the earliest (it's the vehicle, not the transaction)."""
+    matches = [int(y) for y in re.findall(r"\b(19[3-9]\d|20[0-2]\d)\b", name)]
+    if not matches:
+        return None
+    # If we see both a "transaction-era" year (>=2017) and an older year,
+    # the older one is the vehicle.
+    older = [y for y in matches if y < 2017]
+    if older:
+        return min(older)
+    return matches[0]
 
 
 def hint_model(name: str) -> str | None:
@@ -209,69 +224,56 @@ def resolve_vehicle_id(
             "file_name": file_name,
         }
 
-    # 1) VIN — highest confidence.
+    # 1) VIN — highest confidence. Retry on transient errors (timeout,
+    # connection reset) so a one-off Supabase blip doesn't poison the cache.
     for vin in vin_candidates:
-        cached = cache.get(f"vin:{vin}")
-        if cached is not None:
-            return cached, {"matched_by": "vin", "vin": vin}
+        ckey = f"vin:{vin}"
+        if ckey in cache:
+            v = cache[ckey]
+            if v is not None:
+                return v, {"matched_by": "vin", "vin": vin}
+            continue  # confirmed miss; try next VIN
         url = (
             f"{SUPABASE_URL}/rest/v1/vehicles?select=id&vin=eq.{vin}"
         )
-        try:
-            r = requests.get(url, headers=_supabase_headers(), timeout=10)
-            r.raise_for_status()
-            rows = r.json()
-            if rows:
-                cache[f"vin:{vin}"] = rows[0]["id"]
-                return rows[0]["id"], {"matched_by": "vin", "vin": vin}
-            cache[f"vin:{vin}"] = None
-        except Exception:
-            pass
+        last_err = None
+        for attempt in range(2):
+            try:
+                r = requests.get(url, headers=_supabase_headers(), timeout=10)
+                r.raise_for_status()
+                rows = r.json()
+                if rows:
+                    cache[ckey] = rows[0]["id"]
+                    return rows[0]["id"], {"matched_by": "vin", "vin": vin}
+                cache[ckey] = None  # confirmed miss
+                break
+            except Exception as e:
+                last_err = e
+                if attempt == 0:
+                    time.sleep(1.0)
+        else:
+            # Both attempts failed — cache as miss to avoid retrying every row.
+            cache[ckey] = None
 
-    # 2) Year + make + model (combined hints).
+    # 2) Year + make + model fallback is intentionally NOT used.
+    # The DB has many vehicles per (year, make, model) tuple — most of which
+    # are NOT Skylar's. A unique-result match is still likely to be a wrong
+    # vehicle from elsewhere on the platform. Per `wrong-attribution-forks-not-hides`
+    # we leave these unresolved and log for human review rather than guess.
     year = sheet_hints.get("year") or file_hints.get("year")
     make = sheet_hints.get("make") or file_hints.get("make")
     model = sheet_hints.get("model") or file_hints.get("model")
-    if year and make:
-        cache_key = f"ymm:{year}:{make}:{model or ''}"
-        if cache_key in cache:
-            cached = cache[cache_key]
-            if cached:
-                return cached, {
-                    "matched_by": "year_make_model_hint",
-                    "year": year,
-                    "make": make,
-                    "model": model,
-                }
-        params = [
-            f"select=id,year,make,model",
-            f"year=eq.{year}",
-            f"make=ilike.%25{make}%25",
-        ]
-        if model:
-            params.append(f"model=ilike.%25{model}%25")
-        url = f"{SUPABASE_URL}/rest/v1/vehicles?" + "&".join(params) + "&limit=5"
-        try:
-            r = requests.get(url, headers=_supabase_headers(), timeout=10)
-            r.raise_for_status()
-            rows = r.json()
-            if len(rows) == 1:
-                cache[cache_key] = rows[0]["id"]
-                return rows[0]["id"], {
-                    "matched_by": "year_make_model_hint",
-                    "year": year,
-                    "make": make,
-                    "model": model,
-                }
-            cache[cache_key] = None
-        except Exception:
-            pass
 
     return None, {
         "matched_by": None,
         "vin_candidates": vin_candidates,
         "file_hints": file_hints,
         "sheet_hints": sheet_hints,
+        "ymm_hints_for_human_review": {
+            "year": year,
+            "make": make,
+            "model": model,
+        },
     }
 
 
@@ -365,18 +367,30 @@ def row_to_text(row_dict: dict[str, Any]) -> str:
 
 def submit_observation(payload: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
     url = f"{SUPABASE_URL}/functions/v1/ingest-observation"
-    try:
-        r = requests.post(url, headers=_supabase_headers(), data=json.dumps(payload), timeout=30)
-        body = {}
+    last_err: Any = None
+    for attempt in range(3):
         try:
-            body = r.json()
-        except Exception:
-            body = {"raw": r.text[:500]}
-        if r.status_code >= 400:
-            return False, {"status": r.status_code, **body}
-        return True, body
-    except Exception as e:
-        return False, {"error": str(e)}
+            # Use Connection: close so we don't hold sticky pool connections
+            # that the edge function appears to throttle on rapid reuse.
+            headers = {**_supabase_headers(), "Connection": "close"}
+            r = requests.post(url, headers=headers, data=json.dumps(payload), timeout=45)
+            body = {}
+            try:
+                body = r.json()
+            except Exception:
+                body = {"raw": r.text[:500]}
+            if r.status_code >= 500 and attempt < 2:
+                last_err = {"status": r.status_code, **body}
+                time.sleep(1.5 + attempt)
+                continue
+            if r.status_code >= 400:
+                return False, {"status": r.status_code, **body}
+            return True, body
+        except Exception as e:
+            last_err = {"error": str(e)}
+            if attempt < 2:
+                time.sleep(1.5 + attempt)
+    return False, last_err or {"error": "exhausted retries"}
 
 
 # ---------- main loop ---------------------------------------------------------
@@ -456,6 +470,27 @@ def process_file(
                 "model": hint_model(table_name) or sheet_hints["model"],
             }
 
+            # Pre-compute table-level VIN candidates from the entire table
+            # text (table title + all string cells). This lets us resolve at
+            # the table level once instead of per-row, which collapses
+            # thousands of redundant Supabase y/m/m queries to one per table.
+            table_blob_parts: list[str] = [table_name]
+            for r in rows:
+                for c in r:
+                    if isinstance(c, str):
+                        table_blob_parts.append(c)
+            table_blob = " ".join(table_blob_parts)
+            table_vins = find_vins(table_blob)
+
+            # Curated filename map is a free local lookup, no Supabase round
+            # trip. Use it as the table-level fallback when no per-row VIN.
+            if path.name in FILENAME_VEHICLE_MAP:
+                table_vehicle_id = FILENAME_VEHICLE_MAP[path.name]
+                table_signals = {"matched_by": "curated_filename_map", "file_name": path.name}
+            else:
+                table_vehicle_id = None
+                table_signals = {}
+
             for ri, row in enumerate(data_rows):
                 res.rows_seen += 1
                 row_dict = {h: c for h, c in zip(headers, row)}
@@ -464,22 +499,32 @@ def process_file(
                 res.rows_meaningful += 1
 
                 cell_text_parts = [str(c) for c in row if isinstance(c, str)]
-                cell_text_parts.extend([str(c) for c in headers if isinstance(c, str)])
-                cell_text_parts.append(table_name)
                 cell_text = " ".join(cell_text_parts)
 
-                vin_candidates = find_vins(cell_text + " " + table_name)
+                # Per-row VIN can override table-level attribution.
+                row_vins = find_vins(cell_text)
 
-                vehicle_id, signals = resolve_vehicle_id(
-                    vin_candidates=vin_candidates,
-                    file_hints=file_hints,
-                    sheet_hints=table_hints,
-                    file_name=path.name,
-                    cell_text=cell_text,
-                    cache=cache,
-                )
+                vehicle_id = None
+                signals: dict[str, Any] = {}
+                vehicle_hints: dict[str, Any] = {}
 
-                if not vehicle_id:
+                if row_vins:
+                    # Pass the VIN to ingest-observation; the server has its
+                    # own VIN resolver and a normalized index, so we offload
+                    # the lookup rather than doing a separate round-trip.
+                    vehicle_hints["vin"] = row_vins[0]
+                    signals = {"matched_by": "row_vin_via_server", "vin": row_vins[0]}
+                elif table_vehicle_id:
+                    vehicle_id = table_vehicle_id
+                    signals = table_signals
+                elif table_vins:
+                    vehicle_hints["vin"] = table_vins[0]
+                    signals = {"matched_by": "table_vin_via_server", "vin": table_vins[0]}
+                elif path.name in FILENAME_VEHICLE_MAP:
+                    vehicle_id = FILENAME_VEHICLE_MAP[path.name]
+                    signals = {"matched_by": "curated_filename_map", "file_name": path.name}
+
+                if not vehicle_id and not vehicle_hints:
                     res.no_vehicle += 1
                     continue
 
@@ -492,7 +537,7 @@ def process_file(
                     f"{path.name}|{sheet.name}|{table_name}|{ri}|{content_text}".encode()
                 ).hexdigest()[:24]
 
-                payload = {
+                payload: dict[str, Any] = {
                     "source_slug": "numbers-spreadsheet",
                     "kind": kind,
                     "observed_at": row_observed_at(row_dict, file_mtime),
@@ -508,14 +553,17 @@ def process_file(
                         "file_mtime": file_mtime.isoformat(),
                         "vehicle_match_signals": signals,
                     },
-                    "vehicle_id": vehicle_id,
                     "extraction_method": "numbers_parser",
-                    "extractor_id": "ws-6-numbers-files-ingest",
                 }
+                if vehicle_id:
+                    payload["vehicle_id"] = vehicle_id
+                if vehicle_hints:
+                    payload["vehicle_hints"] = vehicle_hints
 
                 if dry_run:
                     res.submitted += 1
-                    res.per_vehicle[vehicle_id] = res.per_vehicle.get(vehicle_id, 0) + 1
+                    bucket = vehicle_id or vehicle_hints.get("vin", "?")
+                    res.per_vehicle[bucket] = res.per_vehicle.get(bucket, 0) + 1
                     continue
 
                 ok, body = submit_observation(payload)
@@ -524,7 +572,11 @@ def process_file(
                         res.duplicates += 1
                     else:
                         res.submitted += 1
-                    res.per_vehicle[vehicle_id] = res.per_vehicle.get(vehicle_id, 0) + 1
+                    bucket = body.get("vehicle_id") or vehicle_id or vehicle_hints.get("vin", "?")
+                    if bucket:
+                        res.per_vehicle[bucket] = res.per_vehicle.get(bucket, 0) + 1
+                    if not body.get("vehicle_resolved", True) and vehicle_hints:
+                        res.no_vehicle += 1
                 else:
                     res.errors += 1
                     msg = f"INGEST-FAIL {path.name}::{table_name}::row{ri}: {body}"
