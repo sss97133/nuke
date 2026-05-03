@@ -28,6 +28,8 @@
     "ops:signals": "dotenvx run -- node scripts/backfill-analysis-signals.mjs",
     "ops:signals:dry-run": "dotenvx run -- node scripts/backfill-analysis-signals.mjs --dry-run",
     "backfill:condition": "dotenvx run -- node scripts/backfill-condition-observations.mjs",
+    "numbers:ingest": "dotenvx run -- scripts/.venv-numbers/bin/python scripts/numbers-files-ingest.py",
+    "numbers:ingest:dry-run": "dotenvx run -- scripts/.venv-numbers/bin/python scripts/numbers-files-ingest.py --dry-run",
     "backfill:bj-vins:dry-run": "node scripts/backfill-bj-vins.mjs --dry-run",
     "backfill:fb-images": "node scripts/backfill-fb-images.mjs",
     "backfill:fb-saved-observations": "node scripts/backfill-fb-saved-observations.mjs",
