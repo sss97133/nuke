@@ -255,27 +255,39 @@ const ObservationTimeline: React.FC = () => {
     });
   }, [observations]);
 
+  // Pin owner-trust observations (shop, agent-submission, owner-input) to top regardless of date.
+  // Within each tier, fall back to observed_at desc.
+  const sortedObservations = useMemo(() => {
+    const OWNER_TRUST_SOURCES = new Set(['shop', 'agent-submission', 'owner-input']);
+    const ownerTrustOrder = (obs: Observation) => OWNER_TRUST_SOURCES.has(obs.source_slug ?? '') ? 0 : 1;
+    return [...cleanObservations].sort((a, b) => {
+      const trustDelta = ownerTrustOrder(a) - ownerTrustOrder(b);
+      if (trustDelta !== 0) return trustDelta;
+      return new Date(b.observed_at ?? 0).getTime() - new Date(a.observed_at ?? 0).getTime();
+    });
+  }, [cleanObservations]);
+
   // Kind counts for filter badges
   const kindCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const obs of cleanObservations) {
+    for (const obs of sortedObservations) {
       counts[obs.kind] = (counts[obs.kind] || 0) + 1;
     }
     return counts;
-  }, [cleanObservations]);
+  }, [sortedObservations]);
 
   // Filtered observations
   const filtered = useMemo(() => {
-    if (!activeFilter) return cleanObservations;
-    return cleanObservations.filter(o => o.kind === activeFilter);
-  }, [cleanObservations, activeFilter]);
+    if (!activeFilter) return sortedObservations;
+    return sortedObservations.filter(o => o.kind === activeFilter);
+  }, [sortedObservations, activeFilter]);
 
   const displayed = showAll ? filtered : filtered.slice(0, 25);
 
   if (!vehicle) return null;
 
   // If all observations are errors (or no observations), return null — don't render the widget
-  if (!loading && cleanObservations.length === 0) return null;
+  if (!loading && sortedObservations.length === 0) return null;
 
   return (
     <div style={{
@@ -307,7 +319,7 @@ const ObservationTimeline: React.FC = () => {
           color: 'var(--text-secondary)',
           letterSpacing: '0.06em',
         }}>
-          {cleanObservations.length} TOTAL
+          {sortedObservations.length} TOTAL
         </span>
       </div>
 
@@ -336,7 +348,7 @@ const ObservationTimeline: React.FC = () => {
               cursor: 'pointer',
             }}
           >
-            ALL {cleanObservations.length}
+            ALL {sortedObservations.length}
           </button>
           {ALL_KINDS.filter(k => kindCounts[k]).map(kind => {
             const kc = getKindConfig(kind);
