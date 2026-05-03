@@ -18,17 +18,63 @@ Comparable mental models: Plaid for banking data, Stripe for payments, SMTP for 
 
 ## What ships in v1
 
-### Two surfaces, same substrate
+### Founding framing — the form is the thing
 
-External agents reach the write path two ways. Both land in `vehicle_observations` via `ingest-observation`.
+> "It's not just mobile but I should be able to access through Claude on my phone and Claude will submit it for me with its interpretation of what it's seeing and then it's gonna fill in the form shape that we require."
+> — Skylar, 2026-05-02
 
-**REST** — `POST nuke.ag/v1/events` with X-API-Key auth. Documented at `nuke.ag/api/docs` (Redoc) with the spec at `nuke.ag/v1/openapi.json`. Read-back via `GET nuke.ag/v1/events?vin={VIN}`.
+> "We need it to work perfectly for one user and then we will define… the ingestion process, then we start practicing scale."
 
-**MCP** — Tools `submit_vehicle_event`, `get_event_schema`, `verify_vehicle_access` on the `mcp-connector` edge function (reachable via `https://nuke.ag/api/mcp`). Identical envelope to the REST surface; the MCP wraps the REST endpoint internally.
+The session that produced this chapter spent hours on OAuth — token endpoints, magic-link callbacks, two open Anthropic client bugs. Skylar pulled the cord: **the form is the thing. Everything else is plumbing to deliver Claude to it.** This section reorders the chapter accordingly.
+
+### 1. The form-shape is the moat
+
+Vehicles are immutable entities. Observations are testimony. The library has said this for two years (Chapter 2; the `testimony-and-half-lives` and `i-just-know` contemplations). What was missing was a contract that turns a vision agent's natural-language interpretation of a photo into structured testimony.
+
+That contract is the **form-shape**: per-event-type JSON Schemas that Claude reads before it writes. For each event type — `service`, `inspection`, `modification`, `note`, `condition_assessment` — the system publishes:
+
+1. A **JSON Schema** (Draft 2020-12) at `docs/api/schemas/v1/<event_type>.json` that the submission must validate against.
+2. A **checklist** returned by the MCP tool `get_event_checklist(event_type)` annotating every field with `vision_fillable`, `context_fillable`, and `tool_fillable` flags — telling the agent where each field's answer comes from.
+
+A vision agent without a form will hallucinate structure. It will write `paint_condition: "lovely"` in one submission and `exterior_paint: "nice"` in the next. The data lands but does not compose. A vision agent **with** a form has a checklist. It fills the fields. The same fields appear on every submission of the same type. The data composes. The timeline renders structured details, not "see narrative" fallbacks.
+
+The form-shape is also the enforcer of the testimony axiom in the agent era. When the source was a BaT listing, the source defined the structure. When the source is Claude reading a photo, the form-shape IS the structure. See `docs/library/intellectual/contemplations/the-form-is-the-thing.md` for the long-form argument and `docs/library/reference/encyclopedia/02-observation-model.md#per-kind-structured_data-shape` for the per-kind canonical fields.
+
+Per-kind routing into the substrate:
+
+| `event_type` | `observation_kind` | `source_slug` | Schema |
+| --- | --- | --- | --- |
+| `service` | `work_record` | `shop` | `service.json` |
+| `inspection` | `condition` | `agent-submission` | `inspection.json` |
+| `modification` | `work_record` | `agent-submission` | `modification.json` (v1.1) |
+| `condition_assessment` | `condition` | `agent-submission` | `condition_assessment.json` (v1.1) |
+| `note` | `comment` | `agent-submission` | `note.json` |
+
+Reserved but not yet routed: `ownership_change`, `media`. Submissions for those return 400 until a real form-shape exists.
+
+### 2. Two surfaces, same form
+
+External agents reach the write path two ways. Both consume the **same** JSON Schemas and the **same** checklist contracts. Both land in `vehicle_observations` via `ingest-observation`.
+
+**REST** — `POST nuke.ag/v1/events` with X-API-Key auth. Documented at `nuke.ag/api/docs` (Redoc) with the spec at `nuke.ag/v1/openapi.json`. Read-back via `GET nuke.ag/v1/events?vin={VIN}`. The OpenAPI spec references the JSON Schemas at `docs/api/schemas/v1/`.
+
+**MCP** — Tools `submit_vehicle_event`, `get_event_schema`, `get_event_checklist`, `verify_vehicle_access` on the `mcp-connector` edge function (reachable via `https://nuke.ag/api/mcp` and `https://nuke.ag/mcp`). Identical envelope to the REST surface; the MCP wraps the REST endpoint internally and exposes the checklist contract as a first-class tool so claude.ai can pre-flight a submission.
+
+The point: there is one form. Whatever transport, whatever client, whatever auth — the agent fills the same fields and the testimony lands the same way. Anything that varies between surfaces is plumbing.
+
+### 3. Auth is plumbing
+
+Auth is documented because we have to ship it; it is **not** the moat. The bare minimum to deliver Claude to the form:
+
+- **REST surface — X-API-Key.** `_shared/apiKeyAuth.ts` hashes the key, calls `check_api_key_rate_limit` RPC, returns scopes. Issuance UI at `/settings/connected-agents`. Backed by `api_keys`.
+- **MCP surface — OAuth 2.0.** Required because claude.ai's connector spec demands DCR (RFC 7591) and authorization code flow. Endpoints: `/oauth/authorize`, `/oauth/login`, `/oauth/callback`, `/oauth/token`. The Supabase magic-link is the user-facing step. Once the access token is issued, the MCP surface uses it identically to the REST X-API-Key — same scopes, same checks.
+- **Service role.** `Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}` bypasses scope checks. Internal only.
+
+That is everything. Auth gets Claude to the form. The form is what matters.
 
 ### Envelope shape (strict)
 
-The outer envelope is closed; additional properties rejected. The `payload` is loose-but-validated against a per-`event_type` JSON Schema (Draft 2020-12).
+The outer envelope is closed; additional properties rejected. The `payload` is loose-but-validated against a per-`event_type` JSON Schema (Draft 2020-12) — the form-shape from section 1.
 
 ```json
 {
@@ -154,13 +200,18 @@ The envelope includes `auth: { user_id, token_id, scopes }`. This is documentary
 
 ## Cross-references
 
+- **Form-shape framing**: `docs/library/intellectual/contemplations/the-form-is-the-thing.md` — the night Skylar pulled us back to the form.
+- **Per-kind shape spec**: `docs/library/reference/encyclopedia/02-observation-model.md#per-kind-structured_data-shape` — the canonical fields for each `kind`.
 - **The Mustang** is pilot user #1. VIN `6F07C219593`. Vehicle ID `83f6f033-a3c3-4cf4-a85e-a60d2c588838`. Year 1966, make Ford, model Mustang.
 - **OpenAPI spec**: `docs/api/openapi.yaml` (canonical), `nuke_frontend/api/v1/openapi.json` (programmatic mirror).
-- **JSON Schemas**: `docs/api/schemas/v1/{envelope,service,note}.json`.
+- **JSON Schemas**: `docs/api/schemas/v1/{envelope,service,inspection,note}.json`. Future: `modification.json`, `condition_assessment.json`, `media.json`, `expense.json`.
+- **MCP checklist tool**: `get_event_checklist` in `supabase/functions/mcp-connector/index.ts` — returns per-field `vision_fillable`/`context_fillable`/`tool_fillable` annotations.
+- **Dictionary entries**: `docs/library/reference/dictionary/{service,inspection,modification,note,condition_assessment,form-shape,vision-fillable}.md`.
 - **Quickstart for integrators**: `docs/api/QUICKSTART.md` ("4 calls from zero").
 - **Skylar's Claude Desktop setup**: `docs/api/CLAUDE_DESKTOP_SETUP.md`.
+- **Skylar's Claude.ai mobile setup**: `docs/api/CLAUDE_MOBILE_SETUP.md`.
 - **Scope grammar reference**: `supabase/functions/_shared/scopeGrammar.ts` + `scopeGrammar.test.ts` (23 tests).
 - **Trust invariant**: `docs/library/intellectual/contemplations/the-trust-invariant.md` and `.claude/rules/agent-trust-invariants.md`.
 - **Brief**: `docs/external-agent-write-api.md`.
 - **Build plan**: `~/.claude/plans/humble-drifting-backus.md`.
-- **The night the API shipped**: 2026-05-02 → 2026-05-03, multi-team overnight build (4 parallel workstreams). DONE.md captures the timeline.
+- **The night the API shipped**: 2026-05-02 → 2026-05-03, multi-team overnight build (10 parallel workstreams). DONE.md captures the timeline.
