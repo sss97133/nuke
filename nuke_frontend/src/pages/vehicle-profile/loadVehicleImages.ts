@@ -55,6 +55,10 @@ export async function loadVehicleImagesImpl({
       .or('is_duplicate.is.null,is_duplicate.eq.false')
       // Hide AI-detected mismatched/unrelated images (wrong vehicle or not a vehicle photo)
       .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
+      // Vision gate: hide images that haven't been agent-classified yet, or that the agent
+      // rejected as personal / misattributed. Legacy rows (NULL) stay visible — they wait
+      // for the retroactive review pass.
+      .or('vision_gate_status.is.null,vision_gate_status.eq.approved')
       .order('is_primary', { ascending: false })
         // IMPORTANT: NULL positions should sort LAST (older backfills didn't set position).
         .order('position', { ascending: true, nullsFirst: false })

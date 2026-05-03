@@ -32,6 +32,12 @@ export async function fetchVehicleImages<T = any>(
       query = query.or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")');
     }
 
+    // Vision gate: hide images the agent hasn't approved yet.
+    // - NULL = legacy row (pre-2026-05-03), wait for retroactive review pass; show for now
+    // - 'approved' = agent confirmed vehicle content + correct attribution
+    // - 'pending' / 'rejected_*' / 'review_needed' = withhold from gallery
+    query = query.or('vision_gate_status.is.null,vision_gate_status.eq.approved');
+
     query = query
       .order('is_primary', { ascending: false })
       .order('position', { ascending: true, nullsFirst: false })
