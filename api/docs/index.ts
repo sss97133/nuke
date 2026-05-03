@@ -1,17 +1,9 @@
 // Vercel serverless function — public OpenAPI documentation page.
 // Routes:
 //   /api/docs           → this handler (Redoc HTML)
-//   /v1/openapi.json    → static mirror at nuke_frontend/api/v1/openapi.json
-//
-// External agents fetch /v1/openapi.json directly. Humans hit /api/docs.
-//
-// CSP NOTE (coordination request for WS-B): the inline <redoc> custom element
-// loads its bundle from https://cdn.redoc.ly. The current vercel.json CSP
-// `script-src 'self' 'unsafe-inline' https://unpkg.com https://js.stripe.com`
-// must be extended with `https://cdn.redoc.ly`. Redoc also pulls font CSS,
-// so style-src needs the same host. See WS-A final report.
+//   /v1/openapi.json    → static asset at nuke_frontend/public/v1/openapi.json (no rewrite needed)
 
-export const config = { runtime: 'edge' };
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const HTML = `<!doctype html>
 <html lang="en">
@@ -32,13 +24,9 @@ const HTML = `<!doctype html>
 </html>
 `;
 
-export default async function handler(_req: Request): Promise<Response> {
-  return new Response(HTML, {
-    status: 200,
-    headers: {
-      'content-type': 'text/html; charset=utf-8',
-      'cache-control': 'public, max-age=300, s-maxage=300',
-      'x-content-type-options': 'nosniff',
-    },
-  });
+export default function handler(_req: VercelRequest, res: VercelResponse) {
+  res.setHeader('content-type', 'text/html; charset=utf-8');
+  res.setHeader('cache-control', 'public, max-age=300, s-maxage=300');
+  res.setHeader('x-content-type-options', 'nosniff');
+  return res.status(200).send(HTML);
 }
