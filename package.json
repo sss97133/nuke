@@ -183,6 +183,7 @@
     "taxonomy:retrigger": "tsx scripts/retrigger-normalization.ts",
     "taxonomy:vin-decode": "tsx scripts/mass-vin-decode.ts",
     "test:invoice-cashflow": "tsx scripts/integration/test-invoice-cashflow.ts",
+    "test:oauth-flow": "dotenvx run -- bash scripts/test-oauth-flow.sh",
     "test:phone-otp": "tsx scripts/test-phone-otp.ts",
     "test:vision-fill": "dotenvx run -f .env -f .env.local -- tsx scripts/test-vision-fill-loop.ts",
     "trickle-backfill-images": "tsx scripts/trickle-backfill-images.ts",
