@@ -17,13 +17,17 @@ Open `~/Library/Application Support/Claude/claude_desktop_config.json`. If it do
       "command": "npx",
       "args": [
         "-y",
-        "@modelcontextprotocol/server-fetch",
-        "https://nuke.ag/mcp"
+        "mcp-remote",
+        "https://nuke.ag/mcp",
+        "--header",
+        "X-API-Key:nk_live_..."
       ]
     }
   }
 }
 ```
+
+`mcp-remote` is the de facto bridge for HTTP MCPs. It speaks stdio to Claude Desktop and HTTP to the remote endpoint. The `--header` arg attaches your API key to every request, so authenticated tools like `submit_vehicle_event` work.
 
 If you already have other MCP servers configured (Linear, Postgres, etc.), keep them — just add the `nuke` key alongside them.
 
@@ -41,25 +45,17 @@ Tools that write (`submit_vehicle_event`, `submit_observation`, `submit_attribut
 
 ## Where the key goes
 
-Two options.
+`mcp-remote` accepts headers via `--header` args. Pass your key:
 
-### Option A — Header in the MCP server config
-
-If your MCP server config supports custom headers (some forks of `server-fetch` do), add the key as `X-API-Key`. Specifics vary by adapter; check your installed `server-fetch` docs.
-
-### Option B — Env var, picked up by the connector
-
-If your MCP fork doesn't pass headers, you can set `NUKE_API_KEY` in your shell environment. The MCP server reads it at startup. Restart Claude Desktop after exporting.
-
-```bash
-export NUKE_API_KEY=nk_live_…
+```
+"args": ["-y", "mcp-remote", "https://nuke.ag/mcp", "--header", "X-API-Key:nk_live_..."]
 ```
 
-(Persist by adding to your `~/.zshrc`.)
+(No space after the colon — `mcp-remote` parses `Name:Value`.)
 
-### Option C — Service role (you only)
+### Service role (you only)
 
-For your own dogfooding only — never share — you can skip the API key entirely if your MCP server passes a `Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY`. Service-role auth bypasses scope checks. **Don't use this for any external integration**, only for local debugging on your own machine.
+For your own dogfooding only — never share — you can swap `X-API-Key:...` for `Authorization:Bearer $SUPABASE_SERVICE_ROLE_KEY`. Service-role auth bypasses scope checks. **Don't use this for any external integration**, only for local debugging on your own machine.
 
 ## Tonight's session — replay it
 
