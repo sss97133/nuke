@@ -264,7 +264,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
 
           {/* Observation History — all observations for this vehicle, chronological */}
           {observationCount > 0 && (
-            <CollapsibleWidget variant="profile" title="Observation History" defaultCollapsed={true}>
+            <CollapsibleWidget variant="profile" title="Observation History" defaultCollapsed={observationCount > 50}>
               <React.Suspense fallback={null}>
                 <ObservationTimeline />
               </React.Suspense>
