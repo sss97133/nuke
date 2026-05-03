@@ -1,0 +1,4500 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Nuke Vehicle Data API",
+    "description": "The Nuke API provides programmatic access to vehicle data management, observations,\nand real-time event notifications via webhooks.\n\n## Authentication\n\nAll API requests require authentication using either:\n\n- **API Key**: Pass via `X-API-Key` header\n- **Bearer Token**: Supabase JWT via `Authorization: Bearer <token>` header\n\nGet your API key at [https://nuke.ag/settings/api-keys](https://nuke.ag/settings/api-keys)\n\n## Rate Limiting\n\nAPI requests are rate limited. When you exceed your limit, you'll receive a 429 response.\nCheck the `X-RateLimit-Remaining` header to monitor your usage.\n\n## Webhooks\n\nSubscribe to real-time events by creating webhook endpoints. Events are delivered with\nHMAC-SHA256 signatures for verification.\n\n## External Agent Write API\n\n`POST /v1/events` is the canonical write target for external LLM agents (Claude, ChatGPT,\nbespoke MCP clients). Agents fetch the JSON Schema, prepare a strict envelope, and write\non the user's behalf — Nuke is the rails, not the destination. See the\n`External Agent Write API` tag below for the full contract.\n",
+    "version": "1.5.0",
+    "contact": {
+      "name": "Nuke Support",
+      "url": "https://nuke.ag/support"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1",
+      "description": "Production API"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": []
+    },
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Vehicles",
+      "description": "Vehicle management operations"
+    },
+    {
+      "name": "Observations",
+      "description": "Observation (data point) operations"
+    },
+    {
+      "name": "Batch",
+      "description": "Bulk import operations"
+    },
+    {
+      "name": "Webhooks",
+      "description": "Webhook endpoint management"
+    },
+    {
+      "name": "Valuations",
+      "description": "Vehicle valuation estimates (Nuke Estimates)"
+    },
+    {
+      "name": "Listings",
+      "description": "External auction/marketplace listings"
+    },
+    {
+      "name": "Comparables",
+      "description": "Comparable vehicle sales for valuation context"
+    },
+    {
+      "name": "VIN Lookup",
+      "description": "One-call vehicle profile by VIN"
+    },
+    {
+      "name": "Vehicle History",
+      "description": "Observation timeline for a vehicle"
+    },
+    {
+      "name": "Vehicle Auction",
+      "description": "Auction results, comments, and sentiment"
+    },
+    {
+      "name": "Market Trends",
+      "description": "Price trends by make/model/year"
+    },
+    {
+      "name": "Search",
+      "description": "Full-text search across all entities"
+    },
+    {
+      "name": "Signal",
+      "description": "Market signal scoring — the \"is this a good deal?\" endpoint. Combines comparable sales, price position, heat score, and auction sentiment into a single 0–100 deal score."
+    },
+    {
+      "name": "Vision",
+      "description": "Vehicle image classification and analysis powered by YONO — a locally-trained model\non Nuke's 33M-image corpus. Make classification costs $0.00/image. Full scene analysis\n(category, angle, condition, camera position) uses Gemini/GPT-4o cloud fallback at\n$0.0001–$0.004/image.\n"
+    },
+    {
+      "name": "Export",
+      "description": "Bulk vehicle data export in CSV, JSON, or NDJSON format. Designed for data scientists,\nML pipelines, and enterprise customers. Up to 100K rows per request (service role) or\n10K rows (API key) or 5K rows (user JWT).\n"
+    },
+    {
+      "name": "Exchange",
+      "description": "Market exchange read API — funds, vehicle offerings, and holdings.\nThe Nuke market exchange enables fractional vehicle ownership backed by collector vehicle assets.\n"
+    },
+    {
+      "name": "External Agent Write API",
+      "description": "Agent-facing write surface. Any LLM agent (Claude, ChatGPT, MCP client) submits structured\nvehicle events on the authenticated user's behalf via `POST /v1/events`. The envelope is\nstrict (versioned, scope-checked, append-only); the payload is JSONB, validated against\nper-event-type JSON Schemas. NUKE is rails for vehicle data — Plaid for cars — and the\nschema is the moat.\n"
+    }
+  ],
+  "paths": {
+    "/api-v1-vehicles": {
+      "get": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "List vehicles",
+        "description": "Retrieve a paginated list of vehicles you own or have access to.",
+        "operationId": "listVehicles",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "mine",
+            "in": "query",
+            "description": "Only return vehicles you own",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of vehicles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/VehicleSummary"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Create a vehicle",
+        "operationId": "createVehicle",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VehicleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Vehicle created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Vehicle"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api-v1-vehicles/{id}": {
+      "get": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Retrieve a vehicle",
+        "operationId": "getVehicle",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vehicle details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Vehicle"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Update a vehicle",
+        "operationId": "updateVehicle",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VehicleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Vehicle updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Vehicle"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Archive a vehicle",
+        "description": "Soft-deletes the vehicle by setting archived_at timestamp.",
+        "operationId": "deleteVehicle",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vehicle archived",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api-v1-observations": {
+      "get": {
+        "tags": [
+          "Observations"
+        ],
+        "summary": "List observations",
+        "description": "Retrieve observations for a specific vehicle.",
+        "operationId": "listObservations",
+        "parameters": [
+          {
+            "name": "vehicle_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "vin",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "Filter by observation kind",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of observations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Observation"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "vehicle_id or vin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Observations"
+        ],
+        "summary": "Create an observation",
+        "description": "Record a new observation (data point) for a vehicle. Observations are immutable\nand include full provenance tracking.\n",
+        "operationId": "createObservation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObservationInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Observation created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Observation"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api-v1-batch": {
+      "post": {
+        "tags": [
+          "Batch"
+        ],
+        "summary": "Batch import vehicles",
+        "description": "Import up to 1000 vehicles in a single request. Optionally include\nobservations for each vehicle.\n",
+        "operationId": "batchIngest",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch import completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/BatchResult"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (e.g., batch too large)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks-manage": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List webhook endpoints",
+        "operationId": "listWebhooks",
+        "responses": {
+          "200": {
+            "description": "List of webhook endpoints",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/WebhookEndpoint"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Create webhook endpoint",
+        "description": "Register a new webhook endpoint. The response includes the signing secret\nwhich will only be shown once - save it immediately.\n",
+        "operationId": "createWebhook",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebhookInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Webhook created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/WebhookEndpoint"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "secret": {
+                              "type": "string",
+                              "description": "Save this! Won't be shown again."
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/webhooks-manage/{id}": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Retrieve webhook endpoint",
+        "operationId": "getWebhook",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook endpoint with recent deliveries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/WebhookEndpoint"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "recent_deliveries": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/WebhookDelivery"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Update webhook endpoint",
+        "operationId": "updateWebhook",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebhookUpdateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/WebhookEndpoint"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Delete webhook endpoint",
+        "operationId": "deleteWebhook",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/webhooks-manage/{id}/rotate-secret": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Rotate webhook secret",
+        "description": "Generate a new signing secret. The old secret will be invalidated immediately.",
+        "operationId": "rotateWebhookSecret",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Secret rotated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/WebhookEndpoint"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "secret": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api-v1-signal": {
+      "get": {
+        "tags": [
+          "Signal"
+        ],
+        "summary": "Get market signal score",
+        "description": "Returns the market signal score for a vehicle — the \"is this a good deal?\" answer.\n\nCombines comparable sales, listing price vs estimated market value, heat score,\nand auction sentiment into a single 0–100 deal score with confidence-weighted\nsignal breakdown.\n\nRequires an existing Nuke Estimate (`nuke_estimates` row). If none exists,\ncall `/api-v1-valuations` first to trigger computation.\n\n**Use cases:**\n- Dealer acquisition tools (\"is this worth buying at asking price?\")\n- Insurance platforms (\"what's the market risk on this vehicle?\")\n- Auction bidding tools (\"when to bid and when to walk away\")\n",
+        "operationId": "getSignalScore",
+        "parameters": [
+          {
+            "name": "vehicle_id",
+            "in": "query",
+            "description": "Vehicle UUID (use this OR vin)",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "vin",
+            "in": "query",
+            "description": "17-character VIN (alternative to vehicle_id)",
+            "schema": {
+              "type": "string",
+              "minLength": 17,
+              "maxLength": 17
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signal score data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SignalScore"
+                    }
+                  }
+                },
+                "example": {
+                  "data": {
+                    "vehicle_id": "b4f2e8a0-1234-4abc-9def-000000000001",
+                    "deal_score": 87,
+                    "deal_score_label": "strong_buy",
+                    "heat_score": 72,
+                    "heat_score_label": "hot",
+                    "estimated_value": 48000,
+                    "value_low": 42000,
+                    "value_high": 55000,
+                    "price_vs_market": -12,
+                    "comp_count": 28,
+                    "signal_weights": {
+                      "comp_coverage": 0.45,
+                      "condition_signal": 0.18,
+                      "auction_sentiment": 0.05,
+                      "listing_velocity": 0.1,
+                      "price_position": 0.1
+                    },
+                    "confidence": 0.78,
+                    "model_version": "v1",
+                    "calculated_at": "2026-02-27T00:00:00Z",
+                    "is_stale": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "No signal score exists for this vehicle yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "No signal score available for this vehicle. Run a valuation first."
+                    },
+                    "vehicle_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "hint": {
+                      "type": "string",
+                      "example": "Use nuke.valuations.get() to trigger a valuation, then retry."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api-v1-valuations": {
+      "get": {
+        "tags": [
+          "Valuations"
+        ],
+        "summary": "Get vehicle valuation",
+        "description": "Returns the Nuke Estimate (valuation) for a vehicle, including confidence scoring,\ndeal score, and heat score. Falls back to vehicle pricing fields if no dedicated\nestimate exists.\n",
+        "operationId": "getValuation",
+        "parameters": [
+          {
+            "name": "vehicle_id",
+            "in": "query",
+            "description": "Vehicle UUID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "vin",
+            "in": "query",
+            "description": "Vehicle VIN (alternative to vehicle_id)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Valuation data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Valuation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api-v1-listings": {
+      "get": {
+        "tags": [
+          "Listings"
+        ],
+        "summary": "List external listings",
+        "description": "Returns external auction and marketplace listings for vehicles. Filter by\nvehicle, platform (bat, cars_and_bids, etc.), or listing status.\n",
+        "operationId": "listListings",
+        "parameters": [
+          {
+            "name": "vehicle_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "vin",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "in": "query",
+            "description": "Filter by platform",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "bat",
+                "cars_and_bids",
+                "pcarmarket",
+                "hagerty",
+                "rm_sothebys",
+                "mecum",
+                "gooding",
+                "broad_arrow",
+                "bonhams"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by listing status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "sold",
+                "expired",
+                "ended"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of external listings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ExternalListing"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api-v1-comps": {
+      "get": {
+        "tags": [
+          "Comparables"
+        ],
+        "summary": "Find comparable sales",
+        "description": "Returns comparable vehicle sales for valuation context. Query by year/make/model\nor VIN to find similar sold vehicles, with summary statistics (avg, median, min, max prices).\n",
+        "operationId": "getComps",
+        "parameters": [
+          {
+            "name": "make",
+            "in": "query",
+            "required": true,
+            "description": "Vehicle make (or provide vin)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "vin",
+            "in": "query",
+            "description": "Resolve make/model/year from VIN",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "year_range",
+            "in": "query",
+            "description": "Years +/- from target year to include",
+            "schema": {
+              "type": "integer",
+              "default": 3
+            }
+          },
+          {
+            "name": "min_price",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "max_price",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Comparable sales with summary statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Comparable"
+                      }
+                    },
+                    "summary": {
+                      "$ref": "#/components/schemas/CompsSummary"
+                    },
+                    "query": {
+                      "type": "object",
+                      "properties": {
+                        "make": {
+                          "type": "string"
+                        },
+                        "model": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "year": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "year_range": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api-v1-vin-lookup/{vin}": {
+      "get": {
+        "tags": [
+          "VIN Lookup"
+        ],
+        "summary": "Look up vehicle by VIN",
+        "description": "One-call vehicle profile by VIN. Returns core vehicle fields plus\nembedded valuation, listing/observation/image counts, and first 5 images.\n",
+        "operationId": "vinLookup",
+        "parameters": [
+          {
+            "name": "vin",
+            "in": "path",
+            "required": true,
+            "description": "Vehicle Identification Number",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vehicle profile with enrichment data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/VinLookupResult"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api-v1-vehicle-history/{vin}": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "summary": "Get vehicle observation timeline",
+        "description": "Paginated observation timeline for a vehicle by VIN. Each observation\nincludes source attribution, kind, structured data, and confidence.\n",
+        "operationId": "getVehicleHistory",
+        "parameters": [
+          {
+            "name": "vin",
+            "in": "path",
+            "required": true,
+            "description": "Vehicle Identification Number",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "Filter by observation kind (e.g., listing, comment, sale, service)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Observation timeline",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "vehicle": {
+                          "$ref": "#/components/schemas/VehicleBrief"
+                        },
+                        "observations": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/HistoryObservation"
+                          }
+                        }
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api-v1-vehicle-auction/{vin}": {
+      "get": {
+        "tags": [
+          "Vehicle Auction"
+        ],
+        "summary": "Get auction data for a vehicle",
+        "description": "Auction results, bid counts, recent comments, and AI sentiment analysis\nfor a vehicle by VIN.\n",
+        "operationId": "getVehicleAuction",
+        "parameters": [
+          {
+            "name": "vin",
+            "in": "path",
+            "required": true,
+            "description": "Vehicle Identification Number",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Auction data with sentiment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/VehicleAuctionResult"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api-v1-market-trends": {
+      "get": {
+        "tags": [
+          "Market Trends"
+        ],
+        "summary": "Get market price trends",
+        "description": "Price trends by make/model/year range over a time period. Returns\ntime-bucketed statistics including median, percentiles, and volume.\n",
+        "operationId": "getMarketTrends",
+        "parameters": [
+          {
+            "name": "make",
+            "in": "query",
+            "required": true,
+            "description": "Vehicle make (e.g., \"Porsche\")",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "description": "Vehicle model (e.g., \"911\")",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "year_from",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "year_to",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "description": "Time period for trend analysis",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "30d",
+                "90d",
+                "1y",
+                "3y"
+              ],
+              "default": "90d"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Market trend data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MarketTrendsResult"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api-v1-search": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Search across all entities",
+        "description": "Full-text search across vehicles, organizations, users, and tags.\nAuto-detects query type (VIN, URL, year, or free text).\n",
+        "operationId": "searchV1",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Search query — VIN, URL, year, make/model, or free text",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "types",
+            "in": "query",
+            "description": "Comma-separated entity types to search",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api-v1-vision/classify": {
+      "post": {
+        "tags": [
+          "Vision"
+        ],
+        "summary": "Classify a vehicle image",
+        "description": "Classify a vehicle image using YONO — a locally-trained model on Nuke's 33M-image corpus.\nReturns make, family (origin group), confidence, top-5 predictions, and vehicle detection.\n\n**Cost: $0.00/image.** YONO runs on dedicated inference infrastructure with no cloud AI fees.\n",
+        "operationId": "visionClassify",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "image_url"
+                ],
+                "properties": {
+                  "image_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Publicly accessible URL of the vehicle image",
+                    "example": "https://cdn.bringatrailer.com/vehicles/porsche-911.jpg"
+                  },
+                  "top_k": {
+                    "type": "integer",
+                    "default": 5,
+                    "minimum": 1,
+                    "maximum": 20,
+                    "description": "Number of top predictions to return"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Classification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "make": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Best make prediction",
+                      "example": "Porsche"
+                    },
+                    "family": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Vehicle origin group (american, german, japanese, british, italian, french, swedish)",
+                      "example": "german"
+                    },
+                    "family_confidence": {
+                      "type": "number",
+                      "format": "float",
+                      "nullable": true,
+                      "description": "Confidence score for family prediction (0.0–1.0)",
+                      "example": 0.97
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "format": "float",
+                      "description": "Make prediction confidence (0.0–1.0)",
+                      "example": 0.91
+                    },
+                    "top5": {
+                      "type": "array",
+                      "description": "Top-K predictions as [make, confidence] pairs",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            }
+                          ]
+                        }
+                      },
+                      "example": [
+                        [
+                          "Porsche",
+                          0.91
+                        ],
+                        [
+                          "BMW",
+                          0.04
+                        ],
+                        [
+                          "Mercedes-Benz",
+                          0.02
+                        ]
+                      ]
+                    },
+                    "is_vehicle": {
+                      "type": "boolean",
+                      "description": "Whether the image appears to contain a vehicle",
+                      "example": true
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "yono",
+                        "unavailable"
+                      ],
+                      "description": "Inference source",
+                      "example": "yono"
+                    },
+                    "ms": {
+                      "type": "number",
+                      "description": "YONO inference time in milliseconds",
+                      "example": 4.2
+                    },
+                    "cost_usd": {
+                      "type": "number",
+                      "description": "Cost in USD (always 0 for YONO)",
+                      "example": 0
+                    },
+                    "elapsed_ms": {
+                      "type": "number",
+                      "description": "Total request time in milliseconds",
+                      "example": 42
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api-v1-vision/analyze": {
+      "post": {
+        "tags": [
+          "Vision"
+        ],
+        "summary": "Analyze a vehicle image",
+        "description": "Full vehicle image analysis: YONO make classification + cloud scene analysis.\n\nReturns make/family (YONO, free), plus category, subject taxonomy, condition notes,\nand camera position (cloud, $0.0001–$0.004/image via Gemini or GPT-4o).\n\nThe `source` field indicates what ran:\n- `yono` — YONO classification only (cloud analysis unavailable)\n- `yono+cloud` — Both YONO + Gemini/GPT-4o analysis\n- `unavailable` — YONO sidecar offline\n",
+        "operationId": "visionAnalyze",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "image_url"
+                ],
+                "properties": {
+                  "image_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Publicly accessible URL of the vehicle image",
+                    "example": "https://cdn.bringatrailer.com/vehicles/porsche-911-door.jpg"
+                  },
+                  "vehicle_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Optional vehicle ID for context-aware analysis"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Analysis result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "make": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": "Porsche"
+                    },
+                    "family": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": "german"
+                    },
+                    "family_confidence": {
+                      "type": "number",
+                      "nullable": true,
+                      "example": 0.97
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "example": 0.91
+                    },
+                    "top5": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "is_vehicle": {
+                      "type": "boolean",
+                      "nullable": true,
+                      "example": true
+                    },
+                    "category": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "exterior",
+                        "interior",
+                        "engine",
+                        "undercarriage",
+                        "document",
+                        "damage"
+                      ],
+                      "example": "exterior"
+                    },
+                    "subject": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Subject taxonomy key",
+                      "example": "exterior.panel.door.front.driver"
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Human-readable description of what is shown",
+                      "example": "Left front door of a Porsche 911 showing minor surface rust on lower sill"
+                    },
+                    "condition_notes": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": "Surface rust on lower sill, paint fading on door handle"
+                    },
+                    "visible_damage": {
+                      "type": "boolean",
+                      "nullable": true,
+                      "example": true
+                    },
+                    "camera_position": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "azimuth_deg": {
+                          "type": "number",
+                          "description": "0=front, 90=driver side, 180=rear, 270=passenger side",
+                          "example": 90
+                        },
+                        "elevation_deg": {
+                          "type": "number",
+                          "description": "Camera elevation relative to vehicle center",
+                          "example": 15
+                        },
+                        "distance_mm": {
+                          "type": "number",
+                          "description": "Estimated camera distance from vehicle center in mm",
+                          "example": 3500
+                        },
+                        "confidence": {
+                          "type": "number",
+                          "example": 0.8
+                        }
+                      }
+                    },
+                    "yono": {
+                      "type": "object",
+                      "nullable": true,
+                      "description": "YONO classification details",
+                      "properties": {
+                        "make": {
+                          "type": "string",
+                          "example": "Porsche"
+                        },
+                        "family": {
+                          "type": "string",
+                          "nullable": true,
+                          "example": "german"
+                        },
+                        "confidence": {
+                          "type": "number",
+                          "example": 0.91
+                        },
+                        "ms": {
+                          "type": "number",
+                          "example": 4.2
+                        }
+                      }
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "yono",
+                        "yono+cloud",
+                        "unavailable"
+                      ],
+                      "example": "yono+cloud"
+                    },
+                    "cost_usd": {
+                      "type": "number",
+                      "example": 0.0001
+                    },
+                    "elapsed_ms": {
+                      "type": "number",
+                      "example": 1250
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api-v1-vision/batch": {
+      "post": {
+        "tags": [
+          "Vision"
+        ],
+        "summary": "Batch classify vehicle images",
+        "description": "Classify up to 100 vehicle images in a single request using YONO.\nAll classifications run locally — **cost: $0.00** regardless of batch size.\n\nResults include per-image make, family, confidence, top-5, and is_vehicle.\nFailed images are included in `results` with an `error` field.\n",
+        "operationId": "visionBatch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "images"
+                ],
+                "properties": {
+                  "images": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "description": "Array of images to classify",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "image_url"
+                      ],
+                      "properties": {
+                        "image_url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "top_k": {
+                          "type": "integer",
+                          "default": 5,
+                          "minimum": 1,
+                          "maximum": 20
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch classification results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "image_url": {
+                            "type": "string"
+                          },
+                          "make": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "family": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "family_confidence": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "confidence": {
+                            "type": "number"
+                          },
+                          "top5": {
+                            "type": "array",
+                            "items": {
+                              "type": "array",
+                              "items": {
+                                "oneOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "is_vehicle": {
+                            "type": "boolean"
+                          },
+                          "ms": {
+                            "type": "number"
+                          },
+                          "cost_usd": {
+                            "type": "number"
+                          },
+                          "error": {
+                            "type": "string",
+                            "description": "Present only if this image failed"
+                          }
+                        }
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "example": 3
+                    },
+                    "errors": {
+                      "type": "integer",
+                      "description": "Number of images that failed",
+                      "example": 0
+                    },
+                    "cost_usd": {
+                      "type": "number",
+                      "description": "Always 0 for YONO batch",
+                      "example": 0
+                    },
+                    "elapsed_ms": {
+                      "type": "number",
+                      "example": 142
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api-v1-export": {
+      "get": {
+        "tags": [
+          "Export"
+        ],
+        "summary": "Bulk export vehicle data",
+        "description": "Export vehicle records in CSV, JSON, or NDJSON format. Designed for data scientists,\nML pipelines, and enterprise customers.\n\n**Row limits by auth tier:**\n- Service role key: 100,000 rows/request\n- API key: 10,000 rows/request\n- User JWT: 5,000 rows/request\n\n**Cursor pagination:** Use `cursor` (last vehicle `id` from previous response) for\nefficient sequential pagination through large datasets.\n\n**Partial fields:** Use `fields` to request only the columns you need — reduces\nresponse size significantly for wide datasets.\n\n**Parquet:** Not directly supported — export as NDJSON and convert:\n`pd.read_json('data.ndjson', lines=True).to_parquet('data.parquet')`\n",
+        "operationId": "exportVehicles",
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Output format",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "csv",
+                "json",
+                "ndjson"
+              ],
+              "default": "json"
+            }
+          },
+          {
+            "name": "make",
+            "in": "query",
+            "description": "Filter by make (case-insensitive)",
+            "schema": {
+              "type": "string",
+              "example": "Porsche"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "description": "Filter by model (case-insensitive)",
+            "schema": {
+              "type": "string",
+              "example": "911"
+            }
+          },
+          {
+            "name": "year_min",
+            "in": "query",
+            "description": "Minimum model year",
+            "schema": {
+              "type": "integer",
+              "example": 1970
+            }
+          },
+          {
+            "name": "year_max",
+            "in": "query",
+            "description": "Maximum model year",
+            "schema": {
+              "type": "integer",
+              "example": 1989
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "description": "Comma-separated list of fields to include. Defaults to a standard set.",
+            "schema": {
+              "type": "string",
+              "example": "id,year,make,model,vin,sale_price,mileage"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum rows to return (capped by auth tier)",
+            "schema": {
+              "type": "integer",
+              "default": 1000,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Cursor for pagination — vehicle `id` from last response (for sequential exports)",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vehicle data in requested format.\n- `application/json` — JSON array or wrapped object\n- `text/csv` — RFC 4180 CSV with header row\n- `application/x-ndjson` — one JSON object per line\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "description": "Vehicle record with requested fields"
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "description": "Number of records returned"
+                    },
+                    "next_cursor": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true,
+                      "description": "Pass as `cursor` in next request for continuation. Null when exhausted."
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Fields included in each record"
+                    }
+                  }
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "description": "CSV with header row"
+                }
+              },
+              "application/x-ndjson": {
+                "schema": {
+                  "type": "string",
+                  "description": "Newline-delimited JSON (one object per line)"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api-v1-exchange": {
+      "get": {
+        "tags": [
+          "Exchange"
+        ],
+        "summary": "Market exchange snapshot",
+        "description": "Returns market exchange data — funds, vehicle offerings, and holdings.\n\nThe `action` parameter controls which subset is returned:\n- (none) — full snapshot: all funds + all offerings\n- `funds` — all active market funds with stats\n- `fund` — single fund detail (requires `symbol`)\n- `offerings` — all vehicle offerings currently trading\n- `holdings` — caller's holdings (requires authentication)\n\nStats are cached and refreshed every 15 minutes. Use `holdings` action to\nget real-time position data for authenticated users.\n",
+        "operationId": "getExchange",
+        "parameters": [
+          {
+            "name": "action",
+            "in": "query",
+            "description": "What to return. Omit for full snapshot.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "funds",
+                "fund",
+                "offerings",
+                "holdings"
+              ]
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "description": "Fund symbol — required when action=fund",
+            "schema": {
+              "type": "string",
+              "example": "PORS"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exchange data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "description": "Full snapshot (action omitted)",
+                      "type": "object",
+                      "properties": {
+                        "funds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/MarketFund"
+                          }
+                        },
+                        "offerings": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/VehicleOffering"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "description": "Funds list (action=funds)",
+                      "type": "object",
+                      "properties": {
+                        "funds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/MarketFund"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "description": "Single fund (action=fund)",
+                      "$ref": "#/components/schemas/MarketFund"
+                    },
+                    {
+                      "description": "Vehicle offerings (action=offerings)",
+                      "type": "object",
+                      "properties": {
+                        "offerings": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/VehicleOffering"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "description": "Caller holdings (action=holdings)",
+                      "type": "object",
+                      "properties": {
+                        "holdings": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "offering_id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "shares": {
+                                "type": "number"
+                              },
+                              "value_usd": {
+                                "type": "number"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Exchange"
+        ],
+        "summary": "Market exchange actions (POST)",
+        "description": "Same actions as GET but via POST body. Useful for actions with complex parameters\nor where GET query string limits apply.\n\nRequest body mirrors GET query params: `{ \"action\": \"fund\", \"symbol\": \"PORS\" }`.\n",
+        "operationId": "postExchange",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "funds",
+                      "fund",
+                      "offerings",
+                      "holdings"
+                    ]
+                  },
+                  "symbol": {
+                    "type": "string",
+                    "description": "Fund symbol (for action=fund)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Exchange data (same structure as GET)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/events": {
+      "post": {
+        "tags": [
+          "External Agent Write API"
+        ],
+        "summary": "Submit a vehicle event (agent-facing write endpoint)",
+        "description": "Canonical write target for external LLM agents. The agent fetches the JSON Schema,\nprepares a strict envelope, and POSTs on the authenticated user's behalf.\n\n### Envelope contract\n\n- **Outer envelope is strict** (closed schema, additional properties rejected).\n  Full schema: [envelope.json](https://nuke.ag/api/schemas/v1/envelope.json).\n- **`payload` is loose** but validated against the per-event-type schema selected\n  by `event_type` (`service` → service.json, `note` → note.json).\n- **VIN is the canonical key.** `vehicle_ref.vin` is required; `vehicle_ref.vehicle_id`\n  is optional and only used if the agent already knows Nuke's internal UUID.\n- **Append-only.** Corrections submit a new event with `correction_of` pointing at the\n  prior event id. The prior observation is marked `is_superseded=true`. Nothing is\n  ever destructively edited.\n\n### Routing under the hood\n\nSubmissions flow through Nuke's source-agnostic `vehicle_observations` substrate:\n\n| event_type | observation_kind | source slug |\n| --- | --- | --- |\n| `service` | `work_record` | `shop` |\n| `note`    | `comment`     | `agent-submission` |\n\nOther event types (`inspection`, `modification`, `ownership_change`, `media`) are reserved\nin the envelope but not yet routed; submissions for those return `400` until v1.1.\n\n### Authentication\n\nRequired: `X-API-Key: nk_live_…` header. The key must carry a write scope that matches\nthe target VIN. Either of these scopes authorizes a write:\n\n- `events:write:vehicle:{vin}` — narrow grant for one vehicle (preferred for agent integrations)\n- `events:write:all` — power-user wildcard\n\nThe `auth` block inside the envelope is advisory — Nuke validates the X-API-Key header\nand rejects submissions where the body's claimed scopes contradict the resolved key.\n\n### Pilot example\n\nSee [examples/v1/mustang-session.json](https://nuke.ag/api/examples/v1/mustang-session.json)\nfor a full envelope: 1966 Mustang VIN `6F07C219593`, valve covers pulled, sludge in\nvalve galley, engine pull deferred.\n",
+        "operationId": "submitEvent",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventEnvelope"
+              },
+              "examples": {
+                "mustang-service": {
+                  "summary": "Mustang engine refresh session (service event)",
+                  "description": "Pilot user — 1966 Mustang VIN `6F07C219593`. Pulled valve covers, found\nsludge in valve galley, deferred engine pull to morning. Canonical JSON\nSchemas (Draft 2020-12) for agent self-validation are mirrored at\n`/api/schemas/v1/{envelope,service,note}.json`.\n",
+                  "externalValue": "./examples/v1/mustang-session.json"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Event accepted and persisted as a vehicle observation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "event_id",
+                    "observation_id",
+                    "vehicle_id"
+                  ],
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "Public-facing event id assigned by Nuke. Use this when submitting a `correction_of` later."
+                    },
+                    "observation_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "Internal `vehicle_observations.id` for the row this submission produced. Same value as event_id today; reserved as a separate field in case routing changes."
+                    },
+                    "vehicle_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "Resolved Nuke vehicle UUID for the VIN in `vehicle_ref.vin`."
+                    },
+                    "observation_kind": {
+                      "type": "string",
+                      "description": "How Nuke classified this submission internally (e.g. `work_record`, `comment`)."
+                    },
+                    "source_slug": {
+                      "type": "string",
+                      "description": "Source registry slug used (`shop`, `agent-submission`)."
+                    },
+                    "superseded_event_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true,
+                      "description": "Set only if this submission included `correction_of` and the prior row was successfully marked superseded."
+                    }
+                  }
+                },
+                "example": {
+                  "event_id": "c2e07b3e-3c11-4f67-9a4f-7a8f0d3a1c11",
+                  "observation_id": "c2e07b3e-3c11-4f67-9a4f-7a8f0d3a1c11",
+                  "vehicle_id": "a1d4ee27-b3a5-4f0f-bf52-9a4d2a8e8c41",
+                  "observation_kind": "work_record",
+                  "source_slug": "shop",
+                  "superseded_event_id": null
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed. Envelope or payload did not match the JSON Schema.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "envelope validation failed",
+                  "details": "vehicle_ref.vin: required property missing"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Authentication succeeded but the API key's scopes do not authorize a write to this VIN.\nRequired scope: `events:write:vehicle:{vin}` or `events:write:all`.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "scope mismatch",
+                  "details": "key does not carry events:write:vehicle:6F07C219593"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "VIN does not resolve to a known vehicle and auto-create is not enabled for this key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API key from https://nuke.ag/settings/api-keys"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Supabase session JWT"
+      }
+    },
+    "schemas": {
+      "Vehicle": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "year": {
+            "type": "integer",
+            "nullable": true
+          },
+          "make": {
+            "type": "string",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "vin": {
+            "type": "string",
+            "nullable": true
+          },
+          "mileage": {
+            "type": "integer",
+            "nullable": true
+          },
+          "exterior_color": {
+            "type": "string",
+            "nullable": true
+          },
+          "interior_color": {
+            "type": "string",
+            "nullable": true
+          },
+          "transmission": {
+            "type": "string",
+            "nullable": true
+          },
+          "engine": {
+            "type": "string",
+            "nullable": true
+          },
+          "drivetrain": {
+            "type": "string",
+            "nullable": true
+          },
+          "body_style": {
+            "type": "string",
+            "nullable": true
+          },
+          "sale_price": {
+            "type": "number",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "is_public": {
+            "type": "boolean"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "VehicleSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "year": {
+            "type": "integer",
+            "nullable": true
+          },
+          "make": {
+            "type": "string",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "vin": {
+            "type": "string",
+            "nullable": true
+          },
+          "mileage": {
+            "type": "integer",
+            "nullable": true
+          },
+          "exterior_color": {
+            "type": "string",
+            "nullable": true
+          },
+          "transmission": {
+            "type": "string",
+            "nullable": true
+          },
+          "body_style": {
+            "type": "string",
+            "nullable": true
+          },
+          "sale_price": {
+            "type": "number",
+            "nullable": true
+          },
+          "is_public": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "VehicleInput": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "minimum": 1886,
+            "maximum": 2100
+          },
+          "make": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "vin": {
+            "type": "string"
+          },
+          "mileage": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "exterior_color": {
+            "type": "string"
+          },
+          "interior_color": {
+            "type": "string"
+          },
+          "transmission": {
+            "type": "string"
+          },
+          "engine": {
+            "type": "string"
+          },
+          "drivetrain": {
+            "type": "string"
+          },
+          "body_style": {
+            "type": "string"
+          },
+          "sale_price": {
+            "type": "number"
+          },
+          "description": {
+            "type": "string"
+          },
+          "is_public": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Observation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vehicle_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vin": {
+            "type": "string",
+            "nullable": true
+          },
+          "source_type": {
+            "type": "string"
+          },
+          "observation_kind": {
+            "type": "string"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "ingested_by": {
+                "type": "string"
+              },
+              "ingested_via": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "document_id": {
+                "type": "string"
+              },
+              "extracted_by": {
+                "type": "string"
+              }
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ObservationInput": {
+        "type": "object",
+        "required": [
+          "source_type",
+          "observation_kind",
+          "data"
+        ],
+        "properties": {
+          "vehicle_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vin": {
+            "type": "string"
+          },
+          "source_type": {
+            "type": "string",
+            "description": "e.g., \"manual\", \"auction\", \"service_record\""
+          },
+          "observation_kind": {
+            "type": "string",
+            "description": "e.g., \"mileage_reading\", \"sale_result\", \"condition_report\""
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0.8
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "document_id": {
+                "type": "string"
+              },
+              "extracted_by": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "BatchRequest": {
+        "type": "object",
+        "required": [
+          "vehicles"
+        ],
+        "properties": {
+          "vehicles": {
+            "type": "array",
+            "maxItems": 1000,
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/VehicleInput"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "observations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "source_type",
+                          "observation_kind",
+                          "data"
+                        ],
+                        "properties": {
+                          "source_type": {
+                            "type": "string"
+                          },
+                          "observation_kind": {
+                            "type": "string"
+                          },
+                          "observed_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "data": {
+                            "type": "object"
+                          },
+                          "confidence": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "skip_duplicates": {
+                "type": "boolean",
+                "default": true
+              },
+              "match_by": {
+                "type": "string",
+                "enum": [
+                  "vin",
+                  "year_make_model",
+                  "none"
+                ],
+                "default": "vin"
+              },
+              "update_existing": {
+                "type": "boolean",
+                "default": false
+              }
+            }
+          }
+        }
+      },
+      "BatchResult": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "integer"
+          },
+          "updated": {
+            "type": "integer"
+          },
+          "skipped": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "vehicles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "created",
+                    "updated",
+                    "skipped",
+                    "failed"
+                  ]
+                },
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "WebhookEndpoint": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "*",
+                "vehicle.created",
+                "vehicle.updated",
+                "vehicle.deleted",
+                "observation.created",
+                "document.uploaded",
+                "import.completed"
+              ]
+            }
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "total_deliveries": {
+                "type": "integer"
+              },
+              "failed_deliveries": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "WebhookDelivery": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "event_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "success",
+              "failed",
+              "retrying"
+            ]
+          },
+          "attempts": {
+            "type": "integer"
+          },
+          "response_status": {
+            "type": "integer",
+            "nullable": true
+          },
+          "response_time_ms": {
+            "type": "integer",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delivered_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_error": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "WebhookInput": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Must be HTTPS (HTTP allowed for localhost)"
+          },
+          "description": {
+            "type": "string"
+          },
+          "events": {
+            "type": "array",
+            "default": [
+              "*"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "*",
+                "vehicle.created",
+                "vehicle.updated",
+                "vehicle.deleted",
+                "observation.created",
+                "document.uploaded",
+                "import.completed"
+              ]
+            }
+          }
+        }
+      },
+      "WebhookUpdateInput": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "description": {
+            "type": "string"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "is_active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "pages": {
+            "type": "integer"
+          }
+        }
+      },
+      "SignalScore": {
+        "type": "object",
+        "description": "Market signal score — answers \"is this a good deal?\"\nCombines comparable sales, heat score, pricing position, and auction sentiment.\n",
+        "properties": {
+          "vehicle_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deal_score": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Deal score 0–100. Higher is a better deal."
+          },
+          "deal_score_label": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "strong_buy",
+              "buy",
+              "hold",
+              "pass",
+              "overpriced"
+            ],
+            "description": "Consumer-friendly deal label.\n- strong_buy: Significantly below market\n- buy: Below market\n- hold: At market\n- pass: Above market or insufficient data\n- overpriced: Meaningfully above comparable sales\n"
+          },
+          "heat_score": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Market demand intensity for this vehicle class."
+          },
+          "heat_score_label": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "cold",
+              "warm",
+              "hot",
+              "fire",
+              "volcanic"
+            ]
+          },
+          "estimated_value": {
+            "type": "number",
+            "nullable": true,
+            "description": "Estimated fair market value in USD"
+          },
+          "value_low": {
+            "type": "number",
+            "nullable": true,
+            "description": "Lower bound of value range in USD"
+          },
+          "value_high": {
+            "type": "number",
+            "nullable": true,
+            "description": "Upper bound of value range in USD"
+          },
+          "price_vs_market": {
+            "type": "number",
+            "nullable": true,
+            "description": "How the listing price compares to estimated market value, as a percentage.\nNegative = priced BELOW market (better deal), positive = ABOVE market (overpriced).\nNull if no listing price is available.\n",
+            "example": -12
+          },
+          "comp_count": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Number of comparable sales used in the valuation"
+          },
+          "signal_weights": {
+            "type": "object",
+            "nullable": true,
+            "description": "Contribution weights for each signal factor (0.0–1.0)",
+            "properties": {
+              "comp_coverage": {
+                "type": "number",
+                "nullable": true,
+                "description": "Weight given to comparable sales coverage"
+              },
+              "condition_signal": {
+                "type": "number",
+                "nullable": true,
+                "description": "Weight given to vehicle condition signals"
+              },
+              "auction_sentiment": {
+                "type": "number",
+                "nullable": true,
+                "description": "Weight given to auction comment sentiment"
+              },
+              "listing_velocity": {
+                "type": "number",
+                "nullable": true,
+                "description": "Weight given to market trend / listing velocity"
+              },
+              "price_position": {
+                "type": "number",
+                "nullable": true,
+                "description": "Weight given to bid curve / price position signals"
+              }
+            }
+          },
+          "confidence": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Confidence score 0.0–1.0"
+          },
+          "model_version": {
+            "type": "string",
+            "nullable": true,
+            "description": "Model version used to compute the score"
+          },
+          "calculated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the score was last calculated"
+          },
+          "is_stale": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "True if the score is older than the staleness threshold"
+          }
+        }
+      },
+      "Valuation": {
+        "type": "object",
+        "properties": {
+          "vehicle_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "estimated_value": {
+            "type": "number",
+            "description": "Primary valuation estimate in USD"
+          },
+          "value_low": {
+            "type": "number",
+            "nullable": true
+          },
+          "value_high": {
+            "type": "number",
+            "nullable": true
+          },
+          "confidence_score": {
+            "type": "number",
+            "nullable": true,
+            "description": "0-1 confidence in the estimate"
+          },
+          "deal_score": {
+            "type": "number",
+            "nullable": true
+          },
+          "deal_score_label": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "steal",
+              "great",
+              "good",
+              "fair",
+              "overpriced"
+            ]
+          },
+          "heat_score": {
+            "type": "number",
+            "nullable": true
+          },
+          "heat_score_label": {
+            "type": "string",
+            "nullable": true
+          },
+          "price_tier": {
+            "type": "string",
+            "nullable": true
+          },
+          "signal_weights": {
+            "type": "object",
+            "nullable": true
+          },
+          "model_version": {
+            "type": "string",
+            "nullable": true
+          },
+          "calculated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "is_stale": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "nuke_estimates",
+              "vehicle_fields"
+            ]
+          }
+        }
+      },
+      "ExternalListing": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vehicle_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "listing_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "listing_id": {
+            "type": "string"
+          },
+          "listing_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "sold",
+              "expired",
+              "ended"
+            ]
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "current_bid": {
+            "type": "number",
+            "nullable": true
+          },
+          "reserve_price": {
+            "type": "number",
+            "nullable": true
+          },
+          "buy_now_price": {
+            "type": "number",
+            "nullable": true
+          },
+          "bid_count": {
+            "type": "integer",
+            "nullable": true
+          },
+          "view_count": {
+            "type": "integer",
+            "nullable": true
+          },
+          "watcher_count": {
+            "type": "integer",
+            "nullable": true
+          },
+          "final_price": {
+            "type": "number",
+            "nullable": true
+          },
+          "sold_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Comparable": {
+        "type": "object",
+        "properties": {
+          "vehicle_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "year": {
+            "type": "integer"
+          },
+          "make": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "trim": {
+            "type": "string",
+            "nullable": true
+          },
+          "vin": {
+            "type": "string",
+            "nullable": true
+          },
+          "sale_price": {
+            "type": "number"
+          },
+          "mileage": {
+            "type": "integer",
+            "nullable": true
+          },
+          "transmission": {
+            "type": "string",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "condition_rating": {
+            "type": "number",
+            "nullable": true
+          },
+          "image_url": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CompsSummary": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "count": {
+            "type": "integer"
+          },
+          "avg_price": {
+            "type": "number"
+          },
+          "median_price": {
+            "type": "number"
+          },
+          "min_price": {
+            "type": "number"
+          },
+          "max_price": {
+            "type": "number"
+          }
+        }
+      },
+      "VinLookupResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "year": {
+            "type": "integer",
+            "nullable": true
+          },
+          "make": {
+            "type": "string",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "trim": {
+            "type": "string",
+            "nullable": true
+          },
+          "vin": {
+            "type": "string"
+          },
+          "mileage": {
+            "type": "integer",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "interior_color": {
+            "type": "string",
+            "nullable": true
+          },
+          "transmission": {
+            "type": "string",
+            "nullable": true
+          },
+          "engine_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "drivetrain": {
+            "type": "string",
+            "nullable": true
+          },
+          "body_style": {
+            "type": "string",
+            "nullable": true
+          },
+          "sale_price": {
+            "type": "number",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "is_public": {
+            "type": "boolean"
+          },
+          "primary_image_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "valuation": {
+            "$ref": "#/components/schemas/Valuation",
+            "nullable": true
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "listings": {
+                "type": "integer"
+              },
+              "observations": {
+                "type": "integer"
+              },
+              "images": {
+                "type": "integer"
+              }
+            }
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "image_url": {
+                  "type": "string"
+                },
+                "image_type": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "category": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "is_primary": {
+                  "type": "boolean",
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "VehicleBrief": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "year": {
+            "type": "integer",
+            "nullable": true
+          },
+          "make": {
+            "type": "string",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "vin": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "HistoryObservation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vehicle_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "type": "string"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "structured_data": {
+            "type": "object",
+            "nullable": true
+          },
+          "confidence": {
+            "type": "number",
+            "nullable": true
+          },
+          "content_text": {
+            "type": "string",
+            "nullable": true
+          },
+          "source_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "ingested_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "VehicleAuctionResult": {
+        "type": "object",
+        "properties": {
+          "vehicle": {
+            "$ref": "#/components/schemas/VehicleBrief"
+          },
+          "listings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalListing"
+            }
+          },
+          "comments": {
+            "type": "object",
+            "properties": {
+              "total_count": {
+                "type": "integer"
+              },
+              "recent": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AuctionComment"
+                }
+              }
+            }
+          },
+          "sentiment": {
+            "$ref": "#/components/schemas/AuctionSentiment",
+            "nullable": true
+          }
+        }
+      },
+      "AuctionComment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comment_text": {
+            "type": "string",
+            "nullable": true
+          },
+          "author_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "posted_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "comment_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "source_url": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "AuctionSentiment": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "overall": {
+            "type": "string",
+            "nullable": true
+          },
+          "score": {
+            "type": "number",
+            "nullable": true
+          },
+          "comment_count_analyzed": {
+            "type": "integer",
+            "nullable": true
+          },
+          "fields_extracted": {
+            "type": "integer",
+            "nullable": true
+          },
+          "details": {
+            "type": "object",
+            "nullable": true
+          },
+          "analyzed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "MarketTrendsResult": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "object",
+            "properties": {
+              "make": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string",
+                "nullable": true
+              },
+              "year_from": {
+                "type": "integer",
+                "nullable": true
+              },
+              "year_to": {
+                "type": "integer",
+                "nullable": true
+              },
+              "period": {
+                "type": "string"
+              }
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/MarketTrendsSummary",
+            "nullable": true
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MarketTrendsPeriod"
+            }
+          }
+        }
+      },
+      "MarketTrendsSummary": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "total_sales": {
+            "type": "integer"
+          },
+          "periods_with_data": {
+            "type": "integer"
+          },
+          "overall_avg_price": {
+            "type": "number"
+          },
+          "price_change_pct": {
+            "type": "number"
+          },
+          "trend_direction": {
+            "type": "string",
+            "enum": [
+              "rising",
+              "falling",
+              "stable"
+            ]
+          }
+        }
+      },
+      "MarketTrendsPeriod": {
+        "type": "object",
+        "properties": {
+          "period_start": {
+            "type": "string",
+            "format": "date"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date"
+          },
+          "sale_count": {
+            "type": "integer"
+          },
+          "avg_price": {
+            "type": "number",
+            "nullable": true
+          },
+          "median_price": {
+            "type": "number",
+            "nullable": true
+          },
+          "p25_price": {
+            "type": "number",
+            "nullable": true
+          },
+          "p75_price": {
+            "type": "number",
+            "nullable": true
+          },
+          "min_price": {
+            "type": "number",
+            "nullable": true
+          },
+          "max_price": {
+            "type": "number",
+            "nullable": true
+          },
+          "avg_mileage": {
+            "type": "number",
+            "nullable": true
+          }
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchResultItem"
+            }
+          },
+          "query": {
+            "type": "object",
+            "properties": {
+              "q": {
+                "type": "string"
+              },
+              "types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "nullable": true
+              },
+              "limit": {
+                "type": "integer"
+              }
+            }
+          },
+          "total_count": {
+            "type": "integer"
+          },
+          "query_type": {
+            "type": "string"
+          },
+          "search_time_ms": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      },
+      "SearchResultItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "description": "Entity type (vehicle, organization, user, tag)"
+          },
+          "title": {
+            "type": "string"
+          },
+          "subtitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "image_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "relevance_score": {
+            "type": "number"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      },
+      "EventEnvelope": {
+        "type": "object",
+        "description": "Strict envelope for `POST /v1/events`. Mirrors `docs/api/schemas/v1/envelope.json`\n(the canonical Draft 2020-12 JSON Schema agents fetch for self-validation).\nClosed at this layer — unknown properties are rejected so schema evolution stays explicit.\n",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "event_type",
+          "vehicle_ref",
+          "occurred_at",
+          "submitted_at",
+          "agent",
+          "auth",
+          "payload"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "enum": [
+              "1.0"
+            ],
+            "description": "Envelope schema version. Major version bumps are non-additive."
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "service",
+              "inspection",
+              "modification",
+              "ownership_change",
+              "media",
+              "note"
+            ],
+            "description": "Discriminator selecting which payload schema applies."
+          },
+          "vehicle_ref": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "vin"
+            ],
+            "properties": {
+              "vin": {
+                "type": "string",
+                "minLength": 5,
+                "maxLength": 32,
+                "pattern": "^[A-HJ-NPR-Z0-9]+$",
+                "description": "Vehicle Identification Number. 17 chars for post-1981 vehicles; pre-1981\nVINs may be shorter (e.g. classic Mustang `6F07C219593` is 11 chars).\n"
+              },
+              "vehicle_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Optional Nuke internal UUID. The endpoint resolves VIN→vehicle_id."
+              }
+            }
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the event happened in the physical world."
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the agent assembled this submission."
+          },
+          "agent": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Stable agent identifier (e.g. `claude-anthropic`)."
+              },
+              "version": {
+                "type": "string",
+                "maxLength": 128
+              },
+              "session_id": {
+                "type": "string",
+                "maxLength": 256,
+                "description": "Opaque correlation id chosen by the agent."
+              }
+            }
+          },
+          "auth": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scopes"
+            ],
+            "properties": {
+              "user_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "token_id": {
+                "type": "string"
+              },
+              "scopes": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "pattern": "^events:(read|write):(all|vehicle:[A-HJ-NPR-Z0-9]+)$"
+                },
+                "description": "Scopes the agent is asserting. Must include `events:write:vehicle:{vin}`\nmatching `vehicle_ref.vin`, or the wildcard `events:write:all`.\n"
+              }
+            }
+          },
+          "payload": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ServicePayload"
+              },
+              {
+                "$ref": "#/components/schemas/NotePayload"
+              }
+            ],
+            "description": "Event-type-specific body. Validated against `ServicePayload` when\n`event_type=service`, `NotePayload` when `event_type=note`. Other event\ntypes are reserved in the envelope but not yet routed.\n"
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "url"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "video",
+                    "audio",
+                    "document"
+                  ]
+                },
+                "url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "caption": {
+                  "type": "string",
+                  "maxLength": 1024
+                }
+              }
+            }
+          },
+          "correction_of": {
+            "type": "string",
+            "format": "uuid",
+            "description": "If present, supersedes a prior event. The prior observation is marked\n`is_superseded=true` and `superseded_by` points to the new row. Append-only.\n"
+          },
+          "submission_hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Optional SHA-256 of the canonical envelope (with this field removed) for integrity."
+          }
+        }
+      },
+      "ServicePayload": {
+        "type": "object",
+        "description": "Payload for `event_type=service`. Routes internally to `vehicle_observations`\nwith `observation_kind='work_record'`, source slug `shop`. Loose by design —\nagents add fields liberally; structure hardens in v1.1 once real submissions\nreveal the missing shape.\n",
+        "additionalProperties": true,
+        "required": [
+          "summary"
+        ],
+        "properties": {
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "narrative": {
+            "type": "string",
+            "maxLength": 32768
+          },
+          "work_performed": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          },
+          "work_planned": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "name"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "manufacturer": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "part_number": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "quantity": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "needed",
+                    "ordered",
+                    "installed",
+                    "considered_rejected"
+                  ]
+                }
+              }
+            }
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "question",
+                "outcome"
+              ],
+              "properties": {
+                "question": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "outcome": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "reasoning": {
+                  "type": "string",
+                  "maxLength": 4000
+                }
+              }
+            }
+          },
+          "condition_observations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "finding"
+              ],
+              "properties": {
+                "system": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "description": "Vehicle subsystem (open enum — top_end, bottom_end, fuel, ignition, cooling, brakes, electrical, suspension, drivetrain, body, interior, ...)."
+                },
+                "finding": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": [
+                    "info",
+                    "monitor",
+                    "concern",
+                    "critical"
+                  ]
+                }
+              }
+            }
+          },
+          "labor_minutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "shop_ref": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      },
+      "NotePayload": {
+        "type": "object",
+        "description": "Payload for `event_type=note`. Routes internally to `vehicle_observations`\nwith `observation_kind='comment'`, source slug `agent-submission`. Use for\nfree-form remarks that don't fit a structured event type.\n",
+        "additionalProperties": true,
+        "required": [
+          "summary"
+        ],
+        "properties": {
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 280
+          },
+          "narrative": {
+            "type": "string",
+            "maxLength": 32768
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "details": {
+            "type": "string"
+          }
+        }
+      },
+      "MarketFund": {
+        "type": "object",
+        "description": "A Nuke market fund backed by a segment of collector vehicles",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Trading symbol (e.g. PORS, TRUK, SQBD)",
+            "example": "PORS"
+          },
+          "fund_type": {
+            "type": "string",
+            "example": "index"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "paused",
+              "closed"
+            ],
+            "example": "active"
+          },
+          "nav_share_price": {
+            "type": "number",
+            "description": "Net asset value per share in USD",
+            "example": 1.24
+          },
+          "total_shares_outstanding": {
+            "type": "number",
+            "example": 4000000
+          },
+          "total_aum_usd": {
+            "type": "number",
+            "description": "Total assets under management in USD",
+            "example": 4960000
+          },
+          "segment": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string",
+                "example": "Porsche"
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "manager_type": {
+                "type": "string"
+              },
+              "year_min": {
+                "type": "integer",
+                "nullable": true
+              },
+              "year_max": {
+                "type": "integer",
+                "nullable": true
+              },
+              "makes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "nullable": true
+              }
+            }
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "vehicle_count": {
+                "type": "integer",
+                "description": "Number of vehicles in this fund's segment"
+              },
+              "market_cap_usd": {
+                "type": "number",
+                "description": "Total market cap for vehicles in this segment"
+              },
+              "change_7d_pct": {
+                "type": "number",
+                "nullable": true,
+                "description": "7-day price change as a percentage"
+              },
+              "change_30d_pct": {
+                "type": "number",
+                "nullable": true,
+                "description": "30-day price change as a percentage"
+              },
+              "stats_updated_at": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "VehicleOffering": {
+        "type": "object",
+        "description": "A vehicle offered for fractional trading on the exchange",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "vehicle_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "paused",
+              "sold",
+              "delisted"
+            ],
+            "example": "active"
+          },
+          "current_share_price": {
+            "type": "number",
+            "description": "Current share price in USD",
+            "example": 12.5
+          },
+          "total_shares": {
+            "type": "number",
+            "description": "Total shares issued for this vehicle",
+            "example": 10000
+          },
+          "available_shares": {
+            "type": "number",
+            "description": "Shares available for purchase",
+            "example": 7500
+          },
+          "vehicle": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "year": {
+                "type": "integer",
+                "nullable": true
+              },
+              "make": {
+                "type": "string",
+                "nullable": true
+              },
+              "model": {
+                "type": "string",
+                "nullable": true
+              },
+              "vin": {
+                "type": "string",
+                "nullable": true
+              },
+              "nuke_estimate": {
+                "type": "number",
+                "nullable": true,
+                "description": "Estimated market value in USD"
+              },
+              "sale_price": {
+                "type": "number",
+                "nullable": true
+              },
+              "primary_image_url": {
+                "type": "string",
+                "format": "uri",
+                "nullable": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Authentication required or invalid",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "Invalid or missing authentication"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Invalid request parameters",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Access denied",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "Access denied"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "Vehicle not found"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Rate limit exceeded",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "Rate limit exceeded"
+            }
+          }
+        },
+        "headers": {
+          "X-RateLimit-Remaining": {
+            "schema": {
+              "type": "integer"
+            }
+          },
+          "Retry-After": {
+            "schema": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    }
+  }
+}

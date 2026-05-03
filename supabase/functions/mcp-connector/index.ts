@@ -1,5 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  getAttribute,
+  getChecklist,
+  validateSubmission,
+  type SubjectKind,
+} from "../_shared/cockpit/attribute-registry.ts";
 
 // =============================================================================
 // NUKE MCP CONNECTOR — Full-Resolution Vehicle Digital Twin Access
@@ -716,6 +722,194 @@ const TOOLS: ToolDef[] = [
       required: ["vehicle_id"],
     },
   },
+  {
+    name: "get_attribute_checklist",
+    description:
+      "Return the checklist of attributes a caller agent can answer about a subject (image, vehicle, person, cluster). Each entry includes the prompt to run, the expected_shape of the answer, the L1–L5 layer, modality hints, and depends_on so callers can iterate in dependency order. " +
+      "Use this as the laser-tag harness: Nuke supplies the checklist + (later) the substrate landing zone; the caller's own model runs the vision/text inference. Surface-level extractions (bbox, viewpoint, year/make/model) are L1–L2; deeper attributes (condition cues, modifications, era-correctness) are L3+ and are where caller agents add the most value. " +
+      "Submit answers via submit_attribute_value once available.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        subject_kind: {
+          type: "string",
+          enum: ["image", "vehicle", "person", "cluster"],
+          description: "What kind of subject the caller is observing",
+        },
+        layers: {
+          type: "array",
+          items: { type: "number", enum: [1, 2, 3, 4, 5] },
+          description: "Optional filter — return only these layers (default: all 1–5)",
+        },
+        include_dependencies: {
+          type: "boolean",
+          description: "If subject_kind=image, also include vehicle-scoped attributes that an image's bbox can resolve (default false)",
+        },
+      },
+      required: ["subject_kind"],
+    },
+  },
+  {
+    name: "submit_attribute_value",
+    description:
+      "Submit a caller-extracted answer for a single attribute from get_attribute_checklist. The caller's model ran the inference; this tool records the result in projection_event with full audit envelope per cockpit-unified-interface.md. " +
+      "The caller's model is auto-registered in model_registry on first submission (caller_kind='walkin', base_trust=0.30 — accumulates reputation over time). The prompt is auto-registered in prompt_template_registry on first submission. " +
+      "Walk-in submissions are recordable, never gateable: bad models accumulate retraction history, good models accrue trust. The discipline is the substrate's, not the gate's.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        attribute: { type: "string", description: "Canonical attribute name from get_attribute_checklist (e.g. 'image.has_vehicle', 'vehicle.exterior_color')" },
+        subject_id: { type: "string", description: "UUID of the subject (vehicle_id, image_id, person_id, cluster_id) the answer applies to" },
+        subject_kind: { type: "string", enum: ["image", "vehicle", "person", "cluster"] },
+        value: { description: "The caller's answer. Shape must match the registry's expected_shape; enums must match enum_values; will be validated before insert." },
+        model_slug: { type: "string", description: "Identifier for the caller's model (e.g. 'claude-opus-4-7-via-byok', 'gpt-4o-mini', 'custom-yolo-v8'). Used to attribute the projection." },
+        model_version: { type: "string", description: "Optional version string for the caller's model" },
+        confidence: { type: "number", description: "Caller's confidence in their answer, 0..1" },
+        observation_ids: { type: "array", items: { type: "string" }, description: "Optional UUIDs of substrate rows the caller cited as basis (e.g. specific vehicle_observations rows that informed the answer)" },
+        candidates: { type: "array", description: "Optional alternate labels the caller considered, with scores" },
+        basis_signals: { type: "array", description: "Optional list of signals the caller's reasoning fired on" },
+        declared_observed_at: { type: "string", description: "Optional ISO-8601 timestamp when the caller's model produced the answer (defaults to now)" },
+      },
+      required: ["attribute", "subject_id", "subject_kind", "value", "model_slug", "confidence"],
+    },
+  },
+  {
+    name: "project_invoice",
+    description:
+      "Project a customer invoice as a deterministic SQL composition over substrate atoms. Wraps `resolve_work_order_status(query)` and writes the result to projection_event with audit envelope per cockpit-unified-interface.md. Same engine the tax-meld pipeline (per project_tax_filing_as_first_meld_mvp.md) is built on. " +
+      "subject = vehicle/work_order; attribute = 'invoice_artifact'; audience selects field set ('client' = customer-facing, 'irs' = audit-defensible with full provenance, 'internal' = unredacted). Re-projects on substrate change; the audit row in projection_event is the durable record.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Customer name, vehicle make/model, VIN, work order text, or vehicle UUID — same resolver as resolve_work_order_status RPC" },
+        audience: {
+          type: "string",
+          enum: ["client", "irs", "internal"],
+          description: "Field calibration: client = customer-facing, irs = audit-defensible with provenance citations per line, internal = unredacted (default: client)",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "project_work_log",
+    description:
+      "Project a shop work-log for a given date as a deterministic SQL composition over substrate atoms (photos + work_order labor + work_order parts + payments + receipts). Same engine as project_invoice, time-bounded subject. " +
+      "Audience tiers: public = customer-facing journal post (atom-attributed but redacted), owner = full shop diary, counterparty = customer-facing per-vehicle. Pass vehicle_id to scope to one build; omit to compose across all activity that day. " +
+      "Writes projection_event row for audit + future re-projection on substrate change. Same engine that powers nuke.ag/journal/[date] when that route is wired.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "ISO date YYYY-MM-DD (the shop day)" },
+        vehicle_id: { type: "string", description: "Optional vehicle UUID to scope the work-log to one build" },
+        audience: {
+          type: "string",
+          enum: ["public", "owner", "counterparty"],
+          description: "public = journal-page-shaped (default); owner = full diary including private notes; counterparty = customer-of-this-vehicle view",
+        },
+      },
+      required: ["date"],
+    },
+  },
+  {
+    name: "project_money_flow",
+    description:
+      "Project a money-flow artifact for a date range — composes (1) accounts receivable: open invoices / work-orders less collected payments, (2) expenses out grouped by scope (NUKE LTD / Viva / Personal / Per-Vehicle), (3) monthly income vs expense over the trailing window. Same projection_event audit pattern as project_work_log. Powers nuke.ag/me/money. " +
+      "Audience: owner = unredacted full ledger (default); counterparty = scoped to caller's own AR/AP only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        from_date: { type: "string", description: "ISO date YYYY-MM-DD — start of window (inclusive)" },
+        to_date: { type: "string", description: "ISO date YYYY-MM-DD — end of window (inclusive)" },
+        audience: {
+          type: "string",
+          enum: ["owner", "counterparty"],
+          description: "owner = full ledger (default); counterparty = scoped",
+        },
+      },
+      required: ["from_date", "to_date"],
+    },
+  },
+  {
+    name: "query_subject_atoms",
+    description:
+      "Read-side companion to submit_attribute_value. Returns every projection_event atom recorded for a subject, grouped by attribute with all observer submissions visible (no top-K curation per feedback_authentic_data_no_topk_curation.md). Each atom carries caller model + caller's base_trust + confidence + recorded_at. " +
+      "Consumers synthesize: corroborated atoms from multiple callers raise effective confidence; contradicting atoms surface dialectic. Use this to query what the laser-tag harness has accumulated for any image / vehicle / shop_day before composing a projection (work_log, invoice, profile, journal post).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        subject_id: { type: "string", description: "UUID or composite key (e.g. 'shop:2026-04-30') of the subject" },
+        attribute: { type: "string", description: "Optional filter — return only atoms for this attribute name" },
+        include_retracted: { type: "boolean", description: "Include retracted atoms (default false)" },
+        limit: { type: "number", description: "Max rows (default 200)" },
+      },
+      required: ["subject_id"],
+    },
+  },
+  {
+    name: "find_subjects_needing_atoms",
+    description:
+      "Discovery surface for walk-in callers: given a subject_kind (image / vehicle), return subjects with thin atom coverage (fewer than min_atoms in projection_event). Activates the laser-tag harness at scale — any caller can hit this, get a worklist, run get_attribute_checklist for each subject, submit answers via submit_attribute_value. " +
+      "Without this, callers don't know where to start. With it, the entire third-party-LLM compute base can attack thin substrate spots in priority order. Defaults: subject_kind=image, min_atoms=3, limit=20, recent_only=true (last 90 days).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        subject_kind: { type: "string", enum: ["image", "vehicle"], description: "What kind of subject to surface (default image)" },
+        vehicle_id: { type: "string", description: "Optional vehicle UUID — for image discovery, scopes to a single build (uses composite index, fast). Without it, samples by primary key (no date sort)." },
+        min_atoms: { type: "number", description: "Subjects with fewer than this many atoms qualify (default 3)" },
+        limit: { type: "number", description: "Max subjects to return (default 20, max 200)" },
+        recent_only: { type: "boolean", description: "If true and vehicle_id provided (default true), only subjects from last 90 days" },
+        attribute: { type: "string", description: "Optional — filter by specific attribute that's missing" },
+      },
+    },
+  },
+  {
+    name: "synthesize_attribute",
+    description:
+      "Dialectic synthesis (L4 of project_signal-substrate-five-layer.md). Given a subject + attribute, returns a single consensus value computed from all non-retracted atoms, weighted by each caller's base_trust × confidence. " +
+      "Output: { consensus: { label, weighted_confidence, support, contradiction_score, distinct_callers }, contributing_atoms[] }. Consumers (vehicle profile, work_log render, invoice composer) use this when they want ONE answer per attribute instead of the raw atom stream from query_subject_atoms. " +
+      "Synthesis algorithm depends on expected_shape from the registry: enum/string/boolean = weighted vote; numeric = weighted mean + variance; structured = best-shape grouping. Contradiction score is the share of weight that disagrees with the winner (0 = unanimous, 1 = total split).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        subject_id: { type: "string", description: "Subject UUID or composite key" },
+        attribute: { type: "string", description: "Attribute name from the registry (e.g. 'image.classification', 'vehicle.make')" },
+      },
+      required: ["subject_id", "attribute"],
+    },
+  },
+  {
+    name: "submit_attribute_values",
+    description:
+      "Batch version of submit_attribute_value. Caller submits an array of {attribute, value, confidence, basis_signals?, candidates?} for the same subject + model_slug in a single call. Returns array of projection_event_ids in submission order, with per-row error if validation/insert failed. " +
+      "Drastically reduces round-trips when iterating a checklist (17 atoms in 1 call instead of 17). Same auto-registration semantics as submit_attribute_value (caller_kind=walkin, base_trust=0.30 on first call).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        subject_id: { type: "string" },
+        subject_kind: { type: "string", enum: ["image", "vehicle", "person", "cluster"] },
+        model_slug: { type: "string" },
+        model_version: { type: "string" },
+        declared_observed_at: { type: "string" },
+        atoms: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              attribute: { type: "string" },
+              value: {},
+              confidence: { type: "number" },
+              candidates: { type: "array" },
+              basis_signals: { type: "array" },
+            },
+            required: ["attribute", "value", "confidence"],
+          },
+          description: "Array of atoms to submit. Each atom shares the subject + caller from the top-level params.",
+        },
+      },
+      required: ["subject_id", "subject_kind", "model_slug", "atoms"],
+    },
+  },
 
   // ── Actors & Organizations ────────────────────────────────────────────
   {
@@ -782,6 +976,60 @@ const TOOLS: ToolDef[] = [
         submitted_by_user_id: { type: "string", description: "User UUID for attribution (from create_profile)" },
       },
       required: ["vehicle_id", "source_slug", "kind"],
+    },
+  },
+
+  // ── External Agent Write API (v1/events) ──────────────────────────────
+  {
+    name: "submit_vehicle_event",
+    description:
+      "Submit a vehicle event via the public /v1/events envelope, keyed by VIN. Use this when a user describes work performed, observations made, or notes about a specific vehicle they own. event_type='service' for shop work / inspections / modifications, 'note' for general comments. Returns event_id (= observation_id) on success. The vehicle must already exist in NUKE — call create_profile or vehicle ingestion first if it doesn't.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vin: { type: "string", description: "Canonical VIN (required). The vehicle must already be in NUKE." },
+        event_type: { type: "string", enum: ["service", "note"], description: "Type of event. 'service' → work_record (kind), 'note' → comment (kind)." },
+        occurred_at: { type: "string", description: "ISO 8601 timestamp when the event happened (not when it was submitted)." },
+        payload: {
+          type: "object",
+          description:
+            "Event-type-specific JSONB payload. For 'service', see get_event_schema('service'). " +
+            "Should include at minimum: { summary: string, narrative?: string, work_performed?: string[], condition_observations?: [...] }",
+        },
+        correction_of: {
+          type: "string",
+          description: "Optional observation_id of a prior event this corrects. The prior row will be marked is_superseded=true. Caller must own the prior row.",
+        },
+        agent_inferred: {
+          type: "boolean",
+          description: "Set true if the structured fields were inferred by an LLM (lower confidence 0.6). Default false (human-confirmed, 0.85).",
+        },
+      },
+      required: ["vin", "event_type", "occurred_at", "payload"],
+    },
+  },
+  {
+    name: "get_event_schema",
+    description:
+      "Return the JSON Schema for a given event_type so an agent can self-validate its payload before calling submit_vehicle_event. Currently supports 'service' and 'note'. Use this to discover what fields are expected.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        event_type: { type: "string", enum: ["service", "note"], description: "The event type whose schema you want." },
+      },
+      required: ["event_type"],
+    },
+  },
+  {
+    name: "verify_vehicle_access",
+    description:
+      "Given the caller's API key, return whether it has read or write access to events for a specific VIN. Use this BEFORE attempting submit_vehicle_event so you can surface a 'connect Nuke and grant scope' message instead of triggering a 403. Returns { can_write, can_read, scopes_matched, vehicle_in_nuke }.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vin: { type: "string", description: "Canonical VIN to check access for." },
+      },
+      required: ["vin"],
     },
   },
 
@@ -1892,7 +2140,7 @@ async function handleQueryMarketHistory(args: Record<string, unknown>): Promise<
       if (args.model) vQuery = vQuery.ilike("model", `%${args.model}%`);
       if (args.year_from) vQuery = vQuery.gte("year", args.year_from);
       if (args.year_to) vQuery = vQuery.lte("year", args.year_to);
-      const { data: vehicleIds } = await vQuery.limit(100);  // PostgREST URL length limit
+      const { data: vehicleIds } = await vQuery.limit(50);  // Cap at 50 to stay within PostgREST URL length limit
       if (vehicleIds?.length) {
         query = query.in("vehicle_id", vehicleIds.map((v: any) => v.id));
       } else {
@@ -2008,6 +2256,1230 @@ async function handleQueryVehicleImages(args: Record<string, unknown>): Promise<
   return toolOk({ vehicle_id: vid, count: data?.length ?? 0, images: data || [] });
 }
 
+async function sha256Hex(input: string): Promise<string> {
+  const bytes = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function handleSubmitAttributeValue(args: Record<string, unknown>): Promise<ToolResult> {
+  const attribute = String(args.attribute ?? "");
+  const subject_id = String(args.subject_id ?? "");
+  const subject_kind = String(args.subject_kind ?? "");
+  const model_slug = String(args.model_slug ?? "");
+  const value = args.value;
+  const confidence = Number(args.confidence);
+
+  if (!attribute || !subject_id || !subject_kind || !model_slug || Number.isNaN(confidence)) {
+    return toolErr("attribute, subject_id, subject_kind, model_slug, and confidence are required");
+  }
+  if (confidence < 0 || confidence > 1) {
+    return toolErr(`confidence must be in [0,1], got ${confidence}`);
+  }
+
+  const def = getAttribute(attribute);
+  if (!def) return toolErr(`unknown attribute: ${attribute} (call get_attribute_checklist to see valid names)`);
+  if (def.subject_kind !== subject_kind) {
+    return toolErr(`attribute ${attribute} expects subject_kind='${def.subject_kind}', caller passed '${subject_kind}'`);
+  }
+  const validation = validateSubmission(attribute, value);
+  if (validation) return toolErr(`invalid value for ${attribute}: ${validation}`);
+
+  const supabase = sb();
+
+  const prompt_input = `${attribute}:${def.prompt_version}:${def.prompt}`;
+  const prompt_sha256 = "sha256:" + (await sha256Hex(prompt_input));
+  const schema_hint: Record<string, unknown> = { expected_shape: def.expected_shape };
+  if (def.enum_values) schema_hint.enum_values = def.enum_values;
+
+  const { error: promptErr } = await supabase
+    .from("prompt_template_registry")
+    .upsert(
+      {
+        prompt_sha256,
+        template_name: attribute,
+        template_body: def.prompt,
+        schema_hint,
+        last_used_at: new Date().toISOString(),
+      },
+      { onConflict: "prompt_sha256", ignoreDuplicates: false }
+    );
+  if (promptErr) return toolErr(`prompt_template_registry upsert failed: ${promptErr.message}`);
+
+  const { data: existingModel, error: modelLookupErr } = await supabase
+    .from("model_registry")
+    .select("id, caller_kind, base_trust")
+    .eq("slug", model_slug)
+    .maybeSingle();
+  if (modelLookupErr) return toolErr(`model_registry lookup failed: ${modelLookupErr.message}`);
+
+  let model_id: string;
+  let caller_kind: string;
+  if (existingModel) {
+    model_id = existingModel.id;
+    caller_kind = existingModel.caller_kind;
+    await supabase
+      .from("model_registry")
+      .update({ last_seen: new Date().toISOString() })
+      .eq("id", model_id);
+  } else {
+    const { data: inserted, error: insertErr } = await supabase
+      .from("model_registry")
+      .insert({
+        slug: model_slug,
+        provider: "walkin",
+        version: typeof args.model_version === "string" ? args.model_version : null,
+        caller_kind: "walkin",
+        base_trust: 0.30,
+        notes: "Auto-registered on first submit_attribute_value call",
+      })
+      .select("id, caller_kind")
+      .single();
+    if (insertErr || !inserted) return toolErr(`model_registry insert failed: ${insertErr?.message ?? "no row"}`);
+    model_id = inserted.id;
+    caller_kind = inserted.caller_kind;
+  }
+
+  const observed_at = typeof args.declared_observed_at === "string" ? args.declared_observed_at : new Date().toISOString();
+  const submitted_at = new Date().toISOString();
+  const walkin_token_hash = await sha256Hex(`${model_slug}:${observed_at}`);
+
+  const request_envelope = {
+    audience: "walkin_default",
+    subject_id,
+    subject_kind,
+    attribute,
+    as_of: observed_at,
+  };
+
+  const observation_ids = Array.isArray(args.observation_ids)
+    ? (args.observation_ids as unknown[]).filter((s) => typeof s === "string")
+    : [];
+
+  const result_envelope = {
+    label: value,
+    confidence,
+    candidates: Array.isArray(args.candidates) ? args.candidates : undefined,
+    basis: {
+      signals: Array.isArray(args.basis_signals) ? args.basis_signals : [],
+      agent_version: `walkin:${model_slug}${typeof args.model_version === "string" ? ":" + args.model_version : ""}`,
+      applied_priors: ["walkin_caller", `model_slug:${model_slug}`],
+    },
+    envelope: {
+      model_id,
+      model_version: typeof args.model_version === "string" ? args.model_version : "unknown",
+      model_caller: { kind: caller_kind, walkin_token_hash },
+      prompt_sha256,
+      observed_at,
+      submitted_at,
+      signature: {
+        algorithm: "attestation-token",
+        value: `att:${walkin_token_hash}:${observed_at}`,
+        signed_at: submitted_at,
+      },
+    },
+  };
+
+  const { data: eventRow, error: eventErr } = await supabase
+    .from("projection_event")
+    .insert({
+      request_envelope,
+      result_envelope,
+      result_kind: def.result_kind,
+      model_id,
+      model_caller: `walkin:${walkin_token_hash}`,
+      prompt_sha256,
+      observation_ids,
+      observed_at,
+    })
+    .select("id, recorded_at")
+    .single();
+  if (eventErr || !eventRow) return toolErr(`projection_event insert failed: ${eventErr?.message ?? "no row"}`);
+
+  return toolOk({
+    projection_event_id: eventRow.id,
+    recorded_at: eventRow.recorded_at,
+    model_id,
+    model_slug,
+    caller_kind,
+    base_trust: existingModel?.base_trust ?? 0.30,
+    attribute,
+    subject_id,
+    subject_kind,
+    result_kind: def.result_kind,
+    prompt_sha256,
+    note: existingModel
+      ? "Walk-in model previously registered. Reputation accumulates by survival rate of your projections."
+      : "First submission from this model_slug. Auto-registered at base_trust=0.30. Future projections accumulate reputation.",
+  });
+}
+
+async function handleProjectInvoice(args: Record<string, unknown>): Promise<ToolResult> {
+  const query = String(args.query ?? "");
+  const audience = (typeof args.audience === "string" ? args.audience : "client") as "client" | "irs" | "internal";
+  if (!query) return toolErr("query is required");
+  if (!["client", "irs", "internal"].includes(audience)) {
+    return toolErr(`audience must be client | irs | internal, got '${audience}'`);
+  }
+
+  const supabase = sb();
+
+  const { data: invoice, error: rpcErr } = await supabase.rpc("resolve_work_order_status", { p_query: query });
+  if (rpcErr) return toolErr(`resolve_work_order_status failed: ${rpcErr.message}`);
+  if (!invoice || (invoice as Record<string, unknown>).error) {
+    return toolOk({ resolved: false, response: invoice });
+  }
+
+  const inv = invoice as {
+    vehicle?: { id?: string };
+    work_orders?: Array<{
+      id?: string;
+      parts?: Array<{ id?: string }>;
+      labor?: Array<{ id?: string }>;
+      payments?: Array<{ id?: string }>;
+    }>;
+    summary?: Record<string, unknown>;
+  };
+  const vehicle_id = inv.vehicle?.id ?? null;
+  if (!vehicle_id) return toolErr("invoice composed but vehicle.id missing — cannot record projection without subject_id");
+
+  const observation_ids: string[] = [];
+  for (const wo of inv.work_orders ?? []) {
+    if (wo.id) observation_ids.push(wo.id);
+    for (const p of wo.parts ?? []) if (p.id) observation_ids.push(p.id);
+    for (const l of wo.labor ?? []) if (l.id) observation_ids.push(l.id);
+    for (const pm of wo.payments ?? []) if (pm.id) observation_ids.push(pm.id);
+  }
+
+  const audienceProjection = audience === "client"
+    ? redactInvoiceForClient(inv)
+    : audience === "irs"
+      ? annotateInvoiceForIrs(inv)
+      : inv;
+
+  const prompt_text = `Compose customer invoice via resolve_work_order_status RPC. Audience: ${audience}. Substrate: work_orders + work_order_{parts,labor,payments,line_items} for the resolved vehicle.`;
+  const prompt_input = `vehicle.invoice_artifact:v1:${audience}:${prompt_text}`;
+  const prompt_sha256 = "sha256:" + (await sha256Hex(prompt_input));
+
+  const { error: promptErr } = await supabase
+    .from("prompt_template_registry")
+    .upsert(
+      {
+        prompt_sha256,
+        template_name: `vehicle.invoice_artifact:${audience}`,
+        template_body: prompt_text,
+        schema_hint: { expected_shape: "structured", audience },
+        last_used_at: new Date().toISOString(),
+      },
+      { onConflict: "prompt_sha256", ignoreDuplicates: false }
+    );
+  if (promptErr) return toolErr(`prompt_template_registry upsert failed: ${promptErr.message}`);
+
+  const { data: detModel, error: modelErr } = await supabase
+    .from("model_registry")
+    .select("id")
+    .eq("slug", "deterministic-sql")
+    .maybeSingle();
+  if (modelErr || !detModel) return toolErr(`deterministic-sql model not found in model_registry: ${modelErr?.message ?? "missing"}`);
+
+  const observed_at = new Date().toISOString();
+  const submitted_at = observed_at;
+
+  const request_envelope = {
+    audience,
+    subject_id: vehicle_id,
+    subject_kind: "vehicle",
+    attribute: "vehicle.invoice_artifact",
+    as_of: observed_at,
+    user_context: { query },
+  };
+
+  const summary = inv.summary ?? {};
+  const totalInvoice = Number((summary as Record<string, number>).total_invoice ?? 0);
+  const totalPayments = Number((summary as Record<string, number>).total_payments ?? 0);
+  const balanceDue = Number((summary as Record<string, number>).balance_due ?? 0);
+  const woCount = Number((summary as Record<string, number>).work_order_count ?? 0);
+
+  const provenance_density = woCount > 0 ? Math.min(1, observation_ids.length / (woCount * 3)) : 0;
+  const has_balance_consistency = Math.abs((totalInvoice - totalPayments) - balanceDue) < 0.01;
+  const confidence = Math.min(0.95, 0.50 + 0.25 * provenance_density + (has_balance_consistency ? 0.20 : 0));
+
+  const result_envelope = {
+    label: audienceProjection,
+    confidence,
+    basis: {
+      signals: [
+        { name: "resolve_work_order_status_returned", fired: true, value: { work_order_count: woCount } },
+        { name: "balance_arithmetic_consistent", fired: has_balance_consistency },
+        { name: "observation_provenance_density", fired: true, weight: provenance_density },
+      ],
+      agent_version: "deterministic-sql:resolve_work_order_status:v1",
+      applied_priors: [`audience:${audience}`],
+    },
+    envelope: {
+      model_id: detModel.id,
+      model_version: "v1",
+      model_caller: { kind: "rule", rule_id: "deterministic-sql:vehicle.invoice_artifact:v1" },
+      prompt_sha256,
+      observed_at,
+      submitted_at,
+      signature: {
+        algorithm: "attestation-token",
+        value: `att:deterministic-sql:${observed_at}`,
+        signed_at: submitted_at,
+      },
+    },
+  };
+
+  const { data: eventRow, error: eventErr } = await supabase
+    .from("projection_event")
+    .insert({
+      request_envelope,
+      result_envelope,
+      result_kind: "projection",
+      model_id: detModel.id,
+      model_caller: "rule:deterministic-sql:vehicle.invoice_artifact:v1",
+      prompt_sha256,
+      observation_ids,
+      observed_at,
+    })
+    .select("id, recorded_at")
+    .single();
+  if (eventErr || !eventRow) return toolErr(`projection_event insert failed: ${eventErr?.message ?? "no row"}`);
+
+  return toolOk({
+    projection_event_id: eventRow.id,
+    recorded_at: eventRow.recorded_at,
+    audience,
+    subject_id: vehicle_id,
+    confidence,
+    observation_count: observation_ids.length,
+    invoice: audienceProjection,
+    note: "Invoice composed from work_order substrate. projection_event row is the durable audit trail; re-call this tool any time substrate changes (new receipt, payment, line) and the new projection supersedes by recording another row.",
+  });
+}
+
+function redactAtomsForPublic(atoms: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  // Per feedback_authentic_data_no_topk_curation.md — surface complete testimony,
+  // consumer sorts. Public tier still gets ALL atoms, just without internal IDs.
+  return atoms.map((a) => ({
+    attribute: a.attribute,
+    label: a.label,
+    confidence: a.confidence,
+    result_kind: a.result_kind,
+    caller_slug: a.caller_slug,
+    caller_base_trust: a.caller_base_trust,
+    recorded_at: a.recorded_at,
+  }));
+}
+
+function redactInvoiceForClient(inv: Record<string, unknown>): Record<string, unknown> {
+  const work_orders = (inv.work_orders as Array<Record<string, unknown>> | undefined ?? []).map((wo) => {
+    const { notes, ...rest } = wo;
+    return { ...rest, notes: undefined };
+  });
+  return {
+    vehicle: inv.vehicle,
+    contact: inv.contact,
+    shop: inv.shop,
+    work_orders,
+    summary: inv.summary,
+    audience: "client",
+  };
+}
+
+function annotateInvoiceForIrs(inv: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...inv,
+    audience: "irs",
+    audit_note: "Each line item id refers to its row in work_order_parts / work_order_labor / work_order_payments. Cross-reference vehicle_receipts via vehicle_id for parts substantiation. Cross-reference work_order_payments.payment_method ('zelle','venmo','cash','wire') against bank statements for cash deposit substantiation.",
+  };
+}
+
+async function handleProjectWorkLog(args: Record<string, unknown>): Promise<ToolResult> {
+  const date = String(args.date ?? "");
+  const audience = (typeof args.audience === "string" ? args.audience : "public") as "public" | "owner" | "counterparty";
+  const vehicle_id_filter = typeof args.vehicle_id === "string" ? args.vehicle_id : null;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return toolErr(`date must be ISO YYYY-MM-DD, got '${date}'`);
+  }
+  if (!["public", "owner", "counterparty"].includes(audience)) {
+    return toolErr(`audience must be public | owner | counterparty, got '${audience}'`);
+  }
+
+  const supabase = sb();
+
+  const dayStart = `${date}T00:00:00Z`;
+  const dayEnd = `${date}T23:59:59Z`;
+
+  const photosQ = supabase
+    .from("vehicle_images")
+    .select("id, vehicle_id, image_url, angle, taken_at, created_at")
+    .gte("taken_at", dayStart)
+    .lte("taken_at", dayEnd)
+    .limit(200);
+  const laborQ = supabase
+    .from("work_order_labor")
+    .select("id, work_order_id, task_name, hours, hourly_rate, total_cost, is_comped, created_at")
+    .gte("created_at", dayStart)
+    .lte("created_at", dayEnd);
+  const partsQ = supabase
+    .from("work_order_parts")
+    .select("id, work_order_id, part_name, part_number, quantity, unit_price, total_price, supplier, status, is_comped, created_at")
+    .gte("created_at", dayStart)
+    .lte("created_at", dayEnd);
+  const paymentsQ = supabase
+    .from("work_order_payments")
+    .select("id, work_order_id, amount, payment_method, payment_date, sender_name, status")
+    .gte("payment_date", dayStart)
+    .lte("payment_date", dayEnd)
+    .eq("status", "completed");
+  const receiptsQ = supabase
+    .from("receipts")
+    .select("id, vehicle_id, vendor_name, total_amount, transaction_date, purchase_date, payment_method, card_last4, file_url, scope_type, scope_id")
+    .or(`transaction_date.eq.${date},purchase_date.eq.${date},receipt_date.eq.${date}`)
+    .limit(200);
+
+  const [photosRes, laborRes, partsRes, paymentsRes, receiptsRes] = await Promise.all([
+    vehicle_id_filter ? photosQ.eq("vehicle_id", vehicle_id_filter) : photosQ,
+    laborQ,
+    partsQ,
+    paymentsQ,
+    vehicle_id_filter ? receiptsQ.eq("vehicle_id", vehicle_id_filter) : receiptsQ,
+  ]);
+
+  if (photosRes.error) return toolErr(`vehicle_images query: ${photosRes.error.message}`);
+  if (laborRes.error) return toolErr(`work_order_labor query: ${laborRes.error.message}`);
+  if (partsRes.error) return toolErr(`work_order_parts query: ${partsRes.error.message}`);
+  if (paymentsRes.error) return toolErr(`work_order_payments query: ${paymentsRes.error.message}`);
+  if (receiptsRes.error) return toolErr(`receipts query: ${receiptsRes.error.message}`);
+
+  const photos = photosRes.data ?? [];
+  const labor = laborRes.data ?? [];
+  const parts = partsRes.data ?? [];
+  const payments = paymentsRes.data ?? [];
+  const receipts = receiptsRes.data ?? [];
+
+  const photo_atoms_by_subject: Record<string, Array<Record<string, unknown>>> = {};
+  if (photos.length > 0) {
+    const photoIds = photos.map((p) => p.id);
+    const { data: atomRows } = await supabase
+      .from("projection_event")
+      .select(`id, request_envelope, result_envelope, result_kind, recorded_at, model_registry!inner(slug, base_trust, caller_kind)`)
+      .in("request_envelope->>subject_id", photoIds)
+      .is("retracted_by", null)
+      .order("recorded_at", { ascending: false })
+      .limit(500);
+    for (const r of (atomRows ?? []) as Array<Record<string, any>>) {
+      const sid = r.request_envelope?.subject_id;
+      if (!sid) continue;
+      if (!photo_atoms_by_subject[sid]) photo_atoms_by_subject[sid] = [];
+      photo_atoms_by_subject[sid].push({
+        attribute: r.request_envelope?.attribute,
+        label: r.result_envelope?.label,
+        confidence: r.result_envelope?.confidence,
+        result_kind: r.result_kind,
+        caller_slug: r.model_registry?.slug,
+        caller_base_trust: r.model_registry?.base_trust,
+        caller_kind: r.model_registry?.caller_kind,
+        recorded_at: r.recorded_at,
+      });
+    }
+  }
+
+  const work_order_ids = Array.from(new Set([
+    ...labor.map((l) => l.work_order_id).filter(Boolean),
+    ...parts.map((p) => p.work_order_id).filter(Boolean),
+    ...payments.map((pm) => pm.work_order_id).filter(Boolean),
+  ]));
+
+  let work_orders: Array<Record<string, unknown>> = [];
+  if (work_order_ids.length > 0) {
+    const { data: woRows, error: woErr } = await supabase
+      .from("work_orders")
+      .select("id, vehicle_id, title, status, customer_name, notes")
+      .in("id", work_order_ids);
+    if (woErr) return toolErr(`work_orders query: ${woErr.message}`);
+    work_orders = (woRows ?? []) as Array<Record<string, unknown>>;
+  }
+
+  const filteredLabor = vehicle_id_filter
+    ? labor.filter((l) => work_orders.some((w) => w.id === l.work_order_id && w.vehicle_id === vehicle_id_filter))
+    : labor;
+  const filteredParts = vehicle_id_filter
+    ? parts.filter((p) => work_orders.some((w) => w.id === p.work_order_id && w.vehicle_id === vehicle_id_filter))
+    : parts;
+  const filteredPayments = vehicle_id_filter
+    ? payments.filter((pm) => work_orders.some((w) => w.id === pm.work_order_id && w.vehicle_id === vehicle_id_filter))
+    : payments;
+
+  const filteredReceipts = vehicle_id_filter
+    ? receipts.filter((r) => r.vehicle_id === vehicle_id_filter)
+    : receipts;
+
+  const observation_ids: string[] = [
+    ...photos.map((p) => p.id),
+    ...filteredLabor.map((l) => l.id),
+    ...filteredParts.map((p) => p.id),
+    ...filteredPayments.map((pm) => pm.id),
+    ...filteredReceipts.map((r) => r.id),
+  ].filter(Boolean);
+
+  const totalActivity = observation_ids.length;
+  if (totalActivity === 0) {
+    return toolOk({
+      date,
+      vehicle_id: vehicle_id_filter,
+      audience,
+      result: "insufficient_substrate",
+      note: "No photos / labor / parts / payments recorded for this date" + (vehicle_id_filter ? ` and vehicle ${vehicle_id_filter}` : ""),
+    });
+  }
+
+  const work_log = {
+    date,
+    vehicle_id: vehicle_id_filter,
+    audience,
+    photos: audience === "public"
+      ? photos.map((p) => ({
+          id: p.id,
+          url: p.image_url,
+          angle: p.angle,
+          vehicle_id: p.vehicle_id,
+          taken_at: p.taken_at,
+          atoms: redactAtomsForPublic(photo_atoms_by_subject[p.id] ?? []),
+        }))
+      : photos.map((p) => ({ ...p, atoms: photo_atoms_by_subject[p.id] ?? [] })),
+    work_orders: audience === "public"
+      ? work_orders.map((w) => ({ id: w.id, title: w.title, status: w.status, vehicle_id: w.vehicle_id }))
+      : work_orders,
+    labor: audience === "public"
+      ? filteredLabor.map((l) => ({ id: l.id, work_order_id: l.work_order_id, task: l.task_name, hours: l.hours }))
+      : filteredLabor,
+    parts: audience === "public"
+      ? filteredParts.map((p) => ({ id: p.id, work_order_id: p.work_order_id, name: p.part_name, supplier: p.supplier }))
+      : filteredParts,
+    payments: audience === "public" ? [] : filteredPayments,
+    receipts: audience === "public"
+      ? filteredReceipts.map((r) => ({
+          id: r.id,
+          vendor: r.vendor_name,
+          total: r.total_amount,
+          date: r.transaction_date ?? r.purchase_date,
+          vehicle_id: r.vehicle_id,
+          scope_type: r.scope_type,
+          scope_id: r.scope_id,
+        }))
+      : filteredReceipts,
+    summary: {
+      photo_count: photos.length,
+      work_order_count: work_orders.length,
+      labor_lines: filteredLabor.length,
+      parts_lines: filteredParts.length,
+      payment_count: audience === "public" ? null : filteredPayments.length,
+      receipt_count: filteredReceipts.length,
+      receipt_total: filteredReceipts.reduce((s, r) => s + Number(r.total_amount ?? 0), 0),
+    },
+  };
+
+  const prompt_text = `Compose shop work-log for date ${date}${vehicle_id_filter ? ` scoped to vehicle ${vehicle_id_filter}` : ""}. Audience: ${audience}. Substrate: vehicle_images + work_order_{labor,parts,payments} for the day, joined to work_orders for context.`;
+  const prompt_input = `vehicle.work_log_artifact:v1:${audience}:${prompt_text}`;
+  const prompt_sha256 = "sha256:" + (await sha256Hex(prompt_input));
+
+  const { error: promptErr } = await supabase
+    .from("prompt_template_registry")
+    .upsert(
+      {
+        prompt_sha256,
+        template_name: `vehicle.work_log_artifact:${audience}`,
+        template_body: prompt_text,
+        schema_hint: { expected_shape: "structured", audience, date },
+        last_used_at: new Date().toISOString(),
+      },
+      { onConflict: "prompt_sha256", ignoreDuplicates: false }
+    );
+  if (promptErr) return toolErr(`prompt_template_registry upsert failed: ${promptErr.message}`);
+
+  const { data: detModel, error: modelErr } = await supabase
+    .from("model_registry")
+    .select("id")
+    .eq("slug", "deterministic-sql")
+    .maybeSingle();
+  if (modelErr || !detModel) return toolErr(`deterministic-sql model not found: ${modelErr?.message ?? "missing"}`);
+
+  const observed_at = new Date().toISOString();
+  const subject_id_text = vehicle_id_filter ? `${vehicle_id_filter}:${date}` : `shop:${date}`;
+
+  const request_envelope = {
+    audience,
+    subject_id: subject_id_text,
+    subject_kind: vehicle_id_filter ? "vehicle" : "shop_day",
+    attribute: "vehicle.work_log_artifact",
+    as_of: observed_at,
+    user_context: { date, vehicle_id: vehicle_id_filter },
+  };
+
+  const richness = Math.min(1, totalActivity / 10);
+  const has_photos = photos.length > 0;
+  const has_work = filteredLabor.length + filteredParts.length > 0;
+  const confidence = Math.min(0.95, 0.40 + 0.30 * richness + (has_photos ? 0.15 : 0) + (has_work ? 0.10 : 0));
+
+  const result_envelope = {
+    label: work_log,
+    confidence,
+    basis: {
+      signals: [
+        { name: "photos_present", fired: has_photos, weight: photos.length },
+        { name: "work_present", fired: has_work, weight: filteredLabor.length + filteredParts.length },
+        { name: "payments_present", fired: filteredPayments.length > 0, weight: filteredPayments.length },
+        { name: "substrate_richness", fired: true, weight: richness },
+      ],
+      agent_version: "deterministic-sql:work_log_compose:v1",
+      applied_priors: [`audience:${audience}`, `date:${date}`],
+    },
+    envelope: {
+      model_id: detModel.id,
+      model_version: "v1",
+      model_caller: { kind: "rule", rule_id: "deterministic-sql:vehicle.work_log_artifact:v1" },
+      prompt_sha256,
+      observed_at,
+      submitted_at: observed_at,
+      signature: {
+        algorithm: "attestation-token",
+        value: `att:deterministic-sql:work_log:${observed_at}`,
+        signed_at: observed_at,
+      },
+    },
+  };
+
+  const { data: eventRow, error: eventErr } = await supabase
+    .from("projection_event")
+    .insert({
+      request_envelope,
+      result_envelope,
+      result_kind: "projection",
+      model_id: detModel.id,
+      model_caller: "rule:deterministic-sql:vehicle.work_log_artifact:v1",
+      prompt_sha256,
+      observation_ids,
+      observed_at,
+    })
+    .select("id, recorded_at")
+    .single();
+  if (eventErr || !eventRow) return toolErr(`projection_event insert failed: ${eventErr?.message ?? "no row"}`);
+
+  return toolOk({
+    projection_event_id: eventRow.id,
+    recorded_at: eventRow.recorded_at,
+    date,
+    vehicle_id: vehicle_id_filter,
+    audience,
+    confidence,
+    observation_count: observation_ids.length,
+    work_log,
+    note: "Work-log composed from shop substrate. Re-call to re-project as substrate fills (e.g. after photo sync, after receipt backfill catches up).",
+  });
+}
+
+async function handleProjectMoneyFlow(args: Record<string, unknown>): Promise<ToolResult> {
+  const from_date = String(args.from_date ?? "");
+  const to_date = String(args.to_date ?? "");
+  const audience = (typeof args.audience === "string" ? args.audience : "owner") as "owner" | "counterparty";
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from_date)) return toolErr(`from_date must be ISO YYYY-MM-DD, got '${from_date}'`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(to_date)) return toolErr(`to_date must be ISO YYYY-MM-DD, got '${to_date}'`);
+  if (!["owner", "counterparty"].includes(audience)) return toolErr(`audience must be owner | counterparty, got '${audience}'`);
+
+  const supabase = sb();
+
+  // (1) Accounts receivable — open invoices: work_orders with actual_total > sum(payments completed)
+  // Compose inline (no view assumed). Limit to recent activity.
+  const { data: woRows, error: woErr } = await supabase
+    .from("work_orders")
+    .select("id, vehicle_id, customer_name, title, status, actual_total, estimated_total, created_at")
+    .gte("created_at", `${from_date}T00:00:00Z`)
+    .lte("created_at", `${to_date}T23:59:59Z`)
+    .limit(500);
+  if (woErr) return toolErr(`work_orders: ${woErr.message}`);
+
+  const wos = (woRows ?? []) as Array<Record<string, any>>;
+  const woIds = wos.map((w) => w.id);
+
+  let payByWo: Record<string, number> = {};
+  if (woIds.length > 0) {
+    const { data: payRows, error: payErr } = await supabase
+      .from("work_order_payments")
+      .select("work_order_id, amount")
+      .in("work_order_id", woIds)
+      .eq("status", "completed");
+    if (payErr) return toolErr(`work_order_payments: ${payErr.message}`);
+    for (const p of (payRows ?? []) as Array<Record<string, any>>) {
+      const k = String(p.work_order_id);
+      payByWo[k] = (payByWo[k] ?? 0) + Number(p.amount ?? 0);
+    }
+  }
+
+  const owed_to_me = wos
+    .map((w) => {
+      const billed = Number(w.actual_total ?? w.estimated_total ?? 0);
+      const paid = payByWo[String(w.id)] ?? 0;
+      const balance = billed - paid;
+      return {
+        work_order_id: w.id,
+        vehicle_id: w.vehicle_id,
+        customer_name: w.customer_name,
+        title: w.title,
+        status: w.status,
+        billed,
+        paid,
+        balance,
+      };
+    })
+    .filter((r) => r.balance > 0.01)
+    .sort((a, b) => b.balance - a.balance);
+
+  // (2) Expenses out by scope
+  const { data: rcptRows, error: rcptErr } = await supabase
+    .from("receipts")
+    .select("scope_type, scope_id, total, total_amount, vendor_name, receipt_date")
+    .gte("receipt_date", from_date)
+    .lte("receipt_date", to_date)
+    .limit(5000);
+  if (rcptErr) return toolErr(`receipts: ${rcptErr.message}`);
+
+  const rcpts = (rcptRows ?? []) as Array<Record<string, any>>;
+  const scopeMap: Record<string, { scope_type: string | null; scope_id: string | null; total: number; count: number }> = {};
+  for (const r of rcpts) {
+    const k = `${r.scope_type ?? "null"}|${r.scope_id ?? "null"}`;
+    if (!scopeMap[k]) scopeMap[k] = { scope_type: r.scope_type, scope_id: r.scope_id, total: 0, count: 0 };
+    scopeMap[k].total += Number(r.total ?? r.total_amount ?? 0);
+    scopeMap[k].count += 1;
+  }
+  const out_by_scope = Object.values(scopeMap).sort((a, b) => b.total - a.total);
+
+  // (3) Monthly income vs expense over the window (trailing 6 months from to_date if window > 30d, else just window)
+  const monthAnchor = new Date(`${to_date}T00:00:00Z`);
+  monthAnchor.setUTCMonth(monthAnchor.getUTCMonth() - 5);
+  monthAnchor.setUTCDate(1);
+  const monthlyFrom = monthAnchor.toISOString().slice(0, 10);
+
+  const { data: rcptMonth, error: rcptMonthErr } = await supabase
+    .from("receipts")
+    .select("receipt_date, total, total_amount")
+    .gte("receipt_date", monthlyFrom)
+    .lte("receipt_date", to_date)
+    .limit(20000);
+  if (rcptMonthErr) return toolErr(`receipts monthly: ${rcptMonthErr.message}`);
+
+  const { data: payMonth, error: payMonthErr } = await supabase
+    .from("work_order_payments")
+    .select("payment_date, amount")
+    .gte("payment_date", `${monthlyFrom}T00:00:00Z`)
+    .lte("payment_date", `${to_date}T23:59:59Z`)
+    .eq("status", "completed")
+    .limit(20000);
+  if (payMonthErr) return toolErr(`payments monthly: ${payMonthErr.message}`);
+
+  const monthly: Record<string, { month: string; expense: number; income: number }> = {};
+  for (const r of (rcptMonth ?? []) as Array<Record<string, any>>) {
+    const m = String(r.receipt_date).slice(0, 7);
+    if (!monthly[m]) monthly[m] = { month: m, expense: 0, income: 0 };
+    monthly[m].expense += Number(r.total ?? r.total_amount ?? 0);
+  }
+  for (const p of (payMonth ?? []) as Array<Record<string, any>>) {
+    const m = String(p.payment_date).slice(0, 7);
+    if (!monthly[m]) monthly[m] = { month: m, expense: 0, income: 0 };
+    monthly[m].income += Number(p.amount ?? 0);
+  }
+  const monthly_series = Object.values(monthly).sort((a, b) => a.month.localeCompare(b.month));
+
+  const money_flow = {
+    from_date,
+    to_date,
+    audience,
+    owed_to_me,
+    out_by_scope,
+    monthly: monthly_series,
+    summary: {
+      total_owed: owed_to_me.reduce((s, r) => s + r.balance, 0),
+      total_out: out_by_scope.reduce((s, r) => s + r.total, 0),
+      total_in_window: monthly_series
+        .filter((m) => m.month >= from_date.slice(0, 7) && m.month <= to_date.slice(0, 7))
+        .reduce((s, m) => s + m.income, 0),
+      receipt_count: rcpts.length,
+      open_invoice_count: owed_to_me.length,
+    },
+  };
+
+  // Audit-write to projection_event
+  const observed_at = new Date().toISOString();
+  const subject_id_text = `${from_date}_to_${to_date}`;
+
+  const prompt_text = `Compose money-flow artifact for window ${from_date}..${to_date}. Audience: ${audience}. Substrate: receipts (scope-grouped) + work_orders/work_order_payments (open invoices) + monthly receipts/payments (trailing 6mo).`;
+  const prompt_input = `money_flow_artifact:v1:${audience}:${prompt_text}`;
+  const prompt_sha256 = "sha256:" + (await sha256Hex(prompt_input));
+
+  const { error: promptErr } = await supabase
+    .from("prompt_template_registry")
+    .upsert(
+      {
+        prompt_sha256,
+        template_name: `money_flow_artifact:${audience}`,
+        template_body: prompt_text,
+        schema_hint: { expected_shape: "structured", audience, from_date, to_date },
+        last_used_at: observed_at,
+      },
+      { onConflict: "prompt_sha256", ignoreDuplicates: false }
+    );
+  if (promptErr) return toolErr(`prompt_template_registry upsert failed: ${promptErr.message}`);
+
+  const { data: detModel, error: modelErr } = await supabase
+    .from("model_registry")
+    .select("id")
+    .eq("slug", "deterministic-sql")
+    .maybeSingle();
+  if (modelErr || !detModel) return toolErr(`deterministic-sql model not found: ${modelErr?.message ?? "missing"}`);
+
+  const request_envelope = {
+    audience,
+    subject_id: subject_id_text,
+    subject_kind: "money_flow",
+    attribute: "money_flow_artifact",
+    as_of: observed_at,
+    user_context: { from_date, to_date },
+  };
+  const result_envelope = {
+    label: money_flow,
+    confidence: 0.85,
+    basis: {
+      signals: [
+        { name: "receipts_present", fired: rcpts.length > 0, weight: rcpts.length },
+        { name: "open_invoices_present", fired: owed_to_me.length > 0, weight: owed_to_me.length },
+        { name: "monthly_series_filled", fired: monthly_series.length > 0, weight: monthly_series.length },
+      ],
+      agent_version: "deterministic-sql:money_flow_compose:v1",
+      applied_priors: [`audience:${audience}`, `window:${from_date}..${to_date}`],
+    },
+    envelope: {
+      model_id: detModel.id,
+      model_version: "v1",
+      model_caller: { kind: "rule", rule_id: "deterministic-sql:money_flow_artifact:v1" },
+      prompt_sha256,
+      observed_at,
+      submitted_at: observed_at,
+      signature: {
+        algorithm: "attestation-token",
+        value: `att:deterministic-sql:money_flow:${observed_at}`,
+        signed_at: observed_at,
+      },
+    },
+  };
+
+  const { data: eventRow, error: eventErr } = await supabase
+    .from("projection_event")
+    .insert({
+      request_envelope,
+      result_envelope,
+      result_kind: "projection",
+      model_id: detModel.id,
+      model_caller: "rule:deterministic-sql:money_flow_artifact:v1",
+      prompt_sha256,
+      observation_ids: [],
+      observed_at,
+    })
+    .select("id, recorded_at")
+    .single();
+  if (eventErr || !eventRow) return toolErr(`projection_event insert failed: ${eventErr?.message ?? "no row"}`);
+
+  return toolOk({
+    projection_event_id: eventRow.id,
+    recorded_at: eventRow.recorded_at,
+    from_date,
+    to_date,
+    audience,
+    money_flow,
+  });
+}
+
+async function handleSynthesizeAttribute(args: Record<string, unknown>): Promise<ToolResult> {
+  const subject_id = String(args.subject_id ?? "");
+  const attribute = String(args.attribute ?? "");
+  if (!subject_id || !attribute) return toolErr("subject_id and attribute are required");
+
+  const def = getAttribute(attribute);
+  const supabase = sb();
+
+  const { data: rows, error } = await supabase
+    .from("projection_event")
+    .select(`
+      id, result_kind, observed_at, recorded_at, retracted_by,
+      request_envelope, result_envelope,
+      model_registry!inner ( slug, caller_kind, base_trust )
+    `)
+    .filter("request_envelope->>subject_id", "eq", subject_id)
+    .filter("request_envelope->>attribute", "eq", attribute)
+    .is("retracted_by", null)
+    .order("recorded_at", { ascending: false })
+    .limit(500);
+
+  if (error) return toolErr(`projection_event query: ${error.message}`);
+  const atoms = (rows ?? []) as Array<Record<string, any>>;
+
+  if (atoms.length === 0) {
+    return toolOk({
+      subject_id,
+      attribute,
+      consensus: null,
+      contributing_atoms: [],
+      note: "No non-retracted atoms recorded for this (subject, attribute). Submit some via submit_attribute_value.",
+    });
+  }
+
+  type Weighted = { atom: Record<string, any>; weight: number; label: unknown; caller: string; base_trust: number; confidence: number };
+  const weighted: Weighted[] = atoms.map((a) => {
+    const caller = a.model_registry;
+    const base_trust = Number(caller?.base_trust ?? 0.3);
+    const confidence = Number(a.result_envelope?.confidence ?? 0.5);
+    return {
+      atom: a,
+      weight: base_trust * confidence,
+      label: a.result_envelope?.label,
+      caller: caller?.slug ?? "unknown",
+      base_trust,
+      confidence,
+    };
+  });
+
+  const total_weight = weighted.reduce((s, w) => s + w.weight, 0);
+  const distinct_callers = new Set(weighted.map((w) => w.caller)).size;
+  const expected_shape = def?.expected_shape ?? "string";
+
+  let consensus_label: unknown = null;
+  let consensus_weight = 0;
+  let contradiction_score = 0;
+  let synthesis_method: string;
+
+  if (["enum", "string", "boolean"].includes(expected_shape)) {
+    synthesis_method = "weighted_vote";
+    const tally = new Map<string, number>();
+    for (const w of weighted) {
+      const key = JSON.stringify(w.label);
+      tally.set(key, (tally.get(key) ?? 0) + w.weight);
+    }
+    let winnerKey = "";
+    let winnerWeight = 0;
+    for (const [k, v] of tally.entries()) {
+      if (v > winnerWeight) { winnerKey = k; winnerWeight = v; }
+    }
+    consensus_label = winnerKey ? JSON.parse(winnerKey) : null;
+    consensus_weight = winnerWeight;
+    contradiction_score = total_weight > 0 ? (total_weight - winnerWeight) / total_weight : 0;
+  } else if (expected_shape === "number" || expected_shape === "ratio_0_1") {
+    synthesis_method = "weighted_mean";
+    let sum = 0;
+    let sum_w = 0;
+    for (const w of weighted) {
+      const v = Number(w.label);
+      if (!Number.isNaN(v)) { sum += v * w.weight; sum_w += w.weight; }
+    }
+    consensus_label = sum_w > 0 ? sum / sum_w : null;
+    consensus_weight = sum_w;
+    let variance_w = 0;
+    for (const w of weighted) {
+      const v = Number(w.label);
+      if (!Number.isNaN(v) && consensus_label !== null) variance_w += w.weight * (v - (consensus_label as number)) ** 2;
+    }
+    contradiction_score = sum_w > 0 ? Math.min(1, Math.sqrt(variance_w / sum_w) / Math.max(1, Math.abs((consensus_label as number) || 1))) : 0;
+  } else {
+    synthesis_method = "best_shape_grouping";
+    const tally = new Map<string, number>();
+    for (const w of weighted) {
+      const key = JSON.stringify(w.label);
+      tally.set(key, (tally.get(key) ?? 0) + w.weight);
+    }
+    let winnerKey = "";
+    let winnerWeight = 0;
+    for (const [k, v] of tally.entries()) {
+      if (v > winnerWeight) { winnerKey = k; winnerWeight = v; }
+    }
+    consensus_label = winnerKey ? JSON.parse(winnerKey) : null;
+    consensus_weight = winnerWeight;
+    contradiction_score = total_weight > 0 ? (total_weight - winnerWeight) / total_weight : 0;
+  }
+
+  const weighted_confidence = total_weight > 0 ? Math.min(0.99, consensus_weight) : 0;
+
+  return toolOk({
+    subject_id,
+    attribute,
+    expected_shape,
+    consensus: {
+      label: consensus_label,
+      weighted_confidence,
+      support: consensus_weight,
+      total_weight,
+      contradiction_score,
+      distinct_callers,
+      observation_count: atoms.length,
+      synthesis_method,
+    },
+    contributing_atoms: weighted.map((w) => ({
+      projection_event_id: w.atom.id,
+      label: w.label,
+      caller_slug: w.caller,
+      base_trust: w.base_trust,
+      confidence: w.confidence,
+      weight: w.weight,
+      result_kind: w.atom.result_kind,
+      recorded_at: w.atom.recorded_at,
+    })),
+    note: contradiction_score < 0.1
+      ? "Strong consensus."
+      : contradiction_score < 0.4
+        ? "Moderate dialectic — consider gathering more callers."
+        : "High contradiction — surface to human review.",
+  });
+}
+
+async function handleSubmitAttributeValues(args: Record<string, unknown>): Promise<ToolResult> {
+  const subject_id = String(args.subject_id ?? "");
+  const subject_kind = String(args.subject_kind ?? "");
+  const model_slug = String(args.model_slug ?? "");
+  const atomsIn = Array.isArray(args.atoms) ? (args.atoms as Array<Record<string, unknown>>) : [];
+
+  if (!subject_id || !subject_kind || !model_slug) return toolErr("subject_id, subject_kind, model_slug required");
+  if (atomsIn.length === 0) return toolErr("atoms array must contain at least one entry");
+  if (atomsIn.length > 100) return toolErr("max 100 atoms per batch call");
+
+  const results: Array<Record<string, unknown>> = [];
+  for (const a of atomsIn) {
+    const single = await handleSubmitAttributeValue({
+      attribute: a.attribute,
+      subject_id,
+      subject_kind,
+      value: a.value,
+      model_slug,
+      model_version: args.model_version,
+      confidence: a.confidence,
+      basis_signals: a.basis_signals,
+      candidates: a.candidates,
+      declared_observed_at: args.declared_observed_at,
+    });
+    const text = single.content?.[0]?.type === "text" ? single.content[0].text : null;
+    if (text) {
+      try { results.push(JSON.parse(text)); }
+      catch { results.push({ attribute: a.attribute, error: "parse_error", raw: text.slice(0, 200) }); }
+    } else {
+      results.push({ attribute: a.attribute, error: "no_text_response" });
+    }
+  }
+
+  const succeeded = results.filter((r) => r.projection_event_id).length;
+  return toolOk({
+    subject_id,
+    subject_kind,
+    model_slug,
+    submitted: atomsIn.length,
+    succeeded,
+    failed: atomsIn.length - succeeded,
+    results,
+  });
+}
+
+async function handleFindSubjectsNeedingAtoms(args: Record<string, unknown>): Promise<ToolResult> {
+  const subject_kind = (typeof args.subject_kind === "string" ? args.subject_kind : "image") as "image" | "vehicle";
+  const min_atoms = Math.max(0, Number(args.min_atoms) || 3);
+  const limit = Math.min(Number(args.limit) || 20, 200);
+  const recent_only = args.recent_only !== false;
+  const attribute_filter = typeof args.attribute === "string" ? args.attribute : null;
+
+  if (!["image", "vehicle"].includes(subject_kind)) {
+    return toolErr(`subject_kind must be image or vehicle, got '${subject_kind}'`);
+  }
+
+  const supabase = sb();
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+
+  // vehicle_id filter unlocks the (vehicle_id, taken_at) composite index. Without
+  // it, scanning vehicle_images by date times out (no standalone taken_at index
+  // on a 1M-row table). Callers who want a worklist for a specific build pass
+  // vehicle_id; otherwise we sample by primary key (no ORDER BY).
+  const vehicle_id_param = typeof args.vehicle_id === "string" ? args.vehicle_id : null;
+  let candidatesQ;
+  if (subject_kind === "image") {
+    candidatesQ = supabase
+      .from("vehicle_images")
+      .select("id, vehicle_id, image_url, taken_at, angle")
+      .limit(Math.min(limit * 5, 500));
+    if (vehicle_id_param) {
+      candidatesQ = candidatesQ.eq("vehicle_id", vehicle_id_param).order("taken_at", { ascending: false });
+      if (recent_only) candidatesQ = candidatesQ.gte("taken_at", ninetyDaysAgo);
+    }
+  } else {
+    candidatesQ = supabase
+      .from("vehicles")
+      .select("id, year, make, model")
+      .order("created_at", { ascending: false })
+      .limit(Math.min(limit * 5, 500));
+    if (recent_only) candidatesQ = candidatesQ.gte("created_at", ninetyDaysAgo);
+  }
+
+  const { data: candidates, error: candErr } = await candidatesQ;
+  if (candErr) return toolErr(`candidate query: ${candErr.message}`);
+
+  const candIds = (candidates ?? []).map((c) => c.id);
+  if (candIds.length === 0) {
+    return toolOk({ subject_kind, count: 0, subjects: [], note: "No candidate subjects matched the filters." });
+  }
+
+  let atomQ = supabase
+    .from("projection_event")
+    .select("request_envelope")
+    .in("request_envelope->>subject_id", candIds)
+    .is("retracted_by", null);
+  if (attribute_filter) atomQ = atomQ.filter("request_envelope->>attribute", "eq", attribute_filter);
+
+  const { data: atomRows, error: atomErr } = await atomQ;
+  if (atomErr) return toolErr(`atom count query: ${atomErr.message}`);
+
+  const counts = new Map<string, number>();
+  for (const r of (atomRows ?? []) as Array<Record<string, any>>) {
+    const sid = r.request_envelope?.subject_id;
+    if (sid) counts.set(sid, (counts.get(sid) ?? 0) + 1);
+  }
+
+  const needs = (candidates ?? [])
+    .map((c) => ({ ...c, atom_count: counts.get(c.id) ?? 0 }))
+    .filter((c) => c.atom_count < min_atoms)
+    .sort((a, b) => a.atom_count - b.atom_count)
+    .slice(0, limit);
+
+  return toolOk({
+    subject_kind,
+    min_atoms,
+    attribute_filter,
+    count: needs.length,
+    subjects: needs,
+    note: "Walk-in callers: pick a subject, call get_attribute_checklist(subject_kind), iterate prompts against the image/context with your model, submit each answer via submit_attribute_value. Trust accumulates by survival rate.",
+  });
+}
+
+async function handleQuerySubjectAtoms(args: Record<string, unknown>): Promise<ToolResult> {
+  const subject_id = String(args.subject_id ?? "");
+  if (!subject_id) return toolErr("subject_id is required");
+
+  const attribute_filter = typeof args.attribute === "string" ? args.attribute : null;
+  const include_retracted = Boolean(args.include_retracted);
+  const limit = Math.min(Number(args.limit) || 200, 500);
+
+  const supabase = sb();
+
+  let q = supabase
+    .from("projection_event")
+    .select(`
+      id,
+      result_kind,
+      observation_ids,
+      observed_at,
+      recorded_at,
+      retracted_by,
+      retracted_at,
+      request_envelope,
+      result_envelope,
+      model_registry!inner ( id, slug, provider, caller_kind, base_trust )
+    `)
+    .filter("request_envelope->>subject_id", "eq", subject_id)
+    .order("recorded_at", { ascending: false })
+    .limit(limit);
+
+  if (!include_retracted) q = q.is("retracted_by", null);
+  if (attribute_filter) q = q.filter("request_envelope->>attribute", "eq", attribute_filter);
+
+  const { data, error } = await q;
+  if (error) return toolErr(`projection_event query: ${error.message}`);
+
+  const rows = data ?? [];
+  const byAttribute = new Map<string, Array<Record<string, unknown>>>();
+  for (const row of rows) {
+    const r = row as Record<string, any>;
+    const attribute = r.request_envelope?.attribute ?? "_unknown";
+    const audience = r.request_envelope?.audience ?? null;
+    const label = r.result_envelope?.label;
+    const confidence = r.result_envelope?.confidence;
+    const model = r.model_registry;
+    const observation = {
+      projection_event_id: r.id,
+      result_kind: r.result_kind,
+      audience,
+      label,
+      confidence,
+      observation_ids: r.observation_ids ?? [],
+      observed_at: r.observed_at,
+      recorded_at: r.recorded_at,
+      retracted: r.retracted_by !== null,
+      caller: model
+        ? { model_id: model.id, slug: model.slug, provider: model.provider, caller_kind: model.caller_kind, base_trust: model.base_trust }
+        : null,
+    };
+    if (!byAttribute.has(attribute)) byAttribute.set(attribute, []);
+    byAttribute.get(attribute)!.push(observation);
+  }
+
+  const attributes = Array.from(byAttribute.entries()).map(([attribute, observations]) => ({
+    attribute,
+    observation_count: observations.length,
+    distinct_callers: new Set(observations.map((o) => (o.caller as Record<string, unknown> | null)?.slug)).size,
+    observations,
+  }));
+
+  return toolOk({
+    subject_id,
+    attribute_filter,
+    total_atoms: rows.length,
+    distinct_attributes: attributes.length,
+    attributes,
+    note: "Atoms returned in full per feedback_authentic_data_no_topk_curation.md — consumer synthesizes. Multiple submissions per attribute = dialectic; corroboration raises trust, contradiction surfaces it.",
+  });
+}
+
+async function handleGetAttributeChecklist(args: Record<string, unknown>): Promise<ToolResult> {
+  const subject_kind = String(args.subject_kind ?? "") as SubjectKind;
+  if (!["image", "vehicle", "person", "cluster"].includes(subject_kind)) {
+    return toolErr(`subject_kind must be one of image | vehicle | person | cluster, got '${subject_kind}'`);
+  }
+  const layers = Array.isArray(args.layers)
+    ? (args.layers as Array<unknown>)
+        .map((n) => Number(n))
+        .filter((n): n is 1 | 2 | 3 | 4 | 5 => [1, 2, 3, 4, 5].includes(n)) as Array<1 | 2 | 3 | 4 | 5>
+    : undefined;
+  const include_dependencies = Boolean(args.include_dependencies);
+
+  const checklist = getChecklist(subject_kind, {
+    include_layers: layers,
+    include_dependencies,
+  });
+
+  return toolOk({
+    subject_kind,
+    count: checklist.length,
+    submission_endpoint: "submit_attribute_value (pending: Phase 1 §1.1 cockpit migration)",
+    checklist: checklist.map((d) => ({
+      attribute: d.attribute,
+      layer: d.layer,
+      result_kind: d.result_kind,
+      modalities: d.modalities,
+      depends_on: d.depends_on ?? [],
+      prompt: d.prompt,
+      expected_shape: d.expected_shape,
+      enum_values: d.enum_values,
+      prompt_version: d.prompt_version,
+    })),
+  });
+}
+
 // ── Actors & Organizations ──────────────────────────────────────────────────
 
 async function handleSearchOrganizations(args: Record<string, unknown>): Promise<ToolResult> {
@@ -2097,6 +3569,188 @@ async function handleSubmitObservation(args: Record<string, unknown>): Promise<T
     submitted_by_user_id: args.submitted_by_user_id || null,
   });
   return toolOk(data);
+}
+
+// ── External Agent Write API (v1/events) ────────────────────────────────────
+
+/**
+ * Inline event schemas. Mirrors the contract WS-A is publishing at
+ * docs/api/schemas/v1/{service,note}.json. Kept inline here to keep this
+ * edge function decoupled from a deployed /v1/schemas/* route.
+ */
+const EVENT_SCHEMAS_INLINE: Record<string, Record<string, unknown>> = {
+  service: {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    $id: "https://nuke.ag/v1/schemas/service.json",
+    title: "Service event payload (v1.0)",
+    type: "object",
+    required: ["summary"],
+    properties: {
+      summary: { type: "string", description: "1-2 sentence headline of the work performed." },
+      narrative: { type: "string", description: "Free-form, agent-written long form." },
+      work_performed: { type: "array", items: { type: "string" } },
+      work_planned: { type: "array", items: { type: "string" } },
+      parts: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            manufacturer: { type: "string" },
+            part_number: { type: "string" },
+            quantity: { type: "number" },
+            status: { type: "string", enum: ["needed", "ordered", "installed", "considered_rejected"] },
+          },
+          required: ["name"],
+        },
+      },
+      decisions: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            question: { type: "string" },
+            outcome: { type: "string" },
+            reasoning: { type: "string" },
+          },
+        },
+      },
+      condition_observations: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            system: {
+              type: "string",
+              enum: ["top_end", "bottom_end", "fuel", "ignition", "cooling", "brakes", "suspension", "drivetrain", "interior", "exterior", "electrical", "other"],
+            },
+            finding: { type: "string" },
+            severity: { type: "string", enum: ["info", "monitor", "concern", "critical"] },
+          },
+          required: ["finding"],
+        },
+      },
+      labor_minutes: { type: "number" },
+      shop_ref: { type: "string" },
+    },
+    additionalProperties: true,
+  },
+  note: {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    $id: "https://nuke.ag/v1/schemas/note.json",
+    title: "Note event payload (v1.0)",
+    type: "object",
+    required: ["summary"],
+    properties: {
+      summary: { type: "string", description: "Short headline of the note." },
+      body: { type: "string", description: "Free-form note body." },
+      tags: { type: "array", items: { type: "string" } },
+    },
+    additionalProperties: true,
+  },
+};
+
+const EVENT_TYPE_TO_VIN_SCOPE = (vin: string) => `events:write:vehicle:${vin}`;
+
+async function handleSubmitVehicleEvent(args: Record<string, unknown>): Promise<ToolResult> {
+  const vin = typeof args.vin === "string" ? args.vin.trim().toUpperCase() : "";
+  const eventType = typeof args.event_type === "string" ? args.event_type : "";
+  const occurredAt = typeof args.occurred_at === "string" ? args.occurred_at : "";
+  const payload = (args.payload as Record<string, unknown>) || {};
+
+  if (!vin) return toolErr("vin required");
+  if (!eventType) return toolErr("event_type required (service|note)");
+  if (!occurredAt) return toolErr("occurred_at required (ISO 8601)");
+  if (!payload || typeof payload !== "object") return toolErr("payload required (object)");
+
+  const envelope = {
+    schema_version: "1.0",
+    event_type: eventType,
+    vehicle_ref: { vin },
+    occurred_at: occurredAt,
+    submitted_at: new Date().toISOString(),
+    agent: { id: "mcp-connector", version: "1.1.0", session_id: null },
+    payload,
+    correction_of: typeof args.correction_of === "string" ? args.correction_of : undefined,
+    agent_inferred: !!args.agent_inferred,
+  };
+
+  // Call api-v1-events internally with service-role auth.
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/api-v1-events`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+    },
+    body: JSON.stringify(envelope),
+  });
+
+  const txt = await res.text();
+  let parsed: unknown;
+  try { parsed = JSON.parse(txt); } catch { parsed = { raw: txt }; }
+
+  if (!res.ok) {
+    return toolErr(`api-v1-events ${res.status}: ${typeof parsed === "object" ? JSON.stringify(parsed) : txt.slice(0, 500)}`);
+  }
+  return toolOk(parsed);
+}
+
+async function handleGetEventSchema(args: Record<string, unknown>): Promise<ToolResult> {
+  const eventType = typeof args.event_type === "string" ? args.event_type : "";
+  if (!eventType) return toolErr("event_type required (service|note)");
+  const schema = EVENT_SCHEMAS_INLINE[eventType];
+  if (!schema) {
+    return toolErr(
+      `Unknown event_type '${eventType}'. Supported: ${Object.keys(EVENT_SCHEMAS_INLINE).join(", ")}`,
+    );
+  }
+  return toolOk({
+    event_type: eventType,
+    schema_version: "1.0",
+    schema,
+    note: "Inline schema. The canonical published copy will be at https://nuke.ag/v1/schemas/{event_type}.json once WS-A publishes the route.",
+  });
+}
+
+async function handleVerifyVehicleAccess(args: Record<string, unknown>): Promise<ToolResult> {
+  const vin = typeof args.vin === "string" ? args.vin.trim().toUpperCase() : "";
+  if (!vin) return toolErr("vin required");
+
+  const supabase = sb();
+
+  // 1. Vehicle existence check (independent of caller scopes)
+  const { data: vehicle } = await supabase
+    .from("vehicles")
+    .select("id, vin")
+    .eq("vin", vin)
+    .limit(1)
+    .maybeSingle();
+
+  // 2. Scope inference. The MCP connector dispatches via service-role auth
+  //    in this implementation, so end-user scopes are not propagated through
+  //    this tool. Surface the intended scope grammar instead and let the
+  //    caller decide what to do; an external integrator hitting POST /v1/events
+  //    directly with their own API key will get the real scope check at the
+  //    endpoint.
+  const writeScope = EVENT_TYPE_TO_VIN_SCOPE(vin);
+  const wildcardWrite = "events:write:all";
+  const readScope = `events:read:vehicle:${vin}`;
+
+  return toolOk({
+    vin,
+    vehicle_in_nuke: !!vehicle,
+    vehicle_id: vehicle?.id ?? null,
+    can_write: !!vehicle,
+    can_read: !!vehicle,
+    scopes_matched: ["service-role"],
+    required_scopes_for_external_callers: {
+      write_one_of: [writeScope, wildcardWrite],
+      read: readScope,
+    },
+    next_steps: vehicle
+      ? "Vehicle exists. Call submit_vehicle_event with this VIN."
+      : "Vehicle not in NUKE. Call create_profile or ingest the vehicle first; v1 does not auto-create vehicles from event submissions.",
+  });
 }
 
 // ── Auction Readiness ────────────────────────────────────────────────────────
@@ -3093,8 +4747,9 @@ async function handleGetAuctionBriefing(args: Record<string, unknown>): Promise<
   const listings = listingsRes.data || [];
   const activeListing = listings.find((l: any) => l.listing_status === "active") || listings[0];
 
-  // Second parallel pass: comps (need make/model from vehicle) + seller profile
-  const [compsResult, sellerResult] = await Promise.all([
+  // Second parallel pass: comps + seller profile + seller analytics
+  const sellerUsername = activeListing?.seller_username || vehicle.bat_seller;
+  const [compsResult, sellerResult, sellerAnalyticsResult] = await Promise.all([
     vehicle.make
       ? supabase.rpc("find_bat_comps", {
           p_make: vehicle.make,
@@ -3104,15 +4759,20 @@ async function handleGetAuctionBriefing(args: Record<string, unknown>): Promise<
           p_limit: 10,
         }).then((r: any) => r.error ? { data: [] } : r)
       : Promise.resolve({ data: [] }),
-    activeListing?.seller_username
+    sellerUsername
       ? supabase
           .from("bat_user_profiles")
           .select("username, total_comments, total_bids, total_wins, win_rate, expertise_score, avg_bid_amount, preferred_categories, bidding_strategy, avg_sentiment, community_trust_score, bot_likelihood")
-          .eq("username", activeListing.seller_username)
+          .eq("username", sellerUsername)
           .single()
+      : Promise.resolve({ data: null }),
+    sellerUsername
+      ? supabase.rpc("get_seller_analytics", { p_seller_username: sellerUsername })
+          .then((r: any) => r.error ? { data: null } : r)
       : Promise.resolve({ data: null }),
   ]);
   const sellerProfile = sellerResult.data;
+  const sellerAnalytics = sellerAnalyticsResult.data;
 
   // Compute bid velocity for active listings
   let bidVelocity = null;
@@ -3179,19 +4839,44 @@ async function handleGetAuctionBriefing(args: Record<string, unknown>): Promise<
       cached_valuation: valuationRes.data?.[0] || null,
     },
 
-    seller: sellerProfile ? {
+    seller: sellerAnalytics ? {
+      username: sellerAnalytics.seller_username,
+      total_listings: sellerAnalytics.total_listings,
+      total_sold: sellerAnalytics.total_sold,
+      total_unsold: sellerAnalytics.total_unsold,
+      active_listings: sellerAnalytics.active_listings,
+      sell_through_rate: sellerAnalytics.sell_through_rate,
+      avg_sale_price: sellerAnalytics.avg_sale_price,
+      median_sale_price: sellerAnalytics.median_sale_price,
+      highest_sale: sellerAnalytics.highest_sale,
+      total_gross_sales: sellerAnalytics.total_gross_sales,
+      avg_sale_to_estimate_ratio: sellerAnalytics.avg_sale_to_estimate_ratio,
+      avg_bid_count: sellerAnalytics.avg_bid_count,
+      avg_view_count: sellerAnalytics.avg_view_count,
+      avg_comment_count: sellerAnalytics.avg_comment_count,
+      no_reserve_count: sellerAnalytics.no_reserve_count,
+      reserve_met_rate: sellerAnalytics.reserve_met_rate,
+      primary_makes: sellerAnalytics.primary_makes,
+      first_listing_date: sellerAnalytics.first_listing_date,
+      last_listing_date: sellerAnalytics.last_listing_date,
+      avg_days_between_listings: sellerAnalytics.avg_days_between_listings,
+      recent_sales: sellerAnalytics.recent_sales,
+      // Community profile from bat_user_profiles (bidding behavior)
+      community: sellerProfile ? {
+        expertise_score: sellerProfile.expertise_score,
+        trust_score: sellerProfile.community_trust_score,
+        avg_sentiment: sellerProfile.avg_sentiment,
+        bidding_strategy: sellerProfile.bidding_strategy,
+        bot_likelihood: sellerProfile.bot_likelihood,
+      } : null,
+    } : (sellerProfile ? {
       username: sellerProfile.username,
-      total_sales: sellerProfile.total_wins,
       total_bids: sellerProfile.total_bids,
-      win_rate: sellerProfile.win_rate,
       expertise_score: sellerProfile.expertise_score,
-      avg_bid_amount: sellerProfile.avg_bid_amount,
-      strategy: sellerProfile.bidding_strategy,
-      sentiment: sellerProfile.avg_sentiment,
       trust_score: sellerProfile.community_trust_score,
-      bot_likelihood: sellerProfile.bot_likelihood,
-      preferred_categories: sellerProfile.preferred_categories,
-    } : null,
+      sentiment: sellerProfile.avg_sentiment,
+      strategy: sellerProfile.bidding_strategy,
+    } : null),
 
     comps: Array.isArray(comps) ? comps.slice(0, 10).map((c: any) => ({
       year: c.v_year, make: c.v_make, model: c.v_model,
@@ -3267,10 +4952,22 @@ const TOOL_HANDLERS: Record<string, (args: Record<string, unknown>) => Promise<T
   analyze_image: handleAnalyzeImage,
   identify_vehicle_image: handleIdentifyVehicleImage,
   query_vehicle_images: handleQueryVehicleImages,
+  get_attribute_checklist: handleGetAttributeChecklist,
+  submit_attribute_value: handleSubmitAttributeValue,
+  submit_attribute_values: handleSubmitAttributeValues,
+  query_subject_atoms: handleQuerySubjectAtoms,
+  find_subjects_needing_atoms: handleFindSubjectsNeedingAtoms,
+  synthesize_attribute: handleSynthesizeAttribute,
+  project_invoice: handleProjectInvoice,
+  project_work_log: handleProjectWorkLog,
+  project_money_flow: handleProjectMoneyFlow,
   search_organizations: handleSearchOrganizations,
   get_organization: handleGetOrganization,
   extract_listing: handleExtractListing,
   submit_observation: handleSubmitObservation,
+  submit_vehicle_event: handleSubmitVehicleEvent,
+  get_event_schema: handleGetEventSchema,
+  verify_vehicle_access: handleVerifyVehicleAccess,
   create_profile: handleCreateProfile,
   get_profile: handleGetProfile,
   link_account: handleLinkAccount,

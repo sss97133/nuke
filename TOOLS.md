@@ -93,6 +93,8 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | MCP: Get coaching plan | `mcp-connector` → `get_coaching_plan` | Read-only from `auction_readiness` |
 | MCP: Prepare listing | `mcp-connector` → `prepare_listing` | Read-only preview |
 | MCP: Auction briefing | `mcp-connector` → `get_auction_briefing` | One-call composite: identity, auction data, valuation, seller profile, comps, market history, sentiment, condition. Accepts vehicle_id or listing_url. |
+| HTTP: Auction briefing | `get-auction-briefing` | Standalone edge function — same composite briefing as MCP tool but callable via HTTP POST. Body: `{vehicle_id}` or `{listing_url}`. Returns identity, auction metrics, seller analytics, comps, sentiment, condition. |
+| Seller analytics (SQL) | `get_seller_analytics(p_seller_username)` | Returns seller profile from bat_listings: sell-through rate, pricing stats, engagement metrics, reserve behavior, recent sales, primary makes. ~60ms even for 1400-listing sellers. |
 
 ---
 
@@ -110,9 +112,21 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Upload image and trigger analysis | `image-intake` | Handles upload + queues processing |
 | Backfill image angles | `backfill-image-angles` | Retroactively adds angle data |
 | Identify vehicle from image | `identify-vehicle-from-image` | AI-powered vehicle recognition |
+| Get attribute checklist for a subject (laser-tag harness) | `mcp-connector` tool `get_attribute_checklist` | Returns L1–L5 attribute schedule a caller agent can answer for image / vehicle / person / cluster. Source = `_shared/cockpit/attribute-registry.ts`. Pairs with `submit_attribute_value` for caller-side BYOK extraction. |
+| Submit caller-extracted attribute value (laser-tag write) | `mcp-connector` tool `submit_attribute_value` | Caller agent submits a single answer from the checklist. Auto-registers caller's model in `model_registry` (caller_kind='walkin', base_trust=0.30) on first call. Auto-registers prompt in `prompt_template_registry`. Validates value against expected_shape + enum_values. Writes signed envelope to `projection_event`. Result_kind enforced per registry. |
+| Query atoms accumulated for a subject (laser-tag read) | `mcp-connector` tool `query_subject_atoms` | Read-side of the laser-tag loop. Returns ALL projection_event atoms for a subject (no top-K), grouped by attribute, each with caller_kind / base_trust / confidence. Composers (work_log, invoice, profile) call this to incorporate caller-extracted atoms before rendering. Multiple submissions per attribute = dialectic; consumer synthesizes. |
+| Find subjects needing atoms (laser-tag discovery) | `mcp-connector` tool `find_subjects_needing_atoms` | Discovery for walk-in callers. Returns subjects (image / vehicle) with fewer than min_atoms in projection_event, recent-first. Activates the harness at scale: any third-party LLM can hit this, get a worklist, run the checklist, submit answers. Without this, callers don't know where to start; with it, the entire BYOK compute base can attack thin substrate spots in priority order. |
+| Submit batch of attribute values (laser-tag write batch) | `mcp-connector` tool `submit_attribute_values` | Plural version of submit_attribute_value. One call submits N atoms for the same subject + caller. Cuts 17 round-trips to 1 when iterating a full checklist. Same auto-registration semantics. |
+| Synthesize consensus value for an attribute (L4 dialectic) | `mcp-connector` tool `synthesize_attribute` | Computes ONE consensus value per (subject, attribute) from all non-retracted atoms, weighted by base_trust × confidence. Returns winner + weighted_confidence + contradiction_score + contributing_atoms. Use when consumers want a single answer instead of the raw atom stream from query_subject_atoms. Implements L4 of project_signal-substrate-five-layer.md. |
+| Project invoice from work-order substrate (audit-grade) | `mcp-connector` tool `project_invoice` | Wraps `resolve_work_order_status(query)` RPC and writes the composed invoice to `projection_event` with audit envelope. audience = client (redacted) / irs (provenance-annotated) / internal (full). Re-call to re-project when substrate changes. First implementation of `vehicle.invoice_artifact` — the tax-meld MVP per `project_tax_filing_as_first_meld_mvp.md`. |
+| Project shop work-log for a date (journal-shaped) | `mcp-connector` tool `project_work_log` | Composes photos + work_order_{labor,parts,payments} for one shop day, audience-tiered (public/owner/counterparty). Returns `vehicle.work_log_artifact` with provenance. Same engine as project_invoice, time-bounded subject. Audit row to `projection_event`. Powers nuke.ag/journal/[date] once the route is wired. |
+| Project money-flow artifact for a window (AR + expenses + monthly) | `mcp-connector` tool `project_money_flow` | Composes (1) accounts receivable from work_orders less completed work_order_payments, (2) expenses out grouped by receipts.scope_type/scope_id, (3) monthly income vs expense over the trailing 6 months. Returns `money_flow_artifact` with audit envelope. Powers nuke.ag/me/money. audience = owner (default) / counterparty (scoped). |
 | Validate image is a vehicle | `validate-vehicle-image` | Screening step (GPT-4o, quota exhausted) |
 | Check image matches assigned vehicle | `check-image-vehicle-match` | Claude Haiku vision — classifies as confirmed/mismatch/ambiguous/unrelated |
 | Reprocess stale images | `trickle-backfill-images` | Slow drip backfill |
+| Ingest a video frame (GoPro/dashcam/etc.) | `ingest-video-frame` | Inserts vehicle_images row (source='gopro_frame'/etc) + image_observations row (role='subject', vehicle_id=null, confidence_basis carries source_clip/frame_offset/wall_clock/youtube_url/inherited_lat-lon). Idempotent on content_sha256. Per chapter 12 image_observations foundation. |
+| Universal artifact intake (photo / video_frame / receipt / bank_tx / card_tx / work_order / document) | `ingest-artifact` | Single front door — discriminated union by `kind`. Validates source, dedups by content_sha256 via `artifact_dispatch_log`, routes to type-appropriate handler (photo→orchestrator, video_frame→ingest-video-frame, receipt/work_order/document→ingest-observation, bank_tx/card_tx→Phase-2 stub). ALWAYS emits observations through `ingest-observation` — never writes vehicle_observations directly. Contract: `docs/library/technical/engineering-manual/16-artifact-dispatcher.md`. |
+| Map receipt → entity scope (NUKE / Viva / personal / household / vehicle) | `classify-receipt-scope` | Deterministic-first (attribution block → card lookup → merchant regex → line-item category → gpt-4o-mini fallback). Returns `{scope_type, scope_id, method, confidence, reasons[]}`. Used by Jenny-receipt ingest and the 2,034-row backfill. |
 
 ---
 
@@ -278,12 +292,34 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 
 ---
 
+## Platform Accounting & Financials
+
+| Intent | Use This | Notes |
+|--------|----------|-------|
+| Get financial summary (public) | `platform-financials` action=`summary` | No auth required. Returns revenue, expenses, burn rate, health, recent income. |
+| Income statement (monthly P&L) | `platform-financials` action=`income_statement` | Service key required. Revenue/COGS/expenses/net income by month. |
+| Balance sheet | `platform-financials` action=`balance_sheet` | Service key required. Assets/liabilities/equity/revenue/expenses. |
+| Platform burn rate | `platform-financials` action=`burn_rate` | Service key required. 30/60/90 day tech spend + monthly detail. |
+| Accounting health check | `platform-financials` action=`health` | Service key required. Unposted counts, ledger balance, freshness. |
+| Post unposted platform expenses | `SELECT post_unposted_expenses()` | Idempotent. Maps vendor→account via `vendor_account_mapping`. |
+| Post unposted QB transactions | `SELECT post_unposted_qb_transactions()` | Idempotent. Posts Purchase-type QB entries. |
+| Post vehicle sale revenue | `SELECT post_vehicle_sale_revenue(vehicle_id, price, date, acq_cost, buyer)` | Dr Cash / Cr Revenue + optional COGS. |
+| Post unposted invoices | `SELECT post_unposted_invoices()` | Dr AR / Cr Labor Revenue for generated_invoices. |
+| Reconcile expenses across sources | `SELECT reconcile_expenses()` | Matches platform_expenses↔qb_transactions by date+amount+vendor. |
+| View trial balance | `SELECT * FROM trial_balance` | Shows all accounts with debit/credit totals. Must sum to 0. |
+| Monthly expense ledger | `SELECT * FROM ledger_monthly` | Journal-backed. Replaces old platform_expenses-only view. |
+| View all accounts | `SELECT * FROM balance_sheet` | Shows every account with natural balance. |
+
+---
+
 ## Wiring System (Agentic Harness Design)
 
 | Intent | Use This | Notes |
 |--------|----------|-------|
 | Compute wiring overlay (harness spec) | `compute-wiring-overlay` | POST `{ vehicle_id }`. Returns wire list, ECU/PDM/alternator sizing, bulkhead pin assignments, warnings. Upserts to `vehicle_wiring_overlays`. |
 | Generate harness fabrication spec | `generate-harness-spec` | POST `{ vehicle_id, format? }`. Formats: "full" (JSON+text), "text" (plaintext spec), "csv" (wire schedule for Excel), "workstation" (live build progress + blockers), "wire_schedule" (tables only). The document you hand to a fabricator or Fiverr illustrator. |
+| Render wiring visual (DB-driven) | `render-wiring-visual` | POST `{ vehicle_id, visual_type, target?, mode?, format? }`. visual_type: "connector_face" / "cutting_list" / "wire_schedule" / "formboard" / "list". mode: "blank" / "populated". target: "M130_Connector_A", "D38999_J61", "ENGINE", "DASH", etc. Returns SVG + completeness_pct + missing_data[] + warnings[]. Use "list" to discover all available targets. |
+| Scan wiring enrichment gaps | `npm run wiring:gaps` | Scans all 131 devices, reports P0-P7 gaps (missing pin maps, datasheets, cavity layouts, current ratings, prices, wire lengths, crimp specs). Generates agent prompts for automated gap-filling. |
 | Harness build workstation view | `SELECT * FROM harness_workstation` | Live builder spreadsheet — every device with zone, integration decision (KEEP/REPLACE/NEW/SPLICE), wire progress (not_started→wire_cut→terminated→installed→tested→verified), blockers, and notes. Pull this up every time you work on the harness. |
 | Update wire build progress | `UPDATE vehicle_build_manifest SET wire_status = 'terminated' WHERE device_name = '...'` | Track physical build progress per device. |
 | Generate vehicle-layout diagram (plan view SVG) | `generate-vehicle-diagram` | POST `{ vehicle_id, view?, show_bulkhead?, highlight_zone? }`. Returns `diagram_url` + summary. View: "plan" (top-down truck layout), "engine_bay", "dash", etc. Toggle bulkhead connector in/out — wire lengths auto-recalculate. |
@@ -293,6 +329,11 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 | Read/write build manifest | `execute_sql` MCP on `vehicle_build_manifest` | INSERT/UPDATE devices directly. |
 | Search GM wiring specs | `search_service_manuals` MCP | Torque specs, wire gauges, procedures. |
 | Resolve components | SQL on `component_library` | 95 entries, extensible via INSERT. |
+| Tech-packet: wire list | `supabase.rpc('wiring_tech_wire_list', { p_vehicle_id })` | Unioned upgrade + custom circuits with gauge/color/length/fuse/category. `src` column = 'upgrade' or 'custom'. Mirrors `gen_wire_list()` in `wiring/scripts/generate_k5_tech_packet.py`. |
+| Tech-packet: PDM channel map | `supabase.rpc('wiring_tech_pdm_channel_map', { p_vehicle_id })` | One row per real PDM output (PDM30 + PDM15). Columns: pdm, channel, device, wire_gauge_awg, wire_color, fuse_rating_amps, circuit_code. Input: `'e04bf9c5-b488-433b-be9a-3d307861d90b'::uuid` for K5. |
+| Tech-packet: BOM wire rollup | `supabase.rpc('wiring_tech_bom_wire', { p_vehicle_id })` | Wire quantities by (gauge, color) with +30% margin + suggested spool size (25ft/100ft/500ft). |
+| Tech-packet: BOM connectors | `supabase.rpc('wiring_tech_bom_connectors', { p_vehicle_id })` | Connectors rolled up by (device_model, connector_type, pin_count). Always includes MoTeC + peripheral fallback set. |
+| Tech-packet: manifest summary | `supabase.rpc('wiring_tech_manifest_summary', { p_vehicle_id })` | One-row summary: devices_total, devices_purchased, devices_pending, spent_usd, pending_usd, total_spec_usd. |
 
 ### Agentic Loop
 ```
@@ -340,6 +381,26 @@ Agent: → UPDATE location_zone = 'dash' in manifest
 | Ingest observations in bulk | `ingest-observation-batch` | Wraps `ingest-observation` for batch processing. Max 200 per request. Options: `gap_fill` (backfill vehicles table), `write_evidence` (field_evidence rows). |
 | Write observation + gap-fill + evidence (from code) | `import { writeObservation } from "../_shared/observationWriter.ts"` | Shared module for edge functions. Wraps observation + Tetris gap-fill + field_evidence in one call. |
 | Migrate legacy data to observations | `migrate-to-observations` | Ports existing auction_comments, vehicle_events, etc. to vehicle_observations |
+
+---
+
+## External Agent Write API (`/v1/events`)
+
+Public agent-writable surface. External LLM agents (Claude, ChatGPT, etc.) submit structured vehicle events on behalf of authenticated users. See `docs/external-agent-write-api.md`, `docs/api/QUICKSTART.md`, and the OpenAPI spec at `docs/api/openapi.yaml` (v1.5.0+).
+
+| Intent | Use This | Notes |
+|--------|----------|-------|
+| Submit a vehicle event (REST) | `POST nuke.ag/v1/events` → `api-v1-events` | Envelope spec at `docs/api/schemas/v1/envelope.json`. Maps `event_type=service` → `kind=work_record` source=`shop`; `event_type=note` → `kind=comment` source=`agent-submission`. VIN is canonical key (resolved internally). |
+| Read events back (REST) | `GET nuke.ag/v1/events?vin={VIN}` → `api-v1-events` | Returns events written through `/v1/events` (filtered by source: shop, agent-submission). Params: `limit` (default 50, max 200), `include_superseded` (default false). |
+| Submit a vehicle event (MCP) | MCP tool `submit_vehicle_event` (in `mcp-connector`) | Wraps `/v1/events` with VIN-keyed entry. Same envelope. |
+| Get event JSON Schema (MCP) | MCP tool `get_event_schema` | Returns inline Draft 2020-12 schema for self-validation. |
+| Verify VIN access (MCP) | MCP tool `verify_vehicle_access` | Returns whether caller's scopes can write to a VIN. |
+| Issue a key for a specific VIN | `nuke.ag/settings/connected-agents` | Scope grammar: `events:write:vehicle:{vin}` (narrow) or `events:write:all` (broad). |
+| Discover the public surface | `https://nuke.ag/v1/openapi.json` (programmatic) or `https://nuke.ag/api/docs` (Redoc UI) | OpenAPI 3.1 spec. |
+
+**Auth contract:** `X-API-Key: nk_live_...` (preferred for external agents) OR `Authorization: Bearer <service-role>` (internal). Per-vehicle scope check via `_shared/apiKeyAuth.ts → requireVehicleScope()` and `_shared/scopeGrammar.ts`. Rate limits enforced atomically via `check_api_key_rate_limit(p_key_hash, p_endpoint)` RPC.
+
+**Substrate:** Reuses `vehicle_observations` + `ingest-observation`. Append-only with supersession via `is_superseded`/`superseded_by` (correction_of in envelope).
 
 ---
 
@@ -455,4 +516,24 @@ cd /Users/skylar/nuke && dotenvx run -- bash -c \
 - **Never write `ai_processing_status`, `signal_score`, `nuke_estimate`, `deal_score`, or `heat_score` directly.** These are computed fields owned by specific pipeline functions.
 - **Never change `locked_by` / `locked_at` on queue tables.** The lock mechanism is managed by queue workers; breaking it causes duplicate processing.
 - **Check `ACTIVE_AGENTS.md`** before touching any edge function file — another agent may be mid-deployment.
+
+---
+
+## Archived (deployed but not invoked)
+
+Per `slim-by-deactivate-not-delete`: storage is cheap, compute hurts. These functions remain deployed (zero idle cost) but are not called from frontend, MCP, or active crons as of 2026-04-25 audit. Treat as retired — do not invoke, do not extend. Recovery is one-line if a use case re-emerges.
+
+Confidence ratings reflect how thoroughly the audit could rule out callers. Promote a function to a category above before re-using it; remove from this list with a dated note.
+
+| Function | Confidence | Reason | Eval source |
+|---|---|---|---|
+| `extract-bh-auction` | MEDIUM | Only legacy `loadVehicleImages.ts` reference; no live invocation found | infra-stewardship-eval-2026-04-25 |
+| `extract-premium-auction` | MEDIUM | Same as above | infra-stewardship-eval-2026-04-25 |
+| `imessage-router` | HIGH | Superseded by local script `imessage-bridge.mjs` | infra-stewardship-eval-2026-04-25 |
+| `gmail-alert-poller` | MEDIUM | No frontend reference; no cron schedule | infra-stewardship-eval-2026-04-25 |
+| `review-agent-submissions` | MEDIUM | No frontend reference; no live caller | infra-stewardship-eval-2026-04-25 |
+
+**Pending invocation-log review (~15-20 more):** the audit identified ~20-25 truly orphaned functions out of 195 deployed. The five above are the highest-confidence subset where callers were ruled out via grep. The rest need 30-day no-fire confirmation from `cron.job_run_details` and edge function logs before they can be marked archived. Until then, they remain in the active list as middling.
+
+**Functions kept despite rare invocation:** `live-admin`, `nlq-sql`, `onboard-source` — admin-only or registry-growth paths. Low frequency is by design, not orphan status.
 - **Always use `archiveFetch()`** for fetching external URLs — never raw `fetch()`.

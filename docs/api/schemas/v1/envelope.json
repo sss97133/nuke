@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nuke.ag/api/schemas/v1/envelope.json",
+  "title": "External Agent Write API — Event Envelope (v1.0)",
+  "description": "Strict outer envelope for any event submitted to POST /v1/events. The payload field is loose (event-type-specific JSONB validated against per-type schemas). The envelope itself is closed: unknown fields at this layer are rejected so that schema evolution stays explicit.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_type",
+    "vehicle_ref",
+    "occurred_at",
+    "submitted_at",
+    "agent",
+    "auth",
+    "payload"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Envelope schema version. Currently '1.0'. Major version bumps are non-additive.",
+      "enum": ["1.0"]
+    },
+    "event_type": {
+      "type": "string",
+      "description": "Discriminator selecting the payload schema. Reserved values defined here; future additions require a minor version bump.",
+      "enum": [
+        "service",
+        "inspection",
+        "modification",
+        "ownership_change",
+        "media",
+        "note"
+      ]
+    },
+    "vehicle_ref": {
+      "type": "object",
+      "description": "Reference to the target vehicle. VIN is canonical; vehicle_id is optional and only honored if the agent already knows Nuke's internal UUID.",
+      "additionalProperties": false,
+      "required": ["vin"],
+      "properties": {
+        "vin": {
+          "type": "string",
+          "description": "Vehicle Identification Number. 17 chars for post-1981 vehicles; pre-1981 VINs may be shorter (e.g. classic Mustang '6F07C219593' is 11 chars).",
+          "minLength": 5,
+          "maxLength": 32,
+          "pattern": "^[A-HJ-NPR-Z0-9]+$"
+        },
+        "vehicle_id": {
+          "type": "string",
+          "description": "Nuke's internal vehicle UUID. Optional; the endpoint resolves VIN→vehicle_id internally.",
+          "format": "uuid"
+        }
+      }
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the event happened in the physical world (e.g. when the wrench turned)."
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the agent assembled this submission."
+    },
+    "agent": {
+      "type": "object",
+      "description": "Identity of the submitting agent. Opaque to Nuke — used for analytics, dispute attribution, and abuse review.",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable agent identifier (e.g. 'claude-anthropic', 'chatgpt-openai', 'curl-test').",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "description": "Agent build/model version (e.g. 'claude-opus-4-7').",
+          "maxLength": 128
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Opaque session correlation id chosen by the agent.",
+          "maxLength": 256
+        }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "description": "Authentication context as the agent understands it. Nuke validates this against the X-API-Key header — submitted values are advisory only and rejected if they conflict with the resolved key.",
+      "additionalProperties": false,
+      "required": ["scopes"],
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Nuke user UUID the token was issued to."
+        },
+        "token_id": {
+          "type": "string",
+          "description": "Identifier of the API key/token being used (matches `api_keys.id`)."
+        },
+        "scopes": {
+          "type": "array",
+          "description": "Scopes the agent is asserting. Must include the per-vehicle write scope for vehicle_ref.vin (e.g. 'events:write:vehicle:6F07C219593') or the wildcard 'events:write:all'.",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^events:(read|write):(all|vehicle:[A-HJ-NPR-Z0-9]+)$"
+          }
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "description": "Event-type-specific body. Validated against the per-type JSON Schema selected by event_type (service.json, note.json, etc.). Loose by design — additive field evolution is allowed within a major version.",
+      "additionalProperties": true
+    },
+    "media": {
+      "type": "array",
+      "description": "Optional attached media. Each item references a publicly addressable resource and an optional integrity hash. Storage and rights handling lives outside the envelope.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "url"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["image", "video", "audio", "document"]
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Lowercase hex SHA-256 of the resource bytes."
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 1024
+          }
+        }
+      }
+    },
+    "correction_of": {
+      "type": "string",
+      "format": "uuid",
+      "description": "If present, this submission supersedes a prior event. The prior observation is marked is_superseded=true and superseded_by points to the new row. Append-only — the prior row is never destroyed."
+    },
+    "submission_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Lowercase hex SHA-256 of the canonical JSON of this envelope with the submission_hash field removed. Optional integrity check; servers may verify and reject mismatches."
+    }
+  }
+}

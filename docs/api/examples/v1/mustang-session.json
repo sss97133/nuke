@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0",
+  "event_type": "service",
+  "vehicle_ref": {
+    "vin": "6F07C219593"
+  },
+  "occurred_at": "2026-05-02T21:47:00Z",
+  "submitted_at": "2026-05-02T21:48:12Z",
+  "agent": {
+    "id": "claude-anthropic",
+    "version": "claude-opus-4-7",
+    "session_id": "mustang-pilot-001"
+  },
+  "auth": {
+    "user_id": "00000000-0000-0000-0000-000000000001",
+    "token_id": "demo-token",
+    "scopes": ["events:write:vehicle:6F07C219593"]
+  },
+  "payload": {
+    "summary": "Engine refresh — peripherals pulled, sludge in valve galley, deferred engine pull to morning.",
+    "narrative": "Worked the 1966 Mustang in the home garage. Pulled both valve covers and inspected the top end. Heavy sludge in the valve galley confirms long sit / poor oil change history — strong indicator the bottom end will need attention too. Photographed the door tag, strut tower stamping, and engine bay condition for the build record. Read plugs (mixed, leaning rich on cylinders 3 and 5). Decided against pulling the engine tonight — too late, want fresh eyes before committing to a teardown. Reassembled valve covers loose to keep dirt out overnight.",
+    "work_performed": [
+      "pulled valve covers (both banks)",
+      "photographed door tag",
+      "photographed strut tower stamping",
+      "read plugs",
+      "reassembled valve covers loose"
+    ],
+    "work_planned": [
+      "decide pull vs work-in-car in the morning",
+      "drop oil pan to check for sludge in bottom end",
+      "compression test before any teardown"
+    ],
+    "parts": [
+      {
+        "name": "valve cover gasket set",
+        "status": "needed",
+        "quantity": 1
+      },
+      {
+        "name": "engine oil",
+        "status": "needed",
+        "quantity": 5
+      }
+    ],
+    "decisions": [
+      {
+        "question": "pull engine vs work in-car",
+        "outcome": "deferred to morning",
+        "reasoning": "Late in the session, sludge finding warrants a clearer head before committing to a full teardown. Compression test first will inform the decision."
+      }
+    ],
+    "condition_observations": [
+      {
+        "system": "top_end",
+        "finding": "heavy sludge in valve galley, both banks",
+        "severity": "concern"
+      },
+      {
+        "system": "ignition",
+        "finding": "plugs reading rich on cylinders 3 and 5",
+        "severity": "monitor"
+      }
+    ],
+    "labor_minutes": 180,
+    "shop_ref": "home garage"
+  },
+  "media": [
+    {
+      "type": "image",
+      "url": "https://example.invalid/mustang/door-tag-2026-05-02.jpg",
+      "caption": "Door tag — VIN, body code, paint code"
+    },
+    {
+      "type": "image",
+      "url": "https://example.invalid/mustang/strut-tower-stamping-2026-05-02.jpg",
+      "caption": "Driver-side strut tower stamping"
+    },
+    {
+      "type": "image",
+      "url": "https://example.invalid/mustang/valve-galley-sludge-2026-05-02.jpg",
+      "caption": "Valve galley sludge — both banks"
+    }
+  ]
+}
