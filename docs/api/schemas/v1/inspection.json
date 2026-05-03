@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nuke.ag/api/schemas/v1/inspection.json",
+  "title": "External Agent Write API — Inspection Event Payload (v1.0)",
+  "description": "Payload shape for envelope.event_type='inspection'. Routes to vehicle_observations with observation_kind='condition', source slug 'agent-submission'. Use when the agent is recording a deliberate visual / mechanical inspection (PPI, walk-around, photo audit) — not work performed. Strict closed schema: the form is a checklist.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "findings"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "1–2 sentence headline of the inspection (e.g. 'Pre-purchase inspection at Boulder City lot — bones look solid, deferred maintenance heavy').",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "narrative": {
+      "type": "string",
+      "description": "Free-form long-form notes from the inspection.",
+      "maxLength": 32768
+    },
+    "inspection_type": {
+      "type": "string",
+      "description": "What kind of inspection this is. Drives downstream filtering and weighting.",
+      "enum": [
+        "pre_purchase",
+        "walk_around",
+        "photo_audit",
+        "post_work_qc",
+        "annual_check",
+        "incident_report",
+        "other"
+      ]
+    },
+    "inspector_role": {
+      "type": "string",
+      "description": "Who performed the inspection. 'agent_vision' = LLM analyzing photos; 'owner_self' = vehicle owner with phone; 'shop' = professional shop.",
+      "enum": ["agent_vision", "owner_self", "shop", "third_party_expert"]
+    },
+    "zones_inspected": {
+      "type": "array",
+      "description": "Subsystems actually examined during the inspection. Closed enum aligned with service.zones_touched.",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "engine_bay",
+          "undercarriage",
+          "interior",
+          "wheels",
+          "drivetrain",
+          "cooling",
+          "electrical",
+          "fuel",
+          "ignition",
+          "suspension",
+          "brakes",
+          "body",
+          "other"
+        ]
+      }
+    },
+    "findings": {
+      "type": "array",
+      "description": "Discrete observations made during the inspection. Each finding is a testimony atom on the vehicle's timeline.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["finding", "severity"],
+        "properties": {
+          "system": {
+            "type": "string",
+            "enum": [
+              "engine_bay",
+              "top_end",
+              "bottom_end",
+              "undercarriage",
+              "interior",
+              "wheels",
+              "drivetrain",
+              "cooling",
+              "electrical",
+              "fuel",
+              "ignition",
+              "suspension",
+              "brakes",
+              "body",
+              "other"
+            ]
+          },
+          "finding": { "type": "string", "minLength": 1, "maxLength": 2000 },
+          "severity": {
+            "type": "string",
+            "enum": ["info", "monitor", "concern", "critical"]
+          },
+          "evidence_photo_ref": {
+            "type": "string",
+            "description": "Optional caller-side photo identifier (URL or sha256) supporting this finding.",
+            "maxLength": 1024
+          }
+        }
+      }
+    },
+    "overall_condition": {
+      "type": "string",
+      "description": "Single-word rollup of vehicle condition. Coarse on purpose; details belong in findings.",
+      "enum": ["excellent", "good", "fair", "rough", "project", "parts_only"]
+    },
+    "deferred_maintenance_minutes": {
+      "type": "number",
+      "description": "Estimated wrench-time backlog the inspector identified, in minutes.",
+      "minimum": 0,
+      "maximum": 100000
+    },
+    "photos_referenced": {
+      "type": "array",
+      "description": "Caller-side identifiers (URL or sha256) of photos that anchor the inspection.",
+      "items": { "type": "string", "maxLength": 1024 }
+    }
+  }
+}
