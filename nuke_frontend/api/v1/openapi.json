@@ -2448,6 +2448,200 @@
             "$ref": "#/components/responses/RateLimited"
           }
         }
+      },
+      "get": {
+        "tags": [
+          "External Agent Write API"
+        ],
+        "summary": "Read events back for a VIN (round-trip / verification)",
+        "description": "Returns events that were written through `POST /v1/events` for the given VIN\n(filtered by source: `shop`, `agent-submission`). Use this to verify a write\nlanded, build agent-side caches, or audit your own submissions.\n\n**Read scope grammar:** `events:read:vehicle:{vin}`, `events:read:all`. Write\nscopes (`events:write:*`) implicitly grant read for the same target.\nLegacy `read`/`write`/`admin` keys also pass.\n\nSuperseded events are filtered by default; pass `include_superseded=true`\nto see the full provenance chain.\n",
+        "operationId": "listEvents",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "vin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-HJ-NPR-Z0-9]{5,32}$"
+            },
+            "description": "Vehicle VIN (canonical key)."
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_superseded",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event list for the VIN.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "vehicle_id",
+                    "vin",
+                    "events",
+                    "count"
+                  ],
+                  "properties": {
+                    "vehicle_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "vin": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "include_superseded": {
+                      "type": "boolean"
+                    },
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "event_id",
+                          "observation_id",
+                          "kind",
+                          "occurred_at",
+                          "summary"
+                        ],
+                        "properties": {
+                          "event_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "observation_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "description": "Internal observation_kind (work_record",
+                            "comment": null,
+                            "...)": null
+                          },
+                          "event_type": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Originating event_type from envelope (service",
+                            "note)": null
+                          },
+                          "occurred_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "ingested_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "summary": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "payload": {
+                            "type": "object",
+                            "description": "The submitted payload, with internal `_envelope` stripped."
+                          },
+                          "confidence_score": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "is_superseded": {
+                            "type": "boolean"
+                          },
+                          "superseded_by": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "superseded_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "agent": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "version": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "session_id": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Read scope insufficient for this VIN.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "VIN not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
       }
     }
   },
