@@ -478,6 +478,8 @@ const ImageGallery = ({
           .or('is_duplicate.is.null,is_duplicate.eq.false')
           // Hide AI-detected mismatched/unrelated images
           .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
+          // Vision gate: only approved or legacy-NULL images appear in the gallery.
+          .or('vision_gate_status.is.null,vision_gate_status.eq.approved')
           .order('position', { ascending: true })
           .order('created_at', { ascending: true });
 
