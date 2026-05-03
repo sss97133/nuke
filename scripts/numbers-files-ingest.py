@@ -57,7 +57,22 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.environ.get("VITE_SUPABASE_U
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 
 VIN_RE = re.compile(r"\b[A-HJ-NPR-Z0-9]{17}\b")
-SHORT_VIN_RE = re.compile(r"\b[A-HJ-NPR-Z0-9]{11,13}\b")  # pre-1981 VINs
+# Pre-1981 short VINs are 11-13 chars. The naïve regex catches a lot of
+# false positives (English words, parts numbers, placeholders like
+# REPLACEMENT). Require at least one digit and at least one letter, and
+# exclude a small denylist of common false positives.
+SHORT_VIN_RE = re.compile(r"\b[A-HJ-NPR-Z0-9]{11,13}\b")
+SHORT_VIN_DENYLIST = {
+    "REPLACEMENT",
+    "TRANSMISSION",
+    "DESCRIPTION",
+    "INSTALLATION",
+    "REGISTRATION",
+    "TRANSPORTATIO",  # truncated by 13-char cap
+    "RESTORATION",
+    "INFORMATION",
+    "MAINTENANCE",
+}
 
 # Curated filename → vehicle_id map. When the year+make+model search returns
 # multiple candidates (very common — there are 5+ "1986 Chevrolet K10"s in DB),
@@ -156,8 +171,18 @@ def find_vins(text: str) -> list[str]:
     full = VIN_RE.findall(text.upper())
     if full:
         return list(dict.fromkeys(full))
-    short = SHORT_VIN_RE.findall(text.upper())
-    return list(dict.fromkeys(short))
+    candidates = SHORT_VIN_RE.findall(text.upper())
+    cleaned = []
+    seen = set()
+    for v in candidates:
+        if v in SHORT_VIN_DENYLIST:
+            continue
+        if not (any(c.isdigit() for c in v) and any(c.isalpha() for c in v)):
+            continue
+        if v not in seen:
+            seen.add(v)
+            cleaned.append(v)
+    return cleaned
 
 
 def hint_make(name: str) -> str | None:
