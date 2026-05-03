@@ -2,14 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://nuke.ag/api/schemas/v1/note.json",
   "title": "External Agent Write API — Note Event Payload (v1.0)",
-  "description": "Minimal payload for envelope.event_type='note'. Routes to vehicle_observations with observation_kind='comment', source slug 'agent-submission'. Use for free-form remarks that don't fit a structured event type.",
+  "description": "Payload shape for envelope.event_type='note'. Routes to vehicle_observations with observation_kind='comment', source slug 'agent-submission'. Use for free-form remarks that don't fit a structured event type. Tightened in WS-4 with optional classifier fields so notes carry enough metadata to be filterable without forcing a heavier event_type.",
   "type": "object",
-  "additionalProperties": true,
+  "additionalProperties": false,
   "required": ["summary"],
   "properties": {
     "summary": {
       "type": "string",
-      "description": "Short headline (1–280 chars).",
+      "description": "Short headline (1–280 chars). Vision-fillable from a photo caption; context-fillable from chat scrollback.",
       "minLength": 1,
       "maxLength": 280
     },
@@ -17,6 +17,52 @@
       "type": "string",
       "description": "Optional longer body for the note.",
       "maxLength": 32768
+    },
+    "observation_type": {
+      "type": "string",
+      "description": "Optional classifier so consumers can filter notes by intent without reading prose.",
+      "enum": [
+        "condition_finding",
+        "modification_indicator",
+        "ownership_clue",
+        "provenance_record",
+        "expert_opinion",
+        "forum_summary",
+        "media_caption"
+      ]
+    },
+    "confidence": {
+      "type": "string",
+      "description": "Agent's self-rated confidence in the note's accuracy. Reflects the quality of the source, not the agent's eloquence.",
+      "enum": ["verified", "high", "medium", "low", "inferred"]
+    },
+    "zones_mentioned": {
+      "type": "array",
+      "description": "Subsystems the note refers to. Same closed enum as service.zones_touched so timeline filters are consistent.",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "engine_bay",
+          "undercarriage",
+          "interior",
+          "wheels",
+          "drivetrain",
+          "cooling",
+          "electrical",
+          "fuel",
+          "ignition",
+          "suspension",
+          "brakes",
+          "body",
+          "other"
+        ]
+      }
+    },
+    "photos_referenced": {
+      "type": "array",
+      "description": "Caller-side identifiers (URL or sha256) of photos this note references.",
+      "items": { "type": "string", "maxLength": 1024 }
     }
   }
 }

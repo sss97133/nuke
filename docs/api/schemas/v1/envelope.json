@@ -23,14 +23,15 @@
     },
     "event_type": {
       "type": "string",
-      "description": "Discriminator selecting the payload schema. Reserved values defined here; future additions require a minor version bump.",
+      "description": "Discriminator selecting the payload schema. Routed types (v1.0): service, note, inspection, modification, condition_assessment. Reserved (envelope-valid but the endpoint returns 400 until v1.1 wires routing): ownership_change, media. Future additions require a minor version bump.",
       "enum": [
         "service",
+        "note",
         "inspection",
         "modification",
+        "condition_assessment",
         "ownership_change",
-        "media",
-        "note"
+        "media"
       ]
     },
     "vehicle_ref": {

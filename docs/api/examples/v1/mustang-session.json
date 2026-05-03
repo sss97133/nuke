@@ -19,6 +19,7 @@
   "payload": {
     "summary": "Engine refresh — peripherals pulled, sludge in valve galley, deferred engine pull to morning.",
     "narrative": "Worked the 1966 Mustang in the home garage. Pulled both valve covers and inspected the top end. Heavy sludge in the valve galley confirms long sit / poor oil change history — strong indicator the bottom end will need attention too. Photographed the door tag, strut tower stamping, and engine bay condition for the build record. Read plugs (mixed, leaning rich on cylinders 3 and 5). Decided against pulling the engine tonight — too late, want fresh eyes before committing to a teardown. Reassembled valve covers loose to keep dirt out overnight.",
+    "zones_touched": ["engine_bay", "ignition"],
     "work_performed": [
       "pulled valve covers (both banks)",
       "photographed door tag",
