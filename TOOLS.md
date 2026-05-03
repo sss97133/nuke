@@ -397,6 +397,7 @@ Public agent-writable surface. External LLM agents (Claude, ChatGPT, etc.) submi
 | Verify VIN access (MCP) | MCP tool `verify_vehicle_access` | Returns whether caller's scopes can write to a VIN. |
 | Issue a key for a specific VIN | `nuke.ag/settings/connected-agents` | Scope grammar: `events:write:vehicle:{vin}` (narrow) or `events:write:all` (broad). |
 | Discover the public surface | `https://nuke.ag/v1/openapi.json` (programmatic) or `https://nuke.ag/api/docs` (Redoc UI) | OpenAPI 3.1 spec. |
+| Bridge OCR'd receipts → observations | `ingest-receipts-as-observations` | WS-3 bridge. Reads `receipts` rows where `vehicle_id IS NOT NULL AND submitted_observation_id IS NULL`, classifies kind (parts/labor → `work_record`, insurance/registration → `specification`, else → `comment`), POSTs through `ingest-observation` with `source_slug='receipt-scan'`, marks receipt with returned `submitted_observation_id`. POST `{batch_size: 50, dry_run?: false, vehicle_id?, receipt_id?}`. Idempotent. Run via `npm run receipts:bridge`. |
 
 **Auth contract:** `X-API-Key: nk_live_...` (preferred for external agents) OR `Authorization: Bearer <service-role>` (internal). Per-vehicle scope check via `_shared/apiKeyAuth.ts → requireVehicleScope()` and `_shared/scopeGrammar.ts`. Rate limits enforced atomically via `check_api_key_rate_limit(p_key_hash, p_endpoint)` RPC.
 
