@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nuke.ag/api/schemas/v1/condition_assessment.json",
+  "title": "External Agent Write API — Condition Assessment Event Payload (v1.0)",
+  "description": "Payload shape for envelope.event_type='condition_assessment'. Routes to vehicle_observations with observation_kind='condition', source slug 'agent-submission'. Use when the agent is producing a single rollup judgment of vehicle condition (e.g. for valuation, listing prep, insurance). Different from 'inspection' — the inspection is the act, the condition_assessment is the verdict.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "overall_condition", "scoring_basis"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "1–2 sentence headline of the assessment (e.g. 'Solid driver-quality K5 — body straight, drivetrain tired, interior aged honestly').",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "narrative": {
+      "type": "string",
+      "description": "Free-form long-form rationale supporting the rollup.",
+      "maxLength": 32768
+    },
+    "overall_condition": {
+      "type": "string",
+      "description": "Single-word rollup. Maps to common collector-car grade language.",
+      "enum": ["excellent", "good", "fair", "rough", "project", "parts_only"]
+    },
+    "condition_score": {
+      "type": "integer",
+      "description": "Optional Hagerty-style numerical rating, 1–4 (1=concours, 4=fair). Use only if the assessor is comfortable on that scale.",
+      "minimum": 1,
+      "maximum": 4
+    },
+    "scoring_basis": {
+      "type": "string",
+      "description": "What the assessor based the rollup on. Drives trust weighting downstream.",
+      "enum": ["photos_only", "in_person_walk_around", "in_person_drive", "shop_inspection", "owner_self_report"]
+    },
+    "subsystem_scores": {
+      "type": "array",
+      "description": "Optional per-subsystem condition breakdown.",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["system", "rating"],
+        "properties": {
+          "system": {
+            "type": "string",
+            "enum": [
+              "engine_bay",
+              "top_end",
+              "bottom_end",
+              "undercarriage",
+              "interior",
+              "wheels",
+              "drivetrain",
+              "cooling",
+              "electrical",
+              "fuel",
+              "ignition",
+              "suspension",
+              "brakes",
+              "body",
+              "paint",
+              "glass",
+              "trim",
+              "other"
+            ]
+          },
+          "rating": {
+            "type": "string",
+            "enum": ["excellent", "good", "fair", "rough", "project", "parts_only"]
+          },
+          "notes": { "type": "string", "maxLength": 1000 }
+        }
+      }
+    },
+    "value_estimate_usd": {
+      "type": "number",
+      "description": "Optional estimated market value supporting the assessment. USD.",
+      "minimum": 0
+    },
+    "comp_basis": {
+      "type": "string",
+      "description": "Free-form note on how value was anchored (e.g. 'BaT comps for 1986 K5 SWBs sold 2024-2025').",
+      "maxLength": 2000
+    },
+    "photos_referenced": {
+      "type": "array",
+      "description": "Caller-side identifiers of photos this assessment leans on.",
+      "items": { "type": "string", "maxLength": 1024 }
+    }
+  }
+}

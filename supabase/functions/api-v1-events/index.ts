@@ -38,7 +38,12 @@ const RESPONSE_HEADERS = {
 
 // ── Type definitions ─────────────────────────────────────────────────────────
 
-type EventType = "service" | "note";
+type EventType =
+  | "service"
+  | "note"
+  | "inspection"
+  | "modification"
+  | "condition_assessment";
 
 interface EventEnvelope {
   schema_version: string;
@@ -58,9 +63,14 @@ interface EventEnvelope {
 }
 
 // event_type → { kind, source_slug }
+// WS-4 expansion: inspection, modification, condition_assessment routed.
+// ownership_change and media remain envelope-valid but unrouted (handler returns 400 for those).
 const EVENT_TYPE_MAP: Record<string, { kind: string; source_slug: string }> = {
   service: { kind: "work_record", source_slug: "shop" },
   note: { kind: "comment", source_slug: "agent-submission" },
+  inspection: { kind: "condition", source_slug: "agent-submission" },
+  modification: { kind: "work_record", source_slug: "agent-submission" },
+  condition_assessment: { kind: "condition", source_slug: "agent-submission" },
 };
 
 const VIN_RE = /^[A-HJ-NPR-Z0-9]{11,17}$/i;

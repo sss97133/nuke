@@ -1597,8 +1597,9 @@ paths:
 
         - **Outer envelope is strict** (closed schema, additional properties rejected).
           Full schema: [envelope.json](https://nuke.ag/api/schemas/v1/envelope.json).
-        - **`payload` is loose** but validated against the per-event-type schema selected
-          by `event_type` (`service` → service.json, `note` → note.json).
+        - **`payload` is closed** and validated against the per-event-type schema selected
+          by `event_type`: `service` → service.json, `note` → note.json, `inspection` → inspection.json,
+          `modification` → modification.json, `condition_assessment` → condition_assessment.json.
         - **VIN is the canonical key.** `vehicle_ref.vin` is required; `vehicle_ref.vehicle_id`
           is optional and only used if the agent already knows Nuke's internal UUID.
         - **Append-only.** Corrections submit a new event with `correction_of` pointing at the
@@ -1613,9 +1614,21 @@ paths:
         | --- | --- | --- |
         | `service` | `work_record` | `shop` |
         | `note`    | `comment`     | `agent-submission` |
+        | `inspection` | `condition` | `agent-submission` |
+        | `modification` | `work_record` | `agent-submission` |
+        | `condition_assessment` | `condition` | `agent-submission` |
 
-        Other event types (`inspection`, `modification`, `ownership_change`, `media`) are reserved
-        in the envelope but not yet routed; submissions for those return `400` until v1.1.
+        Reserved event types (`ownership_change`, `media`) are envelope-valid but unrouted —
+        submissions for those return `400` until v1.1.
+
+        ### Discovering the form-shape (Claude-actionable checklist)
+
+        Agents should fetch a per-field checklist via the MCP tool **`get_event_checklist(event_type)`**
+        before composing a payload. The checklist returns one entry per field with `field`, `type`,
+        `required`, `description`, `why_it_matters`, `vision_fillable`, `context_fillable`,
+        `tool_fillable`, and `validation_rule` — telling the agent how to source each value (from a
+        photo, from chat scrollback, or via another MCP tool). This is the difference between Claude
+        filling the form and Claude hallucinating structure.
 
         ### Authentication
 
@@ -1772,8 +1785,8 @@ paths:
                       properties:
                         event_id: { type: string, format: uuid }
                         observation_id: { type: string, format: uuid }
-                        kind: { type: string, description: Internal observation_kind (work_record, comment, ...) }
-                        event_type: { type: string, nullable: true, description: Originating event_type from envelope (service, note) }
+                        kind: { type: string, description: 'Internal observation_kind (work_record, comment, condition, ...)' }
+                        event_type: { type: string, nullable: true, description: 'Originating event_type from envelope (service, note, inspection, modification, condition_assessment)' }
                         occurred_at: { type: string, format: date-time }
                         ingested_at: { type: string, format: date-time }
                         summary: { type: string, nullable: true }
@@ -2875,8 +2888,11 @@ components:
           description: Envelope schema version. Major version bumps are non-additive.
         event_type:
           type: string
-          enum: [service, inspection, modification, ownership_change, media, note]
-          description: Discriminator selecting which payload schema applies.
+          enum: [service, note, inspection, modification, condition_assessment, ownership_change, media]
+          description: |
+            Discriminator selecting which payload schema applies. Routed in v1.0:
+            service, note, inspection, modification, condition_assessment.
+            Reserved (envelope-valid but the endpoint returns 400 until v1.1 wires routing): ownership_change, media.
         vehicle_ref:
           type: object
           additionalProperties: false
@@ -2942,10 +2958,14 @@ components:
           oneOf:
             - $ref: '#/components/schemas/ServicePayload'
             - $ref: '#/components/schemas/NotePayload'
+            - $ref: '#/components/schemas/InspectionPayload'
+            - $ref: '#/components/schemas/ModificationPayload'
+            - $ref: '#/components/schemas/ConditionAssessmentPayload'
           description: |
-            Event-type-specific body. Validated against `ServicePayload` when
-            `event_type=service`, `NotePayload` when `event_type=note`. Other event
-            types are reserved in the envelope but not yet routed.
+            Event-type-specific body. Validated against the JSON Schema selected by `event_type`:
+            service → ServicePayload, note → NotePayload, inspection → InspectionPayload,
+            modification → ModificationPayload, condition_assessment → ConditionAssessmentPayload.
+            Reserved event types (`ownership_change`, `media`) are envelope-valid but unrouted.
         media:
           type: array
           items:
@@ -2980,10 +3000,11 @@ components:
       type: object
       description: |
         Payload for `event_type=service`. Routes internally to `vehicle_observations`
-        with `observation_kind='work_record'`, source slug `shop`. Loose by design —
-        agents add fields liberally; structure hardens in v1.1 once real submissions
-        reveal the missing shape.
-      additionalProperties: true
+        with `observation_kind='work_record'`, source slug `shop`. Tightened in WS-4 —
+        canonical shape lives at `docs/api/schemas/v1/service.json`. Closed at this layer
+        so additive evolution is explicit. The form-shape is the moat: the agent fills the
+        checklist, not a free-form blob.
+      additionalProperties: false
       required: [summary]
       properties:
         summary:
@@ -2993,6 +3014,12 @@ components:
         narrative:
           type: string
           maxLength: 32768
+        zones_touched:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [engine_bay, undercarriage, interior, wheels, drivetrain, cooling, electrical, fuel, ignition, suspension, brakes, body, other]
         work_performed:
           type: array
           items:
@@ -3009,58 +3036,40 @@ components:
           type: array
           items:
             type: object
-            additionalProperties: true
+            additionalProperties: false
             required: [name]
             properties:
-              name:
-                type: string
-                minLength: 1
-                maxLength: 200
-              manufacturer:
-                type: string
-                maxLength: 200
-              part_number:
-                type: string
-                maxLength: 200
-              quantity:
-                type: number
-                minimum: 0
+              name: { type: string, minLength: 1, maxLength: 200 }
+              manufacturer: { type: string, maxLength: 200 }
+              part_number: { type: string, maxLength: 200 }
+              quantity: { type: number, minimum: 0 }
               status:
                 type: string
                 enum: [needed, ordered, installed, considered_rejected]
+              cost_usd: { type: number, minimum: 0 }
+              supplier: { type: string, maxLength: 200 }
+              notes: { type: string, maxLength: 1000 }
         decisions:
           type: array
           items:
             type: object
-            additionalProperties: true
+            additionalProperties: false
             required: [question, outcome]
             properties:
-              question:
-                type: string
-                minLength: 1
-                maxLength: 1000
-              outcome:
-                type: string
-                minLength: 1
-                maxLength: 1000
-              reasoning:
-                type: string
-                maxLength: 4000
+              question: { type: string, minLength: 1, maxLength: 1000 }
+              outcome: { type: string, minLength: 1, maxLength: 1000 }
+              reasoning: { type: string, maxLength: 4000 }
         condition_observations:
           type: array
           items:
             type: object
-            additionalProperties: true
-            required: [finding]
+            additionalProperties: false
+            required: [finding, severity]
             properties:
               system:
                 type: string
-                maxLength: 100
-                description: Vehicle subsystem (open enum — top_end, bottom_end, fuel, ignition, cooling, brakes, electrical, suspension, drivetrain, body, interior, ...).
-              finding:
-                type: string
-                minLength: 1
-                maxLength: 2000
+                enum: [engine_bay, top_end, bottom_end, undercarriage, interior, wheels, drivetrain, cooling, electrical, fuel, ignition, suspension, brakes, body, other]
+              finding: { type: string, minLength: 1, maxLength: 2000 }
               severity:
                 type: string
                 enum: [info, monitor, concern, critical]
@@ -3071,14 +3080,20 @@ components:
         shop_ref:
           type: string
           maxLength: 200
+        photos_referenced:
+          type: array
+          items:
+            type: string
+            maxLength: 1024
 
     NotePayload:
       type: object
       description: |
         Payload for `event_type=note`. Routes internally to `vehicle_observations`
-        with `observation_kind='comment'`, source slug `agent-submission`. Use for
-        free-form remarks that don't fit a structured event type.
-      additionalProperties: true
+        with `observation_kind='comment'`, source slug `agent-submission`. Tightened in
+        WS-4 with optional classifier fields so notes are filterable without forcing a
+        heavier event_type. Canonical shape: `docs/api/schemas/v1/note.json`.
+      additionalProperties: false
       required: [summary]
       properties:
         summary:
@@ -3088,6 +3103,174 @@ components:
         narrative:
           type: string
           maxLength: 32768
+        observation_type:
+          type: string
+          enum: [condition_finding, modification_indicator, ownership_clue, provenance_record, expert_opinion, forum_summary, media_caption]
+        confidence:
+          type: string
+          enum: [verified, high, medium, low, inferred]
+        zones_mentioned:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [engine_bay, undercarriage, interior, wheels, drivetrain, cooling, electrical, fuel, ignition, suspension, brakes, body, other]
+        photos_referenced:
+          type: array
+          items:
+            type: string
+            maxLength: 1024
+
+    InspectionPayload:
+      type: object
+      description: |
+        Payload for `event_type=inspection`. Routes to `vehicle_observations` with
+        `observation_kind='condition'`, source slug `agent-submission`. Use when the
+        agent records a deliberate inspection (PPI, walk-around, photo audit), not work
+        performed. Canonical shape: `docs/api/schemas/v1/inspection.json`.
+      additionalProperties: false
+      required: [summary, findings]
+      properties:
+        summary: { type: string, minLength: 1, maxLength: 500 }
+        narrative: { type: string, maxLength: 32768 }
+        inspection_type:
+          type: string
+          enum: [pre_purchase, walk_around, photo_audit, post_work_qc, annual_check, incident_report, other]
+        inspector_role:
+          type: string
+          enum: [agent_vision, owner_self, shop, third_party_expert]
+        zones_inspected:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [engine_bay, undercarriage, interior, wheels, drivetrain, cooling, electrical, fuel, ignition, suspension, brakes, body, other]
+        findings:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [finding, severity]
+            properties:
+              system:
+                type: string
+                enum: [engine_bay, top_end, bottom_end, undercarriage, interior, wheels, drivetrain, cooling, electrical, fuel, ignition, suspension, brakes, body, other]
+              finding: { type: string, minLength: 1, maxLength: 2000 }
+              severity:
+                type: string
+                enum: [info, monitor, concern, critical]
+              evidence_photo_ref: { type: string, maxLength: 1024 }
+        overall_condition:
+          type: string
+          enum: [excellent, good, fair, rough, project, parts_only]
+        deferred_maintenance_minutes:
+          type: number
+          minimum: 0
+          maximum: 100000
+        photos_referenced:
+          type: array
+          items: { type: string, maxLength: 1024 }
+
+    ModificationPayload:
+      type: object
+      description: |
+        Payload for `event_type=modification`. Routes to `vehicle_observations` with
+        `observation_kind='work_record'`, source slug `agent-submission`. Use when the
+        work changes the vehicle's spec away from factory. Canonical shape:
+        `docs/api/schemas/v1/modification.json`.
+      additionalProperties: false
+      required: [summary, modification_type, zones_modified]
+      properties:
+        summary: { type: string, minLength: 1, maxLength: 500 }
+        narrative: { type: string, maxLength: 32768 }
+        modification_type:
+          type: string
+          enum: [performance, cosmetic, drivetrain_swap, suspension, brakes, electrical, interior, wheels_tires, fuel_system, ignition, cooling, body, audio, safety, other]
+        zones_modified:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum: [engine_bay, undercarriage, interior, wheels, drivetrain, cooling, electrical, fuel, ignition, suspension, brakes, body, other]
+        reversibility:
+          type: string
+          enum: [bolt_on, minor_irreversible, major_irreversible]
+        from_spec: { type: string, maxLength: 1000 }
+        to_spec: { type: string, maxLength: 1000 }
+        parts:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [name]
+            properties:
+              name: { type: string, minLength: 1, maxLength: 200 }
+              manufacturer: { type: string, maxLength: 200 }
+              part_number: { type: string, maxLength: 200 }
+              quantity: { type: number, minimum: 0 }
+              status:
+                type: string
+                enum: [needed, ordered, installed, considered_rejected, removed_retained]
+              cost_usd: { type: number, minimum: 0 }
+              supplier: { type: string, maxLength: 200 }
+              notes: { type: string, maxLength: 1000 }
+        labor_minutes:
+          type: number
+          minimum: 0
+          maximum: 100000
+        shop_ref: { type: string, maxLength: 200 }
+        photos_referenced:
+          type: array
+          items: { type: string, maxLength: 1024 }
+
+    ConditionAssessmentPayload:
+      type: object
+      description: |
+        Payload for `event_type=condition_assessment`. Routes to `vehicle_observations`
+        with `observation_kind='condition'`, source slug `agent-submission`. Use for a
+        single rollup condition judgment (valuation, listing prep, insurance). Canonical
+        shape: `docs/api/schemas/v1/condition_assessment.json`.
+      additionalProperties: false
+      required: [summary, overall_condition, scoring_basis]
+      properties:
+        summary: { type: string, minLength: 1, maxLength: 500 }
+        narrative: { type: string, maxLength: 32768 }
+        overall_condition:
+          type: string
+          enum: [excellent, good, fair, rough, project, parts_only]
+        condition_score:
+          type: integer
+          minimum: 1
+          maximum: 4
+        scoring_basis:
+          type: string
+          enum: [photos_only, in_person_walk_around, in_person_drive, shop_inspection, owner_self_report]
+        subsystem_scores:
+          type: array
+          uniqueItems: true
+          items:
+            type: object
+            additionalProperties: false
+            required: [system, rating]
+            properties:
+              system:
+                type: string
+                enum: [engine_bay, top_end, bottom_end, undercarriage, interior, wheels, drivetrain, cooling, electrical, fuel, ignition, suspension, brakes, body, paint, glass, trim, other]
+              rating:
+                type: string
+                enum: [excellent, good, fair, rough, project, parts_only]
+              notes: { type: string, maxLength: 1000 }
+        value_estimate_usd:
+          type: number
+          minimum: 0
+        comp_basis:
+          type: string
+          maxLength: 2000
+        photos_referenced:
+          type: array
+          items: { type: string, maxLength: 1024 }
 
     Error:
       type: object
