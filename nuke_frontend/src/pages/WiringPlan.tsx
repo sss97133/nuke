@@ -4,19 +4,34 @@
 // Hosts DeviceDetailPanel (right-side), CommandPalette (overlay)
 // Keyboard shortcuts: 1-5 tabs, F fit, Esc deselect, Cmd+K search
 
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import React, { Suspense, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { ManifestDevice, WireSpec } from '../components/wiring/overlayCompute';
 import { useOverlayCompute } from '../components/wiring/useOverlayCompute';
 import { DeviceDetailPanel } from '../components/wiring/DeviceDetailPanel';
-import { FormboardCanvas } from '../components/wiring/FormboardCanvas';
-import { SchematicView } from '../components/wiring/SchematicView';
-import { HarnessView3D } from '../components/wiring/HarnessView3D';
-import { DataView } from '../components/wiring/DataView';
 import { CommandPalette } from '../components/wiring/CommandPalette';
-import { TopologyView } from '../components/wiring/TopologyView';
 import { useDRC } from '../components/wiring/useDRC';
+
+// Tab views are lazy-loaded so initial paint only pays for the active tab.
+// The 3D tab pulls Three.js (~2.7MB), schematics/data/topology each have their
+// own weight, and formboard is the 2,552-line WHMA-A-620 build — eager-loading
+// all five was the cause of slow first-paint.
+const FormboardCanvas = React.lazy(() =>
+  import('../components/wiring/FormboardCanvas').then(m => ({ default: m.FormboardCanvas })),
+);
+const SchematicView = React.lazy(() =>
+  import('../components/wiring/SchematicView').then(m => ({ default: m.SchematicView })),
+);
+const HarnessView3D = React.lazy(() =>
+  import('../components/wiring/HarnessView3D').then(m => ({ default: m.HarnessView3D })),
+);
+const DataView = React.lazy(() =>
+  import('../components/wiring/DataView').then(m => ({ default: m.DataView })),
+);
+const TopologyView = React.lazy(() =>
+  import('../components/wiring/TopologyView').then(m => ({ default: m.TopologyView })),
+);
 
 // ── Design tokens ─────────────────────────────────────────────────────
 const C = {
@@ -388,40 +403,57 @@ export default function WiringPlan() {
       </div>
 
       {/* ── View Container ── */}
+      {/* Only the active tab is mounted. Camera state lives in cameraRefs (outside
+          React tree) so it survives unmount/remount. */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        {/* All views stay mounted but hidden for camera persistence */}
-        <div style={{ position: 'absolute', inset: 0, display: activeTab === 'formboard' ? 'block' : 'none' }}>
-          <FormboardCanvas
-            vehicleId={vehicleId || ''}
-            devices={overlay.devices}
-            selectedDeviceId={selectedDeviceId}
-            onSelectDevice={(id) => id ? handleDeviceClick(id) : handleDeselect()}
-            drcMap={drc.drcMap}
-            mode="formboard"
-          />
-        </div>
-        <div style={{ position: 'absolute', inset: 0, display: activeTab === 'schematics' ? 'block' : 'none' }}>
-          <SchematicView {...viewProps} cameraRef={cameraRefs.current.schematics} />
-        </div>
-        <div style={{ position: 'absolute', inset: 0, display: activeTab === '3d' ? 'block' : 'none' }}>
-          <HarnessView3D {...viewProps} />
-        </div>
-        <div style={{ position: 'absolute', inset: 0, display: activeTab === 'data' ? 'block' : 'none' }}>
-          <DataView {...viewProps} overlay={overlay} />
-        </div>
-        <div style={{ position: 'absolute', inset: 0, display: activeTab === 'topology' ? 'block' : 'none' }}>
-          <TopologyView
-            devices={overlay.devices}
-            wires={overlay.result.wires}
-            result={overlay.result}
-            selectedDeviceId={selectedDeviceId}
-            selectedDeviceIds={selectedDeviceIds}
-            selectedWireId={selectedWireId}
-            onDeviceClick={(id, e) => handleDeviceClick(id, e.shiftKey)}
-            onWireClick={handleWireClick}
-            drcMap={drc.drcMap}
-          />
-        </div>
+        <Suspense fallback={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: C.muted, fontFamily: "'Courier New', monospace", fontSize: 11 }}>
+            LOADING VIEW...
+          </div>
+        }>
+          {activeTab === 'formboard' && (
+            <div style={{ position: 'absolute', inset: 0 }}>
+              <FormboardCanvas
+                vehicleId={vehicleId || ''}
+                devices={overlay.devices}
+                selectedDeviceId={selectedDeviceId}
+                onSelectDevice={(id) => id ? handleDeviceClick(id) : handleDeselect()}
+                drcMap={drc.drcMap}
+                mode="formboard"
+              />
+            </div>
+          )}
+          {activeTab === 'schematics' && (
+            <div style={{ position: 'absolute', inset: 0 }}>
+              <SchematicView {...viewProps} cameraRef={cameraRefs.current.schematics} />
+            </div>
+          )}
+          {activeTab === '3d' && (
+            <div style={{ position: 'absolute', inset: 0 }}>
+              <HarnessView3D {...viewProps} />
+            </div>
+          )}
+          {activeTab === 'data' && (
+            <div style={{ position: 'absolute', inset: 0 }}>
+              <DataView {...viewProps} overlay={overlay} />
+            </div>
+          )}
+          {activeTab === 'topology' && (
+            <div style={{ position: 'absolute', inset: 0 }}>
+              <TopologyView
+                devices={overlay.devices}
+                wires={overlay.result.wires}
+                result={overlay.result}
+                selectedDeviceId={selectedDeviceId}
+                selectedDeviceIds={selectedDeviceIds}
+                selectedWireId={selectedWireId}
+                onDeviceClick={(id, e) => handleDeviceClick(id, e.shiftKey)}
+                onWireClick={handleWireClick}
+                drcMap={drc.drcMap}
+              />
+            </div>
+          )}
+        </Suspense>
 
         {/* ── Detail Panel (slides in from right) ── */}
         <DeviceDetailPanel
