@@ -10,7 +10,7 @@ import { supabase } from '../lib/supabase';
 import type { ManifestDevice, WireSpec } from '../components/wiring/overlayCompute';
 import { useOverlayCompute } from '../components/wiring/useOverlayCompute';
 import { DeviceDetailPanel } from '../components/wiring/DeviceDetailPanel';
-import { FormboardView } from '../components/wiring/FormboardView';
+import { FormboardCanvas } from '../components/wiring/FormboardCanvas';
 import { SchematicView } from '../components/wiring/SchematicView';
 import { HarnessView3D } from '../components/wiring/HarnessView3D';
 import { DataView } from '../components/wiring/DataView';
@@ -391,7 +391,14 @@ export default function WiringPlan() {
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         {/* All views stay mounted but hidden for camera persistence */}
         <div style={{ position: 'absolute', inset: 0, display: activeTab === 'formboard' ? 'block' : 'none' }}>
-          <FormboardView {...viewProps} cameraRef={cameraRefs.current.formboard} />
+          <FormboardCanvas
+            vehicleId={vehicleId || ''}
+            devices={overlay.devices}
+            selectedDeviceId={selectedDeviceId}
+            onSelectDevice={(id) => id ? handleDeviceClick(id) : handleDeselect()}
+            drcMap={drc.drcMap}
+            mode="formboard"
+          />
         </div>
         <div style={{ position: 'absolute', inset: 0, display: activeTab === 'schematics' ? 'block' : 'none' }}>
           <SchematicView {...viewProps} cameraRef={cameraRefs.current.schematics} />
