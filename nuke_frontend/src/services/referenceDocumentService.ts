@@ -71,6 +71,7 @@ export class ReferenceDocumentService {
     userId: string,
     options: DocumentUploadOptions
   ): Promise<ReferenceDocument> {
+    throw new Error('Reference documents feature is not deployed');
     try {
       const { file, document_type, title, description, auto_index = true, ...metadata } = options;
 
@@ -145,6 +146,7 @@ export class ReferenceDocumentService {
     fileUrl: string,
     userId: string
   ): Promise<void> {
+    throw new Error('Reference documents feature is not deployed');
     try {
       // Determine which indexing function to use based on document type
       if (documentType === 'parts_catalog') {
@@ -190,6 +192,7 @@ export class ReferenceDocumentService {
    * Get user's reference documents
    */
   static async getUserDocuments(userId: string, includePublic = false): Promise<ReferenceDocument[]> {
+    return [];
     try {
       const query = supabase
         .from('reference_documents')
@@ -215,6 +218,7 @@ export class ReferenceDocumentService {
    * Get public reference documents
    */
   static async getPublicDocuments(userId?: string): Promise<ReferenceDocument[]> {
+    return [];
     try {
       const { data, error } = await supabase
         .from('reference_documents')
@@ -234,6 +238,7 @@ export class ReferenceDocumentService {
    * Get documents linked to a vehicle
    */
   static async getVehicleDocuments(vehicleId: string): Promise<ReferenceDocument[]> {
+    return [];
     try {
       // Preferred: RPC (lets the backend choose the right joins + ordering).
       // Cache missing-RPC environments (per-host) to avoid repeated 404/PGRST202 spam.
@@ -336,6 +341,7 @@ export class ReferenceDocumentService {
     linkType: 'owner' | 'public' | 'shared' = 'owner',
     notes?: string
   ): Promise<void> {
+    throw new Error('Reference documents feature is not deployed');
     try {
       const { error } = await supabase
         .from('vehicle_reference_documents')
@@ -367,6 +373,7 @@ export class ReferenceDocumentService {
     documentId: string,
     vehicleId: string
   ): Promise<void> {
+    throw new Error('Reference documents feature is not deployed');
     try {
       const { error } = await supabase
         .from('vehicle_reference_documents')
@@ -385,6 +392,7 @@ export class ReferenceDocumentService {
    * Delete a reference document
    */
   static async deleteDocument(documentId: string, userId: string): Promise<void> {
+    throw new Error('Reference documents feature is not deployed');
     try {
       // Get document to find file path
       const { data: doc, error: docError } = await supabase
@@ -429,6 +437,7 @@ export class ReferenceDocumentService {
     userId: string,
     updates: Partial<ReferenceDocument>
   ): Promise<ReferenceDocument> {
+    throw new Error('Reference documents feature is not deployed');
     try {
       const { data, error } = await supabase
         .from('reference_documents')
@@ -453,6 +462,7 @@ export class ReferenceDocumentService {
     documentId: string,
     statType: 'view' | 'download' | 'bookmark'
   ): Promise<void> {
+    return;
     try {
       await supabase.rpc('increment_document_stat', {
         p_document_id: documentId,

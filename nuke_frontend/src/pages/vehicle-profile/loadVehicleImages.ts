@@ -44,26 +44,28 @@ export async function loadVehicleImagesImpl({
 
   // Load images from database first
   try {
-    const { data: imageRecords, error } = await supabase
+    // NOTE: Chained `.or()` calls combined with `.not.in.("a","b")` syntax were producing
+    // PostgREST 500s (server-side timeout / planner failure). Bounded to vehicle_id, the
+    // result set is small enough to fetch + filter client-side without measurable cost.
+    const { data: rawImageRecords, error } = await supabase
       .from('vehicle_images')
-      // Keep payload lean to reduce DB load/timeouts; we only need URLs + ordering fields here.
-      .select('id, vehicle_id, image_url, thumbnail_url, medium_url, variants, is_primary, is_document, position, created_at, storage_path')
+      .select('id, vehicle_id, image_url, thumbnail_url, medium_url, variants, is_primary, is_document, is_duplicate, image_vehicle_match_status, vision_gate_status, position, created_at, storage_path')
       .eq('vehicle_id', vehicle.id)
-      // Legacy rows may have is_document = NULL; treat that as "not a document"
-      .not('is_document', 'is', true) // Filter out documents - they belong in a separate section
-      // Quarantine/duplicate rows should never appear in standard galleries
-      .or('is_duplicate.is.null,is_duplicate.eq.false')
-      // Hide AI-detected mismatched/unrelated images (wrong vehicle or not a vehicle photo)
-      .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
-      // Vision gate: hide images that haven't been agent-classified yet, or that the agent
-      // rejected as personal / misattributed. Legacy rows (NULL) stay visible — they wait
-      // for the retroactive review pass.
-      .or('vision_gate_status.is.null,vision_gate_status.eq.approved')
       .order('is_primary', { ascending: false })
-        // IMPORTANT: NULL positions should sort LAST (older backfills didn't set position).
         .order('position', { ascending: true, nullsFirst: false })
-        // For un-positioned rows, show in chronological insert order (stable, matches source list order better than DESC).
         .order('created_at', { ascending: true });
+
+    const imageRecords = Array.isArray(rawImageRecords)
+      ? rawImageRecords.filter((r: any) => {
+          if (r?.is_document === true) return false;
+          if (r?.is_duplicate === true) return false;
+          const mvms = r?.image_vehicle_match_status;
+          if (mvms === 'mismatch' || mvms === 'unrelated') return false;
+          const vgs = r?.vision_gate_status;
+          if (vgs != null && vgs !== 'approved') return false;
+          return true;
+        })
+      : null;
 
     if (error) {
       console.error('❌ Error loading vehicle images from database:', error);

@@ -323,6 +323,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   };
 
   const renderCommentText = (text: string) => {
+    if (!text) return null;
     // Parse markdown-style meme references: [meme:Title](url)
     const memeRegex = /\[meme:([^\]]+)\]\(([^)]+)\)/g;
     const parts: React.ReactNode[] = [];
@@ -491,6 +492,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {visibleComments.map((comment) => {
+              if (!comment) return null;
               const displayDate = comment.posted_at || comment.created_at;
               // Check if this is a bid - either comment_type is 'bid' OR bid_amount is set
               const type = String(comment.comment_type || '').toLowerCase();
@@ -672,7 +674,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                           </div>
                         ) : (
                           <>
-                            {renderCommentText(comment.comment_text)}
+                            {renderCommentText(comment.comment_text ?? '')}
                             {/* Show media URLs for Instagram/Facebook comments */}
                             {comment.media_urls && comment.media_urls.length > 0 && (
                               <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>

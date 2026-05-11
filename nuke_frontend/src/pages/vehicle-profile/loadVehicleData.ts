@@ -96,98 +96,93 @@ export async function selectBestHeroImage(
   vehicleId: string,
   supabase: any,
   primaryImageUrl?: string | null,
+  prefetchedImages?: any[],
 ): Promise<HeroImageResult | null> {
   try {
-    // Attempt 0: explicit is_primary wins unconditionally.
-    // With contain mode as default, any orientation works — the full image is always visible.
-    const { data: primaryRows, error: primaryErr } = await supabase
-      .from('vehicle_images')
-      .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle')
-      .eq('vehicle_id', vehicleId)
-      .eq('is_primary', true)
-      .not('is_document', 'is', true)
-      .not('is_duplicate', 'is', true)
-      .limit(1);
+    // Coalesce the prior 4 sequential queries into one round-trip.
+    // Strategy: pull a generous candidate window ordered by (is_primary, quality, ai recency),
+    // then apply the same priority logic client-side. If the caller already has the image list,
+    // skip the network call entirely.
+    let candidates: any[] | null = null;
 
-    if (!primaryErr && primaryRows && primaryRows.length > 0) {
-      return buildHeroResult(primaryRows[0]);
+    if (prefetchedImages && prefetchedImages.length > 0) {
+      candidates = prefetchedImages;
+    } else {
+      const { data, error } = await supabase
+        .from('vehicle_images')
+        .select(
+          'image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, image_vehicle_match_status, ai_processing_status, created_at'
+        )
+        .eq('vehicle_id', vehicleId)
+        .order('is_primary', { ascending: false, nullsFirst: false })
+        .order('photo_quality_score', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false, nullsFirst: false })
+        .limit(60);
+
+      if (error) {
+        console.warn('[selectBestHeroImage] query error:', error);
+      }
+      candidates = data || null;
     }
 
-    // Attempt 1: front-facing exterior zones with completed AI processing
-    // Only trust images where match_status is explicitly 'match' or from trusted sources
-    const { data: frontImages, error: frontErr } = await supabase
-      .from('vehicle_images')
-      .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source')
-      .eq('vehicle_id', vehicleId)
-      .eq('ai_processing_status', 'completed')
-      .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
-      .in('vehicle_zone', ['ext_front', 'ext_front_driver', 'ext_front_passenger'])
-      .order('photo_quality_score', { ascending: false })
-      .limit(20);
+    if (!candidates || candidates.length === 0) {
+      if (primaryImageUrl) return { url: primaryImageUrl, meta: {} };
+      return null;
+    }
 
-    if (!frontErr && frontImages && frontImages.length > 0) {
-      // Prefer images from trusted sources (bat_import_mirrored, user_upload) over
-      // unverified bulk imports (iphoto, photo_auto_sync, drop-folder) which may
-      // contain photos from different vehicles.
-      const trustedSources = new Set(['bat_import_mirrored', 'bat_import', 'user_upload', 'manual']);
-      const scored = frontImages.map((img: any) => {
+    // Filter out documents/duplicates and mismatch-flagged rows
+    const usable = candidates.filter((img: any) => {
+      if (img?.is_document === true) return false;
+      if (img?.is_duplicate === true) return false;
+      const mvms = img?.image_vehicle_match_status;
+      if (mvms === 'mismatch' || mvms === 'unrelated') return false;
+      return true;
+    });
+
+    if (usable.length === 0) {
+      if (primaryImageUrl) return { url: primaryImageUrl, meta: {} };
+      return null;
+    }
+
+    // Priority 0: explicit primary
+    const primary = usable.find((img: any) => img?.is_primary === true);
+    if (primary) return buildHeroResult(primary);
+
+    const trustedSources = new Set(['bat_import_mirrored', 'bat_import', 'user_upload', 'manual']);
+    const frontZones = new Set(['ext_front', 'ext_front_driver', 'ext_front_passenger']);
+
+    // Priority 1: front-facing exterior, AI completed
+    const fronts = usable.filter(
+      (img: any) => img?.ai_processing_status === 'completed' && frontZones.has(img?.vehicle_zone)
+    );
+    if (fronts.length > 0) {
+      const scored = fronts.map((img: any) => {
         const base = scoreHeroCandidate(img, { frontExterior: true });
         const trusted = trustedSources.has(img.source) ? 50 : 0;
-        return { ...img, _score: base + trusted };
+        return { img, score: base + trusted };
       });
-      scored.sort((a: any, b: any) => b._score - a._score);
-      return buildHeroResult(scored[0]);
+      scored.sort((a, b) => b.score - a.score);
+      return buildHeroResult(scored[0].img);
     }
 
-    // Attempt 2: any zone, but still prefer true "money shot" exterior candidates
-    const { data: anyImages, error: anyErr } = await supabase
-      .from('vehicle_images')
-      .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source')
-      .eq('vehicle_id', vehicleId)
-      .not('photo_quality_score', 'is', null)
-      .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
-      .order('photo_quality_score', { ascending: false })
-      .limit(40);
-
-    if (!anyErr && anyImages && anyImages.length > 0) {
-      const trustedSources = new Set(['bat_import_mirrored', 'bat_import', 'user_upload', 'manual']);
-      const scored = anyImages.map((img: any) => {
+    // Priority 2: any zone with a quality score
+    const scored2 = usable
+      .filter((img: any) => img?.photo_quality_score != null)
+      .map((img: any) => {
         const base = scoreHeroCandidate(img);
         const trusted = trustedSources.has(img.source) ? 50 : 0;
-        return { ...img, _score: base + trusted };
+        return { img, score: base + trusted };
       });
-      scored.sort((a: any, b: any) => b._score - a._score);
-      return buildHeroResult(scored[0]);
+    if (scored2.length > 0) {
+      scored2.sort((a, b) => b.score - a.score);
+      return buildHeroResult(scored2[0].img);
     }
 
-    // Attempt 2.5: any non-document, non-duplicate image (no AI filtering)
-    const { data: anyImage, error: anyImageErr } = await supabase
-      .from('vehicle_images')
-      .select('image_url, medium_url, large_url, exif_data, taken_at')
-      .eq('vehicle_id', vehicleId)
-      .not('is_document', 'is', true)
-      .not('is_duplicate', 'is', true)
-      .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
-      .order('is_primary', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (!anyImageErr && anyImage && anyImage.length > 0) {
-      return buildHeroResult(anyImage[0]);
-    }
-
-    // Attempt 3: fall back to primary_image_url
-    if (primaryImageUrl) {
-      return { url: primaryImageUrl, meta: {} };
-    }
-
-    return null;
+    // Priority 3: any usable image (candidates are already ordered by is_primary, quality, created_at)
+    return buildHeroResult(usable[0]);
   } catch (err) {
     console.warn('[selectBestHeroImage] error:', err);
-    // Non-fatal — fall back to primary
-    if (primaryImageUrl) {
-      return { url: primaryImageUrl, meta: {} };
-    }
+    if (primaryImageUrl) return { url: primaryImageUrl, meta: {} };
     return null;
   }
 }
