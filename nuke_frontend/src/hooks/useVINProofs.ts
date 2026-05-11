@@ -40,6 +40,11 @@ export function useVINProofs(vehicleId: string | undefined) {
       return;
     }
 
+    // data_validation_sources table is not deployed; short-circuit until feature lands.
+    setSummary(null);
+    setLoading(false);
+    return;
+
     async function loadProofs() {
       try {
         // Canonical VIN proof table: data_validation_sources (vin proofs should always cite a source)

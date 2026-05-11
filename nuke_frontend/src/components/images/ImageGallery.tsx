@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fetchVehicleImages } from '../../lib/fetchVehicleImages';
 import { ImageUploadService } from '../../services/imageUploadService';
@@ -289,6 +289,8 @@ const ImageGallery = ({
   const [allImages, setAllImages] = useState<any[]>([]);
   const [displayedImages, setDisplayedImages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // Dedup user_tools loads across auth-state churn (Supabase fires INITIAL_SESSION on subscribe).
+  const loadedToolsForUserRef = useRef<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -470,21 +472,25 @@ const ImageGallery = ({
       setLoading(true);
       try {
         // Load images from database
-        const { data: images, error } = await supabase
+        // Chained .or() with not.in.("a","b") syntax was producing PostgREST 500s.
+        // Fetch + filter client-side; result set is bounded by vehicle_id.
+        const { data: rawImages, error } = await supabase
           .from('vehicle_images')
           .select('*')
           .eq('vehicle_id', vehicleId)
-          // Quarantine/duplicate rows should never appear in standard galleries
-          .or('is_duplicate.is.null,is_duplicate.eq.false')
-          // Hide AI-detected mismatched/unrelated images
-          .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
-          // Vision gate: only approved or legacy-NULL images appear in the gallery.
-          .or('vision_gate_status.is.null,vision_gate_status.eq.approved')
           .order('position', { ascending: true })
           .order('created_at', { ascending: true });
 
         if (error) throw error;
-        setAllImages(applyQuarantinePolicy(images || []));
+        const images = (rawImages || []).filter((r: any) => {
+          if (r?.is_duplicate === true) return false;
+          const mvms = r?.image_vehicle_match_status;
+          if (mvms === 'mismatch' || mvms === 'unrelated') return false;
+          const vgs = r?.vision_gate_status;
+          if (vgs != null && vgs !== 'approved') return false;
+          return true;
+        });
+        setAllImages(applyQuarantinePolicy(images));
         setVehicleMeta(vehicleMeta || null);
       } catch {
         setVehicleMeta(null);
@@ -1678,8 +1684,11 @@ const ImageGallery = ({
       if (session?.user?.id) {
         // Any logged in user can create tags - you can adjust this logic as needed
         setCanCreateTags(true);
-        // Load user's tool inventory
-        loadUserTools(session.user.id);
+        // Load user's tool inventory (dedup by userId)
+        if (loadedToolsForUserRef.current !== session.user.id) {
+          loadedToolsForUserRef.current = session.user.id;
+          loadUserTools(session.user.id);
+        }
       }
     };
 
@@ -1689,7 +1698,10 @@ const ImageGallery = ({
       setSession(session);
       setCanCreateTags(!!session?.user?.id);
       if (session?.user?.id) {
-        loadUserTools(session.user.id);
+        if (loadedToolsForUserRef.current !== session.user.id) {
+          loadedToolsForUserRef.current = session.user.id;
+          loadUserTools(session.user.id);
+        }
       }
     });
 
