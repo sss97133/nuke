@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { OwnershipService } from '../services/ownershipService';
 
 interface VehiclePermissions {
@@ -26,11 +26,18 @@ export const useVehiclePermissions = (
     loading: true
   });
 
+  // Dedup permission checks against repeated emissions of the same vehicleId+userId pair.
+  const lastCheckedRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!session?.user || !vehicleId) {
       setPermissions(prev => ({ ...prev, loading: false }));
       return;
     }
+
+    const key = `${vehicleId}:${session.user.id}`;
+    if (lastCheckedRef.current === key) return;
+    lastCheckedRef.current = key;
 
     const checkPermissions = async () => {
       try {
