@@ -1,20 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import MobileImageGallery from '../../components/image/MobileImageGallery';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { BadgePortal } from '../../components/badges/BadgePortal';
+import VehicleMediaKit from './VehicleMediaKit';
 
 interface VehicleHeroImageProps {
   overlayNode?: React.ReactNode;
 }
 
 const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
-  const { leadImageUrl, heroMeta } = useVehicleProfile();
+  const { leadImageUrl, heroMeta, vehicleId } = useVehicleProfile();
   // Default to contain: show the full vehicle, letterbox if needed.
   // "The user came to see the vehicle, not a cropped fragment." — 2026-03-21 audit
   const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
   const [showGallery, setShowGallery] = useState(false);
+  // Media-kit slideshow: rendered when curation finds >=3 distinct BYOK scene_types.
+  // Initialized to true so the slot reserves space — flips to false if curation falls back.
+  const [mediaKitActive, setMediaKitActive] = useState<boolean>(true);
   const isMobile = useIsMobile();
+
+  const handleCurationResolved = useCallback((count: number) => {
+    setMediaKitActive(count >= 3);
+  }, []);
 
   const getSupabaseRenderUrl = (publicObjectUrl: string, width: number, quality = 90): string | null => {
     try {
@@ -26,7 +34,8 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
       const base = url.slice(0, idx);
       const path = url.slice(idx + marker.length).split('?')[0];
       if (!path) return null;
-      return `${base}/storage/v1/render/image/public/${path}?width=${width}&quality=${quality}`;
+      // resize=contain required — Supabase /render/image defaults to resize=cover which crops portrait iPhone photos.
+      return `${base}/storage/v1/render/image/public/${path}?width=${width}&quality=${quality}&resize=contain`;
     } catch {
       return null;
     }
@@ -36,6 +45,41 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
   const v = vehicle as any;
 
   const src = leadImageUrl ? String(leadImageUrl).trim() : '';
+
+  // Build srcset + heroSrc unconditionally (no-photo branch ignores them).
+  // Skip Supabase render endpoint for hero — it strips EXIF orientation,
+  // causing landscape photos to display as portrait. Browsers handle EXIF
+  // orientation natively (image-orientation: from-image is default in all
+  // modern browsers). Use original URL for correct orientation.
+  const imgUrl = src;
+  const srcset420 = getSupabaseRenderUrl(imgUrl, 420);
+  const srcset840 = getSupabaseRenderUrl(imgUrl, 840);
+  const srcset1260 = getSupabaseRenderUrl(imgUrl, 1260);
+  const srcSetAttr = (srcset420 && srcset840 && srcset1260)
+    ? `${srcset420} 420w, ${srcset840} 840w, ${srcset1260} 1260w`
+    : undefined;
+  const heroSrc = srcset840 || imgUrl;
+
+  // <link rel=preload> for the hero — tells the browser to start the fetch
+  // before React paints the <img>. Only meaningful when media-kit is NOT
+  // active (the slideshow's first frame self-preloads via fetchpriority).
+  // Declared before the no-photo early-return so hooks-order is stable.
+  useEffect(() => {
+    if (mediaKitActive) return;
+    if (!heroSrc || typeof document === 'undefined') return;
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'image';
+    link.href = heroSrc;
+    if (srcSetAttr) (link as any).imagesrcset = srcSetAttr;
+    (link as any).imagesizes = '(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 1260px';
+    (link as any).fetchPriority = 'high';
+    document.head.appendChild(link);
+    return () => {
+      try { document.head.removeChild(link); } catch { /* noop */ }
+    };
+  }, [heroSrc, srcSetAttr, mediaKitActive]);
+
   if (!src || src === 'undefined' || src === 'null') {
     // No photo: show spec card with clickable badges (zero dead ends)
     return (
@@ -99,12 +143,6 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
     );
   }
 
-  // Skip Supabase render endpoint for hero — it strips EXIF orientation,
-  // causing landscape photos to display as portrait. Browsers handle EXIF
-  // orientation natively (image-orientation: from-image is default in all
-  // modern browsers). Use original URL for correct orientation.
-  const imgUrl = src;
-
   // Build metadata parts (only render fields that exist)
   const metaParts: string[] = [];
   if (heroMeta?.camera) metaParts.push(heroMeta.camera);
@@ -141,26 +179,49 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                 />
               )}
 
-              {/* Image — fixed frame, toggle between contain and cover */}
-              <img
-                src={imgUrl}
-                alt=""
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: fitMode,
-                  objectPosition: 'center',
-                }}
-              />
+              {/* Media-kit slideshow when curation finds >=3 distinct BYOK
+                  scene_types; falls back to single hero <img> otherwise.
+                  VehicleMediaKit calls onCurationResolved with 0 when it can't
+                  curate, which flips mediaKitActive to false and reveals the
+                  <img> path below. */}
+              {vehicleId && mediaKitActive && (
+                <VehicleMediaKit
+                  vehicleId={vehicleId}
+                  onCurationResolved={handleCurationResolved}
+                  onImageClick={isMobile ? () => setShowGallery(true) : undefined}
+                />
+              )}
+
+              {/* Image — fixed frame, toggle between contain and cover.
+                  Speed: eager+async+fetchpriority=high on LCP candidate.
+                  srcset/sizes lets mobile pull a 420w variant. */}
+              {!mediaKitActive && (
+                <img
+                  src={heroSrc}
+                  srcSet={srcSetAttr}
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 1260px"
+                  alt=""
+                  loading="eager"
+                  decoding="async"
+                  {...({ fetchpriority: 'high' } as any)}
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: fitMode,
+                    objectPosition: 'center',
+                  }}
+                />
+              )}
 
               {/* Overlay (auction banners etc) */}
               {overlayNode && (
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1 }}>{overlayNode}</div>
               )}
 
-              {/* Fit / Fill toggle */}
+              {/* Fit / Fill toggle — hidden when slideshow is active (slideshow uses contain only). */}
+              {!mediaKitActive && (
               <button
                 onClick={e => { e.stopPropagation(); setFitMode(m => m === 'cover' ? 'contain' : 'cover'); }}
                 style={{
@@ -183,6 +244,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
               >
                 {fitMode === 'cover' ? 'FIT' : 'FILL'}
               </button>
+              )}
             </div>
           </div>
 

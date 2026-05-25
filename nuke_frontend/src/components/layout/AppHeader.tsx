@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { PrefetchLink } from '../PrefetchLink';
 import { useHeaderHeight } from './hooks/useHeaderHeight';
 import { useSession } from './hooks/useSession';
 import { useNotificationBadge } from './hooks/useNotificationBadge';
@@ -69,16 +70,16 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           NUKE
         </Link>
 
-        {/* Zone 2: Navigation */}
+        {/* Zone 2: Navigation — hover-prefetch per McMaster benchmark */}
         <nav className="header-nav" aria-label="Main navigation">
           {NAV_LINKS.map(({ label, to }) => (
-            <Link
+            <PrefetchLink
               key={to}
               to={to}
               className={`header-nav-link${isActive(to) ? ' active' : ''}`}
             >
               {label}
-            </Link>
+            </PrefetchLink>
           ))}
         </nav>
 

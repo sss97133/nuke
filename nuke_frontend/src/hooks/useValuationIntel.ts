@@ -45,24 +45,16 @@ export const useValuationIntel = (vehicleId: string | null): ValuationIntelResul
           .limit(1)
           .maybeSingle();
 
-        const readinessPromise = supabase
-          .from('financial_readiness_snapshots')
-          .select('*')
-          .eq('vehicle_id', vehicleId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        // 2026-05-24 dead-query-sweep: financial_readiness_snapshots table is not
+        // deployed (404). Short-circuit to null until the feature lands.
+        const readinessRow = null;
 
-        const [{ data: valuationRow, error: valuationError }, { data: readinessRow, error: readinessError }] =
-          await Promise.all([valuationPromise, readinessPromise]);
+        const { data: valuationRow, error: valuationError } = await valuationPromise;
 
         if (!isMounted) return;
 
         if (valuationError) {
           throw valuationError;
-        }
-        if (readinessError) {
-          console.warn('[useValuationIntel] readiness snapshot unavailable:', readinessError.message);
         }
 
         setValuation(valuationRow || null);
