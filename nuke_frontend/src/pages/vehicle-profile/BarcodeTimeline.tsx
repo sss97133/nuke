@@ -171,6 +171,13 @@ function formatEventLabel(ev: any): string {
     return 'Photo Session';
   }
 
+  // Pending analysis that's actually been analyzed — render as completed photo session
+  if (eventType === 'pending_analysis' && ev.metadata?.analysis_complete === true) {
+    const count = ev.metadata?.image_count || 0;
+    if (count > 0) return `Analyzed (${count} photos)`;
+    return 'Analyzed';
+  }
+
   if (eventType === 'vehicle_added') {
     if (platform) return `Added via ${platform}`;
     if (ev.user_id) return 'Added by User';
@@ -361,7 +368,10 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     // Build the filtered map for heatmap rendering
     const map = activeFilter === 'all' ? allMap : buildEventMap(filteredEvents);
 
-    // Date range uses ALL events so the heatmap grid stays stable across filters
+    // Date range spans the vehicle's full life (model year → today) so the
+    // historical scroll is honest. Empty pre-ownership years are surfaced via
+    // auto-scroll-to-today (below) rather than by truncation — the user lands
+    // on the newest activity and scrolls left to walk back through history.
     const allYears = Object.keys(allMap).map((d) => new Date(d + 'T00:00:00').getFullYear());
     const minYear = Math.min(vehicleYear, ...allYears, currentYear - 3);
     const maxYear = Math.max(currentYear, ...allYears);
@@ -467,6 +477,17 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       }
     }
   }, [expanded]);
+
+  // Auto-scroll the COLLAPSED barcode strip to today's edge on first paint
+  // and whenever the underlying week count changes. Lands the user on the
+  // newest activity; scrolling left walks back through the vehicle's history.
+  useEffect(() => {
+    if (!stripRef.current) return;
+    const el = stripRef.current;
+    requestAnimationFrame(() => {
+      el.scrollLeft = el.scrollWidth;
+    });
+  }, [weeks.length]);
 
   // Collapse on scroll down, re-expand when scrolled back to top
   useEffect(() => {

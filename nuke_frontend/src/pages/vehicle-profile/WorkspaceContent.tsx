@@ -10,6 +10,9 @@ const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/veh
 // WiringQueryContextBar removed — wiring canvas replaced with data view
 const PartsQuoteGenerator = React.lazy(() => import('../../components/PartsQuoteGenerator').then(m => ({ default: m.PartsQuoteGenerator })));
 const InvestmentLedger = React.lazy(() => import('./InvestmentLedger'));
+const WorthEngineCard = React.lazy(() => import('./WorthEngineCard'));
+const PhotoAuthenticationCard = React.lazy(() => import('./PhotoAuthenticationCard'));
+const VehicleFindingsCard = React.lazy(() => import('./VehicleFindingsCard'));
 const BuyerQuestionPreview = React.lazy(() => import('../../components/vehicle/BuyerQuestionPreview'));
 const ExternalListingCard = React.lazy(() => import('../../components/vehicle/ExternalListingCard'));
 const VehicleReferenceLibrary = React.lazy(() => import('../../components/vehicle/VehicleReferenceLibrary'));
@@ -28,6 +31,7 @@ const VehicleListingDetailsCard = React.lazy(() => import('../../components/vehi
 const SimilarSalesSection = React.lazy(() => import('../../components/vehicle/SimilarSalesSection').then(m => ({ default: m.SimilarSalesSection })));
 const PriceHistoryChart = React.lazy(() => import('../../components/vehicle/PriceHistoryChart'));
 const ObservationTimeline = React.lazy(() => import('./ObservationTimeline'));
+const InventoryWidgetLink = React.lazy(() => import('./InventoryWidgetLink'));
 // BuildLog removed — work sessions now surface via BarcodeTimeline Day Card popups
 
 
@@ -215,6 +219,21 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             </React.Suspense>
           )}
 
+          {/* Worth Engine — 3-method labor substrate triangulation */}
+          <React.Suspense fallback={null}>
+            <WorthEngineCard vehicleId={vehicle.id} />
+          </React.Suspense>
+
+          {/* Photo Authentication — EXIF chain of custody rollup */}
+          <React.Suspense fallback={null}>
+            <PhotoAuthenticationCard vehicleId={vehicle.id} />
+          </React.Suspense>
+
+          {/* Image-Analysis Findings — BYOK identity / powertrain / provenance / evidence rollup */}
+          <React.Suspense fallback={null}>
+            <VehicleFindingsCard vehicleId={vehicle.id} />
+          </React.Suspense>
+
           {/* Description */}
           <VehicleDescriptionCard
             vehicleId={vehicle.id}
@@ -326,6 +345,12 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
               <ExternalListingCard vehicleId={vehicle.id} />
             </React.Suspense>
           </CollapsibleWidget>
+
+          {/* Inventory — parts owned, install evidence pending. Public surface
+              of the lifecycle_status='purchased' substrate slice. */}
+          <React.Suspense fallback={null}>
+            <InventoryWidgetLink vehicleId={vehicle.id} />
+          </React.Suspense>
 
           {/* Owner-only tools */}
           {(isRowOwner || isVerifiedOwner) && (
