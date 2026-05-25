@@ -350,17 +350,11 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   }, [vehicleId]);
 
   const loadLiveSession = useCallback(async () => {
-    if (!vehicleId) return;
-    try {
-      const { data } = await supabase
-        .from('live_sessions')
-        .select('id, platform, stream_url, title, stream_provider')
-        .eq('vehicle_id', vehicleId)
-        .eq('is_active', true)
-        .maybeSingle();
-      setLiveSession(data || null);
-    } catch { /* ignore */ }
-  }, [vehicleId]);
+    // 2026-05-24 dead-query-sweep: live_sessions table is not deployed (404).
+    // No-op until the live-streaming feature ships. The setLiveSession(null)
+    // default is already set in state init.
+    setLiveSession(null);
+  }, []);
 
   const loadResponsible = useCallback(async () => {
     if (!vehicle) return;

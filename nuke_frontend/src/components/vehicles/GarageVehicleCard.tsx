@@ -691,15 +691,18 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
             <img
               src={optimizeImageUrl(vehicle.resolved_image_url || vehicle.primary_image_url!)}
               alt={title}
+              width={400}
+              height={225}
+              loading="lazy"
+              decoding="async"
               style={{
                 position: 'absolute',
                 inset: 0,
                 width: '100%',
                 height: '100%',
-                objectFit: 'cover',
+                objectFit: 'contain',
                 display: 'block',
               }}
-              loading="lazy"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
           ) : (
@@ -712,7 +715,15 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
                 justifyContent: 'center',
               }}
             >
-              <img src="/nuke.png" alt="No image" style={{ width: 48, height: 48, opacity: 0.3, objectFit: 'contain' }} />
+              <img
+                src="/nuke.png"
+                alt="No image"
+                width={48}
+                height={48}
+                loading="lazy"
+                decoding="async"
+                style={{ width: 48, height: 48, opacity: 0.3, objectFit: 'contain' }}
+              />
             </div>
           )}
 
@@ -732,6 +743,47 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
               </span>
             </div>
           </HoverData>
+
+          {/* Eject — top-right, hidden for VERIFIED OWNER (those go through formal revocation) */}
+          {vehicle.relationship_type !== 'VERIFIED OWNER' && (
+            <button
+              type="button"
+              title="NOT MINE — REMOVE FROM GARAGE"
+              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              onClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const ok = window.confirm(`Remove ${title} from your garage? This is reversible — the data is preserved.`);
+                if (!ok) return;
+                const { error } = await supabase.rpc('revoke_garage_membership', {
+                  p_vehicle_id: vehicle.id,
+                  p_reason: 'user_eject_from_garage_card',
+                });
+                if (error) {
+                  alert(`Eject failed: ${error.message}`);
+                  return;
+                }
+                onRefresh?.();
+              }}
+              style={{
+                position: 'absolute',
+                top: 6,
+                right: 6,
+                width: 20,
+                height: 20,
+                padding: 0,
+                fontFamily: "'Courier New', Courier, monospace",
+                fontSize: '12px',
+                fontWeight: 700,
+                lineHeight: 1,
+                cursor: 'pointer',
+                backgroundColor: 'var(--surface, #ebebeb)',
+                color: 'var(--text-secondary, #666666)',
+                border: '2px solid var(--border, #bdbdbd)',
+                borderRadius: 0,
+              }}
+            >×</button>
+          )}
 
           {/* Mini timeline barcode */}
           <MiniBarcode eventWeeks={vehicle.event_weeks} />
@@ -916,8 +968,11 @@ function ListCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
             <img
               src={optimizeImageUrl(vehicle.resolved_image_url || vehicle.primary_image_url!)}
               alt={title}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              width={120}
+              height={90}
               loading="lazy"
+              decoding="async"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
             />
           ) : (
             <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

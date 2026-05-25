@@ -75,7 +75,8 @@ const supabaseTransformUrl = (url: string | undefined, width: number, quality = 
   // Only transform Supabase storage URLs
   const match = url.match(/^(https:\/\/[^/]+\.supabase\.co)\/storage\/v1\/object\/public\/(.+)$/);
   if (!match) return url;
-  return `${match[1]}/storage/v1/render/image/public/${match[2]}?width=${width}&quality=${quality}`;
+  // resize=contain required — Supabase /render/image defaults to resize=cover which crops portrait iPhone photos.
+  return `${match[1]}/storage/v1/render/image/public/${match[2]}?width=${width}&quality=${quality}&resize=contain`;
 };
 
 // Helper function to get optimal image URL based on variants

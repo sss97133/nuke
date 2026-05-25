@@ -13,10 +13,19 @@ import { useUserProfile } from './UserProfileContext';
 // ---------------------------------------------------------------------------
 
 const BADGE_MAP: Record<string, string> = {
+  // BaT-bidder events
   listing: 'LISTING',
   bid: 'BID',
   auction_win: 'WIN',
+  auction_activity: 'AUCTION',
   comment: 'COMMENT',
+  // Producer-side events (parity with UserBarcodeTimeline filter taxonomy)
+  image_upload: 'PHOTO',
+  vehicle_added: 'VEHICLE',
+  timeline_event: 'TIMELINE',
+  work_session: 'WORK',
+  receipt: 'RECEIPT',
+  payment: 'PAYMENT',
 };
 
 function getBadgeText(type: string): string {

@@ -94,9 +94,10 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
 
           // Check if it's a Supabase storage URL that needs transformation
           if (selectedImageUrl.includes('/storage/v1/object/public/')) {
+            // resize=contain required — defaults to cover which crops portrait iPhone photos.
             const transformUrl = selectedImageUrl
               .replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
-              + `?width=${width}&quality=${quality}`;
+              + `?width=${width}&quality=${quality}&resize=contain`;
 
             console.log('🔄 Transform URL:', transformUrl);
             setImageUrl(transformUrl);

@@ -21,10 +21,13 @@ export function useVehicleVideos(vehicleId: string) {
   return useQuery({
     queryKey: ['vehicle-videos', vehicleId],
     queryFn: async () => {
+      // 2026-05-24 dead-query-sweep: removed `auction_name` from select — column does
+      // not exist on auction_events (caused 400). The VideoMoment shape keeps the
+      // field nullable; consumer renders null gracefully.
       const { data, error } = await supabase
         .from('auction_events')
         .select(`
-          id, lot_number, source, auction_name, auction_start_date,
+          id, lot_number, source, auction_start_date,
           winning_bid, outcome, estimate_low, estimate_high, vehicle_id,
           broadcast_video_url, broadcast_timestamp_start, broadcast_timestamp_end
         `)

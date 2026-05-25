@@ -8,6 +8,7 @@ import { useVehiclesDashboard } from '../hooks/useVehiclesDashboard';
 import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlideshow';
 import { useInterests } from '../hooks/useInterests';
 import { optimizeImageUrl } from '../lib/imageOptimizer';
+import IntakePage from './intake/IntakePage';
 
 // ────────────────────────────────────────────────────────────
 // TYPES
@@ -381,7 +382,10 @@ function TreemapCell({ rect, onClick, totalCount, showValue, isYear, repImage }:
         <img
           src={optimizeImageUrl(imageUrl, 'small') || imageUrl}
           alt=""
+          width={Math.max(1, Math.round(w))}
+          height={Math.max(1, Math.round(h))}
           loading="lazy"
+          decoding="async"
           onLoad={() => setImgLoaded(true)}
           style={{
             position: 'absolute',
@@ -672,6 +676,19 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
   const [drillStack, setDrillStack] = useState<DrillLevel[]>([{ label: 'ALL MAKES' }]);
   const currentLevel = drillStack[drillStack.length - 1];
 
+  // Narrow-viewport flag — hides decorative chrome when the header would crush.
+  // Threshold matches AppHeader's 768px collapse but tighter (640px) since the
+  // treemap header has its own logo+search+browse triple, not the AppHeader's grid.
+  const [isNarrow, setIsNarrow] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches
+  );
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 640px)');
+    const handler = (e: MediaQueryListEvent) => setIsNarrow(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
   // Prefetch cache: hover-triggered data loaded before click
   const prefetchCache = useRef<Map<string, TreemapNode[]>>(new Map());
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -942,9 +959,11 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
           >
             NUKE
           </span>
-          <span style={{ fontSize: 9, color: 'var(--text-disabled)', letterSpacing: '0.06em', fontWeight: 600 }}>
-            PROVENANCE ENGINE
-          </span>
+          {!isNarrow && (
+            <span style={{ fontSize: 9, color: 'var(--text-disabled)', letterSpacing: '0.06em', fontWeight: 600 }}>
+              PROVENANCE ENGINE
+            </span>
+          )}
         </div>
 
         {/* Search bar */}
@@ -955,7 +974,7 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onFocus={() => setSearchFocused(true)}
-              placeholder="Search: 1967 Porsche 911, VIN, make, model..."
+              placeholder={isNarrow ? 'Search vehicles...' : 'Search: 1967 Porsche 911, VIN, make, model...'}
               aria-label="Search vehicles"
               style={{
                 flex: 1,
@@ -1372,9 +1391,16 @@ export default function HomePage() {
     localStorage.setItem('nuke_onboarding_seen', '1');
   };
 
-  // Logged-out users see the treemap landing page
+  // Logged-out users: by default see the Janitor-drain intake variant (F6).
+  // Treemap is preserved at /explore (or ?force_treemap=1 on this route).
+  // Onboarding slideshow only fires for signed-in users, so it's safe to
+  // fork before the showOnboarding effect mounts.
   if (!authLoading && !user && !showFeed) {
-    return <TreemapHomePage onBrowse={() => setShowFeed(true)} />;
+    const forceTreemap = searchParams.get('force_treemap') === '1';
+    if (forceTreemap) {
+      return <TreemapHomePage onBrowse={() => setShowFeed(true)} />;
+    }
+    return <IntakePage variant="homepage" />;
   }
 
   return (
