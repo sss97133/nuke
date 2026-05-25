@@ -489,13 +489,18 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     });
   }, [weeks.length]);
 
-  // Collapse on scroll down, re-expand when scrolled back to top
+  // Collapse on scroll past the hero area, re-expand when scrolled back near top.
+  // Hysteresis: expand threshold (40) is lower than collapse threshold (320) so the
+  // timeline doesn't strobe open/closed during normal page interaction. Prior threshold
+  // of 10 caused the timeline to slam shut on the slightest scroll.
   useEffect(() => {
+    const COLLAPSE_AT = 320;
+    const EXPAND_AT = 40;
     const onScroll = () => {
-      const atTop = window.scrollY <= 10;
-      if (atTop && !expanded) {
+      const y = window.scrollY;
+      if (y <= EXPAND_AT && !expanded) {
         setExpanded(true);
-      } else if (!atTop && expanded) {
+      } else if (y > COLLAPSE_AT && expanded) {
         setExpanded(false);
         setReceiptDate(null);
         setHighlightGroup(null);
