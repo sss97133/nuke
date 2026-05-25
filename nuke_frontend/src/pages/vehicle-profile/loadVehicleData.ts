@@ -111,12 +111,15 @@ export async function selectBestHeroImage(
       const { data, error } = await supabase
         .from('vehicle_images')
         .select(
-          'image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, image_vehicle_match_status, ai_processing_status, created_at'
+          'image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at'
         )
         .eq('vehicle_id', vehicleId)
+        // Order by recency first — latest owner photo wins per restoration_lead_image_must_be_latest.
+        // is_primary remains a tiebreaker fallback further down.
+        .order('taken_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false, nullsFirst: false })
         .order('is_primary', { ascending: false, nullsFirst: false })
         .order('photo_quality_score', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false, nullsFirst: false })
         .limit(60);
 
       if (error) {
@@ -130,12 +133,14 @@ export async function selectBestHeroImage(
       return null;
     }
 
-    // Filter out documents/duplicates and mismatch-flagged rows
+    // Filter out documents/duplicates, mismatch-flagged rows, and vision-gate rejections.
     const usable = candidates.filter((img: any) => {
       if (img?.is_document === true) return false;
       if (img?.is_duplicate === true) return false;
       const mvms = img?.image_vehicle_match_status;
       if (mvms === 'mismatch' || mvms === 'unrelated') return false;
+      const vgs = img?.vision_gate_status;
+      if (vgs === 'rejected_personal' || vgs === 'rejected_misattributed' || vgs === 'rejected') return false;
       return true;
     });
 
@@ -144,7 +149,27 @@ export async function selectBestHeroImage(
       return null;
     }
 
-    // Priority 0: explicit primary
+    // Priority 0 — latest owner-trust photo wins.
+    // Per ~/.claude/projects/-Users-skylar/memory/feedback_restoration_lead_image_must_be_latest.md:
+    // restoration lead image = latest owner-uploaded photo from owner-trust sources only.
+    // The May-22 photo that was pinned as is_primary is no longer load-bearing — the May-24
+    // iphoto upload should be hero on an in-progress restoration.
+    const isOwnerTrustSource = (src: any): boolean => {
+      if (typeof src !== 'string') return false;
+      return src === 'iphoto'
+        || src === 'user_upload'
+        || src === 'manual'
+        || src === 'tech_capture'
+        || src.startsWith('direct_pull');
+    };
+    const ownerOwned = usable.filter((img: any) => isOwnerTrustSource(img?.source));
+    if (ownerOwned.length > 0) {
+      // Already ordered by taken_at DESC, created_at DESC from the query.
+      // Take the newest. buildHeroResult handles medium/large URL preference.
+      return buildHeroResult(ownerOwned[0]);
+    }
+
+    // Priority 1: explicit is_primary (fallback for vehicles with no owner-trust uploads, e.g. BaT-only imports).
     const primary = usable.find((img: any) => img?.is_primary === true);
     if (primary) return buildHeroResult(primary);
 
