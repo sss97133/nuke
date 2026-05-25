@@ -18,7 +18,7 @@ const CHUNK_MAP: { test: (href: string) => boolean; load: () => Promise<unknown>
   { test: (h) => h.startsWith('/u/') || h === '/profile' || h.startsWith('/profile/'),
     load: () => import('../pages/UserProfile') },
   { test: (h) => h.startsWith('/vehicle/'),
-    load: () => import('../modules/vehicle/routes') },
+    load: () => import('../routes/modules/vehicle/routes') },
   { test: (h) => h === '/search' || h.startsWith('/search?'),
     load: () => import('../pages/Search') },
   { test: (h) => h === '/browse',
