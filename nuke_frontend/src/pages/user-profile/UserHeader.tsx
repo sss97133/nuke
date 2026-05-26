@@ -37,9 +37,10 @@ const UserHeader: React.FC = () => {
   const memberSince = profile.member_since || profile.created_at;
   const memberYear = memberSince ? new Date(memberSince).getFullYear() : null;
 
-  // Stats
+  // Stats — profile_stats (refreshed by recompute_profile_stats) is the source of truth.
+  // Fall back to comprehensiveData.listings only if profile_stats hasn't been computed.
   const totalVehicles =
-    comprehensiveData?.listings?.length ?? profile.total_vehicles ?? 0;
+    stats?.total_vehicles ?? comprehensiveData?.listings?.length ?? 0;
   const totalListings = stats?.total_listings ?? profile.total_listings ?? 0;
   const totalComments = stats?.total_comments ?? profile.total_comments ?? 0;
   const totalBids = stats?.total_bids ?? profile.total_bids ?? 0;

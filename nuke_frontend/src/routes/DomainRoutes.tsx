@@ -105,6 +105,13 @@ const TransferPartyPage = React.lazy(() => import('../pages/TransferPartyPage'))
 // Build Coordinator dashboard (public, vehicle-scoped)
 const BuildDashboard = React.lazy(() => import('../pages/BuildDashboard'));
 
+// Public projections — journal index + day page
+const JournalIndex = React.lazy(() => import('../pages/journal/JournalIndex'));
+const JournalPage = React.lazy(() => import('../pages/journal/JournalPage'));
+
+// Public intake — Janitor drain (first ship: note event type only)
+const IntakePage = React.lazy(() => import('../pages/intake/IntakePage'));
+
 export const DomainRoutes = () => {
   return (
     <Suspense fallback={<div style={{ height: '100vh', background: 'var(--bg)' }} />}>
@@ -169,6 +176,8 @@ export const DomainRoutes = () => {
         {/* Public profile views (with userId = public; without = own profile, guarded below) */}
         <Route path="/profile/:userId" element={<UserProfile />} />
         <Route path="/profile/external/:externalIdentityId" element={<UserProfile />} />
+        {/* Canonical handle-based user binding (frontend-doctrine §2a primary surface) */}
+        <Route path="/u/:handle" element={<UserProfile />} />
         {/* Investor offering / data room — semi-public fundraising page */}
         {/* Docs / developers landing */}
         <Route path="/developers" element={<DevelopersPage />} />
@@ -182,6 +191,14 @@ export const DomainRoutes = () => {
         <Route path="/t/:transferId" element={<TransferPartyPage />} />
         {/* Build Coordinator dashboard — public, vehicle-scoped */}
         <Route path="/builds/:vehicleId" element={<BuildDashboard />} />
+        {/* Public projections — journal index + day page */}
+        <Route path="/journal" element={<JournalIndex />} />
+        <Route path="/journal/:date" element={<JournalPage />} />
+        {/* Public intake — Janitor drain (first ship: note event type only) */}
+        <Route path="/intake" element={<IntakePage />} />
+        {/* Treemap browse experience — preserved at /explore after F6 moved */}
+        {/* the homepage to the Janitor-drain intake variant. */}
+        <Route path="/explore" element={<Navigate to="/?force_treemap=1" replace />} />
         {/* Tech capture, restoration intake, work orders — moved to protected routes below */}
 
         {/* ── Hub convenience redirects → homepage tabs ─────────────────── */}
@@ -233,7 +250,7 @@ export const DomainRoutes = () => {
           <Route path="/tech" element={<TechCapture />} />
           <Route path="/tech/upload" element={<TechShareUpload />} />
           <Route path="/restoration" element={<RestorationIntake />} />
-          <Route path="/intake" element={<RestorationIntake />} />
+          <Route path="/intake/restoration" element={<RestorationIntake />} />
           <Route path="/work-orders/statement" element={<WorkOrderStatement />} />
 
 

@@ -70,10 +70,31 @@ export function useUserProfile(): UserProfileContextValue {
 // ---------------------------------------------------------------------------
 
 export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { userId: routeUserId, externalIdentityId } = useParams<{
+  const { userId: routeUserId, externalIdentityId, handle: routeHandle } = useParams<{
     userId?: string;
     externalIdentityId?: string;
+    handle?: string;
   }>();
+
+  // Handle → userId resolver (for /u/:handle canonical route per frontend-doctrine §2a)
+  const [resolvedHandleUserId, setResolvedHandleUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (routeHandle && !routeUserId) {
+      supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', routeHandle)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!cancelled) setResolvedHandleUserId(data?.id ?? null);
+        });
+    } else {
+      setResolvedHandleUserId(null);
+    }
+    return () => { cancelled = true; };
+  }, [routeHandle, routeUserId]);
 
   // ── Auth ──
   const [session, setSession] = useState<any>(() => readCachedSession());
@@ -100,8 +121,9 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const resolvedUserId = useMemo(() => {
     if (externalIdentityId) return undefined; // external identity path
     if (routeUserId) return routeUserId;
+    if (routeHandle) return resolvedHandleUserId || undefined; // /u/:handle path
     return currentUserId || undefined;
-  }, [routeUserId, externalIdentityId, currentUserId]);
+  }, [routeUserId, externalIdentityId, routeHandle, resolvedHandleUserId, currentUserId]);
 
   const isOwnProfile = Boolean(
     resolvedUserId && currentUserId && resolvedUserId === currentUserId
