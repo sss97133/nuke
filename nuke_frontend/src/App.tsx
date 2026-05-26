@@ -20,6 +20,7 @@ const HomePage = React.lazy(() => import('./pages/HomePage'));
 const LandingPage = React.lazy(() => import('./pages/landing/LandingPage'));
 const ProductPage = React.lazy(() => import('./pages/landing/ProductPage'));
 const PublicMap = React.lazy(() => import('./components/map/PublicMap'));
+const NukeMap = React.lazy(() => import('./components/map/NukeMap'));
 const DeckPage = React.lazy(() => import('./pages/DeckPage'));
 
 const queryClient = new QueryClient({
@@ -64,6 +65,7 @@ function RoutedApp() {
           <Route path="/" element={<HomeGate />} />
           <Route path="/products/:slug" element={<Suspense fallback={LazyFallback}><ProductPage /></Suspense>} />
           <Route path="/map" element={<Suspense fallback={LazyFallback}><PublicMap /></Suspense>} />
+          <Route path="/atlas" element={<Suspense fallback={LazyFallback}><div style={{ position: 'fixed', inset: 0 }}><NukeMap /></div></Suspense>} />
           <Route path="/deck/:deckId" element={<Suspense fallback={LazyFallback}><DeckPage /></Suspense>} />
 
           {/* ── App shell routes (with AppLayout) ── */}

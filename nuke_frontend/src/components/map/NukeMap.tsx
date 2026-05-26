@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, Suspense, lazy, Component } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, Suspense, lazy, Component } from 'react';
 import type { ReactNode } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { MapViewState, MapMode, MapEventPoint, BizPin, ColPin } from './types';
@@ -36,17 +36,20 @@ class MapErrorBoundary extends Component<
 
 // ─── Main NukeMap ──────────────────────────────────────────────────────────────
 export default function NukeMap() {
-  // Support URL params for initial viewport: ?lat=17.9&lng=-62.83&zoom=14
+  // URL params drive initial viewport (?lat&lng&zoom) and source/event/make filters
+  const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const initialView = (() => {
-    const params = new URLSearchParams(window.location.search);
-    const lat = params.get('lat');
-    const lng = params.get('lng');
-    const zoom = params.get('zoom');
+    const lat = urlParams.get('lat');
+    const lng = urlParams.get('lng');
+    const zoom = urlParams.get('zoom');
     if (lat && lng) {
       return { ...INITIAL_VIEW, latitude: parseFloat(lat), longitude: parseFloat(lng), zoom: zoom ? parseFloat(zoom) : 14 };
     }
     return INITIAL_VIEW;
   })();
+  const sourceFilter = urlParams.get('source') || undefined;
+  const eventTypeFilter = urlParams.get('event_type') || undefined;
+  const makeFilter = urlParams.get('make') || undefined;
   const [viewState, setViewState] = useState<MapViewState>(initialView);
   const [mode, setMode] = useState<MapMode>('points');
   const [showBusinesses, setShowBusinesses] = useState(true);
@@ -64,7 +67,10 @@ export default function NukeMap() {
 
   const { data, loading: pointsLoading, error: pointsError } = useMapData({
     viewState, minConfidence,
-    timeStart: timeline.timeStart, timeEnd: timeline.timeEnd, make: searchMake,
+    timeStart: timeline.timeStart, timeEnd: timeline.timeEnd,
+    make: searchMake || makeFilter,
+    source: sourceFilter,
+    eventType: eventTypeFilter,
   });
 
   const { layerData: countyLayerData, stats: countyStats, loading: countyLoading, error: countyError } = useCountyData(mode === 'county', timeline.timeStart, timeline.timeEnd);
