@@ -119,18 +119,69 @@ async function supabaseGet(path) {
   return res.json();
 }
 
+// ─── Local write-ahead buffer ────────────────────────────────────────────────
+// Skylar's WiFi blocks Supabase. Every PATCH is also appended to a local JSONL
+// so analysis isn't lost when the network is hostile. The drain script
+// (scripts/drain-analysis-buffer.mjs) replays buffered rows to Supabase
+// from a network that works.
+
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+const BUFFER_DIR = path.join(os.homedir(), 'nuke-analysis-buffer');
+const BUFFER_FILE = path.join(BUFFER_DIR, 'pending.jsonl');
+let bufferReady = false;
+
+async function ensureBuffer() {
+  if (bufferReady) return;
+  await fs.mkdir(BUFFER_DIR, { recursive: true });
+  bufferReady = true;
+}
+
+async function appendToBuffer(record) {
+  await ensureBuffer();
+  await fs.appendFile(BUFFER_FILE, JSON.stringify(record) + '\n', 'utf8');
+}
+
 async function supabasePatch(table, id, data) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
-    method: 'PATCH',
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=minimal',
-    },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error(`Supabase PATCH failed: ${res.status} ${await res.text()}`);
+  // 1. Always write-ahead to local buffer FIRST. If WiFi kills the rest of
+  //    this call, the analysis is still recoverable via drain-analysis-buffer.
+  const record = {
+    ts: new Date().toISOString(),
+    table,
+    id,
+    data,
+    synced: false,
+  };
+  try {
+    await appendToBuffer(record);
+  } catch (bufErr) {
+    console.error(`  [buffer-write FAILED] ${bufErr.message}`);
+    // If we can't write locally either, fall through to the network attempt
+  }
+
+  // 2. Try Supabase. On failure, don't throw — the buffer has it.
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      throw new Error(`status ${res.status} ${await res.text()}`);
+    }
+    // Successful Supabase write — buffer entry will be removed by drain
+    // script's next pass (cheap; saves us a sync round-trip here).
+  } catch (netErr) {
+    console.warn(`  [supabase PATCH buffered locally] id=${id}: ${netErr.message}`);
+    // Swallow — the buffer record stands as the recoverable source of truth.
+  }
 }
 
 // ─── Fetch image as base64 ───────────────────────────────────────────────────
@@ -263,10 +314,18 @@ async function main() {
   if (!vehicle) { console.error('  Vehicle not found'); process.exit(1); }
   console.log(`  ${vehicle.year} ${vehicle.make} ${vehicle.model} (${vehicle.vin})`);
 
-  // Get images
-  const allImages = await supabaseGet(
-    `vehicle_images?vehicle_id=eq.${vehicleId}&select=id,image_url,position,ai_scan_metadata&order=position.asc&limit=1000`
-  );
+  // Get images — paginate to defeat the postgrest 1000-row default cap so
+  // we can see all 2,300+ K5 photos in one resume pass.
+  const allImages = [];
+  const PAGE = 1000;
+  for (let offset = 0; ; offset += PAGE) {
+    const page = await supabaseGet(
+      `vehicle_images?vehicle_id=eq.${vehicleId}&select=id,image_url,position,ai_scan_metadata&order=position.asc&limit=${PAGE}&offset=${offset}`
+    );
+    if (!page || page.length === 0) break;
+    allImages.push(...page);
+    if (page.length < PAGE) break;
+  }
 
   let images = allImages;
   if (resume) {
