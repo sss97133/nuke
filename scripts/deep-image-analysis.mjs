@@ -13,6 +13,32 @@
  *   dotenvx run -- node scripts/deep-image-analysis.mjs --vehicle-id <uuid> --sample 10
  */
 
+// ─── DNS fix for hostile WiFi (ported from iphoto-intake.mjs) ──────────────
+// Skylar's WiFi blocks specific Cloudflare/Supabase IPs that macOS's broken
+// resolver hands out. Override DNS to use Google/Cloudflare DNS, then swap
+// global fetch to node-fetch (which respects dns.lookup; built-in undici fetch
+// does not). Without this, every supabaseGet/PATCH throws ConnectTimeoutError.
+import dns from 'node:dns';
+import nodeFetch from 'node-fetch';
+
+const _resolver = new dns.Resolver();
+_resolver.setServers(['8.8.8.8', '1.1.1.1']);
+const _origLookup = dns.lookup.bind(dns);
+dns.lookup = function(hostname, options, callback) {
+  if (typeof options === 'function') { callback = options; options = {}; }
+  _resolver.resolve4(hostname, (err, addresses) => {
+    if (err || !addresses || addresses.length === 0) {
+      return _origLookup(hostname, options, callback);
+    }
+    if (options && options.all) {
+      callback(null, addresses.map(a => ({ address: a, family: 4 })));
+    } else {
+      callback(null, addresses[0], 4);
+    }
+  });
+};
+globalThis.fetch = nodeFetch;
+
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
