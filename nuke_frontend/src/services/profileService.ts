@@ -43,8 +43,10 @@ export class ProfileService {
         supabase.from('profile_stats').select('*').eq('user_id', userId).single(),
         // Get ALL timeline events - no date filter, user has historical data going back years
         supabase.from('vehicle_timeline_events').select('id, event_date, event_type, vehicle_id, user_id, metadata, cost_amount, title, description, created_at').eq('user_id', userId).order('event_date', { ascending: false }).limit(5000),
-        // Get ALL images - no date filter for full contribution history
-        supabase.from('vehicle_images').select('id, image_url, created_at, taken_at, exif_data, user_id, vehicle_id').eq('user_id', userId).order('taken_at', { ascending: false }).limit(5000),
+        // Order by created_at (uses idx_vehicle_images_user_created) — taken_at has no index
+        // and times out on users with thousands of images (vehicle_images is ~36M rows / 28GB).
+        // EXIF-based ordering still happens client-side via toDateOnly() over taken_at when present.
+        supabase.from('vehicle_images').select('id, image_url, created_at, taken_at, exif_data, user_id, vehicle_id').eq('user_id', userId).order('created_at', { ascending: false }).limit(5000),
         // Get ALL business events - no date filter
         supabase.from('business_timeline_events').select('id, event_date, event_type, business_id, created_by, title, description, cost_amount, metadata, created_at').eq('created_by', userId).order('event_date', { ascending: false }).limit(5000)
       ]);

@@ -12,6 +12,7 @@ import { useUserProfile } from './UserProfileContext';
 // Lazy-load all card components
 const UserDossierPanel = React.lazy(() => import('./UserDossierPanel'));
 const UserBriefing = React.lazy(() => import('./UserBriefing'));
+const UserConnectionStateStrip = React.lazy(() => import('./UserConnectionStateStrip'));
 const UserActivityFeed = React.lazy(() => import('./UserActivityFeed'));
 const ColumnDivider = React.lazy(() => import('../vehicle-profile/ColumnDivider'));
 
@@ -88,6 +89,11 @@ const UserWorkspaceContent: React.FC = () => {
             <UserBriefing />
           </React.Suspense>
 
+          {/* Connection State Strip — data-source CTAs (owner-only, primary IA per doctrine §2a) */}
+          <React.Suspense fallback={null}>
+            <UserConnectionStateStrip />
+          </React.Suspense>
+
           {/* Dossier — grouped field display */}
           <React.Suspense fallback={null}>
             <UserDossierPanel />
@@ -97,17 +103,6 @@ const UserWorkspaceContent: React.FC = () => {
           {userId && (
             <React.Suspense fallback={null}>
               <VehicleCollection userId={userId} isOwnProfile={isOwnProfile} />
-            </React.Suspense>
-          )}
-
-          {/* Public Auction Track Record */}
-          {hasTrackRecord && (
-            <React.Suspense fallback={null}>
-              <PublicAuctionTrackRecord
-                listings={comprehensiveData?.listings || []}
-                loading={!comprehensiveData}
-                profileName={profile?.full_name || profile?.username || null}
-              />
             </React.Suspense>
           )}
 
@@ -122,6 +117,37 @@ const UserWorkspaceContent: React.FC = () => {
           <React.Suspense fallback={null}>
             <UserActivityFeed />
           </React.Suspense>
+
+          {/* Organization Affiliations */}
+          {userId && (
+            <React.Suspense fallback={null}>
+              <OrganizationAffiliations userId={userId} isOwnProfile={isOwnProfile} />
+            </React.Suspense>
+          )}
+
+          {/* Professional Toolbox — owner-only, non-basic users */}
+          {isOwnProfile && isNotBasicUser && userId && (
+            <React.Suspense fallback={null}>
+              <ProfessionalToolbox userId={userId} isOwnProfile={isOwnProfile} />
+            </React.Suspense>
+          )}
+
+          {/* ── DEMOTED: BaT-bidder cards (IA assessment Step E) ────────────
+              These cards are flavored for collectors who arrived via BaT.
+              Kept (not deleted) but moved below the producer-flavored
+              surfaces so they don't dominate the first screen for
+              technician-producer users like Skylar. */}
+
+          {/* Public Auction Track Record */}
+          {hasTrackRecord && (
+            <React.Suspense fallback={null}>
+              <PublicAuctionTrackRecord
+                listings={comprehensiveData?.listings || []}
+                loading={!comprehensiveData}
+                profileName={profile?.full_name || profile?.username || null}
+              />
+            </React.Suspense>
+          )}
 
           {/* Comments & Bids — merged card */}
           {hasCommentsOrBids && (
@@ -167,20 +193,6 @@ const UserWorkspaceContent: React.FC = () => {
             </React.Suspense>
           )}
 
-          {/* Organization Affiliations */}
-          {userId && (
-            <React.Suspense fallback={null}>
-              <OrganizationAffiliations userId={userId} isOwnProfile={isOwnProfile} />
-            </React.Suspense>
-          )}
-
-          {/* Professional Toolbox — owner-only, non-basic users */}
-          {isOwnProfile && isNotBasicUser && userId && (
-            <React.Suspense fallback={null}>
-              <ProfessionalToolbox userId={userId} isOwnProfile={isOwnProfile} />
-            </React.Suspense>
-          )}
-
           {/* Vehicle Merge Interface — owner-only */}
           {isOwnProfile && (
             <React.Suspense fallback={null}>
@@ -209,26 +221,15 @@ const UserWorkspaceContent: React.FC = () => {
             <UserReputationWidget />
           </React.Suspense>
 
-          {/* Knowledge Library — owner-only */}
-          {isOwnProfile && (
-            <React.Suspense fallback={null}>
-              <KnowledgeLibrary />
-            </React.Suspense>
-          )}
-
-          {/* Live Player — owner-only */}
-          {isOwnProfile && (
-            <React.Suspense fallback={null}>
-              <LivePlayer />
-            </React.Suspense>
-          )}
-
-          {/* Memelord Panel — owner-only */}
-          {isOwnProfile && (
-            <React.Suspense fallback={null}>
-              <MemelordPanel />
-            </React.Suspense>
-          )}
+          {/* Knowledge Library / Live Player / Memelord Panel — disabled 2026-05-24
+              per docs/library/working/field-notes/2026-05-24_safety-audit-completion.md §1:
+              - KnowledgeLibrary's service (referenceDocumentService.ts) is gutted —
+                every method throws "not deployed" or returns [].
+              - LivePlayer has hard-coded kill switch (LIVE_ADMIN_ENABLED = false).
+              - MemelordPanel renders but is permanently empty for current users.
+              All three were rendered without required userId/isOwnProfile props,
+              causing the right-column crash the audit observed. Re-enable when
+              services come back online; pass userId={userId} isOwnProfile={isOwnProfile} then. */}
         </div>
       </div>
     </div>
