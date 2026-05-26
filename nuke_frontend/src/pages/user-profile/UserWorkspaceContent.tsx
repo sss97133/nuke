@@ -10,6 +10,7 @@ import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import { useUserProfile } from './UserProfileContext';
 
 // Lazy-load all card components
+const UserTodayCard = React.lazy(() => import('./UserTodayCard'));
 const UserDossierPanel = React.lazy(() => import('./UserDossierPanel'));
 const UserBriefing = React.lazy(() => import('./UserBriefing'));
 const UserConnectionStateStrip = React.lazy(() => import('./UserConnectionStateStrip'));
@@ -83,6 +84,11 @@ const UserWorkspaceContent: React.FC = () => {
       >
         {/* LEFT COLUMN */}
         <div className="up-col-left" style={{ width: `${leftPct}%` }}>
+
+          {/* Today — live mirror of what's happening RIGHT NOW (own profile) */}
+          <React.Suspense fallback={null}>
+            <UserTodayCard />
+          </React.Suspense>
 
           {/* Briefing — intelligence headline + stat pills */}
           <React.Suspense fallback={null}>
