@@ -485,10 +485,12 @@ const ImageGallery = ({
         if (error) throw error;
         const images = (rawImages || []).filter((r: any) => {
           if (r?.is_duplicate === true) return false;
+          // Superseded rows are prior versions of reattributed images — never display them.
+          if (r?.is_superseded === true) return false;
           const mvms = r?.image_vehicle_match_status;
           if (mvms === 'mismatch' || mvms === 'unrelated') return false;
           const vgs = r?.vision_gate_status;
-          if (vgs != null && vgs !== 'approved') return false;
+          if (vgs === 'rejected_personal' || vgs === 'rejected_misattributed' || vgs === 'rejected') return false;
           return true;
         });
         setAllImages(applyQuarantinePolicy(images));
@@ -2083,6 +2085,7 @@ const ImageGallery = ({
         // Filter out documents (treat NULL as false)
         .not('is_document', 'is', true)
         .not('is_duplicate', 'is', true)
+        .not('is_superseded', 'is', true)
         .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
         .order('is_primary', { ascending: false })
         .order('position', { ascending: true, nullsFirst: false })
