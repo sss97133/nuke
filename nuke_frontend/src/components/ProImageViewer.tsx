@@ -197,8 +197,11 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
       const query = supabase
         .from('vehicle_images')
         .select('*')
-        .eq('vehicle_id', vehicleId);
-      
+        .eq('vehicle_id', vehicleId)
+        // Exclude superseded (reattributed prior versions) and gate-rejected (wrong-vehicle / personal)
+        .not('is_superseded', 'is', true)
+        .or('vision_gate_status.is.null,vision_gate_status.not.in.("rejected_personal","rejected_misattributed")');
+
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
