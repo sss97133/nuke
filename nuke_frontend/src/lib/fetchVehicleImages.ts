@@ -19,15 +19,24 @@ export async function fetchVehicleImages<T = any>(
   const rows: T[] = [];
   let from = 0;
 
+  // The gate/supersession filters below need these columns. Append them if the
+  // caller's select clause omits them (otherwise the client-side filter at the
+  // bottom is dead code — vision_gate_status reads undefined and never matches).
+  let select = selectClause;
+  if (!/\bvision_gate_status\b/.test(select)) select += ', vision_gate_status';
+  if (!/\bis_superseded\b/.test(select)) select += ', is_superseded';
+
   while (true) {
     // Chained .or() with not.in.("a","b") was producing PostgREST 500s.
     // Server-side filters that work cleanly stay; the OR-chain filters move client-side.
     const query = supabase
       .from('vehicle_images')
-      .select(selectClause)
+      .select(select)
       .eq('vehicle_id', vehicleId)
       .not('is_document', 'is', true)
       .not('is_duplicate', 'is', true)
+      // Superseded rows are prior versions of reattributed images — never display them.
+      .not('is_superseded', 'is', true)
       .not('image_url', 'is', null)
       .order('is_primary', { ascending: false })
       .order('position', { ascending: true, nullsFirst: false })
@@ -44,7 +53,7 @@ export async function fetchVehicleImages<T = any>(
         if (mvms === 'mismatch' || mvms === 'unrelated') return false;
       }
       const vgs = r?.vision_gate_status;
-      if (vgs != null && vgs !== 'approved') return false;
+      if (vgs === 'rejected_personal' || vgs === 'rejected_misattributed' || vgs === 'rejected') return false;
       return true;
     }) as T[];
     rows.push(...filtered);
