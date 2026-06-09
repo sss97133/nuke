@@ -1839,7 +1839,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   </div>
                 )}
                 <Link
-                  to={`/search?make=${encodeURIComponent(String(vehicle?.make || ''))}`}
+                  to={`/browse?make=${encodeURIComponent(String(vehicle?.make || ''))}`}
                   style={{ borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: '9px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text)', textDecoration: 'underline' }}
                 >
                   View all {vehicle?.make} →
@@ -1938,7 +1938,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   </div>
                 )}
                 <Link
-                  to={`/search?q=${encodeURIComponent(`${vehicle?.make || ''} ${displayModel || ''}`.trim())}`}
+                  to={vehicle?.model
+                    ? `/browse?make=${encodeURIComponent(String(vehicle?.make || ''))}&model=${encodeURIComponent(String(vehicle.model))}`
+                    : `/search?q=${encodeURIComponent(`${vehicle?.make || ''} ${displayModel || ''}`.trim())}`}
                   style={{ borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: '9px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text)', textDecoration: 'underline' }}
                 >
                   View all {vehicle?.make} {displayModel} →
