@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
-import { ForensicReceiptService } from '../services/forensicReceiptService';
+import { uploadQueue } from '../services/globalUploadQueue';
 
 interface Photo {
   file: File;
@@ -38,7 +39,6 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [vehicles, setVehicles] = useState<any[]>([]);
 
   React.useEffect(() => {
@@ -114,7 +114,7 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
       setSessions(analyzedSessions);
     } catch (error) {
       console.error('Error processing photos:', error);
-      alert('Error processing photos. Please try again.');
+      toast.error('Error processing photos. Please try again.');
     } finally {
       setLoading(false);
       setAnalyzing(false);
@@ -289,115 +289,37 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
 
   const handleUploadAll = async () => {
     if (!user) return;
-    
+
     setUploading(true);
-    setUploadProgress(0);
-    
+
     try {
-      let uploadedCount = 0;
-      const totalPhotos = photos.length;
-      
-      // Track uploaded images by vehicle for forensic analysis
-      const uploadedByVehicle: Record<string, string[]> = {};
-      
-      for (const session of sessions) {
-        const vehicleId = session.manualVehicleId || session.suggestedVehicle?.id;
-        
-        if (!vehicleId) {
-          alert(`Please select a vehicle for session starting at ${formatTime(session.startTime)}`);
-          setUploading(false);
-          return;
-        }
-        
-        if (!uploadedByVehicle[vehicleId]) {
-          uploadedByVehicle[vehicleId] = [];
-        }
-        
-        // Upload all photos in this session
-        for (const photo of session.photos) {
-          try {
-            // Upload to storage
-            const fileName = `${user.id}/${Date.now()}_${photo.file.name}`;
-            const { data: uploadData, error: uploadError } = await supabase.storage
-              .from('vehicle-images')
-              .upload(fileName, photo.file);
-            
-            if (uploadError) throw uploadError;
-            
-            // Get public URL
-            const { data: { publicUrl } } = supabase.storage
-              .from('vehicle-images')
-              .getPublicUrl(fileName);
-            
-            // Create image record with full EXIF data
-            const { data: imageData, error: imageError } = await supabase
-              .from('vehicle_images')
-              .insert({
-                vehicle_id: vehicleId,
-                image_url: publicUrl,
-                uploaded_by: user.id,
-                taken_at: photo.timestamp.toISOString(),
-                latitude: photo.gps?.lat || null,
-                longitude: photo.gps?.lng || null,
-                exif_data: photo.exif,
-                ai_processing_status: 'pending', // Queue for AI analysis
-                metadata: {
-                  gps: photo.gps,
-                  timestamp: photo.timestamp.toISOString(),
-                  session_id: session.id,
-                },
-              })
-              .select()
-              .single();
-            
-            if (imageError) throw imageError;
-            
-            // Track for forensic analysis
-            if (imageData?.id) {
-              uploadedByVehicle[vehicleId].push(imageData.id);
-            }
-            
-            uploadedCount++;
-            setUploadProgress((uploadedCount / totalPhotos) * 80); // Reserve 20% for forensic analysis
-          } catch (error) {
-            console.error('Error uploading photo:', error);
-          }
-        }
+      // Hand everything to the durable global upload queue (IndexedDB-backed:
+      // survives tab close/offline, retries with backoff, dedupes). It routes
+      // through ImageUploadService → canonical 'vehicle-data' bucket, variant
+      // generation, EXIF extraction, and the photo-pipeline-orchestrator
+      // trigger — the previous inline path wrote raw files to the legacy
+      // 'vehicle-images' bucket and blocked the UI for the whole upload.
+      let queued = 0;
+      for (const photoSession of sessions) {
+        // No confident match → personal library (vehicle_id null). The server
+        // pipeline resolves the vehicle via VIN/GPS/rolling context, or the
+        // photos stay in the user's inbox for manual assignment — exactly the
+        // behavior the Capture page promises.
+        const sessionVehicleId = photoSession.manualVehicleId || photoSession.suggestedVehicle?.id || null;
+        const matched = sessionVehicleId ? vehicles.find((v) => v.id === sessionVehicleId) : null;
+        const vehicleName = matched
+          ? `${matched.year} ${matched.make} ${matched.model}`
+          : (photoSession.suggestedVehicle?.name || (sessionVehicleId ? 'Vehicle' : 'Photo Inbox'));
+
+        uploadQueue.addFiles(sessionVehicleId, vehicleName, photoSession.photos.map((p) => p.file));
+        queued += photoSession.photos.length;
       }
-      
-      // 🔬 FORENSIC ANALYSIS: Process uploaded images into work sessions and synthetic receipts
-      console.log('🔬 Triggering forensic analysis for uploaded images...');
-      setUploadProgress(85);
-      
-      for (const [vehicleId, imageIds] of Object.entries(uploadedByVehicle)) {
-        if (imageIds.length > 0) {
-          try {
-            const result = await ForensicReceiptService.processUploadedImages(
-              vehicleId,
-              imageIds,
-              user.id
-            );
-            
-            if (result.success) {
-              console.log(`🔬 Forensic analysis complete for vehicle ${vehicleId}:`, {
-                sessions: result.sessions.length,
-                receiptsCreated: result.sessions.filter(s => s.syntheticReceipt).length,
-                orgsMatched: result.sessions.filter(s => s.matchedOrganization).length
-              });
-            }
-          } catch (err) {
-            console.error('Forensic analysis failed:', err);
-          }
-        }
-      }
-      
-      setUploadProgress(100);
-      alert(`Successfully uploaded ${uploadedCount} photos! Forensic analysis complete.`);
+
+      toast.success(`${queued} photo(s) queued — uploading in background`);
       onClose();
-      window.location.reload(); // Refresh to show new photos and work sessions
     } catch (error) {
-      console.error('Error uploading photos:', error);
-      alert('Error uploading photos. Please try again.');
+      console.error('Error queueing photos:', error);
+      toast.error('Error queueing photos. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -511,15 +433,15 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
             </div>
             
             <div className="actions">
+              {/* Sessions without a vehicle no longer block: they queue to the
+                  personal library and the server pipeline places them. */}
               <button
                 onClick={handleUploadAll}
-                disabled={uploading || sessions.some(s => !s.manualVehicleId && !s.suggestedVehicle)}
+                disabled={uploading}
                 className="upload-button"
               >
                 {uploading ? (
-                  <>
-                    Uploading... {Math.round(uploadProgress)}%
-                  </>
+                  <>Queueing…</>
                 ) : (
                   <>Upload All ({photos.length} photos)</>
                 )}
