@@ -15,7 +15,6 @@ import { useAdminAccess } from '../../hooks/useAdminAccess';
 import { useViewHistory } from '../../hooks/useViewHistory';
 import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
 import { loadVehicleImpl, selectBestHeroImage, type RpcLoadResult } from './loadVehicleData';
-import { loadVehicleImagesImpl } from './loadVehicleImages';
 import { resolveVehicleImages } from './resolveVehicleImages';
 import { resolveCurrencyCode } from '../../utils/currency';
 import { useVehicleIntel } from './hooks/useVehicleIntel';
@@ -212,13 +211,19 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       loadTimelineEvents();
     }
     heroResolvedRef.current = false;
-    selectBestHeroImage(vehicleId, supabase).then((result) => {
-      if (result?.url) {
-        setLeadImageUrl(result.url);
-        setHeroMeta(result.meta);
-        heroResolvedRef.current = true;
-      }
-    }).catch(() => {});
+    // Hero selection runs in exactly one place per load: here when the RPC
+    // delivered the complete image set, otherwise inside loadVehicleImages
+    // (which runs whenever rpcResult.images is false). Running it in both
+    // paths duplicated the 60-row candidate query on every profile load.
+    if (rpcResult.images) {
+      selectBestHeroImage(vehicleId, supabase).then((result) => {
+        if (result?.url) {
+          setLeadImageUrl(result.url);
+          setHeroMeta(result.meta);
+          heroResolvedRef.current = true;
+        }
+      }).catch(() => {});
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicleId, session, navigate]);
 
@@ -503,13 +508,25 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   useEffect(() => {
     if (!vehicle?.id) return;
     const id = vehicle.id;
+    // Debounce realtime refetches: the photo pipeline updates each image row
+    // 2-3 times (pending → processing → completed), so a batch upload fires
+    // hundreds of events. Trailing-edge debounce collapses them into one
+    // refetch per quiet period instead of one full gallery fetch per event.
+    const timers: Record<string, ReturnType<typeof setTimeout>> = {};
+    const debounced = (key: string, fn: () => void, ms = 1500) => {
+      if (timers[key]) clearTimeout(timers[key]);
+      timers[key] = setTimeout(fn, ms);
+    };
     const channel = supabase
       .channel(`vp-ctx:${id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vehicles', filter: `id=eq.${id}` }, () => loadVehicle())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_images', filter: `vehicle_id=eq.${id}` }, () => loadVehicleImages())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'timeline_events', filter: `vehicle_id=eq.${id}` }, () => loadTimelineEvents())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vehicles', filter: `id=eq.${id}` }, () => debounced('vehicle', loadVehicle))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_images', filter: `vehicle_id=eq.${id}` }, () => debounced('images', loadVehicleImages))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'timeline_events', filter: `vehicle_id=eq.${id}` }, () => debounced('timeline', loadTimelineEvents))
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      Object.values(timers).forEach(clearTimeout);
+      supabase.removeChannel(channel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle?.id]);
 
