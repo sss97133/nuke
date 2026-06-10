@@ -147,6 +147,8 @@ FB groups, squarebody/FBM communities where the founder has standing.
 - [ ] BaT posture decided: attribution visible, takedown contact published
 - [ ] Rate limits sane on `universal-search` + extraction functions (one HN
       front page ≈ 20-50k visits in a day, spiky)
+- [ ] BaT ingestion re-armed + ~Mar–Jun gap backfilled (terminal can't be two
+      months stale on launch day — diagnosis in progress, existing pipeline only)
 
 ## Known leaks (fix in this order, founder curates)
 
