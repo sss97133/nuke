@@ -493,21 +493,43 @@ async function resolveVehicle(
     }
   }
 
-  // Strategy 3: User's most recent vehicle with work activity
+  // Strategy 3: rolling user context — the vehicle the user is actively
+  // working on. Time-bounded: an unbounded "most recent ever" misfiles
+  // photos to a vehicle from months ago.
   if (userId) {
+    // 3a. Most recent upload to a vehicle within the last 7 days
     const { data: recentVehicle } = await supabase
       .from("vehicle_images")
       .select("vehicle_id")
       .eq("user_id", userId)
       .not("vehicle_id", "is", null)
+      .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (recentVehicle?.vehicle_id) {
-      console.log("[photo-pipeline] Vehicle resolved via recent activity");
+      console.log("[photo-pipeline] Vehicle resolved via recent upload activity (7d window)");
       return recentVehicle.vehicle_id;
     }
+
+    // 3b. Most recent vehicle profile the user viewed within the last 48 hours
+    try {
+      const { data: recentView } = await supabase
+        .from("vehicle_views")
+        .select("vehicle_id")
+        .eq("user_id", userId)
+        .not("vehicle_id", "is", null)
+        .gte("viewed_at", new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
+        .order("viewed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (recentView?.vehicle_id) {
+        console.log("[photo-pipeline] Vehicle resolved via recent profile view (48h window)");
+        return recentView.vehicle_id;
+      }
+    } catch (_) { /* vehicle_views optional — fall through */ }
   }
 
   console.log("[photo-pipeline] Could not resolve vehicle");

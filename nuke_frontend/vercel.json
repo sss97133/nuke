@@ -5,6 +5,30 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/mcp/:path*",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/mcp-connector/:path*"
+    },
+    {
+      "source": "/mcp",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/mcp-connector"
+    },
+    {
+      "source": "/api/mcp",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/mcp-connector"
+    },
+    {
+      "source": "/.well-known/oauth-authorization-server",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/oauth-server/.well-known/oauth-authorization-server"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/oauth-server/.well-known/oauth-protected-resource"
+    },
+    {
+      "source": "/oauth/:path*",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/oauth-server/oauth/:path*"
+    },
+    {
       "source": "/api/quickbooks/:path*",
       "destination": "/api/quickbooks/:path*"
     },

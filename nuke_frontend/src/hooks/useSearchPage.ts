@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { track } from '../lib/track';
 import { ingestVehicle } from '../services/aiDataIngestion';
 import type { SearchResult, SearchResultType } from '../types/search';
 
@@ -217,6 +218,7 @@ export function useSearchPage() {
 
           // Got a vehicle — go straight to profile, no lingering
           if (result.vehicle_id) {
+            track('url_ingest', { url, ok: true });
             navigate(`/vehicle/${result.vehicle_id}`, { replace: true });
             return;
           }
@@ -241,17 +243,23 @@ export function useSearchPage() {
     setLoading(true);
     setResultFilter('all');
 
-    // Fire search + browse_stats in parallel
+    // Fire search + browse_stats in parallel — but NEVER gate results on stats.
+    // browse_stats was measured live at 15s + statement-timeout 500
+    // (2026-06-10); awaiting it in Promise.all held the entire results page
+    // hostage on every make query. Stats now fill in whenever they arrive.
     const searchPromise = supabase.functions.invoke('universal-search', {
       body: { query: q, limit: 100 },
     });
 
-    // Fetch browse stats if we detected a make
-    const statsPromise = detectedMake
-      ? supabase.rpc('browse_stats', { p_make: detectedMake }).then(({ data }) => data)
-      : Promise.resolve(null);
+    setBrowseStats(null);
+    if (detectedMake) {
+      supabase.rpc('browse_stats', { p_make: detectedMake })
+        .then(({ data }: { data: unknown }) => {
+          if (data) setBrowseStats(data as BrowseStats);
+        }, () => { /* stats are decoration — never surface their failures */ });
+    }
 
-    Promise.all([searchPromise, statsPromise]).then(([searchRes, stats]) => {
+    searchPromise.then((searchRes) => {
       const { data, error } = searchRes;
 
       if (error || !data) {
@@ -269,9 +277,8 @@ export function useSearchPage() {
       const total = data.meta?.total_count ?? mapped.length;
       setSearchSummary(`Found ${total.toLocaleString()} results for "${q}".`);
       setSearchMeta(data.meta || null);
-
-      if (stats) setBrowseStats(stats as BrowseStats);
-      else setBrowseStats(null);
+      // Funnel: the first-query moment. Zero-result queries are the gap list.
+      track('search_results', { q, total });
 
       setLoading(false);
     });

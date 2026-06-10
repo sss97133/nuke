@@ -1775,6 +1775,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     No aggregated market data available yet for {vehicle?.year} vehicles.
                   </div>
                 )}
+                <Link
+                  to={`/search?q=${encodeURIComponent(String(vehicle?.year || ''))}`}
+                  style={{ borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: '9px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text)', textDecoration: 'underline' }}
+                >
+                  View all {vehicle?.year} vehicles →
+                </Link>
               </div>
             ) : (
               <div style={{ color: 'var(--text-muted)' }}>No data available</div>
@@ -1832,6 +1838,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     No aggregated market data available yet for {vehicle?.make}.
                   </div>
                 )}
+                <Link
+                  to={`/browse?make=${encodeURIComponent(String(vehicle?.make || ''))}`}
+                  style={{ borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: '9px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text)', textDecoration: 'underline' }}
+                >
+                  View all {vehicle?.make} →
+                </Link>
               </div>
             ) : (
               <div style={{ color: 'var(--text-muted)' }}>No data available</div>
@@ -1925,6 +1937,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     No aggregated market data available yet for this model.
                   </div>
                 )}
+                <Link
+                  to={vehicle?.model
+                    ? `/browse?make=${encodeURIComponent(String(vehicle?.make || ''))}&model=${encodeURIComponent(String(vehicle.model))}`
+                    : `/search?q=${encodeURIComponent(`${vehicle?.make || ''} ${displayModel || ''}`.trim())}`}
+                  style={{ borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: '9px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text)', textDecoration: 'underline' }}
+                >
+                  View all {vehicle?.make} {displayModel} →
+                </Link>
               </div>
             ) : (
               <div style={{ color: 'var(--text-muted)' }}>No data available</div>
@@ -1944,6 +1964,37 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           {vehicle?.id && (
             <div className="badge-priority-4">
               <MemeDropBadge vehicleId={vehicle.id} compact />
+            </div>
+          )}
+
+          {/* Source listing link — discovery_url/listing_url was never surfaced */}
+          {listingUrl && listingHost && (
+            <div className="badge-priority-3">
+              <a
+                href={String(listingUrl)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                title={`View source listing on ${listingHost}`}
+                className="badge"
+                style={{
+                  fontSize: '8px',
+                  fontWeight: 600,
+                  fontFamily: 'Arial, sans-serif',
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase' as const,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  color: 'var(--text-secondary)',
+                  border: '1px solid var(--border)',
+                  textDecoration: 'none',
+                  padding: '1px 5px',
+                }}
+              >
+                <FaviconIcon url={String(listingUrl)} size={10} />
+                {listingHost}
+              </a>
             </div>
           )}
 
