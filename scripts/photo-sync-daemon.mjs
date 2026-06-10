@@ -176,8 +176,53 @@ async function uploadPhoto(filePath, filename, meta) {
   return { ok: true };
 }
 
+// ─── Label audit: measure Apple's classification before trusting it ─────────
+// Usage: node scripts/photo-sync-daemon.mjs --audit-labels [days]
+// Scans the library (no export, no upload, nothing leaves the Mac), writes
+// per-photo decisions to ~/.nuke/label-audit.jsonl and prints the summary
+// that answers: how many photos have labels at all, what are the labels,
+// what would the gate sync vs hold back. This is the dataset for tuning
+// VEHICLE_LABEL_RE — measure, don't guess.
+async function auditLabels(days) {
+  const since = new Date(Date.now() - days * 86400 * 1000).toISOString();
+  const photos = queryNewPhotos(since).filter(p => !p.ismovie && !p.hidden);
+  const auditFile = join(STATE_DIR, 'label-audit.jsonl');
+  mkdirSync(STATE_DIR, { recursive: true });
+  writeFileSync(auditFile, '');
+
+  const labelCounts = new Map();
+  let labeled = 0, wouldSync = 0;
+  for (const p of photos) {
+    const labels = p.labels || p.labels_normalized || [];
+    if (labels.length > 0) labeled++;
+    const sync = isVehicleish(p);
+    if (sync) wouldSync++;
+    for (const l of labels) labelCounts.set(l, (labelCounts.get(l) || 0) + 1);
+    appendFileSync(auditFile, JSON.stringify({
+      file: p.original_filename, taken: p.date, gps: p.latitude != null,
+      labels, decision: sync ? 'sync' : 'hold',
+    }) + '\n');
+  }
+
+  const top = [...labelCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30);
+  console.log(`\n── LABEL AUDIT (last ${days}d) ─────────────────────────`);
+  console.log(`photos:        ${photos.length}`);
+  console.log(`with labels:   ${labeled} (${photos.length ? Math.round(labeled / photos.length * 100) : 0}%)`);
+  console.log(`would sync:    ${wouldSync}`);
+  console.log(`held on-device:${photos.length - wouldSync}`);
+  console.log(`top labels:`);
+  for (const [l, n] of top) console.log(`  ${String(n).padStart(5)}  ${l}${VEHICLE_LABEL_RE.test(l) ? '   ← gate matches' : ''}`);
+  console.log(`\nper-photo decisions: ${auditFile}`);
+  console.log(`If real vehicle photos show under "held", widen VEHICLE_LABEL_RE with the labels you see here.`);
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 async function main() {
+  const auditIdx = args.indexOf('--audit-labels');
+  if (auditIdx >= 0) {
+    await auditLabels(parseInt(args[auditIdx + 1] || '30', 10));
+    return;
+  }
   const state = readState();
   const since = sinceArg || state.last_sync || new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   const runStartedAt = new Date().toISOString();
@@ -186,8 +231,18 @@ async function main() {
   const photos = queryNewPhotos(since);
   const candidates = photos.filter(p => !p.ismovie && !p.hidden);
   const images = candidates.filter(isVehicleish).slice(0, MAX_PER_RUN);
-  const heldBack = candidates.length - images.length;
-  if (heldBack > 0) log(`${heldBack} photo(s) held back on-device (no vehicle-ish labels — never uploaded)`);
+  const heldBack = candidates.filter(p => !isVehicleish(p));
+  if (heldBack.length > 0) {
+    log(`${heldBack.length} photo(s) held back on-device (no vehicle-ish labels — never uploaded)`);
+    // Decision log (local only): the dataset for auditing gate quality later.
+    const heldFile = join(STATE_DIR, 'held-back.jsonl');
+    for (const p of heldBack) {
+      appendFileSync(heldFile, JSON.stringify({
+        at: runStartedAt, file: p.original_filename, taken: p.date,
+        labels: p.labels || [], gps: p.latitude != null,
+      }) + '\n');
+    }
+  }
 
   if (images.length === 0) {
     log('nothing new');
