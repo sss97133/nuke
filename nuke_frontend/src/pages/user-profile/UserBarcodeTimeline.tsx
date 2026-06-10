@@ -1,11 +1,14 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useUserProfile } from './UserProfileContext';
 import type { ContributionEvent } from './types';
+import '../../styles/barcode-timeline.css';
 
 /**
  * UserBarcodeTimeline -- Contribution heatmap adapted from VehicleBarcodeTimeline.
  *
- * Reuses barcode-strip / hm-* CSS classes from vehicle-profile.css.
+ * Shares barcode-strip / hm-* CSS with the vehicle profile via
+ * styles/barcode-timeline.css (imported above — previously these classes lived
+ * only in vehicle-profile.css's lazy chunk and were unstyled on /profile).
  * Sticky position comes from a wrapper div using --up-stick-barcode token.
  */
 
@@ -103,15 +106,34 @@ const UserBarcodeTimeline: React.FC = () => {
   }, [filteredEvents]);
 
   // ── Date range ──
+  // Range clamp ported from the vehicle BarcodeTimeline: (1) events dated
+  // before 2000 are bogus EXIF (camera-default 1981 phantoms) and are ignored;
+  // (2) the start year floors at the first year with >=10 events so a handful
+  // of stray early dates can't stretch the strip into a decade of empty space.
   const { startDate, endDate } = useMemo(() => {
-    if (filteredEvents.length === 0) return { startDate: new Date(), endDate: new Date() };
-    const dates = filteredEvents
-      .map((e: ContributionEvent) => e.date?.slice(0, 10))
-      .filter((d): d is string => Boolean(d))
-      .sort();
+    const today = new Date();
+    if (filteredEvents.length === 0) return { startDate: today, endDate: today };
+
+    const MIN_VALID_YEAR = 2000;
+    const MIN_EVENTS_PER_YEAR = 10;
+
+    const yearCounts = new Map<number, number>();
+    for (const ev of filteredEvents) {
+      const d = ev.date?.slice(0, 10);
+      if (!d) continue;
+      const y = Number(d.slice(0, 4));
+      if (!Number.isFinite(y) || y < MIN_VALID_YEAR) continue;
+      yearCounts.set(y, (yearCounts.get(y) || 0) + (ev.count || 1));
+    }
+    if (yearCounts.size === 0) return { startDate: today, endDate: today };
+
+    const years = Array.from(yearCounts.keys()).sort((a, b) => a - b);
+    const firstDenseYear =
+      years.find((y) => (yearCounts.get(y) || 0) >= MIN_EVENTS_PER_YEAR) ?? years[0];
+
     return {
-      startDate: new Date(dates[0]!),
-      endDate: new Date(),
+      startDate: new Date(firstDenseYear, 0, 1),
+      endDate: today,
     };
   }, [filteredEvents]);
 
@@ -189,7 +211,11 @@ const UserBarcodeTimeline: React.FC = () => {
     return sy === ey ? String(sy) : `${sy}-${ey}`;
   }, [startDate, endDate]);
 
-  // ── Auto-scroll heatmap to right when expanded ──
+  // ── Auto-scroll heatmap to right (newest) when expanded ──
+  // Must also re-fire when the week grid grows: contribution events load
+  // async, so on first paint scrollWidth covers an empty grid and a
+  // single-fire on [expanded] left the user parked at the left edge
+  // (vehicle BarcodeTimeline fix — deps [expanded, weeks.length]).
   useEffect(() => {
     if (expanded && heatmapRef.current) {
       const el = heatmapRef.current;
@@ -197,7 +223,7 @@ const UserBarcodeTimeline: React.FC = () => {
         el.scrollLeft = el.scrollWidth;
       });
     }
-  }, [expanded]);
+  }, [expanded, heatmapWeeks.length]);
 
   // ── Collapse on scroll down, re-expand at top ──
   useEffect(() => {
@@ -297,25 +323,19 @@ const UserBarcodeTimeline: React.FC = () => {
             ))}
           </div>
 
-          {/* Heatmap grid */}
+          {/* Heatmap grid — same structure as vehicle BarcodeTimeline:
+              day labels are a sibling BEFORE .hm-wrap, month labels render
+              inside each .hm-week column after its day cells */}
           <div className="timeline-heatmap" ref={heatmapRef}>
+            <div className="hm-day-labels">
+              {DAY_LABELS.map((lbl, i) => (
+                <span key={i}>{i % 2 === 1 ? lbl : ''}</span>
+              ))}
+            </div>
             <div className="hm-wrap">
-              {/* Day-of-week labels */}
-              <div className="hm-day-labels">
-                {DAY_LABELS.map((lbl, i) => (
-                  <span key={i} style={{ height: 11 }}>
-                    {i % 2 === 1 ? lbl : ''}
-                  </span>
-                ))}
-              </div>
-
               {/* Week columns */}
               {heatmapWeeks.map((week, wi) => (
                 <div key={wi} className="hm-week">
-                  {/* Month label */}
-                  {week.monthLabel && (
-                    <div className="hm-month-inline">{week.monthLabel}</div>
-                  )}
                   {week.days.map((day, di) => {
                     if (!day) {
                       return <div key={di} className="hm-c empty" />;
@@ -341,6 +361,10 @@ const UserBarcodeTimeline: React.FC = () => {
                       />
                     );
                   })}
+                  {/* Month label — inside the week column, vehicle-style */}
+                  {week.monthLabel && (
+                    <span className="hm-month-inline">{week.monthLabel}</span>
+                  )}
                 </div>
               ))}
             </div>
