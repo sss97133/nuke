@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { track } from '../lib/track';
 import { ingestVehicle } from '../services/aiDataIngestion';
 import type { SearchResult, SearchResultType } from '../types/search';
 
@@ -217,6 +218,7 @@ export function useSearchPage() {
 
           // Got a vehicle — go straight to profile, no lingering
           if (result.vehicle_id) {
+            track('url_ingest', { url, ok: true });
             navigate(`/vehicle/${result.vehicle_id}`, { replace: true });
             return;
           }
@@ -269,6 +271,8 @@ export function useSearchPage() {
       const total = data.meta?.total_count ?? mapped.length;
       setSearchSummary(`Found ${total.toLocaleString()} results for "${q}".`);
       setSearchMeta(data.meta || null);
+      // Funnel: the first-query moment. Zero-result queries are the gap list.
+      track('search_results', { q, total });
 
       if (stats) setBrowseStats(stats as BrowseStats);
       else setBrowseStats(null);

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { track } from '../../lib/track';
 import './landing.css';
 
 export default function LandingPage() {
@@ -9,6 +10,7 @@ export default function LandingPage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const q = query.trim();
+    track('landing_search', { q });
     if (q) navigate(`/search?q=${encodeURIComponent(q)}`);
     else navigate('/search');
   };
