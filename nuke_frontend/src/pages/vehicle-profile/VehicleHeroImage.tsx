@@ -16,8 +16,13 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
   const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
   const [showGallery, setShowGallery] = useState(false);
   // Media-kit slideshow: rendered when curation finds >=3 distinct BYOK scene_types.
-  // Initialized to true so the slot reserves space — flips to false if curation falls back.
-  const [mediaKitActive, setMediaKitActive] = useState<boolean>(true);
+  // Initialized to FALSE so the static <img> paints instantly from primary_image_url.
+  // (The old true-default left the hero an empty void for ~40s on cold loads: the
+  // static img was suppressed until the BYOK curation query resolved at the tail of
+  // the request flood. Measured 2026-06-10: heroImgs=0 at t+30s, first paint t+40s.)
+  // VehicleMediaKit stays mounted regardless and upgrades the slot via
+  // onCurationResolved when curation lands.
+  const [mediaKitActive, setMediaKitActive] = useState<boolean>(false);
   const isMobile = useIsMobile();
 
   const handleCurationResolved = useCallback((count: number) => {
@@ -181,10 +186,10 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
 
               {/* Media-kit slideshow when curation finds >=3 distinct BYOK
                   scene_types; falls back to single hero <img> otherwise.
-                  VehicleMediaKit calls onCurationResolved with 0 when it can't
-                  curate, which flips mediaKitActive to false and reveals the
-                  <img> path below. */}
-              {vehicleId && mediaKitActive && (
+                  Mounted whenever we have a vehicleId (it renders null until
+                  curation passes its gate) so handleCurationResolved can still
+                  upgrade the static hero to the slideshow when ready. */}
+              {vehicleId && (
                 <VehicleMediaKit
                   vehicleId={vehicleId}
                   onCurationResolved={handleCurationResolved}
