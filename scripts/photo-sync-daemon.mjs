@@ -70,9 +70,28 @@ const sinceArg = (() => { const i = args.indexOf('--since'); return i >= 0 ? arg
 // classification remains as the second pass for what does get through.
 const VEHICLE_LABEL_RE = /vehicle|car|truck|automobile|motorcycle|van|jeep|tractor|trailer|wheel|tire|engine|machine|garage|workshop|tool|boat|text|document|receipt|paper/i;
 
+// Known shop coordinates — GPS at a work location is a STRONGER vehicle signal
+// than any Apple label. Apple frequently leaves work photos unlabeled (all 106
+// June 2026 photos: zero labels, 84 of them at Ernie's), so a label-only gate
+// holds back the actual build work. A photo shot at a shop is work evidence by
+// definition; home/personal GPS is never on this list, so the privacy gate holds.
+// Add shops here as they're confirmed (lat, lon, ~550m tolerance).
+const SHOP_LOCATIONS = [
+  { name: 'ernies_upholstery', lat: 35.977, lon: -114.854 },
+];
+const SHOP_TOL = 0.005;
+
+function isAtShop(photo) {
+  const lat = photo.latitude, lon = photo.longitude;
+  if (lat == null || lon == null) return false;
+  return SHOP_LOCATIONS.some((s) => Math.abs(lat - s.lat) < SHOP_TOL && Math.abs(lon - s.lon) < SHOP_TOL);
+}
+
 function isVehicleish(photo) {
+  // GPS-at-shop passes regardless of labels — work location beats Apple's tagging.
+  if (isAtShop(photo)) return true;
   const labels = photo.labels || photo.labels_normalized || [];
-  if (labels.length === 0) return INCLUDE_UNLABELED; // unlabeled: private by default
+  if (labels.length === 0) return INCLUDE_UNLABELED; // unlabeled off-shop: private by default
   return labels.some((l) => VEHICLE_LABEL_RE.test(String(l)));
 }
 
