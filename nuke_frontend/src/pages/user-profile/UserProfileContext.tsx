@@ -147,8 +147,17 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   // ── Data fetching ──
 
+  // In-flight guard: auth bootstrap settles deps twice on a cold load
+  // (cached-session render, then getSession render), which re-created this
+  // callback and ran the whole multi-second waterfall TWICE per visit.
+  const loadingForUidRef = React.useRef<string | null>(null);
+
   const loadProfile = useCallback(async () => {
     if (!authChecked) return;
+
+    const loadKey = externalIdentityId || resolvedUserId || '';
+    if (loadingForUidRef.current === loadKey) return;
+    loadingForUidRef.current = loadKey;
 
     setLoading(true);
     try {
@@ -180,6 +189,12 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       if (profileRow) {
         setProfile(profileRow as any);
+        // FIRST PAINT GATE: the page rendered a blank 100vh div until the
+        // entire stats waterfall finished — measured 24.6-25.5s cold. The
+        // header/garage/timeline only need the profile row; stats and
+        // comprehensive data stream into state below and every consumer
+        // already null-handles them.
+        setLoading(false);
       }
 
       // Background: comprehensive stats data
@@ -330,7 +345,7 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     isMobile,
     galleryFilter,
     setGalleryFilter,
-    reloadProfile: loadProfile,
+    reloadProfile: () => { loadingForUidRef.current = null; void loadProfile(); },
     saveProfileField,
     uploadAvatar,
   }), [
