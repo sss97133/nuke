@@ -40,10 +40,19 @@ interface BatCommentRow {
 
 interface UserBatTrackRecordProps {
   userId: string;
-  /** BaT seller handle for the seller_username match (e.g. 'skylarwilliams'). */
-  username: string | null;
-  /** Claimed external_identities ids for this profile. */
-  identityIds: string[];
+  /**
+   * Optional extra seller_username match (e.g. 'skylarwilliams').
+   * The widget always ALSO matches the handles of the user's claimed
+   * platform='bat' identities, so profile.username ('skylar') is safe to pass
+   * even though it differs from the BaT handle.
+   */
+  username?: string | null;
+  /**
+   * Claimed external_identities ids for this profile. If omitted, the widget
+   * resolves them itself via external_identities.claimed_by_user_id = userId
+   * (same resolution profileStatsService.getUserProfileData uses).
+   */
+  identityIds?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +120,7 @@ const UserBatTrackRecord: React.FC<UserBatTrackRecordProps> = ({ userId, usernam
   const [commentCount, setCommentCount] = useState(0);
   const [commentsOpen, setCommentsOpen] = useState(false);
 
-  const identityKey = identityIds.join(',');
+  const identityKey = identityIds ? identityIds.join(',') : 'auto';
 
   useEffect(() => {
     let cancelled = false;
@@ -119,11 +128,48 @@ const UserBatTrackRecord: React.FC<UserBatTrackRecordProps> = ({ userId, usernam
     const load = async () => {
       setLoading(true);
       try {
-        const cleanUsername = (username || '').trim().replace(/"/g, '');
+        // Identity resolution — same pattern as profileStatsService.getUserProfileData:
+        // claimed external_identities for this user. Used for both the listings
+        // seller match (BaT handles + identity ids) and the comments author match.
+        let resolvedIds: string[] = identityIds || [];
+        let batHandles: string[] = [];
+
+        if (userId && (!identityIds || identityIds.length === 0)) {
+          const { data: identities, error: idErr } = await supabase
+            .from('external_identities')
+            .select('id, platform, handle')
+            .eq('claimed_by_user_id', userId);
+          if (idErr) {
+            console.warn('[UserBatTrackRecord] external_identities query failed:', idErr.message);
+          }
+          resolvedIds = (identities || []).map(ei => ei.id);
+          batHandles = (identities || [])
+            .filter(ei => ei.platform === 'bat' && ei.handle)
+            .map(ei => ei.handle as string);
+        } else if (identityIds && identityIds.length > 0) {
+          // Ids were supplied; still resolve BaT handles for the username match
+          // (bat_listings rows can carry seller_username but a NULL identity id —
+          // the $31K GMC C2500 row does exactly that in prod).
+          const { data: identities } = await supabase
+            .from('external_identities')
+            .select('id, platform, handle')
+            .in('id', identityIds);
+          batHandles = (identities || [])
+            .filter(ei => ei.platform === 'bat' && ei.handle)
+            .map(ei => ei.handle as string);
+        }
+        if (cancelled) return;
+
+        const sellerNames = new Set<string>(batHandles);
+        const cleanUsername = (username || '').trim();
+        if (cleanUsername) sellerNames.add(cleanUsername);
+
         const sellerFilters: string[] = [];
-        if (cleanUsername) sellerFilters.push(`seller_username.eq."${cleanUsername}"`);
-        if (identityIds.length > 0) {
-          sellerFilters.push(`seller_external_identity_id.in.(${identityIds.join(',')})`);
+        for (const name of sellerNames) {
+          sellerFilters.push(`seller_username.eq."${name.replace(/"/g, '')}"`);
+        }
+        if (resolvedIds.length > 0) {
+          sellerFilters.push(`seller_external_identity_id.in.(${resolvedIds.join(',')})`);
         }
 
         const listingsPromise = sellerFilters.length > 0
@@ -134,14 +180,12 @@ const UserBatTrackRecord: React.FC<UserBatTrackRecordProps> = ({ userId, usernam
               .limit(100)
           : Promise.resolve({ data: [] as BatListingRow[], error: null, count: null });
 
-        // Same identity-resolution pattern as profileStatsService.getUserProfileData:
-        // auction_comments filtered on the indexed author_external_identity_id,
-        // bids excluded via bid_amount IS NULL.
-        const commentsPromise = identityIds.length > 0
+        // Comments on the indexed author_external_identity_id; bids excluded.
+        const commentsPromise = resolvedIds.length > 0
           ? supabase
               .from('auction_comments')
               .select('id, comment_text, posted_at, vehicle_id', { count: 'exact' })
-              .in('author_external_identity_id', identityIds)
+              .in('author_external_identity_id', resolvedIds)
               .is('bid_amount', null)
               .order('posted_at', { ascending: false })
               .limit(10)
