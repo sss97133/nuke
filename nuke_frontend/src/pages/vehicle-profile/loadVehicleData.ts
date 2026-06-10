@@ -79,6 +79,13 @@ function scoreHeroCandidate(row: any, options: { frontExterior?: boolean } = {})
   return moneyShotScore + qualityScore + zoneScore + getHeroAspectScore(row);
 }
 
+// In-flight dedupe for the hero-candidate query. The identical vehicle_images
+// query was observed firing 2-4x per page load (StrictMode double-mount +
+// RPC-fallback path both selecting a hero). Key = vehicleId — the rest of the
+// query shape is constant. Entries clear when the promise settles, so this is
+// pure concurrent-request coalescing, not a cache.
+const inflightHeroCandidates = new Map<string, Promise<any[] | null>>();
+
 /**
  * Select the best hero image for a vehicle based on zone, quality, confidence,
  * and banner fit.
@@ -108,24 +115,31 @@ export async function selectBestHeroImage(
     if (prefetchedImages && prefetchedImages.length > 0) {
       candidates = prefetchedImages;
     } else {
-      const { data, error } = await supabase
-        .from('vehicle_images')
-        .select(
-          'image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at'
-        )
-        .eq('vehicle_id', vehicleId)
-        // Order by recency first — latest owner photo wins per restoration_lead_image_must_be_latest.
-        // is_primary remains a tiebreaker fallback further down.
-        .order('taken_at', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false, nullsFirst: false })
-        .order('is_primary', { ascending: false, nullsFirst: false })
-        .order('photo_quality_score', { ascending: false, nullsFirst: false })
-        .limit(60);
-
-      if (error) {
-        console.warn('[selectBestHeroImage] query error:', error);
+      let pending = inflightHeroCandidates.get(vehicleId);
+      if (!pending) {
+        const query: Promise<any[] | null> = supabase
+          .from('vehicle_images')
+          .select(
+            'image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at'
+          )
+          .eq('vehicle_id', vehicleId)
+          // Order by recency first — latest owner photo wins per restoration_lead_image_must_be_latest.
+          // is_primary remains a tiebreaker fallback further down.
+          .order('taken_at', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false, nullsFirst: false })
+          .order('is_primary', { ascending: false, nullsFirst: false })
+          .order('photo_quality_score', { ascending: false, nullsFirst: false })
+          .limit(60)
+          .then(({ data, error }: { data: any[] | null; error: any }) => {
+            if (error) {
+              console.warn('[selectBestHeroImage] query error:', error);
+            }
+            return data || null;
+          });
+        pending = query.finally(() => inflightHeroCandidates.delete(vehicleId));
+        inflightHeroCandidates.set(vehicleId, pending);
       }
-      candidates = data || null;
+      candidates = await pending;
     }
 
     if (!candidates || candidates.length === 0) {
@@ -310,9 +324,12 @@ export async function loadVehicleImpl({
     // Only try RPC if vehicleId is a UUID (RPC expects UUID, not VIN)
     if (isUUID) {
       // Wrap RPC in a timeout so a hung connection never leaves the page in an infinite
-      // "Loading vehicle..." state. 2.5 s fires before the anon DB statement_timeout (3 s),
-      // ensuring the client falls back to the fast direct query before the server errors out.
-      const rpcTimeoutMs = 2500;
+      // "Loading vehicle..." state. 6 s, not 2.5 s: the RPC measures 0.5-1.8 s in
+      // isolation, but in-browser it loses the connection-scheduling race under the
+      // page's request flood (~57 vehicle_images requests observed 2026-06-10), so the
+      // 2.5 s wrapper fired spuriously and the fallback cascade then DOUBLED the flood.
+      // 6 s still fires well before the anon DB statement_timeout (15 s).
+      const rpcTimeoutMs = 6000;
       const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
         setTimeout(() => resolve({ data: null, error: new Error('get_vehicle_profile_data timed out') }), rpcTimeoutMs)
       );
