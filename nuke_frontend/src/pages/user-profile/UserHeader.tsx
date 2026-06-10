@@ -21,7 +21,6 @@ const UserHeader: React.FC = () => {
   const {
     profile,
     stats,
-    comprehensiveData,
     isOwnProfile,
     isAdmin,
     isExternalIdentity,
@@ -33,18 +32,23 @@ const UserHeader: React.FC = () => {
 
   const username = profile.username || profile.id?.slice(0, 8);
   const fullName = profile.full_name;
-  const location = profile.location;
+  // Structured city/state beats the legacy free-text location field
+  // (which holds stale junk like a bare ZIP).
+  const location =
+    [profile.city, profile.state].filter(Boolean).join(', ') ||
+    profile.location;
   const memberSince = profile.member_since || profile.created_at;
   const memberYear = memberSince ? new Date(memberSince).getFullYear() : null;
 
-  // Stats — profile_stats (refreshed by recompute_profile_stats) is the source of truth.
-  // Fall back to comprehensiveData.listings only if profile_stats hasn't been computed.
-  const totalVehicles =
-    stats?.total_vehicles ?? comprehensiveData?.listings?.length ?? 0;
-  const totalListings = stats?.total_listings ?? profile.total_listings ?? 0;
-  const totalComments = stats?.total_comments ?? profile.total_comments ?? 0;
-  const totalBids = stats?.total_bids ?? profile.total_bids ?? 0;
-  const reputation = profile.reputation_score ?? 0;
+  // Stats — profile_stats (refreshed by recompute_profile_stats) is the source
+  // of truth for garage-wide counts; listings/comments/bids are computed live
+  // by profileStatsService. No fallback to BaT seller events or the dead
+  // profiles.total_* columns (all 0 in prod).
+  const totalVehicles = stats?.total_vehicles ?? 0;
+  const totalListings = stats?.total_listings ?? 0;
+  const totalComments = stats?.total_comments ?? 0;
+  const totalBids = stats?.total_bids ?? 0;
+  const totalImages = stats?.total_images ?? 0;
 
   const handleEditProfile = () => {
     window.dispatchEvent(new CustomEvent('up:open-settings'));
@@ -111,10 +115,12 @@ const UserHeader: React.FC = () => {
           <span className="up-stat-pill__label">BIDS</span>
           {totalBids}
         </span>
-        <span className="up-stat-pill">
-          <span className="up-stat-pill__label">REPUTATION</span>
-          {reputation}
-        </span>
+        {totalImages > 0 && (
+          <span className="up-stat-pill">
+            <span className="up-stat-pill__label">IMAGES</span>
+            {totalImages}
+          </span>
+        )}
       </div>
 
       {/* Right: Actions */}

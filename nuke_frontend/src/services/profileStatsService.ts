@@ -12,6 +12,12 @@ export interface ProfileStats {
   total_auction_wins: number;
   total_success_stories: number;
   member_since: string | null;
+  // From the profile_stats table (refreshed by recompute_profile_stats).
+  // null = no row computed for this user yet. Populated on the user path only.
+  total_vehicles?: number | null;
+  vehicles_count?: number | null;
+  total_images?: number | null;
+  total_contributions?: number | null;
 }
 
 export interface UserProfileData {
@@ -63,140 +69,115 @@ export interface OrganizationProfileData {
  * Get comprehensive user profile data (BaT-style)
  */
 export async function getUserProfileData(userId: string): Promise<UserProfileData> {
-  // Get profile with stats
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  // Profile + claimed identities are independent — fetch in parallel.
+  const [profileRes, identitiesRes] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', userId).single(),
+    supabase
+      .from('external_identities')
+      .select('id, platform, handle')
+      .eq('claimed_by_user_id', userId),
+  ]);
 
-  if (profileError) throw profileError;
+  if (profileRes.error) throw profileRes.error;
+  const profile = profileRes.data;
+  const identityIds = identitiesRes.data?.map(ei => ei.id) || [];
 
-  // Get external identities for this user
-  const { data: externalIdentities } = await supabase
-    .from('external_identities')
-    .select('id, platform, handle')
-    .eq('claimed_by_user_id', userId);
-
-  const identityIds = externalIdentities?.map(ei => ei.id) || [];
-  
   // If no claimed identities, return empty arrays but still return profile
   // This allows users to see their profile even if they haven't claimed identities yet
 
-  // Get listings (vehicle_events where user is seller, BaT platform)
-  const { data: listings } = identityIds.length > 0 ? await supabase
-    .from('vehicle_events')
-    .select(`
-      *,
-      vehicle:vehicles(*)
-    `)
-    .in('seller_external_identity_id', identityIds)
-    .eq('source_platform', 'bat')
-    .order('ended_at', { ascending: false })
-    .limit(100) : { data: [] };
+  // Trimmed embed: full vehicles(*) rows were shipped for every event.
+  const VEHICLE_EMBED = 'vehicle:vehicles(id, year, make, model, primary_image_url)';
+  const EMPTY = Promise.resolve({ data: [] as any[] });
 
-  // Get bids (auction bids + BaT listings where user is buyer)
-  const { data: userBids } = await supabase
-    .from('auction_bids')
-    .select(`
-      *,
-      auction:auction_listings(*, vehicle:vehicles(*))
-    `)
-    .eq('bidder_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(100);
+  // All remaining queries are independent of each other — ONE Promise.all
+  // (was a measured 15.2s sequential leg of awaits).
+  // Removed queries on tables that DO NOT EXIST in prod and 404'd silently on
+  // every load: auction_bids, auction_listings, bat_comments, success_stories.
+  // auction_comments now filters on author_external_identity_id (the indexed
+  // column); the old external_identity_id filter was unindexed and timed out.
+  const [listingsRes, batBidsRes, auctionCommentsRes, auctionWinsRes, profileStatsRes] =
+    await Promise.all([
+      // Listings (vehicle_events where user is seller, BaT platform)
+      identityIds.length > 0
+        ? supabase
+            .from('vehicle_events')
+            .select(`*, ${VEHICLE_EMBED}`)
+            .in('seller_external_identity_id', identityIds)
+            .eq('source_platform', 'bat')
+            .order('ended_at', { ascending: false })
+            .limit(100)
+        : EMPTY,
+      // Bids (BaT listings where user is buyer)
+      identityIds.length > 0
+        ? supabase
+            .from('vehicle_events')
+            .select(`*, ${VEHICLE_EMBED}`)
+            .in('buyer_external_identity_id', identityIds)
+            .eq('source_platform', 'bat')
+            .order('ended_at', { ascending: false })
+            .limit(100)
+        : EMPTY,
+      // Comments — EXCLUDE bids
+      identityIds.length > 0
+        ? supabase
+            .from('auction_comments')
+            .select(`*, auction:auction_events(*, ${VEHICLE_EMBED})`)
+            .in('author_external_identity_id', identityIds)
+            .is('bid_amount', null)
+            .order('posted_at', { ascending: false })
+            .limit(100)
+        : EMPTY,
+      // Auction wins
+      identityIds.length > 0
+        ? supabase
+            .from('vehicle_events')
+            .select(`*, ${VEHICLE_EMBED}`)
+            .in('buyer_external_identity_id', identityIds)
+            .eq('event_status', 'sold')
+            .eq('source_platform', 'bat')
+            .order('ended_at', { ascending: false })
+            .limit(50)
+        : EMPTY,
+      // profile_stats — garage-wide counts refreshed by recompute_profile_stats.
+      supabase
+        .from('profile_stats')
+        .select('total_vehicles, vehicles_count, total_images, total_contributions')
+        .eq('user_id', userId)
+        .maybeSingle(),
+    ]);
 
-  const { data: batBids } = identityIds.length > 0 ? await supabase
-    .from('vehicle_events')
-    .select(`
-      *,
-      vehicle:vehicles(*)
-    `)
-    .in('buyer_external_identity_id', identityIds)
-    .eq('source_platform', 'bat')
-    .order('ended_at', { ascending: false })
-    .limit(100) : { data: [] };
+  const listings = listingsRes.data;
+  const batBids = batBidsRes.data;
+  const auctionComments = auctionCommentsRes.data;
+  const auctionWins = auctionWinsRes.data;
+  const profileStatsRow = (profileStatsRes as any)?.data ?? null;
 
-  // Get comments (BaT comments + auction comments) - EXCLUDE bids
-  // NOTE: bat_comments still joins to bat_listings via FK (bat_listing_id) — keep until bat_comments migrated
-  const { data: batComments } = identityIds.length > 0 ? await supabase
-    .from('bat_comments')
-    .select(`
-      *,
-      listing:bat_listings(*, vehicle:vehicles(*))
-    `)
-    .in('external_identity_id', identityIds)
-    .or('contains_bid.is.null,contains_bid.eq.false')
-    .order('comment_timestamp', { ascending: false })
-    .limit(100) : { data: [] };
-
-  const { data: auctionComments } = identityIds.length > 0 ? await supabase
-    .from('auction_comments')
-    .select(`
-      *,
-      auction:auction_events(*, vehicle:vehicles(*))
-    `)
-    .in('external_identity_id', identityIds)
-    .is('bid_amount', null)
-    .order('posted_at', { ascending: false })
-    .limit(100) : { data: [] };
-
-  // Get auction wins
-  const { data: auctionWins } = identityIds.length > 0 ? await supabase
-    .from('vehicle_events')
-    .select(`
-      *,
-      vehicle:vehicles(*)
-    `)
-    .in('buyer_external_identity_id', identityIds)
-    .eq('event_status', 'sold')
-    .eq('source_platform', 'bat')
-    .order('ended_at', { ascending: false })
-    .limit(50) : { data: [] };
-
-  // Get success stories
-  const { data: successStories } = await supabase
-    .from('success_stories')
-    .select(`
-      *,
-      vehicle:vehicles(*)
-    `)
-    .eq('user_id', userId)
-    .order('story_date', { ascending: false })
-    .limit(20);
-
-  // Get comments of note (highly liked/engaged comments)
-  // NOTE: bat_comments still joins to bat_listings via FK (bat_listing_id) — keep until bat_comments migrated
-  const { data: commentsOfNote } = identityIds.length > 0 ? await supabase
-    .from('bat_comments')
-    .select(`
-      *,
-      listing:bat_listings(*, vehicle:vehicles(*))
-    `)
-    .in('external_identity_id', identityIds)
-    .gt('likes_count', 5)
-    .order('likes_count', { ascending: false })
-    .limit(20) : { data: [] };
-
-  // Calculate stats
+  // Calculate stats.
+  // Live computed counts are authoritative — profiles.total_* are dead columns
+  // (all 0 in prod) and the old `profile.total_X || computed` let stale zeros
+  // and live values mask each other.
   const stats: ProfileStats = {
-    total_listings: profile.total_listings || (listings?.length || 0),
-    total_bids: profile.total_bids || ((userBids?.length || 0) + (batBids?.length || 0)),
-    total_comments: profile.total_comments || ((batComments?.length || 0) + (auctionComments?.length || 0)),
-    total_auction_wins: profile.total_auction_wins || (auctionWins?.length || 0),
-    total_success_stories: profile.total_success_stories || (successStories?.length || 0),
+    total_listings: listings?.length ?? 0,
+    total_bids: batBids?.length ?? 0,
+    total_comments: auctionComments?.length ?? 0,
+    total_auction_wins: auctionWins?.length ?? 0,
+    total_success_stories: 0, // success_stories table does not exist in prod
     member_since: profile.member_since || profile.created_at,
+    total_vehicles: profileStatsRow?.total_vehicles ?? null,
+    vehicles_count: profileStatsRow?.vehicles_count ?? null,
+    total_images: profileStatsRow?.total_images ?? null,
+    total_contributions: profileStatsRow?.total_contributions ?? null,
   };
 
   return {
     profile,
     stats,
     listings: listings || [],
-    bids: [...(userBids || []), ...(batBids || [])],
-    comments: [...(batComments || []), ...(auctionComments || [])],
+    bids: batBids || [],
+    comments: auctionComments || [],
     auction_wins: auctionWins || [],
-    success_stories: successStories || [],
-    comments_of_note: commentsOfNote || [],
+    success_stories: [],
+    comments_of_note: [],
   };
 }
 
