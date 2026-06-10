@@ -5,6 +5,11 @@
   "private": true,
   "scripts": {
     "access:firecrawl-logs": "tsx scripts/access-firecrawl-logs-api.ts",
+    "byok:batch": "bash scripts/daily-receipt/byok-image-batch.sh",
+    "byok:burn-all": "bash scripts/daily-receipt/byok-burn-all.sh",
+    "day:build": "dotenvx run -- node scripts/daily-receipt/build-day.mjs",
+    "photo:sync": "dotenvx run -- node scripts/photo-sync-daemon.mjs",
+    "photo:sync:dry-run": "dotenvx run -- node scripts/photo-sync-daemon.mjs --dry-run",
     "receipts:bridge": "dotenvx run -- bash -c 'for i in $(seq 1 15); do echo \"--- batch $i ---\"; curl -s --max-time 120 -X POST \"$VITE_SUPABASE_URL/functions/v1/ingest-receipts-as-observations\" -H \"Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY\" -H \"Content-Type: application/json\" -d \"{\\\"batch_size\\\":50}\" | jq \"{processed,skipped,errors,duplicates,kind_breakdown,remaining_pending}\"; done'",
     "brand:scrape": "dotenvx run -- node scripts/scrape-brand-assets.mjs",
     "brand:scrape:dry-run": "dotenvx run -- node scripts/scrape-brand-assets.mjs --dry-run",

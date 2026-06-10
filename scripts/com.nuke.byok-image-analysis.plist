@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nuke.byok-image-analysis</string>
+
+    <!-- Runs in the login shell (NOT inside Claude Code's Bash sandbox), so the
+         network steps reach Supabase normally. One bounded batch per fire. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/skylar/nuke/scripts/daily-receipt/byok-image-batch.sh</string>
+        <!-- vehicle-id (1977 K5 Blazer) ; change to process a different vehicle -->
+        <string>e08bf694-970f-4cbe-8a74-8715158a0f2e</string>
+        <!-- batch size per fire (4 keeps an Opus-4.8 vision fire inside the 15-min window) -->
+        <string>15</string>
+    </array>
+
+    <!-- 15 min between fires: paces Opus vision cost and respects the >=5min cron rule. -->
+    <key>StartInterval</key>
+    <integer>900</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/skylar/nuke/logs/byok-image-batch.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/skylar/nuke/logs/byok-image-batch.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/skylar/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>Nice</key>
+    <integer>10</integer>
+</dict>
+</plist>
