@@ -69,6 +69,25 @@ jobs:
           fi
           echo "✅ enough secrets to proceed"
 
+      - name: Determine migrations + functions to deploy
+        id: plan
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SINCE="${{ github.event.inputs.migrations_since }}"
+            if [ -n "$SINCE" ]; then
+              ls supabase/migrations/ | awk -v s="$SINCE" '$0 >= s' | sed 's|^|supabase/migrations/|' > /tmp/migrations.txt
+            else
+              : > /tmp/migrations.txt
+            fi
+            echo "${{ github.event.inputs.functions }}" | tr ',' '\n' | sed '/^$/d' > /tmp/functions.txt
+          else
+            git diff --name-only --diff-filter=A HEAD^ HEAD -- 'supabase/migrations/*.sql' > /tmp/migrations.txt || true
+            git diff --name-only HEAD^ HEAD -- 'supabase/functions/' \
+              | awk -F/ '/^supabase\/functions\/[^_]/ {print $3}' | sort -u > /tmp/functions.txt || true
+          fi
+          echo "── migrations to apply:"; cat /tmp/migrations.txt || true
+          echo "── functions to deploy:"; cat /tmp/functions.txt || true
+
       - name: Resolve database URL
         id: db
         env:
@@ -79,6 +98,13 @@ jobs:
           # the stale Feb-era DATABASE_URL black-holed run 27254257086 for 18min.
           PGCONNECT_TIMEOUT: '10'
         run: |
+          # Functions-only runs never touch psql — don't fail the whole
+          # deploy resolving a DB connection nothing will use (run 27286973866
+          # died here while deploying one edge function).
+          if [ ! -s /tmp/migrations.txt ]; then
+            echo "no migrations planned — skipping DB resolution"
+            exit 0
+          fi
           for CANDIDATE in "${DATABASE_URL:-}" "${SUPABASE_DB_URL:-}"; do
             if [ -n "$CANDIDATE" ] && psql "$CANDIDATE" -c "select 1" >/dev/null 2>&1; then
               echo "url=$CANDIDATE" >> $GITHUB_OUTPUT
@@ -111,25 +137,6 @@ jobs:
           echo "❌ could not connect with SUPABASE_DB_PASSWORD — add full SUPABASE_DB_URL secret instead"
           echo "   (Supabase dashboard → Project Settings → Database → Connection string URI)"
           exit 1
-
-      - name: Determine migrations + functions to deploy
-        id: plan
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            SINCE="${{ github.event.inputs.migrations_since }}"
-            if [ -n "$SINCE" ]; then
-              ls supabase/migrations/ | awk -v s="$SINCE" '$0 >= s' | sed 's|^|supabase/migrations/|' > /tmp/migrations.txt
-            else
-              : > /tmp/migrations.txt
-            fi
-            echo "${{ github.event.inputs.functions }}" | tr ',' '\n' | sed '/^$/d' > /tmp/functions.txt
-          else
-            git diff --name-only --diff-filter=A HEAD^ HEAD -- 'supabase/migrations/*.sql' > /tmp/migrations.txt || true
-            git diff --name-only HEAD^ HEAD -- 'supabase/functions/' \
-              | awk -F/ '/^supabase\/functions\/[^_]/ {print $3}' | sort -u > /tmp/functions.txt || true
-          fi
-          echo "── migrations to apply:"; cat /tmp/migrations.txt || true
-          echo "── functions to deploy:"; cat /tmp/functions.txt || true
 
       - name: Apply migrations (psql, in filename order)
         env:
