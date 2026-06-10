@@ -58,7 +58,23 @@ const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.heic', '.webp']);
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
+const INCLUDE_UNLABELED = args.includes('--include-unlabeled');
 const sinceArg = (() => { const i = args.indexOf('--since'); return i >= 0 ? args[i + 1] : null; })();
+
+// ─── On-device privacy gate ──────────────────────────────────────────────────
+// Per docs/architecture/IMAGE_OWNERSHIP_ONTOLOGY.md: a photo library contains
+// people, places, and private life — not vehicle evidence. The cloud must
+// never see those. Apple Photos has ALREADY classified every photo on-device
+// (free, private); we sync only what its labels say is plausibly vehicle
+// evidence. Everything else never leaves this Mac. Server-side vision_gate /
+// classification remains as the second pass for what does get through.
+const VEHICLE_LABEL_RE = /vehicle|car|truck|automobile|motorcycle|van|jeep|tractor|trailer|wheel|tire|engine|machine|garage|workshop|tool|boat|text|document|receipt|paper/i;
+
+function isVehicleish(photo) {
+  const labels = photo.labels || photo.labels_normalized || [];
+  if (labels.length === 0) return INCLUDE_UNLABELED; // unlabeled: private by default
+  return labels.some((l) => VEHICLE_LABEL_RE.test(String(l)));
+}
 
 function log(msg) {
   const line = `[${new Date().toISOString()}] ${msg}`;
@@ -146,6 +162,9 @@ async function uploadPhoto(filePath, filename, meta) {
       original_filename: meta.original_filename,
       synced_by: 'photo-sync-daemon',
     },
+    // Pass Apple's on-device labels through — photo-pipeline-orchestrator
+    // reads apple_ml_labels for its non-automotive fast-path.
+    ...(Array.isArray(meta.labels) && meta.labels.length > 0 && { apple_ml_labels: meta.labels }),
   };
 
   const { error: insertError } = await supabase.from('vehicle_images').insert(row);
@@ -165,9 +184,10 @@ async function main() {
   log(`sync start — photos added since ${since}${DRY_RUN ? ' (DRY RUN)' : ''}`);
 
   const photos = queryNewPhotos(since);
-  const images = photos
-    .filter(p => !p.ismovie && !p.hidden)
-    .slice(0, MAX_PER_RUN);
+  const candidates = photos.filter(p => !p.ismovie && !p.hidden);
+  const images = candidates.filter(isVehicleish).slice(0, MAX_PER_RUN);
+  const heldBack = candidates.length - images.length;
+  if (heldBack > 0) log(`${heldBack} photo(s) held back on-device (no vehicle-ish labels — never uploaded)`);
 
   if (images.length === 0) {
     log('nothing new');
