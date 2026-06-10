@@ -28,7 +28,7 @@ from yono.extractors.description_regex import DescriptionRegexExtractor
 DB_HOST = "aws-0-us-west-1.pooler.supabase.com"
 DB_PORT = 6543
 DB_USER = "postgres.qkgaybvrernstplzjaam"
-DB_PASS = "RbzKq32A0uhqvJMQ"
+DB_PASS = "${SUPABASE_DB_PASSWORD}"
 DB_NAME = "postgres"
 PAGE_SIZE = 1000
 BATCH_SIZE = 500

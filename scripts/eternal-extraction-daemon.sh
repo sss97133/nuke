@@ -40,7 +40,7 @@ log() {
 }
 
 get_queue_stats() {
-  PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -c "
+  PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -c "
     SELECT
       COALESCE(SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END), 0),
       COALESCE(SUM(CASE WHEN status='processing' THEN 1 ELSE 0 END), 0),
@@ -74,7 +74,7 @@ maintain_workers() {
 
 reset_stale_processing() {
   # Reset items stuck in 'processing' for >10 min
-  PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c "
+  PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c "
     UPDATE import_queue
     SET status = 'pending', locked_at = NULL, locked_by = NULL
     WHERE status = 'processing'
@@ -83,7 +83,7 @@ reset_stale_processing() {
 
 retry_failed_with_backoff() {
   # Reset failed items that haven't exceeded max attempts
-  PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c "
+  PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c "
     UPDATE import_queue
     SET status = 'pending'
     WHERE status = 'failed'

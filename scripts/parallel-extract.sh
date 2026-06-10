@@ -23,7 +23,7 @@ for batch in $(seq 1 $BATCHES); do
       fail=0
       for i in $(seq 1 $ITEMS); do
         url=$(dotenvx run -- bash -c '
-          PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "
+          PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "
           UPDATE import_queue SET status='\''processing'\'', locked_at=NOW(), locked_by='\''parallel-w'$w''\''
           WHERE id = (
             SELECT id FROM import_queue
@@ -45,10 +45,10 @@ for batch in $(seq 1 $BATCHES); do
 
         if echo "$result" | grep -q '"success":true'; then
           success=$((success + 1))
-          dotenvx run -- bash -c "PGPASSWORD=\"RbzKq32A0uhqvJMQ\" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c \"UPDATE import_queue SET status='complete', processed_at=NOW() WHERE listing_url='$url';\"" 2>/dev/null >/dev/null
+          dotenvx run -- bash -c "PGPASSWORD=\"${SUPABASE_DB_PASSWORD}\" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c \"UPDATE import_queue SET status='complete', processed_at=NOW() WHERE listing_url='$url';\"" 2>/dev/null >/dev/null
         else
           fail=$((fail + 1))
-          dotenvx run -- bash -c "PGPASSWORD=\"RbzKq32A0uhqvJMQ\" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c \"UPDATE import_queue SET status='failed', attempts=attempts+1 WHERE listing_url='$url';\"" 2>/dev/null >/dev/null
+          dotenvx run -- bash -c "PGPASSWORD=\"${SUPABASE_DB_PASSWORD}\" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c \"UPDATE import_queue SET status='failed', attempts=attempts+1 WHERE listing_url='$url';\"" 2>/dev/null >/dev/null
         fi
       done
       echo "$success $fail"
@@ -62,7 +62,7 @@ for batch in $(seq 1 $BATCHES); do
 
   # Get current stats
   stats=$(dotenvx run -- bash -c '
-    PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "
+    PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "
     SELECT
       (SELECT COUNT(*) FROM vehicles) || '\'' vehicles, '\'' ||
       (SELECT COUNT(*) FROM import_queue WHERE status = '\''pending'\'' AND attempts < 3) || '\'' pending'\'';

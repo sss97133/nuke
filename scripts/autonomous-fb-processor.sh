@@ -22,7 +22,7 @@ echo ""
 
 # Get pending FB listings
 echo "📋 Fetching pending FB Marketplace listings..."
-PENDING=$(PGPASSWORD="RbzKq32A0uhqvJMQ" psql \
+PENDING=$(PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql \
   -h aws-0-us-west-1.pooler.supabase.com \
   -p 6543 \
   -U postgres.qkgaybvrernstplzjaam \

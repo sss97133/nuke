@@ -21,7 +21,7 @@ import { execSync } from 'child_process';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const DB_PASSWORD = process.env.SUPABASE_DB_PASSWORD || 'RbzKq32A0uhqvJMQ';
+const DB_PASSWORD = process.env.SUPABASE_DB_PASSWORD || '${SUPABASE_DB_PASSWORD}';
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
   console.error('Missing env vars. Run with: dotenvx run -- node scripts/question-classify-bulk.mjs');

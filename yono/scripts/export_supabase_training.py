@@ -36,7 +36,7 @@ for line in (NUKE_DIR / ".env").read_text().splitlines():
     k, _, v = line.partition("=")
     os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
-PG_CONN = "postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
+PG_CONN = "postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
 
 YONO_DIR = Path(__file__).parent.parent
 OUTPUT_DIR = NUKE_DIR / "training-data" / "images"

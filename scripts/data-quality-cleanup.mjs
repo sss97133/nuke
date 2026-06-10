@@ -203,7 +203,7 @@ async function phase2MergeJEDuplicates() {
 
   // Connect via pg for merge_into_primary calls
   const pool = new pg.Pool({
-    connectionString: `postgresql://postgres.qkgaybvrernstplzjaam:${process.env.SUPABASE_DB_PASSWORD || 'RbzKq32A0uhqvJMQ'}@aws-0-us-west-1.pooler.supabase.com:6543/postgres`,
+    connectionString: `postgresql://postgres.qkgaybvrernstplzjaam:${process.env.SUPABASE_DB_PASSWORD || '${SUPABASE_DB_PASSWORD}'}@aws-0-us-west-1.pooler.supabase.com:6543/postgres`,
     max: 1,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
@@ -246,7 +246,7 @@ async function phase3HuntPatterns() {
 
   // 1. Exact URL duplicates (beyond JamesEdition)
   const pool = new pg.Pool({
-    connectionString: `postgresql://postgres.qkgaybvrernstplzjaam:${process.env.SUPABASE_DB_PASSWORD || 'RbzKq32A0uhqvJMQ'}@aws-0-us-west-1.pooler.supabase.com:6543/postgres`,
+    connectionString: `postgresql://postgres.qkgaybvrernstplzjaam:${process.env.SUPABASE_DB_PASSWORD || '${SUPABASE_DB_PASSWORD}'}@aws-0-us-west-1.pooler.supabase.com:6543/postgres`,
     max: 1,
     idleTimeoutMillis: 30000,
   });

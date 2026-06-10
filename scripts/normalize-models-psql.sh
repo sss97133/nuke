@@ -9,7 +9,7 @@ set -euo pipefail
 
 LOGFILE="/Users/skylar/nuke/reports/normalize-models-$(date +%Y%m%d-%H%M).log"
 STATUS_FILE="/Users/skylar/nuke/docs/agents/MODEL_NORMALIZATION_STATUS.md"
-export PGPASSWORD="${SUPABASE_DB_PASSWORD:-RbzKq32A0uhqvJMQ}"
+export PGPASSWORD="${SUPABASE_DB_PASSWORD:-${SUPABASE_DB_PASSWORD}}"
 PSQL_HOST="aws-0-us-west-1.pooler.supabase.com"
 PSQL_USER="postgres.qkgaybvrernstplzjaam"
 

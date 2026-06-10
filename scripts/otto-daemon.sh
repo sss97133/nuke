@@ -26,7 +26,7 @@ log "otto-daemon started (PID $$) — polling every ${POLL_INTERVAL}s, concurren
 
 while true; do
   # Count pending tasks
-  PENDING=$(PGPASSWORD="RbzKq32A0uhqvJMQ" psql \
+  PENDING=$(PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql \
     -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
     -U postgres.qkgaybvrernstplzjaam -d postgres \
     -t -A -c "SELECT COUNT(*) FROM agent_tasks WHERE status = 'pending';" 2>/dev/null || echo "0")

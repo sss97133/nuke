@@ -18,7 +18,7 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const DB_HOST = 'aws-0-us-west-1.pooler.supabase.com';
 const DB_PORT = '6543';
 const DB_USER = 'postgres.qkgaybvrernstplzjaam';
-const DB_PASS = 'RbzKq32A0uhqvJMQ';
+const DB_PASS = '${SUPABASE_DB_PASSWORD}';
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
