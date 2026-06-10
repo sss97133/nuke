@@ -28,7 +28,7 @@ except ImportError:
     import psycopg2
     from psycopg2.extras import execute_batch
 
-DB_URL = "postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
+DB_URL = "postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
 
 # Cubic inches to liters conversion
 CI_TO_LITERS = 0.016387064

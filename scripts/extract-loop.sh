@@ -13,7 +13,7 @@ total_fail=0
 
 for batch in $(seq 1 $BATCHES); do
   urls=$(dotenvx run -- bash -c '
-    PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "
+    PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "
     SELECT listing_url FROM import_queue 
     WHERE status = '\''pending'\'' 
     AND listing_url LIKE '\''%bringatrailer%'\''
@@ -38,10 +38,10 @@ for batch in $(seq 1 $BATCHES); do
     
     if echo "$result" | grep -q '"success":true'; then
       success=$((success + 1))
-      dotenvx run -- bash -c "PGPASSWORD=\"RbzKq32A0uhqvJMQ\" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c \"UPDATE import_queue SET status='complete', processed_at=NOW() WHERE listing_url='$url';\"" 2>/dev/null >/dev/null
+      dotenvx run -- bash -c "PGPASSWORD=\"${SUPABASE_DB_PASSWORD}\" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c \"UPDATE import_queue SET status='complete', processed_at=NOW() WHERE listing_url='$url';\"" 2>/dev/null >/dev/null
     else
       fail=$((fail + 1))
-      dotenvx run -- bash -c "PGPASSWORD=\"RbzKq32A0uhqvJMQ\" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c \"UPDATE import_queue SET attempts=attempts+1 WHERE listing_url='$url';\"" 2>/dev/null >/dev/null
+      dotenvx run -- bash -c "PGPASSWORD=\"${SUPABASE_DB_PASSWORD}\" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c \"UPDATE import_queue SET attempts=attempts+1 WHERE listing_url='$url';\"" 2>/dev/null >/dev/null
     fi
   done
   

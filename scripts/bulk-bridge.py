@@ -24,7 +24,7 @@ socket.setdefaulttimeout(None)
 DB_PARAMS = dict(
     host=HOST, port=6543, dbname='postgres',
     user='postgres.qkgaybvrernstplzjaam',
-    password='RbzKq32A0uhqvJMQ',
+    password='${SUPABASE_DB_PASSWORD}',
     connect_timeout=10,
 )
 

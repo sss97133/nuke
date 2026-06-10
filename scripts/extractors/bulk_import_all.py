@@ -35,7 +35,7 @@ def run():
         host="aws-0-us-west-1.pooler.supabase.com",
         port=6543,
         user="postgres.qkgaybvrernstplzjaam",
-        password=os.environ.get('SUPABASE_DB_PASSWORD', 'RbzKq32A0uhqvJMQ'),
+        password=os.environ.get('SUPABASE_DB_PASSWORD', '${SUPABASE_DB_PASSWORD}'),
         database="postgres",
         options="-c statement_timeout=300000"  # 5 min timeout per statement
     )

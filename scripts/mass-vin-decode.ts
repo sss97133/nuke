@@ -46,7 +46,7 @@ const stats = {
 const DB_HOST = 'aws-0-us-west-1.pooler.supabase.com';
 const DB_PORT = '6543';
 const DB_USER = 'postgres.qkgaybvrernstplzjaam';
-const DB_PASS = 'RbzKq32A0uhqvJMQ';
+const DB_PASS = '${SUPABASE_DB_PASSWORD}';
 
 async function executeSql(query: string): Promise<string[]> {
   const { execSync } = await import('child_process');

@@ -42,7 +42,7 @@ except ImportError:
 
 # ── Config ───────────────────────────────────────────────────────────────────
 
-_POOLER_URL = "postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
+_POOLER_URL = "postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
 
 _env_url = os.environ.get("DATABASE_URL", "")
 # Use env var only if it looks like a real postgres URL; otherwise use hardcoded pooler

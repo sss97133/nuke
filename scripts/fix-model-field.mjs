@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const pg = require('pg');
-const client = new pg.Client({connectionString: 'postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres'});
+const client = new pg.Client({connectionString: 'postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres'});
 
 const MAKES = [
   'Alfa Romeo', 'Aston Martin', 'Austin-Healey', 'De Tomaso', 'Land Rover', 'Mercedes-Benz',

@@ -7,7 +7,7 @@ The migration file is ready: `supabase/migrations/20251126000001_fix_dropbox_imp
 ### Option 1: Using the Script (Recommended)
 
 ```bash
-export SUPABASE_DB_PASSWORD='RbzKq32A0uhqvJMQ'
+export SUPABASE_DB_PASSWORD='${SUPABASE_DB_PASSWORD}'
 ./scripts/apply-dropbox-fix.sh
 ```
 
@@ -22,7 +22,7 @@ supabase db push
 ### Option 3: Using psql Directly
 
 ```bash
-export SUPABASE_DB_PASSWORD='RbzKq32A0uhqvJMQ'
+export SUPABASE_DB_PASSWORD='${SUPABASE_DB_PASSWORD}'
 psql "postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@db.qkgaybvrernstplzjaam.supabase.co:5432/postgres" \
   -f supabase/migrations/20251126000001_fix_dropbox_import_tracking.sql
 ```
