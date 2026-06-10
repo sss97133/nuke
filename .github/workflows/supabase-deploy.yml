@@ -130,7 +130,13 @@ jobs:
 
       - name: Apply migrations (psql, in filename order)
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          # Use the URL the resolve step actually verified, not the raw secret.
+          SUPABASE_DB_URL: ${{ steps.db.outputs.url }}
+          # The postgres role's 10s default statement_timeout killed run
+          # 27253881558 mid-CREATE INDEX. 120s is the Hard Rule #12 ceiling;
+          # anything heavier (indexes on 30GB+ tables) must be pre-built
+          # CONCURRENTLY so the migration's IF NOT EXISTS no-ops.
+          PGOPTIONS: -c statement_timeout=120s
         run: |
           if [ ! -s /tmp/migrations.txt ]; then echo "no migrations to apply"; exit 0; fi
           sort /tmp/migrations.txt | while read -r f; do
