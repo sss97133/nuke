@@ -80,18 +80,44 @@ Deno.serve(async (req) => {
     // Batch mode: process images stuck in 'pending' (cleanup/catchup)
     if (input.action === "process_pending") {
       const limit = input.limit || 5;
-      const { data: pendingImages } = await supabase
+      // Owner uploads first, newest first — a freshly-synced user photo must
+      // classify before the scraped backlog. TWO-STEP because a single
+      // ORDER BY user_id sorts the whole million-row pending set (57014
+      // statement timeout, measured 2026-06-10 — and the error was silently
+      // swallowed into "No pending images"). Step 1 is served exactly by
+      // partial index idx_vehicle_images_pending_user
+      // (created_at DESC WHERE pending AND user_id IS NOT NULL).
+      const ownerQ = await supabase
         .from("vehicle_images")
         .select("id, image_url, vehicle_id, user_id")
         .eq("ai_processing_status", "pending")
+        .not("user_id", "is", null)
         .eq("is_duplicate", false)
         .not("image_url", "is", null)
-        // Owner uploads first (user_id NOT NULL, nulls last), newest first —
-        // a freshly-synced user photo must classify before the scraped backlog,
-        // not wait behind a million oldest-first rows.
-        .order("user_id", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
         .limit(limit);
+      if (ownerQ.error) {
+        console.error("[photo-pipeline] pending query (owner step) failed:", ownerQ.error.message);
+      }
+      let pendingImages = ownerQ.data ?? [];
+
+      if (pendingImages.length < limit) {
+        // Backlog fallback: oldest-first scraped rows (original behavior,
+        // served by idx_vehicle_images_pending_processing).
+        const backlogQ = await supabase
+          .from("vehicle_images")
+          .select("id, image_url, vehicle_id, user_id")
+          .eq("ai_processing_status", "pending")
+          .is("user_id", null)
+          .eq("is_duplicate", false)
+          .not("image_url", "is", null)
+          .order("created_at", { ascending: true })
+          .limit(limit - pendingImages.length);
+        if (backlogQ.error) {
+          console.error("[photo-pipeline] pending query (backlog step) failed:", backlogQ.error.message);
+        }
+        pendingImages = pendingImages.concat(backlogQ.data ?? []);
+      }
 
       if (!pendingImages || pendingImages.length === 0) {
         return new Response(
