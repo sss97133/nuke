@@ -9,6 +9,7 @@ const VehicleHeader = React.lazy(() => import('./vehicle-profile/VehicleHeader')
 const VehicleHeroImage = React.lazy(() => import('./vehicle-profile/VehicleHeroImage'));
 import '../styles/unified-design-system.css';
 import '../styles/vehicle-profile.css';
+import '../styles/barcode-timeline.css';
 const VehicleSubHeader = React.lazy(() => import('./vehicle-profile/VehicleSubHeader'));
 const AddOrganizationRelationship = React.lazy(() => import('../components/vehicle/AddOrganizationRelationship'));
 import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
