@@ -409,31 +409,27 @@ Deno.serve(async (req) => {
             paginationQuery = paginationQuery.or(`make.ilike.${t},model.ilike.${t},color.ilike.${t}`);
           }
 
-          const [paginationResponse, countResponse] = await Promise.all([
-            paginationQuery
-              .order('sale_price', { ascending: false, nullsFirst: false })
-              .range(offset, offset + vehicleLimit - 1),
-            supabase.rpc('count_vehicles_search', { query_text: tsqueryStr }),
-          ]);
+          // NOTE: count_vehicles_search RPC removed from the critical path —
+          // measured live at 5.2s AND returning 0 for valid queries (broken).
+          // total_count falls back to result length downstream, same as when
+          // the RPC returned null.
+          const paginationResponse = await paginationQuery
+            .order('sale_price', { ascending: false, nullsFirst: false })
+            .range(offset, offset + vehicleLimit - 1);
 
-          if (countResponse.data !== null) vehicleTotalCount = countResponse.data as number;
           if (paginationResponse.data?.length) vehicles = paginationResponse.data;
         }
         // First page: use RPC for best ranking
         else if (tsqueryStr) {
-          // Run search + count in parallel
-          const [ftsResponse, countResponse] = await Promise.all([
-            supabase.rpc('search_vehicles_fts', {
-              query_text: tsqueryStr,
-              limit_count: vehicleLimit,
-            }),
-            supabase.rpc('count_vehicles_search', { query_text: tsqueryStr }),
-          ]);
+          // NOTE: count_vehicles_search RPC removed — measured live at 5.2s
+          // AND returning 0 for valid queries (broken). It was the slowest
+          // member of this Promise.all, putting +5s on every first-page search.
+          const ftsResponse = await supabase.rpc('search_vehicles_fts', {
+            query_text: tsqueryStr,
+            limit_count: vehicleLimit,
+          });
 
           const { data: ftsResults, error: ftsError } = ftsResponse;
-          if (countResponse.data !== null) {
-            vehicleTotalCount = countResponse.data as number;
-          }
 
           if (!ftsError && ftsResults?.length) {
             // Filter to high-confidence results only (relevance >= 0.85 = strategies 1a/1b).

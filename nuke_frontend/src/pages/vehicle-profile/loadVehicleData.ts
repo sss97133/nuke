@@ -369,15 +369,20 @@ export async function loadVehicleImpl({
       vehicleData = rpcData.vehicle;
 
       // RPC caps images at 50 for performance (see get_vehicle_profile_data migration).
-      // If the vehicle has more images than the RPC returned, do NOT use RPC images so
-      // loadVehicleImages runs the direct DB query and gets the full gallery + correct count.
-      const totalImageCount = rpcData.stats?.image_count ?? 0;
+      // Truncation is detected by hitting that cap. Do NOT compare against
+      // stats.image_count: it is the UNFILTERED total while rpcData.images is
+      // filtered (docs/dupes/e2e excluded), so the counts mismatch for almost
+      // every vehicle and forced a full unbounded vehicle_images refetch.
+      const RPC_IMAGE_CAP = 50;
       const rpcImageCount = Array.isArray(rpcData.images) ? rpcData.images.length : 0;
-      const rpcImagesTruncated = totalImageCount > rpcImageCount;
+      const rpcImagesTruncated = rpcImageCount >= RPC_IMAGE_CAP;
 
-      if (rpcData.images && !rpcImagesTruncated) {
+      if (rpcData.images && rpcImageCount > 0) {
+        // Paint the RPC batch immediately — even when truncated — so heavy
+        // vehicles show a gallery right away instead of waiting on the full
+        // paginated fetch (loadVehicleImages still runs to complete the set).
         setVehicleImages(rpcData.images.map((img: any) => img.image_url));
-        rpcLoaded.images = true;
+        rpcLoaded.images = !rpcImagesTruncated;
       }
       if (rpcData.timeline_events) {
         // Merge work_sessions into timeline events (work_sessions table has RLS,

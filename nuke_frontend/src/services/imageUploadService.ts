@@ -640,20 +640,32 @@ export class ImageUploadService {
         });
       }
 
-      // Trigger photo-pipeline-orchestrator directly (fire-and-forget).
-      // DB trigger via pg_net is a backup but has reliability issues with timeouts.
+      // Trigger photo-pipeline-orchestrator directly (non-blocking, retried).
+      // Backstops: pg_net INSERT trigger + photo-pipeline-drain cron requeue
+      // anything that slips through, so a lost invoke is recoverable.
       if (isImage && dbResult?.id && !duplicateOf) {
         console.log('📸 Triggering photo pipeline for:', dbResult.id);
-        supabase.functions.invoke('photo-pipeline-orchestrator', {
-          body: {
-            image_id: dbResult.id,
-            image_url: urlData.publicUrl,
-            vehicle_id: vehicleId || null,
-            user_id: (await supabase.auth.getUser()).data.user?.id || null,
-          },
-        }).catch((err: any) => {
-          console.warn('📸 Photo pipeline invoke failed (DB trigger is backup):', err.message);
-        });
+        const pipelineBody = {
+          image_id: dbResult.id,
+          image_url: urlData.publicUrl,
+          vehicle_id: vehicleId || null,
+          user_id: (await supabase.auth.getUser()).data.user?.id || null,
+        };
+        (async () => {
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const { error } = await supabase.functions.invoke('photo-pipeline-orchestrator', { body: pipelineBody });
+              if (!error) return;
+              throw error;
+            } catch (err: any) {
+              if (attempt === 2) {
+                console.warn('📸 Photo pipeline invoke failed after retries (cron drain will pick it up):', err?.message);
+                return;
+              }
+              await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+            }
+          }
+        })();
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('image_processing_started', {
             detail: {
