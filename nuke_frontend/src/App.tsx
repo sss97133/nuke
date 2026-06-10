@@ -15,6 +15,7 @@ import AppLayout from './components/layout/AppLayout';
 import { DomainRoutes } from './routes/DomainRoutes';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AuthErrorBoundary } from './components/auth/AuthErrorBoundary';
+import { track } from './lib/track';
 import { useAuth } from './hooks/useAuth';
 const HomePage = React.lazy(() => import('./pages/HomePage'));
 const LandingPage = React.lazy(() => import('./pages/landing/LandingPage'));
@@ -53,6 +54,11 @@ function HomeGate() {
  */
 function RoutedApp() {
   const location = useLocation();
+
+  // First-party funnel analytics: one page_view per route change (app_events)
+  React.useEffect(() => {
+    track('page_view');
+  }, [location.pathname]);
 
   return (
     <>
