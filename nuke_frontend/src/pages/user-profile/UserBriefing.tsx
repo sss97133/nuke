@@ -5,10 +5,9 @@
  * Priority order for headline:
  * 1. Onboarding prompt (own profile, missing data)
  * 2. Active auctions count
- * 3. Reputation milestone
- * 4. Collection summary
- * 5. Recent activity summary
- * 6. null (don't render)
+ * 3. Collection summary
+ * 4. Recent activity summary
+ * 5. null (don't render)
  *
  * Self-guarding: returns null if no headline AND no stats.
  */
@@ -42,11 +41,15 @@ const UserBriefing: React.FC = () => {
   const headline = useMemo(() => {
     if (!profile) return null;
 
+    // Garage-wide vehicle count comes from profile_stats (via stats), NOT the
+    // nonexistent profiles.total_vehicles column (always undefined at runtime).
+    const vehicles = stats?.total_vehicles ?? 0;
+
     // 1. Onboarding prompt
     if (isOwnProfile) {
       const missingAvatar = !profile.avatar_url;
       const missingBio = !profile.bio;
-      const missingVehicles = !profile.total_vehicles || profile.total_vehicles === 0;
+      const missingVehicles = vehicles === 0;
       if (missingAvatar || missingBio || missingVehicles) {
         const missing: string[] = [];
         if (missingAvatar) missing.push('profile photo');
@@ -64,23 +67,13 @@ const UserBriefing: React.FC = () => {
       return `${activeListings.length} active auction${activeListings.length > 1 ? 's' : ''} right now`;
     }
 
-    // 3. Reputation milestone
-    const rep = profile.reputation_score;
-    if (rep && rep > 0) {
-      if (rep >= 1000) return 'Legendary community member';
-      if (rep >= 500) return 'Highly respected contributor';
-      if (rep >= 100) return 'Active community participant';
-      return `Building reputation: ${rep} points`;
-    }
-
-    // 4. Collection summary
-    const vehicles = profile.total_vehicles || 0;
+    // 3. Collection summary
     const listed = stats?.total_listings || 0;
     if (vehicles > 0) {
       return `${vehicles} vehicle${vehicles > 1 ? 's' : ''} in collection${listed > 0 ? `, ${listed} listed` : ''}`;
     }
 
-    // 5. Recent activity
+    // 4. Recent activity
     const since = formatMemberSince(profile.member_since || profile.created_at);
     if (since) {
       return `Active member since ${since}`;
@@ -96,16 +89,14 @@ const UserBriefing: React.FC = () => {
 
     const items: { label: string; value: string | number }[] = [];
 
-    if (profile.total_vehicles != null && profile.total_vehicles > 0) {
-      items.push({ label: 'VEHICLES', value: profile.total_vehicles });
+    // profile_stats-backed counts (profiles.total_vehicles / contribution_count /
+    // reputation_score are not real columns — never read them).
+    if (stats?.total_vehicles != null && stats.total_vehicles > 0) {
+      items.push({ label: 'VEHICLES', value: stats.total_vehicles });
     }
 
-    if (profile.contribution_count != null && profile.contribution_count > 0) {
-      items.push({ label: 'CONTRIBUTIONS', value: profile.contribution_count });
-    }
-
-    if (profile.reputation_score != null && profile.reputation_score > 0) {
-      items.push({ label: 'REPUTATION', value: profile.reputation_score });
+    if (stats?.total_contributions != null && stats.total_contributions > 0) {
+      items.push({ label: 'CONTRIBUTIONS', value: stats.total_contributions });
     }
 
     const memberSince = formatMemberSince(profile.member_since || profile.created_at);

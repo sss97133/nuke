@@ -9,23 +9,31 @@ export interface UserProfile {
   email: string | null;
   avatar_url: string | null;
   bio: string | null;
-  location: string | null;
+  location: string | null; // free-text legacy field — prefer city/state below
+  city: string | null;
+  state: string | null;
   website: string | null;
   github_url: string | null;
   linkedin_url: string | null;
   user_type: 'user' | 'professional' | 'dealer';
-  verification_status: string | null;
+  is_verified: boolean | null;
+  verification_level: string | null; // e.g. 'fully_verified'
   is_public: boolean;
   created_at: string;
   updated_at: string | null;
   member_since: string | null;
-  // Stats (may come from profile_stats view or direct fields)
-  total_vehicles: number | null;
+  // profiles.total_* columns exist in prod but are all 0 (stats RPC never ran).
+  // Do not use for display — read UserProfileStats instead.
   total_listings: number | null;
   total_bids: number | null;
   total_comments: number | null;
   total_auction_wins: number | null;
   total_success_stories: number | null;
+  // DEAD FIELDS — these columns DO NOT EXIST on profiles in prod; they are
+  // always undefined at runtime. Kept only because legacy widgets
+  // (UserDossierPanel, UserReputationWidget) still reference them.
+  verification_status: string | null;
+  total_vehicles: number | null;
   reputation_score: number | null;
   contribution_count: number | null;
 }
@@ -37,6 +45,12 @@ export interface UserProfileStats {
   total_auction_wins: number;
   total_success_stories: number;
   member_since: string | null;
+  // From the profile_stats table (refreshed by recompute_profile_stats).
+  // null = no row computed for this user yet.
+  total_vehicles?: number | null;
+  vehicles_count?: number | null;
+  total_images?: number | null;
+  total_contributions?: number | null;
 }
 
 export interface UserComprehensiveData {
