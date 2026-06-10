@@ -75,6 +75,9 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          # A dead candidate host must fail in seconds, not hang the run —
+          # the stale Feb-era DATABASE_URL black-holed run 27254257086 for 18min.
+          PGCONNECT_TIMEOUT: '10'
         run: |
           for CANDIDATE in "${DATABASE_URL:-}" "${SUPABASE_DB_URL:-}"; do
             if [ -n "$CANDIDATE" ] && psql "$CANDIDATE" -c "select 1" >/dev/null 2>&1; then
