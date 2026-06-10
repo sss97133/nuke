@@ -78,3 +78,16 @@ Until prod SQL is dumped back into the repo (`supabase db dump` of functions
 + cron jobs, committed), treat every "function doesn't exist" conclusion as
 unverified. When you discover an applied-but-uncommitted object, commit its
 definition or note it here.
+
+## Fleet Rules (workflows / crons / daemons)
+
+- **Probe before you schedule.** A workflow may only call endpoints verified
+  to exist in PROD (curl it; 404 = you are scheduling a void). 9 workflows
+  died of this on 2026-06-10.
+- **Success = rows landed, not exit 0.** Every acquisition automation must
+  check its own throughput after running (did the count move?) or it is
+  theater. The pulse board (get_pipeline_pulse) is the arbiter.
+- **One workflow per organ.** One-off chores are scripts run once, not
+  schedules. If it won't run monthly forever, it doesn't get a cron.
+- **Deploys belong to supabase-deploy.yml** — never hand-applied, never a
+  new bespoke deploy workflow.
