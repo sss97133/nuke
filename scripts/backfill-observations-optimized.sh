@@ -10,7 +10,7 @@ SOURCE_SLUG="${2:?Usage: $0 <vehicle.source value> <observation_sources.slug>}"
 BATCH_SIZE="${3:-500}"
 SLEEP_SECS="0.3"
 
-export PGPASSWORD="RbzKq32A0uhqvJMQ"
+export PGPASSWORD="${SUPABASE_DB_PASSWORD}"
 PG="psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres"
 
 echo "[$(date)] Optimized backfill: source='${SOURCE_FIELD}' -> slug='${SOURCE_SLUG}'"

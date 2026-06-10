@@ -73,7 +73,7 @@ bat_reextract() {
   while true; do
     # Get batch: only vehicles with EXISTING snapshots
     local batch
-    batch=$(PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
+    batch=$(PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
       -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -F'|' -c "
       SELECT DISTINCT ON (v.id) v.id, v.bat_auction_url
       FROM vehicles v
@@ -148,7 +148,7 @@ log "=== OVERNIGHT ENRICHMENT COMPLETE ==="
 
 # Final stats
 log "=== FINAL DATA QUALITY ==="
-PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
+PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
   -U postgres.qkgaybvrernstplzjaam -d postgres -c "
 SELECT
   COUNT(*) as total_public,

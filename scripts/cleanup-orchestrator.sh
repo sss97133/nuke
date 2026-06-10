@@ -42,7 +42,7 @@ fi
 
 # === Phase 4: Add unique index to prevent future duplication ===
 log "=== Adding partial unique index on listing_url ==="
-PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c "
+PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c "
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS idx_vehicles_listing_url_unique
 ON vehicles (listing_url)
 WHERE deleted_at IS NULL AND listing_url IS NOT NULL AND listing_url != '';

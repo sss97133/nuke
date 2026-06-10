@@ -61,7 +61,7 @@ bat_worker() {
 
   while alive; do
     local row
-    row=$(PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
+    row=$(PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
       -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -F'|' -c "
       SELECT DISTINCT ON (v.id) v.id, v.bat_auction_url
       FROM vehicles v
@@ -110,7 +110,7 @@ while alive; do
   sleep $REPORT_INTERVAL
 
   # Quick stats from DB
-  STATS=$(PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
+  STATS=$(PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
     -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -c "
     SELECT
       COUNT(*) FILTER (WHERE engine_size IS NOT NULL AND engine_size != 'N/A') as has_engine,

@@ -25,7 +25,7 @@ const vehicleId = process.env.VEHICLE_ID || '2b620b41-f53e-440c-aba0-ad61ed41c4a
 const listingUrl = process.env.LISTING_URL || 'https://sfbay.craigslist.org/sby/cto/d/gilroy-1978-gmc-high-sierra-diesel-now/7898247358.html'
 
 // Database connection for direct SQL (bypasses triggers)
-const DB_PASSWORD = 'RbzKq32A0uhqvJMQ'
+const DB_PASSWORD = '${SUPABASE_DB_PASSWORD}'
 const DB_URL = `postgresql://postgres.qkgaybvrernstplzjaam:${DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres`
 
 function upgradeCraigslistImageUrl(url) {

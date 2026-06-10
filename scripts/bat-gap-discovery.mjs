@@ -29,7 +29,7 @@
 
 import pg from 'pg';
 
-const DB_URL = 'postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres';
+const DB_URL = 'postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres';
 
 function makeClient() {
   return new pg.Client({ connectionString: DB_URL, statement_timeout: 55000 });

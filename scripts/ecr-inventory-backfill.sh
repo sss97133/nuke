@@ -20,7 +20,7 @@ echo "Started: $(date)"
 echo ""
 
 # Get unsynced collection IDs
-IDS=$(PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -c "
+IDS=$(PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -c "
 SELECT id || '|' || coalesce(business_name, slug) FROM organizations
 WHERE entity_type = 'collection'
   AND last_inventory_sync IS NULL
