@@ -9,7 +9,7 @@ log() { echo "[$(date '+%H:%M:%S')] [DISCOVER] $*"; }
 insert_url() {
   local url="$1"
   local source="$2"
-  dotenvx run -- bash -c "PGPASSWORD=\"RbzKq32A0uhqvJMQ\" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c \"
+  dotenvx run -- bash -c "PGPASSWORD=\"${SUPABASE_DB_PASSWORD}\" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c \"
     INSERT INTO import_queue (listing_url, source_name, status, attempts)
     VALUES ('$url', '$source', 'pending', 0)
     ON CONFLICT (listing_url) DO NOTHING;

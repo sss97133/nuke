@@ -60,7 +60,7 @@ async function stepSample() {
 
   // Step 1: Get random question IDs via direct psql (avoids RPC timeout issues on 12M rows)
   const { execSync } = await import('child_process');
-  const pgCmd = `PGPASSWORD="${process.env.SUPABASE_DB_PASSWORD || 'RbzKq32A0uhqvJMQ'}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -F '|' -c "SELECT id, vehicle_id, comment_text, is_seller FROM auction_comments WHERE has_question = true AND random() < ${threshold} LIMIT ${oversample}"`;
+  const pgCmd = `PGPASSWORD="${process.env.SUPABASE_DB_PASSWORD || '${SUPABASE_DB_PASSWORD}'}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -F '|' -c "SELECT id, vehicle_id, comment_text, is_seller FROM auction_comments WHERE has_question = true AND random() < ${threshold} LIMIT ${oversample}"`;
 
   let rawOutput;
   try {

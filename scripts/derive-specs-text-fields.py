@@ -13,7 +13,7 @@ except ImportError:
     import psycopg2
     from psycopg2.extras import execute_values
 
-DB = "postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
+DB = "postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
 COMBO_BATCH = 50
 
 

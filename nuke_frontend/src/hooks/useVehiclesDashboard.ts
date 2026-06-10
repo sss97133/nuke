@@ -250,7 +250,7 @@ function buildSections(vehicles: GarageVehicle[]): GarageSection[] {
 // Vehicle select columns (only columns that exist on the vehicles table)
 // ---------------------------------------------------------------------------
 
-const VEHICLE_SELECT = 'id, year, make, model, trim, vin, current_value, purchase_price, primary_image_url, confidence_score, heat_score, view_count, created_at, updated_at, status';
+const VEHICLE_SELECT = 'id, year, make, model, trim, vin, current_value, purchase_price, primary_image_url, image_count, confidence_score, heat_score, view_count, created_at, updated_at, status';
 
 const VISIBLE_STATUSES = new Set(['active', 'pending', 'discovered', 'pending_backfill']);
 
@@ -264,6 +264,7 @@ interface VehicleRow {
   current_value: number | null;
   purchase_price: number | null;
   primary_image_url: string | null;
+  image_count: number | null;
   confidence_score: number | null;
   heat_score: number | null;
   view_count: number | null;
@@ -472,8 +473,15 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
           // IDs missing primary_image_url need fallback images
           const needsFallback = vehicleIdArray.filter(id => !allRows.get(id)?.primary_image_url);
 
-          const [countsRes, fallbackRes, eventSummaryRes, eventWeeksRes] = await Promise.all([
-            supabase.rpc('count_vehicle_images_batch', { vehicle_ids: vehicleIdArray }),
+          // Image counts come from vehicles.image_count (trigger-maintained by
+          // update_vehicle_image_count, verified exact in prod). The live
+          // count_vehicle_images_batch RPC died on the 15s statement timeout and
+          // froze the whole garage behind it.
+          for (const [vid, row] of allRows) {
+            if (row.image_count != null) imageCounts.set(vid, Number(row.image_count));
+          }
+
+          const [fallbackRes, eventSummaryRes, eventWeeksRes] = await Promise.all([
             needsFallback.length > 0
               ? supabase.rpc('get_first_image_batch', { vehicle_ids: needsFallback })
               : Promise.resolve({ data: [] }),
@@ -484,11 +492,6 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
             supabase.rpc('get_vehicle_event_weeks_batch', { vehicle_ids: vehicleIdArray }),
           ]);
 
-          if (countsRes.data) {
-            for (const c of countsRes.data as { vehicle_id: string; count: number }[]) {
-              imageCounts.set(c.vehicle_id, Number(c.count));
-            }
-          }
           if (fallbackRes.data) {
             for (const f of fallbackRes.data as { vehicle_id: string; image_url: string }[]) {
               fallbackImages.set(f.vehicle_id, f.image_url);

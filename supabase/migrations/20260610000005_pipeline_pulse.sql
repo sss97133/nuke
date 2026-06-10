@@ -49,8 +49,9 @@ BEGIN
   SELECT COALESCE(jsonb_agg(jsonb_build_object('d', d, 'n', n) ORDER BY d), '[]'::jsonb)
   INTO v_observations
   FROM (
-    SELECT date_trunc('day', created_at)::date AS d, count(*) AS n
-    FROM vehicle_observations WHERE created_at >= v_since
+    -- vehicle_observations has no created_at; ingestion time is ingested_at
+    SELECT date_trunc('day', ingested_at)::date AS d, count(*) AS n
+    FROM vehicle_observations WHERE ingested_at >= v_since
     GROUP BY 1
   ) t;
 
@@ -94,7 +95,7 @@ GRANT EXECUTE ON FUNCTION get_pipeline_pulse(INT) TO anon, authenticated;
 
 -- Range scans above need created_at indexes; vehicles/vehicle_images have
 -- them. Ensure the two that commonly lack one:
-CREATE INDEX IF NOT EXISTS idx_vehicle_observations_created_at
-  ON vehicle_observations (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_vehicle_observations_ingested_at
+  ON vehicle_observations (ingested_at DESC);
 CREATE INDEX IF NOT EXISTS idx_auction_comments_created_at
   ON auction_comments (created_at DESC);

@@ -16,7 +16,7 @@ while true; do
   # Queue stats
   echo "📊 QUEUE STATUS"
   echo "---------------"
-  PGPASSWORD="RbzKq32A0uhqvJMQ" psql \
+  PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql \
     -h aws-0-us-west-1.pooler.supabase.com \
     -p 6543 \
     -U postgres.qkgaybvrernstplzjaam \
@@ -35,7 +35,7 @@ ORDER BY count DESC;
   echo ""
   echo "📈 RECENT EXTRACTIONS (last 5 min)"
   echo "-----------------------------------"
-  PGPASSWORD="RbzKq32A0uhqvJMQ" psql \
+  PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql \
     -h aws-0-us-west-1.pooler.supabase.com \
     -p 6543 \
     -U postgres.qkgaybvrernstplzjaam \

@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "byok-image-verdict.schema.json",
+  "title": "BYOK Deep Image Verdict",
+  "description": "The contract every per-image deep-analysis verdict MUST satisfy before it can be ingested into vehicle_images.ai_scan_metadata.byok_deep_analysis. This is the schema-as-DNA: a lazy/tourist-caption verdict fails validation and CANNOT land. Concept: docs/library/reference/encyclopedia/05-image-as-butterfly-node.md + engineering-manual/18-deep-image-analysis.md.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "image_id", "vehicle_id", "scene_type", "build_phase_guess",
+    "intent", "intent_confidence",
+    "components_seen", "state_observations", "workshop_signals",
+    "presence", "camera_pose", "narrative_one_line", "confidence"
+  ],
+  "properties": {
+    "image_id":   { "type": "string", "minLength": 8 },
+    "vehicle_id": { "type": "string", "minLength": 8 },
+    "scene_type": {
+      "type": "string",
+      "enum": ["engine_bay","body_exterior","body_interior","undercarriage","receipt_document","data_plate","hand_drawn_diagram","shop_context","fabrication_in_progress","paint_booth","wheel_assembly","road_test","off_property","cross_reference","product_screenshot","spreadsheet","unknown"]
+    },
+    "build_phase_guess": {
+      "type": "string",
+      "enum": ["discovery","teardown","metalwork","paint_prep","paint_application","mechanical_assembly","wiring","interior","final_assembly","drivable","show_finish","unknown"]
+    },
+    "intent": {
+      "type": "string",
+      "description": "What the photo is FOR. Only intent=labor (with intent_confidence high + owner-confirmed) accrues labor value. Everything else is context, not billable work. This exists because the system once valued a parts-sourcing text-to-dad as $410 of labor (Skylar 2026-05-28). Images are clues; intent must be confirmed, not assumed — when unsure set needs_clarification and ask the technician.",
+      "enum": ["labor","inspection","parts_sourcing","communication","acquisition","documentation","unknown"]
+    },
+    "intent_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "camera_pose": {
+      "type": "object",
+      "description": "STRUCTURED pose only. The literal phrase '3/4' / 'three-quarter' is banned (feedback_camera_pose_precision_over_3_4_view).",
+      "additionalProperties": true
+    },
+    "components_seen": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "confidence", "bbox"],
+        "properties": {
+          "label": { "type": "string", "minLength": 2 },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "part_number_guess": { "type": ["string", "null"] },
+          "bbox": {
+            "type": "array", "minItems": 4, "maxItems": 4,
+            "items": { "type": "number", "minimum": 0, "maximum": 999 }
+          }
+        }
+      }
+    },
+    "damage_localized": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "bbox"],
+        "properties": {
+          "label": { "type": "string" },
+          "severity": { "type": "string" },
+          "bbox": { "type": "array", "minItems": 4, "maxItems": 4, "items": { "type": "number", "minimum": 0, "maximum": 999 } }
+        }
+      }
+    },
+    "text_regions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["text", "bbox"],
+        "properties": {
+          "text": { "type": "string" },
+          "bbox": { "type": "array", "minItems": 4, "maxItems": 4, "items": { "type": "number", "minimum": 0, "maximum": 999 } }
+        }
+      }
+    },
+    "state_observations": {
+      "type": "object",
+      "required": ["rust_severity", "paint_state", "completeness"],
+      "properties": {
+        "rust_severity": { "type": "string", "enum": ["none","surface","pitting","perforation","unknown"] },
+        "paint_state": { "type": "string", "enum": ["bare_metal","primer","sealer","base","clear","aged","unknown"] },
+        "completeness": { "type": "string", "enum": ["stripped","partial","assembled","unknown"] },
+        "damage_callouts": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "workshop_signals": {
+      "type": "object",
+      "required": ["tools_visible", "fixturing", "lighting"],
+      "properties": {
+        "tools_visible": { "type": "array", "items": { "type": "string" } },
+        "fixturing": { "type": "string" },
+        "weld_quality": { "type": "string" },
+        "lighting": { "type": "string" }
+      }
+    },
+    "presence": {
+      "type": "object",
+      "required": ["person"],
+      "properties": {
+        "person": { "type": "boolean" },
+        "dog": { "type": "boolean" },
+        "place_hint": { "type": ["string", "null"] }
+      }
+    },
+    "narrative_one_line": { "type": "string", "minLength": 12 },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "needs_review": { "type": "boolean" },
+    "agent_notes": { "type": ["string", "null"] }
+  }
+}

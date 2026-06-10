@@ -466,7 +466,10 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     });
   }, [setGalleryFilter]);
 
-  // Auto-scroll heatmap to right (most recent events) when expanded
+  // Auto-scroll heatmap to right (most recent events) when expanded.
+  // Must also re-fire when the week grid grows: events load async, so on
+  // first paint scrollWidth is the empty 2-year fallback and the user was
+  // left parked at Jan <model year> staring at a blank 1977 calendar.
   useEffect(() => {
     if (expanded && heatmapRef.current) {
       const scrollContainer = heatmapRef.current.querySelector('.timeline-heatmap') as HTMLElement;
@@ -476,7 +479,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
         });
       }
     }
-  }, [expanded]);
+  }, [expanded, weeks.length]);
 
   // Auto-scroll the COLLAPSED barcode strip to today's edge on first paint
   // and whenever the underlying week count changes. Lands the user on the

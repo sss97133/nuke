@@ -6,7 +6,7 @@ set -uo pipefail
 cd /Users/skylar/nuke
 
 PGARGS="-h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A"
-export PGPASSWORD="RbzKq32A0uhqvJMQ"
+export PGPASSWORD="${SUPABASE_DB_PASSWORD}"
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M")
 ISSUES=0
 

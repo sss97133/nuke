@@ -1032,7 +1032,7 @@ def create_vehicle_image_record(
     )
 
     try:
-        db_password = os.getenv('SUPABASE_DB_PASSWORD', 'RbzKq32A0uhqvJMQ')
+        db_password = os.getenv('SUPABASE_DB_PASSWORD', '${SUPABASE_DB_PASSWORD}')
         result = subprocess.run(
             ['psql', '-h', 'aws-0-us-west-1.pooler.supabase.com', '-p', '6543',
              '-U', 'postgres.qkgaybvrernstplzjaam', '-d', 'postgres',
