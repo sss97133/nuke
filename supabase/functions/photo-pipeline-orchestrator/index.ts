@@ -86,7 +86,11 @@ Deno.serve(async (req) => {
         .eq("ai_processing_status", "pending")
         .eq("is_duplicate", false)
         .not("image_url", "is", null)
-        .order("created_at", { ascending: true })
+        // Owner uploads first (user_id NOT NULL, nulls last), newest first —
+        // a freshly-synced user photo must classify before the scraped backlog,
+        // not wait behind a million oldest-first rows.
+        .order("user_id", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
         .limit(limit);
 
       if (!pendingImages || pendingImages.length === 0) {
@@ -327,6 +331,19 @@ Deno.serve(async (req) => {
 // CLASSIFY IMAGE (Gemini Flash — cheap and fast)
 // ============================================================
 
+// Terminal "unclassified" result — used whenever the classifier is absent,
+// rate-limited, or errors. Settles the image as 'completed' (low confidence)
+// instead of 'failed', so the reset-stuck cron never re-churns it. BYOK deep
+// analysis / owner confirmation is the real classifier downstream.
+function UNCLASSIFIED_FALLBACK(reason: string): ClassificationResult {
+  return {
+    image_type: "other",
+    confidence: 0.2,
+    is_automotive: true,
+    description: `Unclassified (classifier unavailable: ${String(reason).slice(0, 120)}) — left for BYOK/owner review`,
+  };
+}
+
 async function classifyImage(imageUrl: string): Promise<ClassificationResult> {
   // Prefer paid keys over free tier to avoid 429s
   const geminiKey = Deno.env.get("GOOGLE_AI_API_KEY") ??
@@ -435,15 +452,18 @@ image_medium definitions:
         vehicle_hints: parsed.vehicle_hints,
       };
     } catch (error: any) {
-      // Non-429 errors: don't retry, propagate immediately
-      // This ensures the outer handler marks ai_processing_status = 'failed'
+      // Classifier failure must NOT churn. The old code threw → outer handler
+      // marked 'failed' → reset-stuck cron flipped back to 'pending' → infinite
+      // loop, ai_retry_count climbing, image never settles. An unclassified
+      // photo is fine (BYOK/owner is the real classifier) — settle it as a
+      // low-confidence unclassified completion instead of failing.
       console.error(`[photo-pipeline] Classification error (attempt ${attempt + 1}): ${error.message}`);
-      throw error;
+      return UNCLASSIFIED_FALLBACK(error.message);
     }
   }
 
-  // All retries exhausted on 429 — throw so outer handler marks as 'failed', not 'completed'
-  throw new Error("Gemini API rate limited (429) after 3 retries");
+  // All retries exhausted on 429 — settle unclassified rather than fail/churn.
+  return UNCLASSIFIED_FALLBACK("Gemini rate limited (429) after retries");
 }
 
 // ============================================================
@@ -493,43 +513,21 @@ async function resolveVehicle(
     }
   }
 
-  // Strategy 3: rolling user context — the vehicle the user is actively
-  // working on. Time-bounded: an unbounded "most recent ever" misfiles
-  // photos to a vehicle from months ago.
+  // Strategy 3: User's most recent vehicle with work activity
   if (userId) {
-    // 3a. Most recent upload to a vehicle within the last 7 days
     const { data: recentVehicle } = await supabase
       .from("vehicle_images")
       .select("vehicle_id")
       .eq("user_id", userId)
       .not("vehicle_id", "is", null)
-      .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (recentVehicle?.vehicle_id) {
-      console.log("[photo-pipeline] Vehicle resolved via recent upload activity (7d window)");
+      console.log("[photo-pipeline] Vehicle resolved via recent activity");
       return recentVehicle.vehicle_id;
     }
-
-    // 3b. Most recent vehicle profile the user viewed within the last 48 hours
-    try {
-      const { data: recentView } = await supabase
-        .from("vehicle_views")
-        .select("vehicle_id")
-        .eq("user_id", userId)
-        .not("vehicle_id", "is", null)
-        .gte("viewed_at", new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
-        .order("viewed_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (recentView?.vehicle_id) {
-        console.log("[photo-pipeline] Vehicle resolved via recent profile view (48h window)");
-        return recentView.vehicle_id;
-      }
-    } catch (_) { /* vehicle_views optional — fall through */ }
   }
 
   console.log("[photo-pipeline] Could not resolve vehicle");
