@@ -6,8 +6,15 @@ interface FetchVehicleImagesOptions {
   includeMismatchFilter?: boolean;
 }
 
+// In-flight dedupe keyed on query shape. The identical full-set vehicle_images
+// query (select ... order by position) was observed firing 2-4x per page load
+// (StrictMode double-mount + gallery/profile both resolving images). Concurrent
+// callers share one promise; entries clear on settle — coalescing, not caching.
+const inflightFetches = new Map<string, Promise<any[]>>();
+
 /**
  * Fetch all matching vehicle images even when a vehicle exceeds the REST row cap.
+ * Identical concurrent calls (same vehicle + select + options) share one request.
  */
 export async function fetchVehicleImages<T = any>(
   vehicleId: string,
@@ -16,6 +23,21 @@ export async function fetchVehicleImages<T = any>(
 ): Promise<T[]> {
   if (!vehicleId) return [];
 
+  const key = `${vehicleId}|${selectClause}|${options.includeMismatchFilter ? 1 : 0}`;
+  const existing = inflightFetches.get(key);
+  if (existing) return existing as Promise<T[]>;
+
+  const pending = fetchVehicleImagesUncached<T>(vehicleId, selectClause, options)
+    .finally(() => inflightFetches.delete(key));
+  inflightFetches.set(key, pending as Promise<any[]>);
+  return pending;
+}
+
+async function fetchVehicleImagesUncached<T = any>(
+  vehicleId: string,
+  selectClause: string,
+  options: FetchVehicleImagesOptions = {},
+): Promise<T[]> {
   const rows: T[] = [];
   let from = 0;
 

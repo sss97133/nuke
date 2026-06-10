@@ -88,6 +88,7 @@ export function AuthErrorCard({ message }: AuthErrorCardProps) {
 interface State {
   hasError: boolean;
   isAuthError: boolean;
+  error?: unknown;
 }
 
 interface Props {
@@ -105,6 +106,7 @@ export class AuthErrorBoundary extends React.Component<Props, State> {
     return {
       hasError: true,
       isAuthError: isAuthError(error),
+      error,
     };
   }
 
@@ -118,8 +120,12 @@ export class AuthErrorBoundary extends React.Component<Props, State> {
         // Will be rendered inside a Router so useNavigate is available
         return <AuthErrorCardWrapper />;
       }
-      // Re-throw to the outer ErrorBoundary
-      return this.props.fallback ?? null;
+      // Re-throw to the outer ErrorBoundary. The old code returned
+      // `fallback ?? null` here — with no fallback passed (App.tsx), any
+      // non-auth page crash rendered null and silently blanked the entire
+      // route tree. Now the outer ErrorBoundary's error card shows instead.
+      if (this.props.fallback) return this.props.fallback;
+      throw this.state.error;
     }
     return this.props.children;
   }

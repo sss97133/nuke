@@ -43,12 +43,16 @@ class GlobalUploadQueue {
   private readonly DB_STORE = 'queue';
   private dbPromise: Promise<IDBDatabase | null> | null = null;
   private uploadedFingerprints = new Set<string>(); // Track uploaded files to prevent duplicates
+  private fingerprintsPromise: Promise<void> | null = null;
 
   constructor() {
     // Restore persisted queue (IndexedDB) and resume interrupted uploads
     void this.restoreQueue();
-    // Load uploaded fingerprints from database
-    this.loadUploadedFingerprints();
+    // NOTE: fingerprints are loaded lazily on first addFiles(). This used to
+    // run here at module scope — an UNSCOPED vehicle_images scan firing on
+    // EVERY page load for EVERY visitor (measured 16.3s, loading the DB and
+    // starving every other query on the page). Dup-detection is only needed
+    // when someone actually uploads.
 
     if (typeof window !== 'undefined') {
       // Connection returned — resume pending uploads
@@ -183,16 +187,29 @@ class GlobalUploadQueue {
     return `${file.name}_${file.size}_${file.lastModified}`;
   }
 
-  // Load fingerprints of already uploaded images from database
+  // Load fingerprints of already uploaded images from database.
+  // Lazy + memoized; scoped to the signed-in user — only their own recent
+  // uploads matter for duplicate detection, and anonymous visitors never upload.
+  ensureFingerprintsLoaded(): Promise<void> {
+    if (!this.fingerprintsPromise) {
+      this.fingerprintsPromise = this.loadUploadedFingerprints();
+    }
+    return this.fingerprintsPromise;
+  }
+
   private async loadUploadedFingerprints() {
     try {
-      // Get all vehicle images from last 30 days to check for duplicates
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) return;
+
+      // Get the user's own images from last 30 days to check for duplicates
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
+
       const { data: recentImages } = await supabase
         .from('vehicle_images')
         .select('filename, file_size, taken_at')
+        .eq('user_id', session.user.id)
         .gte('created_at', thirtyDaysAgo.toISOString());
       
       if (recentImages) {
@@ -213,6 +230,9 @@ class GlobalUploadQueue {
   // Add files to queue for a specific vehicle (or the personal library when
   // vehicleId is null) with duplicate detection
   addFiles(vehicleId: string | null, vehicleName: string, files: File[]) {
+    // Fire-and-forget warm-up: first upload loads the dup-detection set.
+    // (Sync path keeps prior behavior — unknown fingerprints just upload.)
+    void this.ensureFingerprintsLoaded();
     const newItems: UploadItem[] = [];
     const duplicates: string[] = [];
     const alreadyQueued: string[] = [];
