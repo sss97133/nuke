@@ -104,7 +104,13 @@ enum Config {
     static let recentUploadsCap = 24
 
     /// Google sign-in door — gated OFF until the Supabase Google provider is
-    /// configured for this bundle id. SignInView renders the slot only when
-    /// this is true; flipping it is the only client change needed.
+    /// configured for this bundle id. The constellation ALWAYS renders the
+    /// button; this gates only its enabled state. Flipping it (plus wiring
+    /// signInWithOAuth) is the only client change needed.
     static let enableGoogleSignIn = false
+
+    /// Explore mode's sample profile (the Profile tab with no session) —
+    /// a real prod profile with a deep day record, never a fixture.
+    /// profiles.id for handle "skylar".
+    static let sampleProfileUserId = "0b9f107a-d124-49de-9ded-94698f63c1c4"
 }

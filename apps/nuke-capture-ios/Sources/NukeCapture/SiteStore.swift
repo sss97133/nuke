@@ -15,7 +15,7 @@ import Foundation
 /// One confirmed work site: a center coordinate and a radius in meters.
 /// Codable → persisted as JSON in UserDefaults (device-local, never synced).
 struct Site: Codable, Equatable {
-    let name: String
+    var name: String            // renameable later (Account sheet) — optional, never gated on
     let latitude: Double
     let longitude: Double
     let radiusMeters: Double
@@ -41,6 +41,14 @@ final class SiteStore: ObservableObject {
 
     func add(_ site: Site) {
         sites.append(site)
+        persist()
+    }
+
+    /// Rename a confirmed site (Account sheet). Empty names fall back to
+    /// nothing — the stored name only changes when there's a real value.
+    func rename(at index: Int, to name: String) {
+        guard sites.indices.contains(index) else { return }
+        sites[index].name = name
         persist()
     }
 
