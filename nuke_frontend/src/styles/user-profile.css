@@ -13,6 +13,7 @@
   --up-surface: #ffffff;
   --up-ink: #1a1a1a;
   --up-pencil: #888888;
+  --up-data-dim: #666666; /* de-emphasized but DATA-carrying (values/dates/counts) — >=4.5:1 on light surface */
   --up-ghost: #dddddd;
   --up-text-faint: #bbbbbb;
   --up-row-alt: #f9f9f9;
@@ -89,7 +90,7 @@
 
 .up-header__name {
   font-family: var(--up-font-sans);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 700;
   color: var(--up-ink);
   white-space: nowrap;
@@ -99,15 +100,15 @@
 
 .up-header__username {
   font-family: var(--up-font-mono);
-  font-size: 9px;
-  color: var(--up-pencil);
+  font-size: var(--fs-9);
+  color: var(--up-data-dim);
   white-space: nowrap;
 }
 
 .up-header__meta {
   font-family: var(--up-font-sans);
-  font-size: 8px;
-  color: var(--up-pencil);
+  font-size: var(--fs-8);
+  color: var(--up-data-dim);
   white-space: nowrap;
 }
 
@@ -132,14 +133,14 @@
   align-items: baseline;
   gap: 3px;
   font-family: var(--up-font-mono);
-  font-size: 9px;
+  font-size: var(--fs-9);
   color: var(--up-ink);
   white-space: nowrap;
 }
 
 .up-stat-pill__label {
   font-family: var(--up-font-sans);
-  font-size: 7px;
+  font-size: calc(7px * var(--font-scale, 1));
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -166,12 +167,12 @@
   align-items: center;
   padding: 2px 6px;
   font-family: var(--up-font-mono);
-  font-size: 8px;
+  font-size: var(--fs-8);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   border: 1px solid var(--up-ghost);
-  color: var(--up-pencil);
+  color: var(--up-data-dim);
   white-space: nowrap;
 }
 
@@ -236,7 +237,7 @@
   justify-content: center;
   padding: 3px 8px;
   font-family: var(--up-font-mono);
-  font-size: 8px;
+  font-size: var(--fs-8);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -261,6 +262,73 @@
 .up-btn--primary:hover {
   background: var(--up-gulf-blue);
   border-color: var(--up-gulf-blue);
+}
+
+/* ─── Text Scale Control (A− A A+) ─── */
+.up-textscale {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.up-textscale__label {
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-8);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--up-pencil);
+}
+
+.up-textscale__seg {
+  display: inline-flex;
+  border: 1px solid var(--up-ink);
+}
+
+.up-textscale__btn {
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-8);
+  font-weight: 700;
+  padding: 2px 6px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--up-ink);
+  color: var(--up-ink);
+  cursor: pointer;
+  line-height: 1;
+  transition: background var(--up-speed) var(--up-ease), color var(--up-speed) var(--up-ease);
+}
+
+.up-textscale__btn:last-child {
+  border-right: none;
+}
+
+.up-textscale__btn:hover:not(:disabled) {
+  background: var(--up-ink);
+  color: var(--up-surface);
+}
+
+.up-textscale__btn:disabled {
+  color: var(--up-text-faint);
+  cursor: default;
+}
+
+.up-textscale__btn--active {
+  background: var(--up-ink);
+  color: var(--up-surface);
+}
+
+.up-textscale__value {
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-8);
+  color: var(--up-data-dim);
+  min-width: 28px;
+}
+
+/* Compact variant pushes to the right end of the sub-header */
+.up-textscale--compact {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* ─── Settings Drawer ─── */
@@ -308,7 +376,7 @@
 
 .up-drawer__title {
   font-family: var(--up-font-sans);
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -317,7 +385,7 @@
 .up-drawer__close {
   background: none;
   border: none;
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   cursor: pointer;
   color: var(--up-pencil);
   padding: 4px;
@@ -334,7 +402,7 @@
   gap: 8px;
   padding: 6px 0;
   border-bottom: 1px solid var(--up-ghost);
-  font-size: 9px;
+  font-size: var(--fs-9);
 }
 
 .up-activity-item:last-child {
@@ -343,8 +411,8 @@
 
 .up-activity-item__date {
   font-family: var(--up-font-mono);
-  font-size: 8px;
-  color: var(--up-pencil);
+  font-size: var(--fs-8);
+  color: var(--up-data-dim);
   white-space: nowrap;
   flex-shrink: 0;
   min-width: 60px;
@@ -354,7 +422,7 @@
   display: inline-flex;
   padding: 1px 4px;
   font-family: var(--up-font-mono);
-  font-size: 7px;
+  font-size: calc(7px * var(--font-scale, 1));
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -384,7 +452,7 @@
 
 .up-dossier-group__label {
   font-family: var(--up-font-sans);
-  font-size: 7px;
+  font-size: calc(7px * var(--font-scale, 1));
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -399,12 +467,12 @@
   justify-content: space-between;
   align-items: baseline;
   padding: 2px 0;
-  font-size: 9px;
+  font-size: var(--fs-9);
 }
 
 .up-dossier-row__label {
   font-family: var(--up-font-sans);
-  font-size: 8px;
+  font-size: var(--fs-8);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -413,7 +481,7 @@
 
 .up-dossier-row__value {
   font-family: var(--up-font-sans);
-  font-size: 9px;
+  font-size: var(--fs-9);
   color: var(--up-ink);
   text-align: right;
 }
@@ -431,7 +499,7 @@
 
 .up-briefing__headline {
   font-family: var(--up-font-sans);
-  font-size: 10px;
+  font-size: var(--fs-10);
   font-weight: 400;
   line-height: 1.5;
   color: var(--up-ink);
@@ -454,7 +522,7 @@
 
 .up-reputation .score-row__label {
   font-family: var(--up-font-sans);
-  font-size: 8px;
+  font-size: var(--fs-8);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -480,7 +548,7 @@
 
 .up-reputation .score-row__value {
   font-family: var(--up-font-mono);
-  font-size: 9px;
+  font-size: var(--fs-9);
   min-width: 32px;
   text-align: right;
 }
