@@ -539,24 +539,40 @@ async function resolveVehicle(
     }
   }
 
-  // Strategy 3: User's most recent vehicle with work activity
+  // Strategy 3: rolling user context — SUGGEST-ONLY, never hard-assign.
+  // The hard-assign version cascaded: one filed photo became "most recent
+  // vehicle" for the next, which filed and reinforced it — 102 of user 0's
+  // June frames landed on one truck with no content check (2026-06-10,
+  // pixel-verified the bucket held 2+ different vehicles). Context is a
+  // PRIOR, not evidence: it goes in suggested_vehicle_id for the inbox /
+  // owner-confirmation flow. Only physical evidence (unambiguous GPS above)
+  // may hard-file. Time-bounded 7 days so a stale project never suggests.
   if (userId) {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
     const { data: recentVehicle } = await supabase
       .from("vehicle_images")
       .select("vehicle_id")
       .eq("user_id", userId)
       .not("vehicle_id", "is", null)
+      .gte("created_at", sevenDaysAgo)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (recentVehicle?.vehicle_id) {
-      console.log("[photo-pipeline] Vehicle resolved via recent activity");
-      return recentVehicle.vehicle_id;
+      console.log("[photo-pipeline] Rolling context suggests vehicle (not assigning):", recentVehicle.vehicle_id);
+      await supabase
+        .from("vehicle_images")
+        .update({
+          suggested_vehicle_id: recentVehicle.vehicle_id,
+          image_vehicle_match_status: "ambiguous",
+        })
+        .eq("id", imageId)
+        .is("vehicle_id", null);
     }
   }
 
-  console.log("[photo-pipeline] Could not resolve vehicle");
+  console.log("[photo-pipeline] No hard evidence — photo stays in inbox (suggestion recorded if context existed)");
   return null;
 }
 
