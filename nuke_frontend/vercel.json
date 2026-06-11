@@ -17,6 +17,14 @@
       "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/mcp-connector"
     },
     {
+      "source": "/v1/events",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-events"
+    },
+    {
+      "source": "/v1/events/:path*",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-events/:path*"
+    },
+    {
       "source": "/.well-known/oauth-authorization-server",
       "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/oauth-server/.well-known/oauth-authorization-server"
     },
@@ -43,6 +51,10 @@
     {
       "source": "/api/v1/vehicle/:path*",
       "destination": "/api/v1/vehicle/:path*"
+    },
+    {
+      "source": "/api/docs",
+      "destination": "/api/docs"
     },
     {
       "source": "/api/journal",

@@ -1,3 +1,38 @@
+# ⚠️ This file is NOT deployed. Do not "fix" routing here.
+
+This was the repo-root `vercel.json`. **Vercel never reads it.**
+
+Both deploy workflows run `vercel deploy` with `working-directory: ./nuke_frontend`
+(see `.github/workflows/deploy-vercel.yml` and `.github/workflows/deploy-preview.yml`),
+so the only routing config that reaches production is:
+
+```
+nuke_frontend/vercel.json   ← edit THIS one
+```
+
+Same goes for serverless functions: only `nuke_frontend/api/**` is uploaded.
+Files under repo-root `api/` are dead code.
+
+## Why this tombstone exists
+
+Routing fixes repeatedly landed in this file and shipped nothing:
+
+- `f07181e05` — case study: routing fix landed here, prod unchanged.
+- `4342ca036` — "Fix /v1/events + /api/docs routing" landed here; both stayed
+  broken in prod until they were re-done in `nuke_frontend/vercel.json`.
+- PR #273 — evidence chain proving the deploy path (`/api/journal/:date` fix).
+
+If you are reading this because you grepped for `vercel.json`: the file you
+want is `nuke_frontend/vercel.json`.
+
+## Last contents before retirement (2026-06-10, for reference only)
+
+Rewrites that mattered were folded into `nuke_frontend/vercel.json`
+(`/v1/events`, `/api/docs`). `/api/functions/v1/:path*` is owned by PR #227.
+The CSP header block below was never live; fold it in deliberately (and test)
+if you want it, don't copy it blind.
+
+```json
 {
   "buildCommand": "cd nuke_frontend && CI=false npm run build",
   "outputDirectory": "nuke_frontend/dist",
@@ -99,3 +134,4 @@
     }
   ]
 }
+```
