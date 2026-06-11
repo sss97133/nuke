@@ -15,6 +15,7 @@
 import AppKit
 import AuthenticationServices
 import ServiceManagement
+import UserNotifications
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -33,6 +34,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let loginItem = NSMenuItem(title: "Start at Login", action: #selector(toggleStartAtLogin), keyEquivalent: "")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Ask once for notification permission so "N photos synced" can fire.
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(
             systemSymbolName: "car.fill",
@@ -176,9 +180,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             do {
                 try await SupabaseService.signIn(email: emailValue, password: passwordValue)
                 refreshMenu()
+                // CONFIRM. A silent menu refresh + a sync that finds no shop
+                // photos = the user can't tell anything happened. Say it.
+                await MainActor.run {
+                    NSApp.activate(ignoringOtherApps: true)
+                    let ok = NSAlert()
+                    ok.icon = NSApp.applicationIconImage
+                    ok.messageText = "You're in."
+                    ok.informativeText = "Signed in to Nuke as \(emailValue).\n\nNuke is now watching for photos you take at your shop — they'll upload to your account automatically. Look for the icon in your menu bar."
+                    ok.addButton(withTitle: "Let's go")
+                    ok.runModal()
+                }
                 await engine.sync()
             } catch {
-                showSignInFailure(error.localizedDescription)
+                await MainActor.run {
+                    NSApp.activate(ignoringOtherApps: true)
+                    let fail = NSAlert()
+                    fail.alertStyle = .warning
+                    fail.icon = NSApp.applicationIconImage
+                    fail.messageText = "Couldn't sign in"
+                    fail.informativeText = "\(error.localizedDescription)\n\nDouble-check your Nuke email and password — the same ones you use at nuke.ag. Forgot it? Reset at nuke.ag/login."
+                    fail.addButton(withTitle: "Try again")
+                    fail.addButton(withTitle: "Cancel")
+                    if fail.runModal() == .alertFirstButtonReturn {
+                        self.promptSignIn()
+                    }
+                }
             }
         }
     }
@@ -227,6 +254,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         fail.informativeText = message
         fail.runModal()
         refreshMenu()
+    }
+
+    /// Fire a native notification when photos actually land — the "it worked"
+    /// signal the menu bar alone can't give.
+    func notifyUploaded(_ count: Int) {
+        guard count > 0 else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Nuke"
+        content.body = count == 1 ? "1 shop photo synced to your account." : "\(count) shop photos synced to your account."
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        )
     }
 
     /// Launch-at-login via the modern SMAppService API (macOS 13+). Only

@@ -61,7 +61,7 @@ Key identifiers:
       with a visible contact route). Required field in App Store Connect.
 - [ ] **Agreements signed**: App Store Connect → Business → the Free Apps
       agreement must be Active (Paid Apps agreement not needed — app is free).
-- [ ] **Server TODO from §2 done** (account deletion RPC) — submission
+- [x] **Server TODO from §2 done** (account deletion RPC) — submission
       without it risks a 5.1.1(v) rejection the moment the reviewer taps
       Delete Account and sees an error.
 - [ ] **Demo account exists** for the reviewer (see §7) with seeded data.
@@ -70,39 +70,35 @@ Key identifiers:
 
 ## §2 PRE-SUBMISSION SERVER TODO — `request_account_deletion` RPC
 
-**Status at scaffold time: NOT verified to exist in production. Treat as
-missing until proven otherwise.** The app's Delete Account button calls:
+**Status: DONE (2026-06-10, branch `fable5/account-deletion`).** Live in
+production. The app's Delete Account button calls:
 
 ```
 POST /rest/v1/rpc/request_account_deletion   (authenticated as the user)
 ```
 
-Probe production first (repo rule: the repo is not prod):
+Implementation (soft deletion — anonymize identity, retain contributed
+vehicle data per privacy policy; testimony is never destroyed):
 
-```bash
-# 404/PGRST202 "function not found" = must create it. Anything else = inspect.
-curl -sS -X POST "https://qkgaybvrernstplzjaam.supabase.co/rest/v1/rpc/request_account_deletion" \
-  -H "apikey: <ANON_KEY>" -H "Authorization: Bearer <A_REAL_USER_JWT>" \
-  -H "Content-Type: application/json" -d '{}'
-```
+1. **RPC `public.request_account_deletion()`** (SECURITY DEFINER,
+   authenticated only, migration
+   `supabase/migrations/20260611030000_request_account_deletion.sql`):
+   immediately anonymizes the caller's `profiles` row (username →
+   `deleted-<uuid8>`, full_name → "Deleted User", avatar/city/state/
+   location/bio → NULL) and enqueues a `pending` row in
+   `account_deletion_requests` (RLS-enabled, owner-read). Returns
+   `{status:'requested', note:'identity anonymized; sign-in disabled within
+   24h; ...'}` so the app can sign out locally.
+2. **Edge function `process-account-deletions`** (service-role bearer
+   required) drains pending rows: bans the auth user via
+   `supabase.auth.admin.updateUserById(user_id, { ban_duration: '876000h' })`
+   (~100 years — sign-in disabled) and stamps `processed_at`. Run it on a
+   cron (10–15 min) or manually before submission.
 
-If missing, create a SECURITY DEFINER function (via migration, deployed by
-the normal pipeline — not hand-applied) that, for `auth.uid()`:
-
-1. Deletes or anonymizes the user's rows (`vehicle_images`, profile rows,
-   any tables keyed by `user_id`) **or** inserts into a deletion queue that a
-   scheduled job drains within days — Apple accepts deletion "initiated
-   in-app" with reasonable server-side completion time, but the account must
-   actually get deleted.
-2. Deletes the `auth.users` row (e.g. via `auth.admin` from an edge function,
-   or a queue consumed by a service-role job — plain SQL in a SECURITY
-   DEFINER function CAN `delete from auth.users where id = auth.uid()`).
-3. Returns success so the app can sign out locally.
-
-The exact data-deletion scope is a product/legal decision — **do not let an
-agent silently decide what gets deleted.** Decide, implement, then test:
-sign in to the app with a throwaway account, tap Delete Account, confirm the
-auth user disappears and sign-in fails afterward.
+Remaining manual step before submission: end-to-end test with a throwaway
+account — sign in, tap Delete Account, confirm the RPC returns
+`status:'requested'`, run `process-account-deletions`, confirm sign-in fails
+afterward.
 
 ---
 
