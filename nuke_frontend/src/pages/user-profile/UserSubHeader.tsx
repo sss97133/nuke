@@ -1,5 +1,6 @@
 import React from 'react';
 import { useUserProfile } from './UserProfileContext';
+import TextScaleControl from '../../components/TextScaleControl';
 
 /**
  * UserSubHeader -- Badge bar below the header.
@@ -62,6 +63,9 @@ const UserSubHeader: React.FC = () => {
           {tag.toUpperCase()}
         </span>
       ))}
+
+      {/* Text size control — right end */}
+      <TextScaleControl variant="compact" />
     </div>
   );
 };

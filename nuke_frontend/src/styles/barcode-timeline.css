@@ -18,6 +18,7 @@
   --vp-surface: var(--up-surface);
   --vp-ink: var(--up-ink);
   --vp-pencil: var(--up-pencil);
+  --vp-data-dim: var(--up-data-dim);
   --vp-ghost: var(--up-ghost);
   --vp-text-faint: var(--up-text-faint);
   --vp-font-sans: var(--up-font-sans);
@@ -53,7 +54,7 @@
   padding: 0 12px;
 }
 .barcode-bar__label-left {
-  font-size: 8px;
+  font-size: var(--fs-8);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -66,11 +67,11 @@
   pointer-events: none;
 }
 .barcode-bar__label-right {
-  font-size: 8px;
+  font-size: var(--fs-8);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--vp-text-faint);
+  color: var(--vp-data-dim, #666); /* year range = data, not ghost chrome */
   position: absolute;
   right: 12px;
   top: 50%;
@@ -105,7 +106,7 @@
   background: var(--vp-surface);
   border: 1px solid var(--vp-ink);
   padding: 4px 8px;
-  font-size: 8px;
+  font-size: var(--fs-8);
   font-family: var(--vp-font-mono);
   white-space: nowrap;
   z-index: 1100;
@@ -125,7 +126,7 @@
 .barcode-strip--expanded .barcode-bar { border-bottom: 1px solid var(--vp-ghost); }
 
 .timeline-section__header {
-  font-size: 8px;
+  font-size: var(--fs-8);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -154,8 +155,8 @@
 }
 .hm-day-labels span {
   height: 11px;
-  font-size: 8px;
-  color: var(--vp-pencil);
+  font-size: var(--fs-8);
+  color: var(--vp-data-dim, #666); /* axis dates = data */
   display: flex;
   align-items: center;
   letter-spacing: 0.06em;
@@ -196,8 +197,8 @@
   top: 100%;
   left: 0;
   margin-top: 2px;
-  font-size: 8px;
-  color: var(--vp-pencil);
+  font-size: var(--fs-8);
+  color: var(--vp-data-dim, #666); /* axis dates = data */
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -213,14 +214,14 @@
 }
 .timeline-filter-pill {
   font-family: var(--vp-font-sans);
-  font-size: 8px;
+  font-size: var(--fs-8);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 2px 4px;
   border: 1px solid var(--vp-ghost);
   background: transparent;
-  color: var(--vp-pencil);
+  color: var(--vp-data-dim, #666); /* pills carry counts = data */
   cursor: pointer;
   transition: background var(--vp-speed) var(--vp-ease), color var(--vp-speed) var(--vp-ease), border-color var(--vp-speed) var(--vp-ease);
 }
