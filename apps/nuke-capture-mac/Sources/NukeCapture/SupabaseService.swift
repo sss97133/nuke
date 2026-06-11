@@ -72,6 +72,25 @@ enum SupabaseService {
         try await client.auth.signIn(email: email, password: password)
     }
 
+    /// Sign in with Apple — exchanges the ASAuthorizationAppleIDCredential's
+    /// identity token for a Supabase session (supabase-swift 2.x
+    /// `signInWithIdToken`, verified against the 2.47.0 checkout).
+    ///
+    /// `nonce` is the RAW nonce whose SHA-256 hash was set on the Apple
+    /// request — GoTrue re-hashes it and compares against the ID token's
+    /// `nonce` claim (replay protection). Server-side this needs the app's
+    /// bundle id listed in the Apple provider's Client IDs; no Services ID /
+    /// secret for the native flow. See apps/SIGN_IN_WITH_APPLE_SETUP.md.
+    static func signInWithApple(idToken: String, nonce: String) async throws {
+        try await client.auth.signInWithIdToken(
+            credentials: OpenIDConnectCredentials(
+                provider: .apple,
+                idToken: idToken,
+                nonce: nonce
+            )
+        )
+    }
+
     static func signOut() async throws {
         try await client.auth.signOut()
     }
