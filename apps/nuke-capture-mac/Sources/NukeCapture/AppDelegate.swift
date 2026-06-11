@@ -13,6 +13,7 @@
 //   Quit
 
 import AppKit
+import AuthenticationServices
 import ServiceManagement
 import UserNotifications
 
@@ -21,6 +22,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var statusItem: NSStatusItem!
     private let engine = SyncEngine()
+    /// Retained for the lifetime of the app — ASAuthorizationController's
+    /// delegate callbacks need a live object while the Apple sheet is up.
+    private let appleSignIn = AppleSignInCoordinator()
 
     private let statusLine = NSMenuItem(title: "Starting…", action: nil, keyEquivalent: "")
     private let skippedLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -135,17 +139,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    /// Email/password prompt as an NSAlert with text-field accessories — the
-    /// whole UI this app needs. Session lands in the Keychain (supabase-swift
-    /// default storage); this runs once per machine.
+    /// Sign-in prompt as an NSAlert: "Sign in with Apple" (primary, no
+    /// password) alongside the email/password accessory fields. Session lands
+    /// in the Keychain (supabase-swift default storage) either way; this runs
+    /// once per machine.
     private func promptSignIn() {
         NSApp.activate(ignoringOtherApps: true)
 
         let alert = NSAlert()
         alert.messageText = "Sign in to Nuke"
         alert.informativeText = "Your photos upload to your own Nuke account. You only do this once — the session is stored in your Keychain."
-        alert.addButton(withTitle: "Sign In")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Sign In")                  // .alertFirstButtonReturn (email/password)
+        alert.addButton(withTitle: "Sign in with Apple")      // .alertSecondButtonReturn
+        alert.addButton(withTitle: "Cancel")                   // .alertThirdButtonReturn (Esc via title)
 
         let email = NSTextField(frame: NSRect(x: 0, y: 32, width: 260, height: 24))
         email.placeholderString = "email"
@@ -157,7 +163,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert.accessoryView = box
         alert.window.initialFirstResponder = email
 
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        switch alert.runModal() {
+        case .alertSecondButtonReturn:
+            signInWithApple()
+            return
+        case .alertFirstButtonReturn:
+            break
+        default:
+            return
+        }
         let emailValue = email.stringValue.trimmingCharacters(in: .whitespaces)
         let passwordValue = password.stringValue
         guard !emailValue.isEmpty, !passwordValue.isEmpty else { return }
@@ -192,9 +206,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         self.promptSignIn()
                     }
                 }
-                refreshMenu()
             }
         }
+    }
+
+    /// Apple authorization sheet → identity token → Supabase session.
+    /// From a bare `swift run` binary the controller fails with
+    /// ASAuthorizationError 1000 — the entitlement only exists in the
+    /// bundled, signed app (see README → Sign in with Apple), so that case
+    /// gets an explanatory message instead of a bare "Unknown error".
+    private func signInWithApple() {
+        Task {
+            do {
+                let result = try await appleSignIn.signIn()
+                try await SupabaseService.signInWithApple(
+                    idToken: result.idToken,
+                    nonce: result.nonce
+                )
+                refreshMenu()
+                await engine.sync()
+            } catch {
+                if let authError = error as? ASAuthorizationError {
+                    switch authError.code {
+                    case .canceled:
+                        return // user dismissed the sheet — not an error
+                    case .unknown:
+                        showSignInFailure(
+                            "Sign in with Apple needs the bundled, signed NukeCapture.app "
+                            + "with the Sign in with Apple entitlement — it cannot run from "
+                            + "a dev `swift run` binary. Use email/password for dev, or build "
+                            + "the signed app (README → Sign in with Apple)."
+                        )
+                        return
+                    default:
+                        break
+                    }
+                }
+                showSignInFailure(error.localizedDescription)
+            }
+        }
+    }
+
+    private func showSignInFailure(_ message: String) {
+        let fail = NSAlert()
+        fail.alertStyle = .warning
+        fail.messageText = "Sign-in failed"
+        fail.informativeText = message
+        fail.runModal()
+        refreshMenu()
     }
 
     /// Fire a native notification when photos actually land — the "it worked"

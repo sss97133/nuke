@@ -106,8 +106,10 @@ afterward.
 
 1. <https://developer.apple.com/account> → Certificates, Identifiers &
    Profiles → **Identifiers** → "+" → App ID → bundle ID **explicit**
-   `ag.nuke.capture`. No special capabilities needed (Background Modes is a
-   plist-only capability; Photos needs no entitlement on iOS).
+   `ag.nuke.capture`. Enable the **Sign In with Apple** capability on this
+   App ID (the app ships the `com.apple.developer.applesignin` entitlement —
+   see `apps/SIGN_IN_WITH_APPLE_SETUP.md`). Background Modes is a plist-only
+   capability and Photos needs no entitlement on iOS.
    (Xcode automatic signing can also auto-register this on first device run.)
 2. <https://appstoreconnect.apple.com> → My Apps → "+" → New App:
    - Platform: iOS
