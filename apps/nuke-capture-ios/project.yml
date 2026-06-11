@@ -77,10 +77,11 @@ targets:
           - UIInterfaceOrientationPortrait
         # ── Photo library (read) ── the ONLY sensitive permission this app asks for.
         # This exact string also goes in the App Privacy questionnaire answers
-        # (see apps/APP_STORE_LAUNCH.md) — keep them in sync.
+        # (see apps/APP_STORE_LAUNCH.md) — keep them in sync. Register: report,
+        # don't teach (CONSTRAINTS.md C8).
         NSPhotoLibraryUsageDescription: >-
-          Nuke uploads photos you take at your registered work locations to
-          your own Nuke account.
+          Photos taken at your work sites join your record. Everything else
+          stays on this phone.
         # ── Background Modes capability (fetch/processing via BGTaskScheduler) ──
         # The "capability" in Xcode's UI is just these plist keys; no
         # entitlement file is required for fetch/processing.

@@ -61,6 +61,24 @@ struct SignInView: View {
                     Text("Face ID, no password. Or use your nuke.ag email below.")
                 }
 
+                // Google door — config-gated until the Supabase Google
+                // provider is set up for this bundle id (Config.swift).
+                // SIWA stays first-class above (App Store Guideline 4.8).
+                if Config.enableGoogleSignIn {
+                    Section {
+                        Button {
+                            // TODO(google-auth): client.auth.signInWithOAuth(
+                            //   provider: .google) once the provider is
+                            // configured server-side. Gate stays OFF until
+                            // then — no dead buttons in a shipped build.
+                        } label: {
+                            Label("Sign in with Google", systemImage: "g.circle")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .disabled(true)
+                    }
+                }
+
                 Section("Nuke account") {
                     TextField("Email", text: $email)
                         .keyboardType(.emailAddress)
