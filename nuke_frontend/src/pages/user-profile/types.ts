@@ -66,7 +66,9 @@ export interface UserComprehensiveData {
 
 export interface ContributionEvent {
   date: string;
-  type: 'image_upload' | 'timeline_event' | 'vehicle_added' | 'auction_activity' | 'comment' | 'profile_edit';
+  // Open facet set (skill-fingerprint doctrine): new kinds land here and get a
+  // pill in UserBarcodeTimeline only when they have data — never empty chrome.
+  type: 'image_upload' | 'timeline_event' | 'vehicle_added' | 'auction_activity' | 'comment' | 'profile_edit' | 'work' | 'business_event';
   count: number;
   label: string;
   vehicleId?: string;

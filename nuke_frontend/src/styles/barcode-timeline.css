@@ -227,6 +227,89 @@
 .timeline-filter-pill:hover { background: var(--surface-hover); color: var(--vp-ink); }
 .timeline-filter-pill--active { background: var(--vp-ink); color: var(--vp-surface); border-color: var(--vp-ink); }
 
+/* ─── Day-receipt drawer (user-profile timeline drill-down) ───
+   Inline below the heatmap grid: ALL-CAPS day header, lazy photo thumb strip,
+   work/$ lines, facet chips. Arial labels, Courier data, 2px border, no
+   radius/shadow per design law. Font sizes ride the --fs-* scale tokens. */
+.up-day-receipt {
+  margin-top: 8px;
+  border: 2px solid var(--vp-ink);
+  background: var(--vp-surface);
+  padding: 8px 10px;
+  max-width: 560px;
+}
+.up-day-receipt__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--vp-font-mono);
+  font-size: var(--fs-9, 9px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--vp-ink);
+  margin-bottom: 6px;
+}
+.up-day-receipt__close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--fs-9, 9px);
+  line-height: 1;
+  padding: 0 0 0 8px;
+  color: var(--vp-pencil);
+}
+.up-day-receipt__close:hover { color: var(--vp-ink); }
+.up-day-receipt__facets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.up-day-receipt__facet {
+  font-family: var(--vp-font-mono);
+  font-size: var(--fs-8, 8px);
+  letter-spacing: 0.06em;
+  padding: 1px 4px;
+  border: 1px solid var(--vp-ghost);
+  color: var(--vp-pencil);
+}
+.up-day-receipt__photos {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  margin-bottom: 6px;
+}
+.up-day-receipt__photos img {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  display: block;
+  border: 1px solid var(--vp-ghost);
+  flex: 0 0 auto;
+}
+.up-day-receipt__line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--vp-font-mono);
+  font-size: var(--fs-8, 8px);
+  line-height: 1.7;
+  color: var(--vp-ink);
+}
+.up-day-receipt__line-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.up-day-receipt__line-value { white-space: nowrap; }
+.up-day-receipt__empty {
+  font-family: var(--vp-font-mono);
+  font-size: var(--fs-8, 8px);
+  letter-spacing: 0.08em;
+  color: var(--vp-pencil);
+}
+
 /* Mobile: barcode strip un-sticks (moved with the block from vehicle-profile.css) */
 @media (max-width: 768px) {
   .barcode-strip { position: relative; top: auto; }
