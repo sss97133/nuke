@@ -106,6 +106,22 @@ is supposed to feel like a sick tool that hopefully nobody else has.** Therefore
 - **Scarcity is rendered, not claimed** — the soft-launch doctrine made visible
   (operator number / serialized instrument), never the word "exclusive."
 
+## C9 — The darkroom (Skylar, 2026-06-11, retiring the storyboards)
+
+The two highest-value design systems are **the timeline and its barcode** — because
+they are powered by end-to-end data handling and they GROW: the minute the user taps
+Allow, the timeline starts growing. What makes them cool is the data behind them, so
+the design question collapses to **"how fast can we give them that information?"**
+The hook is the darkroom: the emotion of watching the image appear in the tray —
+the loading screen as proof of existence. Consequences:
+
+- **Static mockups are retired.** From Allow onward it's an entirely new world that
+  can only be designed live — develop the real pages/screens and watch them run;
+  iterate on the running thing, not on pictures of it.
+- The barcode is design language as *concept*, never to be literally pasted as
+  decoration — a bar is cool because a real day of work powers it.
+- Speed-to-first-proof is the ranking metric for all ignition work.
+
 ## C7 — The period: ten days
 
 June 22 the window closes; submission targets Thu/Fri. The deadline is a material
