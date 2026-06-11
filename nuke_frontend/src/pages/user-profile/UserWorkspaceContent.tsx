@@ -6,7 +6,6 @@
  * Right column: gallery, reputation, knowledge library, live player.
  */
 import React, { useState, useCallback } from 'react';
-import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import { useUserProfile } from './UserProfileContext';
 
 // Lazy-load all card components
@@ -19,27 +18,24 @@ const ColumnDivider = React.lazy(() => import('../vehicle-profile/ColumnDivider'
 
 // Existing profile components
 const VehicleCollection = React.lazy(() => import('../../components/profile/VehicleCollection'));
-const PublicAuctionTrackRecord = React.lazy(() => import('../../components/profile/PublicAuctionTrackRecord'));
 const UserDiscoveries = React.lazy(() => import('../../components/profile/UserDiscoveries'));
-const ProfileCommentsTab = React.lazy(() =>
-  import('../../components/profile/ProfileCommentsTab').then(m => ({ default: m.ProfileCommentsTab }))
-);
-const ProfileBidsTab = React.lazy(() =>
-  import('../../components/profile/ProfileBidsTab').then(m => ({ default: m.ProfileBidsTab }))
-);
-const ProfileListingsTab = React.lazy(() =>
-  import('../../components/profile/ProfileListingsTab').then(m => ({ default: m.ProfileListingsTab }))
-);
-const ProfileSuccessStoriesTab = React.lazy(() =>
-  import('../../components/profile/ProfileSuccessStoriesTab').then(m => ({ default: m.ProfileSuccessStoriesTab }))
-);
 const OrganizationAffiliations = React.lazy(() => import('../../components/profile/OrganizationAffiliations'));
 const ProfessionalToolbox = React.lazy(() => import('../../components/profile/ProfessionalToolbox'));
 const VehicleMergeInterface = React.lazy(() => import('../../components/vehicle/VehicleMergeInterface'));
 
+// Data-viz widgets (2026-06-10 overhaul) — every one self-guards to null on
+// empty data per the no-empty-shells rule, so no hasX gating needed here.
+// Replaced/deleted: PublicAuctionTrackRecord + ProfileCommentsTab/BidsTab/
+// ListingsTab (queried tables that don't exist in prod; BaT widget reads
+// bat_listings + auction_comments directly), ProfileSuccessStoriesTab
+// (success_stories table doesn't exist), UserReputationWidget (all inputs
+// nonexistent columns — rendered empty bars forever).
+const UserWorkLedger = React.lazy(() => import('./UserWorkLedger'));
+const UserBatTrackRecord = React.lazy(() => import('./UserBatTrackRecord'));
+const UserMoneyFlow = React.lazy(() => import('./UserMoneyFlow'));
+
 // Right column
-const UserReputationWidget = React.lazy(() => import('./UserReputationWidget'));
-const PublicImageGallery = React.lazy(() => import('../../components/profile/PublicImageGallery'));
+const UserRecentPhotos = React.lazy(() => import('./UserRecentPhotos'));
 const KnowledgeLibrary = React.lazy(() => import('../../components/profile/KnowledgeLibrary'));
 const LivePlayer = React.lazy(() => import('../../components/profile/LivePlayer'));
 const MemelordPanel = React.lazy(() => import('../../components/profile/MemelordPanel'));
@@ -51,10 +47,6 @@ const UserWorkspaceContent: React.FC = () => {
     userId,
     profile,
     isOwnProfile,
-    stats,
-    comprehensiveData,
-    activityEvents,
-    session,
   } = useUserProfile();
 
   const [leftPct, setLeftPct] = useState(DEFAULT_LEFT_PCT);
@@ -63,13 +55,6 @@ const UserWorkspaceContent: React.FC = () => {
 
   if (!userId && !profile) return null;
 
-  const hasListings = comprehensiveData?.listings && comprehensiveData.listings.length > 0;
-  const hasTrackRecord = stats && stats.total_listings > 0;
-  const hasComments = comprehensiveData?.comments && comprehensiveData.comments.length > 0;
-  const hasBids = comprehensiveData?.bids && comprehensiveData.bids.length > 0;
-  const hasCommentsOrBids = hasComments || hasBids;
-  const hasListingsTab = hasListings;
-  const hasSuccessStories = comprehensiveData?.success_stories && comprehensiveData.success_stories.length > 0;
   const isNotBasicUser = profile?.user_type && profile.user_type !== 'user';
 
   return (
@@ -112,6 +97,13 @@ const UserWorkspaceContent: React.FC = () => {
             </React.Suspense>
           )}
 
+          {/* Work Ledger — the decade of wrenching (work_sessions substrate) */}
+          {userId && (
+            <React.Suspense fallback={null}>
+              <UserWorkLedger userId={userId} isOwnProfile={isOwnProfile} />
+            </React.Suspense>
+          )}
+
           {/* User Discoveries */}
           {userId && (
             <React.Suspense fallback={null}>
@@ -144,58 +136,19 @@ const UserWorkspaceContent: React.FC = () => {
               surfaces so they don't dominate the first screen for
               technician-producer users like Skylar. */}
 
-          {/* Public Auction Track Record */}
-          {hasTrackRecord && (
+          {/* BaT Track Record — reads bat_listings + auction_comments
+              directly (replaces the vehicle_events-derived card that found
+              1 of 5 sales, and absorbs the old Comments tab). */}
+          {userId && (
             <React.Suspense fallback={null}>
-              <PublicAuctionTrackRecord
-                listings={comprehensiveData?.listings || []}
-                loading={!comprehensiveData}
-                profileName={profile?.full_name || profile?.username || null}
-              />
+              <UserBatTrackRecord userId={userId} />
             </React.Suspense>
           )}
 
-          {/* Comments & Bids — merged card */}
-          {hasCommentsOrBids && (
-            <CollapsibleWidget variant="profile" title="Comments & Bids" defaultCollapsed={false}>
-              <React.Suspense fallback={null}>
-                {hasComments && (
-                  <ProfileCommentsTab
-                    comments={comprehensiveData?.comments || []}
-                    profileType="user"
-                  />
-                )}
-                {hasBids && (
-                  <ProfileBidsTab
-                    bids={comprehensiveData?.bids || []}
-                    profileType="user"
-                  />
-                )}
-              </React.Suspense>
-            </CollapsibleWidget>
-          )}
-
-          {/* Listings */}
-          {hasListingsTab && (
+          {/* Money Flow — owner-only inside the component (visitors: null) */}
+          {userId && (
             <React.Suspense fallback={null}>
-              <CollapsibleWidget variant="profile" title="Listings" defaultCollapsed={true}>
-                <ProfileListingsTab
-                  listings={comprehensiveData?.listings || []}
-                  profileType="user"
-                />
-              </CollapsibleWidget>
-            </React.Suspense>
-          )}
-
-          {/* Success Stories */}
-          {hasSuccessStories && (
-            <React.Suspense fallback={null}>
-              <CollapsibleWidget variant="profile" title="Success Stories" defaultCollapsed={true}>
-                <ProfileSuccessStoriesTab
-                  stories={comprehensiveData?.success_stories || []}
-                  profileType="user"
-                />
-              </CollapsibleWidget>
+              <UserMoneyFlow userId={userId} isOwnProfile={isOwnProfile} />
             </React.Suspense>
           )}
 
@@ -215,17 +168,12 @@ const UserWorkspaceContent: React.FC = () => {
         {/* RIGHT COLUMN */}
         <div className="up-col-right" style={{ width: `${100 - leftPct}%` }}>
 
-          {/* Public Image Gallery — always */}
+          {/* Recent Photos — true totals, lazy thumbs, day click-through */}
           {userId && (
             <React.Suspense fallback={null}>
-              <PublicImageGallery userId={userId} isOwnProfile={isOwnProfile} />
+              <UserRecentPhotos userId={userId} isOwnProfile={isOwnProfile} />
             </React.Suspense>
           )}
-
-          {/* Reputation Scores */}
-          <React.Suspense fallback={null}>
-            <UserReputationWidget />
-          </React.Suspense>
 
           {/* Knowledge Library / Live Player / Memelord Panel — disabled 2026-05-24
               per docs/library/working/field-notes/2026-05-24_safety-audit-completion.md §1:

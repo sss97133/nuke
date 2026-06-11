@@ -15,7 +15,23 @@ import type {
 } from '../types/profile';
 
 export class ProfileService {
-  
+
+  // Per-day contribution aggregates for the profile timeline.
+  // Replaces the three wide row-level selects in getProfileData (each silently
+  // capped at 1000 rows by PostgREST db-max-rows, so the timeline rendered an
+  // arbitrary slice of history) with one (day, kind, n) GROUP BY RPC.
+  // kind ∈ photo | event | work. Bogus-EXIF floor (day >= 2000-01-01) is
+  // applied inside the RPC.
+  static async getContributionDays(
+    userId: string
+  ): Promise<Array<{ day: string; kind: string; n: number }>> {
+    const { data, error } = await supabase.rpc('get_user_contribution_days', {
+      p_user_id: userId,
+    });
+    if (error) throw error;
+    return data || [];
+  }
+
   // Get comprehensive profile data
   static async getProfileData(userId: string): Promise<ProfileData | null> {
     try {
