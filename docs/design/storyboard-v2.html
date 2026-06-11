@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NUKE CAPTURE — STORYBOARD V2 — THE FUNNEL</title>
+<style>
+  /* Board chrome stays Nuke print. Phone interiors are Apple's material — that is the v2 thesis. */
+  :root{
+    --paper:#f5f5f5; --surface:#ffffff; --ink:#1a1a1a; --pencil:#666666;
+    --ghost:#dddddd; --border:#bdbdbd;
+    --sans:-apple-system, "Helvetica Neue", Arial, sans-serif;
+    --mono:ui-monospace, "SF Mono", Menlo, "Courier New", monospace;
+    /* iOS material, used only inside phones */
+    --ios-bg:#f2f2f7; --ios-cell:#ffffff; --ios-sep:#c6c6c8; --ios-grey:#8e8e93;
+    --ios-blue:#007aff; --ios-label:#000000;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);padding:28px 24px 48px}
+
+  .masthead{border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:6px;
+    display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .masthead h1{font-size:22px;font-weight:800;letter-spacing:-0.5px}
+  .masthead .mlabel{font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .lawline{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--pencil);margin:8px 0 26px}
+
+  .board{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+  .unit{width:302px}
+  .unit.wide{width:420px}
+
+  /* caption block under each frame — board voice */
+  .cap{margin-top:10px;border-top:2px solid var(--ink);padding-top:8px}
+  .cap .num{font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .cap h2{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:2px 0 4px}
+  .cap p{font-size:9px;line-height:1.5;color:var(--pencil)}
+  .cap .organ{font-family:var(--mono);font-size:8px;color:var(--ink);margin-top:5px;line-height:1.5}
+  .cap .cn{font-family:var(--mono);font-size:8px;color:var(--pencil);margin-top:3px}
+
+  /* ============ PHONE FRAME (board-drawn, ink) ============ */
+  .phone{width:302px;height:648px;border:2px solid var(--ink);background:var(--ios-bg);
+    display:flex;flex-direction:column;overflow:hidden;position:relative}
+  .statusbar{display:flex;justify-content:space-between;align-items:center;
+    padding:8px 16px 4px;font-family:var(--sans);font-size:12px;font-weight:600;color:#000}
+  .screen{flex:1;display:flex;flex-direction:column;min-height:0;padding:0 16px 16px}
+
+  /* iOS-native pieces (inside phones only) */
+  .cell{background:var(--ios-cell);border-radius:10px;padding:12px 14px}
+  .cellgroup .cell{border-radius:0}
+  .cellgroup .cell:first-child{border-radius:10px 10px 0 0}
+  .cellgroup .cell:last-child{border-radius:0 0 10px 10px}
+  .cellgroup .cell + .cell{border-top:0.5px solid var(--ios-sep)}
+  .ios-title{font-size:28px;font-weight:700;letter-spacing:0.2px;color:#000}
+  .ios-foot{font-size:12px;color:var(--ios-grey);line-height:1.4}
+  .siwa{background:#000;color:#fff;border:0;border-radius:8px;width:100%;padding:14px 0;
+    font-family:var(--sans);font-size:16px;font-weight:500;text-align:center}
+  .sysdialog{width:250px;background:rgba(248,248,248,.98);border-radius:14px;overflow:hidden;
+    font-family:var(--sans);text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+  .sysdialog .t{font-size:13px;font-weight:600;padding:14px 14px 4px;color:#000}
+  .sysdialog .b{font-size:11px;color:#5b5b5e;padding:0 14px 12px;line-height:1.4}
+  .sysdialog .opt{border-top:0.5px solid #c9c9cc;padding:10px;font-size:14px;color:var(--ios-blue)}
+  .sysdialog .opt.bold{font-weight:600}
+  .scrim{position:absolute;inset:0;background:rgba(0,0,0,.30);display:flex;
+    align-items:flex-end;justify-content:center;padding-bottom:90px}
+
+  /* Nuke signature pieces — the ONLY square-ink elements inside phones */
+  .data{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .nlab{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ios-grey)}
+  .receipt{border:2px solid #1a1a1a;border-radius:0;background:#fff;padding:12px}
+  .receipt .date{font-family:var(--mono);font-size:12px;font-weight:700}
+  .receipt .fig{font-family:var(--mono);font-size:44px;font-weight:700;line-height:1.05;letter-spacing:-1px;margin-top:6px}
+  .receipt .span{font-family:var(--mono);font-size:10px;margin-top:6px;color:#1a1a1a}
+  .thumbs{display:grid;grid-template-columns:repeat(5,1fr);gap:2px;margin-top:10px}
+  .thumbs .t{aspect-ratio:1/1;background:#d9d9d9;border-radius:0}
+  .thumbs .t.d{background:#c4c4c4}
+  .thumbs .more{aspect-ratio:1/1;background:#fff;border:1px solid var(--border);border-radius:0;
+    display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .barcode{display:flex;align-items:flex-end;gap:2px;height:24px;margin-top:10px}
+  .barcode i{display:block;background:#1a1a1a}
+  .barcode .gap{background:transparent}
+
+  /* hero figure */
+  .hero{margin:20px 2px 4px}
+  .hero .fig{font-family:var(--mono);font-size:60px;font-weight:700;line-height:1;letter-spacing:-2px;color:#000}
+  .hero .nlab{margin-top:6px;display:block}
+  .attr{font-family:var(--mono);font-size:8px;color:var(--ios-grey);margin-top:4px}
+
+  /* ============ F0 DOORS PANEL ============ */
+  .doors{display:flex;flex-direction:column;gap:12px}
+  .door{border:2px solid var(--ink);background:var(--surface);padding:12px}
+  .door .dlab{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--pencil);margin-bottom:8px;display:block}
+  /* iMessage bubble */
+  .imess{background:#fff;border-radius:14px;padding:10px;max-width:280px;border:0.5px solid #d8d8dc}
+  .imess .linkcard{border:0.5px solid #d8d8dc;border-radius:10px;overflow:hidden}
+  .imess .lc-img{height:64px;background:#d9d9d9;display:flex;align-items:flex-end;padding:6px}
+  .imess .lc-img .bc{display:flex;align-items:flex-end;gap:2px;height:18px}
+  .imess .lc-img .bc i{display:block;background:#1a1a1a}
+  .imess .lc-body{padding:8px 10px;background:#f7f7f9}
+  .imess .lc-t{font-size:11px;font-weight:600;color:#000}
+  .imess .lc-d{font-family:var(--mono);font-size:9px;color:#666;margin-top:2px}
+  .imess .lc-u{font-size:9px;color:#8e8e93;margin-top:3px}
+  .ibubble{background:#e9e9eb;border-radius:16px;padding:8px 12px;font-size:12px;color:#000;
+    max-width:230px;margin-top:8px}
+  /* agent chat */
+  .achat{font-size:11px;line-height:1.5}
+  .achat .who{font-family:var(--mono);font-size:8px;color:var(--pencil);display:block;margin-top:8px}
+  .achat .msg{background:#fff;border:1px solid var(--ghost);padding:7px 9px;border-radius:0}
+  .achat .msg.tool{font-family:var(--mono);font-size:9px;color:var(--ink);background:var(--paper)}
+  /* app store mini */
+  .asrow{display:flex;gap:10px;align-items:center}
+  .asicon{width:56px;height:56px;border-radius:13px;background:#fff;border:0.5px solid #d8d8dc;
+    display:flex;align-items:flex-end;justify-content:center;padding:9px;gap:2px}
+  .asicon i{display:block;background:#1a1a1a}
+  .asname{font-size:14px;font-weight:600;color:#000}
+  .assub{font-size:11px;color:#8e8e93}
+  .asget{margin-left:auto;background:#f2f2f7;color:var(--ios-blue);font-size:13px;font-weight:700;
+    border-radius:14px;padding:5px 16px}
+  .asshots{display:flex;gap:6px;margin-top:10px}
+  .asshots .sh{width:84px;height:150px;border:1px solid #d8d8dc;border-radius:8px;background:#fff;
+    display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;padding:8px 6px;gap:4px}
+  .asshots .shfig{font-family:var(--mono);font-size:18px;font-weight:700}
+  .asshots .shlab{font-size:6px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8e8e93}
+  .asshots .shbc{display:flex;align-items:flex-end;gap:1px;height:12px;margin-top:auto}
+  .asshots .shbc i{display:block;background:#1a1a1a}
+
+  /* scan counter rule */
+  .scanrule{height:2px;background:#1a1a1a;margin-top:8px}
+
+  .legend{margin-top:34px;border-top:2px solid var(--ink);padding-top:10px;max-width:980px}
+  .legend .lab{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:6px}
+  .legend p{font-size:9px;color:var(--pencil);line-height:1.55;margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <h1>NUKE CAPTURE — STORYBOARD V2</h1>
+  <span class="mlabel">THE FUNNEL · 6 FRAMES · JUN 10 2026 · PER CONSTRAINTS.MD</span>
+</div>
+<div class="lawline">Influence precedes interaction · their data is the constraint · native body, signature artifact · no frame without an organ</div>
+
+<div class="board">
+
+  <!-- ============ F0 — THE INTRODUCTION (frame zero, three doors) ============ -->
+  <div class="unit wide">
+    <div class="doors">
+      <div class="door">
+        <span class="dlab">Door 1 — A builder shares a receipt (iMessage)</span>
+        <div class="imess">
+          <div class="linkcard">
+            <div class="lc-img"><div class="bc">
+              <i style="width:3px;height:10px"></i><i style="width:5px;height:16px"></i><i style="width:2px;height:7px"></i>
+              <i style="width:4px;height:13px"></i><i style="width:6px;height:18px"></i><i style="width:3px;height:9px"></i>
+            </div></div>
+            <div class="lc-body">
+              <div class="lc-t">Tuesday&rsquo;s work — 1977 K5 Blazer</div>
+              <div class="lc-d">47 PHOTOS &middot; FIRST 8:12A &middot; LAST 5:48P</div>
+              <div class="lc-u">nuke.ag</div>
+            </div>
+          </div>
+        </div>
+        <div class="ibubble">that&rsquo;s just from my camera roll. it built this itself</div>
+      </div>
+      <div class="door">
+        <span class="dlab">Door 2 — An agent recommends the tool</span>
+        <div class="achat">
+          <span class="who">USER</span>
+          <div class="msg">how should I track the resto work I&rsquo;m doing?</div>
+          <span class="who">AGENT</span>
+          <div class="msg">Nuke. Your shop photos become the work record — nothing to log.
+            It exposes an MCP connector, so I can already read and write your build data directly.</div>
+          <div class="msg tool" style="margin-top:6px">CONNECTED &middot; mcp-connector &middot; get_user_day_receipt &middot; submit_vehicle_event</div>
+        </div>
+      </div>
+      <div class="door">
+        <span class="dlab">Door 3 — The App Store page</span>
+        <div class="asrow">
+          <div class="asicon">
+            <i style="width:4px;height:14px"></i><i style="width:7px;height:24px"></i><i style="width:3px;height:9px"></i>
+            <i style="width:5px;height:18px"></i><i style="width:8px;height:28px"></i>
+          </div>
+          <div>
+            <div class="asname">Nuke Capture</div>
+            <div class="assub">Proof of work, not presence</div>
+          </div>
+          <div class="asget">GET</div>
+        </div>
+        <div class="asshots">
+          <div class="sh"><span class="shlab">The day is the commit</span><span class="shfig data">47</span><span class="shlab">photos today</span></div>
+          <div class="sh"><span class="shlab">Only what you shot at the shop</span><span class="shfig data">132</span><span class="shlab">held on phone</span></div>
+          <div class="sh"><span class="shlab">The graph you can&rsquo;t buy</span>
+            <div class="shbc">
+              <i style="width:2px;height:7px"></i><i style="width:3px;height:11px"></i><i style="width:2px;height:5px"></i>
+              <i style="width:3px;height:9px"></i><i style="width:4px;height:12px"></i><i style="width:2px;height:6px"></i>
+              <i style="width:3px;height:10px"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">F0 / 06</span>
+      <h2>The introduction — three doors</h2>
+      <p>The convincing happens before the store. Each door makes one concrete promise the
+      app must keep inside sixty seconds: the receipt promises reconstruction, the agent
+      promises machine-readable substrate, the listing promises the graph. Doors carry
+      distinct slugs — which door is the first datum we hold about the observer.</p>
+      <div class="organ">RUNS ON: /journal/:date + get_user_day_receipt (live) &middot; mcp-connector tools (live) &middot; ASC record (pending — Skylar)</div>
+      <div class="cn">CONSTRAINTS: C1 influence precedes interaction &middot; C2 the door is the first datum &middot; C6 the agent door</div>
+    </div>
+  </div>
+
+  <!-- ============ F1 — FIRST OPEN ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:41</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen" style="justify-content:space-between">
+        <div style="margin-top:170px">
+          <div style="font-size:40px;font-weight:800;letter-spacing:-1px;color:#000">NUKE</div>
+          <p style="font-size:15px;line-height:1.45;margin-top:14px;max-width:230px;color:#000">
+            Your shop photos become a work record.</p>
+          <p class="ios-foot" style="margin-top:8px;max-width:230px">Nothing is public until you say so.</p>
+        </div>
+        <div>
+          <button class="siwa">&#63743; Sign in with Apple</button>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">F1 / 06</span>
+      <h2>First open</h2>
+      <p>The one element v1 got right, kept — and the rest of the screen now matches its
+      material. One sentence, one reassurance, one stock button at stock geometry. No
+      carousel, no skip, no account screen ever: the handle derives from the credential.</p>
+      <div class="organ">RUNS ON: fable5/siwa — native ASAuthorization + Supabase Apple provider (portal config pending — Skylar, 5 clicks)</div>
+      <div class="cn">CONSTRAINTS: C3 comprehension in seconds &middot; C5 borrowed legitimacy at stock geometry</div>
+    </div>
+  </div>
+
+  <!-- ============ F2 — THE DEAL → THE SYSTEM ASK ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:41</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="height:56px"></div>
+        <div class="cellgroup">
+          <div class="cell">
+            <span class="nlab">Uploads</span>
+            <div style="font-size:14px;color:#000;margin-top:2px">Photos taken at your shop</div>
+          </div>
+          <div class="cell">
+            <span class="nlab">Stays on your phone</span>
+            <div style="font-size:14px;color:#000;margin-top:2px">Everything else</div>
+          </div>
+          <div class="cell">
+            <span class="nlab">Public</span>
+            <div style="font-size:14px;color:#000;margin-top:2px">Nothing, until you publish it</div>
+          </div>
+        </div>
+        <p class="ios-foot" style="margin-top:10px">The shop filter runs on your phone, on the photo&rsquo;s own
+        metadata. No location permission is requested.</p>
+        <div style="margin-top:auto">
+          <button class="siwa" style="background:#fff;color:var(--ios-blue);border:0.5px solid #d8d8dc">Continue</button>
+        </div>
+      </div>
+      <div class="scrim">
+        <div class="sysdialog">
+          <div class="t">Allow &ldquo;Nuke Capture&rdquo; to Access Your Photos?</div>
+          <div class="b">Nuke Capture finds photos taken at your shop and adds them to your work record. Off-site photos never leave your phone.</div>
+          <div class="opt">Limit Access&hellip;</div>
+          <div class="opt bold">Allow Full Access</div>
+          <div class="opt">Don&rsquo;t Allow</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">F2 / 06</span>
+      <h2>The deal &rarr; the system ask</h2>
+      <p>Thirteen words of ours earn Apple&rsquo;s dialog. Native grouped cells, not bordered
+      ledger rows — the body is Apple&rsquo;s material now. The purpose string is the only
+      copy we fully control inside Apple&rsquo;s chrome; it is design surface.</p>
+      <div class="organ">RUNS ON: fable5/capture-ios — PhotoKit, on-device EXIF GPS gate, zero CoreLocation entitlement</div>
+      <div class="cn">CONSTRAINTS: C4 say exactly what happens next &middot; C5 system chrome untouched &middot; C3 depth one tap down</div>
+    </div>
+  </div>
+
+  <!-- ============ F3 — THE PROOF (first sync) ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:42</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="height:40px"></div>
+        <div class="hero">
+          <div class="fig">1,204</div>
+          <span class="nlab">shop photos found in your library</span>
+          <div class="attr">N=1,204 &middot; EXIF-GATED ON DEVICE &middot; 2021&ndash;2026</div>
+        </div>
+        <div class="cellgroup" style="margin-top:16px">
+          <div class="cell" style="display:flex;justify-content:space-between;align-items:baseline">
+            <span class="nlab">Work days detected</span><span class="data" style="font-size:15px;color:#000">51</span>
+          </div>
+          <div class="cell" style="display:flex;justify-content:space-between;align-items:baseline">
+            <span class="nlab">Off-shop &middot; staying on phone</span><span class="data" style="font-size:15px;color:#000">40,018</span>
+          </div>
+        </div>
+        <p class="ios-foot" style="margin-top:10px">Your proof already exists. Import it?</p>
+        <div class="data" style="font-size:11px;color:#000;margin-top:14px">SCANNING 41,222 PHOTOS</div>
+        <div class="scanrule" style="width:62%"></div>
+        <div class="thumbs">
+          <div class="t"></div><div class="t d"></div><div class="t"></div><div class="t d"></div><div class="t"></div>
+        </div>
+        <div style="margin-top:auto">
+          <button class="siwa">Import the proof</button>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">F3 / 06</span>
+      <h2>The proof — their own life, organized</h2>
+      <p>The conviction moment. The user typed nothing; the system read what arrived with
+      them and handed back five years, counted. The graph is never empty on day one.
+      Real thumbnails land as the rule extends — progress is data, not a spinner.</p>
+      <div class="organ">RUNS ON: photo intake + day rollup pipeline (51 K5 days live in prod) &middot; get_vehicle_contribution_days RPC (live)</div>
+      <div class="cn">CONSTRAINTS: C2 use what arrives with them &middot; C3 we understand them in minutes &middot; C4 every number real</div>
+    </div>
+  </div>
+
+  <!-- ============ F4 — TODAY (the gauge) ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:41</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="padding-top:10px;display:flex;justify-content:space-between;align-items:baseline">
+          <span class="ios-title">Today</span>
+          <span class="data" style="font-size:10px;color:var(--ios-grey)">SYNCED 2:41 PM</span>
+        </div>
+        <div class="hero">
+          <div class="fig">31</div>
+          <span class="nlab">photos on the record</span>
+          <div class="attr">WED JUN 10 2026 &middot; 1977 CHEVROLET K5 BLAZER &middot; ERNIE&rsquo;S SHOP</div>
+        </div>
+        <div class="cellgroup" style="margin-top:16px">
+          <div class="cell" style="display:flex;justify-content:space-between;align-items:baseline">
+            <span class="nlab">Held back &middot; off-shop</span><span class="data" style="font-size:15px;color:#000">12</span>
+          </div>
+          <div class="cell" style="display:flex;justify-content:space-between;align-items:baseline">
+            <span class="nlab">On the record &middot; all time</span><span class="data" style="font-size:15px;color:#000">754</span>
+          </div>
+        </div>
+        <div class="thumbs">
+          <div class="t"></div><div class="t d"></div><div class="t"></div><div class="t"></div><div class="t d"></div>
+          <div class="t d"></div><div class="t"></div><div class="t d"></div><div class="t"></div><div class="more">+22</div>
+        </div>
+        <div style="margin-top:auto">
+          <div class="receipt" style="padding:10px;display:flex;justify-content:space-between;align-items:center">
+            <span class="data" style="font-size:11px;font-weight:700">VIEW DAY ON NUKE.AG</span>
+            <span class="data" style="font-size:11px">&rarr;</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">F4 / 06</span>
+      <h2>Today — glance, then pocket</h2>
+      <p>One number; everything else is caption. The held-back gauge keeps equal billing
+      forever — the filter visibly works FOR the user. Native large-title body; the one
+      square-ink element is the deep link, because it is a Nuke document, not a control.</p>
+      <div class="organ">RUNS ON: capture-ios local store (&lt;100ms cold paint) &middot; vehicle_images source='capture_relay_ios' (live)</div>
+      <div class="cn">CONSTRAINTS: C5 native body, signature artifact &middot; C4 honest gauges &middot; C3 sub-3-second read</div>
+    </div>
+  </div>
+
+  <!-- ============ F5 — THE RECEIPT → THE LOOP ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>7:05</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="height:44px"></div>
+        <div class="receipt">
+          <div class="date">TUE JUN 09 2026</div>
+          <div class="fig">47</div>
+          <span class="nlab" style="color:#1a1a1a">photos</span>
+          <div class="span">FIRST 8:12A &middot; LAST 5:48P &middot; SPAN 9.6H</div>
+          <div class="span" style="margin-top:4px">1977 CHEVROLET K5 BLAZER &middot; ERNIE&rsquo;S SHOP</div>
+          <div class="thumbs" style="grid-template-columns:repeat(4,1fr)">
+            <div class="t"></div><div class="t d"></div><div class="t"></div><div class="t d"></div>
+          </div>
+          <div class="barcode">
+            <i style="width:3px;height:11px"></i><i style="width:5px;height:18px"></i><i style="width:2px;height:7px"></i>
+            <i class="gap" style="width:6px;height:1px"></i><i style="width:4px;height:14px"></i><i style="width:7px;height:24px"></i>
+            <i style="width:3px;height:9px"></i><i class="gap" style="width:9px;height:1px"></i><i style="width:5px;height:16px"></i>
+            <i style="width:2px;height:6px"></i><i style="width:6px;height:20px"></i><i class="gap" style="width:6px;height:1px"></i>
+            <i style="width:4px;height:12px"></i><i style="width:8px;height:24px"></i><i style="width:3px;height:8px"></i>
+          </div>
+          <div class="span" style="color:#666;margin-top:6px">JUN 2026 &middot; EVERY BAR IS A DAY OF WORK</div>
+        </div>
+        <p class="ios-foot" style="margin-top:12px">You logged nothing. The day built its own record.</p>
+        <div style="margin-top:auto;display:flex;gap:8px">
+          <button class="siwa" style="background:#fff;color:var(--ios-blue);border:0.5px solid #d8d8dc;flex:1">Share receipt</button>
+          <button class="siwa" style="flex:1">View on nuke.ag</button>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">F5 / 06</span>
+      <h2>The receipt &rarr; the loop closes</h2>
+      <p>The next morning&rsquo;s earned moment. The receipt card is the signature artifact —
+      the same square-ink document the web testifies with, travelling unchanged between
+      sizes. Share produces Door 1 of frame zero: every user&rsquo;s receipt is the next
+      user&rsquo;s introduction. The funnel is a circle.</p>
+      <div class="organ">RUNS ON: get_user_day_receipt RPC + /journal/:date (live, day-receipt drawer verified on prod) &middot; share sheet = stock iOS</div>
+      <div class="cn">CONSTRAINTS: C1 the loop feeds the doors &middot; C4 the number is the firework &middot; C5 signature artifact</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="legend">
+  <span class="lab">V2 thesis — what changed from the rejected board</span>
+  <p>v1 dressed the phone in the web costume and read as Substack. v2 inverts the seam:
+  the application body is Apple&rsquo;s material at Apple&rsquo;s geometry — grouped cells, stock
+  buttons, untouched dialogs, system type — and Nuke appears only where the data is:
+  mono digits, square thumbnails, the barcode, and one signature artifact per surface
+  (the receipt card). The web keeps the full square canon; the phone borrows
+  legitimacy until the mark earns its own. Codex amendments proposed in CONSTRAINTS.md.</p>
+  <p>Copy budget: F1 carries 13 words, F2 carries 13 inside our cells. No frame exists
+  without a named working organ. The storyboard now begins one frame before the app
+  does, because the convincing does too.</p>
+</div>
+
+</body>
+</html>
