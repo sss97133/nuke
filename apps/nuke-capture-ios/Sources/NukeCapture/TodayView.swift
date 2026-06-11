@@ -47,6 +47,14 @@ struct TodayView: View {
                             .font(.title2.weight(.semibold))
                             .monospacedDigit()
                     }
+                    // Ignition backfill draining (UPLOAD N) — row exists
+                    // only while the queue does.
+                    if engine.backfillRemaining > 0 {
+                        LabeledContent("Backfill queued") {
+                            Text("\(engine.backfillRemaining)")
+                                .monospacedDigit()
+                        }
+                    }
                     LabeledContent("Last sync") {
                         if engine.isSyncing {
                             ProgressView()
@@ -59,13 +67,15 @@ struct TodayView: View {
                 }
 
                 // ── All time ──
-                Section("All time") {
+                Section {
                     LabeledContent("Photos synced") {
                         Text("\(engine.totalSynced)").monospacedDigit()
                     }
-                    LabeledContent("Held back (off-shop)") {
+                    LabeledContent("Held back (off-site)") {
                         Text("\(engine.totalSkippedOffShop)").monospacedDigit()
                     }
+                } header: {
+                    Text("All time")
                 } footer: {
                     // The privacy story, stated where the user (and the App
                     // Review reader) can see it every day.

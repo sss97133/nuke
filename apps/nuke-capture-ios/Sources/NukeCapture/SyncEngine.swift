@@ -41,6 +41,9 @@ final class SyncEngine: ObservableObject {
     /// PHAsset.localIdentifier of recent uploads, newest first — the Today
     /// screen renders local thumbnails from these (no network round-trip).
     @Published private(set) var recentUploadIDs: [String]
+    /// Ignition backfill queue depth — TodayView shows this as a ledger row
+    /// while UPLOAD N drains. 0 = no backfill in flight.
+    @Published private(set) var backfillRemaining = 0
 
     // ─── Persistence (UserDefaults) ──────────────────────────────────────────
     // UserDefaults use is declared in PrivacyInfo.xcprivacy (required-reason
@@ -175,10 +178,12 @@ final class SyncEngine: ObservableObject {
             // watermark below only advances on failures == 0.
             if Task.isCancelled { failed += 1; break }
 
-            // ── Gate 1 (privacy, on-device): GPS shop-gate ──
+            // ── Gate 1 (privacy, on-device): GPS site-gate ──
+            // Confirmed ignition sites; falls back to the hardcoded
+            // Config.shopLocations when none are confirmed (migration).
             guard let loc = asset.location,
-                  Config.isAtShop(latitude: loc.coordinate.latitude,
-                                  longitude: loc.coordinate.longitude) else {
+                  SiteStore.shared.isAtSite(latitude: loc.coordinate.latitude,
+                                            longitude: loc.coordinate.longitude) else {
                 skipped += 1
                 continue
             }
@@ -230,6 +235,112 @@ final class SyncEngine: ObservableObject {
 
     private func advanceWatermark(to date: Date, failures: Int) {
         if failures == 0 { defaults.set(date, forKey: Key.watermark) }
+    }
+
+    /// True when a sync watermark already exists — i.e. this install ran the
+    /// pre-ignition app. NukeCaptureApp uses it to skip ignition for
+    /// existing users (their gate stays the hardcoded shop list).
+    static var hasExistingWatermark: Bool {
+        UserDefaults.standard.object(forKey: Key.watermark) != nil
+    }
+
+    /// Ignition sets the steady-state starting line: everything before the
+    /// scan moment belongs to the backfill, everything after to sync().
+    /// Never moves an existing watermark backward or forward.
+    func setInitialWatermark(_ date: Date) {
+        if defaults.object(forKey: Key.watermark) == nil {
+            defaults.set(date, forKey: Key.watermark)
+        }
+    }
+
+    // ─── Ignition backfill: UPLOAD N ─────────────────────────────────────────
+    //
+    // The record screen's one button. Uploads the given assets (oldest
+    // first) through the SAME per-asset path as sync() — site-gate, original
+    // bytes, (filename,size) dedupe, vehicle_images row — in capped batches
+    // so memory stays flat and the UI breathes between batches. Button-only;
+    // nothing here auto-starts.
+    //
+    // Cap note: a multi-thousand-photo backfill overflows the seen-set cap
+    // (Config.seenSetCap = 1000); long-tail dedupe is then carried by the
+    // server side (storage "already exists" + row duplicate tolerance),
+    // same as the Mac relay re-run story.
+
+    func backfill(assetIdentifiers: [String]) async {
+        guard !assetIdentifiers.isEmpty, !isSyncing else { return }
+        guard let userId = SupabaseService.currentUserId else {
+            lastError = "Not signed in"
+            return
+        }
+        isSyncing = true
+        lastError = nil
+        backfillRemaining = assetIdentifiers.count
+        defer {
+            isSyncing = false
+            backfillRemaining = 0
+            lastSyncDate = Date()
+            defaults.set(lastSyncDate, forKey: Key.lastSyncDate)
+        }
+
+        var uploaded = 0, skipped = 0, deduped = 0, failed = 0
+
+        for start in stride(from: 0, to: assetIdentifiers.count, by: Config.backfillBatchSize) {
+            let end = min(start + Config.backfillBatchSize, assetIdentifiers.count)
+            let slice = Array(assetIdentifiers[start..<end])
+
+            let fetch = PHAsset.fetchAssets(withLocalIdentifiers: slice, options: nil)
+            var assets: [PHAsset] = []
+            fetch.enumerateObjects { asset, _, _ in assets.append(asset) }
+            // fetchAssets(withLocalIdentifiers:) does not guarantee order —
+            // restore oldest-first inside the batch.
+            assets.sort { ($0.creationDate ?? .distantPast) < ($1.creationDate ?? .distantPast) }
+
+            for asset in assets {
+                if Task.isCancelled { return }
+
+                // Same gate as sync() — backfill candidates came from
+                // confirmed clusters, but the gate is the gate.
+                guard let loc = asset.location,
+                      SiteStore.shared.isAtSite(latitude: loc.coordinate.latitude,
+                                                longitude: loc.coordinate.longitude) else {
+                    skipped += 1
+                    backfillRemaining -= 1
+                    continue
+                }
+
+                let filename = Self.originalFilename(for: asset)
+                do {
+                    let data = try await Self.requestOriginalData(for: asset)
+                    let key = "\(filename)|\(data.count)"
+                    if seenSet.contains(key) {
+                        deduped += 1
+                        backfillRemaining -= 1
+                        continue
+                    }
+                    let meta = PhotoMeta(
+                        assetIdentifier: asset.localIdentifier,
+                        filename: filename,
+                        creationDate: asset.creationDate,
+                        latitude: asset.location?.coordinate.latitude,
+                        longitude: asset.location?.coordinate.longitude
+                    )
+                    try await SupabaseService.uploadPhoto(data: data, meta: meta, userId: userId)
+                    markSeen(key)
+                    recordUpload(assetIdentifier: asset.localIdentifier)
+                    uploaded += 1
+                    totalSynced += 1
+                    defaults.set(totalSynced, forKey: Key.totalSynced)
+                } catch {
+                    failed += 1
+                    lastError = "\(filename): \(error.localizedDescription)"
+                }
+                backfillRemaining -= 1
+            }
+            await Task.yield()
+        }
+
+        NSLog("NukeCapture backfill: %d uploaded, %d off-site skipped, %d deduped, %d failed",
+              uploaded, skipped, deduped, failed)
     }
 
     private func markSeen(_ key: String) {
