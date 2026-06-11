@@ -55,6 +55,17 @@ targets:
         CODE_SIGN_STYLE: Automatic
         # Owner sets Team in Xcode after `xcodegen generate` (see header).
         ENABLE_USER_SCRIPT_SANDBOXING: YES
+    # ── Sign in with Apple capability ──
+    # XcodeGen writes this entitlements file at generate time (same lifecycle
+    # as Generated/Info.plist — generated, never committed). The capability
+    # must ALSO be enabled on the ag.nuke.capture App ID in the developer
+    # portal; automatic signing then regenerates the provisioning profile to
+    # match. Full setup: apps/SIGN_IN_WITH_APPLE_SETUP.md.
+    entitlements:
+      path: Generated/NukeCapture-iOS.entitlements
+      properties:
+        com.apple.developer.applesignin:
+          - Default
     info:
       path: Generated/Info.plist
       properties:

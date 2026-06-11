@@ -50,11 +50,40 @@ Notes for dev runs:
   even unbundled. The grant attaches to that exact binary, so expect a
   re-prompt after rebuilds — that's the unsigned-CLI disease this app cures;
   it disappears once the app is bundled and signed (below).
-- A car icon appears in the menu bar. First run: "Sign in…" prompts for the
-  Nuke email/password; the session persists in the Keychain (supabase-swift's
-  default `KeychainLocalStorage`), so sign-in is once per machine.
+- A car icon appears in the menu bar. First run: "Sign in…" offers
+  **Sign in with Apple** (primary) or Nuke email/password; the session
+  persists in the Keychain (supabase-swift's default `KeychainLocalStorage`),
+  so sign-in is once per machine.
 - "Start at Login" only works for the bundled, signed app — `SMAppService`
   refuses bare executables. The menu item explains this if you try.
+- **Sign in with Apple also only works bundled+signed** — from a bare
+  `swift run` binary, `ASAuthorizationController` fails immediately with
+  `ASAuthorizationError` code 1000 (the app carries no
+  `com.apple.developer.applesignin` entitlement). The app shows an
+  explanatory dialog instead of a bare "Unknown error"; use email/password
+  in the dev loop.
+
+## Sign in with Apple (entitlement)
+
+The flow itself lives in `Sources/NukeCapture/AppleSignIn.swift`
+(ASAuthorizationController → identity token →
+`SupabaseService.signInWithApple` → `auth.signInWithIdToken`). For it to
+authorize, the BUNDLED app (see next section) needs:
+
+1. **Capability on the App ID** — developer portal → Identifiers → the Mac
+   app's App ID → enable *Sign In with Apple*.
+2. **Entitlement in the target** — Xcode → target → Signing & Capabilities →
+   "+ Capability" → *Sign in with Apple*. This writes
+   `com.apple.developer.applesignin = [Default]` into the target's
+   `.entitlements` file; automatic signing regenerates the provisioning
+   profile to match.
+3. **Supabase provider config** — the Mac app's bundle id must be listed in
+   the Apple provider's Client IDs in the Supabase dashboard (native
+   `signInWithIdToken` needs no Services ID / secret). Full portal +
+   dashboard runbook: `apps/SIGN_IN_WITH_APPLE_SETUP.md`.
+
+`swift build` / `swift run` stay green without any of this — the entitlement
+gates the Apple authorization sheet at runtime, not compilation.
 
 ## Signing & distribution (one-time, after Xcode finishes installing)
 
@@ -113,6 +142,7 @@ Info.plist                         LSUIElement + Photos usage description
 Sources/NukeCapture/
   App.swift                        @main entry, accessory activation policy
   AppDelegate.swift                NSStatusItem menu, sign-in prompt, SMAppService
+  AppleSignIn.swift                Sign in with Apple (ASAuthorizationController → id token)
   Config.swift                     public URL/anon key, shop-gate geometry, tuning
   SyncEngine.swift                 PhotoKit watch + watermark + dedupe + GPS gate
   SupabaseService.swift            auth (Keychain session), storage upload, row insert
