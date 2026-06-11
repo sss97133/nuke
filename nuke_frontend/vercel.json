@@ -53,8 +53,23 @@
       "destination": "/api/journal/:date"
     },
     {
+      "source": "/api/og/journal/:date",
+      "destination": "/api/og/journal/:date"
+    },
+    {
       "source": "/api/:path+",
       "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/:path+"
+    },
+    {
+      "source": "/journal/:date(\\d{4}-\\d{2}-\\d{2})",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|twitterbot|Slackbot|Slack-ImgProxy|WhatsApp|Discordbot|TelegramBot|LinkedInBot|Applebot|iMessageBot|SkypeUriPreview|Pinterestbot|redditbot|Googlebot|bingbot).*"
+        }
+      ],
+      "destination": "/api/og/journal/:date"
     },
     {
       "source": "/:path*",
