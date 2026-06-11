@@ -9,9 +9,11 @@
 //      so foreground + periodic background refresh is the heartbeat. The
 //      common path is the honest one: the owner takes photos at the shop,
 //      opens the app (or iOS wakes it within hours), photos upload.
-//   4. Route: signed out → SignInView, signed in + ignition pending →
-//      IgnitionView (first-run full-library scan), signed in + ignition
-//      complete → TodayView.
+//   4. Route: signed out → SignInView (the constellation; its Explore path
+//      flips exploreMode), exploring → MainTabView (read-only Map + sample
+//      profile), signed in + ignition pending → IgnitionView (first-run
+//      full-library scan), signed in + ignition complete → MainTabView
+//      (MAP · PROFILE · TODAY).
 
 import SwiftUI
 import BackgroundTasks
@@ -22,8 +24,11 @@ struct NukeCaptureApp: App {
     @StateObject private var session = SessionStore()
     // Shared singleton — the BG task handler drives the same engine.
     @ObservedObject private var engine = SyncEngine.shared
-    /// Flipped by IgnitionEngine when the record screen's button is pressed.
+    /// Flipped by IgnitionEngine when the first-run sequence completes.
     @AppStorage(IgnitionEngine.completeKey) private var ignitionComplete = false
+    /// The constellation's Explore path — the app without auth (read-only
+    /// Map + sample profile). Cleared by the Profile tab's Sign In door.
+    @AppStorage("exploreMode") private var exploreMode = false
 
     init() {
         // Must happen during launch: registering after didFinishLaunching
@@ -42,10 +47,14 @@ struct NukeCaptureApp: App {
             Group {
                 if session.isSignedIn {
                     if ignitionComplete {
-                        TodayView()
+                        MainTabView()
                     } else {
                         IgnitionView()
                     }
+                } else if exploreMode {
+                    // Explore: the populated world, read-only. No Today tab
+                    // (no grant), Sign In one tap away in Profile.
+                    MainTabView()
                 } else {
                     SignInView()
                 }

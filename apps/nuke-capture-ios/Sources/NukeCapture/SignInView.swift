@@ -1,34 +1,31 @@
-// SignInView.swift — auth UI: sign in, sign out, and account deletion.
+// SignInView.swift — the login constellation, plus the account sheet.
 //
-// PRIMARY sign-in is Sign in with Apple (Face ID / Touch ID, zero typing):
-// SwiftUI SignInWithAppleButton → ASAuthorizationAppleIDCredential →
-// identityToken → SupabaseService.signInWithApple (signInWithIdToken).
-// The nonce dance: a fresh random nonce is SHA-256-hashed into the Apple
+// First screen: NUKE wordmark above the full provider row —
+//
+//   Sign in with Apple      (primary — Face ID, zero typing, Guideline 4.8)
+//   Continue with Google    (always renders; enabled state is config-gated
+//                            via Config.enableGoogleSignIn until the
+//                            Supabase Google provider is configured)
+//   Continue with email     (same account as nuke.ag)
+//   Explore                 (no auth — read-only Map + sample profile;
+//                            not-signing-in is not a dead end)
+//
+// SIWA nonce dance: a fresh random nonce is SHA-256-hashed into the Apple
 // request, Apple bakes that hash into the ID token's `nonce` claim, and
 // Supabase receives the RAW nonce to verify the hash — replay protection.
-// SIWA also preempts App Store Guideline 4.8 (Login Services): offering it
-// natively means no equivalent-privacy-login findings at review.
 //
-// Email/password (same account as nuke.ag) stays as the secondary path.
-// Either way the session persists in the device Keychain via
-// supabase-swift's default storage — sign in once per device.
-//
-// Account deletion is REQUIRED by App Store Review Guideline 5.1.1(v): any
-// app that supports sign-in must let the user initiate full account deletion
-// in-app. The button calls SupabaseService.requestAccountDeletion(), which
-// invokes the `request_account_deletion` RPC. If that server function is not
-// deployed yet, the call fails and the error is shown verbatim — deploying
-// it is a PRE-SUBMISSION TODO tracked in apps/APP_STORE_LAUNCH.md §2.
+// Account deletion (AccountView below) is REQUIRED by App Store Review
+// Guideline 5.1.1(v) — the `request_account_deletion` RPC is live in prod
+// (apps/APP_STORE_LAUNCH.md §2, DONE 2026-06-10).
 
 import AuthenticationServices
 import CryptoKit
 import SwiftUI
 
-// ─── Sign in ─────────────────────────────────────────────────────────────────
+// ─── The constellation ───────────────────────────────────────────────────────
 
 struct SignInView: View {
-    @State private var email = ""
-    @State private var password = ""
+    @AppStorage("exploreMode") private var exploreMode = false
     @State private var isWorking = false
     @State private var errorMessage: String?
     /// Raw nonce for the in-flight Apple request; its SHA-256 hash rides in
@@ -37,97 +34,64 @@ struct SignInView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    Text("Sign in with your Nuke account. Photos you take at your registered work locations upload to your own account — nothing else leaves the phone.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+            VStack(spacing: 12) {
+                Spacer()
 
-                Section {
-                    SignInWithAppleButton(.signIn) { request in
-                        let nonce = AppleNonce.random()
-                        appleNonce = nonce
-                        request.requestedScopes = [.fullName, .email]
-                        request.nonce = AppleNonce.sha256(nonce)
-                    } onCompletion: { result in
-                        handleAppleSignIn(result)
-                    }
-                    .signInWithAppleButtonStyle(.black)
-                    .frame(height: 48)
-                    .listRowInsets(EdgeInsets())
-                    .disabled(isWorking)
-                } footer: {
-                    Text("Face ID, no password. Or use your nuke.ag email below.")
-                }
+                Text("NUKE")
+                    .font(.system(size: 40, weight: .heavy))
+                    .kerning(4)
 
-                // Google door — config-gated until the Supabase Google
-                // provider is set up for this bundle id (Config.swift).
-                // SIWA stays first-class above (App Store Guideline 4.8).
-                if Config.enableGoogleSignIn {
-                    Section {
-                        Button {
-                            // TODO(google-auth): client.auth.signInWithOAuth(
-                            //   provider: .google) once the provider is
-                            // configured server-side. Gate stays OFF until
-                            // then — no dead buttons in a shipped build.
-                        } label: {
-                            Label("Sign in with Google", systemImage: "g.circle")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .disabled(true)
-                    }
-                }
+                Spacer()
 
-                Section("Nuke account") {
-                    TextField("Email", text: $email)
-                        .keyboardType(.emailAddress)
-                        .textContentType(.username)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    SecureField("Password", text: $password)
-                        .textContentType(.password)
+                SignInWithAppleButton(.signIn) { request in
+                    let nonce = AppleNonce.random()
+                    appleNonce = nonce
+                    request.requestedScopes = [.fullName, .email]
+                    request.nonce = AppleNonce.sha256(nonce)
+                } onCompletion: { result in
+                    handleAppleSignIn(result)
                 }
+                .signInWithAppleButtonStyle(.black)
+                .frame(height: 50)
+                .disabled(isWorking)
+
+                // Google: the button always renders; the enabled state is the
+                // config gate (provider not configured server-side yet).
+                Button {
+                    // TODO(google-auth): client.auth.signInWithOAuth(
+                    //   provider: .google) once the Supabase provider is
+                    //   configured for ag.nuke.capture.
+                } label: {
+                    Text("Continue with Google")
+                        .frame(maxWidth: .infinity, minHeight: 34)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!Config.enableGoogleSignIn || isWorking)
+
+                NavigationLink {
+                    EmailSignInView()
+                } label: {
+                    Text("Continue with email")
+                        .frame(maxWidth: .infinity, minHeight: 34)
+                }
+                .buttonStyle(.bordered)
+                .disabled(isWorking)
 
                 if let errorMessage {
-                    Section {
-                        Text(errorMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                    }
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
                 }
 
-                Section {
-                    Button {
-                        signIn()
-                    } label: {
-                        if isWorking {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                        } else {
-                            Text("Sign In")
-                                .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .disabled(isWorking || email.isEmpty || password.isEmpty)
+                Button("Explore") {
+                    exploreMode = true
                 }
+                .padding(.top, 12)
+                .disabled(isWorking)
             }
-            .navigationTitle("Nuke Capture")
-        }
-    }
-
-    private func signIn() {
-        isWorking = true
-        errorMessage = nil
-        Task {
-            do {
-                try await SupabaseService.signIn(email: email, password: password)
-                // SessionStore observes authStateChanges — the root view
-                // flips to TodayView on its own; nothing else to do here.
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-            isWorking = false
+            .padding(.horizontal, 24)
+            .padding(.bottom, 32)
         }
     }
 
@@ -156,12 +120,77 @@ struct SignInView: View {
             Task {
                 do {
                     try await SupabaseService.signInWithApple(idToken: idToken, nonce: nonce)
-                    // SessionStore flips the root view to TodayView.
+                    // SessionStore flips the root view on auth change.
                 } catch {
                     errorMessage = error.localizedDescription
                 }
                 isWorking = false
             }
+        }
+    }
+}
+
+// ─── Email door ──────────────────────────────────────────────────────────────
+
+/// Email/password — the same account as nuke.ag. Pushed from the
+/// constellation's "Continue with email".
+struct EmailSignInView: View {
+    @State private var email = ""
+    @State private var password = ""
+    @State private var isWorking = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("Email", text: $email)
+                    .keyboardType(.emailAddress)
+                    .textContentType(.username)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                SecureField("Password", text: $password)
+                    .textContentType(.password)
+            }
+
+            if let errorMessage {
+                Section {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+            }
+
+            Section {
+                Button {
+                    signIn()
+                } label: {
+                    if isWorking {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Text("Sign In")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .disabled(isWorking || email.isEmpty || password.isEmpty)
+            }
+        }
+        .navigationTitle("Email")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func signIn() {
+        isWorking = true
+        errorMessage = nil
+        Task {
+            do {
+                try await SupabaseService.signIn(email: email, password: password)
+                // SessionStore observes authStateChanges — the root view
+                // flips on its own; nothing else to do here.
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isWorking = false
         }
     }
 }
@@ -200,12 +229,14 @@ enum AppleNonce {
     }
 }
 
-// ─── Account sheet (sign out + delete) ───────────────────────────────────────
+// ─── Account sheet (sign out + delete + sites) ───────────────────────────────
 
-/// Presented from TodayView's toolbar. Holds the two account actions Apple
-/// review looks for: sign out, and full account deletion (5.1.1(v)).
+/// Presented from TodayView's toolbar. Sign out, full account deletion
+/// (5.1.1(v)), and the confirmed-sites list — naming a site is optional and
+/// it happens here, not in the ignition flow.
 struct AccountView: View {
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var siteStore = SiteStore.shared
     @State private var confirmingDeletion = false
     @State private var isWorking = false
     @State private var errorMessage: String?
@@ -216,6 +247,25 @@ struct AccountView: View {
                 Section("Signed in as") {
                     Text(SupabaseService.currentUserEmail ?? "—")
                         .foregroundStyle(.secondary)
+                }
+
+                // Confirmed work sites — rename in place (optional, never
+                // required; ignition confirms with one tap and defaults the
+                // name to SITE NN).
+                if !siteStore.sites.isEmpty {
+                    Section("Sites") {
+                        ForEach(siteStore.sites.indices, id: \.self) { i in
+                            TextField(
+                                String(format: "SITE %02d", i + 1),
+                                text: Binding(
+                                    get: { siteStore.sites[i].name },
+                                    set: { siteStore.rename(at: i, to: $0) }
+                                )
+                            )
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                        }
+                    }
                 }
 
                 if let errorMessage {
