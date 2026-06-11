@@ -91,6 +91,21 @@ frame-zero panel, and the listing's review notes already speak agent (`demo acco
 auditable gate). This is the one channel where "the system has to function exactly as
 stated" is checked by a machine before a human ever sees it.
 
+## C8 — Assume the initiate (Skylar, 2026-06-10, after v3)
+
+By the time someone is inside the app, the doors already did the convincing — they
+arrive in a different state of mind. **It is not being handed to every human being; it
+is supposed to feel like a sick tool that hopefully nobody else has.** Therefore:
+
+- **The app never explains itself. It reports.** Every sentence whose job is to teach
+  ("your photos become...", "the filter runs on...") is deleted. Copy is instrument
+  register only: counts, names, timestamps, one-word imperatives. The privacy contract
+  is proven by gauges (`UPLOADED 0` during the scan), not promised by paragraphs.
+- **Assumed competence is the flattery.** MoTeC, Snap-On, Leica do not onboard; they
+  power on. Explanation is for strangers; the initiate was vouched for at the door.
+- **Scarcity is rendered, not claimed** — the soft-launch doctrine made visible
+  (operator number / serialized instrument), never the word "exclusive."
+
 ## C7 — The period: ten days
 
 June 22 the window closes; submission targets Thu/Fri. The deadline is a material

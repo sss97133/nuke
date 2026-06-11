@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NUKE — V4 — THE POWER-ON SEQUENCE</title>
+<style>
+  /* The app is a dark instrument. It never explains; it reports.
+     The only white object in it is the document. The only color is the work. */
+  :root{
+    --paper:#f5f5f5; --ink:#1a1a1a; --pencil:#666666; --border:#bdbdbd;
+    --heat-lo:#d9f99d; --heat-hi:#065f46;
+    --sans:-apple-system, "Helvetica Neue", Arial, sans-serif;
+    --mono:ui-monospace, "SF Mono", Menlo, "Courier New", monospace;
+    --d-bg:#000000; --d-cell:#1c1c1e; --d-cell2:#2c2c2e; --d-sep:rgba(84,84,88,.65);
+    --d-text:#ffffff; --d-grey:#8e8e93; --d-blue:#0a84ff;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);padding:28px 24px 48px}
+
+  .masthead{border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:6px;
+    display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .masthead h1{font-size:22px;font-weight:800;letter-spacing:-0.5px}
+  .masthead .mlabel{font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .lawline{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--pencil);margin:8px 0 26px}
+
+  .board{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+  .unit{width:302px}
+  .cap{margin-top:10px;border-top:2px solid var(--ink);padding-top:8px}
+  .cap .num{font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .cap h2{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:2px 0 4px}
+  .cap p{font-size:9px;line-height:1.5;color:var(--pencil)}
+  .cap .organ{font-family:var(--mono);font-size:8px;color:var(--ink);margin-top:5px;line-height:1.6}
+  .cap .organ b{font-weight:700}
+
+  .phone{width:302px;height:648px;border:2px solid var(--ink);background:var(--d-bg);
+    display:flex;flex-direction:column;overflow:hidden;position:relative}
+  .statusbar{display:flex;justify-content:space-between;align-items:center;
+    padding:8px 16px 4px;font-size:12px;font-weight:600;color:var(--d-text)}
+  .screen{flex:1;display:flex;flex-direction:column;min-height:0;padding:0 16px 16px}
+
+  .dcell{background:var(--d-cell);border-radius:10px;padding:12px 14px}
+  .dgroup .dcell{border-radius:0}
+  .dgroup .dcell:first-child{border-radius:10px 10px 0 0}
+  .dgroup .dcell:last-child{border-radius:0 0 10px 10px}
+  .dgroup .dcell + .dcell{border-top:0.5px solid var(--d-sep)}
+  .nlab{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--d-grey)}
+  .data{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .dfoot{font-size:12px;color:var(--d-grey);line-height:1.4}
+
+  .siwa{background:#fff;color:#000;border:0;border-radius:8px;width:100%;padding:14px 0;
+    font-size:16px;font-weight:500;text-align:center}
+  .dbtn{background:#fff;color:#000;border:0;border-radius:8px;width:100%;padding:14px 0;
+    font-family:var(--mono);font-size:14px;font-weight:700;text-align:center}
+  .dbtn.quiet{background:var(--d-cell2);color:var(--d-text);font-family:var(--sans);font-weight:500}
+
+  .sysdialog{width:250px;background:rgba(44,44,46,.97);border-radius:14px;overflow:hidden;
+    text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+  .sysdialog .t{font-size:13px;font-weight:600;padding:14px 14px 4px;color:#fff}
+  .sysdialog .b{font-size:11px;color:#aeaeb2;padding:0 14px 12px;line-height:1.4}
+  .sysdialog .opt{border-top:0.5px solid rgba(84,84,88,.65);padding:10px;font-size:14px;color:var(--d-blue)}
+  .sysdialog .opt.bold{font-weight:600}
+  .scrim{position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;
+    align-items:flex-end;justify-content:center;padding-bottom:110px}
+
+  .flood{display:grid;grid-template-columns:repeat(4,1fr);gap:2px}
+  .flood img{aspect-ratio:1/1;width:100%;object-fit:cover;display:block}
+  .flood .blank{aspect-ratio:1/1;background:#0d0d0d}
+  .counter{font-family:var(--mono);font-size:54px;font-weight:700;letter-spacing:-2px;color:#fff;line-height:1}
+  .scanrule{height:2px;background:#fff;margin-top:8px}
+
+  .daygrid{display:grid;grid-template-columns:repeat(18,1fr);gap:2px}
+  .daygrid i{display:block;aspect-ratio:1/1}
+  .d0{background:#161618}.d1{background:var(--heat-lo)}.d2{background:#4ade80}
+  .d3{background:#15803d}.d4{background:var(--heat-hi)}
+
+  /* the document — the only white object in the app */
+  .paperdoc{background:#fff;border:0;padding:14px;color:var(--ink)}
+  .paperdoc .date{font-family:var(--mono);font-size:12px;font-weight:700}
+  .paperdoc .fig{font-family:var(--mono);font-size:44px;font-weight:700;line-height:1.05;letter-spacing:-1px;margin-top:6px}
+  .paperdoc .span{font-family:var(--mono);font-size:10px;margin-top:6px}
+  .paperdoc .thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:10px}
+  .paperdoc .thumbs img{aspect-ratio:1/1;width:100%;object-fit:cover;display:block}
+  .paperdoc .serial{font-family:var(--mono);font-size:8px;color:var(--pencil);margin-top:10px;
+    display:flex;justify-content:space-between}
+
+  .legend{margin-top:34px;border-top:2px solid var(--ink);padding-top:10px;max-width:980px}
+  .legend .lab{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:6px}
+  .legend p{font-size:9px;color:var(--pencil);line-height:1.55;margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <h1>NUKE — THE POWER-ON SEQUENCE</h1>
+  <span class="mlabel">V4 · 7 FRAMES · JUN 10 2026 · REAL SUBSTRATE (1977 K5, PROD) · PER CONSTRAINTS.MD C8</span>
+</div>
+<div class="lawline">The tool never explains — it reports · assumed competence is the flattery · the only white object is the document · the only color is the work</div>
+
+<div class="board">
+
+  <!-- ============ V1 — OFF ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:41</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen" style="justify-content:space-between">
+        <div style="margin-top:248px;text-align:left">
+          <div style="font-size:34px;font-weight:800;letter-spacing:-1px;color:#fff">NUKE</div>
+        </div>
+        <button class="siwa">&#63743; Sign in with Apple</button>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">V1 / 07</span>
+      <h2>Off</h2>
+      <p>The instrument, dark. The mark and Apple&rsquo;s button — zero sentences. Whoever is
+      standing here was vouched for at the door; a pitch would only tell them they came
+      to the wrong kind of thing. The absence of selling IS the signal that this is not
+      for everyone.</p>
+      <div class="organ">RUNS ON: <b>BUILT</b> — SIWA merged (#270) &middot; dark-native UI = build flag, same token table</div>
+    </div>
+  </div>
+
+  <!-- ============ V2 — THE ASK ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:41</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="margin-top:248px;opacity:.25">
+          <div style="font-size:34px;font-weight:800;letter-spacing:-1px;color:#fff">NUKE</div>
+        </div>
+      </div>
+      <div class="scrim">
+        <div class="sysdialog">
+          <div class="t">Allow &ldquo;Nuke&rdquo; to Access Your Photos?</div>
+          <div class="b">Photos taken at your work sites join your record. Everything else stays on this phone.</div>
+          <div class="opt">Limit Access&hellip;</div>
+          <div class="opt bold">Allow Full Access</div>
+          <div class="opt">Don&rsquo;t Allow</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">V2 / 07</span>
+      <h2>The ask — Apple&rsquo;s voice, not ours</h2>
+      <p>The deal screen is deleted. Face ID glance &rarr; this dialog, immediately — the
+      purpose string is the only sentence we write and it reports, not teaches. Three
+      taps from install to running. The contract isn&rsquo;t promised here; it&rsquo;s proven on
+      the next screen by a gauge that reads zero.</p>
+      <div class="organ">RUNS ON: <b>BUILT</b> — PhotoKit + EXIF gate, zero CoreLocation (#269) &middot; purpose-string change = 1 line &middot; display name &ldquo;Nuke&rdquo; = 1 line</div>
+    </div>
+  </div>
+
+  <!-- ============ V3 — IGNITION ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:42</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin:18px 2px 12px">
+          <span class="counter">11,408</span>
+          <span class="data" style="font-size:11px;color:var(--d-grey)">UPLOADED&nbsp;0</span>
+        </div>
+        <div class="scanrule" style="width:28%;margin-bottom:12px"></div>
+        <div class="flood">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0118.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1119.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0120.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0161.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1123.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0122.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0125.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1120.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0163.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0166.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1124.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0123.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1121.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0119.jpg" loading="lazy">
+          <div class="blank"></div><div class="blank"></div>
+          <div class="blank"></div><div class="blank"></div><div class="blank"></div><div class="blank"></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">V3 / 07</span>
+      <h2>Ignition — it eats the library</h2>
+      <p>Allow is tapped and the screen becomes the instrument: the counter rips, their
+      life pours in, dark fills with their color. Nobody captions a dyno pull. The
+      entire privacy paragraph from v3 is now two mono characters: <b>UPLOADED 0</b> —
+      a gauge reading zero while the counter passes eleven thousand. Reported, not
+      promised.</p>
+      <div class="organ">RUNS ON: <b>TO BUILD (48h)</b> — full-library scan + ticker (today: 24h lookback) &middot; gauge reads the real upload queue</div>
+    </div>
+  </div>
+
+  <!-- ============ V4 — THE SITE ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:44</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="height:30px"></div>
+        <div class="data" style="font-size:12px;color:#fff">ONE SITE &middot; 2,686 PHOTOS &middot; 2021&ndash;2026</div>
+        <div class="dcell" style="margin-top:12px;padding:0;overflow:hidden">
+          <div style="height:170px;background:#101012;display:flex;align-items:center;justify-content:center;position:relative">
+            <span class="dfoot">[ dark map tile &middot; pin &middot; 150 ft ]</span>
+            <span style="position:absolute;width:10px;height:10px;border-radius:50%;background:var(--d-blue)"></span>
+            <span style="position:absolute;width:92px;height:92px;border-radius:50%;border:1.5px solid var(--d-blue);opacity:.5"></span>
+          </div>
+        </div>
+        <div class="dgroup" style="margin-top:12px">
+          <div class="dcell" style="display:flex;justify-content:space-between;align-items:center">
+            <span class="data" style="font-size:14px;font-weight:700;color:#fff">SITE 01&nbsp;&nbsp;ERNIE'S<span style="opacity:.5">|</span></span>
+            <span class="nlab" style="color:var(--d-blue)">name it</span>
+          </div>
+          <div class="dcell" style="display:flex;justify-content:space-between;align-items:baseline">
+            <span class="nlab">Uploads</span><span class="data" style="font-size:12px;color:#fff">THIS SITE ONLY</span>
+          </div>
+        </div>
+        <div style="margin-top:auto;display:flex;gap:8px">
+          <button class="dbtn quiet" style="flex:1">Not mine</button>
+          <button class="dbtn" style="flex:1">CONFIRM SITE</button>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">V4 / 07</span>
+      <h2>The site — configured, not surveyed</h2>
+      <p>The tool reports what it found and hands over the cursor. SITE 01 is dealer-scan-tool
+      grammar: you are configuring an instrument, not answering an app&rsquo;s onboarding quiz.
+      The kid names his SITE 01 &ldquo;MY DRIVEWAY&rdquo; and owns the same instrument.</p>
+      <div class="organ">RUNS ON: <b>TO BUILD (48h)</b> — on-device GPS clustering + site table (replaces hardcoded single shop) &middot; matches review notes&rsquo; self-declared radius</div>
+    </div>
+  </div>
+
+  <!-- ============ V5 — THE RECORD ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:45</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin:24px 2px 4px">
+          <span class="counter" style="font-size:44px">51</span>
+          <span class="data" style="font-size:10px;color:var(--d-grey)">N&ordm; 0047</span>
+        </div>
+        <span class="nlab">days on record &middot; 2021&ndash;2026</span>
+        <div class="daygrid" style="margin-top:14px">
+          <i class="d0"></i><i class="d1"></i><i class="d0"></i><i class="d2"></i><i class="d3"></i><i class="d0"></i><i class="d0"></i><i class="d1"></i><i class="d0"></i><i class="d4"></i><i class="d2"></i><i class="d0"></i><i class="d1"></i><i class="d0"></i><i class="d3"></i><i class="d0"></i><i class="d2"></i><i class="d0"></i>
+          <i class="d0"></i><i class="d1"></i><i class="d4"></i><i class="d3"></i><i class="d0"></i><i class="d0"></i><i class="d2"></i><i class="d1"></i><i class="d0"></i><i class="d3"></i><i class="d0"></i><i class="d0"></i><i class="d2"></i><i class="d4"></i><i class="d0"></i><i class="d3"></i><i class="d1"></i><i class="d0"></i>
+          <i class="d2"></i><i class="d0"></i><i class="d4"></i><i class="d0"></i><i class="d1"></i><i class="d0"></i><i class="d3"></i><i class="d2"></i><i class="d0"></i><i class="d1"></i><i class="d0"></i><i class="d0"></i><i class="d3"></i><i class="d0"></i><i class="d2"></i><i class="d0"></i><i class="d0"></i><i class="d1"></i>
+        </div>
+        <div class="flood" style="margin-top:14px;grid-template-columns:repeat(5,1fr)">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0124.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0126.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1122.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0167.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0127.jpg" loading="lazy">
+        </div>
+        <div style="margin-top:auto"><button class="dbtn">UPLOAD 2,686</button></div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">V5 / 07</span>
+      <h2>The record — and the number</h2>
+      <p>Five years crystallize into the day grid; heat is the only color besides the work.
+      <b>N&ordm; 0047</b> is the soft launch made visible — a serialized instrument, issued,
+      not downloaded. Nobody is told it&rsquo;s exclusive; they&rsquo;re shown a low number.
+      [PROPOSAL — needs your ruling.] The button is a count and a verb.</p>
+      <div class="organ">RUNS ON: <b>SPLIT</b> — rollup + contribution RPC <b>LIVE</b> (these are the K5&rsquo;s real 51 days) &middot; day grouping + batched upload <b>TO BUILD</b> &middot; operator serial = users.seq, trivial</div>
+    </div>
+  </div>
+
+  <!-- ============ V6 — TODAY ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>5:14</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin:24px 2px 4px">
+          <span class="counter" style="font-size:64px">42</span>
+          <span class="data" style="font-size:10px;color:var(--d-grey)">SYNCED 5:14P</span>
+        </div>
+        <span class="nlab">today &middot; site 01 &middot; K5 BLAZER</span>
+        <div class="dgroup" style="margin-top:16px">
+          <div class="dcell" style="display:flex;justify-content:space-between;align-items:baseline">
+            <span class="nlab">Held &middot; off-site</span><span class="data" style="font-size:15px;color:#fff">9</span>
+          </div>
+          <div class="dcell" style="display:flex;justify-content:space-between;align-items:baseline">
+            <span class="nlab">On record &middot; all time</span><span class="data" style="font-size:15px;color:#fff">2,728</span>
+          </div>
+        </div>
+        <div class="flood" style="margin-top:12px;grid-template-columns:repeat(5,1fr)">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1119.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1121.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1123.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1120.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1124.jpg" loading="lazy">
+        </div>
+        <div style="margin-top:auto">
+          <button class="dbtn quiet" style="font-family:var(--mono);font-weight:700">VIEW DAY ON NUKE.AG &rarr;</button>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">V6 / 07</span>
+      <h2>Today — the pocket gauge</h2>
+      <p>Steady state. One number a day, the held gauge keeping the oath, real Oct-1 day
+      from prod (42 photos, 10:12a&ndash;5:14p). Glance, pocket, back to work. The
+      ledger reconciles: 2,686 imported + 42 today = 2,728.</p>
+      <div class="organ">RUNS ON: <b>BUILT</b> — TodayView local store (merged) &middot; <b>SMOKE NEEDED</b>: first end-to-end photo phone&rarr;prod is a launch gate</div>
+    </div>
+  </div>
+
+  <!-- ============ V7 — THE PAPER ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>7:05</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="height:36px"></div>
+        <div class="paperdoc">
+          <div class="date">SAT AUG 24 2024</div>
+          <div class="fig">60</div>
+          <span style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#666">photos</span>
+          <div class="span">FIRST 10:17A &middot; LAST 8:10P &middot; SPAN 9.9H</div>
+          <div class="span" style="margin-top:4px">1977 CHEVROLET K5 BLAZER &middot; SITE 01 ERNIE'S</div>
+          <div class="thumbs">
+            <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0118.jpg" loading="lazy">
+            <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0123.jpg" loading="lazy">
+            <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0127.jpg" loading="lazy">
+            <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0168.jpg" loading="lazy">
+          </div>
+          <div class="serial"><span>NUKE.AG/JOURNAL/2024-08-24</span><span>N&ordm; 0047</span></div>
+        </div>
+        <div style="margin-top:auto;display:flex;gap:8px">
+          <button class="dbtn quiet" style="flex:1">PDF</button>
+          <button class="dbtn" style="flex:1">SHARE</button>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">V7 / 07</span>
+      <h2>The paper — the only white object</h2>
+      <p>The receipt renders as a lit document on the dark instrument: the thing it
+      prints. PDF sits beside SHARE as an equal — the olive branch to old-world paper;
+      the same document travels to iMessage, to the customer&rsquo;s email, to the printer
+      on the shop wall. The serial rides the document: the maker&rsquo;s mark seed.</p>
+      <div class="organ">RUNS ON: <b>SPLIT</b> — day-receipt RPC <b>LIVE</b> (real Aug-24 day) &middot; /journal/:date <b>404 IN PROD — launch gate</b> &middot; PDF render <b>TO BUILD</b></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="legend">
+  <span class="lab">V4 thesis — the redo</span>
+  <p>v3 was still onboarding — a docent walking a stranger through an app. Wrong observer.
+  The person standing at first-open was vouched for at a door and arrives wanting to be
+  let in, not taught. So v4 is not an onboarding flow; it is a power-on sequence. The app
+  is a dark instrument that never explains itself: every teaching sentence is deleted, the
+  privacy paragraph became a gauge reading zero, the shop survey became SITE 01
+  configuration, and the one earned moment of ceremony is a serial number. Three taps:
+  Apple &rarr; Allow &rarr; Confirm site. Everything else is the machine visibly working.</p>
+  <p>Two rulings embedded for Skylar: the dark-native instrument (vs v3&rsquo;s light body) and
+  the operator serial N&ordm;. Both are reversible flags, neither blocks the 48h organ list,
+  which is unchanged: full-library scan + ticker &middot; site clustering &middot; day grouping +
+  batched upload &middot; first end-to-end photo &middot; /journal/:date fix &middot; display name &ldquo;Nuke&rdquo; &middot;
+  PDF render.</p>
+</div>
+
+</body>
+</html>
