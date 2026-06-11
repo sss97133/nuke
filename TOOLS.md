@@ -430,6 +430,14 @@ Public agent-writable surface. External LLM agents (Claude, ChatGPT, etc.) submi
 
 ---
 
+## Account Lifecycle
+
+| Intent | Use This | Notes |
+|--------|----------|-------|
+| In-app account deletion (App Store 5.1.1(v)) | RPC `request_account_deletion()` + `process-account-deletions` | RPC (authenticated) anonymizes the profiles row and enqueues `account_deletion_requests`; the edge function (service-role bearer required) drains pending rows via `auth.admin.updateUserById(..., { ban_duration: '876000h' })` and stamps `processed_at`. Testimony is never deleted — anonymize identity, retain substrate. |
+
+---
+
 ## DO NOT BUILD THESE — They Already Exist
 
 These are the most common "agent reimplementation" antipatterns. If you find yourself writing any of these, stop and use the existing tool.
