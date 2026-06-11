@@ -47,8 +47,14 @@ struct TodayView: View {
                             .font(.title2.weight(.semibold))
                             .monospacedDigit()
                     }
-                    // Ignition backfill draining (UPLOAD N) — row exists
-                    // only while the queue does.
+                    // The consent surface: backfill/sync run automatically;
+                    // this is the hand on the valve.
+                    Toggle("Uploads", isOn: Binding(
+                        get: { !engine.isPaused },
+                        set: { engine.setPaused(!$0) }
+                    ))
+                    // Ignition backfill draining — row exists only while
+                    // the queue does.
                     if engine.backfillRemaining > 0 {
                         LabeledContent("Backfill queued") {
                             Text("\(engine.backfillRemaining)")
@@ -104,7 +110,8 @@ struct TodayView: View {
                     }
                 }
             }
-            .navigationTitle("Nuke Capture")
+            .navigationTitle("Today")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

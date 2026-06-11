@@ -117,6 +117,42 @@ enum SupabaseService {
         try await client.auth.signOut()
     }
 
+    // ─── Confirmed sites → prod user_sites (owner-ALL RLS) ───────────────────
+    //
+    // Ignition's confirmed sites sync to public.user_sites so the user's
+    // grants are visible server-side. The device-local SiteStore stays the
+    // cache and the actual upload gate; this write failing never blocks the
+    // flow (logged, retried implicitly next ignition — the table tolerates
+    // re-inserts, rows are owner-scoped).
+
+    private struct UserSiteRow: Encodable {
+        let user_id: String
+        let name: String
+        let lat: Double
+        let lon: Double
+        let radius_m: Int
+        let source: String
+        let confirmed_at: String
+    }
+
+    static func pushUserSite(_ site: Site) async {
+        guard let userId = currentUserId else { return }   // explore/debug: no JWT, no row
+        let row = UserSiteRow(
+            user_id: userId,
+            name: site.name,
+            lat: site.latitude,
+            lon: site.longitude,
+            radius_m: Int(site.radiusMeters.rounded()),
+            source: "ignition",
+            confirmed_at: isoFormatter.string(from: Date())
+        )
+        do {
+            try await client.from("user_sites").insert(row).execute()
+        } catch {
+            NSLog("NukeCapture: user_sites insert failed: %@", String(describing: error))
+        }
+    }
+
     // ─── Upload + insert (one photo) ─────────────────────────────────────────
 
     private static let isoFormatter: ISO8601DateFormatter = {

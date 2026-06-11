@@ -42,8 +42,13 @@ final class SyncEngine: ObservableObject {
     /// screen renders local thumbnails from these (no network round-trip).
     @Published private(set) var recentUploadIDs: [String]
     /// Ignition backfill queue depth — TodayView shows this as a ledger row
-    /// while UPLOAD N drains. 0 = no backfill in flight.
+    /// while the queue drains. 0 = no backfill in flight.
     @Published private(set) var backfillRemaining = 0
+    /// The pause toggle (Today tab) — the consent surface now that backfill
+    /// starts automatically after site confirm. Paused = nothing uploads:
+    /// sync() refuses to run and the backfill loop stops between assets
+    /// (the persisted queue keeps the remainder for resume).
+    @Published private(set) var isPaused: Bool
 
     // ─── Persistence (UserDefaults) ──────────────────────────────────────────
     // UserDefaults use is declared in PrivacyInfo.xcprivacy (required-reason
@@ -58,6 +63,8 @@ final class SyncEngine: ObservableObject {
         static let todayKey = "uploadsTodayKey"         // iOS: "yyyy-MM-dd" the count belongs to
         static let todayCount = "uploadsTodayCount"     // iOS: uploads on that day
         static let recentUploads = "recentUploadIDs"    // iOS: [String] asset identifiers
+        static let paused = "syncPaused"                // Bool — the Today pause toggle
+        static let backfillQueue = "backfillQueue"      // [String] asset ids still owed
     }
 
     /// Dedupe set: "filename|size" of everything already uploaded. Ordered
@@ -74,6 +81,8 @@ final class SyncEngine: ObservableObject {
         seenSet = defaults.stringArray(forKey: Key.seenSet) ?? []
         lastSyncDate = defaults.object(forKey: Key.lastSyncDate) as? Date
         recentUploadIDs = defaults.stringArray(forKey: Key.recentUploads) ?? []
+        isPaused = defaults.bool(forKey: Key.paused)
+        backfillRemaining = (defaults.stringArray(forKey: Key.backfillQueue) ?? []).count
         // Day-scoped counter: only valid if it was written today.
         if defaults.string(forKey: Key.todayKey) == Self.dayKey(for: Date()) {
             uploadsToday = defaults.integer(forKey: Key.todayCount)
@@ -110,6 +119,20 @@ final class SyncEngine: ObservableObject {
         changeObserver = observer
 
         await sync()
+        // A backfill interrupted by an app kill (or a pause) left its queue
+        // persisted — pick it back up.
+        await resumeBackfillIfNeeded()
+    }
+
+    /// The Today tab's pause toggle. Pausing stops the backfill loop between
+    /// assets (queue stays persisted) and blocks sync passes; resuming
+    /// restarts the drain immediately.
+    func setPaused(_ paused: Bool) {
+        isPaused = paused
+        defaults.set(paused, forKey: Key.paused)
+        if !paused {
+            Task { await self.resumeBackfillIfNeeded(); await self.sync() }
+        }
     }
 
     /// Debounce: library changes arrive in bursts (iCloud import storms);
@@ -130,7 +153,7 @@ final class SyncEngine: ObservableObject {
     /// setTaskCompleted(success:)).
     @discardableResult
     func sync() async -> Bool {
-        guard !isSyncing, !authorizationDenied else { return false }
+        guard !isSyncing, !authorizationDenied, !isPaused else { return false }
         guard let userId = SupabaseService.currentUserId else {
             lastError = "Not signed in"
             return false
@@ -253,13 +276,17 @@ final class SyncEngine: ObservableObject {
         }
     }
 
-    // ─── Ignition backfill: UPLOAD N ─────────────────────────────────────────
+    // ─── Ignition backfill ───────────────────────────────────────────────────
     //
-    // The record screen's one button. Uploads the given assets (oldest
-    // first) through the SAME per-asset path as sync() — site-gate, original
-    // bytes, (filename,size) dedupe, vehicle_images row — in capped batches
-    // so memory stays flat and the UI breathes between batches. Button-only;
-    // nothing here auto-starts.
+    // Starts AUTOMATICALLY after site confirmation (founder ruling: the
+    // "UPLOAD N" button gate is gone; consent = the live gauge + the pause
+    // toggle in Today). Uploads the given assets (oldest first) through the
+    // SAME per-asset path as sync() — site-gate, original bytes,
+    // (filename,size) dedupe, vehicle_images row — in capped batches so
+    // memory stays flat and the UI breathes between batches.
+    //
+    // The queue PERSISTS (Key.backfillQueue): an app kill or a pause mid-
+    // drain loses nothing — start()/setPaused(false) resume the remainder.
     //
     // Cap note: a multi-thousand-photo backfill overflows the seen-set cap
     // (Config.seenSetCap = 1000); long-tail dedupe is then carried by the
@@ -267,26 +294,43 @@ final class SyncEngine: ObservableObject {
     // same as the Mac relay re-run story.
 
     func backfill(assetIdentifiers: [String]) async {
-        guard !assetIdentifiers.isEmpty, !isSyncing else { return }
+        guard !assetIdentifiers.isEmpty else { return }
+        defaults.set(assetIdentifiers, forKey: Key.backfillQueue)
+        backfillRemaining = assetIdentifiers.count
+        await drainBackfill()
+    }
+
+    /// Resume a persisted queue (after relaunch or un-pause). No-op when
+    /// the queue is empty.
+    func resumeBackfillIfNeeded() async {
+        let queue = defaults.stringArray(forKey: Key.backfillQueue) ?? []
+        guard !queue.isEmpty else { return }
+        backfillRemaining = queue.count
+        await drainBackfill()
+    }
+
+    private func drainBackfill() async {
+        guard !isSyncing, !isPaused else { return }
         guard let userId = SupabaseService.currentUserId else {
             lastError = "Not signed in"
             return
         }
         isSyncing = true
         lastError = nil
-        backfillRemaining = assetIdentifiers.count
         defer {
             isSyncing = false
-            backfillRemaining = 0
             lastSyncDate = Date()
             defaults.set(lastSyncDate, forKey: Key.lastSyncDate)
         }
 
         var uploaded = 0, skipped = 0, deduped = 0, failed = 0
 
-        for start in stride(from: 0, to: assetIdentifiers.count, by: Config.backfillBatchSize) {
-            let end = min(start + Config.backfillBatchSize, assetIdentifiers.count)
-            let slice = Array(assetIdentifiers[start..<end])
+        while true {
+            var queue = defaults.stringArray(forKey: Key.backfillQueue) ?? []
+            guard !queue.isEmpty else { break }
+            if Task.isCancelled || isPaused { return }   // queue stays persisted
+
+            let slice = Array(queue.prefix(Config.backfillBatchSize))
 
             let fetch = PHAsset.fetchAssets(withLocalIdentifiers: slice, options: nil)
             var assets: [PHAsset] = []
@@ -296,7 +340,7 @@ final class SyncEngine: ObservableObject {
             assets.sort { ($0.creationDate ?? .distantPast) < ($1.creationDate ?? .distantPast) }
 
             for asset in assets {
-                if Task.isCancelled { return }
+                if Task.isCancelled || isPaused { return }
 
                 // Same gate as sync() — backfill candidates came from
                 // confirmed clusters, but the gate is the gate.
@@ -304,7 +348,6 @@ final class SyncEngine: ObservableObject {
                       SiteStore.shared.isAtSite(latitude: loc.coordinate.latitude,
                                                 longitude: loc.coordinate.longitude) else {
                     skipped += 1
-                    backfillRemaining -= 1
                     continue
                 }
 
@@ -314,7 +357,6 @@ final class SyncEngine: ObservableObject {
                     let key = "\(filename)|\(data.count)"
                     if seenSet.contains(key) {
                         deduped += 1
-                        backfillRemaining -= 1
                         continue
                     }
                     let meta = PhotoMeta(
@@ -334,8 +376,14 @@ final class SyncEngine: ObservableObject {
                     failed += 1
                     lastError = "\(filename): \(error.localizedDescription)"
                 }
-                backfillRemaining -= 1
             }
+
+            // The whole slice is settled (uploaded / skipped / deduped /
+            // failed-and-reported) — drop it from the persisted queue.
+            // Identifiers that no longer resolve to assets fall out here too.
+            queue.removeFirst(min(slice.count, queue.count))
+            defaults.set(queue, forKey: Key.backfillQueue)
+            backfillRemaining = queue.count
             await Task.yield()
         }
 
