@@ -74,11 +74,11 @@
     },
     {
       "source": "/api/journal/:date",
-      "destination": "/api/journal/:date"
+      "destination": "/api/journal/[date]?date=:date"
     },
     {
       "source": "/api/og/journal/:date",
-      "destination": "/api/og/journal/:date"
+      "destination": "/api/og/journal/[date]?date=:date"
     },
     {
       "source": "/api/:path+",
@@ -97,7 +97,7 @@
           "value": ".*(facebookexternalhit|Facebot|Twitterbot|twitterbot|Slackbot|Slack-ImgProxy|WhatsApp|Discordbot|TelegramBot|LinkedInBot|Applebot|iMessageBot|SkypeUriPreview|Pinterestbot|redditbot|Googlebot|bingbot).*"
         }
       ],
-      "destination": "/api/og/journal/:date"
+      "destination": "/api/og/journal/[date]?date=:date"
     },
     {
       "source": "/:path*",
