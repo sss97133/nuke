@@ -122,6 +122,28 @@ the loading screen as proof of existence. Consequences:
   decoration — a bar is cool because a real day of work powers it.
 - Speed-to-first-proof is the ranking metric for all ignition work.
 
+## C10 — The data end (Skylar, 2026-06-11: "define what data END means")
+
+Every click path terminates at a **document**, never a dead-end. The depth contract:
+
+- **Shelf 0** — a number/cell/bar (the day in the grid, the count in a pill)
+- **Shelf 1** — the rows behind it
+- **Shelf 2** — the document: the DAY RECEIPT (all photos, span, vehicle, work story,
+  dollars) or the IMAGE-AS-EVIDENCE (the photo full-bleed + its provenance rail)
+- **Shelf 3 / the end** — the original evidence itself: the full-resolution photo, the
+  receipt scan, the source listing URL. The end of every chain is testimony + provenance.
+
+Significance, defined: clicking a day answers "what happened that day" completely —
+photos, hours, vehicle, money — in place (drawer/lightbox per the click-anxiety
+contract: additive, reversible, ESC/click-out, URL-addressable). If a click opens
+something that doesn't add a shelf of depth, the click shouldn't exist.
+
+**Images are documentation that becomes strong visuals at depth.** The image viewer is
+Instagram-grade in mechanics (instant, full-bleed, swipeable) and evidence-grade in
+content: every photo carries its when/where/what (taken_at, site, day-link, vehicle,
+extracted atoms). We are not showing curated content; we are showing documentation so
+fluently it reads as content.
+
 ## C7 — The period: ten days
 
 June 22 the window closes; submission targets Thu/Fri. The deadline is a material
