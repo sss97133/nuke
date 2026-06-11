@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { usePopup } from '../../components/popups/usePopup';
+import { supabase } from '../../lib/supabase';
 
 interface BarcodeTimelineProps {}
 
@@ -281,21 +282,64 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
   const heatmapRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
 
+  // Per-day photo/work densities from the substrate. timelineEvents alone
+  // starved the heatmap: an owner-import truck with 861 photos rendered
+  // "ALL (3) / PHOTOS (1)" (C10 quality check, 2026-06-10). The photos ARE
+  // the activity record — get_vehicle_contribution_days returns
+  // (day, kind photo|work|event, n); 'event' kind is skipped here because
+  // timelineEvents already carries the real events.
+  const [dayRows, setDayRows] = useState<{ day: string; kind: string; n: number }[]>([]);
+  useEffect(() => {
+    if (!vehicleId) return;
+    let cancelled = false;
+    supabase
+      .rpc('get_vehicle_contribution_days', { p_vehicle_id: vehicleId })
+      .then(({ data, error }) => {
+        if (error) console.warn('[BarcodeTimeline] contribution days:', error.message);
+        if (!cancelled && data) setDayRows(data as any[]);
+      });
+    return () => { cancelled = true; };
+  }, [vehicleId]);
+
+  // Synthesize photo/work day events for days the event feed doesn't cover.
+  const enrichedEvents = useMemo(() => {
+    if (dayRows.length === 0) return timelineEvents;
+    const coveredPhotoDays = new Set(
+      timelineEvents
+        .filter((ev: any) => (ev.metadata?.image_count > 0) || String(ev.event_type || '').toLowerCase() === 'photo_session')
+        .map((ev: any) => String(ev.event_date || '').slice(0, 10)),
+    );
+    const coveredWorkDays = new Set(
+      timelineEvents
+        .filter((ev: any) => ['work_session', 'repair', 'modification', 'maintenance', 'service'].includes(String(ev.event_type || '').toLowerCase()))
+        .map((ev: any) => String(ev.event_date || '').slice(0, 10)),
+    );
+    const synthetic: any[] = [];
+    for (const r of dayRows) {
+      if (r.kind === 'photo' && !coveredPhotoDays.has(r.day)) {
+        synthetic.push({ event_date: r.day, event_type: 'photo_session', title: `${r.n} photos`, metadata: { image_count: r.n, synthetic_day: true } });
+      } else if (r.kind === 'work' && !coveredWorkDays.has(r.day)) {
+        synthetic.push({ event_date: r.day, event_type: 'work_session', title: 'work session', metadata: { synthetic_day: true } });
+      }
+    }
+    return synthetic.length ? [...timelineEvents, ...synthetic] : timelineEvents;
+  }, [timelineEvents, dayRows]);
+
   // Filter counts — always computed from the full set so pills show totals before clicking
   const filterCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const f of TIMELINE_FILTERS) {
-      counts[f.key] = f.key === 'all' ? timelineEvents.length : timelineEvents.filter(f.match).length;
+      counts[f.key] = f.key === 'all' ? enrichedEvents.length : enrichedEvents.filter(f.match).length;
     }
     return counts;
-  }, [timelineEvents]);
+  }, [enrichedEvents]);
 
   // Filtered events for heatmap — client-side only
   const filteredEvents = useMemo(() => {
     const filter = TIMELINE_FILTERS.find(f => f.key === activeFilter);
-    if (!filter || activeFilter === 'all') return timelineEvents;
-    return timelineEvents.filter(filter.match);
-  }, [timelineEvents, activeFilter]);
+    if (!filter || activeFilter === 'all') return enrichedEvents;
+    return enrichedEvents.filter(filter.match);
+  }, [enrichedEvents, activeFilter]);
 
   // Helper: build an EventDay map from a list of events
   const buildEventMap = useCallback((events: any[]) => {
@@ -360,21 +404,20 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
   // eventMap from FILTERED events (heatmap); weeks from ALL events (barcode strip always shows everything)
   const { eventMap, startDate, endDate, weeks, sortedDates } = useMemo(() => {
     const currentYear = new Date().getFullYear();
-    const vehicleYear = (vehicle as any).year || currentYear;
 
     // Build map from ALL events first for barcode weeks + date range
-    const allMap = buildEventMap(timelineEvents);
+    const allMap = buildEventMap(enrichedEvents);
 
     // Build the filtered map for heatmap rendering
     const map = activeFilter === 'all' ? allMap : buildEventMap(filteredEvents);
 
-    // Date range spans the vehicle's full life (model year → today) so the
-    // historical scroll is honest. Empty pre-ownership years are surfaced via
-    // auto-scroll-to-today (below) rather than by truncation — the user lands
-    // on the newest activity and scrolls left to walk back through history.
-    const allYears = Object.keys(allMap).map((d) => new Date(d + 'T00:00:00').getFullYear());
-    const minYear = Math.min(vehicleYear, ...allYears, currentYear - 3);
-    const maxYear = Math.max(currentYear, ...allYears);
+    // Range = the DATA's range, never the model year. Anchoring at the model
+    // year rendered a '79 truck as a 48-year grid that was 96% void (C10
+    // quality check, 2026-06-10) — empty decades aren't honesty, they're
+    // noise. Floor at 2000 (bogus-EXIF guard); ceiling always reaches today.
+    const allYears = Object.keys(allMap).map((d) => new Date(d + 'T00:00:00').getFullYear()).filter((y) => y >= 2000);
+    const minYear = allYears.length ? Math.min(...allYears) : currentYear - 1;
+    const maxYear = Math.max(currentYear, ...(allYears.length ? allYears : [currentYear]));
 
     const start = new Date(minYear, 0, 1);
     start.setDate(start.getDate() - start.getDay()); // align to Sunday
@@ -407,7 +450,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       weeks: wks,
       sortedDates: sorted,
     };
-  }, [vehicle, timelineEvents, filteredEvents, activeFilter, buildEventMap]);
+  }, [enrichedEvents, filteredEvents, activeFilter, buildEventMap]);
 
   // Heatmap weeks for expanded view
   const heatmapWeeks = useMemo(() => {
