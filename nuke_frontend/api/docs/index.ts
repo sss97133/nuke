@@ -2,6 +2,13 @@
 // Routes:
 //   /api/docs           → this handler (Redoc HTML)
 //   /v1/openapi.json    → static asset at nuke_frontend/public/v1/openapi.json (no rewrite needed)
+//
+// DEPLOYED UNIVERSE: this file MUST live in nuke_frontend/api/. Both
+// deploy-vercel.yml and deploy-preview.yml run `vercel deploy` with
+// working-directory ./nuke_frontend, so only nuke_frontend/api/** becomes
+// functions and nuke_frontend/vercel.json is the live routing config.
+// Repo-root api/ is never uploaded (this handler lived there and prod
+// /api/docs fell through to the mailbox 404 — same bug class as #273).
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
