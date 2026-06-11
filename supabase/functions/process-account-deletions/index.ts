@@ -39,11 +39,28 @@ Deno.serve(async (req) => {
     return json(500, { ok: false, error: "Supabase env vars not configured" });
   }
 
-  // Deployed --no-verify-jwt: require the service role key. This function
+  // Deployed --no-verify-jwt: require a service-grade key. This function
   // bans auth users — it must never be callable with anon/user tokens.
+  // Exact match against the runtime-injected key is brittle across key
+  // rotations/formats (legacy JWT vs sb_secret_*), so fall back to a
+  // capability check: only a real service key can call the GoTrue admin API
+  // (GoTrue verifies the signature server-side; a forged unsigned
+  // role=service_role JWT fails).
   const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (bearer !== serviceKey) {
+  if (!bearer) {
     return json(401, { ok: false, error: "Unauthorized" });
+  }
+  if (bearer !== serviceKey) {
+    const callerClient = createClient(supabaseUrl, bearer, {
+      auth: { persistSession: false },
+    });
+    const { error: gateErr } = await callerClient.auth.admin.listUsers({
+      page: 1,
+      perPage: 1,
+    });
+    if (gateErr) {
+      return json(401, { ok: false, error: "Unauthorized" });
+    }
   }
 
   const supabase = createClient(supabaseUrl, serviceKey, {
