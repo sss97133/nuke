@@ -1,4 +1,6 @@
-// IgnitionView.swift — the first-run sequence: scan → site → record.
+// IgnitionView.swift — the first-run sequence: scan → site confirm → done
+// (backfill starts automatically; the gauge + pause toggle in Today is the
+// consent surface).
 //
 // Styling doctrine (founder ruling, 2026-06-11): STOCK native iOS appearance
 // — system backgrounds, system type, default List/controls. The only custom
@@ -35,8 +37,6 @@ struct IgnitionView: View {
                     ScanScreen(engine: engine)
                 case .site:
                     SiteScreen(engine: engine)
-                case .record:
-                    RecordScreen(engine: engine)
                 case .denied:
                     DeniedScreen(engine: engine)
                 }
@@ -166,17 +166,11 @@ private struct SiteScreen: View {
                                   engine.candidateIndex + 1, engine.candidates.count))
                 }
 
+                // One-tap decision — no naming field (the name defaults to
+                // SITE NN; renaming is optional, later, in Account). The
+                // founder-rejected text gate stays gone.
                 Section {
-                    HStack {
-                        Text(String(format: "SITE %02d", engine.siteOrdinal))
-                            .font(.body.weight(.semibold))
-                            .monospacedDigit()
-                        TextField("Name it", text: $engine.siteName)
-                            .textInputAutocapitalization(.characters)
-                            .autocorrectionDisabled()
-                            .multilineTextAlignment(.trailing)
-                    }
-                    LabeledContent("Uploads") {
+                    LabeledContent(String(format: "SITE %02d", engine.siteOrdinal)) {
                         Text("This site only")
                     }
                 }
@@ -190,7 +184,7 @@ private struct SiteScreen: View {
                     Button {
                         engine.confirmCurrentSite()
                     } label: {
-                        Text("Confirm Site")
+                        Text("That's my shop")
                             .frame(maxWidth: .infinity)
                             .fontWeight(.semibold)
                     }
@@ -201,73 +195,13 @@ private struct SiteScreen: View {
                     Button {
                         engine.rejectCurrentSite()
                     } label: {
-                        Text("Not Mine")
+                        Text("Not mine")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
                 }
-            }
-        }
-    }
-}
-
-// ─── Record: D days, the year range, one button ─────────────────────────────
-
-private struct RecordScreen: View {
-    @ObservedObject var engine: IgnitionEngine
-
-    var body: some View {
-        List {
-            Section {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("\(engine.recordDayCount)")
-                        .font(.system(size: 56, weight: .semibold))
-                        .monospacedDigit()
-                    Spacer()
-                    Text(engine.recordYearRange)
-                        .font(.title3.weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 4)
-                LabeledContent("Days on record") {
-                    Text("\(engine.recordDayCount)").monospacedDigit()
-                }
-                LabeledContent("Photos") {
-                    Text("\(engine.recordPhotoCount)").monospacedDigit()
-                }
-            }
-
-            if !engine.dayHeat.isEmpty {
-                Section {
-                    DayHeatGrid(counts: engine.dayHeat)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-                }
-            }
-
-            if !engine.recordSampleIDs.isEmpty {
-                Section {
-                    FloodGrid(assetIDs: engine.recordSampleIDs, columns: 5)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-                }
-            }
-
-            Section {
-                Button {
-                    engine.beginUpload()
-                } label: {
-                    Text(engine.recordPhotoCount > 0
-                         ? "Upload \(engine.recordPhotoCount)"
-                         : "Start")
-                        .frame(maxWidth: .infinity)
-                        .fontWeight(.semibold)
-                        .monospacedDigit()
-                }
-                .buttonStyle(.borderedProminent)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
             }
         }
     }
@@ -373,36 +307,3 @@ enum ThumbLoader {
     }
 }
 
-/// One cell per recorded day, chronological, heat by photo count — the
-/// record crystallized. GitHub-contribution grammar; data viz, not theme.
-struct DayHeatGrid: View {
-    let counts: [Int]
-    private static let cols = 18
-
-    var body: some View {
-        let padded = counts + Array(
-            repeating: 0,
-            count: (Self.cols - counts.count % Self.cols) % Self.cols
-        )
-        LazyVGrid(
-            columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: Self.cols),
-            spacing: 2
-        ) {
-            ForEach(padded.indices, id: \.self) { i in
-                Rectangle()
-                    .fill(Self.heat(padded[i]))
-                    .aspectRatio(1, contentMode: .fit)
-            }
-        }
-    }
-
-    private static func heat(_ count: Int) -> Color {
-        switch count {
-        case 0:      return Color(.systemFill)
-        case 1...2:  return Color(red: 0.85, green: 0.98, blue: 0.62)   // #d9f99d
-        case 3...5:  return Color(red: 0.29, green: 0.87, blue: 0.50)   // #4ade80
-        case 6...9:  return Color(red: 0.08, green: 0.50, blue: 0.24)   // #15803d
-        default:     return Color(red: 0.02, green: 0.37, blue: 0.27)   // #065f46
-        }
-    }
-}

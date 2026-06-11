@@ -14,11 +14,13 @@
 //      whole time — the privacy contract proven, not promised.
 //   3. Cluster: ~75 m grid bucketing on lat/lon, merge adjacent occupied
 //      cells, rank by photo count → SITE 01/02/… candidates.
-//   4. Confirm: the owner names each site or rejects it. Confirmed sites
-//      persist in SiteStore and become the upload gate.
-//   5. Record: at-site photos grouped by local calendar day → D days,
-//      year range, and the UPLOAD N button. Upload is button-only — the
-//      engine never auto-starts it.
+//   4. Confirm: one tap per candidate — "That's my shop" / "Not mine".
+//      No naming gate (names default to SITE NN; renaming is optional,
+//      later, in the Account sheet). Confirmed sites persist in SiteStore
+//      (the upload gate) and sync to prod user_sites (owner-ALL RLS).
+//   5. Done: backfill of the at-site photos starts AUTOMATICALLY — the
+//      consent surface is the live gauge + the pause toggle in Today,
+//      not an extra button gate.
 
 import Foundation
 import Photos
@@ -53,7 +55,6 @@ final class IgnitionEngine: ObservableObject {
         case off            // pre-permission
         case scanning
         case site           // presenting candidates[candidateIndex]
-        case record
         case denied
     }
 
@@ -68,7 +69,6 @@ final class IgnitionEngine: ObservableObject {
     @Published private(set) var limitedScope = false
 
     // ─── Site confirmation state ─────────────────────────────────────────────
-    @Published var siteName = ""
     @Published private(set) var candidateIndex = 0
     private(set) var candidates: [SiteCandidate] = []
     private(set) var confirmed: [SiteCandidate] = []
@@ -78,16 +78,6 @@ final class IgnitionEngine: ObservableObject {
     }
     /// 1-based ordinal of the site being confirmed (SITE 01, SITE 02, …).
     var siteOrdinal: Int { confirmed.count + 1 }
-
-    // ─── Record state ────────────────────────────────────────────────────────
-    @Published private(set) var recordPhotoCount = 0
-    @Published private(set) var recordDayCount = 0
-    @Published private(set) var recordYearRange = ""
-    /// Per-recorded-day photo counts, chronological — feeds the day grid.
-    @Published private(set) var dayHeat: [Int] = []
-    /// Latest at-site assets for the record screen's thumb strip.
-    @Published private(set) var recordSampleIDs: [String] = []
-    private var recordIDsOldestFirst: [String] = []
 
     private var started = false
     private var scanStart = Date()
@@ -121,7 +111,7 @@ final class IgnitionEngine: ObservableObject {
         await scan()
         buildCandidates()
         if candidates.isEmpty {
-            enterRecord()
+            finishIgnition()
         } else {
             phase = .site
             demoWalkSiteIfNeeded()
@@ -271,19 +261,22 @@ final class IgnitionEngine: ObservableObject {
         )
     }
 
-    // ─── 4. Site confirmation ────────────────────────────────────────────────
+    // ─── 4. Site confirmation: one tap, no naming gate ───────────────────────
 
     func confirmCurrentSite() {
         guard let cand = currentCandidate else { return }
-        let fallback = String(format: "SITE %02d", siteOrdinal)
-        let trimmed = siteName.trimmingCharacters(in: .whitespacesAndNewlines)
-        SiteStore.shared.add(Site(
-            name: trimmed.isEmpty ? fallback : trimmed,
+        let site = Site(
+            name: String(format: "SITE %02d", siteOrdinal),
             latitude: cand.centerLat,
             longitude: cand.centerLon,
             radiusMeters: cand.radiusMeters
-        ))
+        )
+        SiteStore.shared.add(site)
         confirmed.append(cand)
+        // Confirmed sites sync to prod user_sites (owner-ALL RLS). Device
+        // store above stays the cache/gate; failure here is logged, never
+        // blocks the flow.
+        Task { await SupabaseService.pushUserSite(site) }
         advanceCandidate()
     }
 
@@ -292,54 +285,34 @@ final class IgnitionEngine: ObservableObject {
     }
 
     private func advanceCandidate() {
-        siteName = ""
         candidateIndex += 1
         if currentCandidate == nil {
-            enterRecord()
+            finishIgnition()
         } else {
             objectWillChange.send()
             demoWalkSiteIfNeeded()
         }
     }
 
-    // ─── 5. The record: day grouping over confirmed sites ───────────────────
+    // ─── 5. Done: backfill starts automatically ──────────────────────────────
+    //
+    // The "UPLOAD N" button gate is GONE (founder ruling): after the last
+    // site decision the at-site photos (oldest first) hand straight to the
+    // SyncEngine backfill. The consent surface is the live gauge + the
+    // pause toggle on the Today tab — visible the moment the TabView lands.
 
-    private func enterRecord() {
-        let all = confirmed.flatMap(\.assets)
+    private func finishIgnition() {
+        let ids = confirmed.flatMap(\.assets)
             .sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) }
-        recordIDsOldestFirst = all.map(\.id)
-        recordPhotoCount = all.count
+            .map(\.id)
 
-        let cal = Calendar.current
-        var perDay: [Date: Int] = [:]
-        for a in all {
-            if let d = a.date { perDay[cal.startOfDay(for: d), default: 0] += 1 }
-        }
-        recordDayCount = perDay.count
-        dayHeat = perDay.sorted { $0.key < $1.key }.map(\.value)
-        recordYearRange = Self.yearRange(of: all.compactMap(\.date))
-        recordSampleIDs = all.suffix(10).map(\.id).reversed()
-
-        phase = .record
-        demoWalkUploadIfNeeded()
-    }
-
-    /// UPLOAD N — button-only, never auto-started. Hands the at-site assets
-    /// (oldest first) to the existing SyncEngine upload path in capped
-    /// batches and completes ignition; progress surfaces in the TodayView
-    /// ledger (Backfill row + the usual counters).
-    func beginUpload() {
-        let ids = recordIDsOldestFirst
-        complete()
-        guard !ids.isEmpty else { return }
-        Task { await SyncEngine.shared.backfill(assetIdentifiers: ids) }
-    }
-
-    private func complete() {
         // Steady-state sync picks up from the scan moment — the backfill
         // owns everything older.
         SyncEngine.shared.setInitialWatermark(scanStart)
         UserDefaults.standard.set(true, forKey: Self.completeKey)
+
+        guard !ids.isEmpty else { return }
+        Task { await SyncEngine.shared.backfill(assetIdentifiers: ids) }
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -352,39 +325,19 @@ final class IgnitionEngine: ObservableObject {
 
     // ─── DEBUG demo walk ─────────────────────────────────────────────────────
     // Launch arg -IgnitionDemoWalk drives the site screens on timers so the
-    // full ignition can be screenshot-walked headless in the simulator.
-    // DEBUG builds only; the walk stops at the record screen (UPLOAD stays
-    // button-only even in the demo).
-
-    /// -IgnitionDemoUpload (separate, explicit arg): presses UPLOAD N after
-    /// a hold so the record→Today route can be captured headless. The REAL
-    /// flow remains button-only — this exists for screenshot walks only.
-    private func demoWalkUploadIfNeeded() {
-        #if DEBUG
-        guard ProcessInfo.processInfo.arguments.contains("-IgnitionDemoUpload") else { return }
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 6_000_000_000)
-            guard let self, self.phase == .record else { return }
-            self.beginUpload()
-        }
-        #endif
-    }
+    // full ignition (scan → one-tap confirms → auto-backfill → TabView) can
+    // be screenshot-walked headless in the simulator. DEBUG builds only.
 
     private func demoWalkSiteIfNeeded() {
         #if DEBUG
         guard ProcessInfo.processInfo.arguments.contains("-IgnitionDemoWalk") else { return }
         let index = candidateIndex
         Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
             guard let self, self.phase == .site, self.candidateIndex == index else { return }
             if self.confirmed.isEmpty {
-                self.siteName = "ERNIE'S"
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
-                guard self.phase == .site, self.candidateIndex == index else { return }
                 self.confirmCurrentSite()
             } else {
-                try? await Task.sleep(nanoseconds: 4_000_000_000)
-                guard self.phase == .site, self.candidateIndex == index else { return }
                 self.rejectCurrentSite()
             }
         }
