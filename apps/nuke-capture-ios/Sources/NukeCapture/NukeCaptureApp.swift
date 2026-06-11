@@ -9,7 +9,9 @@
 //      so foreground + periodic background refresh is the heartbeat. The
 //      common path is the honest one: the owner takes photos at the shop,
 //      opens the app (or iOS wakes it within hours), photos upload.
-//   4. Route: signed out → SignInView, signed in → TodayView.
+//   4. Route: signed out → SignInView, signed in + ignition pending →
+//      IgnitionView (first-run full-library scan), signed in + ignition
+//      complete → TodayView.
 
 import SwiftUI
 import BackgroundTasks
@@ -20,18 +22,30 @@ struct NukeCaptureApp: App {
     @StateObject private var session = SessionStore()
     // Shared singleton — the BG task handler drives the same engine.
     @ObservedObject private var engine = SyncEngine.shared
+    /// Flipped by IgnitionEngine when the record screen's button is pressed.
+    @AppStorage(IgnitionEngine.completeKey) private var ignitionComplete = false
 
     init() {
         // Must happen during launch: registering after didFinishLaunching
         // returns is a runtime error. SwiftUI App.init() runs early enough.
         Self.registerBackgroundRefresh()
+        // Existing installs ran the pre-ignition app: they keep the
+        // hardcoded shop gate and skip ignition entirely.
+        if SyncEngine.hasExistingWatermark,
+           !UserDefaults.standard.bool(forKey: IgnitionEngine.completeKey) {
+            UserDefaults.standard.set(true, forKey: IgnitionEngine.completeKey)
+        }
     }
 
     var body: some Scene {
         WindowGroup {
             Group {
                 if session.isSignedIn {
-                    TodayView()
+                    if ignitionComplete {
+                        TodayView()
+                    } else {
+                        IgnitionView()
+                    }
                 } else {
                     SignInView()
                 }
@@ -41,9 +55,9 @@ struct NukeCaptureApp: App {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
-                // Foreground sync: requests Photos permission on first run,
-                // then catches up on anything taken since the last pass.
-                guard session.isSignedIn else { return }
+                // Foreground sync — only once ignition is done. During the
+                // scan NOTHING may upload (the UPLOADED 0 gauge is real).
+                guard session.isSignedIn, ignitionComplete else { return }
                 Task { await SyncEngine.shared.start() }
             case .background:
                 // Ask iOS to wake us later. The system decides when (earliest
@@ -109,6 +123,15 @@ final class SessionStore: ObservableObject {
     private var watcher: Task<Void, Never>?
 
     init() {
+        #if DEBUG
+        // Simulator walk-through bypass: `-DebugBypassAuth` fakes a signed-in
+        // session so the ignition UI can be exercised without a real
+        // account. DEBUG builds only; uploads still fail closed (no JWT).
+        if ProcessInfo.processInfo.arguments.contains("-DebugBypassAuth") {
+            isSignedIn = true
+            return
+        }
+        #endif
         watcher = Task { [weak self] in
             // Restore the Keychain session (currentUser is only populated
             // after the SDK loads/refreshes it once).
