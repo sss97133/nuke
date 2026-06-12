@@ -567,20 +567,70 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     });
   }, [setGalleryFilter]);
 
-  // Auto-scroll heatmap to right (most recent events) when expanded.
-  // Must also re-fire when the week grid grows: events load async, so on
-  // first paint scrollWidth is the empty 2-year fallback and the user was
-  // left parked at Jan <model year> staring at a blank 1977 calendar.
+  // Anchor the heatmap's initial window to the DATA, not the calendar:
+  // land with the latest day that has activity at the right edge. Plain
+  // scrollLeft=scrollWidth parked the window at "today" — for vehicles
+  // whose dense history ended earlier, that opened on the emptiest years
+  // with the build history scrolled off-screen left (C10 audit,
+  // 2026-06-11: K5 opened on Jan 2025–Dec 2026 while 2021-2024 held the
+  // build). Re-fires when the week grid grows (events load async).
+  const heatmapUserScrolledRef = useRef(false);
   useEffect(() => {
-    if (expanded && heatmapRef.current) {
-      const scrollContainer = heatmapRef.current.querySelector('.timeline-heatmap') as HTMLElement;
-      if (scrollContainer) {
-        requestAnimationFrame(() => {
-          scrollContainer.scrollLeft = scrollContainer.scrollWidth;
-        });
+    if (!expanded || !heatmapRef.current) return;
+    const scrollContainer = heatmapRef.current.querySelector('.timeline-heatmap') as HTMLElement;
+    if (!scrollContainer) return;
+
+    const anchor = () => {
+      if (heatmapUserScrolledRef.current) return;
+      // Fit-all: nothing to scroll.
+      if (scrollContainer.scrollWidth <= scrollContainer.clientWidth + 4) return;
+      const totalWeeks = heatmapWeeks.length;
+      if (totalWeeks === 0) {
+        scrollContainer.scrollLeft = scrollContainer.scrollWidth;
+        return;
       }
-    }
-  }, [expanded, weeks.length]);
+      // Per-week activity from the event map (sum of day levels + 1 per active day).
+      const density = heatmapWeeks.map((week) =>
+        week.reduce((sum, day) => {
+          const ev = day.inRange ? eventMap[day.s] : undefined;
+          return sum + (ev ? 1 + (ev.level || 0) : 0);
+        }, 0),
+      );
+      const colWidth = scrollContainer.scrollWidth / totalWeeks;
+      const visibleWeeks = Math.max(4, Math.floor(scrollContainer.clientWidth / colWidth));
+      // Slide a viewport-sized window; pick the densest (ties -> most recent).
+      let windowSum = 0;
+      for (let i = 0; i < Math.min(visibleWeeks, totalWeeks); i++) windowSum += density[i];
+      let bestStart = 0;
+      let bestSum = windowSum;
+      for (let s = 1; s + visibleWeeks <= totalWeeks; s++) {
+        windowSum += density[s + visibleWeeks - 1] - density[s - 1];
+        if (windowSum >= bestSum) { bestSum = windowSum; bestStart = s; }
+      }
+      scrollContainer.scrollLeft = bestSum > 0
+        ? Math.min(bestStart * colWidth, scrollContainer.scrollWidth - scrollContainer.clientWidth)
+        : scrollContainer.scrollWidth;
+    };
+
+    // A wheel/touch/keyboard scroll from the user ends auto-anchoring; the
+    // settle re-anchor below must never fight a human hand.
+    const markUserScroll = () => { heatmapUserScrolledRef.current = true; };
+    scrollContainer.addEventListener('wheel', markUserScroll, { passive: true });
+    scrollContainer.addEventListener('touchmove', markUserScroll, { passive: true });
+    scrollContainer.addEventListener('pointerdown', markUserScroll, { passive: true });
+
+    // Anchor now and once after the async event flood settles — the grid DOM
+    // can be replaced between data loads, which silently resets scrollLeft.
+    const raf = requestAnimationFrame(anchor);
+    const settle = window.setTimeout(anchor, 700);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(settle);
+      scrollContainer.removeEventListener('wheel', markUserScroll);
+      scrollContainer.removeEventListener('touchmove', markUserScroll);
+      scrollContainer.removeEventListener('pointerdown', markUserScroll);
+    };
+  }, [expanded, weeks.length, heatmapWeeks, eventMap]);
 
   // Auto-scroll the COLLAPSED barcode strip to today's edge on first paint
   // and whenever the underlying week count changes. Lands the user on the
