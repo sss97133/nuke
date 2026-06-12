@@ -88,6 +88,10 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
   const [index, setIndex] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [paused, setPaused] = useState(false);
+  // Frames whose image failed to load (404 / undecodable) — dropped from the
+  // deck so a broken URL never leaves the hero as a black box.
+  const [brokenIds, setBrokenIds] = useState<Set<string>>(() => new Set());
+  const [loadedIds, setLoadedIds] = useState<Set<string>>(() => new Set());
   const advanceTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -145,7 +149,7 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
     // Pass 1: one image per scene category, in preference order.
     for (const cat of SCENE_PREFERENCE) {
       const candidate = analyzed.find(
-        (r) => r.scene_type && cat.matches.includes(r.scene_type) && !usedIds.has(r.id),
+        (r) => r.scene_type && cat.matches.includes(r.scene_type) && !usedIds.has(r.id) && !brokenIds.has(r.id),
       );
       if (candidate) {
         picks.push({ ...candidate, label: cat.label });
@@ -155,14 +159,14 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
 
     // Pass 2: add the most-recent any-scene as a "current state" 5th frame.
     if (picks.length < 5) {
-      const current = analyzed.find((r) => !usedIds.has(r.id));
+      const current = analyzed.find((r) => !usedIds.has(r.id) && !brokenIds.has(r.id));
       if (current) {
         picks.push({ ...current, label: 'CURRENT STATE' });
       }
     }
 
     return picks;
-  }, [analyzed]);
+  }, [analyzed, brokenIds]);
 
   // Distinct scene types across the curated set — gate at >= 3.
   const distinctScenes = useMemo(() => {
@@ -191,11 +195,14 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
 
   if (!enabled) return null;
 
-  const current = curated[index];
+  const current = curated[index % curated.length];
+  if (!current) return null;
   const srcInfo = buildSrcSet(current.large_url || current.image_url);
   if (!srcInfo) return null;
 
   const dateLabel = formatDate(current.taken_at || current.created_at);
+  const thumbSrc = supabaseRender(current.large_url || current.image_url, 64, 40);
+  const currentLoaded = loadedIds.has(current.id);
 
   return (
     <div
@@ -216,6 +223,27 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
       role="region"
       aria-label="Vehicle media kit slideshow"
     >
+      {/* Thumbnail-then-full: ~2KB 64px render paints near-instantly while
+          the full frame decodes — the hero is never a black box. */}
+      {thumbSrc && thumbSrc !== srcInfo.src && !currentLoaded && (
+        <img
+          key={`thumb-${current.id}`}
+          src={thumbSrc}
+          alt=""
+          aria-hidden
+          loading="eager"
+          decoding="async"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            objectPosition: 'center',
+            filter: 'blur(6px)',
+          }}
+        />
+      )}
       {/* Image — eager/async/high-priority on first frame for LCP */}
       <img
         key={current.id}
@@ -225,6 +253,8 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
         alt={current.label}
         loading={index === 0 ? 'eager' : 'lazy'}
         decoding="async"
+        onLoad={() => setLoadedIds((prev) => { const n = new Set(prev); n.add(current.id); return n; })}
+        onError={() => setBrokenIds((prev) => { const n = new Set(prev); n.add(current.id); return n; })}
         {...(index === 0 ? { fetchpriority: 'high' as any } : {})}
         style={{
           position: 'absolute',

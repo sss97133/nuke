@@ -10,7 +10,7 @@ interface VehicleHeroImageProps {
 }
 
 const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
-  const { leadImageUrl, heroMeta, vehicleId } = useVehicleProfile();
+  const { leadImageUrl, heroMeta, vehicleId, vehicleImages } = useVehicleProfile();
   // Default to contain: show the full vehicle, letterbox if needed.
   // "The user came to see the vehicle, not a cropped fragment." — 2026-03-21 audit
   const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
@@ -49,7 +49,32 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
   const { vehicle } = useVehicleProfile();
   const v = vehicle as any;
 
-  const src = leadImageUrl ? String(leadImageUrl).trim() : '';
+  // 404 resilience: if the lead image fails to load, walk forward through the
+  // vehicle's other photos instead of leaving a black void.
+  const [failedUrls, setFailedUrls] = useState<Set<string>>(() => new Set());
+  const [fullLoaded, setFullLoaded] = useState(false);
+  const candidates = React.useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const u of [leadImageUrl, ...vehicleImages]) {
+      const s = u ? String(u).trim() : '';
+      if (!s || s === 'undefined' || s === 'null' || seen.has(s)) continue;
+      seen.add(s);
+      out.push(s);
+    }
+    return out;
+  }, [leadImageUrl, vehicleImages]);
+  const src = candidates.find((u) => !failedUrls.has(u)) || '';
+  const handleHeroError = useCallback(() => {
+    if (!src) return;
+    setFailedUrls((prev) => {
+      const next = new Set(prev);
+      next.add(src);
+      return next;
+    });
+    setFullLoaded(false);
+  }, [src]);
+  useEffect(() => { setFullLoaded(false); }, [src]);
 
   // Build srcset + heroSrc unconditionally (no-photo branch ignores them).
   // Skip Supabase render endpoint for hero — it strips EXIF orientation,
@@ -64,6 +89,10 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
     ? `${srcset420} 420w, ${srcset840} 840w, ${srcset1260} 1260w`
     : undefined;
   const heroSrc = srcset840 || imgUrl;
+  // Thumbnail-then-full: a ~2KB 64px render paints near-instantly underneath
+  // the full-size image, so the hero is never a black box while the real
+  // frame decodes.
+  const heroThumbSrc = getSupabaseRenderUrl(imgUrl, 64, 40);
 
   // <link rel=preload> for the hero — tells the browser to start the fetch
   // before React paints the <img>. Only meaningful when media-kit is NOT
@@ -200,6 +229,24 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
               {/* Image — fixed frame, toggle between contain and cover.
                   Speed: eager+async+fetchpriority=high on LCP candidate.
                   srcset/sizes lets mobile pull a 420w variant. */}
+              {!mediaKitActive && heroThumbSrc && !fullLoaded && (
+                <img
+                  src={heroThumbSrc}
+                  alt=""
+                  aria-hidden
+                  loading="eager"
+                  decoding="async"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: fitMode,
+                    objectPosition: 'center',
+                    filter: 'blur(6px)',
+                  }}
+                />
+              )}
               {!mediaKitActive && (
                 <img
                   src={heroSrc}
@@ -208,6 +255,8 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                   alt=""
                   loading="eager"
                   decoding="async"
+                  onLoad={() => setFullLoaded(true)}
+                  onError={handleHeroError}
                   {...({ fetchpriority: 'high' } as any)}
                   style={{
                     position: 'absolute',
