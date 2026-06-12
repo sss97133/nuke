@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
-import { usePopup } from '../../components/popups/usePopup';
 import { supabase } from '../../lib/supabase';
+import { VEHICLE_DAY_OPEN_EVENT } from './VehiclePhotoLightbox';
 
 interface BarcodeTimelineProps {}
 
@@ -242,8 +242,16 @@ function extractAreas(description: string): string[] {
   return areas;
 }
 
-// Lazy-load DayCard for popup rendering
-const DayCardPopupContent = React.lazy(() => import('./DayCard'));
+// Day drawer — the complete day document (C10); lazy since it renders on click
+const VehicleDayDrawer = React.lazy(() => import('./VehicleDayDrawer'));
+
+/** Sync ?day=YYYY-MM-DD without touching scroll or history depth. */
+function setDayParam(date: string | null): void {
+  const url = new URL(window.location.href);
+  if (date) url.searchParams.set('day', date);
+  else url.searchParams.delete('day');
+  window.history.replaceState(window.history.state, '', url.toString());
+}
 
 // ---------------------------------------------------------------------------
 // Timeline filter definitions — client-side only, no new queries
@@ -271,11 +279,9 @@ const TIMELINE_FILTERS: { key: string; label: string; match: (ev: any) => boolea
 
 const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
   const { vehicle, vehicleId, timelineEvents, setGalleryFilter } = useVehicleProfile();
-  const { openPopup } = usePopup();
   const [expanded, setExpanded] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
   const [receiptDate, setReceiptDate] = useState<string | null>(null);
-  const [receiptPos, setReceiptPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [tooltipContent, setTooltipContent] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [highlightGroup, setHighlightGroup] = useState<string | null>(null);
@@ -497,11 +503,63 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     return s === e ? String(s) : `${s}—${e}`;
   }, [startDate, endDate]);
 
+  // Open the day document for a date (any day — with or without events).
+  const openDay = useCallback(
+    (ds: string) => {
+      const ev = eventMap[ds];
+      // Area highlight for multi-day project linking
+      if (ev?.areas && ev.areas.length > 0) setHighlightGroup(`area:${ev.areas[0]}`);
+      else if (ev?.group) setHighlightGroup(ev.group);
+      else setHighlightGroup(null);
+      // Emit gallery filter for this day's photos
+      setGalleryFilter({ dateRange: [ds, ds] });
+      setExpanded(true);
+      setReceiptDate(ds);
+      setDayParam(ds);
+    },
+    [eventMap, setGalleryFilter]
+  );
+
+  const closeDay = useCallback(() => {
+    setReceiptDate(null);
+    setDayParam(null);
+    setHighlightGroup(null);
+    setGalleryFilter(null);
+  }, [setGalleryFilter]);
+
+  // Heatmap cell click → the day document, in place
+  const onCellClick = useCallback(
+    (ds: string) => {
+      if (receiptDate === ds) closeDay();
+      else openDay(ds);
+    },
+    [receiptDate, openDay, closeDay]
+  );
+
+  // URL-addressable: ?day=YYYY-MM-DD opens the drawer on load; external
+  // surfaces (e.g. the photo lightbox's PART OF link) open it via event.
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('day');
+    if (param && /^\d{4}-\d{2}-\d{2}$/.test(param)) {
+      setExpanded(true);
+      setReceiptDate(param);
+    }
+    const onOpenDay = (e: Event) => {
+      const date = (e as CustomEvent).detail?.date;
+      if (date) openDay(String(date));
+    };
+    window.addEventListener(VEHICLE_DAY_OPEN_EVENT, onOpenDay);
+    return () => window.removeEventListener(VEHICLE_DAY_OPEN_EVENT, onOpenDay);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
   // Toggle expand
   const toggleExpand = useCallback(() => {
     setExpanded((prev) => {
       if (prev) {
         setReceiptDate(null);
+        setDayParam(null);
         setHighlightGroup(null);
         setGalleryFilter(null);
       }
@@ -543,6 +601,8 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     const COLLAPSE_AT = 320;
     const EXPAND_AT = 40;
     const onScroll = () => {
+      // Never auto-collapse while the user is reading a day document.
+      if (receiptDate) return;
       const y = window.scrollY;
       if (y <= EXPAND_AT && !expanded) {
         setExpanded(true);
@@ -561,21 +621,26 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('scroll', onScroll);
     };
-  }, [expanded]);
+  }, [expanded, receiptDate, setGalleryFilter]);
 
-  // Escape to close
+  // Escape: close the day drawer first, then the strip (mirrors the
+  // user-profile drawer contract — reversible, layer by layer).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && expanded) {
+      if (e.key !== 'Escape') return;
+      if (receiptDate) {
+        closeDay();
+        return;
+      }
+      if (expanded) {
         setExpanded(false);
-        setReceiptDate(null);
         setHighlightGroup(null);
         setGalleryFilter(null);
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [expanded]);
+  }, [expanded, receiptDate, closeDay, setGalleryFilter]);
 
   // Barcode stripe hover
   const onStripeMouseMove = useCallback(
@@ -595,80 +660,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     setTooltipContent(null);
   }, []);
 
-  // Open full Day Card detail in a popup
-  const openDayCardPopup = useCallback(
-    (date: string) => {
-      const ev = eventMap[date];
-      if (!ev) return;
-      const dateLabel = formatDate(date);
-      openPopup(
-        <React.Suspense fallback={null}>
-          <DayCardPopupContent
-            session={{
-              date,
-              title: ev.label,
-              work_type: ev.workMeta?.work_type || 'work',
-              image_count: ev.workMeta?.image_count || 0,
-              duration_minutes: ev.workMeta?.duration_minutes || 0,
-              total_parts_cost: ev.workMeta?.total_parts_cost || 0,
-              has_receipts: (ev.workMeta?.total_parts_cost || 0) > 0,
-              work_description: ev.workMeta?.work_description || '',
-              status: 'complete',
-            }}
-            detail={null}
-            isLoading={false}
-            onExpand={() => {}}
-            vehicleId={vehicleId}
-            isPopup={true}
-          />
-        </React.Suspense>,
-        `DAY CARD — ${dateLabel}`,
-        520,
-        false,
-      );
-      // Close the inline receipt when opening popup
-      setReceiptDate(null);
-    },
-    [eventMap, vehicleId, openPopup]
-  );
-
-  // Heatmap cell click
-  const onCellClick = useCallback(
-    (ds: string, e: React.MouseEvent) => {
-      const ev = eventMap[ds];
-      if (!ev) return;
-
-      // Set area highlight for multi-day project linking (Fix 3)
-      if (ev.areas && ev.areas.length > 0) {
-        setHighlightGroup(`area:${ev.areas[0]}`);
-      } else if (ev.group) {
-        setHighlightGroup(ev.group);
-      } else {
-        setHighlightGroup(null);
-      }
-
-      // Emit gallery filter for this day's photos
-      setGalleryFilter({ dateRange: [ds, ds] });
-
-      // Work session days → open DayCard popup directly (Fix 2)
-      if (ev.hasWorkSession) {
-        openDayCardPopup(ds);
-        return;
-      }
-
-      // Non-work days → show inline receipt
-      setReceiptDate(ds);
-      const rect = (e.target as HTMLElement).getBoundingClientRect();
-      const POPUP_WIDTH = 290;
-      setReceiptPos({
-        x: Math.min(rect.left + rect.width + 4, window.innerWidth - POPUP_WIDTH - 8),
-        y: rect.top,
-      });
-    },
-    [eventMap, setGalleryFilter, openDayCardPopup]
-  );
-
-  // Receipt navigation
+  // Day navigation across days-with-activity
   const navigateReceipt = useCallback(
     (dir: -1 | 1) => {
       if (!receiptDate) return;
@@ -678,6 +670,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       if (nextIdx >= 0 && nextIdx < sortedDates.length) {
         const nextDate = sortedDates[nextIdx];
         setReceiptDate(nextDate);
+        setDayParam(nextDate);
         const nextEv = eventMap[nextDate];
         if (nextEv?.group) setHighlightGroup(nextEv.group);
         else setHighlightGroup(null);
@@ -686,8 +679,6 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     },
     [receiptDate, sortedDates, eventMap, setGalleryFilter]
   );
-
-  const receiptEvent = receiptDate ? eventMap[receiptDate] : null;
 
   // If no timeline events at all, hide the section entirely
   if (timelineEvents.length === 0) {
@@ -780,7 +771,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
                             className={`hm-c ${level > 0 ? `l${level}` : ''} ${isHighlighted ? 'hl' : ''}`}
                             data-date={ev ? day.s : undefined}
                             title={ev ? `${day.s}: ${ev.label}` : undefined}
-                            onClick={ev ? (e) => onCellClick(day.s, e) : undefined}
+                            onClick={ev ? () => onCellClick(day.s) : undefined}
                           />
                         );
                       })}
@@ -795,65 +786,17 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
             {/* Month labels are now rendered inline inside each .hm-week column */}
           </div>
 
-          {/* Receipt popup */}
-          {receiptEvent && receiptDate && (
-            <div
-              className="receipt receipt--visible"
-              style={{ left: receiptPos.x, top: receiptPos.y }}
-            >
-              <div className="receipt__header">{formatDate(receiptDate)}</div>
-              <div className="receipt__header" style={{ fontSize: '8px', fontWeight: 400, marginTop: '-2px' }}>
-                {receiptEvent.label}
-              </div>
-              <hr className="receipt__divider" />
-              {receiptEvent.items.map((item, i) => (
-                <div className="receipt__line" key={i}>
-                  <span className="receipt__line-label">{item.k}</span>
-                  <span className="receipt__line-value">{item.v}</span>
-                </div>
-              ))}
-              {/* Work session summary — duration, photos, parts */}
-              {receiptEvent.hasWorkSession && receiptEvent.workMeta && (
-                <>
-                  <hr className="receipt__divider" />
-                  <div style={{ fontSize: '7px', fontFamily: 'var(--vp-font-mono, Courier New, monospace)', color: 'var(--text-disabled)', lineHeight: 1.6 }}>
-                    {receiptEvent.workMeta.duration_minutes > 0 && (
-                      <div>{Math.floor(receiptEvent.workMeta.duration_minutes / 60)}h {receiptEvent.workMeta.duration_minutes % 60}m session</div>
-                    )}
-                    {receiptEvent.workMeta.image_count > 0 && (
-                      <div>{receiptEvent.workMeta.image_count} photos</div>
-                    )}
-                    {receiptEvent.workMeta.work_description && (
-                      <div style={{ color: 'var(--text-disabled)', fontFamily: 'Arial, sans-serif', marginTop: '2px' }}>
-                        {receiptEvent.workMeta.work_description.length > 100
-                          ? receiptEvent.workMeta.work_description.slice(0, 100) + '...'
-                          : receiptEvent.workMeta.work_description}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-              <hr className="receipt__divider" />
-              <div className="receipt__total">
-                <span>TOTAL</span>
-                <span>{receiptEvent.total}</span>
-              </div>
-              {receiptEvent.group && receiptEvent.groupDay && (
-                <div style={{ fontSize: '8px', color: 'var(--text-disabled)', fontFamily: "var(--vp-font-mono)", marginTop: '2px' }}>
-                  Day {receiptEvent.groupDay} · Group total: {receiptEvent.groupTotal || '—'}
-                </div>
-              )}
-              <div className="receipt__nav">
-                <a onClick={() => navigateReceipt(-1)}>{'\u2190'} PREV</a>
-                <a
-                  onClick={() => openDayCardPopup(receiptDate)}
-                  style={{ fontWeight: 700, color: 'var(--surface-elevated)' }}
-                >
-                  +
-                </a>
-                <a onClick={() => navigateReceipt(1)}>NEXT {'\u2192'}</a>
-              </div>
-            </div>
+          {/* Day document — inline drawer below the grid (C10: a day click
+              answers "what happened that day" completely, in place) */}
+          {receiptDate && (
+            <React.Suspense fallback={null}>
+              <VehicleDayDrawer
+                date={receiptDate}
+                onClose={closeDay}
+                onPrev={() => navigateReceipt(-1)}
+                onNext={() => navigateReceipt(1)}
+              />
+            </React.Suspense>
           )}
         </div>
       </div>

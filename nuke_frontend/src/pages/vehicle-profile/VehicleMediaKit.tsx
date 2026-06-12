@@ -30,7 +30,8 @@ type AnalyzedImage = {
 
 interface VehicleMediaKitProps {
   vehicleId: string;
-  onImageClick?: () => void;
+  /** Receives the vehicle_images.id of the frame that was clicked. */
+  onImageClick?: (imageId: string) => void;
   /** Called once curation resolves with the count of curated frames (0 if fallback). */
   onCurationResolved?: (count: number) => void;
 }
@@ -219,7 +220,7 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
-      onClick={onImageClick}
+      onClick={onImageClick ? () => onImageClick(current.id) : undefined}
       role="region"
       aria-label="Vehicle media kit slideshow"
     >

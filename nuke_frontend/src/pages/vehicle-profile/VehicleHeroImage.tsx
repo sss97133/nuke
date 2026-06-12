@@ -4,6 +4,7 @@ import MobileImageGallery from '../../components/image/MobileImageGallery';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { BadgePortal } from '../../components/badges/BadgePortal';
 import VehicleMediaKit from './VehicleMediaKit';
+import { openVehiclePhoto, openVehiclePhotoByUrl } from './VehiclePhotoLightbox';
 
 interface VehicleHeroImageProps {
   overlayNode?: React.ReactNode;
@@ -196,9 +197,12 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                 position: 'relative',
                 overflow: 'hidden',
                 backgroundColor: 'var(--text)',
-                cursor: isMobile ? 'pointer' : 'default',
+                cursor: 'pointer',
               }}
-              onClick={() => isMobile && setShowGallery(true)}
+              onClick={() => {
+                if (isMobile) setShowGallery(true);
+                else if (!mediaKitActive && src) openVehiclePhotoByUrl(src);
+              }}
             >
               {/* Dark backdrop in contain mode — solid color, not blurred image.
                   CSS background-image doesn't reliably respect EXIF orientation,
@@ -222,7 +226,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                 <VehicleMediaKit
                   vehicleId={vehicleId}
                   onCurationResolved={handleCurationResolved}
-                  onImageClick={isMobile ? () => setShowGallery(true) : undefined}
+                  onImageClick={isMobile ? () => setShowGallery(true) : (imageId) => openVehiclePhoto(imageId)}
                 />
               )}
 
