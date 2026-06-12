@@ -109,9 +109,13 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
     (async () => {
       // Pull analyzed rows. We don't expect more than a few hundred per vehicle
       // with byok_deep_analysis present (vehicle 83f6f033 has 23/1366). Cap at 200.
+      // Only two byok_deep_analysis scalars are consumed; whole-blob select was
+      // 0.96MB vs 0.08MB projected (measured on prod anon 2026-06-11).
       const { data, error } = await supabase
         .from('vehicle_images')
-        .select('id, image_url, large_url, taken_at, created_at, ai_scan_metadata')
+        .select(
+          'id, image_url, large_url, taken_at, created_at, scene_type:ai_scan_metadata->byok_deep_analysis->>scene_type, build_phase_guess:ai_scan_metadata->byok_deep_analysis->>build_phase_guess',
+        )
         .eq('vehicle_id', vehicleId)
         .not('ai_scan_metadata->byok_deep_analysis', 'is', null)
         .order('taken_at', { ascending: false, nullsFirst: false })
@@ -124,18 +128,15 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
         return;
       }
 
-      const rows: AnalyzedImage[] = data.map((r: any) => {
-        const ba = r.ai_scan_metadata?.byok_deep_analysis || {};
-        return {
-          id: r.id,
-          image_url: r.image_url,
-          large_url: r.large_url,
-          taken_at: r.taken_at,
-          created_at: r.created_at,
-          scene_type: ba.scene_type ?? null,
-          build_phase_guess: ba.build_phase_guess ?? null,
-        };
-      });
+      const rows: AnalyzedImage[] = data.map((r: any) => ({
+        id: r.id,
+        image_url: r.image_url,
+        large_url: r.large_url,
+        taken_at: r.taken_at,
+        created_at: r.created_at,
+        scene_type: r.scene_type ?? null,
+        build_phase_guess: r.build_phase_guess ?? null,
+      }));
       setAnalyzed(rows);
     })();
     return () => { cancelled = true; };
