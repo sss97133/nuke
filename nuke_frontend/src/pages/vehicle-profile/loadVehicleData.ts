@@ -5,6 +5,7 @@
  * Extracted from VehicleProfile.tsx to reduce file size.
  * This function has side effects (state setters, supabase calls, navigation) but no React hooks.
  */
+import type React from 'react';
 import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
 import { isMismatchedVehicleImage, scoreMoneyShot } from './imageFilterUtils';
 
@@ -85,6 +86,9 @@ function scoreHeroCandidate(row: any, options: { frontExterior?: boolean } = {})
 // query shape is constant. Entries clear when the promise settles, so this is
 // pure concurrent-request coalescing, not a cache.
 const inflightHeroCandidates = new Map<string, Promise<any[] | null>>();
+
+// In-flight dedupe for the main profile RPC (same coalescing pattern).
+const inflightProfileRpc = new Map<string, Promise<any>>();
 
 /**
  * Select the best hero image for a vehicle based on zone, quality, confidence,
@@ -284,7 +288,7 @@ export interface LoadVehicleParams {
   setIsPublic: (v: boolean) => void;
   setLeadImageUrl: (url: string) => void;
   setVehicleImages: (images: string[]) => void;
-  setTimelineEvents: (events: any[]) => void;
+  setTimelineEvents: React.Dispatch<React.SetStateAction<any[]>>;
   setAuctionPulse: (pulse: any) => void;
 }
 
@@ -333,8 +337,16 @@ export async function loadVehicleImpl({
       const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
         setTimeout(() => resolve({ data: null, error: new Error('get_vehicle_profile_data timed out') }), rpcTimeoutMs)
       );
+      // Coalesce concurrent identical RPC calls (StrictMode double-mount was
+      // observed firing this 3.7s query twice in parallel).
+      let rpcPending = inflightProfileRpc.get(vehicleId);
+      if (!rpcPending) {
+        rpcPending = Promise.resolve(supabase.rpc('get_vehicle_profile_data', { p_vehicle_id: vehicleId }))
+          .finally(() => inflightProfileRpc.delete(vehicleId));
+        inflightProfileRpc.set(vehicleId, rpcPending);
+      }
       const rpcResult = await Promise.race([
-        supabase.rpc('get_vehicle_profile_data', { p_vehicle_id: vehicleId }),
+        rpcPending,
         timeoutPromise,
       ]);
       rpcData = rpcResult.data;
@@ -429,39 +441,49 @@ export async function loadVehicleImpl({
             });
           }
         }
-        // RPC doesn't include image_sets — supplement with a parallel query
-        try {
-          const { data: imageSets } = await supabase
-            .from('image_sets')
-            .select('id, name, session_start, session_end, session_duration_minutes, metadata, event_date')
-            .eq('vehicle_id', vehicleId)
-            .order('session_start', { ascending: false });
-          if (Array.isArray(imageSets)) {
-            for (const s of imageSets) {
-              events.push({
-                id: s.id,
-                vehicle_id: vehicleId,
-                event_date: s.event_date || (s.session_start ? String(s.session_start).slice(0, 10) : null),
-                event_type: 'photo_session',
-                title: s.name || 'Photo session',
-                metadata: {
-                  ...(s.metadata || {}),
-                  session_start: s.session_start,
-                  session_end: s.session_end,
-                  session_duration_minutes: s.session_duration_minutes,
-                  source: 'context_stitcher',
-                },
-              });
-            }
-          }
-        } catch { /* ignore — image_sets is supplementary */ }
-        events.sort((a: any, b: any) => {
+        const sortByDateDesc = (arr: any[]) => arr.sort((a: any, b: any) => {
           const da = a.event_date || '';
           const db = b.event_date || '';
           return db.localeCompare(da);
         });
+        // Paint the timeline NOW — do not gate first paint on image_sets.
+        sortByDateDesc(events);
         setTimelineEvents(events);
         rpcLoaded.timeline = true;
+        // RPC doesn't include image_sets — supplement asynchronously and merge
+        // when (if) it lands. This query was measured at 15s/HTTP 500 for anon
+        // (RLS policy timeout) and was the single biggest stall in signed-out
+        // first paint: awaiting it held the timeline (and everything sequenced
+        // after) to t+19s. Photo sessions are supplementary — never blocking.
+        void (async () => {
+          try {
+            const { data: imageSets } = await supabase
+              .from('image_sets')
+              .select('id, name, session_start, session_end, session_duration_minutes, metadata, event_date')
+              .eq('vehicle_id', vehicleId)
+              .order('session_start', { ascending: false });
+            if (!Array.isArray(imageSets) || imageSets.length === 0) return;
+            const sessionEvents = imageSets.map((s: any) => ({
+              id: s.id,
+              vehicle_id: vehicleId,
+              event_date: s.event_date || (s.session_start ? String(s.session_start).slice(0, 10) : null),
+              event_type: 'photo_session',
+              title: s.name || 'Photo session',
+              metadata: {
+                ...(s.metadata || {}),
+                session_start: s.session_start,
+                session_end: s.session_end,
+                session_duration_minutes: s.session_duration_minutes,
+                source: 'context_stitcher',
+              },
+            }));
+            setTimelineEvents((prev: any[]) => {
+              const have = new Set((prev || []).map((e: any) => e.id));
+              const merged = [...(prev || []), ...sessionEvents.filter((e: any) => !have.has(e.id))];
+              return sortByDateDesc(merged);
+            });
+          } catch { /* ignore — image_sets is supplementary */ }
+        })();
       }
       // Extract counts from RPC stats to avoid separate count queries
       if (rpcData.stats) {
