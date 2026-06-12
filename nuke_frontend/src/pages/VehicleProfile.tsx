@@ -21,6 +21,7 @@ const WorkspaceContent = React.lazy(() => import('./vehicle-profile/WorkspaceCon
 const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners'));
 const BarcodeTimeline = React.lazy(() => import('./vehicle-profile/BarcodeTimeline'));
 const VehicleBriefing = React.lazy(() => import('./vehicle-profile/VehicleBriefing'));
+const VehiclePhotoLightbox = React.lazy(() => import('./vehicle-profile/VehiclePhotoLightbox'));
 
 
 const VehicleProfileInner: React.FC = () => {
@@ -306,6 +307,11 @@ const VehicleProfileInner: React.FC = () => {
           currentUser={session?.user || null}
         /></React.Suspense>
       )}
+
+      {/* Photo lightbox — URL-addressable (?photo=id), opened from hero/day drawer */}
+      <React.Suspense fallback={null}>
+        <VehiclePhotoLightbox />
+      </React.Suspense>
 
       {/* Ownership Claim Modal */}
       {showOwnershipClaim && vehicle && (
