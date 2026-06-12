@@ -80,6 +80,7 @@ struct ProfileTab: View {
     var onSignIn: (() -> Void)? = nil
     @State private var query = ""
     @State private var results: [ProfileRow] = []
+    @State private var showAccount = false
 
     private var rootUserId: String {
         ownUserId ?? Config.sampleProfileUserId
@@ -114,7 +115,21 @@ struct ProfileTab: View {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Sign In", action: onSignIn)
                     }
+                } else if ownUserId != nil {
+                    // Own profile → the account sheet (sign out, deletion,
+                    // site naming, photo grant state).
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showAccount = true
+                        } label: {
+                            Image(systemName: "person.circle")
+                        }
+                        .accessibilityLabel("Account")
+                    }
                 }
+            }
+            .sheet(isPresented: $showAccount) {
+                AccountView()
             }
             .searchable(text: $query, prompt: "Handle")
             .task(id: query) {
@@ -190,9 +205,12 @@ struct ProfileView: View {
                             receiptDay = day
                         } label: {
                             HStack {
+                                // Color.primary (concrete), not .primary —
+                                // inside a Button label the hierarchical
+                                // .primary resolves to the tint color.
                                 Text(day.day)
                                     .monospacedDigit()
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.primary)
                                 Spacer()
                                 if day.photos > 0 {
                                     Text("\(day.photos) photos")

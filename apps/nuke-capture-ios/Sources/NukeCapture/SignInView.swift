@@ -249,6 +249,22 @@ struct AccountView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                // The photo grant, reported as a fact. Off → the one action
+                // that exists (Settings). On-grant ignition re-arms at the
+                // app level (NukeCaptureApp scenePhase handler).
+                if !MainTabView.currentPhotoGrant() {
+                    Section {
+                        LabeledContent("Photos") {
+                            Text("Off")
+                        }
+                        Button("Settings") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                    }
+                }
+
                 // Confirmed work sites — rename in place (optional, never
                 // required; ignition confirms with one tap and defaults the
                 // name to SITE NN).

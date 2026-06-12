@@ -24,6 +24,8 @@ struct NukeCaptureApp: App {
     @StateObject private var session = SessionStore()
     // Shared singleton — the BG task handler drives the same engine.
     @ObservedObject private var engine = SyncEngine.shared
+    /// Ignition phase drives the denied-grant detour (below).
+    @ObservedObject private var ignition = IgnitionEngine.shared
     /// Flipped by IgnitionEngine when the first-run sequence completes.
     @AppStorage(IgnitionEngine.completeKey) private var ignitionComplete = false
     /// The constellation's Explore path — the app without auth (read-only
@@ -48,6 +50,13 @@ struct NukeCaptureApp: App {
                 if session.isSignedIn {
                     if ignitionComplete {
                         MainTabView()
+                    } else if ignition.phase == .denied {
+                        // Photos denied is NOT a dead end: capture is one
+                        // grant, not the app. The world (Map + Profile)
+                        // stays; Today stays hidden (no grant); Photos·Off
+                        // + Settings live in the Account sheet. Granting in
+                        // Settings re-arms ignition (scenePhase below).
+                        MainTabView()
                     } else {
                         IgnitionView()
                     }
@@ -64,6 +73,11 @@ struct NukeCaptureApp: App {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
+                // Back from Settings with the grant now on? Re-arm ignition
+                // (retryAfterSettings no-ops unless phase == .denied).
+                if session.isSignedIn, !ignitionComplete {
+                    Task { await IgnitionEngine.shared.retryAfterSettings() }
+                }
                 // Foreground sync — only once ignition is done. During the
                 // scan NOTHING may upload (the UPLOADED 0 gauge is real).
                 guard session.isSignedIn, ignitionComplete else { return }
