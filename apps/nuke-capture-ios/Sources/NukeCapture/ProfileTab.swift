@@ -215,12 +215,12 @@ struct ProfileView: View {
                                 if day.photos > 0 {
                                     Text("\(day.photos) photos")
                                         .monospacedDigit()
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Color.secondary)
                                 }
                                 if day.work > 0 {
                                     Text("\(day.work) work")
                                         .monospacedDigit()
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Color.secondary)
                                 }
                             }
                         }
