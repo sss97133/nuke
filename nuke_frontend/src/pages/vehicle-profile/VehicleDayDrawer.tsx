@@ -25,6 +25,21 @@ interface DayPhoto {
   taken_at: string | null;
 }
 
+/** Minimal shape of context timeline events the drawer reads. */
+interface DayEvent {
+  id?: string;
+  event_date?: string | null;
+  event_type?: string | null;
+  title?: string | null;
+  cost_amount?: number | null;
+  metadata?: {
+    duration_minutes?: number | null;
+    work_type?: string | null;
+    work_description?: string | null;
+    synthetic_day?: boolean;
+  } | null;
+}
+
 interface VehicleDayDrawerProps {
   date: string; // YYYY-MM-DD
   onClose: () => void;
@@ -109,22 +124,22 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, onClose, onPr
 
   // ── Day events from the already-loaded timeline ──
   const dayEvents = useMemo(
-    () => (timelineEvents || []).filter((ev: any) => String(ev.event_date || '').slice(0, 10) === date),
+    () => ((timelineEvents || []) as DayEvent[]).filter((ev) => String(ev.event_date || '').slice(0, 10) === date),
     [timelineEvents, date],
   );
   const workEvents = useMemo(
-    () => dayEvents.filter((ev: any) => String(ev.event_type || '') === 'work_session' && !ev.metadata?.synthetic_day),
+    () => dayEvents.filter((ev) => String(ev.event_type || '') === 'work_session' && !ev.metadata?.synthetic_day),
     [dayEvents],
   );
   const otherEvents = useMemo(
-    () => dayEvents.filter((ev: any) => !['work_session', 'photo_session'].includes(String(ev.event_type || ''))),
+    () => dayEvents.filter((ev) => !['work_session', 'photo_session'].includes(String(ev.event_type || ''))),
     [dayEvents],
   );
 
   const first = photos && photos.length > 0 ? photos[0].taken_at : null;
   const last = photos && photos.length > 0 ? photos[photos.length - 1].taken_at : null;
   const span = fmtSpan(first, last);
-  const dayTotal = workEvents.reduce((s: number, ev: any) => s + (Number(ev.cost_amount) || 0), 0);
+  const dayTotal = workEvents.reduce((sum, ev) => sum + (Number(ev.cost_amount) || 0), 0);
 
   const loading = photos === null;
   const isEmpty = !loading && photos.length === 0 && workEvents.length === 0 && otherEvents.length === 0;
@@ -178,7 +193,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, onClose, onPr
       )}
 
       {/* Work story */}
-      {workEvents.map((ev: any) => {
+      {workEvents.map((ev) => {
         const meta = ev.metadata || {};
         const mins = Number(meta.duration_minutes) || 0;
         const hrs = mins > 0 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : '';
@@ -199,7 +214,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, onClose, onPr
       })}
 
       {/* Other event lines (sales, listings, milestones) */}
-      {otherEvents.map((ev: any) => (
+      {otherEvents.map((ev) => (
         <div key={ev.id || `${ev.event_type}-${ev.title}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 9, marginBottom: 3 }}>
           <span>{ev.title || String(ev.event_type || '').replace(/_/g, ' ')}</span>
           <span style={mono}>{fmtMoney(ev.cost_amount) || ''}</span>

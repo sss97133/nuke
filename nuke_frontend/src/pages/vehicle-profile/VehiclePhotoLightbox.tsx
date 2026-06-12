@@ -161,7 +161,7 @@ const VehiclePhotoLightbox: React.FC = () => {
       .select('id, image_url, taken_at, source')
       .eq('id', target.id)
       .maybeSingle()
-      .then(({ data }: any) => {
+      .then(({ data }: { data: PhotoRow | null }) => {
         if (cancelled || !data?.image_url) return;
         const merged = [...rows, data as PhotoRow].sort((a, b) =>
           String(a.taken_at || '9999').localeCompare(String(b.taken_at || '9999')));
@@ -186,7 +186,7 @@ const VehiclePhotoLightbox: React.FC = () => {
       .select('ai_scan_metadata')
       .eq('id', current.id)
       .maybeSingle()
-      .then(({ data }: any) => {
+      .then(({ data }: { data: { ai_scan_metadata?: { byok_deep_analysis?: Record<string, unknown> } } | null }) => {
         if (cancelled) return;
         const byok = data?.ai_scan_metadata?.byok_deep_analysis || null;
         atomsCache.set(current.id, byok);
@@ -236,12 +236,12 @@ const VehiclePhotoLightbox: React.FC = () => {
     ? new Date(current.taken_at).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : null;
   const sourceLabel = current?.source ? (SOURCE_LABELS[current.source] || String(current.source).toUpperCase().replace(/_/g, ' ')) : null;
-  const v = vehicle as any;
+  const v = vehicle as { year?: number; make?: string; model?: string } | null;
   const vehicleLabel = [v?.year, v?.make, v?.model].filter(Boolean).join(' ');
   const atomEntries: Array<[string, string]> = [];
   if (atoms) {
     for (const k of ['scene_type', 'build_phase_guess', 'work_activity', 'subject', 'notable_details']) {
-      const val = (atoms as any)[k];
+      const val = (atoms as Record<string, unknown>)[k];
       if (typeof val === 'string' && val.trim()) atomEntries.push([k.replace(/_/g, ' ').toUpperCase(), val.trim()]);
     }
   }
