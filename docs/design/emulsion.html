@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>EMULSION — THE TIMELINE AS DEVELOPING IMAGE</title>
+<title>EMULSION — YEARS / MONTHS / DAY</title>
 <style>
   :root{
-    --paper:#f5f5f5; --surface:#fff; --ink:#1a1a1a; --pencil:#666; --ghost:#ddd;
+    --paper:#f5f5f5; --surface:#fff; --ink:#1a1a1a; --pencil:#666; --ghost:#ddd; --border:#bdbdbd;
     --sans:-apple-system,"Helvetica Neue",Arial,sans-serif;
     --mono:ui-monospace,"SF Mono",Menlo,"Courier New",monospace;
   }
@@ -16,48 +16,54 @@
     display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
   .masthead h1{font-size:18px;font-weight:800;letter-spacing:-0.5px}
   .masthead .m{font-family:var(--mono);font-size:10px;color:var(--pencil)}
-  /* the caption the data paints */
-  #portrait{font-family:var(--mono);font-size:11px;margin:10px 0 14px;letter-spacing:.02em}
+  #portrait{font-family:var(--mono);font-size:11px;margin:10px 0 12px}
   #portrait b{font-weight:700}
-  .bench{position:relative;border:2px solid var(--ink);background:var(--surface)}
-  canvas{display:block;width:100%;height:520px;cursor:crosshair}
+
+  /* navigation: one visible path, always */
+  .crumbs{display:flex;align-items:center;gap:10px;margin-bottom:10px;min-height:34px}
+  .crumbs button{font-family:var(--mono);font-size:12px;font-weight:700;border:2px solid var(--ink);
+    background:var(--surface);color:var(--ink);padding:7px 14px;cursor:pointer}
+  .crumbs button:hover{background:var(--ink);color:#fff}
+  .crumbs .here{font-family:var(--mono);font-size:12px;font-weight:700;padding:7px 0}
+  .crumbs .sep{color:var(--pencil);font-family:var(--mono)}
+
+  .level{border:2px solid var(--ink);background:var(--surface);padding:14px}
+  .grid{display:grid;gap:10px}
+  .grid.years{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+  .grid.months{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .cell{border:1px solid var(--border);background:var(--surface);cursor:pointer;padding:10px;
+    transition:border-color .12s}
+  .cell:hover{border-color:var(--ink);border-width:1px;outline:1px solid var(--ink)}
+  .cell .t{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+  .cell .nm{font-family:var(--mono);font-size:12px;font-weight:700}
+  .cell .n{font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .cell canvas{display:block;width:100%;height:54px}
+  .cell.empty{opacity:.38;cursor:default}
+  .cell.empty:hover{outline:none;border-color:var(--border)}
+
+  /* day level: the receipt, photos as the surface */
+  .dayhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+  .dayhead .date{font-family:var(--mono);font-size:14px;font-weight:700}
+  .dayhead .span{font-family:var(--mono);font-size:11px;color:var(--pencil)}
+  .photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:3px}
+  .photos img{aspect-ratio:1/1;width:100%;object-fit:cover;display:block;background:#eee}
+  .daylink{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ink);
+    border:2px solid var(--ink);padding:9px 16px;margin-top:12px;text-decoration:none}
+  .daylink:hover{background:var(--ink);color:#fff}
   .hint{font-family:var(--mono);font-size:9px;color:var(--pencil);margin-top:8px}
-  /* day receipt panel — the data end */
-  #receipt{position:absolute;top:0;right:0;bottom:0;width:300px;background:var(--surface);
-    border-left:2px solid var(--ink);padding:14px;display:none;overflow:auto}
-  #receipt.open{display:block}
-  #receipt .date{font-family:var(--mono);font-size:13px;font-weight:700}
-  #receipt .fig{font-family:var(--mono);font-size:40px;font-weight:700;line-height:1.05;margin-top:6px;letter-spacing:-1px}
-  #receipt .lab{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--pencil)}
-  #receipt .span{font-family:var(--mono);font-size:10px;margin-top:6px}
-  #receipt .thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-top:10px}
-  #receipt .thumbs img{aspect-ratio:1/1;width:100%;object-fit:cover;display:block}
-  #receipt a{display:block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--ink);
-    border:2px solid var(--ink);text-align:center;padding:8px;margin-top:12px;text-decoration:none}
-  #receipt .x{position:absolute;top:8px;right:10px;font-family:var(--mono);font-size:14px;cursor:pointer;color:var(--pencil)}
 </style>
 </head>
 <body>
 
 <div class="masthead">
   <h1>EMULSION</h1>
-  <span class="m">2,618 REAL EXPOSURES · 1977 K5 BLAZER · EVERY GRAIN IS A PHOTOGRAPH · ZOOM AND IT RESOLVES</span>
+  <span class="m">2,618 REAL EXPOSURES · 1977 K5 BLAZER · TAP IN, TAP BACK — NOTHING ELSE TO LEARN</span>
 </div>
 <div id="portrait">DEVELOPING&hellip;</div>
 
-<div class="bench">
-  <canvas id="cv"></canvas>
-  <div id="receipt">
-    <span class="x" id="rx">&times;</span>
-    <div class="date" id="rdate"></div>
-    <div class="fig" id="rfig"></div>
-    <span class="lab">photos</span>
-    <div class="span" id="rspan"></div>
-    <div class="thumbs" id="rthumbs"></div>
-    <a id="rlink" href="#" target="_blank">VIEW DAY ON NUKE.AG &rarr;</a>
-  </div>
-</div>
-<div class="hint">SCROLL = DEVELOP DEEPER (ZOOM) &middot; DRAG = PAN &middot; CLICK A CLUSTER = THE DAY&rsquo;S RECEIPT &middot; THE GRAINS ARE THE ACTUAL RECORDS, NOT DECORATION</div>
+<div class="crumbs" id="crumbs"></div>
+<div class="level" id="level"></div>
+<div class="hint" id="hint">EVERY CELL IS REAL RECORDS · CLICK A YEAR</div>
 
 <script>
 (async () => {
@@ -66,15 +72,14 @@
     fetch('k5_photos.json').then(r => r.json()),
   ]);
 
-  // ---- substrate ----
-  const T0 = new Date(ts[0]).getTime() - 86400e3 * 40;
-  const T1 = new Date(ts[ts.length - 1]).getTime() + 86400e3 * 40;
-  const days = new Map(); // day -> {n, first, last, idxs:[]}
-  ts.forEach((t, i) => {
-    const d = t.slice(0, 10), hm = t.slice(11, 16);
-    let o = days.get(d);
-    if (!o) { o = { n: 0, first: hm, last: hm, t: new Date(d + 'T12:00:00').getTime() }; days.set(d, o); }
-    o.n++; if (hm < o.first) o.first = hm; if (hm > o.last) o.last = hm;
+  // ---- index the substrate ----
+  const byDay = new Map(), byMonth = new Map(), byYear = new Map();
+  ts.forEach(t => {
+    const d = t.slice(0, 10), m = t.slice(0, 7), y = t.slice(0, 4), hm = t.slice(11, 16);
+    let o = byDay.get(d); if (!o) { o = { n: 0, first: hm, last: hm, times: [] }; byDay.set(d, o); }
+    o.n++; if (hm < o.first) o.first = hm; if (hm > o.last) o.last = hm; o.times.push(t);
+    byMonth.set(m, (byMonth.get(m) || 0) + 1);
+    byYear.set(y, (byYear.get(y) || 0) + 1);
   });
   const photosByDay = new Map();
   photos.forEach(p => {
@@ -83,9 +88,9 @@
     photosByDay.get(d).push(p.u);
   });
 
-  // the caption the data paints — computed, never written
+  // the caption the data paints
   (() => {
-    const ds = [...days.entries()].sort((a,b) => a[0] < b[0] ? -1 : 1);
+    const ds = [...byDay.entries()].sort();
     const biggest = ds.reduce((m, e) => e[1].n > m[1].n ? e : m);
     let streak = 1, best = 1;
     for (let i = 1; i < ds.length; i++) {
@@ -94,184 +99,142 @@
     }
     const years = ((new Date(ds[ds.length-1][0]) - new Date(ds[0][0])) / 31557600e3).toFixed(1);
     document.getElementById('portrait').innerHTML =
-      `<b>${ts.length.toLocaleString()}</b> EXPOSURES &middot; <b>${days.size}</b> DAYS IN THE TRAY &middot; ` +
-      `<b>${years}</b> YEARS &middot; BIGGEST DAY <b>${biggest[0]} (${biggest[1].n})</b> &middot; ` +
-      `LONGEST RUN <b>${best} DAYS STRAIGHT</b>`;
+      `<b>${ts.length.toLocaleString()}</b> EXPOSURES &middot; <b>${byDay.size}</b> DAYS &middot; <b>${years}</b> YEARS &middot; ` +
+      `BIGGEST DAY <b>${biggest[0]} (${biggest[1].n})</b> &middot; LONGEST RUN <b>${best} DAYS STRAIGHT</b>`;
   })();
 
-  // ---- canvas ----
-  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
-  const DPR = window.devicePixelRatio || 1;
-  function size() { cv.width = cv.clientWidth * DPR; cv.height = 520 * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
-  size(); window.addEventListener('resize', () => { size(); draw(); });
-
-  // deterministic grain scatter + character
+  // ---- grain mini-field renderer (the material) ----
   function hash(i) { let x = (i + 1) * 2654435761 % 4294967296; x = (x ^ (x >> 13)) * 1274126177 % 4294967296; return (x ^ (x >> 16)) / 4294967296; }
-  const grains = ts.map((t, i) => ({
-    time: new Date(t).getTime(),
-    day: t.slice(0, 10),
-    y: 70 + hash(i) * 380 + Math.sin(i * 1.7) * 14,
-    r: 0.9 + hash(i + 7919) * 1.5,
-    a: 0.55 + hash(i + 104729) * 0.45,
-  }));
-
-  // view state
-  let zoom = 1, panX = 0, revealed = 0;
-  const order = grains.map((_, i) => i);
-  for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(hash(i + 31337) * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
-
-  const W = () => cv.clientWidth;
-  const tx = t => ((t - T0) / (T1 - T0) * W() - panX) * zoom + (1 - zoom) * 0; // pan in content px before zoom
-  function xOf(t) { return ((t - T0) / (T1 - T0)) * W() * zoom - panX; }
-  const pxPerDay = () => W() * zoom / ((T1 - T0) / 86400e3);
-
-  const imgCache = new Map();
-  function img(u) {
-    if (!imgCache.has(u)) { const im = new Image(); im.crossOrigin = 'anonymous'; im.src = u; im.onload = () => draw(); imgCache.set(u, im); }
-    return imgCache.get(u);
+  function grainField(cv, times, t0, t1, developMs) {
+    const DPR = window.devicePixelRatio || 1;
+    const w = cv.clientWidth || 170, h = cv.clientHeight || 54;
+    cv.width = w * DPR; cv.height = h * DPR;
+    const ctx = cv.getContext('2d'); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const pts = times.map((t, i) => ({
+      x: (new Date(t) - t0) / (t1 - t0) * (w - 4) + 2,
+      y: 4 + hash(i * 7 + times.length) * (h - 8),
+      r: 1.2 + hash(i + 7919) * 1.6,
+      a: 0.65 + hash(i + 104729) * 0.35,
+      o: hash(i + 31337),
+    })).sort((a, b) => a.o - b.o);
+    const start = performance.now();
+    (function dev(now) {
+      const p = developMs ? Math.min(1, (now - start) / developMs) : 1;
+      const k = Math.floor((1 - Math.pow(1 - p, 2.4)) * pts.length);
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#1a1a1a';
+      for (let i = 0; i < k; i++) { const g = pts[i]; ctx.globalAlpha = g.a; ctx.fillRect(g.x, g.y, g.r, g.r); }
+      ctx.globalAlpha = 1;
+      if (p < 1) requestAnimationFrame(dev);
+    })(start);
   }
 
-  function draw() {
-    ctx.clearRect(0, 0, W(), 520);
-    const ppd = pxPerDay();
-    const resolve = ppd > 64, label = ppd > 22;
+  // ---- navigation: a tiny stack, rendered as crumbs + level ----
+  const crumbsEl = document.getElementById('crumbs'), levelEl = document.getElementById('level'), hintEl = document.getElementById('hint');
+  const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  let state = { level: 'years' }; // {level:'years'} | {level:'months', y} | {level:'day', y, m, d}
 
-    // grains (the emulsion)
-    ctx.fillStyle = '#1a1a1a';
-    for (let k = 0; k < revealed; k++) {
-      const g = grains[order[k]];
-      const x = xOf(g.time);
-      if (x < -20 || x > W() + 20) continue;
-      const dphotos = resolve && photosByDay.get(g.day);
-      if (dphotos) continue; // this day's grains resolve into photographs below
-      ctx.globalAlpha = g.a;
-      ctx.fillRect(x, g.y, g.r * (zoom > 3 ? 1.4 : 1), g.r * (zoom > 3 ? 1.4 : 1));
-    }
-    ctx.globalAlpha = 1;
-
-    // day clusters: labels, then photographic resolution
-    if (label) {
-      ctx.font = '700 9px ui-monospace, SF Mono, Menlo, monospace';
-      for (const [d, o] of days) {
-        const x = xOf(o.t);
-        if (x < -120 || x > W() + 120 || o.n < 3) continue;
-        if (resolve && photosByDay.get(d)) {
-          const urls = photosByDay.get(d).slice(0, 4);
-          const s = Math.min(110, Math.max(44, ppd * 0.72));
-          urls.forEach((u, i) => {
-            const im = img(u);
-            const gx = x - s / 2 + (i % 2) * (s / 2 + 1) - s / 4;
-            const gy = 120 + Math.floor(i / 2) * (s / 2 + 1) + (hash(d.length + i) * 120);
-            if (im.complete && im.naturalWidth > 0) {
-              const m = Math.min(im.naturalWidth, im.naturalHeight);
-              ctx.drawImage(im, (im.naturalWidth - m) / 2, (im.naturalHeight - m) / 2, m, m, gx, gy, s / 2, s / 2);
-            } else { ctx.globalAlpha = 0.15; ctx.fillRect(gx, gy, s / 2, s / 2); ctx.globalAlpha = 1; }
-          });
-          ctx.fillStyle = '#1a1a1a';
-          ctx.fillText(`${d.slice(5).replace('-', ' ')} · ${o.n}`, x - 24, 96);
-        } else {
-          ctx.fillStyle = 'rgba(26,26,26,.75)';
-          ctx.fillText(`${d.slice(5).replace('-', ' ')} · ${o.n}`, x - 22, 64 + (hash(o.n) * 18));
-          ctx.fillStyle = '#1a1a1a';
-        }
+  function crumbs(parts) {
+    crumbsEl.innerHTML = '';
+    parts.forEach((p, i) => {
+      if (i) { const s = document.createElement('span'); s.className = 'sep'; s.textContent = '/'; crumbsEl.appendChild(s); }
+      if (p.go) {
+        const b = document.createElement('button'); b.textContent = p.label; b.onclick = p.go; crumbsEl.appendChild(b);
+      } else {
+        const h = document.createElement('span'); h.className = 'here'; h.textContent = p.label; crumbsEl.appendChild(h);
       }
-    }
-
-    // axis: years
-    ctx.font = '700 9px ui-monospace, SF Mono, Menlo, monospace';
-    ctx.fillStyle = '#666';
-    for (let y = 2016; y <= 2026; y++) {
-      const x = xOf(new Date(y + '-01-01').getTime());
-      if (x < -40 || x > W() + 40) continue;
-      ctx.fillRect(x, 495, 1, 6);
-      ctx.fillText(String(y), x + 3, 514);
-    }
-
-    // minimap: the whole strip, always (wayfinding for deep zoom)
-    if (zoom > 1.01) {
-      const mh = 22, my = 8;
-      ctx.fillStyle = 'rgba(245,245,245,.92)';
-      ctx.fillRect(0, my - 4, W(), mh + 10);
-      ctx.fillStyle = 'rgba(26,26,26,.8)';
-      for (const [, o] of days) {
-        const x = (o.t - T0) / (T1 - T0) * W();
-        ctx.fillRect(x, my + mh - Math.min(mh, 3 + Math.sqrt(o.n) * 1.6), 1.5, Math.min(mh, 3 + Math.sqrt(o.n) * 1.6));
-      }
-      // viewport window
-      const vx0 = (panX / zoom) / W() * W(), vw = W() / zoom;
-      ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1.5;
-      ctx.strokeRect(vx0, my - 3, Math.max(6, vw), mh + 8);
-    }
-  }
-
-  // develop-in: the print in the tray (renders real records arriving)
-  const t0 = performance.now();
-  (function develop(now) {
-    const p = Math.min(1, (now - t0) / 2600);
-    revealed = Math.floor((1 - Math.pow(1 - p, 2.6)) * grains.length);
-    draw();
-    if (p < 1) requestAnimationFrame(develop); else revealed = grains.length;
-  })(t0);
-
-  // zoom & pan
-  cv.addEventListener('wheel', e => {
-    e.preventDefault();
-    const mx = e.offsetX;
-    const f = e.deltaY < 0 ? 1.18 : 1 / 1.18;
-    const contentX = (mx + panX) / zoom;
-    zoom = Math.max(1, Math.min(400, zoom * f));
-    panX = contentX * zoom - mx;
-    panX = Math.max(0, Math.min(W() * zoom - W(), panX));
-    // if the window landed on empty calendar, drift to the nearest cluster
-    const t0v = (panX / (W() * zoom)) * (T1 - T0) + T0, t1v = ((panX + W()) / (W() * zoom)) * (T1 - T0) + T0;
-    let visible = false, nearest = null, nd = Infinity;
-    const mid = (t0v + t1v) / 2;
-    for (const [, o] of days) {
-      if (o.t >= t0v && o.t <= t1v) { visible = true; break; }
-      const dd = Math.abs(o.t - mid); if (dd < nd) { nd = dd; nearest = o.t; }
-    }
-    if (!visible && nearest !== null) {
-      panX = Math.max(0, Math.min(W() * zoom - W(), (nearest - T0) / (T1 - T0) * W() * zoom - W() / 2));
-    }
-    draw();
-  }, { passive: false });
-  // click the minimap to jump
-  cv.addEventListener('mousedown', e => {
-    if (zoom > 1.01 && e.offsetY < 40) {
-      const t = (e.offsetX / W()) * (T1 - T0) + T0;
-      panX = Math.max(0, Math.min(W() * zoom - W(), (t - T0) / (T1 - T0) * W() * zoom - W() / 2));
-      draw();
-    }
-  });
-  let dragging = false, dx0 = 0, px0 = 0;
-  cv.addEventListener('mousedown', e => { dragging = true; dx0 = e.clientX; px0 = panX; });
-  window.addEventListener('mousemove', e => { if (dragging) { panX = Math.max(0, Math.min(W() * zoom - W(), px0 - (e.clientX - dx0))); draw(); } });
-  window.addEventListener('mouseup', () => dragging = false);
-
-  // click → the day's receipt (the data end)
-  cv.addEventListener('click', e => {
-    if (Math.abs(e.clientX - dx0) > 4) return; // was a drag
-    let best = null, bd = 28;
-    for (const [d, o] of days) {
-      const x = xOf(o.t);
-      const dist = Math.abs(x - e.offsetX);
-      if (dist < bd && o.n >= 3) { bd = dist; best = [d, o]; }
-    }
-    if (!best) return;
-    const [d, o] = best;
-    document.getElementById('rdate').textContent = d;
-    document.getElementById('rfig').textContent = o.n;
-    document.getElementById('rspan').textContent = `FIRST ${o.first} · LAST ${o.last}`;
-    document.getElementById('rlink').href = 'https://nuke.ag/journal/' + d;
-    const th = document.getElementById('rthumbs');
-    th.innerHTML = '';
-    (photosByDay.get(d) || []).slice(0, 9).forEach(u => {
-      const im = document.createElement('img'); im.src = u; im.loading = 'lazy'; th.appendChild(im);
     });
-    document.getElementById('receipt').classList.add('open');
+  }
+
+  function showYears() {
+    state = { level: 'years' };
+    crumbs([{ label: 'ALL YEARS' }]);
+    hintEl.textContent = 'EVERY CELL IS REAL RECORDS · CLICK A YEAR';
+    levelEl.innerHTML = '<div class="grid years"></div>';
+    const g = levelEl.firstChild;
+    [...byYear.keys()].sort().forEach(y => {
+      const cell = document.createElement('div'); cell.className = 'cell';
+      cell.innerHTML = `<div class="t"><span class="nm">${y}</span><span class="n">${byYear.get(y)} PHOTOS</span></div><canvas></canvas>`;
+      cell.onclick = () => showMonths(y);
+      g.appendChild(cell);
+      const times = ts.filter(t => t.startsWith(y));
+      requestAnimationFrame(() => grainField(cell.querySelector('canvas'), times,
+        new Date(y + '-01-01'), new Date((+y + 1) + '-01-01'), 700));
+    });
+  }
+
+  function showMonths(y) {
+    state = { level: 'months', y };
+    crumbs([{ label: 'ALL YEARS', go: showYears }, { label: y }]);
+    hintEl.textContent = 'CLICK A MONTH WITH GRAIN · ESC OR THE CRUMB GOES BACK UP';
+    levelEl.innerHTML = '<div class="grid months"></div>';
+    const g = levelEl.firstChild;
+    for (let m = 1; m <= 12; m++) {
+      const key = y + '-' + String(m).padStart(2, '0');
+      const n = byMonth.get(key) || 0;
+      const days = [...byDay.keys()].filter(d => d.startsWith(key)).sort();
+      const cell = document.createElement('div');
+      cell.className = 'cell' + (n ? '' : ' empty');
+      cell.innerHTML = `<div class="t"><span class="nm">${MONTHS[m-1]}</span><span class="n">${n ? n + ' · ' + days.length + 'D' : '—'}</span></div><canvas></canvas>`;
+      if (n) {
+        cell.onclick = () => days.length === 1 ? showDay(days[0]) : showDays(y, key, days);
+        const times = ts.filter(t => t.startsWith(key));
+        requestAnimationFrame(() => grainField(cell.querySelector('canvas'), times,
+          new Date(key + '-01'), new Date(m === 12 ? (+y + 1) + '-01-01' : y + '-' + String(m + 1).padStart(2, '0') + '-01'), 500));
+      }
+      g.appendChild(cell);
+    }
+  }
+
+  function showDays(y, key, days) {
+    state = { level: 'days', y, key };
+    const mName = MONTHS[+key.slice(5) - 1];
+    crumbs([{ label: 'ALL YEARS', go: showYears }, { label: y, go: () => showMonths(y) }, { label: mName }]);
+    hintEl.textContent = 'CLICK A DAY — IT OPENS AS THE FULL RECEIPT';
+    levelEl.innerHTML = '<div class="grid months"></div>';
+    const g = levelEl.firstChild;
+    days.forEach(d => {
+      const o = byDay.get(d);
+      const cell = document.createElement('div'); cell.className = 'cell';
+      cell.innerHTML = `<div class="t"><span class="nm">${d.slice(8)} ${mName}</span><span class="n">${o.n} · ${o.first}–${o.last}</span></div><canvas></canvas>`;
+      cell.onclick = () => showDay(d);
+      g.appendChild(cell);
+      requestAnimationFrame(() => grainField(cell.querySelector('canvas'), o.times,
+        new Date(d + 'T00:00:00'), new Date(d + 'T23:59:59'), 400));
+    });
+  }
+
+  function showDay(d) {
+    const y = d.slice(0, 4), key = d.slice(0, 7), mName = MONTHS[+d.slice(5, 7) - 1];
+    const o = byDay.get(d);
+    state = { level: 'day', d };
+    const thumb = u => u.replace('/object/public/', '/render/image/public/') + '?width=420&resize=contain';
+    crumbs([
+      { label: 'ALL YEARS', go: showYears },
+      { label: y, go: () => showMonths(y) },
+      { label: mName, go: () => showDays(y, key, [...byDay.keys()].filter(x => x.startsWith(key)).sort()) },
+      { label: d.slice(8) },
+    ]);
+    hintEl.textContent = 'THE DATA END: THE DAY’S TESTIMONY · CRUMBS GO BACK UP';
+    const urls = photosByDay.get(d) || [];
+    levelEl.innerHTML = `
+      <div class="dayhead">
+        <span class="date">${d}</span>
+        <span class="span">${o.n} PHOTOS · FIRST ${o.first} · LAST ${o.last}</span>
+      </div>
+      <div class="photos">${urls.map(u => `<a href="${u}" target="_blank"><img decoding="async" src="${thumb(u)}"></a>`).join('')}</div>
+      ${urls.length < o.n ? `<div class="hint" style="margin-top:8px">SHOWING ${urls.length} OF ${o.n} — FULL DAY ON THE JOURNAL</div>` : ''}
+      <a class="daylink" href="https://nuke.ag/journal/${d}" target="_blank">VIEW DAY ON NUKE.AG &rarr;</a>`;
+  }
+
+  window.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (state.level === 'day') { const y = state.d.slice(0,4); showMonths(y); }
+    else if (state.level === 'days') showMonths(state.y);
+    else if (state.level === 'months') showYears();
   });
-  document.getElementById('rx').onclick = () => document.getElementById('receipt').classList.remove('open');
-  window.addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('receipt').classList.remove('open'); });
+
+  showYears();
 })();
 </script>
 
