@@ -10,6 +10,7 @@
 // behavior shipped before ignition existed. Nothing gets MORE permissive by
 // default.
 
+import CoreLocation
 import Foundation
 
 /// One confirmed work site: a center coordinate and a radius in meters.
@@ -37,11 +38,16 @@ final class SiteStore: ObservableObject {
         } else {
             sites = []
         }
+        // Lazily geocode any sites still carrying SITE-serial names.
+        geocodeStaleSerials()
     }
 
     func add(_ site: Site) {
         sites.append(site)
         persist()
+        // Geocode the new site — fire and forget; serial name stays on failure.
+        let index = sites.count - 1
+        geocodeIfSerial(at: index)
     }
 
     /// Rename a confirmed site (Account sheet). Empty names fall back to
@@ -55,6 +61,45 @@ final class SiteStore: ObservableObject {
     private func persist() {
         if let data = try? JSONEncoder().encode(sites) {
             defaults.set(data, forKey: Self.key)
+        }
+    }
+
+    /// Geocode any SITE-serial names (SITE 01/02/…) and rename to a street
+    /// address or locality. Fire-and-forget: failure leaves the serial name.
+    /// Called on add() and lazily on load for pre-existing serials.
+    func geocodeStaleSerials() {
+        for index in sites.indices where isSiteName(sites[index].name) {
+            geocodeIfSerial(at: index)
+        }
+    }
+
+    // Matches the SITE NN default names assigned at ignition confirm.
+    private func isSiteName(_ name: String) -> Bool {
+        name.range(of: #"^SITE \d{2}$"#, options: .regularExpression) != nil
+    }
+
+    private func geocodeIfSerial(at index: Int) {
+        guard sites.indices.contains(index), isSiteName(sites[index].name) else { return }
+        let lat = sites[index].latitude
+        let lon = sites[index].longitude
+        let location = CLLocation(latitude: lat, longitude: lon)
+        Task {
+            let geocoder = CLGeocoder()
+            guard let placemarks = try? await geocoder.reverseGeocodeLocation(location),
+                  let mark = placemarks.first else { return }
+            // Prefer street address; fall back to locality (city/town).
+            let name = [mark.subThoroughfare, mark.thoroughfare]
+                .compactMap { $0 }
+                .joined(separator: " ")
+                .trimmingCharacters(in: .whitespaces)
+            let resolved = name.isEmpty ? (mark.locality ?? mark.name ?? "") : name
+            guard !resolved.isEmpty else { return }
+            await MainActor.run {
+                guard self.sites.indices.contains(index),
+                      self.isSiteName(self.sites[index].name) else { return }
+                self.sites[index].name = resolved
+                self.persist()
+            }
         }
     }
 

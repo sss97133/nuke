@@ -104,10 +104,9 @@ struct TodayView: View {
                         Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
                     }
                     .disabled(engine.isSyncing)
-
-                    Link(destination: Config.profileURL) {
-                        Label("View on Nuke", systemImage: "safari")
-                    }
+                    // "View on Nuke" link cut from 1.0 (Jobs cut 2026-06-11):
+                    // it pointed at the legacy web profile. Returns when the
+                    // web rebuild gives it a worthy destination.
                 }
             }
             .navigationTitle("Today")

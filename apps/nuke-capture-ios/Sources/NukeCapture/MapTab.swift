@@ -26,6 +26,18 @@ struct MapTab: View {
     @State private var pins: [OrgPin] = []
     @State private var selectedID: UUID?
     @State private var loadError: String?
+    /// Open zoomed on the user's confirmed site (their shop IS their place —
+    /// no CoreLocation permission needed; sites come from photo EXIF). Falls
+    /// back to automatic framing when no site is confirmed yet (explore mode,
+    /// fresh installs, the review device).
+    @State private var position: MapCameraPosition = MapTab.homePosition()
+
+    private static func homePosition() -> MapCameraPosition {
+        guard let site = SiteStore.shared.sites.first else { return .automatic }
+        return .region(MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: site.latitude, longitude: site.longitude),
+            latitudinalMeters: 25_000, longitudinalMeters: 25_000))
+    }
 
     private var selectedPin: OrgPin? {
         selectedID.flatMap { id in pins.first { $0.id == id } }
@@ -33,7 +45,7 @@ struct MapTab: View {
 
     var body: some View {
         NavigationStack {
-            Map(selection: $selectedID) {
+            Map(position: $position, selection: $selectedID) {
                 ForEach(pins) { pin in
                     Marker(pin.name ?? "—", coordinate: pin.coordinate)
                         .tag(pin.id)
