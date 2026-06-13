@@ -31,6 +31,11 @@ struct MainTabView: View {
             profileTab
                 .tabItem { Label("Profile", systemImage: "person") }
 
+            // EXPLORE — Build-2 §5: search the real record, drill into a
+            // vehicle. Works signed-out too (not-signing-in is never a dead end).
+            ExploreView()
+                .tabItem { Label("Explore", systemImage: "magnifyingglass") }
+
             if session.isSignedIn && photoGrant {
                 TodayView()
                     .tabItem { Label("Today", systemImage: "clock") }
