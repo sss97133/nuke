@@ -47,6 +47,19 @@ struct DayReceipt: Decodable {
         let thumb: String?
         let url: String?
         let taken_at: String?
+        // Analysis atoms — all optional. Present once the image is *understood*
+        // (byok/T0 vision verdict in vehicle_observations); absent until then.
+        // The evidence rail renders only what exists — never an empty shell.
+        let vehicle_id: UUID?
+        let file_name: String?
+        let narrative: String?          // one line: what the frame shows
+        let components: [String]?       // detected parts (labels)
+        let part_numbers: [String]?     // verbatim text / part numbers read
+        let intent: String?             // labor | inspection | parts_sourcing | …
+        let intent_confidence: Double?
+        let intent_confirmed: Bool?     // owner-confirmed? (the $410 guard)
+        let analyzed_by: String?        // provenance: model/tier
+        let analyzed_at: String?
     }
     struct WorkSession: Decodable, Identifiable {
         let id: UUID
@@ -288,8 +301,15 @@ struct DayReceiptView: View {
                         Section("Work") {
                             ForEach(receipt.work_sessions) { ws in
                                 LabeledContent(ws.title ?? "work session") {
-                                    if let minutes = ws.duration_minutes {
-                                        Text("\(minutes) min").monospacedDigit()
+                                    HStack(spacing: 8) {
+                                        if let minutes = ws.duration_minutes {
+                                            Text(formatMinutes(minutes)).monospacedDigit()
+                                        }
+                                        if let cost = ws.total_job_cost, cost > 0 {
+                                            Text(cost, format: .currency(code: "USD"))
+                                                .monospacedDigit()
+                                                .foregroundStyle(.secondary)
+                                        }
                                     }
                                 }
                             }
@@ -369,11 +389,37 @@ private struct RemoteThumbGrid: View {
     }
 }
 
+/// "2H 30M" / "45M" — matches the web day-receipt's formatMinutes.
+private func formatMinutes(_ m: Int) -> String {
+    let h = m / 60, mm = m % 60
+    if h > 0 && mm > 0 { return "\(h)H \(mm)M" }
+    if h > 0 { return "\(h)H" }
+    return "\(mm)M"
+}
+
 /// Full-bleed photo viewer — black background, tap or drag-down to dismiss.
-/// Evidence rail at the bottom: monospaced taken_at + file_name + ANALYSIS PENDING.
+/// Evidence rail surfaces the saved analysis atoms (narrative · components ·
+/// part numbers · provenance) and the intent-confirm loop (the $410 guard).
+/// Renders only the atoms that exist; "Analysis pending" only when none do.
 private struct PhotoFullScreenView: View {
     let photo: DayReceipt.Photo
     @Environment(\.dismiss) private var dismiss
+    @State private var confirmedIntent: String?     // optimistic local confirm
+    @State private var showConfirm = false
+
+    private static let intents = ["labor", "inspection", "parts_sourcing",
+                                  "communication", "acquisition", "documentation"]
+
+    private var hasAtoms: Bool {
+        photo.narrative != nil
+            || !(photo.components ?? []).isEmpty
+            || !(photo.part_numbers ?? []).isEmpty
+            || photo.intent != nil
+    }
+
+    private var confirmedValue: String? {
+        confirmedIntent ?? (photo.intent_confirmed == true ? photo.intent : nil)
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -387,32 +433,106 @@ private struct PhotoFullScreenView: View {
                 ProgressView().tint(.white)
             }
 
-            // Evidence rail — fixed-height facts bar at the bottom.
-            VStack(alignment: .leading, spacing: 2) {
-                // Line 1: taken_at (verbatim) + optional file_name
-                HStack(spacing: 8) {
-                    if let takenAt = photo.taken_at {
-                        Text(takenAt)
-                            .font(.caption)
-                            .monospacedDigit()
-                            .foregroundStyle(.white)
-                    }
-                    // file_name is not on DayReceipt.Photo model (url/thumb only) —
-                    // field absent; omit rather than fabricate.
-                }
-                // Line 2: honest placeholder until vision verdicts exist
-                Text("ANALYSIS PENDING")
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.black)
+            rail
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.black.opacity(0.82))
         }
         .onTapGesture { dismiss() }
         .gesture(DragGesture(minimumDistance: 40)
             .onEnded { v in if v.translation.height > 0 { dismiss() } })
+    }
+
+    @ViewBuilder private var rail: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            if let takenAt = photo.taken_at {
+                Text(takenAt)
+                    .font(.caption2).monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.55))
+            }
+
+            if hasAtoms {
+                if let narrative = photo.narrative {
+                    Text(narrative)
+                        .font(.callout)
+                        .foregroundStyle(.white)
+                }
+                if let comps = photo.components, !comps.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(comps, id: \.self) { c in
+                                Text(c)
+                                    .font(.caption2)
+                                    .padding(.horizontal, 8).padding(.vertical, 3)
+                                    .overlay(Capsule().stroke(.white.opacity(0.3)))
+                                    .foregroundStyle(.white.opacity(0.85))
+                            }
+                        }
+                    }
+                }
+                if let parts = photo.part_numbers {
+                    ForEach(parts, id: \.self) { p in
+                        Label(p, systemImage: "tag")
+                            .font(.caption).monospacedDigit()
+                            .foregroundStyle(.white.opacity(0.85))
+                    }
+                }
+                intentRow
+                if let by = photo.analyzed_by {
+                    Label("\(by)\(photo.analyzed_at.map { " · \($0.prefix(10))" } ?? "")",
+                          systemImage: "checkmark.seal")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+            } else {
+                Text("Analysis pending")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+        }
+    }
+
+    @ViewBuilder private var intentRow: some View {
+        if let confirmed = confirmedValue {
+            Label("\(confirmed.capitalized) · confirmed", systemImage: "checkmark.circle.fill")
+                .font(.caption).foregroundStyle(.green)
+        } else if let intent = photo.intent {
+            // The model guessed; only the owner confirms value (the $410 guard).
+            HStack(spacing: 8) {
+                Text("\(intent.capitalized)?")
+                    .font(.caption).foregroundStyle(.yellow)
+                if let conf = photo.intent_confidence {
+                    Text(String(format: "%.2f", conf))
+                        .font(.caption2).monospacedDigit()
+                        .foregroundStyle(.yellow.opacity(0.7))
+                }
+                Spacer(minLength: 0)
+                Button("Why was this taken?") { showConfirm = true }
+                    .font(.caption).buttonStyle(.bordered).tint(.yellow)
+            }
+            .confirmationDialog("Why was this taken?",
+                                isPresented: $showConfirm, titleVisibility: .visible) {
+                ForEach(Self.intents, id: \.self) { opt in
+                    Button(opt.replacingOccurrences(of: "_", with: " ").capitalized) {
+                        confirm(opt)
+                    }
+                }
+            }
+        }
+    }
+
+    private func confirm(_ intent: String) {
+        confirmedIntent = intent       // optimistic — rail flips to confirmed
+        Task {
+            do {
+                _ = try await SupabaseService.client
+                    .rpc("confirm_photo_intent",
+                         params: ["p_image_id": photo.id.uuidString, "p_intent": intent])
+                    .execute()
+            } catch {
+                NSLog("NukeCapture confirm intent failed: %@", String(describing: error))
+            }
+        }
     }
 }
