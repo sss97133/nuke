@@ -3,9 +3,10 @@
 // First screen: NUKE wordmark above the full provider row —
 //
 //   Sign in with Apple      (primary — Face ID, zero typing, Guideline 4.8)
-//   Continue with Google    (always renders; enabled state is config-gated
-//                            via Config.enableGoogleSignIn until the
-//                            Supabase Google provider is configured)
+//   Continue with Google    (renders only when Config.enableGoogleSignIn —
+//                            hidden until the Supabase Google provider is
+//                            configured; disabled placeholders risk a 2.1
+//                            App Review rejection)
 //   Continue with email     (same account as nuke.ag)
 //   Explore                 (no auth — read-only Map + sample profile;
 //                            not-signing-in is not a dead end)
@@ -55,18 +56,22 @@ struct SignInView: View {
                 .frame(height: 50)
                 .disabled(isWorking)
 
-                // Google: the button always renders; the enabled state is the
-                // config gate (provider not configured server-side yet).
-                Button {
-                    // TODO(google-auth): client.auth.signInWithOAuth(
-                    //   provider: .google) once the Supabase provider is
-                    //   configured for ag.nuke.capture.
-                } label: {
-                    Text("Continue with Google")
-                        .frame(maxWidth: .infinity, minHeight: 34)
+                // Google: render only when the provider is configured — a
+                // visibly disabled button reads as placeholder UI to App
+                // Review (Guideline 2.1). Flip Config.enableGoogleSignIn to
+                // bring it back once the Supabase provider exists.
+                if Config.enableGoogleSignIn {
+                    Button {
+                        // TODO(google-auth): client.auth.signInWithOAuth(
+                        //   provider: .google) once the Supabase provider is
+                        //   configured for ag.nuke.capture.
+                    } label: {
+                        Text("Continue with Google")
+                            .frame(maxWidth: .infinity, minHeight: 34)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isWorking)
                 }
-                .buttonStyle(.bordered)
-                .disabled(!Config.enableGoogleSignIn || isWorking)
 
                 NavigationLink {
                     EmailSignInView()

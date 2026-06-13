@@ -11,6 +11,7 @@
 // platforms is KeychainLocalStorage — sign in once, the session lives in the
 // device Keychain and auto-refreshes.
 
+import CryptoKit
 import Foundation
 import Supabase
 
@@ -31,6 +32,7 @@ struct VehicleImageRow: Encodable {
     let latitude: Double?
     let longitude: Double?
     let taken_at: String?               // asset.creationDate, ISO-8601
+    let file_hash: String?              // SHA-256 hex of the uploaded bytes
     let exif_data: ExifData
 
     struct ExifData: Encodable {
@@ -193,6 +195,10 @@ enum SupabaseService {
             .from(Config.storageBucket)
             .getPublicURL(path: path)
 
+        // SHA-256 of the uploaded bytes — lowercase hex string.
+        let hashBytes = SHA256.hash(data: data)
+        let fileHash = hashBytes.map { String(format: "%02x", $0) }.joined()
+
         let row = VehicleImageRow(
             image_url: publicURL.absoluteString,
             storage_path: path,
@@ -207,6 +213,7 @@ enum SupabaseService {
             latitude: meta.latitude,
             longitude: meta.longitude,
             taken_at: meta.creationDate.map { isoFormatter.string(from: $0) },
+            file_hash: fileHash,
             exif_data: .init(
                 uuid: meta.assetIdentifier,
                 original_filename: meta.filename,

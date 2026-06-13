@@ -65,12 +65,6 @@ struct DayReceipt: Decodable {
     let receipts: [Receipt]
 }
 
-/// One v_user_connections row (auth-scoped: rows exist only for auth.uid()).
-struct ConnectionRow: Decodable {
-    let kind: String?
-    let status: String?
-}
-
 // ─── Tab root: own profile (or the sample) + handle search ──────────────────
 
 struct ProfileTab: View {
@@ -165,7 +159,6 @@ struct ProfileView: View {
 
     @State private var profile: ProfileRow?
     @State private var days: [DayRecord] = []
-    @State private var connections: [(kind: String, count: Int)] = []
     @State private var receiptDay: DayRecord?
     @State private var loadError: String?
 
@@ -180,21 +173,22 @@ struct ProfileView: View {
                 }
             }
 
-            if isOwn, !connections.isEmpty {
-                Section("Connections") {
-                    ForEach(connections, id: \.kind) { c in
-                        LabeledContent(c.kind) {
-                            Text("\(c.count)").monospacedDigit()
-                        }
-                    }
-                }
-            }
-
             if let loadError {
                 Section {
                     Text(loadError)
                         .font(.footnote)
                         .foregroundStyle(.red)
+                }
+            }
+
+            // Barcode timeline — full-span contribution instrument.
+            if !days.isEmpty {
+                Section {
+                    BarcodeTimeline(days: days) { day in
+                        receiptDay = day
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                 }
             }
 
@@ -268,25 +262,6 @@ struct ProfileView: View {
             loadError = "Load failed"
             NSLog("NukeCapture profile load failed: %@", String(describing: error))
         }
-
-        // Own profile only: grants from v_user_connections (the view is
-        // auth-scoped — anon/visitors get nothing, which is correct).
-        if isOwn {
-            do {
-                let rows: [ConnectionRow] = try await SupabaseService.client
-                    .from("v_user_connections")
-                    .select("kind,status")
-                    .execute()
-                    .value
-                var counts: [String: Int] = [:]
-                for row in rows { counts[row.kind ?? "other", default: 0] += 1 }
-                connections = counts.map { (kind: $0.key, count: $0.value) }
-                    .sorted { $0.count > $1.count }
-            } catch {
-                // Signed-out / no grants — section simply doesn't render.
-                connections = []
-            }
-        }
     }
 }
 
@@ -305,7 +280,7 @@ struct DayReceiptView: View {
                 if let receipt {
                     if !receipt.photos.isEmpty {
                         Section("\(receipt.photos.count) photos") {
-                            RemoteThumbGrid(urls: receipt.photos.compactMap { $0.thumb ?? $0.url })
+                            RemoteThumbGrid(photos: receipt.photos)
                                 .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                         }
                     }
@@ -360,29 +335,84 @@ struct DayReceiptView: View {
     }
 }
 
-/// Square remote-thumbnail grid (AsyncImage). Square cells in a plain inset
-/// grid row — same geometry as the local FloodGrid.
+/// Square remote-thumbnail grid (AsyncImage). Tap any cell to open a
+/// full-screen viewer with a caption bar showing taken_at.
 private struct RemoteThumbGrid: View {
-    let urls: [String]
+    let photos: [DayReceipt.Photo]
     var columns: Int = 4
+
+    @State private var selected: DayReceipt.Photo?
 
     var body: some View {
         LazyVGrid(
             columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: columns),
             spacing: 2
         ) {
-            ForEach(urls.prefix(20), id: \.self) { url in
+            ForEach(photos.prefix(20)) { photo in
+                let url = photo.thumb ?? photo.url
                 Color(.secondarySystemFill)
                     .aspectRatio(1, contentMode: .fit)
                     .overlay {
-                        AsyncImage(url: URL(string: url)) { image in
+                        AsyncImage(url: url.flatMap(URL.init)) { image in
                             image.resizable().scaledToFill()
                         } placeholder: {
                             Color(.secondarySystemFill)
                         }
                     }
                     .clipped()
+                    .onTapGesture { selected = photo }
             }
         }
+        .fullScreenCover(item: $selected) { photo in
+            PhotoFullScreenView(photo: photo)
+        }
+    }
+}
+
+/// Full-bleed photo viewer — black background, tap or drag-down to dismiss.
+/// Evidence rail at the bottom: monospaced taken_at + file_name + ANALYSIS PENDING.
+private struct PhotoFullScreenView: View {
+    let photo: DayReceipt.Photo
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Color.black.ignoresSafeArea()
+            AsyncImage(url: (photo.url ?? photo.thumb).flatMap(URL.init)) { image in
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } placeholder: {
+                ProgressView().tint(.white)
+            }
+
+            // Evidence rail — fixed-height facts bar at the bottom.
+            VStack(alignment: .leading, spacing: 2) {
+                // Line 1: taken_at (verbatim) + optional file_name
+                HStack(spacing: 8) {
+                    if let takenAt = photo.taken_at {
+                        Text(takenAt)
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                    }
+                    // file_name is not on DayReceipt.Photo model (url/thumb only) —
+                    // field absent; omit rather than fabricate.
+                }
+                // Line 2: honest placeholder until vision verdicts exist
+                Text("ANALYSIS PENDING")
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.black)
+        }
+        .onTapGesture { dismiss() }
+        .gesture(DragGesture(minimumDistance: 40)
+            .onEnded { v in if v.translation.height > 0 { dismiss() } })
     }
 }

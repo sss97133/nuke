@@ -78,6 +78,8 @@ struct NukeCaptureApp: App {
                 if session.isSignedIn, !ignitionComplete {
                     Task { await IgnitionEngine.shared.retryAfterSettings() }
                 }
+                // Retry geocoding any sites still holding SITE-serial names.
+                SiteStore.shared.geocodeStaleSerials()
                 // Foreground sync — only once ignition is done. During the
                 // scan NOTHING may upload (the UPLOADED 0 gauge is real).
                 guard session.isSignedIn, ignitionComplete else { return }
