@@ -128,6 +128,8 @@ async function main() {
   let sellersFound = 0;
   let upserted = 0;
   let errors = 0;
+  let dbErrors = 0; // consecutive DB-down errors — drives exponential backoff + clean abort
+  const MAX_CONSECUTIVE_DB_ERRORS = 5;
   let lastFetchedAt = null; // keyset pagination cursor
   let lastId = null;
 
@@ -162,10 +164,32 @@ async function main() {
       console.error(`Batch fetch error: ${fetchErr.message}`);
       errors++;
       if (errors > 50) break;
-      // Pool auto-reconnects, just wait
-      await new Promise(r => setTimeout(r, 3000));
+      // On a DB-down error (ECONNREFUSED/5xx/522/timeout) do NOT retry-storm a
+      // struggling database — that's what turns "slow" into "down" and burns egress.
+      // Back off exponentially (cap 60s) before retrying the batch; if the DB is
+      // clearly down after several attempts, abort the run cleanly instead of looping.
+      const msg = String(fetchErr?.message || fetchErr);
+      const isDbDown =
+        /\b522\b|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|ECONNRESET|connection timeout|terminating connection|\b50[0-9]\b|\b52[0-9]\b/i.test(msg);
+      if (isDbDown) {
+        dbErrors++;
+        if (dbErrors >= MAX_CONSECUTIVE_DB_ERRORS) {
+          console.error(`\n*** ${MAX_CONSECUTIVE_DB_ERRORS} consecutive DB errors — DB is down, aborting run ***`);
+          break;
+        }
+        const backoffMs = Math.min(60000, 2000 * 2 ** (dbErrors - 1));
+        console.error(`  DB error (${dbErrors}/${MAX_CONSECUTIVE_DB_ERRORS}) — backing off ${Math.round(backoffMs / 1000)}s before retry, NOT hammering`);
+        await new Promise(r => setTimeout(r, backoffMs));
+      } else {
+        dbErrors = 0;
+        // Transient/non-DB error: pool auto-reconnects, brief wait.
+        await new Promise(r => setTimeout(r, 3000));
+      }
       continue;
     }
+
+    // Batch fetch succeeded — DB is alive, clear the DB-error streak.
+    dbErrors = 0;
 
     if (snapshots.length === 0) break;
 
