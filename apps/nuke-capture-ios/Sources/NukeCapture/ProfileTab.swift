@@ -406,6 +406,7 @@ private struct PhotoFullScreenView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var confirmedIntent: String?     // optimistic local confirm
     @State private var showConfirm = false
+    @State private var showVehicle = false          // drill to the vehicle detail
 
     private static let intents = ["labor", "inspection", "parts_sourcing",
                                   "communication", "acquisition", "documentation"]
@@ -490,6 +491,28 @@ private struct PhotoFullScreenView: View {
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.4))
             }
+
+            // Drill to the vehicle — only when this frame is filed to one.
+            vehicleRow
+        }
+        .sheet(isPresented: $showVehicle) {
+            if let vid = photo.vehicle_id {
+                VehicleDetailView(vehicleId: vid.uuidString.lowercased())
+            }
+        }
+    }
+
+    @ViewBuilder private var vehicleRow: some View {
+        if let vid = photo.vehicle_id {
+            Button {
+                showVehicle = true
+            } label: {
+                Label("View vehicle", systemImage: "car.side")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("view-vehicle-\(vid.uuidString.lowercased())")
         }
     }
 
