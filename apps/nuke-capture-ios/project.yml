@@ -76,6 +76,14 @@ targets:
         CFBundleDisplayName: Nuke
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # OAuth callback scheme for the ASWebAuthenticationSession providers
+        # (Google, GitHub). ASWebAuthenticationSession needs this scheme so
+        # the Supabase redirect (ag.nuke.capture://login-callback) returns
+        # control to the app. Must match Config.oauthRedirectURL.
+        CFBundleURLTypes:
+          - CFBundleURLName: ag.nuke.capture.oauth
+            CFBundleURLSchemes:
+              - ag.nuke.capture
         UILaunchScreen: {}                    # empty dict = system launch screen, full-size rendering
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

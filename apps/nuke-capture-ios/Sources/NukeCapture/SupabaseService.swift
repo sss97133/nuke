@@ -11,6 +11,7 @@
 // platforms is KeychainLocalStorage — sign in once, the session lives in the
 // device Keychain and auto-refreshes.
 
+import AuthenticationServices
 import CryptoKit
 import Foundation
 import Supabase
@@ -73,6 +74,43 @@ enum SupabaseService {
 
     static func signIn(email: String, password: String) async throws {
         try await client.auth.signIn(email: email, password: password)
+    }
+
+    /// Create a new account with email/password. Sign-in IS sign-up on the
+    /// server (a handle_new_user() trigger auto-creates the profile on first
+    /// auth), so the client only needs to call signUp — no separate
+    /// profile-creation step. Depending on the Supabase project's email-
+    /// confirmation setting, the user may be signed in immediately (confirm
+    /// disabled) or must confirm via email first; SessionStore observes the
+    /// auth change either way.
+    static func signUp(email: String, password: String) async throws {
+        try await client.auth.signUp(email: email, password: password)
+    }
+
+    // ─── Third-party OAuth (Google, GitHub) ──────────────────────────────────
+    //
+    // supabase-swift's signInWithOAuth(provider:redirectTo:configure:) drives
+    // an ASWebAuthenticationSession to the provider's consent page and back
+    // through the redirect URL, then exchanges the result for a session (PKCE
+    // flow). Both providers are gated behind Config flags (default OFF) until
+    // the corresponding Supabase auth provider is enabled and
+    // Config.oauthRedirectURL is in the project's redirect allow-list — see
+    // the Config flag docs for the full runtime dependency.
+
+    /// Sign in with Google via the hosted OAuth consent flow.
+    static func signInWithGoogle() async throws {
+        try await client.auth.signInWithOAuth(
+            provider: .google,
+            redirectTo: Config.oauthRedirectURL
+        )
+    }
+
+    /// Sign in with GitHub via the hosted OAuth consent flow.
+    static func signInWithGitHub() async throws {
+        try await client.auth.signInWithOAuth(
+            provider: .github,
+            redirectTo: Config.oauthRedirectURL
+        )
     }
 
     /// Sign in with Apple — exchanges the ASAuthorizationAppleIDCredential's
