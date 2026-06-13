@@ -276,6 +276,17 @@ final class SyncEngine: ObservableObject {
         }
     }
 
+    /// Re-arm ignition: drop the sync watermark (so hasExistingWatermark goes
+    /// false and NukeCaptureApp re-pushes IgnitionView) and clear any
+    /// in-flight backfill queue. The "ignitionComplete" flag is cleared by
+    /// the caller (AccountView). Keeps the seen-set so a re-ignition doesn't
+    /// re-upload everything; the server's dedupe tolerance covers the rest.
+    func resetForReignition() {
+        defaults.removeObject(forKey: Key.watermark)
+        defaults.removeObject(forKey: Key.backfillQueue)
+        backfillRemaining = 0
+    }
+
     // ─── Ignition backfill ───────────────────────────────────────────────────
     //
     // Starts AUTOMATICALLY after site confirmation (founder ruling: the

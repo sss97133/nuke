@@ -104,10 +104,26 @@ enum Config {
     static let recentUploadsCap = 24
 
     /// Google sign-in door — gated OFF until the Supabase Google provider is
-    /// configured for this bundle id. The constellation ALWAYS renders the
-    /// button; this gates only its enabled state. Flipping it (plus wiring
-    /// signInWithOAuth) is the only client change needed.
+    /// configured for this bundle id. The constellation renders the button
+    /// only when this is true; signInWithOAuth(.google) is wired (see
+    /// SupabaseService.signInWithGoogle). Runtime dependency: the Supabase
+    /// project's Google auth provider must be enabled AND oauthRedirectURL
+    /// must be in its Auth → URL Configuration redirect allow-list, or the
+    /// ASWebAuthenticationSession returns an error. Flip to true once both
+    /// are in place.
     static let enableGoogleSignIn = false
+
+    /// GitHub sign-in door — same gating contract as enableGoogleSignIn.
+    /// signInWithOAuth(.github) is wired (SupabaseService.signInWithGitHub).
+    /// Runtime dependency: enable the GitHub provider in Supabase and add
+    /// oauthRedirectURL to the redirect allow-list before flipping to true.
+    static let enableGithubSignIn = false
+
+    /// OAuth callback URL for the ASWebAuthenticationSession providers
+    /// (Google, GitHub). The scheme is registered in project.yml's
+    /// CFBundleURLTypes; this exact URL must also appear in the Supabase
+    /// Auth → URL Configuration redirect allow-list at runtime.
+    static let oauthRedirectURL = URL(string: "ag.nuke.capture://login-callback")!
 
     /// Explore mode's sample profile (the Profile tab with no session) —
     /// a real prod profile with a deep day record, never a fixture.

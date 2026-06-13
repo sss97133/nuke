@@ -56,17 +56,26 @@ struct SignInView: View {
                 .frame(height: 50)
                 .disabled(isWorking)
 
-                // Google: render only when the provider is configured — a
-                // visibly disabled button reads as placeholder UI to App
-                // Review (Guideline 2.1). Flip Config.enableGoogleSignIn to
-                // bring it back once the Supabase provider exists.
+                // Google / GitHub: render only when the provider is configured
+                // — a visibly disabled button reads as placeholder UI to App
+                // Review (Guideline 2.1). Flip the Config flag to bring each
+                // back once the matching Supabase OAuth provider exists.
                 if Config.enableGoogleSignIn {
                     Button {
-                        // TODO(google-auth): client.auth.signInWithOAuth(
-                        //   provider: .google) once the Supabase provider is
-                        //   configured for ag.nuke.capture.
+                        runOAuth { try await SupabaseService.signInWithGoogle() }
                     } label: {
                         Text("Continue with Google")
+                            .frame(maxWidth: .infinity, minHeight: 34)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isWorking)
+                }
+
+                if Config.enableGithubSignIn {
+                    Button {
+                        runOAuth { try await SupabaseService.signInWithGitHub() }
+                    } label: {
+                        Text("Continue with GitHub")
                             .frame(maxWidth: .infinity, minHeight: 34)
                     }
                     .buttonStyle(.bordered)
@@ -97,6 +106,25 @@ struct SignInView: View {
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 32)
+        }
+    }
+
+    /// Shared runner for the ASWebAuthenticationSession OAuth providers
+    /// (Google, GitHub). Spinner + verbatim error surfacing; a user-canceled
+    /// web sheet is not an error worth showing. SessionStore flips the root
+    /// view on the resulting auth change.
+    private func runOAuth(_ action: @escaping () async throws -> Void) {
+        isWorking = true
+        errorMessage = nil
+        Task {
+            do {
+                try await action()
+            } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+                // User dismissed the web sheet — silent, like the Apple cancel.
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isWorking = false
         }
     }
 
@@ -140,6 +168,15 @@ struct SignInView: View {
 /// Email/password — the same account as nuke.ag. Pushed from the
 /// constellation's "Continue with email".
 struct EmailSignInView: View {
+    /// Sign in (existing account) vs create (new). The server's
+    /// handle_new_user() trigger auto-creates the profile on first auth, so
+    /// "create" is just signUp(email,password) — no extra profile step.
+    private enum Mode: String, CaseIterable {
+        case signIn = "Sign In"
+        case createAccount = "Create Account"
+    }
+
+    @State private var mode: Mode = .signIn
     @State private var email = ""
     @State private var password = ""
     @State private var isWorking = false
@@ -148,13 +185,22 @@ struct EmailSignInView: View {
     var body: some View {
         Form {
             Section {
+                Picker("Mode", selection: $mode) {
+                    ForEach(Mode.allCases, id: \.self) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section {
                 TextField("Email", text: $email)
                     .keyboardType(.emailAddress)
                     .textContentType(.username)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                 SecureField("Password", text: $password)
-                    .textContentType(.password)
+                    .textContentType(mode == .createAccount ? .newPassword : .password)
             }
 
             if let errorMessage {
@@ -167,29 +213,39 @@ struct EmailSignInView: View {
 
             Section {
                 Button {
-                    signIn()
+                    submit()
                 } label: {
                     if isWorking {
                         ProgressView()
                             .frame(maxWidth: .infinity)
                     } else {
-                        Text("Sign In")
+                        Text(mode.rawValue)
                             .frame(maxWidth: .infinity)
                     }
                 }
                 .disabled(isWorking || email.isEmpty || password.isEmpty)
+            } footer: {
+                if mode == .createAccount {
+                    Text("Creating an account uses the same login as nuke.ag. If email confirmation is on, check your inbox to finish.")
+                }
             }
         }
         .navigationTitle("Email")
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private func signIn() {
+    private func submit() {
         isWorking = true
         errorMessage = nil
+        let mode = mode
         Task {
             do {
-                try await SupabaseService.signIn(email: email, password: password)
+                switch mode {
+                case .signIn:
+                    try await SupabaseService.signIn(email: email, password: password)
+                case .createAccount:
+                    try await SupabaseService.signUp(email: email, password: password)
+                }
                 // SessionStore observes authStateChanges — the root view
                 // flips on its own; nothing else to do here.
             } catch {
@@ -295,6 +351,21 @@ struct AccountView: View {
                             .font(.footnote)
                             .foregroundStyle(.red)
                     }
+                }
+
+                // Re-arm the first-run flow: clears the ignitionComplete flag
+                // and the sync watermark so NukeCaptureApp re-pushes
+                // IgnitionView on the next routing pass (the full-library scan
+                // + site re-confirmation runs again). The seen-set is kept, so
+                // already-uploaded photos aren't re-sent.
+                Section {
+                    Button("Re-run ignition") {
+                        UserDefaults.standard.set(false, forKey: IgnitionEngine.completeKey)
+                        SyncEngine.shared.resetForReignition()
+                        dismiss()
+                    }
+                } footer: {
+                    Text("Re-runs the first-run scan: re-detects your work sites and re-confirms what uploads. Already-uploaded photos are not sent again.")
                 }
 
                 Section {
