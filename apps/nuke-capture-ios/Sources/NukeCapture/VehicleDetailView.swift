@@ -559,11 +559,14 @@ struct VehicleDetailView: View {
         // sheet. Pulls the analysis atoms (labels/taken_at/status) so a photo
         // tap opens its analysis without a second round-trip.
         do {
+            // Order by created_at ONLY — there is an index on (vehicle_id,
+            // created_at DESC). Adding is_primary as the lead sort key forced a
+            // full sort of all 3,602 K5 rows under RLS and TIMED OUT (57014).
+            // The primary image is the hero already; the strip is newest-first.
             images = try await SupabaseService.client
                 .from("vehicle_images")
                 .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status")
                 .eq("vehicle_id", value: vehicleId)
-                .order("is_primary", ascending: false)
                 .order("created_at", ascending: false)
                 .limit(12)
                 .execute()
@@ -714,12 +717,54 @@ struct InvestmentProof: Decodable {
     let market: Cell
     let totals: Totals
     let by_party: [Party]?
+    /// The drill behind each ledger cell — owner-only. The actual receipts,
+    /// payments, and work_sessions the totals are summed from. This is the
+    /// three-shelf law applied to the proudest number in the app: every figure
+    /// opens to the rows that made it.
+    let audit: Audit?
+
+    struct Audit: Decodable {
+        // Optional: for a non-owner viewer the proof returns audit = {} (empty
+        // object). Non-optional arrays would throw keyNotFound on {} and null
+        // the ENTIRE proof — hiding the whole INVESTMENT section for everyone
+        // who isn't the owner. Optional → {} decodes to all-nil cleanly.
+        let receipts: [Row]?
+        let payments: [Row]?
+        let work_sessions: [Row]?
+        struct Row: Decodable, Identifiable {
+            let id: UUID
+            let source: String?
+            // receipts
+            let vendor: String?
+            let amount: Double?
+            let date: String?
+            // payments
+            let direction: String?
+            let counterparty: String?
+            let method: String?
+            let confirmation: String?
+            let description: String?
+            // work_sessions
+            let cost: Double?
+            let confirmed: Bool?
+        }
+    }
+}
+
+/// A ledger cell tapped for its backing rows — the drill target.
+struct LedgerDrill: Identifiable {
+    enum Kind { case receipts, payments, labor }
+    let title: String
+    let kind: Kind
+    let rows: [InvestmentProof.Audit.Row]
+    var id: String { title }
 }
 
 struct InvestmentProofView: View {
     let vehicleId: String
     @State private var proof: InvestmentProof?
     @State private var showAttest = false
+    @State private var ledgerDrill: LedgerDrill?   // a cell tapped for its rows
 
     private func money(_ v: Double?) -> String {
         guard let v else { return "—" }
@@ -735,13 +780,16 @@ struct InvestmentProofView: View {
                         .foregroundStyle(Color.secondary)
                         .padding(.top, 8).padding(.bottom, 4)
 
-                    line("Parts", p.proven.parts.value, sub: "\(p.proven.parts.count ?? 0) receipts · proven")
+                    line("Parts", p.proven.parts.value, sub: "\(p.proven.parts.count ?? 0) receipts · proven",
+                         onTap: drill("Parts", .receipts, p.audit?.receipts))
                     if (p.proven.confirmed_labor.value ?? 0) > 0 {
-                        line("Labor (confirmed)", p.proven.confirmed_labor.value, sub: "proven")
+                        line("Labor (confirmed)", p.proven.confirmed_labor.value, sub: "proven",
+                             onTap: drill("Labor", .labor, p.audit?.work_sessions))
                     }
                     if (p.proven.money_in.value ?? 0) > 0 {
                         line("Income", p.proven.money_in.value,
-                             sub: "\(p.proven.money_in.count ?? 0) payments · proven", positive: true)
+                             sub: "\(p.proven.money_in.count ?? 0) payments · proven", positive: true,
+                             onTap: drill("Payments", .payments, p.audit?.payments))
                     }
 
                     // ATTRIBUTED — owner-stated (paid-by-other / gifted). A rung
@@ -762,7 +810,8 @@ struct InvestmentProofView: View {
                     Divider().overlay(Color.primary.opacity(0.3)).padding(.vertical, 4)
 
                     line("Labor (projected)", p.projected.labor.value,
-                         sub: "\(p.projected.labor.count ?? 0) sessions · unconfirmed", dim: true)
+                         sub: "\(p.projected.labor.count ?? 0) sessions · tap to confirm", dim: true,
+                         onTap: drill("Labor", .labor, p.audit?.work_sessions))
                     line("Market est.", p.market.value, sub: p.market.confidence ?? "", dim: true)
 
                     Divider().overlay(Color.primary.opacity(0.3)).padding(.vertical, 4)
@@ -809,6 +858,12 @@ struct InvestmentProofView: View {
                 .font(.system(.footnote, design: .monospaced))
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
+                // Ledger drill sheet — attached to the VStack (a DIFFERENT view
+                // than the showAttest sheet below) so both present reliably;
+                // two .sheet modifiers on one view suppress the second.
+                .sheet(item: $ledgerDrill) { drill in
+                    LedgerEvidenceSheet(drill: drill) { Task { await load() } }
+                }
             }
         }
         .task(id: vehicleId) { await load() }
@@ -819,8 +874,9 @@ struct InvestmentProofView: View {
 
     @ViewBuilder private func line(_ label: String, _ value: Double?, sub: String,
                                    positive: Bool = false, dim: Bool = false,
-                                   bold: Bool = false, rawValue: String? = nil) -> some View {
-        HStack(alignment: .firstTextBaseline) {
+                                   bold: Bool = false, rawValue: String? = nil,
+                                   onTap: (() -> Void)? = nil) -> some View {
+        let row = HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(label).foregroundStyle(dim ? Color.secondary : Color.primary)
                 if !sub.isEmpty {
@@ -831,8 +887,24 @@ struct InvestmentProofView: View {
             Text(rawValue ?? money(value))
                 .fontWeight(bold ? .semibold : .regular)
                 .foregroundStyle(positive ? Color.green : (dim ? Color.secondary : Color.primary))
+            if onTap != nil {
+                Image(systemName: "chevron.right.circle").font(.caption2).foregroundStyle(.blue)
+            }
         }
         .padding(.vertical, 3)
+        .contentShape(Rectangle())
+
+        if let onTap {
+            Button(action: onTap) { row }.buttonStyle(.plain)
+        } else {
+            row
+        }
+    }
+
+    /// Build a drill for a ledger cell IFF the owner audit carries its rows.
+    private func drill(_ title: String, _ kind: LedgerDrill.Kind, _ rows: [InvestmentProof.Audit.Row]?) -> (() -> Void)? {
+        guard let rows, !rows.isEmpty else { return nil }
+        return { ledgerDrill = LedgerDrill(title: title, kind: kind, rows: rows) }
     }
 
     private func load() async {
@@ -844,6 +916,14 @@ struct InvestmentProofView: View {
         } catch {
             NSLog("NukeCapture investment proof failed: %@", String(describing: error))
         }
+        #if DEBUG
+        // Screenshot loop: auto-open a ledger drill (NUKE_DEBUG_LEDGER=labor).
+        if ledgerDrill == nil,
+           let kind = ProcessInfo.processInfo.environment["NUKE_DEBUG_LEDGER"],
+           kind == "labor", let rows = proof?.audit?.work_sessions, !rows.isEmpty {
+            ledgerDrill = LedgerDrill(title: "Labor", kind: .labor, rows: rows)
+        }
+        #endif
     }
 }
 
@@ -1202,5 +1282,116 @@ struct FieldProvenanceSheet: View {
             NSLog("NukeCapture field provenance failed: %@", String(describing: error))
         }
         loaded = true
+    }
+}
+
+// ─── Ledger evidence + the CONFIRM verb ──────────────────────────────────────
+// The rows behind a ledger cell — receipts / payments / work sessions, the same
+// audit the proof already returns (owner-only). For the labor bucket each
+// unconfirmed session carries CONFIRM: tapping it promotes that session from
+// projected → proven (confirm_work_session), the parent proof re-rolls, and the
+// owner watches "Invested (proven)" climb in the same turn. The app finally lets
+// you CLIMB the trust ladder it draws — the owner's signature is the product.
+
+private struct LedgerEvidenceSheet: View {
+    typealias Row = InvestmentProof.Audit.Row
+    let drill: LedgerDrill
+    var onChanged: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var confirmed: Set<UUID> = []   // optimistic local promotion
+    @State private var working: UUID?
+
+    private func money(_ v: Double?) -> String {
+        guard let v else { return "—" }
+        return v.formatted(.currency(code: "USD").precision(.fractionLength(0)))
+    }
+
+    private var unconfirmedCount: Int {
+        drill.rows.filter { !($0.confirmed ?? false) && !confirmed.contains($0.id) }.count
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if drill.kind == .labor, unconfirmedCount > 0 {
+                    Section {
+                        Text("\(unconfirmedCount) session\(unconfirmedCount == 1 ? "" : "s") awaiting your confirmation. Confirming promotes labor from projected to proven.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                ForEach(drill.rows) { row in
+                    switch drill.kind {
+                    case .receipts: receiptRow(row)
+                    case .payments: paymentRow(row)
+                    case .labor:    laborRow(row)
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .navigationTitle(drill.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    @ViewBuilder private func receiptRow(_ r: Row) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(r.vendor ?? "Receipt").font(.footnote)
+                if let d = r.date { Text(String(d.prefix(10))).font(.caption2).foregroundStyle(.secondary) }
+            }
+            Spacer()
+            Text(money(r.amount)).font(.system(.footnote, design: .monospaced))
+        }
+    }
+
+    @ViewBuilder private func paymentRow(_ r: Row) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(r.counterparty ?? r.description ?? "Payment").font(.footnote)
+                if let m = r.method { Text(m).font(.caption2).foregroundStyle(.secondary) }
+            }
+            Spacer()
+            Text((r.direction == "in" ? "+" : "") + money(r.amount))
+                .font(.system(.footnote, design: .monospaced))
+                .foregroundStyle(r.direction == "in" ? .green : .primary)
+        }
+    }
+
+    @ViewBuilder private func laborRow(_ r: Row) -> some View {
+        let isConfirmed = (r.confirmed ?? false) || confirmed.contains(r.id)
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(r.date.map { String($0.prefix(10)) } ?? "Work session").font(.footnote)
+                Text(money(r.cost)).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if isConfirmed {
+                Label("Proven", systemImage: "checkmark.seal.fill")
+                    .labelStyle(.titleAndIcon).font(.caption2).foregroundStyle(.green)
+            } else if working == r.id {
+                ProgressView()
+            } else {
+                Button("Confirm") { Task { await confirm(r.id) } }
+                    .buttonStyle(.borderedProminent).controlSize(.small)
+            }
+        }
+    }
+
+    private func confirm(_ id: UUID) async {
+        working = id
+        defer { working = nil }
+        struct P: Encodable { let p_session_id: String; let p_confirm: Bool }
+        do {
+            _ = try await SupabaseService.client
+                .rpc("confirm_work_session", params: P(p_session_id: id.uuidString, p_confirm: true))
+                .execute()
+            confirmed.insert(id)   // optimistic flip
+            onChanged()            // parent re-rolls the proof
+        } catch {
+            NSLog("NukeCapture confirm_work_session failed: %@", String(describing: error))
+        }
     }
 }

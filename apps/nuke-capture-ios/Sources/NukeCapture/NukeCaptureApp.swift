@@ -55,9 +55,9 @@ struct NukeCaptureApp: App {
                 // coordinate-tapping). DEBUG builds only; never ships.
                 if let dbgVehicle = ProcessInfo.processInfo.environment["NUKE_DEBUG_VEHICLE_ID"],
                    !dbgVehicle.isEmpty {
-                    VehicleDetailView(
+                    DebugVehicleDeepLink(
                         vehicleId: dbgVehicle,
-                        debugOpenField: ProcessInfo.processInfo.environment["NUKE_DEBUG_PROVENANCE_FIELD"]
+                        field: ProcessInfo.processInfo.environment["NUKE_DEBUG_PROVENANCE_FIELD"]
                     )
                 } else {
                     rootView
@@ -264,3 +264,40 @@ final class SessionStore: ObservableObject {
         watcher?.cancel()
     }
 }
+
+#if DEBUG
+/// Screenshot-loop deep link. Optionally injects a real session (so owner-gated
+/// surfaces — ASSET window, investment proof, CONFIRM — render as the actual
+/// owner) BEFORE showing the vehicle. Tokens come from NUKE_DEBUG_ACCESS_TOKEN /
+/// NUKE_DEBUG_REFRESH_TOKEN, minted out-of-band. DEBUG only; never ships.
+private struct DebugVehicleDeepLink: View {
+    let vehicleId: String
+    let field: String?
+    @State private var ready = false
+
+    var body: some View {
+        Group {
+            if ready {
+                VehicleDetailView(vehicleId: vehicleId, debugOpenField: field)
+            } else {
+                Color(.systemBackground).overlay { ProgressView() }
+            }
+        }
+        .task {
+            let env = ProcessInfo.processInfo.environment
+            if let at = env["NUKE_DEBUG_ACCESS_TOKEN"], !at.isEmpty,
+               let rt = env["NUKE_DEBUG_REFRESH_TOKEN"], !rt.isEmpty,
+               SupabaseService.currentUserId == nil {
+                do {
+                    _ = try await SupabaseService.client.auth.setSession(accessToken: at, refreshToken: rt)
+                } catch {
+                    NSLog("NukeCapture DEBUG setSession failed: %@", String(describing: error))
+                }
+                NSLog("NukeCapture DEBUG session injected: currentUserId=%@",
+                      SupabaseService.currentUserId ?? "nil")
+            }
+            ready = true
+        }
+    }
+}
+#endif
