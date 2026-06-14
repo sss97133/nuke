@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JIG — PROFILE — every wall cites its authority</title>
+<style>
+  :root{
+    --paper:#f5f5f5; --ink:#1a1a1a; --pencil:#666; --ghost:#ddd; --border:#bdbdbd;
+    --web:#b05a00; --bible:#16825d;
+    --sans:-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,"Courier New",monospace;
+    --ios-bg:#f2f2f7; --ios-cell:#fff; --ios-sep:#c6c6c8; --ios-grey:#8e8e93; --ios-blue:#007aff;
+    --heat-lo:#d9f99d; --heat-hi:#065f46;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);padding:24px 26px 60px}
+  .mast{border-bottom:2px solid var(--ink);padding-bottom:8px;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+  .mast h1{font-size:18px;font-weight:800;letter-spacing:-.5px}
+  .mast .m{font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .law{font-size:10px;line-height:1.6;color:var(--pencil);margin:10px 0 4px;max-width:1100px}
+  .law b{color:var(--ink)}
+  .key{font-family:var(--mono);font-size:10px;margin:6px 0 22px;display:flex;gap:18px}
+  .key .w{color:var(--web);font-weight:700}.key .b{color:var(--bible);font-weight:700}
+
+  .stage{display:flex;gap:40px;align-items:flex-start}
+
+  /* the phone — Apple's building */
+  .phone{flex:0 0 300px;border:2px solid var(--ink);background:var(--ios-bg);border-radius:0;overflow:hidden}
+  .statusbar{display:flex;justify-content:space-between;padding:8px 16px 4px;font-size:12px;font-weight:600}
+  .screen{padding:0 14px 16px}
+  .big{font-size:26px;font-weight:700;letter-spacing:.2px;margin:6px 2px 2px}
+  .portrait{font-family:var(--mono);font-size:11px;color:var(--ink);margin:2px 2px 12px;line-height:1.5}
+  .portrait b{font-weight:700}
+  /* timeline strip */
+  .timeline{height:34px;background:var(--ios-cell);border-radius:10px;display:flex;align-items:flex-end;gap:1.5px;padding:6px 8px;overflow:hidden}
+  .timeline i{display:block;width:2px;background:var(--ink)}
+  .tlabel{font-family:var(--mono);font-size:8px;color:var(--ios-grey);display:flex;justify-content:space-between;margin:3px 2px 12px}
+  /* today card */
+  .card{background:var(--ios-cell);border-radius:12px;padding:13px 14px;margin-bottom:12px}
+  .card .k{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ios-grey)}
+  .card .veh{font-size:15px;font-weight:600;margin:3px 0 2px}
+  .card .sub{font-family:var(--mono);font-size:10px;color:var(--ios-grey)}
+  .card .read{font-size:11px;color:var(--ink);margin-top:6px;font-style:italic}
+  .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:9px}
+  .row3 .t{aspect-ratio:1/1;border-radius:6px;background-size:cover;background-position:center}
+  /* photo river */
+  .river{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-bottom:12px}
+  .river .t{aspect-ratio:1/1;border-radius:6px;background-size:cover;background-position:center;background-color:#e2e2e6}
+  .ariver{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ios-grey);margin:2px 2px 7px;display:flex;justify-content:space-between}
+  /* demoted account row */
+  .acct{background:var(--ios-cell);border-radius:12px;padding:13px 14px;display:flex;justify-content:space-between;align-items:center}
+  .acct .l{font-size:15px}.acct .r{color:var(--ios-grey);font-size:15px}
+
+  /* annotations — board voice, cite authority */
+  .ann{flex:1;min-width:360px}
+  .note{border-left:3px solid var(--ghost);padding:0 0 16px 14px;margin-bottom:16px;position:relative}
+  .note h3{font-family:var(--mono);font-size:12px;font-weight:700;margin-bottom:5px}
+  .note .src{font-family:var(--mono);font-size:10px;line-height:1.7;margin-bottom:5px}
+  .note .w{color:var(--web)}.note .b{color:var(--bible)}
+  .note p{font-size:11px;line-height:1.55;color:#333}
+  .note p .better{color:var(--bible);font-weight:700}
+  .verdict{margin-top:26px;border:2px solid var(--ink);padding:14px;max-width:640px;font-size:11px;line-height:1.6}
+  .verdict b{font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="mast">
+  <h1>JIG · PROFILE TAB</h1>
+  <span class="m">PRE-PRODUCTION FIXTURE · NOT A MOCKUP · 1 OF N SURFACES · REAL DATA (@skylar)</span>
+</div>
+<div class="law">
+  A jig, not a storyboard. <b>Every wall on this screen cites its authority.</b> An element exists here only because
+  <span style="color:var(--web);font-weight:700">the website already proves the structure works</span>, corrected by
+  <span style="color:var(--bible);font-weight:700">a library principle that says how to make it better than the web.</span>
+  The builder follows the citations; there is no blank wall to freelance. Critique the <b>citations</b>, not the pixels.
+</div>
+<div class="key"><span class="w">⬛ WEB = proven on nuke.ag/u/skylar (the storyboard)</span><span class="b">⬛ BIBLE = the principle that perfects it</span></div>
+
+<div class="stage">
+
+  <!-- THE PHONE -->
+  <div class="phone">
+    <div class="statusbar"><span>9:41</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+    <div class="screen">
+      <div class="big">skylar williams</div>
+      <div class="portrait"><b>28,566</b> contributions &middot; <b>334</b> vehicles &middot; <b>78</b> this week<br>@skylar &middot; Boulder City NV &middot; since Sep 2025</div>
+
+      <div class="timeline" id="tl"></div>
+      <div class="tlabel"><span>2006</span><span>EVERY BAR A DAY OF WORK</span><span>2026</span></div>
+
+      <div class="card">
+        <div class="k">Today &middot; Sat Jun 13</div>
+        <div class="veh">1989 Pickup R3500 Cheyenne</div>
+        <div class="sub">3 PHOTOS &middot; LAST 08:12 PM</div>
+        <div class="row3" id="todayPhotos"></div>
+        <div class="read">&ldquo;Bed liner going in &mdash; spray-in, masked cab corners.&rdquo;</div>
+      </div>
+
+      <div class="ariver"><span>The record</span><span>22,982 frames</span></div>
+      <div class="river" id="river"></div>
+
+      <div class="acct"><span class="l">Account &amp; connections</span><span class="r">&rsaquo;</span></div>
+    </div>
+  </div>
+
+  <!-- ANNOTATIONS -->
+  <div class="ann">
+    <div class="note">
+      <h3>① THE PORTRAIT LINE (the headline)</h3>
+      <div class="src"><span class="w">WEB:</span> the profile already computes <b>28,566 contributions / 334 vehicles / 78 this week</b> — but buries them in a grey stat strip next to LOGIN.</div>
+      <div class="src"><span class="b">BIBLE:</span> proof-of-work-not-pay-to-play — <b>the record IS the identity.</b> &ldquo;the data should paint a picture of what the user is&rdquo; (you, 06-11).</div>
+      <p><span class="better">Better than web:</span> the contribution count is the FIRST thing, a computed sentence, not a stat row. This is the line that says who you are before any photo loads.</p>
+    </div>
+    <div class="note">
+      <h3>② THE TIMELINE (develops in)</h3>
+      <div class="src"><span class="w">WEB:</span> the <b>TIMELINE 2006–2026</b> density strip is the proven proof-of-work signature, already on the page.</div>
+      <div class="src"><span class="b">BIBLE:</span> C9 darkroom (it <b>develops</b> on open, never static) + C10 (a bar taps to that day's document). The standard timeline is the navigation benchmark — texture applied TO it, not beside it.</div>
+      <p><span class="better">Better than web:</span> on the phone it paints in over ~1s as the profile opens (the hook), and every bar is a tap into the day receipt. The web strip just sits there.</p>
+    </div>
+    <div class="note">
+      <h3>③ TODAY (the analyst speaks)</h3>
+      <div class="src"><span class="w">WEB:</span> the <b>TODAY · activity-on-vehicle</b> card is proven structure — but its 3 photo slots render as <b>empty boxes</b> (HEIC/render bug).</div>
+      <div class="src"><span class="b">BIBLE:</span> ANALYSIS_DIRECTIVE — the day is named by the on-device analyst, not just counted (&ldquo;bed liner going in&rdquo;, never &ldquo;3 photos&rdquo;). Render-endpoint rule (transcodes HEIC).</div>
+      <p><span class="better">Better than web:</span> real frames render (24KB via /render, not 3.4MB grey voids), and the italic line is the T0 analyst's read of the day — the foundation organ made visible.</p>
+    </div>
+    <div class="note">
+      <h3>④ THE RECORD / PHOTO RIVER</h3>
+      <div class="src"><span class="w">WEB:</span> <b>RECENT PHOTOS · 16,020 images</b> is the proven river — currently a wall of grey placeholders.</div>
+      <div class="src"><span class="b">BIBLE:</span> big rule #1 (every image understood) + C10 (each frame taps to its evidence rail). Documentation images ARE the content.</div>
+      <p><span class="better">Better than web:</span> the river actually renders, and a tap opens the lightbox with the frame's testimony (taken · site · day · vehicle · atoms). The web river is a dead grid.</p>
+    </div>
+    <div class="note">
+      <h3>⑤ ACCOUNT — demoted behind one row</h3>
+      <div class="src"><span class="w">WEB:</span> the page over-weights <b>Dossier / Identity / Social / Account / Type:ADMIN</b> — and the current iOS app reduced the WHOLE profile to exactly this cruft.</div>
+      <div class="src"><span class="b">BIBLE:</span> C5 — Apple owns the building. Settings is Apple's room, not the profile. The profile is the record; account lives one tap away.</div>
+      <p><span class="better">Better than web:</span> name/username/github/type/connections all collapse into one &ldquo;Account &amp; connections ›&rdquo; row → a stock settings sheet. The profile stays the proof, not the form.</p>
+    </div>
+  </div>
+</div>
+
+<div class="verdict">
+  <b>The method, on one wall.</b> Every block above is the website's own structure (it works — it's live) corrected by one named
+  principle (how to beat the web). The current iOS profile kept only block ⑤ and threw out ①–④ — the exact inversion of what
+  matters. <b>If this derivation logic is right, every other surface (login, ignition, map, day, image) gets jigged the same way</b>
+  — and the next builder can't default to stock-iOS-dead, because each wall already names what hangs on it and cites why.
+  Ratify the <b>method</b>; the surfaces follow.
+</div>
+
+<script>
+const R = u => u.replace('/object/public/','/render/image/public/') + '?width=300&resize=contain';
+(async () => {
+  // real K5 frames stand in for the river + today (proves render-endpoint path)
+  const photos = await fetch('k5_photos.json').then(r=>r.json()).catch(()=>[]);
+  const urls = photos.map(p=>p.u);
+  const pick = n => Array.from({length:n}, (_,i)=> urls[(i*7+3) % urls.length]).filter(Boolean);
+  document.getElementById('todayPhotos').innerHTML = pick(3).map(u=>`<div class="t" style="background-image:url('${R(u)}')"></div>`).join('');
+  document.getElementById('river').innerHTML = pick(9).map(u=>`<div class="t" style="background-image:url('${R(u)}')"></div>`).join('');
+  // timeline: develop-in from real day density
+  const ts = await fetch('k5_timestamps.json').then(r=>r.json()).catch(()=>[]);
+  const days = {}; ts.forEach(t=>{const d=t.slice(0,10); days[d]=(days[d]||0)+1;});
+  const tl = document.getElementById('tl');
+  const entries = Object.entries(days).sort();
+  const T0=new Date('2006-01-01'), T1=new Date('2026-12-31');
+  // build 120 slots across the span, height = that window's density
+  const bars = entries.map(([d,n])=>({x:(new Date(d)-T0)/(T1-T0), h:Math.min(22,4+Math.sqrt(n)*3)}));
+  tl.innerHTML = bars.map(b=>`<i style="height:0px;margin-left:${(b.x*270)|0}px;position:absolute;bottom:6px" data-h="${b.h}"></i>`).join('');
+  tl.style.position='relative';
+  let k=0; const ivId=setInterval(()=>{ const bs=tl.querySelectorAll('i'); if(k>=bs.length){clearInterval(ivId);return;} for(let j=0;j<6&&k<bs.length;j++,k++){bs[k].style.height=bs[k].dataset.h+'px';} },30);
+})();
+</script>
+
+</body>
+</html>
