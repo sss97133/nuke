@@ -43,6 +43,14 @@ struct TodayView: View {
                         .listRowBackground(Color.clear)
                 }
 
+                // ── Understanding: the record assembling itself (BUILD_2 §G14) ──
+                // The mesh growing — days/frames becoming understood tick up live
+                // as the analysis engine lands them; the latest understood days
+                // stream in. Distinct from the capture-relay counters above.
+                if let uid = SupabaseService.currentUserId {
+                    UnderstandingPanel(userId: uid)
+                }
+
                 // ── Recent uploads (local thumbnails) ──
                 if !engine.recentUploadIDs.isEmpty {
                     Section("Recent uploads") {
@@ -91,6 +99,140 @@ struct TodayView: View {
             .refreshable {
                 await engine.sync()
             }
+        }
+    }
+}
+
+// ─── Understanding: the mesh growing (BUILD_2 §G14) ─────────────────────────────
+//
+// The owner's whole record being understood — fed by get_user_understanding over
+// work_sessions (the day rollup is the analysis unit; sum(image_count) is the fast
+// frames proxy). Two counters tick up via .numericText as the engine lands days,
+// and the latest understood days stream in, each drilling to its day receipt. A
+// 30s poll loop makes the accretion visible while the screen is open.
+
+/// get_user_understanding(p_user_id) → jsonb (scalar) → PostgREST array-wraps it,
+/// so decode [UserUnderstanding] and take .first (same pattern as the day receipt).
+struct UserUnderstanding: Decodable {
+    let is_owner_view: Bool?
+    let days_understood: Int
+    let frames_understood: Int
+    let days_today: Int
+    let latest: [Day]
+
+    struct Day: Decodable, Identifiable {
+        let date: String          // "yyyy-MM-dd" — drills to DayReceiptView
+        let vehicle_id: UUID?
+        let make: String?
+        let model: String?
+        let frames: Int?
+        let title: String?        // the day's classification (work_type)
+        let minutes: Int?
+
+        var id: String { date + (vehicle_id?.uuidString ?? "") }
+        var vehicleTitle: String {
+            let parts = [make, model].compactMap { $0 }.filter { !$0.isEmpty }
+            return parts.isEmpty ? "VEHICLE" : parts.joined(separator: " ").uppercased()
+        }
+    }
+}
+
+private struct UnderstandingPanel: View {
+    let userId: String
+    @State private var u: UserUnderstanding?
+
+    var body: some View {
+        Group {
+            Section {
+                if let u {
+                    HStack(spacing: 0) {
+                        MetricCell(
+                            label: "DAYS UNDERSTOOD",
+                            value: "\(u.days_understood)",
+                            caption: u.days_today > 0 ? "+\(u.days_today) today" : nil
+                        )
+                        Divider().frame(height: 44)
+                        MetricCell(label: "FRAMES", value: "\(u.frames_understood)")
+                    }
+                    .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
+                } else {
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.7)
+                        Text("Reading the record…")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                    .listRowBackground(Color.clear)
+                }
+            } header: {
+                Text("Understanding")
+            } footer: {
+                Text("Your record assembling itself — frames becoming understood.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+
+            if let u, !u.latest.isEmpty {
+                Section("Latest understood") {
+                    ForEach(u.latest) { day in
+                        NavigationLink {
+                            DayReceiptView(userId: userId, date: day.date)
+                        } label: {
+                            row(day)
+                        }
+                    }
+                }
+            }
+        }
+        .task(id: userId) { await poll() }
+    }
+
+    @ViewBuilder private func row(_ d: UserUnderstanding.Day) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(d.vehicleTitle)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Color.primary)
+                    .lineLimit(1)
+                if let title = d.title, !title.isEmpty {
+                    Text(title)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(d.frames ?? 0) frames")
+                    .font(.caption2).monospacedDigit()
+                    .foregroundStyle(.secondary)
+                Text(d.date)
+                    .font(.caption2).monospacedDigit()
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    /// Poll every 30s while the screen is open — the burn-all lands ~5 frames/min,
+    /// so the counters climb and new rows appear in front of the owner.
+    private func poll() async {
+        while !Task.isCancelled {
+            await fetch()
+            try? await Task.sleep(for: .seconds(30))
+        }
+    }
+
+    private func fetch() async {
+        do {
+            let rows: [UserUnderstanding] = try await SupabaseService.client
+                .rpc("get_user_understanding", params: ["p_user_id": userId])
+                .execute()
+                .value
+            if let row = rows.first {
+                withAnimation(.easeInOut(duration: 0.4)) { u = row }
+            }
+        } catch {
+            NSLog("NukeCapture understanding fetch failed: %@", String(describing: error))
         }
     }
 }
