@@ -2109,7 +2109,8 @@ const ImageGallery = ({
 
       // Refresh images and notify parent. Same fetch path as initial load —
       // the old inline query here was unpaginated (capped at the REST row
-      // limit) and skipped the vision-gate filter the other refresh paths use.
+      // limit) and skipped the vision-gate + superseded filters the shared
+      // fetch applies (see fetchVehicleImages.ts).
       const refreshedImages = await fetchGalleryImages(vehicleId);
 
       const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
