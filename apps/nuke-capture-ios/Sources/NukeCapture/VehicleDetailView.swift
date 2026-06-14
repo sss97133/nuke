@@ -13,6 +13,7 @@
 //     so the pushing stack owns the bar/back chevron (no dead-end Done button).
 
 import SwiftUI
+import UIKit
 
 /// One vehicles row — exact columns, read-only. Header + full spec set in a
 /// single select so one fetch covers the title bar AND the spec table.
@@ -41,6 +42,17 @@ struct VehicleHeaderRow: Decodable, Identifiable, Hashable {
     let sale_price: Double?
     let nuke_estimate: Double?
     let description: String?
+
+    // Inline provenance — the {field}_source columns. Non-null here means the
+    // value drills to a real source row (get_field_provenance), so the spec row
+    // gets a tap affordance; null means the value stays honest dead text (the
+    // three-shelf law / click-through-ready rule — an empty drill is worse than
+    // no drill). Only the fields that carry a _source column on vehicles.
+    let vin_source: String?
+    let mileage_source: String?
+    let transmission_source: String?
+    let engine_source: String?
+    let color_source: String?
 
     /// "YEAR MAKE MODEL TRIM" — only the parts that exist, never a lone "—".
     var title: String {
@@ -103,6 +115,9 @@ struct VehicleDetailView: View {
     /// TRUE (default) = wrap in own NavigationStack + show Done (sheet call sites).
     /// FALSE = pushed onto an existing stack; that stack owns the bar/back chevron.
     var embedInNavigationStack: Bool = true
+    /// DEBUG screenshot loop only: auto-open this spec field's provenance sheet on
+    /// load (deterministic capture of the drill state, no fragile sim-tapping).
+    var debugOpenField: String? = nil
     @Environment(\.dismiss) private var dismiss
 
     @State private var vehicle: VehicleHeaderRow?
@@ -112,10 +127,12 @@ struct VehicleDetailView: View {
     @State private var loaded = false
     @State private var galleryOpen = false
     @State private var selectedPhoto: VehicleGalleryImage?  // photo→analysis drill
+    @State private var provenanceDrill: SpecDrill?          // spec value → its source
 
-    init(vehicleId: String, embedInNavigationStack: Bool = true) {
+    init(vehicleId: String, embedInNavigationStack: Bool = true, debugOpenField: String? = nil) {
         self.vehicleId = vehicleId
         self.embedInNavigationStack = embedInNavigationStack
+        self.debugOpenField = debugOpenField
     }
 
     var body: some View {
@@ -131,17 +148,24 @@ struct VehicleDetailView: View {
                             ToolbarItem(placement: .topBarLeading) {
                                 Button("Done") { dismiss() }
                             }
+                            ToolbarItem(placement: .topBarTrailing) { shareButton }
                         }
                 }
             } else {
                 content
                     .navigationTitle("Vehicle")
                     .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) { shareButton }
+                    }
             }
         }
         .task(id: vehicleId) { await load() }
+        .sheet(item: $provenanceDrill) { drill in
+            FieldProvenanceSheet(vehicleId: vehicleId, drill: drill)
+        }
         .fullScreenCover(isPresented: $galleryOpen) {
-            FullScreenGalleryView(images: images.compactMap { $0.image_url })
+            FullScreenGalleryView(images: galleryURLs)
         }
         // Photo→analysis drill: open the tapped image's vision atoms +
         // provenance. Reuses the shared AnalyzedEvidenceView so there's one
@@ -199,17 +223,33 @@ struct VehicleDetailView: View {
         }
     }
 
-    // ─── Hero (full-res original; the only place we use the un-rendered url) ──
+    // ─── Hero — sized render thumb (NOT the raw original), tap → full gallery.
+    // The hero is a 240pt strip, not a full-screen view, so it must NOT load the
+    // raw object url: measured, that was a 2.9 MB decode on the main thread per
+    // appear. width=1000 keeps it crisp full-bleed at ~60 KB. Full-res lives
+    // only in the full-screen gallery (tap the hero to get there).
     @ViewBuilder private var hero: some View {
-        if let urlStr = vehicle?.primary_image_url, let url = URL(string: urlStr) {
-            AsyncImage(url: url) { image in
-                image.resizable().scaledToFill()
-            } placeholder: {
-                Color(.secondarySystemFill).overlay { ProgressView() }
+        if let urlStr = vehicle?.primary_image_url {
+            Button { galleryOpen = true } label: {
+                CachedAsyncImage(url: NukeImage.thumb(urlStr, width: 1000)) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Color(.secondarySystemFill).overlay { ProgressView() }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 240)
+                .clipped()
+                .overlay(alignment: .bottomTrailing) {
+                    // A quiet affordance that the hero opens the full set.
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(6)
+                        .background(.black.opacity(0.35), in: Circle())
+                        .padding(8)
+                }
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 240)
-            .clipped()
+            .buttonStyle(.plain)
         } else if loaded && loadError == nil {
             // Loaded, no image — a flat plate, never a broken frame.
             Color(.secondarySystemFill)
@@ -314,8 +354,12 @@ struct VehicleDetailView: View {
         }
     }
 
-    // ─── Spec table — only the non-null fields, traditional LabeledContent rows
-    // with monospaced values. Skip any empty field entirely (no lone "—" rows).
+    // ─── Spec table — only the non-null fields. Every value that has a recorded
+    // source (a {field}_source) is TAPPABLE → its provenance: the door-jamb VIN
+    // plate photo, the observation that recorded it, how sure, from where. A
+    // value with no recorded source stays honest dead text — an empty drill is
+    // worse than no drill (the three-shelf law / "no number without a table
+    // behind it"). Long-press any value to copy it.
     @ViewBuilder private var specTable: some View {
         if let v = vehicle, hasAnySpec(v) {
             VStack(alignment: .leading, spacing: 0) {
@@ -325,16 +369,9 @@ struct VehicleDetailView: View {
                     .padding(.bottom, 4)
 
                 VStack(spacing: 0) {
-                    specRow("VIN", v.vin)
-                    specRow("Mileage", v.mileage.map { "\($0.formatted()) mi" })
-                    specRow("Transmission", v.transmission)
-                    specRow("Drivetrain", v.drivetrain)
-                    specRow("Body", v.body_style)
-                    specRow("Color", v.color)
-                    specRow("Interior", v.interior_color)
-                    specRow("Engine", v.engine_type)
-                    specRow("Fuel", v.fuel_type)
-                    specRow("Location", location(v))
+                    ForEach(specItems(v)) { item in
+                        specRow(item)
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -342,22 +379,88 @@ struct VehicleDetailView: View {
         }
     }
 
-    /// One spec row — renders ONLY if the value is present and non-empty.
-    @ViewBuilder private func specRow(_ label: String, _ value: String?) -> some View {
-        if let value, !value.isEmpty {
-            LabeledContent {
-                Text(value)
+    /// Spec rows in display order. `field` = the get_field_provenance key (nil →
+    /// never drillable); `source` = the inline {field}_source value (non-nil →
+    /// the value drills to a real source row). Only present values survive.
+    private func specItems(_ v: VehicleHeaderRow) -> [SpecItem] {
+        [
+            SpecItem(label: "VIN",          value: v.vin,                                    field: "vin",          source: v.vin_source),
+            SpecItem(label: "Mileage",      value: v.mileage.map { "\($0.formatted()) mi" }, field: "mileage",      source: v.mileage_source),
+            SpecItem(label: "Transmission", value: v.transmission,                           field: "transmission", source: v.transmission_source),
+            SpecItem(label: "Drivetrain",   value: v.drivetrain,                             field: nil,            source: nil),
+            SpecItem(label: "Body",         value: v.body_style,                             field: nil,            source: nil),
+            SpecItem(label: "Color",        value: v.color,                                  field: "color",        source: v.color_source),
+            SpecItem(label: "Interior",     value: v.interior_color,                         field: nil,            source: nil),
+            SpecItem(label: "Engine",       value: v.engine_type,                            field: "engine",       source: v.engine_source),
+            SpecItem(label: "Fuel",         value: v.fuel_type,                              field: nil,            source: nil),
+            SpecItem(label: "Location",     value: location(v),                              field: nil,            source: nil),
+        ].filter { $0.value?.isEmpty == false }
+    }
+
+    /// One spec row. Drillable rows (value + recorded source) carry a chevron and
+    /// open the field's provenance sheet; the rest are plain. Long-press to copy.
+    @ViewBuilder private func specRow(_ item: SpecItem) -> some View {
+        let drillable = item.field != nil && (item.source?.isEmpty == false)
+        Group {
+            if drillable {
+                Button {
+                    provenanceDrill = SpecDrill(label: item.label, value: item.value ?? "", field: item.field!)
+                } label: {
+                    specRowBody(item, drillable: true)
+                }
+                .buttonStyle(.plain)
+            } else {
+                specRowBody(item, drillable: false)
+            }
+        }
+        .contextMenu {
+            if let value = item.value, !value.isEmpty {
+                Button {
+                    UIPasteboard.general.string = value
+                } label: { Label("Copy \(item.label)", systemImage: "doc.on.doc") }
+            }
+        }
+        Divider()
+    }
+
+    @ViewBuilder private func specRowBody(_ item: SpecItem, drillable: Bool) -> some View {
+        LabeledContent {
+            HStack(spacing: 6) {
+                Text(item.value ?? "")
                     .font(.system(.footnote, design: .monospaced))
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.trailing)
-            } label: {
-                Text(label)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                if drillable {
+                    Image(systemName: "chevron.right.circle")
+                        .font(.caption2)
+                        .foregroundStyle(.blue)
+                }
             }
-            .padding(.vertical, 5)
-            Divider()
+        } label: {
+            Text(item.label)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
+        .padding(.vertical, 5)
+        .contentShape(Rectangle())
+    }
+
+    /// Share the public vehicle record (the same page the web CTA opens).
+    @ViewBuilder private var shareButton: some View {
+        if let url = URL(string: "https://nuke.ag/vehicle/\(vehicleId)") {
+            ShareLink(item: url, subject: Text(vehicle?.title ?? "Vehicle")) {
+                Image(systemName: "square.and.arrow.up")
+            }
+        }
+    }
+
+    /// Full-screen gallery list: every loaded photo, or the hero alone as a
+    /// fallback so tapping the hero never opens an empty gallery.
+    private var galleryURLs: [String] {
+        let urls = images.compactMap { $0.image_url }
+        if !urls.isEmpty { return urls }
+        if let primary = vehicle?.primary_image_url { return [primary] }
+        return []
     }
 
     private func location(_ v: VehicleHeaderRow) -> String? {
@@ -395,7 +498,7 @@ struct VehicleDetailView: View {
                                 Color(.secondarySystemFill)
                                     .frame(width: 110, height: 110)
                                     .overlay {
-                                        AsyncImage(url: renderThumb(img.image_url, width: 200)) { i in
+                                        CachedAsyncImage(url: NukeImage.thumb(img.image_url, width: 200)) { i in
                                             i.resizable().scaledToFill()
                                         } placeholder: {
                                             Image(systemName: "car.side").foregroundStyle(.secondary)
@@ -430,29 +533,24 @@ struct VehicleDetailView: View {
         }
     }
 
-    // ─── Render-endpoint thumbnail. Handles nested capture-relay paths AND
-    // external CDN urls (the render endpoint can't transcode those — use as-is).
-    private func renderThumb(_ raw: String?, width: Int) -> URL? {
-        guard let raw, !raw.isEmpty else { return nil }
-        if let r = raw.range(of: "/vehicle-photos/") {
-            let path = String(raw[r.upperBound...])
-            return URL(string: "\(Config.supabaseURL)/render/image/public/vehicle-photos/\(path)?width=\(width)&resize=contain")
-        }
-        return URL(string: raw) // external CDN image: render endpoint can't transcode it, use as-is
-    }
-
     private func load() async {
         do {
             // One select covers header + spec table.
             let rows: [VehicleHeaderRow] = try await SupabaseService.client
                 .from("vehicles")
-                .select("id,year,make,model,trim,vin,mileage,transmission,drivetrain,body_style,color,interior_color,engine_type,fuel_type,city,state,price,sale_price,nuke_estimate,primary_image_url,description")
+                .select("id,year,make,model,trim,vin,mileage,transmission,drivetrain,body_style,color,interior_color,engine_type,fuel_type,city,state,price,sale_price,nuke_estimate,primary_image_url,description,vin_source,mileage_source,transmission_source,engine_source,color_source")
                 .eq("id", value: vehicleId)
                 .limit(1)
                 .execute()
                 .value
             vehicle = rows.first
             loadError = rows.first == nil ? "Vehicle not found" : nil
+            #if DEBUG
+            if let f = debugOpenField, let v = vehicle,
+               let item = specItems(v).first(where: { $0.field == f && ($0.source?.isEmpty == false) }) {
+                provenanceDrill = SpecDrill(label: item.label, value: item.value ?? "", field: f)
+            }
+            #endif
         } catch {
             loadError = "Load failed"
             NSLog("NukeCapture vehicle detail load failed: %@", String(describing: error))
@@ -836,5 +934,273 @@ private struct AttestContributionView: View {
             self.error = "Couldn't save — \(error.localizedDescription)"
             NSLog("NukeCapture record_owner_contribution failed: %@", String(describing: error))
         }
+    }
+}
+
+// ─── Spec drill-to-source: the value, then the table behind it ───────────────
+// A spec row descriptor + the tapped-field token + the provenance sheet. This is
+// the three-shelf law applied to the spec table: a value that has a recorded
+// source opens to that source — the inline source string, how sure, the SOURCE
+// PHOTO (e.g. the door-jamb VIN plate), and the observations that recorded it.
+// Nothing renders here that the data didn't call into existence.
+
+/// One spec-table row, built from the vehicle row.
+struct SpecItem: Identifiable {
+    let label: String
+    let value: String?
+    let field: String?     // get_field_provenance key; nil = never drillable
+    let source: String?    // inline {field}_source; non-nil = drills to a source
+    var id: String { label }
+}
+
+/// A tapped spec value awaiting its provenance sheet.
+struct SpecDrill: Identifiable {
+    let label: String
+    let value: String
+    let field: String
+    var id: String { field + value }
+}
+
+/// get_field_provenance(vehicle, field) → one jsonb object. Every piece optional
+/// so a sparse field still decodes; the sheet renders only what exists.
+struct FieldProvenance: Decodable {
+    let field: String?
+    let value: String?
+    let inline_source: String?
+    let inline_confidence: String?     // to_jsonb text ("1","0.95")
+    let source_image_url: String?
+    let evidence: [Evidence]
+    let observations: [Observation]
+
+    struct Evidence: Decodable, Identifiable {
+        let source: String?
+        let value: String?
+        let source_type: String?
+        let confidence: Double?
+        let verified: Bool?
+        let reasoning: String?
+        let image_id: String?
+        let at: String?
+        var id: String { (source_type ?? "") + (at ?? "") + (value ?? "") }
+    }
+    struct Observation: Decodable, Identifiable {
+        let id: UUID
+        let content: String?
+        let value: String?
+        let confidence: Double?
+        let observed_at: String?
+        let kind: String?
+        let source_slug: String?
+        let trust: Double?
+        let source_url: String?
+    }
+}
+
+struct FieldProvenanceSheet: View {
+    let vehicleId: String
+    let drill: SpecDrill
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var prov: FieldProvenance?
+    @State private var loaded = false
+    @State private var zoomURL: String?
+    @State private var zoomOpen = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    valueHeader
+                    Divider()
+                    if let p = prov {
+                        sourceLine(p)
+                        if let img = p.source_image_url, !img.isEmpty { sourceImage(img) }
+                        if !p.observations.isEmpty { observationsSection(p.observations) }
+                        if !p.evidence.isEmpty { evidenceSection(p.evidence) }
+                        if hasNothing(p) { emptyState }
+                    } else if loaded {
+                        emptyState
+                    } else {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Tracing source…").font(.footnote).foregroundStyle(.secondary)
+                        }.padding(16)
+                    }
+                }
+            }
+            .navigationTitle(drill.label)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .task { await load() }
+        .fullScreenCover(isPresented: $zoomOpen) {
+            FullScreenGalleryView(images: zoomURL.map { [$0] } ?? [])
+        }
+    }
+
+    // ─── Value header — the figure, its confidence, copy ─────────────────────
+    private var valueHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(drill.value)
+                .font(.system(.title3, design: .monospaced).weight(.semibold))
+                .foregroundStyle(.primary)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 14) {
+                if let c = confidenceText {
+                    Label(c, systemImage: "gauge.with.dots.needle.50percent")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Button { UIPasteboard.general.string = drill.value } label: {
+                    Label("Copy", systemImage: "doc.on.doc").font(.caption)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+    }
+
+    @ViewBuilder private func sourceLine(_ p: FieldProvenance) -> some View {
+        if let src = p.inline_source, !src.isEmpty {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("RECORDED SOURCE")
+                    .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                Text(src).font(.footnote).foregroundStyle(.primary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.vertical, 12)
+            Divider()
+        }
+    }
+
+    @ViewBuilder private func sourceImage(_ url: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("SOURCE PHOTO")
+                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+            Button { zoomURL = url; zoomOpen = true } label: {
+                CachedAsyncImage(url: NukeImage.thumb(url, width: 1000)) { i in
+                    i.resizable().scaledToFit()
+                } placeholder: {
+                    Color(.secondarySystemFill).frame(height: 200).overlay { ProgressView() }
+                }
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+            Text("The on-vehicle evidence this value was read from. Tap to enlarge.")
+                .font(.caption2).foregroundStyle(.tertiary)
+        }
+        .padding(16)
+        Divider()
+    }
+
+    @ViewBuilder private func observationsSection(_ obs: [FieldProvenance.Observation]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("OBSERVED")
+                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+            ForEach(obs) { o in
+                VStack(alignment: .leading, spacing: 5) {
+                    if let c = o.content, !c.isEmpty {
+                        Text(c).font(.footnote).foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    HStack(spacing: 6) {
+                        ForEach(observationFacets(o), id: \.self) { facet in
+                            Text(facet).font(.system(.caption2, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if let u = o.source_url, let link = URL(string: u) {
+                        Link("View source ↗", destination: link).font(.caption2)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .padding(16)
+    }
+
+    @ViewBuilder private func evidenceSection(_ ev: [FieldProvenance.Evidence]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("EXTRACTION EVIDENCE")
+                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+            ForEach(ev) { e in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(e.source_type ?? "source").font(.footnote.weight(.medium))
+                        Spacer()
+                        if let c = pct(e.confidence) {
+                            Text(c).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                        }
+                        if e.verified == true {
+                            Image(systemName: "checkmark.seal.fill").font(.caption2).foregroundStyle(.green)
+                        }
+                    }
+                    if let r = e.reasoning, !r.isEmpty {
+                        Text(r).font(.caption2).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .padding(16)
+    }
+
+    private var emptyState: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("This value is on the vehicle record but isn't yet traced to an observation.")
+                .font(.footnote).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+    }
+
+    // ─── helpers ─────────────────────────────────────────────────────────────
+    private func hasNothing(_ p: FieldProvenance) -> Bool {
+        (p.inline_source?.isEmpty != false) && p.source_image_url == nil
+            && p.observations.isEmpty && p.evidence.isEmpty
+    }
+
+    private func observationFacets(_ o: FieldProvenance.Observation) -> [String] {
+        var f: [String] = []
+        if let s = o.source_slug, !s.isEmpty { f.append(s) }
+        if let t = pct(o.trust) { f.append("trust \(t)") }
+        if let c = pct(o.confidence) { f.append(c) }
+        if let at = o.observed_at { f.append(String(at.prefix(10))) }
+        return f
+    }
+
+    private var confidenceText: String? {
+        guard let raw = prov?.inline_confidence, let v = Double(raw) else { return nil }
+        return pct(v).map { "Confidence \($0)" }
+    }
+
+    /// 0–1 fractions scale ×100; values already >1 are treated as whole percent.
+    private func pct(_ v: Double?) -> String? {
+        guard let v else { return nil }
+        let p = v <= 1.0 ? v * 100 : v
+        return "\(Int(p.rounded()))%"
+    }
+
+    private func load() async {
+        do {
+            prov = try await SupabaseService.client
+                .rpc("get_field_provenance",
+                     params: ["p_vehicle_id": vehicleId, "p_field": drill.field])
+                .execute()
+                .value
+        } catch {
+            NSLog("NukeCapture field provenance failed: %@", String(describing: error))
+        }
+        loaded = true
     }
 }
