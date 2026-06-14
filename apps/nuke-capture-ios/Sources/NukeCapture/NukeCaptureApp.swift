@@ -48,26 +48,23 @@ struct NukeCaptureApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if session.isSignedIn {
-                    if ignitionComplete {
-                        MainTabView()
-                    } else if ignition.phase == .denied {
-                        // Photos denied is NOT a dead end: capture is one
-                        // grant, not the app. The world (Map + Profile)
-                        // stays; Today stays hidden (no grant); Photos·Off
-                        // + Settings live in the Account sheet. Granting in
-                        // Settings re-arms ignition (scenePhase below).
-                        MainTabView()
-                    } else {
-                        IgnitionView()
-                    }
-                } else if exploreMode {
-                    // Explore: the populated world, read-only. No Today tab
-                    // (no grant), Sign In one tap away in Profile.
-                    MainTabView()
+                #if DEBUG
+                // Dev screenshot deep-link: NUKE_DEBUG_VEHICLE_ID=<uuid> roots the
+                // app on that vehicle's profile so the build→screenshot→critique
+                // loop lands deterministically on the page under work (no fragile
+                // coordinate-tapping). DEBUG builds only; never ships.
+                if let dbgVehicle = ProcessInfo.processInfo.environment["NUKE_DEBUG_VEHICLE_ID"],
+                   !dbgVehicle.isEmpty {
+                    VehicleDetailView(
+                        vehicleId: dbgVehicle,
+                        debugOpenField: ProcessInfo.processInfo.environment["NUKE_DEBUG_PROVENANCE_FIELD"]
+                    )
                 } else {
-                    SignInView()
+                    rootView
                 }
+                #else
+                rootView
+                #endif
             }
             .environmentObject(session)
         }
@@ -102,6 +99,32 @@ struct NukeCaptureApp: App {
             default:
                 break
             }
+        }
+    }
+
+    /// The normal root routing (extracted so the DEBUG deep-link can bypass it).
+    @ViewBuilder private var rootView: some View {
+        Group {
+            if session.isSignedIn {
+                    if ignitionComplete {
+                        MainTabView()
+                    } else if ignition.phase == .denied {
+                        // Photos denied is NOT a dead end: capture is one
+                        // grant, not the app. The world (Map + Profile)
+                        // stays; Today stays hidden (no grant); Photos·Off
+                        // + Settings live in the Account sheet. Granting in
+                        // Settings re-arms ignition (scenePhase below).
+                        MainTabView()
+                    } else {
+                        IgnitionView()
+                    }
+                } else if exploreMode {
+                    // Explore: the populated world, read-only. No Today tab
+                    // (no grant), Sign In one tap away in Profile.
+                    MainTabView()
+                } else {
+                    SignInView()
+                }
         }
     }
 

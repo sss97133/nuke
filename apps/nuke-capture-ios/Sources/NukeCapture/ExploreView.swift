@@ -79,7 +79,7 @@ struct ExploreView: View {
         Color(.secondarySystemFill)
             .aspectRatio(1, contentMode: .fit)
             .overlay {
-                AsyncImage(url: renderThumb(v.primary_image_url, width: 200)) { img in
+                CachedAsyncImage(url: NukeImage.thumb(v.primary_image_url, width: 200)) { img in
                     img.resizable().scaledToFill()
                 } placeholder: {
                     Image(systemName: "car.side")
@@ -89,17 +89,6 @@ struct ExploreView: View {
             }
             .clipped()
             .contentShape(Rectangle())
-    }
-
-    // ─── Render-endpoint thumbnail. Handles nested capture-relay paths AND
-    // external CDN urls (the render endpoint can't transcode those — use as-is).
-    private func renderThumb(_ raw: String?, width: Int) -> URL? {
-        guard let raw, !raw.isEmpty else { return nil }
-        if let r = raw.range(of: "/vehicle-photos/") {
-            let path = String(raw[r.upperBound...])
-            return URL(string: "\(Config.supabaseURL)/render/image/public/vehicle-photos/\(path)?width=\(width)&resize=contain")
-        }
-        return URL(string: raw) // external CDN image: render endpoint can't transcode it, use as-is
     }
 
     // ─── Feed — public vehicles, newest first. Filter to photo-bearing rows in

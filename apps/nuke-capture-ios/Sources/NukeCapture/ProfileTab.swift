@@ -194,6 +194,25 @@ struct ProfileTab: View {
 
 // ─── The profile: name/handle · connections (own) · the day record ──────────
 
+/// One row from get_user_garage — the user's vehicle, enough to render a card
+/// and open VehicleDetailView.
+struct GarageVehicle: Decodable, Identifiable, Hashable {
+    let vehicle_id: String
+    let year: Int?
+    let make: String?
+    let model: String?
+    let trim_name: String?
+    let image_url: String?
+    let current_value: Double?
+    let image_count: Int
+    let relationship: String
+
+    var id: String { vehicle_id }
+    var title: String {
+        [year.map(String.init), make, model].compactMap { $0 }.joined(separator: " ")
+    }
+}
+
 struct ProfileView: View {
     let userId: String
     var isOwn: Bool = false
@@ -202,6 +221,10 @@ struct ProfileView: View {
     @State private var days: [DayRecord] = []
     @State private var receiptDay: DayRecord?
     @State private var loadError: String?
+    // The garage — the user's real vehicles (get_user_garage). The app had no
+    // way in to a vehicle before this; each card opens VehicleDetailView.
+    @State private var garage: [GarageVehicle] = []
+    @State private var openVehicle: GarageVehicle?
 
     // Owner-only: the phone↔record link, made visible. `sync` is the record's
     // server-side truth (the RPC); `engine` is this device's local truth.
@@ -220,6 +243,9 @@ struct ProfileView: View {
                     Text(profile?.username ?? "—")
                 }
             }
+
+            // GARAGE — the user's vehicles, the way into the whole drill chain.
+            if !garage.isEmpty { garageSection }
 
             // SYNC — owner-only ledger that proves the phone↔record link.
             if isOwn { syncSection }
@@ -279,8 +305,63 @@ struct ProfileView: View {
             DayReceiptView(userId: userId, date: day.day)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(item: $openVehicle) { v in
+            VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: true)
+        }
         .task(id: userId) { await load() }
         .task(id: userId) { await loadSync() }   // owner-only inside loadSync
+        .task(id: userId) { await loadGarage() }
+    }
+
+    // ─── Garage ──────────────────────────────────────────────────────────────
+    private var garageSection: some View {
+        Section {
+            ForEach(garage) { v in
+                Button { openVehicle = v } label: {
+                    HStack(spacing: 12) {
+                        CachedAsyncImage(url: NukeImage.thumb(v.image_url, width: 170)) { img in
+                            img.resizable().scaledToFill()
+                        } placeholder: {
+                            Image(systemName: "car.side").foregroundStyle(.secondary)
+                        }
+                        .frame(width: 56, height: 42)
+                        .clipped()
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(v.title).foregroundStyle(Color.primary)
+                            HStack(spacing: 8) {
+                                Text("\(v.image_count) photos")
+                                    .font(.caption2).monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                                if v.relationship != "owner" {
+                                    Text(v.relationship.replacingOccurrences(of: "_", with: " "))
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        Spacer()
+                        if let val = v.current_value, val > 0 {
+                            Text(val, format: .currency(code: "USD").precision(.fractionLength(0)))
+                                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                        }
+                        Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }
+            }
+        } header: {
+            Text("Garage · \(garage.count)")
+        }
+    }
+
+    private func loadGarage() async {
+        do {
+            let rows: [GarageVehicle] = try await SupabaseService.client
+                .rpc("get_user_garage", params: ["p_user_id": userId])
+                .execute()
+                .value
+            garage = rows
+        } catch {
+            NSLog("NukeCapture garage load failed: %@", String(describing: error))
+        }
     }
 
     // ─── SYNC section: the link, in a traditional ledger ─────────────────────
@@ -564,11 +645,13 @@ private struct RemoteThumbGrid: View {
             spacing: 2
         ) {
             ForEach(photos.prefix(20)) { photo in
-                let url = photo.thumb ?? photo.url
                 Color(.secondarySystemFill)
                     .aspectRatio(1, contentMode: .fit)
                     .overlay {
-                        AsyncImage(url: url.flatMap(URL.init)) { image in
+                        // Never a raw full-res original into a small grid cell —
+                        // route the thumb (or the url fallback) through the render
+                        // endpoint at a cell-sized width.
+                        CachedAsyncImage(url: NukeImage.thumb(photo.thumb ?? photo.url, width: 200)) { image in
                             image.resizable().scaledToFill()
                         } placeholder: {
                             Color(.secondarySystemFill)
@@ -602,6 +685,12 @@ private struct PhotoFullScreenView: View {
     @State private var confirmedIntent: String?     // optimistic local confirm
     @State private var showConfirm = false
     @State private var showVehicle = false          // drill to the vehicle detail
+    // Pinch-zoom + pan on the image. Tap-to-dismiss is gone (it fought
+    // interaction); a close button + drag-down (when not zoomed) dismiss.
+    @State private var zoom: CGFloat = 1
+    @State private var lastZoom: CGFloat = 1
+    @State private var pan: CGSize = .zero
+    @State private var lastPan: CGSize = .zero
 
     private static let intents = ["labor", "inspection", "parts_sourcing",
                                   "communication", "acquisition", "documentation"]
@@ -625,6 +714,38 @@ private struct PhotoFullScreenView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .scaleEffect(zoom)
+                    .offset(pan)
+                    .gesture(
+                        MagnificationGesture()
+                            .onChanged { zoom = max(1, lastZoom * $0) }
+                            .onEnded { _ in
+                                lastZoom = zoom
+                                if zoom < 1.05 {
+                                    withAnimation { zoom = 1; pan = .zero }
+                                    lastZoom = 1; lastPan = .zero
+                                }
+                            }
+                    )
+                    .simultaneousGesture(
+                        DragGesture()
+                            .onChanged { v in
+                                if zoom > 1 {
+                                    pan = CGSize(width: lastPan.width + v.translation.width,
+                                                 height: lastPan.height + v.translation.height)
+                                }
+                            }
+                            .onEnded { v in
+                                if zoom > 1 { lastPan = pan }
+                                else if v.translation.height > 60 { dismiss() }
+                            }
+                    )
+                    .onTapGesture(count: 2) {
+                        withAnimation {
+                            if zoom > 1 { zoom = 1; pan = .zero; lastPan = .zero; lastZoom = 1 }
+                            else { zoom = 2.5; lastZoom = 2.5 }
+                        }
+                    }
             } placeholder: {
                 ProgressView().tint(.white)
             }
@@ -635,9 +756,14 @@ private struct PhotoFullScreenView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.black.opacity(0.82))
         }
-        .onTapGesture { dismiss() }
-        .gesture(DragGesture(minimumDistance: 40)
-            .onEnded { v in if v.translation.height > 0 { dismiss() } })
+        .overlay(alignment: .topTrailing) {
+            Button { dismiss() } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(.white.opacity(0.7), .black.opacity(0.4))
+                    .padding(12)
+            }
+        }
     }
 
     @ViewBuilder private var rail: some View {

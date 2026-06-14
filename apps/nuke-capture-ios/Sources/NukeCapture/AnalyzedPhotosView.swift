@@ -89,7 +89,7 @@ struct AnalyzedPhotosView: View {
             } else {
                 LazyVGrid(columns: columns, spacing: 2) {
                     ForEach(photos) { photo in
-                        AnalyzedGridCell(url: renderThumb(photo.thumb ?? photo.url, width: 200))
+                        AnalyzedGridCell(url: NukeImage.thumb(photo.thumb ?? photo.url, width: 200))
                             .onTapGesture { selected = photo }
                     }
                 }
@@ -124,16 +124,6 @@ struct AnalyzedPhotosView: View {
         loaded = true   // flip regardless — stops the infinite spinner
     }
 
-    /// Render-endpoint thumbnail. Handles nested capture-relay storage paths
-    /// AND external CDN urls (the latter can't be transcoded, used as-is).
-    private func renderThumb(_ raw: String?, width: Int) -> URL? {
-        guard let raw, !raw.isEmpty else { return nil }
-        if let r = raw.range(of: "/vehicle-photos/") {
-            let path = String(raw[r.upperBound...])
-            return URL(string: "\(Config.supabaseURL)/render/image/public/vehicle-photos/\(path)?width=\(width)&resize=contain")
-        }
-        return URL(string: raw) // external CDN image: render endpoint can't transcode it, use as-is
-    }
 }
 
 /// One square cell in the contact sheet. Remote thumb only — full-res lives in
@@ -145,18 +135,10 @@ private struct AnalyzedGridCell: View {
         Color(.secondarySystemFill)
             .aspectRatio(1, contentMode: .fit)
             .overlay {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFill()
-                    case .empty:
-                        ProgressView().scaleEffect(0.7)
-                    case .failure:
-                        Image(systemName: "photo")
-                            .foregroundStyle(.secondary)
-                    @unknown default:
-                        Color.clear
-                    }
+                CachedAsyncImage(url: url) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    ProgressView().scaleEffect(0.7)
                 }
             }
             .clipped()
