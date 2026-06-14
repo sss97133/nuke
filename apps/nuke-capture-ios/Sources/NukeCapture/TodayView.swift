@@ -127,6 +127,7 @@ struct UserUnderstanding: Decodable {
         let model: String?
         let frames: Int?
         let title: String?        // the day's classification (work_type)
+        let story: String?        // work_description — the detective's day narrative
         let minutes: Int?
 
         var id: String { date + (vehicle_id?.uuidString ?? "") }
@@ -187,8 +188,15 @@ private struct UnderstandingPanel: View {
     }
 
     @ViewBuilder private func row(_ d: UserUnderstanding.Day) -> some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
+            // The story leads — the detective's read of the day. A day not yet
+            // narrated falls back to its vehicle + classification.
+            if let story = d.story, !story.isEmpty {
+                Text(story)
+                    .font(.footnote)
+                    .foregroundStyle(Color.primary)
+                    .lineLimit(3)
+            } else {
                 Text(d.vehicleTitle)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(Color.primary)
@@ -200,17 +208,19 @@ private struct UnderstandingPanel: View {
                         .lineLimit(1)
                 }
             }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 2) {
+            // Structured footer: vehicle · N frames · date.
+            HStack(spacing: 6) {
+                Text(d.vehicleTitle).lineLimit(1)
+                Text("·")
                 Text("\(d.frames ?? 0) frames")
-                    .font(.caption2).monospacedDigit()
-                    .foregroundStyle(.secondary)
+                Text("·")
                 Text(d.date)
-                    .font(.caption2).monospacedDigit()
-                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 0)
             }
+            .font(.caption2).monospacedDigit()
+            .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 3)
     }
 
     /// Poll every 30s while the screen is open — the burn-all lands ~5 frames/min,
