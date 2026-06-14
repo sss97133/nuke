@@ -109,29 +109,19 @@ private struct LiveMetricsStrip: View {
 
     var body: some View {
         VStack(spacing: 14) {
+            // THE REAL RECORD — server truth (get_user_capture_stats), not
+            // this device's local counters. IMAGES is the full ~22K library.
             HStack(spacing: 0) {
-                MetricCell(
-                    label: "QUEUED",
-                    value: "\(engine.backfillRemaining)",
-                    hero: engine.backfillRemaining > 0
-                )
+                MetricCell(label: "IMAGES", value: "\(engine.serverStats.total_images)")
                 Divider().frame(height: 44)
-                MetricCell(label: "SYNCED", value: "\(engine.totalSynced)")
-            }
-
-            HStack(spacing: 0) {
-                MetricCell(label: "TODAY", value: "\(engine.uploadsToday)")
-                Divider().frame(height: 44)
-                // ANALYZED drills into the evidence behind the count: the
-                // analyzed photos + their extracted atoms. Tappable only when
-                // there's something to show; at 0 it stays the static "—" cell.
-                if engine.analyzedCount > 0 {
+                // ANALYZED drills into the analyzed photos + their atoms.
+                if engine.serverStats.analyzed > 0 {
                     NavigationLink {
                         AnalyzedPhotosView(userId: SupabaseService.currentUserId ?? "")
                     } label: {
                         MetricCell(
                             label: "ANALYZED",
-                            value: "\(engine.analyzedCount)",
+                            value: "\(engine.serverStats.analyzed)",
                             caption: "tap to view"
                         )
                     }
@@ -141,10 +131,19 @@ private struct LiveMetricsStrip: View {
                 }
             }
 
-            // Queue drain progress bar — visible while backfill is active: the
-            // screen-off drain made legible (the pour is the show).
-            if engine.backfillRemaining > 0 || engine.totalSynced > 0 {
-                DrainBar(remaining: engine.backfillRemaining, synced: engine.totalSynced)
+            HStack(spacing: 0) {
+                MetricCell(label: "DAYS", value: "\(engine.serverStats.contribution_days)")
+                Divider().frame(height: 44)
+                MetricCell(label: "TODAY", value: "\(engine.serverStats.uploaded_today)")
+            }
+
+            // The local drain — this device's upload queue, honestly labeled
+            // (not a headline number). Only while backfill is in flight.
+            if engine.backfillRemaining > 0 {
+                Text("Uploading \(engine.backfillRemaining) from this device…")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             // Last sync line
