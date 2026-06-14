@@ -385,8 +385,12 @@ struct InvestmentProof: Decodable {
         let money_out: Cell
     }
     struct Projected: Decodable { let labor: Cell }
+    /// The attributed / owner-stated rung: paid-by-other (no receipt) + gifted
+    /// value. Above projected, below proven on the trust ladder.
+    struct Attributed: Decodable { let cost: Cell; let income: Cell }
     struct Totals: Decodable {
         let invested_proven: Double?
+        let invested_with_attributed: Double?
         let invested_with_projected: Double?
         let proven_income: Double?
         let net_proven: Double?
@@ -394,15 +398,18 @@ struct InvestmentProof: Decodable {
     }
     /// One counterparty's net contribution to the asset — the per-party rung.
     /// Owner-only; empty when no recorded payments carry a counterparty.
+    /// trust = "proven" (receipted/paid) or "attributed" (owner-stated).
     struct Party: Decodable, Identifiable {
         let party: String
         let direction: String?
         let count: Int?
         let total: Double?
-        var id: String { party + (direction ?? "") }
+        let trust: String?
+        var id: String { party + (direction ?? "") + (trust ?? "") }
     }
     let is_owner_view: Bool
     let proven: Proven
+    let attributed: Attributed?
     let projected: Projected
     let market: Cell
     let totals: Totals
@@ -412,6 +419,7 @@ struct InvestmentProof: Decodable {
 struct InvestmentProofView: View {
     let vehicleId: String
     @State private var proof: InvestmentProof?
+    @State private var showAttest = false
 
     private func money(_ v: Double?) -> String {
         guard let v else { return "—" }
@@ -436,6 +444,21 @@ struct InvestmentProofView: View {
                              sub: "\(p.proven.money_in.count ?? 0) payments · proven", positive: true)
                     }
 
+                    // ATTRIBUTED — owner-stated (paid-by-other / gifted). A rung
+                    // below proven, above projected: real value, owner's word.
+                    if let attr = p.attributed,
+                       (attr.cost.value ?? 0) > 0 || (attr.income.value ?? 0) > 0 {
+                        Divider().overlay(Color.primary.opacity(0.3)).padding(.vertical, 4)
+                        if (attr.cost.value ?? 0) > 0 {
+                            line("Cost (owner-stated)", attr.cost.value,
+                                 sub: "\(attr.cost.count ?? 0) attributed · paid by others")
+                        }
+                        if (attr.income.value ?? 0) > 0 {
+                            line("Income (owner-stated)", attr.income.value,
+                                 sub: "attributed", positive: true)
+                        }
+                    }
+
                     Divider().overlay(Color.primary.opacity(0.3)).padding(.vertical, 4)
 
                     line("Labor (projected)", p.projected.labor.value,
@@ -446,6 +469,10 @@ struct InvestmentProofView: View {
 
                     line("Invested (proven)", p.totals.invested_proven,
                          sub: "+ projected: \(money(p.totals.invested_with_projected))", bold: true)
+                    if let attr = p.attributed, (attr.cost.value ?? 0) > 0 {
+                        line("Invested (+ owner-stated)", p.totals.invested_with_attributed,
+                             sub: "proven + attributed", bold: true)
+                    }
                     if let roi = p.totals.roi_proven_pct {
                         line("ROI (proven)", nil, sub: "on proven spend", bold: true, rawValue: "\(Int(roi))%")
                     }
@@ -460,9 +487,23 @@ struct InvestmentProofView: View {
                             .padding(.bottom, 2)
                         ForEach(parties) { party in
                             line(party.party, party.total,
-                                 sub: "\(party.count ?? 0) \(party.direction == "in" ? "received" : "paid") · payment_events",
-                                 positive: party.direction == "in")
+                                 sub: "\(party.count ?? 0) \(party.direction == "in" ? "received" : "paid") · \(party.trust ?? "proven")",
+                                 positive: party.direction == "in",
+                                 dim: party.trust == "attributed")
                         }
+                    }
+
+                    // Owner attests a contribution → record_owner_contribution
+                    // writes an owner-stated payment_event; the proof re-rolls.
+                    if p.is_owner_view {
+                        Divider().overlay(Color.primary.opacity(0.3)).padding(.vertical, 4)
+                        Button { showAttest = true } label: {
+                            Label("Add a contribution", systemImage: "plus.circle")
+                                .font(.system(.footnote, design: .monospaced))
+                                .foregroundStyle(.blue)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.vertical, 2)
                     }
                 }
                 .font(.system(.footnote, design: .monospaced))
@@ -471,6 +512,9 @@ struct InvestmentProofView: View {
             }
         }
         .task(id: vehicleId) { await load() }
+        .sheet(isPresented: $showAttest) {
+            AttestContributionView(vehicleId: vehicleId) { Task { await load() } }
+        }
     }
 
     @ViewBuilder private func line(_ label: String, _ value: Double?, sub: String,
@@ -499,6 +543,96 @@ struct InvestmentProofView: View {
                 .value
         } catch {
             NSLog("NukeCapture investment proof failed: %@", String(describing: error))
+        }
+    }
+}
+
+// ─── Attest a contribution: the owner-stated rung's write surface ────────────
+// The owner records a party's contribution (dad bought the tires; seats
+// reupholstered, no payment). Lands as an owner-stated payment_event via
+// record_owner_contribution; the proof re-rolls with a new attributed rung.
+// The owner's attestation IS the value-confirmation signal (the $410 guard).
+
+private struct AttestContributionView: View {
+    let vehicleId: String
+    var onSaved: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var party = ""
+    @State private var amount = ""
+    @State private var direction = "out"
+    @State private var basis = ""
+    @State private var saving = false
+    @State private var error: String?
+
+    /// Mixed-type RPC params need an Encodable struct (not a [String:String] dict).
+    private struct Params: Encodable {
+        let p_vehicle_id: String
+        let p_party: String
+        let p_amount: Double
+        let p_direction: String
+        let p_basis: String
+    }
+
+    private var amountValue: Double? {
+        Double(amount.trimmingCharacters(in: .whitespaces))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Who contributed") {
+                    TextField("Party — e.g. Dad", text: $party)
+                        .textInputAutocapitalization(.words)
+                }
+                Section("What") {
+                    TextField("Amount (USD)", text: $amount)
+                        .keyboardType(.decimalPad)
+                    Picker("Type", selection: $direction) {
+                        Text("Cost — paid for it").tag("out")
+                        Text("Income — paid in").tag("in")
+                    }
+                    TextField("Basis — e.g. bought tires, no receipt",
+                              text: $basis, axis: .vertical)
+                }
+                if let error {
+                    Section { Text(error).font(.footnote).foregroundStyle(.red) }
+                }
+            }
+            .navigationTitle("Owner-stated")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { Task { await save() } }
+                        .disabled(saving || (amountValue ?? 0) <= 0)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func save() async {
+        guard let amt = amountValue, amt > 0 else { return }
+        saving = true; error = nil
+        defer { saving = false }
+        do {
+            _ = try await SupabaseService.client
+                .rpc("record_owner_contribution", params: Params(
+                    p_vehicle_id: vehicleId,
+                    p_party: party.trimmingCharacters(in: .whitespaces),
+                    p_amount: amt,
+                    p_direction: direction,
+                    p_basis: basis.trimmingCharacters(in: .whitespaces)
+                ))
+                .execute()
+            onSaved()
+            dismiss()
+        } catch {
+            self.error = "Couldn't save — \(error.localizedDescription)"
+            NSLog("NukeCapture record_owner_contribution failed: %@", String(describing: error))
         }
     }
 }
