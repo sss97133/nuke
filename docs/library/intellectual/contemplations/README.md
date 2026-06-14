@@ -6,6 +6,9 @@ Philosophical essays on the foundations of Nuke's architecture, epistemology, an
 
 ## Contents
 
+### [The Agent Must Cite](the-agent-must-cite.md)
+The root-system contract turned to face the speaker. The platform forces citation on its data surfaces; the agent operating it is bound by nothing — so it will, eventually, assert a fact it never looked up (a client's car called "his dad's" when the ownership was fully logged). Rules and memory are not enforcement; they are hope, and hope breaks under load. The fix is structural and identical to the UI's: no factual claim about an atom may be stated without resolving to a cited observation, or it is marked inference, not fact. A provenance-native substrate can bind its operator to the same provenance contract it binds its data to — the thing no general agent system does, and worth saying publicly. Skylar's 2026-06-14 correction, made doctrine.
+
 ### [The Root System](the-root-system.md)
 The acceptance test for every surface. A gas station is legible without explanation because the entire supply chain beneath it is real and bulletproof; a movie-set gas station is a facade — the tip with no tree. Every element on a Nuke profile is one or the other. The root system has two natures inherited from living things: arborial (depth — you can climb a fact to ground truth) and rhizomatic (reach — the same observation is honest in every view). The barcode passes the test and so can be the defining mark of the era; the static lead image fails it (the true lead is the live view of the asset, everything else a decaying node or a curation). Pointed at every system on the vehicle profile as an audit. Skylar's 2026-06-14 thesis, made doctrine.
 
