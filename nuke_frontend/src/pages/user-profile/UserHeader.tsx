@@ -40,15 +40,20 @@ const UserHeader: React.FC = () => {
   const memberSince = profile.member_since || profile.created_at;
   const memberYear = memberSince ? new Date(memberSince).getFullYear() : null;
 
-  // Stats — profile_stats (refreshed by recompute_profile_stats) is the source
-  // of truth for garage-wide counts; listings/comments/bids are computed live
-  // by profileStatsService. No fallback to BaT seller events or the dead
-  // profiles.total_* columns (all 0 in prod).
-  const totalVehicles = stats?.total_vehicles ?? 0;
+  // Stats — every headline carries an honest denominator (number doctrine).
+  // VEHICLES uses vehicles_count = "worked on" (distinct vehicles with timeline
+  // activity), NOT total_vehicles (record-authorship over a 4-col union, ~half
+  // scraped Craigslist listings — never a public headline). Labeled WORKED ON.
+  const workedOnVehicles = stats?.vehicles_count ?? null;
   const totalListings = stats?.total_listings ?? 0;
   const totalComments = stats?.total_comments ?? 0;
-  const totalBids = stats?.total_bids ?? 0;
-  const totalImages = stats?.total_images ?? 0;
+  // BIDS is structurally blind (the bids table doesn't exist; only completed
+  // purchases materialize) — a "0" asserts an inactivity the data can't
+  // support, so it's suppressed. AUCTIONS WON is the real, observable figure.
+  const auctionsWon = stats?.total_auction_wins ?? 0;
+  // IMAGES is intentionally NOT shown here: profile_stats.total_images is a
+  // stale cron snapshot (23,376 vs 22,728 live) and RECENT PHOTOS already shows
+  // the live count — two image totals on one page is a contradiction.
 
   const handleEditProfile = () => {
     window.dispatchEvent(new CustomEvent('up:open-settings'));
@@ -97,28 +102,31 @@ const UserHeader: React.FC = () => {
         </div>
       </div>
 
-      {/* Center: Stat pills */}
+      {/* Center: Stat pills — only show a count when it's real and non-zero
+          (No Empty Shells). Each pill is a labeled, honest figure. */}
       <div className="up-header__center">
-        <span className="up-stat-pill">
-          <span className="up-stat-pill__label">VEHICLES</span>
-          {totalVehicles}
-        </span>
-        <span className="up-stat-pill">
-          <span className="up-stat-pill__label">LISTINGS</span>
-          {totalListings}
-        </span>
-        <span className="up-stat-pill">
-          <span className="up-stat-pill__label">COMMENTS</span>
-          {totalComments}
-        </span>
-        <span className="up-stat-pill">
-          <span className="up-stat-pill__label">BIDS</span>
-          {totalBids}
-        </span>
-        {totalImages > 0 && (
+        {workedOnVehicles != null && workedOnVehicles > 0 && (
           <span className="up-stat-pill">
-            <span className="up-stat-pill__label">IMAGES</span>
-            {totalImages}
+            <span className="up-stat-pill__label">WORKED ON</span>
+            {workedOnVehicles}
+          </span>
+        )}
+        {totalListings > 0 && (
+          <span className="up-stat-pill">
+            <span className="up-stat-pill__label">LISTINGS</span>
+            {totalListings}
+          </span>
+        )}
+        {totalComments > 0 && (
+          <span className="up-stat-pill">
+            <span className="up-stat-pill__label">COMMENTS</span>
+            {totalComments}
+          </span>
+        )}
+        {auctionsWon > 0 && (
+          <span className="up-stat-pill">
+            <span className="up-stat-pill__label">AUCTIONS WON</span>
+            {auctionsWon}
           </span>
         )}
       </div>

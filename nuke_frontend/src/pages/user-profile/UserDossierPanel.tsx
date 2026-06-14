@@ -131,11 +131,19 @@ const UserDossierPanel: React.FC = () => {
 
   // ── Field groups ──
 
+  // Structured city/state is the trustworthy location; the legacy free-text
+  // `location` field holds stale junk (a bare ZIP fragment of the github
+  // handle) so it's only the last-resort fallback — never shown over city/state.
+  const locationDisplay =
+    [profile.city, profile.state].filter(Boolean).join(', ') ||
+    profile.location ||
+    null;
+
   const identityFields: FieldDef[] = [
     { key: 'full_name', label: 'NAME', value: profile.full_name, editable: true },
     { key: 'email', label: 'EMAIL', value: profile.email, ownerOnly: true },
     { key: 'username', label: 'USERNAME', value: profile.username, editable: true },
-    { key: 'location', label: 'LOCATION', value: profile.location, editable: true },
+    { key: 'location', label: 'LOCATION', value: locationDisplay, editable: true },
     { key: 'member_since', label: 'MEMBER SINCE', value: formatDate(profile.member_since || profile.created_at) },
   ];
 
@@ -145,11 +153,12 @@ const UserDossierPanel: React.FC = () => {
     { key: 'linkedin_url', label: 'LINKEDIN', value: profile.linkedin_url, isLink: true, editable: true },
   ];
 
-  const accountFields: FieldDef[] = [
-    { key: 'user_type', label: 'TYPE', value: profile.user_type?.toUpperCase() || 'USER' },
-    { key: 'verification_status', label: 'VERIFICATION', value: profile.verification_status?.toUpperCase() || null },
-    { key: 'is_public', label: 'VISIBILITY', value: profile.is_public ? 'PUBLIC' : 'PRIVATE', ownerOnly: true },
-  ];
+  // ACCOUNT group removed from the public record (audit P3/P5):
+  //  - TYPE (USER/ADMIN) is moderation metadata, not part of the record;
+  //    role is conveyed by the sub-header type badge.
+  //  - VERIFICATION read `verification_status`, a column that doesn't exist on
+  //    profiles (always null) — the VERIFIED badge already attests this.
+  //  - VISIBILITY is a settings toggle, not a dossier datum.
 
   // Filter: hide ownerOnly fields for non-owners
   const filterFields = (fields: FieldDef[]) =>
@@ -176,15 +185,13 @@ const UserDossierPanel: React.FC = () => {
 
   const identityGroup = renderGroup('IDENTITY', identityFields);
   const socialGroup = renderGroup('SOCIAL', socialFields);
-  const accountGroup = renderGroup('ACCOUNT', accountFields);
 
-  if (!identityGroup && !socialGroup && !accountGroup) return null;
+  if (!identityGroup && !socialGroup) return null;
 
   return (
     <CollapsibleWidget variant="profile" title="Dossier">
       {identityGroup}
       {socialGroup}
-      {accountGroup}
     </CollapsibleWidget>
   );
 };

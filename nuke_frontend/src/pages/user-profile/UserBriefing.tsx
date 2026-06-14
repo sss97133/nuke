@@ -41,9 +41,9 @@ const UserBriefing: React.FC = () => {
   const headline = useMemo(() => {
     if (!profile) return null;
 
-    // Garage-wide vehicle count comes from profile_stats (via stats), NOT the
-    // nonexistent profiles.total_vehicles column (always undefined at runtime).
-    const vehicles = stats?.total_vehicles ?? 0;
+    // Worked-on count (vehicles_count = distinct vehicles with real activity),
+    // NOT total_vehicles (record-authorship, ~half scraped — number doctrine).
+    const vehicles = stats?.vehicles_count ?? 0;
 
     // 1. Onboarding prompt
     if (isOwnProfile) {
@@ -70,7 +70,7 @@ const UserBriefing: React.FC = () => {
     // 3. Collection summary
     const listed = stats?.total_listings || 0;
     if (vehicles > 0) {
-      return `${vehicles} vehicle${vehicles > 1 ? 's' : ''} in collection${listed > 0 ? `, ${listed} listed` : ''}`;
+      return `${vehicles} vehicle${vehicles > 1 ? 's' : ''} worked on${listed > 0 ? `, ${listed} listed` : ''}`;
     }
 
     // 4. Recent activity
@@ -89,10 +89,10 @@ const UserBriefing: React.FC = () => {
 
     const items: { label: string; value: string | number }[] = [];
 
-    // profile_stats-backed counts (profiles.total_vehicles / contribution_count /
-    // reputation_score are not real columns — never read them).
-    if (stats?.total_vehicles != null && stats.total_vehicles > 0) {
-      items.push({ label: 'VEHICLES', value: stats.total_vehicles });
+    // Worked-on count, labeled honestly (total_vehicles is record-authorship,
+    // ~half scraped — never a headline; number doctrine).
+    if (stats?.vehicles_count != null && stats.vehicles_count > 0) {
+      items.push({ label: 'WORKED ON', value: stats.vehicles_count });
     }
 
     if (stats?.total_contributions != null && stats.total_contributions > 0) {
