@@ -9,7 +9,6 @@ import React, { useState, useCallback } from 'react';
 import { useUserProfile } from './UserProfileContext';
 
 // Lazy-load all card components
-const UserTodayCard = React.lazy(() => import('./UserTodayCard'));
 const UserDossierPanel = React.lazy(() => import('./UserDossierPanel'));
 const UserBriefing = React.lazy(() => import('./UserBriefing'));
 const UserConnectionStateStrip = React.lazy(() => import('./UserConnectionStateStrip'));
@@ -17,9 +16,16 @@ const UserActivityFeed = React.lazy(() => import('./UserActivityFeed'));
 const ColumnDivider = React.lazy(() => import('../vehicle-profile/ColumnDivider'));
 
 // Existing profile components
+// REMOVED per founder teardown (PROFILE_BUILD_ORDER 2026-06-13):
+//  - UserTodayCard: the "you have an update" notification card ("a flaw and bad
+//    design … I don't trust it"). Freshness is shown natively by the timeline.
+//  - UserDiscoveries (FOUND/SOURCES + discovered marketplace vehicles): not his
+//    built work, unclickable metrics ("I can't click them so I'm never gonna
+//    find out what they are"); maker-controls-the-arc — discovered ≠ built.
+//  - OrganizationAffiliations (Epstein Collection / Desert Performance / Taylor
+//    Customs / FBM / Ernies): data is correct but not wanted on the profile face
+//    ("I don't want those showing up"). Data is untouched; only the render is gone.
 const VehicleCollection = React.lazy(() => import('../../components/profile/VehicleCollection'));
-const UserDiscoveries = React.lazy(() => import('../../components/profile/UserDiscoveries'));
-const OrganizationAffiliations = React.lazy(() => import('../../components/profile/OrganizationAffiliations'));
 const ProfessionalToolbox = React.lazy(() => import('../../components/profile/ProfessionalToolbox'));
 const VehicleMergeInterface = React.lazy(() => import('../../components/vehicle/VehicleMergeInterface'));
 
@@ -70,11 +76,6 @@ const UserWorkspaceContent: React.FC = () => {
         {/* LEFT COLUMN */}
         <div className="up-col-left" style={{ width: `${leftPct}%` }}>
 
-          {/* Today — live mirror of what's happening RIGHT NOW (own profile) */}
-          <React.Suspense fallback={null}>
-            <UserTodayCard />
-          </React.Suspense>
-
           {/* Briefing — intelligence headline + stat pills */}
           <React.Suspense fallback={null}>
             <UserBriefing />
@@ -90,11 +91,14 @@ const UserWorkspaceContent: React.FC = () => {
             <UserDossierPanel />
           </React.Suspense>
 
-          {/* Vehicle Collection */}
+          {/* Vehicle Collection — owned/built garage. Anchor target for the
+              header's WORKED ON door. */}
           {userId && (
-            <React.Suspense fallback={null}>
-              <VehicleCollection userId={userId} isOwnProfile={isOwnProfile} />
-            </React.Suspense>
+            <div id="vehicle-collection">
+              <React.Suspense fallback={null}>
+                <VehicleCollection userId={userId} isOwnProfile={isOwnProfile} />
+              </React.Suspense>
+            </div>
           )}
 
           {/* Work Ledger — the decade of wrenching (work_sessions substrate) */}
@@ -104,24 +108,10 @@ const UserWorkspaceContent: React.FC = () => {
             </React.Suspense>
           )}
 
-          {/* User Discoveries */}
-          {userId && (
-            <React.Suspense fallback={null}>
-              <UserDiscoveries userId={userId} isOwnProfile={isOwnProfile} />
-            </React.Suspense>
-          )}
-
           {/* Activity Feed */}
           <React.Suspense fallback={null}>
             <UserActivityFeed />
           </React.Suspense>
-
-          {/* Organization Affiliations */}
-          {userId && (
-            <React.Suspense fallback={null}>
-              <OrganizationAffiliations userId={userId} isOwnProfile={isOwnProfile} />
-            </React.Suspense>
-          )}
 
           {/* Professional Toolbox — owner-only, non-basic users */}
           {isOwnProfile && isNotBasicUser && userId && (
