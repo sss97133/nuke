@@ -292,9 +292,11 @@ enum AppleNonce {
 
 // ─── Account sheet (sign out + delete + sites) ───────────────────────────────
 
-/// Presented from TodayView's toolbar. Sign out, full account deletion
-/// (5.1.1(v)), and the confirmed-sites list — naming a site is optional and
-/// it happens here, not in the ignition flow.
+/// Presented from TodayView's and ProfileTab's toolbar. Sign out, full account
+/// deletion (5.1.1(v)), and the confirmed work-sites list.
+///
+/// Destructive actions are separated deliberately — Sign Out is mid-form,
+/// Delete Account is the last section with a confirmation alert.
 struct AccountView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var siteStore = SiteStore.shared
@@ -328,9 +330,9 @@ struct AccountView: View {
 
                 // Confirmed work sites — rename in place (optional, never
                 // required; ignition confirms with one tap and defaults the
-                // name to SITE NN).
+                // name to SITE NN). "Sites" → "Work sites" per owner feedback.
                 if !siteStore.sites.isEmpty {
-                    Section("Sites") {
+                    Section("Work sites") {
                         ForEach(siteStore.sites.indices, id: \.self) { i in
                             TextField(
                                 String(format: "SITE %02d", i + 1),
@@ -355,33 +357,41 @@ struct AccountView: View {
 
                 // Re-arm the first-run flow: clears the ignitionComplete flag
                 // and the sync watermark so NukeCaptureApp re-pushes
-                // IgnitionView on the next routing pass (the full-library scan
-                // + site re-confirmation runs again). The seen-set is kept, so
-                // already-uploaded photos aren't re-sent.
+                // IgnitionView on the next routing pass. The seen-set is kept,
+                // so already-uploaded photos aren't re-sent.
+                // "Re-run ignition" → "Re-scan my library" (softer label).
                 Section {
-                    Button("Re-run ignition") {
+                    Button("Re-scan my library") {
                         UserDefaults.standard.set(false, forKey: IgnitionEngine.completeKey)
                         SyncEngine.shared.resetForReignition()
                         dismiss()
                     }
                 } footer: {
-                    Text("Re-runs the first-run scan: re-detects your work sites and re-confirms what uploads. Already-uploaded photos are not sent again.")
+                    Text("Re-detects your work sites and re-confirms what uploads. Already-uploaded photos are not sent again.")
                 }
 
+                // ── Sign Out — separated from Delete Account ──────────────────
                 Section {
                     Button("Sign Out") {
                         run { try await SupabaseService.signOut() }
                     }
                 } footer: {
-                    Text("Signing out stops all uploads from this device. Your photos and account are unaffected.")
+                    Text("Stops uploads from this device. Your photos and account are unaffected.")
                 }
 
+                // ── Delete Account — last, de-emphasized, behind a confirm ────
+                // Deliberately last in the form and behind a confirmation alert
+                // so it cannot be tapped by accident.
                 Section {
-                    Button("Delete Account", role: .destructive) {
+                    Button(role: .destructive) {
                         confirmingDeletion = true
+                    } label: {
+                        Text("Delete Account")
+                            .foregroundStyle(.red.opacity(0.7))
                     }
                 } footer: {
-                    Text("Permanently deletes your Nuke account and the data associated with it. This cannot be undone.")
+                    Text("Anonymizes your account and disables sign-in. This cannot be undone.")
+                        .foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("Account")
@@ -391,17 +401,16 @@ struct AccountView: View {
                 }
             }
             .disabled(isWorking)
-            .confirmationDialog(
-                "Delete your Nuke account?",
-                isPresented: $confirmingDeletion,
-                titleVisibility: .visible
-            ) {
+            .alert("Delete your account?", isPresented: $confirmingDeletion) {
+                // Alert (not confirmationDialog) — shows title + message inline,
+                // less alarming than the modal sheet but still requires an
+                // explicit tap on the red button to proceed.
                 Button("Delete Account", role: .destructive) {
                     run { try await SupabaseService.requestAccountDeletion() }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Your account and associated data will be permanently deleted. This cannot be undone.")
+                Text("This anonymizes your account and disables sign-in. Your uploaded photos remain in the record.")
             }
         }
     }

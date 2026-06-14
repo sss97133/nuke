@@ -40,6 +40,31 @@ final class SiteStore: ObservableObject {
         }
         // Lazily geocode any sites still carrying SITE-serial names.
         geocodeStaleSerials()
+        // Pull server sites so confirmed/geocoded sites survive a fresh install.
+        Task { await fetchAndMergeServerSites() }
+    }
+
+    /// Pull user_sites from the server and merge into the local store.
+    /// Dedupes by lat/lon proximity (within 50 m) so a fresh install doesn't
+    /// re-add sites the user already has locally.
+    func fetchAndMergeServerSites() async {
+        let remote = await SupabaseService.fetchUserSites()
+        guard !remote.isEmpty else { return }
+        var changed = false
+        for candidate in remote {
+            let alreadyPresent = sites.contains { local in
+                Geo.distanceMeters(lat1: local.latitude, lon1: local.longitude,
+                                   lat2: candidate.latitude, lon2: candidate.longitude) < 50
+            }
+            if !alreadyPresent {
+                sites.append(candidate)
+                changed = true
+            }
+        }
+        if changed {
+            persist()
+            geocodeStaleSerials()
+        }
     }
 
     func add(_ site: Site) {

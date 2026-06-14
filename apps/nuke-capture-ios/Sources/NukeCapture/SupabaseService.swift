@@ -40,6 +40,10 @@ struct VehicleImageRow: Encodable {
         let uuid: String                // PHAsset.localIdentifier
         let original_filename: String
         let synced_by: String           // 'capture-relay-ios'
+        let camera_make: String?        // TIFF Make (nil = stripped/foreign)
+        let camera_model: String?       // TIFF Model
+        let source_type: String         // PHAsset.sourceType description
+        let owner_verified: Bool        // true when camera_make == "Apple"
     }
 }
 
@@ -50,6 +54,9 @@ struct PhotoMeta {
     let creationDate: Date?
     let latitude: Double?
     let longitude: Double?
+    let cameraMake: String?             // from TIFF EXIF
+    let cameraModel: String?
+    let sourceType: String              // PHAsset.sourceType description
 }
 
 enum SupabaseService {
@@ -175,6 +182,29 @@ enum SupabaseService {
         let confirmed_at: String
     }
 
+    /// Fetch the signed-in user's confirmed sites from the server.
+    /// RLS scopes the SELECT to the current user — no explicit user_id filter needed.
+    /// Returns [] on error (caller merges into local store silently).
+    static func fetchUserSites() async -> [Site] {
+        do {
+            struct ServerSiteRow: Decodable {
+                let name: String
+                let lat: Double
+                let lon: Double
+                let radius_m: Int
+            }
+            let rows: [ServerSiteRow] = try await client
+                .from("user_sites")
+                .select("name, lat, lon, radius_m")
+                .execute()
+                .value
+            return rows.map { Site(name: $0.name, latitude: $0.lat, longitude: $0.lon, radiusMeters: Double($0.radius_m)) }
+        } catch {
+            NSLog("NukeCapture: fetchUserSites failed: %@", String(describing: error))
+            return []
+        }
+    }
+
     static func pushUserSite(_ site: Site) async {
         guard let userId = currentUserId else { return }   // explore/debug: no JWT, no row
         let row = UserSiteRow(
@@ -255,7 +285,11 @@ enum SupabaseService {
             exif_data: .init(
                 uuid: meta.assetIdentifier,
                 original_filename: meta.filename,
-                synced_by: Config.syncedByTag
+                synced_by: Config.syncedByTag,
+                camera_make: meta.cameraMake,
+                camera_model: meta.cameraModel,
+                source_type: meta.sourceType,
+                owner_verified: meta.cameraMake == "Apple"
             )
         )
 
