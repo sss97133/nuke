@@ -6,6 +6,9 @@ Philosophical essays on the foundations of Nuke's architecture, epistemology, an
 
 ## Contents
 
+### [The Root System](the-root-system.md)
+The acceptance test for every surface. A gas station is legible without explanation because the entire supply chain beneath it is real and bulletproof; a movie-set gas station is a facade — the tip with no tree. Every element on a Nuke profile is one or the other. The root system has two natures inherited from living things: arborial (depth — you can climb a fact to ground truth) and rhizomatic (reach — the same observation is honest in every view). The barcode passes the test and so can be the defining mark of the era; the static lead image fails it (the true lead is the live view of the asset, everything else a decaying node or a curation). Pointed at every system on the vehicle profile as an audit. Skylar's 2026-06-14 thesis, made doctrine.
+
 ### [The Rhizome](the-rhizome.md)
 The Deleuzian foundation of Nuke's architecture. Why the system has no center, no hierarchy, and every concept connects to every other. The 11 machines as organs of a body. Why "thrashing" is not dysfunction but the natural behavior of a system where every feature requires every machine. The Body without Organs. The philosophical case for rhizomatic architecture in knowledge systems.
 
