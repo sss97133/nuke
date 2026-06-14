@@ -559,6 +559,10 @@
 /* ─── Dossier Panel ─── */
 .up-dossier-group {
   margin-bottom: 8px;
+  /* Canonical 12px horizontal gutter (frontend.md): the CollapsibleWidget
+     content this sits in has 0 padding, so without this the GITHUB / WEBSITE
+     value ran flush to the viewport edge and clipped at 375px. */
+  padding: 0 12px;
 }
 
 .up-dossier-group__label {
