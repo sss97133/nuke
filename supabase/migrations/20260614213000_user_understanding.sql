@@ -24,10 +24,16 @@ AS $$
                'model',      v.model,
                'frames',     w.image_count,
                'title',      COALESCE(NULLIF(w.title,''), w.work_type, 'work session'),
+               'story',      NULLIF(w.work_description,''),   -- the detective's day narrative
                'minutes',    w.duration_minutes,
                'cost',       CASE WHEN auth.uid() = p_user_id THEN w.total_job_cost ELSE NULL END
              ) ORDER BY w.created_at DESC), '[]'::jsonb)
-      FROM (SELECT * FROM ws ORDER BY created_at DESC LIMIT GREATEST(p_limit,0)) w
+      -- Storied days first: a day with a written narrative is genuinely
+      -- "understood" (the detective's read), vs a thin classification-only
+      -- rollup. Newest narrated days lead the feed; thin days fill only if needed.
+      FROM (SELECT * FROM ws
+            ORDER BY (NULLIF(work_description,'') IS NOT NULL) DESC, created_at DESC
+            LIMIT GREATEST(p_limit,0)) w
       LEFT JOIN public.vehicles v ON v.id = w.vehicle_id
     )
   );
