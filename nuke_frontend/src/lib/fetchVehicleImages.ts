@@ -51,6 +51,15 @@ async function fetchVehicleImagesUncached<T = any>(
   // to be discarded (20% of rows for heavy vehicles), and applies the vision
   // gate even when the caller's select omits vision_gate_status — the old
   // client-side filter silently no-opped in that case.
+  //
+  // The gallery uses a WHITELIST (vision_gate_status null or approved): the full
+  // gallery is the conservative surface and shows only confirmed-good images.
+  // Peripheral discovery surfaces (DiscoveryFeed, VehicleThumbnail, ProImageViewer)
+  // use a BLACKLIST that only hides the explicit rejects — see those components.
+  // Note: 'rejected' is NOT a vision_gate_status enum value (the enum is pending,
+  // approved, rejected_personal, rejected_misattributed, review_needed); a PostgREST
+  // not.in() containing it 400s with "invalid input value for enum", so it must
+  // never appear in a filter literal.
   const gateFilter = options.includeMismatchFilter
     ? 'and(or(vision_gate_status.is.null,vision_gate_status.eq.approved),or(image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")))'
     : 'vision_gate_status.is.null,vision_gate_status.eq.approved';
@@ -62,6 +71,8 @@ async function fetchVehicleImagesUncached<T = any>(
       .eq('vehicle_id', vehicleId)
       .not('is_document', 'is', true)
       .not('is_duplicate', 'is', true)
+      // Superseded rows are prior versions of reattributed images — never display them.
+      .not('is_superseded', 'is', true)
       .not('image_url', 'is', null)
       .or(gateFilter)
       .order('is_primary', { ascending: false })
