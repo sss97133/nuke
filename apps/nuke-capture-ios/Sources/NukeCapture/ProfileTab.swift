@@ -40,6 +40,23 @@ struct DayRecord: Identifiable {
     var id: String { day }
 }
 
+/// get_user_sync_status(p_user_id) → jsonb scalar (PostgREST array-wraps it,
+/// so we decode [SyncStatus] and take .first — same pattern as DayReceipt).
+/// Owner-only: proves this phone's link to the record. Every field optional
+/// where the contract is nullable; counts default to 0 so a partial row still
+/// renders. PROVENANCE: these are server-side totals (the record's truth),
+/// reconciled against SyncEngine's device-side totals in the SYNC section.
+struct SyncStatus: Decodable {
+    let is_owner_view: Bool?
+    let synced_total: Int
+    let analyzed_total: Int
+    let pending_total: Int
+    let filed_total: Int
+    let all_sources_total: Int
+    let last_synced_at: String?
+    let last_taken_at: String?
+}
+
 /// get_user_day_receipt(p_user_id, p_date) → jsonb.
 struct DayReceipt: Decodable {
     struct Photo: Decodable, Identifiable {
@@ -175,6 +192,13 @@ struct ProfileView: View {
     @State private var receiptDay: DayRecord?
     @State private var loadError: String?
 
+    // Owner-only: the phone↔record link, made visible. `sync` is the record's
+    // server-side truth (the RPC); `engine` is this device's local truth.
+    // Showing both side by side kills the "is it even linked?" doubt — they
+    // reconcile in plain sight.
+    @State private var sync: SyncStatus?
+    @ObservedObject private var engine = SyncEngine.shared
+
     var body: some View {
         List {
             Section {
@@ -185,6 +209,9 @@ struct ProfileView: View {
                     Text(profile?.username ?? "—")
                 }
             }
+
+            // SYNC — owner-only ledger that proves the phone↔record link.
+            if isOwn { syncSection }
 
             if let loadError {
                 Section {
@@ -242,6 +269,117 @@ struct ProfileView: View {
                 .presentationDetents([.medium, .large])
         }
         .task(id: userId) { await load() }
+        .task(id: userId) { await loadSync() }   // owner-only inside loadSync
+    }
+
+    // ─── SYNC section: the link, in a traditional ledger ─────────────────────
+    // Header line names the linked account; rows are the record's totals
+    // (monospaced, source-labeled). The analyzed row drills into the actual
+    // understood frames. A final "this device" line folds in SyncEngine's
+    // local counts so phone and record reconcile on screen. Zeros are skipped
+    // (PROVENANCE: never a lone "—" row for absent data).
+    @ViewBuilder private var syncSection: some View {
+        Section {
+            // Identity confirmation — this handle IS the linked account.
+            if let who = profile?.username ?? profile?.full_name {
+                LabeledContent("Linked account") {
+                    Text(who).foregroundStyle(.secondary)
+                }
+            }
+
+            if let sync {
+                LabeledContent("Synced") {
+                    Text("\(sync.synced_total)").monospacedDigit()
+                }
+
+                // ANALYZED → drill into the understood photos (only when any).
+                if sync.analyzed_total > 0 {
+                    NavigationLink {
+                        AnalyzedPhotosView(userId: userId)
+                    } label: {
+                        LabeledContent("Analyzed") {
+                            Text("\(sync.analyzed_total)").monospacedDigit()
+                        }
+                    }
+                } else {
+                    LabeledContent("Analyzed") {
+                        Text("\(sync.analyzed_total)").monospacedDigit()
+                    }
+                }
+
+                if sync.pending_total > 0 {
+                    LabeledContent("Pending") {
+                        Text("\(sync.pending_total)")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if sync.filed_total > 0 {
+                    LabeledContent("Filed") {
+                        Text("\(sync.filed_total)").monospacedDigit()
+                    }
+                }
+                if let last = sync.last_synced_at {
+                    LabeledContent("Last sync") {
+                        Text(relativeOrPrefix(last))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            // This device's own truth — reconciles the phone against the
+            // record. Honest present values only (skip when nothing to show).
+            if SupabaseService.currentUserId != nil,
+               let line = deviceLine {
+                LabeledContent("This device") {
+                    Text(line)
+                        .font(.footnote)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Sync")
+        }
+    }
+
+    /// "N uploaded · M queued" from SyncEngine — drops either half when zero,
+    /// returns nil when both are zero (nothing honest to show).
+    private var deviceLine: String? {
+        var parts: [String] = []
+        if engine.totalSynced > 0 { parts.append("\(engine.totalSynced) uploaded") }
+        if engine.backfillRemaining > 0 { parts.append("\(engine.backfillRemaining) queued") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Parse the ISO last-sync stamp to a relative string; fall back to the
+    /// raw prefix(16) ("2026-06-14T03:12") if it doesn't parse.
+    private func relativeOrPrefix(_ raw: String) -> String {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = iso.date(from: raw)
+            ?? { let p = ISO8601DateFormatter(); return p.date(from: raw) }()
+        if let date {
+            return RelativeDateTimeFormatter().localizedString(for: date, relativeTo: Date())
+        }
+        return String(raw.prefix(16))
+    }
+
+    /// Owner-only: load the server-side sync ledger. get_user_sync_status
+    /// returns a JSONB scalar — PostgREST array-wraps it, so decode
+    /// [SyncStatus] and take .first (same pattern as get_user_day_receipt).
+    private func loadSync() async {
+        guard isOwn else { return }
+        do {
+            let rows: [SyncStatus] = try await SupabaseService.client
+                .rpc("get_user_sync_status", params: ["p_user_id": userId])
+                .execute()
+                .value
+            sync = rows.first
+        } catch {
+            NSLog("NukeCapture sync status failed: %@", String(describing: error))
+        }
     }
 
     private func load() async {
@@ -286,6 +424,7 @@ struct DayReceiptView: View {
 
     @State private var receipt: DayReceipt?
     @State private var loadError: String?
+    @State private var loaded = false       // prevents infinite ProgressView on empty result
 
     var body: some View {
         NavigationStack {
@@ -331,6 +470,11 @@ struct DayReceiptView: View {
                     Text(loadError)
                         .font(.footnote)
                         .foregroundStyle(.red)
+                } else if loaded {
+                    // Empty RPC result — loaded but no receipt rows
+                    Text("No work logged this day.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 } else {
                     ProgressView()
                 }
@@ -343,15 +487,19 @@ struct DayReceiptView: View {
 
     private func load() async {
         do {
-            receipt = try await SupabaseService.client
+            // get_user_day_receipt returns JSONB (scalar). PostgREST wraps scalar
+            // function results in an array — decode [DayReceipt] and take .first.
+            let rows: [DayReceipt] = try await SupabaseService.client
                 .rpc("get_user_day_receipt",
                      params: ["p_user_id": userId, "p_date": date])
                 .execute()
                 .value
+            receipt = rows.first
         } catch {
             loadError = "Load failed"
             NSLog("NukeCapture day receipt failed: %@", String(describing: error))
         }
+        loaded = true    // flip regardless of result — stops the infinite spinner
     }
 }
 
