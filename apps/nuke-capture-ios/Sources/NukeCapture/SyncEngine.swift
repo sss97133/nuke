@@ -55,6 +55,20 @@ final class SyncEngine: ObservableObject {
     /// uses — source='capture_relay_ios' AND ai_processing_status='analyzed' —
     /// so the count on the gauge and the photos behind it always agree.
     @Published var analyzedCount: Int = 0
+    /// The user's REAL server record (not this device's local counters) —
+    /// total_images is the full library (~22K), not just what this phone
+    /// uploaded. Fetched via get_user_capture_stats. THE web-parity fix:
+    /// TodayView headline numbers must read this, never the UserDefaults
+    /// counters (see docs/design/WEB_PARITY.md).
+    @Published var serverStats: CaptureStats = .zero
+
+    struct CaptureStats: Decodable {
+        let total_images: Int
+        let uploaded_today: Int
+        let analyzed: Int
+        let contribution_days: Int
+        static let zero = CaptureStats(total_images: 0, uploaded_today: 0, analyzed: 0, contribution_days: 0)
+    }
 
     // ─── Persistence (UserDefaults) ──────────────────────────────────────────
     // UserDefaults use is declared in PrivacyInfo.xcprivacy (required-reason
@@ -164,15 +178,20 @@ final class SyncEngine: ObservableObject {
     /// Silent on error — the metric is informational, never an error banner.
     func refreshAnalyzedCount() async {
         guard let userId = SupabaseService.currentUserId else {
+            serverStats = .zero
             analyzedCount = 0
             return
         }
         do {
+            // get_user_capture_stats returns the user's REAL record in one row:
+            // total_images / uploaded_today / analyzed / contribution_days.
+            // PostgREST wraps the single-row table function in a JSON array.
             let response = try await SupabaseService.client
-                .rpc("get_user_analyzed_count", params: ["p_user_id": userId])
+                .rpc("get_user_capture_stats", params: ["p_user_id": userId])
                 .execute()
-            if let count = try? JSONDecoder().decode(Int.self, from: response.data) {
-                analyzedCount = count
+            if let stats = try? JSONDecoder().decode([CaptureStats].self, from: response.data).first {
+                serverStats = stats
+                analyzedCount = stats.analyzed
             }
         } catch {
             NSLog("NukeCapture: refreshAnalyzedCount failed: %@", String(describing: error))
