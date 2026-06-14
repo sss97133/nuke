@@ -105,17 +105,6 @@ function formatLinkDisplay(url: string): string {
   }
 }
 
-function formatDate(dateStr: string | null | undefined): string | null {
-  if (!dateStr) return null;
-  try {
-    const d = new Date(dateStr);
-    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-    return `${months[d.getMonth()]} ${d.getFullYear()}`;
-  } catch {
-    return dateStr;
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -131,20 +120,14 @@ const UserDossierPanel: React.FC = () => {
 
   // ── Field groups ──
 
-  // Structured city/state is the trustworthy location; the legacy free-text
-  // `location` field holds stale junk (a bare ZIP fragment of the github
-  // handle) so it's only the last-resort fallback — never shown over city/state.
-  const locationDisplay =
-    [profile.city, profile.state].filter(Boolean).join(', ') ||
-    profile.location ||
-    null;
-
+  // IDENTITY group trimmed to NON-REDUNDANT fields only (founder teardown,
+  // PROFILE_BUILD_ORDER 2026-06-13): the header already carries NAME, USERNAME,
+  // LOCATION and MEMBER SINCE — repeating them here is pure redundancy ("my name
+  // AGAIN, username AGAIN, location AGAIN, member since AGAIN"). EMAIL is the one
+  // identity field NOT in the header, and it's owner-only, so it stays. Everything
+  // else identity-wise is said once, in the header.
   const identityFields: FieldDef[] = [
-    { key: 'full_name', label: 'NAME', value: profile.full_name, editable: true },
     { key: 'email', label: 'EMAIL', value: profile.email, ownerOnly: true },
-    { key: 'username', label: 'USERNAME', value: profile.username, editable: true },
-    { key: 'location', label: 'LOCATION', value: locationDisplay, editable: true },
-    { key: 'member_since', label: 'MEMBER SINCE', value: formatDate(profile.member_since || profile.created_at) },
   ];
 
   const socialFields: FieldDef[] = [
