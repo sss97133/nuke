@@ -105,17 +105,6 @@ function formatLinkDisplay(url: string): string {
   }
 }
 
-function formatDate(dateStr: string | null | undefined): string | null {
-  if (!dateStr) return null;
-  try {
-    const d = new Date(dateStr);
-    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-    return `${months[d.getMonth()]} ${d.getFullYear()}`;
-  } catch {
-    return dateStr;
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -131,12 +120,14 @@ const UserDossierPanel: React.FC = () => {
 
   // ── Field groups ──
 
+  // IDENTITY group trimmed to NON-REDUNDANT fields only (founder teardown,
+  // PROFILE_BUILD_ORDER 2026-06-13): the header already carries NAME, USERNAME,
+  // LOCATION and MEMBER SINCE — repeating them here is pure redundancy ("my name
+  // AGAIN, username AGAIN, location AGAIN, member since AGAIN"). EMAIL is the one
+  // identity field NOT in the header, and it's owner-only, so it stays. Everything
+  // else identity-wise is said once, in the header.
   const identityFields: FieldDef[] = [
-    { key: 'full_name', label: 'NAME', value: profile.full_name, editable: true },
     { key: 'email', label: 'EMAIL', value: profile.email, ownerOnly: true },
-    { key: 'username', label: 'USERNAME', value: profile.username, editable: true },
-    { key: 'location', label: 'LOCATION', value: profile.location, editable: true },
-    { key: 'member_since', label: 'MEMBER SINCE', value: formatDate(profile.member_since || profile.created_at) },
   ];
 
   const socialFields: FieldDef[] = [
@@ -145,11 +136,12 @@ const UserDossierPanel: React.FC = () => {
     { key: 'linkedin_url', label: 'LINKEDIN', value: profile.linkedin_url, isLink: true, editable: true },
   ];
 
-  const accountFields: FieldDef[] = [
-    { key: 'user_type', label: 'TYPE', value: profile.user_type?.toUpperCase() || 'USER' },
-    { key: 'verification_status', label: 'VERIFICATION', value: profile.verification_status?.toUpperCase() || null },
-    { key: 'is_public', label: 'VISIBILITY', value: profile.is_public ? 'PUBLIC' : 'PRIVATE', ownerOnly: true },
-  ];
+  // ACCOUNT group removed from the public record (audit P3/P5):
+  //  - TYPE (USER/ADMIN) is moderation metadata, not part of the record;
+  //    role is conveyed by the sub-header type badge.
+  //  - VERIFICATION read `verification_status`, a column that doesn't exist on
+  //    profiles (always null) — the VERIFIED badge already attests this.
+  //  - VISIBILITY is a settings toggle, not a dossier datum.
 
   // Filter: hide ownerOnly fields for non-owners
   const filterFields = (fields: FieldDef[]) =>
@@ -176,15 +168,13 @@ const UserDossierPanel: React.FC = () => {
 
   const identityGroup = renderGroup('IDENTITY', identityFields);
   const socialGroup = renderGroup('SOCIAL', socialFields);
-  const accountGroup = renderGroup('ACCOUNT', accountFields);
 
-  if (!identityGroup && !socialGroup && !accountGroup) return null;
+  if (!identityGroup && !socialGroup) return null;
 
   return (
     <CollapsibleWidget variant="profile" title="Dossier">
       {identityGroup}
       {socialGroup}
-      {accountGroup}
     </CollapsibleWidget>
   );
 };
