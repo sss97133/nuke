@@ -1,28 +1,48 @@
-// BarcodeTimeline.swift — horizontal barcode instrument for the profile.
+// BarcodeTimeline.swift — 365-day calendar squares instrument.
 //
-// Bucketing logic:
-//   span ≤ 400 days  → one bar per day
-//   span ≤ 3000 days → one bar per week (Mon-anchored ISO week)
-//   span  > 3000 days → one bar per month
+// Grammar ported from nuke_frontend/src/components/profile/ContributionTimeline.tsx:
+//   • 7 rows (Sun–Sat) × week columns, Sunday-anchored
+//   • square cells 11×11 pt, gap 2 pt
+//   • 5-bucket intensity: empty outline → .primary at 4 opacities
+//   • month labels above the grid (J F M A … )
+//   • day-of-week labels at left (S M T W T F S), alternating
+//   • horizontally scrollable; auto-scrolls to today (trailing edge)
+//   • tapping a nonzero day → onSelect with the DayRecord
 //
-// Bar height: sqrt(count) normalised to [4, 64] pt.
-// Bar width: 3pt, gap: 1pt, color: .primary, bg: clear.
-// Tap: exposes the most-recent DayRecord inside the bucket via the
-//      provided onSelect callback (caller owns the sheet).
+// Span: continuous week-columns from the earliest DayRecord through today —
+// can cover many years, no year-switching UI needed.
+//
+// Filter pills (ALL / PHOTOS / WORK) recolor cells without rebuilding the grid.
 
 import SwiftUI
+
+// ─── Hex color helper ────────────────────────────────────────────────────────
+
+extension Color {
+    /// Init from a CSS hex string (e.g. "#34d399" or "34d399").
+    /// Supports 6-digit RGB only. Falls back to clear on bad input.
+    init(hex: String) {
+        let h = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+        guard h.count == 6, let value = UInt64(h, radix: 16) else {
+            self = .clear; return
+        }
+        let r = Double((value >> 16) & 0xFF) / 255
+        let g = Double((value >>  8) & 0xFF) / 255
+        let b = Double( value        & 0xFF) / 255
+        self = Color(red: r, green: g, blue: b)
+    }
+}
 
 // ─── Bucket model ────────────────────────────────────────────────────────────
 
 struct TimelineBucket: Identifiable {
     let id: String          // ISO bucket key used as ScrollViewReader anchor
     let count: Int          // sum of ALL day counts in bucket (the pinned grid signal)
-    let photos: Int         // per-facet sub-counts — colors/heights recolor off these
-    let work: Int           // never rebuild the grid; filters read these instead
+    let photos: Int         // per-facet sub-counts
+    let work: Int
     let latestDay: String   // "yyyy-MM-dd" of the most-recent nonzero day in bucket
-    let yearBoundary: Int?  // set on the first bucket of a new year (the year value)
+    let yearBoundary: Int?  // unused in calendar mode; kept for API compatibility
 
-    /// The count for a given filter key — ALL is the pinned superset.
     func count(for filter: String) -> Int {
         switch filter {
         case "photos": return photos
@@ -33,10 +53,6 @@ struct TimelineBucket: Identifiable {
 }
 
 // ─── Facets ──────────────────────────────────────────────────────────────────
-// Mirrors nuke_frontend/src/pages/user-profile/UserBarcodeTimeline.tsx FILTERS:
-// a pill renders ONLY when its facet's total > 0 (skill-fingerprint doctrine).
-// iOS surfaces the three facets the contribution-day record actually carries
-// (photo · event/work). Colors are the iOS analogue of the web --heat scale.
 
 struct TimelineFacet: Identifiable {
     let key: String
@@ -51,20 +67,46 @@ let timelineFacets: [TimelineFacet] = [
     .init(key: "work",   label: "WORK",   color: .orange),
 ]
 
+// ─── Calendar cell model ─────────────────────────────────────────────────────
+
+private struct CalCell: Identifiable {
+    let id: String          // "yyyy-MM-dd"
+    let date: Date
+    let inRange: Bool       // false = padding cell before/after data range
+    let count: Int          // ALL-facet count for this day
+    let photos: Int
+    let work: Int
+
+    func count(for filter: String) -> Int {
+        switch filter {
+        case "photos": return photos
+        case "work":   return work
+        default:       return count
+        }
+    }
+}
+
+// ─── Week column model ────────────────────────────────────────────────────────
+
+private struct WeekCol: Identifiable {
+    var id: String { anchorDay }
+    let anchorDay: String   // Sunday of this week "yyyy-MM-dd"
+    let cells: [CalCell]    // always 7, Sun first
+    let monthLabel: String? // e.g. "J" — set on first week of a new month
+    let yearLabel: Int?     // set on first week of a new year
+}
+
 // ─── Builder ─────────────────────────────────────────────────────────────────
 
-enum BucketUnit { case day, week, month }
+private func buildWeekCols(days: [DayRecord]) -> [WeekCol] {
+    guard !days.isEmpty else { return [] }
 
-private func buildBuckets(days: [DayRecord]) -> (buckets: [TimelineBucket], unit: BucketUnit) {
-    guard !days.isEmpty else { return ([], .day) }
-
+    let cal = Calendar.current
     let fmt = DateFormatter()
     fmt.dateFormat = "yyyy-MM-dd"
     fmt.locale = Locale(identifier: "en_US_POSIX")
 
-    // Build a lookup: "yyyy-MM-dd" → total count, plus per-facet sub-counts.
-    // The grid (positions/widths/ticks) is built from the ALL total ONLY; the
-    // per-facet maps just recolor/rescale the same fixed grid on filter.
+    // Lookup maps
     var countByDay: [String: Int] = [:]
     var photosByDay: [String: Int] = [:]
     var workByDay: [String: Int] = [:]
@@ -74,119 +116,86 @@ private func buildBuckets(days: [DayRecord]) -> (buckets: [TimelineBucket], unit
         workByDay[d.day] = d.work
     }
 
-    // Full date range: earliest day in the data → today
+    // Date range: earliest day → today
     let sortedDays = days.map(\.day).sorted()
     guard let firstStr = sortedDays.first,
-          let earliest = fmt.date(from: firstStr) else { return ([], .day) }
+          let earliest = fmt.date(from: firstStr) else { return [] }
 
-    let today = Calendar.current.startOfDay(for: Date())
-    let span = Calendar.current.dateComponents([.day], from: earliest, to: today).day ?? 0
+    let today = cal.startOfDay(for: Date())
 
-    let unit: BucketUnit = span > 3000 ? .month : span > 400 ? .week : .day
-
-    // Generate all calendar dates from earliest → today
-    var buckets: [TimelineBucket] = []
-    var cursor = earliest
-    var lastYear: Int? = nil
-
-    while cursor <= today {
-        let bucketKey: String
-        let bucketEnd: Date
-
-        switch unit {
-        case .day:
-            bucketKey = fmt.string(from: cursor)
-            bucketEnd = cursor
-        case .week:
-            // ISO week Monday anchor
-            var comps = Calendar.current.dateComponents([.yearForWeekOfYear, .weekOfYear], from: cursor)
-            bucketKey = "W\(comps.yearForWeekOfYear!)-\(String(format: "%02d", comps.weekOfYear!))"
-            bucketEnd = Calendar.current.date(byAdding: .day, value: 6, to: cursor) ?? cursor
-        case .month:
-            let comps = Calendar.current.dateComponents([.year, .month], from: cursor)
-            bucketKey = "\(comps.year!)-\(String(format: "%02d", comps.month!))"
-            // last day of the month
-            let nextMonth = Calendar.current.date(byAdding: .month, value: 1, to: cursor)!
-            bucketEnd = Calendar.current.date(byAdding: .day, value: -1, to: nextMonth) ?? cursor
-        }
-
-        // Sum all days in this bucket window
-        var total = 0
-        var photosTotal = 0
-        var workTotal = 0
-        var latest = ""
-        var scanCursor = cursor
-        while scanCursor <= min(bucketEnd, today) {
-            let key = fmt.string(from: scanCursor)
-            if let c = countByDay[key], c > 0 {
-                total += c
-                photosTotal += photosByDay[key] ?? 0
-                workTotal += workByDay[key] ?? 0
-                if key > latest { latest = key }
-            }
-            scanCursor = Calendar.current.date(byAdding: .day, value: 1, to: scanCursor) ?? scanCursor
-        }
-        if latest.isEmpty { latest = fmt.string(from: cursor) }  // fallback for empty buckets
-
-        // Year boundary tick
-        let yearComps = Calendar.current.dateComponents([.year], from: cursor)
-        let year = yearComps.year!
-        let yearBoundary: Int? = (lastYear == nil || year != lastYear!) ? year : nil
-        lastYear = year
-
-        buckets.append(TimelineBucket(id: bucketKey, count: total, photos: photosTotal,
-                                      work: workTotal, latestDay: latest, yearBoundary: yearBoundary))
-
-        // Advance cursor to next bucket start
-        switch unit {
-        case .day:   cursor = Calendar.current.date(byAdding: .day, value: 1, to: cursor) ?? today
-        case .week:  cursor = Calendar.current.date(byAdding: .weekOfYear, value: 1, to: cursor) ?? today
-        case .month: cursor = Calendar.current.date(byAdding: .month, value: 1, to: cursor) ?? today
-        }
+    // Sunday on or before earliest
+    func startOfWeekSunday(_ d: Date) -> Date {
+        var comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear, .weekday], from: d)
+        comps.weekday = 1   // Sunday
+        return cal.date(from: comps) ?? d
     }
 
-    return (buckets, unit)
+    var cursor = startOfWeekSunday(earliest)
+    var weekCols: [WeekCol] = []
+    var prevMonth: Int? = nil
+    var prevYear: Int? = nil
+
+    let monthLabels = ["J","F","M","A","M","J","J","A","S","O","N","D"]
+
+    while cursor <= today {
+        var cells: [CalCell] = []
+        var monthLabel: String? = nil
+        var yearLabel: Int? = nil
+
+        for d in 0..<7 {
+            let cellDate = cal.date(byAdding: .day, value: d, to: cursor)!
+            let key = fmt.string(from: cellDate)
+            let inRange = cellDate <= today && cellDate >= earliest
+
+            cells.append(CalCell(
+                id: key,
+                date: cellDate,
+                inRange: inRange,
+                count: inRange ? (countByDay[key] ?? 0) : 0,
+                photos: inRange ? (photosByDay[key] ?? 0) : 0,
+                work: inRange ? (workByDay[key] ?? 0) : 0
+            ))
+
+            // Month label on Sunday of the first week that touches a new month
+            if d == 0 {
+                let m = cal.component(.month, from: cellDate)
+                let y = cal.component(.year, from: cellDate)
+                if prevMonth != m {
+                    monthLabel = monthLabels[m - 1]
+                    prevMonth = m
+                }
+                if prevYear != y {
+                    yearLabel = y
+                    prevYear = y
+                }
+            }
+        }
+
+        weekCols.append(WeekCol(
+            anchorDay: fmt.string(from: cursor),
+            cells: cells,
+            monthLabel: monthLabel,
+            yearLabel: yearLabel
+        ))
+
+        cursor = cal.date(byAdding: .weekOfYear, value: 1, to: cursor) ?? today
+    }
+
+    return weekCols
 }
 
 // ─── View ─────────────────────────────────────────────────────────────────────
 
 struct BarcodeTimeline: View {
     let days: [DayRecord]
-    /// Called when a nonzero bar is tapped; passes the most-recent DayRecord
-    /// inside the bucket so the caller can present its existing day sheet.
     var onSelect: (DayRecord) -> Void
 
-    private let barWidth: CGFloat = 3
-    private let barGap:   CGFloat = 1
-    private let maxH:     CGFloat = 64
-    private let minH:     CGFloat = 4
-
-    // Precompute once; DayRecord is a value type so Equatable derivation
-    // is automatic — but we key off days.count as a cheap change signal.
-    //
-    // PINNED WINDOW: `buckets` is built ONCE from the ALL set. `activeFilter`
-    // only recolors the bars and rescales their height (per-facet max) — it
-    // never rebuilds the grid, so positions / widths / year ticks never move.
-    @State private var buckets: [TimelineBucket] = []
-    @State private var maxCount: Int = 1
+    // Pinned grid built once from ALL data; filter only recolors
+    @State private var weekCols: [WeekCol] = []
     @State private var activeFilter = "all"
 
-    /// Per-facet totals from the ALL set — drives which pills render. A facet
-    /// with zero events never shows a pill (skill fingerprint, web parity).
-    private var facetTotals: [String: Int] {
-        var photos = 0, work = 0, all = 0
-        for b in buckets { all += b.count; photos += b.photos; work += b.work }
-        return ["all": all, "photos": photos, "work": work]
-    }
-
-    /// Max count for the active facet — bar heights rescale to fill the
-    /// instrument for whatever facet is selected (the ALL grid stays pinned).
-    private var activeMax: Int {
-        max(1, buckets.map { $0.count(for: activeFilter) }.max() ?? 1)
-    }
-
-    // Lookup by day string for onSelect
-    private var dayIndex: [String: DayRecord] = [:]
+    // Day index for onSelect
+    private var dayIndex: [String: DayRecord]
 
     init(days: [DayRecord], onSelect: @escaping (DayRecord) -> Void) {
         self.days = days
@@ -196,20 +205,28 @@ struct BarcodeTimeline: View {
         self.dayIndex = idx
     }
 
+    // Per-facet totals → which pills to show
+    private var facetTotals: [String: Int] {
+        var all = 0, photos = 0, work = 0
+        for d in days { all += d.photos + d.events + d.work; photos += d.photos; work += d.work }
+        return ["all": all, "photos": photos, "work": work]
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             filterPills
-            barcode
+            calendarGrid
         }
         .onAppear { recompute() }
         .onChange(of: days.count) { _, _ in recompute() }
     }
 
-    // ─── Filter pills — only facets with data; ALL/PHOTOS/WORK, web parity ───
+    // ─── Filter pills ─────────────────────────────────────────────────────────
+
     @ViewBuilder private var filterPills: some View {
         let totals = facetTotals
-        let shown = timelineFacets.filter { ($0.key == "all") || (totals[$0.key] ?? 0) > 0 }
-        if shown.count > 1 {   // a lone ALL pill is noise — only show when there's a real choice
+        let shown = timelineFacets.filter { $0.key == "all" || (totals[$0.key] ?? 0) > 0 }
+        if shown.count > 1 {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(shown) { facet in
@@ -220,12 +237,8 @@ struct BarcodeTimeline: View {
                             .padding(.horizontal, 9)
                             .padding(.vertical, 4)
                             .foregroundStyle(active ? Color(.systemBackground) : facet.color)
-                            .background {
-                                Capsule().fill(active ? facet.color : Color.clear)
-                            }
-                            .overlay {
-                                Capsule().stroke(facet.color.opacity(active ? 0 : 0.5), lineWidth: 1)
-                            }
+                            .background { Capsule().fill(active ? facet.color : Color.clear) }
+                            .overlay { Capsule().stroke(facet.color.opacity(active ? 0 : 0.5), lineWidth: 1) }
                             .contentShape(Capsule())
                             .onTapGesture { activeFilter = facet.key }
                     }
@@ -235,79 +248,167 @@ struct BarcodeTimeline: View {
         }
     }
 
-    // ─── The barcode itself — grid pinned, color/height react to filter ──────
-    private var barcode: some View {
+    // ─── Calendar grid ────────────────────────────────────────────────────────
+
+    // Cell geometry — matches web: 11×11 px squares, 2 px gap
+    private let cellSide: CGFloat = 11
+    private let cellGap:  CGFloat = 2
+    private let dayLabelW: CGFloat = 10   // left column for S/M/T labels
+
+    // Height of the 7-row grid
+    private var gridH: CGFloat { 7 * cellSide + 6 * cellGap }
+
+    // Height of the month-label row above the grid
+    private let monthRowH: CGFloat = 12
+    // Height of year label row (rendered inline in first column of new year)
+    private let yearRowH: CGFloat = 0   // year shown as column overlay, not a row
+
+    private var calendarGrid: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .bottom, spacing: barGap) {
-                    ForEach(buckets) { bucket in
-                        VStack(alignment: .leading, spacing: 2) {
-                            // Bar — height/fill come from the ACTIVE facet's
-                            // count; the bucket's x-position and width never move.
-                            let facetCount = bucket.count(for: activeFilter)
-                            let h = barHeight(facetCount)
-                            let facetColor = timelineFacets.first { $0.key == activeFilter }?.color ?? .primary
-                            Rectangle()
-                                .fill(facetCount > 0 ? facetColor
-                                                     : (bucket.count > 0 ? Color.primary.opacity(0.12) : Color.clear))
-                                .frame(width: barWidth, height: h)
-                                .contentShape(Rectangle().size(CGSize(width: barWidth, height: maxH)))
-                                .onTapGesture {
-                                    guard bucket.count > 0 else { return }
-                                    if let d = dayIndex[bucket.latestDay] {
+                HStack(alignment: .top, spacing: 0) {
+                    // Day-of-week labels column (S M T W T F S, alternating shown)
+                    VStack(spacing: 0) {
+                        // spacer for month label row
+                        Color.clear.frame(width: dayLabelW, height: monthRowH)
+                        ForEach(0..<7, id: \.self) { i in
+                            let labels = ["S","M","T","W","T","F","S"]
+                            Text(i % 2 == 1 ? labels[i] : " ")
+                                .font(.system(size: 7))
+                                .foregroundStyle(.secondary)
+                                .frame(width: dayLabelW, height: cellSide)
+                            if i < 6 {
+                                Spacer().frame(height: cellGap)
+                            }
+                        }
+                    }
+
+                    // Week columns
+                    HStack(alignment: .top, spacing: cellGap) {
+                        ForEach(weekCols) { week in
+                            WeekColView(
+                                week: week,
+                                cellSide: cellSide,
+                                cellGap: cellGap,
+                                monthRowH: monthRowH,
+                                activeFilter: activeFilter,
+                                onTap: { date in
+                                    if let d = dayIndex[date] {
                                         onSelect(d)
                                     }
                                 }
-
-                            // Year tick — String(year), never "\(year)":
-                            // interpolation hits LocalizedStringKey and
-                            // locale-formats the Int as "2,017".
-                            if let year = bucket.yearBoundary {
-                                Text(String(year))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .monospacedDigit()
-                                    .fixedSize()
-                                    .frame(width: 28, alignment: .leading)
-                                    .offset(x: 0)
-                            } else {
-                                // Placeholder keeps the year-row height stable
-                                Color.clear
-                                    .frame(width: barWidth, height: 12)
-                            }
+                            )
                         }
-                        .id(bucket.id)
                     }
+                    .id("grid")
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
             .onAppear {
-                // Scroll to trailing end (today)
-                if let last = buckets.last {
-                    proxy.scrollTo(last.id, anchor: .trailing)
-                }
+                proxy.scrollTo("grid", anchor: .trailing)
             }
-            .onChange(of: buckets.count) { _, _ in
-                if let last = buckets.last {
-                    proxy.scrollTo(last.id, anchor: .trailing)
-                }
+            .onChange(of: weekCols.count) { _, _ in
+                proxy.scrollTo("grid", anchor: .trailing)
             }
         }
     }
 
     private func recompute() {
-        let (b, _) = buildBuckets(days: days)
-        buckets = b
-        maxCount = b.map(\.count).max() ?? 1
+        weekCols = buildWeekCols(days: days)
+    }
+}
+
+// ─── Single week column ───────────────────────────────────────────────────────
+
+private struct WeekColView: View {
+    let week: WeekCol
+    let cellSide: CGFloat
+    let cellGap: CGFloat
+    let monthRowH: CGFloat
+    let activeFilter: String
+    let onTap: (String) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Month label row — shown on first week of each month
+            ZStack(alignment: .bottomLeading) {
+                Color.clear.frame(width: cellSide, height: monthRowH)
+                if let label = week.monthLabel {
+                    Text(label)
+                        .font(.system(size: 8))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            // 7 day cells
+            VStack(spacing: cellGap) {
+                ForEach(week.cells) { cell in
+                    CellView(
+                        cell: cell,
+                        side: cellSide,
+                        activeFilter: activeFilter,
+                        onTap: onTap
+                    )
+                }
+            }
+
+            // Year label below grid on the first week of a new year
+            if let year = week.yearLabel {
+                Text(String(year))
+                    .font(.system(size: 7))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .frame(width: cellSide * 2.5, alignment: .leading)
+                    .padding(.top, 2)
+            }
+        }
+    }
+}
+
+// ─── Single day cell ─────────────────────────────────────────────────────────
+
+private struct CellView: View {
+    let cell: CalCell
+    let side: CGFloat
+    let activeFilter: String
+    let onTap: (String) -> Void
+
+    private var facetCount: Int { cell.count(for: activeFilter) }
+
+    // Web --heat palette (ContributionTimeline.tsx):
+    //   empty #ebedf0 | bucket1 #d9f99d | bucket2 #a7f3d0
+    //   bucket3 #34d399 | bucket4 #059669 | bucket5 #047857
+    // Dark mode: same greens with reduced opacity on a #2d2d30 base.
+    private var fillColor: Color {
+        guard cell.inRange else {
+            return Color(hex: "#ebedf0").opacity(0.25)   // out-of-range: very faint
+        }
+        switch facetCount {
+        case 0:      return Color.clear
+        case 1:      return Color(hex: "#d9f99d")
+        case 2:      return Color(hex: "#a7f3d0")
+        case 3:      return Color(hex: "#34d399")
+        case 4:      return Color(hex: "#059669")
+        default:     return Color(hex: "#047857")
+        }
     }
 
-    private func barHeight(_ count: Int) -> CGFloat {
-        // Zero in the active facet → a short ghost tick (the bar's fill decides
-        // whether it shows as faint or clear). Scale against the ACTIVE facet's
-        // max so the selected facet fills the instrument; the grid is pinned.
-        guard count > 0 else { return minH }
-        let ratio = sqrt(Double(count)) / sqrt(Double(activeMax))
-        return max(minH, CGFloat(ratio) * maxH)
+    private var strokeColor: Color {
+        guard cell.inRange else { return Color.clear }
+        // empty cells: the web's #ebedf0 outline
+        return facetCount == 0 ? Color(hex: "#ebedf0") : Color.clear
+    }
+
+    var body: some View {
+        Rectangle()
+            .fill(fillColor)
+            .frame(width: side, height: side)
+            .overlay(Rectangle().stroke(strokeColor, lineWidth: 0.5))
+            .contentShape(Rectangle())
+            .onTapGesture {
+                guard cell.inRange && cell.count > 0 else { return }
+                onTap(cell.id)
+            }
     }
 }
