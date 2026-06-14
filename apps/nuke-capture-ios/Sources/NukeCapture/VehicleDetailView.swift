@@ -775,6 +775,33 @@ struct InvestmentProofView: View {
         Group {
             if let p = proof {
                 VStack(alignment: .leading, spacing: 0) {
+                    // NEEDS YOU — the confirmable queue, made discoverable. Owner
+                    // only. The owner's signature turns projected into proven, so
+                    // surface it as the section's call-to-action instead of
+                    // burying it in one dim ledger line. Tap → the confirm sheet.
+                    if p.is_owner_view {
+                        let unconfirmed = (p.audit?.work_sessions ?? []).filter { !($0.confirmed ?? false) }
+                        if !unconfirmed.isEmpty {
+                            Button {
+                                ledgerDrill = LedgerDrill(title: "Labor", kind: .labor,
+                                                          rows: p.audit?.work_sessions ?? [])
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "checkmark.circle").foregroundStyle(.blue)
+                                    Text("\(unconfirmed.count) work sessions need your confirmation")
+                                        .foregroundStyle(.primary)
+                                    Spacer(minLength: 8)
+                                    Image(systemName: "chevron.right.circle")
+                                        .font(.caption2).foregroundStyle(.blue)
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.vertical, 8)
+                            Divider()
+                        }
+                    }
+
                     Text("INVESTMENT")
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(Color.secondary)
@@ -908,13 +935,21 @@ struct InvestmentProofView: View {
     }
 
     private func load() async {
-        do {
-            proof = try await SupabaseService.client
-                .rpc("compute_vehicle_investment_proof", params: ["p_vehicle_id": vehicleId])
-                .execute()
-                .value
-        } catch {
-            NSLog("NukeCapture investment proof failed: %@", String(describing: error))
+        // Retry: a cold app/network start can stall or cancel the first request
+        // (-999 / data_stall), which would silently leave the whole INVESTMENT
+        // section absent. A couple of spaced retries make it reliable on first
+        // launch (device cold-start as well as the sim).
+        for attempt in 0..<3 {
+            do {
+                proof = try await SupabaseService.client
+                    .rpc("compute_vehicle_investment_proof", params: ["p_vehicle_id": vehicleId])
+                    .execute()
+                    .value
+                break
+            } catch {
+                NSLog("NukeCapture investment proof attempt %d failed: %@", attempt, String(describing: error))
+                try? await Task.sleep(nanoseconds: 800_000_000)
+            }
         }
         #if DEBUG
         // Screenshot loop: auto-open a ledger drill (NUKE_DEBUG_LEDGER=labor).
