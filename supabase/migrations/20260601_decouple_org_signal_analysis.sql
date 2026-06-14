@@ -16,6 +16,7 @@ CREATE OR REPLACE FUNCTION public.trigger_update_primary_focus()
  RETURNS trigger
  LANGUAGE plpgsql
  SECURITY DEFINER
+ SET search_path = public, pg_temp
 AS $function$
 DECLARE
   v_org_id UUID;
@@ -25,9 +26,9 @@ BEGIN
       OLD.ui_config IS DISTINCT FROM NEW.ui_config OR
       OLD.business_type IS DISTINCT FROM NEW.business_type
     ) THEN
-      PERFORM compute_and_store_primary_focus(NEW.id);
+      PERFORM public.compute_and_store_primary_focus(NEW.id);
     ELSIF TG_OP = 'INSERT' THEN
-      PERFORM compute_and_store_primary_focus(NEW.id);
+      PERFORM public.compute_and_store_primary_focus(NEW.id);
     END IF;
     RETURN NEW;
   ELSIF TG_TABLE_NAME = 'organization_vehicles' THEN
@@ -40,19 +41,23 @@ BEGIN
        AND NEW.scope_id IS NOT NULL
        AND NEW.scope_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     THEN
-      PERFORM analyze_organization_data_signals(NEW.scope_id::uuid);
-      PERFORM compute_and_store_primary_focus(NEW.scope_id::uuid);
+      PERFORM public.analyze_organization_data_signals(NEW.scope_id::uuid);
+      PERFORM public.compute_and_store_primary_focus(NEW.scope_id::uuid);
     END IF;
     RETURN NEW;
   ELSIF TG_TABLE_NAME = 'timeline_events' THEN
+    -- On UPDATE that moves an event between vehicles, both the source (OLD) and
+    -- destination (NEW) vehicle's orgs need recomputing — COALESCE alone would
+    -- only touch NEW and leave the old vehicle's org analytics stale.
     FOR v_org_id IN
       SELECT DISTINCT organization_id
       FROM organization_vehicles
-      WHERE vehicle_id = COALESCE(NEW.vehicle_id, OLD.vehicle_id)
+      WHERE vehicle_id IN (NEW.vehicle_id, OLD.vehicle_id)
+        AND vehicle_id IS NOT NULL
         AND organization_id IS NOT NULL
     LOOP
-      PERFORM analyze_organization_data_signals(v_org_id);
-      PERFORM compute_and_store_primary_focus(v_org_id);
+      PERFORM public.analyze_organization_data_signals(v_org_id);
+      PERFORM public.compute_and_store_primary_focus(v_org_id);
     END LOOP;
     RETURN COALESCE(NEW, OLD);
   END IF;
