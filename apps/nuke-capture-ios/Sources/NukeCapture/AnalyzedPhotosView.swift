@@ -168,7 +168,9 @@ private struct AnalyzedGridCell: View {
 
 /// Full-screen black evidence sheet: the original image up top, the extracted
 /// atoms below as a work-order back side. Render only what exists.
-private struct AnalyzedEvidenceView: View {
+/// Internal (not private) so the vehicle sheet's photo→analysis drill presents
+/// the SAME evidence surface — one analysis view, never a parallel one.
+struct AnalyzedEvidenceView: View {
     let photo: AnalyzedPhoto
     @Environment(\.dismiss) private var dismiss
 

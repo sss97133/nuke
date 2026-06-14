@@ -31,6 +31,17 @@ struct ContributionRow: Decodable {
     let n: Int
 }
 
+/// One get_user_contribution_calendar element — already pivoted per day. The
+/// calendar RPC returns a single jsonb array (one object per day), which is
+/// NOT subject to PostgREST's db-max-rows 1000-row cap that truncates the
+/// (day,kind) SETOF for heavy users. This is the full-history path.
+struct CalendarDay: Decodable {
+    let day: String          // "yyyy-MM-dd"
+    let photos: Int
+    let events: Int
+    let work: Int
+}
+
 /// Day rows after grouping (one per calendar day, newest first).
 struct DayRecord: Identifiable {
     let day: String
@@ -393,26 +404,62 @@ struct ProfileView: View {
                 .value
             profile = rows.first
 
-            let contributions: [ContributionRow] = try await SupabaseService.client
-                .rpc("get_user_contribution_days", params: ["p_user_id": userId])
-                .execute()
-                .value
-            var byDay: [String: DayRecord] = [:]
-            for row in contributions {
-                var rec = byDay[row.day] ?? DayRecord(day: row.day)
-                switch row.kind {
-                case "photo": rec.photos += row.n
-                case "work":  rec.work += row.n
-                default:      rec.events += row.n
-                }
-                byDay[row.day] = rec
+            // Full-history path FIRST: get_user_contribution_calendar returns a
+            // single jsonb array (one row per day), bypassing the db-max-rows
+            // 1000-row cap that truncated the (day,kind) SETOF — for Skylar that
+            // cap dropped ~980 real work-days and started the barcode at an
+            // arbitrary 2024 wall. Decode the scalar via [[CalendarDay]].first
+            // (PostgREST array-wraps a scalar function result). If the RPC isn't
+            // deployed yet (404), fall back to the capped (day,kind) RPC so the
+            // timeline still renders a working organ (C4) — it auto-upgrades to
+            // full history once the migration lands.
+            if let calendar = try? await loadCalendar(), !calendar.isEmpty {
+                days = calendar
+            } else {
+                days = try await loadContributionDays()
             }
-            days = byDay.values.sorted { $0.day > $1.day }   // newest first
             loadError = nil
         } catch {
             loadError = "Load failed"
             NSLog("NukeCapture profile load failed: %@", String(describing: error))
         }
+    }
+
+    /// Full-history calendar: one jsonb array, uncapped. Throws if the RPC is
+    /// missing (404) so the caller can fall back to the capped SETOF.
+    private func loadCalendar() async throws -> [DayRecord] {
+        // get_user_contribution_calendar → jsonb scalar; PostgREST array-wraps
+        // it, so decode [[CalendarDay]] and take .first (same shape pattern as
+        // get_user_day_receipt). An empty profile returns [] → no throw.
+        let wrapped: [[CalendarDay]] = try await SupabaseService.client
+            .rpc("get_user_contribution_calendar", params: ["p_user_id": userId])
+            .execute()
+            .value
+        let cal = wrapped.first ?? []
+        return cal
+            .map { DayRecord(day: $0.day, photos: $0.photos, events: $0.events, work: $0.work) }
+            .sorted { $0.day > $1.day }   // newest first (matches the day list)
+    }
+
+    /// Fallback: the capped (day,kind,n) SETOF. Truncated to 1000 rows for heavy
+    /// users — kept only so the timeline is a working organ before the calendar
+    /// RPC is deployed.
+    private func loadContributionDays() async throws -> [DayRecord] {
+        let contributions: [ContributionRow] = try await SupabaseService.client
+            .rpc("get_user_contribution_days", params: ["p_user_id": userId])
+            .execute()
+            .value
+        var byDay: [String: DayRecord] = [:]
+        for row in contributions {
+            var rec = byDay[row.day] ?? DayRecord(day: row.day)
+            switch row.kind {
+            case "photo": rec.photos += row.n
+            case "work":  rec.work += row.n
+            default:      rec.events += row.n
+            }
+            byDay[row.day] = rec
+        }
+        return byDay.values.sorted { $0.day > $1.day }
     }
 }
 
