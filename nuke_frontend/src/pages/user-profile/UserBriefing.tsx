@@ -2,32 +2,21 @@
  * UserBriefing — Intelligence headline + stat pills.
  * Mirrors VehicleBriefing pattern.
  *
- * Priority order for headline:
- * 1. Onboarding prompt (own profile, missing data)
- * 2. Active auctions count
- * 3. Collection summary
- * 4. Recent activity summary
- * 5. null (don't render)
+ * Priority order for headline (each fact appears exactly ONCE — tenet 2):
+ * 1. Onboarding prompt (own profile, missing data) — unique to briefing
+ * 2. Active auctions count — unique to briefing
+ * 3. null (don't render)
+ *
+ * Collection summary ("N worked on, N listed") and "member since" headlines
+ * were REMOVED: the header already carries WORKED ON / LISTINGS pills and a
+ * "SINCE {year}" meta line. Restating them here was the redundancy Skylar
+ * flagged (PROFILE_BUILD_ORDER #9). The briefing now adds only what the header
+ * lacks.
  *
  * Self-guarding: returns null if no headline AND no stats.
  */
 import React, { useMemo } from 'react';
 import { useUserProfile } from './UserProfileContext';
-
-// ---------------------------------------------------------------------------
-// Date formatting
-// ---------------------------------------------------------------------------
-
-function formatMemberSince(dateStr: string | null | undefined): string | null {
-  if (!dateStr) return null;
-  try {
-    const d = new Date(dateStr);
-    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-    return `${months[d.getMonth()]} ${d.getFullYear()}`;
-  } catch {
-    return null;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -45,7 +34,7 @@ const UserBriefing: React.FC = () => {
     // NOT total_vehicles (record-authorship, ~half scraped — number doctrine).
     const vehicles = stats?.vehicles_count ?? 0;
 
-    // 1. Onboarding prompt
+    // 1. Onboarding prompt — unique to the briefing (header has no such call).
     if (isOwnProfile) {
       const missingAvatar = !profile.avatar_url;
       const missingBio = !profile.bio;
@@ -59,7 +48,7 @@ const UserBriefing: React.FC = () => {
       }
     }
 
-    // 2. Active auctions
+    // 2. Active auctions — unique, time-sensitive (header shows totals, not live).
     const activeListings = comprehensiveData?.listings?.filter(
       (l: any) => l.status === 'active' || l.auction_status === 'live'
     ) || [];
@@ -67,18 +56,8 @@ const UserBriefing: React.FC = () => {
       return `${activeListings.length} active auction${activeListings.length > 1 ? 's' : ''} right now`;
     }
 
-    // 3. Collection summary
-    const listed = stats?.total_listings || 0;
-    if (vehicles > 0) {
-      return `${vehicles} vehicle${vehicles > 1 ? 's' : ''} worked on${listed > 0 ? `, ${listed} listed` : ''}`;
-    }
-
-    // 4. Recent activity
-    const since = formatMemberSince(profile.member_since || profile.created_at);
-    if (since) {
-      return `Active member since ${since}`;
-    }
-
+    // Collection-summary and member-since headlines removed: pure restatement of
+    // header WORKED ON / LISTINGS pills and the "SINCE {year}" meta (tenet 2).
     return null;
   }, [profile, isOwnProfile, stats, comprehensiveData]);
 
@@ -89,24 +68,13 @@ const UserBriefing: React.FC = () => {
 
     const items: { label: string; value: string | number }[] = [];
 
-    // Worked-on count, labeled honestly (total_vehicles is record-authorship,
-    // ~half scraped — never a headline; number doctrine).
-    if (stats?.vehicles_count != null && stats.vehicles_count > 0) {
-      items.push({ label: 'WORKED ON', value: stats.vehicles_count });
-    }
-
+    // CONTRIBUTIONS is the ONLY stat the header doesn't already carry, so it's
+    // the only pill the briefing keeps. WORKED ON, MEMBER SINCE (header meta
+    // "SINCE {year}"), and AUCTIONS (header "AUCTIONS WON") were removed —
+    // each was a verbatim restatement of a header fact (tenet 2: every fact
+    // appears exactly once). PROFILE_BUILD_ORDER #9.
     if (stats?.total_contributions != null && stats.total_contributions > 0) {
       items.push({ label: 'CONTRIBUTIONS', value: stats.total_contributions });
-    }
-
-    const memberSince = formatMemberSince(profile.member_since || profile.created_at);
-    if (memberSince) {
-      items.push({ label: 'MEMBER SINCE', value: memberSince });
-    }
-
-    const auctions = stats?.total_auction_wins || 0;
-    if (auctions > 0) {
-      items.push({ label: 'AUCTIONS', value: auctions });
     }
 
     return items;
