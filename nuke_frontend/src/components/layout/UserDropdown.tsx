@@ -89,6 +89,7 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({
           <div className="user-dropdown-section-label">SETTINGS</div>
           <button onClick={() => go('/capsule')}>Appearance</button>
           <button onClick={() => go('/capsule?tab=settings')}>Settings</button>
+          <button onClick={() => go('/settings')}>All Settings</button>
           {isAdmin && <button onClick={() => go('/admin')}>Admin</button>}
         </div>
 

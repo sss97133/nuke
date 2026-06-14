@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NUKE CAPTURE — STORYBOARD</title>
+<style>
+  /* ============ THE 12-TOKEN CANON ============ */
+  :root{
+    --paper:#f5f5f5; --surface:#ffffff; --card:#ebebeb;
+    --ink:#1a1a1a; --pencil:#666666; --ghost:#dddddd; --border:#bdbdbd;
+    --success:#16825d; --warning:#b05a00; --error:#d13438;
+    --heat-lo:#d9f99d; --heat-hi:#065f46;
+    --sans:-apple-system, "Helvetica Neue", Arial, sans-serif;
+    --mono:ui-monospace, "SF Mono", Menlo, "Courier New", monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;border-radius:0;box-shadow:none}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);padding:28px 24px 48px}
+
+  /* ============ PAGE CHROME ============ */
+  .masthead{border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:6px;
+    display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .masthead h1{font-size:22px;font-weight:800;letter-spacing:-0.5px}
+  .masthead .mlabel{font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .lawline{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--pencil);margin:8px 0 26px}
+
+  .board{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+
+  /* ============ PHONE FRAME ============ */
+  .unit{width:302px}
+  .phone{width:302px;height:648px;border:2px solid var(--ink);background:var(--surface);
+    display:flex;flex-direction:column;overflow:hidden;position:relative}
+  .statusbar{display:flex;justify-content:space-between;align-items:center;
+    padding:6px 12px 4px;font-family:var(--mono);font-size:10px;color:var(--ink)}
+  .screen{flex:1;display:flex;flex-direction:column;padding:0 12px 12px;min-height:0}
+
+  /* labels & data */
+  .lab{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink)}
+  .lab.dim{color:var(--pencil)}
+  .data{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .hairline{border-top:1px solid var(--ghost)}
+
+  /* caption block under each phone */
+  .cap{margin-top:10px;border-top:2px solid var(--ink);padding-top:8px}
+  .cap .num{font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .cap h2{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:2px 0 4px}
+  .cap p{font-size:9px;line-height:1.5;color:var(--pencil)}
+
+  /* ============ SCREEN 1 — COLD OPEN ============ */
+  .s1{justify-content:space-between;text-align:left}
+  .s1 .word{margin-top:148px}
+  .s1 .wordmark{font-size:40px;font-weight:800;letter-spacing:-1px;line-height:1}
+  .s1 .tag{margin-top:8px}
+  .s1 .body{font-size:13px;line-height:1.55;margin-top:26px;max-width:240px}
+  .applebtn{background:#000;color:#fff;border:0;width:100%;padding:14px 0;
+    font-family:var(--sans);font-size:15px;font-weight:500;text-align:center}
+  .s1 .foot{margin-top:10px;text-align:center}
+
+  /* ============ SCREEN 2 — THE DEAL ============ */
+  .dealrow{border:2px solid var(--ink);padding:8px 10px;margin-bottom:8px}
+  .dealrow .lab{display:block;margin-bottom:3px}
+  .dealrow .val{font-size:11px;line-height:1.45}
+  .dealfoot{font-family:var(--mono);font-size:9px;letter-spacing:.04em;margin:6px 0 10px}
+  .allowbtn{background:var(--ink);color:var(--surface);border:0;width:100%;padding:13px 0;
+    font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+  /* the borrowed material — Apple's dialog, Apple's corners. The seam is the design. */
+  .scrim{position:absolute;inset:0;background:rgba(26,26,26,.28);display:flex;
+    align-items:flex-end;justify-content:center;padding-bottom:84px}
+  .sysdialog{width:240px;background:rgba(248,248,248,.98);border-radius:14px;overflow:hidden;
+    font-family:var(--sans);text-align:center;
+    box-shadow:0 10px 40px rgba(0,0,0,.25)} /* Apple's material keeps Apple's shadow */
+  .sysdialog .t{font-size:13px;font-weight:600;padding:14px 14px 4px}
+  .sysdialog .b{font-size:11px;color:#5b5b5e;padding:0 14px 12px;line-height:1.4}
+  .sysdialog .opt{border-top:0.5px solid #c9c9cc;padding:10px;font-size:14px;color:#007aff}
+  .sysdialog .opt.bold{font-weight:600}
+
+  /* ============ SCREEN 3 — TODAY ============ */
+  .apphead{display:flex;justify-content:space-between;align-items:baseline;
+    border-bottom:2px solid var(--ink);padding:6px 0 6px}
+  .apphead .nm{font-size:13px;font-weight:800;letter-spacing:-0.2px}
+  .hero{margin:18px 0 2px}
+  .hero .fig{font-family:var(--mono);font-size:56px;font-weight:700;line-height:1;letter-spacing:-2px}
+  .hero .lab{margin-top:4px;display:block}
+  .attr{font-family:var(--mono);font-size:8px;color:var(--pencil);margin-top:4px}
+  .ledger{margin-top:14px;border-top:2px solid var(--ink)}
+  .ledger .row{display:flex;justify-content:space-between;align-items:baseline;
+    padding:6px 0;border-bottom:1px solid var(--ghost)}
+  .ledger .row .data{font-size:11px}
+  .oath{font-family:var(--mono);font-size:10px;margin:10px 0 0;letter-spacing:-0.2px}
+  .vehline{margin-top:10px;display:flex;gap:6px;align-items:baseline}
+  .thumbs{display:grid;grid-template-columns:repeat(5,1fr);gap:2px;margin-top:10px}
+  .thumbs .t{aspect-ratio:1/1;background:var(--ghost)}
+  .thumbs .t.d{background:#cfcfcf}
+  .thumbs .more{aspect-ratio:1/1;background:var(--surface);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .deeplink{margin-top:auto;border:2px solid var(--ink);padding:10px;text-align:center;
+    font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.04em}
+
+  /* ============ SCREEN 4 — DAY RECEIPT ============ */
+  .receipt{border:2px solid var(--ink);padding:10px;margin-top:14px}
+  .receipt .date{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.04em}
+  .receipt .fig{font-family:var(--mono);font-size:40px;font-weight:700;line-height:1.05;letter-spacing:-1px;margin-top:8px}
+  .receipt .span{font-family:var(--mono);font-size:10px;margin-top:6px}
+  .rthumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:10px}
+  .rthumbs .t{aspect-ratio:1/1;background:var(--ghost)}
+  .rthumbs .t.d{background:#cfcfcf}
+  .barcode{display:flex;align-items:flex-end;gap:2px;height:26px;margin-top:14px}
+  .barcode i{display:block;background:var(--ink)}
+  .barcode .gap{background:transparent}
+  .syncline{font-family:var(--mono);font-size:9px;color:var(--pencil);margin-top:8px}
+
+  /* ============ TOKEN LEGEND ============ */
+  .legend{margin-top:34px;border-top:2px solid var(--ink);padding-top:10px}
+  .legend .lab{display:block;margin-bottom:8px}
+  .sw{display:inline-flex;align-items:center;gap:5px;margin:0 14px 8px 0}
+  .sw i{width:14px;height:14px;display:inline-block;border:1px solid var(--border)}
+  .sw span{font-family:var(--mono);font-size:9px;color:var(--pencil)}
+  .legend p{font-size:9px;color:var(--pencil);margin-top:6px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <h1>NUKE CAPTURE</h1>
+  <span class="mlabel">STORYBOARD · 4 SCREENS · JUN 10 2026 · PER NUKE_DESIGN_CODEX.MD</span>
+</div>
+<div class="lawline">One screen, one number &nbsp;·&nbsp; color is data, never decoration &nbsp;·&nbsp; nuke draws square, apple draws apple &nbsp;·&nbsp; the receipt, not the dashboard</div>
+
+<div class="board">
+
+  <!-- ============================== 01 COLD OPEN ============================== -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:41</span><span>LTE&nbsp;&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen s1">
+        <div class="word">
+          <div class="wordmark">NUKE</div>
+          <span class="lab dim tag">PROOF OF WORK</span>
+          <p class="body">Your shop photos become a work record. Nothing posts. Nothing is public until you say so.</p>
+        </div>
+        <div>
+          <button class="applebtn">&#63743; Sign in with Apple</button>
+          <div class="foot"><span class="lab dim">FIVE TAPS. TWO PERMISSIONS. THEN IT RUNS ITSELF.</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">01 / 04</span>
+      <h2>Cold open</h2>
+      <p>One screen, one sentence, one button. No carousel, no skip — there is nothing to skip. The Sign in with Apple button is Apple's stock material squared via the public cornerRadius API. No account screen ever: handle derives from the credential, edited later on nuke.ag.</p>
+    </div>
+  </div>
+
+  <!-- ============================== 02 THE DEAL ============================== -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:41</span><span>LTE&nbsp;&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div class="apphead"><span class="nm">NUKE</span><span class="lab dim">THE DEAL</span></div>
+        <div style="height:14px"></div>
+        <div class="dealrow">
+          <span class="lab">What leaves your phone</span>
+          <div class="val">Photos taken at your shop.</div>
+        </div>
+        <div class="dealrow">
+          <span class="lab">What stays</span>
+          <div class="val">Everything else. Family, screenshots, off-site. Held on your phone, never uploaded.</div>
+        </div>
+        <div class="dealrow">
+          <span class="lab">Who sees it</span>
+          <div class="val">You. Nothing is public until you publish it.</div>
+        </div>
+        <div class="dealfoot">THE SHOP FILTER RUNS ON YOUR PHONE.<br>NO LOCATION PERMISSION — THE PHOTO'S OWN METADATA DECIDES.</div>
+        <button class="allowbtn">Allow photo access</button>
+      </div>
+      <!-- Apple's material, Apple's corners — the borrowed seam stays visible -->
+      <div class="scrim">
+        <div class="sysdialog">
+          <div class="t">Allow &ldquo;Nuke Capture&rdquo; to Access Your Photos?</div>
+          <div class="b">Nuke Capture finds photos taken at your shop and adds them to your work record. Off-site photos never leave your phone.</div>
+          <div class="opt">Limit Access&hellip;</div>
+          <div class="opt bold">Allow Full Access</div>
+          <div class="opt">Don&rsquo;t Allow</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">02 / 04</span>
+      <h2>The deal &rarr; the system ask</h2>
+      <p>Three ledger rows earn the permission before iOS asks. The only rounded corners in the product belong to Apple — system chrome stays stock, never re-skinned. The purpose string is design surface, written in house voice.</p>
+    </div>
+  </div>
+
+  <!-- ============================== 03 TODAY ============================== -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:41</span><span>LTE&nbsp;&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div class="apphead"><span class="nm">NUKE</span><span class="data" style="font-size:9px;color:var(--pencil)">SYNCED 2:41 PM</span></div>
+        <div class="hero">
+          <div class="fig">31</div>
+          <span class="lab dim">PHOTOS TODAY</span>
+          <div class="attr">N=31 &middot; VIA PHOTOS &middot; EXIF-GATED &middot; WED JUN 10 2026</div>
+        </div>
+        <div class="ledger">
+          <div class="row"><span class="lab dim">Uploaded</span><span class="data">31 PHOTOS</span></div>
+          <div class="row"><span class="lab dim">Held back &middot; off-shop</span><span class="data">12 PHOTOS</span></div>
+          <div class="row"><span class="lab dim">Last sync</span><span class="data">2:41 PM</span></div>
+        </div>
+        <div class="oath">754 ON THE RECORD &middot; 12 HELD ON PHONE</div>
+        <div class="vehline"><span class="lab dim">Vehicle</span><span class="data" style="font-size:10px">1977 CHEVROLET K5 BLAZER</span></div>
+        <div class="vehline"><span class="lab dim">Site</span><span class="data" style="font-size:10px">ERNIE'S SHOP</span></div>
+        <div class="thumbs">
+          <div class="t"></div><div class="t d"></div><div class="t"></div><div class="t"></div><div class="t d"></div>
+          <div class="t d"></div><div class="t"></div><div class="t d"></div><div class="t"></div><div class="t"></div>
+          <div class="t"></div><div class="t"></div><div class="t d"></div><div class="t"></div><div class="more">+17</div>
+        </div>
+        <div class="deeplink">VIEW DAY ON NUKE.AG &rarr;</div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">03 / 04</span>
+      <h2>Today — the gauge</h2>
+      <p>One hero figure in mono; everything else is caption. Ledger rows exist iff count &gt; 0 — a zero gets no row. The held-back count is a first-class gauge, equal weight, with its reason: the filter works FOR the user. Glanceable in under 3 seconds, then pocket.</p>
+    </div>
+  </div>
+
+  <!-- ============================== 04 DAY RECEIPT ============================== -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>7:05</span><span>LTE&nbsp;&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div class="apphead"><span class="nm">NUKE</span><span class="lab dim">DAY RECEIPT</span></div>
+        <div class="receipt">
+          <div class="date">TUE JUN 09 2026</div>
+          <div class="fig">47</div>
+          <span class="lab dim">PHOTOS</span>
+          <div class="span">FIRST 8:12A &middot; LAST 5:48P &middot; SPAN 9.6H</div>
+          <div class="hairline" style="margin-top:8px"></div>
+          <div class="vehline"><span class="lab dim">Vehicle</span><span class="data" style="font-size:10px">1977 CHEVROLET K5 BLAZER</span></div>
+          <div class="vehline"><span class="lab dim">Site</span><span class="data" style="font-size:10px">ERNIE'S SHOP</span></div>
+          <div class="rthumbs">
+            <div class="t"></div><div class="t d"></div><div class="t"></div><div class="t d"></div>
+            <div class="t d"></div><div class="t"></div><div class="t"></div><div class="t d"></div>
+          </div>
+          <div class="syncline">LAST SYNC 6:02P &middot; 9 HELD ON PHONE</div>
+        </div>
+        <div style="margin-top:16px"><span class="lab dim">JUN 2026 &middot; EVERY BAR IS A DAY OF WORK</span></div>
+        <div class="barcode">
+          <i style="width:3px;height:12px"></i><i style="width:5px;height:20px"></i><i style="width:2px;height:8px"></i>
+          <i class="gap" style="width:6px;height:1px"></i><i style="width:4px;height:16px"></i><i style="width:7px;height:26px"></i>
+          <i style="width:3px;height:10px"></i><i class="gap" style="width:10px;height:1px"></i><i style="width:5px;height:18px"></i>
+          <i style="width:2px;height:6px"></i><i style="width:6px;height:22px"></i><i class="gap" style="width:6px;height:1px"></i>
+          <i style="width:4px;height:14px"></i><i style="width:8px;height:26px"></i><i style="width:3px;height:9px"></i>
+          <i class="gap" style="width:8px;height:1px"></i><i style="width:5px;height:19px"></i><i style="width:2px;height:7px"></i>
+          <i style="width:6px;height:24px"></i>
+        </div>
+        <div class="deeplink" style="margin-top:auto">VIEW DAY ON NUKE.AG &rarr;</div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">04 / 04</span>
+      <h2>The earned moment</h2>
+      <p>The user logged nothing; the workday is reconstructed — count, first shot, last shot, the vehicle on the lift. No confetti: the number is the firework. The barcode strip is the same graph the web profile testifies with; the deep link lands on the same document at a larger size.</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============ TOKEN LEGEND ============ -->
+<div class="legend">
+  <span class="lab">The 12-token canon — color is data, never decoration</span>
+  <span class="sw"><i style="background:#f5f5f5"></i><span>paper #f5f5f5</span></span>
+  <span class="sw"><i style="background:#ffffff"></i><span>surface #ffffff</span></span>
+  <span class="sw"><i style="background:#ebebeb"></i><span>card #ebebeb</span></span>
+  <span class="sw"><i style="background:#1a1a1a"></i><span>ink #1a1a1a</span></span>
+  <span class="sw"><i style="background:#666666"></i><span>pencil #666666</span></span>
+  <span class="sw"><i style="background:#dddddd"></i><span>ghost #dddddd</span></span>
+  <span class="sw"><i style="background:#bdbdbd"></i><span>border #bdbdbd</span></span>
+  <span class="sw"><i style="background:#16825d"></i><span>success #16825d</span></span>
+  <span class="sw"><i style="background:#b05a00"></i><span>warning #b05a00</span></span>
+  <span class="sw"><i style="background:#d13438"></i><span>error #d13438</span></span>
+  <span class="sw"><i style="background:#d9f99d"></i><span>heat-lo #d9f99d</span></span>
+  <span class="sw"><i style="background:#065f46"></i><span>heat-hi #065f46</span></span>
+  <p>No brand color anywhere on this board: the only saturated pixels Nuke ever renders are earned data — the heat ramp, three semantic states, and the user's own photographs. SF Pro carries words, SF Mono carries every digit. 2px ink borders, 1px ghost hairlines, zero radius, zero shadows on every Nuke-drawn surface. The one exception above is deliberate: Apple's permission dialog keeps Apple's corners and Apple's shadow, because borrowed material must look borrowed.</p>
+</div>
+
+</body>
+</html>

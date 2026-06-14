@@ -64,8 +64,67 @@ const TAG_TYPES = [
   { value: 'tool', label: 'Tool' }
 ];
 
+// exif_data and ai_scan_metadata are NOT selected whole: together they were
+// ~80% of the list payload (ai_scan_metadata alone 62% — multi-MB deep_analysis
+// blobs the gallery never renders). Only the sub-keys the gallery actually
+// reads come down, as PostgREST arrow projections; rehydrateGalleryRows folds
+// them back into the nested shapes consumers expect.
 const GALLERY_IMAGE_SELECT =
-  'id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags, image_medium';
+  'id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags, image_medium, ' +
+  'ai_tier1:ai_scan_metadata->tier_1_analysis, ai_classification:ai_scan_metadata->classification, ai_deep_condition_score:ai_scan_metadata->deep_analysis->condition_detail->overall_score, ai_fabrication_stage:ai_scan_metadata->deep_analysis->>fabrication_stage, ' +
+  'exif_source_url:exif_data->>source_url, exif_discovery_url:exif_data->>discovery_url, exif_original_url:exif_data->>original_url, exif_listing_urls:exif_data->listing_urls, exif_listing_positions:exif_data->listing_positions, exif_auction_start_date:exif_data->>auction_start_date, exif_listed_date:exif_data->>listed_date, exif_start_date:exif_data->>start_date, exif_auction_end_date:exif_data->>auction_end_date, exif_end_date:exif_data->>end_date, exif_camera:exif_data->camera, exif_location:exif_data->location';
+
+const compactObject = (obj: Record<string, any>): Record<string, any> | null => {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== null && v !== undefined) out[k] = v;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+};
+
+// Fold the flat arrow-projection aliases back into the nested exif_data /
+// ai_scan_metadata objects that this component and ImageZoneSection read.
+const rehydrateGalleryRows = (rows: any[]): any[] =>
+  (rows || []).map((r: any) => {
+    if (!r || typeof r !== 'object') return r;
+    const {
+      ai_tier1, ai_classification, ai_deep_condition_score, ai_fabrication_stage,
+      exif_source_url, exif_discovery_url, exif_original_url, exif_listing_urls,
+      exif_listing_positions, exif_auction_start_date, exif_listed_date,
+      exif_start_date, exif_auction_end_date, exif_end_date, exif_camera, exif_location,
+      ...rest
+    } = r;
+    return {
+      ...rest,
+      ai_scan_metadata: compactObject({
+        tier_1_analysis: ai_tier1,
+        classification: ai_classification,
+        deep_analysis: compactObject({
+          condition_detail: ai_deep_condition_score != null ? { overall_score: ai_deep_condition_score } : null,
+          fabrication_stage: ai_fabrication_stage,
+        }),
+      }),
+      exif_data: compactObject({
+        source_url: exif_source_url,
+        discovery_url: exif_discovery_url,
+        original_url: exif_original_url,
+        listing_urls: exif_listing_urls,
+        listing_positions: exif_listing_positions,
+        auction_start_date: exif_auction_start_date,
+        listed_date: exif_listed_date,
+        start_date: exif_start_date,
+        auction_end_date: exif_auction_end_date,
+        end_date: exif_end_date,
+        camera: exif_camera,
+        location: exif_location,
+      }),
+    };
+  });
+
+const fetchGalleryImages = async (vehicleId: string): Promise<any[]> =>
+  rehydrateGalleryRows(
+    await fetchVehicleImages<any>(vehicleId, GALLERY_IMAGE_SELECT, { includeMismatchFilter: true }),
+  );
 const UNKNOWN_DEVICE_FINGERPRINT = 'Unknown-Unknown-Unknown-Unknown';
 
 // Convert a Supabase storage URL to an on-the-fly transform URL.
@@ -467,40 +526,11 @@ const ImageGallery = ({
   }, [vehicleId]);
 
   // Vehicle meta (used to suppress "BaT homepage noise" images that were mistakenly attached to some vehicles)
+  // Loaded by the main fetchImages effect below. A legacy effect here used to fire
+  // an unpaginated select('*') of the entire vehicle_images set (7.4MB on a 3.6k-image
+  // vehicle) and race setAllImages against the real loader — it never actually loaded
+  // vehicle meta (its setVehicleMeta was a self-assignment) and was removed.
   const [vehicleMeta, setVehicleMeta] = useState<any | null>(null);
-  useEffect(() => {
-    const loadImages = async () => {
-      setLoading(true);
-      try {
-        // Load images from database
-        // Chained .or() with not.in.("a","b") syntax was producing PostgREST 500s.
-        // Fetch + filter client-side; result set is bounded by vehicle_id.
-        const { data: rawImages, error } = await supabase
-          .from('vehicle_images')
-          .select('*')
-          .eq('vehicle_id', vehicleId)
-          .order('position', { ascending: true })
-          .order('created_at', { ascending: true });
-
-        if (error) throw error;
-        const images = (rawImages || []).filter((r: any) => {
-          if (r?.is_duplicate === true) return false;
-          // Superseded rows are prior versions of reattributed images — never display them.
-          if (r?.is_superseded === true) return false;
-          const mvms = r?.image_vehicle_match_status;
-          if (mvms === 'mismatch' || mvms === 'unrelated') return false;
-          const vgs = r?.vision_gate_status;
-          if (vgs === 'rejected_personal' || vgs === 'rejected_misattributed' || vgs === 'rejected') return false;
-          return true;
-        });
-        setAllImages(applyQuarantinePolicy(images));
-        setVehicleMeta(vehicleMeta || null);
-      } catch {
-        setVehicleMeta(null);
-      }
-    };
-    loadImages();
-  }, [vehicleId]);
 
   // Default BaT-only view for BaT-origin vehicles, with a user-toggle to show all sources
   const isBatVehicle = useMemo(() => {
@@ -1151,7 +1181,7 @@ const ImageGallery = ({
       }
 
       // Refresh DB-backed gallery view immediately
-      const refreshed = await fetchVehicleImages<any>(vehicleId, GALLERY_IMAGE_SELECT, { includeMismatchFilter: true });
+      const refreshed = await fetchGalleryImages(vehicleId);
 
       const images = filterBatNoiseRows(dedupeFetchedImages(refreshed || []));
       setUsingFallback(false);
@@ -1785,7 +1815,7 @@ const ImageGallery = ({
 
         // Fetch images and duplicate count in parallel
         const [rawImages, dupCountResult] = await Promise.all([
-          fetchVehicleImages<any>(vehicleId, GALLERY_IMAGE_SELECT, { includeMismatchFilter: true }),
+          fetchGalleryImages(vehicleId),
           // Count duplicates filtered out (for "dupes removed" display)
           supabase
             .from('vehicle_images')
@@ -1868,7 +1898,7 @@ const ImageGallery = ({
         setTimeout(async () => {
           try {
             console.log(`Refresh attempt ${index + 1}/${refreshAttempts.length} after ${delay}ms...`);
-            const refreshedImages = await fetchVehicleImages<any>(vehicleId, GALLERY_IMAGE_SELECT, { includeMismatchFilter: true });
+            const refreshedImages = await fetchGalleryImages(vehicleId);
 
             if (refreshedImages) {
               const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
@@ -2077,19 +2107,11 @@ const ImageGallery = ({
       const sortAfterUpload: 'quality' | 'date_desc' | 'date_asc' = 'date_desc';
       setSortBy(sortAfterUpload);
 
-      // Refresh images and notify parent
-      const { data: refreshedImages } = await supabase
-        .from('vehicle_images')
-        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags, image_medium')
-        .eq('vehicle_id', vehicleId)
-        // Filter out documents (treat NULL as false)
-        .not('is_document', 'is', true)
-        .not('is_duplicate', 'is', true)
-        .not('is_superseded', 'is', true)
-        .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
-        .order('is_primary', { ascending: false })
-        .order('position', { ascending: true, nullsFirst: false })
-        .order('created_at', { ascending: true });
+      // Refresh images and notify parent. Same fetch path as initial load —
+      // the old inline query here was unpaginated (capped at the REST row
+      // limit) and skipped the vision-gate + superseded filters the shared
+      // fetch applies (see fetchVehicleImages.ts).
+      const refreshedImages = await fetchGalleryImages(vehicleId);
 
       const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
       const refreshedCleaned = applyQuarantinePolicy(refreshedDeduped);

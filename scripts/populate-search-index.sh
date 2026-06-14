@@ -5,7 +5,7 @@
 set -e
 cd /Users/skylar/nuke
 
-CONN="postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
+CONN="postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
 BATCH=500
 TOTAL=0
 ROUND=0

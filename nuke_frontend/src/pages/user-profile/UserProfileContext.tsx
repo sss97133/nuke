@@ -147,8 +147,17 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   // ── Data fetching ──
 
+  // In-flight guard: auth bootstrap settles deps twice on a cold load
+  // (cached-session render, then getSession render), which re-created this
+  // callback and ran the whole multi-second waterfall TWICE per visit.
+  const loadingForUidRef = React.useRef<string | null>(null);
+
   const loadProfile = useCallback(async () => {
     if (!authChecked) return;
+
+    const loadKey = externalIdentityId || resolvedUserId || '';
+    if (loadingForUidRef.current === loadKey) return;
+    loadingForUidRef.current = loadKey;
 
     setLoading(true);
     try {
@@ -180,12 +189,24 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       if (profileRow) {
         setProfile(profileRow as any);
+        // FIRST PAINT GATE: the page rendered a blank 100vh div until the
+        // entire stats waterfall finished — measured 24.6-25.5s cold. The
+        // header/garage/timeline only need the profile row; stats and
+        // comprehensive data stream into state below and every consumer
+        // already null-handles them.
+        setLoading(false);
       }
 
-      // Background: comprehensive stats data
-      const [compData, profileData] = await Promise.all([
+      // Background: comprehensive stats data + per-day contribution aggregates.
+      // getContributionDays replaces the ProfileService.getProfileData leg here:
+      // that path ran three wide row-level selects (vehicle_images /
+      // vehicle_timeline_events / business_timeline_events) each silently
+      // capped at 1000 rows by PostgREST db-max-rows, so the timeline rendered
+      // whichever arbitrary slice fit — and only for the owner. The RPC returns
+      // complete (day, kind, n) aggregates for any profile in one small call.
+      const [compData, contributionDays] = await Promise.all([
         getUserProfileData(uid).catch(() => null),
-        isOwnProfile ? ProfileService.getProfileData(uid).catch(() => null) : null,
+        ProfileService.getContributionDays(uid).catch(() => null),
       ]);
 
       if (compData) {
@@ -194,9 +215,8 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
         buildEventsFromComprehensive(compData as any);
       }
 
-      // Build contribution events from profile data
-      if (profileData?.recentContributions) {
-        buildContributionEvents(profileData.recentContributions);
+      if (contributionDays) {
+        buildContributionEvents(contributionDays);
       }
 
       // Photo library stats (own profile only, uses auth session internally)
@@ -262,18 +282,35 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setActivityEvents(events);
   }, []);
 
-  const buildContributionEvents = useCallback((contributions: any[]) => {
+  // Map get_user_contribution_days rows (day, kind, n) → ContributionEvents.
+  // The kind map is OPEN: photo/event/work flow today; business / auction /
+  // comment kinds pass through to their own facets the moment the RPC emits
+  // them, instead of being collapsed into timeline_event (the old remap
+  // flattened everything non-photo, which is why auctions/comments never
+  // reached the heatmap).
+  const buildContributionEvents = useCallback((rows: Array<{ day: string; kind: string; n: number }>) => {
+    const KIND_TO_TYPE: Record<string, ContributionEvent['type']> = {
+      photo: 'image_upload',
+      event: 'timeline_event',
+      work: 'work',
+      business: 'business_event',
+      auction: 'auction_activity',
+      comment: 'comment',
+    };
+    const KIND_LABEL: Record<string, [string, string]> = {
+      photo: ['photo', 'photos'],
+      event: ['event', 'events'],
+      work: ['work session', 'work sessions'],
+    };
     const events: ContributionEvent[] = [];
-    for (const c of contributions) {
+    for (const r of rows) {
+      if (!r?.day || !r?.n) continue;
+      const [one, many] = KIND_LABEL[r.kind] || ['contribution', 'contributions'];
       events.push({
-        date: c.contribution_date,
-        type: c.contribution_type === 'image_upload' ? 'image_upload' : 'timeline_event',
-        count: c.contribution_count,
-        label: c.contribution_type === 'image_upload'
-          ? `${c.contribution_count} photo${c.contribution_count > 1 ? 's' : ''}`
-          : c.metadata?.title || 'Activity',
-        vehicleId: c.related_vehicle_id || undefined,
-        metadata: c.metadata,
+        date: r.day,
+        type: KIND_TO_TYPE[r.kind] ?? 'timeline_event',
+        count: r.n,
+        label: `${r.n} ${r.n === 1 ? one : many}`,
       });
     }
     setContributionEvents(events);
@@ -330,7 +367,7 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     isMobile,
     galleryFilter,
     setGalleryFilter,
-    reloadProfile: loadProfile,
+    reloadProfile: () => { loadingForUidRef.current = null; void loadProfile(); },
     saveProfileField,
     uploadAvatar,
   }), [

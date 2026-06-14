@@ -80,14 +80,44 @@ Deno.serve(async (req) => {
     // Batch mode: process images stuck in 'pending' (cleanup/catchup)
     if (input.action === "process_pending") {
       const limit = input.limit || 5;
-      const { data: pendingImages } = await supabase
+      // Owner uploads first, newest first — a freshly-synced user photo must
+      // classify before the scraped backlog. TWO-STEP because a single
+      // ORDER BY user_id sorts the whole million-row pending set (57014
+      // statement timeout, measured 2026-06-10 — and the error was silently
+      // swallowed into "No pending images"). Step 1 is served exactly by
+      // partial index idx_vehicle_images_pending_user
+      // (created_at DESC WHERE pending AND user_id IS NOT NULL).
+      const ownerQ = await supabase
         .from("vehicle_images")
         .select("id, image_url, vehicle_id, user_id")
         .eq("ai_processing_status", "pending")
+        .not("user_id", "is", null)
         .eq("is_duplicate", false)
         .not("image_url", "is", null)
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(limit);
+      if (ownerQ.error) {
+        console.error("[photo-pipeline] pending query (owner step) failed:", ownerQ.error.message);
+      }
+      let pendingImages = ownerQ.data ?? [];
+
+      if (pendingImages.length < limit) {
+        // Backlog fallback: oldest-first scraped rows (original behavior,
+        // served by idx_vehicle_images_pending_processing).
+        const backlogQ = await supabase
+          .from("vehicle_images")
+          .select("id, image_url, vehicle_id, user_id")
+          .eq("ai_processing_status", "pending")
+          .is("user_id", null)
+          .eq("is_duplicate", false)
+          .not("image_url", "is", null)
+          .order("created_at", { ascending: true })
+          .limit(limit - pendingImages.length);
+        if (backlogQ.error) {
+          console.error("[photo-pipeline] pending query (backlog step) failed:", backlogQ.error.message);
+        }
+        pendingImages = pendingImages.concat(backlogQ.data ?? []);
+      }
 
       if (!pendingImages || pendingImages.length === 0) {
         return new Response(
@@ -327,6 +357,19 @@ Deno.serve(async (req) => {
 // CLASSIFY IMAGE (Gemini Flash — cheap and fast)
 // ============================================================
 
+// Terminal "unclassified" result — used whenever the classifier is absent,
+// rate-limited, or errors. Settles the image as 'completed' (low confidence)
+// instead of 'failed', so the reset-stuck cron never re-churns it. BYOK deep
+// analysis / owner confirmation is the real classifier downstream.
+function UNCLASSIFIED_FALLBACK(reason: string): ClassificationResult {
+  return {
+    image_type: "other",
+    confidence: 0.2,
+    is_automotive: true,
+    description: `Unclassified (classifier unavailable: ${String(reason).slice(0, 120)}) — left for BYOK/owner review`,
+  };
+}
+
 async function classifyImage(imageUrl: string): Promise<ClassificationResult> {
   // Prefer paid keys over free tier to avoid 429s
   const geminiKey = Deno.env.get("GOOGLE_AI_API_KEY") ??
@@ -435,15 +478,18 @@ image_medium definitions:
         vehicle_hints: parsed.vehicle_hints,
       };
     } catch (error: any) {
-      // Non-429 errors: don't retry, propagate immediately
-      // This ensures the outer handler marks ai_processing_status = 'failed'
+      // Classifier failure must NOT churn. The old code threw → outer handler
+      // marked 'failed' → reset-stuck cron flipped back to 'pending' → infinite
+      // loop, ai_retry_count climbing, image never settles. An unclassified
+      // photo is fine (BYOK/owner is the real classifier) — settle it as a
+      // low-confidence unclassified completion instead of failing.
       console.error(`[photo-pipeline] Classification error (attempt ${attempt + 1}): ${error.message}`);
-      throw error;
+      return UNCLASSIFIED_FALLBACK(error.message);
     }
   }
 
-  // All retries exhausted on 429 — throw so outer handler marks as 'failed', not 'completed'
-  throw new Error("Gemini API rate limited (429) after 3 retries");
+  // All retries exhausted on 429 — settle unclassified rather than fail/churn.
+  return UNCLASSIFIED_FALLBACK("Gemini rate limited (429) after retries");
 }
 
 // ============================================================
@@ -493,24 +539,40 @@ async function resolveVehicle(
     }
   }
 
-  // Strategy 3: User's most recent vehicle with work activity
+  // Strategy 3: rolling user context — SUGGEST-ONLY, never hard-assign.
+  // The hard-assign version cascaded: one filed photo became "most recent
+  // vehicle" for the next, which filed and reinforced it — 102 of user 0's
+  // June frames landed on one truck with no content check (2026-06-10,
+  // pixel-verified the bucket held 2+ different vehicles). Context is a
+  // PRIOR, not evidence: it goes in suggested_vehicle_id for the inbox /
+  // owner-confirmation flow. Only physical evidence (unambiguous GPS above)
+  // may hard-file. Time-bounded 7 days so a stale project never suggests.
   if (userId) {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
     const { data: recentVehicle } = await supabase
       .from("vehicle_images")
       .select("vehicle_id")
       .eq("user_id", userId)
       .not("vehicle_id", "is", null)
+      .gte("created_at", sevenDaysAgo)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (recentVehicle?.vehicle_id) {
-      console.log("[photo-pipeline] Vehicle resolved via recent activity");
-      return recentVehicle.vehicle_id;
+      console.log("[photo-pipeline] Rolling context suggests vehicle (not assigning):", recentVehicle.vehicle_id);
+      await supabase
+        .from("vehicle_images")
+        .update({
+          suggested_vehicle_id: recentVehicle.vehicle_id,
+          image_vehicle_match_status: "ambiguous",
+        })
+        .eq("id", imageId)
+        .is("vehicle_id", null);
     }
   }
 
-  console.log("[photo-pipeline] Could not resolve vehicle");
+  console.log("[photo-pipeline] No hard evidence — photo stays in inbox (suggestion recorded if context existed)");
   return null;
 }
 

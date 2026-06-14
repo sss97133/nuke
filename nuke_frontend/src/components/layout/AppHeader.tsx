@@ -19,6 +19,7 @@ const NAV_LINKS = [
   { label: 'FEED', to: '/?tab=feed' },
   { label: 'SEARCH', to: '/search' },
   { label: 'GARAGE', to: '/?tab=garage' },
+  { label: 'JOURNAL', to: '/journal' },
   { label: 'MARKET', to: '/market/trends' },
 ];
 

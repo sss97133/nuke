@@ -7,9 +7,9 @@ echo "Starting aggressive BaT extraction at $(date)"
 
 while true; do
   # Check pending count
-  pending=$(PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "SELECT COUNT(*) FROM import_queue WHERE listing_url LIKE '%bringatrailer%' AND status = 'pending';" 2>/dev/null | tr -d ' ')
+  pending=$(PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "SELECT COUNT(*) FROM import_queue WHERE listing_url LIKE '%bringatrailer%' AND status = 'pending';" 2>/dev/null | tr -d ' ')
 
-  complete=$(PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "SELECT COUNT(*) FROM bat_listings;" 2>/dev/null | tr -d ' ')
+  complete=$(PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "SELECT COUNT(*) FROM bat_listings;" 2>/dev/null | tr -d ' ')
 
   echo "[$(date '+%H:%M:%S')] Pending: $pending | BaT Listings: $complete"
 

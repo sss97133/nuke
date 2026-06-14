@@ -1352,7 +1352,11 @@ export default function HomePage() {
     if (fromUrl && TABS.some((t) => t.id === fromUrl)) return fromUrl;
     const fromStorage = localStorage.getItem(LS_KEY) as TabId | null;
     if (fromStorage && TABS.some((t) => t.id === fromStorage)) return fromStorage;
-    return 'feed';
+    // Logged-in users land on THEIR stuff, not the global feed. Sync check
+    // (supabase auth token in localStorage) because auth context is still
+    // loading when this memo runs.
+    const hasSession = Object.keys(localStorage).some((k) => k.startsWith('sb-') && k.endsWith('-auth-token'));
+    return hasSession ? 'garage' : 'feed';
   }, []);
 
   const [activeTab, setActiveTab] = useState<TabId>(defaultTab);

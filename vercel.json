@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "main": false
+    }
+  },
   "buildCommand": "cd nuke_frontend && CI=false npm run build",
   "outputDirectory": "nuke_frontend/dist",
   "installCommand": "cd nuke_frontend && npm install",
@@ -47,6 +52,14 @@
     {
       "source": "/api/docs",
       "destination": "/api/docs"
+    },
+    {
+      "source": "/api/journal",
+      "destination": "/api/journal"
+    },
+    {
+      "source": "/api/journal/:date",
+      "destination": "/api/journal/:date"
     },
     {
       "source": "/api/:path+",

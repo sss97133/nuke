@@ -30,7 +30,7 @@ fi
 
 # 2. Queue Status (via direct psql)
 echo "### Queue Health"
-QUEUE_STATUS=$(PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -c "
+QUEUE_STATUS=$(PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -c "
 SELECT json_build_object(
   'pending', count(*) FILTER (WHERE status = 'pending'),
   'processing', count(*) FILTER (WHERE status IN ('processing', 'pending_review', 'pending_strategy')),
@@ -57,7 +57,7 @@ fi
 
 # 3. Database Health
 echo "### Database Health"
-DB_HEALTH=$(PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -c "
+DB_HEALTH=$(PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -c "
 SELECT json_build_object(
   'active_connections', (SELECT count(*) FROM pg_stat_activity WHERE state = 'active'),
   'lock_waiters', (SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock'),

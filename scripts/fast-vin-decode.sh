@@ -3,7 +3,7 @@
 # 50 VINs per NHTSA call, direct SQL updates
 set -uo pipefail
 
-DB="postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
+DB="postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
 VIN_FILE="/tmp/nuke-overnight/vins-to-decode.txt"
 LOG="/tmp/nuke-overnight/main.log"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

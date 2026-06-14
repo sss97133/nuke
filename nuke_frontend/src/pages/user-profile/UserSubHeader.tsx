@@ -1,5 +1,6 @@
 import React from 'react';
 import { useUserProfile } from './UserProfileContext';
+import TextScaleControl from '../../components/TextScaleControl';
 
 /**
  * UserSubHeader -- Badge bar below the header.
@@ -12,7 +13,11 @@ const UserSubHeader: React.FC = () => {
   if (!profile) return null;
 
   const userType = profile.user_type || 'user';
-  const verified = profile.verification_status === 'verified';
+  // profiles has no verification_status column — the real columns are
+  // verification_level (text) and is_verified (boolean).
+  const verified =
+    profile.verification_level === 'fully_verified' ||
+    profile.is_verified === true;
   const memberSince = profile.member_since || profile.created_at;
   const sinceYear = memberSince ? new Date(memberSince).getFullYear() : null;
 
@@ -38,7 +43,6 @@ const UserSubHeader: React.FC = () => {
       className="up-sub-header"
       data-user-type={userType}
       data-verified={verified ? 'true' : 'false'}
-      data-reputation-score={profile.reputation_score ?? ''}
     >
       {/* User type badge */}
       <span className={typeBadgeClass}>{userType.toUpperCase()}</span>
@@ -59,6 +63,9 @@ const UserSubHeader: React.FC = () => {
           {tag.toUpperCase()}
         </span>
       ))}
+
+      {/* Text size control — right end */}
+      <TextScaleControl variant="compact" />
     </div>
   );
 };

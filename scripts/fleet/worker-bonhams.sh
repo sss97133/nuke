@@ -59,7 +59,7 @@ fi
 
 # Process any Bonhams URLs already in queue
 log "Processing queued Bonhams URLs..."
-QUEUED=$(dotenvx run -- bash -c 'PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "SELECT listing_url FROM import_queue WHERE listing_url LIKE '\''%bonhams%'\'' AND status='\''pending'\'' LIMIT 50;"' 2>/dev/null)
+QUEUED=$(dotenvx run -- bash -c 'PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "SELECT listing_url FROM import_queue WHERE listing_url LIKE '\''%bonhams%'\'' AND status='\''pending'\'' LIMIT 50;"' 2>/dev/null)
 
 echo "$QUEUED" | while read -r url; do
   url=$(echo "$url" | tr -d ' ')

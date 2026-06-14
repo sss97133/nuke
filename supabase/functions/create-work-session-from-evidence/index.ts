@@ -98,6 +98,35 @@ Deno.serve(async (req) => {
 
     let action: "created" | "found_existing" = eventId ? "found_existing" : "created";
 
+    // Attribution guard: do NOT trust the caller's vehicle_id blindly. If the
+    // evidence images already belong to a DIFFERENT vehicle, this session may be
+    // a cross-vehicle leak (the bug that put K5 "iBooster brake planning" on the
+    // Mustang). We don't block — legitimate re-attribution exists — but we flag
+    // it so it surfaces for review instead of silently mis-filing.
+    let attributionConflictVehicleId: string | null = null;
+    let conflictingImageCount = 0;
+    try {
+      const { data: evImgs } = await supabase
+        .from("vehicle_images")
+        .select("vehicle_id")
+        .in("id", imageIds);
+      if (evImgs && evImgs.length > 0) {
+        const counts = new Map<string, number>();
+        for (const r of evImgs as { vehicle_id: string | null }[]) {
+          if (r.vehicle_id && r.vehicle_id !== vehicleId) {
+            counts.set(r.vehicle_id, (counts.get(r.vehicle_id) || 0) + 1);
+          }
+        }
+        // Dominant other-vehicle among the evidence frames.
+        for (const [vid, n] of counts) {
+          if (n > conflictingImageCount) { conflictingImageCount = n; attributionConflictVehicleId = vid; }
+        }
+      }
+    } catch {
+      // If the lookup fails, fall through unflagged rather than block the user.
+      attributionConflictVehicleId = null;
+    }
+
     if (!eventId) {
       const title = String(body.title || `${imageIds.length} photos from ${eventDate}`).slice(0, 140);
       const description = String(body.description || "AI analysis pending").slice(0, 2000);
@@ -119,6 +148,11 @@ Deno.serve(async (req) => {
           image_ids: imageIds,
           needs_ai_analysis: true,
           created_via: "create-work-session-from-evidence",
+          // Source-DNA of attribution: which images backed this session, and
+          // whether they conflict with the claimed vehicle.
+          attribution_conflict_vehicle_id: attributionConflictVehicleId,
+          attribution_conflicting_image_count: conflictingImageCount,
+          needs_review: attributionConflictVehicleId !== null,
         },
       };
 
@@ -158,6 +192,9 @@ Deno.serve(async (req) => {
             linked_image_ids: linkedIds,
             needs_ai_analysis: true,
             created_via: "create-work-session-from-evidence",
+            attribution_conflict_vehicle_id: attributionConflictVehicleId,
+            attribution_conflicting_image_count: conflictingImageCount,
+            needs_review: attributionConflictVehicleId !== null,
           },
         })
         .eq("id", eventId);

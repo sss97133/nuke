@@ -41,7 +41,7 @@ const FETCH_CONCURRENCY = 20; // Max concurrent image downloads
 const FETCH_TIMEOUT = 15000;  // 15s per image fetch
 
 const DB_URL = process.env.SUPABASE_DB_URL
-  || "postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres";
+  || "postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres";
 
 // ---------------------------------------------------------------------------
 // Parse CLI args

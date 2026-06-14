@@ -84,7 +84,7 @@ call_extractor "extract-collecting-cars-simple" '{"batch_size":200}' 300
 log ""
 log "🏎️  CARS & BIDS"
 # Queue any C&B vehicles missing data for Playwright extraction
-PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c "
+PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c "
 INSERT INTO import_queue (listing_url, listing_title, status, priority)
 SELECT DISTINCT
     v.discovery_url,
@@ -102,7 +102,7 @@ log "    ✓ Queued C&B for Playwright"
 # 6. PCARMARKET
 log ""
 log "🏎️  PCARMARKET"
-PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c "
+PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c "
 INSERT INTO import_queue (listing_url, listing_title, status, priority)
 SELECT DISTINCT
     v.discovery_url,
@@ -140,7 +140,7 @@ log "  DISCOVERY COMPLETE"
 log "═══════════════════════════════════════════════════════════"
 
 # Show queue status
-PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "
+PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "
 SELECT
     CASE
         WHEN listing_url LIKE '%bringatrailer%' THEN 'BaT'

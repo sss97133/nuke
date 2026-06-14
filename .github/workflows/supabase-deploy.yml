@@ -1,0 +1,176 @@
+# Supabase Deploy — migrations + edge functions, automatically on merge.
+#
+# WHO HANDLES DEPLOYS: this workflow. Humans click "merge"; this does the rest.
+#
+# ONE-TIME SETUP (two clicks, no terminal — github.com → repo → Settings →
+# Secrets and variables → Actions → New repository secret):
+#   SUPABASE_DB_URL       Supabase dashboard → Project Settings → Database →
+#                         Connection string (URI, the pooler one, with password)
+#   SUPABASE_ACCESS_TOKEN supabase.com/dashboard/account/tokens → Generate
+#
+# Behavior:
+#   - On push to main touching supabase/: applies ONLY the migration files
+#     added in that push (psql, one by one — sidesteps the repo's known
+#     migration-history drift that breaks `supabase db push`), then deploys
+#     only the edge functions whose directories changed.
+#   - Manual run (Actions → Supabase Deploy → Run workflow): applies all
+#     migrations with timestamp >= migrations_since and deploys the listed
+#     functions. Defaults cover the 2026-06-09/10 batch.
+
+name: Supabase Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/functions/**'
+  workflow_dispatch:
+    inputs:
+      migrations_since:
+        description: 'Apply migrations with filename >= this prefix (blank = none)'
+        required: false
+        default: '20260609'
+      functions:
+        description: 'Comma-separated edge functions to deploy (blank = none)'
+        required: false
+        default: 'universal-search,photo-pipeline-orchestrator'
+
+concurrency:
+  group: supabase-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout (with previous commit for diff)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Validate secrets
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "${DATABASE_URL:-}" ] && [ -z "${SUPABASE_DB_URL:-}" ] && [ -z "${SUPABASE_DB_PASSWORD:-}" ]; then
+            echo "❌ Need DATABASE_URL / SUPABASE_DB_URL / SUPABASE_DB_PASSWORD in ACTIONS secrets"
+            echo "   (repo → Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+          if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            echo "⚠ SUPABASE_ACCESS_TOKEN missing — migrations will apply, function deploys will be SKIPPED"
+            echo "   Create: supabase.com/dashboard/account/tokens → add to Actions secrets"
+          fi
+          echo "✅ enough secrets to proceed"
+
+      - name: Determine migrations + functions to deploy
+        id: plan
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SINCE="${{ github.event.inputs.migrations_since }}"
+            if [ -n "$SINCE" ]; then
+              ls supabase/migrations/ | awk -v s="$SINCE" '$0 >= s' | sed 's|^|supabase/migrations/|' > /tmp/migrations.txt
+            else
+              : > /tmp/migrations.txt
+            fi
+            echo "${{ github.event.inputs.functions }}" | tr ',' '\n' | sed '/^$/d' > /tmp/functions.txt
+          else
+            git diff --name-only --diff-filter=A HEAD^ HEAD -- 'supabase/migrations/*.sql' > /tmp/migrations.txt || true
+            git diff --name-only HEAD^ HEAD -- 'supabase/functions/' \
+              | awk -F/ '/^supabase\/functions\/[^_]/ {print $3}' | sort -u > /tmp/functions.txt || true
+          fi
+          echo "── migrations to apply:"; cat /tmp/migrations.txt || true
+          echo "── functions to deploy:"; cat /tmp/functions.txt || true
+
+      - name: Resolve database URL
+        id: db
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          # A dead candidate host must fail in seconds, not hang the run —
+          # the stale Feb-era DATABASE_URL black-holed run 27254257086 for 18min.
+          PGCONNECT_TIMEOUT: '10'
+        run: |
+          # Functions-only runs never touch psql — don't fail the whole
+          # deploy resolving a DB connection nothing will use (run 27286973866
+          # died here while deploying one edge function).
+          if [ ! -s /tmp/migrations.txt ]; then
+            echo "no migrations planned — skipping DB resolution"
+            exit 0
+          fi
+          for CANDIDATE in "${DATABASE_URL:-}" "${SUPABASE_DB_URL:-}"; do
+            if [ -n "$CANDIDATE" ] && psql "$CANDIDATE" -c "select 1" >/dev/null 2>&1; then
+              echo "url=$CANDIDATE" >> $GITHUB_OUTPUT
+              echo "connected via stored connection string"
+              exit 0
+            fi
+          done
+          if [ -z "${SUPABASE_DB_PASSWORD:-}" ]; then
+            echo "❌ stored connection strings failed and no SUPABASE_DB_PASSWORD to build one"
+            exit 1
+          fi
+          # Build from password: try direct host, then pooler regions (direct
+          # host is IPv6-only; GitHub runners are IPv4 — pooler usually wins).
+          ENC_PW=$(python3 -c "import urllib.parse,os;print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'],safe=''))")
+          for HOST_USER in \
+            "db.qkgaybvrernstplzjaam.supabase.co:5432 postgres" \
+            "aws-0-us-west-1.pooler.supabase.com:5432 postgres.qkgaybvrernstplzjaam" \
+            "aws-0-us-east-1.pooler.supabase.com:5432 postgres.qkgaybvrernstplzjaam" \
+            "aws-0-us-east-2.pooler.supabase.com:5432 postgres.qkgaybvrernstplzjaam" \
+            "aws-0-us-west-2.pooler.supabase.com:5432 postgres.qkgaybvrernstplzjaam"; do
+            HOST=${HOST_USER%% *}; USER=${HOST_USER##* }
+            URL="postgresql://$USER:$ENC_PW@$HOST/postgres"
+            if psql "$URL" -c "select 1" >/dev/null 2>&1; then
+              echo "url=$URL" >> $GITHUB_OUTPUT
+              echo "connected via $HOST"
+              exit 0
+            fi
+            echo "no: $HOST"
+          done
+          echo "❌ could not connect with SUPABASE_DB_PASSWORD — add full SUPABASE_DB_URL secret instead"
+          echo "   (Supabase dashboard → Project Settings → Database → Connection string URI)"
+          exit 1
+
+      - name: Apply migrations (psql, in filename order)
+        env:
+          # Use the URL the resolve step actually verified, not the raw secret.
+          SUPABASE_DB_URL: ${{ steps.db.outputs.url }}
+          # The postgres role's 10s default statement_timeout killed run
+          # 27253881558 mid-CREATE INDEX. 120s is the Hard Rule #12 ceiling;
+          # anything heavier (indexes on 30GB+ tables) must be pre-built
+          # CONCURRENTLY so the migration's IF NOT EXISTS no-ops.
+          PGOPTIONS: -c statement_timeout=120s
+        run: |
+          if [ ! -s /tmp/migrations.txt ]; then echo "no migrations to apply"; exit 0; fi
+          sort /tmp/migrations.txt | while read -r f; do
+            [ -f "$f" ] || { echo "skip (not found): $f"; continue; }
+            echo "═══ applying $f"
+            psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"
+          done
+          echo "✅ migrations applied"
+
+      - name: Deploy edge functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ ! -s /tmp/functions.txt ]; then echo "no functions to deploy"; exit 0; fi
+          npx -y supabase@latest --version
+          while read -r fn; do
+            [ -d "supabase/functions/$fn" ] || { echo "skip (no dir): $fn"; continue; }
+            echo "═══ deploying $fn"
+            npx -y supabase@latest functions deploy "$fn" --project-ref qkgaybvrernstplzjaam --no-verify-jwt
+          done < /tmp/functions.txt
+          echo "✅ functions deployed"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "📦 Supabase deploy complete."
+          echo "Verify: pipeline pulse at /system-status, search latency, photo pipeline drain."

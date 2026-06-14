@@ -640,20 +640,32 @@ export class ImageUploadService {
         });
       }
 
-      // Trigger photo-pipeline-orchestrator directly (fire-and-forget).
-      // DB trigger via pg_net is a backup but has reliability issues with timeouts.
+      // Trigger photo-pipeline-orchestrator directly (non-blocking, retried).
+      // Backstops: pg_net INSERT trigger + photo-pipeline-drain cron requeue
+      // anything that slips through, so a lost invoke is recoverable.
       if (isImage && dbResult?.id && !duplicateOf) {
         console.log('📸 Triggering photo pipeline for:', dbResult.id);
-        supabase.functions.invoke('photo-pipeline-orchestrator', {
-          body: {
-            image_id: dbResult.id,
-            image_url: urlData.publicUrl,
-            vehicle_id: vehicleId || null,
-            user_id: (await supabase.auth.getUser()).data.user?.id || null,
-          },
-        }).catch((err: any) => {
-          console.warn('📸 Photo pipeline invoke failed (DB trigger is backup):', err.message);
-        });
+        const pipelineBody = {
+          image_id: dbResult.id,
+          image_url: urlData.publicUrl,
+          vehicle_id: vehicleId || null,
+          user_id: (await supabase.auth.getUser()).data.user?.id || null,
+        };
+        (async () => {
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const { error } = await supabase.functions.invoke('photo-pipeline-orchestrator', { body: pipelineBody });
+              if (!error) return;
+              throw error;
+            } catch (err: any) {
+              if (attempt === 2) {
+                console.warn('📸 Photo pipeline invoke failed after retries (cron drain will pick it up):', err?.message);
+                return;
+              }
+              await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+            }
+          }
+        })();
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('image_processing_started', {
             detail: {
@@ -740,46 +752,55 @@ export class ImageUploadService {
   }
 
   /**
-   * Auto-match an unorganized image to vehicles using GPS, date, and filename
-   * This runs in the background after upload if vehicleId was not provided
+   * Auto-match an unorganized image to vehicles using GPS proximity.
+   * Runs in the background after upload if vehicleId was not provided.
+   *
+   * Calls the 5-arg GPS overload of auto_match_image_to_vehicles (the
+   * ambiguity-guard version, migration 20260610011000). The legacy 4-arg
+   * overload (filename-LIKE scorer) was dropped in migration
+   * 20260611040000_close_destructive_paths.sql.
    */
   private static async autoMatchImage(imageId: string, userId: string): Promise<void> {
     try {
-      // Use the database function for efficient matching
-      const { data: matches, error } = await supabase
-        .rpc('auto_match_image_to_vehicles', {
-          p_image_id: imageId,
-          p_max_gps_distance_meters: 50,
-          p_max_date_difference_days: 30,
-          p_min_confidence: 0.5
-        });
+      // The GPS overload needs the image's coordinates — fetch them first.
+      const { data: img } = await supabase
+        .from('vehicle_images')
+        .select('latitude, longitude, taken_at')
+        .eq('id', imageId)
+        .maybeSingle();
 
-      if (error) {
-        console.warn('Auto-match RPC failed, falling back to client-side matching:', error);
-        // Fallback to client-side matching
+      let bestMatch: { vehicle_id: string; confidence: number } | null = null;
+      let matchReason = 'gps_proximity';
+
+      if (img?.latitude != null && img?.longitude != null) {
+        const { data: matches, error } = await supabase.rpc('auto_match_image_to_vehicles', {
+          p_image_id: imageId,
+          p_latitude: img.latitude,
+          p_longitude: img.longitude,
+          p_taken_at: img.taken_at,
+          p_user_id: userId
+        });
+        if (error) {
+          console.warn('Auto-match RPC failed, falling back to client-side matching:', error);
+        } else if (matches && matches.length > 0) {
+          bestMatch = matches[0];
+        }
+      }
+
+      // Fallback: client-side matcher for no-GPS images or RPC failure.
+      if (!bestMatch) {
         const { ImageVehicleMatcher } = await import('./imageVehicleMatcher');
         const match = await ImageVehicleMatcher.matchImage(imageId, { userId });
         if (match && match.vehicleId) {
-          // SAFETY: do not auto-apply; only store suggestion.
-          await supabase
-            .from('vehicle_images')
-            .update({
-              suggested_vehicle_id: match.vehicleId,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', imageId);
-          console.log(`✅ Suggested match for image ${imageId}: vehicle ${match.vehicleId} (confidence: ${(match.confidence * 100).toFixed(0)}%)`);
+          bestMatch = { vehicle_id: match.vehicleId, confidence: match.confidence };
+          matchReason = 'client_side_matcher';
         }
-        return;
       }
 
-      if (!matches || matches.length === 0) {
+      if (!bestMatch) {
         console.log(`No auto-match found for image ${imageId}`);
         return;
       }
-
-      // Get the best match (highest confidence)
-      const bestMatch = matches[0];
 
       // SAFETY: never auto-assign vehicle_id based on heuristic matching.
       // This prevents cross-vehicle contamination; we only store a suggestion for review.
@@ -796,8 +817,7 @@ export class ImageUploadService {
         return;
       }
 
-      console.log(`✅ Suggested match for image ${imageId}: vehicle ${bestMatch.vehicle_id} (confidence: ${(bestMatch.confidence * 100).toFixed(0)}%)`);
-      console.log('Match reasons:', bestMatch.match_reasons);
+      console.log(`✅ Suggested match for image ${imageId}: vehicle ${bestMatch.vehicle_id} (confidence: ${(bestMatch.confidence * 100).toFixed(0)}%, via ${matchReason})`);
 
       // Notify UI that image was matched
       if (typeof window !== 'undefined') {
@@ -806,7 +826,7 @@ export class ImageUploadService {
             imageId,
             vehicleId: bestMatch.vehicle_id,
             confidence: bestMatch.confidence,
-            reasons: bestMatch.match_reasons
+            reasons: [matchReason]
           }
         }));
       }

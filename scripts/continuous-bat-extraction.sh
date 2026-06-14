@@ -16,7 +16,7 @@ run_batch() {
 
 # Function to check pending count
 check_pending() {
-  PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "SELECT COUNT(*) FROM import_queue WHERE listing_url LIKE '%bringatrailer%' AND status = 'pending';" 2>/dev/null | tr -d ' '
+  PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c "SELECT COUNT(*) FROM import_queue WHERE listing_url LIKE '%bringatrailer%' AND status = 'pending';" 2>/dev/null | tr -d ' '
 }
 
 # Function to crawl a year

@@ -143,41 +143,23 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
           }
         }
 
-        // 2. Check vehicle_images ai_scan_metadata
+        // 2. Check vehicle_images ai_scan_metadata — project just the three VIN
+        // paths instead of whole blobs (122KB -> 3KB for 50 rows, prod-measured).
         const { data: images, error: imagesError } = await supabase
           .from('vehicle_images')
-          .select('ai_scan_metadata')
+          .select(
+            'vin_tag_vin:ai_scan_metadata->vin_tag->>vin, spid_vin:ai_scan_metadata->spid_data->extracted_data->>vin, appraiser_vin:ai_scan_metadata->appraiser->extracted_data->>vin',
+          )
           .eq('vehicle_id', vehicle.id)
           .not('ai_scan_metadata', 'is', null)
           .limit(50);
 
         if (!imagesError && images) {
-          // Look through ai_scan_metadata for VIN
-          for (const img of images) {
-            const metadata = img.ai_scan_metadata;
-            if (!metadata) continue;
-
-            // Check vin_tag
-            if (metadata.vin_tag?.vin) {
-              const vin = String(metadata.vin_tag.vin).trim().toUpperCase();
-              if (isPlausibleVin(vin)) {
-                setVinFromImages(vin);
-                return;
-              }
-            }
-
-            // Check spid_data
-            if (metadata.spid_data?.extracted_data?.vin) {
-              const vin = String(metadata.spid_data.extracted_data.vin).trim().toUpperCase();
-              if (isPlausibleVin(vin)) {
-                setVinFromImages(vin);
-                return;
-              }
-            }
-
-            // Check appraiser analysis
-            if (metadata.appraiser?.extracted_data?.vin) {
-              const vin = String(metadata.appraiser.extracted_data.vin).trim().toUpperCase();
+          // Check vin_tag, then spid_data, then appraiser analysis
+          for (const img of images as Array<Record<string, unknown>>) {
+            for (const raw of [img.vin_tag_vin, img.spid_vin, img.appraiser_vin]) {
+              if (!raw) continue;
+              const vin = String(raw).trim().toUpperCase();
               if (isPlausibleVin(vin)) {
                 setVinFromImages(vin);
                 return;
