@@ -392,11 +392,21 @@ struct InvestmentProof: Decodable {
         let net_proven: Double?
         let roi_proven_pct: Double?
     }
+    /// One counterparty's net contribution to the asset — the per-party rung.
+    /// Owner-only; empty when no recorded payments carry a counterparty.
+    struct Party: Decodable, Identifiable {
+        let party: String
+        let direction: String?
+        let count: Int?
+        let total: Double?
+        var id: String { party + (direction ?? "") }
+    }
     let is_owner_view: Bool
     let proven: Proven
     let projected: Projected
     let market: Cell
     let totals: Totals
+    let by_party: [Party]?
 }
 
 struct InvestmentProofView: View {
@@ -438,6 +448,21 @@ struct InvestmentProofView: View {
                          sub: "+ projected: \(money(p.totals.invested_with_projected))", bold: true)
                     if let roi = p.totals.roi_proven_pct {
                         line("ROI (proven)", nil, sub: "on proven spend", bold: true, rawValue: "\(Int(roi))%")
+                    }
+
+                    // BY PARTY — who the money moved with. Each counterparty's
+                    // net to the asset (owner-only; from payment_events).
+                    if let parties = p.by_party, !parties.isEmpty {
+                        Divider().overlay(Color.primary.opacity(0.3)).padding(.vertical, 4)
+                        Text("BY PARTY")
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(Color.secondary)
+                            .padding(.bottom, 2)
+                        ForEach(parties) { party in
+                            line(party.party, party.total,
+                                 sub: "\(party.count ?? 0) \(party.direction == "in" ? "received" : "paid") · payment_events",
+                                 positive: party.direction == "in")
+                        }
                     }
                 }
                 .font(.system(.footnote, design: .monospaced))
