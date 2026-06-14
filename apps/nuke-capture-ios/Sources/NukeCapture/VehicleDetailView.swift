@@ -59,11 +59,43 @@ struct VehicleHeaderRow: Decodable, Identifiable, Hashable {
 }
 
 /// One vehicle_images row — the gallery unit. Small Decodable, exact columns.
+/// Carries the per-image analysis atoms so a tap opens the photo's analysis
+/// (the photo→analysis path) without a second fetch. All atom fields optional —
+/// a photo renders "Not analyzed yet" when they're absent, never a fabrication.
 private struct VehicleGalleryImage: Decodable, Identifiable {
     let id: UUID
     let image_url: String?
     let thumbnail_url: String?
     let is_primary: Bool?
+    // Analysis atoms (vision verdict) — present once the image is understood.
+    let taken_at: String?
+    let labels: [String]?      // 'scene:x' / 'phase:y' / 'intent:z' + components
+    let ai_processing_status: String?
+}
+
+/// The signed-in viewer's ASSET relationship to this vehicle — his ownership /
+/// provenance. Read from the SAME tables the web uses (vehicle_user_permissions
+/// + ownership_verifications), never fabricated. nil when the vehicle is not the
+/// viewer's (tenet 5 / C0): the app never claims ownership of a vehicle that
+/// isn't his (e.g. a sold truck).
+private struct VehiclePermissionRow: Decodable {
+    let role: String?
+    let granted_at: String?
+    let is_active: Bool?
+    let revoked_at: String?
+}
+private struct OwnershipVerificationRow: Decodable {
+    let status: String?            // approved | expired | pending | rejected
+    let approved_at: String?
+    let verification_type: String?
+    let verification_category: String?
+}
+struct VehicleRelationship {
+    let role: String               // owner | co_owner | contributor | …
+    let since: String?             // "yyyy-MM-dd" granted_at
+    let titleVerified: Bool        // an APPROVED title verification exists
+    let verificationStatus: String? // honest state when not approved (expired/pending)
+    let verifiedAt: String?
 }
 
 struct VehicleDetailView: View {
@@ -75,9 +107,11 @@ struct VehicleDetailView: View {
 
     @State private var vehicle: VehicleHeaderRow?
     @State private var images: [VehicleGalleryImage] = []
+    @State private var relationship: VehicleRelationship?   // ASSET window (owner-scoped)
     @State private var loadError: String?
     @State private var loaded = false
     @State private var galleryOpen = false
+    @State private var selectedPhoto: VehicleGalleryImage?  // photo→analysis drill
 
     init(vehicleId: String, embedInNavigationStack: Bool = true) {
         self.vehicleId = vehicleId
@@ -109,6 +143,42 @@ struct VehicleDetailView: View {
         .fullScreenCover(isPresented: $galleryOpen) {
             FullScreenGalleryView(images: images.compactMap { $0.image_url })
         }
+        // Photo→analysis drill: open the tapped image's vision atoms +
+        // provenance. Reuses the shared AnalyzedEvidenceView so there's one
+        // analysis surface, not a parallel one. Atoms parsed from the row's
+        // labels; an unanalyzed image shows "Analysis pending" with a path,
+        // never fabricated atoms.
+        .fullScreenCover(item: $selectedPhoto) { img in
+            AnalyzedEvidenceView(photo: analyzedPhoto(from: img))
+        }
+    }
+
+    /// Build an AnalyzedPhoto (the shared evidence-view model) from a gallery
+    /// row. Parses the 'scene:'/'phase:'/'intent:' label facets the BYOK vision
+    /// pipeline writes; everything else becomes a component. Real atoms only —
+    /// when labels are empty the evidence view renders "Analysis pending".
+    private func analyzedPhoto(from img: VehicleGalleryImage) -> AnalyzedPhoto {
+        let labels = img.labels ?? []
+        func facet(_ prefix: String) -> String? {
+            labels.first { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) }
+        }
+        let components = labels.filter {
+            !$0.hasPrefix("scene:") && !$0.hasPrefix("phase:") && !$0.hasPrefix("intent:")
+        }
+        return AnalyzedPhoto(
+            id: img.id,
+            url: img.image_url,
+            thumb: img.thumbnail_url ?? img.image_url,
+            vehicle_id: UUID(uuidString: vehicleId),
+            taken_at: img.taken_at,
+            file_name: nil,
+            scene: facet("scene:"),
+            phase: facet("phase:"),
+            intent: facet("intent:"),
+            components: components.isEmpty ? nil : components,
+            analyzed_at: nil,
+            analyzed_by: nil
+        )
     }
 
     // ─── Scrolling build sheet ───────────────────────────────────────────────
@@ -117,10 +187,11 @@ struct VehicleDetailView: View {
             VStack(alignment: .leading, spacing: 0) {
                 hero
                 titleBlock
-                specTable
-                photoStrip
+                assetWindow          // ASSET: his relationship/provenance
+                specTable            // TECHNICAL
+                photoStrip           // CONTENT (each photo → its analysis)
                 if vehicle != nil {
-                    InvestmentProofView(vehicleId: vehicleId)
+                    InvestmentProofView(vehicleId: vehicleId)   // COMMODITY
                 }
                 webCTA
                 Spacer(minLength: 0)
@@ -174,6 +245,73 @@ struct VehicleDetailView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 16)
+    }
+
+    // ─── ASSET window — the viewer's real relationship to this vehicle.
+    // His ownership/provenance: is it his, what role, title-verified, since
+    // when. Sourced from vehicle_user_permissions + ownership_verifications
+    // (the same tables the web reads). Renders ONLY when an active permission
+    // exists for the signed-in viewer — a vehicle that isn't his shows nothing
+    // here, never a false ownership claim (tenet 5 / C0). The title-verified
+    // rung lights ONLY on an approved verification; expired/pending read
+    // honestly. Each row is a flat record line, structure not color.
+    @ViewBuilder private var assetWindow: some View {
+        if let rel = relationship {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("ASSET")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 4)
+
+                // Role — his relationship to the asset (owner / co-owner / …).
+                LabeledContent {
+                    Text(rel.role.replacingOccurrences(of: "_", with: " ").capitalized)
+                        .font(.system(.footnote, design: .monospaced))
+                        .foregroundStyle(.primary)
+                } label: {
+                    Text("Your role").font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 5)
+                Divider()
+
+                // Title-verified rung — honest about the verification state.
+                LabeledContent {
+                    if rel.titleVerified {
+                        Label("Title-verified", systemImage: "checkmark.seal.fill")
+                            .font(.system(.footnote, design: .monospaced))
+                            .foregroundStyle(.green)
+                    } else if let vs = rel.verificationStatus {
+                        // A verification exists but isn't approved — say so.
+                        Text("Title \(vs)")
+                            .font(.system(.footnote, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Not title-verified")
+                            .font(.system(.footnote, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                } label: {
+                    Text("Verification").font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 5)
+
+                // Since when — granted_at (verified date when present).
+                if let since = rel.verifiedAt ?? rel.since {
+                    Divider()
+                    LabeledContent {
+                        Text(since)
+                            .font(.system(.footnote, design: .monospaced))
+                            .foregroundStyle(.primary)
+                    } label: {
+                        Text(rel.verifiedAt != nil ? "Verified" : "Since")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 5)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
+        }
     }
 
     // ─── Spec table — only the non-null fields, traditional LabeledContent rows
@@ -250,7 +388,10 @@ struct VehicleDetailView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(images) { img in
-                            Button { galleryOpen = true } label: {
+                            // Tap a photo → ITS analysis (vision atoms +
+                            // provenance), not a flat gallery. The image is a
+                            // window into the analysis (the explicit priority).
+                            Button { selectedPhoto = img } label: {
                                 Color(.secondarySystemFill)
                                     .frame(width: 110, height: 110)
                                     .overlay {
@@ -316,11 +457,13 @@ struct VehicleDetailView: View {
             loadError = "Load failed"
             NSLog("NukeCapture vehicle detail load failed: %@", String(describing: error))
         }
-        // Gallery is independent — a load failure here never blocks the spec sheet.
+        // Gallery is independent — a load failure here never blocks the spec
+        // sheet. Pulls the analysis atoms (labels/taken_at/status) so a photo
+        // tap opens its analysis without a second round-trip.
         do {
             images = try await SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status")
                 .eq("vehicle_id", value: vehicleId)
                 .order("is_primary", ascending: false)
                 .order("created_at", ascending: false)
@@ -330,7 +473,66 @@ struct VehicleDetailView: View {
         } catch {
             NSLog("NukeCapture vehicle gallery load failed: %@", String(describing: error))
         }
+        // ASSET window — the viewer's relationship. Owner-scoped via RLS; a
+        // signed-out viewer or a non-owner simply gets no rows → nil → the
+        // section doesn't render (no false ownership claim).
+        await loadRelationship()
         loaded = true
+    }
+
+    /// Load the viewer's ASSET relationship from the same tables the web reads.
+    /// vehicle_user_permissions (role/since) + ownership_verifications (title
+    /// rung). RLS scopes both to the signed-in user, so a non-owner gets empty
+    /// results and the ASSET window stays hidden. Never claims ownership the
+    /// data doesn't support (tenet 5 / C0).
+    private func loadRelationship() async {
+        // anon: no asset window. The relationship is THIS viewer's, so it must
+        // be scoped to the signed-in user id — vehicle_user_permissions is
+        // publicly readable, so without the user_id filter a signed-in viewer
+        // would see ANOTHER owner's grant and the UI would falsely claim the
+        // vehicle is theirs (tenet 5 violation). Scope to currentUserId.
+        guard let uid = SupabaseService.currentUserId else { return }
+        do {
+            let perms: [VehiclePermissionRow] = try await SupabaseService.client
+                .from("vehicle_user_permissions")
+                .select("role,granted_at,is_active,revoked_at")
+                .eq("vehicle_id", value: vehicleId)
+                .eq("user_id", value: uid)
+                .execute()
+                .value
+            // Active, non-revoked grants only; prefer 'owner'.
+            let active = perms.filter { ($0.is_active ?? true) && $0.revoked_at == nil }
+            guard let perm = active.first(where: { $0.role == "owner" }) ?? active.first,
+                  let role = perm.role else {
+                relationship = nil
+                return
+            }
+
+            // Title verification rung — approved lights the badge; other states
+            // surface honestly.
+            let vers: [OwnershipVerificationRow] = try await SupabaseService.client
+                .from("ownership_verifications")
+                .select("status,approved_at,verification_type,verification_category")
+                .eq("vehicle_id", value: vehicleId)
+                .eq("user_id", value: uid)
+                .execute()
+                .value
+            let titleVers = vers.filter {
+                $0.verification_type == "title" || $0.verification_category == "title_document"
+            }
+            let approved = titleVers.first { $0.status == "approved" }
+            let anyVer = approved ?? titleVers.first
+
+            relationship = VehicleRelationship(
+                role: role,
+                since: perm.granted_at.map { String($0.prefix(10)) },
+                titleVerified: approved != nil,
+                verificationStatus: approved == nil ? anyVer?.status : nil,
+                verifiedAt: approved?.approved_at.map { String($0.prefix(10)) }
+            )
+        } catch {
+            NSLog("NukeCapture vehicle relationship load failed: %@", String(describing: error))
+        }
     }
 }
 

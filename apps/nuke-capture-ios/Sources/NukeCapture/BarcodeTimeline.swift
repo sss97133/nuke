@@ -84,6 +84,26 @@ private struct CalCell: Identifiable {
         default:       return count
         }
     }
+
+    /// Estimated work-hours for the active facet — the SAME transform the web
+    /// uses (ContributionTimeline.tsx:99-116 / VehicleTimeline hoursForDay).
+    /// The barcode buckets on HOURS, not raw count: a 60-photo day and a
+    /// 3-photo day must not both saturate to the darkest green or the strip
+    /// reads flat (the "still fucked / uninformative" complaint). photos =
+    /// min(9, n/20) + 0.25 baseline; work = 0.5·n; events = 0.25·n; cap 12.
+    func hours(for filter: String) -> Double {
+        // events isn't stored separately on the cell; it's the remainder of the
+        // ALL count after photos + work.
+        let events = max(0, count - photos - work)
+        var h = 0.0
+        let usePhotos = (filter == "all" || filter == "photos")
+        let useWork   = (filter == "all" || filter == "work")
+        let useEvents = (filter == "all")
+        if usePhotos && photos > 0 { h += min(9.0, Double(photos) / 20.0) + 0.25 }
+        if useWork   { h += 0.5  * Double(work) }
+        if useEvents { h += 0.25 * Double(events) }
+        return min(12.0, h)
+    }
 }
 
 // ─── Week column model ────────────────────────────────────────────────────────
@@ -376,21 +396,26 @@ private struct CellView: View {
 
     private var facetCount: Int { cell.count(for: activeFilter) }
 
-    // Web --heat palette (ContributionTimeline.tsx):
-    //   empty #ebedf0 | bucket1 #d9f99d | bucket2 #a7f3d0
-    //   bucket3 #34d399 | bucket4 #059669 | bucket5 #047857
-    // Dark mode: same greens with reduced opacity on a #2d2d30 base.
+    // Web --heat palette + the web's HOURS thresholds (ContributionTimeline.tsx
+    // colorForHours: <1 | <3 | <6 | <12 | 12+). The old code bucketed on raw
+    // count (1/2/3/4/5+) so any active day (Skylar logs 8-60 photos/day)
+    // instantly saturated to the darkest green — the strip read as a flat dark
+    // wall, the "uninformative" complaint. Coloring on the same estimated-hours
+    // transform the web uses restores a real gradient where light and heavy
+    // days are visibly different.
+    //   empty #ebedf0 | <1h #d9f99d | <3h #a7f3d0 | <6h #34d399 | <12h #059669 | 12h #047857
     private var fillColor: Color {
         guard cell.inRange else {
             return Color(hex: "#ebedf0").opacity(0.25)   // out-of-range: very faint
         }
-        switch facetCount {
-        case 0:      return Color.clear
-        case 1:      return Color(hex: "#d9f99d")
-        case 2:      return Color(hex: "#a7f3d0")
-        case 3:      return Color(hex: "#34d399")
-        case 4:      return Color(hex: "#059669")
-        default:     return Color(hex: "#047857")
+        let h = cell.hours(for: activeFilter)
+        switch h {
+        case ..<0.0001: return Color.clear
+        case ..<1:      return Color(hex: "#d9f99d")
+        case ..<3:      return Color(hex: "#a7f3d0")
+        case ..<6:      return Color(hex: "#34d399")
+        case ..<12:     return Color(hex: "#059669")
+        default:        return Color(hex: "#047857")
         }
     }
 
