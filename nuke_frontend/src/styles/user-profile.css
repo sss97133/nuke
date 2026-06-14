@@ -56,6 +56,22 @@
   font-family: var(--up-font-sans);
   background: var(--up-bg);
   min-height: 100vh;
+
+  /* ─── One coherent surface treatment ───
+     The profile is drawn on the light --up-* palette, but a few embedded
+     components (UserDiscoveries, VehicleCollection) read the GLOBAL app tokens
+     (--bg / --surface / --text / --border), which resolve dark in the app's
+     dark theme — producing random dark slabs amid the light record. Remap the
+     global tokens to the profile's own light palette for the subtree so every
+     surface is the same light treatment. No new colors: aliases of --up-*. */
+  --bg: var(--up-bg);
+  --surface: var(--up-surface);
+  --surface-hover: var(--up-row-alt);
+  --surface-elevated: var(--up-surface);
+  --text: var(--up-ink);
+  --text-muted: var(--up-data-dim);
+  --border: var(--up-ghost);
+  color-scheme: light;
 }
 
 /* ─── User Header ─── */
@@ -587,6 +603,25 @@
     order: 3;
     width: 100%;
     justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    column-gap: 12px;
+  }
+
+  /* Dossier rows: let the label hold its width and the value wrap/shrink
+     instead of clipping off the right edge at 375px. */
+  .up-dossier-row {
+    gap: 8px;
+  }
+  .up-dossier-row__label {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .up-dossier-row__value {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .up-drawer {
