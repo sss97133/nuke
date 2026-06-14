@@ -526,38 +526,11 @@ const ImageGallery = ({
   }, [vehicleId]);
 
   // Vehicle meta (used to suppress "BaT homepage noise" images that were mistakenly attached to some vehicles)
+  // Loaded by the main fetchImages effect below. A legacy effect here used to fire
+  // an unpaginated select('*') of the entire vehicle_images set (7.4MB on a 3.6k-image
+  // vehicle) and race setAllImages against the real loader — it never actually loaded
+  // vehicle meta (its setVehicleMeta was a self-assignment) and was removed.
   const [vehicleMeta, setVehicleMeta] = useState<any | null>(null);
-  useEffect(() => {
-    const loadImages = async () => {
-      setLoading(true);
-      try {
-        // Load images from database
-        // Chained .or() with not.in.("a","b") syntax was producing PostgREST 500s.
-        // Fetch + filter client-side; result set is bounded by vehicle_id.
-        const { data: rawImages, error } = await supabase
-          .from('vehicle_images')
-          .select('*')
-          .eq('vehicle_id', vehicleId)
-          .order('position', { ascending: true })
-          .order('created_at', { ascending: true });
-
-        if (error) throw error;
-        const images = (rawImages || []).filter((r: any) => {
-          if (r?.is_duplicate === true) return false;
-          const mvms = r?.image_vehicle_match_status;
-          if (mvms === 'mismatch' || mvms === 'unrelated') return false;
-          const vgs = r?.vision_gate_status;
-          if (vgs != null && vgs !== 'approved') return false;
-          return true;
-        });
-        setAllImages(applyQuarantinePolicy(images));
-        setVehicleMeta(vehicleMeta || null);
-      } catch {
-        setVehicleMeta(null);
-      }
-    };
-    loadImages();
-  }, [vehicleId]);
 
   // Default BaT-only view for BaT-origin vehicles, with a user-toggle to show all sources
   const isBatVehicle = useMemo(() => {
