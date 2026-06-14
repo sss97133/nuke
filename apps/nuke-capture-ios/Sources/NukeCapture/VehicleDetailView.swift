@@ -14,6 +14,7 @@
 
 import SwiftUI
 import UIKit
+import Supabase
 
 /// One vehicles row — exact columns, read-only. Header + full spec set in a
 /// single select so one fetch covers the title bar AND the spec table.
@@ -121,6 +122,8 @@ struct VehicleDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var vehicle: VehicleHeaderRow?
+    @State private var specs: [VehicleSpec] = []   // get_vehicle_specs: fact vs facade
+    @State private var imageTotal: Int?            // true photo count (not the fetched cap)
     @State private var images: [VehicleGalleryImage] = []
     @State private var relationship: VehicleRelationship?   // ASSET window (owner-scoped)
     @State private var loadError: String?
@@ -161,6 +164,7 @@ struct VehicleDetailView: View {
             }
         }
         .task(id: vehicleId) { await load() }
+        .task(id: vehicleId) { await loadSpecs() }
         .sheet(item: $provenanceDrill) { drill in
             FieldProvenanceSheet(vehicleId: vehicleId, drill: drill)
         }
@@ -354,14 +358,15 @@ struct VehicleDetailView: View {
         }
     }
 
-    // ─── Spec table — only the non-null fields. Every value that has a recorded
-    // source (a {field}_source) is TAPPABLE → its provenance: the door-jamb VIN
-    // plate photo, the observation that recorded it, how sure, from where. A
-    // value with no recorded source stays honest dead text — an empty drill is
-    // worse than no drill (the three-shelf law / "no number without a table
-    // behind it"). Long-press any value to copy it.
+    // ─── Spec table — driven by get_vehicle_specs, which marks each value a FACT
+    // (rooted: a real atom — a source photo, a field-keyed observation, or real
+    // extraction evidence backs it) or a FACADE (a bare column carrying only a
+    // source LABEL, e.g. a color copied off a comp's BaT listing, with nothing
+    // beneath it). Facts render in ink and DRILL to their source; facades render
+    // dimmed and "unverified" and never pretend to be fact. The root-system
+    // contract, on the surface. Long-press any value to copy it.
     @ViewBuilder private var specTable: some View {
-        if let v = vehicle, hasAnySpec(v) {
+        if !specs.isEmpty || locationRow != nil {
             VStack(alignment: .leading, spacing: 0) {
                 Text("SPECIFICATIONS")
                     .font(.system(.caption2, design: .monospaced))
@@ -369,9 +374,8 @@ struct VehicleDetailView: View {
                     .padding(.bottom, 4)
 
                 VStack(spacing: 0) {
-                    ForEach(specItems(v)) { item in
-                        specRow(item)
-                    }
+                    ForEach(specs) { specRow($0) }
+                    if let loc = locationRow { plainRow("Location", loc) }
                 }
             }
             .padding(.horizontal, 16)
@@ -379,70 +383,65 @@ struct VehicleDetailView: View {
         }
     }
 
-    /// Spec rows in display order. `field` = the get_field_provenance key (nil →
-    /// never drillable); `source` = the inline {field}_source value (non-nil →
-    /// the value drills to a real source row). Only present values survive.
-    private func specItems(_ v: VehicleHeaderRow) -> [SpecItem] {
-        [
-            SpecItem(label: "VIN",          value: v.vin,                                    field: "vin",          source: v.vin_source),
-            SpecItem(label: "Mileage",      value: v.mileage.map { "\($0.formatted()) mi" }, field: "mileage",      source: v.mileage_source),
-            SpecItem(label: "Transmission", value: v.transmission,                           field: "transmission", source: v.transmission_source),
-            SpecItem(label: "Drivetrain",   value: v.drivetrain,                             field: nil,            source: nil),
-            SpecItem(label: "Body",         value: v.body_style,                             field: nil,            source: nil),
-            SpecItem(label: "Color",        value: v.color,                                  field: "color",        source: v.color_source),
-            SpecItem(label: "Interior",     value: v.interior_color,                         field: nil,            source: nil),
-            SpecItem(label: "Engine",       value: v.engine_type,                            field: "engine",       source: v.engine_source),
-            SpecItem(label: "Fuel",         value: v.fuel_type,                              field: nil,            source: nil),
-            SpecItem(label: "Location",     value: location(v),                              field: nil,            source: nil),
-        ].filter { $0.value?.isEmpty == false }
-    }
+    private var locationRow: String? { vehicle.flatMap { location($0) } }
 
-    /// One spec row. Drillable rows (value + recorded source) carry a chevron and
-    /// open the field's provenance sheet; the rest are plain. Long-press to copy.
-    @ViewBuilder private func specRow(_ item: SpecItem) -> some View {
-        let drillable = item.field != nil && (item.source?.isEmpty == false)
+    /// One spec row. A rooted FACT drills to its source (ink + chevron); a facade
+    /// renders dimmed + "unverified" and is NOT tappable — an empty/false drill is
+    /// worse than honesty. Long-press copies either.
+    @ViewBuilder private func specRow(_ s: VehicleSpec) -> some View {
         Group {
-            if drillable {
+            if s.rooted {
                 Button {
-                    provenanceDrill = SpecDrill(label: item.label, value: item.value ?? "", field: item.field!)
-                } label: {
-                    specRowBody(item, drillable: true)
-                }
+                    provenanceDrill = SpecDrill(label: s.label, value: s.value ?? "", field: s.field)
+                } label: { specRowBody(s) }
                 .buttonStyle(.plain)
             } else {
-                specRowBody(item, drillable: false)
+                specRowBody(s)
             }
         }
         .contextMenu {
-            if let value = item.value, !value.isEmpty {
-                Button {
-                    UIPasteboard.general.string = value
-                } label: { Label("Copy \(item.label)", systemImage: "doc.on.doc") }
+            if let value = s.value, !value.isEmpty {
+                Button { UIPasteboard.general.string = value } label: {
+                    Label("Copy \(s.label)", systemImage: "doc.on.doc")
+                }
             }
         }
         Divider()
     }
 
-    @ViewBuilder private func specRowBody(_ item: SpecItem, drillable: Bool) -> some View {
+    @ViewBuilder private func specRowBody(_ s: VehicleSpec) -> some View {
         LabeledContent {
             HStack(spacing: 6) {
-                Text(item.value ?? "")
-                    .font(.system(.footnote, design: .monospaced))
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.trailing)
-                if drillable {
-                    Image(systemName: "chevron.right.circle")
-                        .font(.caption2)
-                        .foregroundStyle(.blue)
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(s.value ?? "")
+                        .font(.system(.footnote, design: .monospaced))
+                        .foregroundStyle(s.rooted ? Color.primary : Color.secondary)
+                        .multilineTextAlignment(.trailing)
+                    if !s.rooted {
+                        Text("unverified")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                if s.rooted {
+                    Image(systemName: "chevron.right.circle").font(.caption2).foregroundStyle(.blue)
                 }
             }
         } label: {
-            Text(item.label)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            Text(s.label).font(.footnote).foregroundStyle(.secondary)
         }
         .padding(.vertical, 5)
         .contentShape(Rectangle())
+    }
+
+    @ViewBuilder private func plainRow(_ label: String, _ value: String) -> some View {
+        LabeledContent {
+            Text(value).font(.system(.footnote, design: .monospaced))
+                .foregroundStyle(.primary).multilineTextAlignment(.trailing)
+        } label: {
+            Text(label).font(.footnote).foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 5)
     }
 
     /// Share the public vehicle record (the same page the web CTA opens).
@@ -484,12 +483,12 @@ struct VehicleDetailView: View {
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button("View all \(images.count) photos") { galleryOpen = true }
+                    Button("View all \((imageTotal ?? images.count).formatted()) photos") { galleryOpen = true }
                         .font(.caption)
                 }
 
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
+                    LazyHStack(spacing: 6) {
                         ForEach(images) { img in
                             // Tap a photo → ITS analysis (vision atoms +
                             // provenance), not a flat gallery. The image is a
@@ -545,32 +544,28 @@ struct VehicleDetailView: View {
                 .value
             vehicle = rows.first
             loadError = rows.first == nil ? "Vehicle not found" : nil
-            #if DEBUG
-            if let f = debugOpenField, let v = vehicle,
-               let item = specItems(v).first(where: { $0.field == f && ($0.source?.isEmpty == false) }) {
-                provenanceDrill = SpecDrill(label: item.label, value: item.value ?? "", field: f)
-            }
-            #endif
         } catch {
             loadError = "Load failed"
             NSLog("NukeCapture vehicle detail load failed: %@", String(describing: error))
         }
         // Gallery is independent — a load failure here never blocks the spec
         // sheet. Pulls the analysis atoms (labels/taken_at/status) so a photo
-        // tap opens its analysis without a second round-trip.
+        // tap opens its analysis without a second round-trip. The "12 photos"
+        // cap was nonsense for a vehicle with thousands — fetch a real window
+        // (lazy strip), and read the TRUE total (estimated count) so the label
+        // is honest. Order by created_at (the indexed column) to avoid the RLS
+        // full-sort timeout.
         do {
-            // Order by created_at ONLY — there is an index on (vehicle_id,
-            // created_at DESC). Adding is_primary as the lead sort key forced a
-            // full sort of all 3,602 K5 rows under RLS and TIMED OUT (57014).
-            // The primary image is the hero already; the strip is newest-first.
-            images = try await SupabaseService.client
+            let resp: PostgrestResponse<[VehicleGalleryImage]> = try await SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status",
+                        count: .estimated)
                 .eq("vehicle_id", value: vehicleId)
                 .order("created_at", ascending: false)
-                .limit(12)
+                .limit(120)
                 .execute()
-                .value
+            images = resp.value
+            imageTotal = resp.count
         } catch {
             NSLog("NukeCapture vehicle gallery load failed: %@", String(describing: error))
         }
@@ -579,6 +574,25 @@ struct VehicleDetailView: View {
         // section doesn't render (no false ownership claim).
         await loadRelationship()
         loaded = true
+    }
+
+    /// Load the spec set with rootedness (get_vehicle_specs). Separate from the
+    /// header fetch so a slow/failed specs call never blanks the rest of the page.
+    private func loadSpecs() async {
+        do {
+            let rows: [VehicleSpec] = try await SupabaseService.client
+                .rpc("get_vehicle_specs", params: ["p_vehicle_id": vehicleId])
+                .execute()
+                .value
+            specs = rows
+            #if DEBUG
+            if let f = debugOpenField, let s = specs.first(where: { $0.field == f && $0.rooted }) {
+                provenanceDrill = SpecDrill(label: s.label, value: s.value ?? "", field: f)
+            }
+            #endif
+        } catch {
+            NSLog("NukeCapture specs load failed: %@", String(describing: error))
+        }
     }
 
     /// Load the viewer's ASSET relationship from the same tables the web reads.
@@ -1074,6 +1088,19 @@ struct SpecDrill: Identifiable {
     let value: String
     let field: String
     var id: String { field + value }
+}
+
+/// One row from get_vehicle_specs — a spec value tagged FACT vs FACADE.
+/// `rooted` = a real atom (source photo / field-keyed observation / extraction
+/// evidence) backs it; a bare {field}_source label is NOT a root.
+struct VehicleSpec: Decodable, Identifiable {
+    let field: String
+    let label: String
+    let value: String?
+    let rooted: Bool
+    let inline_source: String?
+    let evidence_count: Int?
+    var id: String { field }
 }
 
 /// get_field_provenance(vehicle, field) → one jsonb object. Every piece optional
