@@ -36,6 +36,7 @@ struct NukeCaptureApp: App {
         // Must happen during launch: registering after didFinishLaunching
         // returns is a runtime error. SwiftUI App.init() runs early enough.
         Self.registerBackgroundRefresh()
+        Self.registerBackgroundBackfill()
         // Existing installs ran the pre-ignition app: they keep the
         // hardcoded shop gate and skip ignition entirely.
         if SyncEngine.hasExistingWatermark,
@@ -83,11 +84,21 @@ struct NukeCaptureApp: App {
                 // Foreground sync — only once ignition is done. During the
                 // scan NOTHING may upload (the UPLOADED 0 gauge is real).
                 guard session.isSignedIn, ignitionComplete else { return }
-                Task { await SyncEngine.shared.start() }
+                // BUG #1 defect (c): book the processing-task drain the moment
+                // we learn work exists — not only on .background. If on-site
+                // photos are owed (backfill queue or fresh captures), the drain
+                // is scheduled now so it can run with the screen off later.
+                Task {
+                    await SyncEngine.shared.start()
+                    if SyncEngine.shared.backfillRemaining > 0 {
+                        Self.scheduleBackgroundBackfill()
+                    }
+                }
             case .background:
                 // Ask iOS to wake us later. The system decides when (earliest
                 // 15 min out; in practice it learns usage patterns).
                 Self.scheduleBackgroundRefresh()
+                Self.scheduleBackgroundBackfill()
             default:
                 break
             }
@@ -135,6 +146,62 @@ struct NukeCaptureApp: App {
             // Duplicate submissions and simulator unsupported-errors are
             // expected; log, never crash over scheduling.
             NSLog("NukeCapture: BG refresh submit failed: %@", String(describing: error))
+        }
+    }
+
+    // ─── BGProcessingTask: backfill drain ────────────────────────────────────
+    // Processing tasks get longer budgets than refresh tasks (~minutes vs ~30 s)
+    // and can require power + network — the right vehicle for a 32 K-photo drain.
+
+    private static func registerBackgroundBackfill() {
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: Config.backfillTaskID,
+            using: nil
+        ) { task in
+            guard let processingTask = task as? BGProcessingTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            handleBackgroundBackfill(processingTask)
+        }
+    }
+
+    private static func handleBackgroundBackfill(_ task: BGProcessingTask) {
+        // Re-arm before doing any work — if this run is killed, next one is booked.
+        scheduleBackgroundBackfill()
+
+        let work = Task { @MainActor in
+            // BUG #1: the processing task is the real drain organ — it runs
+            // sync() (new on-site photos) AND drainBackfill() (history) until
+            // empty, gated to un-metered Wi-Fi (charging is the requiresExternalPower
+            // half below). Screen-off ingestion lives here.
+            let drained = await SyncEngine.shared.drainUntilEmpty(
+                requireWiFi: Config.backfillRequiresWiFi
+            )
+            // Reschedule when work remains — either the queue still has assets,
+            // or the drain bailed early (metered link / paused / cancelled).
+            if SyncEngine.shared.backfillRemaining > 0 || !drained {
+                scheduleBackgroundBackfill()
+            }
+            task.setTaskCompleted(success: drained)
+        }
+
+        task.expirationHandler = {
+            // Cancel the drain loop; the persisted queue keeps the remainder.
+            work.cancel()
+        }
+    }
+
+    /// Schedule the backfill drain processing task.
+    /// Safe to call multiple times; duplicate submissions are logged and ignored.
+    static func scheduleBackgroundBackfill() {
+        let request = BGProcessingTaskRequest(identifier: Config.backfillTaskID)
+        request.requiresExternalPower = true
+        request.requiresNetworkConnectivity = true
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            NSLog("NukeCapture: BG backfill submit failed: %@", String(describing: error))
         }
     }
 }

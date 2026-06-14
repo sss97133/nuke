@@ -1,47 +1,68 @@
-// ExploreView.swift — search the world's vehicles (Build-2 §5: explore real
-// DB data; §3: query → drillable rows). The §5 return that replaces the cut
-// Map: not a directory of strangers, a way to FIND a real record and drill in.
+// ExploreView.swift — the world's vehicles as a VISUAL GRID (Build-2 §5: explore
+// real DB data; §3: query → drillable rows). The §5 return that replaces the cut
+// Map: not a search box that's empty until you type, but an Instagram-style wall
+// of real records you scroll and drill into.
 //
-// Backend is a DIRECT vehicles query via the anon client (sub-100ms), NOT the
-// universal-search edge function (measured 24s — unusable for typing). Rows
-// drill into VehicleDetailView (a sheet, its own NavigationStack). Reuses
-// VehicleHeaderRow from VehicleDetailView.swift — no parallel model.
+// Two backends, one grid:
+//   • FEED (on .task, ~99ms): public vehicles, newest first, only those with a
+//     photo — the wall you land on.
+//   • SEARCH (≥2 chars): the existing DIRECT vehicles query via the anon client
+//     (sub-100ms), NOT the universal-search edge function (measured 24s).
+// Cells PUSH into VehicleDetailView via .navigationDestination — a back chevron,
+// not a Done-only dead-end. Reuses VehicleHeaderRow from VehicleDetailView.swift.
 
 import SwiftUI
 
 struct ExploreView: View {
     @State private var query = ""
+    @State private var feed: [VehicleHeaderRow] = []
     @State private var results: [VehicleHeaderRow] = []
-    @State private var selected: VehicleHeaderRow?
-    @State private var loading = false
+    @State private var loadingFeed = false
+    @State private var searching = false
     @State private var searched = false
+
+    // 3-column square grid, 2pt gutters — the Instagram wall.
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
+
+    /// What the grid shows: search results when typing, the feed otherwise.
+    private var rows: [VehicleHeaderRow] {
+        query.trimmingCharacters(in: .whitespaces).count >= 2 ? results : feed
+    }
 
     var body: some View {
         NavigationStack {
             Group {
-                if loading && results.isEmpty {
+                if loadingFeed && feed.isEmpty && !searched {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if results.isEmpty {
-                    // No empty shells — a prompt before searching, an honest
-                    // "nothing" after.
+                } else if rows.isEmpty {
+                    // Honest empty state only when there is genuinely nothing.
                     ContentUnavailableView(
-                        searched ? "No matches" : "Find a vehicle",
+                        searched ? "No matches" : "Nothing to show",
                         systemImage: searched ? "magnifyingglass" : "binoculars",
                         description: Text(searched
                             ? "Try a make, model, or year."
-                            : "Search the record — 18,000+ vehicles.")
+                            : "Pull to refresh the feed.")
                     )
                 } else {
-                    List(results) { v in
-                        Button { selected = v } label: { row(v) }
-                            .buttonStyle(.plain)
+                    ScrollView {
+                        LazyVGrid(columns: columns, spacing: 2) {
+                            ForEach(rows) { v in
+                                NavigationLink(value: v) { cell(v) }
+                                    .buttonStyle(.plain)
+                            }
+                        }
                     }
-                    .listStyle(.plain)
                 }
             }
             .navigationTitle("Explore")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, prompt: "Year, make, or model")
+            .navigationDestination(for: VehicleHeaderRow.self) { v in
+                // PUSH (back chevron) — this is what kills the Done-only dead-end.
+                VehicleDetailView(vehicleId: v.id.uuidString.lowercased(),
+                                  embedInNavigationStack: false)
+            }
+            .task { await loadFeed() }
             .task(id: query) {
                 let term = query.trimmingCharacters(in: .whitespaces)
                 guard term.count >= 2 else { results = []; searched = false; return }
@@ -49,54 +70,67 @@ struct ExploreView: View {
                 guard !Task.isCancelled else { return }
                 await search(term)
             }
-            .sheet(item: $selected) { v in
-                VehicleDetailView(vehicleId: v.id.uuidString.lowercased())
-            }
         }
     }
 
-    @ViewBuilder private func row(_ v: VehicleHeaderRow) -> some View {
-        HStack(spacing: 12) {
-            // Thumb via the render endpoint (contain — never crop portrait
-            // shots), small width; falls back to a flat plate, never a void.
-            let thumb = v.primary_image_url.flatMap(thumbURL)
-            Color(.secondarySystemFill)
-                .frame(width: 54, height: 54)
-                .overlay {
-                    AsyncImage(url: thumb) { img in
-                        img.resizable().scaledToFill()
-                    } placeholder: {
-                        Image(systemName: "car.side").foregroundStyle(.secondary)
-                    }
+    // ─── One square thumbnail cell — render-endpoint thumb, a flat plate +
+    // SF-symbol fallback, never a void.
+    @ViewBuilder private func cell(_ v: VehicleHeaderRow) -> some View {
+        Color(.secondarySystemFill)
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                AsyncImage(url: renderThumb(v.primary_image_url, width: 200)) { img in
+                    img.resizable().scaledToFill()
+                } placeholder: {
+                    Image(systemName: "car.side")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
                 }
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(v.title.isEmpty ? "VEHICLE" : v.title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
             }
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right")
-                .font(.caption).foregroundStyle(.tertiary)
+            .clipped()
+            .contentShape(Rectangle())
+    }
+
+    // ─── Render-endpoint thumbnail. Handles nested capture-relay paths AND
+    // external CDN urls (the render endpoint can't transcode those — use as-is).
+    private func renderThumb(_ raw: String?, width: Int) -> URL? {
+        guard let raw, !raw.isEmpty else { return nil }
+        if let r = raw.range(of: "/vehicle-photos/") {
+            let path = String(raw[r.upperBound...])
+            return URL(string: "\(Config.supabaseURL)/render/image/public/vehicle-photos/\(path)?width=\(width)&resize=contain")
         }
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
+        return URL(string: raw) // external CDN image: render endpoint can't transcode it, use as-is
     }
 
-    /// Small render-endpoint thumbnail (24KB vs multi-MB originals; contain so
-    /// portrait iPhone shots aren't mangled).
-    private func thumbURL(_ raw: String) -> URL? {
-        guard let path = raw.split(separator: "/").last else { return URL(string: raw) }
-        let rendered = "\(Config.supabaseURL)/render/image/public/vehicle-photos/\(path)?width=108&resize=contain"
-        return URL(string: rendered) ?? URL(string: raw)
+    // ─── Feed — public vehicles, newest first. Filter to photo-bearing rows in
+    // Swift (avoids a fragile not-null PostgREST filter); show ~60.
+    private func loadFeed() async {
+        guard feed.isEmpty else { return }
+        loadingFeed = true
+        defer { loadingFeed = false }
+        do {
+            let raw: [VehicleHeaderRow] = try await SupabaseService.client
+                .from("vehicles")
+                .select("id,year,make,model,trim,primary_image_url")
+                .eq("is_public", value: true)
+                .neq("status", value: "pending")
+                .order("created_at", ascending: false)
+                .limit(80)
+                .execute()
+                .value
+            feed = raw
+                .filter { ($0.primary_image_url?.isEmpty == false) }
+                .prefix(60)
+                .map { $0 }
+        } catch {
+            NSLog("NukeCapture explore feed failed: %@", String(describing: error))
+        }
     }
 
+    // ─── Search — existing behaviour, unchanged shape; results land in the grid.
     private func search(_ term: String) async {
-        loading = true
-        defer { loading = false }
+        searching = true
+        defer { searching = false }
         // Sanitize PostgREST filter metacharacters out of the user term.
         let t = term.replacingOccurrences(of: "*", with: "")
             .replacingOccurrences(of: ",", with: "")

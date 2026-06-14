@@ -95,6 +95,12 @@ enum Config {
     /// BGAppRefreshTask identifier — must match
     /// BGTaskSchedulerPermittedIdentifiers in project.yml.
     static let refreshTaskID = "ag.nuke.capture.refresh"
+    /// BGProcessingTask identifier for the backfill drain — must match
+    /// BGTaskSchedulerPermittedIdentifiers in project.yml.
+    static let backfillTaskID = "ag.nuke.capture.backfill"
+
+    /// Background backfill drain runs only on un-metered Wi-Fi (BGProcessingTaskRequest has no Wi-Fi-only flag; NetworkMonitor enforces it).
+    static let backfillRequiresWiFi = true
 
     /// "View on Nuke" deep link on the Today screen.
     static let profileURL = URL(string: "https://nuke.ag/profile")!
