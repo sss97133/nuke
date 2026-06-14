@@ -202,9 +202,12 @@ const UserRecentPhotos: React.FC<UserRecentPhotosProps> = ({ userId, isOwnProfil
         {images.map(img => {
           const rawUrl = img.thumbnail_url || img.image_url;
           if (!rawUrl) return null;
-          const src = failedIds.has(img.id)
-            ? (img.image_url || rawUrl)
-            : (optimizeImageUrl(rawUrl, 'thumbnail') || rawUrl);
+          // A failed render is hidden, never swapped for the raw original:
+          // the newest uploads are multi-MB HEIC that no browser can decode,
+          // so the old raw fallback turned a transient miss into a permanent
+          // broken + heavy image (audit P1a).
+          if (failedIds.has(img.id)) return null;
+          const src = optimizeImageUrl(rawUrl, 'thumbnail') || rawUrl;
           const day = journalDay(img);
           const thumb = (
             <img
