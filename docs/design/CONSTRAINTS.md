@@ -11,6 +11,22 @@ thinking.
 
 ---
 
+## C0 — THE PROVENANCE LAW (supersedes all; the real jig)
+
+*Ruled 2026-06-12 after a jig contaminated data — K5 photos under an R3500 header with
+a fabricated AI caption. The cardinal violation of the platform's load-bearing axiom.*
+
+**A design surface is held to the SAME data-integrity standard as production.** No
+mockup, wireframe, jig, or visual may contain fabricated, stand-in, or cross-associated
+data. Every value real and correctly associated to its entity, carrying its source.
+Never mix entities. Never invent an analysis/caption/count/relationship — if the
+analyst didn't produce it, it does not exist. Where data is absent, render the honest
+absence, never a placeholder value. **If you cannot wire it to real correctly-associated
+provenanced data, do not render it — improve the real product in place instead.** A
+free-floating mockup can only contaminate; the real app/site is already wired to real
+data, so improving it cannot. This is why design = developing what exists, not drawing
+new pictures. This law outranks every aesthetic constraint below it.
+
 ## C1 — Influence precedes interaction
 
 By the minute a person finds the App Store page, the convincing has already happened —
