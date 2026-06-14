@@ -1,0 +1,309 @@
+// IgnitionView.swift — the first-run sequence: scan → site confirm → done
+// (backfill starts automatically; the gauge + pause toggle in Today is the
+// consent surface).
+//
+// Styling doctrine (founder ruling, 2026-06-11): STOCK native iOS appearance
+// — system backgrounds, system type, default List/controls. The only custom
+// treatment is monospaced digits on data values. All effort goes into the
+// windows-into-data-flow: the counter ticking as the library is read, thumbs
+// landing in the grid as they're found, gauges appearing the moment their
+// data exists. Copy is instrument register: counts, names, timestamps,
+// one-word imperatives — the app reports, it never explains.
+//
+// Permission action tree — every button defines a data state, no path
+// undefined:
+//   Allow Full Access → full scan (ScanScreen)
+//   Limit Access      → scan the granted subset; the scope is a ledger fact
+//                       ("Scope · N granted") with Expand as a row; no nag
+//   Don't Allow       → truthful empty state, the one action that exists
+//                       (Settings) — DeniedScreen
+
+import Photos
+import PhotosUI
+import SwiftUI
+
+struct IgnitionView: View {
+    @ObservedObject private var engine = IgnitionEngine.shared
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                switch engine.phase {
+                case .off:
+                    // Pre-permission instant: blank system background; the
+                    // system dialog is the only voice here.
+                    Color(.systemGroupedBackground).ignoresSafeArea()
+                case .scanning:
+                    ScanScreen(engine: engine)
+                case .site:
+                    SiteScreen(engine: engine)
+                case .denied:
+                    DeniedScreen(engine: engine)
+                }
+            }
+            .navigationTitle("Nuke")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .task { await engine.start() }
+    }
+}
+
+// ─── Scan: the counter rips, the grid floods, the gauge reads 0 ─────────────
+
+private struct ScanScreen: View {
+    @ObservedObject var engine: IgnitionEngine
+    @ObservedObject private var sync = SyncEngine.shared
+
+    private var fraction: Double {
+        engine.totalToRead > 0
+            ? Double(engine.photosRead) / Double(engine.totalToRead) : 0
+    }
+
+    var body: some View {
+        List {
+            Section {
+                HStack(alignment: .firstTextBaseline) {
+                    // The counter — photos read off the library, live.
+                    Text("\(engine.photosRead)")
+                        .font(.system(size: 56, weight: .semibold))
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                        .animation(.linear(duration: 0.05), value: engine.photosRead)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                    Spacer()
+                    // The privacy proof: the real upload count, watched
+                    // while the read counter passes thousands.
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Uploaded")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text("\(sync.totalSynced)")
+                            .font(.title3.weight(.semibold))
+                            .monospacedDigit()
+                    }
+                }
+                .padding(.vertical, 4)
+
+                ProgressView(value: fraction)
+
+                // Gauges power on the moment their data exists.
+                if engine.gpsPhotosFound > 0 {
+                    LabeledContent("Located") {
+                        Text("\(engine.gpsPhotosFound)").monospacedDigit()
+                    }
+                }
+            }
+
+            if engine.limitedScope {
+                ScopeSection(grantedCount: engine.totalToRead)
+            }
+
+            if !engine.floodAssetIDs.isEmpty {
+                Section {
+                    FloodGrid(assetIDs: engine.floodAssetIDs)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                }
+            }
+        }
+    }
+}
+
+/// Limited-access scope, reported as fact. One Expand row — the system
+/// limited-library picker — and nothing else. Never a nag.
+private struct ScopeSection: View {
+    let grantedCount: Int
+
+    var body: some View {
+        Section {
+            LabeledContent("Scope") {
+                Text("\(grantedCount) granted").monospacedDigit()
+            }
+            Button("Expand…") {
+                presentLimitedLibraryPicker()
+            }
+        }
+    }
+
+    private func presentLimitedLibraryPicker() {
+        guard let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene }).first,
+              let root = scene.keyWindow?.rootViewController
+        else { return }
+        PHPhotoLibrary.shared().presentLimitedLibraryPicker(from: root)
+    }
+}
+
+// ─── Site: the cluster reported, the cursor handed over ─────────────────────
+
+private struct SiteScreen: View {
+    @ObservedObject var engine: IgnitionEngine
+
+    var body: some View {
+        if let cand = engine.currentCandidate {
+            List {
+                Section {
+                    LabeledContent("Photos") {
+                        Text("\(cand.photoCount)").monospacedDigit()
+                    }
+                    LabeledContent("Days") {
+                        Text("\(cand.dayCount)").monospacedDigit()
+                    }
+                    LabeledContent("Years") {
+                        Text(cand.yearRange).monospacedDigit()
+                    }
+                    LabeledContent("Center") {
+                        Text(String(format: "%.4f, %.4f", cand.centerLat, cand.centerLon))
+                            .monospacedDigit()
+                    }
+                    LabeledContent("Radius") {
+                        Text("\(Int(cand.radiusMeters * 3.28084)) ft").monospacedDigit()
+                    }
+                } header: {
+                    Text(engine.candidates.count == 1
+                         ? "One site"
+                         : String(format: "Site %02d of %02d",
+                                  engine.candidateIndex + 1, engine.candidates.count))
+                }
+
+                // One-tap decision — no naming field (the name defaults to
+                // SITE NN; renaming is optional, later, in Account). The
+                // founder-rejected text gate stays gone.
+                Section {
+                    LabeledContent(String(format: "SITE %02d", engine.siteOrdinal)) {
+                        Text("This site only")
+                    }
+                }
+
+                Section {
+                    FloodGrid(assetIDs: cand.assets.suffix(8).map(\.id))
+                        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                }
+
+                Section {
+                    Button {
+                        engine.confirmCurrentSite()
+                    } label: {
+                        Text("That's my shop")
+                            .frame(maxWidth: .infinity)
+                            .fontWeight(.semibold)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+
+                    Button {
+                        engine.rejectCurrentSite()
+                    } label: {
+                        Text("Not mine")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                }
+            }
+        }
+    }
+}
+
+// ─── Denied: the truthful empty state ────────────────────────────────────────
+
+private struct DeniedScreen: View {
+    @ObservedObject var engine: IgnitionEngine
+    @Environment(\.scenePhase) private var scenePhase
+
+    var body: some View {
+        List {
+            Section {
+                LabeledContent("Photos") {
+                    Text("Off")
+                }
+            }
+            Section {
+                Button("Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Back from Settings → re-check; if access now exists, ignite.
+            if phase == .active {
+                Task { await engine.retryAfterSettings() }
+            }
+        }
+    }
+}
+
+// ─── Shared pieces ───────────────────────────────────────────────────────────
+
+/// Square thumbnail grid fed by PHCachingImageManager — photos land here as
+/// the scan finds them.
+struct FloodGrid: View {
+    let assetIDs: [String]
+    var columns: Int = 4
+
+    var body: some View {
+        LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: columns),
+            spacing: 2
+        ) {
+            ForEach(assetIDs, id: \.self) { id in
+                IgnitionThumb(assetID: id)
+            }
+        }
+    }
+}
+
+/// One square local thumbnail. Never hits the network — ignition reads the
+/// library, it does not spend data.
+struct IgnitionThumb: View {
+    let assetID: String
+    @State private var image: UIImage?
+
+    var body: some View {
+        Color(.secondarySystemFill)
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                }
+            }
+            .clipped()
+            .task(id: assetID) {
+                image = await ThumbLoader.load(assetID)
+            }
+    }
+}
+
+/// Shared PHCachingImageManager front. deliveryMode .highQualityFormat ⇒
+/// exactly one callback, so the continuation cannot double-resume.
+enum ThumbLoader {
+    private static let manager = PHCachingImageManager()
+
+    static func load(_ identifier: String, side: CGFloat = 200) async -> UIImage? {
+        let fetch = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil)
+        guard let asset = fetch.firstObject else { return nil }
+
+        let options = PHImageRequestOptions()
+        options.deliveryMode = .highQualityFormat
+        options.resizeMode = .fast
+        options.isNetworkAccessAllowed = false
+
+        return await withCheckedContinuation { continuation in
+            manager.requestImage(
+                for: asset,
+                targetSize: CGSize(width: side, height: side),
+                contentMode: .aspectFill,
+                options: options
+            ) { image, _ in
+                continuation.resume(returning: image)
+            }
+        }
+    }
+}
+

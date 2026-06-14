@@ -41,6 +41,34 @@ final class SyncEngine: ObservableObject {
     /// PHAsset.localIdentifier of recent uploads, newest first — the Today
     /// screen renders local thumbnails from these (no network round-trip).
     @Published private(set) var recentUploadIDs: [String]
+    /// Ignition backfill queue depth — TodayView shows this as a ledger row
+    /// while the queue drains. 0 = no backfill in flight.
+    @Published private(set) var backfillRemaining = 0
+    /// The pause toggle (Today tab) — the consent surface now that backfill
+    /// starts automatically after site confirm. Paused = nothing uploads:
+    /// sync() refuses to run and the backfill loop stops between assets
+    /// (the persisted queue keeps the remainder for resume).
+    @Published private(set) var isPaused: Bool
+    /// Count of the user's capture photos that have been vision-analyzed
+    /// server-side. Fetched via get_user_analyzed_count RPC after each sync.
+    /// This is the SAME predicate the "Analyzed" drill (get_user_analyzed_photos)
+    /// uses — source='capture_relay_ios' AND ai_processing_status='analyzed' —
+    /// so the count on the gauge and the photos behind it always agree.
+    @Published var analyzedCount: Int = 0
+    /// The user's REAL server record (not this device's local counters) —
+    /// total_images is the full library (~22K), not just what this phone
+    /// uploaded. Fetched via get_user_capture_stats. THE web-parity fix:
+    /// TodayView headline numbers must read this, never the UserDefaults
+    /// counters (see docs/design/WEB_PARITY.md).
+    @Published var serverStats: CaptureStats = .zero
+
+    struct CaptureStats: Decodable {
+        let total_images: Int
+        let uploaded_today: Int
+        let analyzed: Int
+        let contribution_days: Int
+        static let zero = CaptureStats(total_images: 0, uploaded_today: 0, analyzed: 0, contribution_days: 0)
+    }
 
     // ─── Persistence (UserDefaults) ──────────────────────────────────────────
     // UserDefaults use is declared in PrivacyInfo.xcprivacy (required-reason
@@ -55,6 +83,8 @@ final class SyncEngine: ObservableObject {
         static let todayKey = "uploadsTodayKey"         // iOS: "yyyy-MM-dd" the count belongs to
         static let todayCount = "uploadsTodayCount"     // iOS: uploads on that day
         static let recentUploads = "recentUploadIDs"    // iOS: [String] asset identifiers
+        static let paused = "syncPaused"                // Bool — the Today pause toggle
+        static let backfillQueue = "backfillQueue"      // [String] asset ids still owed
     }
 
     /// Dedupe set: "filename|size" of everything already uploaded. Ordered
@@ -71,6 +101,8 @@ final class SyncEngine: ObservableObject {
         seenSet = defaults.stringArray(forKey: Key.seenSet) ?? []
         lastSyncDate = defaults.object(forKey: Key.lastSyncDate) as? Date
         recentUploadIDs = defaults.stringArray(forKey: Key.recentUploads) ?? []
+        isPaused = defaults.bool(forKey: Key.paused)
+        backfillRemaining = (defaults.stringArray(forKey: Key.backfillQueue) ?? []).count
         // Day-scoped counter: only valid if it was written today.
         if defaults.string(forKey: Key.todayKey) == Self.dayKey(for: Date()) {
             uploadsToday = defaults.integer(forKey: Key.todayCount)
@@ -107,6 +139,23 @@ final class SyncEngine: ObservableObject {
         changeObserver = observer
 
         await sync()
+        // A backfill interrupted by an app kill (or a pause) left its queue
+        // persisted — pick it back up.
+        await resumeBackfillIfNeeded()
+        await refreshAnalyzedCount()
+        // Pull server sites (F5 — survive fresh installs)
+        await SiteStore.shared.fetchAndMergeServerSites()
+    }
+
+    /// The Today tab's pause toggle. Pausing stops the backfill loop between
+    /// assets (queue stays persisted) and blocks sync passes; resuming
+    /// restarts the drain immediately.
+    func setPaused(_ paused: Bool) {
+        isPaused = paused
+        defaults.set(paused, forKey: Key.paused)
+        if !paused {
+            Task { await self.resumeBackfillIfNeeded(); await self.sync() }
+        }
     }
 
     /// Debounce: library changes arrive in bursts (iCloud import storms);
@@ -120,6 +169,35 @@ final class SyncEngine: ObservableObject {
         }
     }
 
+    // ─── Analyzed count (vision pipeline) ───────────────────────────────────
+
+    /// Fetch the count of this user's capture photos that have been
+    /// vision-analyzed. Fast + capture-scoped (get_user_analyzed_count is a
+    /// sargable count over source='capture_relay_ios'); never the all-sources
+    /// aggregate that times out on heavy libraries. No-op when not signed in.
+    /// Silent on error — the metric is informational, never an error banner.
+    func refreshAnalyzedCount() async {
+        guard let userId = SupabaseService.currentUserId else {
+            serverStats = .zero
+            analyzedCount = 0
+            return
+        }
+        do {
+            // get_user_capture_stats returns the user's REAL record in one row:
+            // total_images / uploaded_today / analyzed / contribution_days.
+            // PostgREST wraps the single-row table function in a JSON array.
+            let response = try await SupabaseService.client
+                .rpc("get_user_capture_stats", params: ["p_user_id": userId])
+                .execute()
+            if let stats = try? JSONDecoder().decode([CaptureStats].self, from: response.data).first {
+                serverStats = stats
+                analyzedCount = stats.analyzed
+            }
+        } catch {
+            NSLog("NukeCapture: refreshAnalyzedCount failed: %@", String(describing: error))
+        }
+    }
+
     // ─── The sync pass ───────────────────────────────────────────────────────
 
     /// One full pass. Returns true when the pass completed with zero
@@ -127,7 +205,7 @@ final class SyncEngine: ObservableObject {
     /// setTaskCompleted(success:)).
     @discardableResult
     func sync() async -> Bool {
-        guard !isSyncing, !authorizationDenied else { return false }
+        guard !isSyncing, !authorizationDenied, !isPaused else { return false }
         guard let userId = SupabaseService.currentUserId else {
             lastError = "Not signed in"
             return false
@@ -175,10 +253,15 @@ final class SyncEngine: ObservableObject {
             // watermark below only advances on failures == 0.
             if Task.isCancelled { failed += 1; break }
 
-            // ── Gate 1 (privacy, on-device): GPS shop-gate ──
+            // ── Gate 1 (privacy, on-device): GPS site-gate + ownership check ──
+            // Confirmed ignition sites; falls back to the hardcoded
+            // Config.shopLocations when none are confirmed (migration).
+            // sourceType + mediaSubtypes filter: only user-originated, non-screenshot images.
             guard let loc = asset.location,
-                  Config.isAtShop(latitude: loc.coordinate.latitude,
-                                  longitude: loc.coordinate.longitude) else {
+                  SiteStore.shared.isAtSite(latitude: loc.coordinate.latitude,
+                                            longitude: loc.coordinate.longitude),
+                  asset.sourceType == .typeUserLibrary,
+                  !asset.mediaSubtypes.contains(.photoScreenshot) else {
                 skipped += 1
                 continue
             }
@@ -192,16 +275,26 @@ final class SyncEngine: ObservableObject {
                 // at shop-photo sizes (3–10 MB).
                 let data = try await Self.requestOriginalData(for: asset)
 
+                // ── Gate 2 (ownership): require Apple camera EXIF ──
+                // iMessage-received photos have EXIF stripped → make == nil.
+                // Screenshots are pre-filtered above but double-gated here.
+                let (cameraMake, cameraModel) = CameraEXIF.cameraInfo(from: data)
+                guard cameraMake == "Apple" else { skipped += 1; continue }
+
                 // ── Dedupe: (filename, size) seen-set ──
                 let key = "\(filename)|\(data.count)"
                 if seenSet.contains(key) { deduped += 1; continue }
 
+                let sourceTypeLabel = Self.sourceTypeLabel(for: asset)
                 let meta = PhotoMeta(
                     assetIdentifier: asset.localIdentifier,
                     filename: filename,
                     creationDate: asset.creationDate,
                     latitude: asset.location?.coordinate.latitude,
-                    longitude: asset.location?.coordinate.longitude
+                    longitude: asset.location?.coordinate.longitude,
+                    cameraMake: cameraMake,
+                    cameraModel: cameraModel,
+                    sourceType: sourceTypeLabel
                 )
                 try await SupabaseService.uploadPhoto(data: data, meta: meta, userId: userId)
 
@@ -225,11 +318,237 @@ final class SyncEngine: ObservableObject {
 
         NSLog("NukeCapture sync: %d uploaded, %d off-shop skipped, %d deduped, %d failed",
               uploaded, skipped, deduped, failed)
+        await refreshAnalyzedCount()
         return failed == 0
     }
 
     private func advanceWatermark(to date: Date, failures: Int) {
         if failures == 0 { defaults.set(date, forKey: Key.watermark) }
+    }
+
+    /// True when a sync watermark already exists — i.e. this install ran the
+    /// pre-ignition app. NukeCaptureApp uses it to skip ignition for
+    /// existing users (their gate stays the hardcoded shop list).
+    static var hasExistingWatermark: Bool {
+        UserDefaults.standard.object(forKey: Key.watermark) != nil
+    }
+
+    /// Ignition sets the steady-state starting line: everything before the
+    /// scan moment belongs to the backfill, everything after to sync().
+    /// Never moves an existing watermark backward or forward.
+    func setInitialWatermark(_ date: Date) {
+        if defaults.object(forKey: Key.watermark) == nil {
+            defaults.set(date, forKey: Key.watermark)
+        }
+    }
+
+    /// Re-arm ignition: drop the sync watermark (so hasExistingWatermark goes
+    /// false and NukeCaptureApp re-pushes IgnitionView) and clear any
+    /// in-flight backfill queue. The "ignitionComplete" flag is cleared by
+    /// the caller (AccountView). Keeps the seen-set so a re-ignition doesn't
+    /// re-upload everything; the server's dedupe tolerance covers the rest.
+    func resetForReignition() {
+        defaults.removeObject(forKey: Key.watermark)
+        defaults.removeObject(forKey: Key.backfillQueue)
+        backfillRemaining = 0
+    }
+
+    // ─── Ignition backfill ───────────────────────────────────────────────────
+    //
+    // Starts AUTOMATICALLY after site confirmation (founder ruling: the
+    // "UPLOAD N" button gate is gone; consent = the live gauge + the pause
+    // toggle in Today). Uploads the given assets (oldest first) through the
+    // SAME per-asset path as sync() — site-gate, original bytes,
+    // (filename,size) dedupe, vehicle_images row — in capped batches so
+    // memory stays flat and the UI breathes between batches.
+    //
+    // The queue PERSISTS (Key.backfillQueue): an app kill or a pause mid-
+    // drain loses nothing — start()/setPaused(false) resume the remainder.
+    //
+    // Cap note: a multi-thousand-photo backfill overflows the seen-set cap
+    // (Config.seenSetCap = 1000); long-tail dedupe is then carried by the
+    // server side (storage "already exists" + row duplicate tolerance),
+    // same as the Mac relay re-run story.
+
+    func backfill(assetIdentifiers: [String]) async {
+        guard !assetIdentifiers.isEmpty else { return }
+        defaults.set(assetIdentifiers, forKey: Key.backfillQueue)
+        backfillRemaining = assetIdentifiers.count
+        await drainBackfill()
+    }
+
+    /// Resume a persisted queue (after relaunch or un-pause). No-op when
+    /// the queue is empty.
+    func resumeBackfillIfNeeded() async {
+        let queue = defaults.stringArray(forKey: Key.backfillQueue) ?? []
+        guard !queue.isEmpty else { return }
+        backfillRemaining = queue.count
+        await drainBackfill()
+    }
+
+    private func drainBackfill() async {
+        guard !isSyncing, !isPaused else { return }
+        guard let userId = SupabaseService.currentUserId else {
+            lastError = "Not signed in"
+            return
+        }
+        isSyncing = true
+        lastError = nil
+        defer {
+            isSyncing = false
+            lastSyncDate = Date()
+            defaults.set(lastSyncDate, forKey: Key.lastSyncDate)
+        }
+
+        var uploaded = 0, skipped = 0, deduped = 0, failed = 0
+
+        while true {
+            var queue = defaults.stringArray(forKey: Key.backfillQueue) ?? []
+            guard !queue.isEmpty else { break }
+            if Task.isCancelled || isPaused { return }   // queue stays persisted
+
+            let slice = Array(queue.prefix(Config.backfillBatchSize))
+
+            let fetch = PHAsset.fetchAssets(withLocalIdentifiers: slice, options: nil)
+            var assets: [PHAsset] = []
+            fetch.enumerateObjects { asset, _, _ in assets.append(asset) }
+            // fetchAssets(withLocalIdentifiers:) does not guarantee order —
+            // restore oldest-first inside the batch.
+            assets.sort { ($0.creationDate ?? .distantPast) < ($1.creationDate ?? .distantPast) }
+
+            for asset in assets {
+                if Task.isCancelled || isPaused { return }
+
+                // Same gate as sync() — backfill candidates came from
+                // confirmed clusters, but the gate is the gate.
+                // sourceType + mediaSubtypes mirror the sync pass filter.
+                guard let loc = asset.location,
+                      SiteStore.shared.isAtSite(latitude: loc.coordinate.latitude,
+                                                longitude: loc.coordinate.longitude),
+                      asset.sourceType == .typeUserLibrary,
+                      !asset.mediaSubtypes.contains(.photoScreenshot) else {
+                    skipped += 1
+                    continue
+                }
+
+                let filename = Self.originalFilename(for: asset)
+                do {
+                    let data = try await Self.requestOriginalData(for: asset)
+
+                    // Gate 2: require Apple camera EXIF (same as sync pass).
+                    let (cameraMake, cameraModel) = CameraEXIF.cameraInfo(from: data)
+                    guard cameraMake == "Apple" else { skipped += 1; continue }
+
+                    let key = "\(filename)|\(data.count)"
+                    if seenSet.contains(key) {
+                        deduped += 1
+                        continue
+                    }
+                    let sourceTypeLabel = Self.sourceTypeLabel(for: asset)
+                    let meta = PhotoMeta(
+                        assetIdentifier: asset.localIdentifier,
+                        filename: filename,
+                        creationDate: asset.creationDate,
+                        latitude: asset.location?.coordinate.latitude,
+                        longitude: asset.location?.coordinate.longitude,
+                        cameraMake: cameraMake,
+                        cameraModel: cameraModel,
+                        sourceType: sourceTypeLabel
+                    )
+                    try await SupabaseService.uploadPhoto(data: data, meta: meta, userId: userId)
+                    markSeen(key)
+                    recordUpload(assetIdentifier: asset.localIdentifier)
+                    uploaded += 1
+                    totalSynced += 1
+                    defaults.set(totalSynced, forKey: Key.totalSynced)
+                } catch {
+                    failed += 1
+                    lastError = "\(filename): \(error.localizedDescription)"
+                }
+            }
+
+            // The whole slice is settled (uploaded / skipped / deduped /
+            // failed-and-reported) — drop it from the persisted queue.
+            // Identifiers that no longer resolve to assets fall out here too.
+            queue.removeFirst(min(slice.count, queue.count))
+            defaults.set(queue, forKey: Key.backfillQueue)
+            backfillRemaining = queue.count
+            await Task.yield()
+        }
+
+        NSLog("NukeCapture backfill: %d uploaded, %d off-site skipped, %d deduped, %d failed",
+              uploaded, skipped, deduped, failed)
+    }
+
+    // ─── Unified background drain (BUG #1: ingest with the screen off) ───────
+    //
+    // The BGProcessingTask's one job. Three defects this fixes, in order:
+    //   (a) sync() now runs in the background too — new on-site photos taken
+    //       after ignition upload without the app ever being foregrounded.
+    //   (b) the Wi-Fi gate (requireWiFi) — a BGProcessingTaskRequest can only
+    //       demand "any network", so cellular drains are blocked HERE via
+    //       NetworkMonitor before a single byte moves.
+    //   (c) the caller reschedules whenever this returns false or leaves the
+    //       backfill queue non-empty.
+    //
+    // This reads LOCAL Photos and uploads them — it must NEVER re-download
+    // already-uploaded images from Supabase storage. It does NOT duplicate the
+    // per-asset path: it composes the existing sync() (steady-state, advances
+    // the watermark only on a clean pass) and drainBackfill() (historical
+    // queue) organs, both of which carry the same privacy/ownership gates.
+    //
+    // Loop shape: one sync() pass picks up post-ignition on-site photos, then
+    // drainBackfill() empties the historical queue. We re-loop ONLY while real
+    // progress is being made AND the backfill queue is still non-empty, capped
+    // at a few iterations so a stuck queue (failing assets) can't spin. Any of
+    // {cancelled, paused, link going metered} bails immediately — the persisted
+    // queue keeps the remainder for the next scheduled run.
+    @discardableResult
+    func drainUntilEmpty(requireWiFi: Bool) async -> Bool {
+        // (b) Wi-Fi gate — refuse to drain on a metered link; caller reschedules.
+        if requireWiFi && !NetworkMonitor.shared.isUnmetered { return false }
+        guard !isPaused else { return false }
+        guard SupabaseService.currentUserId != nil else {
+            lastError = "Not signed in"
+            return false
+        }
+
+        // Hard cap so a queue that can't drain (every asset failing) can't spin.
+        let maxIterations = 5
+        var iteration = 0
+
+        while iteration < maxIterations {
+            iteration += 1
+
+            // Bail conditions re-checked each iteration: cancellation, the pause
+            // toggle, and the link slipping off Wi-Fi mid-drain.
+            if Task.isCancelled || isPaused { return false }
+            if requireWiFi && !NetworkMonitor.shared.isUnmetered { return false }
+
+            let before = backfillRemaining
+
+            // (a) Steady-state pass — new on-site photos since the watermark.
+            // sync() upholds the silent-failure law itself (watermark only
+            // advances on failures == 0), so we don't touch the watermark here.
+            let syncClean = await sync()
+
+            // Historical queue — drains in batches, persists the remainder.
+            await drainBackfill()
+
+            // Done when the queue is empty.
+            if backfillRemaining == 0 {
+                // Fully drained only counts as success if the sync pass that ran
+                // alongside it was also clean (no failed uploads to retry).
+                return syncClean
+            }
+
+            // Re-loop only if the backfill queue actually shrank — otherwise we
+            // are wedged (failing/unresolvable assets) and looping won't help.
+            if backfillRemaining >= before { return false }
+        }
+
+        // Hit the iteration cap with work still owed — caller reschedules.
+        return false
     }
 
     private func markSeen(_ key: String) {
@@ -269,6 +588,16 @@ final class SyncEngine: ObservableObject {
     }
 
     // ─── PhotoKit plumbing (identical to Mac) ────────────────────────────────
+
+    /// Human-readable label for PHAsset.sourceType (stored in exif_data).
+    static func sourceTypeLabel(for asset: PHAsset) -> String {
+        switch asset.sourceType {
+        case .typeUserLibrary:  return "user_library"
+        case .typeCloudShared:  return "cloud_shared"
+        case .typeiTunesSynced: return "itunes_synced"
+        default:                return "unknown"
+        }
+    }
 
     /// Original filename (IMG_1234.HEIC) from the asset's resources.
     static func originalFilename(for asset: PHAsset) -> String {

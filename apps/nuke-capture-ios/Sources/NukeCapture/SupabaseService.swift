@@ -11,6 +11,8 @@
 // platforms is KeychainLocalStorage — sign in once, the session lives in the
 // device Keychain and auto-refreshes.
 
+import AuthenticationServices
+import CryptoKit
 import Foundation
 import Supabase
 
@@ -31,12 +33,17 @@ struct VehicleImageRow: Encodable {
     let latitude: Double?
     let longitude: Double?
     let taken_at: String?               // asset.creationDate, ISO-8601
+    let file_hash: String?              // SHA-256 hex of the uploaded bytes
     let exif_data: ExifData
 
     struct ExifData: Encodable {
         let uuid: String                // PHAsset.localIdentifier
         let original_filename: String
         let synced_by: String           // 'capture-relay-ios'
+        let camera_make: String?        // TIFF Make (nil = stripped/foreign)
+        let camera_model: String?       // TIFF Model
+        let source_type: String         // PHAsset.sourceType description
+        let owner_verified: Bool        // true when camera_make == "Apple"
     }
 }
 
@@ -47,6 +54,9 @@ struct PhotoMeta {
     let creationDate: Date?
     let latitude: Double?
     let longitude: Double?
+    let cameraMake: String?             // from TIFF EXIF
+    let cameraModel: String?
+    let sourceType: String              // PHAsset.sourceType description
 }
 
 enum SupabaseService {
@@ -71,6 +81,43 @@ enum SupabaseService {
 
     static func signIn(email: String, password: String) async throws {
         try await client.auth.signIn(email: email, password: password)
+    }
+
+    /// Create a new account with email/password. Sign-in IS sign-up on the
+    /// server (a handle_new_user() trigger auto-creates the profile on first
+    /// auth), so the client only needs to call signUp — no separate
+    /// profile-creation step. Depending on the Supabase project's email-
+    /// confirmation setting, the user may be signed in immediately (confirm
+    /// disabled) or must confirm via email first; SessionStore observes the
+    /// auth change either way.
+    static func signUp(email: String, password: String) async throws {
+        try await client.auth.signUp(email: email, password: password)
+    }
+
+    // ─── Third-party OAuth (Google, GitHub) ──────────────────────────────────
+    //
+    // supabase-swift's signInWithOAuth(provider:redirectTo:configure:) drives
+    // an ASWebAuthenticationSession to the provider's consent page and back
+    // through the redirect URL, then exchanges the result for a session (PKCE
+    // flow). Both providers are gated behind Config flags (default OFF) until
+    // the corresponding Supabase auth provider is enabled and
+    // Config.oauthRedirectURL is in the project's redirect allow-list — see
+    // the Config flag docs for the full runtime dependency.
+
+    /// Sign in with Google via the hosted OAuth consent flow.
+    static func signInWithGoogle() async throws {
+        try await client.auth.signInWithOAuth(
+            provider: .google,
+            redirectTo: Config.oauthRedirectURL
+        )
+    }
+
+    /// Sign in with GitHub via the hosted OAuth consent flow.
+    static func signInWithGitHub() async throws {
+        try await client.auth.signInWithOAuth(
+            provider: .github,
+            redirectTo: Config.oauthRedirectURL
+        )
     }
 
     /// Sign in with Apple — exchanges the ASAuthorizationAppleIDCredential's
@@ -117,6 +164,65 @@ enum SupabaseService {
         try await client.auth.signOut()
     }
 
+    // ─── Confirmed sites → prod user_sites (owner-ALL RLS) ───────────────────
+    //
+    // Ignition's confirmed sites sync to public.user_sites so the user's
+    // grants are visible server-side. The device-local SiteStore stays the
+    // cache and the actual upload gate; this write failing never blocks the
+    // flow (logged, retried implicitly next ignition — the table tolerates
+    // re-inserts, rows are owner-scoped).
+
+    private struct UserSiteRow: Encodable {
+        let user_id: String
+        let name: String
+        let lat: Double
+        let lon: Double
+        let radius_m: Int
+        let source: String
+        let confirmed_at: String
+    }
+
+    /// Fetch the signed-in user's confirmed sites from the server.
+    /// RLS scopes the SELECT to the current user — no explicit user_id filter needed.
+    /// Returns [] on error (caller merges into local store silently).
+    static func fetchUserSites() async -> [Site] {
+        do {
+            struct ServerSiteRow: Decodable {
+                let name: String
+                let lat: Double
+                let lon: Double
+                let radius_m: Int
+            }
+            let rows: [ServerSiteRow] = try await client
+                .from("user_sites")
+                .select("name, lat, lon, radius_m")
+                .execute()
+                .value
+            return rows.map { Site(name: $0.name, latitude: $0.lat, longitude: $0.lon, radiusMeters: Double($0.radius_m)) }
+        } catch {
+            NSLog("NukeCapture: fetchUserSites failed: %@", String(describing: error))
+            return []
+        }
+    }
+
+    static func pushUserSite(_ site: Site) async {
+        guard let userId = currentUserId else { return }   // explore/debug: no JWT, no row
+        let row = UserSiteRow(
+            user_id: userId,
+            name: site.name,
+            lat: site.latitude,
+            lon: site.longitude,
+            radius_m: Int(site.radiusMeters.rounded()),
+            source: "ignition",
+            confirmed_at: isoFormatter.string(from: Date())
+        )
+        do {
+            try await client.from("user_sites").insert(row).execute()
+        } catch {
+            NSLog("NukeCapture: user_sites insert failed: %@", String(describing: error))
+        }
+    }
+
     // ─── Upload + insert (one photo) ─────────────────────────────────────────
 
     private static let isoFormatter: ISO8601DateFormatter = {
@@ -157,6 +263,10 @@ enum SupabaseService {
             .from(Config.storageBucket)
             .getPublicURL(path: path)
 
+        // SHA-256 of the uploaded bytes — lowercase hex string.
+        let hashBytes = SHA256.hash(data: data)
+        let fileHash = hashBytes.map { String(format: "%02x", $0) }.joined()
+
         let row = VehicleImageRow(
             image_url: publicURL.absoluteString,
             storage_path: path,
@@ -171,10 +281,15 @@ enum SupabaseService {
             latitude: meta.latitude,
             longitude: meta.longitude,
             taken_at: meta.creationDate.map { isoFormatter.string(from: $0) },
+            file_hash: fileHash,
             exif_data: .init(
                 uuid: meta.assetIdentifier,
                 original_filename: meta.filename,
-                synced_by: Config.syncedByTag
+                synced_by: Config.syncedByTag,
+                camera_make: meta.cameraMake,
+                camera_model: meta.cameraModel,
+                source_type: meta.sourceType,
+                owner_verified: meta.cameraMake == "Apple"
             )
         )
 
