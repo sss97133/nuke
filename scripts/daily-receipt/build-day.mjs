@@ -17,6 +17,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { synthesizeDay } from './synthesize-day.mjs';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -158,6 +159,25 @@ const day_value = labor_value + parts_value + ENABLEMENT + RISK_CARRY - OPPORTUN
 // `total_job_cost` in DB stores the cost-side (labor + parts), not the unlock-value
 const laborCost = Math.round(labor_value * 100) / 100;
 
+// 2c. Look up the vehicle label + prior synthesized arcs (context for the day-synthesis
+// pass — atoms only, no image download). Prior arcs let synthesis place THIS day in the
+// build progression (teardown → condition survey → active job → final assembly).
+const { data: vehRow } = await supabase
+  .from('vehicles').select('year, make, model').eq('id', VEHICLE_ID).maybeSingle();
+const vehicleLabel = vehRow ? `${vehRow.year ?? ''} ${vehRow.make ?? ''} ${vehRow.model ?? ''}`.trim() : null;
+const { data: priorRows } = await supabase
+  .from('work_sessions')
+  .select('session_date, title, work_description, metadata')
+  .eq('vehicle_id', VEHICLE_ID)
+  .lt('session_date', DATE)
+  .order('session_date', { ascending: true });
+const priorArcs = (priorRows || [])
+  .filter((r) => r.metadata?.synthesis || r.work_description)
+  .slice(-12)
+  .map((r) => ({ date: r.session_date, title: r.title,
+                 verdict: r.metadata?.synthesis?.day_verdict || null,
+                 arc: r.metadata?.synthesis?.build_arc_placement || null }));
+
 // 3. Build the day's work_description — each frame's best narrative, in order.
 // Prefer the legacy/human caption; fall back to the BYOK deep-analysis
 // narrative_one_line (the detective's per-frame read), then agent_notes, so
@@ -179,28 +199,68 @@ const summary = photos
   .join(' | ')
   .slice(0, 1000);
 
+// 3a. DAY SYNTHESIS — the genetic-flaw fix. Concatenating per-frame sensor readings
+// (the `summary` above) is NOT analysis. ONE model pass reads the whole day's frames as
+// a TIME-ORDERED SET (their byok atoms + time order + build context + prior arcs) and
+// produces ONE coherent day picture: what was accomplished, the progression, who/what/
+// where/why, worth. Per-frame atoms become drill-down evidence, not the product. Atoms
+// only — no image download, no vision re-call; cheap to re-run as context grows.
+// The $410 guard is intact: synthesis DESCRIBES labor, never prices it; cost stays
+// owner-gated below. The old `summary` concatenation survives ONLY as model raw-material
+// + a metadata.synthesis.raw_concat fallback input — never the stored product.
+let synth = { ok: false };
+try {
+  synth = await synthesizeDay({
+    photos, byok, frameNarrative, laborFrames, intentCounts, dominantIntent, opCounts,
+    spanMinutes, laborMinutes, DATE, VEHICLE_ID, priorArcs, vehicleLabel,
+  });
+} catch (e) {
+  console.error(`day-synthesis error (falling back to concatenation): ${e.message}`);
+}
+if (synth.ok) {
+  console.log(`[synthesis] one-pass day picture: "${synth.title}" (${synth.work_type})`);
+} else {
+  console.error(`[synthesis] unavailable (${synth.reason || 'unknown'}) — work_description falls back to raw concatenation.`);
+}
+
+// CLI overrides still win when explicitly passed; otherwise prefer the SYNTHESIS, then
+// the per-frame-dominance computed values, then the raw concatenation. work_description
+// is the synthesized day_narrative when available — NOT the join() of captions.
+const finalTitle = (TITLE !== 'Shop work') ? TITLE : (synth.ok && synth.title) ? synth.title : computedTitle;
+const finalWorkType = (WORK_TYPE !== 'general') ? WORK_TYPE : (synth.ok && synth.work_type) ? synth.work_type : computedWorkType;
+const finalDescription = (synth.ok && synth.work_description) ? synth.work_description : summary;
+
 // 4. Upsert work_session row
 const sessionRow = {
   vehicle_id: VEHICLE_ID,
   user_id: '0b9f107a-d124-49de-9ded-94698f63c1c4',
   session_date: DATE,
-  title: (TITLE === 'Shop work') ? computedTitle : TITLE,
+  title: finalTitle,
   start_time: startTime,
   end_time: endTime,
   duration_minutes: laborMinutes,
-  work_type: (WORK_TYPE === 'general') ? computedWorkType : WORK_TYPE,
-  work_description: summary,
+  work_type: finalWorkType,
+  work_description: finalDescription,   // synthesized day_narrative (was the join() concatenation)
   status: 'completed',
   total_parts_cost: Number(parts_value.toFixed(2)),
   total_labor_cost: Number(laborCost.toFixed(2)),
   total_job_cost: Number((laborCost + parts_value).toFixed(2)),
   image_count: photos.length,
 };
+// metadata.synthesis — the full day picture (progression, w5, worth-reasoning, frame-id→
+// evidence map). Lands in work_sessions.metadata (jsonb), already read by the RPCs' shape-
+// agnostic select. SUPERSESSION: re-synthesis overwrites metadata.synthesis but the
+// owner-confirmed cost gate (total_job_cost / owner_confirmed_at / owner_confirmed_by)
+// is never touched here.
+if (synth.ok && synth.metadata) {
+  sessionRow.metadata = synth.metadata;
+}
 
-// Check if exists
+// Check if exists (pull metadata + cost gate so re-synthesis SUPERSEDES the description
+// without clobbering owner-confirmed value — the $410 guard at the row level).
 const { data: existing } = await supabase
   .from('work_sessions')
-  .select('id')
+  .select('id, metadata, owner_confirmed_at, owner_confirmed_by, total_job_cost')
   .eq('vehicle_id', VEHICLE_ID)
   .eq('session_date', DATE)
   .limit(1);
@@ -208,15 +268,41 @@ const { data: existing } = await supabase
 let sessionId;
 if (existing && existing.length > 0) {
   sessionId = existing[0].id;
-  const upd = await supabase.from('work_sessions').update(sessionRow).eq('id', sessionId);
+  const prior = existing[0];
+  // SUPERSESSION: overwrite work_description/title/work_type and metadata.synthesis on
+  // the existing row; MERGE metadata (preserve any non-synthesis keys); latest synthesis
+  // IS truth — no append, no version pile-up (metadata.synthesis.synthesized_at stamps it).
+  const updateRow = { ...sessionRow };
+  if (sessionRow.metadata) {
+    updateRow.metadata = { ...(prior.metadata || {}), ...sessionRow.metadata };
+  }
+  // Owner-confirmed value SURVIVES re-synthesis untouched. If the owner has confirmed
+  // this day's cost, never let the recomputed cost-side stomp the signed ledger value.
+  if (prior.owner_confirmed_at || prior.owner_confirmed_by) {
+    delete updateRow.total_job_cost;
+    delete updateRow.total_labor_cost;
+    delete updateRow.total_parts_cost;
+  }
+  const upd = await supabase.from('work_sessions').update(updateRow).eq('id', sessionId);
   if (upd.error) { console.error('update:', upd.error.message); process.exit(3); }
-  console.log(`[update] work_session ${sessionId} for ${DATE}`);
+  console.log(`[update] work_session ${sessionId} for ${DATE}${(prior.owner_confirmed_at || prior.owner_confirmed_by) ? ' (owner-confirmed cost preserved)' : ''}`);
 } else {
   const ins = await supabase.from('work_sessions').insert(sessionRow).select('id').single();
   if (ins.error) { console.error('insert:', ins.error.message); process.exit(3); }
   sessionId = ins.data.id;
   console.log(`[insert] work_session ${sessionId} for ${DATE}`);
 }
+
+// 4c. Refresh the lead/hero. primary_image_url must DERIVE from the latest
+// analyzed exterior owner photo, never a stored field that drifts (Skylar's rule:
+// a restoration is in flux; a years-old hero is "an absolute nightmare"). Now that
+// this vehicle has fresh analyzed frames rolled up, recompute its lead so a new
+// upload updates the profile instead of showing the years-old hero. Best-effort.
+try {
+  const { error: rcErr } = await supabase.rpc('recompute_vehicle_primary_image', { p_vehicle_id: VEHICLE_ID });
+  if (rcErr) console.error(`[lead] recompute skipped: ${rcErr.message}`);
+  else console.log(`[lead] primary_image_url recomputed for ${VEHICLE_ID}`);
+} catch (e) { console.error(`[lead] recompute error: ${e.message}`); }
 
 // 5. Call get_daily_work_receipt to verify the receipt now materializes
 const rpcResp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_daily_work_receipt`, {
