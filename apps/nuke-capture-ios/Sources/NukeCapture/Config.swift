@@ -102,9 +102,6 @@ enum Config {
     /// Background backfill drain runs only on un-metered Wi-Fi (BGProcessingTaskRequest has no Wi-Fi-only flag; NetworkMonitor enforces it).
     static let backfillRequiresWiFi = true
 
-    /// "View on Nuke" deep link on the Today screen.
-    static let profileURL = URL(string: "https://nuke.ag/profile")!
-
     /// How many recently-uploaded asset identifiers to keep for the Today
     /// screen's thumbnail strip.
     static let recentUploadsCap = 24
