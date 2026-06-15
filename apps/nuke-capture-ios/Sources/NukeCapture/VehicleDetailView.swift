@@ -100,6 +100,7 @@ struct VehicleDetailView: View {
 
     @State private var vehicle: VehicleHeaderRow?
     @State private var specs: [VehicleSpec] = []   // get_vehicle_specs: fact vs facade
+    @State private var valuation: VehicleValuation?  // get_vehicle_valuation: comp-based estimate + basis
     @State private var imageTotal: Int?            // true photo count (not the fetched cap)
     @State private var images: [VehicleGalleryImage] = []
     @State private var relationship: VehicleRelationship?   // ASSET window (owner-scoped)
@@ -142,6 +143,7 @@ struct VehicleDetailView: View {
         }
         .task(id: vehicleId) { await load() }
         .task(id: vehicleId) { await loadSpecs() }
+        .task(id: vehicleId) { await loadValuation() }
         .sheet(item: $provenanceDrill) { drill in
             FieldProvenanceSheet(vehicleId: vehicleId, drill: drill)
         }
@@ -194,6 +196,7 @@ struct VehicleDetailView: View {
                 titleBlock
                 assetWindow          // ASSET: his relationship/provenance
                 specTable            // TECHNICAL
+                valuationSection     // MARKET (comp-based estimate, basis on the surface)
                 photoStrip           // CONTENT (each photo → its analysis)
                 if vehicle != nil {
                     InvestmentProofView(vehicleId: vehicleId)   // COMMODITY
@@ -209,9 +212,24 @@ struct VehicleDetailView: View {
     // raw object url: measured, that was a 2.9 MB decode on the main thread per
     // appear. width=1000 keeps it crisp full-bleed at ~60 KB. Full-res lives
     // only in the full-screen gallery (tap the hero to get there).
+    /// The hero's backing image ROW (not just a url) so the lead can drill into
+    /// the data that made it — its analysis cascade — and carry its date (decay).
+    /// Prefer the primary image, else the one matching primary_image_url, else newest.
+    private var heroImage: VehicleGalleryImage? {
+        images.first { $0.is_primary == true }
+            ?? images.first { $0.image_url == vehicle?.primary_image_url }
+            ?? images.first
+    }
+
     @ViewBuilder private var hero: some View {
         if let urlStr = vehicle?.primary_image_url {
-            Button { galleryOpen = true } label: {
+            let h = heroImage
+            // Tap drills into THIS image's cascade (its analysis/atoms), not a flat
+            // gallery — the lead image is a window into the data that made it. The
+            // full set is still one tap away via "View all" in the photo strip.
+            Button {
+                if let h { selectedPhoto = h } else { galleryOpen = true }
+            } label: {
                 CachedAsyncImage(url: NukeImage.thumb(urlStr, width: 1000)) { image in
                     image.resizable().scaledToFill()
                 } placeholder: {
@@ -220,9 +238,21 @@ struct VehicleDetailView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 240)
                 .clipped()
+                .overlay(alignment: .bottomLeading) {
+                    // Decay: when this view of the asset was actually true. A lead
+                    // image is a decaying node, honest only when it carries its date.
+                    if let at = h?.taken_at, !at.isEmpty {
+                        Text(String(at.prefix(10)))
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6).padding(.vertical, 3)
+                            .background(.black.opacity(0.4), in: Capsule())
+                            .padding(8)
+                    }
+                }
                 .overlay(alignment: .bottomTrailing) {
-                    // A quiet affordance that the hero opens the full set.
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    // Affordance that the lead drills to its data (not just zoom).
+                    Image(systemName: "rectangle.and.text.magnifyingglass")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.white)
                         .padding(6)
@@ -361,6 +391,47 @@ struct VehicleDetailView: View {
     }
 
     private var locationRow: String? { vehicle.flatMap { location($0) } }
+
+    // ─── Market estimate — the comp-based model value with its BASIS on the
+    // surface (the pencil microline), never a bare number. Labeled "est" because
+    // it's modeled, not a fact; flagged stale when the run is old; renders nothing
+    // when the asset was never modeled (honest blank, not a facade).
+    @ViewBuilder private var valuationSection: some View {
+        if let v = valuation, let val = v.value, val > 0 {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("MARKET ESTIMATE")
+                    .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(money0(val))
+                        .font(.title3.weight(.semibold)).monospacedDigit()
+                        .foregroundStyle(.primary)
+                    Text("est").font(.caption2).foregroundStyle(.secondary)
+                    if v.is_stale == true {
+                        Text("· stale").font(.caption2).foregroundStyle(.orange)
+                    }
+                }
+                Text(valuationBasis(v))
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.bottom, 16)
+        }
+    }
+
+    private func valuationBasis(_ v: VehicleValuation) -> String {
+        var parts: [String] = []
+        if let lo = v.value_low, let hi = v.value_high { parts.append("range \(money0(lo))–\(money0(hi))") }
+        if let n = v.comp_count, n > 0 { parts.append("\(n) comps") }
+        if let c = v.confidence { parts.append("\(c)% confident") }
+        if let at = v.calculated_at { parts.append("modeled \(String(at.prefix(10)))") }
+        return parts.isEmpty ? "modeled estimate" : parts.joined(separator: " · ")
+    }
+
+    private func money0(_ v: Double) -> String {
+        v.formatted(.currency(code: "USD").precision(.fractionLength(0)))
+    }
 
     /// One spec row. A rooted FACT drills to its source (ink + chevron); a facade
     /// renders dimmed + "unverified" and is NOT tappable — an empty/false drill is
@@ -563,6 +634,18 @@ struct VehicleDetailView: View {
             #endif
         } catch {
             NSLog("NukeCapture specs load failed: %@", String(describing: error))
+        }
+    }
+
+    /// Load the comp-based market estimate + its basis. Null when unmodeled.
+    private func loadValuation() async {
+        do {
+            valuation = try await SupabaseService.client
+                .rpc("get_vehicle_valuation", params: ["p_vehicle_id": vehicleId])
+                .execute()
+                .value
+        } catch {
+            NSLog("NukeCapture valuation load failed: %@", String(describing: error))
         }
     }
 
@@ -1075,6 +1158,19 @@ struct VehicleSpec: Decodable, Identifiable {
     let inline_source: String?
     let evidence_count: Int?
     var id: String { field }
+}
+
+/// get_vehicle_valuation — the comp-based market estimate + the basis it leaned on.
+struct VehicleValuation: Decodable {
+    let value: Double?
+    let value_low: Double?
+    let value_high: Double?
+    let confidence: Int?
+    let comp_count: Int?
+    let is_stale: Bool?
+    let calculated_at: String?
+    let price_tier: String?
+    let model_version: String?
 }
 
 /// get_field_provenance(vehicle, field) → one jsonb object. Every piece optional
