@@ -305,9 +305,7 @@ struct ProfileView: View {
             DayReceiptView(userId: userId, date: day.day)
                 .presentationDetents([.medium, .large])
         }
-        .sheet(item: $openVehicle) { v in
-            VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: true)
-        }
+        // (openVehicle sheet moved onto garageSection — avoids two .sheet on one view)
         .task(id: userId) { await load() }
         .task(id: userId) { await loadSync() }   // owner-only inside loadSync
         .task(id: userId) { await loadGarage() }
@@ -340,7 +338,9 @@ struct ProfileView: View {
                         }
                         Spacer()
                         if let val = v.current_value, val > 0 {
-                            Text(val, format: .currency(code: "USD").precision(.fractionLength(0)))
+                            // It's a modeled comp-estimate (rooted in nuke_estimates),
+                            // not a fact — label it so it never reads as a firm price.
+                            Text("est \(val.formatted(.currency(code: "USD").precision(.fractionLength(0))))")
                                 .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                         }
                         Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
@@ -349,6 +349,12 @@ struct ProfileView: View {
             }
         } header: {
             Text("Garage · \(garage.count)")
+        }
+        // Vehicle sheet lives HERE (on the garage section), NOT stacked as a second
+        // .sheet on the same List as the day-receipt sheet — two .sheet(item:) on one
+        // view is the SwiftUI pitfall where the second silently fails to present.
+        .sheet(item: $openVehicle) { v in
+            VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: true)
         }
     }
 
@@ -875,6 +881,7 @@ private struct PhotoFullScreenView: View {
     }
 
     private func confirm(_ intent: String) {
+        let previous = confirmedIntent
         confirmedIntent = intent       // optimistic — rail flips to confirmed
         Task {
             do {
@@ -883,6 +890,9 @@ private struct PhotoFullScreenView: View {
                          params: ["p_image_id": photo.id.uuidString, "p_intent": intent])
                     .execute()
             } catch {
+                // Roll the optimistic flip back so the rail doesn't lie about a
+                // confirmation that never landed (no silent success).
+                confirmedIntent = previous
                 NSLog("NukeCapture confirm intent failed: %@", String(describing: error))
             }
         }
