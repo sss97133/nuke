@@ -234,13 +234,15 @@ private struct UnderstandingPanel: View {
 
     private func fetch() async {
         do {
-            let rows: [UserUnderstanding] = try await SupabaseService.client
+            // get_user_understanding RETURNS jsonb (scalar) — PostgREST returns a
+            // bare OBJECT body ({"latest":[...]}), NOT an array. Decoding
+            // [UserUnderstanding] (the old code) silently failed every time, so the
+            // panel was stuck on "Reading the record…" forever. Decode the object.
+            let row: UserUnderstanding = try await SupabaseService.client
                 .rpc("get_user_understanding", params: ["p_user_id": userId])
                 .execute()
                 .value
-            if let row = rows.first {
-                withAnimation(.easeInOut(duration: 0.4)) { u = row }
-            }
+            withAnimation(.easeInOut(duration: 0.4)) { u = row }
         } catch {
             NSLog("NukeCapture understanding fetch failed: %@", String(describing: error))
         }
@@ -259,12 +261,45 @@ private struct UnderstandingPanel: View {
 private struct LiveMetricsStrip: View {
     @ObservedObject var engine: SyncEngine
 
+    /// Honest ETA — only a measured rate produces a time; otherwise "estimating…"
+    /// rather than an invented number (C4: every number real).
+    static func etaLine(remaining: Int, perMinute: Double) -> String {
+        guard perMinute > 0 else {
+            return "Uploading \(remaining) from this device… (estimating…)"
+        }
+        let mins = Double(remaining) / perMinute
+        let eta: String
+        if mins < 1 {
+            eta = "<1 min left"
+        } else if mins < 60 {
+            eta = "~\(Int(mins.rounded())) min left"
+        } else {
+            let h = Int(mins / 60)
+            let m = Int(mins.truncatingRemainder(dividingBy: 60).rounded())
+            eta = "~\(h)h \(m)m left"
+        }
+        return "Uploading \(remaining) from this device… \(eta)"
+    }
+
     var body: some View {
         VStack(spacing: 14) {
-            // THE REAL RECORD — server truth (get_user_capture_stats), not
-            // this device's local counters. IMAGES is the full ~22K library.
+            // THE FUNNEL — the owner's own library, organized (C2). LIBRARY is
+            // the whole on-device count from the ignition scan (e.g. 76K);
+            // RELEVANT is the confirmed at-site set. Shown once ignition has
+            // measured them. RUNS ON: IgnitionEngine.scan.
+            if engine.libraryTotal > 0 {
+                HStack(spacing: 0) {
+                    MetricCell(label: "LIBRARY", value: "\(engine.libraryTotal)")
+                    Divider().frame(height: 44)
+                    MetricCell(label: "RELEVANT", value: "\(engine.relevantTotal)")
+                }
+            }
+
+            // THE REAL RECORD — server truth (get_user_capture_stats). UPLOADED
+            // is what has reached the record; ANALYZED is what the engine has
+            // understood. RUNS ON: get_user_capture_stats.
             HStack(spacing: 0) {
-                MetricCell(label: "IMAGES", value: "\(engine.serverStats.total_images)")
+                MetricCell(label: "UPLOADED", value: "\(engine.serverStats.total_images)")
                 Divider().frame(height: 44)
                 // ANALYZED drills into the analyzed photos + their atoms.
                 if engine.serverStats.analyzed > 0 {
@@ -289,10 +324,11 @@ private struct LiveMetricsStrip: View {
                 MetricCell(label: "TODAY", value: "\(engine.serverStats.uploaded_today)")
             }
 
-            // The local drain — this device's upload queue, honestly labeled
-            // (not a headline number). Only while backfill is in flight.
+            // The local drain — this device's upload queue with an HONEST ETA
+            // from the measured rate (C4: "estimating…" until a real rate exists).
             if engine.backfillRemaining > 0 {
-                Text("Uploading \(engine.backfillRemaining) from this device…")
+                Text(Self.etaLine(remaining: engine.backfillRemaining,
+                                  perMinute: engine.uploadsPerMinute))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)

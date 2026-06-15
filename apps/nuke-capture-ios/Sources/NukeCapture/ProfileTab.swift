@@ -615,14 +615,22 @@ struct DayReceiptView: View {
 
     private func load() async {
         do {
-            // get_user_day_receipt returns JSONB (scalar). PostgREST wraps scalar
-            // function results in an array — decode [DayReceipt] and take .first.
-            let rows: [DayReceipt] = try await SupabaseService.client
+            // get_user_day_receipt RETURNS jsonb (scalar). PostgREST returns it as a
+            // BARE OBJECT ({...}), not array-wrapped (proven over the wire for the
+            // sibling get_user_understanding) — the old [DayReceipt].first decode
+            // silently failed. Decode the raw bytes tolerantly: object first, then
+            // array-wrapped, so neither shape can ever silently break the receipt.
+            let raw = try await SupabaseService.client
                 .rpc("get_user_day_receipt",
                      params: ["p_user_id": userId, "p_date": date])
                 .execute()
-                .value
-            receipt = rows.first
+                .data
+            let dec = JSONDecoder()
+            if let one = try? dec.decode(DayReceipt.self, from: raw) {
+                receipt = one
+            } else {
+                receipt = try dec.decode([DayReceipt].self, from: raw).first
+            }
         } catch {
             loadError = "Load failed"
             NSLog("NukeCapture day receipt failed: %@", String(describing: error))
