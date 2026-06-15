@@ -26,34 +26,11 @@ struct VehicleHeaderRow: Decodable, Identifiable, Hashable {
     let model: String?
     let trim: String?
     let primary_image_url: String?
-
-    // Spec columns (all optional — render only what exists, never a lone "—").
-    let vin: String?
-    let mileage: Int?
-    let transmission: String?
-    let drivetrain: String?
-    let body_style: String?
-    let color: String?
-    let interior_color: String?
-    let engine_type: String?
-    let fuel_type: String?
+    // Location only — the spec values + their provenance now come from
+    // get_vehicle_specs (rooted fact-vs-facade), NOT from this row. The header
+    // fetch carries just the title parts, the hero, and the location.
     let city: String?
     let state: String?
-    let price: Double?
-    let sale_price: Double?
-    let nuke_estimate: Double?
-    let description: String?
-
-    // Inline provenance — the {field}_source columns. Non-null here means the
-    // value drills to a real source row (get_field_provenance), so the spec row
-    // gets a tap affordance; null means the value stays honest dead text (the
-    // three-shelf law / click-through-ready rule — an empty drill is worse than
-    // no drill). Only the fields that carry a _source column on vehicles.
-    let vin_source: String?
-    let mileage_source: String?
-    let transmission_source: String?
-    let engine_source: String?
-    let color_source: String?
 
     /// "YEAR MAKE MODEL TRIM" — only the parts that exist, never a lone "—".
     var title: String {
@@ -467,12 +444,6 @@ struct VehicleDetailView: View {
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
-    private func hasAnySpec(_ v: VehicleHeaderRow) -> Bool {
-        let strings = [v.vin, v.transmission, v.drivetrain, v.body_style, v.color,
-                       v.interior_color, v.engine_type, v.fuel_type, location(v)]
-        return v.mileage != nil || strings.contains { ($0?.isEmpty == false) }
-    }
-
     // ─── Photos strip — render-endpoint thumbs (200px); tap opens full-screen
     // gallery using the original image_url at full size.
     @ViewBuilder private var photoStrip: some View {
@@ -537,7 +508,7 @@ struct VehicleDetailView: View {
             // One select covers header + spec table.
             let rows: [VehicleHeaderRow] = try await SupabaseService.client
                 .from("vehicles")
-                .select("id,year,make,model,trim,vin,mileage,transmission,drivetrain,body_style,color,interior_color,engine_type,fuel_type,city,state,price,sale_price,nuke_estimate,primary_image_url,description,vin_source,mileage_source,transmission_source,engine_source,color_source")
+                .select("id,year,make,model,trim,city,state,primary_image_url")
                 .eq("id", value: vehicleId)
                 .limit(1)
                 .execute()
@@ -1072,15 +1043,6 @@ private struct AttestContributionView: View {
 // source opens to that source — the inline source string, how sure, the SOURCE
 // PHOTO (e.g. the door-jamb VIN plate), and the observations that recorded it.
 // Nothing renders here that the data didn't call into existence.
-
-/// One spec-table row, built from the vehicle row.
-struct SpecItem: Identifiable {
-    let label: String
-    let value: String?
-    let field: String?     // get_field_provenance key; nil = never drillable
-    let source: String?    // inline {field}_source; non-nil = drills to a source
-    var id: String { label }
-}
 
 /// A tapped spec value awaiting its provenance sheet.
 struct SpecDrill: Identifiable {
