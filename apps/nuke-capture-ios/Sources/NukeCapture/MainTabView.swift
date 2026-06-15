@@ -11,7 +11,8 @@
 //
 // MAP is cut from 1.0 — a directory of strangers diluted the story. It
 // returns in Build 2 as the pulse map, a window onto analysis
-// (BUILD_2_SCOPE.md §5). MapTab.swift stays in the target for that return.
+// (BUILD_2_SCOPE.md §5). MapTab.swift was REMOVED (dead-shipping, unreachable);
+// recover it from git when Build 2 actually needs it.
 //
 // Explore mode (signed out): sample Profile, read-only. Sign In lives in
 // the Profile toolbar so not-signing-in is never a dead end and the way

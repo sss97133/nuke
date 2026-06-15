@@ -18,7 +18,6 @@ struct ExploreView: View {
     @State private var feed: [VehicleHeaderRow] = []
     @State private var results: [VehicleHeaderRow] = []
     @State private var loadingFeed = false
-    @State private var searching = false
     @State private var searched = false
 
     // 3-column square grid, 2pt gutters — the Instagram wall.
@@ -118,8 +117,6 @@ struct ExploreView: View {
 
     // ─── Search — existing behaviour, unchanged shape; results land in the grid.
     private func search(_ term: String) async {
-        searching = true
-        defer { searching = false }
         // Sanitize PostgREST filter metacharacters out of the user term.
         let t = term.replacingOccurrences(of: "*", with: "")
             .replacingOccurrences(of: ",", with: "")
