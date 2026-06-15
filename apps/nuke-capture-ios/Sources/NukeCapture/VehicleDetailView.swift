@@ -748,6 +748,7 @@ struct LedgerDrill: Identifiable {
 struct InvestmentProofView: View {
     let vehicleId: String
     @State private var proof: InvestmentProof?
+    @State private var loadFailed = false
     @State private var showAttest = false
     @State private var ledgerDrill: LedgerDrill?   // a cell tapped for its rows
 
@@ -876,6 +877,15 @@ struct InvestmentProofView: View {
                 .sheet(item: $ledgerDrill) { drill in
                     LedgerEvidenceSheet(drill: drill) { Task { await load() } }
                 }
+            } else if loadFailed {
+                // Don't vanish silently after the retries failed — say so + offer retry.
+                HStack(spacing: 8) {
+                    Text("INVESTMENT")
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Retry") { Task { await load() } }.font(.caption)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 10)
             }
         }
         .task(id: vehicleId) { await load() }
@@ -930,9 +940,11 @@ struct InvestmentProofView: View {
                     .rpc("compute_vehicle_investment_proof", params: ["p_vehicle_id": vehicleId])
                     .execute()
                     .value
+                loadFailed = false
                 break
             } catch {
                 NSLog("NukeCapture investment proof attempt %d failed: %@", attempt, String(describing: error))
+                loadFailed = (proof == nil)   // surface only if we still have nothing
                 try? await Task.sleep(nanoseconds: 800_000_000)
             }
         }
@@ -1323,8 +1335,9 @@ private struct LedgerEvidenceSheet: View {
     var onChanged: () -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @State private var confirmed: Set<UUID> = []   // optimistic local promotion
+    @State private var confirmed: Set<UUID> = []   // promoted (post-success)
     @State private var working: UUID?
+    @State private var failed: Set<UUID> = []      // RPC failed — surface, don't swallow
 
     private func money(_ v: Double?) -> String {
         guard let v else { return "—" }
@@ -1397,6 +1410,13 @@ private struct LedgerEvidenceSheet: View {
                     .labelStyle(.titleAndIcon).font(.caption2).foregroundStyle(.green)
             } else if working == r.id {
                 ProgressView()
+            } else if failed.contains(r.id) {
+                // The RPC failed — say so and let them retry, never silently nothing.
+                Button { Task { await confirm(r.id) } } label: {
+                    Label("Retry", systemImage: "exclamationmark.arrow.circlepath")
+                        .font(.caption2)
+                }
+                .buttonStyle(.bordered).controlSize(.small).tint(.red)
             } else {
                 Button("Confirm") { Task { await confirm(r.id) } }
                     .buttonStyle(.borderedProminent).controlSize(.small)
@@ -1412,9 +1432,11 @@ private struct LedgerEvidenceSheet: View {
             _ = try await SupabaseService.client
                 .rpc("confirm_work_session", params: P(p_session_id: id.uuidString, p_confirm: true))
                 .execute()
-            confirmed.insert(id)   // optimistic flip
+            failed.remove(id)
+            confirmed.insert(id)   // promote only after the server accepted it
             onChanged()            // parent re-rolls the proof
         } catch {
+            failed.insert(id)      // surface it — the row shows Retry, not silence
             NSLog("NukeCapture confirm_work_session failed: %@", String(describing: error))
         }
     }

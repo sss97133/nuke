@@ -18,6 +18,7 @@ struct ExploreView: View {
     @State private var feed: [VehicleHeaderRow] = []
     @State private var results: [VehicleHeaderRow] = []
     @State private var loadingFeed = false
+    @State private var feedError = false
     @State private var searched = false
 
     // 3-column square grid, 2pt gutters — the Instagram wall.
@@ -33,8 +34,17 @@ struct ExploreView: View {
             Group {
                 if loadingFeed && feed.isEmpty && !searched {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if feedError && feed.isEmpty && !searched {
+                    // The load timed out / failed — NEVER an endless spinner.
+                    ContentUnavailableView {
+                        Label("Couldn't load Explore", systemImage: "wifi.exclamationmark")
+                    } description: {
+                        Text("Check your connection.")
+                    } actions: {
+                        Button("Retry") { Task { await loadFeed(force: true) } }
+                            .buttonStyle(.borderedProminent)
+                    }
                 } else if rows.isEmpty {
-                    // Honest empty state only when there is genuinely nothing.
                     ContentUnavailableView(
                         searched ? "No matches" : "Nothing to show",
                         systemImage: searched ? "magnifyingglass" : "binoculars",
@@ -51,6 +61,7 @@ struct ExploreView: View {
                             }
                         }
                     }
+                    .refreshable { await loadFeed(force: true) }
                 }
             }
             .navigationTitle("Explore")
@@ -90,28 +101,48 @@ struct ExploreView: View {
             .contentShape(Rectangle())
     }
 
-    // ─── Feed — public vehicles, newest first. Filter to photo-bearing rows in
-    // Swift (avoids a fragile not-null PostgREST filter); show ~60.
-    private func loadFeed() async {
-        guard feed.isEmpty else { return }
+    // ─── Feed — public vehicles, newest first, photo-bearing. A 12s timeout
+    // races the fetch so a stalled client request can NEVER leave a dead
+    // spinner (the failure mode Skylar caught): timeout → error state + Retry.
+    private func loadFeed(force: Bool = false) async {
+        guard force || feed.isEmpty else { return }
         loadingFeed = true
+        feedError = false
         defer { loadingFeed = false }
         do {
-            let raw: [VehicleHeaderRow] = try await SupabaseService.client
-                .from("vehicles")
-                .select("id,year,make,model,trim,primary_image_url")
-                .eq("is_public", value: true)
-                .neq("status", value: "pending")
-                .order("created_at", ascending: false)
-                .limit(80)
-                .execute()
-                .value
+            let raw: [VehicleHeaderRow] = try await withTimeout(seconds: 12) {
+                try await SupabaseService.client
+                    .from("vehicles")
+                    .select("id,year,make,model,trim,primary_image_url")
+                    .eq("is_public", value: true)
+                    .neq("status", value: "pending")
+                    .order("created_at", ascending: false)
+                    .limit(80)
+                    .execute()
+                    .value
+            }
             feed = raw
                 .filter { ($0.primary_image_url?.isEmpty == false) }
                 .prefix(60)
                 .map { $0 }
         } catch {
+            feedError = true
             NSLog("NukeCapture explore feed failed: %@", String(describing: error))
+        }
+    }
+
+    /// Race async work against a timeout — first to finish wins; the loser is
+    /// cancelled. Converts a stalled network call into a recoverable error.
+    private func withTimeout<T: Sendable>(seconds: Double,
+                                          _ work: @escaping @Sendable () async throws -> T) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await work() }
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw CancellationError()
+            }
+            defer { group.cancelAll() }
+            return try await group.next()!
         }
     }
 
