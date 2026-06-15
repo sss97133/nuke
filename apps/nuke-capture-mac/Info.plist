@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>ag.nuke.capture-relay</string>
+	<key>CFBundleName</key>
+	<string>NukeCapture</string>
+	<key>CFBundleDisplayName</key>
+	<string>Nuke Capture</string>
+	<key>CFBundleExecutable</key>
+	<string>NukeCapture</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<!-- Menu-bar only: no Dock icon, no app switcher entry. -->
+	<key>LSUIElement</key>
+	<true/>
+	<!-- The ONE permission this app exists to hold persistently. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Nuke uploads your shop photos to your own Nuke account. Only photos taken at your registered work locations are synced.</string>
+</dict>
+</plist>

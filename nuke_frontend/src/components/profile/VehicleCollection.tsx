@@ -18,15 +18,53 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
   const loadVehicles = async () => {
     try {
       setLoading(true);
-      
-      // Check both user_id and uploaded_by for vehicle ownership
+
+      // OWNED / BUILT only — the C0-correct ownership signal (founder teardown
+      // PROFILE_BUILD_ORDER 2026-06-13, item 8 "the ONE thing I wanna see").
+      //
+      // The old query (user_id ∪ uploaded_by ∪ owner_id) returned ~330 rows —
+      // mostly scraped Craigslist listings and a truck he SOLD (the 1983 K2500
+      // sits here as a `contributor` row). Showing those as "his" is the cardinal
+      // sin he named ("I'm not the verified owner of the K2500 … I sold that
+      // fucking truck"). owner_id is set by ingestion, not ownership.
+      //
+      // Truth comes from two gated rungs:
+      //   1. active owner/co_owner permissions  (vehicle_user_permissions)
+      //   2. approved title verifications        (ownership_verifications)
+      // The `contributor` role is deliberately EXCLUDED — it's the scraped/touched
+      // noise bucket (it even contains the sold K2500), so it fails the
+      // built/owned confidence test.
+      const [permRes, titleRes] = await Promise.all([
+        supabase
+          .from('vehicle_user_permissions')
+          .select('vehicle_id')
+          .eq('user_id', userId)
+          .is('revoked_at', null)
+          .in('role', ['owner', 'co_owner']),
+        supabase
+          .from('ownership_verifications')
+          .select('vehicle_id')
+          .eq('user_id', userId)
+          .eq('status', 'approved'),
+      ]);
+
+      const ownedIds = Array.from(new Set([
+        ...((permRes.data || []).map((r: any) => r.vehicle_id)),
+        ...((titleRes.data || []).map((r: any) => r.vehicle_id)),
+      ].filter(Boolean)));
+
+      if (ownedIds.length === 0) {
+        setVehicles([]);
+        return;
+      }
+
       let query = supabase
         .from('vehicles')
         .select(`
           *,
           vehicle_images(image_url, is_primary)
         `)
-        .or(`user_id.eq.${userId},uploaded_by.eq.${userId},owner_id.eq.${userId}`);
+        .in('id', ownedIds);
 
       // For public profiles, only show public vehicles
       if (!isOwnProfile) {
@@ -34,7 +72,7 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
       }
 
       const { data, error } = await query
-        .order('created_at', { ascending: false })
+        .order('year', { ascending: false })
         .limit(50);
 
       if (error) throw error;

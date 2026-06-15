@@ -117,16 +117,20 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
             .order('ended_at', { ascending: false })
             .limit(100)
         : EMPTY,
-      // Comments — EXCLUDE bids
-      identityIds.length > 0
-        ? supabase
-            .from('auction_comments')
-            .select(`*, auction:auction_events(*, ${VEHICLE_EMBED})`)
-            .in('author_external_identity_id', identityIds)
-            .is('bid_amount', null)
-            .order('posted_at', { ascending: false })
-            .limit(100)
-        : EMPTY,
+      // Comments — the user's PLATFORM comments (their own comments on Nuke
+      // vehicles/images/timeline), NOT BaT auction comments. The header
+      // "COMMENTS" headline was previously fed by auction_comments (BaT only,
+      // via external identity) — that number is already surfaced, correctly
+      // scoped, inside UserBatTrackRecord's "COMMENTS (n)" door, so reusing it
+      // here both double-counted and mislabeled it as platform activity. The
+      // canonical platform-comment table is user_comments (superset of the
+      // legacy vehicle_comments). vehicle embed populates the door's link.
+      supabase
+        .from('user_comments')
+        .select(`*, ${VEHICLE_EMBED}`)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(100),
       // Auction wins
       identityIds.length > 0
         ? supabase
@@ -148,7 +152,15 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
 
   const listings = listingsRes.data;
   const batBids = batBidsRes.data;
-  const auctionComments = auctionCommentsRes.data;
+  // Platform comments from user_comments. Normalize the shape so the existing
+  // header COMMENTS door (reads c.comment_text, c.posted_at, c.auction?.vehicle)
+  // renders unchanged: alias created_at→posted_at and lift the embedded vehicle
+  // under `auction.vehicle`.
+  const platformComments = (auctionCommentsRes.data || []).map((c: any) => ({
+    ...c,
+    posted_at: c.created_at,
+    auction: { vehicle: c.vehicle },
+  }));
   const auctionWins = auctionWinsRes.data;
   const profileStatsRow = (profileStatsRes as any)?.data ?? null;
 
@@ -159,7 +171,7 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
   const stats: ProfileStats = {
     total_listings: listings?.length ?? 0,
     total_bids: batBids?.length ?? 0,
-    total_comments: auctionComments?.length ?? 0,
+    total_comments: platformComments.length,
     total_auction_wins: auctionWins?.length ?? 0,
     total_success_stories: 0, // success_stories table does not exist in prod
     member_since: profile.member_since || profile.created_at,
@@ -174,7 +186,7 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     stats,
     listings: listings || [],
     bids: batBids || [],
-    comments: auctionComments || [],
+    comments: platformComments,
     auction_wins: auctionWins || [],
     success_stories: [],
     comments_of_note: [],

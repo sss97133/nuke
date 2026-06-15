@@ -29,7 +29,7 @@ export async function resolveVehicleImages(vehicleId: string): Promise<ResolvedI
   try {
     const rows = await fetchVehicleImages<any>(
       vehicleId,
-      'id, image_url, thumbnail_url, medium_url, storage_path, is_primary, is_document, is_duplicate, image_vehicle_match_status, position, created_at',
+      'id, image_url, thumbnail_url, medium_url, storage_path, is_primary, is_document, is_duplicate, image_vehicle_match_status, position, created_at, taken_at, source',
       { includeMismatchFilter: true },
     );
     if (!rows || rows.length === 0) return empty;
@@ -49,9 +49,24 @@ export async function resolveVehicleImages(vehicleId: string): Promise<ResolvedI
 
     const urls = filtered.map((r: any) => String(r.image_url));
 
-    // Lead image: use primary if it exists and passed filters, otherwise first image
+    // Lead image — platform rule: the restoration lead is the LATEST photo
+    // from an owner-trust source (the vehicle as it is today), not a stale
+    // curated pick. Fall back to is_primary, then first row.
+    const OWNER_TRUST_SOURCES = new Set([
+      'user_upload', 'owner_upload', 'owner', 'iphoto', 'ssd_blast', 'hd_archive',
+    ]);
+    const ts = (r: any): number => {
+      const t = Date.parse(r?.taken_at || r?.created_at || '');
+      return Number.isFinite(t) ? t : 0;
+    };
+    const ownerRows = filtered.filter((r: any) => OWNER_TRUST_SOURCES.has(String(r?.source || '')));
+    const latestOwnerRow = ownerRows.length > 0
+      ? ownerRows.reduce((a: any, b: any) => (ts(b) > ts(a) ? b : a))
+      : null;
     const primaryRow = filtered.find((r: any) => r?.is_primary === true);
-    const leadUrl = primaryRow ? String(primaryRow.image_url) : urls[0];
+    const leadUrl = latestOwnerRow ? String(latestOwnerRow.image_url)
+      : primaryRow ? String(primaryRow.image_url)
+      : urls[0];
 
     return { urls, leadUrl };
   } catch (err) {

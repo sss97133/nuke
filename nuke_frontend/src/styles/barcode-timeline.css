@@ -58,6 +58,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.12em;
+  white-space: nowrap; /* 0.12em tracking made "TIMELINE" wrap/clip its last E in the 10px bar */
   color: var(--vp-text-faint);
   position: absolute;
   left: 12px;

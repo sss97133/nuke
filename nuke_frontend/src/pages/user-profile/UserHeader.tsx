@@ -22,11 +22,16 @@ const UserHeader: React.FC = () => {
     profile,
     stats,
     isOwnProfile,
-    isAdmin,
-    isExternalIdentity,
+    comprehensiveData,
   } = useUserProfile();
 
-  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+  // EXPAND-DON'T-NAVIGATE (founder law: "everything is a button, everything
+  // expands"). The header stats are doors: clicking WORKED ON / LISTINGS /
+  // COMMENTS reveals its detail inline, right under the header, and clicking
+  // again (or the ✕) closes it — reversible depth (C10), no page jump.
+  const [openDoor, setOpenDoor] = useState<null | 'worked' | 'listings' | 'comments'>(null);
+  const toggleDoor = (door: 'worked' | 'listings' | 'comments') =>
+    setOpenDoor((cur) => (cur === door ? null : door));
 
   if (!profile) return null;
 
@@ -40,15 +45,20 @@ const UserHeader: React.FC = () => {
   const memberSince = profile.member_since || profile.created_at;
   const memberYear = memberSince ? new Date(memberSince).getFullYear() : null;
 
-  // Stats — profile_stats (refreshed by recompute_profile_stats) is the source
-  // of truth for garage-wide counts; listings/comments/bids are computed live
-  // by profileStatsService. No fallback to BaT seller events or the dead
-  // profiles.total_* columns (all 0 in prod).
-  const totalVehicles = stats?.total_vehicles ?? 0;
+  // Stats — every headline carries an honest denominator (number doctrine).
+  // VEHICLES uses vehicles_count = "worked on" (distinct vehicles with timeline
+  // activity), NOT total_vehicles (record-authorship over a 4-col union, ~half
+  // scraped Craigslist listings — never a public headline). Labeled WORKED ON.
+  const workedOnVehicles = stats?.vehicles_count ?? null;
   const totalListings = stats?.total_listings ?? 0;
   const totalComments = stats?.total_comments ?? 0;
-  const totalBids = stats?.total_bids ?? 0;
-  const totalImages = stats?.total_images ?? 0;
+  // BIDS is structurally blind (the bids table doesn't exist; only completed
+  // purchases materialize) — a "0" asserts an inactivity the data can't
+  // support, so it's suppressed. AUCTIONS WON is the real, observable figure.
+  const auctionsWon = stats?.total_auction_wins ?? 0;
+  // IMAGES is intentionally NOT shown here: profile_stats.total_images is a
+  // stale cron snapshot (23,376 vs 22,728 live) and RECENT PHOTOS already shows
+  // the live count — two image totals on one page is a contradiction.
 
   const handleEditProfile = () => {
     window.dispatchEvent(new CustomEvent('up:open-settings'));
@@ -97,28 +107,48 @@ const UserHeader: React.FC = () => {
         </div>
       </div>
 
-      {/* Center: Stat pills */}
+      {/* Center: Stat DOORS — each is a button that expands its detail inline
+          (founder law). Only render a count when it's real and non-zero
+          (No Empty Shells). The count and its drilled list always come from the
+          same source, so they can't disagree (C0). */}
       <div className="up-header__center">
-        <span className="up-stat-pill">
-          <span className="up-stat-pill__label">VEHICLES</span>
-          {totalVehicles}
-        </span>
-        <span className="up-stat-pill">
-          <span className="up-stat-pill__label">LISTINGS</span>
-          {totalListings}
-        </span>
-        <span className="up-stat-pill">
-          <span className="up-stat-pill__label">COMMENTS</span>
-          {totalComments}
-        </span>
-        <span className="up-stat-pill">
-          <span className="up-stat-pill__label">BIDS</span>
-          {totalBids}
-        </span>
-        {totalImages > 0 && (
+        {workedOnVehicles != null && workedOnVehicles > 0 && (
+          <button
+            type="button"
+            className={`up-stat-pill up-stat-pill--door${openDoor === 'worked' ? ' up-stat-pill--open' : ''}`}
+            aria-expanded={openDoor === 'worked'}
+            onClick={() => toggleDoor('worked')}
+          >
+            <span className="up-stat-pill__label">WORKED ON</span>
+            {workedOnVehicles}
+          </button>
+        )}
+        {totalListings > 0 && (
+          <button
+            type="button"
+            className={`up-stat-pill up-stat-pill--door${openDoor === 'listings' ? ' up-stat-pill--open' : ''}`}
+            aria-expanded={openDoor === 'listings'}
+            onClick={() => toggleDoor('listings')}
+          >
+            <span className="up-stat-pill__label">LISTINGS</span>
+            {totalListings}
+          </button>
+        )}
+        {totalComments > 0 && (
+          <button
+            type="button"
+            className={`up-stat-pill up-stat-pill--door${openDoor === 'comments' ? ' up-stat-pill--open' : ''}`}
+            aria-expanded={openDoor === 'comments'}
+            onClick={() => toggleDoor('comments')}
+          >
+            <span className="up-stat-pill__label">COMMENTS</span>
+            {totalComments}
+          </button>
+        )}
+        {auctionsWon > 0 && (
           <span className="up-stat-pill">
-            <span className="up-stat-pill__label">IMAGES</span>
-            {totalImages}
+            <span className="up-stat-pill__label">AUCTIONS WON</span>
+            {auctionsWon}
           </span>
         )}
       </div>
@@ -130,58 +160,118 @@ const UserHeader: React.FC = () => {
             EDIT PROFILE
           </button>
         )}
-        {isExternalIdentity && !isOwnProfile && (
-          <button className="up-btn" onClick={() => console.log('claim')}>
-            CLAIM
-          </button>
-        )}
-        {isAdmin && (
-          <div style={{ position: 'relative' }}>
-            <button
-              className="up-btn"
-              onClick={() => setAdminMenuOpen((v) => !v)}
-            >
-              ADMIN
-            </button>
-            {adminMenuOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  right: 0,
-                  background: '#fff',
-                  border: '1px solid #1a1a1a',
-                  zIndex: 1010,
-                  minWidth: 120,
-                  fontFamily: 'Arial, sans-serif',
-                  fontSize: '8px',
-                }}
-              >
-                <button
-                  className="up-btn"
-                  style={{ width: '100%', border: 'none', borderBottom: '1px solid #ddd' }}
-                  onClick={() => {
-                    console.log('admin:inspect');
-                    setAdminMenuOpen(false);
-                  }}
-                >
-                  INSPECT
-                </button>
-                <button
-                  className="up-btn"
-                  style={{ width: '100%', border: 'none' }}
-                  onClick={() => {
-                    console.log('admin:flag');
-                    setAdminMenuOpen(false);
-                  }}
-                >
-                  FLAG USER
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        {/* REMOVED (founder teardown PROFILE_BUILD_ORDER 2026-06-13 + audit P5):
+            - CLAIM button: onClick was console.log('claim') — a dead control.
+            - ADMIN menu (INSPECT / FLAG USER): both console.log only (dead), and
+              moderation tooling does not belong on the public record ("some
+              random stupid shit admin"). */}
       </div>
+
+      {/* Inline DOOR detail — expands under the bar for the open stat (C10
+          reversible: ✕ or re-click the pill to close). */}
+      {openDoor && (
+        <StatDoorPanel
+          door={openDoor}
+          workedOn={workedOnVehicles}
+          listings={comprehensiveData?.listings || []}
+          comments={comprehensiveData?.comments || []}
+          onClose={() => setOpenDoor(null)}
+        />
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Stat door detail panel — renders the real list behind a header stat.
+// Count and list share a source so they can't disagree (C0). No fabrication:
+// WORKED ON has no client-loaded list, so it links to the owned/built garage
+// below rather than inventing 88 rows.
+// ---------------------------------------------------------------------------
+
+const vehLabel = (v: any): string =>
+  v ? [v.year, v.make, v.model].filter(Boolean).join(' ') || 'Vehicle' : 'Vehicle';
+
+const StatDoorPanel: React.FC<{
+  door: 'worked' | 'listings' | 'comments';
+  workedOn: number | null;
+  listings: any[];
+  comments: any[];
+  onClose: () => void;
+}> = ({ door, workedOn, listings, comments, onClose }) => {
+  const title =
+    door === 'worked' ? `WORKED ON · ${workedOn ?? 0}`
+      : door === 'listings' ? `LISTINGS · ${listings.length}`
+        : `COMMENTS · ${comments.length}`;
+
+  return (
+    <div className="up-stat-door" role="region" aria-label={title}>
+      <div className="up-stat-door__bar">
+        <span className="up-stat-door__title">{title}</span>
+        <button type="button" className="up-btn up-stat-door__close" onClick={onClose}>
+          ✕ CLOSE
+        </button>
+      </div>
+
+      {door === 'worked' && (
+        <div className="up-stat-door__body">
+          {/* The 88 worked-on list is not loaded client-side; per C0 we don't
+              fabricate it. The door points at the built/owned garage rendered
+              below (the vehicles he actually owns), the trustworthy subset. */}
+          <a href="#vehicle-collection" className="up-stat-door__cta" onClick={onClose}>
+            View the {workedOn ?? 0} vehicles worked on →
+          </a>
+        </div>
+      )}
+
+      {door === 'listings' && (
+        <div className="up-stat-door__body">
+          {listings.length === 0 ? (
+            <div className="up-stat-door__empty">No listings.</div>
+          ) : (
+            listings.slice(0, 50).map((l: any, i: number) => (
+              <a
+                key={l.id || i}
+                href={l.vehicle?.id ? `/vehicle/${l.vehicle.id}` : (l.source_url || '#')}
+                className="up-stat-door__row"
+              >
+                <span className="up-stat-door__row-main">{vehLabel(l.vehicle)}</span>
+                <span className="up-stat-door__row-meta">
+                  {l.event_status ? String(l.event_status).toUpperCase() : 'LISTED'}
+                  {l.sale_price ? ` · $${Number(l.sale_price).toLocaleString()}` : ''}
+                </span>
+              </a>
+            ))
+          )}
+        </div>
+      )}
+
+      {door === 'comments' && (
+        <div className="up-stat-door__body">
+          {comments.length === 0 ? (
+            <div className="up-stat-door__empty">No comments.</div>
+          ) : (
+            comments.slice(0, 50).map((c: any, i: number) => {
+              const veh = c.auction?.vehicle;
+              const when = c.posted_at ? new Date(c.posted_at).toLocaleDateString() : '';
+              return (
+                <a
+                  key={c.id || i}
+                  href={veh?.id ? `/vehicle/${veh.id}` : '#'}
+                  className="up-stat-door__row"
+                >
+                  <span className="up-stat-door__row-main">
+                    {c.comment_text || '(comment)'}
+                  </span>
+                  <span className="up-stat-door__row-meta">
+                    {[vehLabel(veh), when].filter(Boolean).join(' · ')}
+                  </span>
+                </a>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 };

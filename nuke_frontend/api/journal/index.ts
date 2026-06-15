@@ -6,6 +6,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 // before 2026-06-09: JournalIndex.tsx shipped fetching /api/journal while the
 // rewrite catchall sent it to the mailbox function (404). Same service-role
 // PostgREST pattern as api/v1/vehicle.
+//
+// DEPLOYED UNIVERSE: must live in nuke_frontend/api/ — deploys run
+// `vercel deploy` from ./nuke_frontend, so repo-root api/ never ships.
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
