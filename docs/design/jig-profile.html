@@ -155,8 +155,9 @@ const R = u => u.replace('/object/public/','/render/image/public/') + '?width=30
   const photos = await fetch('k5_photos.json').then(r=>r.json()).catch(()=>[]);
   const urls = photos.map(p=>p.u);
   const pick = n => Array.from({length:n}, (_,i)=> urls[(i*7+3) % urls.length]).filter(Boolean);
-  document.getElementById('todayPhotos').innerHTML = pick(3).map(u=>`<div class="t" style="background-image:url('${R(u)}')"></div>`).join('');
-  document.getElementById('river').innerHTML = pick(9).map(u=>`<div class="t" style="background-image:url('${R(u)}')"></div>`).join('');
+  const enc = u => R(u).replace(/['"\\)]/g, encodeURIComponent); // sanitize before CSS url() injection
+  document.getElementById('todayPhotos').innerHTML = pick(3).map(u=>`<div class="t" style="background-image:url('${enc(u)}')"></div>`).join('');
+  document.getElementById('river').innerHTML = pick(9).map(u=>`<div class="t" style="background-image:url('${enc(u)}')"></div>`).join('');
   // timeline: develop-in from real day density
   const ts = await fetch('k5_timestamps.json').then(r=>r.json()).catch(()=>[]);
   const days = {}; ts.forEach(t=>{const d=t.slice(0,10); days[d]=(days[d]||0)+1;});
@@ -165,7 +166,8 @@ const R = u => u.replace('/object/public/','/render/image/public/') + '?width=30
   const T0=new Date('2006-01-01'), T1=new Date('2026-12-31');
   // build 120 slots across the span, height = that window's density
   const bars = entries.map(([d,n])=>({x:(new Date(d)-T0)/(T1-T0), h:Math.min(22,4+Math.sqrt(n)*3)}));
-  tl.innerHTML = bars.map(b=>`<i style="height:0px;margin-left:${(b.x*270)|0}px;position:absolute;bottom:6px" data-h="${b.h}"></i>`).join('');
+  const tlW = (tl.clientWidth || 252) - 16; // actual content width, not a hardcoded 270
+  tl.innerHTML = bars.map(b=>`<i style="height:0px;margin-left:${(b.x*tlW)|0}px;position:absolute;bottom:6px" data-h="${b.h}"></i>`).join('');
   tl.style.position='relative';
   let k=0; const ivId=setInterval(()=>{ const bs=tl.querySelectorAll('i'); if(k>=bs.length){clearInterval(ivId);return;} for(let j=0;j<6&&k<bs.length;j++,k++){bs[k].style.height=bs[k].dataset.h+'px';} },30);
 })();
