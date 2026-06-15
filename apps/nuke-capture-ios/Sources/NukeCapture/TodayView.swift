@@ -367,8 +367,6 @@ private struct LiveMetricsStrip: View {
 private struct MetricCell: View {
     let label: String
     let value: String
-    // QUEUED becomes the heavy hero while the drain is live.
-    var hero: Bool = false
     // Optional sub-caption — used only by the ANALYZED drill ("tap to view").
     // Default nil keeps the other three cells untouched / non-tappable.
     var caption: String? = nil
@@ -380,7 +378,7 @@ private struct MetricCell: View {
                 .foregroundStyle(.secondary)
                 .kerning(0.5)
             Text(value)
-                .font(hero ? .title.weight(.heavy) : .title2.weight(.semibold))
+                .font(.title2.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(Color.primary)
                 .contentTransition(.numericText())
@@ -396,33 +394,6 @@ private struct MetricCell: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 4)
-    }
-}
-
-/// Thin horizontal bar draining left→right as QUEUED approaches zero.
-private struct DrainBar: View {
-    let remaining: Int
-    let synced: Int
-
-    private var fraction: Double {
-        let total = remaining + synced
-        guard total > 0 else { return 1.0 }
-        return Double(synced) / Double(total)
-    }
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Rectangle()
-                    .fill(Color.primary.opacity(0.08))
-                Rectangle()
-                    .fill(Color.primary.opacity(0.5))
-                    .frame(width: geo.size.width * fraction)
-                    .animation(.easeInOut(duration: 0.4), value: fraction)
-            }
-        }
-        .frame(height: 2)
-        .clipShape(Capsule())
     }
 }
 

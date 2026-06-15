@@ -33,24 +33,6 @@ extension Color {
     }
 }
 
-// ─── Bucket model ────────────────────────────────────────────────────────────
-
-struct TimelineBucket: Identifiable {
-    let id: String          // ISO bucket key used as ScrollViewReader anchor
-    let count: Int          // sum of ALL day counts in bucket (the pinned grid signal)
-    let photos: Int         // per-facet sub-counts
-    let work: Int
-    let latestDay: String   // "yyyy-MM-dd" of the most-recent nonzero day in bucket
-    let yearBoundary: Int?  // unused in calendar mode; kept for API compatibility
-
-    func count(for filter: String) -> Int {
-        switch filter {
-        case "photos": return photos
-        case "work":   return work
-        default:       return count
-        }
-    }
-}
 
 // ─── Facets ──────────────────────────────────────────────────────────────────
 
@@ -275,13 +257,8 @@ struct BarcodeTimeline: View {
     private let cellGap:  CGFloat = 2
     private let dayLabelW: CGFloat = 10   // left column for S/M/T labels
 
-    // Height of the 7-row grid
-    private var gridH: CGFloat { 7 * cellSide + 6 * cellGap }
-
     // Height of the month-label row above the grid
     private let monthRowH: CGFloat = 12
-    // Height of year label row (rendered inline in first column of new year)
-    private let yearRowH: CGFloat = 0   // year shown as column overlay, not a row
 
     private var calendarGrid: some View {
         ScrollViewReader { proxy in
