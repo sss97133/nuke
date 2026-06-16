@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { cloudVisionJSON, cloudVisionMultiJSON } from "../_shared/visionFallback.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -78,37 +79,17 @@ function isUnfetchableUrl(url: string): boolean {
 // ---------------------------------------------------------------------------
 
 async function buildVehicleSignature(
+  supabase: any,
+  userId: string | null,
   imageUrls: string[],
   vehicleDesc: string,
-  anthropicKey: string,
 ): Promise<VehicleSignature["signature"]> {
-  const imageContent = imageUrls
-    .filter((u) => !isNoiseUrl(u) && !isUnfetchableUrl(u))
-    .slice(0, 4)
-    .map((url) => ({
-      type: "image" as const,
-      source: { type: "url" as const, url },
-    }));
+  const usable = imageUrls.filter((u) => !isNoiseUrl(u) && !isUnfetchableUrl(u)).slice(0, 4);
+  if (usable.length === 0) return null;
 
-  if (imageContent.length === 0) return null;
-
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": anthropicKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 500,
-      messages: [{
-        role: "user",
-        content: [
-          ...imageContent,
-          {
-            type: "text",
-            text: `These photos are of: ${vehicleDesc}
+  const parts: Array<{ text: string } | { imageUrl: string }> = usable.map((imageUrl) => ({ imageUrl }));
+  parts.push({
+    text: `These photos are of: ${vehicleDesc}
 
 Describe this SPECIFIC vehicle's distinguishing visual features so it can be told apart from similar vehicles of the same make. Return ONLY valid JSON:
 {
@@ -120,22 +101,11 @@ Describe this SPECIFIC vehicle's distinguishing visual features so it can be tol
 }
 
 Be SPECIFIC about colors (not just "red" but "dark red/maroon metallic"). Focus on features that distinguish THIS vehicle from others of the same make/model/era.`,
-          },
-        ],
-      }],
-    }),
   });
 
-  if (!resp.ok) {
-    const errText = await resp.text();
-    throw new Error(`Signature API ${resp.status}: ${errText}`);
-  }
-
-  const data = await resp.json();
-  const text = data.content?.[0]?.text || "";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error(`No JSON in signature response: ${text.slice(0, 200)}`);
-  return JSON.parse(jsonMatch[0]);
+  const r = await cloudVisionMultiJSON(supabase, userId, { parts, maxTokens: 500 });
+  if (!r) throw new Error("vision unavailable: connect an AI provider (no user key; YONO sidecar down)");
+  return r.data as VehicleSignature["signature"];
 }
 
 // ---------------------------------------------------------------------------
@@ -143,9 +113,10 @@ Be SPECIFIC about colors (not just "red" but "dark red/maroon metallic"). Focus 
 // ---------------------------------------------------------------------------
 
 async function disambiguateImage(
+  supabase: any,
+  userId: string | null,
   imageUrl: string,
   candidates: VehicleSignature[],
-  anthropicKey: string,
 ): Promise<{
   assigned_label: string;
   vehicle_id: string;
@@ -155,7 +126,7 @@ async function disambiguateImage(
   reason: string;
 }> {
   // Build the context: reference images + text descriptions for each candidate
-  const content: any[] = [];
+  const parts: Array<{ text: string } | { imageUrl: string }> = [];
 
   // First, add reference images for each candidate (if available)
   const candidateDescriptions: string[] = [];
@@ -163,24 +134,18 @@ async function disambiguateImage(
     const desc = [c.year, c.make, c.model, c.trim].filter(Boolean).join(" ");
     let sigDesc = "";
     if (c.signature) {
-      const parts: string[] = [];
-      if (c.signature.paint_colors?.length) parts.push(`Paint: ${c.signature.paint_colors.join("/")}`);
-      if (c.signature.body_style) parts.push(`Body: ${c.signature.body_style}`);
-      if (c.signature.modifications?.length) parts.push(`Mods: ${c.signature.modifications.join(", ")}`);
-      if (c.signature.unique_features?.length) parts.push(`Unique: ${c.signature.unique_features.join(", ")}`);
-      sigDesc = parts.join(". ");
+      const sp: string[] = [];
+      if (c.signature.paint_colors?.length) sp.push(`Paint: ${c.signature.paint_colors.join("/")}`);
+      if (c.signature.body_style) sp.push(`Body: ${c.signature.body_style}`);
+      if (c.signature.modifications?.length) sp.push(`Mods: ${c.signature.modifications.join(", ")}`);
+      if (c.signature.unique_features?.length) sp.push(`Unique: ${c.signature.unique_features.join(", ")}`);
+      sigDesc = sp.join(". ");
     }
 
     // Add reference image if available
     if (c.reference_image_url && !isNoiseUrl(c.reference_image_url) && !isUnfetchableUrl(c.reference_image_url)) {
-      content.push({
-        type: "text",
-        text: `--- Reference photo for Vehicle ${c.label} (${desc}): ---`,
-      });
-      content.push({
-        type: "image",
-        source: { type: "url", url: c.reference_image_url },
-      });
+      parts.push({ text: `--- Reference photo for Vehicle ${c.label} (${desc}): ---` });
+      parts.push({ imageUrl: c.reference_image_url });
     }
 
     candidateDescriptions.push(
@@ -189,18 +154,11 @@ async function disambiguateImage(
   }
 
   // Add the image to classify
-  content.push({
-    type: "text",
-    text: "--- Image to classify: ---",
-  });
-  content.push({
-    type: "image",
-    source: { type: "url", url: imageUrl },
-  });
+  parts.push({ text: "--- Image to classify: ---" });
+  parts.push({ imageUrl });
 
   // The disambiguation prompt
-  content.push({
-    type: "text",
+  parts.push({
     text: `The owner of these vehicles needs help sorting photos into the correct vehicle profiles.
 
 CANDIDATE VEHICLES:
@@ -231,31 +189,11 @@ Return ONLY valid JSON:
 If you genuinely cannot tell which vehicle it is (e.g. extreme close-up of a generic part), use confidence < 0.3 and assign to the vehicle it's currently on.`,
   });
 
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": anthropicKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 400,
-      messages: [{ role: "user", content }],
-    }),
-  });
-
-  if (!resp.ok) {
-    const errText = await resp.text();
-    throw new Error(`Disambiguate API ${resp.status}: ${errText}`);
-  }
-
-  const data = await resp.json();
-  const text = data.content?.[0]?.text || "";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error(`No JSON in disambiguate response: ${text.slice(0, 200)}`);
-
-  const result = JSON.parse(jsonMatch[0]);
+  const r = await cloudVisionMultiJSON(supabase, userId, { parts, maxTokens: 400 });
+  if (!r) throw new Error("vision unavailable: connect an AI provider (no user key; YONO sidecar down)");
+  const result = r.data as {
+    assigned_label: string; confidence: number; distinguishing_features: string[]; image_type: string; reason: string;
+  };
 
   // Resolve label to vehicle_id
   const matched = candidates.find((c) => c.label === result.assigned_label);
@@ -270,9 +208,10 @@ If you genuinely cannot tell which vehicle it is (e.g. extreme close-up of a gen
 // ---------------------------------------------------------------------------
 
 async function classifyImage(
+  supabase: any,
+  userId: string | null,
   imageUrl: string,
   expectedVehicle: string,
-  anthropicKey: string,
 ): Promise<{
   is_vehicle: boolean;
   matches_expected: boolean;
@@ -281,23 +220,10 @@ async function classifyImage(
   confidence: number;
   reason: string;
 }> {
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": anthropicKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 300,
-      messages: [{
-        role: "user",
-        content: [
-          { type: "image", source: { type: "url", url: imageUrl } },
-          {
-            type: "text",
-            text: `Expected vehicle: ${expectedVehicle}
+  const r = await cloudVisionJSON(supabase, userId, {
+    imageUrl,
+    maxTokens: 300,
+    userPrompt: `Expected vehicle: ${expectedVehicle}
 
 Classify this image. Return ONLY valid JSON:
 {
@@ -314,22 +240,17 @@ Rules:
 - matches_expected: true ONLY if it matches the expected vehicle above (same make, model, similar year)
 - detected_vehicle: what vehicle is actually shown (null if not a vehicle)
 - Be strict: a Ford is not a BMW, a sedan is not an SUV`,
-          },
-        ],
-      }],
-    }),
   });
-
-  if (!resp.ok) {
-    const errText = await resp.text();
-    throw new Error(`Anthropic API ${resp.status}: ${errText}`);
-  }
-
-  const data = await resp.json();
-  const text = data.content?.[0]?.text || "";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error(`No JSON in response: ${text.slice(0, 200)}`);
-  return JSON.parse(jsonMatch[0]);
+  if (!r) throw new Error("vision unavailable: no cloud provider key (YONO sidecar also down)");
+  const d = r.data;
+  return {
+    is_vehicle: !!d.is_vehicle,
+    matches_expected: !!d.matches_expected,
+    detected_vehicle: (d.detected_vehicle as string) ?? null,
+    image_type: (d.image_type as string) ?? "unrelated",
+    confidence: typeof d.confidence === "number" ? d.confidence : 0.5,
+    reason: (d.reason as string) ?? "",
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -344,11 +265,12 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured");
 
     const supabase = createClient(supabaseUrl, serviceKey);
     const body: CheckRequest = await req.json();
+    // BYOK: vision runs on the vehicle owner's connected provider (they pay). Falls to the
+    // system bootstrap pool only if no user key. user_id is the owner whose photos we're sorting.
+    const userId = body.user_id ?? null;
     const mode = body.mode || "check";
     const batchSize = Math.min(body.batch_size || 10, 50);
     const dryRun = body.dry_run ?? false;
@@ -408,7 +330,7 @@ Deno.serve(async (req: Request) => {
         const imageUrls = sigImages.map((i: any) => i.image_url).filter(Boolean);
 
         try {
-          const signature = await buildVehicleSignature(imageUrls, desc, anthropicKey);
+          const signature = await buildVehicleSignature(supabase, userId, imageUrls, desc);
 
           if (!dryRun && signature) {
             await supabase
@@ -567,7 +489,7 @@ Deno.serve(async (req: Request) => {
 
       for (const img of imagesToCheck) {
         try {
-          const ai = await disambiguateImage(img.image_url, candidates, anthropicKey);
+          const ai = await disambiguateImage(supabase, userId, img.image_url, candidates);
 
           const isCurrentVehicle = ai.vehicle_id === body.vehicle_id;
           let status: MatchResult["status"];
@@ -795,7 +717,7 @@ Deno.serve(async (req: Request) => {
       const expectedVehicle = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ");
 
       try {
-        const ai = await classifyImage(url, expectedVehicle, anthropicKey);
+        const ai = await classifyImage(supabase, userId, url, expectedVehicle);
 
         let status: MatchResult["status"];
         if (!ai.is_vehicle) {
