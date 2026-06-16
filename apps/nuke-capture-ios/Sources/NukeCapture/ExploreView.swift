@@ -19,7 +19,9 @@ struct ExploreView: View {
     @State private var results: [VehicleHeaderRow] = []
     @State private var loadingFeed = false
     @State private var feedError = false
+    @State private var searchError = false   // a failed search ≠ "no matches"
     @State private var searched = false
+    @State private var feedRetried = false   // cold-launch first call self-heals once
     // The Worklight: the feed reports the stage it's IN, never a blank spinner. A
     // stall/timeout reads as an honest failure with retry — never "nothing here".
     @State private var feedStage = "Searching the catalog…"
@@ -55,6 +57,18 @@ struct ExploreView: View {
                     } actions: {
                         Button("Retry") { Task { await loadFeed(force: true) } }
                             .buttonStyle(.borderedProminent)
+                    }
+                } else if searched && searchError && results.isEmpty {
+                    // The search request failed — never let that read as "No matches".
+                    ContentUnavailableView {
+                        Label("Couldn't search", systemImage: "wifi.exclamationmark")
+                    } description: {
+                        Text("Check your connection.")
+                    } actions: {
+                        Button("Retry") {
+                            Task { await search(query.trimmingCharacters(in: .whitespaces)) }
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
                 } else if rows.isEmpty {
                     ContentUnavailableView(
@@ -139,7 +153,17 @@ struct ExploreView: View {
                 .filter { ($0.primary_image_url?.isEmpty == false) }
                 .prefix(60)
                 .map { $0 }
+            feedRetried = false
         } catch {
+            // The cold-launch first network call can stall (data_stall) and trip
+            // the 12s timeout — retry ONCE before surfacing the failure, so the
+            // passive feed self-heals instead of greeting you with an error.
+            if !feedRetried {
+                feedRetried = true
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                await loadFeed(force: true)
+                return
+            }
             feedError = true
             NSLog("NukeCapture explore feed failed: %@", String(describing: error))
         }
@@ -169,20 +193,25 @@ struct ExploreView: View {
             .replacingOccurrences(of: ")", with: "")
         var filter = "make.ilike.*\(t)*,model.ilike.*\(t)*"
         if let yr = Int(t), yr > 1885, yr < 2100 { filter += ",year.eq.\(yr)" }
+        searchError = false
         do {
-            results = try await SupabaseService.client
+            let raw: [VehicleHeaderRow] = try await SupabaseService.client
                 .from("vehicles")
                 .select("id,year,make,model,trim,primary_image_url")
                 .eq("is_public", value: true)
                 .or(filter)
                 .order("year", ascending: false)
-                .limit(30)
+                .limit(60)
                 .execute()
                 .value
+            // Only imaged vehicles — a grid of blank car-outline placeholders reads
+            // as broken (the feed already filters this way). Over-fetch, then trim.
+            results = raw.filter { ($0.primary_image_url?.isEmpty == false) }
             searched = true
         } catch {
-            NSLog("NukeCapture explore search failed: %@", String(describing: error))
+            searchError = true
             searched = true
+            NSLog("NukeCapture explore search failed: %@", String(describing: error))
         }
     }
 }

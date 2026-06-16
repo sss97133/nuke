@@ -77,6 +77,14 @@ final class SyncEngine: ObservableObject {
     /// TodayView headline numbers must read this, never the UserDefaults
     /// counters (see docs/design/WEB_PARITY.md).
     @Published var serverStats: CaptureStats = .zero
+    /// False until the FIRST successful get_user_capture_stats load. Today shows
+    /// "…" (not a fake "0") for the server metrics while this is false — the cold
+    /// RPC can take ~9s, and a 0 placeholder reads as a dead, empty record.
+    @Published private(set) var statsLoaded = false
+    /// True when the FIRST stats load failed (and none has ever succeeded). Lets
+    /// Today distinguish a genuine cold load ("…") from a stuck/failed one
+    /// ("couldn't load · retry") instead of an ellipsis that never resolves.
+    @Published private(set) var statsError = false
 
     struct CaptureStats: Decodable {
         let total_images: Int
@@ -223,11 +231,20 @@ final class SyncEngine: ObservableObject {
             let response = try await SupabaseService.client
                 .rpc("get_user_capture_stats", params: ["p_user_id": userId])
                 .execute()
-            if let stats = try? JSONDecoder().decode([CaptureStats].self, from: response.data).first {
+            if let stats = try JSONDecoder().decode([CaptureStats].self, from: response.data).first {
                 serverStats = stats
                 analyzedCount = stats.analyzed
+                statsLoaded = true
+                statsError = false
+            } else if !statsLoaded {
+                // 200 but an empty/undecodable body before any success — surface it,
+                // don't sit on a permanent "…" (the request "worked" but gave nothing).
+                statsError = true
             }
         } catch {
+            // Only flag while we've never loaded — a failed REFRESH must not blank
+            // numbers already on screen.
+            if !statsLoaded { statsError = true }
             NSLog("NukeCapture: refreshAnalyzedCount failed: %@", String(describing: error))
         }
     }

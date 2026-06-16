@@ -26,21 +26,35 @@ struct MainTabView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("exploreMode") private var exploreMode = false
     @State private var photoGrant = Self.currentPhotoGrant()
+    @State private var tab: Tab = .explore
+
+    enum Tab: Hashable { case profile, explore, today }
 
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             profileTab
+                .tag(Tab.profile)
                 .tabItem { Label("Profile", systemImage: "person") }
 
-            // EXPLORE — Build-2 §5: search the real record, drill into a
-            // vehicle. Works signed-out too (not-signing-in is never a dead end).
+            // EXPLORE — the FRONT DOOR for a signed-out visitor: open the app
+            // already exploring vehicles, never staring at a stranger's day log.
             ExploreView()
+                .tag(Tab.explore)
                 .tabItem { Label("Explore", systemImage: "magnifyingglass") }
 
             if session.isSignedIn && photoGrant {
                 TodayView()
+                    .tag(Tab.today)
                     .tabItem { Label("Today", systemImage: "clock") }
             }
+        }
+        .onAppear {
+            // Signed-in owners land on THEIR record (receipt-first); everyone
+            // else lands on Explore — exploring is the front door, not a profile.
+            tab = session.isSignedIn ? .profile : .explore
+        }
+        .onChange(of: session.isSignedIn) { _, signedIn in
+            tab = signedIn ? .profile : .explore
         }
         .onChange(of: scenePhase) { _, phase in
             // Settings round-trips can change the grant — re-read it.

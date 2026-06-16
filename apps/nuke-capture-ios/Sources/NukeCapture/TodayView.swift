@@ -20,6 +20,9 @@ struct TodayView: View {
         NavigationStack {
             List {
                 // ── Errors / permission banner ──
+                // Only the ACTIONABLE permission state earns a banner. The old
+                // engine.lastError banner (a stale per-upload error) was noise the
+                // owner can't act on — dropped; failures live in the logs.
                 if engine.authorizationDenied {
                     Section {
                         Label(
@@ -29,12 +32,6 @@ struct TodayView: View {
                         .font(.footnote)
                         .foregroundStyle(.orange)
                     }
-                } else if let error = engine.lastError {
-                    Section {
-                        Label(error, systemImage: "exclamationmark.triangle")
-                            .font(.footnote)
-                            .foregroundStyle(.orange)
-                    }
                 }
 
                 // ── Live metrics strip ──
@@ -42,6 +39,12 @@ struct TodayView: View {
                     LiveMetricsStrip(engine: engine)
                         .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
                         .listRowBackground(Color.clear)
+                }
+
+                // ── Your garage ── Today opens onto the owner's actual record,
+                // not just relay counters. Self-loading; renders nothing if empty.
+                if let uid = SupabaseService.currentUserId {
+                    GarageStrip(userId: uid)
                 }
 
                 // ── Just read · on-device (T0) ──
@@ -185,6 +188,7 @@ struct UserUnderstanding: Decodable {
 private struct UnderstandingPanel: View {
     let userId: String
     @State private var u: UserUnderstanding?
+    @State private var loadError = false   // a failed fetch ≠ "still reading the record"
 
     var body: some View {
         Group {
@@ -200,6 +204,16 @@ private struct UnderstandingPanel: View {
                         MetricCell(label: "FRAMES", value: "\(u.frames_understood)")
                     }
                     .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
+                } else if loadError {
+                    // The fetch failed — don't sit on "Reading the record…" forever.
+                    HStack(spacing: 8) {
+                        Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                            .font(.caption2).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Retry") { Task { await fetch() } }
+                            .font(.caption2)
+                    }
                     .listRowBackground(Color.clear)
                 } else {
                     HStack(spacing: 8) {
@@ -277,6 +291,7 @@ private struct UnderstandingPanel: View {
     }
 
     private func fetch() async {
+        loadError = false
         do {
             // get_user_understanding RETURNS jsonb (scalar) — PostgREST returns a
             // bare OBJECT body ({"latest":[...]}), NOT an array. Decoding
@@ -288,6 +303,9 @@ private struct UnderstandingPanel: View {
                 .value
             withAnimation(.easeInOut(duration: 0.4)) { u = row }
         } catch {
+            // Only surface the failure when we have nothing yet — a failed REFRESH
+            // mustn't wipe metrics already on screen (the if-let-u branch wins).
+            if u == nil { loadError = true }
             NSLog("NukeCapture understanding fetch failed: %@", String(describing: error))
         }
     }
@@ -325,6 +343,9 @@ private struct LiveMetricsStrip: View {
         return "Uploading \(remaining) from this device… \(eta)"
     }
 
+    /// A server metric, or "…" until the first stats load lands (never a fake 0).
+    private func stat(_ v: Int) -> String { engine.statsLoaded ? "\(v)" : "…" }
+
     var body: some View {
         VStack(spacing: 14) {
             // THE FUNNEL — the owner's own library, organized (C2). LIBRARY is
@@ -339,40 +360,46 @@ private struct LiveMetricsStrip: View {
                 }
             }
 
-            // THE REAL RECORD — server truth (get_user_capture_stats). UPLOADED
-            // is what has reached the record; ANALYZED is what the engine has
-            // understood. RUNS ON: get_user_capture_stats.
-            HStack(spacing: 0) {
-                MetricCell(label: "UPLOADED", value: "\(engine.serverStats.total_images)")
-                Divider().frame(height: 44)
-                // ANALYZED drills into the analyzed photos + their atoms.
-                if engine.serverStats.analyzed > 0 {
-                    NavigationLink {
-                        AnalyzedPhotosView(userId: SupabaseService.currentUserId ?? "")
-                    } label: {
+            // THE REAL RECORD — server truth (get_user_capture_stats). Until the
+            // first load lands (the RPC can be ~9s cold) the cells read "…", never
+            // a fake "0" — a 0 here reads as a dead, empty record (it isn't). And a
+            // FAILED first load shows a retry, never a "…" that never resolves.
+            if engine.statsError && !engine.statsLoaded {
+                HStack {
+                    Label("Couldn't load your record", systemImage: "wifi.exclamationmark")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Retry") { Task { await engine.refreshAnalyzedCount() } }
+                        .font(.caption)
+                }
+            } else {
+                HStack(spacing: 0) {
+                    MetricCell(label: "UPLOADED", value: stat(engine.serverStats.total_images))
+                    Divider().frame(height: 44)
+                    // ANALYZED drills into the analyzed photos + their atoms (once loaded).
+                    if engine.statsLoaded, engine.serverStats.analyzed > 0 {
+                        NavigationLink {
+                            AnalyzedPhotosView(userId: SupabaseService.currentUserId ?? "")
+                        } label: {
+                            MetricCell(label: "ANALYZED",
+                                       value: "\(engine.serverStats.analyzed)",
+                                       caption: "tap to view")
+                        }
+                        .buttonStyle(.plain)
+                    } else {
                         MetricCell(
                             label: "ANALYZED",
-                            value: "\(engine.serverStats.analyzed)",
-                            caption: "tap to view"
+                            value: stat(engine.serverStats.analyzed),
+                            caption: (engine.statsLoaded && engine.serverStats.total_images > 0) ? "analyzing…" : nil
                         )
                     }
-                    .buttonStyle(.plain)
-                } else {
-                    // 0, not a dead "—": for a new user the gap between UPLOADED
-                    // and ANALYZED is the pipeline working, not a failure. The
-                    // caption says so while there are photos still to understand.
-                    MetricCell(
-                        label: "ANALYZED",
-                        value: "0",
-                        caption: engine.serverStats.total_images > 0 ? "analyzing…" : nil
-                    )
                 }
-            }
 
-            HStack(spacing: 0) {
-                MetricCell(label: "DAYS", value: "\(engine.serverStats.contribution_days)")
-                Divider().frame(height: 44)
-                MetricCell(label: "TODAY", value: "\(engine.serverStats.uploaded_today)")
+                HStack(spacing: 0) {
+                    MetricCell(label: "DAYS", value: stat(engine.serverStats.contribution_days))
+                    Divider().frame(height: 44)
+                    MetricCell(label: "TODAY", value: stat(engine.serverStats.uploaded_today))
+                }
             }
 
             // The local drain — this device's upload queue with an HONEST ETA
@@ -411,6 +438,85 @@ private struct LiveMetricsStrip: View {
                 }
                 Spacer()
             }
+        }
+        .task {
+            // Fetch on appear + keep fresh. Before, the server metrics only
+            // refreshed on app-foreground / after sync — so opening Today showed
+            // stale "…" with no poll. This loads them now + every 30s while open.
+            while !Task.isCancelled {
+                await engine.refreshAnalyzedCount()
+                try? await Task.sleep(nanoseconds: 30_000_000_000)
+            }
+        }
+    }
+}
+
+/// "Your garage" — a horizontal strip of the owner's vehicles, so Today opens
+/// onto the actual record (tap → the vehicle's build story). Self-loading via
+/// get_user_garage (fast now); renders nothing until it has vehicles.
+private struct GarageStrip: View {
+    let userId: String
+    @State private var garage: [GarageVehicle] = []
+    @State private var garageError = false   // a failed load ≠ an empty garage
+
+    var body: some View {
+        Group {
+            if !garage.isEmpty {
+                Section("Your garage") {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(garage) { v in
+                                NavigationLink {
+                                    VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: false)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        CachedAsyncImage(url: NukeImage.thumb(v.image_url, width: 220)) { img in
+                                            img.resizable().scaledToFill()
+                                        } placeholder: {
+                                            Color(.secondarySystemFill)
+                                                .overlay { Image(systemName: "car.side").foregroundStyle(.secondary) }
+                                        }
+                                        .frame(width: 104, height: 76)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        Text(v.title.isEmpty ? "VEHICLE" : v.title)
+                                            .font(.caption2).lineLimit(1)
+                                            .frame(width: 104, alignment: .leading)
+                                            .foregroundStyle(.primary)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                }
+            } else if garageError {
+                // Failed to load — never the same dead-empty render as "no vehicles".
+                Section("Your garage") {
+                    HStack {
+                        Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Retry") { Task { await load() } }
+                            .font(.footnote)
+                    }
+                }
+            }
+            // loaded-and-empty → render nothing: Today already shows the funnel,
+            // a brand-new owner needs no second empty box here.
+        }
+        .task(id: userId) { await load() }
+    }
+
+    private func load() async {
+        garageError = false
+        do {
+            garage = try await SupabaseService.client
+                .rpc("get_user_garage", params: ["p_user_id": userId])
+                .execute().value
+        } catch {
+            garageError = true
+            NSLog("NukeCapture Today garage load failed: %@", String(describing: error))
         }
     }
 }

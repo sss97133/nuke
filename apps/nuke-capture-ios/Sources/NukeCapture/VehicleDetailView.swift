@@ -113,6 +113,12 @@ struct VehicleDetailView: View {
     @State private var relationship: VehicleRelationship?   // ASSET window (owner-scoped)
     @State private var loadError: String?
     @State private var loaded = false
+    // Per-section failure flags — a failed enrichment load must read as "couldn't
+    // load · retry", never as a silently-absent (empty) section (Worklight).
+    @State private var specsError = false
+    @State private var galleryError = false
+    @State private var valuationError = false
+    @State private var daysError = false
     @State private var galleryOpen = false
     @State private var selectedPhoto: VehicleGalleryImage?  // photo→analysis drill
     @State private var provenanceDrill: SpecDrill?          // spec value → its source
@@ -264,7 +270,13 @@ struct VehicleDetailView: View {
         if vehicle == nil {
             Group {
                 if let loadError {
-                    Text(loadError).font(.footnote).foregroundStyle(.red)
+                    // The page spine failed — one Retry recovers header+gallery+ASSET.
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(loadError, systemImage: "wifi.exclamationmark")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        Button("Retry") { Task { await load() } }
+                            .font(.footnote)
+                    }
                 } else {
                     HStack(spacing: 8) {
                         ProgressView()
@@ -366,10 +378,29 @@ struct VehicleDetailView: View {
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
+        } else if specsError {
+            sectionError("specifications") { Task { await loadSpecs() } }
         }
     }
 
     private var locationRow: String? { vehicle.flatMap { location($0) } }
+
+    /// A compact, honest "this section didn't load" row with a retry — for the
+    /// stacked enrichment sections on the vehicle page, where a full-screen
+    /// ContentUnavailableView would be too heavy. Never let a failed section read
+    /// as a silently-absent one (Worklight).
+    @ViewBuilder private func sectionError(_ what: String, retry: @escaping () -> Void) -> some View {
+        HStack(spacing: 8) {
+            Label("Couldn't load \(what)", systemImage: "wifi.exclamationmark")
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Retry", action: retry)
+                .font(.caption2)
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 16)
+    }
 
     // ─── Market estimate — the comp-based model value with its BASIS on the
     // surface (the pencil microline), never a bare number. Labeled "est" because
@@ -382,6 +413,8 @@ struct VehicleDetailView: View {
             WorthBracketView(valuation: v)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16).padding(.bottom, 16)
+        } else if valuationError {
+            sectionError("the estimate") { Task { await loadValuation() } }
         }
     }
 
@@ -512,6 +545,8 @@ struct VehicleDetailView: View {
                 }
             }
             .padding(.bottom, 16)
+        } else if daysError {
+            sectionError("the build timeline") { Task { await loadVehicleDays() } }
         }
     }
 
@@ -561,6 +596,8 @@ struct VehicleDetailView: View {
                 }
             }
             .padding(.bottom, 16)
+        } else if galleryError {
+            sectionError("photos") { Task { await loadGalleryPage(reset: true) } }
         }
     }
 
@@ -617,6 +654,7 @@ struct VehicleDetailView: View {
         if !reset && reachedEnd { return }
         loadingMore = true
         defer { loadingMore = false }
+        galleryError = false
         let from = reset ? 0 : images.count
         let to = from + Self.galleryPageSize - 1
         do {
@@ -633,6 +671,9 @@ struct VehicleDetailView: View {
             imageTotal = resp.count
             if page.count < Self.galleryPageSize { reachedEnd = true }
         } catch {
+            // Only the FIRST page (empty strip) surfaces as an error; a tail-page
+            // failure leaves the populated strip intact (images.isEmpty == false).
+            if images.isEmpty { galleryError = true }
             NSLog("NukeCapture vehicle gallery page load failed: %@", String(describing: error))
         }
     }
@@ -640,6 +681,7 @@ struct VehicleDetailView: View {
     /// Load the spec set with rootedness (get_vehicle_specs). Separate from the
     /// header fetch so a slow/failed specs call never blanks the rest of the page.
     private func loadSpecs() async {
+        specsError = false
         do {
             let rows: [VehicleSpec] = try await SupabaseService.client
                 .rpc("get_vehicle_specs", params: ["p_vehicle_id": vehicleId])
@@ -652,18 +694,21 @@ struct VehicleDetailView: View {
             }
             #endif
         } catch {
+            specsError = true
             NSLog("NukeCapture specs load failed: %@", String(describing: error))
         }
     }
 
     /// Load the comp-based market estimate + its basis. Null when unmodeled.
     private func loadValuation() async {
+        valuationError = false
         do {
             valuation = try await SupabaseService.client
                 .rpc("get_vehicle_valuation", params: ["p_vehicle_id": vehicleId])
                 .execute()
                 .value
         } catch {
+            valuationError = true
             NSLog("NukeCapture valuation load failed: %@", String(describing: error))
         }
     }
@@ -671,6 +716,7 @@ struct VehicleDetailView: View {
     /// The build's working days for the timeline — same (day,kind,n) grouping as
     /// the profile (ProfileTab.loadContributionDays). Vehicle-scoped.
     private func loadVehicleDays() async {
+        daysError = false
         do {
             let rows: [ContributionRow] = try await SupabaseService.client
                 .rpc("get_vehicle_contribution_days", params: ["p_vehicle_id": vehicleId])
@@ -688,6 +734,7 @@ struct VehicleDetailView: View {
             }
             days = byDay.values.sorted { $0.day > $1.day }
         } catch {
+            if days.isEmpty { daysError = true }
             NSLog("NukeCapture vehicle days load failed: %@", String(describing: error))
         }
     }
@@ -1289,6 +1336,7 @@ struct FieldProvenanceSheet: View {
 
     @State private var prov: FieldProvenance?
     @State private var loaded = false
+    @State private var loadFailed = false   // a failed trace ≠ "no source exists"
     @State private var zoomURL: String?
     @State private var zoomOpen = false
 
@@ -1304,6 +1352,14 @@ struct FieldProvenanceSheet: View {
                         if !p.observations.isEmpty { observationsSection(p.observations) }
                         if !p.evidence.isEmpty { evidenceSection(p.evidence) }
                         if hasNothing(p) { emptyState }
+                    } else if loadFailed {
+                        // The trace failed — don't claim "no source exists yet".
+                        VStack(alignment: .leading, spacing: 10) {
+                            Label("Couldn't trace the source", systemImage: "wifi.exclamationmark")
+                                .font(.footnote).foregroundStyle(.secondary)
+                            Button("Retry") { Task { await load() } }
+                                .font(.footnote)
+                        }.padding(16)
                     } else if loaded {
                         emptyState
                     } else {
@@ -1478,6 +1534,7 @@ struct FieldProvenanceSheet: View {
     }
 
     private func load() async {
+        loadFailed = false
         do {
             prov = try await SupabaseService.client
                 .rpc("get_field_provenance",
@@ -1485,6 +1542,7 @@ struct FieldProvenanceSheet: View {
                 .execute()
                 .value
         } catch {
+            loadFailed = true
             NSLog("NukeCapture field provenance failed: %@", String(describing: error))
         }
         loaded = true
