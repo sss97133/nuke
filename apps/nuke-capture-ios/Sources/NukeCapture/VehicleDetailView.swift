@@ -52,7 +52,7 @@ struct VehicleHeaderRow: Decodable, Identifiable, Hashable {
 /// Carries the per-image analysis atoms so a tap opens the photo's analysis
 /// (the photo→analysis path) without a second fetch. All atom fields optional —
 /// a photo renders "Not analyzed yet" when they're absent, never a fabrication.
-private struct VehicleGalleryImage: Decodable, Identifiable {
+struct VehicleGalleryImage: Decodable, Identifiable {
     let id: UUID
     let image_url: String?
     let thumbnail_url: String?
@@ -103,6 +103,13 @@ struct VehicleDetailView: View {
     @State private var valuation: VehicleValuation?  // get_vehicle_valuation: comp-based estimate + basis
     @State private var imageTotal: Int?            // true photo count (not the fetched cap)
     @State private var images: [VehicleGalleryImage] = []
+    @State private var loadingMore = false         // a gallery page is in flight
+    @State private var reachedEnd = false          // last page returned < pageSize
+    @State private var renderingShare = false      // share card is composing
+    @State private var debugCard: UIImage?         // DEBUG: render the card on-screen to verify it
+    @State private var days: [DayRecord] = []      // the build's rhythm (get_vehicle_contribution_days)
+    @State private var bookendBefore: VehicleGalleryImage?   // earliest dated frame
+    @State private var bookendAfter: VehicleGalleryImage?    // latest dated frame
     @State private var relationship: VehicleRelationship?   // ASSET window (owner-scoped)
     @State private var loadError: String?
     @State private var loaded = false
@@ -144,6 +151,8 @@ struct VehicleDetailView: View {
         .task(id: vehicleId) { await load() }
         .task(id: vehicleId) { await loadSpecs() }
         .task(id: vehicleId) { await loadValuation() }
+        .task(id: vehicleId) { await loadVehicleDays() }
+        .task(id: vehicleId) { await loadBookends() }
         .sheet(item: $provenanceDrill) { drill in
             FieldProvenanceSheet(vehicleId: vehicleId, drill: drill)
         }
@@ -158,6 +167,22 @@ struct VehicleDetailView: View {
         .fullScreenCover(item: $selectedPhoto) { img in
             AnalyzedEvidenceView(photo: analyzedPhoto(from: img))
         }
+        #if DEBUG
+        // Verify the rendered share card on-screen (NUKE_DEBUG_SHARECARD=1) — proves
+        // the ImageRenderer output (no blank wells) without going through the share sheet.
+        .task(id: loaded) {
+            if loaded, debugCard == nil,
+               ProcessInfo.processInfo.environment["NUKE_DEBUG_SHARECARD"] == "1" {
+                debugCard = await buildShareCard()
+            }
+        }
+        .overlay {
+            if let c = debugCard {
+                Color.black.ignoresSafeArea()
+                    .overlay { Image(uiImage: c).resizable().scaledToFit().padding(8) }
+            }
+        }
+        #endif
     }
 
     /// Build an AnalyzedPhoto (the shared evidence-view model) from a gallery
@@ -189,18 +214,29 @@ struct VehicleDetailView: View {
     }
 
     // ─── Scrolling build sheet ───────────────────────────────────────────────
+    // The narrative spine — the record told as a story (hero → worth → proof →
+    // photos), with the technical reference demoted below it. Not a ledger of
+    // stacked sections; the build, top to bottom.
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                hero
-                titleBlock
-                assetWindow          // ASSET: his relationship/provenance
-                specTable            // TECHNICAL
-                valuationSection     // MARKET (comp-based estimate, basis on the surface)
-                photoStrip           // CONTENT (each photo → its analysis)
+                BuildStoryHero(
+                    imageURL: vehicle?.primary_image_url,
+                    title: vehicle?.title ?? "",
+                    takenAt: heroImage?.taken_at,
+                    loaded: loaded,
+                    onTap: { if let h = heroImage { selectedPhoto = h } else { galleryOpen = true } }
+                )
+                loadState            // loading / error (only while the header is absent)
+                valuationSection     // WORTH — the bracket, right under the hero
+                beforeAfterSection   // THE BUILD — how far it came (earliest → latest frame)
                 if vehicle != nil {
-                    InvestmentProofView(vehicleId: vehicleId)   // COMMODITY
+                    InvestmentProofView(vehicleId: vehicleId)   // PROOF — dollars in
                 }
+                buildTimeline        // RHYTHM — the build's working days, heat over time
+                photoStrip           // the photos (each → its analysis)
+                assetWindow          // ASSET: his relationship/provenance
+                specTable            // TECHNICAL reference — demoted below the story
                 webCTA
                 Spacer(minLength: 0)
             }
@@ -221,81 +257,24 @@ struct VehicleDetailView: View {
             ?? images.first
     }
 
-    @ViewBuilder private var hero: some View {
-        if let urlStr = vehicle?.primary_image_url {
-            let h = heroImage
-            // Tap drills into THIS image's cascade (its analysis/atoms), not a flat
-            // gallery — the lead image is a window into the data that made it. The
-            // full set is still one tap away via "View all" in the photo strip.
-            Button {
-                if let h { selectedPhoto = h } else { galleryOpen = true }
-            } label: {
-                CachedAsyncImage(url: NukeImage.thumb(urlStr, width: 1000)) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
-                    Color(.secondarySystemFill).overlay { ProgressView() }
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 240)
-                .clipped()
-                .overlay(alignment: .bottomLeading) {
-                    // Decay: when this view of the asset was actually true. A lead
-                    // image is a decaying node, honest only when it carries its date.
-                    if let at = h?.taken_at, !at.isEmpty {
-                        Text(String(at.prefix(10)))
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6).padding(.vertical, 3)
-                            .background(.black.opacity(0.4), in: Capsule())
-                            .padding(8)
+
+    // ─── Load state — only while the header is absent (the title now lives in
+    // the hero title card, so this carries just loading/error).
+    @ViewBuilder private var loadState: some View {
+        if vehicle == nil {
+            Group {
+                if let loadError {
+                    Text(loadError).font(.footnote).foregroundStyle(.red)
+                } else {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Loading…").font(.footnote).foregroundStyle(.secondary)
                     }
                 }
-                .overlay(alignment: .bottomTrailing) {
-                    // Affordance that the lead drills to its data (not just zoom).
-                    Image(systemName: "rectangle.and.text.magnifyingglass")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(6)
-                        .background(.black.opacity(0.35), in: Circle())
-                        .padding(8)
-                }
             }
-            .buttonStyle(.plain)
-        } else if loaded && loadError == nil {
-            // Loaded, no image — a flat plate, never a broken frame.
-            Color(.secondarySystemFill)
-                .frame(maxWidth: .infinity)
-                .frame(height: 160)
-                .overlay {
-                    Image(systemName: "car.side")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
         }
-    }
-
-    // ─── Title + load state ──────────────────────────────────────────────────
-    @ViewBuilder private var titleBlock: some View {
-        Group {
-            if let v = vehicle {
-                Text(v.title.isEmpty ? "VEHICLE" : v.title)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
-            } else if let loadError {
-                Text(loadError)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-            } else {
-                HStack(spacing: 8) {
-                    ProgressView()
-                    Text("Loading…")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 16)
     }
 
     // ─── ASSET window — the viewer's real relationship to this vehicle.
@@ -396,90 +375,35 @@ struct VehicleDetailView: View {
     // surface (the pencil microline), never a bare number. Labeled "est" because
     // it's modeled, not a fact; flagged stale when the run is old; renders nothing
     // when the asset was never modeled (honest blank, not a facade).
+    // Worth as a BRACKET (low · mid · high) + basis, through the shared component —
+    // never a bare scalar posing as a price. Renders nothing without a value.
     @ViewBuilder private var valuationSection: some View {
         if let v = valuation, let val = v.value, val > 0 {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("MARKET ESTIMATE")
-                    .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(money0(val))
-                        .font(.title3.weight(.semibold)).monospacedDigit()
-                        .foregroundStyle(.primary)
-                    Text("est").font(.caption2).foregroundStyle(.secondary)
-                    if v.is_stale == true {
-                        Text("· stale").font(.caption2).foregroundStyle(.orange)
-                    }
-                }
-                Text(valuationBasis(v))
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16).padding(.bottom, 16)
+            WorthBracketView(valuation: v)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16).padding(.bottom, 16)
         }
-    }
-
-    private func valuationBasis(_ v: VehicleValuation) -> String {
-        var parts: [String] = []
-        if let lo = v.value_low, let hi = v.value_high { parts.append("range \(money0(lo))–\(money0(hi))") }
-        if let n = v.comp_count, n > 0 { parts.append("\(n) comps") }
-        if let c = v.confidence { parts.append("\(c)% confident") }
-        if let at = v.calculated_at { parts.append("modeled \(String(at.prefix(10)))") }
-        return parts.isEmpty ? "modeled estimate" : parts.joined(separator: " · ")
     }
 
     private func money0(_ v: Double) -> String {
         v.formatted(.currency(code: "USD").precision(.fractionLength(0)))
     }
 
-    /// One spec row. A rooted FACT drills to its source (ink + chevron); a facade
-    /// renders dimmed + "unverified" and is NOT tappable — an empty/false drill is
-    /// worse than honesty. Long-press copies either.
+    /// One spec row — now the shared rooted-atom primitive. A rooted fact is
+    /// ATTRIBUTED (sourced to a real observation, drillable to it); an unrooted
+    /// value is a FACADE (dim, "unverified", refuses the tap). Same grammar every
+    /// value in the app will speak. (rooted→.proven later, once the spec RPC can
+    /// tell owner-confirmed from merely-sourced.)
     @ViewBuilder private func specRow(_ s: VehicleSpec) -> some View {
-        Group {
-            if s.rooted {
-                Button {
-                    provenanceDrill = SpecDrill(label: s.label, value: s.value ?? "", field: s.field)
-                } label: { specRowBody(s) }
-                .buttonStyle(.plain)
-            } else {
-                specRowBody(s)
-            }
-        }
-        .contextMenu {
-            if let value = s.value, !value.isEmpty {
-                Button { UIPasteboard.general.string = value } label: {
-                    Label("Copy \(s.label)", systemImage: "doc.on.doc")
-                }
-            }
-        }
+        RootedValueView(
+            label: s.label,
+            value: s.value ?? "",
+            status: s.rooted ? .attributed : .facade,
+            onDrill: s.rooted
+                ? { provenanceDrill = SpecDrill(label: s.label, value: s.value ?? "", field: s.field) }
+                : nil
+        )
         Divider()
-    }
-
-    @ViewBuilder private func specRowBody(_ s: VehicleSpec) -> some View {
-        LabeledContent {
-            HStack(spacing: 6) {
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text(s.value ?? "")
-                        .font(.system(.footnote, design: .monospaced))
-                        .foregroundStyle(s.rooted ? Color.primary : Color.secondary)
-                        .multilineTextAlignment(.trailing)
-                    if !s.rooted {
-                        Text("unverified")
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                if s.rooted {
-                    Image(systemName: "chevron.right.circle").font(.caption2).foregroundStyle(.blue)
-                }
-            }
-        } label: {
-            Text(s.label).font(.footnote).foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 5)
-        .contentShape(Rectangle())
     }
 
     @ViewBuilder private func plainRow(_ label: String, _ value: String) -> some View {
@@ -492,13 +416,52 @@ struct VehicleDetailView: View {
         .padding(.vertical, 5)
     }
 
-    /// Share the public vehicle record (the same page the web CTA opens).
+    /// Share = the build STORY as a card, not just a link. Composes hero + title +
+    /// worth + a photo strip into a shareable image and presents it alongside the
+    /// URL. Presented imperatively (UIActivityViewController) to avoid stacking a
+    /// second SwiftUI .sheet on this view (it already hosts the provenance sheet).
     @ViewBuilder private var shareButton: some View {
-        if let url = URL(string: "https://nuke.ag/vehicle/\(vehicleId)") {
-            ShareLink(item: url, subject: Text(vehicle?.title ?? "Vehicle")) {
-                Image(systemName: "square.and.arrow.up")
+        Button {
+            Task {
+                renderingShare = true
+                let card = await buildShareCard()
+                renderingShare = false
+                var items: [Any] = []
+                if let card { items.append(card) }
+                if let url = URL(string: "https://nuke.ag/vehicle/\(vehicleId)") { items.append(url) }
+                presentShare(items)
             }
+        } label: {
+            if renderingShare { ProgressView() }
+            else { Image(systemName: "square.and.arrow.up") }
         }
+        .disabled(renderingShare)
+    }
+
+    /// Pre-decode the hero + up to 3 strip photos (ImageRenderer won't await async
+    /// loads), then render the card. Returns nil → caller shares the URL alone.
+    @MainActor private func buildShareCard() async -> UIImage? {
+        let heroURL = NukeImage.thumb(vehicle?.primary_image_url, width: 1200)
+        let hero = heroURL == nil ? nil : await RemoteImageCache.shared.image(heroURL!)
+        var strip: [UIImage] = []
+        for img in images where strip.count < 3 {
+            if let u = NukeImage.thumb(img.image_url, width: 500),
+               let d = await RemoteImageCache.shared.image(u) { strip.append(d) }
+        }
+        guard hero != nil || !strip.isEmpty else { return nil }   // nothing to show → URL only
+        return renderShareCard(hero: hero, title: vehicle?.title ?? "", valuation: valuation, strip: strip)
+    }
+
+    private func presentShare(_ items: [Any]) {
+        guard !items.isEmpty,
+              let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first,
+              let root = scene.keyWindow?.rootViewController else { return }
+        let avc = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        avc.popoverPresentationController?.sourceView = root.view   // iPad anchor
+        avc.popoverPresentationController?.sourceRect = CGRect(x: root.view.bounds.midX,
+                                                               y: root.view.bounds.midY,
+                                                               width: 0, height: 0)
+        (root.presentedViewController ?? root).present(avc, animated: true)
     }
 
     /// Full-screen gallery list: every loaded photo, or the hero alone as a
@@ -515,8 +478,43 @@ struct VehicleDetailView: View {
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
-    // ─── Photos strip — render-endpoint thumbs (200px); tap opens full-screen
-    // gallery using the original image_url at full size.
+    // ─── Photos — a CONTINUOUS grid, not a strip + "view all" dead-end. The full
+    // set streams in as you scroll (loadGalleryPage fires off the tail cell), so
+    // there's no cap and nowhere to "go". Each cell taps into ITS analysis (vision
+    // atoms + provenance) — the image is a window into the data that made it.
+    private let galleryColumns = [GridItem(.flexible(), spacing: 2),
+                                  GridItem(.flexible(), spacing: 2),
+                                  GridItem(.flexible(), spacing: 2)]
+
+    // ─── The build in two frames — earliest vs latest by capture date. Honest
+    // bookends only; suppressed unless two distinct dated frames exist.
+    @ViewBuilder private var beforeAfterSection: some View {
+        if let b = bookendBefore, let a = bookendAfter {
+            BeforeAfterPair(before: b, after: a) { selectedPhoto = $0 }
+        }
+    }
+
+    // ─── Build timeline — the working days as a heat instrument (the build's
+    // rhythm at a glance). Reuses the profile's BarcodeTimeline; vehicle days carry
+    // no labor minutes/cost, so it heats by photo density (cooler, honest). A day
+    // tap opens that day's photo analysis if it's in the loaded set.
+    @ViewBuilder private var buildTimeline: some View {
+        if !days.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("BUILD TIMELINE")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                BarcodeTimeline(days: days) { day in
+                    if let match = images.first(where: {
+                        ($0.taken_at?.prefix(10)).map(String.init) == day.day
+                    }) { selectedPhoto = match }
+                }
+            }
+            .padding(.bottom, 16)
+        }
+    }
+
     @ViewBuilder private var photoStrip: some View {
         if !images.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
@@ -525,35 +523,43 @@ struct VehicleDetailView: View {
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button("View all \((imageTotal ?? images.count).formatted()) photos") { galleryOpen = true }
-                        .font(.caption)
+                    // Honest count, not a button — the full set is already streaming.
+                    Text((imageTotal ?? images.count).formatted())
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.secondary)
                 }
+                .padding(.horizontal, 16)
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 6) {
-                        ForEach(images) { img in
-                            // Tap a photo → ITS analysis (vision atoms +
-                            // provenance), not a flat gallery. The image is a
-                            // window into the analysis (the explicit priority).
-                            Button { selectedPhoto = img } label: {
-                                Color(.secondarySystemFill)
-                                    .frame(width: 110, height: 110)
-                                    .overlay {
-                                        CachedAsyncImage(url: NukeImage.thumb(img.image_url, width: 200)) { i in
-                                            i.resizable().scaledToFill()
-                                        } placeholder: {
-                                            Image(systemName: "car.side").foregroundStyle(.secondary)
-                                        }
+                LazyVGrid(columns: galleryColumns, spacing: 2) {
+                    ForEach(images) { img in
+                        Button { selectedPhoto = img } label: {
+                            Color(.secondarySystemFill)
+                                .aspectRatio(1, contentMode: .fit)
+                                .overlay {
+                                    CachedAsyncImage(url: NukeImage.thumb(img.image_url, width: 300)) { i in
+                                        i.resizable().scaledToFill()
+                                    } placeholder: {
+                                        Image(systemName: "car.side").foregroundStyle(.secondary)
                                     }
-                                    .clipped()
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                            }
-                            .buttonStyle(.plain)
+                                }
+                                .clipped()
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .onAppear {
+                            // Tail reached → stream the next page. Guarded inside
+                            // loadGalleryPage (no double-fire, stops at the end).
+                            if img.id == images.last?.id { Task { await loadGalleryPage() } }
                         }
                     }
                 }
+
+                if loadingMore && !reachedEnd {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
             }
-            .padding(.horizontal, 16)
             .padding(.bottom, 16)
         }
     }
@@ -591,12 +597,28 @@ struct VehicleDetailView: View {
             NSLog("NukeCapture vehicle detail load failed: %@", String(describing: error))
         }
         // Gallery is independent — a load failure here never blocks the spec
-        // sheet. Pulls the analysis atoms (labels/taken_at/status) so a photo
-        // tap opens its analysis without a second round-trip. The "12 photos"
-        // cap was nonsense for a vehicle with thousands — fetch a real window
-        // (lazy strip), and read the TRUE total (estimated count) so the label
-        // is honest. Order by created_at (the indexed column) to avoid the RLS
-        // full-sort timeout.
+        // sheet. First page only; the rest streams in as the grid scrolls.
+        await loadGalleryPage(reset: true)
+        // ASSET window — the viewer's relationship. Owner-scoped via RLS; a
+        // signed-out viewer or a non-owner simply gets no rows → nil → the
+        // section doesn't render (no false ownership claim).
+        await loadRelationship()
+        loaded = true
+    }
+
+    private static let galleryPageSize = 60
+
+    /// One page of the gallery, appended to `images`. Continuous scroll: the grid
+    /// triggers the next page when its tail appears, so there's no cap and no
+    /// "view all" dead-end. Orders by created_at (the indexed column) to dodge the
+    /// RLS full-sort timeout; reads the estimated TRUE total so the count is honest.
+    private func loadGalleryPage(reset: Bool = false) async {
+        if loadingMore { return }
+        if !reset && reachedEnd { return }
+        loadingMore = true
+        defer { loadingMore = false }
+        let from = reset ? 0 : images.count
+        let to = from + Self.galleryPageSize - 1
         do {
             let resp: PostgrestResponse<[VehicleGalleryImage]> = try await SupabaseService.client
                 .from("vehicle_images")
@@ -604,18 +626,15 @@ struct VehicleDetailView: View {
                         count: .estimated)
                 .eq("vehicle_id", value: vehicleId)
                 .order("created_at", ascending: false)
-                .limit(120)
+                .range(from: from, to: to)
                 .execute()
-            images = resp.value
+            let page = resp.value
+            if reset { images = page; reachedEnd = false } else { images.append(contentsOf: page) }
             imageTotal = resp.count
+            if page.count < Self.galleryPageSize { reachedEnd = true }
         } catch {
-            NSLog("NukeCapture vehicle gallery load failed: %@", String(describing: error))
+            NSLog("NukeCapture vehicle gallery page load failed: %@", String(describing: error))
         }
-        // ASSET window — the viewer's relationship. Owner-scoped via RLS; a
-        // signed-out viewer or a non-owner simply gets no rows → nil → the
-        // section doesn't render (no false ownership claim).
-        await loadRelationship()
-        loaded = true
     }
 
     /// Load the spec set with rootedness (get_vehicle_specs). Separate from the
@@ -646,6 +665,61 @@ struct VehicleDetailView: View {
                 .value
         } catch {
             NSLog("NukeCapture valuation load failed: %@", String(describing: error))
+        }
+    }
+
+    /// The build's working days for the timeline — same (day,kind,n) grouping as
+    /// the profile (ProfileTab.loadContributionDays). Vehicle-scoped.
+    private func loadVehicleDays() async {
+        do {
+            let rows: [ContributionRow] = try await SupabaseService.client
+                .rpc("get_vehicle_contribution_days", params: ["p_vehicle_id": vehicleId])
+                .execute()
+                .value
+            var byDay: [String: DayRecord] = [:]
+            for row in rows {
+                var rec = byDay[row.day] ?? DayRecord(day: row.day)
+                switch row.kind {
+                case "photo": rec.photos += row.n
+                case "work":  rec.work += row.n
+                default:      rec.events += row.n
+                }
+                byDay[row.day] = rec
+            }
+            days = byDay.values.sorted { $0.day > $1.day }
+        } catch {
+            NSLog("NukeCapture vehicle days load failed: %@", String(describing: error))
+        }
+    }
+
+    /// The build's bookends — earliest + latest frame by capture date. Two 1-row
+    /// fetches via the vehicle_images_taken_date index (fast; nulls sort last by
+    /// default so LIMIT 1 lands on a real dated frame). Only set when they're two
+    /// distinct frames on distinct dates — never a fake before/after.
+    private func loadBookends() async {
+        func cols() -> String { "id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status" }
+        do {
+            let earliest: [VehicleGalleryImage] = try await SupabaseService.client
+                .from("vehicle_images").select(cols())
+                .eq("vehicle_id", value: vehicleId)
+                .order("taken_at", ascending: true)
+                .limit(1).execute().value
+            // "After" = the PRIMARY (the owner's curated lead, what it became) if one
+            // exists, else the latest dated frame. Avoids an anticlimactic "after"
+            // (e.g. a recently-shot document) while staying a real dated frame.
+            let latest: [VehicleGalleryImage] = try await SupabaseService.client
+                .from("vehicle_images").select(cols())
+                .eq("vehicle_id", value: vehicleId)
+                .order("is_primary", ascending: false)
+                .order("taken_at", ascending: false)
+                .limit(1).execute().value
+            guard let b = earliest.first, let a = latest.first,
+                  let bAt = b.taken_at, let aAt = a.taken_at,
+                  b.id != a.id, bAt.prefix(10) != aAt.prefix(10) else { return }
+            bookendBefore = b
+            bookendAfter = a
+        } catch {
+            NSLog("NukeCapture bookends load failed: %@", String(describing: error))
         }
     }
 

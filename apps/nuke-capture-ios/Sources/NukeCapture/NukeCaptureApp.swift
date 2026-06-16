@@ -201,6 +201,10 @@ struct NukeCaptureApp: App {
             let drained = await SyncEngine.shared.drainUntilEmpty(
                 requireWiFi: Config.backfillRequiresWiFi
             )
+            // Then ATTRIBUTE: route the day's freshly-uploaded orphans home
+            // on-device (VIN-match + session inheritance). This is the nightly
+            // charging-window slot — upload, then send photos to their vehicle.
+            await AttributionEngine.shared.run()
             // Reschedule when work remains — either the queue still has assets,
             // or the drain bailed early (metered link / paused / cancelled).
             if SyncEngine.shared.backfillRemaining > 0 || !drained {

@@ -23,6 +23,17 @@
 import Foundation
 import Photos
 
+/// One on-device T0 detection — what Apple Vision read off a just-captured frame,
+/// on-device, in milliseconds. A DETECTION (a label + confidence), never a claim
+/// of labor, value, or intent (those need owner confirmation — the $410 rule).
+struct T0Atom: Identifiable, Sendable {
+    let assetID: String
+    let label: String
+    let confidence: Float
+    let isVehicle: Bool
+    var id: String { assetID }
+}
+
 @MainActor
 final class SyncEngine: ObservableObject {
 
@@ -41,6 +52,11 @@ final class SyncEngine: ObservableObject {
     /// PHAsset.localIdentifier of recent uploads, newest first — the Today
     /// screen renders local thumbnails from these (no network round-trip).
     @Published private(set) var recentUploadIDs: [String]
+    /// On-device T0 detections from LIVE captures, newest first — the photo just
+    /// shot at the site, read on-device (Apple Vision) the instant it uploads.
+    /// Today streams these so the user watches analysis land in seconds. A T0 atom
+    /// is a DETECTION (a label), never confirmed labor/value/intent.
+    @Published private(set) var liveT0Atoms: [T0Atom] = []
     /// Ignition backfill queue depth — TodayView shows this as a ledger row
     /// while the queue drains. 0 = no backfill in flight.
     @Published private(set) var backfillRemaining = 0
@@ -70,11 +86,25 @@ final class SyncEngine: ObservableObject {
         static let zero = CaptureStats(total_images: 0, uploaded_today: 0, analyzed: 0, contribution_days: 0)
     }
 
+    /// Ignition scan denominators (PhotoKit). The funnel the owner asked for:
+    /// libraryTotal = the WHOLE on-device library counted at ignition (e.g. 76K),
+    /// relevantTotal = the confirmed at-site set handed to backfill. Today shows
+    /// LIBRARY → RELEVANT instead of only an uploaded count. Written by
+    /// IgnitionEngine, read here. RUNS ON: IgnitionEngine.scan (C2/C3).
+    @Published private(set) var libraryTotal: Int = 0
+    @Published private(set) var relevantTotal: Int = 0
+    /// Observed upload throughput of the CURRENT drain (uploads ÷ elapsed
+    /// minutes). 0 until a real rate is measured — the ETA reads "estimating…"
+    /// rather than fabricating a number (C4: every number real).
+    @Published private(set) var uploadsPerMinute: Double = 0
+
     // ─── Persistence (UserDefaults) ──────────────────────────────────────────
     // UserDefaults use is declared in PrivacyInfo.xcprivacy (required-reason
     // API, reason CA92.1 — accessing our own app's defaults).
     private let defaults = UserDefaults.standard
-    private enum Key {
+    // Internal (not private): IgnitionEngine writes libraryTotal/relevantTotal
+    // through these same keys so there is one source of key strings.
+    enum Key {
         static let watermark = "lastSyncWatermark"      // Date — creationDate high-water mark
         static let seenSet = "seenUploads"              // [String] "filename|bytes", capped
         static let totalSynced = "totalSynced"
@@ -85,6 +115,8 @@ final class SyncEngine: ObservableObject {
         static let recentUploads = "recentUploadIDs"    // iOS: [String] asset identifiers
         static let paused = "syncPaused"                // Bool — the Today pause toggle
         static let backfillQueue = "backfillQueue"      // [String] asset ids still owed
+        static let libraryTotal = "libraryPhotoTotal"   // Int — whole library counted at ignition
+        static let relevantTotal = "relevantPhotoTotal" // Int — confirmed at-site set handed to backfill
     }
 
     /// Dedupe set: "filename|size" of everything already uploaded. Ordered
@@ -103,6 +135,8 @@ final class SyncEngine: ObservableObject {
         recentUploadIDs = defaults.stringArray(forKey: Key.recentUploads) ?? []
         isPaused = defaults.bool(forKey: Key.paused)
         backfillRemaining = (defaults.stringArray(forKey: Key.backfillQueue) ?? []).count
+        libraryTotal = defaults.integer(forKey: Key.libraryTotal)
+        relevantTotal = defaults.integer(forKey: Key.relevantTotal)
         // Day-scoped counter: only valid if it was written today.
         if defaults.string(forKey: Key.todayKey) == Self.dayKey(for: Date()) {
             uploadsToday = defaults.integer(forKey: Key.todayCount)
@@ -198,6 +232,14 @@ final class SyncEngine: ObservableObject {
         }
     }
 
+    /// Re-read the ignition denominators. Called by IgnitionEngine right after
+    /// it writes them, because this singleton may have initialized before the
+    /// first-run scan finished (init would have read zeros).
+    func refreshLibraryCounts() {
+        libraryTotal = defaults.integer(forKey: Key.libraryTotal)
+        relevantTotal = defaults.integer(forKey: Key.relevantTotal)
+    }
+
     // ─── The sync pass ───────────────────────────────────────────────────────
 
     /// One full pass. Returns true when the pass completed with zero
@@ -246,6 +288,7 @@ final class SyncEngine: ObservableObject {
         }
 
         var uploaded = 0, skipped = 0, deduped = 0, failed = 0
+        var t0Fired = 0   // cap on-device T0 per sync — never thrash the ANE on a bulk catch-up
 
         for asset in assets {
             // iOS: BGAppRefreshTask expiration cancels this task — stop
@@ -303,6 +346,19 @@ final class SyncEngine: ObservableObject {
                 uploaded += 1
                 totalSynced += 1
                 defaults.set(totalSynced, forKey: Key.totalSynced)
+
+                // LIVE T0: read the just-captured frame on-device (Apple Vision)
+                // the instant it uploads, so the user watches the analysis land in
+                // seconds. LIVE sync ONLY (this loop) — NEVER the backfill drain,
+                // which would thrash the Neural Engine over thousands of frames.
+                if t0Fired < 8 {
+                    t0Fired += 1
+                    let t0id = asset.localIdentifier
+                    Task { [weak self] in
+                        guard let self, let atom = await SyncEngine.analyzeT0(assetID: t0id) else { return }
+                        self.addLiveT0(atom)
+                    }
+                }
             } catch {
                 failed += 1
                 lastError = "\(filename): \(error.localizedDescription)"
@@ -401,6 +457,7 @@ final class SyncEngine: ObservableObject {
         }
 
         var uploaded = 0, skipped = 0, deduped = 0, failed = 0
+        let drainStart = Date()
 
         while true {
             var queue = defaults.stringArray(forKey: Key.backfillQueue) ?? []
@@ -473,6 +530,10 @@ final class SyncEngine: ObservableObject {
             queue.removeFirst(min(slice.count, queue.count))
             defaults.set(queue, forKey: Key.backfillQueue)
             backfillRemaining = queue.count
+            // Honest ETA fuel: the observed rate of THIS drain (uploads ÷
+            // elapsed minutes), never an assumed constant (C4).
+            let mins = Date().timeIntervalSince(drainStart) / 60.0
+            if uploaded > 0, mins > 0.05 { uploadsPerMinute = Double(uploaded) / mins }
             await Task.yield()
         }
 
@@ -585,6 +646,26 @@ final class SyncEngine: ObservableObject {
             recentUploadIDs.removeLast(recentUploadIDs.count - Config.recentUploadsCap)
         }
         defaults.set(recentUploadIDs, forKey: Key.recentUploads)
+    }
+
+    // ─── On-device T0 (live captures) ────────────────────────────────────────
+    //
+    // Apple Vision reads the just-captured LOCAL frame in milliseconds — $0, no
+    // network, offline-capable. nonisolated so the classify runs OFF the main
+    // actor; returns a Sendable atom. Local-only (allowNetwork:false) — never
+    // re-downloads from storage. A DETECTION, never confirmed value.
+
+    nonisolated static func analyzeT0(assetID: String) async -> T0Atom? {
+        guard let cg = await VisionEngine.loadCGImage(assetID: assetID, allowNetwork: false),
+              let cls = VisionEngine.classify(cg),
+              let top = cls.labels.first else { return nil }
+        return T0Atom(assetID: assetID, label: top.0, confidence: top.1, isVehicle: cls.isVehicle)
+    }
+
+    func addLiveT0(_ atom: T0Atom) {
+        liveT0Atoms.removeAll { $0.assetID == atom.assetID }
+        liveT0Atoms.insert(atom, at: 0)
+        if liveT0Atoms.count > 12 { liveT0Atoms.removeLast(liveT0Atoms.count - 12) }
     }
 
     // ─── PhotoKit plumbing (identical to Mac) ────────────────────────────────

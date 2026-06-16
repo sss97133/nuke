@@ -20,6 +20,9 @@ struct ExploreView: View {
     @State private var loadingFeed = false
     @State private var feedError = false
     @State private var searched = false
+    // The Worklight: the feed reports the stage it's IN, never a blank spinner. A
+    // stall/timeout reads as an honest failure with retry — never "nothing here".
+    @State private var feedStage = "Searching the catalog…"
 
     // 3-column square grid, 2pt gutters — the Instagram wall.
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
@@ -33,7 +36,16 @@ struct ExploreView: View {
         NavigationStack {
             Group {
                 if loadingFeed && feed.isEmpty && !searched {
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // Worklight: a labeled, live stage — never a dead blank spinner.
+                    VStack(spacing: 10) {
+                        ProgressView()
+                        Text(feedStage)
+                            .font(.system(.footnote, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .contentTransition(.opacity)
+                            .animation(.default, value: feedStage)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if feedError && feed.isEmpty && !searched {
                     // The load timed out / failed — NEVER an endless spinner.
                     ContentUnavailableView {
@@ -108,6 +120,7 @@ struct ExploreView: View {
         guard force || feed.isEmpty else { return }
         loadingFeed = true
         feedError = false
+        feedStage = "Searching the catalog…"
         defer { loadingFeed = false }
         do {
             let raw: [VehicleHeaderRow] = try await withTimeout(seconds: 12) {
@@ -121,6 +134,7 @@ struct ExploreView: View {
                     .execute()
                     .value
             }
+            feedStage = "Found \(raw.count) · loading photos…"
             feed = raw
                 .filter { ($0.primary_image_url?.isEmpty == false) }
                 .prefix(60)

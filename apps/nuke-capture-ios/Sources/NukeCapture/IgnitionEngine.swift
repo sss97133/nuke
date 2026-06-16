@@ -52,14 +52,15 @@ final class IgnitionEngine: ObservableObject {
     static let completeKey = "ignitionComplete"
 
     enum Phase: Equatable {
-        case off            // pre-permission
+        case intro          // pre-scan: the one orientation a stranger needs
         case scanning
         case site           // presenting candidates[candidateIndex]
+        case empty          // scan found no located photos — the truth, not a blank app
         case denied
     }
 
     // ─── Published scan state (the windows the UI renders) ──────────────────
-    @Published private(set) var phase: Phase = .off
+    @Published private(set) var phase: Phase = .intro
     @Published private(set) var photosRead = 0
     @Published private(set) var totalToRead = 0
     @Published private(set) var gpsPhotosFound = 0
@@ -111,7 +112,8 @@ final class IgnitionEngine: ObservableObject {
         await scan()
         buildCandidates()
         if candidates.isEmpty {
-            finishIgnition()
+            // Don't dump a stranger on a blank app — tell the truth first.
+            phase = .empty
         } else {
             phase = .site
             demoWalkSiteIfNeeded()
@@ -123,6 +125,11 @@ final class IgnitionEngine: ObservableObject {
         guard phase == .denied else { return }
         await start()
     }
+
+    /// Leave the no-located-photos truth screen for the (still-empty) app. Same
+    /// bookkeeping as any finish — watermark set, ignition marked done, nothing
+    /// to backfill.
+    func continueFromEmpty() { finishIgnition() }
 
     // ─── 2. The scan ─────────────────────────────────────────────────────────
     //
@@ -306,9 +313,21 @@ final class IgnitionEngine: ObservableObject {
             .sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) }
             .map(\.id)
 
+        // Persist the scan's denominators so Today can show the honest funnel
+        // (LIBRARY → RELEVANT) instead of a bare uploaded count. The scan
+        // counted the WHOLE library (totalToRead) and we hand the confirmed
+        // at-site set (ids) to backfill — both numbers are dropped today, which
+        // is exactly why the owner can't see "of your 76,000, N are relevant."
+        // RUNS ON: PhotoKit metadata scan (IgnitionEngine.scan). C2/C3/C4.
+        // Set BEFORE touching SyncEngine.shared so its init reads fresh values.
+        let defaults = UserDefaults.standard
+        defaults.set(totalToRead, forKey: SyncEngine.Key.libraryTotal)
+        defaults.set(ids.count, forKey: SyncEngine.Key.relevantTotal)
+
         // Steady-state sync picks up from the scan moment — the backfill
         // owns everything older.
         SyncEngine.shared.setInitialWatermark(scanStart)
+        SyncEngine.shared.refreshLibraryCounts()
         UserDefaults.standard.set(true, forKey: Self.completeKey)
 
         guard !ids.isEmpty else { return }
