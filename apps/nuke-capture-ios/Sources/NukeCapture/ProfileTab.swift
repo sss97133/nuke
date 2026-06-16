@@ -122,6 +122,7 @@ struct ProfileTab: View {
     var onSignIn: (() -> Void)? = nil
     @State private var query = ""
     @State private var results: [ProfileRow] = []
+    @State private var searchError = false   // a failed handle search ≠ "no such user"
     @State private var showAccount = false
 
     private var rootUserId: String {
@@ -133,6 +134,18 @@ struct ProfileTab: View {
             Group {
                 if query.trimmingCharacters(in: .whitespaces).isEmpty {
                     ProfileView(userId: rootUserId, isOwn: ownUserId != nil)
+                } else if searchError && results.isEmpty {
+                    // The search request failed — never read as "no such handle".
+                    ContentUnavailableView {
+                        Label("Couldn't search", systemImage: "wifi.exclamationmark")
+                    } description: {
+                        Text("Check your connection.")
+                    } actions: {
+                        Button("Retry") {
+                            Task { await search(query.trimmingCharacters(in: .whitespaces)) }
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
                 } else {
                     List(results) { row in
                         NavigationLink {
@@ -185,6 +198,7 @@ struct ProfileTab: View {
     }
 
     private func search(_ term: String) async {
+        searchError = false
         do {
             results = try await SupabaseService.client
                 .from("profiles")
@@ -194,6 +208,7 @@ struct ProfileTab: View {
                 .execute()
                 .value
         } catch {
+            searchError = true
             NSLog("NukeCapture profile search failed: %@", String(describing: error))
         }
     }
@@ -225,6 +240,7 @@ struct ProfileView: View {
     var isOwn: Bool = false
 
     @State private var profile: ProfileRow?
+    @State private var profileSettled = false     // true once load() has succeeded OR failed
     @State private var days: [DayRecord] = []
     @State private var receiptDay: DayRecord?
     @State private var loadError: String?
@@ -232,6 +248,7 @@ struct ProfileView: View {
     // way in to a vehicle before this; each card opens VehicleDetailView.
     @State private var garage: [GarageVehicle] = []
     @State private var garageLoaded = false      // gate the empty state so it never flashes
+    @State private var garageError = false        // a FAILED load must never read as "no vehicles"
     @State private var openVehicle: GarageVehicle?
 
     // Owner-only: the phone↔record link, made visible. `sync` is the record's
@@ -239,16 +256,20 @@ struct ProfileView: View {
     // Showing both side by side kills the "is it even linked?" doubt — they
     // reconcile in plain sight.
     @State private var sync: SyncStatus?
+    @State private var syncError = false          // failed link-ledger load ≠ a fresh account
     @ObservedObject private var engine = SyncEngine.shared
 
     var body: some View {
         List {
             Section {
+                // While the profile is still loading, show "…" — never a fake "—"
+                // that reads as "this person has no name". The "—" only stands once
+                // the load has SETTLED (succeeded-but-null, or failed).
                 LabeledContent("Name") {
-                    Text(profile?.full_name ?? "—")
+                    Text(profile?.full_name ?? (profileSettled ? "—" : "…"))
                 }
                 LabeledContent("Handle") {
-                    Text(profile?.username ?? "—")
+                    Text(profile?.username ?? (profileSettled ? "—" : "…"))
                 }
             }
 
@@ -257,6 +278,11 @@ struct ProfileView: View {
             // hidden section that reads as a dead profile (the cold-start gravestone).
             if !garage.isEmpty {
                 garageSection
+            } else if garageError {
+                // A failed load is NOT an empty garage — say so, with a way back.
+                // (This is the 29.5s-timeout incident: the owner's full garage
+                // had read as "No vehicles yet".)
+                garageErrorSection
             } else if isOwn && garageLoaded {
                 emptyGarageSection
             }
@@ -266,9 +292,14 @@ struct ProfileView: View {
 
             if let loadError {
                 Section {
-                    Text(loadError)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                    HStack {
+                        Text(loadError)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                        Spacer()
+                        Button("Retry") { Task { await load() } }
+                            .font(.footnote)
+                    }
                 }
             }
 
@@ -373,6 +404,7 @@ struct ProfileView: View {
     }
 
     private func loadGarage() async {
+        garageError = false
         do {
             let rows: [GarageVehicle] = try await SupabaseService.client
                 .rpc("get_user_garage", params: ["p_user_id": userId])
@@ -380,9 +412,32 @@ struct ProfileView: View {
                 .value
             garage = rows
         } catch {
+            // Don't swallow: a failed load must surface as "couldn't load", never
+            // fall through to the empty state.
+            garageError = true
             NSLog("NukeCapture garage load failed: %@", String(describing: error))
         }
         garageLoaded = true
+    }
+
+    // ─── Garage failed to load — distinct from "no vehicles yet". ─────────────
+    private var garageErrorSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Couldn't load the garage", systemImage: "wifi.exclamationmark")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.primary)
+                Text("Your vehicles are on the record — the connection dropped.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Retry") { Task { await loadGarage() } }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+            .padding(.vertical, 2)
+        } header: {
+            Text("Garage")
+        }
     }
 
     // ─── Empty garage — the living "what's coming" state (cold-start) ─────────
@@ -457,6 +512,15 @@ struct ProfileView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+            } else if syncError {
+                // The ledger load failed — never let that read as a zeroed,
+                // never-synced account. Say it plainly, offer a way back.
+                LabeledContent("Status") {
+                    Button("Retry") { Task { await loadSync() } }
+                }
+                Text("Couldn't load the sync ledger — check your connection.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             // This device's own truth — reconciles the phone against the
@@ -502,6 +566,7 @@ struct ProfileView: View {
     /// [SyncStatus] and take .first (same pattern as get_user_day_receipt).
     private func loadSync() async {
         guard isOwn else { return }
+        syncError = false
         do {
             let rows: [SyncStatus] = try await SupabaseService.client
                 .rpc("get_user_sync_status", params: ["p_user_id": userId])
@@ -509,6 +574,7 @@ struct ProfileView: View {
                 .value
             sync = rows.first
         } catch {
+            syncError = true
             NSLog("NukeCapture sync status failed: %@", String(describing: error))
         }
     }
@@ -543,6 +609,7 @@ struct ProfileView: View {
             loadError = "Load failed"
             NSLog("NukeCapture profile load failed: %@", String(describing: error))
         }
+        profileSettled = true
     }
 
     /// Full-history calendar: one jsonb array, uncapped. Throws if the RPC is
@@ -637,17 +704,28 @@ struct DayReceiptView: View {
                             }
                         }
                     }
-                } else if let loadError {
-                    Text(loadError)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                } else if loadError != nil {
+                    // Failed ≠ empty — offer a way back, never a dead red string.
+                    ContentUnavailableView {
+                        Label("Couldn't load the day", systemImage: "wifi.exclamationmark")
+                    } description: {
+                        Text("Check your connection.")
+                    } actions: {
+                        Button("Retry") { Task { loaded = false; loadError = nil; await load() } }
+                            .buttonStyle(.borderedProminent)
+                    }
                 } else if loaded {
                     // Empty RPC result — loaded but no receipt rows
                     Text("No work logged this day.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } else {
-                    ProgressView()
+                    // Worklight: a labeled stage, never a bare spinner.
+                    VStack(spacing: 8) {
+                        ProgressView()
+                        Text("Loading \(date)…")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
             }
             .navigationTitle(date)

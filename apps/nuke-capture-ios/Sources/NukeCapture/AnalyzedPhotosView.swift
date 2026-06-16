@@ -70,22 +70,33 @@ struct AnalyzedPhotosView: View {
             }
 
             if !loaded {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 48)
+                // Worklight: a labeled stage, never a bare spinner.
+                VStack(spacing: 8) {
+                    ProgressView()
+                    Text("Loading analyzed photos…")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 48)
             } else if let loadError {
-                // Honest, quiet failure — never a crash, never a blocked screen.
-                Text(loadError)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 48)
+                // Failed ≠ empty — say it, with a way back.
+                ContentUnavailableView {
+                    Label(loadError, systemImage: "wifi.exclamationmark")
+                } description: {
+                    Text("Check your connection.")
+                } actions: {
+                    Button("Retry") { Task { await load() } }
+                        .buttonStyle(.borderedProminent)
+                }
+                .padding(.top, 32)
             } else if photos.isEmpty {
-                Text("No analyzed photos yet")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 48)
+                ContentUnavailableView(
+                    "No analyzed photos yet",
+                    systemImage: "sparkles",
+                    description: Text("Photos become analyzed as the pipeline reads them.")
+                )
+                .padding(.top, 32)
             } else {
                 LazyVGrid(columns: columns, spacing: 2) {
                     ForEach(photos) { photo in
@@ -110,6 +121,7 @@ struct AnalyzedPhotosView: View {
             loaded = true
             return
         }
+        loadError = nil   // clear so a successful retry leaves the error branch
         do {
             // SETOF rows → decode the array directly (NOT array-of-array).
             let rows: [AnalyzedPhoto] = try await SupabaseService.client
