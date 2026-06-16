@@ -259,6 +259,13 @@ struct ProfileView: View {
     @State private var syncError = false          // failed link-ledger load ≠ a fresh account
     @ObservedObject private var engine = SyncEngine.shared
 
+    // Recent meaningful work — the few latest UNDERSTOOD days, each a STORY (not a
+    // bare photo count). Replaces the old exhaustive 1,740-row day ledger: the
+    // barcode above is already the full-history navigator; this surfaces real work.
+    // Source: get_user_understanding.latest (same read as Today's "Latest understood").
+    @State private var latest: [UserUnderstanding.Day] = []
+    @State private var latestError = false
+
     var body: some View {
         List {
             Section {
@@ -314,35 +321,26 @@ struct ProfileView: View {
                 }
             }
 
-            if !days.isEmpty {
-                Section {
-                    ForEach(days) { day in
-                        Button {
-                            receiptDay = day
-                        } label: {
-                            HStack {
-                                // Color.primary (concrete), not .primary —
-                                // inside a Button label the hierarchical
-                                // .primary resolves to the tint color.
-                                Text(day.day)
-                                    .monospacedDigit()
-                                    .foregroundStyle(Color.primary)
-                                Spacer()
-                                if day.photos > 0 {
-                                    Text("\(day.photos) photos")
-                                        .monospacedDigit()
-                                        .foregroundStyle(Color.secondary)
-                                }
-                                if day.work > 0 {
-                                    Text("\(day.work) work")
-                                        .monospacedDigit()
-                                        .foregroundStyle(Color.secondary)
-                                }
-                            }
+            // LATEST WORK — the most recent UNDERSTOOD days as STORIES, capped.
+            // NOT the old 1,740-row photo-count ledger (a count is not the work;
+            // the barcode is the full navigator). Each row → its day receipt.
+            if !latest.isEmpty {
+                Section("Latest work") {
+                    ForEach(latest.prefix(6)) { day in
+                        Button { receiptDay = DayRecord(day: day.date) } label: {
+                            latestRow(day)
                         }
                     }
-                } header: {
-                    Text("\(days.count) days")
+                }
+            } else if latestError {
+                Section("Latest work") {
+                    HStack {
+                        Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Retry") { Task { await loadLatest() } }
+                            .font(.footnote)
+                    }
                 }
             }
         }
@@ -354,6 +352,61 @@ struct ProfileView: View {
         .task(id: userId) { await load() }
         .task(id: userId) { await loadSync() }   // owner-only inside loadSync
         .task(id: userId) { await loadGarage() }
+        .task(id: userId) { await loadLatest() }
+    }
+
+    // ─── Latest work — recent understood days as stories (get_user_understanding) ─
+    /// One story row: the detective's read of the day leads; a day not yet narrated
+    /// falls back to its vehicle + classification. Footer = vehicle · frames · date.
+    /// Mirrors Today's "Latest understood" row (develop from what exists).
+    @ViewBuilder private func latestRow(_ d: UserUnderstanding.Day) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let story = d.story, !story.isEmpty {
+                Text(story)
+                    .font(.footnote)
+                    .foregroundStyle(Color.primary)
+                    .lineLimit(3)
+            } else {
+                Text(d.vehicleTitle)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Color.primary)
+                    .lineLimit(1)
+                if let title = d.title, !title.isEmpty {
+                    Text(title)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            HStack(spacing: 6) {
+                Text(d.vehicleTitle).lineLimit(1)
+                Text("·")
+                Text("\(d.frames ?? 0) frames")
+                Text("·")
+                Text(d.date)
+                Spacer(minLength: 0)
+            }
+            .font(.caption2).monospacedDigit()
+            .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 3)
+    }
+
+    /// get_user_understanding RETURNS a bare jsonb OBJECT (not array-wrapped) —
+    /// decode it directly (same as Today's fetch). `.latest` is already a curated
+    /// recent set; we cap at 6 in the view.
+    private func loadLatest() async {
+        latestError = false
+        do {
+            let u: UserUnderstanding = try await SupabaseService.client
+                .rpc("get_user_understanding", params: ["p_user_id": userId])
+                .execute()
+                .value
+            latest = u.latest
+        } catch {
+            latestError = true
+            NSLog("NukeCapture profile latest work failed: %@", String(describing: error))
+        }
     }
 
     // ─── Garage ──────────────────────────────────────────────────────────────
