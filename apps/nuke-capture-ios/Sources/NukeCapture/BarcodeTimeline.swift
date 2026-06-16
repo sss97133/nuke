@@ -43,10 +43,13 @@ struct TimelineFacet: Identifiable {
     var id: String { key }
 }
 
+// Pills are FILTERS (which count drives cell intensity), not a color key. They
+// render in achromatic ink — the cells are always the green heat ramp regardless
+// of filter, so a green/orange pill would lie about the cells it controls.
 let timelineFacets: [TimelineFacet] = [
     .init(key: "all",    label: "ALL",    color: .primary),
-    .init(key: "photos", label: "PHOTOS", color: .green),
-    .init(key: "work",   label: "WORK",   color: .orange),
+    .init(key: "photos", label: "PHOTOS", color: .primary),
+    .init(key: "work",   label: "WORK",   color: .primary),
 ]
 
 // ─── Calendar cell model ─────────────────────────────────────────────────────
@@ -57,7 +60,9 @@ private struct CalCell: Identifiable {
     let inRange: Bool       // false = padding cell before/after data range
     let count: Int          // ALL-facet count for this day
     let photos: Int
-    let work: Int
+    let work: Int           // confirmed work SESSIONS
+    let workMinutes: Int    // confirmed labor minutes — the value spine
+    let workCost: Int       // job dollars on confirmed work
 
     func count(for filter: String) -> Int {
         switch filter {
@@ -67,24 +72,34 @@ private struct CalCell: Identifiable {
         }
     }
 
-    /// Estimated work-hours for the active facet — the SAME transform the web
-    /// uses (ContributionTimeline.tsx:99-116 / VehicleTimeline hoursForDay).
-    /// The barcode buckets on HOURS, not raw count: a 60-photo day and a
-    /// 3-photo day must not both saturate to the darkest green or the strip
-    /// reads flat (the "still fucked / uninformative" complaint). photos =
-    /// min(9, n/20) + 0.25 baseline; work = 0.5·n; events = 0.25·n; cap 12.
+    /// Confirmed labor "hours" of this day — minutes + a money term. A logged job
+    /// is the real productivity signal; a pile of photos is not.
+    private var laborHours: Double {
+        Double(workMinutes) / 60.0 + min(4.0, Double(workCost) / 250.0)  // $1000 job → +4
+    }
+
+    /// Heat for the active facet. The DEFAULT/ALL facet is VALUE-weighted: a day
+    /// of confirmed labor runs the full heat range; a day of only photos is capped
+    /// cool (≤3) so 60 selfies can NEVER read as hot as a logged welding job — the
+    /// core fix for "a documentation day looks as valuable as a money day." The
+    /// PHOTOS facet is the explicit documentation lens; WORK is pure labor.
     func hours(for filter: String) -> Double {
-        // events isn't stored separately on the cell; it's the remainder of the
-        // ALL count after photos + work.
-        let events = max(0, count - photos - work)
-        var h = 0.0
-        let usePhotos = (filter == "all" || filter == "photos")
-        let useWork   = (filter == "all" || filter == "work")
-        let useEvents = (filter == "all")
-        if usePhotos && photos > 0 { h += min(9.0, Double(photos) / 20.0) + 0.25 }
-        if useWork   { h += 0.5  * Double(work) }
-        if useEvents { h += 0.25 * Double(events) }
-        return min(12.0, h)
+        switch filter {
+        case "photos":
+            return photos > 0 ? min(12.0, Double(photos) / 20.0 + 0.25) : 0
+        case "work":
+            return min(12.0, laborHours)
+        default:
+            if laborHours > 0 { return min(12.0, laborHours + 0.5) }
+            // No confirmed labor → photo/event density, capped LOW. Keeps the
+            // strip informative (and vehicle timelines, which surface no labor,
+            // still show gradients) without ever out-heating real work.
+            let events = max(0, count - photos - work)
+            var h = 0.0
+            if photos > 0 { h += min(2.3, Double(photos) / 24.0) + 0.2 }
+            h += 0.2 * Double(events)
+            return min(3.0, h)
+        }
     }
 }
 
@@ -112,10 +127,14 @@ private func buildWeekCols(days: [DayRecord]) -> [WeekCol] {
     var countByDay: [String: Int] = [:]
     var photosByDay: [String: Int] = [:]
     var workByDay: [String: Int] = [:]
+    var minutesByDay: [String: Int] = [:]
+    var costByDay: [String: Int] = [:]
     for d in days {
         countByDay[d.day] = d.photos + d.events + d.work
         photosByDay[d.day] = d.photos
         workByDay[d.day] = d.work
+        minutesByDay[d.day] = d.workMinutes
+        costByDay[d.day] = d.workCost
     }
 
     // Date range: earliest day → today
@@ -155,7 +174,9 @@ private func buildWeekCols(days: [DayRecord]) -> [WeekCol] {
                 inRange: inRange,
                 count: inRange ? (countByDay[key] ?? 0) : 0,
                 photos: inRange ? (photosByDay[key] ?? 0) : 0,
-                work: inRange ? (workByDay[key] ?? 0) : 0
+                work: inRange ? (workByDay[key] ?? 0) : 0,
+                workMinutes: inRange ? (minutesByDay[key] ?? 0) : 0,
+                workCost: inRange ? (costByDay[key] ?? 0) : 0
             ))
 
             // Month label on Sunday of the first week that touches a new month

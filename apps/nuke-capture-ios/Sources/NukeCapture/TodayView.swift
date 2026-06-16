@@ -13,6 +13,7 @@ import Photos
 
 struct TodayView: View {
     @ObservedObject private var engine = SyncEngine.shared
+    @ObservedObject private var attribution = AttributionEngine.shared
     @State private var showAccount = false
 
     var body: some View {
@@ -43,6 +44,22 @@ struct TodayView: View {
                         .listRowBackground(Color.clear)
                 }
 
+                // ── Just read · on-device (T0) ──
+                // The live capture demo: a frame shot at the site is read on-device
+                // (Apple Vision) the instant it uploads — the detection lands here
+                // in seconds, no network. A DETECTION (a label), not confirmed work.
+                if !engine.liveT0Atoms.isEmpty {
+                    Section {
+                        LiveT0Strip(atoms: engine.liveT0Atoms)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                    } header: {
+                        Label("Just read · on-device", systemImage: "wand.and.stars")
+                    } footer: {
+                        Text("Read on this phone in milliseconds — a detection, not confirmed work.")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+
                 // ── Understanding: the record assembling itself (BUILD_2 §G14) ──
                 // The mesh growing — days/frames becoming understood tick up live
                 // as the analysis engine lands them; the latest understood days
@@ -68,17 +85,44 @@ struct TodayView: View {
                     }
                     .disabled(engine.isSyncing)
 
+                    // Analyze Today — user-triggered on-device attribution run
+                    // (the tuning surface: the owner decides when to route the
+                    // day's photos home). On-device, free, no Mac, no GPU.
+                    Button {
+                        Task { await attribution.run() }
+                    } label: {
+                        if attribution.isRunning, attribution.progress.total > 0 {
+                            Label("Analyzing \(attribution.progress.done)/\(attribution.progress.total)…",
+                                  systemImage: "wand.and.stars")
+                        } else {
+                            Label("Analyze Today", systemImage: "wand.and.stars")
+                        }
+                    }
+                    .disabled(attribution.isRunning)
+
+                    // Confirm sessions — the backlog sweep: one tap routes a day's
+                    // photos to a vehicle (handles VIN-less + new-vehicle cases).
+                    NavigationLink {
+                        SessionConfirmView()
+                    } label: {
+                        Label("Confirm sessions", systemImage: "checklist")
+                    }
+
                     // Pause toggle — secondary; the big numbers are the hero
                     Toggle("Uploads", isOn: Binding(
                         get: { !engine.isPaused },
                         set: { engine.setPaused(!$0) }
                     ))
                 } footer: {
-                    // Privacy story: one line instead of a paragraph
-                    let held = engine.totalSkippedOffShop
-                    Text("On-site photos only · \(held) held back")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        // Privacy story: one line instead of a paragraph
+                        Text("On-site photos only · \(engine.totalSkippedOffShop) held back")
+                        if let s = attribution.lastSummary {
+                            Text(s)   // what the last Analyze Today run routed
+                        }
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("Today")
@@ -314,7 +358,14 @@ private struct LiveMetricsStrip: View {
                     }
                     .buttonStyle(.plain)
                 } else {
-                    MetricCell(label: "ANALYZED", value: "—")
+                    // 0, not a dead "—": for a new user the gap between UPLOADED
+                    // and ANALYZED is the pipeline working, not a failure. The
+                    // caption says so while there are photos still to understand.
+                    MetricCell(
+                        label: "ANALYZED",
+                        value: "0",
+                        caption: engine.serverStats.total_images > 0 ? "analyzing…" : nil
+                    )
                 }
             }
 
@@ -414,6 +465,34 @@ private struct RecentUploadsStrip: View {
             }
         }
         .frame(height: 72)
+    }
+}
+
+/// Live on-device T0 detections — each pops in as the frame is read (the demo's
+/// propagation): the local thumbnail + the detected label + confidence.
+private struct LiveT0Strip: View {
+    let atoms: [T0Atom]
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(atoms) { atom in
+                    VStack(spacing: 4) {
+                        AssetThumbnail(assetIdentifier: atom.assetID)
+                        Text(atom.label.replacingOccurrences(of: "_", with: " "))
+                            .font(.caption2).lineLimit(1)
+                        Text("\(Int(atom.confidence * 100))%")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(width: 72)
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .frame(height: 108)
+        .animation(.spring(response: 0.35, dampingFraction: 0.75), value: atoms.count)
     }
 }
 

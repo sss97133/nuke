@@ -39,15 +39,21 @@ struct CalendarDay: Decodable {
     let day: String          // "yyyy-MM-dd"
     let photos: Int
     let events: Int
-    let work: Int
+    let work: Int            // confirmed work SESSIONS that day
+    let work_minutes: Int    // confirmed labor minutes — the real value signal
+    let work_cost: Int       // job dollars on confirmed work
 }
 
-/// Day rows after grouping (one per calendar day, newest first).
+/// Day rows after grouping (one per calendar day, newest first). Carries the
+/// day-VALUE signals (labor minutes + job cost) so the timeline heats by real
+/// work, not photo count — a selfie day and a welding day must not read alike.
 struct DayRecord: Identifiable {
     let day: String
     var photos = 0
     var events = 0
     var work = 0
+    var workMinutes = 0
+    var workCost = 0
     var id: String { day }
 }
 
@@ -83,9 +89,10 @@ struct DayReceipt: Decodable {
         let narrative: String?          // one line: what the frame shows
         let components: [String]?       // detected parts (labels)
         let part_numbers: [String]?     // verbatim text / part numbers read
-        let intent: String?             // labor | inspection | parts_sourcing | …
+        let intent: String?             // labor | inspection | parts_sourcing | … (agent's read)
         let intent_confidence: Double?
         let intent_confirmed: Bool?     // owner-confirmed? (the $410 guard)
+        let owner_note: String?         // owner's OWN words about this frame (primary testimony)
         let analyzed_by: String?        // provenance: model/tier
         let analyzed_at: String?
     }
@@ -224,6 +231,7 @@ struct ProfileView: View {
     // The garage — the user's real vehicles (get_user_garage). The app had no
     // way in to a vehicle before this; each card opens VehicleDetailView.
     @State private var garage: [GarageVehicle] = []
+    @State private var garageLoaded = false      // gate the empty state so it never flashes
     @State private var openVehicle: GarageVehicle?
 
     // Owner-only: the phone↔record link, made visible. `sync` is the record's
@@ -245,7 +253,13 @@ struct ProfileView: View {
             }
 
             // GARAGE — the user's vehicles, the way into the whole drill chain.
-            if !garage.isEmpty { garageSection }
+            // Empty + own profile → a LIVING state that says what's coming, not a
+            // hidden section that reads as a dead profile (the cold-start gravestone).
+            if !garage.isEmpty {
+                garageSection
+            } else if isOwn && garageLoaded {
+                emptyGarageSection
+            }
 
             // SYNC — owner-only ledger that proves the phone↔record link.
             if isOwn { syncSection }
@@ -367,6 +381,25 @@ struct ProfileView: View {
             garage = rows
         } catch {
             NSLog("NukeCapture garage load failed: %@", String(describing: error))
+        }
+        garageLoaded = true
+    }
+
+    // ─── Empty garage — the living "what's coming" state (cold-start) ─────────
+    // A new user has no vehicles yet. Don't hide the section (dead profile) — say
+    // plainly how cars arrive: photos at a confirmed site develop into them.
+    private var emptyGarageSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("No vehicles yet")
+                    .foregroundStyle(Color.primary)
+                Text("Photos you take at a confirmed site develop into your vehicles — they'll appear here as they're recognized.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 2)
+        } header: {
+            Text("Garage")
         }
     }
 
@@ -518,13 +551,17 @@ struct ProfileView: View {
         // get_user_contribution_calendar → jsonb scalar; PostgREST array-wraps
         // it, so decode [[CalendarDay]] and take .first (same shape pattern as
         // get_user_day_receipt). An empty profile returns [] → no throw.
-        let wrapped: [[CalendarDay]] = try await SupabaseService.client
+        // RETURNS jsonb array → PostgREST sends it BARE (verified against prod:
+        // top-level list of day objects, NOT array-wrapped). Decode [CalendarDay]
+        // directly — the old [[CalendarDay]].first assumption threw and silently
+        // pinned every heavy user to the 1000-row-capped fallback.
+        let cal: [CalendarDay] = try await SupabaseService.client
             .rpc("get_user_contribution_calendar", params: ["p_user_id": userId])
             .execute()
             .value
-        let cal = wrapped.first ?? []
         return cal
-            .map { DayRecord(day: $0.day, photos: $0.photos, events: $0.events, work: $0.work) }
+            .map { DayRecord(day: $0.day, photos: $0.photos, events: $0.events,
+                             work: $0.work, workMinutes: $0.work_minutes, workCost: $0.work_cost) }
             .sorted { $0.day > $1.day }   // newest first (matches the day list)
     }
 
@@ -696,8 +733,15 @@ private func formatMinutes(_ m: Int) -> String {
 private struct PhotoFullScreenView: View {
     let photo: DayReceipt.Photo
     @Environment(\.dismiss) private var dismiss
-    @State private var confirmedIntent: String?     // optimistic local confirm
-    @State private var showConfirm = false
+    @FocusState private var composerFocused: Bool
+    @State private var confirmedIntent: String?     // legacy: photos confirmed via the old menu
+    // Owner free-text context composer — replaces the fixed-taxonomy intent menu.
+    // The owner writes in their own words; the in-house agent distills the category.
+    @State private var composing = false
+    @State private var draft = ""
+    @State private var submitting = false
+    @State private var localNote: String?           // optimistic note until the day reloads
+    @State private var noteError = false
     @State private var showVehicle = false          // drill to the vehicle detail
     // Pinch-zoom + pan on the image. Tap-to-dismiss is gone (it fought
     // interaction); a close button + drag-down (when not zoomed) dismiss.
@@ -705,9 +749,6 @@ private struct PhotoFullScreenView: View {
     @State private var lastZoom: CGFloat = 1
     @State private var pan: CGSize = .zero
     @State private var lastPan: CGSize = .zero
-
-    private static let intents = ["labor", "inspection", "parts_sourcing",
-                                  "communication", "acquisition", "documentation"]
 
     private var hasAtoms: Bool {
         photo.narrative != nil
@@ -718,6 +759,14 @@ private struct PhotoFullScreenView: View {
 
     private var confirmedValue: String? {
         confirmedIntent ?? (photo.intent_confirmed == true ? photo.intent : nil)
+    }
+
+    /// The owner's own words about this frame — optimistic local note first, else
+    /// whatever the day-receipt already carries. This is primary testimony.
+    private var ownerNote: String? {
+        if let n = localNote { return n }
+        let server = photo.owner_note?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (server?.isEmpty == false) ? server : nil
     }
 
     var body: some View {
@@ -788,11 +837,21 @@ private struct PhotoFullScreenView: View {
                     .foregroundStyle(.white.opacity(0.55))
             }
 
+            // Owner's voice — primary testimony, shown first and brightest. This is
+            // the source of truth; everything below is the agent's read of it.
+            if let note = ownerNote {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "quote.opening")
+                        .font(.caption2).foregroundStyle(.white.opacity(0.35))
+                    Text(note).font(.callout).foregroundStyle(.white)
+                }
+            }
+
             if hasAtoms {
                 if let narrative = photo.narrative {
                     Text(narrative)
-                        .font(.callout)
-                        .foregroundStyle(.white)
+                        .font(ownerNote == nil ? .callout : .caption)
+                        .foregroundStyle(ownerNote == nil ? .white : .white.opacity(0.6))
                 }
                 if let comps = photo.components, !comps.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -814,18 +873,21 @@ private struct PhotoFullScreenView: View {
                             .foregroundStyle(.white.opacity(0.85))
                     }
                 }
-                intentRow
+                intentHint
                 if let by = photo.analyzed_by {
                     Label("\(by)\(photo.analyzed_at.map { " · \($0.prefix(10))" } ?? "")",
                           systemImage: "checkmark.seal")
                         .font(.caption2)
                         .foregroundStyle(.white.opacity(0.4))
                 }
-            } else {
+            } else if ownerNote == nil {
                 Text("Analysis pending")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.4))
             }
+
+            // The owner can always add context — even on an unanalyzed frame.
+            contextRow
 
             // Drill to the vehicle — only when this frame is filed to one.
             vehicleRow
@@ -851,49 +913,103 @@ private struct PhotoFullScreenView: View {
         }
     }
 
-    @ViewBuilder private var intentRow: some View {
+    /// The agent's read — a soft hypothesis the owner's words refine, NOT a verdict
+    /// and NOT a menu. The owner authors testimony (contextRow); the in-house agent
+    /// distills the category from it out-of-band. A previously menu-confirmed photo
+    /// still shows its confirmed value.
+    @ViewBuilder private var intentHint: some View {
         if let confirmed = confirmedValue {
             Label("\(confirmed.capitalized) · confirmed", systemImage: "checkmark.circle.fill")
                 .font(.caption).foregroundStyle(.green)
         } else if let intent = photo.intent {
-            // The model guessed; only the owner confirms value (the $410 guard).
-            HStack(spacing: 8) {
-                Text("\(intent.capitalized)?")
-                    .font(.caption).foregroundStyle(.yellow)
+            HStack(spacing: 6) {
+                Text("reads as \(intent.replacingOccurrences(of: "_", with: " "))")
+                    .font(.caption).foregroundStyle(.white.opacity(0.55))
                 if let conf = photo.intent_confidence {
-                    Text(String(format: "%.2f", conf))
+                    Text(String(format: "%.0f%%", conf * 100))
                         .font(.caption2).monospacedDigit()
-                        .foregroundStyle(.yellow.opacity(0.7))
-                }
-                Spacer(minLength: 0)
-                Button("Why was this taken?") { showConfirm = true }
-                    .font(.caption).buttonStyle(.bordered).tint(.yellow)
-            }
-            .confirmationDialog("Why was this taken?",
-                                isPresented: $showConfirm, titleVisibility: .visible) {
-                ForEach(Self.intents, id: \.self) { opt in
-                    Button(opt.replacingOccurrences(of: "_", with: " ").capitalized) {
-                        confirm(opt)
-                    }
+                        .foregroundStyle(.white.opacity(0.4))
                 }
             }
         }
     }
 
-    private func confirm(_ intent: String) {
-        let previous = confirmedIntent
-        confirmedIntent = intent       // optimistic — rail flips to confirmed
+    /// The composer — the owner adds context in their own words. Replaces the fixed
+    /// six-item "Why was this taken?" menu. Available on every frame, analyzed or not.
+    @ViewBuilder private var contextRow: some View {
+        if composing {
+            VStack(alignment: .leading, spacing: 6) {
+                TextField("What was happening here?", text: $draft, axis: .vertical)
+                    .lineLimit(1...4)
+                    .focused($composerFocused)
+                    .font(.callout)
+                    .foregroundStyle(.white)
+                    .tint(.white)
+                    .padding(8)
+                    .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+                HStack(spacing: 14) {
+                    if noteError {
+                        Text("Didn't save — try again")
+                            .font(.caption2).foregroundStyle(.orange)
+                    }
+                    Spacer(minLength: 0)
+                    Button("Cancel") { cancelCompose() }
+                        .font(.caption).foregroundStyle(.white.opacity(0.6))
+                    Button(submitting ? "Saving…" : "Save") { submit() }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(draftIsEmpty ? .white.opacity(0.3) : .white)
+                        .disabled(submitting || draftIsEmpty)
+                }
+            }
+            .buttonStyle(.plain)
+        } else {
+            Button {
+                composing = true
+                composerFocused = true
+            } label: {
+                Label(ownerNote == nil ? "Add context" : "Add to context",
+                      systemImage: "text.bubble")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var draftIsEmpty: Bool {
+        draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func cancelCompose() {
+        composing = false
+        draft = ""
+        noteError = false
+        composerFocused = false
+    }
+
+    /// Land the owner's words as testimony (owner-gated add_photo_comment → a
+    /// vehicle_observations comment row). Optimistic: the note shows immediately;
+    /// on failure we keep the composer open with the text intact (no silent loss).
+    private func submit() {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        submitting = true
+        noteError = false
         Task {
             do {
                 _ = try await SupabaseService.client
-                    .rpc("confirm_photo_intent",
-                         params: ["p_image_id": photo.id.uuidString, "p_intent": intent])
+                    .rpc("add_photo_comment",
+                         params: ["p_image_id": photo.id.uuidString, "p_comment": text])
                     .execute()
+                localNote = text
+                draft = ""
+                composing = false
+                composerFocused = false
+                submitting = false
             } catch {
-                // Roll the optimistic flip back so the rail doesn't lie about a
-                // confirmation that never landed (no silent success).
-                confirmedIntent = previous
-                NSLog("NukeCapture confirm intent failed: %@", String(describing: error))
+                noteError = true
+                submitting = false
+                NSLog("NukeCapture add_photo_comment failed: %@", String(describing: error))
             }
         }
     }

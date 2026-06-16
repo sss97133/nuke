@@ -29,14 +29,16 @@ struct IgnitionView: View {
         NavigationStack {
             Group {
                 switch engine.phase {
-                case .off:
-                    // Pre-permission instant: blank system background; the
-                    // system dialog is the only voice here.
-                    Color(.systemGroupedBackground).ignoresSafeArea()
+                case .intro:
+                    // The one orientation a stranger needs, before the scan +
+                    // the system permission prompt. Begin starts the engine.
+                    IntroScreen(engine: engine)
                 case .scanning:
                     ScanScreen(engine: engine)
                 case .site:
                     SiteScreen(engine: engine)
+                case .empty:
+                    EmptyScreen(engine: engine)
                 case .denied:
                     DeniedScreen(engine: engine)
                 }
@@ -44,7 +46,95 @@ struct IgnitionView: View {
             .navigationTitle("Nuke")
             .navigationBarTitleDisplayMode(.inline)
         }
-        .task { await engine.start() }
+    }
+}
+
+// ─── Intro: the one line that turns a confused stranger into a believer ─────
+// The app's register is "report, never explain" — earned once the user knows
+// what Nuke IS. This single screen states the thesis, then gets out of the way.
+
+private struct IntroScreen: View {
+    @ObservedObject var engine: IgnitionEngine
+
+    var body: some View {
+        List {
+            Section {
+                Text("The photos you already take of your vehicle become its verified history — and its worth.")
+                    .font(.title3.weight(.medium))
+                    .padding(.vertical, 6)
+            }
+            Section {
+                LabeledContent("Next", value: "Scan this device for your shop")
+                LabeledContent("Uploads", value: "None until you confirm")
+            }
+            Section {
+                Button {
+                    Task { await engine.start() }
+                } label: {
+                    Text("Begin")
+                        .frame(maxWidth: .infinity)
+                        .fontWeight(.semibold)
+                }
+                .buttonStyle(.borderedProminent)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+            }
+        }
+        .task {
+            // Headless screenshot/demo walk auto-begins so the full ignition
+            // can be driven without a tap. DEBUG only.
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-IgnitionDemoWalk") {
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                await engine.start()
+            }
+            #endif
+        }
+    }
+}
+
+// ─── Empty: the scan found no located photos — the truth, not a blank app ───
+
+private struct EmptyScreen: View {
+    @ObservedObject var engine: IgnitionEngine
+
+    var body: some View {
+        List {
+            Section {
+                Text("No located photos found.")
+                    .font(.title3.weight(.medium))
+            } footer: {
+                Text("Nuke finds your shop from photo location data. Turn it on for your camera — Settings › Privacy › Location Services › Camera › While Using — then shoot a few photos at your work site.")
+            }
+            Section {
+                LabeledContent("Scanned") {
+                    Text("\(engine.totalToRead)").monospacedDigit()
+                }
+                LabeledContent("Located") {
+                    Text("0").monospacedDigit()
+                }
+            }
+            Section {
+                Button {
+                    engine.continueFromEmpty()
+                } label: {
+                    Text("Continue")
+                        .frame(maxWidth: .infinity)
+                        .fontWeight(.semibold)
+                }
+                .buttonStyle(.borderedProminent)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+            }
+        }
+        .task {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-IgnitionDemoWalk") {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                engine.continueFromEmpty()
+            }
+            #endif
+        }
     }
 }
 
@@ -164,6 +254,8 @@ private struct SiteScreen: View {
                          ? "One site"
                          : String(format: "Site %02d of %02d",
                                   engine.candidateIndex + 1, engine.candidates.count))
+                } footer: {
+                    Text("A site is a place you work on vehicles. Confirm it and photos shot here become your vehicle's record.")
                 }
 
                 // One-tap decision — no naming field (the name defaults to
