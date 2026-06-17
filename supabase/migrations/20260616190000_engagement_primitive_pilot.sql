@@ -87,7 +87,8 @@ BEGIN
   SELECT count(*) INTO v_comments FROM user_comments WHERE vehicle_id=p_vehicle_id;
   SELECT count(*) INTO v_contribs FROM vehicle_observations
    WHERE vehicle_id=p_vehicle_id AND structured_data->>'authored'='user_interaction'
-     AND kind IN ('media','condition','specification','sighting');
+     AND kind IN ('media','condition','specification','sighting')
+     AND is_superseded IS NOT TRUE;
   SELECT coalesce(jsonb_agg(r ORDER BY (r->>'at') DESC), '[]'::jsonb) INTO v_recent FROM (
     SELECT jsonb_build_object('id', u.id, 'text', u.comment_text, 'at', u.created_at,
              'author', coalesce(p.username, p.full_name, 'someone'),
