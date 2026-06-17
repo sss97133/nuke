@@ -29,6 +29,24 @@ struct ProfileRow: Decodable, Identifiable {
     let role: String?
 }
 
+/// get_user_producer_signals → the profile's live + lifetime PROOF-OF-WORK read.
+/// A signal is a function over the user's atomic data (a live feed), not a vanity
+/// count. We never surface confirmed-$ (all sessions unconfirmed → would lie).
+struct ProducerSignals: Decodable {
+    let last_worked: String?
+    let worked_today: Bool?
+    let work_days_total: Int?
+    let work_days_year: Int?
+    let hours_total: Int?
+    let hours_year: Int?
+    let current_streak: Int?
+    let longest_streak: Int?
+    let images_total: Int?
+    let images_analyzed: Int?
+    let images_today: Int?
+    let active_today: Bool?
+}
+
 /// One get_user_contribution_days row: (day, kind, n).
 struct ContributionRow: Decodable {
     let day: String          // "yyyy-MM-dd"
@@ -270,6 +288,8 @@ struct ProfileView: View {
     // Source: get_user_understanding.latest (same read as Today's "Latest understood").
     @State private var latest: [UserUnderstanding.Day] = []
     @State private var latestError = false
+    // Producer signals — the proof-of-work read that replaces vanity counts.
+    @State private var producer: ProducerSignals?
 
     var body: some View {
         List {
@@ -278,6 +298,17 @@ struct ProfileView: View {
             Section { identityHeader }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+
+            // BARCODE — the proof-of-work graph, directly under the identity (the
+            // labor story IS the headline; it belongs with the producer signals,
+            // not buried below sync).
+            if !days.isEmpty {
+                Section {
+                    BarcodeTimeline(days: days) { day in receiptDay = day }
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                }
+            }
 
             // GARAGE — the user's vehicles, the way into the whole drill chain.
             // Empty + own profile → a LIVING state that says what's coming, not a
@@ -306,17 +337,6 @@ struct ProfileView: View {
                         Button("Retry") { Task { await load() } }
                             .font(.footnote)
                     }
-                }
-            }
-
-            // Barcode timeline — full-span contribution instrument.
-            if !days.isEmpty {
-                Section {
-                    BarcodeTimeline(days: days) { day in
-                        receiptDay = day
-                    }
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
                 }
             }
 
@@ -352,6 +372,7 @@ struct ProfileView: View {
         .task(id: userId) { await loadSync() }   // owner-only inside loadSync
         .task(id: userId) { await loadGarage() }
         .task(id: userId) { await loadLatest() }
+        .task(id: userId) { await loadProducer() }
     }
 
     // ─── Latest work — recent understood days as stories (get_user_understanding) ─
@@ -408,6 +429,18 @@ struct ProfileView: View {
         }
     }
 
+    /// The proof-of-work signals for the header (get_user_producer_signals, one call).
+    private func loadProducer() async {
+        do {
+            producer = try await SupabaseService.client
+                .rpc("get_user_producer_signals", params: ["p_user_id": userId])
+                .execute()
+                .value
+        } catch {
+            NSLog("NukeCapture producer signals failed: %@", String(describing: error))
+        }
+    }
+
     // ─── Identity header — the builder, front and center ─────────────────────
     @ViewBuilder private var identityHeader: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -446,12 +479,43 @@ struct ProfileView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            // The numbers — real, from data already loaded; never a fabricated stat.
-            HStack(spacing: 22) {
-                if !garage.isEmpty { stat("\(garage.count)", "vehicles") }
-                if !days.isEmpty { stat("\(days.count)", "days") }
+            // LIVE STATE — is this node producing NOW? The first "worth-connecting-to"
+            // read. Capture-or-work based (uploading today counts), honest when idle.
+            if let p = producer {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(p.active_today == true ? Color.green : Color.secondary)
+                        .frame(width: 7, height: 7)
+                    Text(activityLine(p))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+
+            // PRODUCER SIGNALS — functions over the work record, not vanity counts.
+            // ("8 vehicles" was a dead count; this is "did they do the work".)
+            if let p = producer {
+                HStack(spacing: 22) {
+                    if let hy = p.hours_year, hy > 0 { stat("\(hy)h", "this year") }
+                    if let wy = p.work_days_year, wy > 0 { stat("\(wy)", "work-days") }
+                    if let ls = p.longest_streak, ls > 0 { stat("\(ls)", "best streak") }
+                    if let an = p.images_analyzed, an > 0 { stat(an.formatted(), "analyzed") }
+                }
             }
         }
+    }
+
+    /// "Active today · 220 photos" when producing now; "Last worked 24 days ago"
+    /// when idle — honest either way, never a fake streak.
+    private func activityLine(_ p: ProducerSignals) -> String {
+        if p.worked_today == true { return "Worked today" }
+        if p.active_today == true {
+            let n = p.images_today ?? 0
+            return n > 0 ? "Active today · \(n) photos" : "Active today"
+        }
+        if let last = p.last_worked {
+            return "Last worked \(last)"
+        }
+        return "No work logged yet"
     }
 
     @ViewBuilder private func stat(_ value: String, _ label: String) -> some View {
