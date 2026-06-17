@@ -119,6 +119,14 @@ struct VehicleDetailView: View {
     @State private var galleryError = false
     @State private var valuationError = false
     @State private var daysError = false
+    // ENGAGEMENT — the unified interaction grammar (record_interaction /
+    // get_vehicle_engagement): the visitor's job is to contribute, every action a
+    // typed observation. v1 rungs: follow (signal) + comment (testimony).
+    @State private var engagement: VehicleEngagement?
+    @State private var engagementError = false
+    @State private var commentDraft = ""
+    @State private var posting = false
+    @State private var followBusy = false
     @State private var galleryOpen = false
     @State private var selectedPhoto: VehicleGalleryImage?  // photo→analysis drill
     @State private var provenanceDrill: SpecDrill?          // spec value → its source
@@ -159,6 +167,7 @@ struct VehicleDetailView: View {
         .task(id: vehicleId) { await loadValuation() }
         .task(id: vehicleId) { await loadVehicleDays() }
         .task(id: vehicleId) { await loadBookends() }
+        .task(id: vehicleId) { await loadEngagement() }
         .sheet(item: $provenanceDrill) { drill in
             FieldProvenanceSheet(vehicleId: vehicleId, drill: drill)
         }
@@ -240,6 +249,8 @@ struct VehicleDetailView: View {
                     InvestmentProofView(vehicleId: vehicleId)   // PROOF — dollars in
                 }
                 buildTimeline        // RHYTHM — the build's working days, heat over time
+                engagementSection    // ENGAGE: the visitor's job — follow / comment (above the
+                                     // photo wall, not buried under 60 frames)
                 photoStrip           // the photos (each → its analysis)
                 assetWindow          // ASSET: his relationship/provenance
                 specTable            // TECHNICAL reference — demoted below the story
@@ -598,6 +609,145 @@ struct VehicleDetailView: View {
             .padding(.bottom, 16)
         } else if galleryError {
             sectionError("photos") { Task { await loadGalleryPage(reset: true) } }
+        }
+    }
+
+    // ─── ENGAGE — the visitor's job, the engagement ladder made real. Every
+    // action is a typed interaction through ONE grammar (record_interaction):
+    // FOLLOW is signal (→ user_interactions); COMMENT is testimony (→ a kind=comment
+    // observation on the spine, authored by the user, trust-weighted). The counts
+    // are depth (following · weighed-in · contributions), never hearts.
+    @ViewBuilder private var engagementSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("ENGAGE")
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(.secondary)
+
+            // Counts + Follow — the signal rung.
+            HStack(spacing: 14) {
+                if let e = engagement {
+                    Button {
+                        Task { await toggleFollow() }
+                    } label: {
+                        Label(e.is_following ? "Following" : "Follow",
+                              systemImage: e.is_following ? "checkmark" : "plus")
+                            .font(.footnote.weight(.medium))
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(followBusy)
+
+                    Text(engagementCounts(e))
+                        .font(.caption).monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                } else if engagementError {
+                    Button("Retry") { Task { await loadEngagement() } }.font(.footnote)
+                } else {
+                    ProgressView().scaleEffect(0.7)
+                }
+            }
+
+            // Comment composer — the testimony rung. Any signed-in user contributes.
+            if SupabaseService.currentUserId != nil {
+                HStack(spacing: 8) {
+                    TextField("Add a comment…", text: $commentDraft, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .lineLimit(1...4)
+                        .submitLabel(.send)
+                    Button {
+                        Task { await postComment() }
+                    } label: {
+                        if posting { ProgressView().scaleEffect(0.7) }
+                        else { Image(systemName: "arrow.up.circle.fill").font(.title3) }
+                    }
+                    .disabled(posting || commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .padding(10)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+            } else {
+                Text("Sign in to weigh in.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            // Recent testimony.
+            if let e = engagement, !e.recent_comments.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(e.recent_comments) { c in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(c.text ?? "")
+                                .font(.footnote)
+                                .foregroundStyle(.primary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text("\(c.is_me == true ? "you" : (c.author ?? "someone"))\(c.at.map { " · " + String($0.prefix(10)) } ?? "")")
+                                .font(.caption2).monospacedDigit()
+                                .foregroundStyle(.tertiary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+                .padding(.top, 2)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 16)
+    }
+
+    private func engagementCounts(_ e: VehicleEngagement) -> String {
+        var parts: [String] = []
+        if e.following_count > 0 { parts.append("\(e.following_count) following") }
+        if e.comment_count > 0 { parts.append("\(e.comment_count) weighed in") }
+        if e.contribution_count > 0 { parts.append("\(e.contribution_count) contributions") }
+        return parts.isEmpty ? "Be the first to weigh in" : parts.joined(separator: " · ")
+    }
+
+    private func loadEngagement() async {
+        engagementError = false
+        do {
+            engagement = try await SupabaseService.client
+                .rpc("get_vehicle_engagement", params: ["p_vehicle_id": vehicleId])
+                .execute()
+                .value
+        } catch {
+            engagementError = true
+            NSLog("NukeCapture engagement load failed: %@", String(describing: error))
+        }
+    }
+
+    private func toggleFollow() async {
+        followBusy = true
+        defer { followBusy = false }
+        do {
+            _ = try await SupabaseService.client
+                .rpc("record_interaction", params: [
+                    "p_kind": "follow", "p_target_type": "vehicle", "p_target_id": vehicleId,
+                ])
+                .execute()
+            await loadEngagement()
+        } catch {
+            NSLog("NukeCapture follow failed: %@", String(describing: error))
+        }
+    }
+
+    private func postComment() async {
+        let text = commentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        posting = true
+        defer { posting = false }
+        struct CommentParams: Encodable {
+            let p_kind = "comment"; let p_target_type = "vehicle"
+            let p_target_id: String; let p_payload: [String: String]
+        }
+        do {
+            _ = try await SupabaseService.client
+                .rpc("record_interaction",
+                     params: CommentParams(p_target_id: vehicleId, p_payload: ["text": text]))
+                .execute()
+            commentDraft = ""
+            await loadEngagement()
+        } catch {
+            NSLog("NukeCapture comment post failed: %@", String(describing: error))
         }
     }
 
@@ -1292,6 +1442,24 @@ struct VehicleValuation: Decodable {
     let calculated_at: String?
     let price_tier: String?
     let model_version: String?
+}
+
+/// get_vehicle_engagement(vehicle) → one jsonb object: the engagement ladder's
+/// surface (signal counts + recent testimony). Bare object, decode directly.
+struct VehicleEngagement: Decodable {
+    let following_count: Int
+    let is_following: Bool
+    let comment_count: Int
+    let contribution_count: Int
+    let recent_comments: [Comment]
+
+    struct Comment: Decodable, Identifiable {
+        let id: UUID
+        let text: String?
+        let at: String?
+        let author: String?
+        let is_me: Bool?
+    }
 }
 
 /// get_field_provenance(vehicle, field) → one jsonb object. Every piece optional
