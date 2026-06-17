@@ -430,6 +430,45 @@ async function ingest() {
       }
     }
 
+    // ─── ARM 2b: the search/convergence ENGINE row (image_observations) — Tier 2.
+    // W2 fix: until now the deep writer wrote ai_scan_metadata + a vehicle_observation but
+    // NOT this row, so visual search was dark (placed_t2 ~5%). Mirror the cascade's ARM2b
+    // (process-photo-cascade.mjs) so every deep verdict also lands in the engine. The deep
+    // writer OWNS image_observations (observed_by='caller-byok'); ingest_image_observation
+    // is idempotent (dedups by image_id+observed_by+agent_version), so this is re-run safe.
+    try {
+      const so = v.state_observations || {};
+      const cp = v.camera_pose || {};
+      const role = v.scene_type === 'data_plate' ? 'vin'
+                 : (v.intent === 'parts_sourcing' || v.scene_type === 'product_screenshot') ? 'part'
+                 : 'subject';
+      const comps = Array.isArray(v.components_seen) ? v.components_seen : [];
+      const primary = comps.filter((c) => Array.isArray(c?.bbox))
+        .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))[0];
+      const vsig = {
+        ...(so.paint_state ? { paint_state: so.paint_state } : {}),
+        ...(so.rust_severity ? { rust: so.rust_severity } : {}),
+        ...(v.build_phase_guess ? { build_phase: v.build_phase_guess } : {}),
+        ...(typeof cp.azimuth_deg === 'number' ? { camera_azimuth_deg: cp.azimuth_deg } : {}),
+        scene_type: v.scene_type ?? 'unknown',
+      };
+      const { error: ioErr } = await sb.rpc('ingest_image_observation', {
+        p_image_id: v.image_id, p_vehicle_id: v.vehicle_id, p_role: role,
+        p_confidence: v.confidence ?? 0.7,
+        p_observed_by: 'caller-byok', p_agent_version: v.provenance?.agent_model ?? 'byok_v3_opus48',
+        p_confidence_basis: { source: 'deep_byok', scene_type: v.scene_type ?? null, intent: v.intent ?? null, narrative: v.narrative_one_line ?? null },
+        p_layer_version: { writer: 'deep-image-analysis-byok', prompt_version: 'byok_v3_camera_pose_2026-05-23' },
+      });
+      if (ioErr) console.error(`  image_observations rpc failed for ${String(v.image_id).slice(0,8)}: ${ioErr.message}`);
+      else if (primary?.bbox || Object.keys(vsig).length) {
+        await sb.from('image_observations')
+          .update({ ...(primary?.bbox ? { bbox: primary.bbox } : {}), visual_signature: vsig })
+          .eq('image_id', v.image_id).eq('observed_by', 'caller-byok').eq('is_active', true);
+      }
+    } catch (e) {
+      console.error(`  image_observations write threw for ${String(v.image_id).slice(0,8)}: ${e.message}`);
+    }
+
     wrote++;
   }
 
