@@ -282,3 +282,30 @@ candidates (inflow-first, then biggest backlog) from the counter table and
 `byok-fleet-batch.sh` drains one bounded batch per fire, self-advancing past drained
 vehicles. State lives in the DB (counter + prepare's live queue), so it is idempotent and
 resumable — killing it mid-fire loses nothing.
+
+### Why the cascade arms 3–5 are still empty — it's entity resolution, not wiring (2026-06-17)
+
+`process-photo-cascade.mjs` "wrote 3 rows ever" not because it's unwired but because arms
+3–5 require **resolved org-entity IDs the BYOK verdict does not produce**:
+- ARM3 `technician_work_evidence` needs `person_visible.technician_id`
+- ARM4 `equipment_usage_evidence` needs `tools_visible[].equipment_id`
+- ARM5 `consumables` needs `consumables_used[].consumable_id`
+
+The deep verdict observes *that* a person/tool/substance is present (`presence`,
+`workshop_signals`) but does not resolve them to entities. So "wiring the arms" against the
+verdict just makes them skip (no IDs). The missing layer is the doctrine I keep forgetting —
+*everything is an entity with observed service provenance* (`feedback_everything_is_an_
+entity_with_service_provenance`): person/equipment/consumable must resolve/create through the
+organizations→services→observations path, not a hardcoded registry. **That resolution layer
+is the actual Phase-5 work, and it is a sub-system, not a wire.**
+
+And ARM3/ARM5 feed **labor → value**. Auto-creating technician work-evidence from "a person
+is visible in a photo" is exactly the class of error behind the $410-text-to-dad incident
+(`feedback_photo_intent_must_be_confirmed_not_assumed`): value accrues ONLY from owner-
+confirmed labor; `intent_confidence < 0.6 ⇒ needs_clarification`; `work_sessions` stay
+`owner_confirmed_at = NULL` until the human signs. So the value arms are owner-gated by
+design — they must surface evidence as **unconfirmed**, never auto-accrue. The micro-atoms
+the verdict already captures (`components_seen`, `workshop_signals`, `presence`) are
+preserved in `ai_scan_metadata.byok_deep_analysis` + the vehicle_observation's
+`structured_data`, ready for that resolution pass to consume — the data isn't lost, the
+resolver is what's unbuilt.
