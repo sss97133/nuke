@@ -128,6 +128,45 @@ function extractCoreModel(normalizedModel: string): string {
 // ============================================================================
 // STEP 1: BASE PRICE FROM COMPARABLES (multi-tier matching)
 // ============================================================================
+// Build class from the subject's OWN evidence (vehicle_condition_scores.descriptor_summary).
+// A frame-off resto-mod must not be priced on the stock-comp median — it belongs to the
+// upper tail of its make/model/year distribution (where built examples actually sell).
+async function getBuildClass(supabase: any, vehicleId: string): Promise<string> {
+  const { data } = await supabase
+    .from("vehicle_condition_scores")
+    .select("descriptor_summary, condition_tier, observation_count")
+    .eq("vehicle_id", vehicleId)
+    .limit(1);
+  if (!data || data.length === 0) return "unknown";
+  const r = data[0];
+  const ds = r.descriptor_summary || {};
+  const obs = r.observation_count || 1;
+  const mods = Object.keys(ds)
+    .filter((k) => /aftermarket|non_original|forced_induction|lifted|restored|swap|modification/.test(k))
+    .reduce((s, k) => s + ((ds[k] && ds[k].count) || 0), 0);
+  const modDensity = mods / Math.max(obs, 1);
+  if (modDensity >= 0.15) return "restomod";       // heavy documented modification
+  if (r.condition_tier === "project") return "project";
+  if (["concours", "show", "excellent", "survivor"].includes(r.condition_tier)) return "survivor";
+  return "unknown";
+}
+
+// Class-aware anchor: pick the percentile of the comp pool that matches the subject's
+// build class, instead of always taking the stock-dominated median. Unknown class →
+// the prior recency-weighted median (no behavior change).
+function classAwareAnchor(rows: any[], buildClass: string): number {
+  if (buildClass === "unknown") return recencyWeightedMedian(rows);
+  const prices = rows.map((r) => r.best_price).filter((p) => p > 0).sort((a, b) => a - b);
+  if (prices.length === 0) return 0;
+  const pct = (p: number) => prices[Math.min(prices.length - 1, Math.max(0, Math.round((p / 100) * (prices.length - 1))))];
+  switch (buildClass) {
+    case "restomod": return pct(82);   // documented high-end build → upper tail
+    case "survivor": return pct(55);
+    case "project":  return pct(30);
+    default:         return recencyWeightedMedian(rows);
+  }
+}
+
 async function getBasePrice(supabase: any, vehicle: any): Promise<{
   basePrice: number;
   compCount: number;
@@ -140,6 +179,11 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
   if (!make || !year) {
     return { basePrice: 0, compCount: 0, method: "none" };
   }
+
+  // Subject build class → which percentile of the comp pool anchors the estimate.
+  const buildClass = await getBuildClass(supabase, vehicle.id);
+  const anchor = (rows: any[]) => classAwareAnchor(rows, buildClass);
+  const label = (tier: string) => (buildClass !== "unknown" ? "class_stratified" : tier);
 
   // ---- Tier 1: Canonical model aliases (best quality match) ----
   if (model) {
@@ -217,8 +261,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
         .limit(300);
 
       if (canonComps && canonComps.length >= 3) {
-        const median = recencyWeightedMedian(canonComps);
-        return { basePrice: median, compCount: canonComps.length, method: "canonical" };
+        return { basePrice: anchor(canonComps), compCount: canonComps.length, method: label("canonical") };
       }
     }
   }
@@ -237,8 +280,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
       .limit(300);
 
     if (compRows && compRows.length >= 3) {
-      const median = recencyWeightedMedian(compRows);
-      return { basePrice: median, compCount: compRows.length, method: "exact" };
+      return { basePrice: anchor(compRows), compCount: compRows.length, method: label("exact") };
     }
   }
 
@@ -258,8 +300,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
         .limit(300);
 
       if (normComps && normComps.length >= 3) {
-        const median = recencyWeightedMedian(normComps);
-        return { basePrice: median, compCount: normComps.length, method: "normalized" };
+        return { basePrice: anchor(normComps), compCount: normComps.length, method: label("normalized") };
       }
     }
   }
@@ -280,8 +321,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
         .limit(300);
 
       if (coreComps && coreComps.length >= 3) {
-        const median = recencyWeightedMedian(coreComps);
-        return { basePrice: median, compCount: coreComps.length, method: "core_model" };
+        return { basePrice: anchor(coreComps), compCount: coreComps.length, method: label("core_model") };
       }
     }
   }
@@ -298,8 +338,8 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
     .limit(200);
 
   if (makeComps && makeComps.length > 0) {
-    const median = recencyWeightedMedian(makeComps);
-    return { basePrice: median, compCount: makeComps.length, method: "make_fallback" };
+    // Make-only is too coarse to trust a class anchor → keep the median even when classed.
+    return { basePrice: recencyWeightedMedian(makeComps), compCount: makeComps.length, method: "make_fallback" };
   }
 
   return { basePrice: 0, compCount: 0, method: "none" };
