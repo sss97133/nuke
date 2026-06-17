@@ -1090,12 +1090,12 @@ struct VehicleDetailView: View {
     private func loadBookends() async {
         func cols() -> String { "id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status" }
         do {
-            // "After" = the PRIMARY (the owner's curated lead, what it became) if one
-            // exists, else the latest dated frame.
+            // "After" = the build's CURRENT state: the latest dated frame. is_primary
+            // is NOT used here — the pipeline keeps resetting it to an older frame, which
+            // would show a stale "after" (the same staleness the hero fix addresses).
             let latest: [VehicleGalleryImage] = try await SupabaseService.client
                 .from("vehicle_images").select(cols())
                 .eq("vehicle_id", value: vehicleId)
-                .order("is_primary", ascending: false)
                 .order("taken_at", ascending: false)
                 .limit(1).execute().value
             guard let a = latest.first else { return }
