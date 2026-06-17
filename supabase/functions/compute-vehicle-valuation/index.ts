@@ -207,7 +207,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
     if (bestCanonical) {
       const { data: canonComps } = await supabase
         .from("clean_vehicle_prices")
-        .select("best_price, is_sold, updated_at")
+        .select("best_price, is_sold, updated_at, price_source")
         .ilike("make", make)
         .ilike("model", `%${bestCanonical}%`)
         .gte("year", year - 5)
@@ -248,7 +248,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
     if (normalizedModel && normalizedModel !== model.toLowerCase()) {
       const { data: normComps } = await supabase
         .from("clean_vehicle_prices")
-        .select("best_price, is_sold, updated_at")
+        .select("best_price, is_sold, updated_at, price_source")
         .ilike("make", make)
         .ilike("model", `%${normalizedModel}%`)
         .gte("year", year - 5)
@@ -270,7 +270,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
     if (coreModel && coreModel.length >= 2) {
       const { data: coreComps } = await supabase
         .from("clean_vehicle_prices")
-        .select("best_price, is_sold, updated_at")
+        .select("best_price, is_sold, updated_at, price_source")
         .ilike("make", make)
         .ilike("model", `%${coreModel}%`)
         .gte("year", year - 5)
@@ -305,13 +305,26 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
   return { basePrice: 0, compCount: 0, method: "none" };
 }
 
+// Consecration of a price by its TYPE — the field's authority to confer worth.
+// Doctrine: docs/library/intellectual/contemplations/habitus-and-the-exchange.md (Law 2).
+// A consummated sale is the supreme consecratory act; an asking price is an ASK,
+// not a sale, and should not anchor a valuation the way a hammer price does.
+const PRICE_CONSECRATION: Record<string, number> = {
+  sale_price: 1.0, // consummated sale — money moved
+  bat_sold_price: 1.0, // consummated BaT sale
+  winning_bid: 0.9, // auction close
+  high_bid: 0.6, // auction high — not necessarily sold
+  asking_price: 0.35, // a listing is an ask, not a consecration
+  current_value: 0.25, // owner/derived estimate
+};
+
 function recencyWeightedMedian(rows: any[]): number {
   const now = Date.now();
   const sixMonths = 180 * 24 * 60 * 60 * 1000;
   const oneYear = 365 * 24 * 60 * 60 * 1000;
   const twoYears = 730 * 24 * 60 * 60 * 1000;
 
-  // Apply recency weights
+  // Apply recency + consecration weights
   const weighted: { price: number; weight: number }[] = rows.map((r: any) => {
     const age = now - new Date(r.updated_at).getTime();
     let weight = 0.3;
@@ -320,6 +333,8 @@ function recencyWeightedMedian(rows: any[]): number {
     else if (age < twoYears) weight = 0.4;
     // Sold vehicles get a boost
     if (r.is_sold) weight *= 1.2;
+    // Consecration: weight by how much the price TYPE confers worth (sale >> ask)
+    weight *= PRICE_CONSECRATION[r.price_source as string] ?? 0.5;
     return { price: Number(r.best_price), weight };
   });
 
@@ -345,24 +360,28 @@ async function getConditionMultiplier(supabase: any, vehicleId: string): Promise
   multiplier: number;
   sourceCount: number;
 }> {
-  // Check condition_assessments for severity data
-  const { data: assessments } = await supabase
-    .from("condition_assessments")
-    .select("severity, value_impact")
-    .eq("vehicle_id", vehicleId);
+  // Real source: vehicle_condition_scores. (`condition_assessments` was a PHANTOM
+  // table — the query silently returned null, so this signal read as "no data" for
+  // every vehicle.) KEYSTONE: check {error} loudly so a missing relation can never
+  // again masquerade as missing data.
+  //
+  // CRITICAL: condition_score is teardown-INCLUSIVE — built from the as-found/build
+  // photos (rust, oxidation, paint-fading) — so it must NOT penalize a FINISHED
+  // resto-mod. Until build-class-aware scoring lands, record that condition data is
+  // PRESENT (sourceCount) but keep the multiplier NEUTRAL — never a condition-blind cut.
+  const { data: scores, error } = await supabase
+    .from("vehicle_condition_scores")
+    .select("condition_score, observation_count, zone_coverage")
+    .eq("vehicle_id", vehicleId)
+    .limit(1);
 
-  if (!assessments || assessments.length === 0) {
+  if (error) console.error("[valuation] condition query error (vehicle_condition_scores):", error.message);
+  if (!scores || scores.length === 0) {
     return { multiplier: 1.0, sourceCount: 0 };
   }
-
-  // Average severity: 1=minor, 5=critical
-  // More issues and higher severity = lower multiplier
-  const avgSeverity = assessments.reduce((s: number, a: any) => s + (a.severity || 3), 0) / assessments.length;
-  const issueCount = assessments.length;
-
-  // Scale: 0 issues = 1.15x (excellent), many severe = 0.75x
-  let multiplier = 1.15 - (avgSeverity / 5) * 0.4 - Math.min(issueCount, 10) * 0.01;
-  return { multiplier: clamp(multiplier, 0.75, 1.15), sourceCount: assessments.length };
+  // Neutral multiplier on purpose (class-aware scoring TODO); sourceCount proves the
+  // signal is now firing on real data instead of a phantom table.
+  return { multiplier: 1.0, sourceCount: scores[0].observation_count || 0 };
 }
 
 async function getRarityMultiplier(supabase: any, vehicle: any): Promise<{
@@ -555,23 +574,29 @@ async function getOriginalityMultiplier(supabase: any, vehicleId: string): Promi
   multiplier: number;
   sourceCount: number;
 }> {
-  // Check vehicle_condition_profiles or condition assessments for originality signals
-  const { data: profile } = await supabase
-    .from("vehicle_condition_profiles")
-    .select("overall_score")
+  // Real source: vehicle_condition_scores.descriptor_summary. (`vehicle_condition_profiles`
+  // was a PHANTOM table.) KEYSTONE: check {error} loudly.
+  //
+  // CRITICAL: for a RESTO-MOD, modifications are VALUE, not a penalty. The old logic
+  // (less original → lower multiplier) would punish a documented build. Until build-
+  // class-aware scoring lands, record the build-evidence is PRESENT (sourceCount of
+  // mod atoms) but keep the multiplier NEUTRAL — never penalize documented mods.
+  const { data: scores, error } = await supabase
+    .from("vehicle_condition_scores")
+    .select("descriptor_summary")
     .eq("vehicle_id", vehicleId)
     .limit(1);
 
-  if (!profile || profile.length === 0) {
+  if (error) console.error("[valuation] originality query error (vehicle_condition_scores):", error.message);
+  if (!scores || scores.length === 0) {
     return { multiplier: 1.0, sourceCount: 0 };
   }
-
-  const p = profile[0];
-  const score = p.overall_score || 50;
-  // Score 0-100: 100 = perfect original, 0 = heavily modified/damaged
-  // Map to multiplier range 0.90 - 1.12
-  const multiplier = 0.90 + (score / 100) * 0.22;
-  return { multiplier: clamp(multiplier, 0.90, 1.12), sourceCount: 1 };
+  const ds = scores[0].descriptor_summary || {};
+  // Build-evidence atoms: aftermarket / non-original / forced-induction / lifted / restored.
+  const modCount = Object.keys(ds)
+    .filter((k) => /aftermarket|non_original|forced_induction|lifted|restored|modification/.test(k))
+    .reduce((s, k) => s + ((ds[k] && ds[k].count) || 0), 0);
+  return { multiplier: 1.0, sourceCount: modCount };
 }
 
 // ============================================================================
@@ -707,13 +732,12 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
     if (vehicle.sale_price && vehicle.sale_price > 0) {
       return { error: "no_independent_comps", vehicleId };
     }
-    // If asking_price exists but no sale_price, allow as low-confidence base
-    const fallbackPrice = vehicle.asking_price || vehicle.current_value;
-    if (fallbackPrice && fallbackPrice > 0) {
-      basePrice = fallbackPrice;
-      compCount = 0;
-      compMethod = "self_price_fallback";
-    }
+    // No independent comps AND no sale price. Do NOT fall back to the vehicle's own
+    // asking_price / current_value: deriving the estimate from the ask is circular — it
+    // produces a fixed asking×~1.8 "estimate" and a meaningless (constant) deal score, which
+    // is exactly the contamination that made the deal output untrustworthy. Leave
+    // nuke_estimate NULL. "Not enough comps to value this" is a truthful, meaningful state.
+    return { error: "no_independent_comps", vehicleId };
   }
 
   if (basePrice <= 0) {
