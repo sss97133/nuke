@@ -675,6 +675,21 @@ const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "get_make_model_terminal",
+    description:
+      "Return the cohort terminal for a year-make-model: the full market-intelligence envelope for a model line, not a single VIN. Includes population count, price distribution (min/median/max, percentiles), market flow (listing/sale velocity over time), sentiment, dealer flow, comparable sales, production/survival estimates, and the cited consensus fields that summarize the cohort. Backed by the get_make_model_terminal RPC. Pass grain='generation' to widen the cohort to a full generation; default 'year'.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        make: { type: "string" },
+        model: { type: "string" },
+        year: { type: "number" },
+        grain: { type: "string", description: "year|generation, default year" },
+      },
+      required: ["make", "model"],
+    },
+  },
+  {
     name: "query_market_history",
     description:
       "Get all auction and listing events for a vehicle or model cohort. Returns chronological event history including final prices, bid counts, platforms, and outcomes.",
@@ -797,7 +812,7 @@ const TOOLS: ToolDef[] = [
       properties: {
         subject_kind: {
           type: "string",
-          enum: ["image", "vehicle", "person", "cluster", "user"],
+          enum: ["image", "vehicle", "person", "cluster", "user", "make_model"],
           description: "What kind of subject the caller is observing. 'user' added 2026-05-24 — exposes user.has_profile / display_identity / contact_surface / role_set / possession_set / vendor_preference_signal / daily_activity_density / relationship_map.",
         },
         layers: {
@@ -823,8 +838,8 @@ const TOOLS: ToolDef[] = [
       type: "object",
       properties: {
         attribute: { type: "string", description: "Canonical attribute name from get_attribute_checklist (e.g. 'image.has_vehicle', 'vehicle.exterior_color')" },
-        subject_id: { type: "string", description: "UUID of the subject (vehicle_id, image_id, person_id, cluster_id, user_id) the answer applies to" },
-        subject_kind: { type: "string", enum: ["image", "vehicle", "person", "cluster", "user"] },
+        subject_id: { type: "string", description: "UUID of the subject (vehicle_id, image_id, person_id, cluster_id, user_id, make_model subject_id) the answer applies to" },
+        subject_kind: { type: "string", enum: ["image", "vehicle", "person", "cluster", "user", "make_model"] },
         value: { description: "The caller's answer. Shape must match the registry's expected_shape; enums must match enum_values; will be validated before insert." },
         evidence: {
           type: "object",
@@ -949,7 +964,7 @@ const TOOLS: ToolDef[] = [
     inputSchema: {
       type: "object",
       properties: {
-        subject_kind: { type: "string", enum: ["image", "vehicle", "user"], description: "What kind of subject to surface (default image)" },
+        subject_kind: { type: "string", enum: ["image", "vehicle", "user", "make_model"], description: "What kind of subject to surface (default image)" },
         vehicle_id: { type: "string", description: "Optional vehicle UUID — for image discovery, scopes to a single build (uses composite index, fast). Without it, samples by primary key (no date sort)." },
         min_atoms: { type: "number", description: "Subjects with fewer than this many atoms qualify (default 3)" },
         limit: { type: "number", description: "Max subjects to return (default 20, max 200)" },
@@ -974,6 +989,31 @@ const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "propose_attribute",
+    description:
+      "Propose a NOVEL attribute the registry LACKS (e.g. 'image.weld_pattern_type', 'image.media_blast_profile', 'image.period_correct_finish') so a real discovery isn't lost when get_attribute_checklist has no slot for it. " +
+      "This is the ONLY tool that can grow the attribute vocabulary — without it, anything the checklist doesn't already name is dropped. Records a schema_proposals row (proposal_type='add_image_attribute', status='open') with full source DNA. A human curator reviews and promotes accepted proposals into attribute-registry.ts; promotion stays HUMAN by design (laser-tag doctrine — the agent grows the vocabulary, the human signs it). " +
+      "Use only when you can clearly OBSERVE and CITE something the registry can't capture. Don't propose duplicates of existing attributes (call get_attribute_checklist first).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        attribute: { type: "string", description: "Proposed canonical name, namespaced (e.g. 'image.weld_pattern_type')" },
+        subject_kind: { type: "string", enum: ["image", "vehicle", "person", "cluster", "user", "make_model"] },
+        prompt: { type: "string", description: "The instruction a caller agent would run to answer this attribute" },
+        expected_shape: { type: "string", enum: ["string", "number", "boolean", "enum", "ratio_0_1", "bbox", "uuid", "iso_date", "iso_timestamp", "structured"] },
+        admissible_evidence: { type: "array", items: { type: "string", enum: ["image", "vin_decode", "document", "owner_claim", "context_atoms"] }, description: "Which evidence classes may legitimately cite this attribute (anti-laundering rule). Defaults to ['image']." },
+        result_kind: { type: "string", enum: ["substrate", "projection"], description: "substrate = direct measurement on the artifact; projection = inference about the world. Defaults to substrate." },
+        layer: { type: "number", description: "L1-L5 per the image-to-atom taxonomy (lower answered before higher)" },
+        enum_values: { type: "array", items: { type: "string" }, description: "REQUIRED when expected_shape=enum: the candidate values" },
+        motivation: { type: "string", description: "Why the existing checklist can't capture this — what you observed that has no slot" },
+        sample_evidence: { type: "object", description: "{class, ref} citing the observation that motivated this (e.g. {class:'image', ref:{image_ids:[...]}})" },
+        observed_by: { type: "string", description: "Caller identity (model slug / agent key) for source DNA" },
+        confidence: { type: "number", description: "0-1 confidence that this attribute is real and worth adding" },
+      },
+      required: ["attribute", "subject_kind", "prompt", "expected_shape", "motivation", "observed_by", "confidence"],
+    },
+  },
+  {
     name: "submit_attribute_values",
     description:
       "Batch version of submit_attribute_value. Caller submits an array of {attribute, value, confidence, basis_signals?, candidates?} for the same subject + model_slug in a single call. Returns array of projection_event_ids in submission order, with per-row error if validation/insert failed. " +
@@ -982,7 +1022,7 @@ const TOOLS: ToolDef[] = [
       type: "object",
       properties: {
         subject_id: { type: "string" },
-        subject_kind: { type: "string", enum: ["image", "vehicle", "person", "cluster", "user"] },
+        subject_kind: { type: "string", enum: ["image", "vehicle", "person", "cluster", "user", "make_model"] },
         model_slug: { type: "string" },
         model_version: { type: "string" },
         declared_observed_at: { type: "string" },
@@ -2236,6 +2276,18 @@ async function handleGetComps(args: Record<string, unknown>): Promise<ToolResult
     if (args[k] !== undefined) body[k] = args[k];
   }
   const data = await callEdgeApi("comps", "", "POST", body);
+  return toolOk(data);
+}
+
+async function handleGetMakeModelTerminal(args: Record<string, unknown>): Promise<ToolResult> {
+  const supabase = sb();
+  const { data, error } = await supabase.rpc("get_make_model_terminal", {
+    p_make: args.make,
+    p_model: args.model,
+    p_year: args.year ?? null,
+    p_grain: args.grain ?? "year",
+  });
+  if (error) return toolErr(error.message);
   return toolOk(data);
 }
 
@@ -3536,7 +3588,7 @@ async function handleSynthesizeAttribute(args: Record<string, unknown>): Promise
     .from("projection_event")
     .select(`
       id, result_kind, observed_at, recorded_at, retracted_by,
-      request_envelope, result_envelope,
+      request_envelope, result_envelope, evidence_class, evidence_ref,
       model_registry!inner ( slug, caller_kind, base_trust )
     `)
     .filter("request_envelope->>subject_id", "eq", subject_id)
@@ -3558,6 +3610,53 @@ async function handleSynthesizeAttribute(args: Record<string, unknown>): Promise
     });
   }
 
+  // P5 — temporal "now" resolver. For present-state attributes the canonical
+  // answer must reflect the LATEST era, so weight each atom by its EVIDENCE
+  // CAPTURE recency (image taken_at), not by when the atom was recorded (atoms
+  // can be batch-submitted, which would erase teardown-vs-finished ordering).
+  // A finished-car photo thus outweighs a stale teardown photo. Timeless
+  // attributes (VIN, factory original_color) are untouched.
+  const isPresentState = def?.temporal === "present_state";
+  const HALF_LIFE_DAYS = 365;
+  const nowMs = Date.now();
+  const recencyAt = new Map<string, number>();
+  if (isPresentState) {
+    const idsByAtom = new Map<string, string[]>();
+    const allImageIds = new Set<string>();
+    for (const a of atoms) {
+      const ref = a.evidence_ref ?? a.request_envelope?.evidence?.ref;
+      const ids = Array.isArray(ref?.image_ids) ? ref.image_ids.map(String) : [];
+      if (ids.length) { idsByAtom.set(a.id, ids); for (const i of ids) allImageIds.add(i); }
+    }
+    const takenById = new Map<string, number>();
+    if (allImageIds.size) {
+      const { data: imgs } = await supabase
+        .from("vehicle_images")
+        .select("id, taken_at, created_at")
+        .in("id", [...allImageIds]);
+      for (const im of imgs ?? []) {
+        const t = (im as any).taken_at ?? (im as any).created_at;
+        if (t) takenById.set(String((im as any).id), new Date(t as string).getTime());
+      }
+    }
+    for (const a of atoms) {
+      const times = (idsByAtom.get(a.id) ?? [])
+        .map((i) => takenById.get(i))
+        .filter((x): x is number => typeof x === "number");
+      const t = times.length
+        ? Math.max(...times)
+        : new Date(a.observed_at ?? a.recorded_at ?? 0).getTime();
+      if (t) recencyAt.set(a.id, t);
+    }
+  }
+  const recencyMult = (atomId: string): number => {
+    if (!isPresentState) return 1;
+    const t = recencyAt.get(atomId);
+    if (!t) return 1;
+    const ageDays = Math.max(0, (nowMs - t) / 86_400_000);
+    return Math.pow(0.5, ageDays / HALF_LIFE_DAYS); // half weight per year of evidence age
+  };
+
   type Weighted = { atom: Record<string, any>; weight: number; label: unknown; caller: string; base_trust: number; confidence: number };
   const weighted: Weighted[] = atoms.map((a) => {
     const caller = a.model_registry;
@@ -3565,7 +3664,7 @@ async function handleSynthesizeAttribute(args: Record<string, unknown>): Promise
     const confidence = Number(a.result_envelope?.confidence ?? 0.5);
     return {
       atom: a,
-      weight: base_trust * confidence,
+      weight: base_trust * confidence * recencyMult(a.id),
       label: a.result_envelope?.label,
       caller: caller?.slug ?? "unknown",
       base_trust,
@@ -3645,6 +3744,8 @@ async function handleSynthesizeAttribute(args: Record<string, unknown>): Promise
       distinct_callers,
       observation_count: atoms.length,
       synthesis_method,
+      temporal: def?.temporal ?? "timeless",
+      recency_weighted: isPresentState,
     },
     contributing_atoms: weighted.map((w) => ({
       projection_event_id: w.atom.id,
@@ -3653,6 +3754,7 @@ async function handleSynthesizeAttribute(args: Record<string, unknown>): Promise
       base_trust: w.base_trust,
       confidence: w.confidence,
       weight: w.weight,
+      recency_mult: isPresentState ? Number(recencyMult(w.atom.id).toFixed(3)) : 1,
       result_kind: w.atom.result_kind,
       recorded_at: w.atom.recorded_at,
     })),
@@ -3711,14 +3813,14 @@ async function handleSubmitAttributeValues(args: Record<string, unknown>): Promi
 }
 
 async function handleFindSubjectsNeedingAtoms(args: Record<string, unknown>): Promise<ToolResult> {
-  const subject_kind = (typeof args.subject_kind === "string" ? args.subject_kind : "image") as "image" | "vehicle" | "user";
+  const subject_kind = (typeof args.subject_kind === "string" ? args.subject_kind : "image") as "image" | "vehicle" | "user" | "make_model";
   const min_atoms = Math.max(0, Number(args.min_atoms) || 3);
   const limit = Math.min(Number(args.limit) || 20, 200);
   const recent_only = args.recent_only !== false;
   const attribute_filter = typeof args.attribute === "string" ? args.attribute : null;
 
-  if (!["image", "vehicle", "user"].includes(subject_kind)) {
-    return toolErr(`subject_kind must be image, vehicle, or user, got '${subject_kind}'`);
+  if (!["image", "vehicle", "user", "make_model"].includes(subject_kind)) {
+    return toolErr(`subject_kind must be image, vehicle, user, or make_model, got '${subject_kind}'`);
   }
 
   const supabase = sb();
@@ -3746,6 +3848,14 @@ async function handleFindSubjectsNeedingAtoms(args: Record<string, unknown>): Pr
       .order("created_at", { ascending: false })
       .limit(Math.min(limit * 5, 500));
     if (recent_only) candidatesQ = candidatesQ.gte("created_at", ninetyDaysAgo);
+  } else if (subject_kind === "make_model") {
+    // subject_kind === "make_model" — surface year-make-model cohort profiles with thin
+    // atom coverage. make_model_profiles is keyed by subject_id (uuid); carry the cohort
+    // labels (canonical_make/canonical_model/year/grain) through so the caller has a worklist.
+    candidatesQ = supabase
+      .from("make_model_profiles")
+      .select("subject_id, canonical_make, canonical_model, year, grain")
+      .limit(Math.min(limit * 5, 500));
   } else {
     // subject_kind === "user" — surface auth.users that have minimal profile coverage.
     // We query user_profiles (1:1 with auth.users post-2026-05-24 migration) so we get
@@ -3760,8 +3870,8 @@ async function handleFindSubjectsNeedingAtoms(args: Record<string, unknown>): Pr
   const { data: candidates, error: candErr } = await candidatesQ;
   if (candErr) return toolErr(`candidate query: ${candErr.message}`);
 
-  // user_profiles uses user_id as PK; vehicles/vehicle_images use id.
-  const idField = subject_kind === "user" ? "user_id" : "id";
+  // user_profiles uses user_id as PK; make_model_profiles uses subject_id; vehicles/vehicle_images use id.
+  const idField = subject_kind === "user" ? "user_id" : subject_kind === "make_model" ? "subject_id" : "id";
   const candIds = (candidates ?? []).map((c: Record<string, any>) => c[idField]);
   if (candIds.length === 0) {
     return toolOk({ subject_kind, count: 0, subjects: [], note: "No candidate subjects matched the filters." });
@@ -3772,6 +3882,8 @@ async function handleFindSubjectsNeedingAtoms(args: Record<string, unknown>): Pr
     .select("request_envelope")
     .in("request_envelope->>subject_id", candIds)
     .is("retracted_by", null);
+  // make_model subject_ids (uuid) can collide with other kinds' ids — scope by kind.
+  if (subject_kind === "make_model") atomQ = atomQ.filter("request_envelope->>subject_kind", "eq", "make_model");
   if (attribute_filter) atomQ = atomQ.filter("request_envelope->>attribute", "eq", attribute_filter);
 
   const { data: atomRows, error: atomErr } = await atomQ;
@@ -3879,8 +3991,8 @@ async function handleQuerySubjectAtoms(args: Record<string, unknown>): Promise<T
 
 async function handleGetAttributeChecklist(args: Record<string, unknown>): Promise<ToolResult> {
   const subject_kind = String(args.subject_kind ?? "") as SubjectKind;
-  if (!["image", "vehicle", "person", "cluster", "user"].includes(subject_kind)) {
-    return toolErr(`subject_kind must be one of image | vehicle | person | cluster | user, got '${subject_kind}'`);
+  if (!["image", "vehicle", "person", "cluster", "user", "make_model"].includes(subject_kind)) {
+    return toolErr(`subject_kind must be one of image | vehicle | person | cluster | user | make_model, got '${subject_kind}'`);
   }
   const layers = Array.isArray(args.layers)
     ? (args.layers as Array<unknown>)
@@ -5938,6 +6050,95 @@ async function handleGetAuctionBriefing(args: Record<string, unknown>): Promise<
   };
 }
 
+// propose_attribute — the ONLY tool that can grow the attribute vocabulary. Records a
+// novel proposed attribute into schema_proposals (proposal_type='add_image_attribute',
+// status='pending') with full source DNA. Promotion into attribute-registry.ts stays
+// human (laser-tag doctrine): the agent grows the vocabulary, the human signs it.
+async function handleProposeAttribute(args: Record<string, unknown>): Promise<ToolResult> {
+  const attribute = String(args.attribute ?? "").trim();
+  const subject_kind = String(args.subject_kind ?? "").trim();
+  const prompt = String(args.prompt ?? "").trim();
+  const expected_shape = String(args.expected_shape ?? "").trim();
+  const motivation = String(args.motivation ?? "").trim();
+  const observed_by = String(args.observed_by ?? "").trim();
+  const confidence = Number(args.confidence);
+
+  if (!attribute || !subject_kind || !prompt || !expected_shape || !motivation || !observed_by || Number.isNaN(confidence)) {
+    return toolErr("attribute, subject_kind, prompt, expected_shape, motivation, observed_by, and confidence are required");
+  }
+  if (confidence < 0 || confidence > 1) return toolErr(`confidence must be in [0,1], got ${confidence}`);
+
+  const SUBJECT_KINDS = ["image", "vehicle", "person", "cluster", "user", "make_model"];
+  if (!SUBJECT_KINDS.includes(subject_kind)) return toolErr(`subject_kind must be one of ${SUBJECT_KINDS.join("|")}`);
+  const SHAPES = ["string", "number", "boolean", "enum", "ratio_0_1", "bbox", "uuid", "iso_date", "iso_timestamp", "structured"];
+  if (!SHAPES.includes(expected_shape)) return toolErr(`expected_shape must be one of ${SHAPES.join("|")}`);
+  if (expected_shape === "enum" && (!Array.isArray(args.enum_values) || (args.enum_values as unknown[]).length === 0)) {
+    return toolErr("expected_shape=enum requires a non-empty enum_values array");
+  }
+
+  // Not novel if it already exists — point the caller at submit_attribute_value instead.
+  if (getAttribute(attribute)) {
+    return toolErr(`attribute '${attribute}' already exists in the registry — use submit_attribute_value to record a value, not propose_attribute`);
+  }
+
+  const supabase = sb();
+
+  // Idempotent: an identical pending proposal is returned, not duplicated.
+  const { data: existing } = await supabase
+    .from("schema_proposals")
+    .select("id, status, proposed_at")
+    .eq("proposal_type", "add_image_attribute")
+    .eq("payload->>attribute", attribute)
+    .eq("status", "open")
+    .maybeSingle();
+  if (existing) {
+    return toolOk({ proposal_id: existing.id, status: existing.status, attribute, proposed_at: existing.proposed_at, note: "an identical pending proposal already exists; not duplicated" });
+  }
+
+  const admissible = Array.isArray(args.admissible_evidence)
+    ? (args.admissible_evidence as unknown[]).filter((c) => typeof c === "string")
+    : ["image"];
+  const sample_evidence = (args.sample_evidence && typeof args.sample_evidence === "object") ? args.sample_evidence as Record<string, unknown> : null;
+  const ref = sample_evidence && typeof sample_evidence.ref === "object" ? sample_evidence.ref as Record<string, unknown> : null;
+  const motivating_observation_ids = ref && Array.isArray(ref.image_ids)
+    ? (ref.image_ids as unknown[]).filter((s) => typeof s === "string")
+    : [];
+
+  const payload = {
+    attribute,
+    subject_kind,
+    prompt,
+    expected_shape,
+    enum_values: Array.isArray(args.enum_values) ? args.enum_values : undefined,
+    admissible_evidence: admissible.length ? admissible : ["image"],
+    result_kind: (args.result_kind === "substrate" || args.result_kind === "projection") ? args.result_kind : "substrate",
+    layer: typeof args.layer === "number" ? args.layer : null,
+    motivation,
+  };
+
+  const { data: inserted, error } = await supabase
+    .from("schema_proposals")
+    .insert({
+      proposal_type: "add_image_attribute",
+      proposed_by_agent_key: observed_by,
+      payload,
+      evidence: { sample_evidence, confidence, observed_by, proposed_via: "mcp:propose_attribute" },
+      motivating_observation_ids,
+      status: "open",
+    })
+    .select("id, proposed_at")
+    .single();
+  if (error || !inserted) return toolErr(`schema_proposals insert failed: ${error?.message ?? "no row"}`);
+
+  return toolOk({
+    proposal_id: inserted.id,
+    status: "open",
+    attribute,
+    proposed_at: inserted.proposed_at,
+    note: "Proposal recorded in schema_proposals (proposal_type='add_image_attribute'). A human curator reviews and promotes accepted proposals into attribute-registry.ts — promotion stays human by design.",
+  });
+}
+
 // =============================================================================
 // TOOL DISPATCH
 // =============================================================================
@@ -5958,6 +6159,7 @@ const TOOL_HANDLERS: Record<string, (args: Record<string, unknown>) => Promise<T
   get_valuation: handleGetValuation,
   compute_valuation: handleComputeValuation,
   get_comps: handleGetComps,
+  get_make_model_terminal: handleGetMakeModelTerminal,
   query_market_history: handleQueryMarketHistory,
   query_library: handleQueryLibrary,
   search_service_manuals: handleSearchServiceManuals,
@@ -5972,6 +6174,7 @@ const TOOL_HANDLERS: Record<string, (args: Record<string, unknown>) => Promise<T
   query_subject_atoms: handleQuerySubjectAtoms,
   find_subjects_needing_atoms: handleFindSubjectsNeedingAtoms,
   synthesize_attribute: handleSynthesizeAttribute,
+  propose_attribute: handleProposeAttribute,
   project_invoice: handleProjectInvoice,
   project_work_log: handleProjectWorkLog,
   project_money_flow: handleProjectMoneyFlow,
