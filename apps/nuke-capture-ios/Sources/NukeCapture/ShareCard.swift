@@ -9,12 +9,15 @@
 
 import SwiftUI
 import UIKit
+import CoreImage.CIFilterBuiltins
 
 struct ShareCardContent: View {
     let hero: UIImage?
     let title: String
     let valuation: VehicleValuation?
     let strip: [UIImage]
+    let days: [DayRecord]
+    let vehicleId: String
 
     private static let W: CGFloat = 1080
     private static let H: CGFloat = 1350
@@ -56,15 +59,33 @@ struct ShareCardContent: View {
                 Color(white: 0.12).frame(width: Self.W, height: 342)
             }
 
-            // Footer.
-            HStack(alignment: .firstTextBaseline) {
-                Text("nuke.ag")
-                    .font(.system(size: 34, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white)
-                Spacer()
-                Text("verified build record")
-                    .font(.system(size: 24, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.55))
+            // Footer — the traceable fingerprint baked into the shared image:
+            // the origin code + the build's barcode (its unfakeable rhythm) + a
+            // scannable QR back to the record. Any screenshot now traces home.
+            HStack(alignment: .center, spacing: 28) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("nuke.ag")
+                        .font(.system(size: 34, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.white)
+                    Text(BuildBarcode.originCode(vehicleId))
+                        .font(.system(size: 20, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                if !days.isEmpty {
+                    BuildBarcode(days: days, height: 44)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Spacer()
+                }
+                if let qr = qrImage("https://nuke.ag/vehicle/\(vehicleId)") {
+                    Image(uiImage: qr)
+                        .interpolation(.none)
+                        .resizable()
+                        .frame(width: 104, height: 104)
+                        .padding(7)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
             }
             .padding(.horizontal, 44)
             .frame(width: Self.W, height: 150)
@@ -98,9 +119,24 @@ struct ShareCardContent: View {
 /// Render the card to a UIImage. @MainActor — ImageRenderer is main-actor-bound.
 @MainActor
 func renderShareCard(hero: UIImage?, title: String,
-                     valuation: VehicleValuation?, strip: [UIImage]) -> UIImage? {
-    let content = ShareCardContent(hero: hero, title: title, valuation: valuation, strip: strip)
+                     valuation: VehicleValuation?, strip: [UIImage],
+                     days: [DayRecord], vehicleId: String) -> UIImage? {
+    let content = ShareCardContent(hero: hero, title: title, valuation: valuation,
+                                   strip: strip, days: days, vehicleId: vehicleId)
     let renderer = ImageRenderer(content: content)
     renderer.scale = 1   // the frame is already sized in pixels (1080×1350)
     return renderer.uiImage
+}
+
+/// A scannable QR of the vehicle URL — black modules on a clear ground, so it sits
+/// on the card's white tile. Mirrors the web WorkOrderStatement QR of the same URL.
+func qrImage(_ string: String) -> UIImage? {
+    let filter = CIFilter.qrCodeGenerator()
+    filter.message = Data(string.utf8)
+    filter.correctionLevel = "M"
+    guard let out = filter.outputImage else { return nil }
+    let scaled = out.transformed(by: CGAffineTransform(scaleX: 12, y: 12))
+    let ctx = CIContext()
+    guard let cg = ctx.createCGImage(scaled, from: scaled.extent) else { return nil }
+    return UIImage(cgImage: cg)
 }
