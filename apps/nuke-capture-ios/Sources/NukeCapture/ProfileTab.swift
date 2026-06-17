@@ -273,6 +273,13 @@ struct ProfileView: View {
     @State private var garageLoaded = false      // gate the empty state so it never flashes
     @State private var garageError = false        // a FAILED load must never read as "no vehicles"
     @State private var openVehicle: GarageVehicle?
+    @State private var showPast = false           // "Past & contributions" stays collapsed
+
+    // CURRENT stewardship headlines the garage; previously-owned / contributed-to
+    // (departed — e.g. shipped-out trucks) are demoted to a collapsed section, not
+    // mixed into "what I'm building now". Reads the relationship the RPC already returns.
+    private var currentGarage: [GarageVehicle] { garage.filter { $0.relationship == "owner" } }
+    private var pastGarage: [GarageVehicle] { garage.filter { $0.relationship != "owner" } }
 
     // Owner-only: the phone↔record link, made visible. `sync` is the record's
     // server-side truth (the RPC); `engine` is this device's local truth.
@@ -526,49 +533,72 @@ struct ProfileView: View {
     }
 
     // ─── Garage ──────────────────────────────────────────────────────────────
-    private var garageSection: some View {
-        Section {
-            ForEach(garage) { v in
-                Button { openVehicle = v } label: {
-                    HStack(spacing: 12) {
-                        CachedAsyncImage(url: NukeImage.thumb(v.image_url, width: 170)) { img in
-                            img.resizable().scaledToFill()
-                        } placeholder: {
-                            Image(systemName: "car.side").foregroundStyle(.secondary)
-                        }
-                        .frame(width: 56, height: 42)
-                        .clipped()
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(v.title).foregroundStyle(Color.primary)
-                            HStack(spacing: 8) {
-                                Text("\(v.image_count) photos")
-                                    .font(.caption2).monospacedDigit()
-                                    .foregroundStyle(.secondary)
-                                if v.relationship != "owner" {
-                                    Text(v.relationship.replacingOccurrences(of: "_", with: " "))
-                                        .font(.caption2).foregroundStyle(.secondary)
-                                }
-                            }
-                        }
+    @ViewBuilder private var garageSection: some View {
+        if !currentGarage.isEmpty {
+            Section {
+                ForEach(currentGarage) { v in garageRow(v) }
+            } header: {
+                Text("Garage · \(currentGarage.count)")
+            }
+            // Vehicle sheet lives HERE (on the garage section), NOT stacked as a second
+            // .sheet on the same List as the day-receipt sheet — two .sheet(item:) on one
+            // view is the SwiftUI pitfall where the second silently fails to present.
+            .sheet(item: $openVehicle) { v in
+                VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: true)
+            }
+        }
+        // Past & contributions — departed/peripheral, collapsed by default so the
+        // headline garage is what you're stewarding NOW.
+        if !pastGarage.isEmpty {
+            Section {
+                if showPast { ForEach(pastGarage) { v in garageRow(v) } }
+            } header: {
+                Button { withAnimation(.snappy(duration: 0.2)) { showPast.toggle() } } label: {
+                    HStack {
+                        Text("Past & contributions · \(pastGarage.count)")
                         Spacer()
-                        if let val = v.current_value, val > 0 {
-                            // It's a modeled comp-estimate (rooted in nuke_estimates),
-                            // not a fact — label it so it never reads as a firm price.
-                            Text("est \(val.formatted(.currency(code: "USD").precision(.fractionLength(0))))")
-                                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                        Image(systemName: showPast ? "chevron.up" : "chevron.down")
+                            .font(.caption2)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder private func garageRow(_ v: GarageVehicle) -> some View {
+        Button { openVehicle = v } label: {
+            HStack(spacing: 12) {
+                CachedAsyncImage(url: NukeImage.thumb(v.image_url, width: 170)) { img in
+                    img.resizable().scaledToFill()
+                } placeholder: {
+                    Image(systemName: "car.side").foregroundStyle(.secondary)
+                }
+                .frame(width: 56, height: 42)
+                .clipped()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(v.title).foregroundStyle(Color.primary)
+                    HStack(spacing: 8) {
+                        Text("\(v.image_count) photos")
+                            .font(.caption2).monospacedDigit()
+                            .foregroundStyle(.secondary)
+                        if v.relationship != "owner" {
+                            Text(v.relationship.replacingOccurrences(of: "_", with: " "))
+                                .font(.caption2).foregroundStyle(.secondary)
                         }
-                        Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
                     }
                 }
+                Spacer()
+                if let val = v.current_value, val > 0 {
+                    // A modeled comp-estimate (rooted in nuke_estimates), labeled "est"
+                    // so it never reads as a firm price. Only the defensible
+                    // (class-stratified) estimates reach here — see get_user_garage.
+                    Text("est \(val.formatted(.currency(code: "USD").precision(.fractionLength(0))))")
+                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                }
+                Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
             }
-        } header: {
-            Text("Garage · \(garage.count)")
-        }
-        // Vehicle sheet lives HERE (on the garage section), NOT stacked as a second
-        // .sheet on the same List as the day-receipt sheet — two .sheet(item:) on one
-        // view is the SwiftUI pitfall where the second silently fails to present.
-        .sheet(item: $openVehicle) { v in
-            VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: true)
         }
     }
 
