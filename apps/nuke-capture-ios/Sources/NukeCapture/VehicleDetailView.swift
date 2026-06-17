@@ -588,7 +588,9 @@ struct VehicleDetailView: View {
     /// Pre-decode the hero + up to 3 strip photos (ImageRenderer won't await async
     /// loads), then render the card. Returns nil → caller shares the URL alone.
     @MainActor private func buildShareCard() async -> UIImage? {
-        let heroURL = NukeImage.thumb(vehicle?.primary_image_url, width: 1200)
+        // Match the on-screen hero (latest frame), not the drift-prone primary_image_url,
+        // so the shared card shows the build's current state.
+        let heroURL = NukeImage.thumb(heroImage?.image_url ?? vehicle?.primary_image_url, width: 1200)
         let hero = heroURL == nil ? nil : await RemoteImageCache.shared.image(heroURL!)
         var strip: [UIImage] = []
         for img in images where strip.count < 3 {
