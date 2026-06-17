@@ -256,7 +256,7 @@ struct VehicleDetailView: View {
                 }
                 .frame(height: 0)
                 BuildStoryHero(
-                    imageURL: vehicle?.primary_image_url,
+                    imageURL: heroImage?.image_url ?? vehicle?.primary_image_url,
                     title: vehicle?.title ?? "",
                     takenAt: heroImage?.taken_at,
                     loaded: loaded,
@@ -293,10 +293,14 @@ struct VehicleDetailView: View {
     // only in the full-screen gallery (tap the hero to get there).
     /// The hero's backing image ROW (not just a url) so the lead can drill into
     /// the data that made it — its analysis cascade — and carry its date (decay).
-    /// Prefer the primary image, else the one matching primary_image_url, else newest.
+    /// The single source of truth for the hero — both the image AND its date badge
+    /// read from this, so they can never disagree. The hero is the LATEST owner photo
+    /// (a build's current state — the lead-is-latest rule). is_primary is deliberately
+    /// NOT the lead here: the pipeline keeps resetting it to an older frame (observed
+    /// stuck on a May photo while June work exists), which is exactly the staleness
+    /// this view exists to kill.
     private var heroImage: VehicleGalleryImage? {
-        images.first { $0.is_primary == true }
-            ?? images.first { $0.image_url == vehicle?.primary_image_url }
+        images.max { ($0.taken_at ?? "") < ($1.taken_at ?? "") }
             ?? images.first
     }
 
