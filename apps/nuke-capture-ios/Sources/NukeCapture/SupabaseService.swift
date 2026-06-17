@@ -64,7 +64,15 @@ enum SupabaseService {
     /// storage objects and rows to that user. Never the service-role key.
     static let client = SupabaseClient(
         supabaseURL: Config.supabaseURL,
-        supabaseKey: Config.supabaseAnonKey
+        supabaseKey: Config.supabaseAnonKey,
+        // Opt into the SDK's corrected initial-session behavior (supabase-swift
+        // PR #822): always emit the locally stored session on startup, even if
+        // expired (the SDK refreshes on first authenticated call). Silences the
+        // runtime reportIssue warning. SessionStore already tolerates an expired
+        // session, so no isExpired gating is needed here.
+        options: SupabaseClientOptions(
+            auth: SupabaseClientOptions.AuthOptions(emitLocalSessionAsInitialSession: true)
+        )
     )
 
     // ─── Auth ────────────────────────────────────────────────────────────────
