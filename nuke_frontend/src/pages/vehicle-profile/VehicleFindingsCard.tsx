@@ -98,7 +98,17 @@ const VehicleFindingsCard: React.FC<Props> = ({ vehicleId }) => {
       for (const r of rows) {
         const m = (r as any).ai_scan_metadata as Record<string, any> | null;
         if (!m) continue;
-        if (m.classifier === 'claude-opus-4-7-byok') out.classified++;
+        // Canonical T1 marker: the BYOK deep pass writes a NESTED byok_deep_analysis
+        // object, NOT the flat `classifier` string the old code looked for (which no
+        // writer emits — so this card read 0 analyzed for every byok vehicle). Count the
+        // canonical marker and surface its nested fields into the existing buckets.
+        const d = m.byok_deep_analysis as Record<string, any> | undefined;
+        if (d || m.classifier === 'claude-opus-4-7-byok' || m.classifier === 'caller-byok-cascade') out.classified++;
+        if (d) {
+          if (d.scene_type) inc(out.scenes, String(d.scene_type));
+          if (d.build_phase_guess) inc(out.phases, String(d.build_phase_guess));
+          if (typeof d.confidence === 'number') { out.confidenceSum += d.confidence; out.confidenceCount++; }
+        }
         if (m.error) out.errors++;
         if (m.vin) vins.add(String(m.vin));
         if (m.license_plate) plates.add(String(m.license_plate));
@@ -306,7 +316,7 @@ const VehicleFindingsCard: React.FC<Props> = ({ vehicleId }) => {
         })()}
 
         <div style={{ marginTop: 14, paddingTop: 8, borderTop: '1px solid var(--text-disabled, #ddd)', fontSize: 9, color: 'var(--text-secondary, #666)', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-          <span>{findings.classified}/{findings.total} photos analyzed by claude-opus-4-7-byok</span>
+          <span>{findings.classified}/{findings.total} photos deep-analyzed (BYOK)</span>
           {findings.confidenceCount > 0 && (
             <span>avg confidence {(findings.confidenceSum / findings.confidenceCount).toFixed(2)}</span>
           )}
