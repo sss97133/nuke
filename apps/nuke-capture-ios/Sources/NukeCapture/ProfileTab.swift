@@ -22,6 +22,11 @@ struct ProfileRow: Decodable, Identifiable {
     let id: UUID
     let username: String?
     let full_name: String?
+    let avatar_url: String?
+    let bio: String?
+    let location: String?
+    let city: String?
+    let role: String?
 }
 
 /// One get_user_contribution_days row: (day, kind, n).
@@ -268,17 +273,11 @@ struct ProfileView: View {
 
     var body: some View {
         List {
-            Section {
-                // While the profile is still loading, show "…" — never a fake "—"
-                // that reads as "this person has no name". The "—" only stands once
-                // the load has SETTLED (succeeded-but-null, or failed).
-                LabeledContent("Name") {
-                    Text(profile?.full_name ?? (profileSettled ? "—" : "…"))
-                }
-                LabeledContent("Handle") {
-                    Text(profile?.username ?? (profileSettled ? "—" : "…"))
-                }
-            }
+            // IDENTITY — a builder's profile, not a settings form. Face, name,
+            // handle, where they are, and their numbers. This is the showcase head.
+            Section { identityHeader }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
 
             // GARAGE — the user's vehicles, the way into the whole drill chain.
             // Empty + own profile → a LIVING state that says what's coming, not a
@@ -406,6 +405,59 @@ struct ProfileView: View {
         } catch {
             latestError = true
             NSLog("NukeCapture profile latest work failed: %@", String(describing: error))
+        }
+    }
+
+    // ─── Identity header — the builder, front and center ─────────────────────
+    @ViewBuilder private var identityHeader: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 14) {
+                // Face. avatar_url when present; a clean monogram-less placeholder
+                // otherwise — never a broken image.
+                CachedAsyncImage(url: NukeImage.thumb(profile?.avatar_url, width: 200)) { img in
+                    img.resizable().scaledToFill()
+                } placeholder: {
+                    Image(systemName: "person.crop.circle.fill")
+                        .resizable().scaledToFit()
+                        .foregroundStyle(.tertiary)
+                }
+                .frame(width: 68, height: 68)
+                .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(profile?.full_name ?? (profileSettled ? "Unnamed builder" : "…"))
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(Color.primary)
+                        .lineLimit(1)
+                    if let h = profile?.username, !h.isEmpty {
+                        Text("@\(h)").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    if let place = [profile?.city, profile?.location].compactMap({ $0 })
+                        .first(where: { !$0.isEmpty }) {
+                        Label(place, systemImage: "mappin.and.ellipse")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+
+            if let bio = profile?.bio, !bio.isEmpty {
+                Text(bio).font(.callout).foregroundStyle(Color.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // The numbers — real, from data already loaded; never a fabricated stat.
+            HStack(spacing: 22) {
+                if !garage.isEmpty { stat("\(garage.count)", "vehicles") }
+                if !days.isEmpty { stat("\(days.count)", "days") }
+            }
+        }
+    }
+
+    @ViewBuilder private func stat(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(value).font(.headline).monospacedDigit().foregroundStyle(Color.primary)
+            Text(label).font(.caption2).foregroundStyle(.secondary)
         }
     }
 
@@ -636,7 +688,7 @@ struct ProfileView: View {
         do {
             let rows: [ProfileRow] = try await SupabaseService.client
                 .from("profiles")
-                .select("id,username,full_name")
+                .select("id,username,full_name,avatar_url,bio,location,city,role")
                 .eq("id", value: userId)
                 .limit(1)
                 .execute()
