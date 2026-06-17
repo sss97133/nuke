@@ -127,6 +127,7 @@ struct VehicleDetailView: View {
     @State private var commentDraft = ""
     @State private var posting = false
     @State private var followBusy = false
+    @State private var showComments = false   // the comment thread lives in a summoned sheet
     @State private var galleryOpen = false
     @State private var selectedPhoto: VehicleGalleryImage?  // photo→analysis drill
     @State private var provenanceDrill: SpecDrill?          // spec value → its source
@@ -170,6 +171,11 @@ struct VehicleDetailView: View {
         .task(id: vehicleId) { await loadEngagement() }
         .sheet(item: $provenanceDrill) { drill in
             FieldProvenanceSheet(vehicleId: vehicleId, drill: drill)
+        }
+        .sheet(isPresented: $showComments) {
+            CommentsSheet(engagement: engagement,
+                          commentDraft: $commentDraft, posting: $posting,
+                          onPost: { await postComment() })
         }
         .fullScreenCover(isPresented: $galleryOpen) {
             FullScreenGalleryView(images: galleryURLs)
@@ -243,6 +249,7 @@ struct VehicleDetailView: View {
                     onTap: { if let h = heroImage { selectedPhoto = h } else { galleryOpen = true } }
                 )
                 loadState            // loading / error (only while the header is absent)
+                heroActionRow        // social action row — Follow + comment bubble/count → sheet
                 buildTimeline        // BARCODE — the proof-of-work timeline, directly under
                                      // the hero (the labor story leads, per Skylar)
                 valuationSection     // WORTH — modeled estimate (blocked when not defensible)
@@ -250,8 +257,6 @@ struct VehicleDetailView: View {
                 if vehicle != nil {
                     InvestmentProofView(vehicleId: vehicleId)   // PROOF — dollars in
                 }
-                engagementSection    // ENGAGE: the visitor's job — follow / comment (above the
-                                     // photo wall, not buried under 60 frames)
                 photoStrip           // the photos (each → its analysis)
                 assetWindow          // ASSET: his relationship/provenance
                 specTable            // TECHNICAL reference — demoted below the story
@@ -618,18 +623,15 @@ struct VehicleDetailView: View {
     // FOLLOW is signal (→ user_interactions); COMMENT is testimony (→ a kind=comment
     // observation on the spine, authored by the user, trust-weighted). The counts
     // are depth (following · weighed-in · contributions), never hearts.
-    @ViewBuilder private var engagementSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("ENGAGE")
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundStyle(.secondary)
-
-            // Counts + Follow — the signal rung.
-            HStack(spacing: 14) {
+    // ─── The content-action row, directly under the hero — the slot every social
+    // post reserves for the like/comment/share affordances. Follow (signal) + a
+    // comment bubble whose live count IS the door to the thread. No "ENGAGE" verb,
+    // no section title, no composer standing open in the page spine.
+    @ViewBuilder private var heroActionRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 18) {
                 if let e = engagement {
-                    Button {
-                        Task { await toggleFollow() }
-                    } label: {
+                    Button { Task { await toggleFollow() } } label: {
                         Label(e.is_following ? "Following" : "Follow",
                               systemImage: e.is_following ? "checkmark" : "plus")
                             .font(.footnote.weight(.medium))
@@ -637,62 +639,33 @@ struct VehicleDetailView: View {
                     .buttonStyle(.bordered)
                     .disabled(followBusy)
 
-                    Text(engagementCounts(e))
-                        .font(.caption).monospacedDigit()
-                        .foregroundStyle(.secondary)
+                    Button { showComments = true } label: {
+                        Label(e.comment_count > 0 ? "\(e.comment_count)" : "Comment",
+                              systemImage: "bubble.left")
+                            .font(.footnote.weight(.medium))
+                    }
+                    .buttonStyle(.plain)
+
                     Spacer(minLength: 0)
                 } else if engagementError {
                     Button("Retry") { Task { await loadEngagement() } }.font(.footnote)
+                    Spacer()
                 } else {
                     ProgressView().scaleEffect(0.7)
+                    Spacer()
                 }
             }
-
-            // Comment composer — the testimony rung. Any signed-in user contributes.
-            if SupabaseService.currentUserId != nil {
-                HStack(spacing: 8) {
-                    TextField("Add a comment…", text: $commentDraft, axis: .vertical)
-                        .textFieldStyle(.plain)
-                        .lineLimit(1...4)
-                        .submitLabel(.send)
-                    Button {
-                        Task { await postComment() }
-                    } label: {
-                        if posting { ProgressView().scaleEffect(0.7) }
-                        else { Image(systemName: "arrow.up.circle.fill").font(.title3) }
-                    }
-                    .disabled(posting || commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            // The depth caption — quiet, never a heading.
+            if let e = engagement {
+                let caption = engagementCounts(e)
+                if !caption.isEmpty {
+                    Text(caption).font(.caption2).foregroundStyle(.secondary)
                 }
-                .padding(10)
-                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
-            } else {
-                Text("Sign in to weigh in.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-
-            // Recent testimony.
-            if let e = engagement, !e.recent_comments.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(e.recent_comments) { c in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(c.text ?? "")
-                                .font(.footnote)
-                                .foregroundStyle(.primary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Text("\(c.is_me == true ? "you" : (c.author ?? "someone"))\(c.at.map { " · " + String($0.prefix(10)) } ?? "")")
-                                .font(.caption2).monospacedDigit()
-                                .foregroundStyle(.tertiary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8))
-                    }
-                }
-                .padding(.top, 2)
             }
         }
         .padding(.horizontal, 16)
-        .padding(.bottom, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 6)
     }
 
     private func engagementCounts(_ e: VehicleEngagement) -> String {
@@ -1433,6 +1406,76 @@ struct VehicleSpec: Decodable, Identifiable {
 }
 
 /// get_vehicle_valuation — the comp-based market estimate + the basis it leaned on.
+// ─── The comment thread — a summoned bottom sheet (the universal social pattern),
+// never spliced into the page spine. Thread scrolls; the composer is pinned to the
+// bottom above the keyboard. Reuses the page's record_interaction/get_vehicle_engagement
+// grammar verbatim — this is placement, not new data.
+private struct CommentsSheet: View {
+    let engagement: VehicleEngagement?
+    @Binding var commentDraft: String
+    @Binding var posting: Bool
+    let onPost: () async -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var count: Int { engagement?.comment_count ?? 0 }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    if let e = engagement, !e.recent_comments.isEmpty {
+                        ForEach(e.recent_comments) { c in row(c) }
+                    } else {
+                        Text("Be the first to weigh in.")
+                            .font(.callout).foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity).padding(.top, 48)
+                    }
+                }
+                .padding(16)
+            }
+            .navigationTitle(count > 0 ? "\(count) Comment\(count == 1 ? "" : "s")" : "Comments")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+            .safeAreaInset(edge: .bottom) { composer }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    @ViewBuilder private func row(_ c: VehicleEngagement.Comment) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(c.text ?? "")
+                .font(.footnote).foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("\(c.is_me == true ? "you" : (c.author ?? "someone"))\(c.at.map { " · " + String($0.prefix(10)) } ?? "")")
+                .font(.caption2).monospacedDigit().foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    @ViewBuilder private var composer: some View {
+        if SupabaseService.currentUserId != nil {
+            HStack(spacing: 8) {
+                TextField("Add a comment…", text: $commentDraft, axis: .vertical)
+                    .textFieldStyle(.plain).lineLimit(1...4).submitLabel(.send)
+                Button { Task { await onPost() } } label: {
+                    if posting { ProgressView().scaleEffect(0.7) }
+                    else { Image(systemName: "arrow.up.circle.fill").font(.title2) }
+                }
+                .disabled(posting || commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            .padding(12)
+            .background(.bar)
+        } else {
+            Text("Sign in to weigh in.")
+                .font(.caption).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity).padding(12).background(.bar)
+        }
+    }
+}
+
 struct VehicleValuation: Decodable {
     let value: Double?
     let value_low: Double?
