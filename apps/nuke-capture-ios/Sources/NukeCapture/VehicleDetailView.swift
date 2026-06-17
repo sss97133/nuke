@@ -1442,6 +1442,32 @@ struct VehicleValuation: Decodable {
     let calculated_at: String?
     let price_tier: String?
     let model_version: String?
+    // The power under the hood — the model's real backing, so the surface can be
+    // honest about how thin (or rich) the estimate actually is.
+    let input_count: Int?
+    let confidence_interval_pct: Double?
+    let is_circular: Bool?
+    let comp_method: String?
+    let deal_score: Double?
+    let deal_score_label: String?
+    let heat_score: Double?
+    let heat_score_label: String?
+    let signals: [Signal]?
+
+    struct Signal: Decodable, Identifiable {
+        let name: String
+        let weight: Double?
+        let source_count: Int?
+        let fired: Bool?
+        var id: String { name }
+    }
+
+    /// How many of the model's signals actually had data behind them.
+    var signalsFired: Int { (signals ?? []).filter { $0.fired == true }.count }
+    var signalsTotal: Int { (signals ?? []).count }
+    /// A value backed by ≤1 fired signal or ≤1 input is a rough placeholder, NOT a
+    /// valuation — the surface must say so rather than print a confident bracket.
+    var isThin: Bool { signalsTotal > 0 && (signalsFired <= 1 || (input_count ?? 0) <= 1) }
 }
 
 /// get_vehicle_engagement(vehicle) → one jsonb object: the engagement ladder's
