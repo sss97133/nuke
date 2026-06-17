@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { usePopup } from '../../components/popups/usePopup';
+import { supabase } from '../../lib/supabase';
 
 interface BarcodeTimelineProps {}
 
@@ -270,6 +271,25 @@ const TIMELINE_FILTERS: { key: string; label: string; match: (ev: any) => boolea
 
 const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
   const { vehicle, vehicleId, timelineEvents, setGalleryFilter } = useVehicleProfile();
+
+  // Per-day image-analysis depth (Tier 0-4) → illuminates the timeline as deep analysis
+  // fills in. A day with raw photos and no verdicts stays dim; as T1/T2 land it warms,
+  // an owner-confirmed T4 day glows brightest. One RPC per vehicle (get_vehicle_day_depth).
+  const [depthByDay, setDepthByDay] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!vehicleId) return;
+    let cancelled = false;
+    supabase.rpc('get_vehicle_day_depth', { p_vehicle_id: vehicleId }).then(({ data }) => {
+      if (cancelled || !data) return;
+      const m: Record<string, number> = {};
+      for (const r of data as any[]) {
+        const dp = Number(r.depth) || 0;
+        m[r.day] = dp >= 0.5 ? 4 : dp >= 0.35 ? 3 : dp >= 0.18 ? 2 : dp > 0 ? 1 : 0;
+      }
+      if (!cancelled) setDepthByDay(m);
+    }).catch(() => { /* coverage is best-effort; timeline still renders from events */ });
+    return () => { cancelled = true; };
+  }, [vehicleId]);
   const { openPopup } = usePopup();
   const [expanded, setExpanded] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -368,6 +388,17 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     // Build the filtered map for heatmap rendering
     const map = activeFilter === 'all' ? allMap : buildEventMap(filteredEvents);
 
+    // Illuminate by analysis depth: raise each day's heat to at least its analysis-depth
+    // level (Tier 0-4) so the timeline visibly fills in as the deep pipeline drains.
+    const applyDepth = (mp: Record<string, EventDay>) => {
+      for (const ds in mp) {
+        const dl = depthByDay[ds];
+        if (dl && dl > mp[ds].level) mp[ds].level = dl;
+      }
+    };
+    applyDepth(allMap);
+    if (map !== allMap) applyDepth(map);
+
     // Date range spans the vehicle's full life (model year → today) so the
     // historical scroll is honest. Empty pre-ownership years are surfaced via
     // auto-scroll-to-today (below) rather than by truncation — the user lands
@@ -407,7 +438,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       weeks: wks,
       sortedDates: sorted,
     };
-  }, [vehicle, timelineEvents, filteredEvents, activeFilter, buildEventMap]);
+  }, [vehicle, timelineEvents, filteredEvents, activeFilter, buildEventMap, depthByDay]);
 
   // Heatmap weeks for expanded view
   const heatmapWeeks = useMemo(() => {
