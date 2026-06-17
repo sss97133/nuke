@@ -25,12 +25,46 @@ struct WorthBracketView: View {
 
     var body: some View {
         if let mid = valuation.value, mid > 0 {
-            Button { showDetail = true } label: { content(mid) }
-                .buttonStyle(.plain)
-                .sheet(isPresented: $showDetail) {
-                    ValuationDetailSheet(valuation: valuation)
-                }
+            Button { showDetail = true } label: {
+                // BLOCKED: a comps-only / threadbare model must NOT put a price on a
+                // documented build. Showing a wrong number is a liability (you don't
+                // undervalue someone's belongings — Zillow-scale backlash). No number
+                // until the analysis is real; until then, point at the documented
+                // investment (the defensible figure) instead.
+                if valuation.isThin { blockedContent } else { content(mid) }
+            }
+            .buttonStyle(.plain)
+            .sheet(isPresented: $showDetail) {
+                ValuationDetailSheet(valuation: valuation)
+            }
         }
+    }
+
+    @ViewBuilder private var blockedContent: some View {
+        VStack(alignment: .leading, spacing: compact ? 2 : 5) {
+            if !compact {
+                HStack(spacing: 6) {
+                    Text("MARKET ESTIMATE")
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold)).foregroundStyle(.tertiary)
+                }
+            }
+            Text("Not priced yet")
+                .font(compact ? .body.weight(.medium) : .title3.weight(.medium))
+                .foregroundStyle(ink)
+            if !compact {
+                Text("A documented build isn't a comp average. We won't put a number on it until the analysis includes this build's investment — see the ledger below.")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(dim)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("a build, not a comp")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(dim)
+            }
+        }
+        .contentShape(Rectangle())
     }
 
     @ViewBuilder private func content(_ mid: Double) -> some View {
