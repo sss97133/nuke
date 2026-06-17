@@ -243,12 +243,13 @@ struct VehicleDetailView: View {
                     onTap: { if let h = heroImage { selectedPhoto = h } else { galleryOpen = true } }
                 )
                 loadState            // loading / error (only while the header is absent)
-                valuationSection     // WORTH — the bracket, right under the hero
+                buildTimeline        // BARCODE — the proof-of-work timeline, directly under
+                                     // the hero (the labor story leads, per Skylar)
+                valuationSection     // WORTH — modeled estimate (blocked when not defensible)
                 beforeAfterSection   // THE BUILD — how far it came (earliest → latest frame)
                 if vehicle != nil {
                     InvestmentProofView(vehicleId: vehicleId)   // PROOF — dollars in
                 }
-                buildTimeline        // RHYTHM — the build's working days, heat over time
                 engagementSection    // ENGAGE: the visitor's job — follow / comment (above the
                                      // photo wall, not buried under 60 frames)
                 photoStrip           // the photos (each → its analysis)

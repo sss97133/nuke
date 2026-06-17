@@ -184,18 +184,25 @@ private struct ValuationDetailSheet: View {
                 }
 
                 Section {
-                    if let label = valuation.deal_score_label, let score = valuation.deal_score {
-                        row("Deal", dealText(label, score), warn: score < -50)
+                    if valuation.isThin {
+                        // We have no authority to call demand "cold" or the price an
+                        // "outlier" or claim 77% confidence — those need market data we
+                        // haven't pulled. The honesty: it's OUR intake gap, not a verdict
+                        // on the vehicle. (Deal/Demand/Confidence are suppressed while thin.)
+                        Label("Not measured yet — the deal, demand, and confidence read need market data we haven't pulled. That's an intake gap on our side, not a verdict on this vehicle.",
+                              systemImage: "tray")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        if let label = valuation.deal_score_label, let score = valuation.deal_score {
+                            row("Deal", dealText(label, score), warn: score < -50)
+                        }
+                        if let h = valuation.heat_score_label { row("Demand", h.capitalized) }
+                        if let c = valuation.confidence {
+                            let ci = valuation.confidence_interval_pct.map { " · ±\(Int($0))%" } ?? ""
+                            row("Model confidence", "\(c)%\(ci)")
+                        }
                     }
-                    if let h = valuation.heat_score_label {
-                        row("Demand", h.capitalized)
-                    }
-                    if let m = valuation.comp_method { row("Comp method", m.capitalized) }
-                    if let v = valuation.model_version { row("Model", v) }
-                    if let c = valuation.confidence {
-                        let ci = valuation.confidence_interval_pct.map { " · ±\(Int($0))%" } ?? ""
-                        row("Model confidence", "\(c)%\(ci)")
-                    }
+                    // Factual provenance — always honest to show.
                     if let at = valuation.calculated_at {
                         row("Modeled", String(at.prefix(10)) + (valuation.is_stale == true ? " · stale" : ""),
                             warn: valuation.is_stale == true)
