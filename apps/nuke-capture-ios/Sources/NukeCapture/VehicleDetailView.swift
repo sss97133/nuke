@@ -686,6 +686,18 @@ struct VehicleDetailView: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .contextMenu {
+                            // Owner picks the true "before" — EXIF dates lie, so the
+                            // earliest-timestamp guess is wrong; the owner knows the
+                            // real first shot. (Owner-gated again server-side.)
+                            if isOwner {
+                                Button {
+                                    Task { await setBeforeImage(img.id) }
+                                } label: {
+                                    Label("Set as the 'before' shot", systemImage: "flag.checkered")
+                                }
+                            }
+                        }
                         .onAppear {
                             // Tail reached → stream the next page. Guarded inside
                             // loadGalleryPage (no double-fire, stops at the end).
@@ -955,24 +967,77 @@ struct VehicleDetailView: View {
     /// fetches via the vehicle_images_taken_date index (fast; nulls sort last by
     /// default so LIMIT 1 lands on a real dated frame). Only set when they're two
     /// distinct frames on distinct dates — never a fake before/after.
+    /// True when the signed-in viewer owns this vehicle (gates owner-only actions).
+    private var isOwner: Bool {
+        let r = relationship?.role.lowercased() ?? ""
+        return r == "owner" || r == "co_owner"
+    }
+
+    /// Owner designates the true "before" image (the acquisition shot). EXIF dates
+    /// are unreliable, so min(taken_at) picks the wrong frame — only the owner knows.
+    private func setBeforeImage(_ imageId: UUID) async {
+        struct P: Encodable { let p_vehicle_id: String; let p_image_id: String }
+        do {
+            _ = try await SupabaseService.client
+                .rpc("set_vehicle_before_image",
+                     params: P(p_vehicle_id: vehicleId, p_image_id: imageId.uuidString.lowercased()))
+                .execute()
+            await loadBookends()
+        } catch {
+            NSLog("NukeCapture set before image failed: %@", String(describing: error))
+        }
+    }
+
+    /// The owner-designated "before" image id, if one exists (latest non-superseded
+    /// kind=media observation with role=before_image). EXIF can't be trusted to pick it.
+    private func ownerDesignatedBeforeId() async -> UUID? {
+        struct Obs: Decodable { let structured_data: SD; struct SD: Decodable { let image_id: String? } }
+        do {
+            let rows: [Obs] = try await SupabaseService.client
+                .from("vehicle_observations").select("structured_data")
+                .eq("vehicle_id", value: vehicleId)
+                .eq("kind", value: "media")
+                .eq("structured_data->>role", value: "before_image")
+                .neq("is_superseded", value: true)
+                .order("observed_at", ascending: false)
+                .limit(1).execute().value
+            if let s = rows.first?.structured_data.image_id { return UUID(uuidString: s) }
+        } catch {
+            NSLog("NukeCapture before-designation lookup failed: %@", String(describing: error))
+        }
+        return nil
+    }
+
     private func loadBookends() async {
         func cols() -> String { "id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status" }
         do {
-            let earliest: [VehicleGalleryImage] = try await SupabaseService.client
-                .from("vehicle_images").select(cols())
-                .eq("vehicle_id", value: vehicleId)
-                .order("taken_at", ascending: true)
-                .limit(1).execute().value
             // "After" = the PRIMARY (the owner's curated lead, what it became) if one
-            // exists, else the latest dated frame. Avoids an anticlimactic "after"
-            // (e.g. a recently-shot document) while staying a real dated frame.
+            // exists, else the latest dated frame.
             let latest: [VehicleGalleryImage] = try await SupabaseService.client
                 .from("vehicle_images").select(cols())
                 .eq("vehicle_id", value: vehicleId)
                 .order("is_primary", ascending: false)
                 .order("taken_at", ascending: false)
                 .limit(1).execute().value
-            guard let b = earliest.first, let a = latest.first,
+            guard let a = latest.first else { return }
+
+            // "Before": prefer the OWNER-DESIGNATED acquisition shot (ground truth);
+            // fall back to earliest taken_at only when none is designated.
+            if let designated = await ownerDesignatedBeforeId() {
+                let rows: [VehicleGalleryImage] = try await SupabaseService.client
+                    .from("vehicle_images").select(cols())
+                    .eq("id", value: designated.uuidString.lowercased())
+                    .limit(1).execute().value
+                if let b = rows.first, b.id != a.id {
+                    bookendBefore = b; bookendAfter = a; return   // owner picked it — trust it
+                }
+            }
+            let earliest: [VehicleGalleryImage] = try await SupabaseService.client
+                .from("vehicle_images").select(cols())
+                .eq("vehicle_id", value: vehicleId)
+                .order("taken_at", ascending: true)
+                .limit(1).execute().value
+            guard let b = earliest.first,
                   let bAt = b.taken_at, let aAt = a.taken_at,
                   b.id != a.id, bAt.prefix(10) != aAt.prefix(10) else { return }
             bookendBefore = b
