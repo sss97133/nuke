@@ -241,6 +241,13 @@ struct VehicleDetailView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                // Scroll-offset probe for the BaT sticky header — reports the top's
+                // position in the "vdscroll" space; goes negative as the hero scrolls up.
+                GeometryReader { geo in
+                    Color.clear.preference(key: VDScrollKey.self,
+                                           value: geo.frame(in: .named("vdscroll")).minY)
+                }
+                .frame(height: 0)
                 BuildStoryHero(
                     imageURL: vehicle?.primary_image_url,
                     title: vehicle?.title ?? "",
@@ -249,9 +256,9 @@ struct VehicleDetailView: View {
                     onTap: { if let h = heroImage { selectedPhoto = h } else { galleryOpen = true } }
                 )
                 loadState            // loading / error (only while the header is absent)
+                buildInstrument      // ONE instrument: the build barcode (collapsed) ⇄ the
+                                     // calendar (expanded). The labor story leads (per Skylar).
                 heroActionRow        // social action row — Follow + comment bubble/count → sheet
-                buildTimeline        // BARCODE — the proof-of-work timeline, directly under
-                                     // the hero (the labor story leads, per Skylar)
                 valuationSection     // WORTH — modeled estimate (blocked when not defensible)
                 beforeAfterSection   // THE BUILD — how far it came (earliest → latest frame)
                 if vehicle != nil {
@@ -264,6 +271,12 @@ struct VehicleDetailView: View {
                 Spacer(minLength: 0)
             }
         }
+        .coordinateSpace(name: "vdscroll")
+        .onPreferenceChange(VDScrollKey.self) { y in
+            let c = y < -220   // hero (~240pt) has scrolled past the top
+            if c != collapsed { withAnimation(.snappy(duration: 0.2)) { collapsed = c } }
+        }
+        .overlay(alignment: .top) { stickyHeader }
     }
 
     // ─── Hero — sized render thumb (NOT the raw original), tap → full gallery.
@@ -471,21 +484,26 @@ struct VehicleDetailView: View {
     /// URL. Presented imperatively (UIActivityViewController) to avoid stacking a
     /// second SwiftUI .sheet on this view (it already hosts the provenance sheet).
     @ViewBuilder private var shareButton: some View {
-        Button {
-            Task {
-                renderingShare = true
-                let card = await buildShareCard()
-                renderingShare = false
-                var items: [Any] = []
-                if let card { items.append(card) }
-                if let url = URL(string: "https://nuke.ag/vehicle/\(vehicleId)") { items.append(url) }
-                presentShare(items)
-            }
-        } label: {
+        Button { shareRecord() } label: {
             if renderingShare { ProgressView() }
             else { Image(systemName: "square.and.arrow.up") }
         }
         .disabled(renderingShare)
+    }
+
+    /// Compose the shareable card (image + the nuke.ag URL) and present the sheet.
+    /// Fired by both the nav button and the barcode fingerprint.
+    private func shareRecord() {
+        guard !renderingShare else { return }
+        Task {
+            renderingShare = true
+            let card = await buildShareCard()
+            renderingShare = false
+            var items: [Any] = []
+            if let card { items.append(card) }
+            if let url = URL(string: "https://nuke.ag/vehicle/\(vehicleId)") { items.append(url) }
+            presentShare(items)
+        }
     }
 
     /// Pre-decode the hero + up to 3 strip photos (ImageRenderer won't await async
@@ -499,7 +517,8 @@ struct VehicleDetailView: View {
                let d = await RemoteImageCache.shared.image(u) { strip.append(d) }
         }
         guard hero != nil || !strip.isEmpty else { return nil }   // nothing to show → URL only
-        return renderShareCard(hero: hero, title: vehicle?.title ?? "", valuation: valuation, strip: strip)
+        return renderShareCard(hero: hero, title: vehicle?.title ?? "", valuation: valuation,
+                               strip: strip, days: days, vehicleId: vehicleId)
     }
 
     private func presentShare(_ items: [Any]) {
@@ -544,26 +563,95 @@ struct VehicleDetailView: View {
         }
     }
 
-    // ─── Build timeline — the working days as a heat instrument (the build's
-    // rhythm at a glance). Reuses the profile's BarcodeTimeline; vehicle days carry
-    // no labor minutes/cost, so it heats by photo density (cooler, honest). A day
-    // tap opens that day's photo analysis if it's in the loaded set.
-    @ViewBuilder private var buildTimeline: some View {
+    // ─── The build instrument — ONE thing, two states. Collapsed it is the 1-D
+    // barcode (the build's rhythm, suppressed); tapping it expands the same data
+    // into the 2-D calendar (BarcodeTimeline). A fingerprint header carries the
+    // origin code (tap → share the traceable card) and the expand chevron. The
+    // vehicle name is NOT repeated here — the hero already says it.
+    @State private var timelineExpanded = false
+
+    @ViewBuilder private var buildInstrument: some View {
         if !days.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("BUILD TIMELINE")
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 16)
-                BarcodeTimeline(days: days) { day in
-                    if let match = images.first(where: {
-                        ($0.taken_at?.prefix(10)).map(String.init) == day.day
-                    }) { selectedPhoto = match }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Button { shareRecord() } label: {
+                        HStack(spacing: 4) {
+                            Text(BuildBarcode.originCode(vehicleId))
+                                .font(.system(.caption2, design: .monospaced).weight(.semibold))
+                                .foregroundStyle(.primary)
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
+                    Button {
+                        withAnimation(.snappy(duration: 0.22)) { timelineExpanded.toggle() }
+                    } label: {
+                        Image(systemName: timelineExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+
+                if timelineExpanded {
+                    BarcodeTimeline(days: days) { day in
+                        if let match = images.first(where: {
+                            ($0.taken_at?.prefix(10)).map(String.init) == day.day
+                        }) { selectedPhoto = match }
+                    }
+                    .transition(.opacity)
+                } else {
+                    BuildBarcode(days: days)
+                        .padding(.horizontal, 16)
+                        .contentShape(Rectangle())
+                        .onTapGesture { withAnimation(.snappy(duration: 0.22)) { timelineExpanded = true } }
+                        .transition(.opacity)
                 }
             }
             .padding(.bottom, 16)
         } else if daysError {
             sectionError("the build timeline") { Task { await loadVehicleDays() } }
+        }
+    }
+
+    // ─── BaT-style sticky header — once the hero scrolls away, the identity
+    // compresses into a pinned bar: name · barcode · worth. Driven by `collapsed`,
+    // set from the scroll-offset probe at the top of `content`.
+    @State private var collapsed = false
+
+    struct VDScrollKey: PreferenceKey {
+        static var defaultValue: CGFloat = 0
+        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+    }
+
+    @ViewBuilder private var stickyHeader: some View {
+        if collapsed, let v = vehicle {
+            HStack(spacing: 12) {
+                Text(v.title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .layoutPriority(1)
+                if !days.isEmpty {
+                    BuildBarcode(days: days, height: 18)
+                        .frame(width: 84)
+                }
+                Spacer(minLength: 6)
+                if let val = valuation, let mid = val.value, mid > 0 {
+                    Text(mid.formatted(.currency(code: "USD").precision(.fractionLength(0))))
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity)
+            .background(.regularMaterial)
+            .overlay(alignment: .bottom) { Divider() }
+            .transition(.move(edge: .top).combined(with: .opacity))
         }
     }
 
@@ -1509,9 +1597,15 @@ struct VehicleValuation: Decodable {
     /// How many of the model's signals actually had data behind them.
     var signalsFired: Int { (signals ?? []).filter { $0.fired == true }.count }
     var signalsTotal: Int { (signals ?? []).count }
-    /// A value backed by ≤1 fired signal or ≤1 input is a rough placeholder, NOT a
-    /// valuation — the surface must say so rather than print a confident bracket.
-    var isThin: Bool { signalsTotal > 0 && (signalsFired <= 1 || (input_count ?? 0) <= 1) }
+    /// NOT defensible — block the price — until the comps are build-class-stratified.
+    /// A resto-mod priced on stock-truck comps is wrong even with many signals firing
+    /// (condition/originality fire now, but the comp ANCHOR is still class-blind), so
+    /// the estimate stays "Not priced yet" until comp_method proves the comps match
+    /// this vehicle's build class. Then the ≤1-signal / ≤1-input floor still applies.
+    var isThin: Bool {
+        guard comp_method == "class_stratified" else { return signalsTotal > 0 }
+        return signalsFired <= 1 || (input_count ?? 0) <= 1
+    }
 }
 
 /// get_vehicle_engagement(vehicle) → one jsonb object: the engagement ladder's
