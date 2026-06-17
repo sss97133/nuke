@@ -236,39 +236,11 @@ struct BarcodeTimeline: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            filterPills
-            calendarGrid
-        }
-        .onAppear { recompute() }
-        .onChange(of: days.count) { _, _ in recompute() }
-    }
-
-    // ─── Filter pills ─────────────────────────────────────────────────────────
-
-    @ViewBuilder private var filterPills: some View {
-        let totals = facetTotals
-        let shown = timelineFacets.filter { $0.key == "all" || (totals[$0.key] ?? 0) > 0 }
-        if shown.count > 1 {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(shown) { facet in
-                        let active = activeFilter == facet.key
-                        Text("\(facet.label) (\(totals[facet.key] ?? 0))")
-                            .font(.caption2.weight(.semibold))
-                            .monospacedDigit()
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 4)
-                            .foregroundStyle(active ? Color(.systemBackground) : facet.color)
-                            .background { Capsule().fill(active ? facet.color : Color.clear) }
-                            .overlay { Capsule().stroke(facet.color.opacity(active ? 0 : 0.5), lineWidth: 1) }
-                            .contentShape(Capsule())
-                            .onTapGesture { activeFilter = facet.key }
-                    }
-                }
-                .padding(.horizontal, 12)
-            }
-        }
+        // No ALL/PHOTOS/WORK filter pills — they read as clutter (Skylar, repeatedly).
+        // The grid shows all activity on the value-weighted heat; activeFilter stays "all".
+        calendarGrid
+            .onAppear { recompute() }
+            .onChange(of: days.count) { _, _ in recompute() }
     }
 
     // ─── Calendar grid ────────────────────────────────────────────────────────

@@ -67,9 +67,9 @@ struct ShareCardContent: View {
                     Text("nuke.ag")
                         .font(.system(size: 34, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.white)
-                    Text(BuildBarcode.originCode(vehicleId))
-                        .font(.system(size: 20, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.6))
+                    Text("scan to trace this build")
+                        .font(.system(size: 18, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.5))
                 }
                 if !days.isEmpty {
                     BuildBarcode(days: days, height: 44)

@@ -571,7 +571,7 @@ struct VehicleDetailView: View {
     }
 
     /// Compose the shareable card (image + the nuke.ag URL) and present the sheet.
-    /// Fired by both the nav button and the barcode fingerprint.
+    /// Fired by the nav-bar share button.
     private func shareRecord() {
         guard !renderingShare else { return }
         Task {
@@ -645,40 +645,26 @@ struct VehicleDetailView: View {
     }
 
     // ─── The build instrument — ONE thing, two states. Collapsed it is the 1-D
-    // barcode (the build's rhythm, suppressed); tapping it expands the same data
-    // into the 2-D calendar (BarcodeTimeline). A fingerprint header carries the
-    // origin code (tap → share the traceable card) and the expand chevron. The
-    // vehicle name is NOT repeated here — the hero already says it.
+    // barcode (the build's rhythm); tapping it expands the same data into the 2-D
+    // calendar. No origin code and no share button here: the nav bar already shares,
+    // and the traceable fingerprint (code + QR) lives where it matters — baked into
+    // the shared card. In-app this is just the instrument.
     @State private var timelineExpanded = false
 
     @ViewBuilder private var buildInstrument: some View {
         if !days.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Button { shareRecord() } label: {
-                        HStack(spacing: 4) {
-                            Text(BuildBarcode.originCode(vehicleId))
-                                .font(.system(.caption2, design: .monospaced).weight(.semibold))
-                                .foregroundStyle(.primary)
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 9, weight: .semibold))
+                if timelineExpanded {
+                    HStack {
+                        Spacer()
+                        Button { withAnimation(.snappy(duration: 0.22)) { timelineExpanded = false } } label: {
+                            Image(systemName: "chevron.up")
+                                .font(.system(size: 10, weight: .semibold))
                                 .foregroundStyle(.secondary)
                         }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                    Spacer()
-                    Button {
-                        withAnimation(.snappy(duration: 0.22)) { timelineExpanded.toggle() }
-                    } label: {
-                        Image(systemName: timelineExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 16)
-
-                if timelineExpanded {
+                    .padding(.horizontal, 16)
                     BarcodeTimeline(days: days) { day in
                         if let match = images.first(where: {
                             ($0.taken_at?.prefix(10)).map(String.init) == day.day
@@ -686,11 +672,16 @@ struct VehicleDetailView: View {
                     }
                     .transition(.opacity)
                 } else {
-                    BuildBarcode(days: days)
-                        .padding(.horizontal, 16)
-                        .contentShape(Rectangle())
-                        .onTapGesture { withAnimation(.snappy(duration: 0.22)) { timelineExpanded = true } }
-                        .transition(.opacity)
+                    HStack(spacing: 10) {
+                        BuildBarcode(days: days)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 16)
+                    .contentShape(Rectangle())
+                    .onTapGesture { withAnimation(.snappy(duration: 0.22)) { timelineExpanded = true } }
+                    .transition(.opacity)
                 }
             }
             .padding(.bottom, 16)
