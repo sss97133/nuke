@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nuke.byok-image-analysis</string>
+
+    <!-- FLEET-WIDE, self-advancing BYOK deep image analysis. byok-fleet-batch.sh asks the
+         coordinator (byok-fleet-next.mjs) for the highest-priority vehicle with real pending
+         work and drains ONE bounded batch. NO hardcoded vehicle: the old single-vehicle pin
+         to the (drained) 1977 K5 was wound W1 — it looped "drained" every fire and never
+         touched the rest of the fleet. Runs in the login shell (NOT Claude Code's Bash
+         sandbox) so the network steps reach Supabase normally.
+         This repo copy is the source of truth; keep it identical to the installed
+         ~/Library/LaunchAgents/com.nuke.byok-image-analysis.plist. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/skylar/nuke/scripts/daily-receipt/byok-fleet-batch.sh</string>
+        <!-- batch size per fire: frames per bounded day-chunk -->
+        <string>15</string>
+    </array>
+
+    <!-- 5 min between fires: paces Opus vision cost and respects the >=5min cron rule. -->
+    <key>StartInterval</key>
+    <integer>300</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/skylar/nuke/logs/byok-image-batch.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/skylar/nuke/logs/byok-image-batch.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/skylar/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>Nice</key>
+    <integer>10</integer>
+</dict>
+</plist>
