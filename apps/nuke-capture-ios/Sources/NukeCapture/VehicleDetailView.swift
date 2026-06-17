@@ -128,6 +128,13 @@ struct VehicleDetailView: View {
     @State private var posting = false
     @State private var followBusy = false
     @State private var showComments = false   // the comment thread lives in a summoned sheet
+    // CONTRIBUTE — the user's job: fill what the record needs. The unverified (facade)
+    // specs ARE the needs (data-driven, no hardcoded "what matters"); a signed-in user
+    // contributes a value → record_interaction(kind=specification) → testimony.
+    @State private var contributeField: VehicleSpec?
+    @State private var contributeText = ""
+    @State private var contributing = false
+    @State private var contributed: Set<String> = []   // optimistic: fields just submitted
     @State private var galleryOpen = false
     @State private var selectedPhoto: VehicleGalleryImage?  // photo→analysis drill
     @State private var provenanceDrill: SpecDrill?          // spec value → its source
@@ -405,11 +412,79 @@ struct VehicleDetailView: View {
                     ForEach(specs) { specRow($0) }
                     if let loc = locationRow { plainRow("Location", loc) }
                 }
+
+                // WHAT THIS NEEDS — the unverified specs are the gaps; a signed-in
+                // user fills them (the contribution rung of engagement). Data-driven:
+                // the spec RPC decides fact-vs-facade, not a hardcoded "what matters".
+                if SupabaseService.currentUserId != nil, !needsToFill.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("HELP COMPLETE THIS RECORD")
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        FlowChips(items: needsToFill.map(\.label))
+                            { idx in contributeField = needsToFill[idx]; contributeText = "" }
+                    }
+                    .padding(.top, 14)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
+            // Sheet on THIS subview (not the top-level view) — avoids stacking a 3rd
+            // .sheet on the view that already hosts provenance + comments.
+            .sheet(item: $contributeField) { spec in contributeSheet(spec) }
         } else if specsError {
             sectionError("specifications") { Task { await loadSpecs() } }
+        }
+    }
+
+    /// The record's gaps = unverified specs not just submitted (optimistic).
+    private var needsToFill: [VehicleSpec] {
+        specs.filter { !$0.rooted && !contributed.contains($0.field) }
+    }
+
+    @ViewBuilder private func contributeSheet(_ spec: VehicleSpec) -> some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField(spec.label, text: $contributeText)
+                        .autocorrectionDisabled()
+                } header: {
+                    Text("What's the \(spec.label.lowercased())?")
+                } footer: {
+                    Text("Your entry is recorded as your testimony — it's reviewed and rooted to you, never silently overwriting the record.")
+                }
+            }
+            .navigationTitle("Add \(spec.label)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { Button("Cancel") { contributeField = nil } }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Submit") { Task { await contributeSpec(spec) } }
+                        .disabled(contributing || contributeText.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+        .presentationDetents([.height(220)])
+    }
+
+    private func contributeSpec(_ spec: VehicleSpec) async {
+        let value = contributeText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        contributing = true
+        defer { contributing = false }
+        struct P: Encodable {
+            let p_kind = "specification"; let p_target_type = "vehicle"
+            let p_target_id: String; let p_payload: [String: String]
+        }
+        do {
+            _ = try await SupabaseService.client
+                .rpc("record_interaction",
+                     params: P(p_target_id: vehicleId, p_payload: ["field": spec.field, "value": value]))
+                .execute()
+            contributed.insert(spec.field)   // optimistic — drops the chip
+            contributeField = nil
+        } catch {
+            NSLog("NukeCapture contribute spec failed: %@", String(describing: error))
         }
     }
 
@@ -1625,6 +1700,31 @@ private struct CommentsSheet: View {
             Text("Sign in to weigh in.")
                 .font(.caption).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity).padding(12).background(.bar)
+        }
+    }
+}
+
+/// A horizontal strip of tappable "+ field" chips — the record's gaps as one-tap
+/// contribution prompts.
+private struct FlowChips: View {
+    let items: [String]
+    let onTap: (Int) -> Void
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(Array(items.enumerated()), id: \.offset) { idx, label in
+                    Button { onTap(idx) } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus").font(.system(size: 9, weight: .bold))
+                            Text(label).font(.caption2.weight(.medium))
+                        }
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .foregroundStyle(.primary)
+                        .overlay { Capsule().stroke(.secondary.opacity(0.4), lineWidth: 1) }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 }
