@@ -312,6 +312,15 @@ struct AccountView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                // What you choose to link — your AI subscriptions (BYOK) + accounting.
+                Section {
+                    NavigationLink {
+                        ConnectedAccountsView()
+                    } label: {
+                        Label("Connected accounts", systemImage: "link")
+                    }
+                }
+
                 // The photo grant, reported as a fact. Off → the one action
                 // that exists (Settings). On-grant ignition re-arms at the
                 // app level (NukeCaptureApp scenePhase handler).
