@@ -989,6 +989,21 @@ const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "project_attribute",
+    description:
+      "Canonical weighted-consensus projection. Calls the SQL function project_attribute(p_subject_id, p_attribute) — the SAME engine that powers vehicle_wiki_view — so the answer you get here is byte-for-byte the answer the vehicle profile renders. " +
+      "Prefer this over synthesize_attribute when you want the system's authoritative single value for a (subject, attribute): synthesize_attribute is a separate TS reimplementation of the same idea and can drift from the SQL truth. This tool has no drift — it IS the canonical engine. " +
+      "Returns whatever shape project_attribute emits (typically the consensus value plus its supporting weight/provenance).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        subject_id: { type: "string", description: "Subject UUID (p_subject_id)" },
+        attribute: { type: "string", description: "Attribute name from the registry (p_attribute), e.g. 'vehicle.make'" },
+      },
+      required: ["subject_id", "attribute"],
+    },
+  },
+  {
     name: "propose_attribute",
     description:
       "Propose a NOVEL attribute the registry LACKS (e.g. 'image.weld_pattern_type', 'image.media_blast_profile', 'image.period_correct_finish') so a real discovery isn't lost when get_attribute_checklist has no slot for it. " +
@@ -2566,7 +2581,30 @@ async function handleSubmitAttributeValue(args: Record<string, unknown>): Promis
   }
 
   const def = getAttribute(attribute);
-  if (!def) return toolErr(`unknown attribute: ${attribute} (call get_attribute_checklist to see valid names)`);
+  if (!def) {
+    // Don't drop the attempted claim — a rejected value is still testimony. Capture
+    // the value + evidence + source DNA into pending_claims so it's routable to a
+    // propose_attribute proposal instead of evaporating. Best-effort: a capture
+    // failure must NOT change the rejection the caller sees.
+    try {
+      await sb()
+        .from("pending_claims")
+        .insert({
+          attempted_property_key: attribute,
+          attempted_value: value === undefined ? null : value,
+          attempted_structured_data: (args.evidence && typeof args.evidence === "object")
+            ? args.evidence
+            : null,
+          agent_key: model_slug || null,
+          rejection_reason: "unknown_attribute",
+          status: "captured",
+        });
+    } catch (_e) { /* best-effort — capture must never block the rejection */ }
+    return toolErr(
+      `unknown attribute: ${attribute} (call get_attribute_checklist to see valid names; ` +
+      `if this is a real, novel observation the registry lacks, call propose_attribute to route it)`,
+    );
+  }
   if (def.subject_kind !== subject_kind) {
     return toolErr(`attribute ${attribute} expects subject_kind='${def.subject_kind}', caller passed '${subject_kind}'`);
   }
@@ -3763,6 +3801,32 @@ async function handleSynthesizeAttribute(args: Record<string, unknown>): Promise
       : contradiction_score < 0.4
         ? "Moderate dialectic — consider gathering more callers."
         : "High contradiction — surface to human review.",
+  });
+}
+
+// project_attribute — thin MCP exposure of the CANONICAL SQL consensus engine.
+// project_attribute(p_subject_id, p_attribute) is the same function vehicle_wiki_view
+// is built on; calling it directly here guarantees the MCP answer matches what the
+// vehicle profile renders (no TS-reimplementation drift like synthesize_attribute).
+async function handleProjectAttribute(args: Record<string, unknown>): Promise<ToolResult> {
+  const subject_id = String(args.subject_id ?? "");
+  const attribute = String(args.attribute ?? "");
+  if (!subject_id || !attribute) return toolErr("subject_id and attribute are required");
+
+  const supabase = sb();
+  const { data, error } = await supabase.rpc("project_attribute", {
+    p_subject_id: subject_id,
+    p_attribute: attribute,
+  });
+  if (error) return toolErr(`project_attribute rpc: ${error.message}`);
+
+  return toolOk({
+    subject_id,
+    attribute,
+    projection: data ?? null,
+    engine: "sql:project_attribute",
+    note: "Canonical weighted-consensus value from the SQL engine behind vehicle_wiki_view. " +
+      (data == null ? "No projection — no non-retracted atoms for this (subject, attribute)." : "This is the authoritative single value."),
   });
 }
 
@@ -6174,6 +6238,7 @@ const TOOL_HANDLERS: Record<string, (args: Record<string, unknown>) => Promise<T
   query_subject_atoms: handleQuerySubjectAtoms,
   find_subjects_needing_atoms: handleFindSubjectsNeedingAtoms,
   synthesize_attribute: handleSynthesizeAttribute,
+  project_attribute: handleProjectAttribute,
   propose_attribute: handleProposeAttribute,
   project_invoice: handleProjectInvoice,
   project_work_log: handleProjectWorkLog,
