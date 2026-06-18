@@ -8,15 +8,15 @@
 # "project not found." Install XcodeGen and generate the project (+ its shared
 # scheme) before Xcode Cloud resolves packages and builds.
 #
-# Xcode Cloud runs the archive action with AUTOMATIC SwiftPM resolution DISABLED:
-# it refuses to hit the network mid-build and instead requires a committed
-# Package.resolved at
-#   NukeCapture-iOS.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
-# A freshly XcodeGen'd project has no such file, so the archive died with
-# "a resolved file is required when automatic dependency resolution is disabled …
-# Running resolver because the following dependencies were added: 'supabase-swift'"
-# (build 29, e9e5401a). post_clone DOES have network, so we resolve here — that
-# writes Package.resolved before the archive step runs.
+# Xcode Cloud runs with AUTOMATIC SwiftPM resolution DISABLED everywhere — even an
+# explicit `xcodebuild -resolvePackageDependencies` is refused (build 29 attempt 2,
+# 0445d81b: "ci_post_clone.sh failed (exit 74) … a resolved file is required when
+# automatic dependency resolution is disabled"). So we cannot resolve on the runner
+# at all; we must SHIP a Package.resolved and drop it into the generated workspace
+# before the archive step. The committed copy lives next to project.yml
+# (apps/nuke-capture-ios/Package.resolved); regenerate it after changing `packages:`
+# with:  xcodegen generate && xcodebuild -resolvePackageDependencies … then copy the
+# produced .xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved here.
 
 set -e
 
@@ -27,11 +27,11 @@ echo "▸ Generating NukeCapture-iOS.xcodeproj from project.yml…"
 cd "$CI_PRIMARY_REPOSITORY_PATH/apps/nuke-capture-ios"
 xcodegen generate
 
-echo "▸ Resolving Swift package dependencies (writes the Package.resolved the archive step demands)…"
-xcodebuild -resolvePackageDependencies \
-  -project NukeCapture-iOS.xcodeproj \
-  -scheme NukeCapture-iOS
+echo "▸ Seeding the committed Package.resolved into the generated workspace…"
+SWIFTPM_DIR="NukeCapture-iOS.xcodeproj/project.xcworkspace/xcshareddata/swiftpm"
+mkdir -p "$SWIFTPM_DIR"
+cp Package.resolved "$SWIFTPM_DIR/Package.resolved"
 
-echo "▸ Done. Project generated + packages resolved:"
+echo "▸ Done. Project generated + Package.resolved seeded:"
 ls -d NukeCapture-iOS.xcodeproj
-ls -l NukeCapture-iOS.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+ls -l "$SWIFTPM_DIR/Package.resolved"
