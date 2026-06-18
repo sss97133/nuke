@@ -45,7 +45,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ag.nuke.capture
         PRODUCT_NAME: NukeCapture
-        MARKETING_VERSION: "1.0.0"
+        MARKETING_VERSION: "1.0.1"
         CURRENT_PROJECT_VERSION: 30
         # Swift 5 language mode, same rationale as the Mac relay's
         # Package.swift: PhotoKit's observer/callback surface predates strict
@@ -75,7 +75,17 @@ targets:
       properties:
         CFBundleDisplayName: Nuke
         CFBundleShortVersionString: $(MARKETING_VERSION)
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # LITERAL build number — NOT $(CURRENT_PROJECT_VERSION). Xcode Cloud forces
+        # CURRENT_PROJECT_VERSION = CI_BUILD_NUMBER (the small per-workflow run counter)
+        # onto the archive, and the "Process Info.plist" step re-expands the variable
+        # AFTER ci_post_clone / ci_pre_xcodebuild run — so every script-written value
+        # (build 8 set timestamps 1781745994 / 1781746066 in the log) was clobbered back
+        # to the run number 8, which is <= the highest TestFlight build (27) and rejected
+        # ("bundle version must be higher than the previously uploaded version"). A literal
+        # has no variable to re-expand, so it survives. Bump this by hand before each
+        # TestFlight archive (28 -> 29 -> ...). ci_pre_xcodebuild's PlistBuddy timestamp,
+        # if it still runs, overwrites this literal with a monotonic epoch (also > 27).
+        CFBundleVersion: "28"
         # OAuth callback scheme for the ASWebAuthenticationSession providers
         # (Google, GitHub). ASWebAuthenticationSession needs this scheme so
         # the Supabase redirect (ag.nuke.capture://login-callback) returns
