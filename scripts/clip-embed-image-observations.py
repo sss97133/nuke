@@ -56,7 +56,7 @@ def fetch_batch(n):
     r = requests.post(
         f"{URL}/rest/v1/rpc/get_clip_embed_batch",
         headers={**H, "Content-Type": "application/json"},
-        json={"p_limit": n}, timeout=60)
+        json={"p_limit": n}, timeout=90)
     r.raise_for_status()
     out = []
     for row in r.json():
@@ -93,10 +93,23 @@ def write(obs_id, vec):
         json={"embedding_clip_vitb32": lit}, timeout=60)
     r.raise_for_status()
 
+def fetch_batch_resilient(n, retries=5):
+    # a transient RPC ReadTimeout (DB busy, e.g. a concurrent reap) must NOT crash the whole --all
+    # drain. Retry with backoff; if persistently failing, exit the drain gracefully (rc=0) so the
+    # launchd job simply resumes on its next fire instead of dying.
+    for attempt in range(retries):
+        try:
+            return fetch_batch(n)
+        except Exception as e:
+            print(f"  fetch retry {attempt+1}/{retries}: {str(e)[:90]}", flush=True)
+            time.sleep(5 * (attempt + 1))
+    print("  fetch failed after retries — DB busy; exiting drain gracefully (launchd resumes next fire)", flush=True)
+    return []
+
 done = fail = 0
 remaining = args.limit if not args.all else 10**9
 while remaining > 0:
-    rows = fetch_batch(min(args.batch, remaining))
+    rows = fetch_batch_resilient(min(args.batch, remaining))
     if not rows:
         break
     for obs_id, image_url, storage_path in rows:
