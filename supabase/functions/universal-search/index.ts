@@ -81,6 +81,87 @@ function detectInputType(query: string): 'vin' | 'url' | 'year' | 'text' | 'empt
   return 'text';
 }
 
+interface CohortTarget {
+  year: number;
+  make: string;
+  model: string;
+}
+
+/**
+ * Parse a query into a year-make-model cohort target ("1969 Chevrolet Camaro").
+ * Mirrors the frontend heuristic in nuke_frontend/src/hooks/useSearchPage.ts.
+ * Requires a leading 4-digit year (1885–current+1), a make token, and at least
+ * one model token. Returns null when the query isn't a clean YMM — we never
+ * guess a cohort from a partial query.
+ */
+function parseCohort(q: string): CohortTarget | null {
+  const t = q.trim();
+  const m = t.match(/^(1[89]\d{2}|20\d{2})\s+([A-Za-z][A-Za-z-]*)\s+(.+?)\s*$/);
+  if (!m) return null;
+  const year = parseInt(m[1], 10);
+  if (year < 1885 || year > new Date().getFullYear() + 1) return null;
+  const make = m[2];
+  const model = m[3].trim();
+  if (!model) return null;
+  return { year, make, model };
+}
+
+/**
+ * Register a cohort subject and build the cohort_card for the response.
+ * Never throws — a cohort-registration failure must not break search.
+ */
+/**
+ * Resolve a "year + model" query (no explicit make, e.g. "1966 mustang") into a
+ * cohort by looking the model up in canonical_models (by canonical name or alias)
+ * and borrowing its make. This is how most people actually search — make omitted.
+ * Returns null if the model can't be resolved to a single canonical make.
+ */
+async function resolveCohortFromModel(supabase: any, query: string): Promise<CohortTarget | null> {
+  const m = query.trim().match(/^(1[89]\d{2}|20\d{2})\s+(.+?)\s*$/);
+  if (!m) return null;
+  const year = parseInt(m[1], 10);
+  if (year < 1885 || year > new Date().getFullYear() + 1) return null;
+  const rest = m[2].trim();
+  if (rest.length < 2) return null;
+  // Exact-ish canonical model match first, then alias membership.
+  let { data } = await supabase
+    .from('canonical_models').select('make, canonical_model').ilike('canonical_model', rest).limit(1);
+  if (!data?.length) {
+    ({ data } = await supabase
+      .from('canonical_models').select('make, canonical_model').contains('aliases', [rest.toLowerCase()]).limit(1));
+  }
+  if (!data?.length) return null;
+  return { year, make: data[0].make, model: data[0].canonical_model };
+}
+
+async function buildCohortCard(supabase: any, query: string): Promise<any | undefined> {
+  const c = parseCohort(query) ?? await resolveCohortFromModel(supabase, query);
+  if (!c) return undefined;
+  try {
+    const { data: subjectId, error } = await supabase.rpc('register_make_model_subject', {
+      p_make: c.make,
+      p_model: c.model,
+      p_year: c.year,
+    });
+    if (error || !subjectId) {
+      if (error) console.error('register_make_model_subject failed (non-fatal):', error.message);
+      return undefined;
+    }
+    return {
+      type: 'cohort',
+      year: c.year,
+      make: c.make,
+      model: c.model,
+      subject_id: subjectId,
+      label: `${c.year} ${c.make} ${c.model}`,
+      path: `/cohort/${encodeURIComponent(c.make.toLowerCase())}/${encodeURIComponent(c.model.toLowerCase())}/${c.year}`,
+    };
+  } catch (e) {
+    console.error('Cohort registration failed (non-fatal):', e);
+    return undefined;
+  }
+}
+
 // Normalize and tokenize query for search
 function tokenizeQuery(query: string): string[] {
   return query
@@ -329,11 +410,16 @@ Deno.serve(async (req) => {
         }
       }
 
+      // A bare-year query (e.g. "1969") never parses as a clean YMM, so this
+      // returns undefined — included for parity with the text path.
+      const cohortCard = await buildCohortCard(supabase, trimmedQuery);
+
       return new Response(JSON.stringify({
         success: true,
         results,
         query_type: 'year',
         total_count: results.length,
+        cohort_card: cohortCard,
         search_time_ms: Date.now() - startTime
       }), { headers: { ...corsHeaders, ...rlHeaders, 'Content-Type': 'application/json' } });
     }
@@ -916,12 +1002,18 @@ Deno.serve(async (req) => {
       // const aiResponse = await callOpenAI(`Suggest search terms for: ${trimmedQuery}`);
     }
 
+    // Clean year-make-model query → auto-register cohort subject + attach card.
+    // Only runs when parseCohort succeeds (never for VINs, URLs, bare years, or
+    // single-word queries). Failures are swallowed inside buildCohortCard.
+    const cohortCard = await buildCohortCard(supabase, trimmedQuery);
+
     return new Response(JSON.stringify({
       success: true,
       results: dedupedResults,
       query_type: 'text',
       total_count: dedupedResults.length,
       ai_suggestion: aiSuggestion,
+      cohort_card: cohortCard,
       search_time_ms: Date.now() - startTime,
       meta: {
         total_count: vehicleTotalCount || dedupedResults.length,

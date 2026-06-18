@@ -92,6 +92,39 @@ const TYPE_MAP: Record<string, string> = {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export interface CohortTarget {
+  year: number;
+  make: string;
+  model: string;
+  label: string;
+  path: string;
+}
+
+/**
+ * Parse a query into a year-make-model cohort target ("1966 Ford Mustang").
+ * Requires a leading 4-digit year (1885–current+1), a make token, and at
+ * least one model token. Returns null when the query isn't a clean YMM —
+ * we never guess a cohort from a partial query.
+ */
+function parseCohort(q: string): CohortTarget | null {
+  const t = q.trim();
+  const m = t.match(/^(1[89]\d{2}|20\d{2})\s+([A-Za-z][A-Za-z-]*)\s+(.+?)\s*$/);
+  if (!m) return null;
+  const year = parseInt(m[1], 10);
+  if (year < 1885 || year > new Date().getFullYear() + 1) return null;
+  const make = m[2];
+  const model = m[3].trim();
+  if (!model) return null;
+  const slug = (s: string) => encodeURIComponent(s.toLowerCase());
+  return {
+    year,
+    make,
+    model,
+    label: `${year} ${make} ${model}`,
+    path: `/cohort/${slug(make)}/${slug(model)}/${year}`,
+  };
+}
+
 function mapRawResult(r: any): SearchResult {
   return {
     id: r.id,
@@ -337,8 +370,12 @@ export function useSearchPage() {
   const vehicleCount = results.filter(r => r.type === 'vehicle').length;
   const displayVehicleCount = displayResults.filter(r => r.type === 'vehicle').length;
 
+  // Cohort terminal target — only when the query is a clean year-make-model.
+  const cohortTarget = useMemo(() => parseCohort(query), [query]);
+
   return {
     query,
+    cohortTarget,
     results,
     displayResults,
     loading,
