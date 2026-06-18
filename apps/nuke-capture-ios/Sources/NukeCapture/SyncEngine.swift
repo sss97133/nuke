@@ -21,6 +21,7 @@
 // remains the second gate for everything that does upload.
 
 import Foundation
+import ImageIO
 import Photos
 
 /// One on-device T0 detection — what Apple Vision read off a just-captured frame,
@@ -106,6 +107,17 @@ final class SyncEngine: ObservableObject {
     /// rather than fabricating a number (C4: every number real).
     @Published private(set) var uploadsPerMinute: Double = 0
 
+    /// CONTRIBUTOR MODE — true when this device contributes to a shared org
+    /// pool rather than the signer's own record. Off by default: the owner flow
+    /// is unchanged (an owner's own at-site photos upload ungated — founder
+    /// ruling). When ON, every at-site frame must clear the default-exclude
+    /// firewall (VisionEngine.contributorVerdict) BEFORE it leaves the phone, so
+    /// a private photo shot at the shop never reaches the pool.
+    @Published private(set) var contributorMode: Bool
+    /// Frames the contributor gate held back (not a vehicle, or a prominent
+    /// face). Honest counter — the held photos stayed on the device, never sent.
+    @Published private(set) var totalHeldPrivate: Int
+
     // ─── Persistence (UserDefaults) ──────────────────────────────────────────
     // UserDefaults use is declared in PrivacyInfo.xcprivacy (required-reason
     // API, reason CA92.1 — accessing our own app's defaults).
@@ -125,6 +137,8 @@ final class SyncEngine: ObservableObject {
         static let backfillQueue = "backfillQueue"      // [String] asset ids still owed
         static let libraryTotal = "libraryPhotoTotal"   // Int — whole library counted at ignition
         static let relevantTotal = "relevantPhotoTotal" // Int — confirmed at-site set handed to backfill
+        static let contributorMode = "contributorMode"  // Bool — this device contributes to an org pool
+        static let totalHeldPrivate = "totalHeldPrivate" // Int — frames the contributor gate held back
     }
 
     /// Dedupe set: "filename|size" of everything already uploaded. Ordered
@@ -145,6 +159,8 @@ final class SyncEngine: ObservableObject {
         backfillRemaining = (defaults.stringArray(forKey: Key.backfillQueue) ?? []).count
         libraryTotal = defaults.integer(forKey: Key.libraryTotal)
         relevantTotal = defaults.integer(forKey: Key.relevantTotal)
+        contributorMode = defaults.bool(forKey: Key.contributorMode)
+        totalHeldPrivate = defaults.integer(forKey: Key.totalHeldPrivate)
         // Day-scoped counter: only valid if it was written today.
         if defaults.string(forKey: Key.todayKey) == Self.dayKey(for: Date()) {
             uploadsToday = defaults.integer(forKey: Key.todayCount)
@@ -198,6 +214,34 @@ final class SyncEngine: ObservableObject {
         if !paused {
             Task { await self.resumeBackfillIfNeeded(); await self.sync() }
         }
+    }
+
+    /// Turn the contributor firewall on/off for this device. Set from
+    /// onboarding when the signer joins an org as crew (membership confirmed via
+    /// SupabaseService.fetchActiveOrgMemberships). Persisted; survives relaunch.
+    func setContributorMode(_ on: Bool) {
+        contributorMode = on
+        defaults.set(on, forKey: Key.contributorMode)
+    }
+
+    /// The contributor firewall. True ⇒ HOLD this frame (do not upload to the
+    /// pool). Loads the LOCAL downscaled frame (no network) and runs the
+    /// default-exclude verdict: an affirmative vehicle label AND no prominent
+    /// face are both required to pass. On image-load failure it HOLDS — a frame
+    /// we cannot classify must never auto-cross into a shared pool (fail-safe).
+    /// Only ever consulted when contributorMode is true.
+    private func contributorGateHolds(assetID: String) async -> Bool {
+        guard let cg = await VisionEngine.loadCGImage(assetID: assetID, allowNetwork: false) else {
+            return true
+        }
+        if case .allow = VisionEngine.contributorVerdict(cg) { return false }
+        return true
+    }
+
+    private func recordHeldPrivate(_ n: Int) {
+        guard n > 0 else { return }
+        totalHeldPrivate += n
+        defaults.set(totalHeldPrivate, forKey: Key.totalHeldPrivate)
     }
 
     /// Debounce: library changes arrive in bursts (iCloud import storms);
@@ -305,6 +349,8 @@ final class SyncEngine: ObservableObject {
         }
 
         var uploaded = 0, skipped = 0, deduped = 0, failed = 0
+        var heldPrivate = 0   // contributor-mode firewall holds (face / not-a-vehicle)
+        var metadataOnly = 0  // owner-triage: row uploaded WITHOUT pixels (personal/sensitive — alibi metadata only)
         var t0Fired = 0   // cap on-device T0 per sync — never thrash the ANE on a bulk catch-up
 
         for asset in assets {
@@ -323,6 +369,16 @@ final class SyncEngine: ObservableObject {
                   asset.sourceType == .typeUserLibrary,
                   !asset.mediaSubtypes.contains(.photoScreenshot) else {
                 skipped += 1
+                continue
+            }
+
+            // ── Gate 1b (contributor firewall): default-exclude before upload ──
+            // Contributor mode only. A private photo shot AT the shop (selfie,
+            // paycheck, a person) clears the GPS gate but must NEVER reach the
+            // shared pool — hold anything without an affirmative vehicle label
+            // or with a prominent face. Owner mode skips this entirely.
+            if contributorMode, await contributorGateHolds(assetID: asset.localIdentifier) {
+                heldPrivate += 1
                 continue
             }
 
@@ -345,6 +401,22 @@ final class SyncEngine: ObservableObject {
                 let key = "\(filename)|\(data.count)"
                 if seenSet.contains(key) { deduped += 1; continue }
 
+                // ── Owner triage (on-device): pixels vs metadata-only ──
+                // Classify the already-fetched bytes (no second PhotoKit fetch).
+                // Pixels upload ONLY when it's vehicle work, no prominent face,
+                // and not flagged sensitive; everything else uploads metadata
+                // only (EXIF alibi) with the pixels left on the phone. Fail-safe:
+                // undecodable/unclassifiable ⇒ metadata-only (mirrors the
+                // contributor firewall's "hold if unclassifiable").
+                var pixelsEligible = false
+                var mlLabels: [String] = []
+                if let cg = Self.downsampledCGImage(from: data) {
+                    let t = VisionEngine.triage(cg)
+                    mlLabels = t.labels
+                    pixelsEligible = t.pixelsEligible
+                }
+                if !pixelsEligible { metadataOnly += 1 }
+
                 let sourceTypeLabel = Self.sourceTypeLabel(for: asset)
                 let meta = PhotoMeta(
                     assetIdentifier: asset.localIdentifier,
@@ -356,7 +428,10 @@ final class SyncEngine: ObservableObject {
                     cameraModel: cameraModel,
                     sourceType: sourceTypeLabel
                 )
-                try await SupabaseService.uploadPhoto(data: data, meta: meta, userId: userId)
+                try await SupabaseService.uploadPhoto(
+                    data: data, meta: meta, userId: userId,
+                    uploadPixels: pixelsEligible, appleMLLabels: mlLabels
+                )
 
                 markSeen(key)
                 recordUpload(assetIdentifier: asset.localIdentifier)
@@ -384,13 +459,14 @@ final class SyncEngine: ObservableObject {
 
         totalSkippedOffShop += skipped
         defaults.set(totalSkippedOffShop, forKey: Key.totalSkipped)
+        recordHeldPrivate(heldPrivate)
 
         // Silent-failure law (same as the daemon): advance the watermark ONLY
         // when nothing failed — a failed asset must be retried next pass.
         advanceWatermark(to: runStarted, failures: failed)
 
-        NSLog("NukeCapture sync: %d uploaded, %d off-shop skipped, %d deduped, %d failed",
-              uploaded, skipped, deduped, failed)
+        NSLog("NukeCapture sync: %d uploaded (%d metadata-only), %d off-shop skipped, %d held(private), %d deduped, %d failed",
+              uploaded, metadataOnly, skipped, heldPrivate, deduped, failed)
         await refreshAnalyzedCount()
         return failed == 0
     }
@@ -474,6 +550,8 @@ final class SyncEngine: ObservableObject {
         }
 
         var uploaded = 0, skipped = 0, deduped = 0, failed = 0
+        var heldPrivate = 0   // contributor-mode firewall holds
+        var metadataOnly = 0  // owner-triage: row uploaded WITHOUT pixels (alibi metadata only)
         let drainStart = Date()
 
         while true {
@@ -505,6 +583,13 @@ final class SyncEngine: ObservableObject {
                     continue
                 }
 
+                // Contributor firewall (default-exclude) before any historical
+                // photo joins the pool — same gate as the live sync pass.
+                if contributorMode, await contributorGateHolds(assetID: asset.localIdentifier) {
+                    heldPrivate += 1
+                    continue
+                }
+
                 let filename = Self.originalFilename(for: asset)
                 do {
                     let data = try await Self.requestOriginalData(for: asset)
@@ -518,6 +603,18 @@ final class SyncEngine: ObservableObject {
                         deduped += 1
                         continue
                     }
+
+                    // Owner triage — same on-device pixels-vs-metadata-only
+                    // decision as the live sync pass (fail-safe to metadata-only).
+                    var pixelsEligible = false
+                    var mlLabels: [String] = []
+                    if let cg = Self.downsampledCGImage(from: data) {
+                        let t = VisionEngine.triage(cg)
+                        mlLabels = t.labels
+                        pixelsEligible = t.pixelsEligible
+                    }
+                    if !pixelsEligible { metadataOnly += 1 }
+
                     let sourceTypeLabel = Self.sourceTypeLabel(for: asset)
                     let meta = PhotoMeta(
                         assetIdentifier: asset.localIdentifier,
@@ -529,7 +626,10 @@ final class SyncEngine: ObservableObject {
                         cameraModel: cameraModel,
                         sourceType: sourceTypeLabel
                     )
-                    try await SupabaseService.uploadPhoto(data: data, meta: meta, userId: userId)
+                    try await SupabaseService.uploadPhoto(
+                        data: data, meta: meta, userId: userId,
+                        uploadPixels: pixelsEligible, appleMLLabels: mlLabels
+                    )
                     markSeen(key)
                     recordUpload(assetIdentifier: asset.localIdentifier)
                     uploaded += 1
@@ -554,8 +654,9 @@ final class SyncEngine: ObservableObject {
             await Task.yield()
         }
 
-        NSLog("NukeCapture backfill: %d uploaded, %d off-site skipped, %d deduped, %d failed",
-              uploaded, skipped, deduped, failed)
+        recordHeldPrivate(heldPrivate)
+        NSLog("NukeCapture backfill: %d uploaded (%d metadata-only), %d off-site skipped, %d held(private), %d deduped, %d failed",
+              uploaded, metadataOnly, skipped, heldPrivate, deduped, failed)
     }
 
     // ─── Unified background drain (BUG #1: ingest with the screen off) ───────
@@ -706,6 +807,21 @@ final class SyncEngine: ObservableObject {
 
     /// Full-quality original image data; allowed to hit the network for
     /// iCloud-optimized libraries.
+    /// Decode the already-fetched original bytes into a small CGImage for the
+    /// on-device triage classify — reuses the bytes from requestOriginalData
+    /// (no second PhotoKit/iCloud round-trip) and thumbnails at ~512px so the
+    /// Neural Engine isn't handed a 48 MP original. Returns nil on undecodable
+    /// data → the caller fails safe to metadata-only.
+    nonisolated static func downsampledCGImage(from data: Data, maxPixel: CGFloat = 512) -> CGImage? {
+        guard let src = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let opts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary)
+    }
+
     static func requestOriginalData(for asset: PHAsset) async throws -> Data {
         let options = PHImageRequestOptions()
         options.version = .original

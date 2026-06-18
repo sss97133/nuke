@@ -84,6 +84,90 @@ enum VisionEngine {
         )
     }
 
+    // MARK: - 1b. Face presence (the private-photo firewall)
+    //
+    // The geo-gate keeps OFF-site photos out; it does NOTHING for a private
+    // photo shot AT the shop (a selfie, a paycheck on the bench, a coworker's
+    // kid). For the CONTRIBUTOR (multi-user) path such a photo must never
+    // auto-upload into the shared org record, so the firewall holds anything
+    // with a prominent human face — default-EXCLUDE, faces lose ties. The
+    // OWNER path does not use this (founder ruling: an owner's own at-site
+    // photos upload ungated); this is the contributor gate only.
+
+    /// True when a human face occupies a meaningful share of the frame — a
+    /// person-centric photo, not a worker incidentally in a wide garage shot.
+    /// `minAreaFraction` is the bbox area fraction: a distant bystander stays
+    /// under it, a selfie/portrait trips it. Returns false on detector failure
+    /// — safe because `contributorVerdict` ALSO requires an affirmative vehicle
+    /// label, so a failed face pass alone can never let a private photo through.
+    static func hasProminentFace(_ cg: CGImage, minAreaFraction: CGFloat = 0.045) -> Bool {
+        let request = VNDetectFaceRectanglesRequest()
+        let handler = VNImageRequestHandler(cgImage: cg, options: [:])
+        do { try handler.perform([request]) } catch { return false }
+        guard let faces = request.results else { return false }
+        // VNFaceObservation.boundingBox is normalized [0,1] in image space;
+        // width*height is the fraction of the frame the face covers.
+        return faces.contains {
+            CGFloat($0.boundingBox.width * $0.boundingBox.height) >= minAreaFraction
+        }
+    }
+
+    // MARK: - 1c. Contributor upload verdict (default-exclude firewall)
+
+    /// Whether a CONTRIBUTOR's at-site photo may cross into the shared org
+    /// record. Two affirmative conditions, BOTH required (swiss-cheese):
+    ///   • the frame classifies as vehicle/work (`isVehicle`) — an affirmative
+    ///     positive, not merely "absence of something bad"
+    ///   • no prominent human face
+    /// Anything else → `.hold` (quarantined for the contributor's OWN review,
+    /// never auto-uploaded). Ambiguity loses. Multi-user path ONLY; the owner's
+    /// own-device flow stays deliberately ungated.
+    enum ContributorVerdict: Equatable {
+        case allow
+        case hold(reason: String)
+    }
+
+    static func contributorVerdict(_ cg: CGImage) -> ContributorVerdict {
+        guard let cls = classify(cg) else { return .hold(reason: "unclassifiable") }
+        if hasProminentFace(cg) { return .hold(reason: "prominent_face") }
+        guard cls.isVehicle else { return .hold(reason: "not_vehicle_work") }
+        return .allow
+    }
+
+    // MARK: - 1d. Owner triage (pixels vs metadata-only, pre-upload)
+    //
+    // The OWNER path uploads its own at-site photos, but raw PIXELS of personal
+    // frames (the owner's kids, a paycheck, a portrait shot in the home shop)
+    // must NOT land in the public bucket. So before upload we run the SAME
+    // classify+face logic as the contributor firewall and let the caller split:
+    //   • pixels-eligible  → upload the image + metadata (the build record)
+    //   • not eligible     → upload METADATA ONLY (EXIF time/GPS = alibi signal);
+    //                         the pixels stay on the phone.
+    // One classify() pass yields BOTH the decision AND the label list, so we
+    // also stop discarding the Apple ML labels the server L2 gate is starved for.
+    // The `isSensitivePhoto` factor is a PHAsset property (not a pixel signal),
+    // so the caller AND-folds it into the final decision.
+
+    struct TriageResult {
+        /// isVehicle AND no prominent face. Caller ANDs in `!asset.isSensitivePhoto`.
+        let pixelsEligible: Bool
+        /// Top labels (confidence-desc), for the `apple_ml_labels` column.
+        let labels: [String]
+        let isVehicle: Bool
+        /// false ⇒ classify() returned nil (unclassifiable). Caller fails safe to metadata-only.
+        let classified: Bool
+    }
+
+    static func triage(_ cg: CGImage, labelCap: Int = 12) -> TriageResult {
+        guard let cls = classify(cg) else {
+            return TriageResult(pixelsEligible: false, labels: [], isVehicle: false, classified: false)
+        }
+        let labels = Array(cls.labels.prefix(labelCap).map { $0.0 })
+        let pixelsEligible = cls.isVehicle && !hasProminentFace(cg)
+        return TriageResult(pixelsEligible: pixelsEligible, labels: labels,
+                            isVehicle: cls.isVehicle, classified: true)
+    }
+
     // MARK: - 2. Feature print (on-device embedding for similarity)
 
     static func featurePrint(_ cg: CGImage) -> VNFeaturePrintObservation? {
