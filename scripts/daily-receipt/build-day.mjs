@@ -69,7 +69,29 @@ const photos = (rawPhotos || []).filter(p =>
   !(p.caption && IMSG_ARTIFACT.test(p.caption))
 );
 if (!photos || photos.length === 0) {
-  console.log(`No photos for ${VEHICLE_ID} on ${DATE} — work_session not created.`);
+  // No vetted/approved photos qualify for this day. A pre-existing work_session here is
+  // STALE — built before the gate/intent rules, or its frames were later un-approved /
+  // reattributed. Its labor must NOT keep accruing phantom value (e.g. K5 2023-12-02:
+  // 761min/$1,280 from acquisition photos shot at 01:43/04:43/19:50). Zero the LABOR,
+  // preserve parts cost + any owner-confirmed signed value (the human owns that).
+  const { data: stale } = await supabase
+    .from('work_sessions')
+    .select('id, duration_minutes, total_labor_cost, total_parts_cost, metadata, owner_confirmed_at, owner_confirmed_by')
+    .eq('vehicle_id', VEHICLE_ID).eq('session_date', DATE).limit(1);
+  const s = stale && stale[0];
+  const isConfirmed = s && (s.owner_confirmed_at || s.owner_confirmed_by);
+  const hasPhantomLabor = s && (Number(s.duration_minutes) > 0 || Number(s.total_labor_cost) > 0);
+  if (s && !isConfirmed && hasPhantomLabor) {
+    const parts = Number(s.total_parts_cost) || 0;
+    await supabase.from('work_sessions').update({
+      duration_minutes: 0, total_labor_cost: 0, total_job_cost: parts,
+      metadata: { ...(s.metadata || {}), stale_zeroed_at: new Date().toISOString(),
+        stale_zero_reason: `no approved/labor-qualifying photos on re-derivation (was ${s.duration_minutes}min/$${s.total_labor_cost})` },
+    }).eq('id', s.id);
+    console.log(`[zeroed-stale] work_session ${s.id} for ${DATE}: ${s.duration_minutes}min/$${s.total_labor_cost} → 0 labor (no qualifying photos)`);
+  } else {
+    console.log(`No photos for ${VEHICLE_ID} on ${DATE} — work_session unchanged${isConfirmed ? ' (owner-confirmed, preserved)' : ''}.`);
+  }
   process.exit(0);
 }
 
