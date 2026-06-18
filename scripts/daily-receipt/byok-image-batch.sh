@@ -252,6 +252,11 @@ if [ -n "$DAY" ]; then
   dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/refresh_equipment_hours" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{}"' >>"$LOG" 2>&1 || true
   # consumable presence testimony (present-in-frame; never a fabricated consumed quantity)
   dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_consumable_evidence" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 || true
+  # ARM6 parts-presence testimony (resolves components to parts_catalog SKUs or surfaces catalog gap)
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_parts_evidence" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 || true
+  # micro-atom lane: promote workshop_signals/presence/scene_type/build_phase JSONB into queryable rows
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_micro_atoms" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 \
+    && log "worth-cascade: refreshed parts + micro-atoms for ${VEHICLE_ID:0:8}" || true
   # recompute the documented-investment floor (v3 labor + photo-parts ledger) and store it on the
   # coverage counter, so the fleet worth-proof stays current as this vehicle's analysis deepens
   dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/refresh_vehicle_documented_floor" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 \
