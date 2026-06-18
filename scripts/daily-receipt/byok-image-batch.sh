@@ -250,5 +250,7 @@ if [ -n "$DAY" ]; then
   # equipment usage testimony (actor-event: tool used on this vehicle/day) → depreciation computes
   dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_equipment_evidence" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 || true
   dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/refresh_equipment_hours" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{}"' >>"$LOG" 2>&1 || true
+  # consumable presence testimony (present-in-frame; never a fabricated consumed quantity)
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_consumable_evidence" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 || true
 fi
 log "=== batch done: day ${DAY:-unknown}, ingest $WROTE / $N ==="
