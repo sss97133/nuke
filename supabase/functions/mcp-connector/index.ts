@@ -3614,193 +3614,59 @@ async function handleProjectMoneyFlow(args: Record<string, unknown>): Promise<To
   });
 }
 
+// synthesize_attribute — ONE consensus engine (P7.3, image-ecosystem mandate §7.3).
+// The old TS reimplementation here weighted only base_trust*confidence*recency and
+// could drift from the SQL truth the vehicle profile renders. It is RETIRED. This
+// tool now CALLS the canonical SQL project_attribute(p_subject_id, p_attribute) — the
+// same engine behind vehicle_wiki_view, weight = evidence_weight*actor_trust*confidence*recency.
+// Tool name + {subject_id, attribute} signature stay stable; the answer is now the
+// authoritative one with no second math to drift. (handleProjectAttribute is the
+// explicit alias of the same engine.)
 async function handleSynthesizeAttribute(args: Record<string, unknown>): Promise<ToolResult> {
   const subject_id = String(args.subject_id ?? "");
   const attribute = String(args.attribute ?? "");
   if (!subject_id || !attribute) return toolErr("subject_id and attribute are required");
 
-  const def = getAttribute(attribute);
   const supabase = sb();
-
-  const { data: rows, error } = await supabase
-    .from("projection_event")
-    .select(`
-      id, result_kind, observed_at, recorded_at, retracted_by,
-      request_envelope, result_envelope, evidence_class, evidence_ref,
-      model_registry!inner ( slug, caller_kind, base_trust )
-    `)
-    .filter("request_envelope->>subject_id", "eq", subject_id)
-    .filter("request_envelope->>attribute", "eq", attribute)
-    .is("retracted_by", null)
-    .order("recorded_at", { ascending: false })
-    .limit(500);
-
-  if (error) return toolErr(`projection_event query: ${error.message}`);
-  const atoms = (rows ?? []) as Array<Record<string, any>>;
-
-  if (atoms.length === 0) {
-    return toolOk({
-      subject_id,
-      attribute,
-      consensus: null,
-      contributing_atoms: [],
-      note: "No non-retracted atoms recorded for this (subject, attribute). Submit some via submit_attribute_value.",
-    });
-  }
-
-  // P5 — temporal "now" resolver. For present-state attributes the canonical
-  // answer must reflect the LATEST era, so weight each atom by its EVIDENCE
-  // CAPTURE recency (image taken_at), not by when the atom was recorded (atoms
-  // can be batch-submitted, which would erase teardown-vs-finished ordering).
-  // A finished-car photo thus outweighs a stale teardown photo. Timeless
-  // attributes (VIN, factory original_color) are untouched.
-  const isPresentState = def?.temporal === "present_state";
-  const HALF_LIFE_DAYS = 365;
-  const nowMs = Date.now();
-  const recencyAt = new Map<string, number>();
-  if (isPresentState) {
-    const idsByAtom = new Map<string, string[]>();
-    const allImageIds = new Set<string>();
-    for (const a of atoms) {
-      const ref = a.evidence_ref ?? a.request_envelope?.evidence?.ref;
-      const ids = Array.isArray(ref?.image_ids) ? ref.image_ids.map(String) : [];
-      if (ids.length) { idsByAtom.set(a.id, ids); for (const i of ids) allImageIds.add(i); }
-    }
-    const takenById = new Map<string, number>();
-    if (allImageIds.size) {
-      const { data: imgs } = await supabase
-        .from("vehicle_images")
-        .select("id, taken_at, created_at")
-        .in("id", [...allImageIds]);
-      for (const im of imgs ?? []) {
-        const t = (im as any).taken_at ?? (im as any).created_at;
-        if (t) takenById.set(String((im as any).id), new Date(t as string).getTime());
-      }
-    }
-    for (const a of atoms) {
-      const times = (idsByAtom.get(a.id) ?? [])
-        .map((i) => takenById.get(i))
-        .filter((x): x is number => typeof x === "number");
-      const t = times.length
-        ? Math.max(...times)
-        : new Date(a.observed_at ?? a.recorded_at ?? 0).getTime();
-      if (t) recencyAt.set(a.id, t);
-    }
-  }
-  const recencyMult = (atomId: string): number => {
-    if (!isPresentState) return 1;
-    const t = recencyAt.get(atomId);
-    if (!t) return 1;
-    const ageDays = Math.max(0, (nowMs - t) / 86_400_000);
-    return Math.pow(0.5, ageDays / HALF_LIFE_DAYS); // half weight per year of evidence age
-  };
-
-  type Weighted = { atom: Record<string, any>; weight: number; label: unknown; caller: string; base_trust: number; confidence: number };
-  const weighted: Weighted[] = atoms.map((a) => {
-    const caller = a.model_registry;
-    const base_trust = Number(caller?.base_trust ?? 0.3);
-    const confidence = Number(a.result_envelope?.confidence ?? 0.5);
-    return {
-      atom: a,
-      weight: base_trust * confidence * recencyMult(a.id),
-      label: a.result_envelope?.label,
-      caller: caller?.slug ?? "unknown",
-      base_trust,
-      confidence,
-    };
+  const { data, error } = await supabase.rpc("project_attribute", {
+    p_subject_id: subject_id,
+    p_attribute: attribute,
   });
+  if (error) return toolErr(`project_attribute rpc: ${error.message}`);
 
-  const total_weight = weighted.reduce((s, w) => s + w.weight, 0);
-  const distinct_callers = new Set(weighted.map((w) => w.caller)).size;
-  const expected_shape = def?.expected_shape ?? "string";
+  const p = (data ?? {}) as Record<string, any>;
+  const hasAtoms = Number(p.observation_count ?? 0) > 0;
 
-  let consensus_label: unknown = null;
-  let consensus_weight = 0;
-  let contradiction_score = 0;
-  let synthesis_method: string;
-
-  if (["enum", "string", "boolean"].includes(expected_shape)) {
-    synthesis_method = "weighted_vote";
-    const tally = new Map<string, number>();
-    for (const w of weighted) {
-      const key = JSON.stringify(w.label);
-      tally.set(key, (tally.get(key) ?? 0) + w.weight);
-    }
-    let winnerKey = "";
-    let winnerWeight = 0;
-    for (const [k, v] of tally.entries()) {
-      if (v > winnerWeight) { winnerKey = k; winnerWeight = v; }
-    }
-    consensus_label = winnerKey ? JSON.parse(winnerKey) : null;
-    consensus_weight = winnerWeight;
-    contradiction_score = total_weight > 0 ? (total_weight - winnerWeight) / total_weight : 0;
-  } else if (expected_shape === "number" || expected_shape === "ratio_0_1") {
-    synthesis_method = "weighted_mean";
-    let sum = 0;
-    let sum_w = 0;
-    for (const w of weighted) {
-      const v = Number(w.label);
-      if (!Number.isNaN(v)) { sum += v * w.weight; sum_w += w.weight; }
-    }
-    consensus_label = sum_w > 0 ? sum / sum_w : null;
-    consensus_weight = sum_w;
-    let variance_w = 0;
-    for (const w of weighted) {
-      const v = Number(w.label);
-      if (!Number.isNaN(v) && consensus_label !== null) variance_w += w.weight * (v - (consensus_label as number)) ** 2;
-    }
-    contradiction_score = sum_w > 0 ? Math.min(1, Math.sqrt(variance_w / sum_w) / Math.max(1, Math.abs((consensus_label as number) || 1))) : 0;
-  } else {
-    synthesis_method = "best_shape_grouping";
-    const tally = new Map<string, number>();
-    for (const w of weighted) {
-      const key = JSON.stringify(w.label);
-      tally.set(key, (tally.get(key) ?? 0) + w.weight);
-    }
-    let winnerKey = "";
-    let winnerWeight = 0;
-    for (const [k, v] of tally.entries()) {
-      if (v > winnerWeight) { winnerKey = k; winnerWeight = v; }
-    }
-    consensus_label = winnerKey ? JSON.parse(winnerKey) : null;
-    consensus_weight = winnerWeight;
-    contradiction_score = total_weight > 0 ? (total_weight - winnerWeight) / total_weight : 0;
-  }
-
-  const weighted_confidence = total_weight > 0 ? Math.min(0.99, consensus_weight) : 0;
-
+  // Re-shape the canonical SQL projection into the stable synthesize_attribute
+  // response contract (consensus + contributing-atom-style summary), so existing
+  // callers keep working while the value itself comes from the single SQL engine.
   return toolOk({
     subject_id,
     attribute,
-    expected_shape,
-    consensus: {
-      label: consensus_label,
-      weighted_confidence,
-      support: consensus_weight,
-      total_weight,
-      contradiction_score,
-      distinct_callers,
-      observation_count: atoms.length,
-      synthesis_method,
-      temporal: def?.temporal ?? "timeless",
-      recency_weighted: isPresentState,
-    },
-    contributing_atoms: weighted.map((w) => ({
-      projection_event_id: w.atom.id,
-      label: w.label,
-      caller_slug: w.caller,
-      base_trust: w.base_trust,
-      confidence: w.confidence,
-      weight: w.weight,
-      recency_mult: isPresentState ? Number(recencyMult(w.atom.id).toFixed(3)) : 1,
-      result_kind: w.atom.result_kind,
-      recorded_at: w.atom.recorded_at,
-    })),
-    note: contradiction_score < 0.1
-      ? "Strong consensus."
-      : contradiction_score < 0.4
-        ? "Moderate dialectic — consider gathering more callers."
-        : "High contradiction — surface to human review.",
+    engine: "sql:project_attribute",
+    consensus: hasAtoms
+      ? {
+          label: p.consensus ?? null,
+          weighted_confidence: p.consensus_support != null
+            ? Math.min(0.99, Number(p.consensus_support))
+            : 0,
+          support: p.consensus_support ?? null,
+          total_weight: p.total_support ?? null,
+          contradiction_score: p.conflict ? 1 - Number(p.corroboration ?? 0) : 0,
+          distinct_callers: p.distinct_values ?? null,
+          observation_count: p.observation_count ?? 0,
+          synthesis_method: "sql_weighted_consensus",
+          conflict: !!p.conflict,
+          corroboration: p.corroboration ?? null,
+        }
+      : null,
+    candidates: p.candidates ?? null,
+    projection: data ?? null,
+    note: !hasAtoms
+      ? "No non-retracted atoms recorded for this (subject, attribute). Submit some via submit_attribute_value."
+      : p.conflict
+        ? "Conflict detected — competing values; surface to human review."
+        : "Consensus from the canonical SQL engine (matches vehicle_wiki_view).",
   });
 }
 

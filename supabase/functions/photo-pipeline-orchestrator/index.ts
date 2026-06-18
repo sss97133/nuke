@@ -86,7 +86,11 @@ Deno.serve(async (req) => {
         .eq("ai_processing_status", "pending")
         .eq("is_duplicate", false)
         .not("image_url", "is", null)
-        .order("created_at", { ascending: true })
+        // Owner uploads first (user_id NOT NULL, nulls last), newest first —
+        // a freshly-synced user photo must classify before the scraped backlog,
+        // not wait behind a million oldest-first rows.
+        .order("user_id", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
         .limit(limit);
 
       if (!pendingImages || pendingImages.length === 0) {
@@ -260,15 +264,27 @@ Deno.serve(async (req) => {
 
     // Step 7: Mark as completed (single update)
     const durationMs = Date.now() - startedAt;
+    const scanMeta: Record<string, any> = {
+      pipeline_version: "v2",
+      classification,
+      route_result: routeResult.summary,
+      duration_ms: durationMs,
+      processed_at: new Date().toISOString(),
+    };
+    // P3.2: stamp the observable deep-queue marker here (step 7 rewrites
+    // ai_scan_metadata, so enqueueDeepByok deliberately doesn't write it itself —
+    // it only flips the gate column, the real prepare() selection key). NOT
+    // byok_deep_analysis, which would make prepare() think the deep work is done.
+    if (routeResult.deep_enqueued) {
+      scanMeta.deep_byok_enqueued = {
+        enqueued_at: new Date().toISOString(),
+        enqueued_by: "photo-pipeline-orchestrator",
+        route: "inflow_deep_tier",
+      };
+    }
     const updatePayload: Record<string, any> = {
       ai_processing_status: "completed",
-      ai_scan_metadata: {
-        pipeline_version: "v2",
-        classification,
-        route_result: routeResult.summary,
-        duration_ms: durationMs,
-        processed_at: new Date().toISOString(),
-      },
+      ai_scan_metadata: scanMeta,
     };
     if (resolvedVehicleId && !vehicle_id) {
       updatePayload.vehicle_id = resolvedVehicleId;
@@ -326,6 +342,19 @@ Deno.serve(async (req) => {
 // ============================================================
 // CLASSIFY IMAGE (Gemini Flash — cheap and fast)
 // ============================================================
+
+// Terminal "unclassified" result — used whenever the classifier is absent,
+// rate-limited, or errors. Settles the image as 'completed' (low confidence)
+// instead of 'failed', so the reset-stuck cron never re-churns it. BYOK deep
+// analysis / owner confirmation is the real classifier downstream.
+function UNCLASSIFIED_FALLBACK(reason: string): ClassificationResult {
+  return {
+    image_type: "other",
+    confidence: 0.2,
+    is_automotive: true,
+    description: `Unclassified (classifier unavailable: ${String(reason).slice(0, 120)}) — left for BYOK/owner review`,
+  };
+}
 
 async function classifyImage(imageUrl: string): Promise<ClassificationResult> {
   // Prefer paid keys over free tier to avoid 429s
@@ -435,15 +464,18 @@ image_medium definitions:
         vehicle_hints: parsed.vehicle_hints,
       };
     } catch (error: any) {
-      // Non-429 errors: don't retry, propagate immediately
-      // This ensures the outer handler marks ai_processing_status = 'failed'
+      // Classifier failure must NOT churn. The old code threw → outer handler
+      // marked 'failed' → reset-stuck cron flipped back to 'pending' → infinite
+      // loop, ai_retry_count climbing, image never settles. An unclassified
+      // photo is fine (BYOK/owner is the real classifier) — settle it as a
+      // low-confidence unclassified completion instead of failing.
       console.error(`[photo-pipeline] Classification error (attempt ${attempt + 1}): ${error.message}`);
-      throw error;
+      return UNCLASSIFIED_FALLBACK(error.message);
     }
   }
 
-  // All retries exhausted on 429 — throw so outer handler marks as 'failed', not 'completed'
-  throw new Error("Gemini API rate limited (429) after 3 retries");
+  // All retries exhausted on 429 — settle unclassified rather than fail/churn.
+  return UNCLASSIFIED_FALLBACK("Gemini rate limited (429) after retries");
 }
 
 // ============================================================
@@ -523,6 +555,8 @@ interface RouteResult {
   handler: string;
   extracted_fields?: Record<string, any>;
   response_data?: any;
+  /** Set when the frame was marked eligible for the BYOK deep queue (P3.2). */
+  deep_enqueued?: boolean;
 }
 
 async function routeByType(
@@ -540,15 +574,8 @@ async function routeByType(
     case "detail_closeup":
     case "undercarriage":
     case "other": {
-      // Run YONO zone + stage analysis in background (cheap, local)
-      if (vehicleId) {
-        callEdgeFunction("yono-analyze", {
-          image_url: imageUrl,
-          image_id: imageId,
-        }).catch((e: any) => console.warn("[photo-pipeline] yono-analyze:", e.message));
-      }
-
-      // Only call expensive analyze-image if we have a vehicle to enrich
+      // DEEP TIER: callAnalyzeImage enqueues for BYOK deep analysis (replaces the
+      // dead yono-analyze sidecar) and returns deep_enqueued.
       if (vehicleId) {
         return await callAnalyzeImage(imageId, imageUrl, vehicleId, userId);
       }
@@ -612,59 +639,17 @@ async function routeByType(
       // Work documentation → generate work logs + labor estimation pipeline
       const workLogResult = await callGenerateWorkLogs(imageId, imageUrl, vehicleId, userId);
 
-      // Run YONO analysis for zone + stage classification (non-blocking pipeline)
       if (vehicleId) {
         try {
-          // 1. YONO analyze for zone + stage
-          const yonoResp = await callEdgeFunction("yono-analyze", {
-            image_url: imageUrl,
-            image_id: imageId,
-          });
+          // DEEP TIER: enqueue for BYOK fleet deep analysis (replaces dead
+          // yono-analyze). The BYOK verdict carries the zone/stage/condition/
+          // damage the old sidecar produced; zone-based before/after clustering
+          // is handled by the backlog fleet, not synchronously on inflow (the
+          // yono-dependent escalation-router + detect-before-after branches were
+          // dead — yono-analyze returns {available:false} from the 404 sidecar).
+          workLogResult.deep_enqueued = await enqueueDeepByok(imageId, vehicleId);
 
-          // 2. Escalation router — validates YONO if confidence is low
-          if (yonoResp?.available && yonoResp?.vehicle_zone) {
-            callEdgeFunction("yono-escalation-router", {
-              image_id: imageId,
-              image_url: imageUrl,
-              yono_result: {
-                vehicle_zone: yonoResp.vehicle_zone,
-                zone_confidence: yonoResp.zone_confidence,
-                fabrication_stage: yonoResp.fabrication_stage,
-                stage_confidence: yonoResp.stage_confidence,
-                condition_score: yonoResp.condition_score,
-                damage_flags: yonoResp.damage_flags,
-                modification_flags: yonoResp.modification_flags,
-                photo_quality: yonoResp.photo_quality,
-              },
-              prediction_type: "all",
-            }).catch((e: any) => console.warn("[photo-pipeline] escalation-router:", e.message));
-          }
-
-          // 3. Before/after detection (if prior zone images exist)
-          if (yonoResp?.vehicle_zone) {
-            const { data: priorImages } = await supabase
-              .from("vehicle_images")
-              .select("id")
-              .eq("vehicle_id", vehicleId)
-              .eq("vehicle_zone", yonoResp.vehicle_zone)
-              .neq("id", imageId)
-              .not("taken_at", "is", null)
-              .order("taken_at", { ascending: false })
-              .limit(5);
-
-            if (priorImages && priorImages.length > 0) {
-              const allIds = [
-                ...priorImages.map((p: any) => p.id),
-                imageId,
-              ];
-              callEdgeFunction("detect-before-after", {
-                vehicleId,
-                imageIds: allIds,
-              }).catch((e: any) => console.warn("[photo-pipeline] detect-before-after:", e.message));
-            }
-          }
-
-          // 5. Compute labor estimate
+          // Compute labor estimate (independent of the deep verdict).
           callEdgeFunction("compute-labor-estimate", {
             vehicle_id: vehicleId,
           }).catch((e: any) => console.warn("[photo-pipeline] compute-labor-estimate:", e.message));
@@ -681,6 +666,65 @@ async function routeByType(
       // Fallback to standard analysis
       return await callAnalyzeImage(imageId, imageUrl, vehicleId, userId);
     }
+  }
+}
+
+// ============================================================
+// DEEP-TIER ENQUEUE (BYOK fleet, replaces the dead yono-analyze sidecar)
+// ============================================================
+
+// W (image-ecosystem mandate §3.2): the daily-inflow deep route used to call
+// yono-analyze → a Modal Florence-2 sidecar whose /health returns 404, so new
+// photos fell through into nothing. Instead of restoring Modal, we feed the SAME
+// deep engine the backlog uses (byok-image-batch.sh → deep-image-analysis-byok.mjs).
+// That engine's prepare() selects frames WHERE vision_gate_status='approved' AND
+// ai_scan_metadata.byok_deep_analysis IS MISSING; byok-fleet-next.mjs then ranks
+// vehicles by their image_coverage_by_vehicle counter (inflow_7d first). So to
+// enqueue a freshly-classified inflow photo for deep analysis we mark it gate-
+// approved (respecting any prior rejection) WITHOUT writing byok_deep_analysis,
+// then refresh the vehicle's coverage counter so the fleet coordinator sees it.
+//
+// Returns true if the frame was (or already is) eligible for the deep queue, so
+// the caller can stamp the observable `deep_byok_enqueued` marker into the FINAL
+// ai_scan_metadata write (the main handler clobbers ai_scan_metadata in step 7, so
+// this helper must NOT write that JSONB itself — it flips only the gate column,
+// which is the real prepare() selection key, plus refreshes the counter).
+async function enqueueDeepByok(imageId: string, vehicleId: string): Promise<boolean> {
+  try {
+    const { data: row } = await supabase
+      .from("vehicle_images")
+      .select("vision_gate_status, ai_scan_metadata")
+      .eq("id", imageId)
+      .maybeSingle();
+
+    // Respect the gate's verdict: a photo rejected as misattributed/personal must
+    // NOT be auto-approved back into the deep queue (doctrine: the gate filters,
+    // it doesn't permanently park real build photos — but only a human/approver
+    // reverses a rejection, never the inflow path).
+    const gate = (row?.vision_gate_status as string | null) ?? null;
+    if (gate && gate.startsWith("rejected_")) return false;
+
+    const meta = (row?.ai_scan_metadata as Record<string, any>) ?? {};
+    // Already deep-analyzed? prepare() would skip it anyway; leave it alone.
+    if (meta.byok_deep_analysis) return false;
+
+    // The orchestrator resolved this image to a vehicle with confidence, so it is
+    // gate-eligible for deep work. Only promote pending/null/review_needed —
+    // never touch an existing 'approved' (idempotent) or a rejection (handled above).
+    if (gate !== "approved") {
+      await supabase
+        .from("vehicle_images")
+        .update({ vision_gate_status: "approved" })
+        .eq("id", imageId);
+    }
+
+    // Refresh the per-vehicle coverage counter (indexed, never a full scan) so
+    // byok-fleet-next.mjs's inflow lane ranks this vehicle for the next drain.
+    await supabase.rpc("refresh_image_coverage", { p_vehicle_id: vehicleId });
+    return true;
+  } catch (e: any) {
+    console.warn(`[photo-pipeline] enqueueDeepByok(${imageId}): ${e.message}`);
+    return false;
   }
 }
 
@@ -718,40 +762,24 @@ async function callAnalyzeImage(
   vehicleId: string | null,
   userId: string | null,
 ): Promise<RouteResult> {
-  try {
-    const data = await callEdgeFunction("yono-analyze", {
-      image_id: imageId,
-      image_url: imageUrl,
-      vehicle_id: vehicleId,
-      user_id: userId,
-      timeline_event_id: null,
-    });
-
-    // Extract fields from analysis result
-    const metadata = data?.ai_scan_metadata || data;
-    const appraiser = metadata?.appraiser || {};
-
-    const extracted_fields: Record<string, any> = {};
-    if (appraiser.vin) extracted_fields.vin = appraiser.vin;
-    if (appraiser.year) extracted_fields.year = appraiser.year;
-    if (appraiser.make) extracted_fields.make = appraiser.make;
-    if (appraiser.model) extracted_fields.model = appraiser.model;
-    if (appraiser.exterior_color) extracted_fields.exterior_color = appraiser.exterior_color;
-    if (appraiser.detected_angle) extracted_fields.detected_angle = appraiser.detected_angle;
-
+  // DEEP TIER repointed off the dead yono-analyze Modal sidecar (W §3.2) onto the
+  // BYOK fleet: enqueue the frame so deep-image-analysis-byok.mjs picks it up. The
+  // rich appraiser fields (vin/year/make/model/zone/condition) the old sidecar was
+  // meant to produce now come from the BYOK deep verdict downstream, not here.
+  if (vehicleId) {
+    const enqueued = await enqueueDeepByok(imageId, vehicleId);
     return {
-      summary: `analyze-image: ${data?.success ? "ok" : "partial"}`,
-      handler: "analyze-image",
-      extracted_fields: Object.keys(extracted_fields).length > 0 ? extracted_fields : undefined,
-      response_data: data,
-    };
-  } catch (error: any) {
-    console.warn(`[photo-pipeline] analyze-image failed: ${error.message}`);
-    return {
-      summary: `analyze-image: failed (${error.message})`,
-      handler: "analyze-image",
+      summary: enqueued
+        ? "deep-byok: enqueued for fleet deep analysis"
+        : "deep-byok: not enqueued (rejected gate or already deep)",
+      handler: "byok-deep-enqueue",
+      deep_enqueued: enqueued,
     };
   }
+  return {
+    summary: "deep-byok: skipped (no vehicle_id)",
+    handler: "byok-deep-enqueue",
+  };
 }
 
 async function callAnalyzeEngineBay(
