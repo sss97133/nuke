@@ -14,7 +14,12 @@ const Extension = React.lazy(() => import('../pages/Extension'));
 // Search: lazy-loaded (chunk retry logic in main.tsx handles failures)
 const Search = React.lazy(() => import('../pages/Search'));
 const BrowseVehicles = React.lazy(() => import('../pages/BrowseVehicles'));
+// Cohort terminal — Bloomberg-for-a-cohort (year-make-model landing)
+const CohortTerminal = React.lazy(() => import('../pages/CohortTerminal'));
+// R&D: white-label / "make this my app" showroom
+const BrandStudio = React.lazy(() => import('../pages/BrandStudio'));
 const PublicMap = React.lazy(() => import('../components/map/PublicMap'));
+const Valuation = React.lazy(() => import('../pages/Valuation'));
 
 // Public map page — no auth, no DeckGL
 function MapPage() {
@@ -111,6 +116,8 @@ const JournalPage = React.lazy(() => import('../pages/journal/JournalPage'));
 
 // Public intake — Janitor drain (first ship: note event type only)
 const IntakePage = React.lazy(() => import('../pages/intake/IntakePage'));
+// Live intake — owner watches the BYOK fleet burn fill the timeline
+const LiveIntakeScreen = React.lazy(() => import('../pages/intake/LiveIntakeScreen'));
 
 export const DomainRoutes = () => {
   return (
@@ -132,6 +139,9 @@ export const DomainRoutes = () => {
         <Route path="/eula" element={<EULA />} />
         <Route path="/extension" element={<Extension />} />
         <Route path="/data-deletion" element={<DataDeletion />} />
+
+        {/* ── R&D: white-label "make this my app" showroom ──────────────── */}
+        <Route path="/brand-studio" element={<BrandStudio />} />
 
         {/* Local-first user views — no Supabase, works offline */}
         <Route path="/my/discover" element={<LocalDiscover />} />
@@ -166,8 +176,10 @@ export const DomainRoutes = () => {
 
         {/* Search + Browse + Map: public */}
         <Route path="/search" element={<Search />} />
+        <Route path="/cohort/:make/:model/:year" element={<CohortTerminal />} />
         <Route path="/browse" element={<BrowseVehicles />} />
         <Route path="/map" element={<MapPage />} />
+        <Route path="/valuation" element={<Valuation />} />
         {/* Public auction listings */}
         <Route path="/auctions" element={<AuctionMarketplace />} />
         <Route path="/auction/:listingId" element={<AuctionListing />} />
@@ -196,6 +208,9 @@ export const DomainRoutes = () => {
         <Route path="/journal/:date" element={<JournalPage />} />
         {/* Public intake — Janitor drain (first ship: note event type only) */}
         <Route path="/intake" element={<IntakePage />} />
+        {/* Live intake — fleet burn watch (kept off /intake: that route is the
+            Janitor-drain note form and login returnUrl target) */}
+        <Route path="/intake/live" element={<LiveIntakeScreen />} />
         {/* Treemap browse experience — preserved at /explore after F6 moved */}
         {/* the homepage to the Janitor-drain intake variant. */}
         <Route path="/explore" element={<Navigate to="/?force_treemap=1" replace />} />
