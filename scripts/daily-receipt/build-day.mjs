@@ -128,32 +128,29 @@ for (const p of analyzed) {
 }
 // The day is "labor" if any labor-intent frame exists, OR it's entirely legacy/unanalyzed.
 const dayHasLabor = laborFrames.length > 0 || (analyzed.length === 0);
-// Labor window: TRUE temporal clustering of labor-intent frames into work BURSTS — not
-// first-to-last span. A photo at 01:43 and one at 19:50 is not 18 hours of labor; it's two
-// moments. Bursts break on gaps > GAP_BREAK_MIN; each burst contributes its internal span
-// plus a short tail; a lone frame contributes a small fixed window. This is the defensible
-// replacement for the old `laborSpan × 0.7` heuristic (which still inflated a day whose
-// labor frames bracketed a long lunch / a morning + evening shooting pattern).
-const GAP_BREAK_MIN = 45;     // a gap longer than this ends a continuous work burst
-const LONE_FRAME_MIN = 15;    // a single isolated labor frame ≈ 15 min of work around it
-const BURST_TAIL_MIN = 10;    // work continues a little past the last photo of a burst
-const PER_DAY_CAP_MIN = 480;  // 8h/day — matches compute_inferred_value's clamp (Skylar QA 2026-05-23)
-let laborMinutes;
-let laborBursts = 0;
+// Labor-minutes per Skylar's Worth Engine calibration spec (2026-05-23, the v3 method):
+// labor frames cluster into work BURSTS (gap > 45min breaks a burst); each burst contributes
+//   GREATEST(span, n_photos × 5min) + 10min trailing,  summed and capped at 480/day.
+// The photos×5min floor credits dense short bursts (many shots in minutes = active work) that
+// raw span under-counts; a lone frame = GREATEST(0,5)+10 = 15min. This matches vehicle_full_picture's
+// v3 so v1's stored minutes and the v3 triangulation agree. Replaces the old span×0.7 inflation.
+// Only intent=labor frames at conf>=0.6 (the $410 gate).
+const GAP_BREAK_MIN = 45, PHOTO_FLOOR_MIN = 5, BURST_TAIL_MIN = 10, PER_DAY_CAP_MIN = 480;
+let laborMinutes, laborBursts = 0;
 if (laborFrames.length > 0) {
   const lt = laborFrames.map(p => new Date(p.taken_at).getTime()).sort((a, b) => a - b);
-  let total = 0, burstStart = lt[0], prev = lt[0];
-  const closeBurst = (start, end) => {
+  let total = 0, bs = 0;
+  const closeBurst = (i0, i1) => {
     laborBursts++;
-    const span = Math.round((end - start) / 60000);
-    total += span > 0 ? span + BURST_TAIL_MIN : LONE_FRAME_MIN;
+    const span = Math.round((lt[i1] - lt[i0]) / 60000);
+    const nPhotos = i1 - i0 + 1;
+    total += Math.max(span, nPhotos * PHOTO_FLOOR_MIN) + BURST_TAIL_MIN;
   };
   for (let i = 1; i < lt.length; i++) {
-    if ((lt[i] - prev) / 60000 > GAP_BREAK_MIN) { closeBurst(burstStart, prev); burstStart = lt[i]; }
-    prev = lt[i];
+    if ((lt[i] - lt[i - 1]) / 60000 > GAP_BREAK_MIN) { closeBurst(bs, i - 1); bs = i; }
   }
-  closeBurst(burstStart, prev);
-  laborMinutes = Math.min(PER_DAY_CAP_MIN, Math.max(15, total));
+  closeBurst(bs, lt.length - 1);
+  laborMinutes = Math.min(PER_DAY_CAP_MIN, total);
 } else if (analyzed.length === 0) {
   laborMinutes = Math.min(PER_DAY_CAP_MIN, Math.max(30, Math.round(spanMinutes * 0.7))); // legacy: no verdicts yet
 } else {
