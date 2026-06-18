@@ -67,19 +67,18 @@ export default function ImageProcessingDashboard() {
   useEffect(() => {
     loadStats();
 
-    if (autoRefresh) {
-      const interval = setInterval(loadStats, 2000); // Refresh every 2 seconds for live feel
-      return () => clearInterval(interval);
-    }
-
-    // Real-time subscription to see updates instantly (only when autoRefresh is off)
+    // Event-driven refresh: when a deep-analysis atom lands in vehicle_observations
+    // (the canonical sink), refresh the recent-activity feed. No polling — the old
+    // 2s setInterval fired four `count: exact, head: true` scans over the 38.9M-row
+    // vehicle_images table every tick, which times out / hammers the DB. The feed is
+    // bounded (LIMIT) and indexed, so it stays cheap.
+    if (!autoRefresh) return;
     const channel = supabase
       .channel('image-processing-updates')
       .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'vehicle_images' },
-        () => {
-          console.log('Image updated - refreshing stats');
-          loadStats();
+        { event: 'INSERT', schema: 'public', table: 'vehicle_observations' },
+        (payload) => {
+          if ((payload.new as { kind?: string }).kind === 'condition') loadStats();
         }
       )
       .subscribe();
@@ -91,84 +90,64 @@ export default function ImageProcessingDashboard() {
 
   async function loadStats() {
     try {
-      // Get counts efficiently
-      const { count: total } = await supabase
-        .from('vehicle_images')
-        .select('*', { count: 'exact', head: true });
+      // Canonical deep-analysis marker = vehicle_images.ai_scan_metadata.byok_deep_analysis,
+      // surfaced as atoms in vehicle_observations (kind=condition, analysis_kind=image_deep_byok).
+      // The retired tier_1/2/3_analysis JSONB keys have no writer (tier_2/3 are 0 everywhere),
+      // so the old tier counters always read ~zero while thousands of images were deep-analyzed.
+      //
+      // We do NOT compute exact global totals here: counting the 38.9M-row vehicle_images table
+      // (or the 7.5M-row vehicle_observations table) on every render is not affordable client-side.
+      // The recent-activity feed below is bounded + index-ordered (ingested_at) and is the honest,
+      // cheap signal for "is the deep pipeline flowing right now."
+      //
+      // TODO(needs_db): a true global rollup — total deep-analyzed images, % coverage, per-day
+      // depth distribution — belongs in a DB-side aggregate (a materialized view or a
+      // get_global_analysis_coverage() RPC mirroring get_vehicle_analysis_coverage / get_vehicle_day_depth).
+      // Repoint the headline tiles at that RPC once it exists. Do not reintroduce full-table head counts.
+      const { data: recentAtoms } = await supabase
+        .from('vehicle_observations')
+        .select('id, vehicle_id, observed_at, ingested_at, confidence_score, structured_data')
+        .eq('kind', 'condition')
+        .contains('structured_data', { analysis_kind: 'image_deep_byok' })
+        .order('ingested_at', { ascending: false })
+        .limit(20);
 
-      const { count: tier1Complete } = await supabase
-        .from('vehicle_images')
-        .select('*', { count: 'exact', head: true })
-        .not('ai_scan_metadata->tier_1_analysis', 'is', null);
+      const atoms = recentAtoms || [];
 
-      const { count: tier2Complete } = await supabase
-        .from('vehicle_images')
-        .select('*', { count: 'exact', head: true })
-        .not('ai_scan_metadata->tier_2_analysis', 'is', null);
-
-      const { count: tier3Complete } = await supabase
-        .from('vehicle_images')
-        .select('*', { count: 'exact', head: true })
-        .not('ai_scan_metadata->tier_3_analysis', 'is', null);
-
-      const { count: failed } = await supabase
-        .from('vehicle_images')
-        .select('*', { count: 'exact', head: true })
-        .eq('ai_processing_status', 'failed');
-
-      // Get recent completions for activity feed
-      const { data: recentImages } = await supabase
-        .from('vehicle_images')
-        .select('id, vehicle_id, ai_scan_metadata, ai_processing_completed_at, category')
-        .not('ai_scan_metadata->tier_1_analysis', 'is', null)
-        .order('ai_processing_completed_at', { ascending: false })
-        .limit(15);
-
-      // Calculate total cost from metadata
-      let totalCost = 0;
-      const modelUsage: Record<string, { count: number; cost: number; avgConfidence: number }> = {
-        'gemini-2.0-flash': { count: 0, cost: 0, avgConfidence: 0 },
-        'claude-3-haiku': { count: 0, cost: 0, avgConfidence: 0 },
-        'gpt-4o-mini': { count: 0, cost: 0, avgConfidence: 0 }
-      };
-
-      recentImages?.forEach(img => {
-        const usage = img.ai_scan_metadata?.usage;
-        if (usage?.cost) {
-          totalCost += usage.cost;
-          const provider = img.ai_scan_metadata?.provider || 'gemini-2.0-flash';
-          if (modelUsage[provider]) {
-            modelUsage[provider].count++;
-            modelUsage[provider].cost += usage.cost;
-          }
-        }
+      const recentActivity = atoms.map(a => {
+        const sd = (a.structured_data || {}) as {
+          image_id?: string; scene_type?: string; build_phase_guess?: string; agent_model?: string;
+        };
+        return {
+          imageId: sd.image_id || a.id,
+          vehicleId: a.vehicle_id,
+          tier: 0,
+          model: sd.agent_model || sd.scene_type || sd.build_phase_guess || 'byok',
+          confidence: Math.round((a.confidence_score ?? 0) * 100),
+          cost: 0,
+          contextScore: 0,
+          timestamp: a.ingested_at || a.observed_at || new Date().toISOString()
+        };
       });
 
-      const recentActivity = (recentImages || []).map(img => ({
-        imageId: img.id,
-        vehicleId: img.vehicle_id,
-        tier: img.ai_scan_metadata?.processing_tier_reached || 1,
-        model: img.ai_scan_metadata?.provider || 'gemini',
-        confidence: 95, // Placeholder
-        cost: img.ai_scan_metadata?.usage?.cost || 0,
-        contextScore: 0,
-        timestamp: img.ai_processing_completed_at || new Date().toISOString()
-      }));
+      // Window counts from the live feed only (NOT global totals — see note above).
+      const recentDeep = atoms.length;
+      const recentConfident = atoms.filter(a => (a.confidence_score ?? 0) >= 0.6).length;
 
       setStats({
-        total: total || 0,
-        tier1Complete: tier1Complete || 0,
-        tier2Complete: tier2Complete || 0,
-        tier3Complete: tier3Complete || 0,
-        failed: failed || 0,
-        totalCost,
-        modelUsage,
+        total: recentDeep,
+        tier1Complete: recentDeep,
+        tier2Complete: recentConfident,
+        tier3Complete: 0,
+        failed: 0,
+        totalCost: 0,
+        modelUsage: {},
         contextScores: { rich: 0, good: 0, medium: 0, poor: 0 },
         recentActivity,
         imagesPerMinute: 0,
         eta: '',
         startTime: new Date(),
-        avgCostPerImage: totalCost / (tier1Complete || 1),
+        avgCostPerImage: 0,
         projectedCost: 0,
         avgConfidence: 0,
         validationRate: 0,
@@ -176,7 +155,7 @@ export default function ImageProcessingDashboard() {
         tablesPopulated: {},
         alerts: []
       });
-      
+
       setLoading(false);
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -192,13 +171,12 @@ export default function ImageProcessingDashboard() {
     );
   }
 
-  const tier1Percent = (stats.tier1Complete / stats.total) * 100;
-  const tier2Percent = (stats.tier2Complete / stats.total) * 100;
-  const tier3Percent = (stats.tier3Complete / stats.total) * 100;
-
-  const estimatedTotal = stats.total * 0.02; // If all were GPT-4o
-  const savings = estimatedTotal - stats.totalCost;
-  const savingsPercent = (savings / estimatedTotal) * 100;
+  // These are WINDOW figures from the live recent-atom feed, not global totals.
+  // Percentages over a 20-row window are meaningless, so the tiles below show raw
+  // counts only. Global coverage % awaits the DB-side rollup (see loadStats TODO).
+  const confidentPercent = stats.tier1Complete > 0
+    ? (stats.tier2Complete / stats.tier1Complete) * 100
+    : 0;
 
   return (
     <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
@@ -242,103 +220,49 @@ export default function ImageProcessingDashboard() {
         </button>
       </div>
 
-      {/* Main Stats Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
-        
-        {/* Total Images */}
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-            TOTAL IMAGES
-          </div>
-          <div style={{ fontSize: '19px', fontWeight: 700 }}>
-            {stats.total.toLocaleString()}
-          </div>
-        </div>
+      {/* Live-window stats — figures from the recent deep-analysis atom feed, NOT global
+          totals. A real global coverage rollup awaits the DB-side aggregate (see loadStats). */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
 
-        {/* Tier 1 Progress */}
+        {/* Recent deep-analyzed atoms */}
         <div className="card" style={{ padding: '16px', border: '2px solid var(--accent)' }}>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-            ORGANIZATION (TIER 1)
+            RECENT DEEP-ANALYSIS ATOMS
           </div>
-          <div style={{ fontSize: '19px', fontWeight: 700, marginBottom: '8px' }}>
+          <div style={{ fontSize: '19px', fontWeight: 700 }}>
             {stats.tier1Complete.toLocaleString()}
           </div>
-          <div style={{ height: '4px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
-            <div style={{ width: `${tier1Percent}%`, height: '100%', background: 'var(--accent)' }} />
-          </div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            {tier1Percent.toFixed(1)}% complete
+            byok_deep_analysis · live window
           </div>
         </div>
 
-        {/* Tier 2 Progress */}
+        {/* High-confidence within window */}
         <div className="card" style={{ padding: '16px', border: '2px solid var(--success)' }}>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-            PARTS ID (TIER 2)
+            HIGH CONFIDENCE (≥0.6)
           </div>
           <div style={{ fontSize: '19px', fontWeight: 700, marginBottom: '8px' }}>
             {stats.tier2Complete.toLocaleString()}
           </div>
           <div style={{ height: '4px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
-            <div style={{ width: `${tier2Percent}%`, height: '100%', background: 'var(--success)' }} />
+            <div style={{ width: `${confidentPercent}%`, height: '100%', background: 'var(--success)' }} />
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            {tier2Percent.toFixed(1)}% complete
+            {confidentPercent.toFixed(0)}% of window
           </div>
         </div>
 
-        {/* Tier 3 Progress */}
-        <div className="card" style={{ padding: '16px', border: '2px solid var(--purple, #8b5cf6)' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-            EXPERT ANALYSIS (TIER 3)
-          </div>
-          <div style={{ fontSize: '19px', fontWeight: 700, marginBottom: '8px' }}>
-            {stats.tier3Complete.toLocaleString()}
-          </div>
-          <div style={{ height: '4px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
-            <div style={{ width: `${tier3Percent}%`, height: '100%', background: 'var(--purple, #8b5cf6)' }} />
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            {tier3Percent.toFixed(1)}% complete
-          </div>
-        </div>
-      </div>
-
-      {/* Cost & Savings */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
+        {/* Global coverage — pending DB rollup */}
         <div className="card" style={{ padding: '16px' }}>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-            TOTAL COST
+            GLOBAL COVERAGE
           </div>
-          <div style={{ fontSize: '19px', fontWeight: 700, color: 'var(--warning)' }}>
-            ${stats.totalCost.toFixed(4)}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            ${(stats.totalCost / (stats.tier1Complete || 1)).toFixed(6)} per image
-          </div>
-        </div>
-
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-            FULL PRICE (BASELINE)
-          </div>
-          <div style={{ fontSize: '19px', fontWeight: 700 }}>
-            ${estimatedTotal.toFixed(2)}
+          <div style={{ fontSize: '19px', fontWeight: 700, color: 'var(--text-muted)' }}>
+            —
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            If using GPT-4o for all
-          </div>
-        </div>
-
-        <div className="card" style={{ padding: '16px', border: '2px solid var(--success)' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-            SAVINGS
-          </div>
-          <div style={{ fontSize: '19px', fontWeight: 700, color: 'var(--success)' }}>
-            ${savings.toFixed(2)}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--success)', marginTop: '4px' }}>
-            {savingsPercent.toFixed(1)}% cheaper
+            awaiting analysis-coverage rollup RPC
           </div>
         </div>
       </div>
@@ -382,36 +306,33 @@ export default function ImageProcessingDashboard() {
           </div>
         </div>
 
-        {/* Context Quality */}
+        {/* Pipeline marker reference */}
         <div className="card">
           <div className="card-header" style={{ fontSize: '11px', fontWeight: 700 }}>
-            CONTEXT QUALITY
+            DEPTH MARKER
           </div>
           <div className="card-body">
             <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Higher context = cheaper processing
+              Analysis depth is read from the canonical BYOK marker, not the retired tier_1/2/3 keys.
             </p>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {[
-                { label: 'Rich (60+)', count: stats.contextScores.rich, color: 'var(--success)', cost: '$0.00008' },
-                { label: 'Good (30-60)', count: stats.contextScores.good, color: 'var(--accent)', cost: '$0.0004' },
-                { label: 'Medium (10-30)', count: stats.contextScores.medium, color: 'var(--warning)', cost: '$0.005' },
-                { label: 'Poor (<10)', count: stats.contextScores.poor, color: 'var(--error)', cost: '$0.015' }
-              ].map(score => (
-                <div key={score.label}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
-                    <span style={{ color: score.color, fontWeight: 600 }}>{score.label}</span>
-                    <span>{score.count}</span>
-                  </div>
-                  <div style={{ height: '4px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
-                    <div style={{ width: `${(score.count / stats.total) * 100}%`, height: '100%', background: score.color }} />
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', textAlign: 'right' }}>
-                    {score.cost}/img
-                  </div>
-                </div>
-              ))}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '11px' }}>
+              <div>
+                <div style={{ fontWeight: 600, marginBottom: '2px' }}>image</div>
+                <code style={{ color: 'var(--text-muted)' }}>ai_scan_metadata.byok_deep_analysis</code>
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, marginBottom: '2px' }}>atom</div>
+                <code style={{ color: 'var(--text-muted)' }}>vehicle_observations · kind=condition · analysis_kind=image_deep_byok</code>
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, marginBottom: '2px' }}>per-vehicle / per-day depth</div>
+                <code style={{ color: 'var(--text-muted)' }}>get_vehicle_analysis_coverage() · get_vehicle_day_depth()</code>
+              </div>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                A global coverage rollup (total deep-analyzed, % of library) needs a DB-side
+                aggregate — the headline tile lights up once that RPC ships.
+              </p>
             </div>
           </div>
         </div>
