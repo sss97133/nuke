@@ -111,6 +111,14 @@ struct TodayView: View {
                         Label("Confirm sessions", systemImage: "checklist")
                     }
 
+                    // Tier 3 → 4: the day-journal sign surface, promoted to a
+                    // direct entry (it was buried a level under Confirm sessions).
+                    NavigationLink {
+                        WorkDaySignView()
+                    } label: {
+                        Label("Confirm your days", systemImage: "checkmark.seal")
+                    }
+
                     // Pause toggle — secondary; the big numbers are the hero
                     Toggle("Uploads", isOn: Binding(
                         get: { !engine.isPaused },

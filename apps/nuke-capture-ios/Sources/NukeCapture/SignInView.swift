@@ -300,6 +300,7 @@ enum AppleNonce {
 struct AccountView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var siteStore = SiteStore.shared
+    @ObservedObject private var sync = SyncEngine.shared
     @State private var confirmingDeletion = false
     @State private var isWorking = false
     @State private var errorMessage: String?
@@ -319,6 +320,26 @@ struct AccountView: View {
                     } label: {
                         Label("Connected accounts", systemImage: "link")
                     }
+                }
+
+                // Contributor mode — the crew safety gate. ON when this device
+                // contributes to a shop's SHARED pool: every at-site photo must
+                // clear the on-device firewall (affirmative vehicle label AND no
+                // prominent face) before it uploads, so a private photo shot at
+                // the shop never crosses. OFF = owner mode (your own at-site
+                // photos upload ungated). Held photos stay on the phone.
+                Section {
+                    Toggle("Contributing to a shop", isOn: Binding(
+                        get: { sync.contributorMode },
+                        set: { sync.setContributorMode($0) }
+                    ))
+                    if sync.contributorMode, sync.totalHeldPrivate > 0 {
+                        LabeledContent("Kept private (held back)") {
+                            Text("\(sync.totalHeldPrivate)").monospacedDigit()
+                        }
+                    }
+                } footer: {
+                    Text("When on, only clear vehicle/work photos upload to the shop. Anything with a face — or not work-related — stays on your phone and is never sent.")
                 }
 
                 // The photo grant, reported as a fact. Off → the one action

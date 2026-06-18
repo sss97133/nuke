@@ -20,6 +20,12 @@ struct SessionConfirmView: View {
             if let note = routedNote {
                 Section { Text(note).font(.caption).foregroundStyle(.secondary) }
             }
+            // Tier 3 → 4: confirm the days the analysis derived (the value gate).
+            Section {
+                NavigationLink { WorkDaySignView() } label: {
+                    Label("Confirm your days", systemImage: "checkmark.seal")
+                }
+            }
             if attribution.orphanSessions.isEmpty {
                 Section {
                     Text(attribution.isLoadingConfirm ? "READING SESSIONS…" : "NOTHING TO CONFIRM")
