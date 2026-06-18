@@ -252,5 +252,9 @@ if [ -n "$DAY" ]; then
   dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/refresh_equipment_hours" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{}"' >>"$LOG" 2>&1 || true
   # consumable presence testimony (present-in-frame; never a fabricated consumed quantity)
   dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_consumable_evidence" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 || true
+  # recompute the documented-investment floor (v3 labor + photo-parts ledger) and store it on the
+  # coverage counter, so the fleet worth-proof stays current as this vehicle's analysis deepens
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/refresh_vehicle_documented_floor" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 \
+    && log "worth-cascade: refreshed documented-investment floor for ${VEHICLE_ID:0:8}" || true
 fi
 log "=== batch done: day ${DAY:-unknown}, ingest $WROTE / $N ==="
