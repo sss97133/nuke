@@ -106,14 +106,34 @@ for (const p of analyzed) {
 }
 // The day is "labor" if any labor-intent frame exists, OR it's entirely legacy/unanalyzed.
 const dayHasLabor = laborFrames.length > 0 || (analyzed.length === 0);
-// Labor window: span of the labor-intent frames (fallback to full span for legacy days).
+// Labor window: TRUE temporal clustering of labor-intent frames into work BURSTS — not
+// first-to-last span. A photo at 01:43 and one at 19:50 is not 18 hours of labor; it's two
+// moments. Bursts break on gaps > GAP_BREAK_MIN; each burst contributes its internal span
+// plus a short tail; a lone frame contributes a small fixed window. This is the defensible
+// replacement for the old `laborSpan × 0.7` heuristic (which still inflated a day whose
+// labor frames bracketed a long lunch / a morning + evening shooting pattern).
+const GAP_BREAK_MIN = 45;     // a gap longer than this ends a continuous work burst
+const LONE_FRAME_MIN = 15;    // a single isolated labor frame ≈ 15 min of work around it
+const BURST_TAIL_MIN = 10;    // work continues a little past the last photo of a burst
+const PER_DAY_CAP_MIN = 480;  // 8h/day — matches compute_inferred_value's clamp (Skylar QA 2026-05-23)
 let laborMinutes;
+let laborBursts = 0;
 if (laborFrames.length > 0) {
   const lt = laborFrames.map(p => new Date(p.taken_at).getTime()).sort((a, b) => a - b);
-  const laborSpan = Math.round((lt[lt.length - 1] - lt[0]) / 60000);
-  laborMinutes = Math.max(30, Math.round(laborSpan * 0.7)); // 70% idle discount
+  let total = 0, burstStart = lt[0], prev = lt[0];
+  const closeBurst = (start, end) => {
+    laborBursts++;
+    const span = Math.round((end - start) / 60000);
+    total += span > 0 ? span + BURST_TAIL_MIN : LONE_FRAME_MIN;
+  };
+  for (let i = 1; i < lt.length; i++) {
+    if ((lt[i] - prev) / 60000 > GAP_BREAK_MIN) { closeBurst(burstStart, prev); burstStart = lt[i]; }
+    prev = lt[i];
+  }
+  closeBurst(burstStart, prev);
+  laborMinutes = Math.min(PER_DAY_CAP_MIN, Math.max(15, total));
 } else if (analyzed.length === 0) {
-  laborMinutes = Math.max(30, Math.round(spanMinutes * 0.7)); // legacy: no verdicts yet
+  laborMinutes = Math.min(PER_DAY_CAP_MIN, Math.max(30, Math.round(spanMinutes * 0.7))); // legacy: no verdicts yet
 } else {
   laborMinutes = 0; // analyzed, but zero labor-intent frames → no shop labor today
 }
