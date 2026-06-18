@@ -23,8 +23,21 @@ set -e
 echo "▸ Installing XcodeGen…"
 brew install xcodegen
 
-echo "▸ Generating NukeCapture-iOS.xcodeproj from project.yml…"
 cd "$CI_PRIMARY_REPOSITORY_PATH/apps/nuke-capture-ios"
+
+# Build number: set CURRENT_PROJECT_VERSION (the build SETTING that drives
+# CFBundleVersion) to an epoch timestamp BEFORE generating the project. Editing the
+# generated Info.plist after xcodegen does NOT stick — Process-Info.plist
+# re-substitutes $(CURRENT_PROJECT_VERSION) at build time, so the *setting* is what
+# must change. That's why the PlistBuddy-timestamp approach still uploaded a stale
+# number and hit "bundle version must be higher than the previously uploaded version"
+# (builds 29 AND 30 collided). An epoch timestamp (~1.78e9, < CFBundleVersion's
+# uint32 ceiling 4294967295) is always above any prior build number and monotonic.
+BUILD_NUM=$(date +%s)
+sed -i '' "s/CURRENT_PROJECT_VERSION: .*/CURRENT_PROJECT_VERSION: $BUILD_NUM/" project.yml
+echo "▸ Set CURRENT_PROJECT_VERSION -> $BUILD_NUM (before xcodegen)"
+
+echo "▸ Generating NukeCapture-iOS.xcodeproj from project.yml…"
 xcodegen generate
 
 echo "▸ Seeding the committed Package.resolved into the generated workspace…"
