@@ -10,7 +10,7 @@
 create or replace function cascade_technician_evidence(p_vehicle_id uuid)
 returns int language plpgsql security definer set search_path = public as $$
 declare
-  v_skylar uuid := '5060a007-fd0a-4d8e-bbc0-1c2fc31abaa6';
+  v_skylar uuid := 'd44915d3-f908-424d-8afa-a6a4a1067257';  -- canonical: user-linked Skylar ($160), not the $85 dup
   v_ernie  uuid := '58029815-e901-4f6e-832d-048d0e0fa5c2';
   n int;
 begin
