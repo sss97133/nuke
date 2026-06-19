@@ -384,20 +384,22 @@ private struct LiveMetricsStrip: View {
                 HStack(spacing: 0) {
                     MetricCell(label: "UPLOADED", value: stat(engine.serverStats.total_images))
                     Divider().frame(height: 44)
-                    // ANALYZED drills into the analyzed photos + their atoms (once loaded).
-                    if engine.statsLoaded, engine.serverStats.analyzed > 0 {
+                    // ANALYZED = the REAL vision-analyzed count (engine.analyzedCount,
+                    // get_user_analyzed_count) — the SAME population the drill resolves
+                    // to. NEVER serverStats.analyzed (the 12k work_sessions rollup).
+                    if engine.analyzedCount > 0 {
                         NavigationLink {
                             AnalyzedPhotosView(userId: SupabaseService.currentUserId ?? "")
                         } label: {
                             MetricCell(label: "ANALYZED",
-                                       value: "\(engine.serverStats.analyzed)",
+                                       value: "\(engine.analyzedCount)",
                                        caption: "tap to view")
                         }
                         .buttonStyle(.plain)
                     } else {
                         MetricCell(
                             label: "ANALYZED",
-                            value: stat(engine.serverStats.analyzed),
+                            value: stat(engine.analyzedCount),
                             caption: (engine.statsLoaded && engine.serverStats.total_images > 0) ? "analyzing…" : nil
                         )
                     }

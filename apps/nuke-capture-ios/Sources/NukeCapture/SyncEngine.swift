@@ -269,21 +269,34 @@ final class SyncEngine: ObservableObject {
             return
         }
         do {
-            // get_user_capture_stats returns the user's REAL record in one row:
-            // total_images / uploaded_today / analyzed / contribution_days.
-            // PostgREST wraps the single-row table function in a JSON array.
+            // serverStats = the capture record: total_images / uploaded_today /
+            // contribution_days. WARNING: get_user_capture_stats.analyzed is the
+            // work_sessions image_count ROLLUP (frames TOUCHED by work sessions,
+            // ~12,100) — NOT the count of vision-analyzed images. We deliberately
+            // do NOT bind the "analyzed" metric to it (that 68x-inflated number is
+            // what the headline used to show while the drill resolved to 176).
             let response = try await SupabaseService.client
                 .rpc("get_user_capture_stats", params: ["p_user_id": userId])
                 .execute()
             if let stats = try JSONDecoder().decode([CaptureStats].self, from: response.data).first {
                 serverStats = stats
-                analyzedCount = stats.analyzed
                 statsLoaded = true
                 statsError = false
             } else if !statsLoaded {
                 // 200 but an empty/undecodable body before any success — surface it,
                 // don't sit on a permanent "…" (the request "worked" but gave nothing).
                 statsError = true
+            }
+            // analyzedCount = the REAL vision-analyzed image count
+            // (get_user_analyzed_count — sargable over source='capture_relay_ios',
+            // = 176), which is EXACTLY what the AnalyzedPhotos drill resolves to.
+            // This is the number the "ANALYZED" headline must show.
+            let countResp = try await SupabaseService.client
+                .rpc("get_user_analyzed_count", params: ["p_user_id": userId])
+                .execute()
+            if let n = (try? JSONDecoder().decode(Int.self, from: countResp.data))
+                        ?? (try? JSONDecoder().decode([Int].self, from: countResp.data))?.first {
+                analyzedCount = n
             }
         } catch {
             // Only flag while we've never loaded — a failed REFRESH must not blank

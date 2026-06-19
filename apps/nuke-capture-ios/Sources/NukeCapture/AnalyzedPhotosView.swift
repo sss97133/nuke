@@ -18,6 +18,12 @@
 
 import SwiftUI
 
+/// get_user_analyzed_photos named params (mixed types → a struct, not [String:String]).
+private struct AnalyzedPhotosParams: Encodable {
+    let p_user_id: String
+    let p_limit: Int
+}
+
 // ─── The analyzed-photo row (1:1 with the RPC element shape) ──────────────────
 
 /// One analyzed photo as returned by get_user_analyzed_photos. Every field but
@@ -124,8 +130,11 @@ struct AnalyzedPhotosView: View {
         loadError = nil   // clear so a successful retry leaves the error branch
         do {
             // SETOF rows → decode the array directly (NOT array-of-array).
+            // p_limit raised past the default 120 so the grid count matches the
+            // ANALYZED headline (get_user_analyzed_count) — one concept, one number.
             let rows: [AnalyzedPhoto] = try await SupabaseService.client
-                .rpc("get_user_analyzed_photos", params: ["p_user_id": userId])
+                .rpc("get_user_analyzed_photos",
+                     params: AnalyzedPhotosParams(p_user_id: userId, p_limit: 500))
                 .execute()
                 .value
             photos = rows
