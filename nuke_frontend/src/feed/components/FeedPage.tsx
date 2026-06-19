@@ -432,6 +432,8 @@ export default function FeedPage() {
               <FeedEmptyState
                 hasFilters={hasActiveFilters}
                 onResetFilters={resetAll}
+                error={feedQuery.isError}
+                onRetry={() => feedQuery.refetch()}
               />
             ) : (
               <FeedLayout
