@@ -468,39 +468,11 @@ const ImageGallery = ({
 
   // Vehicle meta (used to suppress "BaT homepage noise" images that were mistakenly attached to some vehicles)
   const [vehicleMeta, setVehicleMeta] = useState<any | null>(null);
-  useEffect(() => {
-    const loadImages = async () => {
-      setLoading(true);
-      try {
-        // Load images from database
-        // Chained .or() with not.in.("a","b") syntax was producing PostgREST 500s.
-        // Fetch + filter client-side; result set is bounded by vehicle_id.
-        const { data: rawImages, error } = await supabase
-          .from('vehicle_images')
-          .select('*')
-          .eq('vehicle_id', vehicleId)
-          .order('position', { ascending: true })
-          .order('created_at', { ascending: true });
-
-        if (error) throw error;
-        const images = (rawImages || []).filter((r: any) => {
-          if (r?.is_duplicate === true) return false;
-          // Superseded rows are prior versions of reattributed images — never display them.
-          if (r?.is_superseded === true) return false;
-          const mvms = r?.image_vehicle_match_status;
-          if (mvms === 'mismatch' || mvms === 'unrelated') return false;
-          const vgs = r?.vision_gate_status;
-          if (vgs === 'rejected_personal' || vgs === 'rejected_misattributed' || vgs === 'rejected') return false;
-          return true;
-        });
-        setAllImages(applyQuarantinePolicy(images));
-        setVehicleMeta(vehicleMeta || null);
-      } catch {
-        setVehicleMeta(null);
-      }
-    };
-    loadImages();
-  }, [vehicleId]);
+  // NOTE: a second, redundant `vehicle_images` SELECT * loader used to live here. It
+  // double-loaded the gallery on every profile open (unprojected SELECT *, no row cap)
+  // and never resolved `loading`, contributing to the connection-pool storm that hung
+  // the gallery for 30s+. The canonical `fetchImages` effect below is the single loader
+  // (projected columns via fetchVehicleImages + dedup + BaT overlay + finally→setLoading(false)).
 
   // Default BaT-only view for BaT-origin vehicles, with a user-toggle to show all sources
   const isBatVehicle = useMemo(() => {
