@@ -34,6 +34,13 @@ interface ProcessingStats {
     medium: number;
     poor: number;
   };
+
+  // Global coverage — from get_image_ecosystem_status() (image_coverage_by_vehicle counter
+  // rollup, NOT a 38.9M-row scan). Null until the counter has a refreshed row.
+  globalCoverage: {
+    photos: number; seenT1: number; placedT2: number; vehicles: number;
+    pctDeep: number; pctEngine: number; pctClip: number;
+  } | null;
   
   // Tables populated
   tablesPopulated: Record<string, number>;
@@ -100,10 +107,9 @@ export default function ImageProcessingDashboard() {
       // The recent-activity feed below is bounded + index-ordered (ingested_at) and is the honest,
       // cheap signal for "is the deep pipeline flowing right now."
       //
-      // TODO(needs_db): a true global rollup — total deep-analyzed images, % coverage, per-day
-      // depth distribution — belongs in a DB-side aggregate (a materialized view or a
-      // get_global_analysis_coverage() RPC mirroring get_vehicle_analysis_coverage / get_vehicle_day_depth).
-      // Repoint the headline tiles at that RPC once it exists. Do not reintroduce full-table head counts.
+      // The true global rollup (total deep-analyzed, % coverage) IS wired below via
+      // get_image_ecosystem_status() — it sums the image_coverage_by_vehicle counter (~80 rows),
+      // never the 38.9M-row table. Do not reintroduce full-table head counts here.
       const { data: recentAtoms } = await supabase
         .from('vehicle_observations')
         .select('id, vehicle_id, observed_at, ingested_at, confidence_score, structured_data')
@@ -134,7 +140,21 @@ export default function ImageProcessingDashboard() {
       const recentDeep = atoms.length;
       const recentConfident = atoms.filter(a => (a.confidence_score ?? 0) >= 0.6).length;
 
+      // Global coverage from the DB-side rollup. get_image_ecosystem_status() reads the
+      // image_coverage_by_vehicle counter (bounded, ~80 rows) — never the 38.9M-row table.
+      let globalCoverage: ProcessingStats['globalCoverage'] = null;
+      try {
+        const { data: eco } = await supabase.rpc('get_image_ecosystem_status');
+        const cov = (eco as { coverage?: Record<string, number> } | null)?.coverage;
+        if (cov) globalCoverage = {
+          photos: cov.photos ?? 0, seenT1: cov.seen_t1 ?? 0, placedT2: cov.placed_t2 ?? 0,
+          vehicles: cov.vehicles ?? 0, pctDeep: cov.pct_deep ?? 0,
+          pctEngine: cov.pct_engine ?? 0, pctClip: cov.pct_clip ?? 0,
+        };
+      } catch { /* counter not refreshed yet — tile stays in pending state */ }
+
       setStats({
+        globalCoverage,
         total: recentDeep,
         tier1Complete: recentDeep,
         tier2Complete: recentConfident,
@@ -253,16 +273,18 @@ export default function ImageProcessingDashboard() {
           </div>
         </div>
 
-        {/* Global coverage — pending DB rollup */}
+        {/* Global coverage — DB-side rollup from get_image_ecosystem_status() */}
         <div className="card" style={{ padding: '16px' }}>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
             GLOBAL COVERAGE
           </div>
-          <div style={{ fontSize: '19px', fontWeight: 700, color: 'var(--text-muted)' }}>
-            —
+          <div style={{ fontSize: '19px', fontWeight: 700, color: stats.globalCoverage ? 'var(--text)' : 'var(--text-muted)' }}>
+            {stats.globalCoverage ? `${Math.round(stats.globalCoverage.pctDeep * 100)}%` : '—'}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            awaiting analysis-coverage rollup RPC
+            {stats.globalCoverage
+              ? `${stats.globalCoverage.seenT1.toLocaleString()} deep · ${Math.round(stats.globalCoverage.pctEngine * 100)}% engine · ${Math.round(stats.globalCoverage.pctClip * 100)}% CLIP · ${stats.globalCoverage.vehicles} vehicles`
+              : 'awaiting analysis-coverage rollup RPC'}
           </div>
         </div>
       </div>
@@ -329,10 +351,10 @@ export default function ImageProcessingDashboard() {
                 <div style={{ fontWeight: 600, marginBottom: '2px' }}>per-vehicle / per-day depth</div>
                 <code style={{ color: 'var(--text-muted)' }}>get_vehicle_analysis_coverage() · get_vehicle_day_depth()</code>
               </div>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                A global coverage rollup (total deep-analyzed, % of library) needs a DB-side
-                aggregate — the headline tile lights up once that RPC ships.
-              </p>
+              <div>
+                <div style={{ fontWeight: 600, marginBottom: '2px' }}>global rollup</div>
+                <code style={{ color: 'var(--text-muted)' }}>get_image_ecosystem_status() · image_coverage_by_vehicle counter (no full scan)</code>
+              </div>
             </div>
           </div>
         </div>
