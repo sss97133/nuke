@@ -16,6 +16,12 @@ struct WorthBracketView: View {
     /// compact = the hero title-card overlay (white on a dark scrim); full = the
     /// standalone profile section.
     var compact: Bool = false
+    /// The vehicle's identity — threaded through so the "comps" signal can drill
+    /// to the ACTUAL sold comparables (get_comps_scored), not dead-end at a count.
+    var make: String? = nil
+    var model: String? = nil
+    var year: Int? = nil
+    var excludeId: String? = nil
 
     @State private var showDetail = false
 
@@ -35,7 +41,8 @@ struct WorthBracketView: View {
             }
             .buttonStyle(.plain)
             .sheet(isPresented: $showDetail) {
-                ValuationDetailSheet(valuation: valuation)
+                ValuationDetailSheet(valuation: valuation, make: make, model: model,
+                                     year: year, excludeId: excludeId)
             }
         }
     }
@@ -135,7 +142,19 @@ struct WorthBracketView: View {
 // answer to "where does this number come from."
 private struct ValuationDetailSheet: View {
     let valuation: VehicleValuation
+    var make: String? = nil
+    var model: String? = nil
+    var year: Int? = nil
+    var excludeId: String? = nil
     @Environment(\.dismiss) private var dismiss
+    @State private var compsSignal: VehicleValuation.Signal?   // the signal being drilled
+
+    /// The comps signal can drill to its real evidence iff we know the vehicle's
+    /// year/make to query get_comps_scored. Other signals have no live accessor
+    /// yet — they stay honest informational rows, never a tap onto nothing.
+    private func canDrill(_ s: VehicleValuation.Signal) -> Bool {
+        s.name == "comps" && s.fired == true && make != nil && year != nil
+    }
 
     var body: some View {
         NavigationStack {
@@ -162,19 +181,20 @@ private struct ValuationDetailSheet: View {
                 // This is the disclosure: the absence of power, made visible.
                 Section {
                     ForEach(valuation.signals ?? []) { s in
-                        HStack {
-                            Image(systemName: s.fired == true ? "checkmark.circle.fill" : "circle.dashed")
-                                .foregroundStyle(s.fired == true ? .green : .secondary)
-                            Text(s.name.replacingOccurrences(of: "_", with: " ").capitalized)
-                                .foregroundStyle(s.fired == true ? .primary : .secondary)
-                            Spacer()
-                            if let w = s.weight {
-                                Text("\(Int((w * 100).rounded()))%")
-                                    .font(.caption2.monospaced()).foregroundStyle(.tertiary)
+                        if canDrill(s) {
+                            // The comps signal drills to its ACTUAL evidence — the
+                            // sold comparables that fired it — each linking to its source.
+                            Button { compsSignal = s } label: {
+                                HStack(spacing: 8) {
+                                    signalRow(s)
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(.tertiary)
+                                }
                             }
-                            Text(s.fired == true ? "\(s.source_count ?? 0) src" : "no data")
-                                .font(.caption2.monospaced())
-                                .foregroundStyle(s.fired == true ? .secondary : .tertiary)
+                            .buttonStyle(.plain)
+                        } else {
+                            signalRow(s)
                         }
                     }
                 } header: {
@@ -217,8 +237,30 @@ private struct ValuationDetailSheet: View {
             .navigationTitle("How it's modeled")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+            .sheet(item: $compsSignal) { _ in
+                CompsDrillView(make: make ?? "", model: model, year: year ?? 0, excludeId: excludeId)
+            }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    /// One signal row: fired/empty mark, name, weight %, and the source count
+    /// (which, for comps, is the drillable handle).
+    @ViewBuilder private func signalRow(_ s: VehicleValuation.Signal) -> some View {
+        HStack {
+            Image(systemName: s.fired == true ? "checkmark.circle.fill" : "circle.dashed")
+                .foregroundStyle(s.fired == true ? .green : .secondary)
+            Text(s.name.replacingOccurrences(of: "_", with: " ").capitalized)
+                .foregroundStyle(s.fired == true ? .primary : .secondary)
+            Spacer()
+            if let w = s.weight {
+                Text("\(Int((w * 100).rounded()))%")
+                    .font(.caption2.monospaced()).foregroundStyle(.tertiary)
+            }
+            Text(s.fired == true ? "\(s.source_count ?? 0) src" : "no data")
+                .font(.caption2.monospaced())
+                .foregroundStyle(s.fired == true ? .secondary : .tertiary)
+        }
     }
 
     @ViewBuilder private func row(_ label: String, _ value: String, warn: Bool = false) -> some View {
@@ -236,5 +278,135 @@ private struct ValuationDetailSheet: View {
 
     private func money0(_ v: Double) -> String {
         v.formatted(.currency(code: "USD").precision(.fractionLength(0)))
+    }
+}
+
+// ─── The comps drill — the evidence behind "comps · N src". The ACTUAL sold
+// comparables the model leaned on (get_comps_scored), each a real vehicle with
+// its sale price, platform, sold date, and a link to its source listing. This
+// is the dead-end fixed: the count becomes the rows it counts.
+private struct Comp: Decodable, Identifiable {
+    let vehicle_id: String?
+    let yr: Int?
+    let mk: String?
+    let mdl: String?
+    let tr: String?
+    let sale_price: Double?
+    let miles: Int?
+    let image_url: String?
+    let listing_url: String?
+    let platform: String?
+    let sold_date: String?
+    let similarity_score: Double?
+    var id: String { (vehicle_id ?? listing_url ?? UUID().uuidString) }
+}
+
+/// get_comps_scored named params — optionals omit (encodeIfPresent) so the SQL
+/// defaults apply (e.g. nil model → make-only).
+private struct CompsParams: Encodable {
+    let p_make: String
+    let p_model: String?
+    let p_year: Int
+    let p_exclude_vehicle_id: String?
+    let p_limit: Int
+}
+
+struct CompsDrillView: View {
+    let make: String
+    var model: String? = nil
+    let year: Int
+    var excludeId: String? = nil
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var comps: [Comp] = []
+    @State private var loaded = false
+    @State private var loadError = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if !comps.isEmpty {
+                    Section {
+                        ForEach(comps) { compRow($0) }
+                    } header: {
+                        Text("\(comps.count) sold comparables")
+                    } footer: {
+                        Text("Recently sold \(year)-era \(make)\(model.map { " " + $0 } ?? "") — the real sales the estimate leaned on. Tap one to open its listing.")
+                    }
+                } else if loadError {
+                    ContentUnavailableView {
+                        Label("Couldn't load comps", systemImage: "wifi.exclamationmark")
+                    } description: { Text("Check your connection.") } actions: {
+                        Button("Retry") { Task { loaded = false; loadError = false; await load() } }
+                            .buttonStyle(.borderedProminent)
+                    }
+                } else if loaded {
+                    Text("No sold comparables on record for this build yet.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                } else {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Loading comparables…").font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("Comparables")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+        }
+        .presentationDetents([.large])
+        .task { await load() }
+    }
+
+    @ViewBuilder private func compRow(_ c: Comp) -> some View {
+        let title = [c.yr.map(String.init), c.mk, c.mdl, c.tr].compactMap { $0 }.joined(separator: " ")
+        if let s = c.listing_url, let url = URL(string: s) {
+            Link(destination: url) { compRowContent(c, title: title, linky: true) }
+        } else {
+            compRowContent(c, title: title, linky: false)
+        }
+    }
+
+    @ViewBuilder private func compRowContent(_ c: Comp, title: String, linky: Bool) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title.isEmpty ? "Comparable" : title)
+                    .font(.subheadline).foregroundStyle(.primary).lineLimit(1)
+                HStack(spacing: 8) {
+                    if let p = c.platform, !p.isEmpty {
+                        Text(p.uppercased()).font(.caption2).foregroundStyle(.secondary)
+                    }
+                    if let d = c.sold_date {
+                        Text(String(d.prefix(10))).font(.caption2.monospaced()).foregroundStyle(.tertiary)
+                    }
+                    if let m = c.miles, m > 0 {
+                        Text("\(m.formatted()) mi").font(.caption2.monospaced()).foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            Spacer()
+            if let price = c.sale_price, price > 0 {
+                Text(price.formatted(.currency(code: "USD").precision(.fractionLength(0))))
+                    .font(.callout.monospacedDigit()).foregroundStyle(.primary)
+            }
+            if linky {
+                Image(systemName: "arrow.up.right").font(.caption2).foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private func load() async {
+        do {
+            comps = try await SupabaseService.client
+                .rpc("get_comps_scored",
+                     params: CompsParams(p_make: make, p_model: model, p_year: year,
+                                         p_exclude_vehicle_id: excludeId, p_limit: 24))
+                .execute()
+                .value
+        } catch {
+            loadError = true
+            NSLog("NukeCapture comps drill failed: %@", String(describing: error))
+        }
+        loaded = true
     }
 }
