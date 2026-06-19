@@ -76,16 +76,21 @@ The firewall pass-through is where mil-spec engine wiring meets factory body wir
 
 | Boundary fact | Value | Citation |
 |---|---|---|
-| Firewall bulkhead connector | **D38999/24WJ61SN** receptacle + **D38999/26WJ61PN** plug, insert 25-61, M39029 #20 contacts, 20–24 AWG only | (source: `K5_WIRING_STATE.md:43`) |
+| Firewall bulkhead connector | **D38999/24WJ61SN** receptacle + **D38999/26WJ61PN** plug, insert 25-61, M39029 #20 contacts, 20–24 AWG only | (source: `K5_WIRING_STATE.md:43`; **externally confirmed** — shell size 25 = "J" shell; arrangement **25-61 is a real cataloged shell-25 arrangement holding 61 contacts, ALL size #20**, and size #20 accepts **20–24 AWG** rated **7.5 A** test current, per Milnec MIL-DTL-38999 Insert Arrangements + Contact specs and TE/Deutsch Series III datasheet) |
 | Cavity loading | 61/61 used, 0 spare, **8 wires OVERFLOW** (OPS/FPS companions, #100, #60, #114/#115) | (source: `K5_WIRING_STATE.md:43`) |
-| Overflow resolution | rail consolidation vs 2nd bulkhead vs grommet — **OPEN, Skylar's call** | (source: `K5_WIRING_STATE.md:43`) |
+| Overflow resolution | rail consolidation vs 2nd bulkhead vs grommet — **OPEN, Skylar's call** | (source: `K5_WIRING_STATE.md:43`; see §3.3 for the cavity-count constraint) |
+| Power cabling excluded from the D38999 | **Power/ground cables do NOT cross at this connector — physically grounded by the contact rating.** Size #20 tops at 7.5 A; even the largest mixed insert (#16) tops at **16 AWG / 13 A**, far below starter/alternator/PDM/ground cabling. Power cabling is excluded regardless of insert choice and **must use dedicated grommet/stud pass-throughs.** | (source: Milnec MIL-DTL-38999 Insert Arrangements + Contact specs `https://www.milnec.com/mil-d38999-connectors/d38999-contacts.pdf`; TE/Deutsch Series III datasheet) |
 | Protocol transition at the bulkhead | mil-spec heat-shrink stack STOPS at the firewall; body-side reverts to factory crimp + vinyl sleeve | (source: `research/2026-05-21_milspec_heatshrink_protocols.md:172`) |
+
+> **External confirmation (§3.2):** the firewall connector's `#20 contacts, 20–24 AWG only` is independently verified against catalog data — Milnec MIL-DTL-38999 Insert Arrangements table (`https://www.milnec.com/mil-d38999-connectors/d38999-contact-arrangements.pdf`) + Milnec contact specs (`https://www.milnec.com/mil-d38999-connectors/d38999-contacts.pdf`); corroborated by the TE/Deutsch Series III datasheet (Milnec + TE/Deutsch tables agree). 25-61 = 61 × #20, #20 = 20–24 AWG @ 7.5 A. This grounds the "power does not cross here" rule physically, not just by our internal lock.
 
 ### 3.3 The engine ↔ body join method is still open
 
 How the engine sub-harness joins the body sub-harness — bulkhead connector (serviceable) vs solder + heat-shrink (permanent) vs Raychem ES splice — is an **OPEN architectural question** that affects rebuildability. Do not assert it closed. (source: `K5_WIRING_STATE.md:67-68` — open questions 1 and 2)
 
 > The D38999 firewall connector (§3.2) is LOCKED as *a* bulkhead; whether every cross-firewall wire goes through it (vs supplementary grommet runs) is the unresolved part, tied to the 8-wire overflow. (source: `K5_WIRING_STATE.md:43`)
+
+**Cavity-count constraint on the overflow resolution (external confirmation, mirrors ch17 §17.9.5):** a mixed insert is **NOT** a cavity-count fix. **25-61 (61 × #20) is the maximum-cavity shell-25 arrangement** — every mixed #16+#20 arrangement has FEWER total cavities (25-43 = 43, 25-46 = 46), because each #16 cavity displaces multiple #20 positions. So you cannot add cavities by going to a mixed insert; you lose them. The only reason to go mixed is current, not count: if any overflow wire is 16–20 AWG and needs **>7.5 A**, a **#16 cavity (13 A)** is the lever — but that *shrinks* total capacity. The real capacity levers remain **rail consolidation / 2nd bulkhead / dedicated grommet** (engine-only segmentation or a second crossing). The open call (still Skylar's, §3.3) should be made *with this cavity-count constraint stated*, not re-litigated. (source: Milnec MIL-DTL-38999 Insert Arrangements table — shell-25 contact counts — `https://www.milnec.com/mil-d38999-connectors/d38999-contact-arrangements.pdf`)
 
 ### 3.4 Segmentation respects the power-spine routing schools
 
@@ -159,11 +164,18 @@ Every power-spine lug termination is built in this exact order, inside-out. This
 
 **What layer 2 actually does (three jobs):** (a) seals the crimp mouth against moisture wicking down the strands; (b) strain-relieves — vibration bends the cable in open span, not at the crimp mouth where strands fatigue; (c) insulates the barrel. (source: `research/2026-06-10_power_spine_builders_study.md:221`)
 
-**Crimp verification:** inspection (crimp centered, no barrel cracks) + pull test per IPC/WHMA-A-620 §19.1 — 16 AWG ≥ 50 lbf, 20 AWG ≥ 13 lbf, 22 AWG ≥ 8 lbf. (source: `research/2026-05-21_milspec_heatshrink_protocols.md:157`)
+**Crimp verification:** inspection (crimp centered, no barrel cracks) + pull test per IPC/WHMA-A-620 §19.1 — **16 AWG ≥ 30 lbf** (CORRECTED — the old "16 AWG ≥ 50 lbf" was a mislabel; **50 lbf is the 14 AWG value**, per the ch16 §8.3 correction), 20 AWG ≥ 13 lbf, 22 AWG ≥ 8 lbf. (source: `research/2026-05-21_milspec_heatshrink_protocols.md:157`; pull-force correction cross-ref ch16 §8.3 — Checkline wire-pull-test standards `https://www.checkline.com/res/products/126677/wire_pull_test_standards.pdf`)
 
 **Signal-wire terminations** (non-lug, at Superseal/D38999 contacts) follow the same inside-out logic with a different stack: optional solder sleeve (shield drain) → SCL inner → DR-25 outer → AS85049 backshell+boot (D38999 side only; Superseal uses a built-up SCL+DR-25 boot, no formal AS backshell). (source: `research/2026-05-21_milspec_heatshrink_protocols.md:54-86`)
 
-**Recovered-diameter sizing** for each shrink layer (supplied ID ≥ largest OD covered; recovered ID ≤ smallest OD gripped) depends on the verified bundle ODs from §2.4 — which is why DR-25/SCL are not ordered until after the formboard (§6). The K5's per-termination recovered diameters: (UNKNOWN — needs external ingestion: per-wire DR-25/SCL recovered IDs off the verified formboard; `library_search.py "DR-25 recovery ratio"` → no matches; the property slots `wire_termination_*_inner_seal_pn` / `_outer_cover_pn` exist but hold no values — `K5_WIRING_STATE.md:182,185`)
+**Recovered-diameter sizing** for each shrink layer (supplied ID ≥ largest OD covered; recovered ID ≤ smallest OD gripped) depends on the verified bundle ODs from §2.4 — which is why DR-25/SCL are not ordered until after the formboard (§6).
+
+**PARTIAL CLOSE — the recovered-ID-BY-SIZE catalog and the selection rule are now CITED** (the per-WIRE final size remains a HANDS deferral, below):
+
+- **Recovered-ID-by-size catalog:** the DR-25 and SCL per-size recovered-ID tables are now ingested — see the ch16 §6 updates (DR-25 2:1 and SCL adhesive-lined per-size tables). Cross-ref `chapters/16-wire-and-protection-canon.md` §6. (source: TE/Raychem DR-25 datasheet `https://www.corsa-technic.com/productdata/DR-25-Specs.pdf`; Raychem SCL datasheet `https://www.prowireusa.com/content/6596/Raychem%20SCL%20Datasheet.pdf`)
+- **Selection rule (authoritative, from the DR-25 datasheet):** *"Always order the largest size that will shrink snugly over the component to be covered."* Operationally: pick the **smallest standard size whose recovered ID ≤ the measured bundle OD while its as-supplied ID ≥ the bundle OD** (so it slips on before shrinking and grips after). **Caveat (datasheet):** *"the wall thickness of the tubing will be less than specified if recovery is restricted"* — a bundle OD sitting near the recovered-ID floor yields a thinner-than-spec wall, so don't oversize to the point where recovery is choked. (source: TE/Raychem DR-25 datasheet, selection rule + per-size table)
+
+**STILL UNKNOWN — the per-WIRE final size selection** [HANDS]: this depends on the verified bundle ODs measured off the formboard (§2.4 / §6 / Dave step ③), which do not exist until the loom is laid and verified. The catalog + selection rule are now cited; only the **measured-OD inputs** remain a builder-deferred unknown by design. Do **NOT** assert per-wire DR-25/SCL sizes COMPLETE. (UNKNOWN — needs the verified bundle ODs off the formboard; the property slots `wire_termination_*_inner_seal_pn` / `_outer_cover_pn` exist but hold no values — `K5_WIRING_STATE.md:182,185`)
 
 ---
 
