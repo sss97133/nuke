@@ -101,7 +101,6 @@ struct VehicleDetailView: View {
     @State private var vehicle: VehicleHeaderRow?
     @State private var specs: [VehicleSpec] = []   // get_vehicle_specs: fact vs facade
     @State private var valuation: VehicleValuation?  // get_vehicle_valuation: comp-based estimate + basis
-    @State private var imageTotal: Int?            // true photo count (not the fetched cap)
     @State private var images: [VehicleGalleryImage] = []
     @State private var loadingMore = false         // a gallery page is in flight
     @State private var reachedEnd = false          // last page returned < pageSize
@@ -519,7 +518,8 @@ struct VehicleDetailView: View {
     // never a bare scalar posing as a price. Renders nothing without a value.
     @ViewBuilder private var valuationSection: some View {
         if let v = valuation, let val = v.value, val > 0 {
-            WorthBracketView(valuation: v)
+            WorthBracketView(valuation: v, make: vehicle?.make, model: vehicle?.model,
+                             year: vehicle?.year, excludeId: vehicleId)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16).padding(.bottom, 16)
         } else if valuationError {
@@ -735,8 +735,10 @@ struct VehicleDetailView: View {
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    // Honest count, not a button — the full set is already streaming.
-                    Text((imageTotal ?? images.count).formatted())
+                    // Honest count: what's actually loaded (analyzed, dated). A "+"
+                    // until the tail is reached, since more are still streaming; at
+                    // end-of-scroll the bare number IS the true total.
+                    Text(images.count.formatted() + (reachedEnd ? "" : "+"))
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
@@ -759,14 +761,19 @@ struct VehicleDetailView: View {
                         }
                         .buttonStyle(.plain)
                         .contextMenu {
-                            // Owner picks the true "before" — EXIF dates lie, so the
-                            // earliest-timestamp guess is wrong; the owner knows the
-                            // real first shot. (Owner-gated again server-side.)
+                            // Owner curates THE BUILD's two frames — EXIF dates lie and
+                            // the auto min/max guess paired junk (interior vs VIN plate),
+                            // so the owner picks both ends. (Owner-gated again server-side.)
                             if isOwner {
                                 Button {
-                                    Task { await setBeforeImage(img.id) }
+                                    Task { await setBuildImage(img.id, role: "before_image") }
                                 } label: {
                                     Label("Set as the 'before' shot", systemImage: "flag.checkered")
+                                }
+                                Button {
+                                    Task { await setBuildImage(img.id, role: "after_image") }
+                                } label: {
+                                    Label("Set as the 'after' shot", systemImage: "flag.checkered.2.crossed")
                                 }
                             }
                         }
@@ -943,8 +950,24 @@ struct VehicleDetailView: View {
 
     /// One page of the gallery, appended to `images`. Continuous scroll: the grid
     /// triggers the next page when its tail appears, so there's no cap and no
-    /// "view all" dead-end. Orders by created_at (the indexed column) to dodge the
-    /// RLS full-sort timeout; reads the estimated TRUE total so the count is honest.
+    /// "view all" dead-end.
+    ///
+    /// Two rules, both from Skylar's report (the grid was showing un-analyzed,
+    /// cross-vehicle junk in ingest order):
+    ///   1. ANALYZED ONLY — `ai_processing_status='completed'`. Pending/processing
+    ///      frames (incl. the doppelganger shop photos not yet attributed) don't
+    ///      pollute the profile; they appear once they're understood.
+    ///   2. LATEST FIRST — order by `taken_at` desc, not `created_at`. Capture date
+    ///      is what "newest" means; ingest order was a jumble.
+    /// Both ride the `vehicle_images_taken_date` partial index (vehicle_id, taken_at
+    /// WHERE taken_at IS NOT NULL) → backward index scan, ~1ms, no RLS full-sort
+    /// timeout.
+    ///
+    /// NO server count: an exact count over the ~2.6K matching rows under RLS
+    /// materializes the whole set and trips statement_timeout (measured: 500 @19s),
+    /// and the planner's estimate for this partial-index query is garbage (~65). So
+    /// the header shows the honest loaded count (`images.count`) — which becomes the
+    /// true total once the tail is reached.
     private func loadGalleryPage(reset: Bool = false) async {
         if loadingMore { return }
         if !reset && reachedEnd { return }
@@ -954,17 +977,17 @@ struct VehicleDetailView: View {
         let from = reset ? 0 : images.count
         let to = from + Self.galleryPageSize - 1
         do {
-            let resp: PostgrestResponse<[VehicleGalleryImage]> = try await SupabaseService.client
+            let page: [VehicleGalleryImage] = try await SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status",
-                        count: .estimated)
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status")
                 .eq("vehicle_id", value: vehicleId)
-                .order("created_at", ascending: false)
+                .eq("ai_processing_status", value: "completed")
+                .not("taken_at", operator: .is, value: "null")
+                .order("taken_at", ascending: false)
                 .range(from: from, to: to)
                 .execute()
-            let page = resp.value
+                .value
             if reset { images = page; reachedEnd = false } else { images.append(contentsOf: page) }
-            imageTotal = resp.count
             if page.count < Self.galleryPageSize { reachedEnd = true }
         } catch {
             // Only the FIRST page (empty strip) surfaces as an error; a tail-page
@@ -1045,78 +1068,79 @@ struct VehicleDetailView: View {
         return r == "owner" || r == "co_owner"
     }
 
-    /// Owner designates the true "before" image (the acquisition shot). EXIF dates
-    /// are unreliable, so min(taken_at) picks the wrong frame — only the owner knows.
-    private func setBeforeImage(_ imageId: UUID) async {
-        struct P: Encodable { let p_vehicle_id: String; let p_image_id: String }
+    /// Owner designates a build frame (before = acquisition shot, after = current
+    /// state). THE BUILD is an owner STATEMENT, not a guess: min/max(taken_at)
+    /// picked indefensible frames (a 2016 interior shot vs a 2026 VIN data-plate —
+    /// the most recent capture session happened to photograph the tag). So both
+    /// ends are owner-designated through one generalized RPC.
+    private func setBuildImage(_ imageId: UUID, role: String) async {
+        struct P: Encodable { let p_vehicle_id: String; let p_image_id: String; let p_role: String }
         do {
             _ = try await SupabaseService.client
-                .rpc("set_vehicle_before_image",
-                     params: P(p_vehicle_id: vehicleId, p_image_id: imageId.uuidString.lowercased()))
+                .rpc("set_vehicle_build_image",
+                     params: P(p_vehicle_id: vehicleId,
+                               p_image_id: imageId.uuidString.lowercased(), p_role: role))
                 .execute()
             await loadBookends()
         } catch {
-            NSLog("NukeCapture set before image failed: %@", String(describing: error))
+            NSLog("NukeCapture set build image (%@) failed: %@", role, String(describing: error))
         }
     }
 
-    /// The owner-designated "before" image id, if one exists (latest non-superseded
-    /// kind=media observation with role=before_image). EXIF can't be trusted to pick it.
-    private func ownerDesignatedBeforeId() async -> UUID? {
+    /// The owner-designated image id for a role, if one exists (latest non-superseded
+    /// kind=media observation with the matching structured_data.role). EXIF can't be
+    /// trusted to pick build frames, so only the owner's pick counts.
+    private func ownerDesignatedImageId(role: String) async -> UUID? {
         struct Obs: Decodable { let structured_data: SD; struct SD: Decodable { let image_id: String? } }
         do {
             let rows: [Obs] = try await SupabaseService.client
                 .from("vehicle_observations").select("structured_data")
                 .eq("vehicle_id", value: vehicleId)
                 .eq("kind", value: "media")
-                .eq("structured_data->>role", value: "before_image")
+                .eq("structured_data->>role", value: role)
                 .neq("is_superseded", value: true)
                 .order("observed_at", ascending: false)
                 .limit(1).execute().value
             if let s = rows.first?.structured_data.image_id { return UUID(uuidString: s) }
         } catch {
-            NSLog("NukeCapture before-designation lookup failed: %@", String(describing: error))
+            NSLog("NukeCapture %@ designation lookup failed: %@", role, String(describing: error))
         }
         return nil
     }
 
-    private func loadBookends() async {
-        func cols() -> String { "id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status" }
+    /// Fetch one image row by id (for an owner-designated bookend).
+    private func image(id: UUID) async -> VehicleGalleryImage? {
         do {
-            // "After" = the build's CURRENT state: the latest dated frame. is_primary
-            // is NOT used here — the pipeline keeps resetting it to an older frame, which
-            // would show a stale "after" (the same staleness the hero fix addresses).
-            let latest: [VehicleGalleryImage] = try await SupabaseService.client
-                .from("vehicle_images").select(cols())
-                .eq("vehicle_id", value: vehicleId)
-                .order("taken_at", ascending: false)
+            let rows: [VehicleGalleryImage] = try await SupabaseService.client
+                .from("vehicle_images")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status")
+                .eq("id", value: id.uuidString.lowercased())
                 .limit(1).execute().value
-            guard let a = latest.first else { return }
-
-            // "Before": prefer the OWNER-DESIGNATED acquisition shot (ground truth);
-            // fall back to earliest taken_at only when none is designated.
-            if let designated = await ownerDesignatedBeforeId() {
-                let rows: [VehicleGalleryImage] = try await SupabaseService.client
-                    .from("vehicle_images").select(cols())
-                    .eq("id", value: designated.uuidString.lowercased())
-                    .limit(1).execute().value
-                if let b = rows.first, b.id != a.id {
-                    bookendBefore = b; bookendAfter = a; return   // owner picked it — trust it
-                }
-            }
-            let earliest: [VehicleGalleryImage] = try await SupabaseService.client
-                .from("vehicle_images").select(cols())
-                .eq("vehicle_id", value: vehicleId)
-                .order("taken_at", ascending: true)
-                .limit(1).execute().value
-            guard let b = earliest.first,
-                  let bAt = b.taken_at, let aAt = a.taken_at,
-                  b.id != a.id, bAt.prefix(10) != aAt.prefix(10) else { return }
-            bookendBefore = b
-            bookendAfter = a
+            return rows.first
         } catch {
-            NSLog("NukeCapture bookends load failed: %@", String(describing: error))
+            NSLog("NukeCapture bookend image fetch failed: %@", String(describing: error))
+            return nil
         }
+    }
+
+    /// THE BUILD's two frames — BOTH owner-designated, no auto min/max guess. The
+    /// guess produced indefensible pairs (interior vs VIN plate), so the section
+    /// shows only when the owner has picked both ends; otherwise it stays hidden
+    /// (an honest blank beats a wrong before/after). Owner sets each via the photo
+    /// long-press menu.
+    private func loadBookends() async {
+        async let beforeIdT = ownerDesignatedImageId(role: "before_image")
+        async let afterIdT  = ownerDesignatedImageId(role: "after_image")
+        let (beforeId, afterId) = await (beforeIdT, afterIdT)
+        guard let bId = beforeId, let aId = afterId, bId != aId else {
+            bookendBefore = nil; bookendAfter = nil; return
+        }
+        async let bT = image(id: bId)
+        async let aT = image(id: aId)
+        let (b, a) = await (bT, aT)
+        guard let b, let a else { bookendBefore = nil; bookendAfter = nil; return }
+        bookendBefore = b
+        bookendAfter = a
     }
 
     /// Load the viewer's ASSET relationship from the same tables the web reads.
