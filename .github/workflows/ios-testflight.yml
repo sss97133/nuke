@@ -23,6 +23,11 @@ name: iOS TestFlight
 on:
   workflow_dispatch:
 
+# This job only reads the repo (build + sign happen with Apple credentials, not
+# the GitHub token). Pin to least privilege per CodeQL actions/missing-permissions.
+permissions:
+  contents: read
+
 concurrency:
   group: ios-testflight
   cancel-in-progress: false
