@@ -81,13 +81,23 @@ export const useImageViewerState = (vehicleId: string) => {
     if (filters.area) query = query.ilike('area', `%${filters.area}%`);
     if (filters.part) query = query.ilike('part', `%${filters.part}%`);
 
-    // Apply ordering based on sortMode
+    // Apply ordering based on sortMode. Order by CAPTURE time (taken_at), not
+    // ingestion time (created_at) — backfilled/synced photos get created_at=now,
+    // so a created_at sort interleaves old and new photos. created_at is the
+    // fallback only for the minority with no taken_at.
     if (sortMode === 'primary_newest') {
-      query = query.order('is_primary', { ascending: false }).order('created_at', { ascending: false });
+      query = query
+        .order('is_primary', { ascending: false })
+        .order('taken_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false });
     } else if (sortMode === 'newest') {
-      query = query.order('created_at', { ascending: false });
+      query = query
+        .order('taken_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false });
     } else if (sortMode === 'oldest') {
-      query = query.order('created_at', { ascending: true });
+      query = query
+        .order('taken_at', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true });
     }
 
     try {

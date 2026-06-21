@@ -200,9 +200,39 @@ export class ProfileService {
       console.log('ProfileService: Built contributions sample:', realContributions.slice(0, 3));
       console.log('ProfileService: Contribution dates:', realContributions.map(c => c.contribution_date).slice(0, 10));
 
-      // ALWAYS use the real contribution data from timeline events, NEVER the fake user_contributions table
-      // The user_contributions table has inaccurate/fake data that should be ignored
-      const finalContributions = realContributions;
+      // Heatmap counts come from the uncapped server-side aggregate
+      // (get_user_contribution_days), NOT the three wide selects above — those are
+      // silently capped to 1000 rows by PostgREST db-max-rows, so for a >1000-image
+      // user the heatmap rendered an arbitrary recent slice (346 of 1,626 capture-days
+      // for user 0, nothing before 2017, while real history reaches further back). The
+      // RPC groups by COALESCE(taken_at, created_at) over ALL rows and floors bogus
+      // pre-2000 EXIF. Falls back to the capped client-built map if the RPC is
+      // unavailable; business events (not covered by the RPC) are preserved.
+      let finalContributions = realContributions;
+      try {
+        const days = await ProfileService.getContributionDays(userId);
+        if (days && days.length) {
+          const kindToType: Record<string, UserContribution['contribution_type']> = {
+            photo: 'image_upload', event: 'vehicle_data', work: 'vehicle_data',
+          };
+          const rpcContribs: UserContribution[] = days.map((d) => ({
+            id: `${userId}-${d.day}-${d.kind}`,
+            user_id: userId,
+            contribution_date: d.day,
+            contribution_type: kindToType[d.kind] || 'vehicle_data',
+            contribution_count: d.n,
+            metadata: {},
+            related_vehicle_id: null,
+            created_at: d.day,
+          }));
+          const businessContribs = realContributions.filter(
+            (c) => c.contribution_type === 'business_event',
+          );
+          finalContributions = [...rpcContribs, ...businessContribs];
+        }
+      } catch (e) {
+        console.warn('[ProfileService] get_user_contribution_days failed, using capped fallback:', e);
+      }
       
       console.log('ProfileService: Using REAL timeline-built contributions data');
       console.log('ProfileService: Real contributions from timeline events:', realContributions.length);

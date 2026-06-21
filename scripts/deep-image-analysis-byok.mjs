@@ -195,15 +195,30 @@ async function prepare() {
   mkdirSync(dirname(WORKLIST), { recursive: true });
   // EXIF is invisible in the (Supabase-stripped) pixels the agent reads — extract it
   // from the row and hand it over: true capture time, GPS, resolved location, camera.
+  //
+  // CRITICAL: the authoritative capture date is the `taken_at` COLUMN (the iOS capture
+  // relay writes asset.creationDate there; see apps/nuke-capture-ios SupabaseService.swift),
+  // NOT exif_data. The relay's exif_data carries no date field and stores the camera as
+  // flat `camera_make`/`camera_model` keys — so the previous code, which read shot_at
+  // from exif_data date fields and the camera from a nested `e.camera.make` object,
+  // returned shot_at=null + camera=null for the ENTIRE iOS-synced library. With no
+  // temporal anchor the detective inferred a date from image content (a 2017 build photo
+  // could land on a 2026 frame). taken_at is primary; exif_data is fallback for
+  // exiftool-backfilled storage images only.
   const exifOf = (r) => {
     const e = r.exif_data || {};
-    const cam = e.camera && typeof e.camera === 'object' ? `${e.camera.make || ''} ${e.camera.model || ''}`.trim()
-      : (typeof e.camera === 'string' ? e.camera : null);
-    const shotAt = e.dateTaken || e.dateTime || e.DateTimeOriginal || e.technical?.dateTaken || null;
+    const shotAt = r.taken_at
+      || e.dateTaken || e.dateTime || e.DateTimeOriginal || e.technical?.dateTaken || e.CreateDate || null;
+    const camMake = e.camera_make || e.Make || (e.camera && typeof e.camera === 'object' ? e.camera.make : null) || null;
+    const camModel = e.camera_model || e.Model || (e.camera && typeof e.camera === 'object' ? e.camera.model : null) || null;
+    const cam = [camMake, camModel].filter(Boolean).join(' ').trim()
+      || (typeof e.camera === 'string' ? e.camera : null) || null;
     const lat = r.latitude ?? e.gps?.latitude ?? e.location?.latitude ?? null;
     const lon = r.longitude ?? e.gps?.longitude ?? e.location?.longitude ?? null;
     return {
-      shot_at: shotAt, camera: cam || null,
+      shot_at: shotAt,
+      shot_at_source: r.taken_at ? 'taken_at' : (shotAt ? 'exif_data' : null),
+      camera: cam,
       gps: (lat != null && lon != null) ? { lat: Number(lat), lon: Number(lon) } : null,
       location_name: r.location_name || null,
       exif_present: !!(cam || shotAt || (lat != null)),
@@ -558,13 +573,41 @@ async function buildContext() {
   console.log(`context: wrote briefing → ${OUT} (dossier=${dossier ? 'yes' : 'THIN'}, timeline=${dossier?.timeline?.length || 0} days)`);
 }
 
+// queue — print this user's vehicle_ids that have approved frames, most-first.
+// Used by byok-image-drain.sh to self-drive the steady launchd cron across ALL
+// vehicles instead of one hardcoded car. Cheap (scoped to approved frames);
+// prepare skips already-analyzed frames, so a fully-drained vehicle returns
+// instantly and the drain's cursor advances past it.
+async function queue() {
+  const VEHICLE_USER = arg('--user-id');
+  if (!VEHICLE_USER) { console.error('queue: --user-id required'); process.exit(1); }
+  const counts = new Map();
+  const PAGE = 1000;
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await sb
+      .from('vehicle_images')
+      .select('vehicle_id')
+      .eq('user_id', VEHICLE_USER)
+      .eq('vision_gate_status', 'approved')
+      .not('vehicle_id', 'is', null)
+      .order('vehicle_id', { ascending: true })
+      .range(offset, offset + PAGE - 1);
+    if (error) { console.error(`queue: ${error.message}`); process.exit(1); }
+    if (!data || data.length === 0) break;
+    for (const r of data) counts.set(r.vehicle_id, (counts.get(r.vehicle_id) || 0) + 1);
+    if (data.length < PAGE) break;
+  }
+  for (const [vid] of [...counts.entries()].sort((a, b) => b[1] - a[1])) console.log(vid);
+}
+
 const isMain = process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (!['prepare', 'ingest', 'context'].includes(mode)) {
-    console.error('mode must be "prepare", "ingest", or "context"');
+  if (!['prepare', 'ingest', 'context', 'queue'].includes(mode)) {
+    console.error('mode must be "prepare", "ingest", "context", or "queue"');
     process.exit(1);
   }
   if (mode === 'prepare') await prepare();
   else if (mode === 'context') await buildContext();
+  else if (mode === 'queue') await queue();
   else await ingest();
 }
