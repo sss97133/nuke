@@ -600,14 +600,51 @@ async function queue() {
   for (const [vid] of [...counts.entries()].sort((a, b) => b[1] - a[1])) console.log(vid);
 }
 
+// resolve: print the user's chosen compute as shell-exportable lines. This is the
+// "broker" — it turns the per-user Settings row (user_analysis_settings) into the env
+// the drain needs, so the cloud runner stops being hardwired to one GitHub secret.
+//   nuke_hosted      -> NUKE_ANALYSIS_METHOD=nuke_hosted (runner falls back to platform creds)
+//   byo_subscription -> CLAUDE_CODE_OAUTH_TOKEN=<decrypted vault secret>
+//   byo_api_key      -> ANTHROPIC_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY per provider
+// The secret is decrypted server-side via the service-role-only RPC; we never log it.
+async function resolve() {
+  const VEHICLE_USER = arg('--user-id');
+  if (!VEHICLE_USER) { console.error('resolve: --user-id required'); process.exit(1); }
+  const { data: row, error } = await sb
+    .from('user_analysis_settings')
+    .select('method, provider, model, enabled')
+    .eq('user_id', VEHICLE_USER)
+    .maybeSingle();
+  if (error) { console.error(`resolve: ${error.message}`); process.exit(1); }
+
+  // No row yet, or hosted, or disabled → hosted (drain uses whatever the workflow provides).
+  const method = row?.method || 'nuke_hosted';
+  const enabled = row ? row.enabled : true;
+  const out = [`NUKE_ANALYSIS_METHOD=${method}`, `NUKE_ANALYSIS_ENABLED=${enabled ? '1' : '0'}`];
+  if (row?.model) out.push(`BYOK_MODEL=${row.model}`);
+
+  if ((method === 'byo_subscription' || method === 'byo_api_key') && enabled) {
+    const { data: secret, error: se } = await sb.rpc('get_analysis_credential', { p_user_id: VEHICLE_USER });
+    if (se) { console.error(`resolve: credential decrypt failed: ${se.message}`); process.exit(1); }
+    if (!secret) { console.error('resolve: method is byo_* but no credential stored — falling back to hosted'); out[0] = 'NUKE_ANALYSIS_METHOD=nuke_hosted'; }
+    else if (method === 'byo_subscription') out.push(`CLAUDE_CODE_OAUTH_TOKEN=${secret}`);
+    else {
+      const env = { anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY', google: 'GOOGLE_API_KEY' }[row.provider || 'anthropic'];
+      out.push(`${env}=${secret}`);
+    }
+  }
+  for (const line of out) console.log(line);
+}
+
 const isMain = process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (!['prepare', 'ingest', 'context', 'queue'].includes(mode)) {
-    console.error('mode must be "prepare", "ingest", "context", or "queue"');
+  if (!['prepare', 'ingest', 'context', 'queue', 'resolve'].includes(mode)) {
+    console.error('mode must be "prepare", "ingest", "context", "queue", or "resolve"');
     process.exit(1);
   }
   if (mode === 'prepare') await prepare();
   else if (mode === 'context') await buildContext();
   else if (mode === 'queue') await queue();
+  else if (mode === 'resolve') await resolve();
   else await ingest();
 }
