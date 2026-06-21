@@ -5,7 +5,11 @@
  * vehicles with one click instead of opening the GitHub Actions tab.
  *
  * POST /functions/v1/trigger-analysis-run
- *   { minutes?: number, batch?: number }   // model comes from the user's settings
+ *   { minutes?: number, batch?: number, vehicle_id?: uuid }  // model from user settings
+ *
+ * vehicle_id (optional): analyze just that one vehicle — this is what the per-image
+ * "Analyze" button targets. We verify the caller actually has images on that vehicle
+ * before dispatching, so a user can only ever target their own data.
  *
  * The run is ALWAYS scoped to the authenticated user's own id — a caller can never
  * dispatch analysis for someone else's vehicles. It dispatches the existing
@@ -65,8 +69,28 @@ Deno.serve(async (req) => {
 
     // Clamp the budget so a button press can't launch an enormous run.
     const body = await req.json().catch(() => ({}));
-    const minutes = Math.min(Math.max(Number(body.minutes) || 10, 1), 30);
     const batch = Math.min(Math.max(Number(body.batch) || 8, 1), 20);
+
+    // Optional single-vehicle target (the per-image button). Verify ownership: the caller
+    // must actually have images on that vehicle, else they could analyze someone else's.
+    let vehicleId: string | null = null;
+    if (body.vehicle_id) {
+      if (!/^[0-9a-f-]{36}$/i.test(String(body.vehicle_id))) {
+        return json(400, { error: "vehicle_id is not a valid uuid" });
+      }
+      const { count, error: ce } = await supabase
+        .from("vehicle_images")
+        .select("id", { count: "exact", head: true })
+        .eq("vehicle_id", body.vehicle_id)
+        .eq("user_id", user.id);
+      if (ce) return json(500, { error: "ownership check failed: " + ce.message });
+      if (!count) {
+        return json(403, { error: "You don't have any images on that vehicle." });
+      }
+      vehicleId = String(body.vehicle_id);
+    }
+    // A targeted single-vehicle run is short; a fleet run gets the default budget.
+    const minutes = Math.min(Math.max(Number(body.minutes) || (vehicleId ? 8 : 10), 1), 30);
 
     // Respect the user's stored settings: disabled => nothing to do; model passes through
     // the workflow input (the broker still overrides per-row, this is just the default).
@@ -85,6 +109,7 @@ Deno.serve(async (req) => {
       batch: String(batch),
     };
     if (settings?.model) inputs.model = settings.model;
+    if (vehicleId) inputs.vehicle_id = vehicleId;
 
     const res = await fetch(
       `https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}/dispatches`,
@@ -103,7 +128,10 @@ Deno.serve(async (req) => {
     if (res.status === 204) {
       return json(202, {
         ok: true,
-        message: "Analysis run dispatched. It runs in the cloud — check back on your vehicles shortly.",
+        scope: vehicleId ? "vehicle" : "fleet",
+        message: vehicleId
+          ? "Analysis dispatched for this vehicle — it runs in the cloud, check back shortly."
+          : "Analysis run dispatched. It runs in the cloud — check back on your vehicles shortly.",
       });
     }
 

@@ -365,6 +365,10 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
   const [attribution, setAttribution] = useState<any>(null);
   const [imageMetadata, setImageMetadata] = useState<any>(null);
+  // Deep (BYOK) analysis request state — distinct from the legacy ai_processing_status
+  // triage. "Analyzed" here means ai_scan_metadata.byok_deep_analysis exists.
+  const [deepRequesting, setDeepRequesting] = useState(false);
+  const [deepRequested, setDeepRequested] = useState(false);
   const [angleData, setAngleData] = useState<any>(null);
   const [vehicleOwnerId, setVehicleOwnerId] = useState<string | null>(null);
   const [previousOwners, setPreviousOwners] = useState<Set<string>>(new Set());
@@ -1034,6 +1038,31 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     [imageUrl, vehicleId, imageId, session?.user?.id, triggerAIAnalysis, timelineEventId, loadTags, loadImageMetadata]
   );
 
+  // Request deep BYOK analysis for THIS image's vehicle. The drain is the unit
+  // (vehicle day-chunks), so this queues the vehicle; the cloud run reads the frame
+  // and writes ai_scan_metadata.byok_deep_analysis + a provenance-stamped observation.
+  const requestDeepAnalysis = useCallback(async () => {
+    if (!vehicleId || deepRequesting) return;
+    setDeepRequesting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('trigger-analysis-run', {
+        body: { vehicle_id: vehicleId },
+      });
+      if (error) {
+        // Edge function returns a clear message in the body for known cases (no token, etc.)
+        const msg = (error as any)?.context?.body || error.message || 'Could not start analysis';
+        toast.error(typeof msg === 'string' ? msg : 'Could not start analysis');
+      } else {
+        setDeepRequested(true);
+        toast.success(data?.message || 'Analysis dispatched — runs in the cloud.');
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not start analysis');
+    } finally {
+      setDeepRequesting(false);
+    }
+  }, [vehicleId, deepRequesting]);
+
   const submitClaim = useCallback(async () => {
     if (!claimTarget) return;
     setClaimSubmitting(true);
@@ -1507,8 +1536,28 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               />
             );
           })()}
-          
-          <button 
+
+          {/* Deep-analysis trigger — shown only when this image has no BYOK deep verdict
+              yet. Fires a cloud run scoped to this image's vehicle. */}
+          {vehicleId && !imageMetadata?.ai_scan_metadata?.byok_deep_analysis && (
+            <button
+              onClick={requestDeepAnalysis}
+              disabled={deepRequesting || deepRequested}
+              title={deepRequested
+                ? 'Analysis queued for this vehicle'
+                : 'Analyze this image with Claude (runs in the cloud)'}
+              className={`px-3 py-1.5 border-2 text-[9px] font-bold uppercase tracking-wide transition-all duration-150 ${
+                deepRequesting || deepRequested
+                  ? 'bg-[#2a2a2a] text-white/40 border-white/10 cursor-not-allowed'
+                  : 'bg-transparent border-emerald-500/50 text-emerald-300 hover:border-emerald-400 hover:bg-emerald-500/10'
+              }`}
+              style={{ fontFamily: 'Arial, sans-serif' }}
+            >
+              {deepRequesting ? 'Starting…' : deepRequested ? 'Queued' : 'Analyze'}
+            </button>
+          )}
+
+          <button
             onClick={() => setShowSidebar(!showSidebar)}
             className={`px-3 py-1.5 border-2 text-[9px] font-bold uppercase tracking-wide transition-all duration-150 ${
               showSidebar 
