@@ -75,15 +75,35 @@ substitute for that context.**
   never re-reading the pixels — so it is nearly free.
 
 - **Context folder (work session).** The strongest prior of all, because it encodes
-  *intent*: the vehicle the technician is actually working on. A dash-teardown
-  close-up that names no marque ("an older vehicle") is not ambiguous if the work
-  session says "today is the 1989 R3500" — the whole session is the R3500 by
-  **declaration**, and inheritance is unnecessary. The rail exists
-  (`vehicle_images.work_session_id`) but is currently null; capturing it at upload —
-  the technician declaring/confirming the active build — is the highest-leverage
-  attribution fix in the system, because it converts a guess into ground truth at
-  the source. For the backlog, the folder is reconstructed (time+GPS) and the subject
-  is confirmed by the owner in review.
+  *intent* — but it is **evidenced, never declared.** The technician does not tell
+  the system what they are working on; **they already testified by shooting.** The
+  photo declares the intent (a teardown shot *is* the teardown), the sequence
+  declares the session, and the **device signature** signs who testified. A
+  dash-teardown close-up that names no marque is not ambiguous, not because anyone
+  declared the subject, but because it is signed by the same device, within the same
+  time/place run, inside a progression that is visibly the 1989 R3500. **Soliciting a
+  declaration is friction for evidence the system already holds.** The rail
+  `vehicle_images.work_session_id` is null — but so is the declaration's premise: the
+  fix is not a "what are you working on?" prompt, it is to *read the testimony that is
+  already on every frame* (see Device signature, Gap as proof of work). For the
+  backlog the folder is reconstructed from that evidence; the owner only adjudicates
+  genuine ambiguity in review.
+
+- **Device signature.** The phone/account identity in EXIF — the technician's
+  signature on the testimony. Present on 100% of the test frames
+  (`exif_data.camera_make/camera_model/synced_by` = "Apple / iPhone 15 Pro /
+  capture-relay-ios"), yet **never extracted** into the queryable
+  `device_fingerprint` / `documented_by_device` columns (both null). Extracting it is
+  the real "context folder" rail: same-device + time + place binds a run of frames
+  into one work session without asking anyone anything.
+
+- **Gap as proof of work.** A work session is self-proving through *change*. When the
+  sequence goes broken → fixed on the same component, the gap between the states
+  **is** the work — and the same part progressing **is** the same vehicle, which
+  confirms subject continuity for the whole run, including the close-ups that name
+  nothing. State-change is therefore both the proof that a session is real and the
+  glue that holds its subject together. (This is the image-as-testimony spine of the
+  platform applied to attribution: the tech already testified; we read it.)
 
 - **Knowledge-base re-pass.** Once a frame's subject is fixed (by anchor, inheritance,
   or context folder), the read can be sharpened by re-running it *with the correct
@@ -186,6 +206,11 @@ image), so flagging a frame removes it from the wrong profile *before* the move.
   exactly the unnameable close-ups — which the work session resolves (the technician
   knows that teardown is the 1989 R3500 Cheyenne, `b1edd5c1`, confirmed in the
   garage).
+- **The testimony is already signed.** All 122 frames of that sweep are stamped in
+  EXIF by one device — Apple iPhone 15 Pro via capture-relay-ios — across one work
+  day (01:10–21:55). The technician signed every frame; the system simply never
+  extracted the signature (`device_fingerprint` null on 100%). Attribution does not
+  need a declaration; it needs to *read what is already there*.
 - **Subject identity cannot be done in SQL.** Token-overlap against the kin garage
   trades false positives (a pseudo-vehicle "Unassigned Vehicle **Photos**" matching
   any narrative with "photos"/"vehicle"; "Intake Quarantine" matching engine
@@ -201,11 +226,14 @@ image), so flagging a frame removes it from the wrong profile *before* the move.
 - `byok-vision-prompt.md` is referenced by `byok-image-batch.sh` but **missing from
   the repo** — the cloud drain `cat`s a file that isn't there, degrading the prompt.
   Recreate before relying on the forward-fix.
-- `upload_batch_id` **and** `work_session_id` are **null** across `vehicle_images` —
-  both the batch rail and the context-folder rail exist but are unpopulated. Sessions
-  must be reconstructed from time+GPS until these are stamped at intake. Stamping
-  `work_session_id` at capture (technician declares the active build) is the
-  single highest-leverage fix and should be prioritized over backlog reconstruction.
+- `upload_batch_id`, `work_session_id`, `device_fingerprint`, and
+  `documented_by_device` are all **null** across `vehicle_images` — the rails exist,
+  unpopulated. But the underlying evidence is **not** missing: `exif_data` is present
+  on 100% of frames and already carries the device signature
+  (`camera_make/camera_model/synced_by`). The highest-leverage fix is therefore to
+  **extract the signature from EXIF and derive the work session from evidence**
+  (device + time + place + state-change), not to add a declaration UI — the testimony
+  is already on the image.
 - One-off cleanup scripts exist (`fix-mixed-vehicle-data.js`,
   `cleanup_vehicle_contamination.js`) — prior attempts that did not stick because
   they never fixed the DNA (no structured subject, no harness). This chapter is the
