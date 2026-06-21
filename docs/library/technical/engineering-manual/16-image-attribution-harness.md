@@ -105,6 +105,20 @@ substitute for that context.**
   glue that holds its subject together. (This is the image-as-testimony spine of the
   platform applied to attribution: the tech already testified; we read it.)
 
+- **Album context.** The uploaded set is a **gappy subset** of the real album, and
+  correct sessionization needs the whole. Proof (test user, 2026-06-20): the day's
+  frames are filenames IMG_1373–1507 — a 135-frame span in the album, of which only
+  **122 uploaded; 13 neighbors exist locally and the cloud never sees them.** The
+  relay also synced `source_type:"user_library"` (the whole camera roll) rather than
+  the vehicle's **folder** — so the owner's own organization (e.g. the 84 K20 folder)
+  never reached the cloud. Two consequences: (1) the contiguous `original_filename`
+  run is a *cleaner* session key than time/GPS bucketing (one IMG_ run = one shoot);
+  (2) the strongest attribution signal of all — the local album folder — is only
+  visible to **local processing**. This is why the architecture is local+cloud: local
+  reads the folder + the full album index (count, this frame's position, neighbors,
+  what's still pending) and hands it up; the cloud does the heavy read. Without it the
+  cloud is attributing from a sequence with holes.
+
 - **Knowledge-base re-pass.** Once a frame's subject is fixed (by anchor, inheritance,
   or context folder), the read can be sharpened by re-running it *with the correct
   vehicle's dossier as context* — its receipts, parts, prior verdicts. This is not a
