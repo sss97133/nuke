@@ -195,15 +195,30 @@ async function prepare() {
   mkdirSync(dirname(WORKLIST), { recursive: true });
   // EXIF is invisible in the (Supabase-stripped) pixels the agent reads — extract it
   // from the row and hand it over: true capture time, GPS, resolved location, camera.
+  //
+  // CRITICAL: the authoritative capture date is the `taken_at` COLUMN (the iOS capture
+  // relay writes asset.creationDate there; see apps/nuke-capture-ios SupabaseService.swift),
+  // NOT exif_data. The relay's exif_data carries no date field and stores the camera as
+  // flat `camera_make`/`camera_model` keys — so the previous code, which read shot_at
+  // from exif_data date fields and the camera from a nested `e.camera.make` object,
+  // returned shot_at=null + camera=null for the ENTIRE iOS-synced library. With no
+  // temporal anchor the detective inferred a date from image content (a 2017 build photo
+  // could land on a 2026 frame). taken_at is primary; exif_data is fallback for
+  // exiftool-backfilled storage images only.
   const exifOf = (r) => {
     const e = r.exif_data || {};
-    const cam = e.camera && typeof e.camera === 'object' ? `${e.camera.make || ''} ${e.camera.model || ''}`.trim()
-      : (typeof e.camera === 'string' ? e.camera : null);
-    const shotAt = e.dateTaken || e.dateTime || e.DateTimeOriginal || e.technical?.dateTaken || null;
+    const shotAt = r.taken_at
+      || e.dateTaken || e.dateTime || e.DateTimeOriginal || e.technical?.dateTaken || e.CreateDate || null;
+    const camMake = e.camera_make || e.Make || (e.camera && typeof e.camera === 'object' ? e.camera.make : null) || null;
+    const camModel = e.camera_model || e.Model || (e.camera && typeof e.camera === 'object' ? e.camera.model : null) || null;
+    const cam = [camMake, camModel].filter(Boolean).join(' ').trim()
+      || (typeof e.camera === 'string' ? e.camera : null) || null;
     const lat = r.latitude ?? e.gps?.latitude ?? e.location?.latitude ?? null;
     const lon = r.longitude ?? e.gps?.longitude ?? e.location?.longitude ?? null;
     return {
-      shot_at: shotAt, camera: cam || null,
+      shot_at: shotAt,
+      shot_at_source: r.taken_at ? 'taken_at' : (shotAt ? 'exif_data' : null),
+      camera: cam,
       gps: (lat != null && lon != null) ? { lat: Number(lat), lon: Number(lon) } : null,
       location_name: r.location_name || null,
       exif_present: !!(cam || shotAt || (lat != null)),
