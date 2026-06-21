@@ -45,8 +45,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ag.nuke.capture
         PRODUCT_NAME: NukeCapture
-        MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: "1.0.1"
+        CURRENT_PROJECT_VERSION: 30
         # Swift 5 language mode, same rationale as the Mac relay's
         # Package.swift: PhotoKit's observer/callback surface predates strict
         # Sendable checking. All mutable state is main-actor-confined by hand.
@@ -55,6 +55,10 @@ targets:
         CODE_SIGN_STYLE: Automatic
         # Owner sets Team in Xcode after `xcodegen generate` (see header).
         ENABLE_USER_SCRIPT_SANDBOXING: YES
+        # App icon (Sources/Assets.xcassets/AppIcon.appiconset) — single
+        # 1024px wordmark; Xcode derives every size. Upload validation
+        # rejects icon-less bundles (codes 90022/90713).
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     # ── Sign in with Apple capability ──
     # XcodeGen writes this entitlements file at generate time (same lifecycle
     # as Generated/Info.plist — generated, never committed). The capability
@@ -71,16 +75,35 @@ targets:
       properties:
         CFBundleDisplayName: Nuke
         CFBundleShortVersionString: $(MARKETING_VERSION)
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # LITERAL build number — NOT $(CURRENT_PROJECT_VERSION). Xcode Cloud forces
+        # CURRENT_PROJECT_VERSION = CI_BUILD_NUMBER (the small per-workflow run counter)
+        # onto the archive, and the "Process Info.plist" step re-expands the variable
+        # AFTER ci_post_clone / ci_pre_xcodebuild run — so every script-written value
+        # (build 8 set timestamps 1781745994 / 1781746066 in the log) was clobbered back
+        # to the run number 8, which is <= the highest TestFlight build (27) and rejected
+        # ("bundle version must be higher than the previously uploaded version"). A literal
+        # has no variable to re-expand, so it survives. Bump this by hand before each
+        # TestFlight archive (28 -> 29 -> ...). ci_pre_xcodebuild's PlistBuddy timestamp,
+        # if it still runs, overwrites this literal with a monotonic epoch (also > 27).
+        CFBundleVersion: "28"
+        # OAuth callback scheme for the ASWebAuthenticationSession providers
+        # (Google, GitHub). ASWebAuthenticationSession needs this scheme so
+        # the Supabase redirect (ag.nuke.capture://login-callback) returns
+        # control to the app. Must match Config.oauthRedirectURL.
+        CFBundleURLTypes:
+          - CFBundleURLName: ag.nuke.capture.oauth
+            CFBundleURLSchemes:
+              - ag.nuke.capture
         UILaunchScreen: {}                    # empty dict = system launch screen, full-size rendering
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         # ── Photo library (read) ── the ONLY sensitive permission this app asks for.
         # This exact string also goes in the App Privacy questionnaire answers
-        # (see apps/APP_STORE_LAUNCH.md) — keep them in sync.
+        # (see apps/APP_STORE_LAUNCH.md) — keep them in sync. Register: report,
+        # don't teach (CONSTRAINTS.md C8).
         NSPhotoLibraryUsageDescription: >-
-          Nuke uploads photos you take at your registered work locations to
-          your own Nuke account.
+          Photos taken at your work sites join your record. Everything else
+          stays on this phone.
         # ── Background Modes capability (fetch/processing via BGTaskScheduler) ──
         # The "capability" in Xcode's UI is just these plist keys; no
         # entitlement file is required for fetch/processing.
@@ -91,6 +114,7 @@ targets:
         # here or registration traps at runtime.
         BGTaskSchedulerPermittedIdentifiers:
           - ag.nuke.capture.refresh
+          - ag.nuke.capture.backfill
         # App makes HTTPS-only calls (Supabase) → exempt from export
         # compliance docs; answering here skips the question on every upload.
         ITSAppUsesNonExemptEncryption: false

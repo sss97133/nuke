@@ -147,8 +147,10 @@ In Xcode:
    (Settings → General → VPN & Device Management).
 3. On-device smoke test (do all of these — this is the review rehearsal):
    - [ ] First launch shows the Photos permission prompt with the exact
-         string from project.yml ("Nuke uploads photos you take at your
-         registered work locations…"). Allow Full Access.
+         string from project.yml ("Photos taken at your work sites join
+         your record. Everything else stays on this phone."). Allow Full
+         Access → the ignition scan runs (counter, Uploaded 0 gauge, site
+         confirmation, Upload N).
    - [ ] Sign in with a real Nuke account. Kill + relaunch → still signed in
          (Keychain session).
    - [ ] Take a photo **at a registered shop** (or temporarily add your

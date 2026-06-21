@@ -72,18 +72,64 @@ enum Config {
     static let maxPerRun = 200
     /// Dedupe seen-set cap in UserDefaults.
     static let seenSetCap = 1000
-    /// First run looks back this far when no watermark exists yet.
+    /// Steady-state fallback: how far sync() looks back when no watermark
+    /// exists. First run proper is the IGNITION full-library scan
+    /// (IgnitionEngine) — it sets the watermark to the scan moment and the
+    /// backfill owns everything older; this lookback only applies if sync
+    /// somehow runs with no watermark at all.
     static let firstRunLookback: TimeInterval = 24 * 3600
+
+    // ─── Ignition (first-run scan + site clustering + backfill) ──────────────
+    /// Grid cell edge for GPS clustering (~75 m).
+    static let siteCellMeters: Double = 75
+    /// A cluster needs at least this many photos to be proposed as a site.
+    static let siteMinPhotos = 5
+    /// How many site candidates ignition presents, ranked by photo count.
+    static let siteMaxCandidates = 3
+    /// Floor on a confirmed site's gate radius.
+    static let siteMinRadiusMeters: Double = 150
+    /// Backfill upload batch size (UPLOAD N runs in caps of this).
+    static let backfillBatchSize = 50
 
     // ─── iOS-only ────────────────────────────────────────────────────────────
     /// BGAppRefreshTask identifier — must match
     /// BGTaskSchedulerPermittedIdentifiers in project.yml.
     static let refreshTaskID = "ag.nuke.capture.refresh"
+    /// BGProcessingTask identifier for the backfill drain — must match
+    /// BGTaskSchedulerPermittedIdentifiers in project.yml.
+    static let backfillTaskID = "ag.nuke.capture.backfill"
 
-    /// "View on Nuke" deep link on the Today screen.
-    static let profileURL = URL(string: "https://nuke.ag/profile")!
+    /// Background backfill drain runs only on un-metered Wi-Fi (BGProcessingTaskRequest has no Wi-Fi-only flag; NetworkMonitor enforces it).
+    static let backfillRequiresWiFi = true
 
     /// How many recently-uploaded asset identifiers to keep for the Today
     /// screen's thumbnail strip.
     static let recentUploadsCap = 24
+
+    /// Google sign-in door — gated OFF until the Supabase Google provider is
+    /// configured for this bundle id. The constellation renders the button
+    /// only when this is true; signInWithOAuth(.google) is wired (see
+    /// SupabaseService.signInWithGoogle). Runtime dependency: the Supabase
+    /// project's Google auth provider must be enabled AND oauthRedirectURL
+    /// must be in its Auth → URL Configuration redirect allow-list, or the
+    /// ASWebAuthenticationSession returns an error. Flip to true once both
+    /// are in place.
+    static let enableGoogleSignIn = false
+
+    /// GitHub sign-in door — same gating contract as enableGoogleSignIn.
+    /// signInWithOAuth(.github) is wired (SupabaseService.signInWithGitHub).
+    /// Runtime dependency: enable the GitHub provider in Supabase and add
+    /// oauthRedirectURL to the redirect allow-list before flipping to true.
+    static let enableGithubSignIn = false
+
+    /// OAuth callback URL for the ASWebAuthenticationSession providers
+    /// (Google, GitHub). The scheme is registered in project.yml's
+    /// CFBundleURLTypes; this exact URL must also appear in the Supabase
+    /// Auth → URL Configuration redirect allow-list at runtime.
+    static let oauthRedirectURL = URL(string: "ag.nuke.capture://login-callback")!
+
+    /// Explore mode's sample profile (the Profile tab with no session) —
+    /// a real prod profile with a deep day record, never a fixture.
+    /// profiles.id for handle "skylar".
+    static let sampleProfileUserId = "0b9f107a-d124-49de-9ded-94698f63c1c4"
 }
