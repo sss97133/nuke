@@ -221,6 +221,36 @@ image), so flagging a frame removes it from the wrong profile *before* the move.
 
 ---
 
+## The schema already encodes this theory (the gap is wiring, not design)
+
+Investigating the live DB, every concept above already exists as schema — the system
+was designed for the testimony model and then left unwired at the joins:
+
+- **Device signature**: `generate_device_fingerprint()` →
+  `get_or_create_ghost_user()` → `device_attributions` + `ghost_users`, plus the
+  denormalized `vehicle_images.device_fingerprint`. *Was* dead on iOS photos because
+  it read only standard EXIF keys; **fixed** 2026-06-21 to read the relay's
+  `camera_make/camera_model/synced_by`, and backfilled (14,944 frames signed, 59
+  devices). This is the one fix that was a true bug, not a missing build.
+- **Work session (context folder)**: the `work_sessions` table is fully modeled —
+  `technician_phone_link_id` (device link), `place_id`, `start/end_image_id`,
+  `zones_touched`, `stages_observed`, `stage_transitions` (the broken→fixed
+  progression — *gap as proof of work*, schematized), `intent`/`intent_source`,
+  `evidence`, and `owner_confirmed_at/by`. 789 sessions already exist for the test
+  user, but the per-frame back-link `vehicle_images.work_session_id` is null — the
+  sessions float, unlinked. **Crucially it requires `vehicle_id NOT NULL`**: a work
+  session is bound to one vehicle, so a multi-subject sweep cannot be bound until the
+  subject is resolved.
+- **Mismatch signal**: `image_vehicle_match_status` exists and the primary chooser
+  already respects it — but it is null/unfed (see above).
+
+The dependency chain is therefore: **device signature (now wired) → subject identity
+(the one missing capability) → work-session binding → attribution reconciliation.**
+Every downstream rail waits on the same thing — structured subject extraction — which
+is why that LLM-over-prose pass (Stage 1) is the keystone, not an optional nicety.
+
+---
+
 ## Drift notes (verify against prod before trusting)
 
 - `byok-vision-prompt.md` is referenced by `byok-image-batch.sh` but **missing from
