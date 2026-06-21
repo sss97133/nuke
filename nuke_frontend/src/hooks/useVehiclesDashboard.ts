@@ -344,43 +344,43 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
 
     async function fetchAll() {
       try {
-        // Fire 5 relationship queries in parallel (explicit + local_photos)
-        const [verifiedRes, permRes, contribRes, prevOwnedRes, localPhotosRes] = await Promise.all([
-          // Q1: ownership_verifications (approved)
+        // Garage = vehicles the user has an EXPLICIT ownership relationship with.
+        //
+        // Removed sources (2026-05-23 cleanup):
+        //  - vehicle_user_permissions  -- auto-granted by import triggers; was
+        //    producing 70+ junk "owner" rows for vehicles Skylar only ran a
+        //    dropbox import on (Viva inventory etc).
+        //  - vehicle_contributors      -- same problem; auto-set by ingestion.
+        //  - profile_origin='local_photos' AND uploaded_by=me -- promoted every
+        //    user-triggered import to OWNER.
+        //
+        // Kept sources (all explicit user signals):
+        //  Q1 ownership_verifications  -- approved verification flow
+        //  Q4 discovered_vehicles      -- previously_owned discoveries
+        //  Q5 vehicle_ownerships       -- the authoritative current ownership table
+        //
+        // Q2/Q3 results below are hard-coded empty so the rest of the file's
+        // ordering stays untouched.
+        const [verifiedRes, prevOwnedRes, localPhotosRes] = await Promise.all([
           supabase
             .from('ownership_verifications')
             .select('vehicle_id, created_at')
             .eq('user_id', userId)
             .eq('status', 'approved'),
-
-          // Q2: vehicle_user_permissions (active)
-          supabase
-            .from('vehicle_user_permissions')
-            .select('vehicle_id, role, created_at')
-            .eq('user_id', userId)
-            .eq('is_active', true),
-
-          // Q3: vehicle_contributors
-          supabase
-            .from('vehicle_contributors')
-            .select('vehicle_id, role, created_at, status')
-            .eq('user_id', userId),
-
-          // Q4: previously owned vehicles
           supabase
             .from('discovered_vehicles')
             .select('vehicle_id, relationship_type, created_at')
             .eq('user_id', userId)
             .eq('relationship_type', 'previously_owned')
             .eq('is_active', true),
-
-          // Q5: vehicles whose data originates from my photos (profile_origin = local_photos)
           supabase
-            .from('vehicles')
-            .select('id')
-            .eq('profile_origin', 'local_photos')
-            .or(`user_id.eq.${userId},uploaded_by.eq.${userId}`),
+            .from('vehicle_ownerships')
+            .select('vehicle_id, role, is_current')
+            .eq('owner_profile_id', userId)
+            .eq('is_current', true),
         ]);
+        const permRes: { data: any[] } = { data: [] };
+        const contribRes: { data: any[] } = { data: [] };
 
         if (cancelled) return;
 
@@ -428,10 +428,18 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
           }
         }
 
-        // Q5: from my photos (data originates from user's photo library)
+        // Q5: explicit vehicle_ownerships (authoritative current ownership)
         if (localPhotosRes.data) {
-          for (const row of localPhotosRes.data as { id: string }[]) {
-            setRel(row.id, 'OWNER', 'uploaded_by');
+          for (const row of localPhotosRes.data as { vehicle_id: string; role: string | null }[]) {
+            const role = String(row.role || '').toLowerCase();
+            // verified_owner → VERIFIED OWNER, owner/current_owner → OWNER,
+            // co_owner → CO-OWNER, previous_owner → PREVIOUSLY OWNED
+            const rel: RelationshipType =
+              role === 'verified_owner' ? 'VERIFIED OWNER'
+              : role === 'co_owner' || role === 'co-owner' ? 'CO-OWNER'
+              : role === 'previous_owner' ? 'PREVIOUSLY OWNED'
+              : 'OWNER';
+            setRel(row.vehicle_id, rel, 'verification', row.role || undefined);
           }
         }
 
@@ -546,10 +554,11 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
 
   const sections = buildSections(vehicles);
 
-  const totalEstimatedValue = vehicles.reduce(
-    (sum, v) => sum + (v.estimated_value ?? 0),
-    0,
-  );
+  // Only sum OWNED-class relationships. Contributors / previously-owned are
+  // not yours to sum into "my garage value." See garage audit 2026-05-05.
+  const totalEstimatedValue = vehicles
+    .filter((v) => MY_RELATIONSHIP_TYPES.includes(v.relationship_type))
+    .reduce((sum, v) => sum + (v.estimated_value ?? 0), 0);
 
   const data = userId ? buildDashboardData(sections, vehicles) : null;
 

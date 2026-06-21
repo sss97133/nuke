@@ -9,6 +9,7 @@
  * zero shadows, ALL CAPS section labels at 8-9px.
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
 
@@ -517,6 +518,23 @@ const ObservationTimeline: React.FC = () => {
                 >
                   {ago || dateDisplay}
                 </span>
+              )}
+              {vehicle?.id && (
+                <Link
+                  to={`/vehicle/${vehicle.id}/observation/${obs.id}`}
+                  aria-label="Open observation detail"
+                  title="Open observation detail"
+                  style={{
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '8px',
+                    fontWeight: 700,
+                    color: 'var(--text-secondary)',
+                    textDecoration: 'none',
+                    marginTop: '2px',
+                  }}
+                >
+                  →
+                </Link>
               )}
             </div>
           </div>

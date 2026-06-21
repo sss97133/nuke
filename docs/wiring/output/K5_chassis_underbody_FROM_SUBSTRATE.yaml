@@ -1,0 +1,109 @@
+# Generated from vehicle_canonical — substrate-driven, not file-driven.
+# Vehicle: e08bf694-970f-4cbe-8a74-8715158a0f2e
+# Loom: CHASSIS / UNDERBODY
+# Wires projected: 12
+
+metadata:
+  title: K5 CHASSIS / UNDERBODY
+  description: |
+    Projection of 12 wires from public.vehicle_canonical for
+    vehicle_id=e08bf694-970f-4cbe-8a74-8715158a0f2e. Source of truth is the DB; this YAML
+    is regenerated on demand. Cite-by-cell provenance retained in
+    structured_data on each underlying observation row.
+
+connectors:
+  M130_A:  {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  M130_B:  {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+  PDM30_A: {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  PDM30_B: {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+
+cables:
+  W1:
+    gauge: 14 AWG
+    length: 11.5
+    length_unit: ft
+    colors: [OGBK]
+    type: M22759/32
+    notes: "AMP Research Step Left | from PDM30:OUT9 | sources=k5_cut_list_v2"
+  W2:
+    gauge: 14 AWG
+    length: 11.5
+    length_unit: ft
+    colors: [OGBKWH]
+    type: M22759/32
+    notes: "AMP Research Step Right | from PDM30:OUT10 | sources=k5_cut_list_v2"
+  W3:
+    gauge: 14 AWG
+    length: 11.5
+    length_unit: ft
+    colors: [OGBKBK]
+    type: M22759/32
+    notes: "AMP Research Controller | from PDM30:OUT11 | sources=k5_cut_list_v2"
+  W21:
+    gauge: 12 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [OGWH]
+    type: M22759/32
+    notes: "Radiator Fan 1 | from PDM30:OUT1 | sources=k5_cut_list_v2"
+  W22:
+    gauge: 12 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [OGBK]
+    type: M22759/32
+    notes: "Radiator Fan 2 | from PDM30:OUT2 | sources=k5_cut_list_v2"
+  W25:
+    gauge: 14 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [OGBU]
+    type: M22759/32
+    notes: "Electric Water Pump | from PDM30:OUT5 | sources=k5_cut_list_v2"
+  W64:
+    gauge: 20 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [OGBK]
+    type: M22759/32
+    notes: "Wideband Lambda Controller | from PDM30:OUT24 | sources=k5_cut_list_v2"
+  W66:
+    gauge: 10 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [OGBU]
+    type: M22759/16
+    notes: "Fuel Pump | from ECU | sources=k5_cut_list_v2"
+  W94:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [OG]
+    type: M22759/32
+    notes: "Fuel Pump Relay | from PDM30 | sources=k5_cut_list_v2"
+  W100:
+    gauge: 22 AWG
+    length: 11.5
+    length_unit: ft
+    colors: [OGBU]
+    type: M22759/32
+    notes: "Vehicle Speed Sensor | from ECU | sources=k5_cut_list_v2"
+  W106:
+    gauge: 22 AWG
+    length: 11.5
+    length_unit: ft
+    colors: [VTBU]
+    type: M22759/32
+    notes: "Wideband O2 Sensor 1 | from ECU | sources=k5_cut_list_v2"
+  W107:
+    gauge: 22 AWG
+    length: 11.5
+    length_unit: ft
+    colors: [VTBUWH]
+    type: M22759/32
+    notes: "Wideband O2 Sensor 2 | from ECU | sources=k5_cut_list_v2"
+
+# Connection list intentionally omitted in this MVP — needs the
+# from_pin → connector pin mapping logic that lives in
+# docs/wiring/output/generate_wireviz_yaml.py. Next pass: refactor
+# that generator to consume the per-wire dicts produced above.

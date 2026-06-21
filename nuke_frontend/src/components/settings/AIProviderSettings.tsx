@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../hooks/useToast';
+import ClaudeSubscriptionSettings from './ClaudeSubscriptionSettings';
 
 interface AIProvider {
   id?: string;
@@ -158,6 +159,9 @@ const AIProviderSettings: React.FC = () => {
 
   return (
     <div className="card">
+      <div style={{ marginBottom: '16px' }}>
+        <ClaudeSubscriptionSettings />
+      </div>
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h3 className="heading-3">AI Provider API Keys</h3>

@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1700" viewBox="0 0 2200 1700">
+<rect x="0" y="0" width="2200" height="1700" fill="#FFFFFF"/>
+<rect x="30.0" y="30.0" width="2140.0" height="1640.0" fill="none" stroke="#1A1A1A" stroke-width="3"/>
+<rect x="38.0" y="38.0" width="2124.0" height="1624.0" fill="none" stroke="#1A1A1A" stroke-width="1"/>
+<text x="1100.0" y="88.0" font-family="Courier New, Courier, monospace" font-size="28" font-weight="bold" fill="#1A1A1A" text-anchor="middle">SECTION 6 — AUDIO</text>
+<text x="1100.0" y="116.0" font-family="Courier New, Courier, monospace" font-size="13" fill="#1A1A1A" text-anchor="middle">BATTERY (FUSED) + OUT20 + AMP CHANNELS → HEAD UNIT / AMP / 4 SPEAKERS / SUB</text>
+<rect x="1530.0" y="170.0" width="600.0" height="92.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="188.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">AMPLIFIER (REAR-MOUNT)</text>
+<text x="1540.0" y="238.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">remote-in ← amp relay; signal ← head unit RCA</text>
+<text x="1540.0" y="254.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#E67300" text-anchor="start">EE-audit: REAR-SUB-POS/NEG 14 AWG &lt; 15A required — FAIL, upsize</text>
+<rect x="1530.0" y="272.0" width="600.0" height="92.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="290.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">RADIO / HEAD UNIT</text>
+<text x="1540.0" y="340.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">RCA pre-out + remote turn-on → amp relay coil path</text>
+<text x="1540.0" y="356.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">camera #97 video lands here or on C125 (cross_dependency)</text>
+<rect x="1530.0" y="374.0" width="600.0" height="76.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="392.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">AMPLIFIER RELAY</text>
+<text x="1540.0" y="442.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#E67300" text-anchor="start">output = amp remote turn-on; coil trigger #96 FROM=ECU, pin TBD</text>
+<rect x="1516.0" y="450.0" width="628.0" height="106.0" fill="none" stroke="#1A1A1A" stroke-width="1.2" stroke-dasharray="7,4"/>
+<text x="1524.0" y="444.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">DRIVER DOOR — BOOT</text>
+<rect x="1530.0" y="460.0" width="600.0" height="86.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="478.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">SPEAKER FRONT LEFT (DOOR)</text>
+<rect x="1516.0" y="546.0" width="628.0" height="106.0" fill="none" stroke="#1A1A1A" stroke-width="1.2" stroke-dasharray="7,4"/>
+<text x="1524.0" y="540.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">PASSENGER DOOR — BOOT</text>
+<rect x="1530.0" y="556.0" width="600.0" height="86.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="574.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">SPEAKER FRONT RIGHT (DOOR)</text>
+<rect x="1530.0" y="652.0" width="600.0" height="86.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="670.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">SPEAKER REAR LEFT</text>
+<rect x="1530.0" y="748.0" width="600.0" height="86.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="766.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">SPEAKER REAR RIGHT</text>
+<rect x="1530.0" y="844.0" width="600.0" height="86.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="862.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">SUBWOOFER (REAR)</text>
+<rect x="70.0" y="170.0" width="310.0" height="76.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.8"/>
+<rect x="70.0" y="170.0" width="310.0" height="24.0" fill="#D8D8D8" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="78.0" y="187.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="start">BATTERY — DIRECT FEED</text>
+<text x="372.0" y="220.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">BAT+ STUD</text>
+<polyline points="380.0,216.0 1140.0,216.0 1140.0,209.0 1530.0,209.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="216.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="213.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#32 B+ FEED (30A)</text>
+<rect x="398.0" y="206.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="220.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#32</text>
+<text x="444.2" y="210.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/RED · 8 AWG · 18.4ft</text>
+<text x="444.2" y="231.0" font-family="Courier New, Courier, monospace" font-size="9.5" fill="#8A8A8A" text-anchor="start">direct fused battery feed — NOT a PDM channel (power budget direct-wire table)</text>
+<rect x="742.2" y="208.0" width="44.0" height="16.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.5"/>
+<line x1="742.2" y1="216.0" x2="786.2" y2="216.0" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="764.2" y="204.0" font-family="Courier New, Courier, monospace" font-size="10" font-weight="bold" fill="#1A1A1A" text-anchor="middle">30A</text>
+<rect x="70.0" y="256.0" width="310.0" height="76.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.8"/>
+<rect x="70.0" y="256.0" width="310.0" height="24.0" fill="#D8D8D8" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="78.0" y="273.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="start">PDM30</text>
+<text x="372.0" y="306.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT20</text>
+<polyline points="380.0,302.0 1164.0,302.0 1164.0,311.0 1530.0,311.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="302.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="315.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#31 SWITCHED +12V (3A)</text>
+<rect x="398.0" y="292.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="306.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#31</text>
+<text x="444.2" y="296.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/BLK · 22 AWG · 3.5ft</text>
+<rect x="70.0" y="342.0" width="310.0" height="76.0" fill="#FFFFFF" stroke="#E67300" stroke-width="1.8"/>
+<rect x="70.0" y="342.0" width="310.0" height="24.0" fill="#D8D8D8" stroke="#E67300" stroke-width="1.2"/>
+<text x="78.0" y="359.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#E67300" text-anchor="start">M130 ECU — PIN TBD</text>
+<text x="372.0" y="392.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#E67300" text-anchor="end">PIN TBD</text>
+<polyline points="380.0,388.0 1188.0,388.0 1188.0,413.0 1530.0,413.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="388.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="417.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#96 RELAY COIL TRIGGER</text>
+<rect x="398.0" y="378.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="392.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#96</text>
+<text x="444.2" y="382.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/BLK · 22 AWG · 18.4ft</text>
+<rect x="70.0" y="428.0" width="310.0" height="436.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.8"/>
+<rect x="70.0" y="428.0" width="310.0" height="24.0" fill="#D8D8D8" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="78.0" y="445.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="start">AMPLIFIER — SPEAKER OUTPUTS</text>
+<text x="372.0" y="478.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">CH1+</text>
+<polyline points="380.0,474.0 1212.0,474.0 1212.0,499.0 1530.0,499.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="474.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="503.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#26a (+)</text>
+<rect x="398.0" y="464.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="478.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#26a</text>
+<text x="451.6" y="468.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/YEL · 18 AWG · 6.9ft</text>
+<circle cx="1060.0" cy="474.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="518.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">CH1-</text>
+<polyline points="380.0,514.0 1212.0,514.0 1212.0,525.0 1530.0,525.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="514.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="529.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#26b (-)</text>
+<rect x="398.0" y="504.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="518.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#26b</text>
+<text x="451.6" y="508.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/YEL/BLK · 18 AWG · 6.9ft</text>
+<circle cx="1060.0" cy="514.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="558.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">CH2+</text>
+<polyline points="380.0,554.0 1236.0,554.0 1236.0,595.0 1530.0,595.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="554.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="599.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#27a (+)</text>
+<rect x="398.0" y="544.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="558.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#27a</text>
+<text x="451.6" y="548.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/VIO · 18 AWG · 6.9ft</text>
+<circle cx="1060.0" cy="554.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="598.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">CH2-</text>
+<polyline points="380.0,594.0 1236.0,594.0 1236.0,621.0 1530.0,621.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="594.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="625.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#27b (-)</text>
+<rect x="398.0" y="584.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="598.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#27b</text>
+<text x="451.6" y="588.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/VIO/BLK · 18 AWG · 6.9ft</text>
+<circle cx="1060.0" cy="594.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="638.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">CH3+</text>
+<polyline points="380.0,634.0 1260.0,634.0 1260.0,691.0 1530.0,691.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="634.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="695.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#28a (+)</text>
+<rect x="398.0" y="624.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="638.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#28a</text>
+<text x="451.6" y="628.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/ORG · 16 AWG · 18.4ft</text>
+<text x="372.0" y="678.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">CH3-</text>
+<polyline points="380.0,674.0 1260.0,674.0 1260.0,717.0 1530.0,717.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="674.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="721.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#28b (-)</text>
+<rect x="398.0" y="664.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="678.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#28b</text>
+<text x="451.6" y="668.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/ORG/BLK · 16 AWG · 18.4ft</text>
+<text x="372.0" y="718.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">CH4+</text>
+<polyline points="380.0,714.0 1284.0,714.0 1284.0,787.0 1530.0,787.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="714.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="791.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#29a (+)</text>
+<rect x="398.0" y="704.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="718.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#29a</text>
+<text x="451.6" y="708.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN · 16 AWG · 18.4ft</text>
+<text x="372.0" y="758.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">CH4-</text>
+<polyline points="380.0,754.0 1284.0,754.0 1284.0,813.0 1530.0,813.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="754.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="817.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#29b (-)</text>
+<rect x="398.0" y="744.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="758.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#29b</text>
+<text x="451.6" y="748.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/BLK · 16 AWG · 18.4ft</text>
+<text x="372.0" y="798.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">SUB+</text>
+<polyline points="380.0,794.0 1308.0,794.0 1308.0,883.0 1530.0,883.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="794.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="887.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#30a (+)</text>
+<rect x="398.0" y="784.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="798.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#30a</text>
+<text x="451.6" y="788.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/WHT · 10 AWG · 18.4ft</text>
+<text x="372.0" y="838.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">SUB-</text>
+<polyline points="380.0,834.0 1308.0,834.0 1308.0,909.0 1530.0,909.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="834.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="913.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#30b (-)</text>
+<rect x="398.0" y="824.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="838.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#30b</text>
+<text x="451.6" y="828.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/WHT/BLK · 10 AWG · 18.4ft</text>
+<text x="1060.0" y="158.0" font-family="Courier New, Courier, monospace" font-size="10" font-weight="bold" fill="#1E7D32" text-anchor="middle">DOOR BOOTS</text>
+<text x="70.0" y="958.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="start">NOTES:</text>
+<text x="80.0" y="976.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">Amp feed #32 + rear speaker/sub runs share the FLOOR-RR + frame-rail trunk with the rear loom (SHEET 6).</text>
+<text x="80.0" y="992.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">Speaker wires carry no battery amps — amp 30A + head unit 3A are the only supply loads (subsystems.json AUDIO).</text>
+<text x="70.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="start">LEGEND:</text>
+<line x1="150.0" y1="1626.0" x2="200.0" y2="1626.0" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="206.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">wire run (id in box, COLOR · AWG · LEN on run)</text>
+<circle cx="610.0" cy="1626.0" r="7.0" fill="none" stroke="#1E7D32" stroke-width="2"/>
+<text x="624.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">grommet / boot pass-through</text>
+<rect x="860.0" y="1618.0" width="40.0" height="15.0" fill="none" stroke="#1A1A1A" stroke-width="1" stroke-dasharray="5,3"/>
+<text x="908.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">physical boundary</text>
+<text x="1060.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="10" font-weight="bold" fill="#E67300" text-anchor="start">ORANGE = CONFLICT / TBD</text>
+<text x="1280.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">GRAY = cross-ref other sheet</text>
+<rect x="1494.0" y="1486.0" width="660.0" height="168.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="2"/>
+<line x1="1494.0" y1="1516.0" x2="2154.0" y2="1516.0" stroke="#1A1A1A" stroke-width="1"/>
+<line x1="1494.0" y1="1544.0" x2="2154.0" y2="1544.0" stroke="#1A1A1A" stroke-width="1"/>
+<line x1="1494.0" y1="1572.0" x2="2154.0" y2="1572.0" stroke="#1A1A1A" stroke-width="1"/>
+<line x1="1494.0" y1="1600.0" x2="2154.0" y2="1600.0" stroke="#1A1A1A" stroke-width="1"/>
+<text x="1506.0" y="1507.0" font-family="Courier New, Courier, monospace" font-size="15" font-weight="bold" fill="#1A1A1A" text-anchor="start">NUKE LTD / DESERT PERFORMANCE</text>
+<text x="1506.0" y="1535.0" font-family="Courier New, Courier, monospace" font-size="13" fill="#1A1A1A" text-anchor="start">1977 CHEVROLET K5 BLAZER — VIN CKR187F127263</text>
+<text x="1506.0" y="1563.0" font-family="Courier New, Courier, monospace" font-size="13" fill="#1A1A1A" text-anchor="start">SYSTEM SCHEMATICS — SECTION 6 — AUDIO</text>
+<text x="1506.0" y="1591.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">SHEET 4 OF 6   —   2026-06-09   —   REV A</text>
+<text x="1506.0" y="1617.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">DERIVED FROM K5_cut_list_v4 + pdm30 channel plan (2026-04-05 AUTH) + wire_</text>
+<text x="1506.0" y="1638.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">paths + subsystems.json + objectTraits grounds</text>
+</svg>

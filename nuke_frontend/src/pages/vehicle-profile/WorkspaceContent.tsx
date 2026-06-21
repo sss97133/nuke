@@ -25,6 +25,8 @@ const AnalysisSignalsSection = React.lazy(() => import('./AnalysisSignalsSection
 const VehicleIntelligencePanel = React.lazy(() => import('./VehicleIntelligencePanel'));
 const VehicleScoresWidget = React.lazy(() => import('./VehicleScoresWidget'));
 const AuctionReadinessPanel = React.lazy(() => import('./AuctionReadinessPanel'));
+const ChannelSwitchboardCard = React.lazy(() => import('./ChannelSwitchboardCard'));
+const VenueSkinPreviewCard = React.lazy(() => import('./VenueSkinPreviewCard'));
 const ColumnDivider = React.lazy(() => import('./ColumnDivider'));
 const BuildManifestPanel = React.lazy(() => import('./BuildManifestPanel'));
 const VehicleListingDetailsCard = React.lazy(() => import('../../components/vehicle/VehicleListingDetailsCard'));
@@ -510,6 +512,16 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {/* Auction Readiness */}
           <React.Suspense fallback={null}>
             <AuctionReadinessPanel />
+          </React.Suspense>
+
+          {/* Sales Channels — readiness gate + one-toggle submission per outlet */}
+          <React.Suspense fallback={null}>
+            <ChannelSwitchboardCard />
+          </React.Suspense>
+
+          {/* Preview as Venue — render the profile in a venue's real design language */}
+          <React.Suspense fallback={null}>
+            <VenueSkinPreviewCard />
           </React.Suspense>
 
           {/* Videos — VehicleVideoSection self-guards: returns null when no videos */}

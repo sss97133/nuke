@@ -837,18 +837,22 @@ Deno.serve(async (req) => {
                 }
               }
 
+              // Reject financing/down-payment artifacts: sub-$1k, or a 2015+ vehicle under $3k.
+              const plausibleAsk = (a: number | null | undefined): boolean =>
+                !!a && a >= 1000 && a <= 500000 && !((vehicle.year as number) >= 2015 && a < 3000);
+
               // Price from raw_scrape_data
               if (!vehicle.asking_price && raw) {
                 const price = raw.price as Record<string, unknown> | null;
                 const amount = price?.amount ? parseFloat(price.amount as string) : null;
-                if (amount && amount > 0) {
+                if (plausibleAsk(amount)) {
                   vehicleUpdates.asking_price = amount;
                   fields++;
                 }
               }
 
               // Price from title
-              if (!vehicle.asking_price && !vehicleUpdates.asking_price && parsed.cleanPrice) {
+              if (!vehicle.asking_price && !vehicleUpdates.asking_price && plausibleAsk(parsed.cleanPrice)) {
                 vehicleUpdates.asking_price = parsed.cleanPrice;
                 fields++;
               }
