@@ -122,13 +122,17 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
 
         if (error) throw error;
 
-        // Track contribution
+        // Track contribution. RLS only allows self-inserting low-privilege
+        // roles as status='pending' (an org owner activates them), and we
+        // must not downgrade an existing membership row — so insert-if-absent
+        // instead of overwriting (ignoreDuplicates -> ON CONFLICT DO NOTHING).
         await supabase.from('organization_contributors').upsert({
           organization_id: organizationId,
           user_id: user.id,
           role: 'contributor',
+          status: 'pending',
           contribution_count: 1
-        });
+        }, { onConflict: 'organization_id,user_id', ignoreDuplicates: true });
 
         onSaved();
         onClose();
@@ -287,13 +291,15 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
         uploadedImages.push(publicUrl);
       }
 
-      // Track contribution
+      // Track contribution — same RLS rule as above: self-insert is
+      // pending-only, and never overwrite an existing membership row.
       await supabase.from('organization_contributors').upsert({
         organization_id: organizationId,
         user_id: user.id,
         role: 'photographer',
+        status: 'pending',
         contribution_count: uploadedImages.length
-      });
+      }, { onConflict: 'organization_id,user_id', ignoreDuplicates: true });
 
       // 4. Create timeline event with EXIF date
       const eventDate = earliestDate || new Date();
