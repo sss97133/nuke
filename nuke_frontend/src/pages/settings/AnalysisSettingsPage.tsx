@@ -19,7 +19,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { supabase, getSupabaseFunctionsUrl } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 
 type Method = 'nuke_hosted' | 'byo_api_key' | 'byo_subscription';
@@ -82,6 +82,7 @@ export default function AnalysisSettingsPage() {
   const [provider, setProvider] = useState<Provider>('anthropic');
   const [model, setModel] = useState('');
   const [secret, setSecret] = useState('');
+  const [running, setRunning] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -171,6 +172,35 @@ export default function AnalysisSettingsPage() {
       setError(err instanceof Error ? err.message : 'Failed to save');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Fire a one-off cloud run for just this user's vehicles, right now.
+  const runNow = async () => {
+    setRunning(true);
+    setError('');
+    setNotice('');
+    try {
+      const accessToken = session?.access_token;
+      if (!accessToken) {
+        navigate('/login');
+        return;
+      }
+      const res = await fetch(`${getSupabaseFunctionsUrl()}/trigger-analysis-run`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ minutes: 10, batch: 8 }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setNotice(result.message || 'Analysis run dispatched — it runs in the cloud.');
+      } else {
+        setError(result.error || `Could not start analysis (${res.status}).`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start analysis');
+    } finally {
+      setRunning(false);
     }
   };
 
@@ -361,24 +391,56 @@ export default function AnalysisSettingsPage() {
         </div>
       )}
 
-      <button
-        onClick={save}
-        disabled={saving}
-        style={{
-          background: 'var(--accent)',
-          color: 'var(--bg)',
-          border: 'none',
-          padding: '12px 20px',
-          fontSize: '12px',
-          cursor: saving ? 'default' : 'pointer',
-          opacity: saving ? 0.5 : 1,
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          fontWeight: 700,
-        }}
-      >
-        {saving ? 'Saving…' : 'Save Analysis Settings'}
-      </button>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <button
+          onClick={save}
+          disabled={saving}
+          style={{
+            background: 'var(--accent)',
+            color: 'var(--bg)',
+            border: 'none',
+            padding: '12px 20px',
+            fontSize: '12px',
+            cursor: saving ? 'default' : 'pointer',
+            opacity: saving ? 0.5 : 1,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            fontWeight: 700,
+          }}
+        >
+          {saving ? 'Saving…' : 'Save Analysis Settings'}
+        </button>
+
+        {/* On-demand run — no GitHub tab needed. Disabled until a method is saved. */}
+        <button
+          onClick={runNow}
+          disabled={running || !settings || settings.enabled === false}
+          title={
+            !settings
+              ? 'Save your analysis settings first'
+              : settings.enabled === false
+              ? 'Analysis is turned off'
+              : 'Analyze your vehicles now (runs in the cloud)'
+          }
+          style={{
+            background: 'transparent',
+            color: 'var(--text)',
+            border: '2px solid var(--accent)',
+            padding: '12px 20px',
+            fontSize: '12px',
+            cursor: running || !settings || settings.enabled === false ? 'default' : 'pointer',
+            opacity: running || !settings || settings.enabled === false ? 0.5 : 1,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            fontWeight: 700,
+          }}
+        >
+          {running ? 'Starting…' : 'Analyze Now'}
+        </button>
+      </div>
+      <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '8px' }}>
+        "Analyze Now" runs a short cloud burst over your vehicles. The hourly schedule keeps going on its own.
+      </p>
     </div>
   );
 }
