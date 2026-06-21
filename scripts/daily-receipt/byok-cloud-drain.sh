@@ -25,6 +25,38 @@ MINUTES="${3:-45}"
 DEADLINE=$(( $(date +%s) + MINUTES * 60 ))
 log(){ echo "$(date -u '+%F %T') | cloud-drain | $*"; }
 
+# Broker: resolve THIS user's chosen compute from app Settings (user_analysis_settings)
+# and load the right credential into the env. This is what lets a user pick their method
+# in the UI instead of us hardcoding one GitHub secret. The resolver decrypts via a
+# service-role-only RPC; we eval its output but never echo the secret.
+RESOLVED="$(dotenvx run -- node scripts/deep-image-analysis-byok.mjs resolve --user-id "$USER_ID" 2>/dev/null)"
+if [ -n "$RESOLVED" ]; then
+  while IFS= read -r kv; do [ -n "$kv" ] && export "$kv"; done <<< "$RESOLVED"
+fi
+METHOD="${NUKE_ANALYSIS_METHOD:-nuke_hosted}"
+if [ "${NUKE_ANALYSIS_ENABLED:-1}" = "0" ]; then
+  log "user has analysis DISABLED in settings — nothing to do"; exit 0
+fi
+# An API-key method must not silently fall through to the subscription token. If the
+# user picked byo_api_key, the subscription token would take a back seat to the API key
+# we just exported; if they picked byo_subscription, drop any stray API key so it wins.
+if [ "$METHOD" = "byo_subscription" ]; then unset ANTHROPIC_API_KEY OPENAI_API_KEY GOOGLE_API_KEY; fi
+log "compute method: $METHOD (model ${BYOK_MODEL:-claude-sonnet-4-6})"
+
+# Vision can't run without SOME credential. For nuke_hosted / byo_subscription that's the
+# OAuth token (repo secret or the user's vault); for byo_api_key it's the provider key the
+# broker exported. Fail loud here rather than burning a run that produces no verdicts.
+case "$METHOD" in
+  byo_api_key)
+    if [ -z "${ANTHROPIC_API_KEY:-}${OPENAI_API_KEY:-}${GOOGLE_API_KEY:-}" ]; then
+      log "method byo_api_key but no provider key resolved — abort"; exit 1
+    fi ;;
+  *)
+    if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+      log "no CLAUDE_CODE_OAUTH_TOKEN (subscription) available — set it in Settings or as a repo secret — abort"; exit 1
+    fi ;;
+esac
+
 # Vehicles with approved frames, most-first (cheap; prepare skips drained ones instantly).
 VEH=()
 while IFS= read -r line; do

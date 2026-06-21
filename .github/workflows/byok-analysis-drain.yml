@@ -78,11 +78,14 @@ jobs:
           NUKE_LOG_DIR: ${{ github.workspace }}/logs
         run: |
           # ANTHROPIC_API_KEY would take precedence and bill the API instead of the
-          # subscription — make sure nothing in the runner env set it.
+          # subscription — make sure nothing in the runner env set it. (A byo_api_key
+          # user's key is re-exported by the broker inside the drain, after this point.)
           unset ANTHROPIC_API_KEY
+          # No hard-fail on a missing repo token: the drain resolves each user's chosen
+          # method from Settings (user_analysis_settings) and may supply the credential
+          # from Vault instead. The drain fails loud if NO usable credential resolves.
           if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
-            echo "::error::CLAUDE_CODE_OAUTH_TOKEN secret is not set. Run 'claude setup-token' on a machine logged into your Claude subscription, then add the token as a repo secret. Vision cannot run without it."
-            exit 1
+            echo "::warning::No repo CLAUDE_CODE_OAUTH_TOKEN secret. nuke_hosted users will have no compute; byo users still work via their stored credential."
           fi
           mkdir -p "$NUKE_LOG_DIR"
           bash scripts/daily-receipt/byok-cloud-drain.sh \
