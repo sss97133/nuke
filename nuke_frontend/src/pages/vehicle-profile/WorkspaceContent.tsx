@@ -31,6 +31,7 @@ const VehicleListingDetailsCard = React.lazy(() => import('../../components/vehi
 const SimilarSalesSection = React.lazy(() => import('../../components/vehicle/SimilarSalesSection').then(m => ({ default: m.SimilarSalesSection })));
 const PriceHistoryChart = React.lazy(() => import('../../components/vehicle/PriceHistoryChart'));
 const ObservationTimeline = React.lazy(() => import('./ObservationTimeline'));
+const VehicleAgentChat = React.lazy(() => import('./VehicleAgentChat'));
 const InventoryWidgetLink = React.lazy(() => import('./InventoryWidgetLink'));
 // BuildLog removed — work sessions now surface via BarcodeTimeline Day Card popups
 
@@ -171,6 +172,14 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
             <React.Suspense fallback={null}>
               <WorkMemorySection vehicleId={vehicle.id} permissions={permissions} />
+            </React.Suspense>
+          )}
+
+          {/* Vehicle Agent — interactive Claude over this vehicle's data; can record
+              observations on the owner's behalf (provenance-stamped, reversible). */}
+          {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
+            <React.Suspense fallback={null}>
+              <VehicleAgentChat vehicleId={vehicle.id} />
             </React.Suspense>
           )}
 
