@@ -31,6 +31,10 @@ on:
   schedule:
     - cron: '0 * * * *'   # hourly
 
+# Least-privilege GITHUB_TOKEN: this job only checks out and reads.
+permissions:
+  contents: read
+
 concurrency:
   group: byok-analysis-drain
   cancel-in-progress: false
