@@ -29,8 +29,32 @@
       "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/oauth-server/oauth/:path*"
     },
     {
+      "source": "/v1/events",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-events"
+    },
+    {
+      "source": "/v1/events/:path*",
+      "destination": "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/api-v1-events/:path*"
+    },
+    {
+      "source": "/api/functions/v1/:path*",
+      "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/:path*"
+    },
+    {
       "source": "/api/quickbooks/:path*",
       "destination": "/api/quickbooks/:path*"
+    },
+    {
+      "source": "/api/docs",
+      "destination": "/api/docs"
+    },
+    {
+      "source": "/api/schemas/:path+",
+      "destination": "/api/schemas/:path+"
+    },
+    {
+      "source": "/api/examples/:path+",
+      "destination": "/api/examples/:path+"
     },
     {
       "source": "/api",
@@ -50,11 +74,30 @@
     },
     {
       "source": "/api/journal/:date",
-      "destination": "/api/journal/:date"
+      "destination": "/api/journal/[date]?date=:date"
+    },
+    {
+      "source": "/api/og/journal/:date",
+      "destination": "/api/og/journal/[date]?date=:date"
     },
     {
       "source": "/api/:path+",
       "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/:path+"
+    },
+    {
+      "source": "/data/:path+",
+      "destination": "/data/:path+"
+    },
+    {
+      "source": "/journal/:date(\\d{4}-\\d{2}-\\d{2})",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|twitterbot|Slackbot|Slack-ImgProxy|WhatsApp|Discordbot|TelegramBot|LinkedInBot|Applebot|iMessageBot|SkypeUriPreview|Pinterestbot|redditbot|Googlebot|bingbot).*"
+        }
+      ],
+      "destination": "/api/og/journal/[date]?date=:date"
     },
     {
       "source": "/:path*",

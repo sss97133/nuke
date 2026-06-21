@@ -30,7 +30,8 @@ type AnalyzedImage = {
 
 interface VehicleMediaKitProps {
   vehicleId: string;
-  onImageClick?: () => void;
+  /** Receives the vehicle_images.id of the frame that was clicked. */
+  onImageClick?: (imageId: string) => void;
   /** Called once curation resolves with the count of curated frames (0 if fallback). */
   onCurationResolved?: (count: number) => void;
 }
@@ -88,6 +89,10 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
   const [index, setIndex] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [paused, setPaused] = useState(false);
+  // Frames whose image failed to load (404 / undecodable) — dropped from the
+  // deck so a broken URL never leaves the hero as a black box.
+  const [brokenIds, setBrokenIds] = useState<Set<string>>(() => new Set());
+  const [loadedIds, setLoadedIds] = useState<Set<string>>(() => new Set());
   const advanceTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -104,9 +109,13 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
     (async () => {
       // Pull analyzed rows. We don't expect more than a few hundred per vehicle
       // with byok_deep_analysis present (vehicle 83f6f033 has 23/1366). Cap at 200.
+      // Only two byok_deep_analysis scalars are consumed; whole-blob select was
+      // 0.96MB vs 0.08MB projected (measured on prod anon 2026-06-11).
       const { data, error } = await supabase
         .from('vehicle_images')
-        .select('id, image_url, large_url, taken_at, created_at, ai_scan_metadata')
+        .select(
+          'id, image_url, large_url, taken_at, created_at, scene_type:ai_scan_metadata->byok_deep_analysis->>scene_type, build_phase_guess:ai_scan_metadata->byok_deep_analysis->>build_phase_guess',
+        )
         .eq('vehicle_id', vehicleId)
         .not('ai_scan_metadata->byok_deep_analysis', 'is', null)
         .order('taken_at', { ascending: false, nullsFirst: false })
@@ -119,18 +128,15 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
         return;
       }
 
-      const rows: AnalyzedImage[] = data.map((r: any) => {
-        const ba = r.ai_scan_metadata?.byok_deep_analysis || {};
-        return {
-          id: r.id,
-          image_url: r.image_url,
-          large_url: r.large_url,
-          taken_at: r.taken_at,
-          created_at: r.created_at,
-          scene_type: ba.scene_type ?? null,
-          build_phase_guess: ba.build_phase_guess ?? null,
-        };
-      });
+      const rows: AnalyzedImage[] = data.map((r: any) => ({
+        id: r.id,
+        image_url: r.image_url,
+        large_url: r.large_url,
+        taken_at: r.taken_at,
+        created_at: r.created_at,
+        scene_type: r.scene_type ?? null,
+        build_phase_guess: r.build_phase_guess ?? null,
+      }));
       setAnalyzed(rows);
     })();
     return () => { cancelled = true; };
@@ -145,7 +151,7 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
     // Pass 1: one image per scene category, in preference order.
     for (const cat of SCENE_PREFERENCE) {
       const candidate = analyzed.find(
-        (r) => r.scene_type && cat.matches.includes(r.scene_type) && !usedIds.has(r.id),
+        (r) => r.scene_type && cat.matches.includes(r.scene_type) && !usedIds.has(r.id) && !brokenIds.has(r.id),
       );
       if (candidate) {
         picks.push({ ...candidate, label: cat.label });
@@ -155,14 +161,14 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
 
     // Pass 2: add the most-recent any-scene as a "current state" 5th frame.
     if (picks.length < 5) {
-      const current = analyzed.find((r) => !usedIds.has(r.id));
+      const current = analyzed.find((r) => !usedIds.has(r.id) && !brokenIds.has(r.id));
       if (current) {
         picks.push({ ...current, label: 'CURRENT STATE' });
       }
     }
 
     return picks;
-  }, [analyzed]);
+  }, [analyzed, brokenIds]);
 
   // Distinct scene types across the curated set — gate at >= 3.
   const distinctScenes = useMemo(() => {
@@ -191,11 +197,14 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
 
   if (!enabled) return null;
 
-  const current = curated[index];
+  const current = curated[index % curated.length];
+  if (!current) return null;
   const srcInfo = buildSrcSet(current.large_url || current.image_url);
   if (!srcInfo) return null;
 
   const dateLabel = formatDate(current.taken_at || current.created_at);
+  const thumbSrc = supabaseRender(current.large_url || current.image_url, 64, 40);
+  const currentLoaded = loadedIds.has(current.id);
 
   return (
     <div
@@ -212,10 +221,31 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
-      onClick={onImageClick}
+      onClick={onImageClick ? () => onImageClick(current.id) : undefined}
       role="region"
       aria-label="Vehicle media kit slideshow"
     >
+      {/* Thumbnail-then-full: ~2KB 64px render paints near-instantly while
+          the full frame decodes — the hero is never a black box. */}
+      {thumbSrc && thumbSrc !== srcInfo.src && !currentLoaded && (
+        <img
+          key={`thumb-${current.id}`}
+          src={thumbSrc}
+          alt=""
+          aria-hidden
+          loading="eager"
+          decoding="async"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            objectPosition: 'center',
+            filter: 'blur(6px)',
+          }}
+        />
+      )}
       {/* Image — eager/async/high-priority on first frame for LCP */}
       <img
         key={current.id}
@@ -225,6 +255,8 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
         alt={current.label}
         loading={index === 0 ? 'eager' : 'lazy'}
         decoding="async"
+        onLoad={() => setLoadedIds((prev) => { const n = new Set(prev); n.add(current.id); return n; })}
+        onError={() => setBrokenIds((prev) => { const n = new Set(prev); n.add(current.id); return n; })}
         {...(index === 0 ? { fetchpriority: 'high' as any } : {})}
         style={{
           position: 'absolute',

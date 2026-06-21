@@ -90,6 +90,7 @@ const TeamInbox = React.lazy(() => import('../pages/TeamInbox'));
 // Photo / Unified Inbox
 const PersonalPhotoLibrary = React.lazy(() => import('../pages/PersonalPhotoLibrary').then(m => ({ default: m.PersonalPhotoLibrary })));
 
+const SettingsHubPage = React.lazy(() => import('../pages/settings/SettingsHubPage'));
 const ApiKeysPage = React.lazy(() => import('../pages/settings/ApiKeysPage'));
 const ConnectedAgentsPage = React.lazy(() => import('../pages/settings/ConnectedAgentsPage'));
 const WebhooksPage = React.lazy(() => import('../pages/settings/WebhooksPage'));
@@ -256,6 +257,7 @@ export const DomainRoutes = () => {
 
           {/* Settings (protected) */}
           <Route element={<ProtectedRoute />}>
+            <Route path="/settings" element={<SettingsHubPage />} />
             <Route path="/settings/api-keys" element={<ApiKeysPage />} />
             <Route path="/settings/connected-agents" element={<ConnectedAgentsPage />} />
             <Route path="/settings/webhooks" element={<WebhooksPage />} />

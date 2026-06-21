@@ -228,19 +228,31 @@ const UserDiscoveries: React.FC<UserDiscoveriesProps> = ({ userId, isOwnProfile 
     }
   };
 
-  if (loading && discoveries.length === 0) {
-    return (
-      <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
-        Loading discoveries...
-      </div>
-    );
-  }
+  // No Empty Shells: nothing while loading. For a visitor with no discoveries
+  // at all, render nothing rather than an empty card. The discovery tracker is
+  // an owner workspace tool, so the owner still sees it (to paste/ingest URLs)
+  // even at zero.
+  if (loading && discoveries.length === 0) return null;
+  if (!isOwnProfile && discoveries.length === 0) return null;
+
+  // Only show stat cells that carry a non-zero count — a wall of zeros is an
+  // empty shell. "Found" always shows when there's any discovery activity.
+  const statCells = stats
+    ? ([
+        { label: 'Found', value: stats.total_discoveries },
+        { label: 'Saved', value: stats.saved },
+        { label: 'Watching', value: stats.watching },
+        { label: 'Contacted', value: stats.contacted },
+        { label: 'Purchased', value: stats.purchased },
+        { label: 'Sources', value: stats.sources_used },
+      ].filter(c => c.value > 0))
+    : [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 
-      {/* Stats bar */}
-      {stats && (
+      {/* Stats bar — only non-zero counts */}
+      {statCells.length > 0 && (
         <div style={{
           display: 'flex',
           gap: 'var(--space-4)',
@@ -250,12 +262,9 @@ const UserDiscoveries: React.FC<UserDiscoveriesProps> = ({ userId, isOwnProfile 
           background: 'var(--surface)',
           fontFamily: '"Courier New", Courier, monospace',
         }}>
-          <StatCell label="Found" value={stats.total_discoveries} />
-          <StatCell label="Saved" value={stats.saved} />
-          <StatCell label="Watching" value={stats.watching} />
-          <StatCell label="Contacted" value={stats.contacted} />
-          <StatCell label="Purchased" value={stats.purchased} />
-          <StatCell label="Sources" value={stats.sources_used} />
+          {statCells.map(c => (
+            <StatCell key={c.label} label={c.label} value={c.value} />
+          ))}
         </div>
       )}
 

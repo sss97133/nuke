@@ -50,9 +50,14 @@ const VehicleFindingsCard: React.FC<Props> = ({ vehicleId }) => {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Project only the scalar keys this card reads — whole ai_scan_metadata
+      // rows carry multi-MB deep_analysis blobs (1.57MB -> 0.43MB for a
+      // 3.6k-image vehicle, measured on prod anon 2026-06-11).
       const { data, error } = await supabase
         .from('vehicle_images')
-        .select('ai_scan_metadata')
+        .select(
+          'classifier:ai_scan_metadata->classifier, error:ai_scan_metadata->error, vin:ai_scan_metadata->vin, license_plate:ai_scan_metadata->license_plate, engine:ai_scan_metadata->engine, engine_guess:ai_scan_metadata->engine_guess, engine_badge:ai_scan_metadata->engine_badge, transmission:ai_scan_metadata->transmission, color_visible:ai_scan_metadata->color_visible, interior_trim:ai_scan_metadata->interior_trim, odometer:ai_scan_metadata->odometer, mileage_at_listing:ai_scan_metadata->mileage_at_listing, source:ai_scan_metadata->source, part_number:ai_scan_metadata->part_number, critical:ai_scan_metadata->critical, privacy_concern:ai_scan_metadata->privacy_concern, attribution_concern:ai_scan_metadata->attribution_concern, phase:ai_scan_metadata->phase, scene_class:ai_scan_metadata->scene_class, make_guess:ai_scan_metadata->make_guess, model_guess:ai_scan_metadata->model_guess, year_guess:ai_scan_metadata->year_guess, confidence:ai_scan_metadata->confidence',
+        )
         .eq('vehicle_id', vehicleId)
         .limit(5000);
       if (error) return;
@@ -96,8 +101,8 @@ const VehicleFindingsCard: React.FC<Props> = ({ vehicleId }) => {
       const parts = new Set<string>();
 
       for (const r of rows) {
-        const m = (r as any).ai_scan_metadata as Record<string, any> | null;
-        if (!m) continue;
+        // Arrow projections land the keys flat on the row, same names as before.
+        const m = r as Record<string, any>;
         if (m.classifier === 'claude-opus-4-7-byok') out.classified++;
         if (m.error) out.errors++;
         if (m.vin) vins.add(String(m.vin));
