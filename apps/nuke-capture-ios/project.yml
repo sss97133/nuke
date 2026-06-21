@@ -46,7 +46,15 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: ag.nuke.capture
         PRODUCT_NAME: NukeCapture
         MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: 1
+        # CFBundleVersion. XcodeGen REGENERATES the (gitignored) .xcodeproj from
+        # this file on every `xcodegen generate`, so the build number lives here,
+        # not in the project — a stale value here silently resets it. App Store
+        # Connect rejects any upload whose build number is not strictly higher
+        # than the last one accepted for the same MARKETING_VERSION. We shipped
+        # up to (27) on 1.0.0 (and a 1.0.1 train), then a regenerate reset this
+        # to 1 and every upload was rejected. Floor set well clear of all burned
+        # builds; bump this for each new archive — it must only ever go UP.
+        CURRENT_PROJECT_VERSION: 100
         # Swift 5 language mode, same rationale as the Mac relay's
         # Package.swift: PhotoKit's observer/callback surface predates strict
         # Sendable checking. All mutable state is main-actor-confined by hand.
