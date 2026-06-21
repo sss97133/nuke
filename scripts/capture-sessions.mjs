@@ -68,14 +68,14 @@ function sessionize(frames) {
     const gpsJump = cur && cur.lastLat != null && f.latitude != null &&
       (Math.abs(f.latitude - cur.lastLat) > GPS_JUMP || Math.abs(f.longitude - cur.lastLon) > GPS_JUMP);
     if (!cur || (t - cur.lastT) > GAP_MS || gpsJump) {
-      cur = { frames: [], lastT: t, lastLat: f.latitude, lastLon: f.longitude,
+      cur = { frames: [], unassignedIds: [], lastT: t, lastLat: f.latitude, lastLon: f.longitude,
               vehicles: new Set(), unassigned: 0, labels: new Map(), startT: t };
       sessions.push(cur);
     }
     cur.frames.push(f.id);
     cur.lastT = t;
     if (f.latitude != null) { cur.lastLat = f.latitude; cur.lastLon = f.longitude; }
-    if (f.vehicle_id) cur.vehicles.add(f.vehicle_id); else cur.unassigned++;
+    if (f.vehicle_id) cur.vehicles.add(f.vehicle_id); else { cur.unassigned++; cur.unassignedIds.push(f.id); }
     for (const l of (f.apple_ml_labels || [])) cur.labels.set(l, (cur.labels.get(l) || 0) + 1);
   }
   return sessions;
@@ -101,4 +101,27 @@ console.log('\ntop bursts:');
 for (const s of [...sessions].sort((a, b) => b.frames.length - a.frames.length).slice(0, 15)) {
   console.log(`  ${new Date(s.startT).toISOString().slice(0,10)}  shots=${s.frames.length}  span=${spanMin(s)}m  ` +
     `vehicles=${s.vehicles.size}  unassigned=${s.unassigned}  subject=${topLabel(s)}`);
+}
+
+// --apply: propagate the burst's vehicle to its unassigned frames as a SUGGESTION
+// (never a hard assignment — suggest-only per the misattribution scar tissue). Only
+// single-subject bursts; only frames with no existing suggestion. Batched + paced
+// because each update fires the per-row valuation-recompute trigger.
+if (args.includes('--apply')) {
+  let suggested = 0;
+  for (const s of attribution) {
+    const veh = [...s.vehicles][0];
+    for (let i = 0; i < s.unassignedIds.length; i += 200) {
+      const batch = s.unassignedIds.slice(i, i + 200);
+      const { error } = await sb.from('vehicle_images')
+        .update({ suggested_vehicle_id: veh, image_vehicle_match_status: 'ambiguous' })
+        .in('id', batch)
+        .is('suggested_vehicle_id', null)
+        .is('vehicle_id', null);
+      if (error) console.error(`  suggest burst ${new Date(s.startT).toISOString().slice(0,10)}: ${error.message}`);
+      else suggested += batch.length;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+  console.log(`\napplied: ${suggested} suggested_vehicle_id propagations (suggest-only)`);
 }
