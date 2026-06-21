@@ -6,14 +6,17 @@
     <string>com.nuke.byok-image-analysis</string>
 
     <!-- Runs in the login shell (NOT inside Claude Code's Bash sandbox), so the
-         network steps reach Supabase normally. One bounded batch per fire. -->
+         network steps reach Supabase normally. One bounded batch per fire.
+         byok-image-drain.sh SELF-DRIVES across ALL the user's vehicles via a
+         persistent cursor (was pinned to one hardcoded vehicle, leaving the rest
+         un-analyzed); a network blip never advances the cursor or marks the fleet drained. -->
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/skylar/nuke/scripts/daily-receipt/byok-image-batch.sh</string>
-        <!-- vehicle-id (1977 K5 Blazer) ; change to process a different vehicle -->
-        <string>e08bf694-970f-4cbe-8a74-8715158a0f2e</string>
-        <!-- batch size per fire (4 keeps an Opus-4.8 vision fire inside the 15-min window) -->
+        <string>/Users/skylar/nuke/scripts/daily-receipt/byok-image-drain.sh</string>
+        <!-- user-id (the owner whose vehicles get drained) -->
+        <string>0b9f107a-d124-49de-9ded-94698f63c1c4</string>
+        <!-- batch size per fire (15 keeps an Opus-4.8 vision fire inside the 15-min window) -->
         <string>15</string>
     </array>
 

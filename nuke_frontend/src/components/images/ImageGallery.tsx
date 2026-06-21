@@ -1236,8 +1236,8 @@ const ImageGallery = ({
         const posB = (typeof b?.position === 'number' && Number.isFinite(b.position)) ? b.position : Number.POSITIVE_INFINITY;
         if (posA !== posB) return posA - posB;
 
-        const ca = typeof a?.created_at === 'string' ? new Date(a.created_at).getTime() : 0;
-        const cb = typeof b?.created_at === 'string' ? new Date(b.created_at).getTime() : 0;
+        const ca = new Date(a?.taken_at || a?.created_at || 0).getTime();
+        const cb = new Date(b?.taken_at || b?.created_at || 0).getTime();
         if (ca !== cb) return ca - cb;
 
         return String(a?.id || '').localeCompare(String(b?.id || ''));

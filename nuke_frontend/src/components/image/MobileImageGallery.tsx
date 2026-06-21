@@ -42,6 +42,8 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
       .select('id, image_url, large_url, caption, angle_tag, created_at')
       .eq('vehicle_id', vehicleId)
       .order('is_primary', { ascending: false })
+      // Capture time, not ingestion time — backfilled photos get created_at=now.
+      .order('taken_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
 
     if (!error && data) {
