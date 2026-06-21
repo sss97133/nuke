@@ -573,13 +573,41 @@ async function buildContext() {
   console.log(`context: wrote briefing → ${OUT} (dossier=${dossier ? 'yes' : 'THIN'}, timeline=${dossier?.timeline?.length || 0} days)`);
 }
 
+// queue — print this user's vehicle_ids that have approved frames, most-first.
+// Used by byok-image-drain.sh to self-drive the steady launchd cron across ALL
+// vehicles instead of one hardcoded car. Cheap (scoped to approved frames);
+// prepare skips already-analyzed frames, so a fully-drained vehicle returns
+// instantly and the drain's cursor advances past it.
+async function queue() {
+  const VEHICLE_USER = arg('--user-id');
+  if (!VEHICLE_USER) { console.error('queue: --user-id required'); process.exit(1); }
+  const counts = new Map();
+  const PAGE = 1000;
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await sb
+      .from('vehicle_images')
+      .select('vehicle_id')
+      .eq('user_id', VEHICLE_USER)
+      .eq('vision_gate_status', 'approved')
+      .not('vehicle_id', 'is', null)
+      .order('vehicle_id', { ascending: true })
+      .range(offset, offset + PAGE - 1);
+    if (error) { console.error(`queue: ${error.message}`); process.exit(1); }
+    if (!data || data.length === 0) break;
+    for (const r of data) counts.set(r.vehicle_id, (counts.get(r.vehicle_id) || 0) + 1);
+    if (data.length < PAGE) break;
+  }
+  for (const [vid] of [...counts.entries()].sort((a, b) => b[1] - a[1])) console.log(vid);
+}
+
 const isMain = process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (!['prepare', 'ingest', 'context'].includes(mode)) {
-    console.error('mode must be "prepare", "ingest", or "context"');
+  if (!['prepare', 'ingest', 'context', 'queue'].includes(mode)) {
+    console.error('mode must be "prepare", "ingest", "context", or "queue"');
     process.exit(1);
   }
   if (mode === 'prepare') await prepare();
   else if (mode === 'context') await buildContext();
+  else if (mode === 'queue') await queue();
   else await ingest();
 }
