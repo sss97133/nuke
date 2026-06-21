@@ -70,7 +70,28 @@ substitute for that context.**
 
 - **Inheritance.** A detail frame takes the subject of the nearest anchor within its
   session. This is the formal answer to "how do you attribute a close-up": *you
-  don't analyze it, you inherit from its session.*
+  don't analyze it, you inherit from its session.* Inheritance is computed by
+  comparing the **narratives** of temporally adjacent frames — text against text,
+  never re-reading the pixels — so it is nearly free.
+
+- **Context folder (work session).** The strongest prior of all, because it encodes
+  *intent*: the vehicle the technician is actually working on. A dash-teardown
+  close-up that names no marque ("an older vehicle") is not ambiguous if the work
+  session says "today is the 1989 R3500" — the whole session is the R3500 by
+  **declaration**, and inheritance is unnecessary. The rail exists
+  (`vehicle_images.work_session_id`) but is currently null; capturing it at upload —
+  the technician declaring/confirming the active build — is the highest-leverage
+  attribution fix in the system, because it converts a guess into ground truth at
+  the source. For the backlog, the folder is reconstructed (time+GPS) and the subject
+  is confirmed by the owner in review.
+
+- **Knowledge-base re-pass.** Once a frame's subject is fixed (by anchor, inheritance,
+  or context folder), the read can be sharpened by re-running it *with the correct
+  vehicle's dossier as context* — its receipts, parts, prior verdicts. This is not a
+  blind vision re-run; it is a cheap, knowledge-informed second look (text over the
+  existing verdict + the dossier), and it embodies the DB-as-memory thesis: hand the
+  read the right memory and it improves for free. Vision pixels are re-touched only on
+  the rare residual the dossier still can't resolve (top rung of the ladder).
 
 - **Component DNA.** Marque-level cues the analysis already extracts
   (`components_seen`, `state_observations`) — an IH slant-4 is not a Ford V8 is not a
@@ -157,6 +178,14 @@ image), so flagging a frame removes it from the wrong profile *before* the move.
 - The session + inheritance mechanics **work**: they cleanly split 30 Scout frames
   (anchors + inherited close-ups) from 209 Mustang frames and parked 24 un-anchorable
   frames in review — no pixel-guessing of close-ups.
+- A single capture sweep is **many-subject**, not two. One 2026-06-20 sweep on the
+  Mustang held: a Scout, a square-body Suburban/Blazer, a crew-cab pickup, a *second*
+  (later) Mustang, a Honda CB motorcycle, dash-teardown close-ups that name no
+  vehicle, and shop-context frames. Text extraction over the existing narratives
+  recovered every self-identifying subject for ~zero compute; the residual was
+  exactly the unnameable close-ups — which the work session resolves (the technician
+  knows that teardown is the 1989 R3500 Cheyenne, `b1edd5c1`, confirmed in the
+  garage).
 - **Subject identity cannot be done in SQL.** Token-overlap against the kin garage
   trades false positives (a pseudo-vehicle "Unassigned Vehicle **Photos**" matching
   any narrative with "photos"/"vehicle"; "Intake Quarantine" matching engine
@@ -172,8 +201,11 @@ image), so flagging a frame removes it from the wrong profile *before* the move.
 - `byok-vision-prompt.md` is referenced by `byok-image-batch.sh` but **missing from
   the repo** — the cloud drain `cat`s a file that isn't there, degrading the prompt.
   Recreate before relying on the forward-fix.
-- `upload_batch_id` is **null** across `vehicle_images` — sessions must be
-  reconstructed from time+GPS until it is backfilled at intake.
+- `upload_batch_id` **and** `work_session_id` are **null** across `vehicle_images` —
+  both the batch rail and the context-folder rail exist but are unpopulated. Sessions
+  must be reconstructed from time+GPS until these are stamped at intake. Stamping
+  `work_session_id` at capture (technician declares the active build) is the
+  single highest-leverage fix and should be prioritized over backlog reconstruction.
 - One-off cleanup scripts exist (`fix-mixed-vehicle-data.js`,
   `cleanup_vehicle_contamination.js`) — prior attempts that did not stick because
   they never fixed the DNA (no structured subject, no harness). This chapter is the
