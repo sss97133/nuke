@@ -1,0 +1,84 @@
+name: BYOK Analysis Drain
+
+# Laptop-free deep image analysis. Replaces the launchd cron that tied the BYOK
+# detective to Skylar's Mac being on — that is not a product. The detective is just
+# `claude --print` reading downloaded JPEGs, so it runs fine in a cloud runner.
+#
+# REQUIRED REPO SECRETS: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (already present for
+# process-images.yml) and ANTHROPIC_API_KEY (NEW — add this). Vision runs via the
+# Anthropic API here, not a Claude subscription, so it COSTS money per image: the
+# trade for not needing the laptop. Cost levers: the `model` input (Sonnet by default,
+# cheaper than Opus), the `batch`/`minutes` budget, and the cron cadence below.
+#
+# Idempotent: prepare only pulls frames still lacking a verdict, so each run resumes
+# where the last left off — no cursor/state needed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: Owner whose vehicles to analyze
+        default: '0b9f107a-d124-49de-9ded-94698f63c1c4'
+      minutes:
+        description: Time budget per run (minutes)
+        default: '45'
+      batch:
+        description: Frames per day-chunk
+        default: '12'
+      model:
+        description: Claude vision model
+        default: 'claude-sonnet-4-6'
+  schedule:
+    - cron: '0 * * * *'   # hourly
+
+concurrency:
+  group: byok-analysis-drain
+  cancel-in-progress: false
+
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          npm install
+          npm install -g @dotenvx/dotenvx @anthropic-ai/claude-code
+          pip install requests
+
+      - name: Run cloud drain
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BYOK_MODEL: ${{ github.event.inputs.model || 'claude-sonnet-4-6' }}
+          NUKE_LOG_DIR: ${{ github.workspace }}/logs
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::ANTHROPIC_API_KEY secret is not set — the vision step cannot run. Add it in repo Settings → Secrets."
+            exit 1
+          fi
+          mkdir -p "$NUKE_LOG_DIR"
+          bash scripts/daily-receipt/byok-cloud-drain.sh \
+            "${{ github.event.inputs.user_id || '0b9f107a-d124-49de-9ded-94698f63c1c4' }}" \
+            "${{ github.event.inputs.batch || '12' }}" \
+            "${{ github.event.inputs.minutes || '45' }}"
+
+      - name: Upload drain log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: byok-drain-log
+          path: logs/
+          if-no-files-found: ignore
