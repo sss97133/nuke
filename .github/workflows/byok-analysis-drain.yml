@@ -1,0 +1,102 @@
+name: BYOK Analysis Drain
+
+# Laptop-free deep image analysis. Replaces the launchd cron that tied the BYOK
+# detective to Skylar's Mac being on — that is not a product. The detective is just
+# `claude --print` reading downloaded JPEGs, so it runs fine in a cloud runner.
+#
+# AUTH = the Claude SUBSCRIPTION, not a pay-per-token API key. One-time setup: on a
+# machine logged into your Claude (Max) subscription, run `claude setup-token` (mints a
+# ~1-year token), then add it as repo secret CLAUDE_CODE_OAUTH_TOKEN. After that, the
+# laptop is never needed again — analysis bills your subscription, not the API.
+# (We deliberately do NOT set ANTHROPIC_API_KEY: it takes precedence over the
+# subscription token and would silently switch you to per-token API billing.)
+#
+# REQUIRED REPO SECRETS: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (already present for
+# process-images.yml) and CLAUDE_CODE_OAUTH_TOKEN (NEW).
+#
+# Levers: `model` (Sonnet default — easier on subscription rate limits than Opus),
+# `batch`/`minutes` budget, and the cron cadence below.
+#
+# Idempotent: prepare only pulls frames still lacking a verdict, so each run resumes
+# where the last left off — no cursor/state needed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: Owner whose vehicles to analyze
+        default: '0b9f107a-d124-49de-9ded-94698f63c1c4'
+      minutes:
+        description: Time budget per run (minutes)
+        default: '45'
+      batch:
+        description: Frames per day-chunk
+        default: '12'
+      model:
+        description: Claude vision model
+        default: 'claude-sonnet-4-6'
+  schedule:
+    - cron: '0 * * * *'   # hourly
+
+# Least-privilege GITHUB_TOKEN: this job only checks out and reads.
+permissions:
+  contents: read
+
+concurrency:
+  group: byok-analysis-drain
+  cancel-in-progress: false
+
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          npm install
+          npm install -g @dotenvx/dotenvx @anthropic-ai/claude-code
+          pip install requests
+
+      - name: Run cloud drain
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Subscription auth — NOT an API key. See header.
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          BYOK_MODEL: ${{ github.event.inputs.model || 'claude-sonnet-4-6' }}
+          NUKE_LOG_DIR: ${{ github.workspace }}/logs
+        run: |
+          # ANTHROPIC_API_KEY would take precedence and bill the API instead of the
+          # subscription — make sure nothing in the runner env set it. (A byo_api_key
+          # user's key is re-exported by the broker inside the drain, after this point.)
+          unset ANTHROPIC_API_KEY
+          # No hard-fail on a missing repo token: the drain resolves each user's chosen
+          # method from Settings (user_analysis_settings) and may supply the credential
+          # from Vault instead. The drain fails loud if NO usable credential resolves.
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::warning::No repo CLAUDE_CODE_OAUTH_TOKEN secret. nuke_hosted users will have no compute; byo users still work via their stored credential."
+          fi
+          mkdir -p "$NUKE_LOG_DIR"
+          bash scripts/daily-receipt/byok-cloud-drain.sh \
+            "${{ github.event.inputs.user_id || '0b9f107a-d124-49de-9ded-94698f63c1c4' }}" \
+            "${{ github.event.inputs.batch || '12' }}" \
+            "${{ github.event.inputs.minutes || '45' }}"
+
+      - name: Upload drain log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: byok-drain-log
+          path: logs/
+          if-no-files-found: ignore
