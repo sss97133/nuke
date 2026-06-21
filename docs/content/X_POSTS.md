@@ -356,3 +356,76 @@ Week 4: Post 3D (Ralph), Thread: YONO, Post 4B (the raise)
 ---
 
 *Updated: 2026-02-26*
+
+---
+
+## SERIES — The Provenance Thesis (data honesty / the aperture)
+*Goal: establish prowess in the one department we develop on — honest, structured data in AI systems. Voice-checked against Skylar's real writing (11k prompts + library). Em-dashes removed (his tell). Citations web-verified. Adversarially hardened. Longform essays: `thesis-provenance-as-syntax.md`, `thesis-aperture-of-llm-control.md`.*
+
+### Hook (top of funnel)
+
+> A frontier without an ecosystem isn't stable. The AI labs built a capability frontier and skipped the ecosystem. There's no shared layer of verifiable truth under it. That's why it feels like a bubble: raw power with nothing trustworthy to stand on. The missing ecosystem isn't more models. It's provenance. That's what I'm building.
+
+### Flagship — the honest pillar (leads with the gap, not a victory lap)
+
+> I cannot get a system to answer me honestly yet. Not "mostly." Not "with caveats." It will look me in the eye and invent a date, a name, a citation. Confident, fluent, wrong. And I have no clean way to stop it at the moment it happens.
+>
+> So I went looking for what's actually blocking the truth. My first guess was the obvious one: data centers. Not enough scale. But that's wrong, and the proof is uncomfortable. Hallucination has a statistical floor. A calibrated model must fabricate rare facts at roughly the rate those facts appeared exactly once in training (Kalai & Vempala, STOC 2024). And models keep guessing instead of abstaining because training and evaluation reward the bluff over the "I don't know" (Kalai et al., 2025). More FLOPs don't break a floor baked into next-token prediction. You're buying a better liar.
+>
+> Here's the real gap, and it's embarrassingly simple once you see it. Nothing in the generation loop forces a source at the exact position where a fact is mandatory. When the grammar of a sentence reaches a slot that requires a referent, a name, a number, a date, a citation, the model just fills it from vibes. There's no rule that says: this token may only pass if a reachable store backs it. No store reachable? Then the slot can't be filled, and the system should say so.
+>
+> That rule is what I'm building. I call it the aperture of LLM control. A model-agnostic gate that sits around a frozen model, detects the mandatory-fact slot mid-generation, and either binds it to an external source or closes: "cannot respond fully." Not a smarter model. A model demoted to transport, with its factual tokens vetoed from outside. The mechanism already exists for syntax (grammar-constrained decoding, Geng et al. 2023). I'm re-aiming it at provenance.
+>
+> I have not shipped this. I cannot get a system to answer honestly today, and I'm telling you that on purpose. The honesty in public is the whole point. What I'm publishing is the harness and an honest ledger of how far it actually gets: what fraction of mandatory slots it binds, where it still leaks, what it abstains on. Not a victory lap. A position, a build path, and a number that says exactly how honest "honest" is so far.
+
+### The $85,100 truck (hard problem + proof)
+
+> An AI agent told me a 1977 Blazer was worth $85,100. No source. I believed it for a second, and that's the whole failure. The number was real in the database. Write-anywhere, source-nowhere. The dashboard code picked `current_value ?? purchase_price`, so the unowned number won over the one field that actually had a pipeline behind it. The architecture inverts trust by default.
+>
+> The fix isn't a better detector or a "please cite your sources" line in a config file. It's making the unsourced value impossible to construct. In my system a number is a tuple: (value, source, method, observed_at, trust). The type makes "money without source" unconstructable. Even an absent value carries its provenance: { amount: null, source: 'vehicles.vin', method: 'absent', needs: 'capture VIN plate photo' }.
+>
+> That's the bug nobody names. Not "the model hallucinated." The system let an unsourced fact be expressible at all.
+
+### Contrarian (takes the fight to the paradigm)
+
+> Claude Code, the harness I'm typing into right now, does not enforce citing your sources. Neither does OpenAI Assistants, LangChain, Copilot, or AutoGPT. The strongest primitive anyone ships is Anthropic's Citations API, and it's opt-in per document, only cites from docs you hand it, and guarantees a citation is valid, never that every claim is covered.
+>
+> So when an agent states "the owner is X" with nothing behind it, that's not a discipline problem. It's a syntax problem. The system permits an unsourced assertion to be expressible, and what's expressible eventually gets expressed.
+>
+> The whole 2026 discourse treats this as a detection arms race. Vibe citing, GPTZero, catch the fake reference after the fact. Detection treats the symptom. The disease is that the generation format permits a sourceless claim. You don't need a skeptic agent to contest a claim if the claim can't exist without its provenance attached. The cure isn't behavioral. It's a type system where the unsourced claim is a compile error.
+
+### Frege (sense vs reference)
+
+> There is a number that comes canonically after 3. There is a number that comes canonically before 5. Both point at 4 without saying it. They're hallucinations, in a sense. Neither one is the literal symbol "4." But they're also exactly right.
+>
+> That's not a paradox. It's Frege, 1892. "Successor of 3" and "predecessor of 5" are two senses, two modes of presentation, of one reference: the number 4 (Über Sinn und Bedeutung). The Stanford Encyclopedia uses the same arithmetic case independently: "4" and "8/2," same denotation, different sense. There are many ways to point at an idea. There is only one way to define its nature. Many senses, one reference.
+>
+> It tells you what to demand of a model at a fact-slot. The wrong requirement is "the output must sound right." A plausible-sounding description that picks out nothing is Russell's empty case, "the present King of France," where the honest verdict is unfulfilled, not a confident answer (Russell, On Denoting, 1905). The right requirement is "the output must refer." The slot is filled only when a description uniquely determines its referent.
+>
+> Kripke draws the line for which slots a model can self-serve. A-priori, rigid facts (math, definitions) reconstruct from internal structure, fetchable in-band. A-posteriori facts (Hesperus = Phosphorus = Venus) need an external oracle. A model has no causal-historical link to most empirical referents, so for those slots its only honest move is fetch-or-abstain.
+>
+> Must refer, not must sound right. A 130-year-old distinction is the spec for the gate.
+
+### Humans plagiarize, agents hallucinate
+
+> Humans plagiarize. Agents hallucinate. Same shape, opposite cause, and the difference is the whole game.
+>
+> When a person plagiarizes, the referent exists. There's a real source, they just suppress the attribution. The provenance is there, hidden. When a model hallucinates, no referent was ever available to it. It reaches a slot, has nothing to bind to, and emits anyway. Provenance was never held, so it can't be revealed. It gets fabricated.
+>
+> This is why citing an idea is easier for an LLM than citing a hard fact. An idea recurs across thousands of documents. High count, bindable, attributable. A specific fact like a date or a VIN is often a "monofact," seen once or never. No redundancy, no binding, one path the model usually hasn't walked. So it guesses. That's not a vibe, it's a theorem (Kalai & Vempala, STOC 2024). Scope it honestly: the floor is on once-seen contingent facts, not systematic ones. 2+2=4 is reconstructable.
+
+### Aphorisms (most quotable)
+
+> A bare number is not a number. It's a schema violation. Every value is (amount, source, method, observed_at, trust), or it doesn't exist.
+
+> A number without a source isn't data. It's a rumor with a decimal point.
+
+> You can't fix vibe citing with a detector. You fix it by making the unsourced claim a type error.
+
+> More compute buys a better liar. Honesty is a valve, not a weight.
+
+> Confidence is the one signal that can't catch a confident lie. Gate on whether a source exists, not on how sure the model feels.
+
+> The model should never be the author of a fact. It's a transport that moves sourced atoms from a typed store to you. The tool boundary is the compiler.
+
+> Plagiarism hides a referent that exists. Hallucination invents one that never did. The fix isn't a smarter model, it's knowing which case you're in at the slot.

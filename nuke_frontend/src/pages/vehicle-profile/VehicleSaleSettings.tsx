@@ -1,6 +1,7 @@
 import React from 'react';
 import VehicleResults from '../../components/VehicleResults';
 import BuyVehicleButton from '../../components/BuyVehicleButton';
+import ChannelSwitchboard from '../../components/listing/ChannelSwitchboard';
 import type { VehicleSaleSettingsProps } from './types';
 
 const VehicleSaleSettings: React.FC<VehicleSaleSettingsProps> = ({
@@ -14,11 +15,6 @@ const VehicleSaleSettings: React.FC<VehicleSaleSettingsProps> = ({
   onSaveSaleSettings,
   onShowCompose
 }) => {
-  const composeListingForPartner = (partnerKey: string) => {
-    // This would be moved to parent component or a custom hook
-    onShowCompose();
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
   };
@@ -114,37 +110,15 @@ const VehicleSaleSettings: React.FC<VehicleSaleSettingsProps> = ({
             />
           </div>
 
-          {/* Partner checkboxes */}
-          <div className="text-small text-muted" style={{ marginBottom: 6 }}>
-            Submit listing package to partners
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
-            {[
-              { k: 'bring_a_trailer', l: 'Bring a Trailer' },
-              { k: 'cars_and_bids', l: 'Cars & Bids' },
-              { k: 'ebay_motors', l: 'eBay Motors' },
-              { k: 'facebook_marketplace', l: 'Facebook Marketplace' },
-              { k: 'hemmings', l: 'Hemmings' },
-              { k: 'hagerty', l: 'Hagerty' },
-              { k: 'sothebys', l: 'RM Sotheby\'s' },
-              { k: 'christies', l: 'Christie\'s' },
-              { k: 'pebble_beach', l: 'Pebble Beach' },
-              { k: 'local_auctioneer_generic', l: 'Local Auctioneer' },
-            ].map(p => (
-              <label key={p.k} className="text" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input
-                  type="checkbox"
-                  checked={saleSettings.partners.includes(p.k)}
-                  onChange={(e) => onSaleSettingsChange({
-                    ...saleSettings,
-                    partners: e.target.checked
-                      ? Array.from(new Set([...(saleSettings.partners || []), p.k]))
-                      : (saleSettings.partners || []).filter(x => x !== p.k)
-                  })}
-                />
-                <span>{p.l}</span>
-              </label>
-            ))}
+          {/* Sales channel switchboard — one toggle per outlet, mechanism hidden behind the switch */}
+          <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12, marginBottom: 10 }}>
+            <ChannelSwitchboard
+              vehicleId={vehicle.id}
+              canList={!!permissions?.isVerifiedOwner || !!permissions?.hasContributorAccess}
+              askingPriceCents={vehicle.asking_price ? Math.round(Number(vehicle.asking_price) * 100) : undefined}
+              reserveCents={typeof saleSettings.reserve === 'number' ? Math.round(saleSettings.reserve * 100) : undefined}
+              onCompose={onShowCompose}
+            />
           </div>
 
           {/* Show sale settings to owner */}
@@ -152,9 +126,6 @@ const VehicleSaleSettings: React.FC<VehicleSaleSettingsProps> = ({
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="button button-primary" disabled={savingSale} onClick={onSaveSaleSettings}>
                 {savingSale ? 'Saving…' : 'Save Sale Settings'}
-              </button>
-              <button className="button" onClick={() => composeListingForPartner('bring_a_trailer')}>
-                Compose & Autofill
               </button>
             </div>
           )}

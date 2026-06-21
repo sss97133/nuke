@@ -2,9 +2,9 @@
 // Transparent K5 shell, zone volumes, harness trunks as 3D tubes,
 // OrbitControls. Click connector → detail panel.
 
-import React, { useMemo, useRef, useState, useCallback } from 'react';
+import React, { useMemo, useRef, useState, useCallback, useEffect, Suspense } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Text } from '@react-three/drei';
+import { OrbitControls, Text, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ManifestDevice, OverlayResult } from './overlayCompute';
 import { K5_HARNESS_GRAPH, routeWiresAlongHarness, computeTrunkSegments } from './harnessRouting';
@@ -86,7 +86,7 @@ export function HarnessView3D({
   return (
     <div style={{ width: '100%', height: '100%', background: '#0a0a18' }}>
       <Canvas
-        camera={{ position: [15, 10, 15], fov: 45, near: 0.1, far: 200 }}
+        camera={{ position: [32, 18, 32], fov: 45, near: 0.1, far: 500 }}
         style={{ background: '#0a0a18' }}
         onClick={(e) => {
           // Click on empty space = deselect
@@ -95,23 +95,28 @@ export function HarnessView3D({
           }
         }}
       >
-        <ambientLight intensity={0.4} />
-        <directionalLight position={[10, 15, 10]} intensity={0.6} />
-        <directionalLight position={[-10, 10, -5]} intensity={0.3} />
+        <ambientLight intensity={1.2} />
+        <hemisphereLight args={["#ffffff", "#404060", 0.8]} />
+        <directionalLight position={[20, 25, 15]} intensity={2.2} />
+        <directionalLight position={[-18, 12, -12]} intensity={1.2} />
+        <directionalLight position={[0, 20, -20]} intensity={0.8} />
+        <pointLight position={[0, 10, 0]} intensity={0.6} />
 
         {/* Controls */}
         <OrbitControls
           enableDamping
           dampingFactor={0.1}
           minDistance={3}
-          maxDistance={50}
+          maxDistance={150}
         />
 
         {/* Ground grid */}
         <gridHelper args={[30, 30, '#222244', '#161630']} position={[0, -1, 0]} />
 
-        {/* K5 shell (transparent wireframe box) */}
-        <VehicleShell />
+        {/* K5 shell — loads GLB inside Suspense so the rest of the scene mounts */}
+        <Suspense fallback={null}>
+          <VehicleShell />
+        </Suspense>
 
         {/* Zone volumes */}
         {Object.entries(ZONES).map(([zoneId, zone]) => (
@@ -192,17 +197,99 @@ export function HarnessView3D({
 }
 
 // ── Vehicle shell ─────────────────────────────────────────────────────
+// Loads the 1978 Blazer GLB (53 named meshes, no textures) and paints
+// material slots with the vehicle's actual color combo.
+const K5_MODEL_URL = '/models/k5-blazer.glb';
+
+// Maroon body, tan/tartan interior — driven by vehicles.color for e08bf694.
+// Keys are case-insensitive substrings of Blender material names.
+interface MatRule {
+  match: RegExp;
+  color: string;
+  metalness?: number;
+  roughness?: number;
+  opacity?: number;
+  transparent?: boolean;
+  emissive?: string;
+  emissiveIntensity?: number;
+  clearcoat?: number;
+  clearcoatRoughness?: number;
+}
+
+const MATERIAL_OVERRIDES: MatRule[] = [
+  // Maroon automotive paint — clearcoat for that wet candy look
+  { match: /car_paint/i,           color: '#6b1f1f', metalness: 0.85, roughness: 0.25, clearcoat: 1.0, clearcoatRoughness: 0.05 },
+  { match: /window_glass|^glass/i, color: '#1a1f25', metalness: 0,    roughness: 0.02, opacity: 0.3, transparent: true },
+  // Chrome must be near-zero roughness for reflections to read
+  { match: /chrome/i,              color: '#e4e6ea', metalness: 1.0,  roughness: 0.08 },
+  { match: /wheel_tire|^rubber\b|tire/i, color: '#161616', metalness: 0, roughness: 0.95 },
+  { match: /plaid/i,               color: '#8b6535', metalness: 0, roughness: 0.85 },
+  { match: /leather|seat_belt/i,   color: '#c4a984', metalness: 0, roughness: 0.65 },
+  { match: /carpet/i,              color: '#3e2f22', metalness: 0, roughness: 1.0 },
+  { match: /dashboard_plastic|plastic_black|metal_black|undercarriage/i, color: '#1a1b1f', metalness: 0.2, roughness: 0.55 },
+  { match: /headlight/i,           color: '#f5f5f7', metalness: 0.1, roughness: 0.15, emissive: '#fff8dc', emissiveIntensity: 0.4 },
+  { match: /tail_light/i,          color: '#a01818', metalness: 0.1, roughness: 0.2,  emissive: '#a01818', emissiveIntensity: 0.5 },
+];
+
+useGLTF.preload(K5_MODEL_URL);
+
 function VehicleShell() {
+  const { scene } = useGLTF(K5_MODEL_URL);
+
+  // Clone so material overrides don't leak across instances
+  const cloned = useMemo(() => scene.clone(true), [scene]);
+
+  useEffect(() => {
+    cloned.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      mesh.material = mats.map((m) => {
+        if (!m) return m;
+        const name = (m.name || '').toLowerCase();
+        const rule = MATERIAL_OVERRIDES.find((r) => r.match.test(name));
+        const std = new THREE.MeshStandardMaterial({
+          color: rule?.color ?? '#888888',
+          metalness: rule?.metalness ?? 0.1,
+          roughness: rule?.roughness ?? 0.6,
+          transparent: rule?.transparent ?? false,
+          opacity: rule?.opacity ?? 1,
+          emissive: rule?.emissive ? new THREE.Color(rule.emissive) : new THREE.Color(0x000000),
+          emissiveIntensity: rule?.emissiveIntensity ?? 0,
+          envMapIntensity: 1.0,
+          side: THREE.FrontSide,
+        });
+        std.name = m.name;
+        return std;
+      }) as THREE.Material[] | THREE.Material;
+      if (Array.isArray(mesh.material) && mesh.material.length === 1) {
+        mesh.material = mesh.material[0];
+      }
+    });
+  }, [cloned]);
+
+  // The Blender export is in meters (Y-up). The scene uses inches/10.
+  // Blazer length ≈ 4.69m → 18.48 scene units (K5_L * S). Ratio ≈ 3.94.
+  // Compute scale from the model bounding box so it always matches K5_L.
+  const { scale, offset } = useMemo(() => {
+    const box = new THREE.Box3().setFromObject(cloned);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    // The longest horizontal axis is the vehicle length
+    const longest = Math.max(size.x, size.z);
+    const k5LenUnits = K5_L * S;
+    const s = longest > 0 ? k5LenUnits / longest : 1;
+    return { scale: s, offset: center.multiplyScalar(s).negate() };
+  }, [cloned]);
+
+  // Model from Blender export has +Z forward. Our scene has +X forward.
+  // Rotate -90° around Y to align.
   return (
-    <mesh>
-      <boxGeometry args={[K5_L * S, K5_H * S, K5_W * S]} />
-      <meshStandardMaterial
-        color="#2266cc"
-        transparent
-        opacity={0.04}
-        wireframe
-      />
-    </mesh>
+    <group rotation={[0, -Math.PI / 2, 0]}>
+      <primitive object={cloned} scale={scale} position={offset} />
+    </group>
   );
 }
 

@@ -1,0 +1,285 @@
+{
+  "dodge_d150": {
+    "anchor_uuid": "C61DE361-61C9-4D90-8058-6ADCA68BCDC1",
+    "anchor_taken": "2023-05-20 15:19:34",
+    "samples": [
+      {
+        "uuid": "C61DE361-61C9-4D90-8058-6ADCA68BCDC1",
+        "taken": "2023-05-20 15:19:34",
+        "fname": "IMG_5652.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/dodge_d150/C61DE361_2023-05-20_15-19-34.jpg",
+        "is_anchor": true
+      },
+      {
+        "uuid": "6AEDD304-3EE1-428F-AF68-39E15BF39996",
+        "taken": "2023-05-20 15:19:40",
+        "fname": "IMG_5653.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/dodge_d150/6AEDD304_2023-05-20_15-19-40.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "E0FC0C21-920B-4E27-98E6-0C92A8AA9D6A",
+        "taken": "2023-05-20 15:19:58",
+        "fname": "IMG_5654.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/dodge_d150/E0FC0C21_2023-05-20_15-19-58.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "DA63DA7D-7681-4AE8-AC31-8D498AC99096",
+        "taken": "2023-05-20 15:20:59",
+        "fname": "IMG_5655.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/dodge_d150/DA63DA7D_2023-05-20_15-20-59.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "9F45BE37-573D-4290-9266-C990177B57DF",
+        "taken": "2023-05-20 15:21:20",
+        "fname": "IMG_5656.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/dodge_d150/9F45BE37_2023-05-20_15-21-20.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "FF07E9A5-DD00-4AD4-BDD6-8D04440D5D5B",
+        "taken": "2023-05-20 15:21:31",
+        "fname": "IMG_5657.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/dodge_d150/FF07E9A5_2023-05-20_15-21-31.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "07CD49B3-C7AC-4128-8124-DA347B2A33D6",
+        "taken": "2023-05-20 15:21:44",
+        "fname": "IMG_5658.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/dodge_d150/07CD49B3_2023-05-20_15-21-44.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "6C40566B-AF1E-45EB-811D-997CEDED9BC6",
+        "taken": "2023-05-20 15:21:56",
+        "fname": "IMG_5659.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/dodge_d150/6C40566B_2023-05-20_15-21-56.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "725D8557-9E73-42BA-80C7-A561A35D26BF",
+        "taken": "2023-05-20 15:22:04",
+        "fname": "IMG_5660.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/dodge_d150/725D8557_2023-05-20_15-22-04.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "A3DC5C30-7D07-4CDF-A501-7B7B37D3D56B",
+        "taken": "2023-05-20 15:22:19",
+        "fname": "IMG_5661.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/dodge_d150/A3DC5C30_2023-05-20_15-22-19.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "159E42F2-F5ED-4258-84E7-8CB013E3EC1C",
+        "taken": "2023-05-20 15:22:41",
+        "fname": "IMG_5662.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/dodge_d150/159E42F2_2023-05-20_15-22-41.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "98297737-AC3C-447E-9D83-8525D9D5D427",
+        "taken": "2023-05-20 15:23:00",
+        "fname": "IMG_5663.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/dodge_d150/98297737_2023-05-20_15-23-00.jpg",
+        "is_anchor": false
+      }
+    ]
+  },
+  "mustang_bos": {
+    "anchor_uuid": "F919E792-A0C0-45C0-9413-D6BC315205BA",
+    "anchor_taken": "2026-02-07 05:37:00",
+    "samples": [
+      {
+        "uuid": "F919E792-A0C0-45C0-9413-D6BC315205BA",
+        "taken": "2026-02-07 05:37:00",
+        "fname": "IMG_7232.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/mustang_bos/F919E792_2026-02-07_05-37-00.jpg",
+        "is_anchor": true
+      },
+      {
+        "uuid": "D7DAC3AD-5A86-491E-8133-F9477AA46764",
+        "taken": "2026-02-07 05:37:04",
+        "fname": "IMG_7233.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/mustang_bos/D7DAC3AD_2026-02-07_05-37-04.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "5A461106-69F5-493E-B905-A3E3ADACF5D6",
+        "taken": "2026-02-07 05:37:14",
+        "fname": "IMG_7234.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/mustang_bos/5A461106_2026-02-07_05-37-14.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "5F93FDC3-1031-4B5D-B341-1AA864A270AC",
+        "taken": "2026-02-07 05:36:41",
+        "fname": "IMG_7231.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/mustang_bos/5F93FDC3_2026-02-07_05-36-41.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "55C4BC80-187E-45F5-830C-D9E9E39C6019",
+        "taken": "2026-02-07 05:37:23",
+        "fname": "IMG_7235.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/mustang_bos/55C4BC80_2026-02-07_05-37-23.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "0881C21B-9324-4B31-9BEA-C8E3B873AEBE",
+        "taken": "2026-02-07 05:37:27",
+        "fname": "IMG_7236.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/mustang_bos/0881C21B_2026-02-07_05-37-27.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "D3630DA1-BB0B-4F46-9339-EEA8CB158BB5",
+        "taken": "2026-02-07 05:36:29",
+        "fname": "IMG_7230.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/mustang_bos/D3630DA1_2026-02-07_05-36-29.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "03F36192-3C10-4C95-B759-8EDBE8A33913",
+        "taken": "2026-02-07 05:37:35",
+        "fname": "IMG_7237.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/mustang_bos/03F36192_2026-02-07_05-37-35.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "F5657001-985E-4786-B36A-1885EA5863CE",
+        "taken": "2026-02-07 05:37:43",
+        "fname": "IMG_7238.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/mustang_bos/F5657001_2026-02-07_05-37-43.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "306ED8E2-0B28-4937-A579-1B374230418A",
+        "taken": "2026-02-07 05:36:11",
+        "fname": "IMG_7229.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/mustang_bos/306ED8E2_2026-02-07_05-36-11.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "53D254B2-6331-400A-9A25-8AFBD90863C8",
+        "taken": "2026-02-07 05:37:57",
+        "fname": "IMG_7239.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/mustang_bos/53D254B2_2026-02-07_05-37-57.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "B3249D5A-755B-40E5-8376-286F585B47C8",
+        "taken": "2026-02-07 05:38:06",
+        "fname": "IMG_7240.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/mustang_bos/B3249D5A_2026-02-07_05-38-06.jpg",
+        "is_anchor": false
+      }
+    ]
+  },
+  "spid_cheyenne": {
+    "anchor_uuid": "501EC936-5DEE-4F86-91EF-2144C3D9EEC0",
+    "anchor_taken": "2025-09-10 16:54:13",
+    "samples": [
+      {
+        "uuid": "501EC936-5DEE-4F86-91EF-2144C3D9EEC0",
+        "taken": "2025-09-10 16:54:13",
+        "fname": "IMG_0826.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/spid_cheyenne/501EC936_2025-09-10_16-54-13.jpg",
+        "is_anchor": true
+      }
+    ]
+  },
+  "cheyenne_brochure": {
+    "anchor_uuid": "8D146E80-5B64-41B7-A093-699D8A06B86D",
+    "anchor_taken": "2024-09-23 00:11:56",
+    "samples": [
+      {
+        "uuid": "8D146E80-5B64-41B7-A093-699D8A06B86D",
+        "taken": "2024-09-23 00:11:56",
+        "fname": "IMG_0765.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/cheyenne_brochure/8D146E80_2024-09-23_00-11-56.jpg",
+        "is_anchor": true
+      },
+      {
+        "uuid": "8511966F-3507-4CB9-ABD1-17FBE935DE70",
+        "taken": "2024-09-23 00:11:58",
+        "fname": "IMG_0766.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/cheyenne_brochure/8511966F_2024-09-23_00-11-58.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "371D8769-76CE-41BE-A327-54F10CE1CBBD",
+        "taken": "2024-09-23 00:12:01",
+        "fname": "IMG_0767.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/cheyenne_brochure/371D8769_2024-09-23_00-12-01.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "5423FB11-D531-402C-9B19-AAC04C18F2B4",
+        "taken": "2024-09-23 00:12:02",
+        "fname": "IMG_0768.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/cheyenne_brochure/5423FB11_2024-09-23_00-12-02.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "96CC9449-49AA-40CD-97C1-AFE972350A76",
+        "taken": "2024-09-23 00:11:49",
+        "fname": "IMG_0764.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/cheyenne_brochure/96CC9449_2024-09-23_00-11-49.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "90912380-B06D-478B-B90E-C073A85EE748",
+        "taken": "2024-09-23 00:11:47",
+        "fname": "IMG_0763.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/cheyenne_brochure/90912380_2024-09-23_00-11-47.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "97ADA0EE-6ABB-4EF9-9B2B-1AC619DEF5B4",
+        "taken": "2024-09-23 00:12:09",
+        "fname": "IMG_0769.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/cheyenne_brochure/97ADA0EE_2024-09-23_00-12-09.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "BFB013EA-4C4E-42E8-A5CC-ADBF594984C4",
+        "taken": "2024-09-23 00:12:12",
+        "fname": "IMG_0770.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/cheyenne_brochure/BFB013EA_2024-09-23_00-12-12.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "3ADBE333-9473-4CE6-BAEA-C01D25FB2DB0",
+        "taken": "2024-09-23 00:11:39",
+        "fname": "IMG_0762.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/cheyenne_brochure/3ADBE333_2024-09-23_00-11-39.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "0D1927F3-013C-409B-999E-1B680DA50B70",
+        "taken": "2024-09-23 00:12:14",
+        "fname": "IMG_0771.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/cheyenne_brochure/0D1927F3_2024-09-23_00-12-14.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "4BD58B25-BA52-4EFC-A217-762CD2919E36",
+        "taken": "2024-09-23 00:11:38",
+        "fname": "IMG_0761.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/cheyenne_brochure/4BD58B25_2024-09-23_00-11-38.jpg",
+        "is_anchor": false
+      },
+      {
+        "uuid": "4C53EDF6-AF48-4FF0-B923-7E9BDED7DE71",
+        "taken": "2024-09-23 00:12:15",
+        "fname": "IMG_0772.HEIC",
+        "path": "/Users/skylar/nuke/.context/scrap_context/cheyenne_brochure/4C53EDF6_2024-09-23_00-12-15.jpg",
+        "is_anchor": false
+      }
+    ]
+  }
+}

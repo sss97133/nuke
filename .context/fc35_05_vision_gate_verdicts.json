@@ -1,0 +1,162 @@
+[
+  {
+    "order": 0,
+    "image_id": "3946165c-d388-4a9d-bb92-663cb80d45f0",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/000_3946165c.jpg",
+    "verdict": "approved",
+    "confidence": 0.6,
+    "reasoning": "Dark, blurry indoor shot showing a black-painted body panel/hood/cowl of a vehicle, likely the K5 mid-restoration/disassembly in a shop. No conflicting evidence; consistent with K5 work-in-progress photos."
+  },
+  {
+    "order": 1,
+    "image_id": "5e0685ea-1dca-4e9e-8f7c-b60a8b9b815c",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/001_5e0685ea.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Black squarebody front fender propped on a cardboard box against cinder block shop wall. Shape and headlight cutout consistent with 1973-1980 Chevy/GMC K5 Blazer / C/K truck front fender. K5 restoration part."
+  },
+  {
+    "order": 2,
+    "image_id": "7747640c-1f99-4531-ad0a-eb3095c1baf8",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/002_7747640c.jpg",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Battery disconnect / master solenoid wired to heavy battery cables on diamond-plate floor. Consistent with K5 electrical/battery setup. No conflicting body-style cues."
+  },
+  {
+    "order": 3,
+    "image_id": "9cbd7d70-5436-41b7-8f29-b1d5d2ad96a5",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/003_9cbd7d70.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Steering knuckle, tie rod end, and leaf spring under a vehicle on lift. Solid-axle front suspension with leaf springs consistent with 4WD squarebody K5 chassis."
+  },
+  {
+    "order": 5,
+    "image_id": "738f8a70-d5c1-4bac-8391-229f8b0f6e68",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/005_738f8a70.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Underbody frame rail with green paint overspray visible above (matches K5 dark-green paint history). Body mount bracket and rusted frame characteristic of 1970s squarebody K5 chassis."
+  },
+  {
+    "order": 6,
+    "image_id": "0edcfb56-1649-4bc9-813c-3d67b4d2112d",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/006_0edcfb56.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Front suspension shot — ball joint, leaf spring, and frame, with BFGoodrich All-Terrain tire visible. Solid-axle 4WD squarebody front end."
+  },
+  {
+    "order": 7,
+    "image_id": "e59e98d9-a041-41b0-9648-fb9b5e1e10ce",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/007_e59e98d9.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Engine mount / front crossmember on a black-painted squarebody frame, with exhaust manifold/header visible. Consistent with K5 frame-off."
+  },
+  {
+    "order": 9,
+    "image_id": "9381ae9b-0ea3-4edc-81a6-900c8022da7e",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/009_9381ae9b.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Bare squarebody C/K frame with engine block (BBC/SBC, looks SBC with raised valley) and front leaf-sprung 4WD axle, disc brakes with orange caliper. Classic K5 frame-off restoration."
+  },
+  {
+    "order": 10,
+    "image_id": "5ed20ab4-020e-48db-b980-d78650325bed",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/010_5ed20ab4.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Front leaf-sprung 4WD axle on jack stands with disc brake rotor, locking hub spindle, BFGoodrich All-Terrain tire — squarebody K5 front end during chassis work."
+  },
+  {
+    "order": 11,
+    "image_id": "3858b801-8193-4cf7-a83b-723fe0f53314",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/011_3858b801.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Black squarebody K5 Blazer (no top, rear opening visible) on jack stands in shop. BFGoodrich All-Terrain T/A tires. Matches fc35's dark/black K5 build. Image is rotated."
+  },
+  {
+    "order": 12,
+    "image_id": "dfe4fabd-ed53-4110-ad12-c75c550772d9",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/012_dfe4fabd.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Dark-green/black squarebody K5 Blazer profile view, soft-top off, on jack stands. BFGoodrich AT tires, amber side marker. Same truck, rotated image. Matches K5 dark-green-over-multi-color paint history."
+  },
+  {
+    "order": 13,
+    "image_id": "9a042abb-0e37-4294-8c68-dfdc6b163b96",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/013_9a042abb.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Front 3/4 of dark squarebody K5 Blazer with grille, single round headlights, and bowtie center bar — consistent with 1974 K5 face. BFG AT tires, no top. Image rotated."
+  },
+  {
+    "order": 14,
+    "image_id": "9c4c20a2-cc13-419e-a5ea-93c51669b1ff",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/014_9c4c20a2.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Hero shot of black 1973-1980 K5 Blazer in shop, lifted, no soft-top, single round headlights, removed fenders on wall in background. Classic fc35 K5 image."
+  },
+  {
+    "order": 15,
+    "image_id": "81a2f91a-a7a7-401b-9beb-5dce968fe9d4",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/015_81a2f91a.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front-end portrait of black squarebody K5/C-K with single round headlights, bowtie grille, dual round park lights. American flag in background. Rotated image. Matches K5."
+  },
+  {
+    "order": 16,
+    "image_id": "e87e39ed-99d4-460e-8152-101d703e4b00",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/016_e87e39ed.jpg",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "iPhone screenshot of a speedometer/GPS app showing 6.5 mph current, 40.7 avg, 58.2 top speed, 9:29 duration. No vehicle visible. Could be a test drive log of the K5 but no direct vehicle ID. Notable paperwork: app screenshot (data evidence, not vehicle photo)."
+  },
+  {
+    "order": 17,
+    "image_id": "9a62e2fa-0992-4540-9090-6a1d38b7cb56",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/017_9a62e2fa.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front 3/4 of dark/blue-black squarebody K5 Blazer at Circle K gas station, single round headlights, AT tires. Same vehicle archetype. Rotated image."
+  },
+  {
+    "order": 18,
+    "image_id": "77ffb4ce-6385-42e3-972e-556d7f1ab6c5",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/018_77ffb4ce.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Black K5 Blazer at Circle K gas station, full profile, removable hardtop on. Squarebody silhouette. Rotated image."
+  },
+  {
+    "order": 19,
+    "image_id": "2849e007-e2f4-41bb-815f-aff78589790e",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/019_2849e007.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Black K5 Blazer at Circle K, side view with hardtop. Same gas station series. Image rotated/inverted."
+  },
+  {
+    "order": 20,
+    "image_id": "bcc12d31-fbac-4848-8ed8-c3e1c7b71ef6",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/020_bcc12d31.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Two people shaking hands in Circle K parking lot. Foreground: gold 1960s Chevy Corvair (rejected vehicle). Background right: black squarebody K5 Blazer (fc35's K5) with front-mounted tire/bumper guard. Mixed-vehicle photo but K5 is present — approve as K5 acquisition-context evidence (handshake suggests a deal/meet)."
+  },
+  {
+    "order": 21,
+    "image_id": "018e142c-df49-4ece-b2f3-857c413af1a3",
+    "path": "/Users/skylar/nuke/.context/fc35_05_vision_gate/021_018e142c.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Same Circle K scene: black squarebody K5 Blazer with hardtop on, person in foreground, gold Corvair in foreground-left, white pickup background. K5 is the subject vehicle. Acquisition / meet-up context photo."
+  }
+]

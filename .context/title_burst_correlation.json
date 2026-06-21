@@ -1,0 +1,826 @@
+[
+  {
+    "title_id": "4f611009-9900-4326-b1cf-4fceb6903094",
+    "uuid": "4AB65322-E67F-4633-83AA-11F147A9411D",
+    "original_filename": "IMG_9250.jpeg",
+    "taken_at": "2025-08-26 22:46:53",
+    "lat": 35.962363333333336,
+    "lng": -114.83342,
+    "title_number": null,
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-08-26 14:32:59",
+      "end": "2025-08-27 02:46:57",
+      "count": 241,
+      "lat_mean": 35.97659,
+      "lng_mean": -114.85885,
+      "first_uuid": "7986A84C-1B3C-4969-8547-07D5966828CE",
+      "mid_uuid": "C4FB8F0A-08CD-4256-9DAB-8E82AE591BE6",
+      "last_uuid": "9F4B4C72-51D7-468A-B881-F249E92C0248"
+    }
+  },
+  {
+    "title_id": "ec453789-df92-4ec0-9b46-e779d3de2ef9",
+    "uuid": "D3B567F1-CF65-49C3-9951-A1F0DDC99931",
+    "original_filename": "IMG_9251.jpeg",
+    "taken_at": "2025-08-26 22:47:24",
+    "lat": 35.96236666666667,
+    "lng": -114.83345,
+    "title_number": null,
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-08-26 14:32:59",
+      "end": "2025-08-27 02:46:57",
+      "count": 241,
+      "lat_mean": 35.97659,
+      "lng_mean": -114.85885,
+      "first_uuid": "7986A84C-1B3C-4969-8547-07D5966828CE",
+      "mid_uuid": "C4FB8F0A-08CD-4256-9DAB-8E82AE591BE6",
+      "last_uuid": "9F4B4C72-51D7-468A-B881-F249E92C0248"
+    }
+  },
+  {
+    "title_id": "82fb0643-0da4-458e-a3e7-5460731f4683",
+    "uuid": "D3B567F1-CF65-49C3-9951-A1F0DDC99931",
+    "original_filename": "IMG_9251.jpeg",
+    "taken_at": "2025-08-26 22:47:24",
+    "lat": 35.96236666666667,
+    "lng": -114.83345,
+    "title_number": null,
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-08-26 14:32:59",
+      "end": "2025-08-27 02:46:57",
+      "count": 241,
+      "lat_mean": 35.97659,
+      "lng_mean": -114.85885,
+      "first_uuid": "7986A84C-1B3C-4969-8547-07D5966828CE",
+      "mid_uuid": "C4FB8F0A-08CD-4256-9DAB-8E82AE591BE6",
+      "last_uuid": "9F4B4C72-51D7-468A-B881-F249E92C0248"
+    }
+  },
+  {
+    "title_id": "2ae4f069-782e-436c-8336-8c440d2d0fa1",
+    "uuid": "D3B567F1-CF65-49C3-9951-A1F0DDC99931",
+    "original_filename": "IMG_9251.jpeg",
+    "taken_at": "2025-08-26 22:47:24",
+    "lat": 35.96236666666667,
+    "lng": -114.83345,
+    "title_number": null,
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-08-26 14:32:59",
+      "end": "2025-08-27 02:46:57",
+      "count": 241,
+      "lat_mean": 35.97659,
+      "lng_mean": -114.85885,
+      "first_uuid": "7986A84C-1B3C-4969-8547-07D5966828CE",
+      "mid_uuid": "C4FB8F0A-08CD-4256-9DAB-8E82AE591BE6",
+      "last_uuid": "9F4B4C72-51D7-468A-B881-F249E92C0248"
+    }
+  },
+  {
+    "title_id": "7212aa5f-34d5-44b1-8b25-c829a97b7749",
+    "uuid": "D3B567F1-CF65-49C3-9951-A1F0DDC99931",
+    "original_filename": "IMG_9251.jpeg",
+    "taken_at": "2025-08-26 22:47:24",
+    "lat": 35.96236666666667,
+    "lng": -114.83345,
+    "title_number": null,
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-08-26 14:32:59",
+      "end": "2025-08-27 02:46:57",
+      "count": 241,
+      "lat_mean": 35.97659,
+      "lng_mean": -114.85885,
+      "first_uuid": "7986A84C-1B3C-4969-8547-07D5966828CE",
+      "mid_uuid": "C4FB8F0A-08CD-4256-9DAB-8E82AE591BE6",
+      "last_uuid": "9F4B4C72-51D7-468A-B881-F249E92C0248"
+    }
+  },
+  {
+    "title_id": "f32e31df-4944-4a1f-a2d3-c607fc31e902",
+    "uuid": "8E6B4A0C-CFE3-4056-9E68-AD5444D258B3",
+    "original_filename": "IMG_9443.jpeg",
+    "taken_at": "2025-08-27 02:43:01",
+    "lat": 35.97258,
+    "lng": -114.85576666666667,
+    "title_number": "NV012923502",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-08-26 14:32:59",
+      "end": "2025-08-27 02:46:57",
+      "count": 241,
+      "lat_mean": 35.97659,
+      "lng_mean": -114.85885,
+      "first_uuid": "7986A84C-1B3C-4969-8547-07D5966828CE",
+      "mid_uuid": "C4FB8F0A-08CD-4256-9DAB-8E82AE591BE6",
+      "last_uuid": "9F4B4C72-51D7-468A-B881-F249E92C0248"
+    }
+  },
+  {
+    "title_id": "21c4e24a-b25f-41b2-9394-7f4433f6e12c",
+    "uuid": "D82816C3-AE00-4D49-9763-21F1E8FB2AC7",
+    "original_filename": "IMG_7668.jpeg",
+    "taken_at": "2025-07-04 12:49:18",
+    "lat": 17.903016666666666,
+    "lng": -62.84413,
+    "title_number": "0276041",
+    "vin": "TKL148F714125",
+    "year_make_model": [
+      1978,
+      "GMC",
+      "K10"
+    ],
+    "owner_names": [
+      "Fortner Roofing"
+    ],
+    "burst": {
+      "start": "2025-07-04 12:28:56",
+      "end": "2025-07-04 19:28:23",
+      "count": 22,
+      "lat_mean": 17.90197,
+      "lng_mean": -62.84488,
+      "first_uuid": "01874A63-BCE7-4EC9-8040-FD8C2B241F50",
+      "mid_uuid": "D1B65C72-B679-43FD-AE19-8C2936749E22",
+      "last_uuid": "C9A034A5-1CBB-4304-AC24-28CB9665EF54"
+    }
+  },
+  {
+    "title_id": "e5f2b06f-29e5-4e96-9f21-defdcd14c75f",
+    "uuid": "5EB57FFA-489C-44B2-BF26-A1808FB7D3D7",
+    "original_filename": "IMG_7659.jpeg",
+    "taken_at": "2025-07-03 19:36:28",
+    "lat": 17.903111666666668,
+    "lng": -62.84419666666667,
+    "title_number": null,
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-07-03 12:37:05",
+      "end": "2025-07-03 22:08:12",
+      "count": 21,
+      "lat_mean": 17.90161,
+      "lng_mean": -62.84479,
+      "first_uuid": "2850B4FB-786D-4233-B5A7-B50CAF5CB42A",
+      "mid_uuid": "4292CFE5-9C1D-4F9B-AA58-E755E72E9963",
+      "last_uuid": "4CEFE19A-BA67-4C54-930A-93364B2DE9FA"
+    }
+  },
+  {
+    "title_id": "683adc19-17d6-4e15-9081-e382c62317d0",
+    "uuid": "5EB57FFA-489C-44B2-BF26-A1808FB7D3D7",
+    "original_filename": "IMG_7659.jpeg",
+    "taken_at": "2025-07-03 19:36:28",
+    "lat": 17.903111666666668,
+    "lng": -62.84419666666667,
+    "title_number": null,
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-07-03 12:37:05",
+      "end": "2025-07-03 22:08:12",
+      "count": 21,
+      "lat_mean": 17.90161,
+      "lng_mean": -62.84479,
+      "first_uuid": "2850B4FB-786D-4233-B5A7-B50CAF5CB42A",
+      "mid_uuid": "4292CFE5-9C1D-4F9B-AA58-E755E72E9963",
+      "last_uuid": "4CEFE19A-BA67-4C54-930A-93364B2DE9FA"
+    }
+  },
+  {
+    "title_id": "961f040b-65cf-40fe-8030-ee24b49ba746",
+    "uuid": "5EB57FFA-489C-44B2-BF26-A1808FB7D3D7",
+    "original_filename": "IMG_7659.jpeg",
+    "taken_at": "2025-07-03 19:36:28",
+    "lat": 17.903111666666668,
+    "lng": -62.84419666666667,
+    "title_number": null,
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-07-03 12:37:05",
+      "end": "2025-07-03 22:08:12",
+      "count": 21,
+      "lat_mean": 17.90161,
+      "lng_mean": -62.84479,
+      "first_uuid": "2850B4FB-786D-4233-B5A7-B50CAF5CB42A",
+      "mid_uuid": "4292CFE5-9C1D-4F9B-AA58-E755E72E9963",
+      "last_uuid": "4CEFE19A-BA67-4C54-930A-93364B2DE9FA"
+    }
+  },
+  {
+    "title_id": "39a4974b-7482-429a-88b0-5567a55d811a",
+    "uuid": "5EB57FFA-489C-44B2-BF26-A1808FB7D3D7",
+    "original_filename": "IMG_7659.jpeg",
+    "taken_at": "2025-07-03 19:36:28",
+    "lat": 17.903111666666668,
+    "lng": -62.84419666666667,
+    "title_number": null,
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-07-03 12:37:05",
+      "end": "2025-07-03 22:08:12",
+      "count": 21,
+      "lat_mean": 17.90161,
+      "lng_mean": -62.84479,
+      "first_uuid": "2850B4FB-786D-4233-B5A7-B50CAF5CB42A",
+      "mid_uuid": "4292CFE5-9C1D-4F9B-AA58-E755E72E9963",
+      "last_uuid": "4CEFE19A-BA67-4C54-930A-93364B2DE9FA"
+    }
+  },
+  {
+    "title_id": "16e75adc-717d-4350-973e-8fce8e4e1afa",
+    "uuid": "E624BED5-A24B-4CF9-B2E5-E05289830875",
+    "original_filename": "IMG_7655.jpeg",
+    "taken_at": "2025-07-03 19:26:02",
+    "lat": -180.0,
+    "lng": -180.0,
+    "title_number": null,
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-07-03 12:37:05",
+      "end": "2025-07-03 22:08:12",
+      "count": 21,
+      "lat_mean": 17.90161,
+      "lng_mean": -62.84479,
+      "first_uuid": "2850B4FB-786D-4233-B5A7-B50CAF5CB42A",
+      "mid_uuid": "4292CFE5-9C1D-4F9B-AA58-E755E72E9963",
+      "last_uuid": "4CEFE19A-BA67-4C54-930A-93364B2DE9FA"
+    }
+  },
+  {
+    "title_id": "01c86d99-7cb3-42ad-83f8-6b7668632128",
+    "uuid": "B8BF073F-8EBB-4D28-A308-FB2F2BBC8533",
+    "original_filename": "IMG_0054.jpeg",
+    "taken_at": "2024-08-21 18:44:41",
+    "lat": 35.977395,
+    "lng": -114.85410333333333,
+    "title_number": "0396285",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2024-08-21 15:19:29",
+      "end": "2024-08-21 21:34:03",
+      "count": 10,
+      "lat_mean": 35.97629,
+      "lng_mean": -114.84948,
+      "first_uuid": "033CD12D-F42D-41DD-B821-07F1C0EFFD22",
+      "mid_uuid": "B8BF073F-8EBB-4D28-A308-FB2F2BBC8533",
+      "last_uuid": "B23C4FCF-47BA-48A7-A80C-D997CA57A71B"
+    }
+  },
+  {
+    "title_id": "30ba168f-af7c-4e00-b8eb-0fea0e20d95e",
+    "uuid": "B74C5AC1-BD7F-49A4-A0EC-F7C0535A7C8A",
+    "original_filename": "IMG_6987.jpeg",
+    "taken_at": "2025-06-09 22:55:00",
+    "lat": -180.0,
+    "lng": -180.0,
+    "title_number": "NV015658731",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": null
+  },
+  {
+    "title_id": "92ff97cd-eecf-4004-a692-26ade5cb7481",
+    "uuid": "51E03C49-8BAE-493C-BA6B-571713D3AFAA",
+    "original_filename": "IMG_0977.jpeg",
+    "taken_at": "2025-09-11 04:45:19",
+    "lat": 35.97741333333333,
+    "lng": -114.85400333333334,
+    "title_number": "NV016099967",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-09-10 16:54:13",
+      "end": "2025-09-11 04:45:42",
+      "count": 142,
+      "lat_mean": 35.97706,
+      "lng_mean": -114.85957,
+      "first_uuid": "501EC936-5DEE-4F86-91EF-2144C3D9EEC0",
+      "mid_uuid": "2DF4FAEF-D487-4945-B8DA-BEAD3168AD7B",
+      "last_uuid": "CE8BF3C2-13E9-4968-AF79-1F90AB378CA1"
+    }
+  },
+  {
+    "title_id": "05014e2b-b752-494d-81ce-05b4ddccbb72",
+    "uuid": "B8BF073F-8EBB-4D28-A308-FB2F2BBC8533",
+    "original_filename": "IMG_0054.jpeg",
+    "taken_at": "2024-08-21 18:44:41",
+    "lat": 35.977395,
+    "lng": -114.85410333333333,
+    "title_number": "0396285",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2024-08-21 15:19:29",
+      "end": "2024-08-21 21:34:03",
+      "count": 10,
+      "lat_mean": 35.97629,
+      "lng_mean": -114.84948,
+      "first_uuid": "033CD12D-F42D-41DD-B821-07F1C0EFFD22",
+      "mid_uuid": "B8BF073F-8EBB-4D28-A308-FB2F2BBC8533",
+      "last_uuid": "B23C4FCF-47BA-48A7-A80C-D997CA57A71B"
+    }
+  },
+  {
+    "title_id": "c8bebd6b-077f-4bd6-9a3e-cb33f1607a69",
+    "uuid": "B74C5AC1-BD7F-49A4-A0EC-F7C0535A7C8A",
+    "original_filename": "IMG_6987.jpeg",
+    "taken_at": "2025-06-09 22:55:00",
+    "lat": -180.0,
+    "lng": -180.0,
+    "title_number": "NV015658731",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": null
+  },
+  {
+    "title_id": "25144d30-5378-440b-9a10-afa49b6c21b8",
+    "uuid": "2F67F70E-D8E5-4219-94F1-4F4094037360",
+    "original_filename": "IMG_7333.jpeg",
+    "taken_at": "2024-05-30 22:48:13",
+    "lat": 35.976371666666665,
+    "lng": -114.8499,
+    "title_number": "UT0035500460",
+    "vin": null,
+    "year_make_model": [
+      null,
+      "CHEV",
+      "K10"
+    ],
+    "owner_names": [
+      "...USE WEBSTER"
+    ],
+    "burst": {
+      "start": "2024-05-30 18:19:36",
+      "end": "2024-05-31 07:23:57",
+      "count": 57,
+      "lat_mean": 35.97652,
+      "lng_mean": -114.85195,
+      "first_uuid": "DD83AC84-D9D3-4195-8517-48E87D58C426",
+      "mid_uuid": "588FDE9A-E2BF-4D04-83B3-E5F40F3D0F57",
+      "last_uuid": "7EDDC2D5-BA8A-46D7-8E2A-79DD0BE55A24"
+    }
+  },
+  {
+    "title_id": "26ece063-1d25-42d8-80c8-e6052f644924",
+    "uuid": "FF84BC37-C173-437D-8D83-CD7BD6C5BBF2",
+    "original_filename": "IMG_7941.jpeg",
+    "taken_at": "2024-06-14 02:13:02",
+    "lat": 35.97734666666667,
+    "lng": -114.85406333333333,
+    "title_number": null,
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2024-06-13 19:25:59",
+      "end": "2024-06-14 02:22:04",
+      "count": 128,
+      "lat_mean": 35.97721,
+      "lng_mean": -114.85341,
+      "first_uuid": "EEA8A123-289B-4AC5-9E7E-E3DFB8251161",
+      "mid_uuid": "DBFB9959-9B0D-4127-A880-D6FC89C27989",
+      "last_uuid": "742A67FA-BBFD-4858-A437-A8CFD7E7ACD2"
+    }
+  },
+  {
+    "title_id": "92e9e1f5-cdc9-4767-891c-96e19136429d",
+    "uuid": "3765CBC6-E3AC-4646-B3EC-C72F7203B664",
+    "original_filename": "IMG_7657.jpeg",
+    "taken_at": "2025-07-03 19:26:14",
+    "lat": -180.0,
+    "lng": -180.0,
+    "title_number": null,
+    "vin": null,
+    "year_make_model": [
+      1982,
+      "GMC",
+      null
+    ],
+    "owner_names": [],
+    "burst": {
+      "start": "2025-07-03 12:37:05",
+      "end": "2025-07-03 22:08:12",
+      "count": 21,
+      "lat_mean": 17.90161,
+      "lng_mean": -62.84479,
+      "first_uuid": "2850B4FB-786D-4233-B5A7-B50CAF5CB42A",
+      "mid_uuid": "4292CFE5-9C1D-4F9B-AA58-E755E72E9963",
+      "last_uuid": "4CEFE19A-BA67-4C54-930A-93364B2DE9FA"
+    }
+  },
+  {
+    "title_id": "26c4112a-b735-47a3-bde8-da9b46e56c79",
+    "uuid": "ABA0ADF6-05BC-464C-A3EE-8C03D517A5AA",
+    "original_filename": "IMG_1303.jpeg",
+    "taken_at": "2025-09-19 01:43:30",
+    "lat": 35.97736333333334,
+    "lng": -114.85412,
+    "title_number": "NV016571424",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "bf44a609-6e23-4415-8c8e-37e8abd7ff5a",
+    "uuid": "AA9751EA-2513-4FF2-BA20-DD1F7BBC0AA5",
+    "original_filename": "IMG_1299.jpeg",
+    "taken_at": "2025-09-19 01:43:12",
+    "lat": 35.97739166666667,
+    "lng": -114.854095,
+    "title_number": "NV016392798",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "e07540d1-97ea-4ba2-8d88-b71e0f1bbf69",
+    "uuid": "AA9751EA-2513-4FF2-BA20-DD1F7BBC0AA5",
+    "original_filename": "IMG_1299.jpeg",
+    "taken_at": "2025-09-19 01:43:12",
+    "lat": 35.97739166666667,
+    "lng": -114.854095,
+    "title_number": "NV016392798",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "4ccab3d0-d9e2-4496-99cc-de6ad886d5fd",
+    "uuid": "AA9751EA-2513-4FF2-BA20-DD1F7BBC0AA5",
+    "original_filename": "IMG_1299.jpeg",
+    "taken_at": "2025-09-19 01:43:12",
+    "lat": 35.97739166666667,
+    "lng": -114.854095,
+    "title_number": "NV016392798",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "8259ea63-509a-4995-a859-1d8ddfd97adf",
+    "uuid": "EDABFBED-A4B6-4D83-B656-C28CE3B3EF05",
+    "original_filename": "IMG_1302.jpeg",
+    "taken_at": "2025-09-19 01:43:26",
+    "lat": 35.97737166666667,
+    "lng": -114.854095,
+    "title_number": "NV016492783",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "5b477625-3ad0-4e8a-9585-5d9baacc641e",
+    "uuid": "EDABFBED-A4B6-4D83-B656-C28CE3B3EF05",
+    "original_filename": "IMG_1302.jpeg",
+    "taken_at": "2025-09-19 01:43:26",
+    "lat": 35.97737166666667,
+    "lng": -114.854095,
+    "title_number": "NV016492783",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "bf38f38f-64d5-4496-be2d-cf9b2ba19718",
+    "uuid": "AA9751EA-2513-4FF2-BA20-DD1F7BBC0AA5",
+    "original_filename": "IMG_1299.jpeg",
+    "taken_at": "2025-09-19 01:43:12",
+    "lat": 35.97739166666667,
+    "lng": -114.854095,
+    "title_number": "NV016392798",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "5a021790-8917-4e24-9bd4-68ee1f66a8dc",
+    "uuid": "AA9751EA-2513-4FF2-BA20-DD1F7BBC0AA5",
+    "original_filename": "IMG_1299.jpeg",
+    "taken_at": "2025-09-19 01:43:12",
+    "lat": 35.97739166666667,
+    "lng": -114.854095,
+    "title_number": "NV016392798",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "a24dccee-360c-42c5-9bae-64d98fea6440",
+    "uuid": "AB13D571-D136-4CA7-861A-E48FA970A723",
+    "original_filename": "IMG_1301.jpeg",
+    "taken_at": "2025-09-19 01:43:20",
+    "lat": 35.977383333333336,
+    "lng": -114.85408833333334,
+    "title_number": "NV015423103",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "7a65387c-cde3-417f-8823-46750ebb00d9",
+    "uuid": "EE5E4E95-2D40-428F-8F2C-3ED9A15A5FDA",
+    "original_filename": "IMG_1296.jpeg",
+    "taken_at": "2025-09-19 01:42:58",
+    "lat": 35.97738666666667,
+    "lng": -114.85415,
+    "title_number": "NV016492936",
+    "vin": "6F07C219593",
+    "year_make_model": [
+      1966,
+      "FORD",
+      "MUSTANG"
+    ],
+    "owner_names": [
+      "Williams Skylar Jacob"
+    ],
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "5356bd5a-327c-4874-91e9-f7e12c1e22be",
+    "uuid": "EE5E4E95-2D40-428F-8F2C-3ED9A15A5FDA",
+    "original_filename": "IMG_1296.jpeg",
+    "taken_at": "2025-09-19 01:42:58",
+    "lat": 35.97738666666667,
+    "lng": -114.85415,
+    "title_number": "NV016492936",
+    "vin": "6F07C219593",
+    "year_make_model": [
+      1966,
+      "FORD",
+      "MUSTANG"
+    ],
+    "owner_names": [
+      "Williams Skylar Jacob"
+    ],
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "f880108c-a91b-44f4-ab4d-afac2adbf7cc",
+    "uuid": "EE5E4E95-2D40-428F-8F2C-3ED9A15A5FDA",
+    "original_filename": "IMG_1296.jpeg",
+    "taken_at": "2025-09-19 01:42:58",
+    "lat": 35.97738666666667,
+    "lng": -114.85415,
+    "title_number": "NV016492936",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "b0a6f8c5-5053-4a0d-92ab-199f68f946ea",
+    "uuid": "EE5E4E95-2D40-428F-8F2C-3ED9A15A5FDA",
+    "original_filename": "IMG_1296.jpeg",
+    "taken_at": "2025-09-19 01:42:58",
+    "lat": 35.97738666666667,
+    "lng": -114.85415,
+    "title_number": "NV016492936",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "d103b53a-ba70-43b6-9a49-b42bcb1d9f3c",
+    "uuid": "EE5E4E95-2D40-428F-8F2C-3ED9A15A5FDA",
+    "original_filename": "IMG_1296.jpeg",
+    "taken_at": "2025-09-19 01:42:58",
+    "lat": 35.97738666666667,
+    "lng": -114.85415,
+    "title_number": "NV016492936",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "3dfc90da-3635-4618-b532-78ad9a02eca5",
+    "uuid": "EE5E4E95-2D40-428F-8F2C-3ED9A15A5FDA",
+    "original_filename": "IMG_1296.jpeg",
+    "taken_at": "2025-09-19 01:42:58",
+    "lat": 35.97738666666667,
+    "lng": -114.85415,
+    "title_number": "NV016492936",
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": [],
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "2eb359ce-c38e-4eb9-9208-96b108545bc9",
+    "uuid": "5BDB3924-AEC8-49E2-9E8B-650FC7834222",
+    "original_filename": "IMG_1304.jpeg",
+    "taken_at": "2025-09-19 01:43:37",
+    "lat": 35.97736666666667,
+    "lng": -114.85410333333333,
+    "title_number": null,
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": null,
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  },
+  {
+    "title_id": "ba77c8c6-0310-44eb-a077-58219c24a3b1",
+    "uuid": "5BDB3924-AEC8-49E2-9E8B-650FC7834222",
+    "original_filename": "IMG_1304.jpeg",
+    "taken_at": "2025-09-19 01:43:37",
+    "lat": 35.97736666666667,
+    "lng": -114.85410333333333,
+    "title_number": null,
+    "vin": null,
+    "year_make_model": null,
+    "owner_names": null,
+    "burst": {
+      "start": "2025-09-18 14:42:56",
+      "end": "2025-09-19 04:04:17",
+      "count": 41,
+      "lat_mean": 35.97431,
+      "lng_mean": -114.85486,
+      "first_uuid": "630D2567-BF76-4628-A1F7-5AA06CBFE57B",
+      "mid_uuid": "2AB11E76-8FC8-49DB-8BB4-8F3C370BB9FB",
+      "last_uuid": "C2F7DC05-F0AD-4125-9E32-4BBB84471833"
+    }
+  }
+]

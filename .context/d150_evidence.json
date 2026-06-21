@@ -1,0 +1,370 @@
+[
+  {
+    "sample_uuid": "C61DE361-61C9-4D90-8058-6ADCA68BCDC1",
+    "burst_start": "2023-05-20 15:19:34",
+    "burst_count": 72,
+    "d150_present": true,
+    "evidence_type": "paperwork",
+    "notes": "Direct evidence: NV Certificate of Title for VIN 1B7GE06X5LS715014, 1990 DODG D-150 S, owner Skylar Williams. Title issued 12/15/2022, photographed May 20 2023 (72-frame burst, likely doc shoot for sale)."
+  },
+  {
+    "sample_uuid": "56108CA1-60B9-460A-8046-5E644779E38F",
+    "burst_start": "2023-05-21 22:51:15",
+    "burst_count": 6,
+    "d150_present": true,
+    "evidence_type": "paperwork",
+    "notes": "Same D-150 NV title photographed again, this time SIGNED by Skylar Williams as seller plus buyer signature visible at bottom — sale/transfer documentation."
+  },
+  {
+    "sample_uuid": "26EC9DA6-0501-4998-9369-06CD9B6DF1FF",
+    "burst_start": "2023-05-18 18:39:18",
+    "burst_count": 36,
+    "d150_present": "uncertain",
+    "evidence_type": "engine_swap",
+    "notes": "Red HEI-style distributor cap (4-terminal) being probed with Snap-on multimeter reading 000.5 ohms — classic Mopar 318/360 ignition diagnostic. Timing fits 2 days before title photo; likely D-150 pre-sale shakedown."
+  },
+  {
+    "sample_uuid": "A1B160B1-2B29-47C8-ACAE-5771B5ED7740",
+    "burst_start": "2023-05-22 22:25:13",
+    "burst_count": 9,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Close-up of red painted hood with blue-outlined flame graphics — looks like a hot-rod / custom paint job, NOT a D-150 panel. Different vehicle."
+  },
+  {
+    "sample_uuid": "ABB1A6C6-09AC-4FD6-BBA0-AFCB7E6ADFD0",
+    "burst_start": "2023-05-16 23:50:08",
+    "burst_count": 9,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Storefront with American Express / business hours sign — not vehicle related."
+  },
+  {
+    "sample_uuid": "31206FB5-AFB9-4639-A2C7-4EB7428B06D9",
+    "burst_start": "2023-05-16 17:14:37",
+    "burst_count": 18,
+    "d150_present": "uncertain",
+    "evidence_type": "parts",
+    "notes": "Tape-measuring teeth on a splined gear inside a housing — possibly transmission/transfer-case internals. Could be D-150 driveline but generic enough to be any V8 truck."
+  },
+  {
+    "sample_uuid": "8B4E99DC-A552-492F-8579-96D98B0D0AD1",
+    "burst_start": "2023-05-25 01:51:09",
+    "burst_count": 5,
+    "d150_present": "uncertain",
+    "evidence_type": "parts",
+    "notes": "Date-stamped blue-painted casting (USA-made, ink stamp 0731ES1 11:47) sitting on darker substrate — looks like a freshly painted timing cover or intake. Could be Mopar but no marque ID visible."
+  },
+  {
+    "sample_uuid": "3FA0406A-AB9D-46FE-995D-8400B11F1C51",
+    "burst_start": "2023-05-15 03:18:52",
+    "burst_count": 6,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Toddler face, indoor — kid photo."
+  },
+  {
+    "sample_uuid": "41FD7FB9-2661-4079-989F-18A395681652",
+    "burst_start": "2023-05-14 00:20:19",
+    "burst_count": 25,
+    "d150_present": "uncertain",
+    "evidence_type": "engine_swap",
+    "notes": "Blurry thumbnail but appears to show engine/parts on bench with yellow object — could be Dodge engine bay during swap. Resolution too low to confirm."
+  },
+  {
+    "sample_uuid": "14FD3B16-3891-4E3F-A600-7D7DE916B233",
+    "burst_start": "2023-05-27 17:22:59",
+    "burst_count": 13,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Close-up of red painted hood with blue-outlined flames — same hot rod paint job as A1B160B1. Different vehicle."
+  },
+  {
+    "sample_uuid": "591D5987-FDC0-43D0-B8DD-D1C33197559C",
+    "burst_start": "2023-05-28 18:53:14",
+    "burst_count": 6,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Toddler looking at grasshopper on cinder-block wall. Kid photo."
+  },
+  {
+    "sample_uuid": "0F0070FE-5114-4C69-AE09-7C6AF344A849",
+    "burst_start": "2023-05-11 18:01:33",
+    "burst_count": 8,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Energy Suspension polyurethane sway bar / transmission mount packages on retail shelf — parts shopping, not Dodge-specific (3.1108G is GM 2WD/4WD trans mount per label)."
+  },
+  {
+    "sample_uuid": "0D82B7D7-FE00-4A39-AB23-F0ECFDCC670D",
+    "burst_start": "2023-05-30 22:09:52",
+    "burst_count": 7,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "R-134A AC manifold gauge — HVAC service tool, no vehicle visible."
+  },
+  {
+    "sample_uuid": "6967FE4A-D1B1-460A-B2F5-5326FF91F3AD",
+    "burst_start": "2023-05-09 15:30:04",
+    "burst_count": 6,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Nevada DMV smog FAIL slip for 1985 Chevy K20 (VIN 1GCGK24MXFJ174484) — different truck (K20), not the D-150."
+  },
+  {
+    "sample_uuid": "188C837D-5B14-400A-9E28-2FAF8DB51B80",
+    "burst_start": "2023-05-08 18:31:14",
+    "burst_count": 8,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Multi-package international shipping form (DHL/shipping software UI) — admin work, no vehicle."
+  },
+  {
+    "sample_uuid": "BE69B964-27F2-47BE-BF50-0B10ADE748B5",
+    "burst_start": "2023-06-01 23:36:00",
+    "burst_count": 14,
+    "d150_present": "uncertain",
+    "evidence_type": "body_work",
+    "notes": "Very blurry — appears to show a panel/floor with light source in background, possibly inside paint booth or shop. Cannot ID vehicle."
+  },
+  {
+    "sample_uuid": "458E3258-E9F3-4B8D-BF6E-761B20E9C084",
+    "burst_start": "2023-06-02 22:52:29",
+    "burst_count": 13,
+    "d150_present": "uncertain",
+    "evidence_type": "finished",
+    "notes": "Yellow pickup bed (long-bed truck) on dirt/desert pad. Body style could be 4th-gen Dodge Ram (square slab side, simple bed cap). Worth deeper investigation."
+  },
+  {
+    "sample_uuid": "B68CD3F1-0F2B-4418-A065-0D878E8A0389",
+    "burst_start": "2023-05-05 16:45:28",
+    "burst_count": 44,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Blurry shop floor / concrete pad with light reflection — no vehicle visible at this resolution."
+  },
+  {
+    "sample_uuid": "3F87E981-95FB-49CB-B503-357335000E03",
+    "burst_start": "2023-06-04 04:08:32",
+    "burst_count": 15,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Blurry warehouse / shop interior shot — no clear subject."
+  },
+  {
+    "sample_uuid": "EEC323D4-361E-4A9D-B8AF-812DA9247525",
+    "burst_start": "2023-05-02 01:05:23",
+    "burst_count": 7,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Teal close-up of round metal disc — looks like a brake rotor or hubcap, abstract macro. Not identifiable as D-150."
+  },
+  {
+    "sample_uuid": "C1A4D877-2253-43FF-97E2-1CCE32829321",
+    "burst_start": "2023-04-29 17:54:41",
+    "burst_count": 55,
+    "d150_present": false,
+    "evidence_type": "parts",
+    "notes": "Cattleman's Selection cardboard box on shop floor (16x11.5x5 'Rod' label) — packing/shipping a part. Not vehicle-identifying."
+  },
+  {
+    "sample_uuid": "1582CEBD-AFCB-4B34-96BF-93FEF7C6A381",
+    "burst_start": "2023-04-28 15:44:52",
+    "burst_count": 27,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Blurry shop floor — no subject identifiable."
+  },
+  {
+    "sample_uuid": "C1A2B8F3-FC0C-4A64-9289-1B225DA7FDA2",
+    "burst_start": "2023-06-11 16:13:49",
+    "burst_count": 13,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "El-Nikkor 150mm enlarger lens with mounting instructions — darkroom equipment, not vehicle."
+  },
+  {
+    "sample_uuid": "5461D9B9-FFF8-4AB3-9EAA-5833B7FA64BF",
+    "burst_start": "2023-04-27 15:44:49",
+    "burst_count": 5,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Blurry close-up of a dark vehicle / dashboard interior — possibly automotive but unidentifiable."
+  },
+  {
+    "sample_uuid": "B76B6B55-90C8-4058-99D2-C5211DB5F47B",
+    "burst_start": "2023-06-15 16:04:33",
+    "burst_count": 59,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Swedish Allerum cheese / Pagen Levain sourdough bread on table — trip to Sweden, not vehicle work."
+  },
+  {
+    "sample_uuid": "3BEE1AD0-058B-487C-9B52-84DD08E6814D",
+    "burst_start": "2023-04-21 14:48:13",
+    "burst_count": 15,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Jenny's Dispensary storefront, suite 100 — errand photo."
+  },
+  {
+    "sample_uuid": "3131D260-4C78-4674-BDCF-39BCBB7D36BE",
+    "burst_start": "2023-04-20 16:02:09",
+    "burst_count": 149,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Blurry crib railing with toddler — kid photo. Large 149-frame burst but family content."
+  },
+  {
+    "sample_uuid": "6DAE69D7-2252-4B19-AB97-8AFBBEA3C3D2",
+    "burst_start": "2023-06-20 01:36:04",
+    "burst_count": 6,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Beseler PM1A photographic color analyzer — darkroom equipment."
+  },
+  {
+    "sample_uuid": "7C01B1E3-7F6A-4D31-9B86-AAA3D334D715",
+    "burst_start": "2023-06-21 20:14:43",
+    "burst_count": 26,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Black 1965-66 Ford Mustang coupe in front of white shop building, hood open, light fixture taped. Background shows white Bronco / red square-body Chevy / yellow vehicle in neighbor lot. Subject is Mustang, not Dodge."
+  },
+  {
+    "sample_uuid": "C5DD3D82-226C-4A2D-BEF2-A4DB016C52A6",
+    "burst_start": "2023-04-17 16:24:57",
+    "burst_count": 51,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Blurry mostly-yellow shop scene — looks like the same Mustang/Bronco lot. No clear D-150."
+  },
+  {
+    "sample_uuid": "BAF64B37-32AC-4D59-91FF-CA21DB2C53C8",
+    "burst_start": "2023-04-16 03:02:08",
+    "burst_count": 12,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Blurry vertical strip — possibly a water heater or column in a utility room. Not vehicle."
+  },
+  {
+    "sample_uuid": "E3C584A9-B2D8-4420-B93C-D82A93A6FB3A",
+    "burst_start": "2023-04-14 16:29:06",
+    "burst_count": 22,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "1991 1HP induction motor nameplate (110/220V, 60Hz, P18908) — shop air compressor or similar tool."
+  },
+  {
+    "sample_uuid": "90752A97-6A63-494A-8A7D-8A314FE99FD2",
+    "burst_start": "2023-04-13 17:36:28",
+    "burst_count": 87,
+    "d150_present": false,
+    "evidence_type": "parts",
+    "notes": "Stanley tape measure on green/painted angle iron sitting in a blue vise — fabrication work, not Dodge-specific."
+  },
+  {
+    "sample_uuid": "304BC235-1196-46C8-A647-37346BFFFA0D",
+    "burst_start": "2023-04-11 18:54:08",
+    "burst_count": 50,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Blurry blue sky and rooflines, possibly a parking lot from above — no clear vehicle."
+  },
+  {
+    "sample_uuid": "C68557D6-BB33-4619-90AF-255761A4C29D",
+    "burst_start": "2023-04-10 23:25:36",
+    "burst_count": 33,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Blurry green / floral pattern — looks like fabric or wallpaper macro, not vehicle."
+  },
+  {
+    "sample_uuid": "977408AA-5C10-4249-AC74-A5E2A007A642",
+    "burst_start": "2023-04-10 16:35:23",
+    "burst_count": 5,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Blurry interior with red / blue blob — toddler in car seat or stroller. Kid photo."
+  },
+  {
+    "sample_uuid": "13581A7E-2ABD-48CD-8FC9-34B4D7287635",
+    "burst_start": "2023-07-01 20:36:25",
+    "burst_count": 148,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Sunset desert horizon from elevated viewpoint — landscape photo, large 148-frame burst but scenery."
+  },
+  {
+    "sample_uuid": "29D8AB4B-5B80-42FD-AEFC-C1450F2B2B41",
+    "burst_start": "2023-04-06 17:30:36",
+    "burst_count": 17,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Adult man in black t-shirt and ball cap, indoor — portrait. Not vehicle."
+  },
+  {
+    "sample_uuid": "E101CCE1-CB78-4788-AB63-9D791DB1C102",
+    "burst_start": "2023-07-02 23:36:28",
+    "burst_count": 7,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "1985 Chevy Pickup owner's manual + warranty booklet handwritten 'Colt River Racing / Craig CO / VIN 1GCDK14H4FJ174684 / 10/14/85' — paperwork for a 1985 K10, different truck."
+  },
+  {
+    "sample_uuid": "B5586619-E711-430E-8C84-B1049D851409",
+    "burst_start": "2023-04-04 16:14:35",
+    "burst_count": 20,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Brass antique camera lens (Bausch & Lomb-style) with engraved focal length scale — photography gear."
+  },
+  {
+    "sample_uuid": "EB81671B-269B-41F5-A7A5-71DF1AD170EF",
+    "burst_start": "2023-07-05 16:24:09",
+    "burst_count": 5,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "GM Corp door VIN/weight plate on red truck — date 07/87, model 31MR83 — Chevy/GMC pickup, not Dodge."
+  },
+  {
+    "sample_uuid": "7B45A547-FC5E-4545-972B-401DAEB9054C",
+    "burst_start": "2023-04-01 01:10:31",
+    "burst_count": 19,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "GM Service Parts Identification sticker (RPO codes C60 C68 G80 K81 NL2, order L85535) — GM vehicle option list, not Dodge."
+  },
+  {
+    "sample_uuid": "13E8C3F6-0E11-4FE1-8D1C-F76605EE58AA",
+    "burst_start": "2023-07-10 19:35:01",
+    "burst_count": 86,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Snap-on wrench roll with 9 combination wrenches laid out in tool-box drawer — tool inventory."
+  },
+  {
+    "sample_uuid": "44857C61-3A23-4634-812E-CD70ED0639C4",
+    "burst_start": "2023-03-29 16:47:01",
+    "burst_count": 46,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Photographic Instruments Company Moduline Print Processor instruction sheet — darkroom equipment manual."
+  },
+  {
+    "sample_uuid": "DC2366F4-4816-4030-A17A-DCBDE3B61F01",
+    "burst_start": "2023-03-28 17:35:46",
+    "burst_count": 19,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Bearded man selfie in front of window with desert view — portrait."
+  },
+  {
+    "sample_uuid": "8F9B59D3-1F0F-47B9-B83E-EDDBB648F959",
+    "burst_start": "2023-07-11 23:33:56",
+    "burst_count": 76,
+    "d150_present": false,
+    "evidence_type": "non_dodge",
+    "notes": "Blurry shop or driveway with yellow/tan tone — could be a vehicle but unidentifiable at this resolution."
+  }
+]

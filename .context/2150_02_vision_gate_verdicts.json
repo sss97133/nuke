@@ -1,0 +1,402 @@
+[
+  {
+    "order": 0,
+    "image_id": "4c8dec0a-3bbe-40d2-822d-62f6d335248e",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Square-body Chevy cab/body shell on rotisserie/2-post lift in shop, dark red primer, yellow rotisserie arms. Tear-down state consistent with LS-swap project. Default-approved per bucket attribution rule.",
+    "paperwork": null
+  },
+  {
+    "order": 1,
+    "image_id": "5da15063-d5a9-4936-a40d-367959239bd6",
+    "verdict": "approved",
+    "confidence": 0.6,
+    "reasoning": "Screenshot from oldcarmanualproject.com showing red square-body Chevy Silverado pickup (not Blazer) reference image. Square-body GM content, default approved. Marketing/reference material.",
+    "paperwork": "Screenshot of oldcarmanualproject.com browser, 'Silverado' badge visible"
+  },
+  {
+    "order": 2,
+    "image_id": "fec3ef88-1023-4121-93de-e2b64adc2069",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Factory marketing/brochure photo of yellow 1981-82 Chevy Suburban with Airstream trailer. Square-body GM content, reference imagery. Default approved.",
+    "paperwork": "Brochure/marketing photo, Chevrolet logo on grille"
+  },
+  {
+    "order": 3,
+    "image_id": "396aed13-cd2d-47e4-968e-e77724be900b",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "1980 Chevy Suburban brochure cover ('80 SUBURBAN / CHEVY TRUCKS / BUILT TO STAY TOUGH). Square-body GM marketing reference. Default approved.",
+    "paperwork": "'80 SUBURBAN brochure cover, 'CHEVY TRUCKS BUILT TO STAY TOUGH'"
+  },
+  {
+    "order": 4,
+    "image_id": "deab0fda-b29e-4d15-9d4c-879aad109eac",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Screenshot of FB Marketplace/listing showing white early-square-body K5 Blazer (1971-72 era based on grille). Different vehicle being researched/considered for purchase, not Skylar's K5 (CRK178P122739).",
+    "paperwork": "FB Marketplace listing screenshot, 'Ask' / 'Make offer' buttons"
+  },
+  {
+    "order": 5,
+    "image_id": "b5f0b053-0fa4-46cf-90b3-666f4c4578cb",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Screenshot of FB Marketplace listing, white early-square-body GMC Jimmy/K5 Blazer rear view with GMC tailgate badge. Different vehicle being researched, not Skylar's K5.",
+    "paperwork": "FB Marketplace listing screenshot, GMC tailgate badge visible"
+  },
+  {
+    "order": 6,
+    "image_id": "04322a99-56ec-4c6c-9fd6-c0d53b0c6b77",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "KSL.com classifieds screenshot: '1973 Chevrolet Blazer, $9,500, Mileage: 99,999, Cedar Hills, UT, Posted May 12, 2022'. Different K5 being researched/shopped, not Skylar's vehicle.",
+    "paperwork": "KSL.com listing, 1973 Chevrolet Blazer, $9,500, 99,999 mi, Cedar Hills UT, May 12 2022"
+  },
+  {
+    "order": 7,
+    "image_id": "05102c0a-4557-4ec9-98e1-811815c05cf1",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "BringATrailer screenshot: '1974 Chevrolet K5 Blazer Cheyenne, Sold for $65,500, 36 comments, Seller: CHEVYGURU, Location: Wakarusa, Kansas 66546'. Different K5 (1974 yellow/white) being researched, not Skylar's.",
+    "paperwork": "BaT listing, 1974 K5 Blazer Cheyenne, sold $65,500, seller CHEVYGURU, Wakarusa KS 66546"
+  },
+  {
+    "order": 8,
+    "image_id": "8eb97e06-dbaa-407b-adcb-4584659ed607",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Vintage Chevy Truck advertisement showing red square-body pickup with engine lineup (250 Six, 350-4 V8, 400-4 V8, 454-4 V8). Square-body GM marketing reference. Default approved.",
+    "paperwork": "'Chevy Truck value starts under the hood' ad, engine options 250 Six / 350-4 / 400-4 / 454-4 V8"
+  },
+  {
+    "order": 9,
+    "image_id": "57b9993a-24e1-4359-b991-9fd94ecfcc4d",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Two custom fabricated suspension mounting brackets on welding/fab table with Yale forklift in background ('LATTITUDE' sticker). Build parts consistent with K5 LS-swap chassis work. Default approved.",
+    "paperwork": null
+  },
+  {
+    "order": 10,
+    "image_id": "88e83f37-cc37-466b-ab62-023341dd9f97",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "SolidWorks CAD screenshot of custom front suspension assembly (coilovers, control arms, axle housing). Timestamp 10:09 AM 3/27/2022. Build engineering work for K5 chassis. Default approved.",
+    "paperwork": "SolidWorks CAD window, '62F Sunny', 3/27/2022 timestamp"
+  },
+  {
+    "order": 11,
+    "image_id": "fea08fad-0740-4797-aa9f-83ba128591cd",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Small-block Chevy V8 engine on stand with new 4-barrel intake/carb, in art-gallery-like room with framed desert photographs on wall. Engine consistent with K5 build prep. Default approved.",
+    "paperwork": null
+  },
+  {
+    "order": 12,
+    "image_id": "3e9de12d-ffdf-46b0-a752-69465d9b8d43",
+    "verdict": "review_needed",
+    "confidence": 0.45,
+    "reasoning": "Two-tone green-over-maroon square-body Blazer on shop lift with engine and front axle pulled. Two-tone scheme does NOT match either Skylar's K5 CRK178P122739 (need color), e04b CKR187F127263 red/white, or fc35 CKY184F130930 black/dark green. Could be a customer/shop vehicle at Viva Las Vegas Autos. Body-style is square-body so not rejected, but specific evidence (unusual two-tone) flags review.",
+    "paperwork": null
+  },
+  {
+    "order": 13,
+    "image_id": "1c4f9410-22a9-41e3-ac27-59622e2d6871",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "SMS Auto Fabrics order sheet/sample card dated 2/10/22 with handwritten '1979 K5 Blazer' notation. Fabric sample $1.59/yard, vinyl $.75/yard. Interior upholstery research for K5 build. Date is '1979' on form but year may refer to fabric pattern era; bucket attribution rule applies.",
+    "paperwork": "SMS Auto Fabrics form, dated 2/10/22, handwritten '1979 K5 Blazer', fabric $1.59/yd, vinyl $.75/yd, fabric swatch A, vinyl swatch B"
+  },
+  {
+    "order": 14,
+    "image_id": "be792a26-af7c-47ee-8686-a974cf088d14",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Square-body GM truck interior showing blue dash, Chevrolet bowtie horn pad, plaid bench seat upholstery (matches SMS fabric in image 013). Interior reference photo for upholstery selection. Default approved.",
+    "paperwork": null
+  },
+  {
+    "order": 15,
+    "image_id": "39857847-931f-4808-b1b2-3394e10a9910",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "TV/auction broadcast screenshot: 'LOT 1423.1 / 1971 CHEVROLET K5 BLAZER / $400,000 SOLD!' on Barrett-Jackson. Black K5 reference/market research. Default approved (K5 content).",
+    "paperwork": "Barrett-Jackson auction TV, Lot 1423.1, 1971 Chevrolet K5 Blazer, $400,000 SOLD"
+  },
+  {
+    "order": 16,
+    "image_id": "a05758b7-2d68-4869-9a58-3dd203d7c13c",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Four refurbished GM Rally wheels (silver), General box, Duralast (?) box, black shocks/struts in foreground, American flag and 'COWBOY' sign on wall. Parts staging for K5 build. Default approved.",
+    "paperwork": "General brand parts box, Duralast box"
+  },
+  {
+    "order": 17,
+    "image_id": "212629f5-19d0-4c4c-b71d-0c3d05b3d80d",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Single refurbished GM Rally-style steel wheel with center cap removed, on parts bench with NGK plug box and Duralast box. K5 wheel rebuild content. Default approved.",
+    "paperwork": "NGK box, Duralast box visible"
+  },
+  {
+    "order": 18,
+    "image_id": "9295e527-d391-4428-9741-23cae99b507e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "GM 10-bolt or 12-bolt differential housing/third-member viewed from above, transmission tailshaft and crossmember visible. K5 driveline work. Default approved.",
+    "paperwork": null
+  },
+  {
+    "order": 19,
+    "image_id": "95e1f0e0-8ba4-48bc-993c-c1babd98bcdc",
+    "verdict": "review_needed",
+    "confidence": 0.45,
+    "reasoning": "Maroon/dark red square-body GM truck rear quarter on 2-post lift, with body-side molding stripe visible. Color (maroon with chrome trim) matches e04b CKR187F127263 (1977 K10 Cheyenne Super red/white). Specific evidence pointing to e04b chassis, not Skylar's K5.",
+    "paperwork": null
+  },
+  {
+    "order": 20,
+    "image_id": "d4123b75-133c-4262-bee3-a05994cd52ec",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Shop workbench with transfer case internals, t-case yokes, gears, transmission parts. Pegboard tool wall above. Driveline tear-down for K5 build. Default approved.",
+    "paperwork": "RAPTOR brand can/spray on bench"
+  },
+  {
+    "order": 21,
+    "image_id": "27184343-6e38-4d29-bdad-c64a25cc7bb7",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Maroon/dark-red square-body Chevrolet (CHEVROLET tailgate letters visible) tailgate/rear bumper from below on lift, with body damage. Color matches e04b CKR187F127263 (1977 K10 Cheyenne Super red/white). Specific evidence pointing to e04b chassis.",
+    "paperwork": "CHEVROLET tailgate letters visible, 'Hyster' forklift in frame"
+  },
+  {
+    "order": 22,
+    "image_id": "4c39d4c2-32d4-477b-9ebd-f4457ba70c09",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Maroon/dark-red square-body K5 Blazer body shell on lift, removable hardtop visible, side panel with stripe line. Color clearly matches e04b CKR187F127263 (1977 K10 Cheyenne Super red/white). Specific evidence points to e04b.",
+    "paperwork": null
+  },
+  {
+    "order": 23,
+    "image_id": "28616a89-e017-4361-b998-6cb3f2f5265d",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Maroon/dark-red K5 Blazer driver's door with 'BLAZER' badge on shop floor, alongside aluminum radiator. Color matches e04b CKR187F127263 (1977 K10 Cheyenne Super red/white). Door removed during teardown.",
+    "paperwork": "BLAZER door badge visible"
+  },
+  {
+    "order": 24,
+    "image_id": "514d8a3f-c83f-4523-a92a-3402e565098d",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Shop scene with Hyster XL2 forklift, 2-post hoist, yellow lift arms, square-body cab on hoist visible. K5-related shop environment. Default approved.",
+    "paperwork": "Hyster XL2 forklift"
+  },
+  {
+    "order": 25,
+    "image_id": "ed71f0ce-9d0a-4b99-aed1-564007cf9e9e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "GM Dana 44 or 10-bolt front axle with hubs/knuckles on stand in shop. K5 chassis work. Default approved.",
+    "paperwork": null
+  },
+  {
+    "order": 26,
+    "image_id": "35522ec9-106f-40af-b740-438229f742a9",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Workbench with original GM accessories: harmonic balancer, alternator, A/C compressor (ACDelco/MOPAR-style), engine mount brackets, accessory brackets. Square-body GM teardown. Default approved.",
+    "paperwork": null
+  },
+  {
+    "order": 27,
+    "image_id": "cfabfb2e-ec9c-4dbe-9cf2-d78e6ca7346c",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Workbench with sorted hardware (nuts, bolts, fittings), original wiring harness (bundled), engine mount/cab mount brackets. K5 disassembly content. Default approved.",
+    "paperwork": null
+  },
+  {
+    "order": 28,
+    "image_id": "ad7210ad-aeb7-44bf-ba5d-6ab6b965b158",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "GM small-block V8 engine viewed from the bellhousing/flywheel end with fan clutch, intake manifold, throttle body, exhaust manifolds. Engine on stand or in process of removal. Square-body driveline. Default approved.",
+    "paperwork": null
+  },
+  {
+    "order": 29,
+    "image_id": "14d37192-718a-4e51-90e7-802e29533ea1",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Bare K5/square-body GM truck frame on white dolly/stands in shop, fully stripped, with crossmembers and front frame horns visible. K5 chassis prep. Default approved.",
+    "paperwork": null
+  },
+  {
+    "order": 30,
+    "image_id": "e197c26a-651f-4d4b-bffd-6dfe239c62f9",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Shop floor view: GM small-block engine, transmission (TH350/TH400?) with transfer case, additional V8 engine bare block on engine stand. 'BUSH 4 MORE YEARS' bumper sticker on red cabinet. Driveline collection for K5 swap. Default approved.",
+    "paperwork": "'BUSH 4 MORE YEARS' bumper sticker visible"
+  },
+  {
+    "order": 31,
+    "image_id": "8fb28a0b-0bb2-43fa-8750-4835f9e9ffa7",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Under-vehicle view of GM solid front axle steering knuckle, tie rod, drag link, on red 3-ton jack stand. Square-body GM 4WD front suspension. Default approved.",
+    "paperwork": null
+  },
+  {
+    "order": 32,
+    "image_id": "770c6cda-cfd3-468c-a43a-b8a871d1dc85",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Shop interior with K5 frame/floorpan visible on 2-post lift (with stripped bare red body), GM Rally wheels stored on ceiling rack, blue hoist columns. Skylar's K5 build environment. Default approved.",
+    "paperwork": null
+  },
+  {
+    "order": 33,
+    "image_id": "ea7cbc4b-5979-49ba-b915-797ddfc58abd",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Under-body frame rail/crossmember showing original factory rivets, green underbody paint/overspray, wiring routing. Square-body GM frame detail. Default approved.",
+    "paperwork": null
+  },
+  {
+    "order": 34,
+    "image_id": "deaad8d5-04e9-458c-ae98-1e3b91c15efa",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Cardboard box containing 16x10 chrome reverse-style steel wheel with Mile Marker XL7 center cap, Mile Marker 'STREET MASTER LOCKING HUB PART NO. 302' box visible. K5 4WD parts. Default approved.",
+    "paperwork": "Mile Marker Street Master Locking Hub, Part No. 302; XL7 wheel center cap"
+  },
+  {
+    "order": 35,
+    "image_id": "e52a37bd-d428-48c5-8811-667907342354",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Cardboard box ('UNBREAKABLE'/inventory label visible) containing original GM air cleaner housing, throttle linkage, dashboard trim pieces, original light bezels. Original K5 components in storage. Default approved.",
+    "paperwork": "Cardboard box with shipping/inventory labels"
+  },
+  {
+    "order": 36,
+    "image_id": "2b007773-fdce-4357-8135-5267fe8c11b7",
+    "verdict": "review_needed",
+    "confidence": 0.35,
+    "reasoning": "Maroon/burgundy K5 Blazer front-end fully stripped (no hood, no radiator support, no fenders mounted), on 2-post lift in shop. Body color matches e04b CKR187F127263 (1977 K10 Cheyenne Super red/white). Mid-restoration state. Specific evidence points to e04b.",
+    "paperwork": null
+  },
+  {
+    "order": 37,
+    "image_id": "1e18988b-781e-4cd7-924c-4b5d0057c3d6",
+    "verdict": "review_needed",
+    "confidence": 0.95,
+    "reasoning": "GM door-jamb VIN/data plate clearly shows 'VIN CKR187F127263' (with GVWR 6200, GAWR FRONT 3600, GAWR REAR 3400, tire info LR78x15-C). This is EXPLICITLY the e04b vehicle (1977 K10 Cheyenne Super red/white CKR187F127263), NOT Skylar's K5 CRK178P122739. Strong evidence for reattribution.",
+    "paperwork": "GM door-jamb data plate: VIN CKR187F127263, GVWR 6200, GAWR FRONT 3600 / REAR 3400, FRONT LR78x15-C / REAR LR78x15-C, MFD BY GENERAL MOTORS CORPORATION, 'THIS TRUCK SHOULD NOT BE USED TO CARRY A SLIDE-IN CAMPER'"
+  },
+  {
+    "order": 38,
+    "image_id": "0400b1e5-8d0c-465a-a762-92fd021de3d8",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Interior view through K5 Blazer doorway, tan/buckskin bench seat visible, maroon interior trim, replacement floor panel patch being fabricated. Maroon body color matches e04b CKR187F127263. Floor pan rust repair in progress.",
+    "paperwork": null
+  },
+  {
+    "order": 39,
+    "image_id": "681e384d-8640-481e-942a-16884e263129",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Maroon K5 floor pan / sill / rocker repair: black sheet metal patch being fit into rear wheelwell-to-cab area, original red paint visible. Color matches e04b CKR187F127263.",
+    "paperwork": null
+  },
+  {
+    "order": 40,
+    "image_id": "aa052a43-fbe6-4792-80b7-cbc8677bab86",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Rocker/inner-fender rust repair on maroon K5 with raw sheet-metal patch tacked in. Color matches e04b CKR187F127263. Mid-restoration body work.",
+    "paperwork": null
+  },
+  {
+    "order": 41,
+    "image_id": "cc5bc391-0864-4585-a755-0d84e4b677cf",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Rusted-out body sections cut from maroon K5 laid on shop floor showing severe corrosion damage. Red paint matches e04b CKR187F127263. Restoration documentation.",
+    "paperwork": null
+  },
+  {
+    "order": 42,
+    "image_id": "26dcbb82-7d66-448e-9707-35ff3bb206c6",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Interior corner of maroon K5 cab showing severe rust on rocker / kick panel area, tan vinyl bench seat visible, sound deadening pulled. Color matches e04b CKR187F127263.",
+    "paperwork": null
+  },
+  {
+    "order": 43,
+    "image_id": "2aff30a2-650d-43fd-b5e3-4ac968af85a0",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Maroon K5 inner rocker/floor area with sheetmetal cut away exposing severe rust. Color matches e04b CKR187F127263. Restoration body work in progress.",
+    "paperwork": null
+  },
+  {
+    "order": 44,
+    "image_id": "d5b64ffe-6783-48de-9712-08cc86ae12f3",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Doorless view into maroon K5 cab from outside: tan bench seat, body-side trim, repainted gray door sill/rocker. Color matches e04b CKR187F127263.",
+    "paperwork": null
+  },
+  {
+    "order": 45,
+    "image_id": "46a0b890-cd7b-44ef-9675-338349f385e9",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Side profile of maroon K5 Blazer with white removable hardtop, body-side stripe trim, 'Cheyenne' badge on front fender, BFGoodrich All-Terrain T/A tires on chrome wheels, mild lift. Two-tone red/white matches e04b CKR187F127263 1977 K10 Cheyenne Super.",
+    "paperwork": "'Cheyenne' fender badge, BFGoodrich All-Terrain T/A tires"
+  },
+  {
+    "order": 46,
+    "image_id": "bf461bfc-6aef-4b69-b7fc-1e8b572f5ffe",
+    "verdict": "rejected_personal",
+    "confidence": 0.95,
+    "reasoning": "Two black dogs (large lab/mix and small pug), person's arm with green chew toy, indoor floor. No vehicle content. Personal/pet photo.",
+    "paperwork": null
+  },
+  {
+    "order": 47,
+    "image_id": "294b480f-db54-4678-8856-86e8872a97d4",
+    "verdict": "rejected_personal",
+    "confidence": 0.95,
+    "reasoning": "Black dog and pug on shop floor near person's boot/jeans, green chew toy. No vehicle content. Personal/pet photo.",
+    "paperwork": null
+  },
+  {
+    "order": 48,
+    "image_id": "1e8b42c8-edd3-4238-807b-7b81afe68692",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Chrome GM Rally wheel with 'MW' (Mickey Wheels / Western) center cap showing 5-lug GM bolt pattern and locking hub visible through center hole. Square-body GM 4WD wheel. Default approved.",
+    "paperwork": "'MW' wheel center cap (Mickey Wheels / Western)"
+  },
+  {
+    "order": 49,
+    "image_id": "5afad8bf-5826-424c-8ad9-d892bb00a9c2",
+    "verdict": "review_needed",
+    "confidence": 0.35,
+    "reasoning": "Maroon/red K5 Blazer rear quarter panel with white removable hardtop, gold and chrome body-side trim, taillight assembly. Two-tone red/white with gold trim matches e04b CKR187F127263 1977 K10 Cheyenne Super. Chevy bowtie box visible in foreground.",
+    "paperwork": "Chevy bowtie logo on box in foreground"
+  }
+]

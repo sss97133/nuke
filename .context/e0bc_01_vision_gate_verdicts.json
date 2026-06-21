@@ -1,0 +1,34 @@
+[
+  {
+    "order": 0,
+    "image_id": "95e0ecd3-3ac2-4101-b745-47ebd8cfe402",
+    "path": "/Users/skylar/nuke/.context/e0bc_01_vision_gate/000_95e0ecd3.jpg",
+    "classification": "rejected_personal",
+    "confidence": 0.98,
+    "reasoning": "Index card with Skylar's full Nevada driver's license clearly visible: license number 1702768060, DOB 01/17/1991, exp 01/17/2026, full address 707 Yucca St Boulder City NV 89005-1912, photo, signature, height/weight/eye color. Also handwritten phone 702-624-6793 and home address 674 Wells Rd. The note references purchase of '1987 GMC Suburban VIN 1GKEV16K7HF509103' which is the target vehicle's acquisition context, but the PII on the driver's license (DL#, DOB, address, photo) is severe and not publishable. Reject for personal/PII content. The provenance information (VIN + purchase note) should be transcribed to vehicle_observations as a structured atom rather than published as an image."
+  },
+  {
+    "order": 1,
+    "image_id": "c70ecfac-3368-45da-ae46-bd41de92da09",
+    "path": "/Users/skylar/nuke/.context/e0bc_01_vision_gate/001_c70ecfac.jpg",
+    "classification": "approved",
+    "confidence": 0.9,
+    "reasoning": "Nevada DMV Certificate of Title (duplicate, print date 01/22/2021). VIN 1GTEV14K7HS532225, 1987 GMC V15, body type TPK (truck/utility = Suburban/Carryall), title number NV013272976, GVWR 5999, empty wt 3901. Owners: O'Malley Tabitha Teddy AND Williams Brian Robert (Skylar's father), mailing 2341 E Lynn Ave Pahrump NV 89060. This is canonical title/provenance evidence for the 1987 GMC V15 LWB (Suburban) — exactly the kind of acquisition-context document the title-photos rule says to keep. Title documents contain owner names and addresses but are routine vehicle provenance, not driver's-license-level PII. Approved as title-record testimony. Per feedback_title_photos_are_acquisition_context.md, pair this with surrounding photos to tell the ownership story."
+  },
+  {
+    "order": 2,
+    "image_id": "fd192c7a-3bea-4705-ba43-7d377598c60f",
+    "path": "/Users/skylar/nuke/.context/e0bc_01_vision_gate/002_fd192c7a.jpg",
+    "classification": "approved",
+    "confidence": 0.97,
+    "reasoning": "Clean front-three-quarter exterior photo of a two-tone red-over-white 1987 GMC V15 Suburban (Sierra trim) in a desert parking lot (Lake Mead / Valley of Fire area, consistent with Boulder City NV registration). Square-body GM C/K Suburban, long roof with three side windows (Suburban, not Blazer/Jimmy), GMC grille, chrome bumpers, BFGoodrich All-Terrain T/As on factory-style argent rallye wheels, mild lift. Matches '1987 GMC V15 LWB' attribution. Default-approved square-body GM C/K content per task rubric. Strong lead-image candidate."
+  },
+  {
+    "order": 3,
+    "image_id": "68c3b7aa-a2a0-421f-bdbc-f9f6f2779da7",
+    "path": "/Users/skylar/nuke/.context/e0bc_01_vision_gate/003_68c3b7aa.jpg",
+    "classification": "review_needed",
+    "confidence": 0.6,
+    "reasoning": "Same red-and-white 1987 GMC V15 Suburban from same location/session as image 002, side profile. HOWEVER the left ~40% of the frame is solid gray — this is a cropped/partial frame, likely from a panorama or pano-stitch artifact that didn't render or was truncated on export. The remaining 60% is on-vehicle and on-attribution (square-body GM C/K), but the gray band is a publishability defect, not a content defect. Flag for review: either re-crop to remove the gray band (then approved), regenerate from the original asset, or supersede with the full frame. Do not publish as-is."
+  }
+]

@@ -1,0 +1,472 @@
+[
+  {
+    "burst_start": "2026-02-06 18:10:01",
+    "burst_end": "2026-02-07 06:45:38",
+    "burst_count": 531,
+    "sample_uuid": "F919E792-A0C0-45C0-9413-D6BC315205BA",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/F919E792-A0C0-45C0-9413-D6BC315205BA.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/F/F919E792-A0C0-45C0-9413-D6BC315205BA_1_105_c.jpeg",
+    "lat": 35.97263,
+    "lng": -114.85576
+  },
+  {
+    "burst_start": "2019-12-24 18:46:35",
+    "burst_end": "2019-12-24 19:22:48",
+    "burst_count": 417,
+    "sample_uuid": "181A5FBA-B40B-4753-A14F-D0428A26D706",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/181A5FBA-B40B-4753-A14F-D0428A26D706.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/1/181A5FBA-B40B-4753-A14F-D0428A26D706.THM",
+    "lat": 35.97248,
+    "lng": -114.85595
+  },
+  {
+    "burst_start": "2025-11-04 15:46:05",
+    "burst_end": "2025-11-05 06:01:34",
+    "burst_count": 416,
+    "sample_uuid": "0B826AB5-08BB-4F28-B44F-0680199B3F18",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/0B826AB5-08BB-4F28-B44F-0680199B3F18.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/0/0B826AB5-08BB-4F28-B44F-0680199B3F18.THM",
+    "lat": 35.97628,
+    "lng": -114.85893
+  },
+  {
+    "burst_start": "2024-12-01 16:45:02",
+    "burst_end": "2024-12-02 04:17:17",
+    "burst_count": 392,
+    "sample_uuid": "090966DF-A040-489D-9E30-C0FF79C3E8D7",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/090966DF-A040-489D-9E30-C0FF79C3E8D7.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/0/090966DF-A040-489D-9E30-C0FF79C3E8D7.THM",
+    "lat": 35.98242,
+    "lng": -114.84532
+  },
+  {
+    "burst_start": "2026-02-10 15:53:19",
+    "burst_end": "2026-02-11 06:14:55",
+    "burst_count": 354,
+    "sample_uuid": "DF11AC3F-00B2-417C-A0B6-4CCFF9AFB123",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/DF11AC3F-00B2-417C-A0B6-4CCFF9AFB123.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/D/DF11AC3F-00B2-417C-A0B6-4CCFF9AFB123_1_105_c.jpeg",
+    "lat": 35.97403,
+    "lng": -114.85854
+  },
+  {
+    "burst_start": "2025-08-26 14:32:59",
+    "burst_end": "2025-08-27 02:46:57",
+    "burst_count": 241,
+    "sample_uuid": "7986A84C-1B3C-4969-8547-07D5966828CE",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/7986A84C-1B3C-4969-8547-07D5966828CE.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/7/7986A84C-1B3C-4969-8547-07D5966828CE_1_105_c.jpeg",
+    "lat": 35.97659,
+    "lng": -114.85885
+  },
+  {
+    "burst_start": "2020-04-18 19:00:35",
+    "burst_end": "2020-04-18 23:59:47",
+    "burst_count": 208,
+    "sample_uuid": "7EC25401-295D-4DBA-85FD-044A1584F001",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/7EC25401-295D-4DBA-85FD-044A1584F001.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/7/7EC25401-295D-4DBA-85FD-044A1584F001.THM",
+    "lat": 35.9772,
+    "lng": -114.85415
+  },
+  {
+    "burst_start": "2020-05-27 18:43:25",
+    "burst_end": "2020-05-28 01:23:46",
+    "burst_count": 190,
+    "sample_uuid": "A51A26A7-9917-4EEA-95EE-BBB43CFFA146",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/A51A26A7-9917-4EEA-95EE-BBB43CFFA146.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/A/A51A26A7-9917-4EEA-95EE-BBB43CFFA146.THM",
+    "lat": 35.97813,
+    "lng": -114.85565
+  },
+  {
+    "burst_start": "2025-08-28 16:36:41",
+    "burst_end": "2025-08-29 00:48:41",
+    "burst_count": 174,
+    "sample_uuid": "05076D2D-62EC-4607-B156-D7DDE6382632",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/05076D2D-62EC-4607-B156-D7DDE6382632.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/0/05076D2D-62EC-4607-B156-D7DDE6382632.THM",
+    "lat": 35.97356,
+    "lng": -114.85644
+  },
+  {
+    "burst_start": "2025-10-18 19:01:09",
+    "burst_end": "2025-10-19 04:07:44",
+    "burst_count": 169,
+    "sample_uuid": "69ECB3F1-32BB-4B7D-99A4-AFD50ABE4A16",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/69ECB3F1-32BB-4B7D-99A4-AFD50ABE4A16.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/6/69ECB3F1-32BB-4B7D-99A4-AFD50ABE4A16.THM",
+    "lat": 35.9736,
+    "lng": -114.85524
+  },
+  {
+    "burst_start": "2024-01-13 20:49:47",
+    "burst_end": "2024-01-13 23:03:32",
+    "burst_count": 168,
+    "sample_uuid": "AAFBD9D1-D199-4B1A-9BDF-0F892D43DEB7",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/AAFBD9D1-D199-4B1A-9BDF-0F892D43DEB7.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/A/AAFBD9D1-D199-4B1A-9BDF-0F892D43DEB7_1_105_c.jpeg",
+    "lat": 35.97681,
+    "lng": -114.85816
+  },
+  {
+    "burst_start": "2024-04-24 23:42:12",
+    "burst_end": "2024-04-25 03:18:05",
+    "burst_count": 162,
+    "sample_uuid": "50FFA956-29BF-415C-9148-9AE26E983AE2",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/50FFA956-29BF-415C-9148-9AE26E983AE2.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/5/50FFA956-29BF-415C-9148-9AE26E983AE2.THM",
+    "lat": 35.97836,
+    "lng": -114.86182
+  },
+  {
+    "burst_start": "2026-02-03 17:38:22",
+    "burst_end": "2026-02-04 04:04:46",
+    "burst_count": 155,
+    "sample_uuid": "22EE65FB-77B5-4458-B94F-30FCC3AAD70F",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/22EE65FB-77B5-4458-B94F-30FCC3AAD70F.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/2/22EE65FB-77B5-4458-B94F-30FCC3AAD70F_1_105_c.jpeg",
+    "lat": 35.97484,
+    "lng": -114.85446
+  },
+  {
+    "burst_start": "2024-09-22 15:18:51",
+    "burst_end": "2024-09-23 03:01:22",
+    "burst_count": 154,
+    "sample_uuid": "8D146E80-5B64-41B7-A093-699D8A06B86D",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/8D146E80-5B64-41B7-A093-699D8A06B86D.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/8/8D146E80-5B64-41B7-A093-699D8A06B86D_1_105_c.jpeg",
+    "lat": 35.97712,
+    "lng": -114.85414
+  },
+  {
+    "burst_start": "2025-09-06 23:00:35",
+    "burst_end": "2025-09-07 03:51:38",
+    "burst_count": 151,
+    "sample_uuid": "44D553C9-535D-4B94-88BA-DCA1F1AFCBA0",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/44D553C9-535D-4B94-88BA-DCA1F1AFCBA0.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/4/44D553C9-535D-4B94-88BA-DCA1F1AFCBA0.THM",
+    "lat": 35.97932,
+    "lng": -114.86209
+  },
+  {
+    "burst_start": "2023-04-20 16:02:09",
+    "burst_end": "2023-04-21 05:30:48",
+    "burst_count": 149,
+    "sample_uuid": "3131D260-4C78-4674-BDCF-39BCBB7D36BE",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/3131D260-4C78-4674-BDCF-39BCBB7D36BE.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/3/3131D260-4C78-4674-BDCF-39BCBB7D36BE_1_105_c.jpeg",
+    "lat": 35.97747,
+    "lng": -114.85411
+  },
+  {
+    "burst_start": "2023-07-01 20:36:25",
+    "burst_end": "2023-07-02 03:25:44",
+    "burst_count": 148,
+    "sample_uuid": "13581A7E-2ABD-48CD-8FC9-34B4D7287635",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/13581A7E-2ABD-48CD-8FC9-34B4D7287635.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/1/13581A7E-2ABD-48CD-8FC9-34B4D7287635.THM",
+    "lat": 35.97877,
+    "lng": -114.86096
+  },
+  {
+    "burst_start": "2024-03-15 18:03:16",
+    "burst_end": "2024-03-16 04:32:17",
+    "burst_count": 148,
+    "sample_uuid": "A3E9C385-DE84-4819-9203-0584FB140835",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/A3E9C385-DE84-4819-9203-0584FB140835.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/A/A3E9C385-DE84-4819-9203-0584FB140835.THM",
+    "lat": 35.97534,
+    "lng": -114.85827
+  },
+  {
+    "burst_start": "2020-05-01 20:07:24",
+    "burst_end": "2020-05-01 23:38:45",
+    "burst_count": 144,
+    "sample_uuid": "A04BDAB5-35C0-4640-AB53-E5BEDD4DB4CB",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/A04BDAB5-35C0-4640-AB53-E5BEDD4DB4CB.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/A/A04BDAB5-35C0-4640-AB53-E5BEDD4DB4CB.THM",
+    "lat": 35.97112,
+    "lng": -114.84633
+  },
+  {
+    "burst_start": "2025-09-10 16:54:13",
+    "burst_end": "2025-09-11 04:45:42",
+    "burst_count": 142,
+    "sample_uuid": "501EC936-5DEE-4F86-91EF-2144C3D9EEC0",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/501EC936-5DEE-4F86-91EF-2144C3D9EEC0.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/5/501EC936-5DEE-4F86-91EF-2144C3D9EEC0_1_105_c.jpeg",
+    "lat": 35.97706,
+    "lng": -114.85957
+  },
+  {
+    "burst_start": "2018-09-23 03:01:12",
+    "burst_end": "2018-09-23 13:47:06",
+    "burst_count": 133,
+    "sample_uuid": "E37CAC60-760A-447F-BB54-037F9F5C64EF",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/E37CAC60-760A-447F-BB54-037F9F5C64EF.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/E/E37CAC60-760A-447F-BB54-037F9F5C64EF_1_105_c.jpeg",
+    "lat": 35.97263,
+    "lng": -114.85559
+  },
+  {
+    "burst_start": "2025-09-09 15:07:28",
+    "burst_end": "2025-09-10 02:01:28",
+    "burst_count": 131,
+    "sample_uuid": "AF6EBD37-D2D6-490F-AFB3-844400BEEE11",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/AF6EBD37-D2D6-490F-AFB3-844400BEEE11.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/A/AF6EBD37-D2D6-490F-AFB3-844400BEEE11.THM",
+    "lat": 35.97674,
+    "lng": -114.85882
+  },
+  {
+    "burst_start": "2024-06-13 19:25:59",
+    "burst_end": "2024-06-14 02:22:04",
+    "burst_count": 128,
+    "sample_uuid": "DBFB9959-9B0D-4127-A880-D6FC89C27989",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/DBFB9959-9B0D-4127-A880-D6FC89C27989.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/D/DBFB9959-9B0D-4127-A880-D6FC89C27989_1_105_c.jpeg",
+    "lat": 35.97721,
+    "lng": -114.85341
+  },
+  {
+    "burst_start": "2019-11-01 20:57:57",
+    "burst_end": "2019-11-01 23:17:31",
+    "burst_count": 116,
+    "sample_uuid": "B360A45F-3203-4447-A17D-E05E7331872E",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/B360A45F-3203-4447-A17D-E05E7331872E.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/B/B360A45F-3203-4447-A17D-E05E7331872E.THM",
+    "lat": 35.97263,
+    "lng": -114.85576
+  },
+  {
+    "burst_start": "2023-12-21 18:56:16",
+    "burst_end": "2023-12-22 02:20:37",
+    "burst_count": 115,
+    "sample_uuid": "759623DC-7CC2-4167-8632-407490B1936B",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/759623DC-7CC2-4167-8632-407490B1936B.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/7/759623DC-7CC2-4167-8632-407490B1936B.THM",
+    "lat": 35.97925,
+    "lng": -114.86059
+  },
+  {
+    "burst_start": "2024-04-18 17:42:58",
+    "burst_end": "2024-04-19 04:27:28",
+    "burst_count": 110,
+    "sample_uuid": "D918CC7A-C74E-4A2F-BE7B-42FEDEC3CFAF",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/D918CC7A-C74E-4A2F-BE7B-42FEDEC3CFAF.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/D/D918CC7A-C74E-4A2F-BE7B-42FEDEC3CFAF_1_105_c.jpeg",
+    "lat": 35.97553,
+    "lng": -114.85804
+  },
+  {
+    "burst_start": "2021-08-30 17:47:27",
+    "burst_end": "2021-08-30 21:23:52",
+    "burst_count": 100,
+    "sample_uuid": "2D9224B2-1E55-43FC-A6E3-EEEF93EE7C2D",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/2D9224B2-1E55-43FC-A6E3-EEEF93EE7C2D.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/2/2D9224B2-1E55-43FC-A6E3-EEEF93EE7C2D_1_105_c.jpeg",
+    "lat": 35.97718,
+    "lng": -114.85418
+  },
+  {
+    "burst_start": "2020-12-21 00:35:32",
+    "burst_end": "2020-12-21 07:12:48",
+    "burst_count": 92,
+    "sample_uuid": "72F2F904-F143-46C5-AA15-87330144C77E",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/72F2F904-F143-46C5-AA15-87330144C77E.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/7/72F2F904-F143-46C5-AA15-87330144C77E.THM",
+    "lat": 35.97732,
+    "lng": -114.85411
+  },
+  {
+    "burst_start": "2025-04-25 17:40:04",
+    "burst_end": "2025-04-25 23:29:08",
+    "burst_count": 91,
+    "sample_uuid": "0CE78867-D313-4FC9-B2CA-53012B8EB3FC",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/0CE78867-D313-4FC9-B2CA-53012B8EB3FC.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/0/0CE78867-D313-4FC9-B2CA-53012B8EB3FC.THM",
+    "lat": 35.97276,
+    "lng": -114.8554
+  },
+  {
+    "burst_start": "2020-01-24 01:12:59",
+    "burst_end": "2020-01-24 01:26:11",
+    "burst_count": 87,
+    "sample_uuid": "703DC2E3-6BF9-4E67-AA33-9E8267647B7C",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/703DC2E3-6BF9-4E67-AA33-9E8267647B7C.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/7/703DC2E3-6BF9-4E67-AA33-9E8267647B7C.THM",
+    "lat": 35.97793,
+    "lng": -114.85434
+  },
+  {
+    "burst_start": "2023-04-13 17:36:28",
+    "burst_end": "2023-04-14 02:23:10",
+    "burst_count": 87,
+    "sample_uuid": "90752A97-6A63-494A-8A7D-8A314FE99FD2",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/90752A97-6A63-494A-8A7D-8A314FE99FD2.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/9/90752A97-6A63-494A-8A7D-8A314FE99FD2_1_105_c.jpeg",
+    "lat": 35.97708,
+    "lng": -114.85415
+  },
+  {
+    "burst_start": "2023-07-10 19:35:01",
+    "burst_end": "2023-07-11 01:36:13",
+    "burst_count": 86,
+    "sample_uuid": "13E8C3F6-0E11-4FE1-8D1C-F76605EE58AA",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/13E8C3F6-0E11-4FE1-8D1C-F76605EE58AA.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/1/13E8C3F6-0E11-4FE1-8D1C-F76605EE58AA_1_105_c.jpeg",
+    "lat": 35.97863,
+    "lng": -114.86013
+  },
+  {
+    "burst_start": "2025-10-30 16:24:09",
+    "burst_end": "2025-10-31 03:13:51",
+    "burst_count": 82,
+    "sample_uuid": "CA4D4A08-6CB8-4CB3-86FB-5BBD170D16AC",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/CA4D4A08-6CB8-4CB3-86FB-5BBD170D16AC.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/C/CA4D4A08-6CB8-4CB3-86FB-5BBD170D16AC_1_105_c.jpeg",
+    "lat": 35.97313,
+    "lng": -114.85478
+  },
+  {
+    "burst_start": "2022-11-19 18:53:34",
+    "burst_end": "2022-11-20 01:33:38",
+    "burst_count": 80,
+    "sample_uuid": "3ACC256D-23AB-4B92-AFD3-AF05C1D132CC",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/3ACC256D-23AB-4B92-AFD3-AF05C1D132CC.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/3/3ACC256D-23AB-4B92-AFD3-AF05C1D132CC_1_105_c.jpeg",
+    "lat": 35.97774,
+    "lng": -114.85653
+  },
+  {
+    "burst_start": "2026-04-27 15:34:20",
+    "burst_end": "2026-04-28 09:28:41",
+    "burst_count": 80,
+    "sample_uuid": "193B2934-624B-43EB-B4F9-29509B650812",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/193B2934-624B-43EB-B4F9-29509B650812.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/1/193B2934-624B-43EB-B4F9-29509B650812_1_105_c.jpeg",
+    "lat": 35.97301,
+    "lng": -114.85546
+  },
+  {
+    "burst_start": "2019-12-22 00:46:39",
+    "burst_end": "2019-12-22 02:04:20",
+    "burst_count": 78,
+    "sample_uuid": "2071E525-7B55-4867-BD08-3B15719C71A5",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/2071E525-7B55-4867-BD08-3B15719C71A5.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/2/2071E525-7B55-4867-BD08-3B15719C71A5.THM",
+    "lat": 35.97243,
+    "lng": -114.856
+  },
+  {
+    "burst_start": "2021-06-12 21:02:21",
+    "burst_end": "2021-06-12 21:47:03",
+    "burst_count": 78,
+    "sample_uuid": "4F58A2CF-38AE-4CEB-864C-A9C37326CBE3",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/4F58A2CF-38AE-4CEB-864C-A9C37326CBE3.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/4/4F58A2CF-38AE-4CEB-864C-A9C37326CBE3_1_102_o.jpeg",
+    "lat": 35.97743,
+    "lng": -114.8539
+  },
+  {
+    "burst_start": "2022-01-25 04:33:10",
+    "burst_end": "2022-01-25 06:39:33",
+    "burst_count": 77,
+    "sample_uuid": "C9725335-9EB9-4812-99B8-553E01AA4D6A",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/C9725335-9EB9-4812-99B8-553E01AA4D6A.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/C/C9725335-9EB9-4812-99B8-553E01AA4D6A.THM",
+    "lat": 35.97722,
+    "lng": -114.85415
+  },
+  {
+    "burst_start": "2023-07-11 23:33:56",
+    "burst_end": "2023-07-12 02:55:19",
+    "burst_count": 76,
+    "sample_uuid": "8F9B59D3-1F0F-47B9-B83E-EDDBB648F959",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/8F9B59D3-1F0F-47B9-B83E-EDDBB648F959.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/8/8F9B59D3-1F0F-47B9-B83E-EDDBB648F959.THM",
+    "lat": 35.97725,
+    "lng": -114.85419
+  },
+  {
+    "burst_start": "2020-05-25 16:07:02",
+    "burst_end": "2020-05-26 03:30:07",
+    "burst_count": 73,
+    "sample_uuid": "D29B0662-0E9D-45D7-A0E1-E0E420B05FBE",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/D29B0662-0E9D-45D7-A0E1-E0E420B05FBE.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/D/D29B0662-0E9D-45D7-A0E1-E0E420B05FBE.THM",
+    "lat": 35.98407,
+    "lng": -114.86528
+  },
+  {
+    "burst_start": "2025-02-18 18:23:10",
+    "burst_end": "2025-02-19 06:14:49",
+    "burst_count": 73,
+    "sample_uuid": "5C3F6A3F-376A-4115-B0AB-9AD7B0E50859",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/5C3F6A3F-376A-4115-B0AB-9AD7B0E50859.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/5/5C3F6A3F-376A-4115-B0AB-9AD7B0E50859.THM",
+    "lat": 35.97435,
+    "lng": -114.85472
+  },
+  {
+    "burst_start": "2023-05-20 15:19:34",
+    "burst_end": "2023-05-21 00:05:02",
+    "burst_count": 72,
+    "sample_uuid": "C61DE361-61C9-4D90-8058-6ADCA68BCDC1",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/C61DE361-61C9-4D90-8058-6ADCA68BCDC1.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/C/C61DE361-61C9-4D90-8058-6ADCA68BCDC1_1_105_c.jpeg",
+    "lat": 35.97788,
+    "lng": -114.85335
+  },
+  {
+    "burst_start": "2025-10-05 20:47:50",
+    "burst_end": "2025-10-06 06:41:56",
+    "burst_count": 72,
+    "sample_uuid": "DA3719FA-1B95-40A3-AB0F-576D12ED8310",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/DA3719FA-1B95-40A3-AB0F-576D12ED8310.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/D/DA3719FA-1B95-40A3-AB0F-576D12ED8310_1_105_c.jpeg",
+    "lat": 35.97613,
+    "lng": -114.85456
+  },
+  {
+    "burst_start": "2026-02-02 20:32:16",
+    "burst_end": "2026-02-03 01:23:49",
+    "burst_count": 71,
+    "sample_uuid": "DED14731-63BD-4158-89B2-BEA0CB8963CA",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/DED14731-63BD-4158-89B2-BEA0CB8963CA.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/D/DED14731-63BD-4158-89B2-BEA0CB8963CA_1_105_c.jpeg",
+    "lat": 35.97273,
+    "lng": -114.85563
+  },
+  {
+    "burst_start": "2019-04-29 19:50:09",
+    "burst_end": "2019-04-29 21:11:14",
+    "burst_count": 70,
+    "sample_uuid": "596F593C-666D-4688-980A-213CCC51E25A",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/596F593C-666D-4688-980A-213CCC51E25A.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/5/596F593C-666D-4688-980A-213CCC51E25A.THM",
+    "lat": 35.9756,
+    "lng": -114.85742
+  },
+  {
+    "burst_start": "2025-04-24 21:25:51",
+    "burst_end": "2025-04-25 00:12:25",
+    "burst_count": 66,
+    "sample_uuid": "3B6C37C3-1AB5-42B2-8B81-37A8EBA67B2E",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/3B6C37C3-1AB5-42B2-8B81-37A8EBA67B2E.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/3/3B6C37C3-1AB5-42B2-8B81-37A8EBA67B2E_1_105_c.jpeg",
+    "lat": 35.97187,
+    "lng": -114.85302
+  },
+  {
+    "burst_start": "2026-04-15 16:58:30",
+    "burst_end": "2026-04-16 08:49:10",
+    "burst_count": 66,
+    "sample_uuid": "7DBF7094-C810-45B3-BEB7-C22B8C17589A",
+    "sample_path": "/Users/skylar/nuke/.context/burst_samples/7DBF7094-C810-45B3-BEB7-C22B8C17589A.jpg",
+    "sample_source_path": "/Users/skylar/Pictures/Photos Library.photoslibrary/resources/derivatives/7/7DBF7094-C810-45B3-BEB7-C22B8C17589A_1_105_c.jpeg",
+    "lat": 35.97279,
+    "lng": -114.85556
+  }
+]

@@ -1,0 +1,302 @@
+[
+  {
+    "kind": "brand_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "brand": "Holley",
+    "mention_count": 3,
+    "distinct_vendors": 1,
+    "first_mention": "2022-07-05",
+    "last_mention": "2022-09-13",
+    "samples": [
+      {
+        "date": "2022-07-05",
+        "vendor": "PayPal",
+        "amount": 15.3,
+        "desc": "PURCHASE AUTHORIZED ON 07/02 HOLLEY PERFORMANCE 800-6380032 KY S582183536737191 CARD 8759"
+      },
+      {
+        "date": "2022-09-08",
+        "vendor": null,
+        "amount": 81.8,
+        "desc": "VISA - 09/06 HOLLEY PERFORMANCE PRODUC 800-6380032 KY 006"
+      },
+      {
+        "date": "2022-09-13",
+        "vendor": null,
+        "amount": 1596.53,
+        "desc": "VISA - 09/10 HOLLEY PERFORMANCE PRODUC 800-6380032 KY 004"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.854839",
+    "method": "regex_brand_mention",
+    "trust": "T2",
+    "caveats": "single-mention brands flagged as low_confidence per correctness rule",
+    "confidence": "medium"
+  },
+  {
+    "kind": "brand_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "brand": "MSD",
+    "mention_count": 2,
+    "distinct_vendors": 1,
+    "first_mention": "2019-03-09",
+    "last_mention": "2019-03-09",
+    "samples": [
+      {
+        "date": "2019-03-09",
+        "vendor": "Desert Performance",
+        "amount": 35,
+        "desc": "MSD MSD Denso coil termination"
+      },
+      {
+        "date": "2019-03-09",
+        "vendor": "Desert Performance",
+        "amount": 250,
+        "desc": "MSD MSD billet cam sync"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.854822",
+    "method": "regex_brand_mention",
+    "trust": "T2",
+    "caveats": "single-mention brands flagged as low_confidence per correctness rule",
+    "confidence": "medium"
+  },
+  {
+    "kind": "brand_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "brand": "Dorman",
+    "mention_count": 2,
+    "distinct_vendors": 2,
+    "first_mention": "2025-02-07",
+    "last_mention": "2025-10-17",
+    "samples": [
+      {
+        "date": "2025-02-07",
+        "vendor": "Summit Racing",
+        "amount": 193.98,
+        "desc": "RNB-576-300 Dorman Fuel Tank x2 ($96.99 ea)"
+      },
+      {
+        "date": "2025-10-17",
+        "vendor": "RockAuto",
+        "amount": 0,
+        "desc": "Dorman 47099"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.854844",
+    "method": "regex_brand_mention",
+    "trust": "T2",
+    "caveats": "single-mention brands flagged as low_confidence per correctness rule",
+    "confidence": "medium"
+  },
+  {
+    "kind": "brand_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "brand": "Optima",
+    "mention_count": 1,
+    "distinct_vendors": 1,
+    "first_mention": "2019-03-09",
+    "last_mention": "2019-03-09",
+    "samples": [
+      {
+        "date": "2019-03-09",
+        "vendor": "Desert Performance",
+        "amount": 240,
+        "desc": "Optima Optima battery"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.854833",
+    "method": "regex_brand_mention",
+    "trust": "T2",
+    "caveats": "single-mention brands flagged as low_confidence per correctness rule",
+    "confidence": "low"
+  },
+  {
+    "kind": "brand_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "brand": "Bosch",
+    "mention_count": 1,
+    "distinct_vendors": 1,
+    "first_mention": "2019-03-09",
+    "last_mention": "2019-03-09",
+    "samples": [
+      {
+        "date": "2019-03-09",
+        "vendor": "Desert Performance",
+        "amount": 240,
+        "desc": "Bosch LSU 4.9 oxygen sensor"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.854836",
+    "method": "regex_brand_mention",
+    "trust": "T2",
+    "caveats": "single-mention brands flagged as low_confidence per correctness rule",
+    "confidence": "low"
+  },
+  {
+    "kind": "brand_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "brand": "ARP",
+    "mention_count": 1,
+    "distinct_vendors": 1,
+    "first_mention": "2024-09-25",
+    "last_mention": "2024-09-25",
+    "samples": [
+      {
+        "date": "2024-09-25",
+        "vendor": "Summit Racing",
+        "amount": 0,
+        "desc": "ARP bolts, ADO Starter + heat shield + connector, FEL valve cover gaskets, ARP bellhousing bolts (7 items, prices unavailable)"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.854841",
+    "method": "regex_brand_mention",
+    "trust": "T2",
+    "caveats": "single-mention brands flagged as low_confidence per correctness rule",
+    "confidence": "low"
+  },
+  {
+    "kind": "brand_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "brand": "Felpro",
+    "mention_count": 1,
+    "distinct_vendors": 1,
+    "first_mention": "2024-09-25",
+    "last_mention": "2024-09-25",
+    "samples": [
+      {
+        "date": "2024-09-25",
+        "vendor": "Summit Racing",
+        "amount": 0,
+        "desc": "ARP bolts, ADO Starter + heat shield + connector, FEL valve cover gaskets, ARP bellhousing bolts (7 items, prices unavailable)"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.854842",
+    "method": "regex_brand_mention",
+    "trust": "T2",
+    "caveats": "single-mention brands flagged as low_confidence per correctness rule",
+    "confidence": "low"
+  },
+  {
+    "kind": "brand_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "brand": "Pro Comp",
+    "mention_count": 1,
+    "distinct_vendors": 1,
+    "first_mention": "2025-04-16",
+    "last_mention": "2025-04-16",
+    "samples": [
+      {
+        "date": "2025-04-16",
+        "vendor": "Summit Racing",
+        "amount": 739.96,
+        "desc": "PCW-1069-6182 Pro Comp Xtreme Alloys Polished Wheels 16x10 x4 ($184.99 ea)"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.854846",
+    "method": "regex_brand_mention",
+    "trust": "T2",
+    "caveats": "single-mention brands flagged as low_confidence per correctness rule",
+    "confidence": "low"
+  },
+  {
+    "kind": "brand_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "brand": "Raybestos",
+    "mention_count": 1,
+    "distinct_vendors": 1,
+    "first_mention": "2026-03-01",
+    "last_mention": "2026-03-01",
+    "samples": [
+      {
+        "date": "2026-03-01",
+        "vendor": "Summit Racing",
+        "amount": 122.44,
+        "desc": "SUM-RP22000 Under Hood Insulation Kit ($45.99) + AGB-MC39308 Raybestos Brake Master Cylinder ($66.99)"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.854848",
+    "method": "regex_brand_mention",
+    "trust": "T2",
+    "caveats": "single-mention brands flagged as low_confidence per correctness rule",
+    "confidence": "low"
+  },
+  {
+    "kind": "brand_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "brand": "Brothers",
+    "mention_count": 1,
+    "distinct_vendors": 1,
+    "first_mention": "2026-03-04",
+    "last_mention": "2026-03-04",
+    "samples": [
+      {
+        "date": "2026-03-04",
+        "vendor": "Summit Racing",
+        "amount": 1243.36,
+        "desc": "HCT-05-100 Brothers Floor Mats ($157.95) + SUM-461058-BLK Door Panel Carpet ($142.15) + GMK-4145-035-812 Air Dam ($44.99) + SUM-RP22170 ($62.99) + UDD-D10018100 Dash Pad ($255.99) + SUM-RP22000 ($45.9"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.854849",
+    "method": "regex_brand_mention",
+    "trust": "T2",
+    "caveats": "single-mention brands flagged as low_confidence per correctness rule",
+    "confidence": "low"
+  },
+  {
+    "kind": "brand_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "brand": "Goodmark",
+    "mention_count": 1,
+    "distinct_vendors": 1,
+    "first_mention": "2026-03-06",
+    "last_mention": "2026-03-06",
+    "samples": [
+      {
+        "date": "2026-03-06",
+        "vendor": "Summit Racing",
+        "amount": 44.99,
+        "desc": "Goodmark Air Dam GMK4145035812"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.854851",
+    "method": "regex_brand_mention",
+    "trust": "T2",
+    "caveats": "single-mention brands flagged as low_confidence per correctness rule",
+    "confidence": "low"
+  },
+  {
+    "kind": "brand_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "brand": "QTP",
+    "mention_count": 1,
+    "distinct_vendors": 1,
+    "first_mention": "2026-03-17",
+    "last_mention": "2026-03-17",
+    "samples": [
+      {
+        "date": "2026-03-17",
+        "vendor": "Summit Racing",
+        "amount": 617.48,
+        "desc": "QTP Electric 2.5\" Exhaust Cutouts QTEC50CP + Adjustable Turndowns 11250 x2"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.854852",
+    "method": "regex_brand_mention",
+    "trust": "T2",
+    "caveats": "single-mention brands flagged as low_confidence per correctness rule",
+    "confidence": "low"
+  }
+]

@@ -1,0 +1,284 @@
+[
+  {
+    "image_id": "ef197287-b30a-4f2c-9974-ccad8c811f00",
+    "verdict": "review_needed",
+    "confidence": 0.55,
+    "reasoning": "Closeup of rust-pitted sheet metal with fresh weld, triangle + round access holes; consistent with Mustang body repair but no marque-identifying feature visible"
+  },
+  {
+    "image_id": "d5cbb575-becf-409e-aa66-c658e7721b16",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Underside of '66 Mustang on rotisserie/2-post: front shock towers, oil pan, sway bar, A-arms; body-color edges visible \u2014 Skylar's car mid-restoration"
+  },
+  {
+    "image_id": "c57641da-df69-425e-bfb2-cbf491aac28c",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rotated underside view of same Mustang front suspension/transmission area on lift"
+  },
+  {
+    "image_id": "f0429dcb-8351-4594-ac53-6ea7118e589b",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underside floor pans of '66 Mustang on lift with yellow rotisserie/lift arms; same workshop"
+  },
+  {
+    "image_id": "c793887c-3948-4f4d-8c50-bdda95a29be5",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Underside of '66 Mustang showing 8-inch rear axle, leaf springs, trunk floor pan with spare tire well \u2014 same car on lift"
+  },
+  {
+    "image_id": "d2f1da30-4403-44a9-8201-d434fdbe9864",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Full-length underside of '66 Mustang on lift, chrome rear bumper visible \u2014 same vehicle"
+  },
+  {
+    "image_id": "5b9f6680-8d97-4459-a155-082987e2b975",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Same underside angle of '66 Mustang on lift, chrome front bumper visible at bottom"
+  },
+  {
+    "image_id": "ec61687e-1a54-4be9-a6fc-4a19e8d3589b",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Exhaust system on '66 Mustang with shop equipment in background; rotated/sideways orientation"
+  },
+  {
+    "image_id": "aaa933e4-90d9-40a9-875d-4f6512764dcb",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Closeup of driveshaft yoke / U-joint with blue-painted component; ambiguous but consistent with Mustang underside"
+  },
+  {
+    "image_id": "0f5d6b08-efdc-4c5e-9a62-30da1d88fcfb",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Front '66 Mustang grille with running pony emblem, dual headlights, primer body on 2-post lift \u2014 Skylar's car (rotated)"
+  },
+  {
+    "image_id": "e849b504-448d-4ae9-b10a-1a1242defa43",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Hero candidate: 3/4 front of '66 Mustang coupe in dark primer/black on lift at night, factory 289 visible, dual carb intake"
+  },
+  {
+    "image_id": "a4240fca-684d-4a07-a5bc-e95ebbae90cd",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Hero candidate: head-on '66 Mustang in primer with hood open, engine bay visible, dual carb 289 V8"
+  },
+  {
+    "image_id": "33e0aaad-24e3-4629-8e36-00ee9324dc15",
+    "verdict": "approved",
+    "confidence": 0.88,
+    "reasoning": "Cowl area sheet metal repair showing original turquoise/teal paint under rust \u2014 confirms original Mustang color"
+  },
+  {
+    "image_id": "ee744d2e-54cc-4d46-ba9f-91a6fbebf258",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same cowl repair area showing turquoise paint substrate, hinge bracket weld"
+  },
+  {
+    "image_id": "7f6ccd01-63c6-457a-8d3c-2c4f80afc010",
+    "verdict": "review_needed",
+    "confidence": 0.55,
+    "reasoning": "Underside repair with fresh weld bead and new patch panel; consistent with Mustang restoration but no marque ID"
+  },
+  {
+    "image_id": "0f5b4458-29a0-4898-9b64-e0e11ea481b1",
+    "verdict": "rejected_personal",
+    "confidence": 0.85,
+    "reasoning": "Shop floor with tools (drill, grinder, hammer, tape measure) and cut sheet metal; non-vehicle workspace photo"
+  },
+  {
+    "image_id": "59ed7462-7f74-4be5-984e-29c2f9790a7a",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rust hole at lower rear quarter being patched, turquoise factory paint visible under primer \u2014 Skylar's Mustang"
+  },
+  {
+    "image_id": "aa03d65a-942f-4559-97cd-279c8110cb13",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same quarter panel rust repair with welded patch and turquoise paint visible"
+  },
+  {
+    "image_id": "252282cd-56ca-496e-b3cf-8a678173ec9b",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Lower quarter / wheel arch rust-out with turquoise paint under primer; same restoration"
+  },
+  {
+    "image_id": "b15a147f-e820-4151-bb45-a66c771ea464",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Rear drum brake and exhaust on chassis underside; consistent with Mustang rear end"
+  },
+  {
+    "image_id": "f3667705-d23b-475f-a8ab-472eddbaaf2a",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Underside rocker/quarter area with fresh patch panel weld"
+  },
+  {
+    "image_id": "da265f2e-9030-44af-bf4c-73bdfa09da1d",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Underside quarter panel area with new sheet metal patch"
+  },
+  {
+    "image_id": "3b777fa7-697e-444a-b821-ac0165918b1a",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "New replacement quarter panel patch piece on shop floor labeled LG-1P-1691LH (Mustang torque box / rear quarter patch part)"
+  },
+  {
+    "image_id": "ecc1fab0-dac3-47e7-8b53-04b204843e79",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Underside rear quarter with rust-out and new patch panel installation"
+  },
+  {
+    "image_id": "203faf80-4966-4a9e-b9b0-b0c94daf7bcd",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Interior shot looking through open trunk into back seat / package tray of stripped '66 Mustang"
+  },
+  {
+    "image_id": "5ccee5a3-32f1-49eb-b5e9-9f865f89a33a",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Interior view through windshield showing '66 Mustang Falcon-style dash with chrome bezels and three-spoke steering wheel"
+  },
+  {
+    "image_id": "41593843-55d5-474d-9604-cc619e738534",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Closeup of door jamb / B-pillar area with blue masking tape over rust-hole during patch repair"
+  },
+  {
+    "image_id": "dbecae56-c733-4b72-b011-f080720a2cad",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Hero candidate: front 3/4 underside of '66 Mustang on 2-post lift with running-pony grille, BFGoodrich Radial T/A on Magnum 500-style wheels (rotated)"
+  },
+  {
+    "image_id": "03cbb3fd-426f-4bf9-aa21-fc8c2b5537bc",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Hero candidate: head-on '66 Mustang grille with running pony emblem on lift, dark body (rotated)"
+  },
+  {
+    "image_id": "55423c8c-5709-4d6f-a829-7a39f5cf97c8",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front 3/4 of Mustang on lift showing chrome bumper, running pony grille, Magnum 500-style wheels (rotated)"
+  },
+  {
+    "image_id": "63bbbea7-18fc-4e52-88c4-dc88714d24c9",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Side/rear 3/4 of Mustang on lift, BFG Radial T/A tires, dark body (rotated)"
+  },
+  {
+    "image_id": "a340f32e-43f6-4e6e-ac23-50606688e468",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Hero candidate: rear of '66 Mustang on lift showing tri-bar tail lights, chrome bumper, body-colored gas tank visible \u2014 diagnostic Mustang rear end"
+  },
+  {
+    "image_id": "2c8e09bb-f244-41ae-b393-3428e58c819f",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Hero candidate: side profile of '66 Mustang coupe on 2-post lift showing full body silhouette with running pony grille (rotated)"
+  },
+  {
+    "image_id": "07a4d870-fcd9-4929-abde-10fe5413ec85",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Nevada Certificate of Title for VIN 6F07C219593, 1966 FORD MUSTANG, SKYLAR W JAMES JACOB / SKYLAR WILLIAMS, 674 Wells Rd Boulder City NV \u2014 definitive document for this car"
+  },
+  {
+    "image_id": "23776b6f-2252-40a4-8c95-04efaf0a68c0",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Replacement '66 Mustang front bucket seat in black vinyl (new upholstery) \u2014 restoration part"
+  },
+  {
+    "image_id": "309eea19-d60a-466b-bf8b-73a9a578683d",
+    "verdict": "approved",
+    "confidence": 0.6,
+    "reasoning": "Black vinyl upholstered panel (rear quarter trim or door card) on garage wall \u2014 likely Mustang interior part"
+  },
+  {
+    "image_id": "f2ed01a8-9bb5-4e56-9137-0e5d99f65e1d",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Trunk of '66 Mustang with correct houndstooth-pattern (plaid) trunk mat \u2014 factory-correct restoration touch"
+  },
+  {
+    "image_id": "43057f7e-786c-4160-9456-421dee39c976",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "'66 Mustang interior: original Falcon-style dash with three round gauge pods, running-pony glovebox emblem, three-spoke wheel, manual trans pedals + auto column"
+  },
+  {
+    "image_id": "fed8fc89-0493-4120-998e-d6839dae64df",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "'66 Mustang rear bench seat (correct vertical-pleat pattern with chrome trim) installed in black vinyl"
+  },
+  {
+    "image_id": "c4d2d664-e35b-49ad-8aa9-da78f19fc5a6",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Underside view of body mount / floor pan area on the lift"
+  },
+  {
+    "image_id": "f9b631fe-c493-4d4d-8e03-2fb3ed10eb83",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Underside floor pan and rocker area with old undercoating, lit shop floor below"
+  },
+  {
+    "image_id": "02db4f0d-d35d-4f0d-a3b0-25b5388efc9e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underside front frame rail / strut rod with green paint smear visible (turquoise body color) and dark body bottom"
+  },
+  {
+    "image_id": "5a5fafed-fb08-41ba-a120-5eac26e080a1",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underside view of '66 Mustang front radiator core support and front spring/shock"
+  },
+  {
+    "image_id": "86742847-aa24-4604-a21a-24e122640739",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Underside leaf spring and shackle / rear frame rail of Mustang"
+  },
+  {
+    "image_id": "9bccd6ba-d538-45d1-9061-accc86714ee1",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underside frame rail and lower control arm at front of '66 Mustang on yellow rotisserie/lift arm"
+  },
+  {
+    "image_id": "6bfa0bfd-d210-4103-967a-1827aee7209f",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Underside exhaust and frame with shop lift arm"
+  },
+  {
+    "image_id": "a3ef3973-c763-46ab-b3bf-5fef0cf6e49c",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Underside frame rail and lift arm contact point on '66 Mustang"
+  }
+]

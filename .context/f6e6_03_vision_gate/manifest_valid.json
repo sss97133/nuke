@@ -1,0 +1,44 @@
+[
+  {
+    "order": 0,
+    "image_id": "bf8dcc2f-b088-409d-adfc-4e612444c7c0",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/f6e64a4f-6f74-4234-8174-5a7f8dbdafab/iphoto/IMG_3948.jpg",
+    "taken_or_created": "2024-01-19 04:54:59.131+00",
+    "path": "/Users/skylar/nuke/.context/f6e6_03_vision_gate/000_bf8dcc2f.jpg"
+  },
+  {
+    "order": 1,
+    "image_id": "32ddded8-0b33-48be-9313-4470041d733e",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/f6e64a4f-6f74-4234-8174-5a7f8dbdafab/iphoto/IMG_3823.jpg",
+    "taken_or_created": "2024-01-18 22:49:29.551+00",
+    "path": "/Users/skylar/nuke/.context/f6e6_03_vision_gate/001_32ddded8.jpg"
+  },
+  {
+    "order": 2,
+    "image_id": "a84fcb05-5743-4c3a-946c-0a22a361a8d2",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/f6e64a4f-6f74-4234-8174-5a7f8dbdafab/iphoto/IMG_3822.jpg",
+    "taken_or_created": "2024-01-18 22:49:27.019+00",
+    "path": "/Users/skylar/nuke/.context/f6e6_03_vision_gate/002_a84fcb05.jpg"
+  },
+  {
+    "order": 3,
+    "image_id": "5a020459-4827-4a75-abfd-0e979b31bf4d",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/f6e64a4f-6f74-4234-8174-5a7f8dbdafab/iphoto/IMG_3821.jpg",
+    "taken_or_created": "2024-01-18 22:49:15.976+00",
+    "path": "/Users/skylar/nuke/.context/f6e6_03_vision_gate/003_5a020459.jpg"
+  },
+  {
+    "order": 4,
+    "image_id": "fa055edb-7b66-4cc8-8b8c-2935a1fafb92",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/f6e64a4f-6f74-4234-8174-5a7f8dbdafab/iphoto/IMG_3820.jpg",
+    "taken_or_created": "2024-01-18 22:49:13.961+00",
+    "path": "/Users/skylar/nuke/.context/f6e6_03_vision_gate/004_fa055edb.jpg"
+  },
+  {
+    "order": 5,
+    "image_id": "24966a96-27c4-4388-b337-f3e9b9738940",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/f6e64a4f-6f74-4234-8174-5a7f8dbdafab/iphoto/IMG_3819.jpg",
+    "taken_or_created": "2024-01-18 22:49:10.186+00",
+    "path": "/Users/skylar/nuke/.context/f6e6_03_vision_gate/005_24966a96.jpg"
+  }
+]

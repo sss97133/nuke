@@ -41,6 +41,12 @@ interface ObservationInput {
   content_text?: string;
   structured_data?: Record<string, unknown>;
   vehicle_id?: string;
+  /**
+   * Polymorphic subject (engineering-manual/20). Optional + backward-compatible:
+   * omit it and the observation is a vehicle observation exactly as before.
+   * For a non-vehicle subject, pass { type: 'organization'|'user'|'asset', id }.
+   */
+  subject?: { type?: string; id?: string };
   vehicle_hints?: {
     vin?: string;
     plate?: string;
@@ -111,13 +117,22 @@ Deno.serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Compute content hash for deduplication
+    // Compute content hash for deduplication.
+    // Hash includes vehicle_id + observed_at + observer_raw so observations on different
+    // vehicles or from different source photos don't collapse onto each other.
+    // Bug fix 2026-05-24: previously two observations with same source/kind but different
+    // vehicle_id collapsed into one row; cross-vehicle reuse of an observation_id was
+    // returned to callers. See ISSUES.md "[MEDIUM] ingest-observation dedup ignores vehicle_id".
     const contentForHash = JSON.stringify({
       source: input.source_slug,
       kind: input.kind,
-      identifier: input.source_identifier,
-      text: input.content_text,
-      data: input.structured_data
+      vehicle_id: input.vehicle_id || "",
+      source_url: input.source_url || "",
+      source_identifier: input.source_identifier || "",
+      observed_at: input.observed_at,
+      text: input.content_text || "",
+      data: input.structured_data || {},
+      observer: input.observer_raw || {}
     });
     const contentHash = await hashContent(contentForHash);
 
@@ -281,6 +296,11 @@ Deno.serve(async (req) => {
         vehicle_id: vehicleId,
         vehicle_match_confidence: vehicleId ? vehicleMatchConfidence : null,
         vehicle_match_signals: Object.keys(vehicleMatchSignals).length > 0 ? vehicleMatchSignals : null,
+        // Polymorphic subject (engineering-manual/20). Conditional spread: with no
+        // subject passed, this is byte-identical to before and the DB default
+        // (subject_type='vehicle', subject_id=NULL) applies.
+        ...(input.subject?.type ? { subject_type: input.subject.type } : {}),
+        ...(input.subject?.id ? { subject_id: input.subject.id } : {}),
         observed_at: input.observed_at,
         source_id: source.id,
         source_url: input.source_url,

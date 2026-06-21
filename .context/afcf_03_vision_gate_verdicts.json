@@ -1,0 +1,317 @@
+[
+  {
+    "order": 0,
+    "image_id": "afd57e7b-ef38-43a8-8a4c-ebc05be672f1",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "POV interior driver-side: square-body GM dashboard with Chevrolet steering wheel hub badge, four round-pod cluster, tan interior trim matches K10. Desert SW palm-tree scene through windshield consistent with current NV/AZ location."
+  },
+  {
+    "order": 1,
+    "image_id": "1ffdaa91-1530-4037-b9cc-9b7bd52de80b",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Interior POV from driver seat: square-body Chevrolet dash, Chevrolet steering wheel badge, tan trim. Same session as order 0. Desert SW backdrop."
+  },
+  {
+    "order": 2,
+    "image_id": "d771013d-1f40-412f-a9ca-0b83f0427fe5",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 driver-side full vehicle shot. Maroon-over-tan two-tone Cheyenne, square-body GM, single round headlights, 'Cheyenne' badge visible on fender, chrome bumper, 4WD stance. Matches target 1979 K10 exactly."
+  },
+  {
+    "order": 3,
+    "image_id": "833c2fad-7aa4-4134-b201-850608a4510e",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Interior vent window/door frame shot at True Value hardware store at night. Tan door panel and dash texture matches K10 interior. Square-body door geometry."
+  },
+  {
+    "order": 4,
+    "image_id": "0c8285e5-eb47-4198-b6ab-f80263bd59f2",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Interior POV showing tan square-body dash, maroon door panel insert, mirror, desert SW landscape through windshield/passenger window. Cardboard parcel on passenger floor with shipping label. Matches K10 cabin."
+  },
+  {
+    "order": 5,
+    "image_id": "ce041b9c-7240-4659-8baa-b8d5b9207659",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rotated 90deg image at Sinclair gas pump at night. Maroon truck cab visible with rust at rocker and tan two-tone. Square-body GM consistent with K10. Payment terminal in foreground (no card numbers visible)."
+  },
+  {
+    "order": 6,
+    "image_id": "346311ad-0497-4b46-9ce5-5260bc83e894",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Rear 3/4 at Sinclair gas station at night. Maroon-over-tan two-tone square-body Chevy stepside (rounded fenderwell visible). 4WD stance. Nevada license plate visible but small/blurry. Same vehicle - K10."
+  },
+  {
+    "order": 7,
+    "image_id": "33051f3f-9627-4165-b904-ccadb03f422a",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Rotated 90deg image showing side profile of maroon-over-tan two-tone square-body Chevy parked in strip mall lot (signs: H&R Block, Rebel Jiu-Jitsu visible). Single headlights, Cheyenne side trim. Matches K10."
+  },
+  {
+    "order": 8,
+    "image_id": "6e2bd3bf-9fe5-415a-bcf8-5d1dae7e6ad8",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Rotated image at Goodyear Tune-Up/Brakes service bay. Two views of same truck showing square-body interior (steering wheel, four-pod gauge cluster, tan dash) and exterior trim with rust at lower body. K10."
+  },
+  {
+    "order": 10,
+    "image_id": "d08d2e20-7399-4a06-b060-39d31b9c88d9",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Rotated image at Goodyear service bay. Square-body fender/hood corner with single round headlight, heavy rust at lower body. Continuation of order 8 session."
+  },
+  {
+    "order": 11,
+    "image_id": "317ee1ff-6874-462b-b31a-c3e6a4a770e2",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Head-on front view of maroon square-body Chevy with chrome grille, bowtie emblem, single round headlights, in narrow alley behind metal fence. Cheyenne K10."
+  },
+  {
+    "order": 12,
+    "image_id": "31f50017-e810-4a8b-862a-ad19d6a480bc",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Extreme close-up of dusty/dirty dark-painted metal surface with light reflection. Unable to identify what part of vehicle this is. Could be hood, fender, or unrelated. No square-body identifiers visible."
+  },
+  {
+    "order": 13,
+    "image_id": "0c93eaa0-c0ac-4ae2-95ec-0f1095a030e5",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "PAPERWORK/VIN STAMPING: Frame VIN stamp clearly reads 'CKL149F376441' - exact match to target vehicle VIN. High-value evidence."
+  },
+  {
+    "order": 14,
+    "image_id": "ffca4832-d641-41b0-acc9-78b81862e5ff",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "PAPERWORK/VIN STAMPING: Same frame VIN stamp 'CKL149F376441' from slightly different angle. Confirms target vehicle identity."
+  },
+  {
+    "order": 15,
+    "image_id": "5212a578-7c64-44d9-8391-110aeca617c9",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "PAPERWORK/VIN: Wider shot of same frame VIN plate area 'CKL???F376441' with mounting bolts visible. Confirms VIN location and target vehicle."
+  },
+  {
+    "order": 16,
+    "image_id": "e56582ef-41ab-4345-8dee-606a842b6736",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "PAPERWORK/VIN: Vertical frame rail stamp showing '...F376441' tail of VIN with flashlight glare. Same stamping series, target VIN."
+  },
+  {
+    "order": 17,
+    "image_id": "6e530bd1-8e0b-4eaa-9ef2-86b1c3fa42a0",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 driver-side at dusk/sunset in industrial yard. Maroon-over-tan two-tone Cheyenne with chrome bumper, single headlights, factory wheels, 4WD stance. K10 target vehicle."
+  },
+  {
+    "order": 18,
+    "image_id": "bb89ab4d-9344-4e98-ba1d-a6b865ad30a6",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Pure driver-side profile at sunset. Maroon-over-tan two-tone square-body, Cheyenne stripe, factory steel wheels, 4WD lift, longbed configuration. K10."
+  },
+  {
+    "order": 19,
+    "image_id": "a414ebd3-6318-4b13-874b-808910c00891",
+    "verdict": "approved",
+    "confidence": 0.94,
+    "reasoning": "Bed-floor close-up showing original ribbed steel bed with light surface rust, wheel-well hump, washers/hardware debris. Background through cab window shows another square-body GM truck. Consistent with K10 bed."
+  },
+  {
+    "order": 22,
+    "image_id": "ba748436-dd39-4701-a3d3-013fe219991e",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Rocker panel close-up showing maroon paint, tan body side with multi-stripe Cheyenne pinstriping, exhaust pipe and severe rust-through at rocker. Matches K10 livery."
+  },
+  {
+    "order": 23,
+    "image_id": "816e157c-0bb4-4e74-b8d1-6505facf617a",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Cab corner/rocker area showing rust hole punch-through, two-tone maroon/tan with Cheyenne stripes. Body damage documentation for K10."
+  },
+  {
+    "order": 24,
+    "image_id": "884f869e-5e29-4fb7-a442-9f30cb48a5f6",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Rear wheel-well arch close-up showing severe rust-through on tan lower body with Cheyenne stripe ghost. Bedside damage doc for K10."
+  },
+  {
+    "order": 25,
+    "image_id": "b39ea1cf-6063-4cfe-9097-ee5398118f55",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Rear corner showing chrome bumper, tan tailgate insert with maroon body, rust-through at bedside lower panel and rear cab corner. K10 body documentation."
+  },
+  {
+    "order": 26,
+    "image_id": "9c892688-a8ff-4730-840a-cb0db750cbfb",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Passenger rear corner with taillight, rust holes through tan bedside with Cheyenne stripe and maroon lower body. Diamond-plate step pad on bumper. K10 body doc."
+  },
+  {
+    "order": 29,
+    "image_id": "3ab0b2fe-514f-473e-92cb-cf86e0220103",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Rear wheel well showing very heavy rust eating through bedside, maroon bedrail/upper, tan lower with Cheyenne stripe ghost, factory steel wheel painted maroon. K10."
+  },
+  {
+    "order": 30,
+    "image_id": "13bd3848-654a-4e2a-8d1d-7b9950f8c427",
+    "verdict": "approved",
+    "confidence": 0.94,
+    "reasoning": "Cab-to-bed gap with fuel filler door visible, rust-through both cab rear corner and bedside leading edge. Two-tone with Cheyenne stripes. K10."
+  },
+  {
+    "order": 31,
+    "image_id": "17019e71-81f6-43a7-8ed9-14dc4ad1f8c1",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Driver-side interior with door open: square-body four-pod gauge cluster, tan dash, classic two-spoke wheel, bench seat with Mexican blanket cover and torn upholstery. Background shows another square-body and a vintage camper. K10 cabin."
+  },
+  {
+    "order": 32,
+    "image_id": "5549606c-e28d-42f4-8985-b3b7b5192bb0",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 passenger-side. Maroon-over-tan Cheyenne with stripes, square-body GM, 4WD, chrome bumper. Background: another square-body (red Suburban/Crew Cab) and van. K10."
+  },
+  {
+    "order": 33,
+    "image_id": "e4f5d78d-113f-45f5-bce4-56b08c4a7c69",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Passenger-side profile. Maroon-over-tan Cheyenne K10, longbed, factory steel wheels, 4WD. Side mirror, single headlight. Target vehicle."
+  },
+  {
+    "order": 34,
+    "image_id": "baef4edc-2385-4974-9dc1-d74c9af3e0e5",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Rear 3/4 passenger view. Maroon body, tan tailgate panel with CHEVROLET embossed, chrome bumper. Background: yellow-and-white square-body truck and other GM trucks. K10."
+  },
+  {
+    "order": 35,
+    "image_id": "f37fdb4a-1404-4bf6-8a49-4f675b1bc95a",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Dead-rear view. CHEVROLET tailgate, sliding rear window in cab, maroon over tan, chrome bumper with receiver hitch ball mount. K10."
+  },
+  {
+    "order": 36,
+    "image_id": "d9462969-3fb5-452f-9644-9378db700164",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Passenger-side 3/4 rear with diamond-plate step pad on bumper, fuel filler visible, Cheyenne badge, two-tone. 4WD. K10."
+  },
+  {
+    "order": 37,
+    "image_id": "10ab3127-41d4-41d2-a0ac-dfafee0e749f",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Passenger profile shot at industrial bay. Maroon-over-tan Cheyenne K10 with factory steel wheels (one painted dark, one bare metal), 4WD lift, square-body sweep."
+  },
+  {
+    "order": 38,
+    "image_id": "cfe29bac-5db3-4bf8-b10b-fe20d09943a9",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Dead-front nose. Single round headlights, '79-style flat chrome grille with horizontal bars and bowtie center, chrome bumper. Maroon hood. Background: shop with another vehicle on lift. K10."
+  },
+  {
+    "order": 39,
+    "image_id": "a4d668e9-53e5-4067-987b-3a202cf14b66",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 driver-side in clean shop. Maroon-over-tan Cheyenne 10, '79 grille, chrome bumper, factory steel wheels (maroon centers), 4WD. License plate visible on front but text not legible. K10."
+  },
+  {
+    "order": 40,
+    "image_id": "562ccf81-5ce5-4f9b-9125-8f8e8acd201e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rainy lot scene with multiple vehicles. Foreground square-body 4WD with chrome bumper and '79-style grille appears all-maroon (no tan two-tone visible) but body style matches square-body GM (1973-1980). Also visible: 70s Chevelle/Monte Carlo, another C/K truck, modern Chevy Silverado. Per attribution rule (default approve for any square-body GM C/K content), approving. The maroon truck could be primer/single-color phase or a sibling vehicle in same yard."
+  },
+  {
+    "order": 41,
+    "image_id": "8891476e-ca86-43c8-bced-e15ba7b9ff1e",
+    "verdict": "review_needed",
+    "confidence": 0.3,
+    "reasoning": "Rotated 90deg image of shop interior with insulation walls, workbench with vise, blue floor lift. Vehicle partially visible at top edge appears to be white (modern truck?), not the K10. No square-body identifiers. Could be shop where K10 is being worked on (context shot) but no positive ID."
+  },
+  {
+    "order": 42,
+    "image_id": "d7e7088e-3b74-4152-8534-09dcc2bb76a7",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rotated 90deg image: rear of maroon-over-tan two-tone Chevrolet pickup with CHEVROLET tailgate embossing, square-body lines, on shop floor near blue lift. K10 in shop session."
+  },
+  {
+    "order": 43,
+    "image_id": "2d88dbba-2aff-4f89-bd7e-b7a8520e80f5",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Front undercarriage on lift: solid front axle (4WD), leaf springs, shock towers, oil pan, radiator support visible. Consistent with K10 chassis layout. Shop has yellow walls/scaffolding."
+  },
+  {
+    "order": 44,
+    "image_id": "938c5717-e4fb-48f7-ba4b-e99f09073077",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Mid-frame undercarriage on lift: frame rails, crossmembers, exhaust loops, fuel/brake lines. Consistent with C/K truck frame. Same shop session as 43."
+  },
+  {
+    "order": 45,
+    "image_id": "465a8134-36ed-45f5-8a56-74f82365a539",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Rear undercarriage: solid rear axle (likely 14-bolt), leaf springs, dual shocks with red/pink overspray, dual fuel tanks (or fuel + spare), driveshaft. K10 4WD layout."
+  },
+  {
+    "order": 46,
+    "image_id": "ac2e6cd5-766b-40ba-b6cb-58684ce16501",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Full undercarriage shot from front: frame, transfer case, driveshafts, dual fuel tanks, leaf springs, rear axle. Consistent with K10 4WD chassis."
+  },
+  {
+    "order": 47,
+    "image_id": "c6ef512c-710d-4345-af68-306d32f2deb5",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Full undercarriage shot from rear: front solid axle with steering linkage, transfer case, transmission, dual fuel tanks. K10 4WD layout. Same lift session."
+  },
+  {
+    "order": 48,
+    "image_id": "210c724d-5e31-41ff-8686-94b120b8a1f4",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Close-up of engine accessory area: starter motor visible at top, exhaust manifold with red engine paint overspray (Chevy small-block orange/red), driveshaft U-joint at bottom, blue object (filter/AC?) on left. Consistent with K10 engine bay underside."
+  },
+  {
+    "order": 49,
+    "image_id": "eeed96fe-60c9-4358-9ec9-7228ba86a4d2",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Close-up of engine oil pan and bell housing area with red engine paint (Chevy SBC orange) overspray on black components, oil filter visible top right. Consistent with K10 powertrain underside."
+  }
+]

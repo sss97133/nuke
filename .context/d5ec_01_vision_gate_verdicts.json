@@ -1,0 +1,303 @@
+[
+  {
+    "order": 0,
+    "image_id": "6f7db6df-1383-4f42-b3e7-dbc2a32fca11",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body GM front steering knuckle/spindle assembly (right side, 'R' cast mark), Dana-style closed-knuckle 4WD front axle with leaf spring. Consistent with K20 4WD front end during restoration/disassembly. Blue painted axle housing visible. Approved per archetype rule (square-body GM C/K parts work)."
+  },
+  {
+    "order": 1,
+    "image_id": "d35a3402-619d-4cba-ab6e-3f783f34fb6f",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Underside view of square-body truck on two-post lift showing rear axle (8-lug 3/4-ton), leaf springs, driveshaft, blue-painted differential. Body color visible. Consistent with K20 chassis work."
+  },
+  {
+    "order": 2,
+    "image_id": "4722e3d1-2754-42cd-91a8-89e275c9a1e2",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Differential cover (Dana 60 or Corporate 14-bolt style, square-bolt drain plug visible, casting marks 'A4-8F' and '88888'). Square-body GM 3/4-ton rear axle work. Blue paint on adjacent housing matches."
+  },
+  {
+    "order": 3,
+    "image_id": "98842c88-3df3-44c0-a802-dae9a3fbdf0d",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Closed-knuckle Dana front axle inner workings exposed (steering knuckle removed showing ball joints/kingpin area). 4WD square-body front axle disassembly. Wire-spoke wheels and another truck visible in background — typical shop scene."
+  },
+  {
+    "order": 4,
+    "image_id": "547bed9a-f295-47e0-9f2d-72679fee3060",
+    "verdict": "review_needed",
+    "confidence": 0.85,
+    "reasoning": "PAPERWORK: RM Auto Sales/dealer deal jacket / vehicle consignment form for a DIFFERENT 1978 Chevrolet K20 Scottsdale. VIN visible: 'CCL248Z164631' (does NOT match target VIN CCL448J172994). Sold to Robert P Hess 8/21/2024 for $3,000. Acquired from Richard Stephenson 1/15/2024. Address 4388 Crystal Peak Dr, Las Vegas NV 89115. Phone (702) 844-3075. Color: Blue. Inset photo shows blue 1973-80 square-body. Same archetype (1978 K20) but different VIN — flag for review/possible reattribution to a different vehicle record. Paperwork is acquisition-context evidence."
+  },
+  {
+    "order": 5,
+    "image_id": "a946004a-85c8-4642-8aea-17ba3a0df7ef",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Through-the-rear-window view from inside a square-body GM truck cab (visible rear glass, weather seal, light-tan vinyl). Looking out at a Vegas-style shop yard with multiple vehicles. Interior is square-body consistent."
+  },
+  {
+    "order": 6,
+    "image_id": "235030db-9f42-4d05-8272-5b82261397c9",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Interior cabin shot of square-body GM truck — visible 'Scottsdale' trim badge on door panel, tan/saddle interior, vent window/A-pillar, brown exterior paint reflection. 1978 K20 Scottsdale matches target trim level exactly. Shop ceiling visible."
+  },
+  {
+    "order": 7,
+    "image_id": "e7422310-ab7e-4012-be63-6abb2a612820",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Close-up of brown automotive paint surface showing scratch/swirl marks under shop fluorescent reflection. Likely paint inspection/correction on the brown square-body. No identifying features but consistent with d5ec brown body work."
+  },
+  {
+    "order": 8,
+    "image_id": "2fa690ca-6182-4b56-b85c-ac684f809ca8",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Close-up of brown automotive paint panel/edge under shop lighting. Paint inspection/detailing of brown square-body bodywork. No identifying features but same brown paint as adjacent approved images."
+  },
+  {
+    "order": 9,
+    "image_id": "f54feb25-0099-4ce8-b0bd-72efbd71aee6",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Close-up of brown square-body GM hood/cowl seam at base of windshield. Window seal, wipers, and yellow inspection/registration sticker visible at top of windshield. Paint condition assessment of brown truck — same vehicle context."
+  },
+  {
+    "order": 10,
+    "image_id": "69b0635d-9028-4a40-873c-dc81b9f561f5",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rear suspension shot — Rough Country leaf springs and shocks, sway bar, on a yellow-painted frame square-body. Aftermarket suspension typical of square-body lift builds. Yellow body color visible above frame."
+  },
+  {
+    "order": 11,
+    "image_id": "a979e308-98ca-463e-b405-76be763fa5fd",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front suspension/leaf spring/Rough Country shock detail on lifted square-body 4WD truck. Frame, sway bar, brake caliper visible. Suspension upgrade work consistent with K20 build."
+  },
+  {
+    "order": 12,
+    "image_id": "98eb1fef-3a40-467c-b0d8-9d8572bdab17",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front leaf spring/Rough Country shock/U-bolt assembly on lifted square-body 4WD truck. Blue painted axle housing visible matching other underside shots. Frame-up suspension work."
+  },
+  {
+    "order": 13,
+    "image_id": "5131fd85-d176-4f9b-8c9c-0ab22eb53e77",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front suspension assembly view with brake disc rotor visible, Rough Country leaf springs/shock, sway bar end link. Square-body 4WD front end. Same context as other K20 underside images."
+  },
+  {
+    "order": 14,
+    "image_id": "810fa1be-88cd-4c77-a70b-c97167a8d080",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Detailed view of front axle, leaf spring U-bolt plate, Rough Country leaf spring stamp, sway bar end link, driveshaft/U-joint area on square-body 4WD truck. Suspension build/assembly photo."
+  },
+  {
+    "order": 17,
+    "image_id": "e741c2b1-efd4-43b4-9861-512d114a352c",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Underside rear suspension/leaf spring/axle view on square-body truck (black undercoated body visible). Rough Country leaf springs and shock. Continued chassis work documentation."
+  },
+  {
+    "order": 18,
+    "image_id": "78379ff5-1e40-4857-8497-b953587966c2",
+    "verdict": "approved",
+    "confidence": 0.6,
+    "reasoning": "Underside detail of black-painted rear bumper bracket or frame extension, mud-tire tread visible at lower left. A white square-cab vehicle (possibly an older COE truck or industrial vehicle) visible in background — that is a shop neighbor, not the subject. Subject context is square-body undercarriage."
+  },
+  {
+    "order": 19,
+    "image_id": "3920f3f7-1b76-4bf3-aef2-8f92e6a0ff66",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Close-up of cab rear corner / B-pillar / cab-back interface showing rust on bracket and brown body paint on doorjamb. Body work documentation on square-body truck — consistent with d5ec restoration."
+  },
+  {
+    "order": 22,
+    "image_id": "796926bc-d2b2-46fd-b284-75f14e46a6d0",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Image is rotated 180 degrees (upside-down EXIF). Square-body GM short-bed pickup on lift — cream/brown two-tone, knobby off-road tires, 'BIG SKY COUNTRY MONTANA' mudflaps, Montana plate visible on rear bumper. Single round headlights consistent with 1973-80. PAPERWORK: Montana license plate observed."
+  },
+  {
+    "order": 23,
+    "image_id": "2d0b95fa-443a-43a0-acc5-9645e5100b0d",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Image is rotated 90 degrees. Rear of cream/brown two-tone square-body Chevrolet C/K short-bed pickup on lift, 'CHEVROLET' tailgate lettering, Montana plate '127-DCV' (or similar — partially visible), 'BIG SKY COUNTRY MONTANA' mudflaps both sides, large knobby tires. PAPERWORK: Montana plate captured (license number visible). Single round-headlight square-body archetype."
+  },
+  {
+    "order": 24,
+    "image_id": "22838127-dc67-4e4b-9d57-a89f3b279c1f",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Image is rotated 180 degrees. Front 3/4 view of cream/brown two-tone square-body GM short-bed pickup outdoors. Single round headlights, egg-crate grille with Chevy bowtie, chrome bumper, 'Scottsdale' badge area on front fender. Other square-body trucks visible in lot (red/white in background). Matches K20 archetype. Nevada or other front plate hard to read."
+  },
+  {
+    "order": 26,
+    "image_id": "36738cb3-4cce-43b8-910d-6b06a0caa89b",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Image rotated 180 degrees. Same cream/brown two-tone square-body GM short-bed pickup in a shop, front 3/4 view, cardboard under tires, knobby tires, single round headlights, Chevy bowtie grille. Background shows shop framing/insulation. Same vehicle as orders 22-24."
+  },
+  {
+    "order": 27,
+    "image_id": "dc24ce69-8bd0-421e-9f9e-507e1947a5c7",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Brown/cream two-tone square-body GM C/K short-bed pickup with hood open, in a shop. Single round headlights, egg-crate grille with Chevy bowtie. Watermark '小红书 ID: 95439081800' (Xiaohongshu/RED — Chinese social media reference image, likely a research/inspiration save rather than Skylar's own photo). Square-body archetype — APPROVED, but note: image is third-party social media content (research). Nevada front plate partially visible."
+  },
+  {
+    "order": 28,
+    "image_id": "d2cecec9-662c-4719-a21d-46d8937310c5",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Pile of small fasteners (screws/bolts with Phillips and Pozidriv heads, mix of zinc and black-oxide) sorted on a cardboard box. Hardware disassembly/cataloging during restoration. Approved as restoration parts documentation per archetype rule."
+  },
+  {
+    "order": 29,
+    "image_id": "e999b7a2-b316-4aa5-8b4e-6a983c5df6b5",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Close-up of organized fastener collection — Phillips heads, hex heads, various lengths. Restoration parts inventory/cataloging documentation."
+  },
+  {
+    "order": 30,
+    "image_id": "93279b05-8ab0-4e3b-a918-a79a54b0a111",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Same cream/brown two-tone square-body GM short-bed K-series 4WD pickup as order 27 — front 3/4 view, hood open, in shop, on cardboard, knobby tires, single round headlights, egg-crate Chevy grille, 'Scottsdale' badge area. This appears to be Skylar's own photo (no watermark, matches shop). Nevada front plate."
+  },
+  {
+    "order": 31,
+    "image_id": "5046728c-395e-4124-9996-22d4c45c50d6",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Image rotated 90 degrees. Side/front-quarter view of cream/brown two-tone square-body GM short-bed 4WD pickup in shop, hood open, knobby tires, single round headlights, Nevada front plate visible. Same vehicle as orders 27, 30."
+  },
+  {
+    "order": 32,
+    "image_id": "cc2857b2-4e5c-47e9-b6e8-5565a2c3351c",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Image rotated 90 degrees. Front spindle/knuckle on Dana 4WD front axle (casting numbers '*4*24' and '20' visible), exposed wheel bearing seat, leaf spring, blue-painted axle housing in background. Square-body 4WD front-end restoration shot."
+  },
+  {
+    "order": 33,
+    "image_id": "c15de89e-22a2-44a8-9a51-f1ed478855ce",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Closed-knuckle Dana front axle interior view (steering knuckle removed showing ball joint/kingpin pocket), inner shaft/U-joint visible. Square-body 4WD front axle teardown."
+  },
+  {
+    "order": 34,
+    "image_id": "4a1e7ec2-55ee-439e-95c5-9dacd041d74f",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Differential cover with casting '38338' (or similar) and 'AA-8F' — Dana 60 or 14-bolt rear axle cover (10-bolt pattern), repainted black. Blue paint on adjacent housing matches other images. Square-body rear axle work."
+  },
+  {
+    "order": 35,
+    "image_id": "47107516-9ca4-4208-b3dc-538324b55ea5",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Image rotated 90 degrees. Removed front axle assembly (differential housing, leaf springs, U-bolts, brake lines) sitting on shop floor, painted black, supported by stand. Frame-off axle work for square-body restoration."
+  },
+  {
+    "order": 36,
+    "image_id": "d8c1ba2b-822b-4b34-9cb6-1389eaa15be6",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Dirty/used closed-knuckle front axle steering knuckle joint, ball joint, U-joint area (before disassembly). Pre-restoration condition documentation. Square-body 4WD front axle."
+  },
+  {
+    "order": 37,
+    "image_id": "0fa79fb3-709d-435c-826a-6ada4080ae95",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Dirty/used closed-knuckle front axle joint with ball stud and grease zerk, mud-tire tread visible. Pre-disassembly condition photo. Square-body 4WD front axle."
+  },
+  {
+    "order": 38,
+    "image_id": "a16e93f7-12f9-472a-afb6-3b72528e806b",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Tie-rod end / drag link adjuster sleeve with castle nut and cotter pin, knobby off-road tire visible behind. Square-body 4WD steering linkage."
+  },
+  {
+    "order": 39,
+    "image_id": "5a09ff23-a669-4191-b025-15d581b70963",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Hand holding restored/painted leaf spring shackle end with new shackle bolt installed. Suspension restoration component. Boot visible at bottom of frame — Skylar's hand."
+  },
+  {
+    "order": 40,
+    "image_id": "47b92dc8-713f-4b18-9820-b395826cd044",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Same hand-held leaf spring shackle/bolt detail as order 39 — slightly different angle. Suspension hardware restoration documentation."
+  },
+  {
+    "order": 41,
+    "image_id": "bd0f6fe7-146a-4293-aa53-72f8a3ac5adb",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Hand holding ball joint / tie-rod end against rebuilt axle steering knuckle (painted black). Component fitment check during front-end rebuild. Square-body 4WD front axle."
+  },
+  {
+    "order": 42,
+    "image_id": "daaafffb-a915-4af7-a55f-9ed42e3aefd3",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Behind-the-cab view showing brown body panel (cab corner/inner bedside), wire brush wedged in for cleaning, exhaust pipe routing, transmission tail housing/yoke and driveshaft slip yoke visible. Square-body cab-to-bed gap/frame area during drivetrain work."
+  },
+  {
+    "order": 45,
+    "image_id": "dabc5a6c-6ce8-4cf1-afdf-d1567ec15f1c",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Image rotated 90 degrees. GM exhaust manifold with cast part number 'GM 3847758 LH' (left-hand small-block Chevy manifold, common SBC 305/350 part used in C/K trucks). Square-body engine bay component documentation. PAPERWORK: GM casting number visible."
+  },
+  {
+    "order": 46,
+    "image_id": "67079b85-dfe1-4ec6-afc7-3135f7686d95",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Same 'GM 3847758 LH' exhaust manifold, in-situ in engine bay with spark plug wires, heat shield, exhaust pipe routing visible. Blue-painted block visible behind. Square-body SBC engine bay. PAPERWORK: GM casting number visible."
+  },
+  {
+    "order": 47,
+    "image_id": "11a032e9-97ac-47c5-b7ad-d0a12c5601d4",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Close-up of cab-to-bed gap on cream/brown two-tone square-body pickup — bed cap edge with brown paint, cream bedside, gas filler neck area exposed (cap removed showing tank). Cab in foreground, in shop. Final assembly / paint photo of the d5ec K20 or sibling."
+  },
+  {
+    "order": 48,
+    "image_id": "4c8e3ae3-529e-4d70-9a57-4df1f59c2047",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Reflection in glossy brown-painted bed rail/cap shows another vehicle (light-colored sedan/wagon) outside the open shop door. Cream and brown two-tone square-body bed visible in foreground. Shop interior, roll-up door. Paint quality / reflection check on finished bodywork."
+  },
+  {
+    "order": 49,
+    "image_id": "000b7877-84f2-4796-92a9-2c6cedf4058f",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Image rotated 90 degrees. Cab-to-bed gap on cream/brown two-tone square-body pickup, gas filler neck visible (cap off), door open, in shop with parts shelving and overhead lights. Final paint/assembly view of square-body short-bed."
+  }
+]

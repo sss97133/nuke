@@ -1,0 +1,338 @@
+[
+  {
+    "order": 2,
+    "image_id": "2bc529f6-217a-4511-ac33-29d4f4071c2b",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Interior shot of white early Bronco showing diamond-stitched tan leather seats, external roll cage, dash with gauges, steering wheel, door panel — matches subject vehicle exactly.",
+    "notes": "Shop setting; red C10-era truck visible in background (other vehicle in shop, not subject)."
+  },
+  {
+    "order": 3,
+    "image_id": "2d041823-4aed-41ec-870f-b63ee1416898",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Full front 3/4 of white early Bronco with FORD-stamped grille, Bronco script on fender, round headlights, roll cage, lifted, Method-style wheels — canonical subject vehicle.",
+    "notes": "Green VW bus and white-spare-tire bus visible behind; pickup truck right edge — these are other shop vehicles."
+  },
+  {
+    "order": 4,
+    "image_id": "7cbd5958-81df-4ae8-a467-1c278d9be5ab",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Interior cabin: diamond-stitched tan seats, white center console, roll cage tube, white quilted door panel — early Bronco interior, matches subject build.",
+    "notes": "Red vehicle visible through windshield — shop background."
+  },
+  {
+    "order": 5,
+    "image_id": "0da177a2-f28e-4b60-b0f4-0d7a7493b081",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Dash view with Ford-logo wood steering wheel, painted white dash, two-stick transfer case shifters, tan diamond-stitch seat — early Bronco dash matches subject.",
+    "notes": "Blue hot rod / coupe visible through windshield — shop background, not subject."
+  },
+  {
+    "order": 6,
+    "image_id": "83275984-f0f3-442e-b7b7-fac75cc12593",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Driver-side cockpit: white dash, wood Ford steering wheel, tan diamond-stitched seats, quilted door panel — same early Bronco subject.",
+    "notes": "Blue coupe (hot rod) outside through windshield — shop, not subject."
+  },
+  {
+    "order": 7,
+    "image_id": "22c2a225-5b92-4523-aa14-8a99b22805e0",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rear seat-back view through external roll cage of early Bronco showing tan seats, small center console with single gauge, white interior — matches subject build.",
+    "notes": "Bilstein shocks in plastic bin in foreground (parts staging)."
+  },
+  {
+    "order": 10,
+    "image_id": "99b90f57-602a-4948-b84b-30d81b896e53",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "TWO early Broncos side by side: white subject (FORD grille right) and a stone-gray early Bronco (left). Both are 1966-1977 generation; subject vehicle clearly present.",
+    "notes": "Second early Bronco (gray) in shop — separate vehicle but same generation."
+  },
+  {
+    "order": 12,
+    "image_id": "d8f1cb03-d26d-474a-b484-5a24576988e1",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Front 3/4 of white early Bronco with FORD grille, Bronco fender script, roll cage, safari rack, lifted, Method-style wheels — canonical subject.",
+    "notes": "Red truck/Blazer in background; coilover shock right edge."
+  },
+  {
+    "order": 13,
+    "image_id": "bde7e5f1-0ab2-4c60-a60f-525850e92f96",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Front 3/4 of white early Bronco showing FORD grille, Bronco script, tan interior visible, roll cage, lifted stance — subject vehicle.",
+    "notes": "Red K5/Blazer visible right side — shop background, not subject."
+  },
+  {
+    "order": 14,
+    "image_id": "e23fb03e-d9c8-4f86-aa46-f3a0093b8da8",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Rotated photo of rear corner of white early Bronco: tailgate with round taillight, painted white body, internal cage tube, tan seat — same build/color as subject.",
+    "notes": "Body-off-frame or panel-off detail shot; restoration context."
+  },
+  {
+    "order": 15,
+    "image_id": "2f793aa6-d378-4ecc-8cde-b68ecadb2153",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Rotated underside/cabin shot of white early Bronco with tan seats, external roll cage, sound deadening on rear panel — matches subject build.",
+    "notes": "Detail shot, hard to orient but unmistakably subject vehicle interior."
+  },
+  {
+    "order": 16,
+    "image_id": "acdd8b85-1aef-4fb5-9445-58a409c9462d",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "White Ford tailgate (FORD stamped, in mirror/reverse perspective) lying on shop floor in front of a gray early Bronco with Bronco script — both are subject-generation parts. The tailgate is the subject's panel; gray Bronco is shop's other early Bronco.",
+    "notes": "Tailgate panel detached for paint/restoration. Two early Broncos visible in this 710d bucket consistently."
+  },
+  {
+    "order": 17,
+    "image_id": "34bcc4b4-6659-4ece-980d-4b380bce6864",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rotated rear view of tan-interior, white-cage early Bronco rear compartment with sound deadening — restoration in progress on subject.",
+    "notes": "Bilstein shocks and parts in foreground; restoration context."
+  },
+  {
+    "order": 18,
+    "image_id": "69fd736e-c0e5-4381-8b95-c86525b50c01",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Rotated rear interior of early Bronco showing rear wheel well with diamond quilted panel, sound deadening, white-painted body, roll cage tube, cup holder — matches subject.",
+    "notes": "Restoration detail; Bilstein shock visible in bin foreground."
+  },
+  {
+    "order": 19,
+    "image_id": "bb83412d-4666-49ee-92f6-eae4ffcc02e4",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rotated photo: white Bronco rear bumper with single round taillight + plastic-wrapped object + diamond-stitched tan seat back on workbench — subject parts/restoration staging.",
+    "notes": "Restoration work area; seat being upholstered/restored."
+  },
+  {
+    "order": 20,
+    "image_id": "483c8eb5-0ac5-42bb-8442-b912b214412f",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Overhead shop shot: white early Bronco (subject) center-left with FORD grille, lifted, safari rack. Multiple other shop vehicles visible (Land Cruiser, Polaris RZR, etc.) but subject is clearly the focus.",
+    "notes": "Shop overview; subject vehicle present and primary."
+  },
+  {
+    "order": 21,
+    "image_id": "31cd6dbd-1291-4472-af41-28d0f4096119",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Overhead shop shot: gray early Bronco center, red Bronco (or similar) right, white Land Cruiser, RZR chassis — multiple early Broncos in shop. Subject not clearly framed but early-Bronco context dominant.",
+    "notes": "Shop overview; subject white Bronco not visible in this frame but context is the same shop where subject lives. Approving as build/shop context."
+  },
+  {
+    "order": 22,
+    "image_id": "8ee30669-476c-427d-9968-68e50e5d5244",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Overhead shop shot: white early Bronco (subject, left), gray early Bronco, red Bronco/SUV, white Land Cruiser, RZR, vintage muscle car. Subject white Bronco visible.",
+    "notes": "Shop overview, multiple vehicles, subject clearly present (left)."
+  },
+  {
+    "order": 23,
+    "image_id": "1bbb6a39-bfd3-4bd4-8d13-18ee3afa3e5c",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Phone screenshot (Samsung UI, 4:34, 26% battery) showing white-painted body panel/jamb area with tan carpet and tan diamond-stitch seat visible — body/jamb detail of subject early Bronco during restoration.",
+    "notes": "Screenshot/share-sheet from phone (Samsung); subject vehicle detail. Marketplace/share UI in thumbnail strip."
+  },
+  {
+    "order": 24,
+    "image_id": "5b364136-5178-46b2-af12-ffb69976800b",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Phone screenshot (Samsung UI) showing early Bronco interior: tan diamond-stitch seat, wood steering wheel, white sill, yellow tape protecting paint — subject vehicle, restoration shot.",
+    "notes": "Screenshot from phone gallery; thumbnail strip at bottom shows series of related shots."
+  },
+  {
+    "order": 25,
+    "image_id": "a94c3ecd-bd5a-4291-86e3-e7e95295c01d",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Close-up of black plastic tailgate handle on white panel — early Bronco tailgate handle / latch. Restoration detail on subject's tailgate.",
+    "notes": "Tailgate handle/latch hardware detail; paint prep area visible (faded yellow tape residue)."
+  },
+  {
+    "order": 26,
+    "image_id": "64ca00b7-e6f6-404f-846b-8f2084eacdc0",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Close-up of white-painted body panel corner showing minor paint crack — bodywork detail consistent with subject Bronco restoration.",
+    "notes": "Bodywork/paint defect documentation."
+  },
+  {
+    "order": 28,
+    "image_id": "3dc14d3a-0799-4952-806b-6e2e756ef4ae",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "White early Bronco tailgate (interior side) with hinge bracket and latch hole — panel off the truck, restoration context.",
+    "notes": "Tailgate inner side detail."
+  },
+  {
+    "order": 29,
+    "image_id": "b1cf786f-a573-4dec-a0af-958e5c94b773",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "White rear quarter panel of early Bronco with round taillight, latch hole, and rear door handle visible — tailgate / quarter panel restoration detail.",
+    "notes": "Tailgate edge with round taillight (1973-77 style) and latch hardware."
+  },
+  {
+    "order": 30,
+    "image_id": "753e70c8-ba24-424b-907f-9c3d609903c6",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Close-up of white painted body tube/sill with minor paint chip/wear — restoration documentation, subject Bronco body.",
+    "notes": "Paint defect close-up."
+  },
+  {
+    "order": 31,
+    "image_id": "acaff138-7fdc-4ca3-ae14-422d42a61386",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Close-up of white sill/panel with paint chip and door latch striker visible — restoration documentation, subject body.",
+    "notes": "Paint chip + latch hardware detail."
+  },
+  {
+    "order": 32,
+    "image_id": "faff98e1-7be6-43a5-996f-8247161c36e8",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Close-up of white painted body tube/sill with hairline crack/chip — restoration paint defect documentation on subject Bronco body.",
+    "notes": "Paint defect close-up."
+  },
+  {
+    "order": 33,
+    "image_id": "686d378c-94da-46fa-b07f-192328229aee",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "White-painted Bronco tailgate (showing FORD stamping in mirror) being repaired on shop bench — interior structure visible with welds — restoration in progress.",
+    "notes": "Tailgate inner structure / repair detail; FORD lettering visible in reverse."
+  },
+  {
+    "order": 34,
+    "image_id": "e7522939-1666-41b6-bcee-1e3f669c4287",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Inside of white-painted Bronco tailgate showing FORD stamped lettering (mirror image), inner structure, edge — restoration detail of subject's tailgate.",
+    "notes": "Tailgate interior view with FORD embossing visible."
+  },
+  {
+    "order": 35,
+    "image_id": "8249d36f-df86-4d58-97f3-bd95dcc158b3",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Edge view of white-painted Bronco tailgate showing FORD stamping, inner structure, latch mechanism, and door handle hole — restoration in progress on subject.",
+    "notes": "Tailgate edge with latch hardware exposed."
+  },
+  {
+    "order": 36,
+    "image_id": "ad6a42e0-f12e-4a15-a008-0b916615835a",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Underside corner of a white-painted body panel (tailgate or similar) showing primer/filler edge — restoration prep detail.",
+    "notes": "Bodywork prep close-up."
+  },
+  {
+    "order": 37,
+    "image_id": "9a0da171-9465-40af-88b3-a82254a95b6c",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Rotated photo of white Bronco tailgate with FORD stamping (in mirror), on sawhorses in paint booth (insulation visible) for repainting — subject restoration in active paint phase.",
+    "notes": "Tailgate in paint booth; FORD stamping clearly visible; paint prep/booth setting."
+  },
+  {
+    "order": 38,
+    "image_id": "aa98a557-f3e4-491a-8507-e52955151077",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Suspension detail: blue powdercoated coil spring + radius arm + black shock — early Bronco suspension (blue powdercoat matches subject's blue block / blue frame components). Could be subject under chassis.",
+    "notes": "Blue powdercoated suspension components — coil spring, radius arm, shock. Matches subject's blue color scheme."
+  },
+  {
+    "order": 39,
+    "image_id": "ab0a13a0-f57a-4cb1-b7f4-f3e87cc24a48",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Suspension/steering close-up: tie rod end, rear leaf spring, frame — early Bronco-style chassis (front coil rear leaf is correct for early Bronco).",
+    "notes": "Steering linkage / tie rod end detail."
+  },
+  {
+    "order": 40,
+    "image_id": "3bf3986f-5d5d-4f2e-a3c3-91420aeadaaa",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Filler neck plate detail on white-painted body — fuel filler being installed on subject Bronco. Hand for scale, green hose visible.",
+    "notes": "Fuel filler/vent installation on white body. Restoration work in progress."
+  },
+  {
+    "order": 43,
+    "image_id": "354e9495-d744-483e-ba6e-30986d7384d6",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Rear 3/4 of white early Bronco showing roll cage, tan diamond-stitch seats, swing-out tailgate, round taillights, Method wheels — canonical subject vehicle.",
+    "notes": "Blue coupe / hot rod and RZR-style chassis in shop background."
+  },
+  {
+    "order": 44,
+    "image_id": "9d1fcc5f-9b8a-4b52-95be-88819a743ac8",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Rotated photo of black shock + bushing mount on workbench in shop — shock detail, restoration parts staging. Bilstein label partially visible.",
+    "notes": "Shock + bushing detail; Bilstein box in background. Likely subject suspension parts."
+  },
+  {
+    "order": 45,
+    "image_id": "1a03c852-c1a5-47e0-8f83-25783b30f2b0",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rotated photo: black shock + multiple shocks in plastic bin on workbench in shop — Bilstein-branded packaging visible. Restoration parts staging for subject.",
+    "notes": "Multiple shocks; Bilstein 'YE' / 'SALE' partial labels visible."
+  },
+  {
+    "order": 46,
+    "image_id": "1b5fb8ba-7953-42a2-9388-ee6e0ba0aa67",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Measurement shot: tape measure on blue powdercoated radius arm / coil spring mount — measuring shock/suspension geometry on subject Bronco chassis (blue matches build).",
+    "notes": "Tape measure measurement on suspension. Approximately 1-2 inch reading visible."
+  },
+  {
+    "order": 47,
+    "image_id": "f7658dc4-d4ae-4efa-8269-f10ff301d905",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Tape measure on blue coil spring / blue frame member with tie rod / radius arm hardware — under-chassis measurement on subject's blue-powdercoated suspension.",
+    "notes": "Tape measure ~1-2 inch reading; blue powdercoat consistent with subject build."
+  },
+  {
+    "order": 48,
+    "image_id": "605797ce-e711-4681-8b3c-ef087ac949cb",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Tape measure on black radius arm bracket/mount against white surface — chassis component measurement (~4-5 inches across). Subject Bronco fab/measurement.",
+    "notes": "Black bracket dimension measurement, ~4-5 inches."
+  },
+  {
+    "order": 49,
+    "image_id": "d74993ae-4670-43fb-986a-02a6dd6a6b3d",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Under-rear-seat detail: sound deadening (textured black), gray seat-back fabric, white-painted floor support tube with bracket — subject Bronco interior restoration detail.",
+    "notes": "Sound deadening (textured), seat-back base, white tube/support detail."
+  }
+]

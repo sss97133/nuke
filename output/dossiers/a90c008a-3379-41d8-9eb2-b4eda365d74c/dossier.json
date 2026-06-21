@@ -1,0 +1,645 @@
+{
+  "schema": "nuke.dossier/v1",
+  "generated_at": "2026-06-01T01:16:54.679Z",
+  "generator": "_shared/dossier.ts",
+  "vehicle": {
+    "id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+    "name": "1983 GMC K2500 Sierra Classic",
+    "year": 1983,
+    "make": "GMC",
+    "model": "K2500 Sierra Classic",
+    "trim": "Sierra Classic",
+    "vin": "1GTGK24M1DJ514592",
+    "mileage": 41000,
+    "color": "Midnight Blue Metallic / Frost White",
+    "engine": "350ci SBC V8 / Edelbrock 4-bbl / HEI",
+    "transmission": "TH400",
+    "lead_image_url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/a90c008a-3379-41d8-9eb2-b4eda365d74c/iphoto/IMG_9151.jpeg"
+  },
+  "proof_of_ownership": {
+    "vin": {
+      "amount": "1GTGK24M1DJ514592",
+      "source": "vehicles.vin",
+      "method": "recorded"
+    },
+    "owner_user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "photo_attribution": {
+      "total_publishable_photos": 2454,
+      "by_source": {
+        "iphoto": 734,
+        "ssd_blast": 390,
+        "user_upload": 662,
+        "drop-folder": 339,
+        "bat_import_mirrored": 251,
+        "photo_auto_sync": 78
+      },
+      "note": "Photo density by a single documenter is the strongest available ownership/possession signal absent a title scan."
+    },
+    "title_document": {
+      "present": false,
+      "needs": "upload title scan to attach a registry-grade ownership proof"
+    }
+  },
+  "build_summary": {
+    "work_days": {
+      "amount": 30,
+      "source": "work_sessions",
+      "method": "distinct session_date count"
+    },
+    "span": {
+      "first": "2023-08-26",
+      "last": "2026-03-27"
+    },
+    "documented_hours": {
+      "amount": 173.3,
+      "source": "work_sessions.duration_minutes",
+      "method": "sum/60"
+    },
+    "recorded_labor_value_usd": {
+      "amount": 2118,
+      "source": "work_sessions.total_job_cost",
+      "method": "sum of recorded session cost"
+    },
+    "estimated_labor_value_usd": {
+      "amount": 14732,
+      "source": "documented_hours × $85/hr",
+      "method": "estimate — not invoiced"
+    },
+    "publishable_photos": {
+      "amount": 2454,
+      "source": "vehicle_images",
+      "method": "approved & non-superseded & non-sensitive"
+    },
+    "work_type_breakdown": {
+      "general": 4,
+      "work": 1,
+      "parts_received": 2,
+      "brakes": 3,
+      "fabrication": 16,
+      "inspection": 3,
+      "suspension": 1
+    }
+  },
+  "valuation": {
+    "amount": 21607.5,
+    "source": "vehicles.nuke_estimate",
+    "method": "nuke multi-signal estimate"
+  },
+  "timeline": [
+    {
+      "date": "2023-08-26",
+      "title": "Shop work",
+      "work_type": "general",
+      "description": "12:54 1983 GMC K2500 — Damage/wear detail — Aug 26, 2023 | 13:02 1983 GMC K2500 — Driver-side profile — Aug 26, 2023 | 13:34 1983 GMC K2500 — Damage/wear detail — Aug 26, 2023 | 21:17 1983 GMC K2500 — Front-left door — Aug 26, 2023",
+      "hours": 5.9,
+      "photos": 5,
+      "recorded_value_usd": 498.67,
+      "confidence": 0,
+      "provenance": {
+        "method": "auto_detected",
+        "created_by": null,
+        "sources": null
+      }
+    },
+    {
+      "date": "2023-08-27",
+      "title": "Shop work",
+      "work_type": "general",
+      "description": "12:37 1983 GMC K2500 — Suspension components — Aug 27, 2023 | 16:48 1983 GMC K2500 — Undercarriage view — Aug 27, 2023",
+      "hours": 13.7,
+      "photos": 6,
+      "recorded_value_usd": 1161.67,
+      "confidence": 0,
+      "provenance": {
+        "method": "auto_detected",
+        "created_by": null,
+        "sources": null
+      }
+    },
+    {
+      "date": "2023-08-30",
+      "title": "Shop work",
+      "work_type": "general",
+      "description": "11:30 1983 GMC K2500 — Front driver-side exterior — Aug 30, 2023 | 15:11 1983 GMC K2500 — Hood panel — Aug 30, 2023",
+      "hours": 2.6,
+      "photos": 2,
+      "recorded_value_usd": 219.58,
+      "confidence": 0,
+      "provenance": {
+        "method": "auto_detected",
+        "created_by": null,
+        "sources": null
+      }
+    },
+    {
+      "date": "2023-10-14",
+      "title": "Shop work",
+      "work_type": "general",
+      "description": "12:27 1983 GMC K2500 — Damage/wear detail — Oct 14, 2023 | 12:27 1983 GMC K2500 — Driver-side profile — Oct 14, 2023 | 12:27 1983 GMC K2500 — Damage/wear detail — Oct 14, 2023 | 12:27 1983 GMC K2500 — Damage/wear detail — Oct 14, 2023 | 12:27 1983 GMC K2500 — Hood panel — Oct 14, 2023 | 12:27 1983 GMC K2500 — Damage/wear detail — Oct 14, 2023 | 16:27 1983 GMC K2500 — Driver-side profile — Oct 14, 2023",
+      "hours": 2.8,
+      "photos": 7,
+      "recorded_value_usd": 238,
+      "confidence": 0,
+      "provenance": {
+        "method": "auto_detected",
+        "created_by": null,
+        "sources": null
+      }
+    },
+    {
+      "date": "2026-02-27",
+      "title": "Granholm K2500 Build — Feb 27",
+      "work_type": "work",
+      "description": "Work session — 10 photos documented",
+      "hours": 6.4,
+      "photos": 10,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 10,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-01",
+      "title": "Granholm K2500 Build — Mar 01",
+      "work_type": "parts_received",
+      "description": "Summit Racing parts received: $122.44",
+      "hours": 0,
+      "photos": 0,
+      "recorded_value_usd": 0,
+      "confidence": 0.5,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 0,
+          "receipts": "Summit Racing: $122.44"
+        }
+      }
+    },
+    {
+      "date": "2026-03-02",
+      "title": "Granholm K2500 Build — Mar 02",
+      "work_type": "brakes",
+      "description": "Rear drum brake hardware disassembly; initial exhaust collector flange welding",
+      "hours": 1,
+      "photos": 8,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 8,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-03",
+      "title": "Granholm K2500 Build — Mar 03",
+      "work_type": "fabrication",
+      "description": "Exhaust pipe and flange welding (2.5\" SS); rear drum brake disassembly; front suspension shock removal",
+      "hours": 1.5,
+      "photos": 18,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 18,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-04",
+      "title": "Granholm K2500 Build — Mar 04",
+      "work_type": "inspection",
+      "description": "Rear shock absorber inspection",
+      "hours": 1,
+      "photos": 1,
+      "recorded_value_usd": 0,
+      "confidence": 0.75,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 1,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-05",
+      "title": "Granholm K2500 Build — Mar 05",
+      "work_type": "fabrication",
+      "description": "Full-day exhaust fabrication — welding 2.5\" SS pipe to collector flanges, fuel pump inspection, rear brake hardware",
+      "hours": 10.5,
+      "photos": 14,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 14,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-06",
+      "title": "Granholm K2500 Build — Mar 06",
+      "work_type": "fabrication",
+      "description": "Exhaust pipe and flange welding; rear drum brake disassembly; interior/dash disassembly. Parts received: Summit Racing $44.99",
+      "hours": 7.5,
+      "photos": 14,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 14,
+          "receipts": "Summit Racing: $44.99"
+        }
+      }
+    },
+    {
+      "date": "2026-03-07",
+      "title": "Granholm K2500 Build — Mar 07",
+      "work_type": "brakes",
+      "description": "Rear drum brake rebuild — disassembly, machining, parts prep; continued exhaust welding",
+      "hours": 4,
+      "photos": 10,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 10,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-08",
+      "title": "Granholm K2500 Build — Mar 08",
+      "work_type": "fabrication",
+      "description": "Exhaust fabrication and welding; rear drum brake rebuild; shock absorber work; engine/transfer case access",
+      "hours": 7.5,
+      "photos": 33,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 33,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-09",
+      "title": "Granholm K2500 Build — Mar 09",
+      "work_type": "fabrication",
+      "description": "Extended exhaust fabrication session — collector flanges, 2.5\" SS pipe welding; rear drum brake components; shock/spring disassembly",
+      "hours": 11.5,
+      "photos": 31,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 31,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-10",
+      "title": "Granholm K2500 Build — Mar 10",
+      "work_type": "inspection",
+      "description": "Exhaust progress documentation photo",
+      "hours": 1,
+      "photos": 1,
+      "recorded_value_usd": 0,
+      "confidence": 0.75,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 1,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-11",
+      "title": "Granholm K2500 Build — Mar 11",
+      "work_type": "fabrication",
+      "description": "Exhaust welding continued; brake hardware check. Parts received: Amazon $336.15",
+      "hours": 3,
+      "photos": 7,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 7,
+          "receipts": "Amazon: $336.15"
+        }
+      }
+    },
+    {
+      "date": "2026-03-12",
+      "title": "Granholm K2500 Build — Mar 12",
+      "work_type": "fabrication",
+      "description": "Exhaust fabrication; brake system rebuild continued",
+      "hours": 5,
+      "photos": 7,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 7,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-13",
+      "title": "Granholm K2500 Build — Mar 13",
+      "work_type": "fabrication",
+      "description": "Exhaust fabrication; rear drum brake rebuild with new wheel cylinders and hardware; shock inspection",
+      "hours": 9.5,
+      "photos": 21,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 21,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-14",
+      "title": "Granholm K2500 Build — Mar 14",
+      "work_type": "brakes",
+      "description": "Rear drum brake rebuild — drum removal, shoe replacement, wheel cylinder install; front brake hub inspection",
+      "hours": 2.5,
+      "photos": 12,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 12,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-15",
+      "title": "Granholm K2500 Build — Mar 15",
+      "work_type": "fabrication",
+      "description": "Header fabrication (1.75\" primaries, 2.5\" collectors); rear drum brake rebuild completion; suspension spring/shock work",
+      "hours": 10,
+      "photos": 18,
+      "recorded_value_usd": 0,
+      "confidence": 0.95,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "Fabricated and installed left-side long tube header. 1.75\" primaries, 2.5\" collector. Hand-bent around steering column and frame rail. TIG welded joints. | Fabricated and installed right-side long tube header. 1.75\" primaries, 2.5\" collector. Routed around oil filter and starter. TIG welded joints.",
+          "photos": 18,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-16",
+      "title": "Granholm K2500 Build — Mar 16",
+      "work_type": "fabrication",
+      "description": "Straight exhaust piping fabrication — routing 2.5\" SS pipes around transfer case crossmember. Dual independent exhaust runs (NOT a Y-pipe merge). MIG welded. Brake hardware reassembly.",
+      "hours": 7.5,
+      "photos": 16,
+      "recorded_value_usd": 0,
+      "confidence": 0.95,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "Fabricated custom Y-pipe merging dual 2.5\" collectors into single 3\" pipe. Routed around transfer case crossmember. MIG welded.",
+          "photos": 16,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-17",
+      "title": "Granholm K2500 Build — Mar 17",
+      "work_type": "fabrication",
+      "description": "Exhaust piping continued; brake hardware finishing; suspension check. Parts received: Summit Racing $617.48",
+      "hours": 5,
+      "photos": 12,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 12,
+          "receipts": "Summit Racing: $617.48"
+        }
+      }
+    },
+    {
+      "date": "2026-03-18",
+      "title": "Granholm K2500 Build — Mar 18",
+      "work_type": "fabrication",
+      "description": "Exhaust fabrication; axle/driveline inspection; shock replacement; brake hardware final check",
+      "hours": 5.5,
+      "photos": 14,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 14,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-19",
+      "title": "Granholm K2500 Build — Mar 19",
+      "work_type": "fabrication",
+      "description": "Full-day exhaust fabrication — pipe routing, welding, fitment",
+      "hours": 8,
+      "photos": 8,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 8,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-20",
+      "title": "Granholm K2500 Build — Mar 20",
+      "work_type": "fabrication",
+      "description": "Exhaust piping and welding; engine/driveline components check",
+      "hours": 2.5,
+      "photos": 16,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 16,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-22",
+      "title": "Granholm K2500 Build — Mar 22",
+      "work_type": "suspension",
+      "description": "Bilstein 5100 shock install (4 corners); brake reassembly verification; exhaust routing finalization",
+      "hours": 8,
+      "photos": 8,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 8,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-23",
+      "title": "Granholm K2500 Build — Mar 23",
+      "work_type": "fabrication",
+      "description": "Exhaust fabrication continued; transfer case area routing; brake and suspension verification",
+      "hours": 10,
+      "photos": 10,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 10,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-24",
+      "title": "Granholm K2500 Build — Mar 24",
+      "work_type": "fabrication",
+      "description": "Marathon session — final exhaust routing and welding; suspension reassembly; brake system completion; full vehicle documentation photography (91 photos)",
+      "hours": 19,
+      "photos": 91,
+      "recorded_value_usd": 0,
+      "confidence": 0.85,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 91,
+          "receipts": "none"
+        }
+      }
+    },
+    {
+      "date": "2026-03-26",
+      "title": "Granholm K2500 Build — Mar 26",
+      "work_type": "parts_received",
+      "description": "Amazon parts received: $118.35",
+      "hours": 0,
+      "photos": 0,
+      "recorded_value_usd": 0,
+      "confidence": 0.5,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 0,
+          "receipts": "Amazon: $118.35"
+        }
+      }
+    },
+    {
+      "date": "2026-03-27",
+      "title": "Granholm K2500 Build — Mar 27",
+      "work_type": "inspection",
+      "description": "Exhaust progress photo — final routing check",
+      "hours": 1,
+      "photos": 1,
+      "recorded_value_usd": 0,
+      "confidence": 0.75,
+      "provenance": {
+        "method": "photo_interpolated",
+        "created_by": "granholm-photo-dating-agent",
+        "sources": {
+          "events": "none",
+          "photos": 1,
+          "receipts": "none"
+        }
+      }
+    }
+  ],
+  "disclosure": "Build history derived from timestamped photo evidence and recorded work sessions. Labor values marked \"estimated\" are computed from documented hours at the stated rate and were not necessarily invoiced. Provenance is attached to every claim; nothing here is inferred without a cited source."
+}

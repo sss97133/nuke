@@ -1,0 +1,331 @@
+[
+  {
+    "order": 1,
+    "image_id": "4c4549a1-75bc-447d-999d-0e2ce961d1ba",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0393.jpg",
+    "taken_or_created": "2024-09-03 23:11:37.975+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/001_4c4549a1.jpg"
+  },
+  {
+    "order": 2,
+    "image_id": "4dc7f4a8-a8b3-4522-a071-ff3af95bcf69",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0390.jpg",
+    "taken_or_created": "2024-09-03 21:12:55.965+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/002_4dc7f4a8.jpg"
+  },
+  {
+    "order": 3,
+    "image_id": "749c55fc-3ae1-4a7d-b07b-aa4b227e53c4",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0389.jpg",
+    "taken_or_created": "2024-09-03 21:12:54.575+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/003_749c55fc.jpg"
+  },
+  {
+    "order": 4,
+    "image_id": "2b74b393-a722-458e-80e1-3da1d6b2fa4b",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_7464.jpg",
+    "taken_or_created": "2024-08-15 19:08:03.118+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/004_2b74b393.jpg"
+  },
+  {
+    "order": 5,
+    "image_id": "2ea73352-7d8e-4450-8a7e-cb9ddea13235",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_7463.jpg",
+    "taken_or_created": "2024-08-15 19:08:01.479+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/005_2ea73352.jpg"
+  },
+  {
+    "order": 6,
+    "image_id": "89efcabc-47e3-4cde-aaa4-b528c94dda8b",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_7462.jpg",
+    "taken_or_created": "2024-08-15 19:07:59.491+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/006_89efcabc.jpg"
+  },
+  {
+    "order": 7,
+    "image_id": "2f3b9d85-f970-45dc-8143-ab2894070790",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_7461.jpg",
+    "taken_or_created": "2024-08-15 19:07:56.071+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/007_2f3b9d85.jpg"
+  },
+  {
+    "order": 8,
+    "image_id": "cfbb2f4a-33d3-4692-98fd-a02e2a3736a9",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_7460.jpg",
+    "taken_or_created": "2024-08-15 16:55:00.689+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/008_cfbb2f4a.jpg"
+  },
+  {
+    "order": 9,
+    "image_id": "2fa59ccc-b36b-4298-baec-c356a8464010",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_1658.jpg",
+    "taken_or_created": "2024-08-14 20:27:41.969+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/009_2fa59ccc.jpg"
+  },
+  {
+    "order": 10,
+    "image_id": "9e607841-3c88-491b-8fda-32cb5694fdfc",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_1657.jpg",
+    "taken_or_created": "2024-08-14 20:27:33.612+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/010_9e607841.jpg"
+  },
+  {
+    "order": 12,
+    "image_id": "3e69d85e-e33d-4008-8119-f965e9a66f96",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_1655.jpg",
+    "taken_or_created": "2024-08-14 20:27:14.685+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/012_3e69d85e.jpg"
+  },
+  {
+    "order": 14,
+    "image_id": "3195bbf4-5c32-41cb-ad58-e347d6b8bb0d",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_1653.jpg",
+    "taken_or_created": "2024-08-14 17:12:41.572+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/014_3195bbf4.jpg"
+  },
+  {
+    "order": 15,
+    "image_id": "11c2c605-e511-482e-acd0-b72f4db6ddc5",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0311.PNG",
+    "taken_or_created": "2024-08-13 23:44:55+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/015_11c2c605.jpg"
+  },
+  {
+    "order": 16,
+    "image_id": "0f35cc8c-118c-48cf-a495-f38a593bc94f",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0310.PNG",
+    "taken_or_created": "2024-08-13 23:44:44+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/016_0f35cc8c.jpg"
+  },
+  {
+    "order": 17,
+    "image_id": "6b7cfc38-1d6d-40be-9e88-6566e74d51d3",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0307.jpg",
+    "taken_or_created": "2024-08-13 00:37:03.015+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/017_6b7cfc38.jpg"
+  },
+  {
+    "order": 18,
+    "image_id": "6d8b9fef-f2d8-4624-8292-c73594ac2855",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0306.jpg",
+    "taken_or_created": "2024-08-13 00:36:58.559+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/018_6d8b9fef.jpg"
+  },
+  {
+    "order": 19,
+    "image_id": "cfd5731e-00d9-43d1-833d-fb9f8842a55e",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0305.jpg",
+    "taken_or_created": "2024-08-13 00:36:54.45+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/019_cfd5731e.jpg"
+  },
+  {
+    "order": 20,
+    "image_id": "7caba0c2-d264-41af-968e-538f043043cb",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0304.jpg",
+    "taken_or_created": "2024-08-13 00:36:50.861+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/020_7caba0c2.jpg"
+  },
+  {
+    "order": 21,
+    "image_id": "dfa5f31d-c0fa-4b1b-9632-4a90aae6f7a4",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0303.jpg",
+    "taken_or_created": "2024-08-13 00:36:44.622+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/021_dfa5f31d.jpg"
+  },
+  {
+    "order": 22,
+    "image_id": "f7cc87a1-7049-4fa7-89f4-0ac487e3e0cb",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0302.jpg",
+    "taken_or_created": "2024-08-12 21:54:58.566+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/022_f7cc87a1.jpg"
+  },
+  {
+    "order": 23,
+    "image_id": "4cb9e7e3-06e6-43ff-ac6a-6dedd8d145ae",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_1651.jpg",
+    "taken_or_created": "2024-08-12 17:51:46.432+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/023_4cb9e7e3.jpg"
+  },
+  {
+    "order": 24,
+    "image_id": "64ac7880-6d66-41ca-b382-c56b00686236",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_1650.jpg",
+    "taken_or_created": "2024-08-12 17:51:41.3+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/024_64ac7880.jpg"
+  },
+  {
+    "order": 25,
+    "image_id": "ab69f91f-cdea-4c84-ba37-fae58d8f2832",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_1649.jpg",
+    "taken_or_created": "2024-08-12 17:51:31.836+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/025_ab69f91f.jpg"
+  },
+  {
+    "order": 26,
+    "image_id": "fb9234cd-9f1d-4418-8f1b-a8d79cfa02ad",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_1647.jpg",
+    "taken_or_created": "2024-08-12 03:57:06.256+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/026_fb9234cd.jpg"
+  },
+  {
+    "order": 27,
+    "image_id": "e804b23b-3e63-4fd6-b026-91289245f527",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_1646.jpg",
+    "taken_or_created": "2024-08-12 03:56:50.585+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/027_e804b23b.jpg"
+  },
+  {
+    "order": 28,
+    "image_id": "4ea7a077-30cf-499e-8bfc-c503605b1eca",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_1645.jpg",
+    "taken_or_created": "2024-08-12 03:56:37.513+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/028_4ea7a077.jpg"
+  },
+  {
+    "order": 29,
+    "image_id": "31ccc464-72f7-4478-98b4-762b0d81b099",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_1644.jpg",
+    "taken_or_created": "2024-08-12 00:31:07.916+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/029_31ccc464.jpg"
+  },
+  {
+    "order": 30,
+    "image_id": "d0549f34-f65b-4674-afe0-86dd791c65cb",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0299.jpg",
+    "taken_or_created": "2024-08-11 02:02:59.867+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/030_d0549f34.jpg"
+  },
+  {
+    "order": 31,
+    "image_id": "f42ed3a6-0371-4489-9b0c-9f6d0238c3d6",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0298.jpg",
+    "taken_or_created": "2024-08-11 02:02:52.599+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/031_f42ed3a6.jpg"
+  },
+  {
+    "order": 32,
+    "image_id": "61beedc1-d0d3-4859-8552-20b9a66cf43b",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0297.jpg",
+    "taken_or_created": "2024-08-11 02:02:48.751+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/032_61beedc1.jpg"
+  },
+  {
+    "order": 33,
+    "image_id": "5cf132f4-8a03-4c66-aad3-3891461d7c7b",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0293.jpg",
+    "taken_or_created": "2024-08-11 02:02:35.533+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/033_5cf132f4.jpg"
+  },
+  {
+    "order": 34,
+    "image_id": "f203a359-d1be-4fc2-95a6-a7ab9abe70d3",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0292.jpg",
+    "taken_or_created": "2024-08-11 02:02:32.937+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/034_f203a359.jpg"
+  },
+  {
+    "order": 35,
+    "image_id": "a538843c-1bdc-4f47-88e3-f6dc0ef1c265",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0291.jpg",
+    "taken_or_created": "2024-08-11 02:02:29.227+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/035_a538843c.jpg"
+  },
+  {
+    "order": 36,
+    "image_id": "4f74182b-6b8a-4890-8054-5062941e1f03",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0290.jpg",
+    "taken_or_created": "2024-08-11 02:02:23.915+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/036_4f74182b.jpg"
+  },
+  {
+    "order": 37,
+    "image_id": "5c2610a5-2c2f-49c5-8eb1-6467dc347cd3",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0288.jpg",
+    "taken_or_created": "2024-08-11 02:02:06.621+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/037_5c2610a5.jpg"
+  },
+  {
+    "order": 38,
+    "image_id": "bcddebd6-193a-45e9-904a-418a02343d78",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0286.jpg",
+    "taken_or_created": "2024-08-11 02:02:00.259+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/038_bcddebd6.jpg"
+  },
+  {
+    "order": 39,
+    "image_id": "29e0d67e-ef6b-44bb-b72a-e3b97682e4e9",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0285.jpg",
+    "taken_or_created": "2024-08-11 02:01:54.682+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/039_29e0d67e.jpg"
+  },
+  {
+    "order": 40,
+    "image_id": "49f2a72b-d018-4ae2-84bf-b47e821d4fb4",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0284.jpg",
+    "taken_or_created": "2024-08-11 02:01:49.226+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/040_49f2a72b.jpg"
+  },
+  {
+    "order": 41,
+    "image_id": "15320cb4-4e3d-47f5-a2a6-94d5d66226cc",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0283.jpg",
+    "taken_or_created": "2024-08-11 02:01:42.182+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/041_15320cb4.jpg"
+  },
+  {
+    "order": 42,
+    "image_id": "544c53b8-5c6a-4d4e-9b27-07e0555be142",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0282.jpg",
+    "taken_or_created": "2024-08-11 02:01:38.623+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/042_544c53b8.jpg"
+  },
+  {
+    "order": 43,
+    "image_id": "575a356c-bef9-440f-8417-028be5b20228",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0281.jpg",
+    "taken_or_created": "2024-08-11 02:01:30.036+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/043_575a356c.jpg"
+  },
+  {
+    "order": 44,
+    "image_id": "5ad9e5fb-7f81-4316-a2bb-76a256792a2a",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0280.jpg",
+    "taken_or_created": "2024-08-11 02:01:20.597+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/044_5ad9e5fb.jpg"
+  },
+  {
+    "order": 45,
+    "image_id": "6b65eeca-de65-40db-95ca-2fc9eb2b2b9a",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0279.jpg",
+    "taken_or_created": "2024-08-11 02:01:04.117+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/045_6b65eeca.jpg"
+  },
+  {
+    "order": 46,
+    "image_id": "802f0ffd-a092-4283-93a6-3602f40699f6",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0278.jpg",
+    "taken_or_created": "2024-08-11 02:00:57.365+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/046_802f0ffd.jpg"
+  },
+  {
+    "order": 47,
+    "image_id": "d22f1a36-d22b-4071-88de-7f1b06f4f5da",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0277.jpg",
+    "taken_or_created": "2024-08-11 02:00:51.264+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/047_d22f1a36.jpg"
+  },
+  {
+    "order": 48,
+    "image_id": "217697a6-b15b-42e0-9783-2022b9328f47",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0276.jpg",
+    "taken_or_created": "2024-08-11 02:00:40.973+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/048_217697a6.jpg"
+  },
+  {
+    "order": 49,
+    "image_id": "4dbd6d8e-32c6-42fb-9699-11e52acf8dfa",
+    "url": "https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/5a1deb95-4b67-4cc3-9575-23bb5b180693/iphoto/IMG_0275.jpg",
+    "taken_or_created": "2024-08-11 02:00:27.146+00",
+    "path": "/Users/skylar/nuke/.context/5a1d07_vision_gate/049_4dbd6d8e.jpg"
+  }
+]

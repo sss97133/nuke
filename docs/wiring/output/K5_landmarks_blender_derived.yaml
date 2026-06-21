@@ -1,0 +1,97 @@
+# K5 landmark distances — DERIVED FROM THE DIGITAL TWIN (NOT tape-measured).
+#
+# method: blender_polyline_derived_v2
+# derived: 2026-06-09 (v2 — re-derived in the REAL model after Skylar rejected
+#          the from-primitives build; v1 values are superseded)
+# model: /Users/skylar/k5-harness-pull/K5_harness_workspace_v2.blend
+#        base = 1978_Chevrolet_Blazer.blend (TurboSquid #1764639, $99, Dec 2024
+#        order 6425842) — designated digital twin in K5_DIMENSIONAL_SUBSTRATE.md.
+#        SCALE VERIFIED THIS SESSION: model wheelbase 2,703 mm vs FR-88 cited
+#        2,705 mm (Δ 2 mm). Body/dash/doors/lights = real geometry anchors.
+#        Engine bay contents = atom-built insert (LS3-Marine envelope, Holley
+#        mid-mount fitment, bore-pitch injector/coil placement) replacing the
+#        model's placeholder Under_Engine_Simple lump.
+# derived_by: claude-fable-5 session 2026-06-09 (3D reopened by Skylar's direct
+#        instruction, superseding the 2026-05-11 2D-only rule)
+#
+# PURPOSE: set one-color PROTOTYPE max lengths (Dave's method steps 1-2).
+# NOT final cut lengths. Verify on vehicle (step 3) before cutting (step 4).
+#
+# POSITION ASSUMPTIONS BAKED IN (orange-flagged in the .blend):
+#   A1 M130 passenger firewall (x=-0.45, y=-1.44, z=1.05 model coords) — ASSERTED (§4 unknown)
+#   A2 PDM30 under dash passenger (-0.45, -1.28, 0.82) — ASSERTED (§4 unknown)
+#   A3 FWG-MAIN at factory hole H3 lateral/height (objectTraits.ts: passenger,
+#      1.5", "A/C + ECU", sealed) at probed firewall plane y=-1.46 — boundary
+#      method still OPEN QUESTION §3.1
+#   A4 Battery driver-front — BELIEF POISONED 2026-06-09: the "Skylar image"
+#      showing driver-front was a DIFFERENT blue carbureted squarebody from the
+#      misattributed 2026-02-03 telegram batch. As-built photos (2026-01-31)
+#      show NO battery or tray on either side. Battery side = fully OPEN
+#      decision (Skylar's call). L14/L15 flip mirror-image if passenger wins.
+#      Model keeps driver placement as a placeholder pending the decision.
+#      UPDATE 2026-06-10: Skylar working statement = PASSENGER firewall corner
+#      (receipts/2026-06-10_cut-list-v4.1-ecu-lifelines.md). Owner-stated
+#      working position, NOT a measurement. L14/L15 RE-DERIVED 2026-06-10
+#      for passenger corner + as-built CVF driver-low alternator
+#      (analytic_polyline_derived; Blender twin re-route still owed).
+#      PDM B+ feed from this corner ≈ 16.7" (receipt 2026-06-10_battery-corner-rederivation.md).
+#   A5 Engine: bellhousing face y=-1.30 (tunnel entry behind probed firewall
+#      plane), crank CL z=0.75 — placement vs motor-mount frame station NOT
+#      re-derived in model coords; ±50 mm class
+#   A6 FLOOR-RR grommet under driver seat rocker (0.82, -0.30, 0.74) — choice
+#
+# KNOWN SUBSTRATE CONFLICTS (do not silently "fix"):
+#   C1 objectTraits.ts H1–H4 firewall holes carry y≈-1.02 — inside the dash
+#      volume per actual model geometry (dash spans y -1.46..-0.99); traits
+#      hole positions are best-estimate and need re-anchoring to the model.
+#   C2 harness_spec_latest.txt (2026-04-13) says ECU at DRIVER kick panel;
+#      state file §4 asserts M130 passenger firewall. Later doc wins for now.
+#
+# Values: tape-routed-equivalent inches along planned path, WITHOUT service
+# loop. Loop/bend/flags added by scripts/compute_wire_lengths.py.
+
+vehicle: K5_1977_CKR187F127263
+measured_by: blender_polyline_derived_v2 (digital twin, NOT physical tape)
+measured_date: 2026-06-09
+
+landmarks:
+  # 3.1 Engine bay
+  L01: 7.2    # M130 → FWG-MAIN (H3)                              [A1, A3]
+  L02: 24.7   # FWG-MAIN → intake valley junction                 [A3, A5]
+  L03: 7.2    # valley junction → Cyl 1 coil, DEL-Stributor central bracket
+  L04: 4.3    # coil-to-coil pitch driver row on bracket
+  L05: 7.2    # valley junction → Cyl 2 coil on bracket
+  L06: 4.3    # coil-to-coil pitch passenger row on bracket
+  L07: 7.1    # coil bracket → injector at same cylinder
+  L08: 17.5   # valley junction → throttle body (90mm DBW)
+  L09: 8.0    # valley junction → MAP sensor port
+  L10: 32.5   # M130 B-conn → CKP at FRONT timing cover (Gen IV LS3 — BOM PN 12615626 corroborates; 'bellhousing rear' in K5_landmarks.yaml was a Gen III pattern, surfaced 2026-06-09) [A1, A5]
+  L11: 30.1   # M130 B-conn → CMP front timing cover              [A1, A5]
+  L12: 44.2   # M130 B-conn → KS1 driver block (around engine rear)
+  L13: 21.5   # M130 B-conn → KS2 passenger block
+  L14: 89.4   # BAT+ → ALT stud — RE-DERIVED 2026-06-10: battery PASSENGER firewall corner (owner working position) → CVF alternator LOW DRIVER (as-built photos 2026-01-31). Cross-car run via core support. method: analytic_polyline_derived (same waypoint math as twin; twin re-route pending next Blender session) [A4-updated]
+  L15: 24.3   # BAT+ → STARTER stud — RE-DERIVED 2026-06-10: battery and LS starter share the passenger corner; short fender drop. Was 68.7 from the dead driver-front placeholder. [A4-updated]
+
+  # 3.2 Cab / dash (anchored to REAL dash/column/door geometry)
+  L16: 8.7    # PDM30 → FWG-MAIN interior side                    [A2, A3]
+  L17: 38.5   # PDM30 → steering column (real Steering_Main)      [A2]
+  L18: 43.4   # PDM30 → headlight switch (real dash position)     [A2]
+  L19: 34.7   # PDM30 → brake pedal switch                        [A2]
+  L20: 55.2   # PDM30 → driver door boot (real hinge line)        [A2]
+  L21: 19.2   # door boot → in-door devices (real door cavity)
+  L22: 20.7   # PDM30 → passenger door boot                       [A2]
+  L23: 153.5  # PDM30 → dome light (A-pillar → headliner cavity per objectTraits channel) [A2]
+  L24: 76.8   # PDM30 → FLOOR-RR grommet                          [A2, A6]
+  L25: 54.1   # FLOOR-RR → rear axle junction (inside driver C-channel per objectTraits)
+  L26: 50.3   # rear junction → tailgate cluster (real Tail_Lights_Main y=+1.78)
+  L27: 27.5   # rear junction → fuel tank sender/pump
+  L28: 35.6   # PDM30 → 6L80E switches via tunnel grommet         [A2]
+
+  # 3.4 Engine bay → underbody
+  L29: 52.8   # M130 → O2 bung driver exhaust                     [A1]
+  L30: 33.4   # M130 → O2 bung passenger exhaust                  [A1]
+
+# After prototype layout on the truck: record ACTUAL tape lengths into
+# K5_landmarks.yaml (the measured file), rerun
+#   python3 scripts/compute_wire_lengths.py --variance
+# and the delta report is the final-cut authorization.

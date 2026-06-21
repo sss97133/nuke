@@ -1,0 +1,784 @@
+[
+  {
+    "uuid_or_filename": "000_dd382e83-f971-4d98-98a6-2a68309c45b2.jpeg",
+    "observed_at": "2025-11-01T18:40:36.719857Z",
+    "kind": "condition",
+    "summary": "Burgundy/pink faded Chevrolet Suburban (K-body, 4WD) sitting in commercial parking lot with rear axle on jack stands, spare tire on ground, AZ plate '87U8UE' (front)",
+    "extracted_data": {
+      "work_type": "rolling_chassis_storage",
+      "components_visible": ["body", "front_clip", "grille_350_badge", "spare_tire_on_ground", "axle_on_jackstands", "spare_tire_under_rear"],
+      "color_observed": "faded_burgundy_pink_originally_dark_red",
+      "plate_state": "AZ",
+      "plate_text": "87U8UE",
+      "trim": "Cheyenne 350",
+      "body_style": "Suburban_long_roof_4_door"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": "Body is Suburban (long-roof, 4-door, no separate bed) — DB record says 'K20' which is the chassis designation that could apply to a 3/4-ton Suburban OR pickup. Body style is Suburban, not pickup. Flag for body-style correction in DB."
+  },
+  {
+    "uuid_or_filename": "001_b87efbde-425e-4d67-a617-d634c094264f.jpeg",
+    "observed_at": "2025-11-01T18:40:36.733783Z",
+    "kind": "condition",
+    "summary": "Side view (passenger) of same burgundy Suburban, rear axle pulled, spare laid on ground, in commercial lot next to 'AIR CONDITIONING' shop, mountain background — likely Las Vegas or AZ desert",
+    "extracted_data": {
+      "work_type": "wheel_axle_service_or_disassembly",
+      "components_visible": ["full_body_passenger_side", "rear_wheel_missing", "spare_tire", "Cheyenne_fender_badge"],
+      "color_observed": "burgundy_with_pink_oxidation",
+      "body_style": "Suburban_long_roof_3_window_side"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": "Same Suburban body — see note on photo 000"
+  },
+  {
+    "uuid_or_filename": "002_35cb7613-8130-47cb-aa88-8f57a94ab775.jpeg",
+    "observed_at": "2025-11-01T18:40:40.689871Z",
+    "kind": "work_record",
+    "summary": "Same Suburban, viewed from rear of U-Haul auto-transport trailer ramps — loaded for transport. NV temp plate '378-3-' visible front",
+    "extracted_data": {
+      "work_type": "transport_loading",
+      "vendor": "U-Haul",
+      "components_visible": ["U-Haul_trailer_ramps", "front_clip", "grille", "NV_temp_paper_plate"],
+      "plate_state": "NV_temp"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "003_e5d003ca-9744-4213-80ee-fa90641d6dc8.jpeg",
+    "observed_at": "2025-11-01T18:40:41.614414Z",
+    "kind": "condition",
+    "summary": "Suburban on U-Haul tandem-axle trailer at night, hood up showing inner hood panel, chain rigging visible on bumper. Audi sedan in background.",
+    "extracted_data": {
+      "work_type": "transport_loaded",
+      "vendor": "U-Haul",
+      "components_visible": ["hood_open_inner_panel", "headlight", "Cheyenne_badge", "front_axle_chains", "amber_marker_light"],
+      "color_observed": "burgundy"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "004_30e3390e-6da7-42e1-ab4a-e8e576b166b0.jpeg",
+    "observed_at": "2025-11-01T18:40:41.778245Z",
+    "kind": "work_record",
+    "summary": "Suburban front view on U-Haul trailer at sunset, palm trees, strapped down with green ratchet straps. NV plate '870-UJ' visible.",
+    "extracted_data": {
+      "work_type": "transport_loaded_strapped",
+      "vendor": "U-Haul",
+      "components_visible": ["green_ratchet_straps", "U-Haul_diamond_plate_ramps", "chains_to_front_axle"],
+      "plate_text": "870-UJ",
+      "plate_state": "NV"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "005_40b7f4a4-9004-4852-95fa-a6875a895ba0.jpeg",
+    "observed_at": "2025-11-01T18:40:42.802119Z",
+    "kind": "sighting",
+    "summary": "Suburban on U-Haul trailer at night being towed behind white late-90s GM SUV (Suburban or Tahoe). Trailer license 'AT 7056M', NV plate '870-UJ' on Suburban.",
+    "extracted_data": {
+      "work_type": "transport_in_progress",
+      "vendor": "U-Haul",
+      "components_visible": ["full_vehicle_front_three_quarter", "tow_vehicle_white_SUV", "trailer_plate"],
+      "plate_text": "870-UJ",
+      "trailer_plate": "AT 7056M"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "006_d296fa13-cb9e-4093-a139-18cda4c6b719.jpeg",
+    "observed_at": "2025-11-01T18:40:43.99634Z",
+    "kind": "sighting",
+    "summary": "Suburban on U-Haul trailer at gas station, fuel pump nozzle visible, NV plate '870-UJ'. Street signs read 'Mesquite' — vehicle being fueled/towed through Mesquite NV.",
+    "extracted_data": {
+      "work_type": "transport_refueling",
+      "vendor": "U-Haul",
+      "components_visible": ["fuel_nozzle", "Mesquite_NV_street_sign"],
+      "plate_text": "870-UJ",
+      "location_clue": "Mesquite_NV"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "007_c2393803-868b-4ee7-8b47-bac1ef2496ab.jpeg",
+    "observed_at": "2025-11-01T18:40:43.998536Z",
+    "kind": "sighting",
+    "summary": "Suburban on U-Haul trailer in front of open shop bay door at night. Another squarebody (blue, 4WD) parked next to it on lot.",
+    "extracted_data": {
+      "work_type": "transport_arrival_at_shop",
+      "vendor": "U-Haul",
+      "components_visible": ["shop_bay_door_open", "second_squarebody_blue_4wd_unrelated"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "008_63ee0ae0-9c31-46a8-b78c-efb8823e6ccc.jpeg",
+    "observed_at": "2025-11-01T18:40:44.855119Z",
+    "kind": "sighting",
+    "summary": "Close-up front of Suburban on U-Haul trailer, intersection at Mesquite & Riverside, NV plate '870-UJ', tow strap chains hanging off front bumper. Headlight surrounds and chrome grille trim visible.",
+    "extracted_data": {
+      "work_type": "transport_in_transit",
+      "vendor": "U-Haul",
+      "components_visible": ["chrome_grille_trim", "headlight_bezels", "front_bumper_with_tow_hooks", "amber_park_lights"],
+      "plate_text": "870-UJ",
+      "location_clue": "Mesquite_NV_Riverside_intersection",
+      "trim_grille": "350"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "009_cf994e42-703a-4625-9fb9-f9b1429bd41d.jpeg",
+    "observed_at": "2025-11-01T18:40:46.379415Z",
+    "kind": "sighting",
+    "summary": "Suburban on trailer at night in dirt/gravel lot with palm tree and red Plymouth/Dodge Coronet/Charger silhouette in background, and red Porsche-like coupe also visible — suggests classic car lot or storage yard.",
+    "extracted_data": {
+      "work_type": "transport_arrival",
+      "vendor": "U-Haul",
+      "components_visible": ["full_vehicle_three_quarter", "Cheyenne_badge", "nearby_classic_cars_unrelated"],
+      "location_clue": "appears_to_be_classic_car_lot_or_shop"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "010_b9effb93-b8f8-4018-88c4-616e93f09486.jpeg",
+    "observed_at": "2025-11-01T18:40:46.484129Z",
+    "kind": "sighting",
+    "summary": "Wider angle of Suburban on U-Haul trailer at same lot with red classic cars in background (Plymouth/Dodge B-body and red roadster).",
+    "extracted_data": {
+      "work_type": "transport_arrival",
+      "vendor": "U-Haul",
+      "components_visible": ["full_passenger_side_view", "U-Haul_trailer", "classic_cars_in_background_unrelated"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "011_350b8e73-0dee-4d0c-a3fa-47e4532840fc.jpeg",
+    "observed_at": "2025-11-01T18:40:46.880387Z",
+    "kind": "sighting",
+    "summary": "Daytime: Suburban on U-Haul trailer parked next to white 1990s GMT400 Suburban tow rig, in front of white commercial building with maroon stripe and bay '882'. Skylar (man in dark jacket and ballcap) standing in foreground.",
+    "extracted_data": {
+      "work_type": "transport_arrival_at_destination",
+      "vendor": "U-Haul",
+      "components_visible": ["full_passenger_side", "tow_vehicle_white_GMT400_Suburban", "Skylar_in_frame", "shop_bay_882"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "012_3c8a7ca5-691e-402f-8055-b2dbacf45c81.jpeg",
+    "observed_at": "2025-11-01T18:40:48.484158Z",
+    "kind": "sighting",
+    "summary": "Same scene as 011, without Skylar — Suburban on trailer behind white tow Suburban at commercial bay '882'. Both vehicles framed clearly.",
+    "extracted_data": {
+      "work_type": "transport_arrival_at_destination",
+      "vendor": "U-Haul",
+      "components_visible": ["full_passenger_side_clean_shot", "tow_vehicle_GMT400", "commercial_building_bay_882"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "013_IMG_3585.jpg",
+    "observed_at": "2026-03-20T16:58:20.770369Z",
+    "kind": "sighting",
+    "summary": "GOLD/CREAM two-tone squarebody pickup (single cab + bed, NOT a Suburban) on different (orange/silver SpeedLoader) flatbed trailer at night, driver door open showing interior. 'Super Cheyenne' or similar fender badge.",
+    "extracted_data": {
+      "work_type": "transport_loaded",
+      "components_visible": ["pickup_body_single_cab_with_bed", "two_tone_paint_gold_white", "open_driver_door", "passenger_mirror", "SpeedLoader_trailer"],
+      "color_observed": "gold_olive_with_white_lower_two_tone",
+      "body_style": "shortbed_pickup_separate_bed"
+    },
+    "confidence": "high",
+    "is_actually_k20": false,
+    "wrong_attribution_notes": "DIFFERENT VEHICLE — gold/cream two-tone squarebody PICKUP (single cab + separate bed). 1973-77 era. Not the same chassis as the burgundy K20 Suburban. Belongs to a different vehicle record. Fork to ghost vehicle."
+  },
+  {
+    "uuid_or_filename": "014_IMG_3584.jpg",
+    "observed_at": "2026-03-20T16:58:29.125847Z",
+    "kind": "sighting",
+    "summary": "Same gold/cream two-tone squarebody pickup as 013, longer side view showing 'Cheyenne 30' or 'Super Cheyenne' fender badge, opened door, beige interior visible, on the SpeedLoader trailer.",
+    "extracted_data": {
+      "work_type": "transport_loaded",
+      "components_visible": ["pickup_full_side", "Cheyenne_30_or_Super_Cheyenne_badge", "chrome_door_handle", "beige_bench_seat"],
+      "color_observed": "gold_two_tone_white",
+      "trim": "Cheyenne_or_Super_Cheyenne",
+      "body_style": "longbed_pickup_separate_bed"
+    },
+    "confidence": "high",
+    "is_actually_k20": false,
+    "wrong_attribution_notes": "DIFFERENT VEHICLE — same gold two-tone pickup from 013. Not Skylar's burgundy K20 Suburban."
+  },
+  {
+    "uuid_or_filename": "015_IMG_3429.jpg",
+    "observed_at": "2026-03-20T16:58:32.99074Z",
+    "kind": "sighting",
+    "summary": "Rotated 90° landscape — appears to show a red dump truck (1980s+ medium-duty), white tow rig, and possibly equipment in desert ranch setting with snow-capped mountains. No 1973 K20 in frame.",
+    "extracted_data": {
+      "work_type": "ranch_property_scene",
+      "components_visible": ["red_medium_duty_dump_truck", "white_tow_rig", "snow_capped_mountains_distant"],
+      "color_observed": "red_dump_truck"
+    },
+    "confidence": "medium",
+    "is_actually_k20": false,
+    "wrong_attribution_notes": "Wrong attribution — image shows a red dump truck and white tow rig at a ranch/storage property. Not a 1973 K20. Belongs in property/scene context, not vehicle-specific photos."
+  },
+  {
+    "uuid_or_filename": "016_IMG_3583.jpg",
+    "observed_at": "2026-03-20T16:58:35.228102Z",
+    "kind": "sighting",
+    "summary": "Night scene with multiple vehicles: foreground a 1979-80 squarebody C/K (round single headlights, eggcrate grille) with hood up and jumper cables, midground a yellow squarebody pickup with amber roof clearance lights/tow-haul package, background another trailer and pickup.",
+    "extracted_data": {
+      "work_type": "shop_yard_multi_vehicle_scene",
+      "components_visible": ["jumper_cables", "open_hood_late70s_squarebody", "yellow_pickup_with_amber_roof_lights", "shop_yard"],
+      "vehicles_in_frame": ["1979-80_C/K_squarebody", "gold_squarebody_with_roof_lights"]
+    },
+    "confidence": "high",
+    "is_actually_k20": false,
+    "wrong_attribution_notes": "Wrong attribution — multiple OTHER vehicles in frame, none are the burgundy 1973 K20 Suburban. Shop yard scene. Possibly related to the gold pickup in 013/014."
+  },
+  {
+    "uuid_or_filename": "017_IMG_3586.jpg",
+    "observed_at": "2026-03-20T16:58:35.494613Z",
+    "kind": "sighting",
+    "summary": "Gold/cream two-tone squarebody pickup on flatbed trailer at night with three amber roof clearance/tow lights illuminated, headlights on, parked next to a blue late-70s squarebody pickup.",
+    "extracted_data": {
+      "work_type": "loaded_for_transport",
+      "components_visible": ["pickup_full_front_three_quarter", "amber_roof_clearance_lights_x3", "gold_white_two_tone_paint", "blue_squarebody_pickup_nearby"],
+      "color_observed": "gold_with_white_two_tone",
+      "body_style": "shortbed_pickup"
+    },
+    "confidence": "high",
+    "is_actually_k20": false,
+    "wrong_attribution_notes": "DIFFERENT VEHICLE — gold pickup same as 013/014, not the burgundy K20 Suburban. Plus a blue squarebody pickup in frame which is also unrelated."
+  },
+  {
+    "uuid_or_filename": "018_IMG_3428.jpg",
+    "observed_at": "2026-03-20T16:58:38.765149Z",
+    "kind": "sighting",
+    "summary": "Rotated 90° landscape — desert ranch property scene with red dump truck and what appears to be a flatbed/trailer. Similar to 015. No 1973 K20.",
+    "extracted_data": {
+      "work_type": "ranch_property_scene",
+      "components_visible": ["red_dump_truck", "trailer_with_load", "desert_terrain"]
+    },
+    "confidence": "medium",
+    "is_actually_k20": false,
+    "wrong_attribution_notes": "Wrong attribution — ranch property scene without the K20 in frame."
+  },
+  {
+    "uuid_or_filename": "019_IMG_2087.jpg",
+    "observed_at": "2026-03-20T22:16:28.708962Z",
+    "kind": "condition",
+    "summary": "Burgundy K20 Suburban on U-Haul trailer at night, front three-quarter view at parking lot with palm trees. NV plate '870-UJ' visible. Chains and tow strap rigging visible.",
+    "extracted_data": {
+      "work_type": "transport_arrived_at_parking",
+      "vendor": "U-Haul",
+      "components_visible": ["full_front_three_quarter", "tow_chains_front_axle", "NV_plate", "amber_park_lights"],
+      "plate_text": "870-UJ",
+      "color_observed": "burgundy_pink_faded"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "020_IMG_2086.jpg",
+    "observed_at": "2026-03-20T22:16:36.525282Z",
+    "kind": "condition",
+    "summary": "Suburban with hood open, sideways angle (camera rotated). Inner hood insulation visible, chrome grille trim, '350' grille badge visible, NV plate '870-UJ'.",
+    "extracted_data": {
+      "work_type": "hood_open_inspection",
+      "components_visible": ["inner_hood_panel", "350_grille_badge", "chrome_grille", "front_bumper", "headlight"],
+      "trim_grille": "350",
+      "plate_text": "870-UJ"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "021_IMG_2088.jpg",
+    "observed_at": "2026-03-20T22:16:40.216395Z",
+    "kind": "condition",
+    "summary": "Suburban on U-Haul trailer at shop with bay door open and forklift visible inside shop. Wider context view. Suspension/4WD axle visible underneath, chrome bumper, NV plate.",
+    "extracted_data": {
+      "work_type": "transport_arrival_at_shop",
+      "vendor": "U-Haul",
+      "components_visible": ["full_front_three_quarter", "shop_bay_with_forklift", "front_suspension_4WD", "chrome_bumper"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "022_IMG_2090.jpg",
+    "observed_at": "2026-03-20T22:16:49.851166Z",
+    "kind": "condition",
+    "summary": "Rotated 90° — close-up of Suburban front including chrome grille, '350' badge, headlight, NV plate '870-UJ', and another spare tire on trailer.",
+    "extracted_data": {
+      "work_type": "transport_loaded_detail",
+      "vendor": "U-Haul",
+      "components_visible": ["close_grille_detail", "350_badge", "spare_tire_on_trailer", "chains"],
+      "plate_text": "870-UJ",
+      "trim_grille": "350"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "023_IMG_2083.jpg",
+    "observed_at": "2026-03-20T22:16:56.844491Z",
+    "kind": "condition",
+    "summary": "Rotated 90° — front view at parking lot with palm trees and a brick wall. Spare tire on ground, NV plate '870-UJ', amber park light, '350' grille badge.",
+    "extracted_data": {
+      "work_type": "parked_inspection",
+      "components_visible": ["front_clip", "350_badge", "spare_tire_at_curb", "amber_park_light"],
+      "plate_text": "870-UJ",
+      "trim_grille": "350"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "024_IMG_2085.jpg",
+    "observed_at": "2026-03-20T22:17:06.915428Z",
+    "kind": "condition",
+    "summary": "Rotated 90° — Suburban front centered on U-Haul trailer ramps with palm trees and pink/orange sunset sky. NV plate '870-UJ'.",
+    "extracted_data": {
+      "work_type": "transport_loaded",
+      "vendor": "U-Haul",
+      "components_visible": ["full_front_view", "U-Haul_ramps_close", "sunset_lighting"],
+      "plate_text": "870-UJ"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "025_IMG_2089.jpg",
+    "observed_at": "2026-03-20T22:17:13.225208Z",
+    "kind": "sighting",
+    "summary": "Suburban on U-Haul trailer at gas station with fuel nozzle visible (refueling at Mesquite NV — street sign visible). Tow rig is white SUV. NV plate '870-UJ'.",
+    "extracted_data": {
+      "work_type": "transport_refueling_Mesquite_NV",
+      "vendor": "U-Haul",
+      "components_visible": ["fuel_nozzle_close", "Mesquite_NV_sign", "Riverside_sign", "tow_vehicle_white_SUV"],
+      "plate_text": "870-UJ",
+      "location_clue": "Mesquite_NV_Mesquite_Blvd_Riverside_intersection"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "026_IMG_2081.jpg",
+    "observed_at": "2026-03-20T22:17:15.018657Z",
+    "kind": "condition",
+    "summary": "DEFINITIVE side profile of Suburban — long roof extends to rear cargo doors, 4 doors, 3 fixed glass panes on side. 'Cheyenne' badge on front fender. Rear wheel removed, sitting on floor jack, spare on ground. White mountain backdrop suggests Las Vegas Spring Mountains.",
+    "extracted_data": {
+      "work_type": "rear_axle_or_wheel_disassembly",
+      "components_visible": ["full_passenger_side_profile", "Cheyenne_fender_badge", "rear_wheel_off", "floor_jack", "spare_tire_on_ground", "fixed_quarter_glass", "rear_cargo_doors", "running_board"],
+      "color_observed": "burgundy_with_pink_oxidation_above_beltline",
+      "body_style": "Suburban_4_door_long_roof_definitive",
+      "trim": "Cheyenne_350"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": "Body style is DEFINITIVELY a Suburban (4-door, long roof, no separate bed) — not a pickup as the DB record description implies. K20 chassis designation could apply to Suburban — but body type field in DB should be corrected from 'pickup' to 'Suburban' if it's set wrong."
+  },
+  {
+    "uuid_or_filename": "027_IMG_2082.jpg",
+    "observed_at": "2026-03-20T22:17:25.445981Z",
+    "kind": "condition",
+    "summary": "Rotated 90° — same Suburban from driver-front three-quarter, spare tire next to it, palm trees, parking lot.",
+    "extracted_data": {
+      "work_type": "parked_inspection",
+      "components_visible": ["front_three_quarter_driver_side", "spare_tire", "chrome_grille"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "028_IMG_2084.jpg",
+    "observed_at": "2026-03-20T22:17:51.856049Z",
+    "kind": "condition",
+    "summary": "Rotated 90° — view down U-Haul trailer ramps with Suburban front centered between them. U-Haul branding visible on ramps.",
+    "extracted_data": {
+      "work_type": "transport_loaded_ramps_view",
+      "vendor": "U-Haul",
+      "components_visible": ["trailer_ramps_with_branding", "front_clip", "tow_strap"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "029_IMG_2092.jpg",
+    "observed_at": "2026-03-20T22:18:33.955479Z",
+    "kind": "sighting",
+    "summary": "Rotated 90° — Suburban on trailer at night with another red car visible in background, possibly at storage lot. Driver-side full view.",
+    "extracted_data": {
+      "work_type": "transport_arrival",
+      "vendor": "U-Haul",
+      "components_visible": ["full_driver_side", "trailer_tandem_axle"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "030_IMG_2091.jpg",
+    "observed_at": "2026-03-20T22:18:34.972267Z",
+    "kind": "sighting",
+    "summary": "Suburban on U-Haul trailer at night at lot with red Plymouth/Dodge Coronet (early 70s) parked in background and red roadster (possibly Porsche 911 or similar) — same scene as 010.",
+    "extracted_data": {
+      "work_type": "transport_arrival_at_classic_car_lot",
+      "vendor": "U-Haul",
+      "components_visible": ["full_three_quarter_passenger", "red_Mopar_B_body_background_unrelated", "red_roadster_background_unrelated"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "031_IMG_2095.jpg",
+    "observed_at": "2026-03-20T22:19:01.673573Z",
+    "kind": "sighting",
+    "summary": "Daytime: Suburban on U-Haul trailer parked next to white GMT400 Suburban tow rig, in front of white commercial building bay '882'. Same scene as 012.",
+    "extracted_data": {
+      "work_type": "arrival_at_destination_shop",
+      "vendor": "U-Haul",
+      "components_visible": ["full_passenger_side", "tow_vehicle_GMT400", "commercial_bay_882"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "032_IMG_2094.jpg",
+    "observed_at": "2026-03-20T22:19:03.314062Z",
+    "kind": "sighting",
+    "summary": "Same scene as 031 with Skylar (man in dark jacket and ballcap) standing next to white tow Suburban. Suburban on trailer behind.",
+    "extracted_data": {
+      "work_type": "arrival_at_destination_with_Skylar",
+      "vendor": "U-Haul",
+      "components_visible": ["full_passenger_side", "tow_vehicle_GMT400", "Skylar_in_frame"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "033_5402960574da2f4f962113837cdf5d10cbedb3f1ec7eae67fc6d3e4422d9",
+    "observed_at": "2026-04-11T05:27:09.36473Z",
+    "kind": "sighting",
+    "summary": "GOLD/CREAM two-tone squarebody PICKUP on SpeedLoader flatbed trailer at night, driver door open. Same vehicle as 013. NOT the burgundy K20 Suburban.",
+    "extracted_data": {
+      "work_type": "transport_loaded_at_night",
+      "components_visible": ["pickup_side_with_door_open", "trailer", "bed_separation_visible"],
+      "color_observed": "gold_white_two_tone",
+      "body_style": "pickup_separate_cab_and_bed"
+    },
+    "confidence": "high",
+    "is_actually_k20": false,
+    "wrong_attribution_notes": "DIFFERENT VEHICLE — gold pickup, not burgundy K20 Suburban. Fork to ghost vehicle for the gold pickup. Same chassis as 013/014/017/034/035."
+  },
+  {
+    "uuid_or_filename": "034_c85745f28f2938a2d5ca1e9d1adac2ca5235524089111f27a6ca3a4e59ab",
+    "observed_at": "2026-04-11T05:27:09.508972Z",
+    "kind": "sighting",
+    "summary": "Gold two-tone squarebody pickup on flatbed with three amber roof clearance lights illuminated, headlights on, next to blue squarebody pickup. Same as 017.",
+    "extracted_data": {
+      "work_type": "loaded_at_night",
+      "components_visible": ["pickup_front_three_quarter", "amber_roof_lights_x3", "blue_squarebody_nearby"],
+      "color_observed": "gold_two_tone_white",
+      "body_style": "pickup"
+    },
+    "confidence": "high",
+    "is_actually_k20": false,
+    "wrong_attribution_notes": "DIFFERENT VEHICLE — gold pickup."
+  },
+  {
+    "uuid_or_filename": "035_74753988f9d7806509484c64ca1166beb573764570000f642df64ef61e3d",
+    "observed_at": "2026-04-11T05:27:09.542948Z",
+    "kind": "sighting",
+    "summary": "Gold two-tone squarebody pickup on flatbed, driver door open showing beige interior. Same as 014.",
+    "extracted_data": {
+      "work_type": "loaded_at_night",
+      "components_visible": ["full_passenger_side", "open_door", "beige_interior", "Cheyenne_or_Super_Cheyenne_badge"],
+      "color_observed": "gold_two_tone_white",
+      "trim": "Cheyenne_30_or_Super_Cheyenne",
+      "body_style": "pickup_longbed"
+    },
+    "confidence": "high",
+    "is_actually_k20": false,
+    "wrong_attribution_notes": "DIFFERENT VEHICLE — gold pickup."
+  },
+  {
+    "uuid_or_filename": "036_93170c132aecc6d42f12aef304e94ff4db9032fb8b2fe4b3da902a919e9a",
+    "observed_at": "2026-04-11T05:27:10.598001Z",
+    "kind": "sighting",
+    "summary": "Night yard scene: foreground 1979-80 squarebody C/K with hood up and jumper cables running to it. Mid-frame, the gold pickup (from 013/034) parked with amber roof lights on. Background shows other trucks parked under a covered carport with desert mountains.",
+    "extracted_data": {
+      "work_type": "jump_starting_or_yard_work",
+      "components_visible": ["late70s_squarebody_with_hood_up", "jumper_cables", "gold_pickup_with_roof_lights_in_back", "covered_carport_with_other_trucks"],
+      "vehicles_in_frame": ["1979-80_C/K_squarebody_unrelated", "gold_pickup_unrelated"]
+    },
+    "confidence": "high",
+    "is_actually_k20": false,
+    "wrong_attribution_notes": "Wrong attribution — none of the vehicles in frame are the burgundy K20 Suburban. Foreground vehicle is a late-70s/early-80s C/K (round single headlights). Yard scene at remote desert/ranch property."
+  },
+  {
+    "uuid_or_filename": "037_b688c687b8aa69be6653720ab0965144df04dae197860f689eac4247083a",
+    "observed_at": "2026-04-11T05:27:10.915812Z",
+    "kind": "sighting",
+    "summary": "Daytime desert/ranch property scene: red+white two-tone 1970s squarebody pickup with hood UP under metal carport, snow-capped mountains. Brown/white squarebody flatbed dually (early 80s) parked beside it. No burgundy K20 Suburban in frame.",
+    "extracted_data": {
+      "work_type": "property_vehicle_inventory",
+      "components_visible": ["red_white_squarebody_pickup_hood_up", "brown_white_squarebody_flatbed_dually", "metal_carport_garage", "snow_capped_mountains_distant"],
+      "vehicles_in_frame": ["red_white_squarebody_pickup_unrelated", "brown_white_flatbed_dually_unrelated"],
+      "location_clue": "ranch_property_with_mountains_likely_Colorado_or_Utah"
+    },
+    "confidence": "high",
+    "is_actually_k20": false,
+    "wrong_attribution_notes": "Wrong attribution — ranch property scene with OTHER vehicles. None are the K20 Suburban. Could be Skylar's other vehicles or seller's vehicles."
+  },
+  {
+    "uuid_or_filename": "038_c378b76ea661dc622c4f9487feca6134a46f5bb16d563a17f133ff387b4f",
+    "observed_at": "2026-04-11T05:27:11.085015Z",
+    "kind": "sighting",
+    "summary": "Same daytime ranch scene as 037, slightly different angle showing red+white pickup with hood up, the brown+white flatbed dually, and additional vehicle silhouettes beyond. Beautiful Colorado/Utah mountain backdrop.",
+    "extracted_data": {
+      "work_type": "property_vehicle_inventory",
+      "components_visible": ["red_white_squarebody_pickup_hood_up", "brown_white_flatbed_dually", "additional_vehicles_in_background"],
+      "vehicles_in_frame": ["red_white_squarebody_pickup", "brown_white_dually", "other_unknowns"],
+      "location_clue": "ranch_with_mountains"
+    },
+    "confidence": "high",
+    "is_actually_k20": false,
+    "wrong_attribution_notes": "Wrong attribution — same ranch scene, no K20 in frame."
+  },
+  {
+    "uuid_or_filename": "039_6a5362890a4c1c42ed7a57e22e91ae263f2c886305ceab00a865e11d77c3",
+    "observed_at": "2026-04-11T05:27:33.11385Z",
+    "kind": "sighting",
+    "summary": "Daytime: same scene as 012/031 — Suburban on U-Haul trailer next to white GMT400 Suburban at commercial bay '882'. K20 IS in frame.",
+    "extracted_data": {
+      "work_type": "arrival_at_destination",
+      "vendor": "U-Haul",
+      "components_visible": ["full_passenger_side", "tow_vehicle_GMT400", "commercial_bay_882"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "040_8bfe5ada3ab43e1d86e93a3070854765e754fbb6effd3e1993aed0608f00",
+    "observed_at": "2026-04-11T05:27:33.482785Z",
+    "kind": "sighting",
+    "summary": "Same scene as 011/032 — Suburban on trailer with Skylar standing next to tow rig at commercial bay.",
+    "extracted_data": {
+      "work_type": "arrival_at_destination_with_Skylar",
+      "vendor": "U-Haul",
+      "components_visible": ["full_passenger_side", "tow_vehicle_GMT400", "Skylar_in_frame", "commercial_bay_882"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "041_97b498fc50860ede5b4380bd7b561a5d55b809ec25efbafd1b42bfc4d70f",
+    "observed_at": "2026-04-11T05:27:34.227177Z",
+    "kind": "sighting",
+    "summary": "Suburban on U-Haul trailer at night at classic car lot — same as 009/030, with red Mopar B-body and red roadster in background.",
+    "extracted_data": {
+      "work_type": "transport_arrival_at_classic_car_lot",
+      "vendor": "U-Haul",
+      "components_visible": ["full_three_quarter_passenger", "red_Mopar_B_body_unrelated", "red_roadster_unrelated"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "042_2ff569afa56379bfe1442dfcfc9bd3bdc385210ab763639c35035f514344",
+    "observed_at": "2026-04-11T05:27:34.228945Z",
+    "kind": "sighting",
+    "summary": "Same as 010/041 — Suburban on trailer at classic car lot at night.",
+    "extracted_data": {
+      "work_type": "transport_arrival_at_classic_car_lot",
+      "vendor": "U-Haul",
+      "components_visible": ["full_passenger_side", "U-Haul_trailer", "classic_cars_background"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "043_b8391fd46523e7cc1ec27dadf9ecfb41c7c31ace63137a2662fb8393903e",
+    "observed_at": "2026-04-11T05:27:34.2781Z",
+    "kind": "sighting",
+    "summary": "Suburban on U-Haul trailer at Mesquite NV intersection at night — same scene as 008. Tow strap chains hanging off front bumper.",
+    "extracted_data": {
+      "work_type": "transport_in_transit",
+      "vendor": "U-Haul",
+      "components_visible": ["chrome_grille_close", "chains_hanging", "amber_park_lights"],
+      "plate_text": "870-UJ",
+      "location_clue": "Mesquite_NV_intersection",
+      "trim_grille": "350"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "044_68317e338af5f77a723bd5db9e8be8f500612e4b2ab2a5513fbb3b06e517",
+    "observed_at": "2026-04-11T05:27:34.760536Z",
+    "kind": "sighting",
+    "summary": "Suburban on trailer at gas station — same as 006/025. Mesquite NV signage.",
+    "extracted_data": {
+      "work_type": "transport_refueling",
+      "vendor": "U-Haul",
+      "components_visible": ["fuel_pump", "Mesquite_sign", "Riverside_sign"],
+      "plate_text": "870-UJ",
+      "location_clue": "Mesquite_NV"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "045_a6e0b9ab7aec13777c714b1911cd9301a63eeb60909b0bd846997e7a84f6",
+    "observed_at": "2026-04-11T05:27:35.248861Z",
+    "kind": "sighting",
+    "summary": "Suburban on trailer at shop with bay door open showing forklift inside — same as 007/021.",
+    "extracted_data": {
+      "work_type": "transport_arrival_at_shop",
+      "vendor": "U-Haul",
+      "components_visible": ["shop_bay_door_open", "forklift_inside", "blue_squarebody_pickup_in_lot"]
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "046_43aeea32531b4943daca9426e1316552a392aeb3859c03cf390d9e0fc783",
+    "observed_at": "2026-04-11T05:27:35.379956Z",
+    "kind": "sighting",
+    "summary": "Suburban on U-Haul trailer at night with white SUV in foreground — same as 005/019/047.",
+    "extracted_data": {
+      "work_type": "transport_in_parking_at_night",
+      "vendor": "U-Haul",
+      "components_visible": ["full_front_three_quarter", "tow_vehicle_white_SUV", "palm_trees"],
+      "plate_text": "870-UJ"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "047_04d9cf8e6265bcb4cf78c7bdc7d4fed0b6141d0947dbf955b77f9b699781",
+    "observed_at": "2026-04-11T05:27:35.804509Z",
+    "kind": "condition",
+    "summary": "Suburban on U-Haul trailer at night with HOOD OPEN. Inner hood structural pattern visible (1973-74 style triangular reinforcement). Audi sedan in background. Same scene as 003.",
+    "extracted_data": {
+      "work_type": "transport_loaded_hood_open",
+      "vendor": "U-Haul",
+      "components_visible": ["hood_OPEN_inner_panel_view", "headlight", "Cheyenne_fender_badge_close", "chain_rigging", "Audi_in_background"],
+      "color_observed": "burgundy"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "048_3bd1b47fd571a6340357c1ea22ad785dd0ce848b19bd18be0de851f1e502",
+    "observed_at": "2026-04-11T05:27:37.117267Z",
+    "kind": "condition",
+    "summary": "Daytime hero shot of Suburban front three-quarter (passenger), rear wheel removed, spare on ground. Best documentation of overall condition — paint oxidation, body integrity, trim, bumpers all visible. AZ-style plate '87U8UE' on front.",
+    "extracted_data": {
+      "work_type": "static_documentation",
+      "components_visible": ["full_front_three_quarter", "chrome_bumper_intact", "Cheyenne_fender_badge", "350_grille_badge", "spare_tire_BFG_AT", "rear_axle_on_jackstands", "exterior_trim_intact"],
+      "color_observed": "faded_pink_oxidized_burgundy",
+      "plate_text": "87U8UE",
+      "plate_state": "AZ",
+      "trim_grille": "350",
+      "trim": "Cheyenne",
+      "body_style": "Suburban_long_roof"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "049_10937ff6d44a574f925653083db63e6d386e6de3d534b64c022b35bd3d01",
+    "observed_at": "2026-04-11T05:27:37.305838Z",
+    "kind": "condition",
+    "summary": "Dead-front symmetrical view of Suburban at sunset, palm trees behind block wall. NV plate '870-UJ' visible. Chrome grille, 350 badge, both headlights, chrome bumper with mounted tow hooks.",
+    "extracted_data": {
+      "work_type": "front_view_documentation",
+      "components_visible": ["dead_front_view", "chrome_grille", "350_badge", "both_headlights", "amber_park_lights", "chrome_bumper", "tow_hooks_on_bumper"],
+      "plate_text": "870-UJ",
+      "plate_state": "NV",
+      "trim_grille": "350"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "051_01c95880f6b96d0c3246eb9e90feb242e515390b7695f24a558cb4ed81eb",
+    "observed_at": "2026-04-11T05:27:37.621991Z",
+    "kind": "condition",
+    "summary": "Dead-front view of Suburban on U-Haul trailer (looking down trailer ramps at the front of the truck). NV plate '870-UJ' visible. Palm trees, sunset.",
+    "extracted_data": {
+      "work_type": "transport_loaded_front_view",
+      "vendor": "U-Haul",
+      "components_visible": ["U-Haul_trailer_ramps", "dead_front_view_of_vehicle", "ratchet_straps_yellow"],
+      "plate_text": "870-UJ",
+      "trim_grille": "350"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": ""
+  },
+  {
+    "uuid_or_filename": "052_9f5104dd490a24275265cdd97701077f78f0dbab585aabeaa8d290792b45",
+    "observed_at": "2026-04-11T05:27:38.35876Z",
+    "kind": "condition",
+    "summary": "Best hero shot — full passenger-side profile of Suburban at commercial shop ('AIR CONDITIONING' building behind). Rear wheel off, jackstands, spare on ground, white truck and blue Ford Ranger neighbors visible. Mountain backdrop.",
+    "extracted_data": {
+      "work_type": "rear_axle_or_wheel_service",
+      "components_visible": ["full_passenger_profile", "rear_wheel_removed", "floor_jack", "spare_tire", "Cheyenne_badge", "rear_cargo_doors", "running_board", "fixed_quarter_glass", "chrome_trim_belt_line"],
+      "color_observed": "faded_burgundy_pink_top_darker_burgundy_below_beltline",
+      "body_style": "Suburban_definitive_4_door_long_roof",
+      "trim": "Cheyenne_350"
+    },
+    "confidence": "high",
+    "is_actually_k20": true,
+    "wrong_attribution_notes": "Best confirmation that body style is Suburban (not pickup). Suggest updating DB body_type field if it currently reads 'pickup'."
+  }
+]

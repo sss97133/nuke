@@ -1,0 +1,116 @@
+# Generated from vehicle_canonical — substrate-driven, not file-driven.
+# Vehicle: e08bf694-970f-4cbe-8a74-8715158a0f2e
+# Loom: AUDIO
+# Wires projected: 13
+
+metadata:
+  title: K5 AUDIO
+  description: |
+    Projection of 13 wires from public.vehicle_canonical for
+    vehicle_id=e08bf694-970f-4cbe-8a74-8715158a0f2e. Source of truth is the DB; this YAML
+    is regenerated on demand. Cite-by-cell provenance retained in
+    structured_data on each underlying observation row.
+
+connectors:
+  M130_A:  {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  M130_B:  {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+  PDM30_A: {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  PDM30_B: {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+
+cables:
+  W26a:
+    gauge: 18 AWG
+    length: 6.9
+    length_unit: ft
+    colors: [OGYE]
+    type: M22759/32
+    notes: "Speaker Front Left (+) | from AMP CH1+ | sources=k5_cut_list_v2"
+  W26b:
+    gauge: 18 AWG
+    length: 6.9
+    length_unit: ft
+    colors: [OGYEBK]
+    type: M22759/32
+    notes: "Speaker Front Left (-) | from AMP CH1- | sources=k5_cut_list_v2"
+  W27a:
+    gauge: 18 AWG
+    length: 6.9
+    length_unit: ft
+    colors: [OGVT]
+    type: M22759/32
+    notes: "Speaker Front Right (+) | from AMP CH2+ | sources=k5_cut_list_v2"
+  W27b:
+    gauge: 18 AWG
+    length: 6.9
+    length_unit: ft
+    colors: [OGVTBK]
+    type: M22759/32
+    notes: "Speaker Front Right (-) | from AMP CH2- | sources=k5_cut_list_v2"
+  W28a:
+    gauge: 18 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [OGOG]
+    type: M22759/32
+    notes: "Speaker Rear Left (+) | from AMP CH3+ | sources=k5_cut_list_v2"
+  W28b:
+    gauge: 18 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [OGOGBK]
+    type: M22759/32
+    notes: "Speaker Rear Left (-) | from AMP CH3- | sources=k5_cut_list_v2"
+  W29a:
+    gauge: 18 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [OG]
+    type: M22759/32
+    notes: "Speaker Rear Right (+) | from AMP CH4+ | sources=k5_cut_list_v2"
+  W29b:
+    gauge: 18 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [OGBK]
+    type: M22759/32
+    notes: "Speaker Rear Right (-) | from AMP CH4- | sources=k5_cut_list_v2"
+  W30a:
+    gauge: 14 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [OGWH]
+    type: M22759/32
+    notes: "Subwoofer (+) | from AMP SUB+ | sources=k5_cut_list_v2"
+  W30b:
+    gauge: 14 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [OGWHBK]
+    type: M22759/32
+    notes: "Subwoofer (-) | from AMP SUB- | sources=k5_cut_list_v2"
+  W31:
+    gauge: 18 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [OGBK]
+    type: M22759/32
+    notes: "Radio/Head Unit | from PDM30:OUT20 | sources=k5_cut_list_v2"
+  W32:
+    gauge: 8 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [OGRD]
+    type: M22759/16
+    notes: "Amplifier | from ECU | sources=k5_cut_list_v2"
+  W96:
+    gauge: 22 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [OGBK]
+    type: M22759/32
+    notes: "Amplifier Relay | from ECU | sources=k5_cut_list_v2"
+
+# Connection list intentionally omitted in this MVP — needs the
+# from_pin → connector pin mapping logic that lives in
+# docs/wiring/output/generate_wireviz_yaml.py. Next pass: refactor
+# that generator to consume the per-wire dicts produced above.

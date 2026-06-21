@@ -42,16 +42,19 @@ export function optimizeImageUrl(url: string | null | undefined, size: ImageSize
     }
 
     // Supabase Storage - use render API
+    // resize=contain is required when only width is specified — the default
+    // (cover) crops to fill, which mangles portrait iPhone photos because
+    // Supabase picks an arbitrary tall crop ratio when no height is given.
     if (url.includes('/storage/v1/object/public/')) {
       return url
         .replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
-        + `?width=${width}&quality=${quality}`;
+        + `?width=${width}&quality=${quality}&resize=contain`;
     }
 
     // Already using Supabase render API - update params
     if (url.includes('/storage/v1/render/image/')) {
       const baseUrl = url.split('?')[0];
-      return `${baseUrl}?width=${width}&quality=${quality}`;
+      return `${baseUrl}?width=${width}&quality=${quality}&resize=contain`;
     }
 
     // Cars & Bids - also WordPress, same pattern

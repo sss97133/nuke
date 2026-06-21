@@ -1,0 +1,332 @@
+[
+  {
+    "image_id": "624103a5-a84d-4499-b7ae-bb712f25e5c2",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "289 V8 engine bay with chrome Mustang air cleaner, blue valve covers, turquoise/blue inner fender visible - matches spec"
+  },
+  {
+    "image_id": "85e78afa-4510-484a-847c-880379363d44",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Underside exhaust shot with blue paint visible on chassis - could be Mustang but only partial undercarriage"
+  },
+  {
+    "image_id": "06f69a5e-db45-49aa-8b39-502075d0159f",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Undercarriage exhaust/rear axle with red oxide primer floor pan - restoration chassis, vehicle ID unclear"
+  },
+  {
+    "image_id": "527e1fac-e9e5-45af-9d59-ebf9c8f0eee5",
+    "verdict": "rejected_personal",
+    "confidence": 0.95,
+    "reasoning": "Indoor storage area with washer/dryer, plastic bins, vanity mirror - no vehicle"
+  },
+  {
+    "image_id": "fb75aa22-eb66-411f-bca0-c3645248f03b",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "1965-66 Mustang interior - dash, steering wheel, console, green carpet, door card with chrome trim"
+  },
+  {
+    "image_id": "a76990c9-41ec-481d-bf1f-18637cf8d800",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Mustang convertible/coupe with tan top cover and chrome trim parts on top; turquoise/blue vehicle visible in background garage"
+  },
+  {
+    "image_id": "b26bd947-5bf0-4776-9e2f-9481c7040198",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Black vinyl interior panel/upholstery part on shop floor - could be Mustang trim but ambiguous"
+  },
+  {
+    "image_id": "fcda05d5-1eff-49b7-bf41-85b523b04276",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Gloved hand showing damaged plug wire in turquoise/blue Mustang engine bay - color and 289 engine match"
+  },
+  {
+    "image_id": "3be26753-03d9-47fc-b447-4ad458a9f282",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Same gloved-hand wire shot - turquoise/blue engine bay clearly visible, matches Mustang spec"
+  },
+  {
+    "image_id": "a181f5ba-8700-4c8b-bda4-c3da934d822a",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "289 engine bay with chrome Mustang valve covers, blue block, Ford Mustang badge visible - factory spec match"
+  },
+  {
+    "image_id": "37c071a0-9fd5-44c9-a0be-cd87ae0ed3be",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Close-up of 289 V8 with chrome Ford Mustang valve covers, blue block, carburetor - matches spec"
+  },
+  {
+    "image_id": "f08c96d3-3924-4570-b532-0a78fb78053d",
+    "verdict": "rejected_personal",
+    "confidence": 0.95,
+    "reasoning": "Selfie of person's face with dark vehicle in background - not a vehicle photo"
+  },
+  {
+    "image_id": "424d6d42-2564-488c-920b-e15a328503b9",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Engine bay with 289 visible and crimp tool/connectors on inner fender; rotated/unclear, but engine matches"
+  },
+  {
+    "image_id": "3bee9e9c-7c86-4ab3-9f51-5600ca5700a0",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Mustang voltage regulator close-up on inner fender with blue 289 engine and blue Mustang valve covers visible below"
+  },
+  {
+    "image_id": "4014fbad-49af-4dc8-9d9a-0a801f879901",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Voltage regulator on fender with 289 engine bay view - matches Mustang engine spec"
+  },
+  {
+    "image_id": "5de069e0-7bc5-474d-8217-e22b043bc2bf",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Underside of restoration chassis with new exhaust + leaf springs, red oxide primer floor - could be Mustang but unidentified"
+  },
+  {
+    "image_id": "78ff4ca6-4f45-40fb-905f-3baf804ee101",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Rear axle/leaf spring/fuel tank undercarriage shot, primer red - same chassis as 015, vehicle unconfirmed"
+  },
+  {
+    "image_id": "74599ea3-5fe9-40e2-b6f2-eaa8b3bb350a",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Rear suspension/dual exhaust underside with leaf springs - restoration shot, vehicle ID ambiguous"
+  },
+  {
+    "image_id": "2e666dcf-75a0-46a2-bfb1-1b1cfac08fdf",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Rear differential and exhaust underside on lift - could be Mustang chassis being restored"
+  },
+  {
+    "image_id": "5a25f8ca-3bca-4e96-869b-6cbc03fe780c",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Stainless exhaust mockup on workbench with chassis on lift in background"
+  },
+  {
+    "image_id": "5e92bf41-0fbe-4aed-b6a8-2f2a32feb071",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.75,
+    "reasoning": "Dark/black classic Mustang front end on lift with blue air cleaner - body color is dark not turquoise"
+  },
+  {
+    "image_id": "d4e1ade0-00e6-42da-9bb3-788b16883df2",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "289 engine bay with blue air cleaner, blue block, matches Mustang factory spec and engine bay shots"
+  },
+  {
+    "image_id": "f252d340-602e-4a18-be9f-b63f1e7b6e37",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Close-up of chrome valve cover with blue 289 block underneath - matches Mustang engine"
+  },
+  {
+    "image_id": "16f54ee4-ea7e-4c09-a305-c5e734e03dd2",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Blue 289 engine with blue air cleaner, distributor, master cylinder visible - matches Mustang spec"
+  },
+  {
+    "image_id": "f575869c-8457-416d-b797-492565fb8d01",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Full Mustang engine bay shot - 289 V8, blue air cleaner, battery, hood hinges, dark fender - matches"
+  },
+  {
+    "image_id": "a60eba53-6f71-475f-9ec4-8cde7601c6b2",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Interior shot with Kilmat sound deadener installed in roof, dashboard with steering wheel visible - Mustang interior restoration"
+  },
+  {
+    "image_id": "b8e88c1c-0629-4a68-8ed8-5006436988ad",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Close-up of blue Ford Mustang valve cover and 289 block - direct match to Mustang factory spec"
+  },
+  {
+    "image_id": "6d479146-bc5f-4bcf-8233-66884c99a2f6",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Close-up of Ford Mustang chrome valve cover and spark plugs on 289 - matches spec"
+  },
+  {
+    "image_id": "d758e721-c03a-4d36-b915-3ec555570f73",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "ARP header bolt kit packaging in front of blue 289 engine with Mustang valve cover - parts shot for this Mustang"
+  },
+  {
+    "image_id": "62241372-41aa-47dd-9d85-f2d2059bb686",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "ARP fastener package next to blue 289 engine - same parts shot, matches Mustang"
+  },
+  {
+    "image_id": "d2f03c15-94e4-4f23-8814-aad55e076cf6",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.8,
+    "reasoning": "Dark/black 1965-66 Mustang coupe on outdoor lift in shop yard - body is dark not turquoise"
+  },
+  {
+    "image_id": "7737271b-3612-483e-bf27-4c1f2c5b30f6",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.8,
+    "reasoning": "Same dark/black classic Mustang on outdoor lift - body color does not match turquoise spec"
+  },
+  {
+    "image_id": "35983154-b3c5-4778-b2b2-5d08d49c09a0",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Stainless exhaust pipe/muffler under car at shop - restoration shot, vehicle ID not confirmable"
+  },
+  {
+    "image_id": "c2b5062b-e64f-494a-bed5-c10916e2ff9b",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Same stainless exhaust under-shot - vehicle not visible enough to confirm"
+  },
+  {
+    "image_id": "b277d0e4-92e0-4564-b032-6c3d6c06376b",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Underside of restoration chassis with exhaust and primer floor - vehicle unidentified"
+  },
+  {
+    "image_id": "8728432f-2e34-4d1e-a373-5a9ff35b8221",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Underside of chassis with dual exhaust, frame rails in red primer - restoration in progress, unidentified"
+  },
+  {
+    "image_id": "35e2b7b6-0439-423c-88bb-551cd55334ad",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Underside chassis shot with driveshaft, exhaust, red primer body - restoration, vehicle unconfirmed"
+  },
+  {
+    "image_id": "4c824e3e-e225-4ef3-a6c4-354a4f933d2a",
+    "verdict": "review_needed",
+    "confidence": 0.3,
+    "reasoning": "Modern Coyote-style aluminum oil pan and transmission underside - does NOT match factory 289+C4 spec; possibly different vehicle"
+  },
+  {
+    "image_id": "ddcf1ce5-79fd-4f9a-8ab3-8e4fd42962a9",
+    "verdict": "review_needed",
+    "confidence": 0.3,
+    "reasoning": "Front suspension underside with modern blue gas tank visible - restoration chassis, possibly different vehicle"
+  },
+  {
+    "image_id": "424b4d4c-c5b4-4ba7-9144-3c5a303e3e38",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Stainless exhaust assembly on Peastorm welding table at shop - parts/fabrication shot"
+  },
+  {
+    "image_id": "676c7986-b752-48ac-8cab-ee4bd383ac4f",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.8,
+    "reasoning": "Dark/black classic Mustang rear view on outdoor lift - body color does not match turquoise spec"
+  },
+  {
+    "image_id": "94f502a5-f8f3-4574-997c-36ff6b023bbc",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "U-joint/transmission tailshaft and exhaust with blue 289 oil pan visible - Mustang drivetrain"
+  },
+  {
+    "image_id": "45cab5e4-52e8-42c1-91b9-39527a81cb71",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Same U-joint/tailshaft area with blue 289 oil pan - Mustang drivetrain detail"
+  },
+  {
+    "image_id": "baf54e37-813b-4d8f-89f0-3e5c71977104",
+    "verdict": "review_needed",
+    "confidence": 0.3,
+    "reasoning": "Tight close-up of polished exhaust collar/clamp on undercarriage - cannot ID vehicle"
+  },
+  {
+    "image_id": "4eb2e49d-9779-4c91-b71c-4e63b476d49d",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Underside of chassis showing trunk floor pans in primer with drive shaft tunnel - restoration shot"
+  },
+  {
+    "image_id": "d7f51a10-c3c0-400a-a58d-69396b19469d",
+    "verdict": "review_needed",
+    "confidence": 0.3,
+    "reasoning": "Stainless tubing/pipe fabrication on workbench with belt sander - shop fabrication shot, vehicle ID indeterminate"
+  },
+  {
+    "image_id": "3e7b60cb-bf1e-4730-b99e-37331f4b78dd",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine bay shock tower close-up with blue 289 and chrome Ford Mustang valve cover visible - matches"
+  },
+  {
+    "image_id": "f75618bd-b1a2-4ca0-a3ca-633f54c6c9ef",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Pair of shocks/struts on workbench with hardware - parts shot, vehicle attribution ambiguous"
+  },
+  {
+    "image_id": "f29d3877-da8f-4453-92f0-b14e833e2c47",
+    "verdict": "review_needed",
+    "confidence": 0.3,
+    "reasoning": "Two black shock absorbers on workbench - generic parts, cannot attribute to specific vehicle"
+  },
+  {
+    "image_id": "8f52a572-3f23-44c4-959c-da5b5c2dd877",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Rear underside of unibody chassis with rear axle, leaf springs, drum brakes, red primer floor - restoration in progress"
+  },
+  {
+    "image_id": "cab6a506-511c-49c1-8354-c126a4d5bfcf",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Mustang engine bay with hood open showing blue 289, chrome Mustang valve covers, master cylinder - matches spec"
+  },
+  {
+    "image_id": "4b940ab2-6a77-4e30-84d3-789de414cacf",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Full Mustang engine bay top-down view - blue 289, chrome Ford Mustang valve covers, intake, distributor - clean match"
+  },
+  {
+    "image_id": "9c920be7-8a27-4bd2-ad47-fe84b78e9f92",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Hero-quality Mustang engine bay shot - 289 with chrome valve covers, intake, distributor, master cylinder, clean black inner fenders, full bay view"
+  },
+  {
+    "image_id": "f5768e33-d0a2-47c0-9c1e-e113d257ce50",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Macro close-up of blue 289 block with valve cover bolt - matches Ford 289 with Ford Blue paint"
+  },
+  {
+    "image_id": "8277548c-9f26-40cf-b181-5454e9d0d7f2",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Close-up of chrome Mustang valve cover seated on blue 289 head with spark plug wires - matches spec"
+  }
+]

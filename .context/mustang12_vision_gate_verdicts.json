@@ -1,0 +1,296 @@
+[
+  {
+    "image_id": "80348278-9558-4867-898f-f7e104bcad4f",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Mustang trunklid (decklid) inside body shop, turquoise/teal color matches early KSL phase; consistent with Mustang body panel work"
+  },
+  {
+    "image_id": "bae240fe-08d6-4f95-b281-545a5884b1f2",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Light-blue car detail with chrome trim and triple pinstripe \u2014 paint shade and trim style do not match either turquoise '66 Mustang seen elsewhere; possibly a different vehicle in same shop"
+  },
+  {
+    "image_id": "9e989df5-b035-421e-8cc4-b5d992bb92b8",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Toddler on hood of turquoise '66 Mustang coupe with running-pony grille \u2014 matches canonical car"
+  },
+  {
+    "image_id": "327ed6f3-4240-4300-8cbc-53ec0ec7357a",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Toddler portrait with turquoise '66 Mustang in background \u2014 same coupe"
+  },
+  {
+    "image_id": "0e1c2a1d-3d27-40fb-9f7c-69718af9cfc2",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Toddler with turquoise '66 Mustang coupe \u2014 same canonical car"
+  },
+  {
+    "image_id": "785fed2b-e896-4a7c-90b6-84f242cd68c3",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Toddler on hood, '66 Mustang grille with running pony and turquoise paint visible"
+  },
+  {
+    "image_id": "b4845f98-1b9d-42c9-81af-027a5b9d8a8d",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Toddler in front of turquoise '66 Mustang coupe grille, ladder visible"
+  },
+  {
+    "image_id": "a65f896b-4b24-41b1-90ef-15ae7c8c883e",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Toddler in front of '66 Mustang with Utah plate U4A visible \u2014 canonical car"
+  },
+  {
+    "image_id": "e716e19b-3833-47d8-b1f8-543f8882337a",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Toddler in front of turquoise '66 Mustang coupe in shop"
+  },
+  {
+    "image_id": "bd17d085-a801-4324-b908-9787181ac49d",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Same scene as 008 \u2014 toddler with '66 Mustang coupe"
+  },
+  {
+    "image_id": "f67c5f47-f427-4336-ae66-2e479efeefab",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Toddler with '66 Mustang coupe, ladder workspace"
+  },
+  {
+    "image_id": "66ef8c18-2ee1-4ed0-a63d-1a5319c5d46b",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Child reaching across hood of '66 Mustang coupe grille, turquoise paint"
+  },
+  {
+    "image_id": "66b5c2ed-9409-4558-85b6-34c17a988ef3",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Different '66 Mustang FASTBACK on 2-post lift with white racing stripe and wire wheels; body style is fastback (65B per data plate seen at image 023), not the canonical coupe \u2014 likely sibling vehicle/shop project"
+  },
+  {
+    "image_id": "d686cd6f-a4eb-43d3-8536-5d972f428986",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Front view of same blue '66 Mustang fastback on lift \u2014 different body style than canonical coupe"
+  },
+  {
+    "image_id": "d1e35113-dfc1-4577-972f-b2c0d012ef26",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Side view of fastback Mustang with horse-silhouette graphics on quarter panel \u2014 distinctive, different vehicle"
+  },
+  {
+    "image_id": "4992c8ce-533e-431f-9346-75bb5dce2ddf",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Same fastback Mustang on lift, horse graphics on side panels"
+  },
+  {
+    "image_id": "bbd96edd-cb88-4dde-998e-a1d51f281f60",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Front view of fastback Mustang on lift, dusty patina condition"
+  },
+  {
+    "image_id": "9e0a3970-0ae8-402a-a1d5-3675142c6c6d",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Front quarter of fastback Mustang on lift with horse graphics"
+  },
+  {
+    "image_id": "40ce081e-7bc2-4cc7-aff5-f1d6b85df2f9",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Wide view of fastback Mustang on 4-post lift in shop"
+  },
+  {
+    "image_id": "3dd0b8c5-b4e1-4afa-a1c0-9f71e6475596",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Front view of fastback Mustang on lift, shop equipment surrounds"
+  },
+  {
+    "image_id": "60624b31-3d74-47a7-9c1c-a0e26c2b1445",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Fastback Mustang on lift, front clip removed or pulled forward exposing engine"
+  },
+  {
+    "image_id": "2579e433-f62c-4ce9-a8b9-110c5f8d6cab",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.95,
+    "reasoning": "Volvo engine bay with VOLVO valve cover badge \u2014 completely different vehicle"
+  },
+  {
+    "image_id": "4fbfe19d-9842-4404-8dd9-4e243274efad",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.95,
+    "reasoning": "Volvo interior dashboard with VOLVO steering wheel badge \u2014 different vehicle"
+  },
+  {
+    "image_id": "5d315a74-6e75-4d8c-80fa-4f35974491b7",
+    "verdict": "review_needed",
+    "confidence": 0.55,
+    "reasoning": "Ford data plate close-up showing body 65B (FASTBACK), Color U (turquoise), Trim 67, DSO 73, Trans 6 (C4) \u2014 this is the fastback's plate, not the canonical coupe; documentation of a different '66 Mustang"
+  },
+  {
+    "image_id": "1ff19f36-e5db-4795-9aef-d28255bf52dc",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Driver-side door interior of turquoise '66 Mustang with white pony-style panel \u2014 consistent with canonical car"
+  },
+  {
+    "image_id": "98dc61f6-60f5-4421-a628-b2b1e3976066",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "1966 Mustang under-dash radio and glovebox area \u2014 consistent with the car"
+  },
+  {
+    "image_id": "bbd0a2d1-40bf-4301-bbcb-20984b6997c3",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Classic 1966 Mustang 5-pod gauge cluster \u2014 exact model match"
+  },
+  {
+    "image_id": "09715c28-5eee-4b3c-83d6-6280c42bbceb",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine bay with Ford 289 V8, blue block, dual-quad-era inline carb on intake \u2014 matches factory 289 Windsor spec; engine bay painted black"
+  },
+  {
+    "image_id": "ab62aad4-2834-45b5-a08c-f660cb8bc71a",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "VIN/serial number stamp on shock tower or frame rail of Mustang \u2014 vehicle documentation"
+  },
+  {
+    "image_id": "91b8555b-8ff4-439d-adff-9ab94bda9b09",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same 289 V8 engine bay, turquoise inner fender visible \u2014 canonical Mustang"
+  },
+  {
+    "image_id": "85f82912-12c6-44ed-8584-37a55e1cbf1b",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "1966 Mustang interior \u2014 front seats, dash, steering wheel; torn upholstery consistent with project car"
+  },
+  {
+    "image_id": "d3936df5-77c0-4d06-b7eb-ee24bc85931d",
+    "verdict": "approved",
+    "confidence": 0.6,
+    "reasoning": "Underside of car showing severe floor pan rust \u2014 likely the Mustang during restoration"
+  },
+  {
+    "image_id": "cfa4917b-d795-4b56-ac13-3efd1f5aeaec",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Shiny turquoise '66 Mustang coupe on lift, Utah plate visible \u2014 canonical car"
+  },
+  {
+    "image_id": "9f91c657-8f18-4622-8654-801a1ee30fc5",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rear 3/4 of shiny turquoise '66 Mustang coupe on lift with Utah plate 04AP4 \u2014 canonical car"
+  },
+  {
+    "image_id": "f8562e91-f74b-4db6-8c5a-4ef45091ce4b",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Side profile of turquoise '66 Mustang coupe on lift with visible '289' fender emblem \u2014 definitive match to canonical car spec"
+  },
+  {
+    "image_id": "673ab8ee-26e0-4854-94a3-1aaba604f27c",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "'66 Mustang coupe on lift, Utah plate, US flag in background \u2014 canonical car"
+  },
+  {
+    "image_id": "896d2212-6f43-4b0f-a4dd-7c1b33b477d2",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Front of turquoise '66 Mustang coupe with Utah plate 04AP4 \u2014 definitive canonical car"
+  },
+  {
+    "image_id": "3cf6c2d4-9aa9-469d-8736-c421fa05af93",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front-quarter of '66 Mustang coupe on lift, hood up"
+  },
+  {
+    "image_id": "bee27012-89dc-42cb-9df6-e78bc20bfddd",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front view of '66 Mustang coupe on lift, Utah plate visible"
+  },
+  {
+    "image_id": "da05f2e5-6468-4916-9f27-44fce0d6f000",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Outdoor close-up of generic radiator and cap being filled \u2014 no Mustang-specific identifiers visible; could be the car or unrelated"
+  },
+  {
+    "image_id": "c03d2c53-3acb-4f76-83b9-1b297c5f08b2",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rear of turquoise '66 Mustang coupe with Utah plate 04AP4 at outdoor fuel station \u2014 canonical car"
+  },
+  {
+    "image_id": "e2866c3d-0d50-4362-83c2-0c9e1a0e2d94",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Turquoise '66 Mustang coupe loaded on car-hauler trailer \u2014 canonical car in transport"
+  },
+  {
+    "image_id": "9ed9df31-9855-496a-a98c-122b0be3bfd2",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same turquoise '66 Mustang coupe on trailer, different angle"
+  },
+  {
+    "image_id": "0b87d752-b336-4fc6-a06d-72974da2e79a",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine bay with chrome 'MUSTANG'-stamped valve cover, blue Ford block \u2014 '66 Mustang 289"
+  },
+  {
+    "image_id": "2934e844-774f-40c5-975d-a7617040f4a0",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Side of '66 Mustang coupe with side scoop trim, snowy mountain backdrop (Utah) \u2014 canonical car"
+  },
+  {
+    "image_id": "dceaff89-7e42-46e7-9043-9979bdc2f9e3",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Driver-side rocker/door close-up of turquoise '66 Mustang coupe outdoors"
+  },
+  {
+    "image_id": "c877fc5b-f1f0-4085-a271-0804fa55dd09",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front view of '66 Mustang coupe with running pony grille, Utah plate 04AP4 \u2014 clearest hero shot of canonical car"
+  },
+  {
+    "image_id": "9ba6e2b1-02fe-41ec-9207-a6e813eb6fcd",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Front-quarter of '66 Mustang coupe with '289' fender emblem, BFG Radial tires on Magnum-style wheels \u2014 matches spec exactly"
+  },
+  {
+    "image_id": "94b948c5-221d-488e-be33-5f8ce99334ad",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Rear 3/4 of turquoise '66 Mustang coupe with Utah plate 04AP4 at residential driveway \u2014 canonical car"
+  }
+]

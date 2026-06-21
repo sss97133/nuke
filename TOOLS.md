@@ -368,6 +368,7 @@ Agent: → UPDATE location_zone = 'dash' in manifest
 | Search vehicles, orgs, users, tags | `universal-search` | Magic input handler with thumbnails |
 | API vehicle search | `api-v1-search` | REST API endpoint |
 | Get vehicle history | `api-v1-vehicle-history` | Historical data |
+| **Get build dossier (Proof-of-Ownership + Build-History)** | `api-v1-vehicle-history/{vin\|uuid}?view=dossier` | Returns `nuke.dossier/v1`: identity, ownership signals, documented build summary (days/hours/est-labor/photos), valuation, dated timeline. Every number carries source+method. Builder: `_shared/dossier.ts`. CLI: `npm run dossier:build -- --vehicle-id <id>` (renders printable HTML). MCP tool: `dossier`. |
 | Get auction data | `api-v1-vehicle-auction` | Auction-specific fields |
 | Get observations for a vehicle | `api-v1-observations` | All source observations |
 
@@ -402,6 +403,25 @@ Public agent-writable surface. External LLM agents (Claude, ChatGPT, etc.) submi
 **Auth contract:** `X-API-Key: nk_live_...` (preferred for external agents) OR `Authorization: Bearer <service-role>` (internal). Per-vehicle scope check via `_shared/apiKeyAuth.ts → requireVehicleScope()` and `_shared/scopeGrammar.ts`. Rate limits enforced atomically via `check_api_key_rate_limit(p_key_hash, p_endpoint)` RPC.
 
 **Substrate:** Reuses `vehicle_observations` + `ingest-observation`. Append-only with supersession via `is_superseded`/`superseded_by` (correction_of in envelope).
+
+---
+
+## User Claude Auth (subscription + BYOK funnel)
+
+Lets a Nuke user run analysis on **their own Claude plan**: subscription token as the low-friction floor, API key as the pressure-release. Per-job funnel: `subscription → 429 → slow-down OR upgrade-to-API (user key → platform key)`.
+
+| Intent | Use This | Notes |
+|--------|----------|-------|
+| Link a user's Claude subscription ("Connect Claude" button) | `connect-claude` (POST `/start`, POST `/complete`, GET `/status`, POST `/disconnect`) | Nuke as OAuth *client* to Anthropic (inverse of `oauth-server`). Stores token bundle as JSON in `user_ai_providers.api_key_encrypted` under `provider='anthropic_subscription'` — no schema change. |
+| Run a Claude call through the funnel | `_shared/claudeSubscriptionAuth.ts → runWithChain()` | `mode:"slow"` returns the 429 for the caller to back off; `mode:"upgrade"` re-runs on API. `maxWaitSeconds` forces upgrade if the rate-limit reset is too far out. |
+| Resolve best Claude auth for a user | `_shared/claudeSubscriptionAuth.ts → resolveClaudeAuth()` | Order: subscription → user `anthropic` key → system `ANTHROPIC_API_KEY`. `allowSubscription:false` skips straight to API (the upgrade branch). |
+| BYOK API key (any provider, system fallback) | `_shared/getUserApiKey.ts → getUserApiKey()` | Pre-existing. Returns user-key-or-system with a `source` tag. |
+| Read/move AI credits (prepaid wallet) | `_shared/aiCredits.ts` (`availableCents`, `holdCredits`, `settleHold`, `creditCents`) | Backed by `ai_credit_ledger` (append-only; balance DERIVED via `ai_credit_available_cents()` / `my_ai_credit_balance()` RPC). Platform-key spend reserves→settles here; user never spends past funded balance. |
+| Fund the wallet (Stripe) | `create-api-access-checkout` (`subscription_type: wallet_10/25/50`) → `stripe-webhook` | Checkout sets `metadata.amount_cents`; the webhook credits the ledger idempotently on `checkout.session.completed`. Deploy webhook `--no-verify-jwt`; set `STRIPE_WEBHOOK_SECRET`. |
+| Connect-Claude + balance UI | `nuke_frontend/.../settings/ClaudeSubscriptionSettings.tsx` (mounted in `AIProviderSettings.tsx`) | Settings card: connect subscription, show balance, top up. |
+| Run user analysis on their own Claude (web + iOS) | `analyze-with-claude` | User-JWT entrypoint → `runWithChain`. POST `{ prompt, vehicle_id?, mode?: slow\|upgrade, model?, max_tokens? }`. Returns `{ source, text, chargedCents, needsFunding }`. 429→slow, 402→needs funding. Retires archived `imessage-router`. |
+
+**⚠️ Unsanctioned client:** the subscription flow rides Anthropic's first-party Claude Code OAuth `client_id` (no published third-party client). Fragile + ToS-gray; built for the defensible BYOK case only. Verify `ANTHROPIC_OAUTH` constants against a live `claude setup-token` before prod. See the warning block in `_shared/claudeSubscriptionAuth.ts`.
 
 ---
 

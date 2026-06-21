@@ -1,0 +1,266 @@
+[
+  {
+    "order": 0,
+    "image_id": "475bc84a-7514-4608-b813-b368b5685ba1",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Underbody shot of solid front axle differential with leaf springs, drag link, and rubber CV boots — consistent with square-body 4WD 1-ton chassis. Concrete pad setting matches Vegas shop floor.",
+    "paperwork": null
+  },
+  {
+    "order": 1,
+    "image_id": "1c38cf5c-3edf-4883-9c5a-fdc8461372c4",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "8-lug aluminum 5-slot wheel with Cooper Discoverer ATR tire — matches the 8-lug aluminum dually wheel description for this V3500. Single rear wheel (not dual stacked) so likely front or spare.",
+    "paperwork": "Cooper Discoverer ATR tire branding visible"
+  },
+  {
+    "order": 2,
+    "image_id": "8b559dbd-a778-4ee1-9bea-39e42c686fdc",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Interior shot from bed looking forward at cab rear window of a square-body GM crew cab (sliding rear window visible). Large fuel/aux tank mounted in bed with two filler necks. Headlight buckets and parts stacked in bed indicate active build.",
+    "paperwork": null
+  },
+  {
+    "order": 3,
+    "image_id": "e8ba4fc4-265f-4615-a854-4124dbf27056",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "White square-body GM crew cab in a shop bay — door handles, window line, B-pillar, and crew-cab rear door all match V3500. Interior shows roll cage and another vehicle visible in mirror.",
+    "paperwork": null
+  },
+  {
+    "order": 4,
+    "image_id": "a6a6f40a-612d-4da7-908c-a3b93b0c2676",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Dusk street scene with a person in hi-vis next to a white pickup. Truck appears to be square-body GM single-cab short-bed (not crew cab dually). Person in frame triggers personal-content concern but the vehicle context (Huntridge-style street) and square-body silhouette keep it ambiguous. Could be a different square-body in the same iphoto bucket.",
+    "paperwork": null
+  },
+  {
+    "order": 5,
+    "image_id": "ae1aea17-7312-4b66-ba3e-c001b91d0e28",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Two square-body GM vehicles side-by-side: white pickup (rear quarter, square-body bed cap) and red 2-door K5 Blazer with chrome wheels and BF Goodrich tires. Both are GM square-body — fits b5a2 default-approve rule. The white truck may not be V3500 specifically but is square-body GM content in this bucket.",
+    "paperwork": null
+  },
+  {
+    "order": 6,
+    "image_id": "e1656f52-eaa9-4713-a503-cfb5e142fffc",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same scene as order 5 — white square-body pickup and red K5 Blazer side by side at night with boats/trailers in background. Square-body GM content default-approved.",
+    "paperwork": null
+  },
+  {
+    "order": 7,
+    "image_id": "96f1acb4-bc95-49bb-b455-1cbe645c512d",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Distant shot of white square-body crew-cab dually truck parked in a Vegas-style desert yard with cacti and palms, alongside a rusted coupe (Karmann Ghia or similar) on the ground. Crew cab + long bed + DRW + lifted stance = clearly the V3500.",
+    "paperwork": null
+  },
+  {
+    "order": 8,
+    "image_id": "ca53359b-4daa-4075-bbe1-a85d4f87c80d",
+    "verdict": "approved",
+    "confidence": 0.88,
+    "reasoning": "Underbody close-up of steering box, drag link, frame rail, and front leaf spring — consistent with square-body GM HD chassis. Worm-gear steering box and recirculating-ball setup typical for V3500.",
+    "paperwork": null
+  },
+  {
+    "order": 9,
+    "image_id": "a272d7f2-48ed-48b8-8769-445601760a4e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underbody view showing exhaust pipes, two-piece driveshaft with carrier bearing, and rear axle housing. Two-piece shaft is consistent with long-wheelbase crew-cab. Vehicle in background looks like an orange coupe.",
+    "paperwork": null
+  },
+  {
+    "order": 10,
+    "image_id": "9254bcd4-674c-4645-b6d0-30333a32c6c9",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Underbody close-up of a large finned cast oil pan with bolt flange and a coolant/oil line routed to it — consistent with a Cummins ISC oil pan (the C8.3 has the deep finned pan). Matches the documented C8.3 ISC swap in this V3500.",
+    "paperwork": "Finned cast aluminum pan consistent with Cummins ISC"
+  },
+  {
+    "order": 11,
+    "image_id": "81cdd0e3-39b5-43f3-8130-606385a0e652",
+    "verdict": "approved",
+    "confidence": 0.88,
+    "reasoning": "Transmission oil pan with stamped reinforcement ribs and a fluid line routed up to it — consistent with an Allison MT643 trans pan (the documented Allison swap behind the Cummins). Frame rail and crossmember visible.",
+    "paperwork": null
+  },
+  {
+    "order": 13,
+    "image_id": "debde3be-9371-45dc-a4f3-9df75e698a3e",
+    "verdict": "review_needed",
+    "confidence": 0.45,
+    "reasoning": "Close-up of a 'Mopar' service-replacement parts tag (with pentastar logo and 'SERVICE REMANUFACTURED') wired to what appears to be a fuel injection pump or rotary pump. Mopar branding strongly suggests Chrysler product. Could be a Bosch/VE pump re-boxed under Mopar for Cummins service parts (Mopar did sell Cummins-related service parts for Dodge trucks). Paperwork naming a non-GM brand triggers review_needed.",
+    "paperwork": "Mopar Service Remanufactured tag with part number (illegible) and pentastar logo"
+  },
+  {
+    "order": 14,
+    "image_id": "b07cdc56-2498-4df9-9ef4-7df6269de334",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Engine bay shot (rotated/sideways) showing massive intake plumbing, an inline-6 valve cover area, factory wiring harness in chaos, and aftermarket boost plumbing. Cummins inline-6 architecture visible. Matches documented C8.3 swap.",
+    "paperwork": null
+  },
+  {
+    "order": 15,
+    "image_id": "f59b9d76-0926-4371-9251-5acdc2a05f36",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Engine bay view from front showing 'KEEP THIS LID ON' radiator cap text, intercooler tube going to a turbo/intake on the inline-6, valve cover, and exhaust manifold. Classic Cummins inline-6 layout — confirmed C8.3 ISC content.",
+    "paperwork": "'KEEP THIS LID ON' radiator cap visible"
+  },
+  {
+    "order": 16,
+    "image_id": "24396ad2-0d4b-49ab-9819-4c4bcfa6ccfe",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine front showing harmonic balancer, accessory drive pulleys, A/C compressor with clutch, and serpentine/V-belt setup. The very large balancer and accessory bracket geometry is consistent with a Cummins C-series mechanical front. Frame rail visible at left.",
+    "paperwork": null
+  },
+  {
+    "order": 17,
+    "image_id": "0ad2e45a-7981-49c1-adcc-3b7d4b19c185",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underbody view (rotated) of front leaf-sprung solid-axle 4WD setup with steering linkage and a front tire. Consistent with V3500 1-ton 4WD front end.",
+    "paperwork": null
+  },
+  {
+    "order": 18,
+    "image_id": "3d7d94d0-0ef9-4f92-9062-9df5b2a4712b",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underbody (rotated) showing front differential housing, steering linkage, leaf spring, and tire. Solid-axle 4WD square-body chassis. Matches V3500.",
+    "paperwork": null
+  },
+  {
+    "order": 19,
+    "image_id": "6a8e5bc2-9c91-4440-8308-057020dbfd4f",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Square-body GM B-pillar/door area (rotated 90 degrees) with sliding side window showing a 'NV' (Nevada) registration sticker with checkered flag graphic on the glass. Vegas attribution confirmed.",
+    "paperwork": "Nevada registration sticker visible on side glass (checkered flag style)"
+  },
+  {
+    "order": 20,
+    "image_id": "f48d3287-a6e5-4587-b47a-21e1c63925a9",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Bed rail of a square-body GM truck, white repaint with rust bleed-through and old bed-rail tie-down holes. Tail-light corner of body visible at lower right. Bed wall with stake pockets matches square-body long bed.",
+    "paperwork": null
+  },
+  {
+    "order": 21,
+    "image_id": "c8c1d2c3-791e-4191-b542-227cd47506ff",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body GM rear quarter showing the distinctive squared tail-light bezel with 'R.H. TOP' molding text and a faint 'GM' (or marker) emboss. Crew-cab/long-bed proportions, white paint, dually flare just visible at right. Clearly the V3500.",
+    "paperwork": "'R.H. TOP' molded into tail-light bezel; tail-light is correct square-body GM unit"
+  },
+  {
+    "order": 22,
+    "image_id": "4d05ef30-7fdd-411e-a5db-96a05cc0d3dc",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underbody close-up of body mount bushing (factory rubber puck) between cab/bed and frame rail, plus an exhaust pipe with clamp. Standard square-body construction detail.",
+    "paperwork": null
+  },
+  {
+    "order": 23,
+    "image_id": "e517a433-f6c5-448e-a37a-e42ff27438f4",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Underbody view (rotated) showing fuel tank strap, fuel tank, frame rail, body mount, and a metallic cylindrical aux tank. Consistent with V3500 dual-tank or aux-tank setup. Step rail visible.",
+    "paperwork": null
+  },
+  {
+    "order": 24,
+    "image_id": "f8e0ae00-4953-4748-9420-18d21b619ee8",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Hero-grade shot of the V3500: white square-body crew-cab dually long-bed with rear DRW fender flare prominently visible, fuel filter (WIX) hanging behind cab, parked at desert Vegas residence with house and palms in background, and a project early-60s coupe (looks like a 1962 Chevy or similar) in the background. Iconic V3500 identifier.",
+    "paperwork": "WIX fuel filter visible behind cab — consistent with diesel swap fuel system"
+  },
+  {
+    "order": 25,
+    "image_id": "3529d1a5-9a63-4de6-a9d1-de41ef2fa584",
+    "verdict": "approved",
+    "confidence": 0.82,
+    "reasoning": "Rocker / step rail close-up of a square-body GM truck with running board / step bar mounted below. White paint. Door seam visible. Default-approve under b5a2 rule.",
+    "paperwork": null
+  },
+  {
+    "order": 26,
+    "image_id": "41a5e585-7b1b-4323-bdf7-89ad2ea0006c",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Square-body GM crew-cab door pair showing front and rear door handles, vent windows, and the characteristic crew-cab B-pillar gap. Tan/beige paint in the golden hour light (likely the same white truck under heavy warm sun — color cast). Crew cab confirms V3500.",
+    "paperwork": null
+  },
+  {
+    "order": 27,
+    "image_id": "608b831d-2cd9-4cc6-b4d6-af54b6260ac9",
+    "verdict": "approved",
+    "confidence": 0.88,
+    "reasoning": "Door / mirror area close-up with square-body GM rectangular tow-mirror, vent window, and door seam — heavy golden-hour color cast making the white look tan. Matches V3500 mirror style.",
+    "paperwork": null
+  },
+  {
+    "order": 28,
+    "image_id": "13d4bdb0-8a03-4414-9c54-bbd892b47e9e",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Front 3/4 view of the white square-body crew-cab dually: hood, fender, square-body tow mirror, cowl, windshield. Dually rear fender flare visible. Background: another vehicle and Vegas residential block walls. Clearly the V3500.",
+    "paperwork": null
+  },
+  {
+    "order": 29,
+    "image_id": "48b700ab-3797-4a8d-883f-221d5d3a7d8e",
+    "verdict": "approved",
+    "confidence": 0.94,
+    "reasoning": "Front fender close-up with the amber side-marker reflector lens (square-body GM front fender marker) and rectangular sealed-beam headlight. Bondo/filler patch repair visible on the fender. White paint. Matches V3500.",
+    "paperwork": null
+  },
+  {
+    "order": 30,
+    "image_id": "11d1dc6e-b4ea-43cf-af01-573855ca27ea",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Lower cab corner / cab mount area with white cab metal, exposed black bracket and bumper bracket below, and rear tire visible. Square-body GM cab structure.",
+    "paperwork": null
+  },
+  {
+    "order": 31,
+    "image_id": "e6cc5725-554d-4161-81df-2384a91ebaa7",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front corner of square-body GM truck showing rectangular sealed-beam headlight, dual amber turn-signal pods on top of fender, fender-to-hood seam with rust bubbling and surface damage. The dual turn-signal pods on the fender top are a square-body HD/dually-era detail. Matches V3500.",
+    "paperwork": null
+  },
+  {
+    "order": 32,
+    "image_id": "f8190717-1417-4fcf-8d88-135996deae24",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front fender of square-body GM showing the rectangular amber side-marker/reflector with 'GM' or sticker text, rectangular sealed-beam headlight, white repaint, and front DRW tire below. Classic V3500 fender.",
+    "paperwork": "Amber side-marker has small text/sticker (illegible at this resolution)"
+  },
+  {
+    "order": 33,
+    "image_id": "7b22318c-f5b8-4246-801c-0a4142e9c6cb",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Wide front 3/4 of the white square-body crew-cab dually with the Cooper-shod 8-lug aluminum dually wheels, square-body grille area with rectangular headlights, side-marker, and the back end of another vehicle (looks like the carcass coupe also seen in order 7) visible at right. Image is sideways. Definitively the V3500.",
+    "paperwork": "Cooper brand visible on tire sidewall (Cooper Discoverer ATR matches the spare in order 1)"
+  }
+]

@@ -6,8 +6,9 @@
 #   • stale phantom sessions (days whose frames no longer qualify) get their labor zeroed
 # Idempotent: build-day overwrites; owner-confirmed/signed cost is preserved untouched.
 # Going forward the byok cron runs build-day per-day, so NEW days stay accurate; this sweep
-# corrects the BACKLOG of pre-fix sessions. Run detached:
-#   nohup bash scripts/daily-receipt/rebuild-worth-days.sh >/tmp/rebuild-worth.out 2>&1 &
+# corrects the BACKLOG of pre-fix sessions. Env is injected ONCE for the whole sweep (not
+# per build-day call), so launch it UNDER dotenvx, detached:
+#   nohup dotenvx run -- bash scripts/daily-receipt/rebuild-worth-days.sh >/tmp/rebuild-worth.out 2>&1 &
 set -u
 cd "$(dirname "$0")/../.." || exit 1
 export PATH="/Users/skylar/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:$PATH"
@@ -26,7 +27,7 @@ for vid in $VEH; do
   n=0
   for d in $DAYS; do
     [ -n "$d" ] || continue
-    dotenvx run -- node scripts/daily-receipt/build-day.mjs --vehicle-id "$vid" --date "$d" >>"$LOG" 2>&1
+    node scripts/daily-receipt/build-day.mjs --vehicle-id "$vid" --date "$d" >>"$LOG" 2>&1
     n=$((n+1)); total=$((total+1))
   done
   log "vehicle ${vid:0:8}: re-derived $n days (running total $total)"

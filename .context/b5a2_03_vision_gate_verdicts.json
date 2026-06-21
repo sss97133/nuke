@@ -1,0 +1,370 @@
+[
+  {
+    "order": 0,
+    "image_id": "4784d6c9-d4bd-4d7f-b5fb-291d46136808",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Undercarriage shot of lifted square-body GM truck with leaf-spring suspension, two-piece driveshaft, transfer-case yoke and dual-rear-wheel tire visible at lower left. Consistent with b5a2 1987 V3500 dually.",
+    "notes": "Underside shop shot; no paperwork. Other vehicles visible in background (medium-duty truck, tow rig) are environment, not subject."
+  },
+  {
+    "order": 1,
+    "image_id": "0c6bda14-bbb6-40b7-9ee8-deec8023d49d",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Driver-side front fender of a 1981-87 square-body GM truck (single-headlight w/ amber side marker), white, with dual-rear-wheel tire and aluminum dually wheel visible. Matches b5a2.",
+    "notes": "Mud-terrain dually tires; 8-lug polished aluminum dually wheels; lifted; in front of building with Hollywood-era sign in background."
+  },
+  {
+    "order": 2,
+    "image_id": "687a3a4e-5b47-4308-9197-3ffe3cf8d2a4",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Image is rotated 90 deg; subject is a white square-body GM crew-cab dually pickup at a 'TRUCK REPAIR' shop with dually wheel/tire and spare visible in bed. Matches b5a2 V3500.",
+    "notes": "Diesel exhaust stack visible behind cab; sign reads 'TRUCK REPAIR'. Las Vegas-style shop building. No paperwork."
+  },
+  {
+    "order": 5,
+    "image_id": "f07232ba-6fed-412c-8759-d0b56345f2e7",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "POV-from-driver-seat shot of square-body GM truck interior — black vinyl door panel, black square dash, aftermarket gauges in left dash pod, factory-style steering wheel. Desert/mountain landscape (Las Vegas area). Matches b5a2.",
+    "notes": "Driver-arm visible (incidental). Aftermarket gauge cluster (oil/water/etc). No paperwork."
+  },
+  {
+    "order": 6,
+    "image_id": "d7dbee7d-06ab-483f-ab2f-6817b38625d3",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body GM dash and hood from driver seat, desert two-lane road. Faded white hood with rust streaks (consistent with the b5a2 truck shown in other images).",
+    "notes": "Three-pod aftermarket gauges in left dash; large center gauge cluster with empty bezels (gauges removed/being reworked)."
+  },
+  {
+    "order": 7,
+    "image_id": "3b63ed10-d7b9-48ce-84d3-2d5a7decd274",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Same desert driving POV as 005/006 — square-body GM dash with three aftermarket gauges, faded white hood with rust patch on driver side, large factory-spec hood with center crease.",
+    "notes": "Driver wristwatch visible (incidental). Same vehicle as 005/006."
+  },
+  {
+    "order": 8,
+    "image_id": "226b55eb-d6f4-4d31-b64d-a85369405055",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Image rotated 90 deg; front 3/4 of white square-body GM truck with quad-headlight grille (1986-87 style), Chevy bowtie center, rusted hood, dually rear wheel visible behind. Matches b5a2 1987 V3500.",
+    "notes": "Quad-headlight + horizontal-bar grille = 1986-87 face. License plate light bar / overhead markers visible. No plate showing characters."
+  },
+  {
+    "order": 9,
+    "image_id": "9bf63f53-32bf-474c-82bd-bbc03c87133e",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Image rotated 90 deg; front of same square-body GM dually with quad-headlight grille and Chevy bowtie. Diesel exhaust stack visible behind cab. Matches b5a2.",
+    "notes": "Vertical exhaust stack indicates diesel; consistent with possible Cummins swap. Front license plate area is blank."
+  },
+  {
+    "order": 10,
+    "image_id": "54dfc3b2-407c-4ea4-9ccc-821962250597",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Head-on front shot of white square-body GM dually truck — quad-headlight grille, bowtie, lifted, mud-terrain tires, in front of stucco shop building. Matches b5a2 1987 V3500.",
+    "notes": "Front license plate frame is empty (no plate). Roof cab clearance lights visible (5 amber)."
+  },
+  {
+    "order": 11,
+    "image_id": "71bfab02-88b4-45f3-a83e-8afe45114b4f",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Night front-3/4 of white square-body GM crew-cab dually pickup, lifted, quad-headlight 86-87 face, polished aluminum dually wheels, at a stucco compound (Las Vegas).",
+    "notes": "Roof clearance lights visible. No plate readable. Hero exterior shot of b5a2."
+  },
+  {
+    "order": 13,
+    "image_id": "fb636ea9-bd8c-43ce-bc02-d9b440fa90ce",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Night side-3/4 of same white square-body GM crew-cab dually pickup with bedside dual fender flare and long bed. Same compound as 011.",
+    "notes": "Confirms crew-cab + long-bed + dually body configuration of b5a2. No readable plate."
+  },
+  {
+    "order": 14,
+    "image_id": "497651ee-63c7-4f60-99cf-d377918e7130",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Night front-3/4 of same white square-body GM crew-cab dually. Same vehicle/location as 011, 013.",
+    "notes": "Same b5a2 hero shoot. No paperwork."
+  },
+  {
+    "order": 15,
+    "image_id": "314e87a2-508b-4310-81f8-38089c16b965",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Shot through square-body GM passenger window/mirror at a residential driveway. Window-frame and side-mirror geometry match a square-body truck.",
+    "notes": "Subject is the view (driveway w/ carport, desert plants); vehicle is the camera platform. Approved per b5a2 iphoto rule — interior of the truck is implied."
+  },
+  {
+    "order": 16,
+    "image_id": "0b0211f9-83da-403b-9e54-aaff949e3db7",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Image rotated 90 deg; white square-body GM crew-cab dually pickup in front of HUNTRIDGE marquee/theater (Las Vegas landmark), with a person crouched/sitting next to it. Vehicle is the subject.",
+    "notes": "HUNTRIDGE Theater sign visible (Las Vegas, NV). Mud-terrain dually tires. No readable plate. Person incidental — truck is the subject."
+  },
+  {
+    "order": 17,
+    "image_id": "073f49f7-d6e4-45ca-a097-85bc220c9e60",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Image rotated 90 deg; close-up of same white square-body crew-cab dually side at Huntridge sign. Polished aluminum dually wheel visible.",
+    "notes": "Person crouched next to truck (incidental). Same Huntridge sign location. Truck is the subject."
+  },
+  {
+    "order": 18,
+    "image_id": "d149a7d3-a9b4-4544-83db-fa9dfed4a0df",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Image rotated 90 deg; same white square-body dually truck at Huntridge sign, full 3/4 view.",
+    "notes": "Same Huntridge photoshoot of b5a2."
+  },
+  {
+    "order": 19,
+    "image_id": "553cc1f7-740e-4add-8150-6fc7bbb424d9",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Image rotated 90 deg; same white square-body dually at Huntridge sign.",
+    "notes": "Same Huntridge photoshoot."
+  },
+  {
+    "order": 20,
+    "image_id": "cff711e4-f21f-46cd-92ba-4719c4c16ba8",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Image rotated 90 deg; white square-body GM dually truck at Huntridge sign.",
+    "notes": "Same Huntridge photoshoot of b5a2."
+  },
+  {
+    "order": 21,
+    "image_id": "18112419-4377-4aeb-bea2-495e26ec00b9",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Image rotated 90 deg; white square-body GM dually pickup at Huntridge sign.",
+    "notes": "Same Huntridge photoshoot."
+  },
+  {
+    "order": 22,
+    "image_id": "910f4811-33f9-4cf8-a9e7-e1ab40b6051c",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Image rotated 90 deg; white square-body dually at Huntridge sign, slightly wider shot.",
+    "notes": "Photographer's leg/arm visible bottom (incidental). Truck still subject."
+  },
+  {
+    "order": 23,
+    "image_id": "3a4e9d51-1147-4f01-a322-e22d3e6d449e",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "White square-body GM crew-cab dually pickup parked at a Circle K gas station — head-on/3-quarter view, lifted, mud-terrain, polished aluminum dually wheels, faded white paint w/ rust on hood. Matches b5a2.",
+    "notes": "Las Vegas area cues — Circle K, palm trees, 'Polar Pop 79¢' signage. Front license plate visible on truck but characters are not legible at this resolution. Tacos Bucanas / Hollywood-style signage in background."
+  },
+  {
+    "order": 24,
+    "image_id": "e6e3bc14-93d0-4b2f-985c-72edf6141c0b",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Through-windshield POV from square-body GM truck on highway with mountain backdrop (Las Vegas-style). Aftermarket Auto Meter Phantom-style gauges (Oil, Water/temp, Fuel) on lower-left dash pod consistent with the b5a2 dash seen in 025.",
+    "notes": "Gauges show Auto Meter branding. Highway scene. No paperwork."
+  },
+  {
+    "order": 25,
+    "image_id": "9e5f03f6-7f8c-4b57-b0e7-2cae11f4d198",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Square-body GM truck interior — left dash pillar pod with Auto Meter Oil / Water / Volts / Fuel gauges, factory cluster opening (empty), through-windshield highway view. Matches b5a2 dash configuration in 005-007.",
+    "notes": "Auto Meter Phantom-style faces; voltmeter reading ~14V; water temp roughly center; oil ~50 psi. No paperwork."
+  },
+  {
+    "order": 26,
+    "image_id": "4fa3540e-6b63-4cf5-a464-9e679371735b",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "POV from driver seat of square-body GM truck on highway, faded-white hood with rust streak (matches b5a2 hood shown in 002/006/007).",
+    "notes": "Highway construction barrels (orange) on right, semi truck ahead. Driver hand on wheel (incidental)."
+  },
+  {
+    "order": 27,
+    "image_id": "7890bd13-bf8d-403f-bf04-f2b306dfce58",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "POV from driver seat of square-body GM truck on highway behind semi. Same faded-white hood w/ rust streak as 026 — same b5a2 truck.",
+    "notes": "Driver hand on wheel (incidental). No paperwork."
+  },
+  {
+    "order": 28,
+    "image_id": "907f2794-b777-4106-8bfe-d2728adf3c41",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "POV behind semi-trailer 'JCRF' from square-body GM truck — faded white hood w/ rust matches b5a2.",
+    "notes": "Trailer marked 'JCRF'. Same b5a2 hood."
+  },
+  {
+    "order": 29,
+    "image_id": "877b9afd-0c69-4910-9b95-17cbcb3a8027",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "POV from driver seat of square-body GM truck behind a semi on highway — same b5a2 hood with rust streak.",
+    "notes": "Same drive as 026-028."
+  },
+  {
+    "order": 30,
+    "image_id": "bb1e0362-70ee-4d54-b2c4-badb347e1ea2",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "POV from driver seat of square-body GM truck behind a Ford F-150 (American-flag wrap) on highway — same b5a2 hood.",
+    "notes": "Other vehicles in scene are environment, not subject."
+  },
+  {
+    "order": 31,
+    "image_id": "4f70a456-3c34-4e42-b3db-3b73c0ac8fc3",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "POV from driver seat of square-body GM truck on desert highway with mountain backdrop — square dashboard, large factory cluster opening, aftermarket gauges, dual-cup steering wheel pad, two-tone tan and dark gray interior. Matches b5a2.",
+    "notes": "No paperwork. Las Vegas-area scenery."
+  },
+  {
+    "order": 32,
+    "image_id": "b8384368-450d-4433-b3ad-310847286559",
+    "verdict": "review_needed",
+    "confidence": 0.6,
+    "reasoning": "Close-up of a stamped engine tag reading 'R472874' over what looks like 'M04129' with a Chrysler Pentastar logo and 'CHRYSLER' partly visible. This is a Mopar/Chrysler-stamped tag — NOT a Cummins ISB/B-series tag. Could be a Chrysler component (steering box / pump tag) on the truck, OR could be paperwork/parts photo from a different (Mopar/Cummins-Dodge) vehicle. Body-style not visible.",
+    "notes": "Visible tag text: 'R472874', 'M04129' (probably 'M0412918'), CHRYSLER + Pentastar logo. Pink/red wire spade connector. Could be Mopar power steering box, gear, or pump tag. Mark for human review to confirm whether it's on b5a2's truck (e.g., Mopar steering box swap) vs. a non-square-body Mopar/Cummins vehicle's paperwork. Not a different-VEHICLE title or registration."
+  },
+  {
+    "order": 33,
+    "image_id": "f6a7d7a8-fd7a-4f81-b141-624a9bcdfbba",
+    "verdict": "review_needed",
+    "confidence": 0.55,
+    "reasoning": "EPA 'Important Engine Information' emissions label fragment visible — reads partial text about 'diesel-fuel … heavy-duty … applicable engine as a medium' and a stamped part number '3924918'. Part number 3924918 is a Cummins (Cummins emissions label / certificate) reference and supports the 'possible Cummins swap' hypothesis for b5a2. However the label could equally be from a Dodge Ram Cummins donor vehicle.",
+    "notes": "EPA emissions label. Part number visible: 3924918. Looks like a fan-shroud-mounted Cummins B-series emissions decal. Mark for review to confirm whether label is on b5a2's swapped engine."
+  },
+  {
+    "order": 35,
+    "image_id": "be9e002b-5d9e-4ebb-8ed0-58d857001c3e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Close-up of inline diesel injection pump / fuel system on a green-painted engine (Cummins-style green). Consistent with Cummins inline-pump 12-valve in b5a2's engine bay (seen in 040-046).",
+    "notes": "Bosch-style inline injection pump visible. Yellow control rod / linkage. Green block paint — Cummins 6BT 12-valve hallmark. Approved as Cummins-swap diagnostic content for b5a2."
+  },
+  {
+    "order": 36,
+    "image_id": "157e3715-d682-4d61-9845-d9048ecc0354",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Close-up of engine-bay wiring loom + heater hoses + injection-pump area. Color palette (rust, green block) matches 035/040+ Cummins swap shots in b5a2 set.",
+    "notes": "Factory-style square-body firewall edge visible bottom-left; supports b5a2 attribution."
+  },
+  {
+    "order": 37,
+    "image_id": "8bbf3672-708c-439b-ab84-651ce340af1e",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Close-up of mechanical injection pump / lift pump area on a diesel engine — same Cummins-swap subject as 035/036.",
+    "notes": "White spin-on fuel filter visible. Throttle linkage. Same engine as 035 and the larger bay shots."
+  },
+  {
+    "order": 38,
+    "image_id": "b7c6a307-1d05-4a65-a2c7-c96a4452da08",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Engine bay shot showing A/C compressor, injection pump, fuel filter housing, throttle linkage on green block — Cummins B-series 12-valve. Consistent with b5a2 Cummins swap.",
+    "notes": "Same engine as 035-037."
+  },
+  {
+    "order": 39,
+    "image_id": "52680b4c-1efd-414d-b495-b97b805fccfe",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Close-up of turbo + intake elbow + exhaust manifold on a diesel engine — heavy-soot, factory Holset-style turbo. Consistent with Cummins B-series turbo on b5a2's swapped engine.",
+    "notes": "Stainless braided oil-feed line to turbo visible. Could potentially be a larger Cummins (ISC/ISL) rather than 6BT — diagnostic for engine identification."
+  },
+  {
+    "order": 40,
+    "image_id": "91615059-eb14-4b8d-9cb7-95db646ad588",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Wide engine-bay shot of a large inline 6 diesel — green block, exhaust manifold, intake elbow w/ turbo outlet, radiator on left, valve covers visible. This is a sizable Cummins (likely ISC 8.3L or possibly 6BT) installed in a square-body engine bay.",
+    "notes": "Sticker partially visible top-left near radiator. Consistent with the b5a2 Cummins swap context. Engine looks bigger than a 6BT — possible ISC 8.3."
+  },
+  {
+    "order": 41,
+    "image_id": "4dadb75c-b88a-42af-ab61-977ad8789835",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "From-below shot of large inline-6 Cummins-style diesel engine (green block, '690' cast number visible on side of block, inline exhaust manifold, intake elbow). Installed in a vehicle from underneath.",
+    "notes": "'690' cast number visible on block side — useful for engine-family ID (e.g., Cummins C-series ISC/8.3 has '690' family numbers). Diagnostic detail for engine substrate atom."
+  },
+  {
+    "order": 42,
+    "image_id": "3c724e1c-1922-4a79-8b04-255abbc02fd9",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "From-below shot of same green inline-6 Cummins engine — '690' cast number visible. Same engine as 041.",
+    "notes": "'690' cast number visible. Cummins ISC 8.3L candidate."
+  },
+  {
+    "order": 43,
+    "image_id": "1154137e-1269-463f-b4b2-90967d1d229e",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "From-below shot of large green Cummins inline-6 — injection pump, oil pan, exhaust manifold visible.",
+    "notes": "Same engine as 041/042. Injection pump prominent — Bosch P-series style typical for Cummins C8.3."
+  },
+  {
+    "order": 44,
+    "image_id": "33d2dedd-8d55-41ae-82c8-8b30ffdf104c",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "From-below shot of large green Cummins inline-6 — valve covers ('690' visible), turbo, downpipe, exhaust manifold.",
+    "notes": "Same engine as 041-043. Downpipe to turbo visible."
+  },
+  {
+    "order": 45,
+    "image_id": "a04c2770-a20b-4609-b8aa-4d7fa549d2a0",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "From-below shot of green Cummins inline-6 with battery box and lots of wiring loom visible — same b5a2 engine swap.",
+    "notes": "Battery box visible to left. Inline injection pump + fuel filter visible center."
+  },
+  {
+    "order": 46,
+    "image_id": "d43f1377-b416-4354-a5d5-97f027311243",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "From-below shot of green Cummins inline-6 — valve covers, intake elbow, charge-air pipe, exhaust manifold. Same b5a2 engine.",
+    "notes": "Wiring loom visible. Cummins C-series candidate."
+  },
+  {
+    "order": 47,
+    "image_id": "e466bbc3-7ebc-4bd0-af89-ace02f6a86e3",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Crew-cab interior of a square-body GM truck — bench seats front and rear (crew-cab), green/teal cloth+vinyl upholstery, square dash with column-shift, white paint visible through windows. Matches b5a2 crew-cab dually.",
+    "notes": "Crew-cab confirmation (front + rear bench). Interior is mid-restoration — pegboard wall visible through windows (shop environment). No paperwork."
+  },
+  {
+    "order": 48,
+    "image_id": "1afd79b4-3245-46c3-bf64-6e27fff246a2",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Side step / running board detail on a white square-body GM dually pickup — extended power-step + dually rear wheel + lifted ride height visible. Matches b5a2.",
+    "notes": "AMP Research-style retracting power step. Concrete floor with green-painted patches (shop). No paperwork."
+  },
+  {
+    "order": 49,
+    "image_id": "e4fad2d8-0dcb-44a8-99e3-e77b329a9ddf",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Interior of a square-body GM truck — square dash, factory cluster bezel, aftermarket three-spoke steering wheel, green/teal cloth seats (matches 047), column shift, pegboard shop background. Matches b5a2 crew-cab dually interior.",
+    "notes": "Same interior as 047 from passenger side. No paperwork."
+  }
+]

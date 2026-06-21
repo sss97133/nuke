@@ -1,0 +1,362 @@
+[
+  {
+    "order": 0,
+    "image_id": "eca7cf62-8043-4655-9c33-4c9a9b8787a7",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Utah safety inspection certificate for VIN CKL149F376441, 1979 Chev K10 PK, plate 211FWM, owner Wesley S Robinson, 280 East 100 S Coalville UT 84017-9700, expires JUN 2001, Summit County. Direct VIN+name+plate match.",
+    "paperwork": "inspection_certificate, VIN, plate, owner name+address, expiration, county"
+  },
+  {
+    "order": 1,
+    "image_id": "2ca448fd-25d1-42e1-b80b-a2e847c9795b",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Utah State Tax Comm Motor Vehicle Div renewal receipt dated 06/1998, plate 211FNM (matches 211FWM on other docs - OCR ambiguity W vs N), $32.00 total. Same vehicle's renewal receipt.",
+    "paperwork": "registration_renewal_receipt, plate, date, amount"
+  },
+  {
+    "order": 2,
+    "image_id": "e13e336c-8281-495c-8d80-3ec710d47ed5",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Utah registration certificate VIN CKL149F376441, K10K10 PK, plate 211FWM, owner Robinson Wesley S, BX 661 / 280 East 100 S Coalville UT 84017, expires JUN 1997, JUL 13 1996 stamp.",
+    "paperwork": "registration_certificate, VIN, plate, owner, address, expiration"
+  },
+  {
+    "order": 3,
+    "image_id": "5e8f8ee8-28f0-4137-bbb4-d165e922e61f",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Utah registration certificate VIN CKL149F376441, T CHEV K10K10 PK, plate 211FWM, owner Robinson Wesley S, BX 661 / 180 E 50 NORTH Coalville UT, expires JUN 1995, AUG 09 1994 stamp, Summit County, 1994 Certificate of Assessment - Barbara J Robinson, county assessor.",
+    "paperwork": "registration_certificate, VIN, plate, owner+address, expiration, county_assessor_name, 1994_assessment"
+  },
+  {
+    "order": 4,
+    "image_id": "29839088-2c89-4e8c-a79b-60b7bb6fa698",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Utah PERMANENT Registration Certificate (TC-656A) for Wesley S Robinson, 180 E 50 N, PO Box ___, Coalville UT 84017, 1979 Chev K-10, mileage 51077, OCT 29 1993 county assessor stamp, Summit County. Earliest Robinson-era paperwork.",
+    "paperwork": "permanent_registration_certificate, year+make+model, mileage_51077, owner+address, 1993_county_stamp"
+  },
+  {
+    "order": 5,
+    "image_id": "323aa6de-a4e8-46aa-9c0e-e727f151cec3",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Speedometer/odometer face of square-body GM truck, 0-100 MPH dial style consistent with 1979 K10 instrument cluster. In-vehicle photograph.",
+    "paperwork": "odometer_face (mileage hard to read - photo blurry)"
+  },
+  {
+    "order": 6,
+    "image_id": "f82450b8-97cc-4291-acac-480ac4d0d161",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Truck Camper Loading Information sticker on door jamb. VIN CKL149F376441 directly visible. Dimension A 75in. Maroon paint on door jamb visible. Exact VIN match.",
+    "paperwork": "door_jamb_VIN_sticker, camper_loading_info, dimension_A_75in"
+  },
+  {
+    "order": 7,
+    "image_id": "93f3b698-663d-4f6e-a464-139188b7f728",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Truck Camper Loading sticker close-up. VIN CKL149F376441, dim A 75in, dim B 5in, cargo weight rating 874LB. Maroon door jamb. State Farm decal visible in corner = Deweese-era insurance link.",
+    "paperwork": "door_jamb_VIN_sticker, dimensions, weight_rating_874LB, state_farm_decal"
+  },
+  {
+    "order": 8,
+    "image_id": "7c19dbfc-49b5-4ebe-8d28-bd5ba5edc4e3",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "State Farm Utah Insurance Card. Insured DEWEESE ZANE & BARBARA, 1979 K10 Chevrolet, VIN CKL149F376441, policy 147 1666-F01-44, eff DEC 01 2019 - JUN 01 2020, Agent BRYAN R DAYBELL INS AGCY INC (435)649-9161. Direct VIN match + Deweese-era owner names.",
+    "paperwork": "insurance_card, VIN, year+make+model, insured_names, policy_number, effective_dates, agent"
+  },
+  {
+    "order": 9,
+    "image_id": "55cd5f54-36ea-43a4-9418-3fc1f9b79b34",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Interior of square-body GM truck - maroon paint, tan interior, center-stack round gauge cluster matching 1979 K-series. Looking in from driver door at steering wheel and bench. Consistent with this K10.",
+    "paperwork": null
+  },
+  {
+    "order": 10,
+    "image_id": "ea7c6402-501b-4a78-84cd-2eadcdd30176",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front view of square-body Chevrolet truck, single round headlights, Chevy bowtie grille, hood open. Maroon body. Body style and grille match 1979 K10 (78-80 single-headlight square-body).",
+    "paperwork": null
+  },
+  {
+    "order": 11,
+    "image_id": "655aefaf-5595-496f-aaa7-7380440a0d22",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rear view of square-body Chevrolet truck, maroon/tan two-tone, CHEVROLET tailgate, fleetside long bed. Matches K10 Cheyenne profile.",
+    "paperwork": "tailgate_badge_CHEVROLET"
+  },
+  {
+    "order": 12,
+    "image_id": "96e6e314-cf0b-414c-a0b3-a5091ad0d0c3",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Interior windshield/dash POV - square-body GM dash with round center-stack gauges, Chevrolet 4-spoke steering wheel, tan interior. Consistent with K10. Desert/mountain view through windshield.",
+    "paperwork": null
+  },
+  {
+    "order": 13,
+    "image_id": "8ab5c3ac-b5bf-4c40-9e7c-2917ae226f2f",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Passenger side window view at Taco Bell drive-thru. Square-body window frame and tan interior visible. K10 in active use - contextual.",
+    "paperwork": null
+  },
+  {
+    "order": 14,
+    "image_id": "6eccf699-d2d4-4ed1-b6ae-4270815654a8",
+    "verdict": "approved",
+    "confidence": 0.88,
+    "reasoning": "Night driving POV through K10 windshield. Square-body dash and gauge cluster visible at bottom. Maroon hood faintly visible.",
+    "paperwork": null
+  },
+  {
+    "order": 19,
+    "image_id": "818dbb68-e6d7-484e-9daa-7b2d86d47cd8",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Full side profile of the 1979 K10 Cheyenne - maroon over tan two-tone, lifted 4WD stance, Cheyenne badging on door, fleetside long bed. Hero shot of target vehicle. Parking lot setting.",
+    "paperwork": "cheyenne_badge"
+  },
+  {
+    "order": 20,
+    "image_id": "b33b5d7d-3058-421e-b5e1-67255c84b207",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "K10 Cheyenne in foreground at restoration/garage shop. Yellow K5 Blazer to left, red square-body Chevy on lift in shop background. All square-body GM. Target vehicle.",
+    "paperwork": null
+  },
+  {
+    "order": 21,
+    "image_id": "17155ba4-613f-4ae7-af4d-9e71fc1114ee",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Dark night highway POV from inside the truck. Square-body gauge cluster faintly visible at bottom. Low visual content but consistent with driver POV inside K10.",
+    "paperwork": null
+  },
+  {
+    "order": 22,
+    "image_id": "90630fb3-9fc3-48b9-97e5-7a94e69ff2b0",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Dark night highway POV, gauge cluster faintly visible at bottom. Same driving sequence as adjacent photos. K10 in use.",
+    "paperwork": null
+  },
+  {
+    "order": 23,
+    "image_id": "0da10533-5672-47e4-889e-d7f20471ac32",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Night driving POV approaching railroad crossing. Square-body dash and steering wheel silhouette visible. K10 in use.",
+    "paperwork": null
+  },
+  {
+    "order": 24,
+    "image_id": "a4119bc8-e964-4c6b-a03c-925739602791",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Night driving POV approaching another railroad crossing. Square-body dash and round gauges visible in foreground. Continuation of K10 night drive.",
+    "paperwork": null
+  },
+  {
+    "order": 25,
+    "image_id": "8b0f0f55-ef6f-40da-a280-07cc21f02851",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Driver POV (image rotated 90deg) - square-body dash, round gauges, hand on steering wheel. K10 in use.",
+    "paperwork": null
+  },
+  {
+    "order": 26,
+    "image_id": "63516608-9828-4fe5-8a14-fe56773a033f",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Driving K10 at sunset on highway. Driver hand on steering wheel, square-body door window and side mirror visible. Mountain/desert horizon.",
+    "paperwork": null
+  },
+  {
+    "order": 27,
+    "image_id": "e09cd461-744a-4fdb-afed-f604e0b08eb9",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Same sunset highway driving sequence - square-body window frame, side mirror, B-pillar all visible. K10 in use.",
+    "paperwork": null
+  },
+  {
+    "order": 28,
+    "image_id": "29176d81-8e4b-4eb1-a83f-be66c4c8e394",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Square-body GM door mirror (large rectangular west-coast style mirror) visible at sunset on highway. Period-correct K-series mirror.",
+    "paperwork": null
+  },
+  {
+    "order": 29,
+    "image_id": "31502dd4-61f0-4a6c-b5bd-6f9eb81fc3d7",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Square-body GM door mirror close-up at sunset on highway. K10 in use.",
+    "paperwork": null
+  },
+  {
+    "order": 30,
+    "image_id": "2c521b05-9644-416a-b1c6-44b7582f2f97",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Driver POV through square-body windshield, driver arm/leg in foreground, sunset highway. K10 in use.",
+    "paperwork": null
+  },
+  {
+    "order": 31,
+    "image_id": "f9fc9628-7368-44bd-af14-2f8b46591535",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Driver hand on square-body GM steering wheel, full gauge cluster visible, sunset highway. K10 in use.",
+    "paperwork": null
+  },
+  {
+    "order": 32,
+    "image_id": "1fcc2a1f-ca3f-422e-82da-6a8a1524ffcc",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "K10 interior view - Chevrolet 4-spoke steering wheel, full square-body dash with round gauge cluster, tan vinyl dash, sunset desert through windshield. CHEVROLET badge on horn pad.",
+    "paperwork": null
+  },
+  {
+    "order": 33,
+    "image_id": "628259a6-a294-4d80-9bdf-d6c4a541ee8c",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "K10 interior - CHEVROLET steering wheel pad, square-body dash, full round gauges, palm trees outside. Direct match.",
+    "paperwork": "chevrolet_horn_pad_badge"
+  },
+  {
+    "order": 34,
+    "image_id": "81d9afad-d229-4488-aeda-b18e68075914",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "K10 interior - CHEVROLET horn pad, square-body dash, gauges, palm trees outside.",
+    "paperwork": "chevrolet_horn_pad_badge"
+  },
+  {
+    "order": 35,
+    "image_id": "53cf4c2e-1554-4d93-9089-ab0282e9d0fb",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Excellent side profile of the K10 Cheyenne - maroon/tan two-tone, single round headlight visible at front, fleetside long bed, 4WD stance with all-terrain tires, Cheyenne badging on door, rust on lower rear quarter. Same truck as 019.",
+    "paperwork": "cheyenne_badge"
+  },
+  {
+    "order": 36,
+    "image_id": "ca0ab762-16bf-431a-bd5b-3038b07748e8",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 hero shot of the K10 - maroon over tan, single round headlights, Chevrolet bowtie grille, 4WD stance, badge visible on fender. Direct match to subject vehicle.",
+    "paperwork": "chevy_grille_bowtie"
+  },
+  {
+    "order": 37,
+    "image_id": "75ba9438-f2b8-49b5-806d-3831d9153f8a",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Night front 3/4 of K10 in parking lot, palm tree foreground. Same vehicle as 035/036.",
+    "paperwork": null
+  },
+  {
+    "order": 38,
+    "image_id": "c8d9d2c2-ee10-4f22-88a9-e07aadce7183",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "K10 interior view through windshield/driver door window. Square-body dash, tan interior, side mirror, Sunset Rd street sign outside. Vegas-area context.",
+    "paperwork": null
+  },
+  {
+    "order": 39,
+    "image_id": "3e8b0c0a-a1b9-4ec2-ad6f-fc619034e624",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Square-body GM door mirror visible looking out at airport runway fence. K10 in use.",
+    "paperwork": null
+  },
+  {
+    "order": 40,
+    "image_id": "1afee112-08fb-430d-aba7-636555dfcaf2",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Driver POV through dirty windshield, square-body hood and dash visible in foreground. K10 in highway use.",
+    "paperwork": null
+  },
+  {
+    "order": 41,
+    "image_id": "d98483cb-4ade-4fda-b419-cda82be8f168",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Driver POV - square-body truck hood visible, highway with speed sign showing 57 in 55 zone. K10 in use.",
+    "paperwork": null
+  },
+  {
+    "order": 42,
+    "image_id": "1c49e2ab-1338-4df4-a9cd-a1bd63da0447",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Driver POV with square-body truck hood visible. Highway under overpass. K10 in use.",
+    "paperwork": null
+  },
+  {
+    "order": 43,
+    "image_id": "520696ae-a789-4cd1-92bb-63ff936f04ed",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Driver POV - CHEVROLET square-body steering wheel pad, full round gauge cluster visible, desert highway with 'Searchlight' Nevada highway sign. Direct match.",
+    "paperwork": "chevrolet_horn_pad_badge"
+  },
+  {
+    "order": 44,
+    "image_id": "5bc9ed67-493b-4086-a97e-e3d00806adcb",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Square-body GM interior - passenger side dash showing tan vinyl, vents, sunset desert outside. Package on passenger seat. K10 in use.",
+    "paperwork": null
+  },
+  {
+    "order": 46,
+    "image_id": "cc9785e7-a5a0-4f81-95ab-78d4441af74a",
+    "verdict": "approved",
+    "confidence": 0.88,
+    "reasoning": "Image rotated 90deg - passenger door open showing K10 interior, brown door card, tan seat with package, ground/dirt outside. Square-body GM cab.",
+    "paperwork": null
+  },
+  {
+    "order": 47,
+    "image_id": "0f62ec5d-4468-4f00-8b7e-6b7a4183a9ba",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Driver POV - CHEVROLET square-body steering wheel, full square-body dash with gauges, tan interior, desert sunset highway. Direct match to K10.",
+    "paperwork": "chevrolet_horn_pad_badge"
+  },
+  {
+    "order": 48,
+    "image_id": "5c77ea7e-00c3-4d79-bb3c-21622dc49f43",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Interior - CHEVROLET steering wheel pad, square-body dash with round gauges, side mirror, driver hand visible. K10 in use.",
+    "paperwork": "chevrolet_horn_pad_badge"
+  },
+  {
+    "order": 49,
+    "image_id": "4cdeef29-cf2a-48da-abc9-da9d1ba4c78d",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Square-body GM driver door window, large rectangular west-coast mirror, dash cluster visible. K10 in use, desert sunset.",
+    "paperwork": null
+  }
+]
