@@ -197,8 +197,11 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
       const query = supabase
         .from('vehicle_images')
         .select('*')
-        .eq('vehicle_id', vehicleId);
-      
+        .eq('vehicle_id', vehicleId)
+        // Exclude superseded (reattributed prior versions) and gate-rejected (wrong-vehicle / personal)
+        .not('is_superseded', 'is', true)
+        .or('vision_gate_status.is.null,vision_gate_status.not.in.("rejected_personal","rejected_misattributed")');
+
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
@@ -1559,70 +1562,6 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                   X
                 </button>
               </div>
-
-              {/* Comments Panel */}
-              {showComments && (
-                <div className="card-body flex flex-col" style={{ flex: 1, minHeight: 0 }}>
-                  {/* Comments List */}
-                  <div className="comments-list" style={{ flex: 1, overflowY: 'auto' }}>
-                    {comments.length === 0 ? (
-                      <div className="text-center text-muted p-4">
-                        No comments yet. Be the first to comment!
-                      </div>
-                    ) : (
-                      comments.map(comment => (
-                        <div key={comment.id} className="comment-item" style={{
-                          padding: 'var(--space-3)',
-                          borderBottom: '1px solid var(--border-light)'
-                        }}>
-                          <div className="comment-header" style={{ 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            marginBottom: 'var(--space-2)' 
-                          }}>
-                            <span className="text-small font-bold">
-                              {comment.user?.full_name || comment.user?.email || 'Anonymous'}
-                            </span>
-                            <span className="text-small text-muted">
-                              {new Date(comment.created_at).toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="comment-content">
-                            {comment.content}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {/* Comment Input */}
-                  {currentUser && (
-                    <div className="comment-form" style={{
-                      padding: 'var(--space-3)',
-                      borderTop: '1px solid var(--border-light)'
-                    }}>
-                      <textarea
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        placeholder="Add a comment..."
-                        className="comment-input"
-                        style={{
-                          width: '100%',
-                          minHeight: '60px',
-                          marginBottom: 'var(--space-2)'
-                        }}
-                      />
-                      <button
-                        onClick={() => addComment()}
-                        disabled={!newComment.trim()}
-                        className={`button button-small ${newComment.trim() ? 'button-primary' : ''}`}
-                      >
-                        Post Comment
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Comments Panel */}
               {showComments && (

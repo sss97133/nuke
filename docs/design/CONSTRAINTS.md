@@ -11,6 +11,22 @@ thinking.
 
 ---
 
+## C0 — THE PROVENANCE LAW (supersedes all; the real jig)
+
+*Ruled 2026-06-12 after a jig contaminated data — K5 photos under an R3500 header with
+a fabricated AI caption. The cardinal violation of the platform's load-bearing axiom.*
+
+**A design surface is held to the SAME data-integrity standard as production.** No
+mockup, wireframe, jig, or visual may contain fabricated, stand-in, or cross-associated
+data. Every value real and correctly associated to its entity, carrying its source.
+Never mix entities. Never invent an analysis/caption/count/relationship — if the
+analyst didn't produce it, it does not exist. Where data is absent, render the honest
+absence, never a placeholder value. **If you cannot wire it to real correctly-associated
+provenanced data, do not render it — improve the real product in place instead.** A
+free-floating mockup can only contaminate; the real app/site is already wired to real
+data, so improving it cannot. This is why design = developing what exists, not drawing
+new pictures. This law outranks every aesthetic constraint below it.
+
 ## C1 — Influence precedes interaction
 
 By the minute a person finds the App Store page, the convincing has already happened —
@@ -90,6 +106,59 @@ the space can say that. Design consequence: the agent-referral door is a first-c
 frame-zero panel, and the listing's review notes already speak agent (`demo account`,
 auditable gate). This is the one channel where "the system has to function exactly as
 stated" is checked by a machine before a human ever sees it.
+
+## C8 — Assume the initiate (Skylar, 2026-06-10, after v3)
+
+By the time someone is inside the app, the doors already did the convincing — they
+arrive in a different state of mind. **It is not being handed to every human being; it
+is supposed to feel like a sick tool that hopefully nobody else has.** Therefore:
+
+- **The app never explains itself. It reports.** Every sentence whose job is to teach
+  ("your photos become...", "the filter runs on...") is deleted. Copy is instrument
+  register only: counts, names, timestamps, one-word imperatives. The privacy contract
+  is proven by gauges (`UPLOADED 0` during the scan), not promised by paragraphs.
+- **Assumed competence is the flattery.** MoTeC, Snap-On, Leica do not onboard; they
+  power on. Explanation is for strangers; the initiate was vouched for at the door.
+- **Scarcity is rendered, not claimed** — the soft-launch doctrine made visible
+  (operator number / serialized instrument), never the word "exclusive."
+
+## C9 — The darkroom (Skylar, 2026-06-11, retiring the storyboards)
+
+The two highest-value design systems are **the timeline and its barcode** — because
+they are powered by end-to-end data handling and they GROW: the minute the user taps
+Allow, the timeline starts growing. What makes them cool is the data behind them, so
+the design question collapses to **"how fast can we give them that information?"**
+The hook is the darkroom: the emotion of watching the image appear in the tray —
+the loading screen as proof of existence. Consequences:
+
+- **Static mockups are retired.** From Allow onward it's an entirely new world that
+  can only be designed live — develop the real pages/screens and watch them run;
+  iterate on the running thing, not on pictures of it.
+- The barcode is design language as *concept*, never to be literally pasted as
+  decoration — a bar is cool because a real day of work powers it.
+- Speed-to-first-proof is the ranking metric for all ignition work.
+
+## C10 — The data end (Skylar, 2026-06-11: "define what data END means")
+
+Every click path terminates at a **document**, never a dead-end. The depth contract:
+
+- **Shelf 0** — a number/cell/bar (the day in the grid, the count in a pill)
+- **Shelf 1** — the rows behind it
+- **Shelf 2** — the document: the DAY RECEIPT (all photos, span, vehicle, work story,
+  dollars) or the IMAGE-AS-EVIDENCE (the photo full-bleed + its provenance rail)
+- **Shelf 3 / the end** — the original evidence itself: the full-resolution photo, the
+  receipt scan, the source listing URL. The end of every chain is testimony + provenance.
+
+Significance, defined: clicking a day answers "what happened that day" completely —
+photos, hours, vehicle, money — in place (drawer/lightbox per the click-anxiety
+contract: additive, reversible, ESC/click-out, URL-addressable). If a click opens
+something that doesn't add a shelf of depth, the click shouldn't exist.
+
+**Images are documentation that becomes strong visuals at depth.** The image viewer is
+Instagram-grade in mechanics (instant, full-bleed, swipeable) and evidence-grade in
+content: every photo carries its when/where/what (taken_at, site, day-link, vehicle,
+extracted atoms). We are not showing curated content; we are showing documentation so
+fluently it reads as content.
 
 ## C7 — The period: ten days
 

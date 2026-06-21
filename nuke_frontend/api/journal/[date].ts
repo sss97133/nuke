@@ -5,6 +5,13 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 // project_work_log tool in mcp-connector (which remains the writer of
 // audited projection_event rows). JournalPage.tsx consumes the
 // { date, audience, work_log } shape.
+//
+// DEPLOYED UNIVERSE: this file MUST live in nuke_frontend/api/. Both
+// deploy-vercel.yml and deploy-preview.yml run `vercel deploy` with
+// working-directory ./nuke_frontend, so only nuke_frontend/api/** becomes
+// functions and nuke_frontend/vercel.json is the live routing config.
+// Repo-root api/ is never uploaded (commit f07181e05 moved these handlers
+// there and prod /api/journal/* fell through to the mailbox 404).
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
