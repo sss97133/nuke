@@ -4,11 +4,18 @@ name: BYOK Analysis Drain
 # detective to Skylar's Mac being on — that is not a product. The detective is just
 # `claude --print` reading downloaded JPEGs, so it runs fine in a cloud runner.
 #
+# AUTH = the Claude SUBSCRIPTION, not a pay-per-token API key. One-time setup: on a
+# machine logged into your Claude (Max) subscription, run `claude setup-token` (mints a
+# ~1-year token), then add it as repo secret CLAUDE_CODE_OAUTH_TOKEN. After that, the
+# laptop is never needed again — analysis bills your subscription, not the API.
+# (We deliberately do NOT set ANTHROPIC_API_KEY: it takes precedence over the
+# subscription token and would silently switch you to per-token API billing.)
+#
 # REQUIRED REPO SECRETS: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (already present for
-# process-images.yml) and ANTHROPIC_API_KEY (NEW — add this). Vision runs via the
-# Anthropic API here, not a Claude subscription, so it COSTS money per image: the
-# trade for not needing the laptop. Cost levers: the `model` input (Sonnet by default,
-# cheaper than Opus), the `batch`/`minutes` budget, and the cron cadence below.
+# process-images.yml) and CLAUDE_CODE_OAUTH_TOKEN (NEW).
+#
+# Levers: `model` (Sonnet default — easier on subscription rate limits than Opus),
+# `batch`/`minutes` budget, and the cron cadence below.
 #
 # Idempotent: prepare only pulls frames still lacking a verdict, so each run resumes
 # where the last left off — no cursor/state needed.
@@ -65,12 +72,16 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Subscription auth — NOT an API key. See header.
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           BYOK_MODEL: ${{ github.event.inputs.model || 'claude-sonnet-4-6' }}
           NUKE_LOG_DIR: ${{ github.workspace }}/logs
         run: |
-          if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "::error::ANTHROPIC_API_KEY secret is not set — the vision step cannot run. Add it in repo Settings → Secrets."
+          # ANTHROPIC_API_KEY would take precedence and bill the API instead of the
+          # subscription — make sure nothing in the runner env set it.
+          unset ANTHROPIC_API_KEY
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN secret is not set. Run 'claude setup-token' on a machine logged into your Claude subscription, then add the token as a repo secret. Vision cannot run without it."
             exit 1
           fi
           mkdir -p "$NUKE_LOG_DIR"

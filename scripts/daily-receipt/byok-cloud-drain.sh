@@ -9,9 +9,10 @@
 # last one stopped.
 #
 # Network here is a normal runner (no Claude Code Bash sandbox), so all steps reach
-# Supabase fine. The vision step uses `claude --print` with ANTHROPIC_API_KEY (API
-# billing — the cloud trade for not needing the laptop; default model is Sonnet, which
-# the batch notes is "fast + accurate enough for the bulk drain").
+# Supabase fine. The vision step uses `claude --print`, authenticated by the Claude
+# SUBSCRIPTION via CLAUDE_CODE_OAUTH_TOKEN (set in the workflow) — not a pay-per-token
+# API key. Default model is Sonnet, which the batch notes is "fast + accurate enough
+# for the bulk drain" and is easier on subscription rate limits than Opus.
 #
 # Usage: byok-cloud-drain.sh <user-id> [batch_size] [minutes]
 set -u
