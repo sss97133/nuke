@@ -105,19 +105,21 @@ substitute for that context.**
   glue that holds its subject together. (This is the image-as-testimony spine of the
   platform applied to attribution: the tech already testified; we read it.)
 
-- **Album context.** The uploaded set is a **gappy subset** of the real album, and
-  correct sessionization needs the whole. Proof (test user, 2026-06-20): the day's
-  frames are filenames IMG_1373–1507 — a 135-frame span in the album, of which only
-  **122 uploaded; 13 neighbors exist locally and the cloud never sees them.** The
-  relay also synced `source_type:"user_library"` (the whole camera roll) rather than
-  the vehicle's **folder** — so the owner's own organization (e.g. the 84 K20 folder)
-  never reached the cloud. Two consequences: (1) the contiguous `original_filename`
-  run is a *cleaner* session key than time/GPS bucketing (one IMG_ run = one shoot);
-  (2) the strongest attribution signal of all — the local album folder — is only
-  visible to **local processing**. This is why the architecture is local+cloud: local
-  reads the folder + the full album index (count, this frame's position, neighbors,
-  what's still pending) and hands it up; the cloud does the heavy read. Without it the
-  cloud is attributing from a sequence with holes.
+- **Album context (sequence, not folders).** The uploaded set is a **gappy subset**
+  of the real album, and correct sessionization needs to know the whole — but *not*
+  by trusting albums. Proof (test user, 2026-06-20): the day's frames are filenames
+  IMG_1373–1507 — a 135-frame span, of which only **122 uploaded; 13 neighbors exist
+  locally and the cloud never sees them.** The dependable local signal is the
+  **chronological sequence and its completeness** — how many frames bracket this one,
+  which exist locally but haven't uploaded, which are still coming — so the cloud
+  stops sessionizing from a sequence with holes. **Albums/folders are NOT dependable
+  and must never key attribution**: a user may treat an album as a random bag (the
+  relay even synced `source_type:"user_library"`, the whole roll). The contiguous
+  `original_filename`/time run is a useful *session* signal (one IMG_ run ≈ one
+  shoot); but the *subject* of those frames always comes from **content** (signatures
+  + the harness), never from which album they sit in. This is the real local+cloud
+  split: local supplies full-sequence awareness (count, position, neighbors,
+  pending); the cloud does the content read.
 
 - **Knowledge-base re-pass.** Once a frame's subject is fixed (by anchor, inheritance,
   or context folder), the read can be sharpened by re-running it *with the correct
