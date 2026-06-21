@@ -71,6 +71,11 @@ export default defineConfig({
       '**/node_modules/**',
       '**/dist/**',
       '**/_archived/**',
+      // Remote integration tests hit live prod (auth.uid(), RPCs, RLS) — they are
+      // nondeterministic and break on schema drift unrelated to the PR under review,
+      // so they do NOT belong in the per-PR unit gate. Run them with
+      // `npm run test:integration` (or the nightly schedule). See frontend-tests.yml.
+      'src/integration/**',
     ],
   },
   optimizeDeps: {
