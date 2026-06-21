@@ -35,6 +35,9 @@ on:
       model:
         description: Claude vision model
         default: 'claude-sonnet-4-6'
+      vehicle_id:
+        description: Analyze only this vehicle (blank = whole fleet)
+        default: ''
   schedule:
     - cron: '0 * * * *'   # hourly
 
@@ -91,7 +94,8 @@ jobs:
           bash scripts/daily-receipt/byok-cloud-drain.sh \
             "${{ github.event.inputs.user_id || '0b9f107a-d124-49de-9ded-94698f63c1c4' }}" \
             "${{ github.event.inputs.batch || '12' }}" \
-            "${{ github.event.inputs.minutes || '45' }}"
+            "${{ github.event.inputs.minutes || '45' }}" \
+            "${{ github.event.inputs.vehicle_id || '' }}"
 
       - name: Upload drain log
         if: always()

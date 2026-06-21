@@ -14,14 +14,17 @@
 # API key. Default model is Sonnet, which the batch notes is "fast + accurate enough
 # for the bulk drain" and is easier on subscription rate limits than Opus.
 #
-# Usage: byok-cloud-drain.sh <user-id> [batch_size] [minutes]
+# Usage: byok-cloud-drain.sh <user-id> [batch_size] [minutes] [vehicle_id]
+#   vehicle_id (optional): drain ONLY that one vehicle (the per-image "Analyze" button
+#   in the app targets the image's vehicle). Omitted → drain the whole fleet, most-first.
 set -u
 cd "$(dirname "$0")/../.." || exit 1
 HERE="$(dirname "$0")"
 
-USER_ID="${1:?usage: byok-cloud-drain.sh <user-id> [batch_size] [minutes]}"
+USER_ID="${1:?usage: byok-cloud-drain.sh <user-id> [batch_size] [minutes] [vehicle_id]}"
 BATCH="${2:-12}"
 MINUTES="${3:-45}"
+ONLY_VEHICLE="${4:-}"
 DEADLINE=$(( $(date +%s) + MINUTES * 60 ))
 log(){ echo "$(date -u '+%F %T') | cloud-drain | $*"; }
 
@@ -57,11 +60,17 @@ case "$METHOD" in
     fi ;;
 esac
 
-# Vehicles with approved frames, most-first (cheap; prepare skips drained ones instantly).
+# Build the work list. Single-vehicle when targeted from the app; otherwise the whole
+# fleet, most-first (cheap; prepare skips drained ones instantly).
 VEH=()
-while IFS= read -r line; do
-  [[ "$line" =~ ^[0-9a-f-]{36}$ ]] && VEH+=("$line")
-done < <(dotenvx run -- node scripts/deep-image-analysis-byok.mjs queue --user-id "$USER_ID" 2>&1)
+if [[ "$ONLY_VEHICLE" =~ ^[0-9a-f-]{36}$ ]]; then
+  VEH=("$ONLY_VEHICLE")
+  log "targeted run: single vehicle ${ONLY_VEHICLE:0:8}"
+else
+  while IFS= read -r line; do
+    [[ "$line" =~ ^[0-9a-f-]{36}$ ]] && VEH+=("$line")
+  done < <(dotenvx run -- node scripts/deep-image-analysis-byok.mjs queue --user-id "$USER_ID" 2>&1)
+fi
 
 if [ "${#VEH[@]}" -eq 0 ]; then
   log "vehicle queue empty or query failed — abort (NOT a drain)"; exit 1
