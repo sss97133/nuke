@@ -374,13 +374,14 @@ Deno.serve(async (req: Request) => {
         p_user_id: body.user_id,
       });
 
+      // Memory bound: build the TARGET's signature per invocation, not every sibling.
+      // Building all of a user's vehicles (300+) in one edge call fetched images +
+      // ran a vision call per vehicle and hit WORKER_RESOURCE_LIMIT. Callers build
+      // each vehicle's signature with its own call; siblings already carrying a
+      // signature are used as-is by disambiguate.
+      void siblings;
       const allVehicles = [
         { ...target, vehicle_id: target.id },
-        ...(siblings || []).map((s: any) => ({
-          id: s.vehicle_id, year: s.v_year, make: s.v_make, model: s.v_model,
-          trim: s.v_trim, vin: s.v_vin, visual_signature: s.visual_signature,
-          primary_image_url: s.primary_image_url,
-        })),
       ];
 
       const results: { vehicle_id: string; desc: string; signature: any; skipped?: string }[] = [];
@@ -474,14 +475,22 @@ Deno.serve(async (req: Request) => {
           signature: target.visual_signature,
           reference_image_url: target.primary_image_url,
         },
-        ...(siblings || []).map((s: any, i: number) => ({
-          vehicle_id: s.vehicle_id,
-          label: labels[i + 1] || `V${i + 2}`,
-          year: s.v_year, make: s.v_make, model: s.v_model,
-          trim: s.v_trim, vin: s.v_vin,
-          signature: s.visual_signature,
-          reference_image_url: s.primary_image_url,
-        })),
+        // Memory/prompt bound: cap candidates. Sending 300+ reference images into one
+        // vision call hit WORKER_RESOURCE_LIMIT. Prefer siblings that already have a
+        // built signature (cheap, no image fetch); cap the rest. (The candidate set
+        // should also be scoped to OWNED vehicles upstream in get_sibling_vehicles so
+        // discovery comps can't become a re-home target — see Ch.16.)
+        ...[...(siblings || [])]
+          .sort((a: any, b: any) => (b.visual_signature ? 1 : 0) - (a.visual_signature ? 1 : 0))
+          .slice(0, 12)
+          .map((s: any, i: number) => ({
+            vehicle_id: s.vehicle_id,
+            label: labels[i + 1] || `V${i + 2}`,
+            year: s.v_year, make: s.v_make, model: s.v_model,
+            trim: s.v_trim, vin: s.v_vin,
+            signature: s.visual_signature,
+            reference_image_url: s.primary_image_url,
+          })),
       ];
 
       // Get images to check
