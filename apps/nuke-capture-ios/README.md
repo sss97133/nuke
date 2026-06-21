@@ -19,12 +19,16 @@ Same engine, same row shape, same privacy gates as the Mac app:
 
 ## Build
 
-There is no committed `.xcodeproj` — it's generated from `project.yml`:
+There is no committed `.xcodeproj` — it's generated from `project.yml`.
+Always generate with `./generate.sh`, never bare `xcodegen generate`: the
+script also stamps a fresh, monotonic **build number** (CFBundleVersion) so
+App Store Connect never rejects an upload for a stale/duplicate build —
+the bug that stalled 1.0.0 after build 27. You never hand-bump it.
 
 ```bash
 brew install xcodegen
 cd apps/nuke-capture-ios
-xcodegen generate
+./generate.sh
 open NukeCapture-iOS.xcodeproj
 ```
 
