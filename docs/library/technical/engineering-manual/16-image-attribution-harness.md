@@ -203,6 +203,9 @@ image), so flagging a frame removes it from the wrong profile *before* the move.
 - `reconcile_vehicle_attribution(vehicle_id)` — runs Stages 2–3, writes proposals.
 - `image_vehicle_match_status` — the early-stage mismatch signal (exists; was dead —
   null on the Scout frames — because nothing fed it).
+- `image_component_targets`, `image_text_targets`, `get_vehicle_component_inventory()`
+  — depth-promotion views exposing the per-frame component/OCR targets as queryable
+  rows (see "Depth promotion" below).
 
 ---
 
@@ -264,6 +267,48 @@ The dependency chain is therefore: **device signature (now wired) → subject id
 (the one missing capability) → work-session binding → attribution reconciliation.**
 Every downstream rail waits on the same thing — structured subject extraction — which
 is why that LLM-over-prose pass (Stage 1) is the keystone, not an optional nicety.
+
+---
+
+## Depth promotion: the many targets per image (2026-06-22)
+
+Subject identity (which vehicle) is only the *shallow* layer. Each frame is
+**many-target**: the deep-analysis verdict already carries ~3.7 `components_seen`
+detections + OCR `text_regions` per frame, each with a label/confidence/bbox. That
+depth was landing but **trapped**: it lived only as nested arrays inside
+`vehicle_observations.structured_data` (one observation row per image) and the JSONB
+blob — so you could not query "every frame showing a 289 V8" or "every OCR serial."
+
+The relational tables built to hold it (`component_identifications` + its required
+parent `image_analysis_records`) are **dead** — the abandoned "reference system"
+pipeline, listed in `docs/dead_tables_candidates.txt`, gated behind an analysis-record
+FK nothing populates. Reviving them would fight the grain; backfilling tens of
+thousands of target rows would duplicate the 7.5M-row observation firehose.
+
+**Fix (migration `20260622010000`): expose, don't duplicate.** Two `security_invoker`
+views explode the already-landed targets, plus an inventory helper:
+- `image_component_targets` — one row per component (label, part_number_guess,
+  confidence, bbox, scene_type, build_phase, agent_model).
+- `image_text_targets` — one row per OCR region (text, confidence, bbox) — the
+  badges/data-plates/**serials**, the strongest identity evidence.
+- `get_vehicle_component_inventory(vehicle_id)` — aggregated sightings per vehicle.
+
+Zero data migration, fully reversible, always fresh as the drain writes more.
+Measured on the 1966 Mustang (`8bde1dda`): 368 byok image observations → **1,352
+component targets + 194 text targets** instantly queryable. The view did real work the
+moment it existed: it surfaced the cross-make pollution as *data* — `"Chevy-orange
+small-block V8"` ranked #2 component on a Ford; an OCR'd `SCOUT 80 4X4 FC 2579 A`
+data-plate serial on the Mustang record — and flagged a **privacy** hit (an OCR'd
+`State of Nevada Declaration of Paternity` / vital-records form sitting in a vehicle
+record, which must be quarantined, not re-homed).
+
+**Depth-aware Stage 1.** The subject classifier (`scripts/classify-image-subjects.mjs`
+forward; this run fed it `narrative + components + ocr` per frame) is now evidence-rich
+rather than caption-only: the OCR/component targets make Scout/Honda/document frames
+unambiguous, and the prompt enforces "never guess among near-identical records → NONE,"
+so de-pollution is high-precision and specific re-homes require unambiguous evidence.
+Runs on the Claude **subscription** (`claude --print`, no per-token API). Note: a
+single `--print` call is slow (minutes); batch ~30 frames and run detached.
 
 ---
 

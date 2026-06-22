@@ -24,23 +24,35 @@ if [ "${FRAMES:-0}" -eq 0 ]; then log "no unclassified frames — done"; exit 3;
 if [ "${CANDS:-0}" -eq 0 ]; then log "no owned candidate vehicles — abort"; exit 1; fi
 log "classifying $FRAMES frames against $CANDS owned vehicles"
 
-# 2) BUILD PROMPT — text only: the owner's vehicles + the frame narratives.
+# 2) BUILD PROMPT — the owner's vehicles + each frame's description, COMPONENTS and OCR.
 {
-  echo "You are reconciling which of an owner's OWN vehicles each photo depicts, using the"
-  echo "analyst's one-line description of each photo. You are NOT guessing from pixels — you"
-  echo "have the descriptions. Match each photo to exactly one vehicle from the OWNER'S LIST,"
-  echo "or NONE if it depicts no vehicle on the list (a building, a document, a tool, or a"
-  echo "vehicle the owner does not own)."
+  echo "You reconcile which of an owner's OWN vehicles each photo depicts. For each photo you"
+  echo "get the analyst's one-line description, the COMPONENTS detected, and any OCR TEXT read"
+  echo "(badges, data plates, serials, signs). OCR and components are strong, often decisive"
+  echo "evidence — e.g. an 'INTERNATIONAL HARVESTER'/'SCOUT' plate means it is a Scout; an"
+  echo "orange Chevy small-block is not a Ford 289. Match each photo to exactly one vehicle"
+  echo "number, or NONE."
+  echo
+  echo "Rules, in order:"
+  echo "  - If it depicts a vehicle on the list, answer that number."
+  echo "  - NONE if it depicts no listed vehicle: a building/shop/yard/sign, ANY document or"
+  echo "    paper, a tool, a PERSONAL photo (people, infants, pets), or a vehicle the owner"
+  echo "    does not own. Documents/PII are always NONE."
+  echo "  - Only pick a number when the evidence matches ONE listed vehicle. If several match"
+  echo "    equally (e.g. 'a Chevy small-block' / 'a GMC Suburban' with no year/trim to"
+  echo "    disambiguate), use the number of the frame's CURRENT vehicle if it is among them,"
+  echo "    otherwise NONE — never guess among near-identical records."
+  echo "  - A vehicle merely in the BACKGROUND does not change the subject; judge the MAIN one."
   echo
   echo "OWNER'S VEHICLES:"
-  node -e 'const j=require(process.argv[1]);for(const c of j.candidates)console.log(`  ${c.letter}) ${c.label}`)' "$JOB"
+  node -e 'const j=require(process.argv[1]);for(const c of j.candidates)console.log(`  ${c.n}) ${c.label}`)' "$JOB"
   echo
-  echo "PHOTOS (image_id :: description):"
-  node -e 'const j=require(process.argv[1]);for(const f of j.frames)console.log(`  ${f.image_id} :: ${f.narrative}`)' "$JOB"
+  echo "PHOTOS:"
+  node -e 'const j=require(process.argv[1]);for(const f of j.frames){console.log(`  id=${f.image_id}`);console.log(`     desc: ${f.narrative}`);if(f.components)console.log(`     components: ${f.components}`);if(f.ocr)console.log(`     ocr: ${f.ocr}`);}' "$JOB"
   echo
-  echo "Output ONLY JSON lines, one per photo, no prose:"
-  echo '  {"image_id":"<uuid>","vehicle_letter":"<A..Z or NONE>","confidence":<0..1>}'
-  echo "Be conservative: if the description does not clearly match one listed vehicle, use NONE."
+  echo "Output ONLY JSON lines, one per photo, no prose, no code fences:"
+  echo '  {"image_id":"<uuid>","n":<number or "NONE">,"confidence":<0..1>}'
+  echo "Be conservative: if the evidence does not clearly match one listed vehicle, use NONE."
   echo "Write the JSON lines to: $OUT"
   echo "Write nothing else. When done, stop."
 } > "$PROMPT"
