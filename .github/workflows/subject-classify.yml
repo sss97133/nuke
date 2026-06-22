@@ -1,0 +1,65 @@
+name: Subject Classify (text-only, subscription)
+
+# Reconcile which OWNED vehicle each already-analyzed frame depicts, using the narratives
+# the analysis drain already wrote — NO new vision, NO API tokens. Auth is the Claude
+# SUBSCRIPTION (CLAUDE_CODE_OAUTH_TOKEN). Stages reversible proposals + de-pollution flags;
+# never moves images. This is the cost-aligned path to organizing the backlog when the
+# pay-per-token Anthropic API is unavailable/undesired.
+#
+# REQUIRED SECRETS: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CLAUDE_CODE_OAUTH_TOKEN.
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: Owner whose frames to classify
+        default: '0b9f107a-d124-49de-9ded-94698f63c1c4'
+      minutes:
+        description: Time budget (minutes)
+        default: '30'
+      batch:
+        description: Frames per batch
+        default: '40'
+      model:
+        description: Claude model
+        default: 'claude-sonnet-4-6'
+
+permissions:
+  contents: read
+concurrency:
+  group: subject-classify
+  cancel-in-progress: false
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Install deps
+        run: |
+          npm install
+          npm install -g @dotenvx/dotenvx @anthropic-ai/claude-code
+      - name: Classify
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          BYOK_MODEL: ${{ github.event.inputs.model || 'claude-sonnet-4-6' }}
+        run: |
+          unset ANTHROPIC_API_KEY
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN (subscription) not set."; exit 1
+          fi
+          USER_ID="${{ github.event.inputs.user_id || '0b9f107a-d124-49de-9ded-94698f63c1c4' }}"
+          BATCH="${{ github.event.inputs.batch || '40' }}"
+          MINUTES="${{ github.event.inputs.minutes || '30' }}"
+          DEADLINE=$(( $(date +%s) + MINUTES*60 ))
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            bash scripts/daily-receipt/subject-classify-batch.sh "$USER_ID" "$BATCH"; rc=$?
+            [ "$rc" -eq 3 ] && { echo "drained"; break; }
+            [ "$rc" -eq 1 ] && { echo "batch error — stopping"; break; }
+          done
