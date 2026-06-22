@@ -23,6 +23,8 @@ on:
       model:
         description: Claude model
         default: 'claude-sonnet-4-6'
+  schedule:
+    - cron: '17 9 * * *'   # daily; idempotent (only classifies unclassified frames)
 
 permissions:
   contents: read
