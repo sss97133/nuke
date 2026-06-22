@@ -36,6 +36,23 @@ interface AnalysisSettings {
   updated_at: string;
 }
 
+// One row per vehicle from get_user_ingestion_status — the "see the ingestion" board.
+interface IngestionRow {
+  vehicle_id: string;
+  vehicle: string;
+  total_images: number;
+  analyzed: number;
+  pending: number;
+  dated: number;
+  hashed: number;
+  sessioned: number;
+  duplicates: number;
+  confirmed: number;
+  unrelated: number;
+  analysis_cost_usd: number;
+  last_analyzed: string | null;
+}
+
 const METHODS: { value: Method; label: string; blurb: string; needsCredential: boolean }[] = [
   {
     value: 'nuke_hosted',
@@ -74,6 +91,7 @@ export default function AnalysisSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<AnalysisSettings | null>(null);
+  const [ingestion, setIngestion] = useState<IngestionRow[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -109,6 +127,12 @@ export default function AnalysisSettingsPage() {
         setMethod(s.method);
         if (s.provider) setProvider(s.provider);
         if (s.model) setModel(s.model);
+      }
+      // Ingestion board — per-vehicle progress against the extraction contract.
+      const uid = session?.user?.id;
+      if (uid) {
+        const { data: ing } = await supabase.rpc('get_user_ingestion_status', { p_user_id: uid });
+        if (Array.isArray(ing)) setIngestion(ing as IngestionRow[]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load settings');
@@ -441,6 +465,69 @@ export default function AnalysisSettingsPage() {
       <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '8px' }}>
         "Analyze Now" runs a short cloud burst over your vehicles. The hourly schedule keeps going on its own.
       </p>
+
+      {/* INGESTION BOARD — see each vehicle fill against the extraction contract. */}
+      {ingestion.length > 0 && (() => {
+        const sum = (k: keyof IngestionRow) =>
+          ingestion.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+        const total = sum('total_images');
+        const analyzed = sum('analyzed');
+        const cost = ingestion.reduce((a, r) => a + (Number(r.analysis_cost_usd) || 0), 0);
+        const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
+        const chipStyle = {
+          fontFamily: "'Courier New', monospace",
+          fontSize: '10px',
+          color: 'var(--text-muted)',
+          whiteSpace: 'nowrap' as const,
+        };
+        return (
+          <div style={{ marginTop: '28px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
+              <label style={labelStyle}>Ingestion · {ingestion.length} vehicles</label>
+              <span style={chipStyle}>
+                {analyzed.toLocaleString()}/{total.toLocaleString()} analyzed ({pct(analyzed, total)}%)
+                {cost > 0 ? ` · $${cost.toFixed(2)}` : ' · subscription'}
+              </span>
+            </div>
+            <div style={{ border: '1px solid var(--border)' }}>
+              {ingestion.map((r, i) => {
+                const ap = pct(r.analyzed, r.total_images);
+                return (
+                  <div
+                    key={r.vehicle_id}
+                    style={{
+                      padding: '8px 10px',
+                      borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+                      background: i % 2 ? 'var(--bg-secondary)' : 'transparent',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 700 }}>{r.vehicle || 'Unknown'}</span>
+                      <span style={chipStyle}>
+                        {r.analyzed}/{r.total_images} · {ap}%
+                      </span>
+                    </div>
+                    {/* analyzed progress bar (2px, no radius) */}
+                    <div style={{ height: '4px', background: 'var(--border)', marginTop: '5px' }}>
+                      <div style={{ height: '4px', width: `${ap}%`, background: 'var(--accent)' }} />
+                    </div>
+                    {/* contract fill chips */}
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '5px', flexWrap: 'wrap' }}>
+                      <span style={chipStyle}>dated {r.dated}</span>
+                      <span style={chipStyle}>hashed {r.hashed}</span>
+                      <span style={chipStyle}>sessions {r.sessioned}</span>
+                      {r.duplicates > 0 && <span style={chipStyle}>dupes {r.duplicates}</span>}
+                      {r.confirmed > 0 && <span style={chipStyle}>confirmed {r.confirmed}</span>}
+                      {r.unrelated > 0 && <span style={chipStyle}>off-subject {r.unrelated}</span>}
+                      {r.pending > 0 && <span style={{ ...chipStyle, color: 'var(--accent)' }}>pending {r.pending}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
