@@ -154,11 +154,22 @@ log "invoking claude for vision on $N images"
 # MODEL is hoisted so provenance (stamped in sanitize below) can never drift from
 # the model that actually ran — numbers carry source DNA.
 MODEL="${BYOK_MODEL:-claude-opus-4-8}"
+RESULT_JSON="$DIR/claude_result.json"
 T_VISION_START=$(date +%s)
 env -u CLAUDE_EFFORT timeout $(( N * 150 + 60 )) \
-  claude --print --model "$MODEL" --permission-mode bypassPermissions --add-dir "$DIR" \
-  < "$PROMPT_FILE" >>"$LOG" 2>&1 || log "claude --print returned non-zero/timeout (ingesting whatever landed)"
+  claude --print --output-format json --model "$MODEL" --permission-mode bypassPermissions --add-dir "$DIR" \
+  < "$PROMPT_FILE" >"$RESULT_JSON" 2>>"$LOG" || log "claude --print returned non-zero/timeout (ingesting whatever landed)"
 BATCH_MS=$(( ( $(date +%s) - T_VISION_START ) * 1000 ))
+
+# Capture REAL token usage + cost for the batch. --output-format json makes the CLI emit
+# total_cost_usd + usage even on the subscription (it computes the API-equivalent cost
+# from actual tokens), so every run finally records what an image costs — the per-image
+# unit-economics signal the pipeline never had (provenance was hard-coded $0 before).
+read COST_USD IN_TOK OUT_TOK CACHE_TOK < <(node -e '
+  try{const j=require(process.argv[1]); const u=j.usage||{};
+    process.stdout.write([j.total_cost_usd||0, u.input_tokens||0, u.output_tokens||0, (u.cache_creation_input_tokens||0)+(u.cache_read_input_tokens||0)].join(" "));
+  }catch(e){process.stdout.write("0 0 0 0");}' "$RESULT_JSON" 2>/dev/null || echo "0 0 0 0")
+log "vision cost: \$$COST_USD for $N imgs | tokens in=$IN_TOK out=$OUT_TOK cache=$CACHE_TOK | model=$MODEL"
 
 V=$( [ -f "$SINK" ] && wc -l < "$SINK" | tr -d ' ' || echo 0 )
 log "claude wrote $V verdict lines"
@@ -170,10 +181,14 @@ if [ "$V" -eq 0 ]; then log "no verdicts produced — abort ingest"; exit 1; fi
 #      or mislabels). Match by position when the echoed image_id isn't a worklist id.
 #  (2) Drop localized elements missing a valid bbox (the validator rejects the whole
 #      verdict otherwise) — keep the rest so the image still lands.
-python3 - "$SINK" "$WORK" "$VEHICLE_ID" "$MODEL" "$BATCH_MS" "$RUN" "$N" >>"$LOG" 2>&1 <<'PY'
+python3 - "$SINK" "$WORK" "$VEHICLE_ID" "$MODEL" "$BATCH_MS" "$RUN" "$N" "$COST_USD" "$IN_TOK" "$OUT_TOK" "$CACHE_TOK" >>"$LOG" 2>&1 <<'PY'
 import json,sys
 sink,work,vehicle_id=sys.argv[1],sys.argv[2],sys.argv[3]
 model,batch_ms,run_id,n_imgs=sys.argv[4],int(sys.argv[5]),sys.argv[6],max(1,int(sys.argv[7]))
+cost_usd=float(sys.argv[8]) if len(sys.argv)>8 else 0.0
+in_tok =int(sys.argv[9])  if len(sys.argv)>9  else 0
+out_tok=int(sys.argv[10]) if len(sys.argv)>10 else 0
+cache_tok=int(sys.argv[11]) if len(sys.argv)>11 else 0
 wl=[json.loads(l) for l in open(work) if l.strip()]
 ids=[w["image_id"] for w in wl]; idset=set(ids)
 by_id={w["image_id"]:w for w in wl}
@@ -219,8 +234,14 @@ for i,l in enumerate(raw):
         "batch_duration_ms":batch_ms,
         "agent_duration_ms":batch_ms//n_imgs,
         "images_in_batch":n_imgs,
-        "agent_cost_cents":0,
-        "cost_basis":"byok_subscription_flat",
+        # REAL per-image economics, amortized from the batch's measured usage/cost.
+        # cost is the API-equivalent the CLI reports (true even on subscription).
+        "agent_cost_cents":round(cost_usd*100/n_imgs,4),
+        "batch_cost_usd":cost_usd,
+        "input_tokens_per_image":in_tok//n_imgs,
+        "output_tokens_per_image":out_tok//n_imgs,
+        "cache_tokens_per_image":cache_tok//n_imgs,
+        "cost_basis":"metered_from_usage" if cost_usd>0 else "byok_subscription_flat",
     }
     out.append(json.dumps(v))
 open(sink,"w").write("\n".join(out)+"\n")
