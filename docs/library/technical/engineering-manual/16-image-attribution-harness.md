@@ -310,7 +310,6 @@ so de-pollution is high-precision and specific re-homes require unambiguous evid
 Runs on the Claude **subscription** (`claude --print`, no per-token API). Note: a
 single `--print` call is slow (minutes); batch ~30 frames and run detached.
 
-<<<<<<< HEAD
 ### Mustang cleanup results + two traps (2026-06-22)
 
 Applied to the 1966 Mustang (`8bde1dda`), the user's "look at my garage" test case.
