@@ -310,6 +310,31 @@ so de-pollution is high-precision and specific re-homes require unambiguous evid
 Runs on the Claude **subscription** (`claude --print`, no per-token API). Note: a
 single `--print` call is slow (minutes); batch ~30 frames and run detached.
 
+### Mustang cleanup results + two traps (2026-06-22)
+
+Applied to the 1966 Mustang (`8bde1dda`), the user's "look at my garage" test case.
+Outcome: gallery dropped from **385 → 183 visible** (186 frames flagged `unrelated`,
+82 `confirmed`); the off-subject set was an orange Chevy small-block engine series, GMC
+Suburbans, an International Scout, a C2 Corvette, ~13 personal/family photos (newborns),
+a paternity/vital-records form, and a revolver. The sensitive PII was confined to this
+vehicle; the "Certificate of Title" OCR hits on other vehicles are legitimate titles.
+
+Two traps worth remembering:
+- **Negation defeats keyword matching (again).** A deterministic de-pollution pass keyed
+  on `narrative ~ 'mustang'` wrongly marked frames `confirmed` whose narrative read
+  *"…Mustang **absent**"* or *"**not the** Mustang"*. One such frame ("garage bay, Mustang
+  absent") had even become the lead image. Keyword presence ≠ subject; this is exactly why
+  Stage 1 is an LLM, and why deterministic passes must be treated as a stopgap and
+  manually reviewed (the 11 mis-marked frames here were corrected by explicit id).
+- **The lead image followed the newest upload, not the subject.**
+  `recompute_vehicle_primary_image` picked the latest eligible owner photo, so when the
+  newest uploads were off-subject shop/parts shots the primary became junk; the old
+  "prefer exterior" tier keyed on `vehicle_zone`, which is empty. Fixed (migration
+  `20260622030000`): prefer `confirmed` subject first, and detect "exterior" from the
+  analysis `scene_type = 'body_exterior'`. Because the `sync_vehicle_primary_image`
+  trigger fires on `image_vehicle_match_status` change, every vehicle's lead image now
+  **auto-heals** as the classifier confirms/flags its frames.
+
 ---
 
 ## Drift notes (verify against prod before trusting)
