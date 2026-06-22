@@ -68,7 +68,9 @@ jobs:
         run: |
           npm install
           npm install -g @dotenvx/dotenvx @anthropic-ai/claude-code
-          pip install requests
+          # requests = download/REST; imagehash+Pillow+pillow-heif = perceptual hashing
+          # (drain step 6 fills phash from the already-downloaded frames; see Ch.19).
+          pip install requests imagehash Pillow pillow-heif
 
       - name: Run cloud drain
         env:
