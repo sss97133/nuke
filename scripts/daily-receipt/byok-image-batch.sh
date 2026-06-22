@@ -261,4 +261,44 @@ if [ -n "$DAY" ]; then
     && log "rolled up work_session for $DAY" \
     || log "build-day rollup for $DAY returned non-zero (non-fatal)"
 fi
+# 6) PERCEPTUAL HASH (no AI, no extra download) — hash the already-local frames so the
+# dedup organ has input (phash was 0% filled; see engineering-manual Ch.19). Guarded:
+# if the image libs aren't installed it skips cleanly rather than failing the batch.
+dotenvx run -- python3 - "$WORK" "$IMG" >>"$LOG" 2>&1 <<'PY'
+import json,sys,os
+try:
+    import imagehash; from PIL import Image; import pillow_heif; pillow_heif.register_heif_opener(); import requests
+except Exception as e:
+    print("phash: deps missing, skipping (", str(e)[:60], ")"); sys.exit(0)
+work,imgdir=sys.argv[1],sys.argv[2]
+URL=os.environ.get("SUPABASE_URL") or os.environ.get("VITE_SUPABASE_URL"); KEY=os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+if not URL or not KEY: print("phash: no creds, skipping"); sys.exit(0)
+H={"apikey":KEY,"authorization":f"Bearer {KEY}","content-type":"application/json","prefer":"return=minimal"}
+n=0
+for l in open(work):
+    r=json.loads(l); p=os.path.join(imgdir, r.get("file_name",""))
+    if not p or not os.path.exists(p): continue
+    try:
+        im=Image.open(p).convert("RGB"); ph=str(imagehash.phash(im)); dh=str(imagehash.dhash(im))
+        requests.patch(f"{URL}/rest/v1/vehicle_images?id=eq.{r['image_id']}&phash=is.null",
+                       headers=H, json={"phash":ph,"dhash":dh}, timeout=30)
+        n+=1
+    except Exception as e: print("phash err", r.get("file_name"), str(e)[:60])
+print("phash: hashed", n, "local frames")
+PY
+
+# 7) DEDUP + SESSION (no AI) — collapse bursts and fill work_session_id for this vehicle.
+# Both functions are vehicle-scoped, idempotent, and reversible (see Ch.19); safe per batch.
+dotenvx run -- node -e '
+const { createClient } = require("@supabase/supabase-js");
+const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const sb = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY);
+(async () => {
+  for (const fn of ["flag_image_burst_duplicates", "derive_work_sessions"]) {
+    const { data, error } = await sb.rpc(fn, { p_vehicle_id: process.argv[1] });
+    console.log(fn, error ? ("ERR " + error.message) : JSON.stringify(data));
+  }
+})();
+' "$VEHICLE_ID" >>"$LOG" 2>&1 || log "dedup/session rpc returned non-zero (non-fatal)"
+
 log "=== batch done: day ${DAY:-unknown}, ingest $WROTE / $N ==="
