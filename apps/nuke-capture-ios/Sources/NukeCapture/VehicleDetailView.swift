@@ -2849,6 +2849,13 @@ struct FieldProvenanceSheet: View {
                     Label("Copy", systemImage: "doc.on.doc").font(.caption)
                 }
             }
+            // The value is true AS OF its latest verification — show the WHEN, and warn if aging.
+            if let v = latestVerified {
+                Label(v.aging ? "Last verified \(v.label) · may be out of date" : "Verified \(v.label)",
+                      systemImage: v.aging ? "clock.badge.exclamationmark" : "checkmark.circle")
+                    .font(.caption2)
+                    .foregroundStyle(v.aging ? Color.orange : Color.secondary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
@@ -2903,6 +2910,10 @@ struct FieldProvenanceSheet: View {
                             Text(facet).font(.system(.caption2, design: .monospaced))
                                 .foregroundStyle(.secondary)
                         }
+                        Spacer()
+                        if let w = whenLabel(o.observed_at) {
+                            Text(w).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                        }
                     }
                     if let u = o.source_url, let link = URL(string: u) {
                         Link("View source ↗", destination: link).font(.caption2)
@@ -2917,16 +2928,26 @@ struct FieldProvenanceSheet: View {
     }
 
     @ViewBuilder private func evidenceSection(_ ev: [FieldProvenance.Evidence]) -> some View {
+        let timeline = ev.sorted { ($0.at ?? "") > ($1.at ?? "") }   // newest first = the chronology
         VStack(alignment: .leading, spacing: 10) {
-            Text("EXTRACTION EVIDENCE")
+            Text("EVIDENCE · NEWEST FIRST")
                 .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
-            ForEach(ev) { e in
+            ForEach(Array(timeline.enumerated()), id: \.element.id) { idx, e in
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
+                    HStack(spacing: 6) {
                         Text(e.source_type ?? "source").font(.footnote.weight(.medium))
+                        if idx == 0 {   // the current reading
+                            Text("LATEST").font(.system(size: 9, design: .monospaced).weight(.bold))
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                                .foregroundStyle(Color.accentColor)
+                        }
                         Spacer()
+                        if let w = whenLabel(e.at) {
+                            Text(w).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                        }
                         if let c = pct(e.confidence) {
-                            Text(c).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                            Text(c).font(.system(.caption2, design: .monospaced)).foregroundStyle(.tertiary)
                         }
                         if e.verified == true {
                             Image(systemName: "checkmark.seal.fill").font(.caption2).foregroundStyle(.green)
@@ -2959,6 +2980,29 @@ struct FieldProvenanceSheet: View {
     private func hasNothing(_ p: FieldProvenance) -> Bool {
         (p.inline_source?.isEmpty != false) && p.source_image_url == nil
             && p.observations.isEmpty && p.evidence.isEmpty
+    }
+
+    // ─── Temporal: a spec is true AS OF a date. Surface the WHEN so a value reads as
+    // "current · verified DATE" with older readings as a timeline — not as timeless fact.
+    private func whenLabel(_ iso: String?) -> String? {
+        guard let iso, !iso.isEmpty else { return nil }
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.locale = Locale(identifier: "en_US_POSIX")
+        guard let d = f.date(from: String(iso.prefix(10))) else { return String(iso.prefix(10)) }
+        let out = DateFormatter(); out.dateFormat = "MMM yyyy"
+        return out.string(from: d)
+    }
+    private func monthsAgo(_ iso: String?) -> Int? {
+        guard let iso, !iso.isEmpty else { return nil }
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.locale = Locale(identifier: "en_US_POSIX")
+        guard let d = f.date(from: String(iso.prefix(10))) else { return nil }
+        return Calendar.current.dateComponents([.month], from: d, to: Date()).month
+    }
+    // Newest reading across all evidence + observations (ISO strings sort chronologically).
+    private var latestVerified: (label: String, aging: Bool)? {
+        guard let p = prov else { return nil }
+        let dates = p.evidence.compactMap { $0.at } + p.observations.compactMap { $0.observed_at }
+        guard let newest = dates.max(), let lbl = whenLabel(newest) else { return nil }
+        return (lbl, (monthsAgo(newest) ?? 0) > 14)   // a build-state value >~14mo old is likely stale
     }
 
     private func observationFacets(_ o: FieldProvenance.Observation) -> [String] {
