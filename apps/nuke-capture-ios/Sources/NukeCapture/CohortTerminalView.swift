@@ -1295,6 +1295,15 @@ private struct SentimentMap: View {
             Text("\(points.count) comments · \(vouch) vouch · \(challenge) challenge · tap a point to read it")
                 .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
         }
+        #if DEBUG
+        // Screenshot loop: auto-open a real comment (text + stance) to verify CommentPeek renders.
+        .task {
+            if ProcessInfo.processInfo.environment["NUKE_DEBUG_COMMENTPEEK"] == "1", selected == nil {
+                try? await Task.sleep(nanoseconds: 1_400_000_000)
+                selected = points.first { ($0.text?.isEmpty == false) && $0.stance != nil } ?? points.first
+            }
+        }
+        #endif
         .sheet(item: $selected) { p in CommentPeek(p: p) }
     }
 }
