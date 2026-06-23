@@ -1036,30 +1036,54 @@ private struct ProdEstimate: Decodable, Identifiable {
     let total_produced: Int?
     let rarity_level: String?
     let rarity_reason: String?
+    let body_style: String?
     let trim_level: String?
     let engine_option: String?
     let msrp: Double?
     let data_source: String?
     let source_url: String?
     let verified_by: String?
+    // Marti scope: how many qualifiers this figure pins. 0 = the year-total root;
+    // higher = a narrower subset (a breakdown level, NOT a conflicting estimate).
+    var specificity: Int { [body_style, trim_level, engine_option].filter { $0?.isEmpty == false }.count }
+    var scopeDelta: String {
+        let p = [body_style, trim_level, engine_option].compactMap { $0 }.filter { !$0.isEmpty }
+        return p.joined(separator: " · ")
+    }
+    var cited: Bool { source_url?.isEmpty == false }
 }
 
+private struct CensusBucket: Identifiable { let label: String; let count: Int; var id: String { label } }
+
+// PRODUCTION as a REVERSE DSO. Marti works top-down (Ford handed over the build DB);
+// GM never did. So this surface shows two honest epistemics, never "conflicting":
+//   BUILT — the cited total (the denominator), + any cited scoped figures as a Marti
+//           breakdown (broad→narrow); two figures only "conflict" at the SAME scope.
+//   DOCUMENTED IN NUKE — the reverse census (the numerator): vehicles we've actually
+//           met, photo-backed, growing; the observed trim distribution among them.
+//           Never extrapolated to a fabricated total.
 struct ProductionProvenanceSheet: View {
     let drill: ProductionDrill
     @Environment(\.dismiss) private var dismiss
     @State private var rows: [ProdEstimate] = []
+    @State private var census: [CensusBucket] = []
     @State private var loaded = false
     @State private var loadFailed = false
 
-    private var anyCited: Bool { rows.contains { ($0.source_url?.isEmpty == false) } }
-    private var conflicting: Bool { Set(rows.compactMap { $0.total_produced }).count > 1 }
+    // Cited figures, broadest → narrowest (Marti order: year total first).
+    private var citedRows: [ProdEstimate] {
+        rows.filter(\.cited).sorted {
+            $0.specificity != $1.specificity ? $0.specificity < $1.specificity
+                                             : ($0.total_produced ?? 0) > ($1.total_produced ?? 0)
+        }
+    }
+    private var yearTotal: ProdEstimate? { citedRows.first { $0.specificity == 0 } ?? citedRows.first }
 
     var body: some View {
         NavigationStack {
             List {
-                survivalSection
-                estimatesSection
-                citationSection
+                builtSection
+                documentedSection
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Production")
@@ -1071,132 +1095,123 @@ struct ProductionProvenanceSheet: View {
         .task { await load() }
     }
 
-    @ViewBuilder private var survivalSection: some View {
-        Section("SURVIVAL") {
-            let lo = drill.minProduced, hi = drill.maxProduced
-            let builtStr: String = {
-                switch (lo, hi) {
-                case let (l?, h?) where l != h: return "~\(kk(l))–\(kk(h))"
-                case let (_, h?): return "~\(kk(h))"
-                case let (l?, _): return "~\(kk(l))"
-                default: return "an unrecorded number"
-                }
-            }()
-            VStack(alignment: .leading, spacing: 6) {
-                Text("\(drill.documented.formatted(.number)) documented")
-                    .font(.system(.title3, design: .monospaced).weight(.semibold))
-                Text("of \(builtStr) estimated built")
-                    .font(.system(.body, design: .monospaced)).foregroundStyle(.secondary)
-                Text("Documented is a floor — the count the substrate has actually met, not a survival estimate. Built is an estimate (below).")
-                    .font(.footnote).foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.vertical, 2)
-        }
-    }
-
-    @ViewBuilder private var estimatesSection: some View {
-        Section(rows.count > 1 ? "ESTIMATES · \(rows.count) CONFLICTING" : "ESTIMATE") {
-            if loadFailed {
-                Label("Couldn't load the production records", systemImage: "wifi.exclamationmark")
-                    .font(.footnote).foregroundStyle(.secondary)
-            } else if !rows.isEmpty {
-                if conflicting {
-                    Text("The records disagree. Both are shown — neither is promoted to fact, because neither is cited.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .listRowSeparator(.hidden)
-                }
-                ForEach(rows) { r in estimateRow(r) }
-            } else if loaded {
-                Text("No production estimate has reached the substrate for this year-make-model yet.")
-                    .font(.footnote).foregroundStyle(.tertiary)
-            } else {
-                HStack(spacing: 8) { ProgressView(); Text("Loading records…").font(.footnote).foregroundStyle(.secondary) }
-            }
-        }
-    }
-
-    @ViewBuilder private func estimateRow(_ r: ProdEstimate) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(r.total_produced.map { "\($0.formatted(.number)) built" } ?? "count not recorded")
-                    .font(.system(.body, design: .monospaced).weight(.medium))
-                Spacer()
-                if let rl = r.rarity_level {
-                    Text(rl.replacingOccurrences(of: "_", with: " ").capitalized)
-                        .font(.system(size: 11, design: .monospaced).weight(.semibold))
-                        .padding(.horizontal, 7).padding(.vertical, 2)
-                        .background(Capsule().fill(Color(.tertiarySystemFill)))
-                }
-            }
-            let qual = [r.trim_level, r.engine_option].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
-            if !qual.isEmpty {
-                Text(qual).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
-            }
-            if let reason = r.rarity_reason, !reason.isEmpty {
-                Text(reason).font(.footnote).foregroundStyle(.tertiary)
-            }
-            HStack(spacing: 10) {
-                if let m = r.msrp {
-                    Text("MSRP " + m.formatted(.currency(code: "USD").precision(.fractionLength(0))))
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
-                }
-                if let u = r.source_url, !u.isEmpty, let url = URL(string: u) {
-                    Link(destination: url) {
-                        HStack(spacing: 3) { Text(r.data_source ?? "source"); Image(systemName: "arrow.up.right") }
-                            .font(.system(size: 10, design: .monospaced))
-                    }
-                } else {
-                    Text("uncited" + (r.data_source.map { " · \($0)" } ?? ""))
-                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.orange)
-                }
-            }
-        }
-        .padding(.vertical, 3)
-    }
-
-    @ViewBuilder private var citationSection: some View {
-        Section("CITATION") {
-            if anyCited {
-                Label("At least one estimate carries a source link.", systemImage: "checkmark.seal")
-                    .font(.footnote).foregroundStyle(.secondary)
-            } else if !rows.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("These figures are uncited.", systemImage: "exclamationmark.triangle")
-                        .font(.footnote.weight(.medium)).foregroundStyle(.orange)
-                    Text("They were seeded into the registry without a reference. Until one is attached, the range is shown but not promoted to a verified fact.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("A citation would come from a marque production reference — a factory build record, a marque registry, or a primary source (e.g. Wikipedia, a model-specific registry) — recorded as a named source with a URL, the form other production figures in the substrate already carry.")
-                        .font(.footnote).foregroundStyle(.tertiary)
-                        .fixedSize(horizontal: false, vertical: true)
+    // ── BUILT — the cited total (denominator) + cited scoped figures as a Marti tree.
+    @ViewBuilder private var builtSection: some View {
+        Section("BUILT") {
+            if let yt = yearTotal, let n = yt.total_produced {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(n.formatted(.number)) built")
+                        .font(.system(.title3, design: .monospaced).weight(.semibold))
+                    Text("all \(drill.year) \(drill.make) \(drill.model)")
+                        .font(.system(.footnote, design: .monospaced)).foregroundStyle(.secondary)
+                    citationLink(yt)
                 }
                 .padding(.vertical, 2)
+                // Narrower cited figures — a real breakdown, indented by scope depth.
+                ForEach(citedRows.filter { $0.specificity > 0 }) { r in martiRow(r) }
+            } else if !loaded {
+                HStack(spacing: 8) { ProgressView(); Text("Loading…").font(.footnote).foregroundStyle(.secondary) }
+            } else if loadFailed {
+                Label("Couldn't load production records", systemImage: "wifi.exclamationmark").font(.footnote).foregroundStyle(.secondary)
+            } else {
+                Text("Year total not yet cited. The reverse census below is what Nuke has documented so far.")
+                    .font(.footnote).foregroundStyle(.tertiary).fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 
-    private func kk(_ v: Int) -> String {
-        v >= 1000 ? "\((Double(v)/1000).formatted(.number.precision(.fractionLength(v < 10000 ? 1 : 0))))k"
-                  : v.formatted(.number)
+    @ViewBuilder private func martiRow(_ r: ProdEstimate) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Color.clear.frame(width: CGFloat(r.specificity) * 12, height: 1)   // indent = scope depth
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(r.total_produced.map { "\($0.formatted(.number)) built" } ?? "—")
+                        .font(.system(.subheadline, design: .monospaced).weight(.medium))
+                    Spacer()
+                    if let rl = r.rarity_level {
+                        Text(rl.replacingOccurrences(of: "_", with: " ").capitalized)
+                            .font(.system(size: 10, design: .monospaced).weight(.semibold))
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Capsule().fill(Color(.tertiarySystemFill)))
+                    }
+                }
+                if !r.scopeDelta.isEmpty {
+                    Text(r.scopeDelta).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+                }
+                citationLink(r)
+            }
+        }
+        .padding(.vertical, 2)
     }
+
+    @ViewBuilder private func citationLink(_ r: ProdEstimate) -> some View {
+        if let u = r.source_url, !u.isEmpty, let url = URL(string: u) {
+            Link(destination: url) {
+                HStack(spacing: 3) { Text(r.data_source ?? "source"); Image(systemName: "arrow.up.right") }
+                    .font(.system(size: 10, design: .monospaced))
+            }
+        }
+    }
+
+    // ── DOCUMENTED IN NUKE — the reverse DSO. The numerator: cars we've actually met.
+    @ViewBuilder private var documentedSection: some View {
+        Section("DOCUMENTED IN NUKE") {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(drill.documented.formatted(.number))
+                        .font(.system(.title3, design: .monospaced).weight(.semibold))
+                    if let n = yearTotal?.total_produced {
+                        Text("of \(n.formatted(.number)) built")
+                            .font(.system(.body, design: .monospaced)).foregroundStyle(.secondary)
+                    }
+                }
+                Text("No factory build database was published for this model. Nuke reverse-builds the record from documented, photo-backed vehicles — \(drill.documented) met so far. Each new car sharpens the breakdown below as its specs are recorded.")
+                    .font(.footnote).foregroundStyle(.tertiary).fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, 2)
+
+            // Observed AMONG the documented (never extrapolated to a total).
+            ForEach(census) { b in
+                HStack {
+                    Text(b.label).font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(b.label.hasPrefix("trim ") ? .tertiary : .primary)
+                    Spacer()
+                    Text("\(b.count)").font(.system(size: 12, design: .monospaced).weight(.medium)).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private struct CohortTrim: Decodable { let trim: String? }
 
     private func load() async {
         defer { loaded = true }
+        // Cited figures (denominator side) — quarantined junk excluded.
         do {
-            let r: [ProdEstimate] = try await SupabaseService.client
+            rows = try await SupabaseService.client
                 .from("vehicle_production_data")
-                .select("id,total_produced,rarity_level,rarity_reason,trim_level,engine_option,msrp,data_source,source_url,verified_by")
-                .eq("make", value: drill.make)
-                .eq("model", value: drill.model)
-                .eq("year", value: drill.year)
-                .order("total_produced", ascending: true)
+                .select("id,total_produced,rarity_level,rarity_reason,body_style,trim_level,engine_option,msrp,data_source,source_url,verified_by")
+                .eq("make", value: drill.make).eq("model", value: drill.model).eq("year", value: drill.year)
+                .not("quarantined", operator: .is, value: "true")
+                .order("total_produced", ascending: false)
                 .execute().value
-            rows = r
         } catch {
             loadFailed = true
-            NSLog("NukeCapture production provenance load failed: %@", String(describing: error))
+            NSLog("NukeCapture production load failed: %@", String(describing: error))
+        }
+        // Reverse census (numerator side) — observed trims among the documented cohort.
+        // "not yet recorded" is reconciled to drill.documented (the authoritative count).
+        if let cohort: [CohortTrim] = try? await SupabaseService.client
+            .from("vehicles").select("trim")
+            .ilike("make", value: drill.make).ilike("model", value: "%\(drill.model)%").eq("year", value: drill.year)
+            .limit(2000).execute().value {
+            var counts: [String: Int] = [:]
+            for v in cohort where (v.trim?.isEmpty == false) { counts[v.trim!, default: 0] += 1 }
+            var buckets = counts.map { CensusBucket(label: $0.key, count: $0.value) }.sorted { $0.count > $1.count }
+            let knownSum = buckets.reduce(0) { $0 + $1.count }
+            let unrecorded = max(0, drill.documented - knownSum)
+            if unrecorded > 0 { buckets.append(CensusBucket(label: "trim not yet recorded", count: unrecorded)) }
+            census = buckets
         }
     }
 }
