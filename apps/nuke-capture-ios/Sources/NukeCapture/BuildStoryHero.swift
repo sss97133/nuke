@@ -30,19 +30,22 @@ struct BuildStoryHero: View {
 
     var body: some View {
         if let urlStr = imageURL {
-            // ZStack — NOT nested buttons. The hero photo is one button (drills to
-            // the image's data); the identity chips are a sibling layer ON TOP, so
-            // their taps win in their own frame and the rest of the hero still
-            // drills to the photo. (Chips inside the hero button would never fire.)
-            ZStack(alignment: .bottomLeading) {
-                Button(action: onTap) { heroPhoto(urlStr) }
-                    .buttonStyle(.plain)
-
-                IdentityChips(year: year, make: make, model: model, trim: trim,
-                              onScrim: true, onDrill: onDrillCohort)
-                    .padding(16)
-                    .allowsHitTesting(onDrillCohort != nil)
-            }
+            // Chips as an OVERLAY on the photo button, NOT a ZStack sibling. An overlay
+            // is sized to its source (the photo = screen width), so the identity can
+            // never force the hero wider than the photo. As a ZStack sibling, the
+            // chips' FlowLayout could be proposed an UNBOUNDED width (when the image's
+            // sizing pass defers), lay every chip on one line, blow past the screen and
+            // shove the whole page left (the left-clip bug). Overlay buttons still fire:
+            // they sit ON TOP of the photo button, not inside it, so chip taps win in
+            // their frame and the rest of the hero still drills to the photo.
+            Button(action: onTap) { heroPhoto(urlStr) }
+                .buttonStyle(.plain)
+                .overlay(alignment: .bottomLeading) {
+                    IdentityChips(year: year, make: make, model: model, trim: trim,
+                                  onScrim: true, onDrill: onDrillCohort)
+                        .padding(16)
+                        .allowsHitTesting(onDrillCohort != nil)
+                }
         } else if loaded {
             // Loaded, no image — a flat plate, never a broken frame.
             Color(.secondarySystemFill)
@@ -62,17 +65,25 @@ struct BuildStoryHero: View {
     // small unit (the inline chain timed out). Photo only — identity lives on top.
     // Each overlay references a named sub-view to keep inference trivial.
     @ViewBuilder private func heroPhoto(_ urlStr: String) -> some View {
-        CachedAsyncImage(url: NukeImage.thumb(urlStr, width: 1000)) { image in
-            image.resizable().scaledToFill()
-        } placeholder: {
-            Color(.secondarySystemFill).overlay { ProgressView() }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 300)
-        .clipped()
-        .overlay(alignment: .bottom) { heroScrim }
-        .overlay(alignment: .topLeading) { decayBadge }
-        .overlay(alignment: .topTrailing) { dataAffordance }
+        // A fixed-size box is the AUTHORITATIVE sizer (full-width × 300); the image is
+        // a non-layout-affecting overlay that fills + clips. Critical: with the image
+        // as the sizer (scaledToFill + frame(maxWidth:.infinity)), a SMALL source
+        // (e.g. a 480×271 photo) lets the scaled image's intrinsic width propagate into
+        // layout and shove the whole page sideways. As an overlay on a fixed box it
+        // can never affect layout, whatever the source dimensions.
+        Color(.secondarySystemFill)
+            .frame(maxWidth: .infinity)
+            .frame(height: 300)
+            .overlay {
+                CachedAsyncImage(url: NukeImage.thumb(urlStr, width: 1000)) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: { ProgressView() }
+            }
+            .clipped()
+            .contentShape(Rectangle())
+            .overlay(alignment: .bottom) { heroScrim }
+            .overlay(alignment: .topLeading) { decayBadge }
+            .overlay(alignment: .topTrailing) { dataAffordance }
     }
 
     // Cinematic scrim — carries the identity chips' legibility on the photo.

@@ -1287,12 +1287,36 @@ private struct SentimentMap: View {
 private struct CommentPeek: View {
     let p: CohortSentiment.CommentPoints.Pt
     @Environment(\.dismiss) private var dismiss
+    // The author's real profile, when the comment is BaT-sourced — the username is a
+    // door to who said it, not dead text.
+    private var memberURL: URL? {
+        guard let a = p.author, !a.isEmpty, let src = p.source_url,
+              src.contains("bringatrailer.com") else { return nil }
+        return URL(string: "https://bringatrailer.com/member/\(a)")
+    }
+    private var sourceName: String {
+        guard let s = p.source_url else { return "the listing" }
+        if s.contains("bringatrailer.com") { return "Bring a Trailer" }
+        if s.contains("mecum") { return "Mecum" }
+        if s.contains("barrett") { return "Barrett-Jackson" }
+        return "the listing"
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 6) {
-                        Text(p.author ?? "anon").font(.subheadline.weight(.semibold))
+                        if let mu = memberURL {                  // author → their profile
+                            Link(destination: mu) {
+                                HStack(spacing: 3) {
+                                    Text(p.author ?? "anon").font(.subheadline.weight(.semibold))
+                                    Image(systemName: "arrow.up.right").font(.caption2)
+                                }
+                            }
+                        } else {
+                            Text(p.author ?? "anon").font(.subheadline.weight(.semibold))
+                        }
                         if p.is_seller == true {
                             Text("SELLER").font(.system(size: 9, design: .monospaced))
                                 .padding(.horizontal, 5).padding(.vertical, 2)
@@ -1303,23 +1327,32 @@ private struct CommentPeek: View {
                             Label("\(l)", systemImage: "hand.thumbsup").font(.caption2).foregroundStyle(.secondary)
                         }
                     }
+
+                    // FULL comment — never clipped (the RPC now returns whole text).
                     Text(p.text ?? "").font(.body).fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: 20) {
-                        axisChip("polarity", p.sentiment)
-                        axisChip("stance", p.stance)
+                        .textSelection(.enabled)
+
+                    Divider()
+
+                    // What the two scores MEAN — not bare numbers. Polarity = tone;
+                    // stance = whether the comment vouches for or challenges the car's claims.
+                    VStack(alignment: .leading, spacing: 12) {
+                        scoreRow("Polarity", p.sentiment, polarityLabel(p.sentiment),
+                                 "−1 critical · 0 neutral · +1 enthusiastic")
+                        scoreRow("Stance", p.stance, stanceLabel(p.stance),
+                                 "−1 challenges the claims · +1 vouches for them")
                     }
-                    // Drill to where it was said — the listing this comment lives on.
-                    // A scored comment with no reachable source is an unfalsifiable claim.
+
                     if let u = p.source_url, !u.isEmpty, let url = URL(string: u) {
                         Link(destination: url) {
-                            HStack { Image(systemName: "text.bubble"); Text("Read in context"); Spacer()
+                            HStack { Image(systemName: "text.bubble")
+                                Text("Open the discussion on \(sourceName)"); Spacer()
                                 Image(systemName: "arrow.up.right") }
                                 .font(.callout.weight(.medium))
                                 .padding()
                                 .frame(maxWidth: .infinity)
                                 .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12))
                         }
-                        .padding(.top, 4)
                     }
                 }
                 .padding()
@@ -1327,14 +1360,40 @@ private struct CommentPeek: View {
             .navigationTitle("Comment").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])      // expandable — a long comment never clips
         .presentationDragIndicator(.visible)
     }
-    @ViewBuilder private func axisChip(_ label: String, _ v: Double?) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
-            Text(v.map { String(format: "%+.2f", $0) } ?? "—")
-                .font(.system(.body, design: .monospaced).weight(.medium))
+
+    // value + plain-language meaning + the scale it sits on
+    @ViewBuilder private func scoreRow(_ title: String, _ v: Double?, _ meaning: String, _ scale: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(title.uppercased()).font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                Text(v.map { String(format: "%+.2f", $0) } ?? "—")
+                    .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                Text(meaning).font(.subheadline).foregroundStyle(.secondary)
+            }
+            Text(scale).font(.caption2).foregroundStyle(.tertiary)
+        }
+    }
+    private func polarityLabel(_ v: Double?) -> String {
+        guard let v else { return "unscored" }
+        switch v {
+        case ..<(-0.4): return "critical in tone"
+        case ..<(-0.1): return "leaning negative"
+        case ...0.1:    return "neutral in tone"
+        case ...0.4:    return "leaning positive"
+        default:        return "enthusiastic"
+        }
+    }
+    private func stanceLabel(_ v: Double?) -> String {
+        guard let v else { return "stance not scored" }
+        switch v {
+        case ..<(-0.4): return "challenges the car's claims"
+        case ..<(-0.1): return "mild doubt"
+        case ...0.1:    return "neither vouches nor challenges"
+        case ...0.4:    return "leans supportive"
+        default:        return "vouches for the car's claims"
         }
     }
 }

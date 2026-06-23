@@ -30,7 +30,7 @@ begin
         'sentiment', round((ac.sentiment_score/100.0)::numeric,3),       -- -1..1
         'stance', round(ac.community_stance_score::numeric,3),           -- -1..1 (null = unscored)
         'kind', ac.comment_type, 'is_seller', ac.is_seller, 'author', ac.author_username,
-        'likes', ac.comment_likes, 'text', left(ac.comment_text,280),
+        'likes', ac.comment_likes, 'text', ac.comment_text,   -- FULL text (was left(,280) → clipped mid-sentence)
         'source_url', ac.source_url) order by ac.sentiment_score), '[]'::jsonb))   -- drill: where it was said
     into v_points
   from public.auction_comments ac

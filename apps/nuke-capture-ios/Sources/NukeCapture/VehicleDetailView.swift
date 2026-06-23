@@ -270,6 +270,7 @@ struct VehicleDetailView: View {
     @State private var contributed: Set<String> = []   // optimistic: fields just submitted
     @State private var galleryOpen = false
     @State private var selectedPhoto: VehicleGalleryImage?  // photo→analysis drill
+    @State private var dayDrill: DayRecord?                 // calendar cell → that day's evidence
     @State private var viewerStart: GalleryStart?           // grid tap → swipeable Photos-style viewer
     @State private var pendingAnalyze: VehicleGalleryImage? // viewer "Analysis" → atoms after dismiss
     @State private var provenanceDrill: SpecDrill?          // spec value → its source
@@ -344,6 +345,10 @@ struct VehicleDetailView: View {
         // never fabricated atoms.
         .fullScreenCover(item: $selectedPhoto) { img in
             AnalyzedEvidenceView(photo: analyzedPhoto(from: img))
+        }
+        // Calendar cell → that day's evidence (fetched on demand, paging-independent).
+        .sheet(item: $dayDrill) { d in
+            DayDrillSheet(vehicleId: vehicleId, day: d) { selectedPhoto = $0 }
         }
         // The Photos-style swipeable viewer over the loaded build photos. Its "Analysis"
         // action routes to the SAME AnalyzedEvidenceView (after the viewer closes) so the
@@ -1057,9 +1062,10 @@ struct VehicleDetailView: View {
                     }
                     .padding(.horizontal, 16)
                     BarcodeTimeline(days: days) { day in
-                        if let match = images.first(where: {
-                            ($0.taken_at?.prefix(10)).map(String.init) == day.day
-                        }) { selectedPhoto = match }
+                        // Every activity day drills to its evidence. Can't rely on the
+                        // paged `images` (newest-first; old days like 2016 aren't loaded)
+                        // — the day sheet fetches that day's photos + work on demand.
+                        dayDrill = day
                     }
                     .transition(.opacity)
                 } else {
@@ -1750,6 +1756,106 @@ struct VehicleDetailView: View {
 // CTA resolves in-app (C10 dead-link rule). Carries its own dismiss.
 /// Drives the swipeable viewer's `.fullScreenCover(item:)` — the index to open at.
 private struct GalleryStart: Identifiable { let index: Int; var id: Int { index } }
+
+// ─── DAY DRILL ────────────────────────────────────────────────────────────────
+/// A calendar cell → that day's real evidence. The build calendar shows EVERY
+/// activity day across years; a given day's photos usually live PAST the paged
+/// gallery's first page (newest-first), so this fetches the day's photos on demand
+/// — that's why the cells "did nothing" before. Shows the day's work summary (the
+/// labor that day) + its photos as a contact sheet (tap → full screen).
+private struct DayDrillSheet: View {
+    let vehicleId: String
+    let day: DayRecord
+    let onPhoto: (VehicleGalleryImage) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var photos: [VehicleGalleryImage] = []
+    @State private var loaded = false
+
+    private let cols = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    if day.work > 0 || day.workMinutes > 0 || day.workCost > 0 { summaryRow }
+                    if day.events > 0 {
+                        Label("\(day.events) event\(day.events == 1 ? "" : "s") recorded", systemImage: "calendar")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    if !photos.isEmpty {
+                        Text("\(photos.count) photo\(photos.count == 1 ? "" : "s")")
+                            .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                        LazyVGrid(columns: cols, spacing: 2) {
+                            ForEach(photos) { p in
+                                Button { dismiss(); onPhoto(p) } label: {
+                                    CachedAsyncImage(url: NukeImage.thumb(p.image_url, width: 300)) { i in
+                                        i.resizable().scaledToFill()
+                                    } placeholder: { Color(.secondarySystemFill) }
+                                    .frame(height: 120).frame(maxWidth: .infinity).clipped()
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    } else if !loaded {
+                        ProgressView().frame(maxWidth: .infinity).padding(.vertical, 24)
+                    } else if day.photos == 0 {
+                        Text("No photos this day — the activity was work logged.")
+                            .font(.footnote).foregroundStyle(.tertiary)
+                    } else {
+                        Text("\(day.photos) photo\(day.photos == 1 ? "" : "s") recorded; none carry a capture date to place here yet.")
+                            .font(.footnote).foregroundStyle(.tertiary).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(16)
+            }
+            .navigationTitle(prettyDayLong(day.day))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .task { await load() }
+    }
+
+    private var summaryRow: some View {
+        HStack(spacing: 22) {
+            if day.workMinutes > 0 { stat("HOURS", String(format: "%.1f", Double(day.workMinutes) / 60.0)) }
+            if day.workCost > 0 { stat("SPEND", day.workCost.formatted(.currency(code: "USD").precision(.fractionLength(0)))) }
+            if day.work > 0 { stat("ENTRIES", "\(day.work)") }
+        }
+    }
+    private func stat(_ l: String, _ v: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(l).font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+            Text(v).font(.system(.title3, design: .monospaced).weight(.medium))
+        }
+    }
+    private func prettyDayLong(_ s: String) -> String {
+        let inF = DateFormatter(); inF.dateFormat = "yyyy-MM-dd"; inF.locale = Locale(identifier: "en_US_POSIX")
+        let outF = DateFormatter(); outF.dateFormat = "EEEE, MMMM d, yyyy"
+        return inF.date(from: s).map { outF.string(from: $0) } ?? s
+    }
+    private func load() async {
+        defer { loaded = true }
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone(identifier: "UTC")
+        guard let d = f.date(from: day.day),
+              let next = Calendar.current.date(byAdding: .day, value: 1, to: d) else { return }
+        do {
+            photos = try await SupabaseService.client
+                .from("vehicle_images")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,vision_gate_agent_reasoning")
+                .eq("vehicle_id", value: vehicleId)
+                .gte("taken_at", value: day.day)
+                .lt("taken_at", value: f.string(from: next))
+                .not("is_superseded", operator: .is, value: "true")
+                .order("taken_at", ascending: true)
+                .limit(200)
+                .execute().value
+        } catch {
+            NSLog("NukeCapture day drill load failed: %@", String(describing: error))
+        }
+    }
+}
 
 // A real photo viewer (the Photos-app idiom): swipe between, pinch/pan/double-tap zoom,
 // a filmstrip scrubber, date caption, cached full-res. Tap toggles chrome. Analysis is
