@@ -48,23 +48,6 @@ const ago = (iso: string): string => {
   return `${Math.floor(s / 86400)}d`;
 };
 
-// 8-9px ALL-CAPS marker (design system).
-function Chip({ text, tone = 'muted', title }: { text: string; tone?: 'muted' | 'on' | 'value'; title?: string }) {
-  const colors = {
-    muted: { bg: 'transparent', fg: 'var(--text-muted, #888)', bd: 'var(--border, #333)' },
-    on: { bg: 'var(--text, #111)', fg: 'var(--bg, #fff)', bd: 'var(--text, #111)' },
-    value: { bg: 'transparent', fg: 'var(--accent, #2563eb)', bd: 'var(--accent, #2563eb)' },
-  }[tone];
-  return (
-    <span title={title} style={{
-      display: 'inline-block', fontSize: '8px', fontWeight: 700, letterSpacing: '0.06em',
-      textTransform: 'uppercase', padding: '1px 4px', marginRight: '4px', lineHeight: '12px',
-      fontFamily: 'Arial, Helvetica, sans-serif',
-      background: colors.bg, color: colors.fg, border: `1px solid ${colors.bd}`,
-    }}>{text}</span>
-  );
-}
-
 export default function PipelineVisualizer() {
   const navigate = useNavigate();
   const { session, loading: authLoading } = useAuth();
@@ -154,7 +137,6 @@ export default function PipelineVisualizer() {
           const isNew = newIdsRef.current.has(r.image_id);
           const comps = Array.isArray(r.components) ? r.components.filter((c) => c?.label) : [];
           const ocr = Array.isArray(r.text_regions) ? r.text_regions.filter((t) => t?.text) : [];
-          const partNos = comps.map((c) => c.part_number_guess).filter(Boolean) as string[];
           const st = (r.state || {}) as Record<string, string>;
           // The schema fields that landed for this frame, in fill order — the cascade.
           const fields: { k: string; v: React.ReactNode; mono?: boolean }[] = [];
@@ -192,7 +174,9 @@ export default function PipelineVisualizer() {
               {/* the schema filling itself, field by field */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text,#111)' }}>
+                  <span
+                    onClick={() => navigate(`/vehicle/${r.vehicle_id}`)}
+                    style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text,#111)', cursor: 'pointer' }}>
                     {r.vehicle || 'Unknown vehicle'}
                   </span>
                   <span style={{ marginLeft: 'auto', fontFamily: '"Courier New", monospace',
@@ -207,26 +191,16 @@ export default function PipelineVisualizer() {
                 )}
 
                 {fields.map((f, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '8px', fontSize: '11px', lineHeight: '16px',
+                  <div key={i} style={{ display: 'flex', gap: '10px', fontSize: '13px', lineHeight: '18px',
                     animation: isNew ? 'nukeLine 300ms cubic-bezier(0.16,1,0.3,1) both' : undefined,
                     animationDelay: isNew ? `${i * 55}ms` : undefined }}>
-                    <span style={{ flex: '0 0 96px', textAlign: 'right', fontSize: '8px', fontWeight: 700,
+                    <span style={{ flex: '0 0 104px', textAlign: 'right', fontSize: '8px', fontWeight: 700,
                       letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted,#999)',
-                      paddingTop: '1px' }}>{f.k}</span>
+                      paddingTop: '3px' }}>{f.k}</span>
                     <span style={{ flex: 1, minWidth: 0, color: 'var(--text,#222)',
                       fontFamily: f.mono ? '"Courier New", monospace' : 'inherit' }}>{f.v}</span>
                   </div>
                 ))}
-
-                {/* derived pipeline stages this frame passed through */}
-                <div style={{ marginTop: '6px' }}>
-                  <Chip text="analyzed" tone="on" />
-                  {r.hashed && <Chip text="hashed" />}
-                  {r.sessioned && <Chip text="session" />}
-                  {r.is_duplicate && <Chip text="dup" title="burst duplicate" />}
-                  {partNos.length > 0 && <Chip text={`${partNos.length} part#`} tone="value" />}
-                  {r.match_status && r.match_status !== 'pending' && <Chip text={label(r.match_status)} />}
-                </div>
               </div>
             </div>
           );

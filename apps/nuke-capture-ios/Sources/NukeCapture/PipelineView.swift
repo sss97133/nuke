@@ -148,7 +148,7 @@ private struct FrameRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
-                    Text(row.vehicle ?? "Unknown vehicle").font(.subheadline.weight(.semibold))
+                    Text(row.vehicle ?? "Unknown vehicle").font(.headline)
                     Spacer()
                     Text(relativeAgo(row.landed_at)).font(.caption2.monospaced()).foregroundStyle(.secondary)
                 }
@@ -169,8 +169,6 @@ private struct FrameRow: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-
-                stageFlags
             }
         }
         .padding(.vertical, 10)
@@ -197,25 +195,6 @@ private struct FrameRow: View {
         return out.map { (key: $0.0, value: $0.1, mono: $0.2, accent: $0.3) }
     }
 
-    private var stageFlags: some View {
-        HStack(spacing: 4) {
-            flag("analyzed", on: true)
-            if row.hashed { flag("hashed", on: false) }
-            if row.sessioned { flag("session", on: false) }
-            if row.is_duplicate { flag("dup", on: false) }
-            if let m = row.match_status, m != "pending" { flag(pretty(m), on: false) }
-        }
-        .padding(.top, 2)
-    }
-
-    private func flag(_ text: String, on: Bool) -> some View {
-        Text(text.uppercased())
-            .font(.system(size: 8, weight: .bold)).tracking(0.5)
-            .padding(.horizontal, 4).padding(.vertical, 1)
-            .background(on ? Color.primary : Color.clear)
-            .foregroundStyle(on ? Color(.systemBackground) : .secondary)
-            .overlay(Rectangle().stroke(Color.secondary.opacity(0.4), lineWidth: on ? 0 : 1))
-    }
 
     private func pretty(_ s: String) -> String { s.replacingOccurrences(of: "_", with: " ") }
 }
