@@ -132,7 +132,11 @@ async function prepare() {
       .from('vehicle_images')
       .select('id, image_url, file_name, taken_at, created_at, source, ai_scan_metadata, latitude, longitude, location_name, exif_data, stale')
       .eq('vehicle_id', VEHICLE_ID)
-      .eq('vision_gate_status', 'approved')
+      // Match the GALLERY whitelist (null OR approved), not just approved. The vision gate
+      // stalled and left ~12k frames at null/pending — null-gate frames are SHOWN in the
+      // gallery but were never analyzed (browse → image with no data). Analyze what the
+      // gallery displays. Explicit rejects (rejected_personal/misattributed) stay excluded.
+      .or('vision_gate_status.is.null,vision_gate_status.eq.approved')
       .order('created_at', { ascending: true })
       .range(offset, offset + PAGE - 1);
     if (error) {
@@ -584,13 +588,14 @@ async function queue() {
   const approved = new Map();   // vehicle_id -> approved frame count
   const analyzed = new Map();   // vehicle_id -> frames already carrying a byok verdict
   const PAGE = 1000;
-  // Pass 1: all approved frames per vehicle. Pass 2: the subset already analyzed.
+  // Pass 1: all eligible frames per vehicle (gallery whitelist: null OR approved — see
+  // prepare()). Pass 2: the subset already analyzed.
   for (let offset = 0; ; offset += PAGE) {
     const { data, error } = await sb
       .from('vehicle_images')
       .select('vehicle_id')
       .eq('user_id', VEHICLE_USER)
-      .eq('vision_gate_status', 'approved')
+      .or('vision_gate_status.is.null,vision_gate_status.eq.approved')
       .not('vehicle_id', 'is', null)
       .order('vehicle_id', { ascending: true })
       .range(offset, offset + PAGE - 1);
@@ -604,7 +609,7 @@ async function queue() {
       .from('vehicle_images')
       .select('vehicle_id')
       .eq('user_id', VEHICLE_USER)
-      .eq('vision_gate_status', 'approved')
+      .or('vision_gate_status.is.null,vision_gate_status.eq.approved')
       .not('vehicle_id', 'is', null)
       .not('ai_scan_metadata->byok_deep_analysis', 'is', null)
       .order('vehicle_id', { ascending: true })
