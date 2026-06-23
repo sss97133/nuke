@@ -818,17 +818,21 @@ struct ProfileView: View {
     }
 
     /// Owner-only: load the server-side sync ledger. get_user_sync_status
-    /// returns a JSONB scalar — PostgREST array-wraps it, so decode
-    /// [SyncStatus] and take .first (same pattern as get_user_day_receipt).
+    /// RETURNS jsonb (a bare object, NOT a SETOF) — verified live 2026-06-23:
+    /// the wire payload is `{"synced_total":5275,...}`, not `[{...}]`. Decode
+    /// the object directly (same pattern as get_user_producer_signals /
+    /// get_user_understanding). The old `[SyncStatus].first` decode threw a
+    /// DecodingError on every load → the Sync section always showed its error
+    /// state while real data sat on the wire.
     private func loadSync() async {
         guard isOwn else { return }
         syncError = false
         do {
-            let rows: [SyncStatus] = try await SupabaseService.client
+            let status: SyncStatus = try await SupabaseService.client
                 .rpc("get_user_sync_status", params: ["p_user_id": userId])
                 .execute()
                 .value
-            sync = rows.first
+            sync = status
         } catch {
             syncError = true
             NSLog("NukeCapture sync status failed: %@", String(describing: error))
