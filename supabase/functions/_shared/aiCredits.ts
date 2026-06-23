@@ -62,7 +62,12 @@ export async function creditCents(
   const { error } = await supabase.from("ai_credit_ledger").insert({
     user_id: userId, entry_type: "topup", amount_cents: Math.round(cents), status: "closed", ref, metadata,
   });
-  if (error) throw new Error(`creditCents: ${error.message}`);
+  if (error) {
+    // 23505 = unique_violation on the partial UNIQUE(ref) topup index: a concurrent Stripe
+    // re-delivery already credited this event. Idempotent — treat as success, never double-credit.
+    if (error.code === "23505" || /duplicate key|unique constraint/i.test(error.message ?? "")) return;
+    throw new Error(`creditCents: ${error.message}`);
+  }
 }
 
 /**
@@ -93,10 +98,14 @@ export async function settleHold(
   supabase: any, userId: string, holdId: string, actualCents: number, metadata: Record<string, unknown> = {},
 ): Promise<void> {
   const charge = Math.max(0, Math.round(actualCents));
-  // Release the reservation.
-  const { error: relErr } = await supabase.from("ai_credit_ledger")
-    .update({ status: "closed" }).eq("id", holdId).eq("user_id", userId).eq("status", "open");
+  // Release the reservation. Capture which rows actually flipped open->closed: if none
+  // (a duplicate/replayed settle), the hold was already settled — return without inserting
+  // a second `settle` debit row (idempotent against double-debit).
+  const { data: released, error: relErr } = await supabase.from("ai_credit_ledger")
+    .update({ status: "closed" }).eq("id", holdId).eq("user_id", userId).eq("status", "open")
+    .select("id");
   if (relErr) throw new Error(`settleHold release: ${relErr.message}`);
+  if (!released || released.length === 0) return; // already settled/released — idempotent no-op
   if (charge > 0) {
     const { error } = await supabase.from("ai_credit_ledger").insert({
       user_id: userId, entry_type: "settle", amount_cents: -charge, hold_id: holdId, status: "closed",

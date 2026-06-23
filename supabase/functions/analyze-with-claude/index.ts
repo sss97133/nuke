@@ -106,6 +106,18 @@ Deno.serve(async (req) => {
       }, 429);
     }
 
+    if (result.serviceError) {
+      // The PLATFORM's own Anthropic account failed billing (e.g. empty balance). The
+      // user's wallet was NOT charged. This is an operator problem, not the user's — don't
+      // tell them to add funds; tell them it's temporarily unavailable.
+      return json({
+        ok: false,
+        serviceError: result.serviceError,
+        error: "ai_unavailable",
+        error_description: "AI is temporarily unavailable (platform is topping up). Your balance was not charged — please retry shortly.",
+      }, 503);
+    }
+
     if (!result.ok) {
       return json({ ok: false, source: result.source, status: result.status, body: result.body }, 502);
     }
