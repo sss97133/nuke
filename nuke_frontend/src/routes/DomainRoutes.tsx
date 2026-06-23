@@ -94,6 +94,7 @@ const SettingsHubPage = React.lazy(() => import('../pages/settings/SettingsHubPa
 const ApiKeysPage = React.lazy(() => import('../pages/settings/ApiKeysPage'));
 const ConnectedAgentsPage = React.lazy(() => import('../pages/settings/ConnectedAgentsPage'));
 const AnalysisSettingsPage = React.lazy(() => import('../pages/settings/AnalysisSettingsPage'));
+const PipelineVisualizer = React.lazy(() => import('../pages/PipelineVisualizer'));
 const WebhooksPage = React.lazy(() => import('../pages/settings/WebhooksPage'));
 const UsageDashboardPage = React.lazy(() => import('../pages/settings/UsageDashboardPage'));
 const DevelopersPage = React.lazy(() => import('../pages/developers'));
@@ -262,6 +263,7 @@ export const DomainRoutes = () => {
             <Route path="/settings/api-keys" element={<ApiKeysPage />} />
             <Route path="/settings/connected-agents" element={<ConnectedAgentsPage />} />
             <Route path="/settings/analysis" element={<AnalysisSettingsPage />} />
+            <Route path="/pipeline/analysis" element={<PipelineVisualizer />} />
             <Route path="/settings/webhooks" element={<WebhooksPage />} />
             <Route path="/settings/usage" element={<UsageDashboardPage />} />
             <Route path="/developers/dashboard" element={<DeveloperDashboard />} />
