@@ -1,0 +1,12 @@
+-- 20260623090000_get_class_stratified_price_v1.sql
+-- Applied to prod 2026-06-23 via apply_migration (mirrors live). WIRE #2 (v1) of the
+-- build-class unlock: prices a vehicle against comps of its OWN build class instead of
+-- the class-blind cohort median — producing comp_method='class_stratified', the value
+-- iOS isThin waits for. Reads nuke_build_class per cohort member (ok for year-grain;
+-- materialize build_class for model-grain scale, and before wiring into the hot iOS
+-- read path get_vehicle_valuation). Honest blocks: unknown subject class, or < 5
+-- class-matched priced comps => 'blocked', never a guessed number.
+-- Validated: K5 e08bf694 -> class_stratified, $30,050 from 6 build comps (was $112k
+-- stock-comp model / blocked). Full body is authoritative in prod (pg_get_functiondef).
+-- See docs/features/build-class-valuation-unlock.md + build-class-comp-vision-prompt.md.
+-- (Body identical to the deployed get_class_stratified_price(uuid); pull live def to resync.)
