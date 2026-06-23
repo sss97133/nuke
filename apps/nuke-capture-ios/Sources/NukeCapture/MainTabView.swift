@@ -1,22 +1,24 @@
-// MainTabView.swift — the app: PROFILE · TODAY.
+// MainTabView.swift — the app spine: EXPLORE · PROFILE · TODAY.
 //
-// The 1.0 Jobs cut (2026-06-11): the app does ONE thing — your photos
-// develop into your record. Two tabs, one story:
+// Three tabs, left to right:
 //
-//   PROFILE  always — own record signed in, the sample profile in explore
-//            mode; other profiles via handle search either way. First tab:
-//            the app lands on YOUR record (receipt-first ruling).
-//   TODAY    only when signed in AND the photo grant exists — the capture
-//            gauge + the pause toggle (the consent surface)
+//   EXPLORE  the front door (LEFTMOST). The populated world of vehicles + the
+//            cohort market terminal — reachable signed-out, no wall. An anon
+//            visitor lands here; "not signing in" is never a dead end (Sign In
+//            lives in the Profile toolbar). Explore being the leftmost tab makes
+//            the front-door ruling STRUCTURAL, not a selection trick — the cure
+//            for "dumped in my back office / there's no actual exploring."
+//   PROFILE  the owner's record (own when signed in, the sample in explore
+//            mode); other profiles via handle search. Receipt-first: a
+//            signed-in owner's FIRST landing is still their own record.
+//   TODAY    only when signed in AND the photo grant exists — the capture gauge
+//            + pause toggle (the consent surface) and the live-analysis
+//            worklight. Conditional BY DESIGN (no upload button; the gauge is
+//            the consent surface) — not a bug to "fix" by always-showing it.
 //
-// MAP is cut from 1.0 — a directory of strangers diluted the story. It
-// returns in Build 2 as the pulse map, a window onto analysis
-// (BUILD_2_SCOPE.md §5). MapTab.swift was REMOVED (dead-shipping, unreachable);
-// recover it from git when Build 2 actually needs it.
-//
-// Explore mode (signed out): sample Profile, read-only. Sign In lives in
-// the Profile toolbar so not-signing-in is never a dead end and the way
-// back in is always one tap.
+// MAP stays cut from 1.0 — it returns in Build 2 as the pulse map
+// (BUILD_2_SCOPE.md §5); Explore is its 1.0 stand-in. Recover MapTab from git
+// when Build 2 needs it.
 
 import Photos
 import SwiftUI
@@ -32,15 +34,16 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $tab) {
-            profileTab
-                .tag(Tab.profile)
-                .tabItem { Label("Profile", systemImage: "person") }
-
-            // EXPLORE — the FRONT DOOR for a signed-out visitor: open the app
-            // already exploring vehicles, never staring at a stranger's day log.
+            // EXPLORE — the FRONT DOOR (leftmost): open the app already in the
+            // populated world + the cohort market terminal, never dumped in the
+            // back-office Profile. The anon spine reads explore-first.
             ExploreView()
                 .tag(Tab.explore)
                 .tabItem { Label("Explore", systemImage: "magnifyingglass") }
+
+            profileTab
+                .tag(Tab.profile)
+                .tabItem { Label("Profile", systemImage: "person") }
 
             if session.isSignedIn && photoGrant {
                 TodayView()

@@ -58,6 +58,10 @@ struct NukeCaptureApp: App {
                     // NUKE_DEBUG_COHORT="year|make|model" roots on the cohort terminal
                     // so the screenshot loop lands on it without tab/tap navigation.
                     DebugCohortDeepLink(spec: dbgCohort)
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "app" {
+                    DebugAppDeepLink()
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "profile" {
+                    DebugProfileDeepLink()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "today" {
                     DebugTodayDeepLink()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "signdays" {
@@ -322,6 +326,56 @@ private struct DebugScreenDeepLink: View {
         Group {
             if ready {
                 NavigationStack { WorkDaySignView() }
+            } else {
+                Color(.systemBackground).overlay { ProgressView() }
+            }
+        }
+        .task {
+            let env = ProcessInfo.processInfo.environment
+            if let at = env["NUKE_DEBUG_ACCESS_TOKEN"], !at.isEmpty,
+               let rt = env["NUKE_DEBUG_REFRESH_TOKEN"], !rt.isEmpty,
+               SupabaseService.currentUserId == nil {
+                _ = try? await SupabaseService.client.auth.setSession(accessToken: at, refreshToken: rt)
+            }
+            ready = true
+        }
+    }
+}
+
+/// Screenshot-loop deep link for the full app shell (bottom nav + landing).
+/// NUKE_DEBUG_SCREEN=app → injects the owner session, then shows MainTabView so the
+/// loop sees the real tab bar (EXPLORE leftmost) + receipt-first landing. DEBUG only.
+private struct DebugAppDeepLink: View {
+    @State private var ready = false
+    var body: some View {
+        Group {
+            if ready {
+                MainTabView()
+            } else {
+                Color(.systemBackground).overlay { ProgressView() }
+            }
+        }
+        .task {
+            let env = ProcessInfo.processInfo.environment
+            if let at = env["NUKE_DEBUG_ACCESS_TOKEN"], !at.isEmpty,
+               let rt = env["NUKE_DEBUG_REFRESH_TOKEN"], !rt.isEmpty,
+               SupabaseService.currentUserId == nil {
+                _ = try? await SupabaseService.client.auth.setSession(accessToken: at, refreshToken: rt)
+            }
+            ready = true
+        }
+    }
+}
+
+/// Screenshot-loop deep link for the owner's PROFILE (the fleet headline + garage).
+/// NUKE_DEBUG_SCREEN=profile → injects the owner session, then shows ProfileTab on
+/// the owner so the maker's fleet worth/labor headline renders. DEBUG only.
+private struct DebugProfileDeepLink: View {
+    @State private var ready = false
+    var body: some View {
+        Group {
+            if ready {
+                ProfileTab(ownUserId: SupabaseService.currentUserId, onSignIn: nil)
             } else {
                 Color(.systemBackground).overlay { ProgressView() }
             }
