@@ -63,6 +63,8 @@ struct VehicleGalleryImage: Decodable, Identifiable {
     let taken_at: String?
     let labels: [String]?      // 'scene:x' / 'phase:y' / 'intent:z' + components
     let ai_processing_status: String?
+    let image_category: String?  // vision: exterior_body / interior / documentation / engine_mechanical…
+    let created_at: String?      // upload time — recency fallback when EXIF taken_at is null
 }
 
 // SALE HISTORY — real sale events from vehicle_timeline_events (same table the build-days
@@ -285,8 +287,12 @@ struct VehicleDetailView: View {
             if embedInNavigationStack {
                 NavigationStack {
                     content
-                        .navigationTitle("Vehicle")
+                        // No generic "Vehicle" title + a transparent nav background:
+                        // the living header IS the title now, and the translucent
+                        // system bar was the plane the hero+chips ghosted through.
+                        // Done/Share ride their own glass over the hero.
                         .navigationBarTitleDisplayMode(.inline)
+                        .toolbarBackground(.hidden, for: .navigationBar)
                         .toolbar {
                             ToolbarItem(placement: .topBarLeading) {
                                 Button("Done") { dismiss() }
@@ -303,8 +309,8 @@ struct VehicleDetailView: View {
                 }
             } else {
                 content
-                    .navigationTitle("Vehicle")
                     .navigationBarTitleDisplayMode(.inline)
+                    .toolbarBackground(.hidden, for: .navigationBar)
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) { shareButton }
                     }
@@ -426,15 +432,7 @@ struct VehicleDetailView: View {
                                                value: geo.frame(in: .named("vdscroll")).minY)
                     }
                     .frame(height: 0)
-                    BuildStoryHero(
-                        imageURL: heroImage?.image_url ?? vehicle?.primary_image_url,
-                        year: vehicle?.year, make: vehicle?.make,
-                        model: vehicle?.model, trim: vehicle?.trim,
-                        takenAt: heroImage?.taken_at,
-                        loaded: loaded,
-                        onTap: { if let h = heroImage { selectedPhoto = h } else { galleryOpen = true } },
-                        onDrillCohort: cohortDrillAction()
-                    )
+                    heroLayer        // BuildStoryHero — parallaxed, faded + CLIPPED under the living bar
                     loadState            // loading / error (only while the header is absent)
                     liveAuctionBanner    // LIVE — server-arbitrated bid + countdown (only when live)
                     buildInstrument      // ONE instrument: the build barcode (collapsed) ⇄ the
@@ -456,11 +454,8 @@ struct VehicleDetailView: View {
             }
             .background(pageBackground.ignoresSafeArea())
             .coordinateSpace(name: "vdscroll")
-            .onPreferenceChange(VDScrollKey.self) { y in
-                let c = y < -220   // hero (~240pt) has scrolled past the top
-                if c != collapsed { withAnimation(.snappy(duration: 0.2)) { collapsed = c } }
-            }
-            .overlay(alignment: .top) { stickyHeader }
+            .onPreferenceChange(VDScrollKey.self) { y in scrollY = y }   // raw offset → the collapse fraction
+            .overlay(alignment: .top) { livingHeader }
             // Identity chip → the vehicle's market cohort, PUSHED (native back
             // chevron) so it's part of the navigable system, not a dead-end sheet.
             .navigationDestination(item: $cohortTarget) { c in
@@ -475,7 +470,7 @@ struct VehicleDetailView: View {
                 // Force the collapsed living header for deterministic capture.
                 if ProcessInfo.processInfo.environment["NUKE_DEBUG_COLLAPSED"] == "1" {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                        withAnimation { collapsed = true }
+                        withAnimation { scrollY = -300 }   // drives collapse→1 (collapsed is now derived)
                     }
                 }
                 if let target = debugScrollTarget {
@@ -503,6 +498,29 @@ struct VehicleDetailView: View {
     // Hero, barcode and the photo grid keep their full-bleed; only the cards float.
     private var pageBackground: Color { Color(.systemGroupedBackground) }
 
+    // The hero transformed by the continuous `collapse` fraction so it condenses
+    // INTO the living bar instead of scrolling under a translucent nav bar. Three
+    // stacked guarantees against ghosting: it fades out, and its drawable window
+    // CLIPS from 300→0 (past that edge there's no hero pixel to show through), while
+    // a slow parallax dissolves it into the bar plane. BuildStoryHero is unchanged —
+    // we only transform its rendered output.
+    @ViewBuilder private var heroLayer: some View {
+        BuildStoryHero(
+            imageURL: heroImage?.image_url ?? vehicle?.primary_image_url,
+            year: vehicle?.year, make: vehicle?.make,
+            model: vehicle?.model, trim: vehicle?.trim,
+            takenAt: heroImage?.taken_at,
+            loaded: loaded,
+            onTap: { if let h = heroImage { selectedPhoto = h } else { galleryOpen = true } },
+            onDrillCohort: cohortDrillAction()
+        )
+        .offset(y: collapse * -60)                              // parallax: dissolve into the bar, don't race past
+        .opacity(Double(1 - collapse))                         // hero (+ its chips) gone before the bar reads
+        .frame(height: 300 * (1 - collapse), alignment: .top)  // HARD guarantee: window shrinks to 0
+        .clipped()
+        .allowsHitTesting(collapse < 0.5)                      // taps go to the bar once it leads
+    }
+
     // ─── Hero — sized render thumb (NOT the raw original), tap → full gallery.
     // The hero is a 240pt strip, not a full-screen view, so it must NOT load the
     // raw object url: measured, that was a 2.9 MB decode on the main thread per
@@ -510,14 +528,23 @@ struct VehicleDetailView: View {
     // only in the full-screen gallery (tap the hero to get there).
     /// The hero's backing image ROW (not just a url) so the lead can drill into
     /// the data that made it — its analysis cascade — and carry its date (decay).
-    /// The single source of truth for the hero — both the image AND its date badge
-    /// read from this, so they can never disagree. The hero is the LATEST owner photo
-    /// (a build's current state — the lead-is-latest rule). is_primary is deliberately
-    /// NOT the lead here: the pipeline keeps resetting it to an older frame (observed
-    /// stuck on a May photo while June work exists), which is exactly the staleness
-    /// this view exists to kill.
+    /// Single source of truth for the hero: image AND date badge read from this so
+    /// they can never disagree.
+    ///
+    /// The lead is the TRUCK, not a document. Two failures produced a data-plate hero:
+    /// (1) is_primary is drift-prone (pipeline resets it to a stale frame), so it's not
+    /// used; (2) "latest by taken_at" sounds right but taken_at is sparse EXIF — recent
+    /// June photos have none, so a deliberately-shot VIN plate with a 2026-02-01 EXIF
+    /// kept winning. Fix: a document/plate is acquisition evidence, never the title card
+    /// (drop the `documentation` category); lead with the latest EXTERIOR_BODY shot (the
+    /// build's current face); recency falls back to created_at so sparse EXIF can't skew it.
     private var heroImage: VehicleGalleryImage? {
-        images.max { ($0.taken_at ?? "") < ($1.taken_at ?? "") }
+        func recency(_ i: VehicleGalleryImage) -> String { i.taken_at ?? i.created_at ?? "" }
+        func latest(_ xs: [VehicleGalleryImage]) -> VehicleGalleryImage? { xs.max { recency($0) < recency($1) } }
+        let candidates = images.filter { $0.image_category != "documentation" }   // never lead with a plate
+        return latest(candidates.filter { $0.image_category == "exterior_body" }) // the truck itself
+            ?? latest(candidates.filter { $0.image_category != nil })             // any categorized vehicle photo
+            ?? latest(candidates)                                                 // latest non-document
             ?? images.first
     }
 
@@ -1034,52 +1061,65 @@ struct VehicleDetailView: View {
     // ─── BaT-style sticky header — once the hero scrolls away, the identity
     // compresses into a pinned bar: name · barcode · worth. Driven by `collapsed`,
     // set from the scroll-offset probe at the top of `content`.
-    @State private var collapsed = false
+    // Continuous collapse: a 0→1 fraction from the live scroll offset drives the
+    // hero's fade+clip AND the living header's growth in exact lockstep — no binary
+    // snap, no dead-zone where chips have left the hero but the bar hasn't covered
+    // them yet (the old `y < -220` failure). `collapsed` survives as a derived bool.
+    @State private var scrollY: CGFloat = 0          // raw minY in "vdscroll" (≤ 0 as the hero rises)
+    private var collapseStart: CGFloat { 120 }       // px scrolled before the condense begins
+    private var collapseEnd:   CGFloat { 240 }       // fully condensed (≈ the 300pt hero)
+    private var collapse: CGFloat {                  // 0 (hero full) → 1 (bar condensed), eased
+        let raw = (-scrollY - collapseStart) / (collapseEnd - collapseStart)
+        let t = min(max(raw, 0), 1)
+        return t * t * (3 - 2 * t)                   // smoothstep — no linear edge snap
+    }
+    private var collapsed: Bool { collapse > 0.5 }   // derived — for the bits that read a bool
+    // Measured collapsed height: one identity line (~24) + barcode spine (13) + paddings.
+    private var condensedBarHeight: CGFloat { days.isEmpty ? 42 : 60 }
 
     struct VDScrollKey: PreferenceKey {
         static var defaultValue: CGFloat = 0
         static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
     }
 
-    // ─── The LIVING header. Once the hero scrolls away, the identity compresses
-    // into a pinned glass bar that keeps the vehicle's vital signs in view while
-    // the user browses its images: name · barcode sliver · the activity PULSE
-    // (weighed-in · following · contributions · est). The pulse is typed signals
-    // (VehiclePulse) — only signals with REAL backing data render; viewers/bids are
-    // defined but stay dark until their systems land (the "storm"), never faked.
-    @ViewBuilder private var stickyHeader: some View {
-        if collapsed, let v = vehicle {
-            // Two layers on the SAME glass: the identity line (whole title — NEVER
-            // truncated — + pulse), and the full-width barcode SPINE flush beneath.
-            // The barcode is the constant thread; it never loses width. No foreign
-            // field — empties read faintly on the glass, so it survives mode/colorway.
+    // ─── The LIVING header. ALWAYS mounted; the continuous `collapse` fraction grows
+    // it from nothing and crossfades the identity + dynamic pulse in as the hero
+    // leaves. Opaque `.bar` glass occupies the top band the instant any hero pixel
+    // would arrive — that, plus the hero's own clip+fade and the hidden system nav
+    // background, is why nothing ghosts. Dynamic by STATE: when an auction is live the
+    // bid leads the pulse, else the market estimate; identity never truncates (scales
+    // to one line). Tap → the thread (today: comments).
+    @ViewBuilder private var livingHeader: some View {
+        if let v = vehicle {
             VStack(spacing: 5) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(v.title)
+                    Text(v.title)                       // identity — one line, NEVER truncated
                         .font(.subheadline.weight(.semibold))
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .layoutPriority(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    PulseStrip(signals: pulseSignals)
+                    PulseStrip(signals: pulseSignals)   // dynamic metric — bid leads when live, else estimate
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
 
                 if !days.isEmpty {
-                    BuildBarcode(days: days, height: 13)
+                    BuildBarcode(days: days, height: 13)  // the constant spine
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 7)
                 }
             }
             .frame(maxWidth: .infinity)
-            .background(.regularMaterial)
-            .overlay(alignment: .bottom) { Divider() }
+            .opacity(Double(collapse))                  // content crossfades with the hero
+            .frame(height: collapse * condensedBarHeight, alignment: .top)
+            .clipped()
+            .background(.bar)                            // truly opaque — the occlusion guarantee
+            .overlay(alignment: .bottom) { Divider().opacity(Double(collapse)) }
             .contentShape(Rectangle())
-            // Everything is a button: the living bar drills to the thread (the
-            // primary live action today). Scroll-to-top can graft on later.
-            .onTapGesture { showComments = true }
-            .transition(.move(edge: .top).combined(with: .opacity))
+            .onTapGesture { showComments = true }        // DRILL preserved: bar → thread
+            .allowsHitTesting(collapse > 0.5)            // inert until it leads
         }
     }
 
@@ -1387,7 +1427,7 @@ struct VehicleDetailView: View {
         do {
             let page: [VehicleGalleryImage] = try await SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at")
                 .eq("vehicle_id", value: vehicleId)
                 .in("ai_processing_status", values: ["completed", "analyzed"])
                 .not("taken_at", operator: .is, value: "null")
@@ -1585,7 +1625,7 @@ struct VehicleDetailView: View {
         do {
             let rows: [VehicleGalleryImage] = try await SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at")
                 .eq("id", value: id.uuidString.lowercased())
                 .limit(1).execute().value
             return rows.first
@@ -1696,7 +1736,8 @@ private struct FullScreenGalleryView: View {
     init(images: [String]) {
         self.init(photos: images.map {
             VehicleGalleryImage(id: UUID(), image_url: $0, thumbnail_url: nil, is_primary: nil,
-                                taken_at: nil, labels: nil, ai_processing_status: nil)
+                                taken_at: nil, labels: nil, ai_processing_status: nil,
+                                image_category: nil, created_at: nil)
         })
     }
 
