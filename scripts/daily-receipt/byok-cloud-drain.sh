@@ -85,18 +85,32 @@ if [ "${#VEH[@]}" -eq 0 ]; then
 fi
 log "queue: ${#VEH[@]} vehicles; time budget ${MINUTES}m, batch ${BATCH}, model ${BYOK_MODEL:-claude-sonnet-4-6}"
 
+# Round-robin across vehicles: ONE batch per vehicle per pass, cycling until the time
+# budget runs out or every vehicle is drained. Biggest-first (drain each vehicle fully
+# before the next) starved breadth — one big vehicle hogged whole runs while 100+ stayed
+# at 0% and showed empty when browsed. Rotating one batch each spreads coverage fast.
 did=0
-for vid in "${VEH[@]}"; do
-  while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+declare -A DRAINED=()
+while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+  progressed=0
+  for vid in "${VEH[@]}"; do
+    [ "$(date +%s)" -ge "$DEADLINE" ] && break
+    [ -n "${DRAINED[$vid]:-}" ] && continue
     bash "$HERE/byok-image-batch.sh" "$vid" "$BATCH"; rc=$?
     case "$rc" in
-      3) break ;;                                   # vehicle drained → next vehicle
-      1) log "transient on ${vid:0:8} — backoff 10s, retry"; sleep 10 ;;   # network blip; never skip
-      *) did=$((did + 1)) ;;                         # did real work; keep going on this vehicle
+      3) DRAINED[$vid]=1 ;;                              # vehicle drained → drop from rotation
+      1) log "transient on ${vid:0:8} — backoff 10s, retry next pass"; sleep 10 ;;
+      *) did=$((did + 1)); progressed=1 ;;              # did real work; rotate to next vehicle
     esac
   done
   if [ "$(date +%s)" -ge "$DEADLINE" ]; then
     log "time budget reached — stopping (next scheduled run resumes; analysis is idempotent)"; break
   fi
+  # Stop early only when every vehicle is drained (no undrained left).
+  if [ "$progressed" -eq 0 ]; then
+    remaining=0
+    for vid in "${VEH[@]}"; do [ -z "${DRAINED[$vid]:-}" ] && remaining=$((remaining + 1)); done
+    [ "$remaining" -eq 0 ] && { log "all vehicles drained this run"; break; }
+  fi
 done
-log "done: $did batches analyzed this run"
+log "done: $did batches analyzed this run (round-robin, breadth-first)"

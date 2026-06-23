@@ -581,8 +581,10 @@ async function buildContext() {
 async function queue() {
   const VEHICLE_USER = arg('--user-id');
   if (!VEHICLE_USER) { console.error('queue: --user-id required'); process.exit(1); }
-  const counts = new Map();
+  const approved = new Map();   // vehicle_id -> approved frame count
+  const analyzed = new Map();   // vehicle_id -> frames already carrying a byok verdict
   const PAGE = 1000;
+  // Pass 1: all approved frames per vehicle. Pass 2: the subset already analyzed.
   for (let offset = 0; ; offset += PAGE) {
     const { data, error } = await sb
       .from('vehicle_images')
@@ -594,10 +596,38 @@ async function queue() {
       .range(offset, offset + PAGE - 1);
     if (error) { console.error(`queue: ${error.message}`); process.exit(1); }
     if (!data || data.length === 0) break;
-    for (const r of data) counts.set(r.vehicle_id, (counts.get(r.vehicle_id) || 0) + 1);
+    for (const r of data) approved.set(r.vehicle_id, (approved.get(r.vehicle_id) || 0) + 1);
     if (data.length < PAGE) break;
   }
-  for (const [vid] of [...counts.entries()].sort((a, b) => b[1] - a[1])) console.log(vid);
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await sb
+      .from('vehicle_images')
+      .select('vehicle_id')
+      .eq('user_id', VEHICLE_USER)
+      .eq('vision_gate_status', 'approved')
+      .not('vehicle_id', 'is', null)
+      .not('ai_scan_metadata->byok_deep_analysis', 'is', null)
+      .order('vehicle_id', { ascending: true })
+      .range(offset, offset + PAGE - 1);
+    // Non-fatal: if this filter is rejected, fall back to pending-desc ordering rather
+    // than killing the drain (an empty `analyzed` map just means everyone reads as 0).
+    if (error) { console.error(`queue: analyzed-count pass skipped (${error.message})`); break; }
+    if (!data || data.length === 0) break;
+    for (const r of data) analyzed.set(r.vehicle_id, (analyzed.get(r.vehicle_id) || 0) + 1);
+    if (data.length < PAGE) break;
+  }
+  // Coverage-first: vehicles with the FEWEST analyzed frames lead, so zero-coverage cars
+  // (empty when browsed) get a verdict before fully-drained ones. Tiebreak by pending desc
+  // (more undone work first), then by id for stability. Combined with the drain's round-robin
+  // loop, every vehicle gets a batch fast instead of one big car hogging the run.
+  const order = [...approved.keys()].sort((a, b) => {
+    const da = analyzed.get(a) || 0, db = analyzed.get(b) || 0;
+    if (da !== db) return da - db;                       // least-analyzed first
+    const pa = (approved.get(a) || 0) - da, pb = (approved.get(b) || 0) - db;
+    if (pa !== pb) return pb - pa;                        // most pending first
+    return a < b ? -1 : 1;
+  });
+  for (const vid of order) console.log(vid);
 }
 
 // resolve: print the user's chosen compute as shell-exportable lines. This is the
