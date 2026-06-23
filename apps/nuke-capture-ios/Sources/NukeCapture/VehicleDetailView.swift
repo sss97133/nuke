@@ -489,6 +489,12 @@ struct VehicleDetailView: View {
                 if ProcessInfo.processInfo.environment["NUKE_DEBUG_PUSH_COHORT"] == "1" {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { cohortDrillAction()?() }
                 }
+                // Auto-open the calendar day-drill on the richest day — verify it renders + fetches.
+                if ProcessInfo.processInfo.environment["NUKE_DEBUG_DAYDRILL"] == "1" {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {
+                        dayDrill = days.max { ($0.photos + $0.work) < ($1.photos + $1.work) }
+                    }
+                }
             }
             #endif
         }
@@ -2208,10 +2214,57 @@ struct InvestmentProofView: View {
         return v.formatted(.currency(code: "USD").precision(.fractionLength(0)))
     }
 
+    /// WHERE IT STANDS — the asset's independent value veins side by side, ahead
+    /// of the ledger. PROVEN (receipts + confirmed labor) is hard fact; MARKET
+    /// (the modeled comp estimate) is its own vein. Neither is derived from the
+    /// other, and neither is a verdict on the build — comps don't price a build,
+    /// and the proven floor is simply what's documented into it. Honest dark
+    /// states: "—" when nothing is proven yet, "not priced" when comps can't.
+    @ViewBuilder private func standHeader(_ p: InvestmentProof) -> some View {
+        let proven = p.totals.invested_proven ?? 0
+        let market = p.market.value ?? 0
+        if proven > 0 || market > 0 {
+            HStack(alignment: .top, spacing: 12) {
+                standCell("PROVEN IN",
+                          proven > 0 ? money(proven) : "—",
+                          "receipts · hard", emphasized: true)
+                Divider().frame(height: 38)
+                standCell("MARKET EST",
+                          market > 0 ? money(market) : "not priced",
+                          market > 0 ? (p.market.confidence ?? "modeled") : "needs comps",
+                          emphasized: false)
+            }
+            .padding(.top, 8).padding(.bottom, 10)
+            Divider().overlay(Color.primary.opacity(0.3))
+        }
+    }
+
+    @ViewBuilder private func standCell(_ title: String, _ value: String, _ sub: String,
+                                        emphasized: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(Color.secondary)
+            Text(value)
+                .font(.system(.title3, design: .monospaced))
+                .fontWeight(.semibold)
+                .foregroundStyle(emphasized ? Color.primary : Color.secondary)
+                .lineLimit(1).minimumScaleFactor(0.7)
+            Text(sub)
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(Color.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     var body: some View {
         Group {
             if let p = proof {
                 VStack(alignment: .leading, spacing: 0) {
+                    // WHERE IT STANDS — lead with the independent veins at a glance
+                    // (proven floor vs modeled market), then the detail beneath.
+                    standHeader(p)
+
                     // NEEDS YOU — the confirmable queue, made discoverable. Owner
                     // only. The owner's signature turns projected into proven, so
                     // surface it as the section's call-to-action instead of
