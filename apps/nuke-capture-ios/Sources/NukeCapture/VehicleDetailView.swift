@@ -2229,9 +2229,13 @@ struct InvestmentProofView: View {
                           proven > 0 ? money(proven) : "—",
                           "receipts · hard", emphasized: true)
                 Divider().frame(height: 38)
-                standCell("MARKET EST",
+                // Honest: the comp model is stock/cohort comps, NOT this build's
+                // defensible price — the app blocks it as a build valuation (isThin)
+                // until comps are class-stratified. Shown as dim reference, never a
+                // co-equal verdict to the documented PROVEN figure.
+                standCell("MARKET (COMPS)",
                           market > 0 ? money(market) : "not priced",
-                          market > 0 ? (p.market.confidence ?? "modeled") : "needs comps",
+                          market > 0 ? "stock comps · not build-priced" : "needs comps",
                           emphasized: false)
             }
             .padding(.top, 8).padding(.bottom, 10)
@@ -2327,7 +2331,7 @@ struct InvestmentProofView: View {
                     Divider().overlay(Color.primary.opacity(0.3)).padding(.vertical, 4)
 
                     line("Labor (projected)", p.projected.labor.value,
-                         sub: "\(p.projected.labor.count ?? 0) sessions · tap to confirm", dim: true,
+                         sub: "photo-documented activity · \(p.projected.labor.confidence ?? "projection")", dim: true,
                          onTap: drill("Labor", .labor, p.audit?.work_sessions))
                     line("Market est.", p.market.value, sub: p.market.confidence ?? "", dim: true)
 
