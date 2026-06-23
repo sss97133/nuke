@@ -21,10 +21,12 @@ set -u
 cd "$(dirname "$0")/../.." || exit 1
 HERE="$(dirname "$0")"
 
-USER_ID="${1:?usage: byok-cloud-drain.sh <user-id> [batch_size] [minutes] [vehicle_id]}"
+USER_ID="${1:?usage: byok-cloud-drain.sh <user-id> [batch_size] [minutes] [vehicle_id] [shard_count] [shard_index]}"
 BATCH="${2:-12}"
 MINUTES="${3:-45}"
 ONLY_VEHICLE="${4:-}"
+SHARD_COUNT="${5:-1}"   # parallel drain: split the fleet across N runners
+SHARD_INDEX="${6:-0}"   # which slice THIS runner owns (0..N-1)
 DEADLINE=$(( $(date +%s) + MINUTES * 60 ))
 log(){ echo "$(date -u '+%F %T') | cloud-drain | $*"; }
 
@@ -82,6 +84,27 @@ fi
 
 if [ "${#VEH[@]}" -eq 0 ]; then
   log "vehicle queue empty or query failed — abort (NOT a drain)"; exit 1
+fi
+
+# Vehicle-level sharding for a PARALLEL drain. A single serial run only reaches the head
+# of a long least-analyzed-first queue inside its time budget, so the tail starved —
+# zero-coverage vehicles sat at 0% (measured: 19 of the owner's vehicles, 961 frames,
+# never analyzed) while the drain re-chewed the front. Splitting the queue across N
+# parallel matrix shards (each a separate runner) lets pass-1 finish for EVERY vehicle.
+# Each shard owns disjoint WHOLE vehicles (hash of id % N), so no frame is analyzed twice
+# and byok-image-batch keeps its per-vehicle day cursor. Order (least-analyzed-first) is
+# preserved within the shard. Targeted single-vehicle runs land on exactly one shard.
+if [ "$SHARD_COUNT" -gt 1 ]; then
+  SHARDED=()
+  for vid in "${VEH[@]}"; do
+    h=$(printf '%s' "$vid" | md5sum | cut -c1-8)
+    [ $(( 0x$h % SHARD_COUNT )) -eq "$SHARD_INDEX" ] && SHARDED+=("$vid")
+  done
+  VEH=("${SHARDED[@]}")
+  if [ "${#VEH[@]}" -eq 0 ]; then
+    log "shard ${SHARD_INDEX}/${SHARD_COUNT}: no vehicles in this slice — nothing to do"; exit 0
+  fi
+  log "shard ${SHARD_INDEX}/${SHARD_COUNT}: ${#VEH[@]} of the fleet's vehicles"
 fi
 log "queue: ${#VEH[@]} vehicles; time budget ${MINUTES}m, batch ${BATCH}, model ${BYOK_MODEL:-claude-sonnet-4-6}"
 

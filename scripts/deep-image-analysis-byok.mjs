@@ -130,7 +130,7 @@ async function prepare() {
   for (let offset = 0; ; offset += PAGE) {
     const { data, error } = await sb
       .from('vehicle_images')
-      .select('id, image_url, file_name, taken_at, created_at, source, ai_scan_metadata, latitude, longitude, location_name, exif_data, stale')
+      .select('id, user_id, image_url, file_name, taken_at, created_at, source, ai_scan_metadata, latitude, longitude, location_name, exif_data, stale')
       .eq('vehicle_id', VEHICLE_ID)
       // Match the GALLERY whitelist (null OR approved), not just approved. The vision gate
       // stalled and left ~12k frames at null/pending — null-gate frames are SHOWN in the
@@ -250,6 +250,22 @@ async function prepare() {
     }),
   );
   writeFileSync(WORKLIST, lines.join('\n') + '\n');
+  // Live feed: these frames are now in flight — emit an 'analyzing' stage per frame so
+  // the pipeline visualizer (analysis_events → get_pipeline_events) shows the journey as
+  // it happens, not after. Guarded: telemetry must never block the drain.
+  try {
+    const analyzingEvents = pending.map((r) => ({
+      user_id: r.user_id ?? null,
+      vehicle_id: VEHICLE_ID,
+      image_id: r.id,
+      stage: 'analyzing',
+      detail: { day: dayOf(r), source: r.source ?? null },
+    }));
+    if (analyzingEvents.length) {
+      const { error: aerr } = await sb.from('analysis_events').insert(analyzingEvents);
+      if (aerr) console.error(`  (non-fatal) analysis_events analyzing insert: ${aerr.message}`);
+    }
+  } catch (e) { console.error(`  (non-fatal) analyzing emit: ${e.message}`); }
   if (chosenDay) {
     writeFileSync(`${WORKLIST}.date`, chosenDay + '\n');
     const remaining = (pendingAll.filter((r) => dayOf(r) === chosenDay).length) - pending.length;
@@ -281,6 +297,7 @@ async function ingest() {
   const lines = readFileSync(SINK, 'utf-8').split('\n').filter(Boolean);
   let wrote = 0, failed = 0;
   const now = new Date().toISOString();
+  const landedEvents = []; // live pipeline feed (analysis_events) — collected, inserted once, guarded
 
   for (const line of lines) {
     let v;
@@ -298,7 +315,7 @@ async function ingest() {
     // Merge new analysis into existing ai_scan_metadata.byok_deep_analysis
     const { data: imgRow } = await sb
       .from('vehicle_images')
-      .select('ai_scan_metadata')
+      .select('ai_scan_metadata, user_id')
       .eq('id', v.image_id)
       .maybeSingle();
     const existingMeta = (imgRow?.ai_scan_metadata) || {};
@@ -450,8 +467,29 @@ async function ingest() {
     }
 
     wrote++;
+    // Live feed: this frame's verdict just landed — the "money hitting the account"
+    // moment. Record it for the pipeline visualizer (analysis_events).
+    landedEvents.push({
+      user_id: imgRow?.user_id ?? null,
+      vehicle_id: v.vehicle_id,
+      image_id: v.image_id,
+      stage: 'verdict_landed',
+      detail: {
+        scene_type: v.scene_type ?? null,
+        build_phase: v.build_phase_guess ?? null,
+        narrative: v.narrative_one_line ?? null,
+        component_count: Array.isArray(v.components_seen) ? v.components_seen.length : 0,
+        ocr_count: Array.isArray(v.text_regions) ? v.text_regions.length : 0,
+        confidence: v.confidence ?? null,
+      },
+    });
   }
 
+  // One guarded batch insert of the landed events — telemetry, never fatal to ingest.
+  if (landedEvents.length) {
+    const { error: evErr } = await sb.from('analysis_events').insert(landedEvents);
+    if (evErr) console.error(`  (non-fatal) analysis_events insert: ${evErr.message}`);
+  }
   console.log(`ingest: wrote ${wrote}, failed ${failed} from ${SINK}`);
 }
 

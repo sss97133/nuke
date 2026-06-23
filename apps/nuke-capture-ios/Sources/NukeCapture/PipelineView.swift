@@ -1,51 +1,64 @@
 // PipelineView.swift — the live analysis pipeline, on device.
 //
-// What the owner asked to SEE in the app: each frame as its verdict lands, with the actual
-// schema filling in — scene, build phase, components (+ part numbers), OCR read off the metal,
-// state — newest first, refreshing live. Not a progress bar; the extracted intelligence itself.
-//
-// Source: the get_analysis_stream RPC (auth.uid()-scoped, no params but a page limit). We poll
-// it on a short interval and merge by image_id, so new verdicts appear as the drain produces
-// them. Pure read — no model spend, no writes.
+// What the owner asked to SEE: each photo's real journey as it happens — received →
+// analyzing → the verdict landing with its schema (scene, build phase, components, OCR,
+// narrative) — led by the vehicle it's identified with, newest first, refreshing live.
+// Not a replay of finished rows: get_pipeline_events returns the actual stage events the
+// drain emits as it works. Pure read — no model spend, no writes.
 
 import SwiftUI
 
-// One frame's row from get_analysis_stream. jsonb columns decode into small structs; unknown
-// keys are ignored by Decodable, so we only pull what we render.
-struct AnalysisStreamRow: Decodable, Identifiable {
+// One stage event from get_pipeline_events. Unknown detail keys are ignored by Decodable.
+struct PipelineEvent: Decodable {
+    let event_id: UUID
+    let stage: String
+    let created_at: String
     let image_id: UUID
-    let vehicle_id: UUID
+    let vehicle_id: UUID?
     let vehicle: String?
     let thumbnail_url: String?
     let image_url: String?
-    let landed_at: String
-    let scene_type: String?
-    let build_phase: String?
-    let narrative: String?
-    let components: [Component]?
-    let text_regions: [TextRegion]?
-    let state: StateObs?
-    let hashed: Bool
-    let sessioned: Bool
-    let is_duplicate: Bool
-    let match_status: String?
+    let received_at: String?
+    let detail: Detail?
 
-    var id: UUID { image_id }
-
-    struct Component: Decodable { let label: String?; let part_number_guess: String? }
-    struct TextRegion: Decodable { let text: String? }
-    struct StateObs: Decodable { let paint_state: String?; let completeness: String?; let rust_severity: String? }
+    struct Detail: Decodable {
+        let scene_type: String?
+        let build_phase: String?
+        let narrative: String?
+        let component_count: Int?
+        let ocr_count: Int?
+    }
 }
+
+// One image's journey, assembled from its events.
+struct Journey: Identifiable {
+    let image_id: UUID
+    var vehicle_id: UUID?
+    var vehicle: String?
+    var thumbnail_url: String?
+    var image_url: String?
+    var stage: String
+    var last_at: String
+    var detail: PipelineEvent.Detail?
+    var id: UUID { image_id }
+}
+
+// received ─ analyzing ─ landed
+private let RAIL: [(key: String, label: String)] = [
+    ("received", "received"), ("analyzing", "analyzing"), ("verdict_landed", "landed"),
+]
+private func rank(_ stage: String) -> Int { RAIL.firstIndex { $0.key == stage } ?? 0 }
 
 @MainActor
 final class PipelineStore: ObservableObject {
-    @Published private(set) var rows: [AnalysisStreamRow] = []
+    @Published private(set) var cards: [Journey] = []
     @Published private(set) var error: String?
     @Published private(set) var loadedOnce = false
 
+    private var byImage: [UUID: Journey] = [:]
     private var poller: Task<Void, Never>?
     private let pollInterval: UInt64 = 4_000_000_000 // 4s
-    private let maxRows = 200
+    private let maxCards = 120
 
     func start() {
         guard poller == nil else { return }
@@ -58,29 +71,41 @@ final class PipelineStore: ObservableObject {
     }
 
     func stop() { poller?.cancel(); poller = nil }
-
     func refresh() async { await fetch() }
 
     private func fetch() async {
         do {
-            let incoming: [AnalysisStreamRow] = try await SupabaseService.client
-                .rpc("get_analysis_stream", params: ["p_limit": 60])
+            let events: [PipelineEvent] = try await SupabaseService.client
+                .rpc("get_pipeline_events", params: ["p_limit": 120])
                 .execute()
                 .value
             error = nil
             loadedOnce = true
-            // Merge by image_id, newest landed_at first, cap the list.
-            var byId: [UUID: AnalysisStreamRow] = [:]
-            for r in incoming { byId[r.image_id] = r }
-            for r in rows where byId[r.image_id] == nil { byId[r.image_id] = r }
-            rows = byId.values
-                .sorted { $0.landed_at > $1.landed_at }
-                .prefix(maxRows)
+            for e in events { merge(e) }
+            cards = byImage.values
+                .sorted { $0.last_at > $1.last_at }
+                .prefix(maxCards)
                 .map { $0 }
         } catch {
             self.error = String(describing: error)
             loadedOnce = true
         }
+    }
+
+    private func merge(_ e: PipelineEvent) {
+        var j = byImage[e.image_id] ?? Journey(
+            image_id: e.image_id, vehicle_id: e.vehicle_id, vehicle: e.vehicle,
+            thumbnail_url: e.thumbnail_url, image_url: e.image_url,
+            stage: "received", last_at: e.created_at, detail: nil
+        )
+        j.vehicle = e.vehicle ?? j.vehicle
+        j.vehicle_id = e.vehicle_id ?? j.vehicle_id
+        j.thumbnail_url = e.thumbnail_url ?? j.thumbnail_url
+        j.image_url = e.image_url ?? j.image_url
+        if rank(e.stage) >= rank(j.stage) { j.stage = e.stage }
+        if e.stage == "verdict_landed", let d = e.detail { j.detail = d }
+        if e.created_at > j.last_at { j.last_at = e.created_at }
+        byImage[e.image_id] = j
     }
 }
 
@@ -93,24 +118,24 @@ struct PipelineView: View {
                 if !store.loadedOnce {
                     ProgressView("Connecting to pipeline…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error = store.error, store.rows.isEmpty {
+                } else if let error = store.error, store.cards.isEmpty {
                     ContentUnavailableView("Pipeline unavailable", systemImage: "exclamationmark.triangle", description: Text(error))
-                } else if store.rows.isEmpty {
+                } else if store.cards.isEmpty {
                     ContentUnavailableView(
                         "Nothing analyzed yet",
                         systemImage: "waveform.path.ecg",
-                        description: Text("As the drain processes your photos, each frame streams in here with its extracted data.")
+                        description: Text("As the drain processes your photos, each one streams through here with its journey.")
                     )
                 } else {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
-                            ForEach(store.rows) { row in
-                                FrameRow(row: row)
+                            ForEach(store.cards) { card in
+                                JourneyCard(j: card)
                                 Divider()
                             }
                         }
                         .padding(.horizontal, 12)
-                        .animation(.easeOut(duration: 0.25), value: store.rows.map(\.id))
+                        .animation(.easeOut(duration: 0.25), value: store.cards.map(\.id))
                     }
                 }
             }
@@ -130,94 +155,93 @@ struct PipelineView: View {
     }
 }
 
-// One frame: thumbnail + the schema that landed for it.
-private struct FrameRow: View {
-    let row: AnalysisStreamRow
+// One image: thumbnail + vehicle + the journey rail + the schema that landed.
+private struct JourneyCard: View {
+    let j: Journey
+
+    private var landed: Bool { j.stage == "verdict_landed" }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            AsyncImage(url: URL(string: row.thumbnail_url ?? row.image_url ?? "")) { phase in
-                if let img = phase.image {
-                    img.resizable().scaledToFill()
-                } else {
-                    Rectangle().fill(Color(.secondarySystemFill))
-                }
+            AsyncImage(url: URL(string: j.thumbnail_url ?? j.image_url ?? "")) { phase in
+                if let img = phase.image { img.resizable().scaledToFill() }
+                else { Rectangle().fill(Color(.secondarySystemFill)) }
             }
-            .frame(width: 84, height: 84)
+            .frame(width: 88, height: 88)
             .clipped()
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 5) {
                 HStack {
-                    Text(row.vehicle ?? "Unknown vehicle").font(.subheadline.weight(.semibold))
+                    Text(j.vehicle ?? "Unidentified vehicle").font(.headline)
                     Spacer()
-                    Text(relativeAgo(row.landed_at)).font(.caption2.monospaced()).foregroundStyle(.secondary)
+                    Text(relativeAgo(j.last_at)).font(.caption2.monospaced()).foregroundStyle(.secondary)
                 }
 
-                if let n = row.narrative, !n.isEmpty {
+                StageRail(stage: j.stage)
+
+                if !landed {
+                    Text("reading the frame…").font(.footnote).foregroundStyle(.secondary)
+                }
+
+                if landed, let n = j.detail?.narrative, !n.isEmpty {
                     Text(n).font(.footnote).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
                 }
 
-                ForEach(Array(fields.enumerated()), id: \.offset) { _, f in
-                    HStack(alignment: .top, spacing: 8) {
-                        Text(f.key.uppercased())
-                            .font(.system(size: 8, weight: .bold)).tracking(0.5)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 92, alignment: .trailing)
-                        Text(f.value)
-                            .font(f.mono ? .caption.monospaced() : .caption)
-                            .foregroundStyle(f.accent ? Color.accentColor : .primary)
-                            .fixedSize(horizontal: false, vertical: true)
+                if landed {
+                    ForEach(Array(fields.enumerated()), id: \.offset) { _, f in
+                        HStack(alignment: .top, spacing: 8) {
+                            Text(f.key.uppercased())
+                                .font(.system(size: 8, weight: .bold)).tracking(0.5)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 86, alignment: .trailing)
+                            Text(f.value).font(.caption).foregroundStyle(.primary)
+                        }
                     }
                 }
-
-                stageFlags
             }
         }
         .padding(.vertical, 10)
     }
 
-    // The ordered schema fields that landed — the "fill".
-    private var fields: [(key: String, value: String, mono: Bool, accent: Bool)] {
-        var out: [(String, String, Bool, Bool)] = []
-        if let s = row.scene_type, s != "unknown" { out.append(("scene_type", pretty(s), false, false)) }
-        if let b = row.build_phase, b != "unknown" { out.append(("build_phase", pretty(b), false, false)) }
-        if let st = row.state {
-            if let p = st.paint_state { out.append(("paint_state", pretty(p), false, false)) }
-            if let c = st.completeness { out.append(("completeness", pretty(c), false, false)) }
-            if let r = st.rust_severity, r != "none" { out.append(("rust", pretty(r), false, false)) }
-        }
-        for c in (row.components ?? []).prefix(8) {
-            guard let l = c.label, !l.isEmpty else { continue }
-            let pn = c.part_number_guess.map { " #\($0)" } ?? ""
-            out.append(("component", l + pn, false, !(c.part_number_guess ?? "").isEmpty))
-        }
-        for t in (row.text_regions ?? []).prefix(5) {
-            if let txt = t.text, !txt.isEmpty { out.append(("ocr", txt, true, true)) }
-        }
-        return out.map { (key: $0.0, value: $0.1, mono: $0.2, accent: $0.3) }
-    }
-
-    private var stageFlags: some View {
-        HStack(spacing: 4) {
-            flag("analyzed", on: true)
-            if row.hashed { flag("hashed", on: false) }
-            if row.sessioned { flag("session", on: false) }
-            if row.is_duplicate { flag("dup", on: false) }
-            if let m = row.match_status, m != "pending" { flag(pretty(m), on: false) }
-        }
-        .padding(.top, 2)
-    }
-
-    private func flag(_ text: String, on: Bool) -> some View {
-        Text(text.uppercased())
-            .font(.system(size: 8, weight: .bold)).tracking(0.5)
-            .padding(.horizontal, 4).padding(.vertical, 1)
-            .background(on ? Color.primary : Color.clear)
-            .foregroundStyle(on ? Color(.systemBackground) : .secondary)
-            .overlay(Rectangle().stroke(Color.secondary.opacity(0.4), lineWidth: on ? 0 : 1))
+    private var fields: [(key: String, value: String)] {
+        var out: [(String, String)] = []
+        if let s = j.detail?.scene_type, s != "unknown" { out.append(("scene", pretty(s))) }
+        if let b = j.detail?.build_phase, b != "unknown" { out.append(("build phase", pretty(b))) }
+        if let c = j.detail?.component_count, c > 0 { out.append(("components", "\(c)")) }
+        if let o = j.detail?.ocr_count, o > 0 { out.append(("text read", "\(o)")) }
+        return out.map { (key: $0.0, value: $0.1) }
     }
 
     private func pretty(_ s: String) -> String { s.replacingOccurrences(of: "_", with: " ") }
+}
+
+// received ─ analyzing ─ landed; reached stages filled, in-flight stage pulses.
+private struct StageRail: View {
+    let stage: String
+    @State private var pulse = false
+
+    var body: some View {
+        let at = rank(stage)
+        HStack(spacing: 6) {
+            ForEach(Array(RAIL.enumerated()), id: \.offset) { i, s in
+                if i > 0 {
+                    Rectangle()
+                        .fill(i <= at ? Color.primary : Color.secondary.opacity(0.3))
+                        .frame(width: 14, height: 2)
+                }
+                let done = i <= at
+                let current = i == at && stage != "verdict_landed"
+                Text(s.label.uppercased())
+                    .font(.system(size: 8, weight: .bold)).tracking(0.5)
+                    .padding(.horizontal, 5).padding(.vertical, 1)
+                    .background(done ? Color.primary : Color.clear)
+                    .foregroundStyle(done ? Color(.systemBackground) : .secondary)
+                    .overlay(Rectangle().stroke(Color.secondary.opacity(done ? 0 : 0.4), lineWidth: 1))
+                    .opacity(current && pulse ? 0.35 : 1)
+            }
+        }
+        .onAppear { withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { pulse = true } }
+    }
 }
 
 // "Xs / Xm / Xh / Xd ago" from a Postgres/ISO timestamp string.
