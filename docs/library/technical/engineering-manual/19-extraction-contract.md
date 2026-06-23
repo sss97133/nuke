@@ -2,11 +2,13 @@
 
 ## Why this chapter exists
 
-`vehicle_images` has **162 columns**. On a real vehicle (the 1966 Mustang test case,
-2026-06-22) only ~15 are meaningfully filled; the rest are **dead duplicates** or
-**unfed load-bearing fields**. "Fill all the schema fields" is the stated goal — but it
-is the wrong goal stated against this table, because half the columns are redundant and a
-handful of the important ones have no extractor feeding them.
+`vehicle_images` has **172 columns**. On a real vehicle (the 1966 Mustang test case,
+2026-06-22) only ~15 are meaningfully filled; the rest are **aspirational targets** the
+pipeline is only now producing data for — reserved fields for stages that haven't run,
+columns whose depth still lives in JSONB awaiting promotion, and a small redundant residue
+(see the 2026-06-23 audit below). The schema is the *contract the pipeline grows into*, so
+"fill all the schema fields" is directionally right; the work is wiring an extractor to each
+field and promoting JSONB depth into columns, not pruning the table.
 
 This chapter defines the **canonical extraction contract**: the real, minimal set of
 fields each image should carry, *where each comes from*, and the **decision tree** that
@@ -82,17 +84,42 @@ the field can exist.
 | `work_session_id` | derived (taken_at+device+gps cluster) | all | **18% — barely fed** |
 | `components_seen` | vision (conditional) | engine/undercarriage/interior | in JSONB |
 | `text_regions` (OCR) | vision (conditional) | data_plate/document | in JSONB |
-| `camera_pose` | vision (conditional) | exterior | in JSONB (dead column) |
+| `camera_pose` | vision (conditional) | exterior | in JSONB → column (promoted, migration 20260623010000) |
 | `state_observations` | vision (conditional) | most | in JSONB |
 | `narrative_one_line` | vision | all | live |
 | provenance (`agent_model`,`agent_cost_cents`,tokens) | harness | all | fixed 2026-06-22 (cost capture) |
 
-Everything else in the 162 columns is one of: a **dead duplicate** (`filename`+`file_name`;
-`category`+`image_category`+`image_type`; `vehicle_make/model/year/vin` columns that
-identity already lives for on the vehicle record; four hash columns where one is
-canonical; five quality scores where `image_hero_score` is canonical), or **scaffolding
-for a stage that never ran** (`fabrication_stage`, `surface_coord_u/v`, `yono_queued_at`).
-Those are consolidation/deletion targets, not fill targets.
+### The unfilled columns are aspirational targets, not dead weight (audit, 2026-06-23)
+
+A two-axis audit (live `pg_stats` fill-rate × full-repo code-reference sweep × view-dependency
+check) re-classified every near-empty column. The earlier "dead duplicate / deletion target"
+framing was wrong on two counts, and **nothing is being dropped** — per the owner, these columns
+are *aspirational targets becoming more and more reality* as the pipeline matures.
+
+First, the trap: a column reading ~0% filled across the whole table does **not** mean dead. The
+table is dominated by ~38.9M bulk-scraped listing rows where even `user_id` is only **0.08%**
+filled; any column set only on *owned, analyzed* frames reads ~0% globally while being alive on
+the slice that matters. Fill-rate alone condemns nothing — it must be crossed with code refs.
+
+Crossed that way, the unfilled columns fall into three buckets, none of them "drop now":
+
+- **Reserved / not-yet-run** — referenced by the vision roadmap or the extraction contract, empty
+  only because the stage hasn't executed: `surface_coord_u/v`, `yaw_deg`/`yaw_confidence`,
+  `yono_queued_at`, `bbox`, `spatial_tags`. Fill targets when the YONO/COLMAP phase ships.
+- **Promotable now** — the data already exists in `ai_scan_metadata->'byok_deep_analysis'` JSONB
+  and just needed lifting into columns: `camera_pose`, `components`, `ai_component_count`,
+  `ai_avg_confidence`. Done by `promote_image_depth_to_columns()` (migration 20260623010000),
+  wired into the drain (step 8) so each batch promotes itself and re-runs converge idempotently.
+- **Active but low-coverage** — written by yono-analyze / photo-pipeline / our backfills on the
+  owned slice, so ~0% global is rollout, not death: `vehicle_zone`/`zone_*`, `fabrication_stage`/
+  `stage_confidence`, `interior_quality`, `image_vehicle_match_status`, `work_session_id`, `phash`,
+  `taken_at`, the `vehicle_make/model/year/vin` denorm block (written by `backfill-images`).
+
+A genuinely redundant residue exists (`perceptual_hash` superseded by `phash`; the abandoned
+"personal photo library" taxonomy `area`/`part`/`damage_type`/`operation`/`materials`/
+`perspective`/`process_stage`/`workflow_role`/`image_context`, still `SELECT`ed only by six
+frontend-unused legacy views), but even these stay — consolidation can wait; the schema is the
+contract the pipeline grows into.
 
 ---
 
