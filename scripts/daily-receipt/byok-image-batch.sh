@@ -294,11 +294,13 @@ const { createClient } = require("@supabase/supabase-js");
 const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const sb = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY);
 (async () => {
-  for (const fn of ["flag_image_burst_duplicates", "derive_work_sessions"]) {
+  // promote_image_depth_to_columns lifts this batch's verdicts (camera_pose, components_seen)
+  // out of ai_scan_metadata JSONB into the first-class columns so the depth is queryable (Ch.19).
+  for (const fn of ["flag_image_burst_duplicates", "derive_work_sessions", "promote_image_depth_to_columns"]) {
     const { data, error } = await sb.rpc(fn, { p_vehicle_id: process.argv[1] });
     console.log(fn, error ? ("ERR " + error.message) : JSON.stringify(data));
   }
 })();
-' "$VEHICLE_ID" >>"$LOG" 2>&1 || log "dedup/session rpc returned non-zero (non-fatal)"
+' "$VEHICLE_ID" >>"$LOG" 2>&1 || log "dedup/session/promote rpc returned non-zero (non-fatal)"
 
 log "=== batch done: day ${DAY:-unknown}, ingest $WROTE / $N ==="
