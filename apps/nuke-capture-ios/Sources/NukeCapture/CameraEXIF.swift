@@ -21,4 +21,35 @@ enum CameraEXIF {
             tiff[kCGImagePropertyTIFFModel] as? String
         )
     }
+
+    /// The TRUE capture instant, read from the file's embedded EXIF
+    /// DateTimeOriginal (+ OffsetTimeOriginal when present). This is the raw
+    /// source of truth — it survives intact even when PHAsset.creationDate is
+    /// the date the photo was *re-added* to the library (iCloud restore, shared
+    /// album, AirDrop), which is how 2018/2019 photos got stamped "today" and
+    /// contaminated the wrong vehicle's timeline. Always prefer this over the
+    /// OS-supplied creationDate. Returns nil only when the file carries no
+    /// DateTimeOriginal (stripped EXIF) — caller falls back to creationDate.
+    static func captureDate(from data: Data) -> Date? {
+        guard let src = CGImageSourceCreateWithData(data as CFData, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+              let exif = props[kCGImagePropertyExifDictionary] as? [CFString: Any],
+              let original = exif[kCGImagePropertyExifDateTimeOriginal] as? String
+        else { return nil }
+
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+
+        // DateTimeOriginal is local wall-clock ("yyyy:MM:dd HH:mm:ss").
+        // OffsetTimeOriginal ("-07:00") pins it to a real instant when present.
+        if let offset = exif[kCGImagePropertyExifOffsetTimeOriginal] as? String {
+            fmt.dateFormat = "yyyy:MM:dd HH:mm:ssXXXXX"
+            if let d = fmt.date(from: original + offset) { return d }
+        }
+        // No embedded offset: interpret the wall-clock in the device's current
+        // zone. Still the file's own date — never the re-add date.
+        fmt.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        fmt.timeZone = .current
+        return fmt.date(from: original)
+    }
 }

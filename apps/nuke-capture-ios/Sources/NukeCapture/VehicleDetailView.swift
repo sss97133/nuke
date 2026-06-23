@@ -15,6 +15,8 @@
 import SwiftUI
 import UIKit
 import Supabase
+import Charts          // value-trajectory accrual curve
+import AVFoundation   // chime on a real arbitrated bid (motion = derivative of data)
 
 /// One vehicles row — exact columns, read-only. Header + full spec set in a
 /// single select so one fetch covers the title bar AND the spec table.
@@ -63,6 +65,30 @@ struct VehicleGalleryImage: Decodable, Identifiable {
     let ai_processing_status: String?
 }
 
+// SALE HISTORY — real sale events from vehicle_timeline_events (same table the build-days
+// RPC reads; no new RPC). Deduped by (date|price|listing) because multiple ingest paths
+// write the SAME sale, which the profile otherwise reads as "sold twice" — a rendering
+// artifact, never a real resale. Each row drills to its source listing.
+private struct SaleEventRow: Decodable {
+    let id: UUID
+    let event_type: String
+    let event_date: String?          // "yyyy-MM-dd"
+    let title: String?
+    let metadata: SaleMeta?
+    struct SaleMeta: Decodable {
+        let final_price: Double?; let sale_price: Double?; let high_bid: Double?
+        let platform: String?; let source_url: String?; let listing_url: String?
+        let lot_number: String?; let bid_count: Int?
+        var price: Double? { final_price ?? sale_price ?? high_bid }
+        var url: String? { listing_url ?? source_url }
+    }
+}
+private struct Sale: Identifiable {
+    let id: String                   // "date|int price|url" — the dedup key
+    let date: String?; let price: Double?; let platform: String?
+    let url: String?; let lot: String?; let bids: Int?
+}
+
 /// The signed-in viewer's ASSET relationship to this vehicle — his ownership /
 /// provenance. Read from the SAME tables the web uses (vehicle_user_permissions
 /// + ownership_verifications), never fabricated. nil when the vehicle is not the
@@ -88,6 +114,107 @@ struct VehicleRelationship {
     let verifiedAt: String?
 }
 
+/// The market-cohort drill a header identity chip opens. Identifiable so it drives
+/// a `.sheet(item:)`. id keyed on the triple so re-tapping the same identity is a no-op.
+struct CohortDrill: Identifiable, Hashable {
+    let make: String
+    let model: String
+    let year: Int
+    var id: String { "\(year)|\(make)|\(model)" }
+}
+
+private extension View {
+    /// Stock inset-grouped card: the data section floats as a rounded
+    /// `secondarySystemGroupedBackground` panel on the grouped page — the native
+    /// Settings / Photos-info idiom, replacing flat monospace-on-white. The values
+    /// inside (RootedValueView, the barcode, the worth bracket) are unchanged; only
+    /// the container becomes stock. iOS gives the material + dark-mode for free.
+    func nukeCard() -> some View {
+        self
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(Color(.secondarySystemGroupedBackground),
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+    }
+}
+
+/// One vital sign in the living header. The KIND carries the glyph + meaning on ONE
+/// vocabulary (so the storm signals slot in beside today's); the text is the count.
+/// `live` distinguishes a real, backed signal from a wired-but-dark storm slot.
+struct PulseSignal: Identifiable {
+    enum Kind { case viewers, weighedIn, following, contributions, activity, bids, estimate }
+    let kind: Kind
+    let text: String
+    var live: Bool = true
+
+    var id: String { "\(kind)" }
+
+    var glyph: String {
+        switch kind {
+        case .viewers:       return "eye.fill"
+        case .weighedIn:     return "bubble.left.fill"
+        case .following:     return "person.2.fill"
+        case .contributions: return "hammer.fill"
+        case .activity:      return "bolt.fill"
+        case .bids:          return "gavel.fill"
+        case .estimate:      return "hourglass"
+        }
+    }
+
+    /// $112,200 → "$112k". Short enough to live in a pinned strip.
+    static func shortMoney(_ v: Double) -> String {
+        if v >= 1000 {
+            let k = (v / 1000).rounded()
+            return "$\(Int(k))k"
+        }
+        return "$\(Int(v.rounded()))"
+    }
+}
+
+/// The activity pulse — the vehicle's vital signs as a tight glyph·count strip in
+/// the living header. Live signals read in ink; a dark storm slot reads tertiary.
+struct PulseStrip: View {
+    let signals: [PulseSignal]
+    var body: some View {
+        HStack(spacing: 11) {
+            ForEach(signals) { sig in
+                HStack(spacing: 3) {
+                    Image(systemName: sig.glyph).font(.system(size: 10, weight: .semibold))
+                    Text(sig.text).font(.caption2.weight(.semibold)).monospacedDigit()
+                        .lineLimit(1)
+                }
+                .foregroundStyle(sig.live ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+            }
+        }
+        .fixedSize()   // the vital signs never compress — the title truncates instead
+    }
+}
+
+/// The canonical live-signal row (public.vehicle_pulse), arbitrated server-side. The
+/// living header subscribes to it via Realtime; both web and iOS read the SAME row.
+struct VehiclePulse: Decodable {
+    let mode: String
+    let headline_label: String?
+    let headline_amount: Double?
+    let is_live: Bool
+    let live_state: String
+    let liveness: Double
+    let urgency_pulse_ms: Int?
+    let ends_at: String?       // ISO; parsed client-side so the countdown is smooth
+    let live_bid: Double?
+    let bid_count: Int
+    let source_platform: String?
+
+    var displayBid: Double? { live_bid ?? headline_amount }
+    var endsAtDate: Date? {
+        guard let s = ends_at else { return nil }
+        let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f.date(from: s) ?? { let g = ISO8601DateFormatter(); return g.date(from: s) }()
+    }
+}
+
 struct VehicleDetailView: View {
     let vehicleId: String
     /// TRUE (default) = wrap in own NavigationStack + show Done (sheet call sites).
@@ -107,6 +234,10 @@ struct VehicleDetailView: View {
     @State private var renderingShare = false      // share card is composing
     @State private var debugCard: UIImage?         // DEBUG: render the card on-screen to verify it
     @State private var days: [DayRecord] = []      // the build's rhythm (get_vehicle_contribution_days)
+    @State private var sales: [Sale] = []          // real sale history (deduped), each → its listing
+    @State private var salesError = false
+    @State private var pulse: VehiclePulse?        // live arbitrated signal (vehicle_pulse, Realtime)
+    @State private var pulseChannel: RealtimeChannelV2?
     @State private var bookendBefore: VehicleGalleryImage?   // earliest dated frame
     @State private var bookendAfter: VehicleGalleryImage?    // latest dated frame
     @State private var relationship: VehicleRelationship?   // ASSET window (owner-scoped)
@@ -136,7 +267,10 @@ struct VehicleDetailView: View {
     @State private var contributed: Set<String> = []   // optimistic: fields just submitted
     @State private var galleryOpen = false
     @State private var selectedPhoto: VehicleGalleryImage?  // photo→analysis drill
+    @State private var viewerStart: GalleryStart?           // grid tap → swipeable Photos-style viewer
+    @State private var pendingAnalyze: VehicleGalleryImage? // viewer "Analysis" → atoms after dismiss
     @State private var provenanceDrill: SpecDrill?          // spec value → its source
+    @State private var cohortTarget: CohortDrill?           // identity chip → its market cohort
 
     init(vehicleId: String, embedInNavigationStack: Bool = true, debugOpenField: String? = nil) {
         self.vehicleId = vehicleId
@@ -159,6 +293,13 @@ struct VehicleDetailView: View {
                             }
                             ToolbarItem(placement: .topBarTrailing) { shareButton }
                         }
+                        // This sheet owns its stack, so register the vehicle
+                        // destination here too — a cohort comp row drills to that
+                        // vehicle (vehicle → cohort → comp → its cohort → …).
+                        .navigationDestination(for: VehicleHeaderRow.self) { v in
+                            VehicleDetailView(vehicleId: v.id.uuidString.lowercased(),
+                                              embedInNavigationStack: false)
+                        }
                 }
             } else {
                 content
@@ -173,6 +314,8 @@ struct VehicleDetailView: View {
         .task(id: vehicleId) { await loadSpecs() }
         .task(id: vehicleId) { await loadValuation() }
         .task(id: vehicleId) { await loadVehicleDays() }
+        .task(id: vehicleId) { await loadSaleHistory() }
+        .task(id: vehicleId) { await subscribePulse() }
         .task(id: vehicleId) { await loadBookends() }
         .task(id: vehicleId) { await loadEngagement() }
         .sheet(item: $provenanceDrill) { drill in
@@ -194,6 +337,15 @@ struct VehicleDetailView: View {
         .fullScreenCover(item: $selectedPhoto) { img in
             AnalyzedEvidenceView(photo: analyzedPhoto(from: img))
         }
+        // The Photos-style swipeable viewer over the loaded build photos. Its "Analysis"
+        // action routes to the SAME AnalyzedEvidenceView (after the viewer closes) so the
+        // atom drill survives — one analysis surface, reachable from any swiped photo.
+        .fullScreenCover(item: $viewerStart, onDismiss: {
+            if let p = pendingAnalyze { pendingAnalyze = nil; selectedPhoto = p }
+        }) { start in
+            FullScreenGalleryView(photos: images, startIndex: start.index,
+                                  onAnalyze: { img in pendingAnalyze = img; viewerStart = nil })
+        }
         #if DEBUG
         // Verify the rendered share card on-screen (NUKE_DEBUG_SHARECARD=1) — proves
         // the ImageRenderer output (no blank wells) without going through the share sheet.
@@ -207,6 +359,13 @@ struct VehicleDetailView: View {
             if let c = debugCard {
                 Color.black.ignoresSafeArea()
                     .overlay { Image(uiImage: c).resizable().scaledToFit().padding(8) }
+            }
+        }
+        // Screenshot loop: open the Photos-style viewer once the gallery loads.
+        .onChange(of: images.count) { _, n in
+            if n > 0, viewerStart == nil,
+               ProcessInfo.processInfo.environment["NUKE_DEBUG_VIEWER"] == "1" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { viewerStart = GalleryStart(index: 0) }
             }
         }
         #endif
@@ -244,46 +403,105 @@ struct VehicleDetailView: View {
     // The narrative spine — the record told as a story (hero → worth → proof →
     // photos), with the technical reference demoted below it. Not a ledger of
     // stacked sections; the build, top to bottom.
-    private var content: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                // Scroll-offset probe for the BaT sticky header — reports the top's
-                // position in the "vdscroll" space; goes negative as the hero scrolls up.
-                GeometryReader { geo in
-                    Color.clear.preference(key: VDScrollKey.self,
-                                           value: geo.frame(in: .named("vdscroll")).minY)
-                }
-                .frame(height: 0)
-                BuildStoryHero(
-                    imageURL: heroImage?.image_url ?? vehicle?.primary_image_url,
-                    title: vehicle?.title ?? "",
-                    takenAt: heroImage?.taken_at,
-                    loaded: loaded,
-                    onTap: { if let h = heroImage { selectedPhoto = h } else { galleryOpen = true } }
-                )
-                loadState            // loading / error (only while the header is absent)
-                buildInstrument      // ONE instrument: the build barcode (collapsed) ⇄ the
-                                     // calendar (expanded). The labor story leads (per Skylar).
-                heroActionRow        // social action row — Follow + comment bubble/count → sheet
-                valuationSection     // WORTH — modeled estimate (blocked when not defensible)
-                beforeAfterSection   // THE BUILD — how far it came (earliest → latest frame)
-                if vehicle != nil {
-                    InvestmentProofView(vehicleId: vehicleId)   // PROOF — dollars in
-                }
-                photoStrip           // the photos (each → its analysis)
-                assetWindow          // ASSET: his relationship/provenance
-                specTable            // TECHNICAL reference — demoted below the story
-                webCTA
-                Spacer(minLength: 0)
-            }
-        }
-        .coordinateSpace(name: "vdscroll")
-        .onPreferenceChange(VDScrollKey.self) { y in
-            let c = y < -220   // hero (~240pt) has scrolled past the top
-            if c != collapsed { withAnimation(.snappy(duration: 0.2)) { collapsed = c } }
-        }
-        .overlay(alignment: .top) { stickyHeader }
+    // The identity drill, gated on REALITY: returns an action only when the
+    // make+model+year triple exists (CohortTerminalView needs all three, and the
+    // cohort node is only real then). Missing any → nil → chips render flat, never
+    // a tappable-looking dead end (the cardinal no-fake-affordance rule).
+    private func cohortDrillAction() -> (() -> Void)? {
+        guard let v = vehicle,
+              let mk = v.make, !mk.isEmpty,
+              let md = v.model, !md.isEmpty,
+              let yr = v.year else { return nil }
+        return { cohortTarget = CohortDrill(make: mk, model: md, year: yr) }
     }
+
+    private var content: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Scroll-offset probe for the BaT sticky header — reports the top's
+                    // position in the "vdscroll" space; goes negative as the hero scrolls up.
+                    GeometryReader { geo in
+                        Color.clear.preference(key: VDScrollKey.self,
+                                               value: geo.frame(in: .named("vdscroll")).minY)
+                    }
+                    .frame(height: 0)
+                    BuildStoryHero(
+                        imageURL: heroImage?.image_url ?? vehicle?.primary_image_url,
+                        year: vehicle?.year, make: vehicle?.make,
+                        model: vehicle?.model, trim: vehicle?.trim,
+                        takenAt: heroImage?.taken_at,
+                        loaded: loaded,
+                        onTap: { if let h = heroImage { selectedPhoto = h } else { galleryOpen = true } },
+                        onDrillCohort: cohortDrillAction()
+                    )
+                    loadState            // loading / error (only while the header is absent)
+                    liveAuctionBanner    // LIVE — server-arbitrated bid + countdown (only when live)
+                    buildInstrument      // ONE instrument: the build barcode (collapsed) ⇄ the
+                                         // calendar (expanded). The labor story leads (per Skylar).
+                    heroActionRow        // social action row — Follow + comment bubble/count → sheet
+                    valuationSection.id("worth")     // WORTH — modeled estimate (blocked when not defensible)
+                    saleHistorySection.id("sales")   // SALE HISTORY — the real transacted record (deduped)
+                    beforeAfterSection   // THE BUILD — how far it came (earliest → latest frame)
+                    ValueTrajectoryView(vehicleId: vehicleId).id("trajectory")  // VALUE BUILT — accrual curve
+                    if vehicle != nil {
+                        InvestmentProofView(vehicleId: vehicleId).id("proof")   // PROOF — dollars in
+                    }
+                    photoStrip           // the photos (each → its analysis)
+                    assetWindow.id("asset")          // ASSET: his relationship/provenance
+                    specTable.id("specs")            // TECHNICAL reference — demoted below the story
+                    webCTA
+                    Spacer(minLength: 0)
+                }
+            }
+            .background(pageBackground.ignoresSafeArea())
+            .coordinateSpace(name: "vdscroll")
+            .onPreferenceChange(VDScrollKey.self) { y in
+                let c = y < -220   // hero (~240pt) has scrolled past the top
+                if c != collapsed { withAnimation(.snappy(duration: 0.2)) { collapsed = c } }
+            }
+            .overlay(alignment: .top) { stickyHeader }
+            // Identity chip → the vehicle's market cohort, PUSHED (native back
+            // chevron) so it's part of the navigable system, not a dead-end sheet.
+            .navigationDestination(item: $cohortTarget) { c in
+                CohortTerminalView(make: c.make, model: c.model, year: c.year)
+            }
+            #if DEBUG
+            // Screenshot loop only: NUKE_DEBUG_SCROLL_TO=worth|proof|asset|specs lands
+            // the capture on a below-fold section deterministically (cliclick drag
+            // can't drive this ScrollView). Never ships behavior — DEBUG-gated.
+            .onChange(of: loaded) { _, done in
+                guard done else { return }
+                // Force the collapsed living header for deterministic capture.
+                if ProcessInfo.processInfo.environment["NUKE_DEBUG_COLLAPSED"] == "1" {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                        withAnimation { collapsed = true }
+                    }
+                }
+                if let target = debugScrollTarget {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) {  // let async sections fetch first
+                        withAnimation { proxy.scrollTo(target, anchor: .top) }
+                    }
+                }
+                // Screenshot loop: auto-push the cohort to verify the back chevron.
+                if ProcessInfo.processInfo.environment["NUKE_DEBUG_PUSH_COHORT"] == "1" {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { cohortDrillAction()?() }
+                }
+            }
+            #endif
+        }
+    }
+
+    #if DEBUG
+    private var debugScrollTarget: String? {
+        ProcessInfo.processInfo.environment["NUKE_DEBUG_SCROLL_TO"]
+    }
+    #endif
+
+    // Page background — the grouped grey that makes the data sections read as stock
+    // inset cards (the Settings / Photos-info idiom) instead of flat text on white.
+    // Hero, barcode and the photo grid keep their full-bleed; only the cards float.
+    private var pageBackground: Color { Color(.systemGroupedBackground) }
 
     // ─── Hero — sized render thumb (NOT the raw original), tap → full gallery.
     // The hero is a 240pt strip, not a full-screen view, so it must NOT load the
@@ -391,8 +609,7 @@ struct VehicleDetailView: View {
                     .padding(.vertical, 5)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 16)
+            .nukeCard()
         }
     }
 
@@ -430,8 +647,7 @@ struct VehicleDetailView: View {
                     .padding(.top, 14)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 16)
+            .nukeCard()
             // Sheet on THIS subview (not the top-level view) — avoids stacking a 3rd
             // .sheet on the view that already hosts provenance + comments.
             .sheet(item: $contributeField) { spec in contributeSheet(spec) }
@@ -520,8 +736,7 @@ struct VehicleDetailView: View {
         if let v = valuation, let val = v.value, val > 0 {
             WorthBracketView(valuation: v, make: vehicle?.make, model: vehicle?.model,
                              year: vehicle?.year, excludeId: vehicleId)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16).padding(.bottom, 16)
+                .nukeCard()
         } else if valuationError {
             sectionError("the estimate") { Task { await loadValuation() } }
         }
@@ -638,6 +853,105 @@ struct VehicleDetailView: View {
 
     // ─── The build in two frames — earliest vs latest by capture date. Honest
     // bookends only; suppressed unless two distinct dated frames exist.
+    // LIVE AUCTION — the BaT-style living instrument, driven by the server-arbitrated
+    // vehicle_pulse. Shows ONLY when the arbiter reports a live auction (never faked); a
+    // pulsing LIVE dot, the current bid, and a countdown derived client-side from ends_at
+    // (TimelineView ticks it smoothly; turns red under 30s). A real new bid chimes (applyPulse).
+    @ViewBuilder private var liveAuctionBanner: some View {
+        if let p = pulse, p.is_live {
+            TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                let secs = p.endsAtDate.map { Int(max(0, $0.timeIntervalSince(ctx.date))) }
+                HStack(spacing: 8) {
+                    Circle().fill(.red).frame(width: 8, height: 8)
+                        .opacity(Int(ctx.date.timeIntervalSinceReferenceDate) % 2 == 0 ? 1 : 0.35)
+                    Text("LIVE").font(.caption2.weight(.heavy)).foregroundStyle(.red)
+                    Text(p.headline_label ?? "Current Bid").font(.caption2).foregroundStyle(.secondary)
+                    Text(p.headline_amount.map { money0($0) } ?? "—")
+                        .font(.title3.weight(.bold)).monospacedDigit()
+                    Spacer(minLength: 8)
+                    if let s = secs {
+                        HStack(spacing: 4) {
+                            Image(systemName: "timer")
+                            Text("\(s / 60):\(String(format: "%02d", s % 60))").monospacedDigit()
+                        }
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(s <= 30 ? .red : .primary)
+                    }
+                }
+                .padding(.horizontal, 16).padding(.vertical, 12)
+                .background(Color.red.opacity(0.06))
+                .overlay(alignment: .bottom) { Divider() }
+            }
+        }
+    }
+
+    // SALE HISTORY — the real transacted record, deduped so duplicate ingest rows of the
+    // SAME sale don't read as "sold twice". Money leads (mono); each row drills to its
+    // source listing. Honest absence: no sales + no error → no section, never a fake row.
+    @ViewBuilder private var saleHistorySection: some View {
+        if !sales.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(sales.count == 1 ? "SALE HISTORY" : "SALE HISTORY · \(sales.count)")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.secondary).padding(.horizontal, 16).padding(.bottom, 6)
+                VStack(spacing: 0) { ForEach(sales) { s in saleRow(s) } }
+                    .background(Color(.secondarySystemGroupedBackground),
+                                in: RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 16)
+            }
+            .padding(.bottom, 16)
+        } else if salesError {
+            sectionError("the sale history") { Task { await loadSaleHistory() } }
+        }
+    }
+
+    @ViewBuilder private func saleRow(_ s: Sale) -> some View {
+        let body = HStack(alignment: .firstTextBaseline, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(s.price.map { money0($0) } ?? "Sold")
+                    .font(.system(.body, design: .monospaced).weight(.semibold))
+                HStack(spacing: 6) {
+                    if let p = s.platform {
+                        Text(prettySaleSource(p).uppercased())
+                            .font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                    }
+                    if let d = s.date {
+                        Text(String(d.prefix(10)))
+                            .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                    }
+                    if let b = s.bids, b > 0 {
+                        Text("· \(b) bids")
+                            .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+            if s.url != nil {
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 11).contentShape(Rectangle())
+
+        if let u = s.url, let url = URL(string: u) {
+            Link(destination: url) { body }.buttonStyle(.plain)   // drills to the listing
+        } else {
+            body                                                   // honest non-link (no source)
+        }
+        Divider().padding(.leading, 14)
+    }
+
+    private func prettySaleSource(_ s: String) -> String {
+        switch s.lowercased() {
+        case "bat", "bringatrailer": return "Bring a Trailer"
+        case "mecum": return "Mecum"
+        case "barrettjackson": return "Barrett-Jackson"
+        case "gaa-classic-cars": return "GAA"
+        case "classiccars.com": return "ClassicCars"
+        default: return s.capitalized
+        }
+    }
+
     @ViewBuilder private var beforeAfterSection: some View {
         if let b = bookendBefore, let a = bookendAfter {
             BeforeAfterPair(before: b, after: a) { selectedPhoto = $0 }
@@ -651,8 +965,23 @@ struct VehicleDetailView: View {
     // the shared card. In-app this is just the instrument.
     @State private var timelineExpanded = false
 
+    /// "ACTIVITY · 2 days over 6 yr" — leads the collapsed strip with meaning so a
+    /// sparse band reads as a fact, not a broken instrument.
+    private var buildSpanLabel: String {
+        let eps = days.compactMap { BuildBarcode.epochDay($0.day) }
+        guard let lo = eps.min(), let hi = eps.max() else { return "ACTIVITY" }
+        let span = hi - lo
+        let s = span >= 365 ? "\(span / 365) yr" : span >= 30 ? "\(span / 30) mo"
+              : span > 0 ? "\(span) days" : "1 day"
+        return "ACTIVITY · \(days.count) \(days.count == 1 ? "day" : "days") over \(s)"
+    }
+
     @ViewBuilder private var buildInstrument: some View {
-        if !days.isEmpty {
+        // A build barcode is the wrong instrument for a scraped comp (its days are
+        // event-only ingest dumps, not owner work) — it collapses to one cryptic cell.
+        // Show it only when there's a real BUILD signal (work logged, or real photo
+        // activity); otherwise the SALE HISTORY above is the honest spine.
+        if !days.isEmpty && days.contains(where: { $0.work > 0 || $0.photos > 1 }) {
             VStack(alignment: .leading, spacing: 6) {
                 if timelineExpanded {
                     HStack {
@@ -672,13 +1001,25 @@ struct VehicleDetailView: View {
                     }
                     .transition(.opacity)
                 } else {
-                    HStack(spacing: 10) {
-                        BuildBarcode(days: days)
+                    // Headline the strip so a sparse band reads as a true fact, not a
+                    // glitch (lead with meaning, per the Fitness pattern).
+                    Text(buildSpanLabel)
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 16)
+                    // The spine: edge-to-edge, full-bleed, on the SHARED surface.
+                    // Density reads by filled-green vs faint-empty (no foreign field
+                    // to fight light/dark/colorway). Tap → the timeline (the nav).
+                    ZStack(alignment: .trailing) {
+                        BuildBarcode(days: days, height: 26)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 16)
                         Image(systemName: "chevron.down")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(.secondary)
+                            .padding(.trailing, 12)
                     }
-                    .padding(.horizontal, 16)
                     .contentShape(Rectangle())
                     .onTapGesture { withAnimation(.snappy(duration: 0.22)) { timelineExpanded = true } }
                     .transition(.opacity)
@@ -700,100 +1041,165 @@ struct VehicleDetailView: View {
         static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
     }
 
+    // ─── The LIVING header. Once the hero scrolls away, the identity compresses
+    // into a pinned glass bar that keeps the vehicle's vital signs in view while
+    // the user browses its images: name · barcode sliver · the activity PULSE
+    // (weighed-in · following · contributions · est). The pulse is typed signals
+    // (VehiclePulse) — only signals with REAL backing data render; viewers/bids are
+    // defined but stay dark until their systems land (the "storm"), never faked.
     @ViewBuilder private var stickyHeader: some View {
         if collapsed, let v = vehicle {
-            HStack(spacing: 12) {
-                Text(v.title)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                    .layoutPriority(1)
-                if !days.isEmpty {
-                    BuildBarcode(days: days, height: 18)
-                        .frame(width: 84)
-                }
-                Spacer(minLength: 6)
-                if let val = valuation, let mid = val.value, mid > 0 {
-                    Text(mid.formatted(.currency(code: "USD").precision(.fractionLength(0))))
+            // Two layers on the SAME glass: the identity line (whole title — NEVER
+            // truncated — + pulse), and the full-width barcode SPINE flush beneath.
+            // The barcode is the constant thread; it never loses width. No foreign
+            // field — empties read faintly on the glass, so it survives mode/colorway.
+            VStack(spacing: 5) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(v.title)
                         .font(.subheadline.weight(.semibold))
-                        .monospacedDigit()
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    PulseStrip(signals: pulseSignals)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+
+                if !days.isEmpty {
+                    BuildBarcode(days: days, height: 13)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 7)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 9)
             .frame(maxWidth: .infinity)
             .background(.regularMaterial)
             .overlay(alignment: .bottom) { Divider() }
+            .contentShape(Rectangle())
+            // Everything is a button: the living bar drills to the thread (the
+            // primary live action today). Scroll-to-top can graft on later.
+            .onTapGesture { showComments = true }
             .transition(.move(edge: .top).combined(with: .opacity))
         }
     }
 
+    /// The vehicle's vital signs, assembled from REAL engagement + valuation data.
+    /// Order = primacy. A signal renders only when its data genuinely exists; the
+    /// "storm" signals (viewers/presence, bids/auction) are defined in PulseKind but
+    /// not appended until their backing systems exist — wired, dark, never fabricated.
+    private var pulseSignals: [PulseSignal] {
+        var out: [PulseSignal] = []
+        if let e = engagement {
+            if e.comment_count > 0 {
+                out.append(.init(kind: .weighedIn, text: "\(e.comment_count)"))
+            }
+            if e.following_count > 0 {
+                out.append(.init(kind: .following, text: "\(e.following_count)"))
+            }
+            if e.contribution_count > 0 {
+                out.append(.init(kind: .contributions, text: "\(e.contribution_count)"))
+            }
+        }
+        if let val = valuation, let mid = val.value, mid > 0 {
+            out.append(.init(kind: .estimate, text: PulseSignal.shortMoney(mid)))
+        }
+        // STORM — auction now ROUTED via the server-arbitrated vehicle_pulse. Lights ONLY
+        // when the arbiter reports a live auction WITH a real bid; dormant → stays dark.
+        // No fabricated number (viewers/presence still dark — no backing system yet).
+        if let p = pulse, p.is_live, let bid = p.displayBid {
+            out.insert(.init(kind: .bids, text: PulseSignal.shortMoney(bid)), at: 0)  // leads when live
+        }
+        return out
+    }
+
+    // The Photos 'Days' grid: build photos grouped under pinned date headers (the data
+    // has 133 distinct days), each a contact-sheet of 1:1 tiles. Tap → the swipeable
+    // viewer. Tail-paging + the owner before/after curation are preserved on the tile.
     @ViewBuilder private var photoStrip: some View {
         if !images.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
+            LazyVStack(alignment: .leading, spacing: 8, pinnedViews: .sectionHeaders) {
                 HStack {
                     Text("PHOTOS")
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                     Spacer()
-                    // Honest count: what's actually loaded (analyzed, dated). A "+"
-                    // until the tail is reached, since more are still streaming; at
-                    // end-of-scroll the bare number IS the true total.
                     Text(images.count.formatted() + (reachedEnd ? "" : "+"))
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 16)
 
-                LazyVGrid(columns: galleryColumns, spacing: 2) {
-                    ForEach(images) { img in
-                        Button { selectedPhoto = img } label: {
-                            Color(.secondarySystemFill)
-                                .aspectRatio(1, contentMode: .fit)
-                                .overlay {
-                                    CachedAsyncImage(url: NukeImage.thumb(img.image_url, width: 300)) { i in
-                                        i.resizable().scaledToFill()
-                                    } placeholder: {
-                                        Image(systemName: "car.side").foregroundStyle(.secondary)
-                                    }
-                                }
-                                .clipped()
-                                .contentShape(Rectangle())
+                ForEach(photoDays, id: \.day) { group in
+                    Section {
+                        LazyVGrid(columns: galleryColumns, spacing: 2) {
+                            ForEach(group.photos) { img in photoTile(img) }
                         }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            // Owner curates THE BUILD's two frames — EXIF dates lie and
-                            // the auto min/max guess paired junk (interior vs VIN plate),
-                            // so the owner picks both ends. (Owner-gated again server-side.)
-                            if isOwner {
-                                Button {
-                                    Task { await setBuildImage(img.id, role: "before_image") }
-                                } label: {
-                                    Label("Set as the 'before' shot", systemImage: "flag.checkered")
-                                }
-                                Button {
-                                    Task { await setBuildImage(img.id, role: "after_image") }
-                                } label: {
-                                    Label("Set as the 'after' shot", systemImage: "flag.checkered.2.crossed")
-                                }
-                            }
+                    } header: {
+                        HStack {
+                            Text(prettyDay(group.day)).font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Text("\(group.photos.count)")
+                                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                         }
-                        .onAppear {
-                            // Tail reached → stream the next page. Guarded inside
-                            // loadGalleryPage (no double-fire, stops at the end).
-                            if img.id == images.last?.id { Task { await loadGalleryPage() } }
-                        }
+                        .padding(.horizontal, 16).padding(.vertical, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.regularMaterial)
                     }
                 }
 
                 if loadingMore && !reachedEnd {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
+                    ProgressView().frame(maxWidth: .infinity).padding(.vertical, 12)
                 }
             }
             .padding(.bottom, 16)
         } else if galleryError {
             sectionError("photos") { Task { await loadGalleryPage(reset: true) } }
+        }
+    }
+
+    /// `images` (taken_at DESC) grouped into ordered day-clusters — the Photos 'Days' shape.
+    private var photoDays: [(day: String, photos: [VehicleGalleryImage])] {
+        var order: [String] = []; var map: [String: [VehicleGalleryImage]] = [:]
+        for img in images {
+            let d = img.taken_at.map { String($0.prefix(10)) } ?? "undated"
+            if map[d] == nil { order.append(d) }
+            map[d, default: []].append(img)
+        }
+        return order.map { ($0, map[$0] ?? []) }
+    }
+
+    private func prettyDay(_ s: String) -> String {
+        guard s != "undated" else { return "Undated" }
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        guard let d = f.date(from: s) else { return s }
+        let out = DateFormatter(); out.dateStyle = .long
+        return out.string(from: d)
+    }
+
+    @ViewBuilder private func photoTile(_ img: VehicleGalleryImage) -> some View {
+        Button {
+            viewerStart = GalleryStart(index: images.firstIndex { $0.id == img.id } ?? 0)
+        } label: {
+            Color(.secondarySystemFill)
+                .aspectRatio(1, contentMode: .fit)
+                .overlay {
+                    CachedAsyncImage(url: NukeImage.thumb(img.image_url, width: 300)) { i in
+                        i.resizable().scaledToFill()
+                    } placeholder: { Image(systemName: "car.side").foregroundStyle(.secondary) }
+                }
+                .clipped().contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            if isOwner {
+                Button { Task { await setBuildImage(img.id, role: "before_image") } } label: {
+                    Label("Set as the 'before' shot", systemImage: "flag.checkered")
+                }
+                Button { Task { await setBuildImage(img.id, role: "after_image") } } label: {
+                    Label("Set as the 'after' shot", systemImage: "flag.checkered.2.crossed")
+                }
+            }
+        }
+        .onAppear {
+            if img.id == images.last?.id { Task { await loadGalleryPage() } }
         }
     }
 
@@ -954,9 +1360,11 @@ struct VehicleDetailView: View {
     ///
     /// Two rules, both from Skylar's report (the grid was showing un-analyzed,
     /// cross-vehicle junk in ingest order):
-    ///   1. ANALYZED ONLY — `ai_processing_status='completed'`. Pending/processing
-    ///      frames (incl. the doppelganger shop photos not yet attributed) don't
-    ///      pollute the profile; they appear once they're understood.
+    ///   1. ANALYZED ONLY — `ai_processing_status IN ('completed','analyzed')`. The
+    ///      web pipeline marks frames `'completed'`; the iOS capture runner marks them
+    ///      `'analyzed'` — both mean "vision has read it", so accept either. Pending/
+    ///      processing frames (incl. the doppelganger shop photos not yet attributed)
+    ///      don't pollute the profile; they appear once they're understood.
     ///   2. LATEST FIRST — order by `taken_at` desc, not `created_at`. Capture date
     ///      is what "newest" means; ingest order was a jumble.
     /// Both ride the `vehicle_images_taken_date` partial index (vehicle_id, taken_at
@@ -981,8 +1389,9 @@ struct VehicleDetailView: View {
                 .from("vehicle_images")
                 .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status")
                 .eq("vehicle_id", value: vehicleId)
-                .eq("ai_processing_status", value: "completed")
+                .in("ai_processing_status", values: ["completed", "analyzed"])
                 .not("taken_at", operator: .is, value: "null")
+                .not("is_superseded", operator: .is, value: "true")   // keep null/false, drop superseded dupes
                 .order("taken_at", ascending: false)
                 .range(from: from, to: to)
                 .execute()
@@ -1056,6 +1465,69 @@ struct VehicleDetailView: View {
             if days.isEmpty { daysError = true }
             NSLog("NukeCapture vehicle days load failed: %@", String(describing: error))
         }
+    }
+
+    /// Real sale events, deduped so duplicate ingest rows of the SAME sale don't read as
+    /// "sold twice" (a rendering artifact — the cohort has zero genuine resales). Reads
+    /// vehicle_timeline_events directly (RLS off; same table the build-days RPC uses).
+    private func loadSaleHistory() async {
+        salesError = false
+        do {
+            let rows: [SaleEventRow] = try await SupabaseService.client
+                .from("vehicle_timeline_events")
+                .select("id,event_type,event_date,title,metadata")
+                .eq("vehicle_id", value: vehicleId)
+                .in("event_type", values: ["auction_sold", "listing_sold", "sale", "sold"])
+                .order("event_date", ascending: false)
+                .execute().value
+            var seen = Set<String>(); var out: [Sale] = []
+            for r in rows {
+                let price = r.metadata?.price; let url = r.metadata?.url
+                let key = "\(r.event_date ?? "")|\(price.map { String(Int($0)) } ?? "")|\(url ?? "")"
+                guard !seen.contains(key) else { continue }   // collapse duplicate ingest rows
+                seen.insert(key)
+                out.append(Sale(id: key, date: r.event_date, price: price,
+                                platform: r.metadata?.platform, url: url,
+                                lot: r.metadata?.lot_number, bids: r.metadata?.bid_count))
+            }
+            sales = out
+        } catch {
+            if sales.isEmpty { salesError = true }
+            NSLog("NukeCapture sale history load failed: %@", String(describing: error))
+        }
+    }
+
+    // ─── LIVE PULSE ─────────────────────────────────────────────────────────────
+    // Hydrate from the canonical row, then subscribe to its Realtime changes. The header
+    // re-headlines off the SAME server-arbitrated row the web reads (WEB_PARITY) — the
+    // client never reconciles sources. Reconnect re-hydrates (postgres_changes has no replay).
+    private func loadPulse() async {
+        let rows: [VehiclePulse]? = try? await SupabaseService.client
+            .from("vehicle_pulse").select()
+            .eq("vehicle_id", value: vehicleId).limit(1)
+            .execute().value
+        await applyPulse(rows?.first)
+    }
+
+    private func subscribePulse() async {
+        await loadPulse()
+        let channel = SupabaseService.client.channel("vp-\(vehicleId)")
+        await MainActor.run { self.pulseChannel = channel }
+        let stream = channel.postgresChange(AnyAction.self, schema: "public",
+                                            table: "vehicle_pulse", filter: "vehicle_id=eq.\(vehicleId)")
+        await channel.subscribe()
+        for await _ in stream { await loadPulse() }   // already-arbitrated truth; refetch the row
+    }
+
+    @MainActor private func applyPulse(_ p: VehiclePulse?) {
+        let prev = pulse
+        pulse = p
+        // Chime + haptic ONLY on a real higher live bid — motion is a derivative of data,
+        // never theater; never on hydrate/reconnect (prev nil) or a non-increase.
+        guard let p, p.is_live, p.live_state == "live",
+              let bid = p.displayBid, let was = prev?.displayBid, bid > was else { return }
+        AudioServicesPlaySystemSound(1057)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     /// The build's bookends — earliest + latest frame by capture date. Two 1-row
@@ -1201,33 +1673,253 @@ struct VehicleDetailView: View {
 
 // ─── Full-screen gallery — in-app, full-res originals. A paged TabView; every
 // CTA resolves in-app (C10 dead-link rule). Carries its own dismiss.
+/// Drives the swipeable viewer's `.fullScreenCover(item:)` — the index to open at.
+private struct GalleryStart: Identifiable { let index: Int; var id: Int { index } }
+
+// A real photo viewer (the Photos-app idiom): swipe between, pinch/pan/double-tap zoom,
+// a filmstrip scrubber, date caption, cached full-res. Tap toggles chrome. Analysis is
+// still one tap away (the drill survives) — never a parallel atom view (don't-mint).
 private struct FullScreenGalleryView: View {
-    let images: [String]
+    let photos: [VehicleGalleryImage]
+    var onAnalyze: ((VehicleGalleryImage) -> Void)? = nil
+    @State private var index: Int
+    @State private var showChrome = true
     @Environment(\.dismiss) private var dismiss
 
+    init(photos: [VehicleGalleryImage], startIndex: Int = 0,
+         onAnalyze: ((VehicleGalleryImage) -> Void)? = nil) {
+        self.photos = photos
+        self.onAnalyze = onAnalyze
+        _index = State(initialValue: min(max(startIndex, 0), max(photos.count - 1, 0)))
+    }
+    // Legacy shim — the two callers that pass bare URL strings (hero fallback, cohort zoom).
+    init(images: [String]) {
+        self.init(photos: images.map {
+            VehicleGalleryImage(id: UUID(), image_url: $0, thumbnail_url: nil, is_primary: nil,
+                                taken_at: nil, labels: nil, ai_processing_status: nil)
+        })
+    }
+
+    private var current: VehicleGalleryImage? { photos.indices.contains(index) ? photos[index] : nil }
+
     var body: some View {
-        NavigationStack {
-            TabView {
-                ForEach(images, id: \.self) { urlStr in
-                    if let url = URL(string: urlStr) {
-                        AsyncImage(url: url) { image in
-                            image.resizable().scaledToFit()
-                        } placeholder: {
-                            Color.black.overlay { ProgressView().tint(.white) }
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
+        ZStack {
+            Color.black.ignoresSafeArea()
+            TabView(selection: $index) {
+                ForEach(Array(photos.enumerated()), id: \.offset) { i, img in
+                    ZoomableImage(url: img.image_url).tag(i).ignoresSafeArea()
                 }
             }
-            .tabViewStyle(.page(indexDisplayMode: .automatic))
-            .background(Color.black.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { showChrome.toggle() } }
+
+            if showChrome {
+                VStack(spacing: 0) {
+                    HStack {
+                        Button { dismiss() } label: {
+                            Image(systemName: "xmark").font(.headline.weight(.semibold))
+                                .foregroundStyle(.white).padding(10).background(.black.opacity(0.4), in: Circle())
+                        }
+                        Spacer()
+                        if let c = current, onAnalyze != nil {
+                            Button { onAnalyze?(c) } label: {
+                                Label("Analysis", systemImage: "sparkle.magnifyingglass")
+                                    .font(.subheadline.weight(.medium)).foregroundStyle(.white)
+                                    .padding(.horizontal, 12).padding(.vertical, 8)
+                                    .background(.black.opacity(0.4), in: Capsule())
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16).padding(.top, 8)
+                    Spacer()
+                    if let at = current?.taken_at, !at.isEmpty {
+                        Text(prettyDate(at)).font(.footnote.weight(.medium)).foregroundStyle(.white)
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(.black.opacity(0.4), in: Capsule())
+                            .padding(.bottom, 6)
+                    }
+                    scrubber.padding(.bottom, 8)
+                }
+                .transition(.opacity)
+            }
+        }
+        .statusBarHidden()
+    }
+
+    private var scrubber: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(Array(photos.enumerated()), id: \.offset) { i, img in
+                        Button { withAnimation(.snappy(duration: 0.2)) { index = i } } label: {
+                            CachedAsyncImage(url: NukeImage.thumb(img.image_url, width: 120)) { im in
+                                im.resizable().scaledToFill()
+                            } placeholder: { Color.white.opacity(0.1) }
+                            .frame(width: i == index ? 46 : 34, height: i == index ? 46 : 34)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .overlay(RoundedRectangle(cornerRadius: 4)
+                                .strokeBorder(.white, lineWidth: i == index ? 2 : 0))
+                            .id(i)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+            .frame(height: 54)
+            .onChange(of: index) { _, new in withAnimation { proxy.scrollTo(new, anchor: .center) } }
+        }
+    }
+
+    private func prettyDate(_ s: String) -> String {
+        let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let d = iso.date(from: s) ?? {
+            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.date(from: String(s.prefix(10)))
+        }()
+        guard let d else { return String(s.prefix(10)) }
+        let out = DateFormatter(); out.dateStyle = .long
+        return out.string(from: d)
+    }
+}
+
+// Pinch-to-zoom + pan-while-zoomed + double-tap toggle, clamped 1…4×. Full-res raw
+// image (IMAGE RULE), cached. Resets on page change (each page is its own instance).
+private struct ZoomableImage: View {
+    let url: String?
+    @State private var scale: CGFloat = 1
+    @State private var lastScale: CGFloat = 1
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+
+    var body: some View {
+        GeometryReader { geo in
+            CachedAsyncImage(url: URL(string: url ?? "")) { image in
+                image.resizable().scaledToFit()
+            } placeholder: {
+                Color.black.overlay { ProgressView().tint(.white) }
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .scaleEffect(scale)
+            .offset(offset)
+            .gesture(MagnificationGesture()
+                .onChanged { v in scale = min(max(lastScale * v, 1), 4) }
+                .onEnded { _ in
+                    lastScale = scale
+                    if scale <= 1 { withAnimation(.spring) { offset = .zero; lastOffset = .zero } }
+                })
+            .simultaneousGesture(DragGesture()
+                .onChanged { v in
+                    if scale > 1 {
+                        offset = CGSize(width: lastOffset.width + v.translation.width,
+                                        height: lastOffset.height + v.translation.height)
+                    }
+                }
+                .onEnded { _ in lastOffset = offset })
+            .onTapGesture(count: 2) {
+                withAnimation(.spring) {
+                    if scale > 1 { scale = 1; lastScale = 1; offset = .zero; lastOffset = .zero }
+                    else { scale = 2.5; lastScale = 2.5 }
                 }
             }
         }
+    }
+}
+
+// ─── VALUE TRAJECTORY ────────────────────────────────────────────────────────
+// The thesis: a built car has ONE sale (the purchase) then ACCRUING documented
+// investment — value you BUILD over time, not wait for a resale to reveal. Reads
+// get_vehicle_investment_timeline (receipts, dated). Undated receipts are summarized
+// honestly, never plotted (no date to place them). Headline includes the acquisition
+// so the curve total ($33.5K) doesn't look broken next to the parts-only proof ledger.
+struct InvestmentTimeline: Decodable {
+    let points: [Point]?
+    let final_cumulative_dated: Double?
+    let total_with_undated: Double?
+    let baseline: Point?
+    let undated: Undated?
+    struct Point: Decodable, Identifiable {
+        let date: String?; let kind: String?; let delta: Double?
+        let proven: Bool?; let cumulative: Double?
+        var id: String { (date ?? "") + (kind ?? "") + String(cumulative ?? 0) }
+        var day: Date? {
+            guard let s = date else { return nil }
+            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.date(from: String(s.prefix(10)))
+        }
+    }
+    struct Undated: Decodable { let n: Int?; let total: Double? }
+}
+
+struct ValueTrajectoryView: View {
+    let vehicleId: String
+    @State private var t: InvestmentTimeline?
+
+    private func money(_ v: Double) -> String { v.formatted(.currency(code: "USD").precision(.fractionLength(0))) }
+    private func moneyK(_ v: Double) -> String {
+        v >= 1000 ? "$\((v/1000).formatted(.number.precision(.fractionLength(v < 10000 ? 1 : 0))))k" : money(v)
+    }
+
+    var body: some View {
+        Group {
+        if let t, let pts = (t.points ?? []).filter({ $0.day != nil && $0.cumulative != nil }) as [InvestmentTimeline.Point]?,
+           pts.count >= 2 {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("VALUE BUILT")
+                    .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(moneyK(t.total_with_undated ?? t.final_cumulative_dated ?? 0))
+                        .font(.system(.title, design: .monospaced).weight(.semibold))
+                    Text("invested").font(.caption2).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 16)
+                if let b = t.baseline?.delta {
+                    Text("incl. \(money(b)) acquisition · the value you build, not wait to sell")
+                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                        .padding(.horizontal, 16)
+                }
+
+                Chart {
+                    ForEach(pts) { p in
+                        AreaMark(x: .value("Date", p.day!), y: .value("Invested", p.cumulative!))
+                            .foregroundStyle(.linearGradient(colors: [Color.accentColor.opacity(0.28), Color.accentColor.opacity(0.02)],
+                                                             startPoint: .top, endPoint: .bottom))
+                        LineMark(x: .value("Date", p.day!), y: .value("Invested", p.cumulative!))
+                            .foregroundStyle(Color.accentColor).interpolationMethod(.monotone)
+                    }
+                    if let first = pts.first, let d = first.day {
+                        PointMark(x: .value("Date", d), y: .value("Invested", first.cumulative!))
+                            .foregroundStyle(Color.accentColor).symbolSize(40)
+                            .annotation(position: .topLeading) {
+                                Text("bought").font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+                            }
+                    }
+                }
+                .chartYScale(domain: 0...((pts.compactMap { $0.cumulative }.max() ?? 1) * 1.12))
+                .chartYAxis {
+                    AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { v in
+                        AxisGridLine(); AxisValueLabel { if let d = v.as(Double.self) { Text(moneyK(d)) } }
+                    }
+                }
+                .frame(height: 170).padding(.horizontal, 16)
+
+                if let u = t.undated, let ut = u.total, ut > 0 {
+                    Text("+ \(money(ut)) from \(u.n ?? 0) undated receipts — real spend, no date to place it on the curve")
+                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                        .padding(.horizontal, 16)
+                }
+            }
+            .padding(.bottom, 16)
+        }
+        }
+        .task(id: vehicleId) { await fetch() }
+    }
+
+    private func fetch() async {
+        struct P: Encodable { let p_vehicle: String }
+        t = try? await SupabaseService.client
+            .rpc("get_vehicle_investment_timeline", params: P(p_vehicle: vehicleId))
+            .execute().value
     }
 }
 
