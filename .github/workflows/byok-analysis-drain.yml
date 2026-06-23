@@ -39,7 +39,13 @@ on:
         description: Analyze only this vehicle (blank = whole fleet)
         default: ''
   schedule:
-    - cron: '0 * * * *'   # hourly
+    # Near-continuous observation, not hourly. Each run is time-boxed (~45 min) and the
+    # concurrency group below (cancel-in-progress: false) keeps exactly ONE run active plus
+    # at most ONE pending — so a tight cron does NOT stack no-ops, it keeps a fresh run
+    # queued to start the instant the active one ends ≈ continuous coverage. A dropped tick
+    # (GitHub schedules are best-effort) self-heals on the next one. New uploads are picked
+    # up within ~one interval since `prepare` only pulls frames still lacking a verdict.
+    - cron: '*/10 * * * *'   # every 10 min
   # A push that touches THIS file fires one drain run and re-activates the
   # schedule if GitHub has suspended it (scheduled workflows get disabled after
   # repo inactivity or silently throttled). Path-scoped so normal merges don't
