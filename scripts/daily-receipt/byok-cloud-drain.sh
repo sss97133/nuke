@@ -34,7 +34,15 @@ log(){ echo "$(date -u '+%F %T') | cloud-drain | $*"; }
 # service-role-only RPC; we eval its output but never echo the secret.
 RESOLVED="$(dotenvx run -- node scripts/deep-image-analysis-byok.mjs resolve --user-id "$USER_ID" 2>/dev/null)"
 if [ -n "$RESOLVED" ]; then
-  while IFS= read -r kv; do [ -n "$kv" ] && export "$kv"; done <<< "$RESOLVED"
+  # Export ONLY well-formed KEY=VALUE lines. dotenvx prints a human banner
+  # ("⟐ injected env (N)") to stdout; exporting that line trips
+  # "not a valid identifier" and pollutes the resolve output. Filter to shell
+  # identifiers so the banner (or any stray line) is skipped, not exported.
+  while IFS= read -r kv; do
+    case "$kv" in
+      [A-Za-z_]*=*) export "$kv" ;;
+    esac
+  done <<< "$RESOLVED"
 fi
 METHOD="${NUKE_ANALYSIS_METHOD:-nuke_hosted}"
 if [ "${NUKE_ANALYSIS_ENABLED:-1}" = "0" ]; then
