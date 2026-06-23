@@ -633,6 +633,33 @@ async function resolve() {
       out.push(`${env}=${secret}`);
     }
   }
+
+  // Fallback to the APP's "Connected accounts" screen. AIProviderSettings.tsx saves the user's
+  // key to user_ai_providers with base64 "obfuscation" (btoa) — NOT Vault — and with no method
+  // field. That is a separate credential system the broker historically ignored, so a user who
+  // set their key in the app got no per-user compute (the drain silently ran on the platform
+  // repo secret instead). If the secure Vault path above produced no byo credential, honor the
+  // app connection: base64-decode and route by token prefix — sk-ant-oat = Claude subscription
+  // (CLAUDE_CODE_OAUTH_TOKEN, flat cost), sk-ant-api = pay-per-token key (ANTHROPIC_API_KEY).
+  // SECURITY DEBT: a subscription token stored base64-only is weak; the real fix is to make the
+  // app save via set_analysis_credential (Vault) so both systems share one encrypted source.
+  if (method === 'nuke_hosted' && enabled) {
+    const { data: prov } = await sb.rpc('get_user_api_key_info', { p_user_id: VEHICLE_USER, p_provider: 'anthropic' });
+    const r0 = Array.isArray(prov) ? prov[0] : prov;
+    if (r0?.api_key_encrypted) {
+      let tok = '';
+      try { tok = Buffer.from(r0.api_key_encrypted, 'base64').toString('utf8').trim(); } catch { tok = ''; }
+      if (tok.startsWith('sk-ant-oat')) {
+        out[0] = 'NUKE_ANALYSIS_METHOD=byo_subscription';
+        out.push(`CLAUDE_CODE_OAUTH_TOKEN=${tok}`);
+      } else if (tok.startsWith('sk-ant-api')) {
+        out[0] = 'NUKE_ANALYSIS_METHOD=byo_api_key';
+        out.push(`ANTHROPIC_API_KEY=${tok}`);
+      }
+      if (r0.model_name && !row?.model && tok.startsWith('sk-ant-')) out.push(`BYOK_MODEL=${r0.model_name}`);
+    }
+  }
+
   for (const line of out) console.log(line);
 }
 
