@@ -263,7 +263,7 @@ export const DomainRoutes = () => {
             <Route path="/settings/api-keys" element={<ApiKeysPage />} />
             <Route path="/settings/connected-agents" element={<ConnectedAgentsPage />} />
             <Route path="/settings/analysis" element={<AnalysisSettingsPage />} />
-            <Route path="/pipeline" element={<PipelineVisualizer />} />
+            <Route path="/pipeline/analysis" element={<PipelineVisualizer />} />
             <Route path="/settings/webhooks" element={<WebhooksPage />} />
             <Route path="/settings/usage" element={<UsageDashboardPage />} />
             <Route path="/developers/dashboard" element={<DeveloperDashboard />} />

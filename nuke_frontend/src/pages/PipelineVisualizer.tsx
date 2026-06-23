@@ -80,7 +80,6 @@ export default function PipelineVisualizer() {
   const poll = useCallback(async (initial: boolean) => {
     if (!uid) return;
     const { data, error } = await supabase.rpc('get_analysis_stream', {
-      p_user_id: uid,
       p_since: initial ? null : cursorRef.current,
       p_limit: initial ? 60 : 40,
     });
