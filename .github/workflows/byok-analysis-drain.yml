@@ -39,6 +39,8 @@ on:
         description: Analyze only this vehicle (blank = whole fleet)
         default: ''
   schedule:
+    # Drain now analyzes the gallery whitelist (null OR approved gate), not approved-only —
+    # so the ~5.6k displayed-but-unanalyzed null-gate frames finally get verdicts.
     # Near-continuous observation, not hourly. Each run is time-boxed (~45 min) and the
     # concurrency group below (cancel-in-progress: false) keeps exactly ONE run active plus
     # at most ONE pending — so a tight cron does NOT stack no-ops, it keeps a fresh run
