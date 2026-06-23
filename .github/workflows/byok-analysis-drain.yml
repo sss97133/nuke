@@ -69,6 +69,17 @@ jobs:
   drain:
     runs-on: ubuntu-latest
     timeout-minutes: 55
+    # Parallel shards. A single serial run only reached the HEAD of the least-analyzed-first
+    # queue within its 45-min budget, so the tail starved — zero-coverage vehicles never got
+    # a verdict (measured: 19 vehicles / 961 frames stuck at 0%) while the drain re-chewed the
+    # front. Each shard is a separate runner draining a disjoint slice of the fleet (see the
+    # sharding block in byok-cloud-drain.sh), so every vehicle is reached. fail-fast off: one
+    # shard's hiccup must not cancel the others. 4 = a real throughput multiple without storming
+    # the Claude subscription's concurrency/rate limits; raise cautiously if the sub allows.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
 
@@ -116,12 +127,13 @@ jobs:
             "${{ github.event.inputs.user_id || '0b9f107a-d124-49de-9ded-94698f63c1c4' }}" \
             "${{ github.event.inputs.batch || '12' }}" \
             "${{ github.event.inputs.minutes || '45' }}" \
-            "${{ github.event.inputs.vehicle_id || '' }}"
+            "${{ github.event.inputs.vehicle_id || '' }}" \
+            4 "${{ matrix.shard }}"
 
       - name: Upload drain log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: byok-drain-log
+          name: byok-drain-log-shard-${{ matrix.shard }}
           path: logs/
           if-no-files-found: ignore
