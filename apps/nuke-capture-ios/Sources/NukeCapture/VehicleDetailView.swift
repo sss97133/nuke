@@ -65,6 +65,7 @@ struct VehicleGalleryImage: Decodable, Identifiable {
     let ai_processing_status: String?
     let image_category: String?  // vision: exterior_body / interior / documentation / engine_mechanical…
     let created_at: String?      // upload time — recency fallback when EXIF taken_at is null
+    let vision_gate_agent_reasoning: String?  // names the medium → photo vs rendering/receipt (hero pick)
 }
 
 // SALE HISTORY — real sale events from vehicle_timeline_events (same table the build-days
@@ -317,6 +318,7 @@ struct VehicleDetailView: View {
             }
         }
         .task(id: vehicleId) { await load() }
+        .task(id: vehicleId) { await loadHero() }
         .task(id: vehicleId) { await loadSpecs() }
         .task(id: vehicleId) { await loadValuation() }
         .task(id: vehicleId) { await loadVehicleDays() }
@@ -541,11 +543,44 @@ struct VehicleDetailView: View {
     private var heroImage: VehicleGalleryImage? {
         func recency(_ i: VehicleGalleryImage) -> String { i.taken_at ?? i.created_at ?? "" }
         func latest(_ xs: [VehicleGalleryImage]) -> VehicleGalleryImage? { xs.max { recency($0) < recency($1) } }
-        let candidates = images.filter { $0.image_category != "documentation" }   // never lead with a plate
-        return latest(candidates.filter { $0.image_category == "exterior_body" }) // the truck itself
-            ?? latest(candidates.filter { $0.image_category != nil })             // any categorized vehicle photo
-            ?? latest(candidates)                                                 // latest non-document
-            ?? images.first
+        // A real PHOTO, not a rendering/receipt: vision reasoning names the medium
+        // ("Hand-drawn pencil sketch…", "eBay receipt…" vs "Maroon K5 Blazer in shop").
+        // Null reasoning → treat as a photo (the common, un-flagged case).
+        func realPhoto(_ i: VehicleGalleryImage) -> Bool {
+            guard let r = i.vision_gate_agent_reasoning?.lowercased(), !r.isEmpty else { return true }
+            return !["sketch","drawing","pencil","illustration","painting","render",
+                     "screenshot","receipt","invoice","brochure","spec sheet","scan"].contains { r.contains($0) }
+        }
+        // Prefer a real exterior PHOTO of the truck (from the dedicated heroCandidates
+        // fetch — the latest one can sit past the gallery's first page). Then a
+        // rendering of it (art fallback). Then the paged gallery for vehicles with no
+        // exterior set — always excluding documents (a plate never leads).
+        if let realExt = latest(heroCandidates.filter(realPhoto)) { return realExt }
+        if let anyExt  = latest(heroCandidates) { return anyExt }                 // art fallback
+        let nonDoc = images.filter { $0.image_category != "documentation" }
+        return latest(nonDoc.filter(realPhoto)) ?? latest(nonDoc) ?? images.first
+    }
+
+    /// Dedicated lead-image candidates: the gallery is paged taken_at-DESC, and the
+    /// latest real exterior PHOTO can sit past page 1 (renderings/receipts that vision
+    /// miscategorized as exterior_body carry newer dates). Fetch the exterior_body set
+    /// once, with its vision reasoning, and let `heroImage` choose photo-over-art.
+    @State private var heroCandidates: [VehicleGalleryImage] = []
+    private func loadHero() async {
+        do {
+            heroCandidates = try await SupabaseService.client
+                .from("vehicle_images")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,vision_gate_agent_reasoning")
+                .eq("vehicle_id", value: vehicleId)
+                .eq("image_category", value: "exterior_body")
+                .in("ai_processing_status", values: ["completed", "analyzed"])
+                .not("is_superseded", operator: .is, value: "true")
+                .order("taken_at", ascending: false)
+                .limit(200)
+                .execute().value
+        } catch {
+            NSLog("NukeCapture hero candidates fetch failed: %@", String(describing: error))
+        }
     }
 
 
@@ -1737,7 +1772,7 @@ private struct FullScreenGalleryView: View {
         self.init(photos: images.map {
             VehicleGalleryImage(id: UUID(), image_url: $0, thumbnail_url: nil, is_primary: nil,
                                 taken_at: nil, labels: nil, ai_processing_status: nil,
-                                image_category: nil, created_at: nil)
+                                image_category: nil, created_at: nil, vision_gate_agent_reasoning: nil)
         })
     }
 
