@@ -74,8 +74,8 @@ const AIProviderSettings: React.FC = () => {
     }
 
     try {
-      // Store API key as base64 encoded (simple obfuscation)
-      // In production, use proper encryption
+      // user_ai_providers stores the key base64-encoded (legacy; read by AIModelSelector). The
+      // security-critical copy for analysis is written to Vault below via set_analysis_credential.
       let encryptedKey = provider.api_key_encrypted || '';
       if (apiKey && apiKey.trim()) {
         // Only update key if a new one was provided
@@ -112,6 +112,26 @@ const AIProviderSettings: React.FC = () => {
         });
 
       if (upsertError) throw upsertError;
+
+      // Persist the analysis credential to Vault (encrypted) via the broker RPC so the deep-
+      // analysis drain reads a properly-encrypted secret, not the base64 value above. Only for a
+      // freshly-entered Anthropic key (the provider the drain uses); method is detected from the
+      // token prefix — setup-token subscription (sk-ant-oat) vs pay-per-token API key (sk-ant-api).
+      // Best-effort: a failure here must not block the provider save.
+      if (apiKey && apiKey.trim() && provider.provider === 'anthropic') {
+        const raw = apiKey.trim();
+        const method = raw.startsWith('sk-ant-oat') ? 'byo_subscription'
+                     : raw.startsWith('sk-ant-api') ? 'byo_api_key' : null;
+        if (method) {
+          const { error: credErr } = await supabase.rpc('set_analysis_credential', {
+            p_method: method,
+            p_provider: 'anthropic',
+            p_secret: raw,
+            p_model: provider.model_name.trim(),
+          });
+          if (credErr) console.warn('analysis credential (Vault) not stored:', credErr.message);
+        }
+      }
 
       showToast('AI provider saved successfully', 'success');
       setEditingProvider(null);
