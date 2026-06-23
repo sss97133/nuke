@@ -31,7 +31,12 @@ struct NukeCaptureApp: App {
         WindowGroup {
             Group {
                 if session.isSignedIn {
-                    TodayView()
+                    TabView {
+                        TodayView()
+                            .tabItem { Label("Capture", systemImage: "camera") }
+                        PipelineView()
+                            .tabItem { Label("Pipeline", systemImage: "waveform.path.ecg") }
+                    }
                 } else {
                     SignInView()
                 }
