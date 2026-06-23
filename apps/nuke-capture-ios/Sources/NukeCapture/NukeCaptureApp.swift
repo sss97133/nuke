@@ -53,7 +53,14 @@ struct NukeCaptureApp: App {
                 // app on that vehicle's profile so the build→screenshot→critique
                 // loop lands deterministically on the page under work (no fragile
                 // coordinate-tapping). DEBUG builds only; never ships.
-                if let dbgVehicle = ProcessInfo.processInfo.environment["NUKE_DEBUG_VEHICLE_ID"],
+                if let dbgCohort = ProcessInfo.processInfo.environment["NUKE_DEBUG_COHORT"],
+                   !dbgCohort.isEmpty {
+                    // NUKE_DEBUG_COHORT="year|make|model" roots on the cohort terminal
+                    // so the screenshot loop lands on it without tab/tap navigation.
+                    DebugCohortDeepLink(spec: dbgCohort)
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "signdays" {
+                    DebugScreenDeepLink()
+                } else if let dbgVehicle = ProcessInfo.processInfo.environment["NUKE_DEBUG_VEHICLE_ID"],
                    !dbgVehicle.isEmpty {
                     DebugVehicleDeepLink(
                         vehicleId: dbgVehicle,
@@ -301,6 +308,52 @@ private struct DebugVehicleDeepLink: View {
                       SupabaseService.currentUserId ?? "nil")
             }
             ready = true
+        }
+    }
+}
+
+/// Screenshot-loop deep link for the day-confirm surface.
+/// NUKE_DEBUG_SCREEN=signdays → roots the app on WorkDaySignView (authed). DEBUG only.
+private struct DebugScreenDeepLink: View {
+    @State private var ready = false
+    var body: some View {
+        Group {
+            if ready {
+                NavigationStack { WorkDaySignView() }
+            } else {
+                Color(.systemBackground).overlay { ProgressView() }
+            }
+        }
+        .task {
+            let env = ProcessInfo.processInfo.environment
+            if let at = env["NUKE_DEBUG_ACCESS_TOKEN"], !at.isEmpty,
+               let rt = env["NUKE_DEBUG_REFRESH_TOKEN"], !rt.isEmpty,
+               SupabaseService.currentUserId == nil {
+                _ = try? await SupabaseService.client.auth.setSession(accessToken: at, refreshToken: rt)
+            }
+            ready = true
+        }
+    }
+}
+
+/// Screenshot-loop deep link for the cohort terminal.
+/// NUKE_DEBUG_COHORT="year|make|model" → roots the app on that cohort. DEBUG only.
+private struct DebugCohortDeepLink: View {
+    let spec: String
+    private var parsed: (make: String, model: String, year: Int)? {
+        let p = spec.split(separator: "|").map(String.init)
+        guard p.count == 3, let yr = Int(p[0]) else { return nil }
+        return (p[1], p[2], yr)
+    }
+    var body: some View {
+        Group {
+            if let c = parsed {
+                NavigationStack {
+                    CohortTerminalView(make: c.make, model: c.model, year: c.year)
+                }
+            } else {
+                Color(.systemBackground)
+            }
         }
     }
 }

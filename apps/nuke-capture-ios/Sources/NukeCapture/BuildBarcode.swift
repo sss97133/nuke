@@ -19,11 +19,15 @@ struct BuildBarcode: View {
             let cols = Self.weekColors(days)
             guard !cols.isEmpty else { return }
             let bw = size.width / CGFloat(cols.count)
+            // Empty weeks render as a QUIET adaptive bar (not blank, not a slab) so
+            // the band reads as filled-vs-empty density on ANY surface — the GitHub
+            // model. Adaptive system fill → correct in light AND dark mode; the green
+            // ramp stays the themeable colorway layer. No foreign field needed.
+            let empty = Color(uiColor: .quaternarySystemFill)
             for (i, c) in cols.enumerated() {
-                guard let c else { continue }                 // empty week → blank
                 let x = CGFloat(i) * bw
                 let rect = CGRect(x: x, y: 0, width: bw + 0.6, height: size.height)
-                ctx.fill(Path(rect), with: .color(c))         // full-height, flush
+                ctx.fill(Path(rect), with: .color(c ?? empty)) // full-height, flush
             }
         }
         .frame(height: height)
@@ -79,7 +83,7 @@ struct BuildBarcode: View {
 
     // Days since 1970-01-01 from "yyyy-MM-dd" (Howard Hinnant's civil algorithm) —
     // exact, no DateFormatter, so weekly bucketing lands on real week boundaries.
-    private static func epochDay(_ s: String) -> Int? {
+    static func epochDay(_ s: String) -> Int? {
         let p = s.split(separator: "-")
         guard p.count == 3, let y0 = Int(p[0]), let m = Int(p[1]), let d = Int(p[2]) else { return nil }
         let y = m <= 2 ? y0 - 1 : y0

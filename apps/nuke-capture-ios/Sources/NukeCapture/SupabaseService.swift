@@ -32,7 +32,7 @@ struct VehicleImageRow: Encodable {
     let documented_by_user_id: String
     let latitude: Double?
     let longitude: Double?
-    let taken_at: String?               // asset.creationDate, ISO-8601
+    let taken_at: String?               // embedded EXIF DateTimeOriginal (raw truth), ISO-8601; falls back to creationDate only if EXIF date absent
     let file_hash: String?              // SHA-256 hex of the uploaded bytes (nil for metadata-only)
     let apple_ml_labels: [String]?      // on-device Apple Vision labels → feeds the server L2 gate (both row kinds)
     let exif_data: ExifData
@@ -53,6 +53,7 @@ struct PhotoMeta {
     let assetIdentifier: String
     let filename: String
     let creationDate: Date?
+    let exifCaptureDate: Date?          // embedded EXIF DateTimeOriginal — the raw truth; preferred over creationDate
     let latitude: Double?
     let longitude: Double?
     let cameraMake: String?             // from TIFF EXIF
@@ -341,7 +342,7 @@ enum SupabaseService {
             documented_by_user_id: userId,
             latitude: meta.latitude,
             longitude: meta.longitude,
-            taken_at: meta.creationDate.map { isoFormatter.string(from: $0) },
+            taken_at: (meta.exifCaptureDate ?? meta.creationDate).map { isoFormatter.string(from: $0) },
             file_hash: fileHash,
             apple_ml_labels: appleMLLabels.isEmpty ? nil : appleMLLabels,
             exif_data: .init(

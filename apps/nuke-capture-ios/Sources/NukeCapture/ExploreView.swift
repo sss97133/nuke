@@ -13,6 +13,18 @@
 
 import SwiftUI
 
+/// A clean year-make-model the search resolved to — the push target for the
+/// COHORT entry. Hashable so it rides a second .navigationDestination on the same
+/// stack that pushes individual vehicles. Built ONLY from an unambiguous parse
+/// (see detectCohort); the app never guesses a cohort it can't cleanly read.
+struct CohortTarget: Hashable {
+    let year: Int
+    let make: String
+    let model: String
+    /// "1966 Ford Mustang" — the row label.
+    var label: String { "\(year) \(make) \(model)" }
+}
+
 struct ExploreView: View {
     @State private var query = ""
     @State private var feed: [VehicleHeaderRow] = []
@@ -32,6 +44,44 @@ struct ExploreView: View {
     /// What the grid shows: search results when typing, the feed otherwise.
     private var rows: [VehicleHeaderRow] {
         query.trimmingCharacters(in: .whitespaces).count >= 2 ? results : feed
+    }
+
+    /// The cohort the query resolves to, if it parses CLEANLY to a year-make-model
+    /// (4-digit year 1885..nextYear LEADING + a make token + a model remainder).
+    /// Returns nil for anything ambiguous — we never guess a cohort. When non-nil,
+    /// the grid shows a single COHORT TERMINAL entry above the vehicle results.
+    private var cohort: CohortTarget? { Self.detectCohort(query) }
+
+    /// Parse a clean year-make-model out of the search term, or nil. STRICT: the
+    /// first token must be a valid 4-digit year, then at least two more tokens (a
+    /// make + a model remainder). "1966 ford mustang" → (1966, "Ford", "Mustang");
+    /// "mustang" / "ford mustang" / "1966 ford" → nil (no clean YMM to resolve).
+    static func detectCohort(_ raw: String) -> CohortTarget? {
+        let tokens = raw.trimmingCharacters(in: .whitespaces)
+            .split(whereSeparator: { $0.isWhitespace })
+            .map(String.init)
+        guard tokens.count >= 3 else { return nil }            // need year + make + model
+        let yearTok = tokens[0]
+        guard yearTok.count == 4, let year = Int(yearTok) else { return nil }
+        // Calendar year ceiling: next model year is valid (e.g. 2027 in late 2026).
+        let nextYear = (Calendar.current.component(.year, from: Date())) + 1
+        guard year > 1885, year <= nextYear else { return nil }
+        let make = tokens[1]
+        let model = tokens[2...].joined(separator: " ")
+        guard !make.isEmpty, !model.isEmpty else { return nil }
+        // Title-case the make/model for display + the RPC (matches the web's
+        // register-then-fetch casing; the RPC is case-tolerant but this reads right).
+        return CohortTarget(year: year, make: titleCase(make), model: titleCase(model))
+    }
+
+    /// Title-case each word ("ford" → "Ford", "model t" → "Model T"). Leaves
+    /// already-uppercase tokens (e.g. "GT350") intact rather than lowercasing them.
+    private static func titleCase(_ s: String) -> String {
+        s.split(separator: " ").map { word -> String in
+            let str = String(word)
+            if str == str.uppercased() { return str }          // GT350, K-code stay as typed
+            return str.prefix(1).uppercased() + str.dropFirst().lowercased()
+        }.joined(separator: " ")
     }
 
     var body: some View {
@@ -70,7 +120,7 @@ struct ExploreView: View {
                         }
                         .buttonStyle(.borderedProminent)
                     }
-                } else if rows.isEmpty {
+                } else if rows.isEmpty && cohort == nil {
                     ContentUnavailableView(
                         searched ? "No matches" : "Nothing to show",
                         systemImage: searched ? "magnifyingglass" : "binoculars",
@@ -80,6 +130,15 @@ struct ExploreView: View {
                     )
                 } else {
                     ScrollView {
+                        // COHORT entry — when the query parses to a clean YMM, the
+                        // cohort itself leads the results: a single standard row that
+                        // pushes the CohortTerminalView (the whole population as one
+                        // instrument). The individual vehicle grid follows, unchanged.
+                        if let c = cohort {
+                            NavigationLink(value: c) { cohortRow(c) }
+                                .buttonStyle(.plain)
+                            Divider()
+                        }
                         LazyVGrid(columns: columns, spacing: 2) {
                             ForEach(rows) { v in
                                 NavigationLink(value: v) { cell(v) }
@@ -98,6 +157,11 @@ struct ExploreView: View {
                 VehicleDetailView(vehicleId: v.id.uuidString.lowercased(),
                                   embedInNavigationStack: false)
             }
+            .navigationDestination(for: CohortTarget.self) { c in
+                // PUSH the cohort instrument. Its comp rows drill back into this
+                // same stack via the VehicleHeaderRow destination above.
+                CohortTerminalView(make: c.make, model: c.model, year: c.year)
+            }
             .task { await loadFeed() }
             .task(id: query) {
                 let term = query.trimmingCharacters(in: .whitespaces)
@@ -107,6 +171,34 @@ struct ExploreView: View {
                 await search(term)
             }
         }
+    }
+
+    // ─── The COHORT row — a standard, full-width List-style row (icon · YMM ·
+    // "Cohort Terminal" · chevron). Native grammar: it reads as a system
+    // disclosure row, distinct from the photo grid below it, signaling "this opens
+    // a different KIND of thing — the population, not one vehicle."
+    @ViewBuilder private func cohortRow(_ c: CohortTarget) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "square.grid.3x3.fill")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(c.label)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text("Cohort Terminal")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
     }
 
     // ─── One square thumbnail cell — render-endpoint thumb, a flat plate +
@@ -184,22 +276,40 @@ struct ExploreView: View {
         }
     }
 
-    // ─── Search — existing behaviour, unchanged shape; results land in the grid.
+    // ─── Search — tokenized: a 4-digit year token becomes an AND year.eq filter,
+    // the remaining words become an OR(make,model) text match. So "1966 mustang"
+    // is year=1966 AND (make/model ~ "mustang"), not one literal ILIKE that no row
+    // can satisfy. Order-independent: "mustang 1966" resolves identically.
     private func search(_ term: String) async {
         // Sanitize PostgREST filter metacharacters out of the user term.
-        let t = term.replacingOccurrences(of: "*", with: "")
+        let clean = term.replacingOccurrences(of: "*", with: "")
             .replacingOccurrences(of: ",", with: "")
             .replacingOccurrences(of: "(", with: "")
             .replacingOccurrences(of: ")", with: "")
-        var filter = "make.ilike.*\(t)*,model.ilike.*\(t)*"
-        if let yr = Int(t), yr > 1885, yr < 2100 { filter += ",year.eq.\(yr)" }
+        // Split into whitespace tokens; pull out a single 4-digit year (1886–2100).
+        let tokens = clean.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        var year: Int? = nil
+        var textTokens: [String] = []
+        for tok in tokens {
+            if year == nil, tok.count == 4, let n = Int(tok), n > 1885, n < 2100 {
+                year = n
+            } else {
+                textTokens.append(tok)
+            }
+        }
+        let text = textTokens.joined(separator: " ")
         searchError = false
         do {
-            let raw: [VehicleHeaderRow] = try await SupabaseService.client
+            // Build the query with the public/status filters shared by every path,
+            // then conditionally chain the year (AND) and the make/model text (OR).
+            var q = SupabaseService.client
                 .from("vehicles")
                 .select("id,year,make,model,trim,primary_image_url")
                 .eq("is_public", value: true)
-                .or(filter)
+                .neq("status", value: "pending")
+            if let yr = year { q = q.eq("year", value: yr) }
+            if !text.isEmpty { q = q.or("make.ilike.*\(text)*,model.ilike.*\(text)*") }
+            let raw: [VehicleHeaderRow] = try await q
                 .order("year", ascending: false)
                 .limit(60)
                 .execute()
