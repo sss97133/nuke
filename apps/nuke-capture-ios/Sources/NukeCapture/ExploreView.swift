@@ -46,11 +46,39 @@ struct ExploreView: View {
         query.trimmingCharacters(in: .whitespaces).count >= 2 ? results : feed
     }
 
-    /// The cohort the query resolves to, if it parses CLEANLY to a year-make-model
-    /// (4-digit year 1885..nextYear LEADING + a make token + a model remainder).
-    /// Returns nil for anything ambiguous — we never guess a cohort. When non-nil,
-    /// the grid shows a single COHORT TERMINAL entry above the vehicle results.
-    private var cohort: CohortTarget? { Self.detectCohort(query) }
+    /// The cohort the query resolves to. FIRST the strict explicit parse (a leading
+    /// 4-digit year + make + model). Failing that — so "mustang" / "k5 blazer" /
+    /// "ford mustang" no longer DEAD-END in the photo grid (the buried-instrument
+    /// defect) — DERIVE it from the search results: the dominant make+model among the
+    /// matched rows, year taken from those same rows. Grounded in real data, never a
+    /// guess. When non-nil, a COHORT TERMINAL row leads the results.
+    private var cohort: CohortTarget? {
+        if let strict = Self.detectCohort(query) { return strict }
+        guard query.trimmingCharacters(in: .whitespaces).count >= 2, !results.isEmpty else { return nil }
+        return Self.dominantCohort(in: results)
+    }
+
+    /// Derive a cohort from search results when the user didn't type a clean YMM:
+    /// the most-common make+model pair (require ≥2 hits so we never guess off a
+    /// single row), with the year = the MODE year among that pair's rows. This
+    /// un-buries CohortTerminalView for natural queries without inventing data.
+    static func dominantCohort(in rows: [VehicleHeaderRow]) -> CohortTarget? {
+        struct Acc { var make: String; var model: String; var years: [Int] }
+        var groups: [String: Acc] = [:]
+        for r in rows {
+            guard let mk = r.make?.trimmingCharacters(in: .whitespaces), !mk.isEmpty,
+                  let md = r.model?.trimmingCharacters(in: .whitespaces), !md.isEmpty else { continue }
+            let key = (mk + "|" + md).lowercased()
+            var acc = groups[key] ?? Acc(make: mk, model: md, years: [])
+            if let y = r.year, y > 1885 { acc.years.append(y) }
+            groups[key] = acc
+        }
+        guard let top = groups.values.max(by: { $0.years.count < $1.years.count }),
+              top.years.count >= 2 else { return nil }
+        let modeYear = top.years.reduce(into: [Int: Int]()) { $0[$1, default: 0] += 1 }
+            .max(by: { $0.value < $1.value })!.key
+        return CohortTarget(year: modeYear, make: titleCase(top.make), model: titleCase(top.model))
+    }
 
     /// Parse a clean year-make-model out of the search term, or nil. STRICT: the
     /// first token must be a valid 4-digit year, then at least two more tokens (a

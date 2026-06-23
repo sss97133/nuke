@@ -508,6 +508,24 @@ struct ProfileView: View {
                     if let an = p.images_analyzed, an > 0 { stat(an.formatted(), "analyzed") }
                 }
             }
+
+            // THE FLEET — the maker headline the VEHICLE profile earns, lifted to the
+            // whole body of work: proven LABOR (worth-hiring, Tenet 9) across the
+            // fleet, and the fleet's defensible WORTH in the SAME est/block grammar a
+            // single vehicle uses — never a firm price, "Not priced yet" at zero. The
+            // per-car evidence drills one section down (the garage rows). Own profile.
+            if isOwn, let p = producer, !currentGarage.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Divider().padding(.vertical, 2)
+                    Text(fleetLaborLine(p))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(fleetWorthLine)
+                        .font(.caption).monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
@@ -532,13 +550,52 @@ struct ProfileView: View {
         }
     }
 
+    // ─── Fleet headline — the maker's whole body of work, mirroring the VEHICLE
+    //     profile's worth read. Summed in-view from already-fetched data
+    //     (get_user_garage est values + get_user_producer_signals); no new fetch,
+    //     no new RPC, no drill sheet (the per-car evidence is the garage section
+    //     one row down — each car drills to its own WorthBracketView, C10).
+    /// Defensible fleet worth = sum of the class-stratified "est" values already on
+    /// the garage rows (get_user_garage only emits defensible estimates).
+    private var fleetWorth: Double {
+        currentGarage.compactMap(\.current_value).filter { $0 > 0 }.reduce(0, +)
+    }
+    private var fleetPricedCount: Int {
+        currentGarage.filter { ($0.current_value ?? 0) > 0 }.count
+    }
+
+    /// The Tenet-9 worth-hiring sentence — proven LABOR across the fleet, not a
+    /// vanity count. Lifetime totals, distinct from the "this year" producer chips
+    /// above (no fact stated twice).
+    private func fleetLaborLine(_ p: ProducerSignals) -> String {
+        var parts = ["\(currentGarage.count) vehicle\(currentGarage.count == 1 ? "" : "s")"]
+        if let h = p.hours_total, h > 0 { parts.append("\(h)h proven") }
+        if let d = p.work_days_total, d > 0 { parts.append("\(d) logged days") }
+        return parts.joined(separator: " · ")
+    }
+
+    /// The fleet's worth in the SAME est/tilde/block grammar a single vehicle uses:
+    /// "~est $210,000 · 3 of 8 priced" when thin, "Not priced yet" when none of the
+    /// fleet is defensibly priced — never a firm fleet number (the valuation law).
+    private var fleetWorthLine: String {
+        guard fleetPricedCount > 0 else {
+            return "Not priced yet — a body of work, not a comp average"
+        }
+        let money = fleetWorth.formatted(.currency(code: "USD").precision(.fractionLength(0)))
+        let thin = fleetPricedCount < currentGarage.count
+        return "\(thin ? "~" : "")est \(money) · \(fleetPricedCount) of \(currentGarage.count) priced"
+    }
+
     // ─── Garage ──────────────────────────────────────────────────────────────
     @ViewBuilder private var garageSection: some View {
         if !currentGarage.isEmpty {
             Section {
                 ForEach(currentGarage) { v in garageRow(v) }
             } header: {
-                Text("Garage · \(currentGarage.count)")
+                // "The fleet" (was "Garage") — the worth/labor headline lives up in
+                // the identity head now; this just labels the list (Tenet 2: the
+                // fleet figure is stated once, in the headline, not restated here).
+                Text("The fleet · \(currentGarage.count)")
             }
             // Vehicle sheet lives HERE (on the garage section), NOT stacked as a second
             // .sheet on the same List as the day-receipt sheet — two .sheet(item:) on one
