@@ -40,6 +40,14 @@ on:
         default: ''
   schedule:
     - cron: '0 * * * *'   # hourly
+  # A push that touches THIS file fires one drain run and re-activates the
+  # schedule if GitHub has suspended it (scheduled workflows get disabled after
+  # repo inactivity or silently throttled). Path-scoped so normal merges don't
+  # trigger a 45-minute drain — only edits to the drain workflow itself do.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/byok-analysis-drain.yml'
 
 # Least-privilege GITHUB_TOKEN: this job only checks out and reads.
 permissions:
