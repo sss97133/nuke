@@ -971,6 +971,22 @@ private struct SaleCard: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(sale.vehicleId == nil)
+
+                    // The price's OWN evidence: the listing where this sale happened.
+                    // A price with no reachable source is an assertion; this makes the
+                    // dot drill to the auction page that proves it. Absent url → no
+                    // fake affordance (honest: the sale carries no captured source).
+                    if let u = sale.url, !u.isEmpty, let url = URL(string: u) {
+                        Link(destination: url) {
+                            HStack { Text("View listing"); Spacer()
+                                Text(prettySource(sale.source)).foregroundStyle(.secondary)
+                                Image(systemName: "arrow.up.right") }
+                                .font(.callout.weight(.medium))
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12))
+                        }
+                    }
                 }
                 .padding(16)
             }
@@ -1200,6 +1216,7 @@ struct CohortSentiment: Decodable {
         struct Pt: Decodable, Identifiable {
             let comment_id: String?; let sentiment: Double?; let stance: Double?
             let kind: String?; let is_seller: Bool?; let author: String?; let likes: Int?; let text: String?
+            let source_url: String?   // the listing where this comment was said (drill-to-source)
             var id: String { comment_id ?? "\(author ?? "")\(sentiment ?? 0)\(stance ?? 0)" }
         }
     }
@@ -1290,6 +1307,19 @@ private struct CommentPeek: View {
                     HStack(spacing: 20) {
                         axisChip("polarity", p.sentiment)
                         axisChip("stance", p.stance)
+                    }
+                    // Drill to where it was said — the listing this comment lives on.
+                    // A scored comment with no reachable source is an unfalsifiable claim.
+                    if let u = p.source_url, !u.isEmpty, let url = URL(string: u) {
+                        Link(destination: url) {
+                            HStack { Image(systemName: "text.bubble"); Text("Read in context"); Spacer()
+                                Image(systemName: "arrow.up.right") }
+                                .font(.callout.weight(.medium))
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12))
+                        }
+                        .padding(.top, 4)
                     }
                 }
                 .padding()
