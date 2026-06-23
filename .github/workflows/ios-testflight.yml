@@ -7,8 +7,12 @@
 # cert + App Store Connect API key, and uploads to TestFlight. Logs are visible
 # in the Actions tab, so failures are debuggable.
 #
-# Trigger: manual only for now (Actions tab → "iOS TestFlight" → Run workflow,
-# also works from the GitHub mobile app). We add push-on-merge once it's green.
+# Trigger: manual (Actions tab → "iOS TestFlight" → Run workflow, also works from
+# the GitHub mobile app) AND automatically on merge to main when the iOS app or
+# this workflow changes — so a merge actually ships a build instead of silently
+# doing nothing. generate.sh stamps a fresh monotonic build number every run, so
+# back-to-back ships never collide on CFBundleVersion. Path-filtered to avoid
+# burning a macOS runner (and a TestFlight build) on unrelated backend merges.
 #
 # Required repo secrets (Settings → Secrets and variables → Actions):
 #   ASC_KEY_ID            App Store Connect API key id (e.g. 77637BYL66)
@@ -22,6 +26,11 @@ name: iOS TestFlight
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/nuke-capture-ios/**'
+      - '.github/workflows/ios-testflight.yml'
 
 # This job only reads the repo (build + sign happen with Apple credentials, not
 # the GitHub token). Pin to least privilege per CodeQL actions/missing-permissions.
