@@ -41,6 +41,15 @@ struct TodayView: View {
                         .listRowBackground(Color.clear)
                 }
 
+                // ── Live analysis · the pipeline on the wire ──
+                // The ENGINE worklight: each frame's DEEP verdict landing in
+                // realtime (get_analysis_stream), newest first — the data itself
+                // streaming, not a progress bar. Tap a frame → its evidence (the
+                // same rail the ANALYZED grid drills to). Self-loading.
+                if let uid = SupabaseService.currentUserId {
+                    LiveAnalysisStream(userId: uid)
+                }
+
                 // ── Your garage ── Today opens onto the owner's actual record,
                 // not just relay counters. Self-loading; renders nothing if empty.
                 if let uid = SupabaseService.currentUserId {
