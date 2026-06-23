@@ -58,6 +58,10 @@ struct NukeCaptureApp: App {
                     // NUKE_DEBUG_COHORT="year|make|model" roots on the cohort terminal
                     // so the screenshot loop lands on it without tab/tap navigation.
                     DebugCohortDeepLink(spec: dbgCohort)
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "explore" {
+                    // Explore is anon/self-contained (its own NavigationStack) — root
+                    // straight on it for the market-pulse screenshot. DEBUG only.
+                    ExploreView()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "app" {
                     DebugAppDeepLink()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "profile" {
