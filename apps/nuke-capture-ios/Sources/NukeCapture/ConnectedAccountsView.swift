@@ -8,6 +8,7 @@
 // Accounting (QuickBooks) links via the web OAuth hub.
 
 import SwiftUI
+import Supabase
 
 private struct LinkedProvider: Decodable, Identifiable {
     let id: UUID
@@ -37,6 +38,7 @@ struct ConnectedAccountsView: View {
     @State private var loaded = false
     @State private var loadError = false
     @State private var showAdd = false
+    @State private var balanceCents: Int? = nil
 
     private func label(for key: String) -> String {
         providerOptions.first { $0.key == key }?.label ?? key.capitalized
@@ -44,9 +46,35 @@ struct ConnectedAccountsView: View {
     private func icon(for key: String) -> String {
         providerOptions.first { $0.key == key }?.icon ?? "key"
     }
+    // Which compute tier is driving: your own key (BYOK) > prepaid wallet > nothing.
+    private var computeSource: String {
+        if !providers.isEmpty { return "Your linked key" }
+        if let c = balanceCents, c > 0 { return "Nuke wallet" }
+        return "Not configured"
+    }
 
     var body: some View {
         List {
+            // ── Compute status (read-only) ─────────────────────────────────────
+            Section {
+                HStack {
+                    Text("Running on").foregroundStyle(.secondary)
+                    Spacer()
+                    Text(computeSource).font(.callout.monospacedDigit())
+                }
+                if let c = balanceCents, c > 0 {
+                    HStack {
+                        Text("Nuke wallet").foregroundStyle(.secondary)
+                        Spacer()
+                        Text(String(format: "$%.2f", Double(c) / 100)).font(.callout.monospacedDigit())
+                    }
+                }
+            } header: {
+                Text("Compute")
+            } footer: {
+                Text("Analysis runs on your linked key when present. The Nuke wallet is prepaid managed compute, funded on the web.")
+            }
+
             // ── BYOK AI ────────────────────────────────────────────────────────
             Section {
                 if !loaded {
@@ -119,6 +147,10 @@ struct ConnectedAccountsView: View {
             loadError = true
             NSLog("NukeCapture providers load failed: %@", String(describing: error))
         }
+        // Read-only prepaid wallet balance (RLS-scoped to the caller via auth.uid()).
+        if let c: Int = try? await SupabaseService.client.rpc("my_ai_credit_balance").execute().value {
+            balanceCents = c
+        }
         loaded = true
     }
 
@@ -185,21 +217,27 @@ private struct AddProviderSheet: View {
     }
 
     private func save() async {
-        guard let uid = SupabaseService.currentUserId else { error = "Not signed in"; return }
+        guard SupabaseService.currentUserId != nil else { error = "Not signed in"; return }
         saving = true; error = nil
         defer { saving = false }
-        // Base64 the key (matches the web's api_key_encrypted obfuscation).
-        let encoded = Data(apiKey.trimmingCharacters(in: .whitespaces).utf8).base64EncodedString()
-        struct Row: Encodable {
-            let user_id: String; let provider: String; let api_key_encrypted: String
-            let model_name: String; let is_active = true
+        let trimmed = apiKey.trimmingCharacters(in: .whitespaces)
+        // Reject a Claude OAuth subscription token pasted as an API key. sk-ant-oat… is a
+        // subscription bearer (it routes through the OAuth path), NOT an API key — pasting it
+        // here produces a dead, mis-classified credential. Anthropic API keys start sk-ant-api.
+        if selected.key == "anthropic" && trimmed.hasPrefix("sk-ant-oat") {
+            error = "That's a Claude subscription token, not an API key. Paste a key that starts with sk-ant-api… (Anthropic Console → API Keys)."
+            return
         }
+        // Send the PLAINTEXT key to set-ai-provider over TLS; it encrypts at rest with the
+        // server key (AES-GCM). The client never writes the api_key_encrypted column directly.
+        struct Body: Encodable { let provider: String; let api_key: String; let model_name: String }
         do {
-            try await SupabaseService.client
-                .from("user_ai_providers")
-                .insert(Row(user_id: uid, provider: selected.key, api_key_encrypted: encoded,
-                            model_name: model.trimmingCharacters(in: .whitespaces)))
-                .execute()
+            try await SupabaseService.client.functions.invoke(
+                "set-ai-provider",
+                options: FunctionInvokeOptions(body: Body(
+                    provider: selected.key,
+                    api_key: trimmed,
+                    model_name: model.trimmingCharacters(in: .whitespaces))))
             await onDone()
             dismiss()
         } catch {

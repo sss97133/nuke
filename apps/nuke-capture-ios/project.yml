@@ -85,7 +85,7 @@ targets:
         # has no variable to re-expand, so it survives. Bump this by hand before each
         # TestFlight archive (28 -> 29 -> ...). ci_pre_xcodebuild's PlistBuddy timestamp,
         # if it still runs, overwrites this literal with a monotonic epoch (also > 27).
-        CFBundleVersion: "28"
+        CFBundleVersion: "29"
         # OAuth callback scheme for the ASWebAuthenticationSession providers
         # (Google, GitHub). ASWebAuthenticationSession needs this scheme so
         # the Supabase redirect (ag.nuke.capture://login-callback) returns
