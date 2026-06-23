@@ -37,6 +37,7 @@
 import {
   holdCredits, settleHold, releaseHold, estimateCents, usageToCents, type ClaudeUsage,
 } from "./aiCredits.ts";
+import { encryptSecret, decryptSecret } from "./secretBox.ts";
 
 const SUBSCRIPTION_PROVIDER = "anthropic_subscription";
 
@@ -179,7 +180,7 @@ export async function storeSubscriptionToken(
   userId: string,
   bundle: StoredSubscriptionToken,
 ): Promise<void> {
-  const encoded = btoa(JSON.stringify(bundle)); // matches the base64 convention in getUserApiKey.ts
+  const encoded = await encryptSecret(JSON.stringify(bundle)); // AES-GCM at rest — see secretBox.ts
   // Manual update-or-insert: user_ai_providers has no unique (user_id, provider)
   // constraint, so we can't use onConflict upsert without a schema change.
   const { data: existing } = await supabase
@@ -211,7 +212,7 @@ async function loadSubscriptionToken(supabase: any, userId: string): Promise<Sto
     .maybeSingle();
   if (!data?.api_key_encrypted) return null;
   try {
-    return JSON.parse(atob(data.api_key_encrypted)) as StoredSubscriptionToken;
+    return JSON.parse(await decryptSecret(data.api_key_encrypted)) as StoredSubscriptionToken;
   } catch {
     return null;
   }
@@ -264,9 +265,17 @@ export async function resolveClaudeAuth(
       .limit(1)
       .maybeSingle();
     if (data?.api_key_encrypted) {
-      let key: string;
-      try { key = atob(data.api_key_encrypted); } catch { key = data.api_key_encrypted; }
-      return { source: "user_api_key", token: key, isOAuth: false };
+      const key = await decryptSecret(data.api_key_encrypted);
+      // A Claude OAuth access token (sk-ant-oat...) is a SUBSCRIPTION credential, not an
+      // API key. It MUST use the OAuth bearer + beta header (isOAuth), never x-api-key.
+      // Route it as a subscription so it runs free on the user's plan. In the 429
+      // "upgrade" fork (allowSubscription=false) we deliberately skip it — an OAuth token
+      // cannot act as an API key — and fall through to the system key.
+      if (key.startsWith("sk-ant-oat")) {
+        if (allowSubscription) return { source: "subscription", token: key, isOAuth: true };
+      } else {
+        return { source: "user_api_key", token: key, isOAuth: false };
+      }
     }
   }
 
@@ -300,6 +309,9 @@ export interface RunResult {
   chargedCents?: number;
   // True when an upgrade to the platform key was needed but the user has no funds.
   needsFunding?: boolean;
+  // Set when the PLATFORM's own Anthropic account failed billing (e.g. empty balance).
+  // The user was NOT charged; this is an operator/service problem — surface as 503.
+  serviceError?: string;
 }
 
 /**
@@ -326,13 +338,21 @@ export async function runWithChain(
   const auth = await resolveClaudeAuth(supabase, userId);
   if (!auth) throw new Error("no claude auth available (no subscription, no user key, no system key)");
 
+  // Platform/system key is the PRIMARY credential (no subscription, no BYOK key): WE pay
+  // Anthropic, so this MUST be metered against the user's prepaid wallet — same as the
+  // 429-upgrade fork below. (Previously this happy path returned unmetered.)
+  if (auth.source === "system_api_key") {
+    return await runMeteredPlatform(supabase, userId, auth, payload);
+  }
+
   let res = await fetch(ANTHROPIC_OAUTH.MESSAGES_URL, {
     method: "POST",
     headers: authHeaders(auth),
     body: JSON.stringify(payload),
   });
 
-  // Happy path or a non-rate-limit error: return as-is.
+  // Happy path or a non-rate-limit error on the subscription/BYOK key: return as-is
+  // (subscription = free for the user; user_api_key = their own bill — neither metered).
   if (res.status !== 429 || auth.source !== "subscription") {
     return await toRunResult(res, auth.source);
   }
@@ -350,8 +370,6 @@ export async function runWithChain(
   const apiAuth = await resolveClaudeAuth(supabase, userId, { allowSubscription: false });
   if (!apiAuth) return await toRunResult(res, auth.source); // nothing to upgrade to
 
-  const model = String((payload as any).model ?? "claude-opus-4-8");
-
   // BYOK (user's own API key): their bill — we don't meter or hold credits.
   if (apiAuth.source === "user_api_key") {
     res = await fetch(ANTHROPIC_OAUTH.MESSAGES_URL, {
@@ -360,34 +378,66 @@ export async function runWithChain(
     return await toRunResult(res, apiAuth.source);
   }
 
-  // Platform key: WE pay Anthropic, so the user's prepaid credits must cover it.
-  // Reserve an estimate, run, then settle the actual token cost from the response.
-  if (!userId) throw new Error("platform-key upgrade requires a user to bill");
+  // Platform key via upgrade: meter it. Pass the rate-limit result so an out-of-funds
+  // user still gets the original retry signal.
+  const rl = await toRunResult(res, auth.source);
+  return await runMeteredPlatform(supabase, userId, apiAuth, payload, rl);
+}
+
+/**
+ * Run ONE Claude call on the PLATFORM key with full metering: reserve an estimate,
+ * call, then settle the actual token cost. Used both when the platform key is the
+ * primary credential and via the 429-upgrade fork — so platform usage is NEVER
+ * unmetered. The user is charged only for a successful call; a failed call (including
+ * the platform's own Anthropic account running dry) releases the hold and charges $0.
+ */
+async function runMeteredPlatform(
+  supabase: any,
+  userId: string | null,
+  apiAuth: ResolvedClaudeAuth,
+  payload: Record<string, unknown>,
+  priorRateLimited?: RunResult,
+): Promise<RunResult> {
+  if (!userId) throw new Error("platform-key call requires a user to bill");
+  const model = String((payload as any).model ?? "claude-opus-4-8");
   const maxOut = Number((payload as any).max_tokens ?? 1024);
   const estInput = 2000; // rough; refine with a token-count pass if needed
   const hold = await holdCredits(
     supabase, userId, estimateCents(model, estInput, maxOut),
-    "claude-upgrade", { model, est_input: estInput, max_tokens: maxOut },
+    "claude-platform", { model, est_input: estInput, max_tokens: maxOut },
   );
   if (!hold) {
-    // Out of funds — surface the funding prompt instead of running on our dime.
-    const rl = await toRunResult(res, auth.source);
-    return { ...rl, needsFunding: true };
+    // User's prepaid wallet can't cover it — surface the funding prompt, don't run on our dime.
+    const base: RunResult = priorRateLimited ??
+      { ok: false, status: 402, source: apiAuth.source, body: null, rateLimited: false, retryAfterSeconds: null };
+    return { ...base, needsFunding: true };
   }
-
   try {
-    res = await fetch(ANTHROPIC_OAUTH.MESSAGES_URL, {
+    const res = await fetch(ANTHROPIC_OAUTH.MESSAGES_URL, {
       method: "POST", headers: authHeaders(apiAuth), body: JSON.stringify(payload),
     });
     const result = await toRunResult(res, apiAuth.source);
     const usage: ClaudeUsage = (result.body && result.body.usage) ? result.body.usage : {};
     const cents = result.ok ? usageToCents(model, usage) : 0;
     await settleHold(supabase, userId, hold, cents, { model, usage, status: result.status });
+    // The PLATFORM's own Anthropic account failed billing (e.g. empty balance): the user
+    // was NOT charged (cents=0, hold released). This is an operator problem, not a user
+    // wallet problem — flag it distinctly so the endpoint returns 503, not "add funds".
+    if (!result.ok && isBillingError(result)) {
+      return { ...result, chargedCents: 0, serviceError: "platform_unfunded" };
+    }
     return { ...result, chargedCents: cents };
   } catch (e) {
     await releaseHold(supabase, userId, hold); // never charge for a call that threw
     throw e;
   }
+}
+
+/** True when an Anthropic response is a billing/credit-balance failure (HTTP 400). */
+function isBillingError(r: RunResult): boolean {
+  if (r.status !== 400) return false;
+  const msg = JSON.stringify(r.body ?? "").toLowerCase();
+  return msg.includes("credit balance") || msg.includes("too low") || msg.includes("billing");
 }
 
 function parseRetryAfter(res: Response): number | null {
