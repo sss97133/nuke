@@ -137,7 +137,8 @@ export default function PipelineVisualizer() {
         )}
       </div>
       <style>{`@keyframes nukePulse{0%,100%{opacity:1}50%{opacity:0.25}}
-        @keyframes nukeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}`}</style>
+        @keyframes nukeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+        @keyframes nukeLine{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}`}</style>
 
       {loading && <p style={{ color: 'var(--text-muted,#888)', fontSize: '12px', padding: '16px 0' }}>Connecting to pipeline…</p>}
       {err && <p style={{ color: 'var(--error,#e53e3e)', fontSize: '12px', padding: '8px 0' }}>{err}</p>}
@@ -154,9 +155,26 @@ export default function PipelineVisualizer() {
           const comps = Array.isArray(r.components) ? r.components.filter((c) => c?.label) : [];
           const ocr = Array.isArray(r.text_regions) ? r.text_regions.filter((t) => t?.text) : [];
           const partNos = comps.map((c) => c.part_number_guess).filter(Boolean) as string[];
+          const st = (r.state || {}) as Record<string, string>;
+          // The schema fields that landed for this frame, in fill order — the cascade.
+          const fields: { k: string; v: React.ReactNode; mono?: boolean }[] = [];
+          if (r.scene_type && r.scene_type !== 'unknown') fields.push({ k: 'scene_type', v: label(r.scene_type) });
+          if (r.build_phase && r.build_phase !== 'unknown') fields.push({ k: 'build_phase', v: label(r.build_phase) });
+          if (st.paint_state) fields.push({ k: 'paint_state', v: label(st.paint_state) });
+          if (st.completeness) fields.push({ k: 'completeness', v: label(st.completeness) });
+          if (st.rust_severity && st.rust_severity !== 'none') fields.push({ k: 'rust', v: label(st.rust_severity) });
+          for (const c of comps.slice(0, 8)) {
+            fields.push({
+              k: 'component',
+              v: (<>{c.label}{c.part_number_guess && (
+                <span style={{ fontFamily: '"Courier New", monospace', color: 'var(--accent,#2563eb)' }}> #{c.part_number_guess}</span>
+              )}</>),
+            });
+          }
+          for (const t of ocr.slice(0, 5)) fields.push({ k: 'ocr', v: t.text, mono: true });
           return (
             <div key={r.image_id} style={{
-              display: 'flex', gap: '12px', padding: '10px 0', borderBottom: '1px solid var(--border,#e5e5e5)',
+              display: 'flex', gap: '12px', padding: '12px 0', borderBottom: '1px solid var(--border,#e5e5e5)',
               animation: isNew ? 'nukeIn 220ms cubic-bezier(0.16,1,0.3,1)' : undefined,
             }}>
               {/* thumbnail */}
@@ -171,11 +189,9 @@ export default function PipelineVisualizer() {
                 )}
               </div>
 
-              {/* extracted payload */}
+              {/* the schema filling itself, field by field */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap', marginBottom: '3px' }}>
-                  {r.scene_type && r.scene_type !== 'unknown' && <Chip text={label(r.scene_type)} tone="on" />}
-                  {r.build_phase && r.build_phase !== 'unknown' && <Chip text={label(r.build_phase)} />}
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text,#111)' }}>
                     {r.vehicle || 'Unknown vehicle'}
                   </span>
@@ -184,44 +200,26 @@ export default function PipelineVisualizer() {
                 </div>
 
                 {r.narrative && (
-                  <div style={{ fontSize: '12px', color: 'var(--text,#222)', marginBottom: '4px', lineHeight: 1.35 }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text,#222)', marginBottom: '6px', lineHeight: 1.35,
+                    animation: isNew ? 'nukeLine 300ms cubic-bezier(0.16,1,0.3,1) both' : undefined }}>
                     {r.narrative}
                   </div>
                 )}
 
-                {/* components — the "what's in this photo" */}
-                {comps.length > 0 && (
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted,#555)', marginBottom: '3px' }}>
-                    {comps.slice(0, 6).map((c, i) => (
-                      <span key={i} style={{ marginRight: '10px', whiteSpace: 'nowrap' }}>
-                        {c.label}
-                        {c.part_number_guess && (
-                          <span style={{ fontFamily: '"Courier New", monospace', color: 'var(--accent,#2563eb)' }}>
-                            {' '}#{c.part_number_guess}
-                          </span>
-                        )}
-                      </span>
-                    ))}
-                    {comps.length > 6 && <span>+{comps.length - 6} more</span>}
+                {fields.map((f, i) => (
+                  <div key={i} style={{ display: 'flex', gap: '8px', fontSize: '11px', lineHeight: '16px',
+                    animation: isNew ? 'nukeLine 300ms cubic-bezier(0.16,1,0.3,1) both' : undefined,
+                    animationDelay: isNew ? `${i * 55}ms` : undefined }}>
+                    <span style={{ flex: '0 0 96px', textAlign: 'right', fontSize: '8px', fontWeight: 700,
+                      letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted,#999)',
+                      paddingTop: '1px' }}>{f.k}</span>
+                    <span style={{ flex: 1, minWidth: 0, color: 'var(--text,#222)',
+                      fontFamily: f.mono ? '"Courier New", monospace' : 'inherit' }}>{f.v}</span>
                   </div>
-                )}
-
-                {/* OCR — VINs, stampings, brands read off the metal */}
-                {ocr.length > 0 && (
-                  <div style={{ marginBottom: '3px' }}>
-                    {ocr.slice(0, 4).map((t, i) => (
-                      <span key={i} title="OCR text" style={{ display: 'inline-block',
-                        fontFamily: '"Courier New", monospace', fontSize: '10px',
-                        padding: '1px 5px', marginRight: '4px',
-                        border: '1px solid var(--accent,#2563eb)', color: 'var(--accent,#2563eb)' }}>
-                        {t.text}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                ))}
 
                 {/* derived pipeline stages this frame passed through */}
-                <div>
+                <div style={{ marginTop: '6px' }}>
                   <Chip text="analyzed" tone="on" />
                   {r.hashed && <Chip text="hashed" />}
                   {r.sessioned && <Chip text="session" />}
