@@ -94,6 +94,9 @@ jobs:
           # subscription — make sure nothing in the runner env set it. (A byo_api_key
           # user's key is re-exported by the broker inside the drain, after this point.)
           unset ANTHROPIC_API_KEY
+          # Definitive credential readout (length only — never the value; GitHub masks it).
+          # Distinguishes "secret not set / wrong scope" (0) from "present" (~70+).
+          echo "cred-check | CLAUDE_CODE_OAUTH_TOKEN length: ${#CLAUDE_CODE_OAUTH_TOKEN}"
           # No hard-fail on a missing repo token: the drain resolves each user's chosen
           # method from Settings (user_analysis_settings) and may supply the credential
           # from Vault instead. The drain fails loud if NO usable credential resolves.
