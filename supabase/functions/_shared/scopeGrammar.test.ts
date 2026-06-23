@@ -9,6 +9,8 @@ import {
   parseScope,
   scopeMatches,
   vinFromScope,
+  scopeAllowsWriteTier,
+  isWriteTierScope,
   type ScopeRequest,
 } from './scopeGrammar.ts';
 
@@ -197,4 +199,42 @@ Deno.test('scopeMatches: mixed grants — first matching wins', () => {
     `events:write:vehicle:${MUSTANG_VIN}`,
   ];
   if (!scopeMatches(granted, writeMustang)) throw new Error('expected match');
+});
+
+// ── Write-tier scopes (governed agent-write pipeline) ──────────────────────
+
+Deno.test('isWriteTierScope: recognizes tier scopes only', () => {
+  if (!isWriteTierScope('write:observations')) throw new Error('observations should be a tier scope');
+  if (!isWriteTierScope('write:canonical')) throw new Error('canonical should be a tier scope');
+  if (isWriteTierScope('read')) throw new Error('read is not a tier scope');
+  if (isWriteTierScope('events:write:all')) throw new Error('events scope is not a tier scope');
+});
+
+Deno.test('scopeAllowsWriteTier: write:observations is autonomous for observations, blocked for canonical', () => {
+  const t = ['read', 'write:observations'];
+  if (!scopeAllowsWriteTier(t, 'observations')) throw new Error('observations should be allowed');
+  if (scopeAllowsWriteTier(t, 'canonical')) throw new Error('canonical must be HUMAN-GATED — observations token cannot reach it');
+});
+
+Deno.test('scopeAllowsWriteTier: write:canonical subsumes observations', () => {
+  const t = ['write:canonical'];
+  if (!scopeAllowsWriteTier(t, 'canonical')) throw new Error('canonical scope → canonical');
+  if (!scopeAllowsWriteTier(t, 'observations')) throw new Error('canonical should subsume observations');
+});
+
+Deno.test('scopeAllowsWriteTier: admin allows every tier', () => {
+  if (!scopeAllowsWriteTier(['admin'], 'observations')) throw new Error('admin → observations');
+  if (!scopeAllowsWriteTier(['admin'], 'canonical')) throw new Error('admin → canonical');
+});
+
+Deno.test('scopeAllowsWriteTier: legacy "write" → observations only, never canonical', () => {
+  if (!scopeAllowsWriteTier(['write'], 'observations')) throw new Error('legacy write → observations');
+  if (scopeAllowsWriteTier(['write'], 'canonical')) throw new Error('legacy write must NOT confer canonical');
+});
+
+Deno.test('scopeAllowsWriteTier: read-only / empty / unknown never authorize writes', () => {
+  if (scopeAllowsWriteTier(['read'], 'observations')) throw new Error('read must not write');
+  if (scopeAllowsWriteTier([], 'observations')) throw new Error('empty must not write');
+  if (scopeAllowsWriteTier(null, 'canonical')) throw new Error('null must not write');
+  if (scopeAllowsWriteTier(['events:write:all'], 'observations')) throw new Error('events scope is a different resource, not a write tier');
 });
