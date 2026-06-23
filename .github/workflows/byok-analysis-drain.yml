@@ -96,7 +96,7 @@ jobs:
           unset ANTHROPIC_API_KEY
           # Definitive credential readout (length only — never the value; GitHub masks it).
           # Distinguishes "secret not set / wrong scope" (0) from "present" (~70+).
-          echo "cred-check | CLAUDE_CODE_OAUTH_TOKEN length: ${#CLAUDE_CODE_OAUTH_TOKEN}"
+          echo "cred-check | repo CLAUDE_CODE_OAUTH_TOKEN length: ${#CLAUDE_CODE_OAUTH_TOKEN} (per-user app/Vault creds resolve inside the drain)"
           # No hard-fail on a missing repo token: the drain resolves each user's chosen
           # method from Settings (user_analysis_settings) and may supply the credential
           # from Vault instead. The drain fails loud if NO usable credential resolves.
