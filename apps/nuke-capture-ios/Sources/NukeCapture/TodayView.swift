@@ -41,6 +41,15 @@ struct TodayView: View {
                         .listRowBackground(Color.clear)
                 }
 
+                // ── Live analysis · the pipeline on the wire ──
+                // The ENGINE worklight: each frame's DEEP verdict landing in
+                // realtime (get_analysis_stream), newest first — the data itself
+                // streaming, not a progress bar. Tap a frame → its evidence (the
+                // same rail the ANALYZED grid drills to). Self-loading.
+                if let uid = SupabaseService.currentUserId {
+                    LiveAnalysisStream(userId: uid)
+                }
+
                 // ── Your garage ── Today opens onto the owner's actual record,
                 // not just relay counters. Self-loading; renders nothing if empty.
                 if let uid = SupabaseService.currentUserId {
@@ -102,6 +111,21 @@ struct TodayView: View {
                         }
                     }
                     .disabled(attribution.isRunning)
+
+                    // Repair photo dates — re-reads each synced asset's true EXIF
+                    // (DateTimeOriginal + GPS) on-device and patches rows that an
+                    // older build stamped with the iCloud re-add date. One-shot.
+                    Button {
+                        Task { await engine.reconcileLibrary() }
+                    } label: {
+                        if engine.isReconciling {
+                            Label(engine.reconcileStatus.isEmpty ? "Repairing…" : engine.reconcileStatus,
+                                  systemImage: "calendar.badge.clock")
+                        } else {
+                            Label("Repair photo dates", systemImage: "calendar.badge.clock")
+                        }
+                    }
+                    .disabled(engine.isReconciling)
 
                     // Confirm sessions — the backlog sweep: one tap routes a day's
                     // photos to a vehicle (handles VIN-less + new-vehicle cases).

@@ -10,13 +10,12 @@
 // data exists. Copy is instrument register: counts, names, timestamps,
 // one-word imperatives — the app reports, it never explains.
 //
-// Permission action tree — every button defines a data state, no path
-// undefined:
+// Permission action tree — theory: MAXIMUM VISIBILITY to the source library, so
+// full access is the only resting state:
 //   Allow Full Access → full scan (ScanScreen)
-//   Limit Access      → scan the granted subset; the scope is a ledger fact
-//                       ("Scope · N granted") with Expand as a row; no nag
-//   Don't Allow       → truthful empty state, the one action that exists
-//                       (Settings) — DeniedScreen
+//   Limit Access      → LimitedScreen: a slice is not the library; escalate to
+//                       Full Access in Settings (supersedes the 2026-06-11 no-nag)
+//   Don't Allow       → truthful empty state (Settings) — DeniedScreen
 
 import Photos
 import PhotosUI
@@ -41,6 +40,8 @@ struct IgnitionView: View {
                     EmptyScreen(engine: engine)
                 case .denied:
                     DeniedScreen(engine: engine)
+                case .limited:
+                    LimitedScreen(engine: engine)
                 }
             }
             .navigationTitle("Nuke")
@@ -66,6 +67,8 @@ private struct IntroScreen: View {
             Section {
                 LabeledContent("Next", value: "Scan this device for your shop")
                 LabeledContent("Uploads", value: "None until you confirm")
+            } footer: {
+                Text("On the next prompt, choose Allow Full Access — Nuke reads your whole library on-device to build your record. A limited selection hides most of it.")
             }
             Section {
                 Button {
@@ -185,10 +188,6 @@ private struct ScanScreen: View {
                 }
             }
 
-            if engine.limitedScope {
-                ScopeSection(grantedCount: engine.totalToRead)
-            }
-
             if !engine.floodAssetIDs.isEmpty {
                 Section {
                     FloodGrid(assetIDs: engine.floodAssetIDs)
@@ -199,28 +198,42 @@ private struct ScanScreen: View {
     }
 }
 
-/// Limited-access scope, reported as fact. One Expand row — the system
-/// limited-library picker — and nothing else. Never a nag.
-private struct ScopeSection: View {
-    let grantedCount: Int
+// ─── Limited: a hand-picked slice is not the library — escalate to Full ──────
+// Theory: maximum visibility to the source. Limited access is the opposite, so
+// it is a state to FIX, not a ledger fact to report. The one action is Full
+// Access in Settings; on return, ignition re-checks and proceeds if granted.
+
+private struct LimitedScreen: View {
+    @ObservedObject var engine: IgnitionEngine
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        Section {
-            LabeledContent("Scope") {
-                Text("\(grantedCount) granted").monospacedDigit()
+        List {
+            Section {
+                Text("Nuke can only see the photos you picked.")
+                    .font(.title3.weight(.medium))
+            } footer: {
+                Text("Your full library is hidden. Nuke needs Full Access to build your vehicles' record from everything you've shot — Settings › Nuke › Photos › All Photos.")
             }
-            Button("Expand…") {
-                presentLimitedLibraryPicker()
+            Section {
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                } label: {
+                    Text("Grant Full Access")
+                        .frame(maxWidth: .infinity)
+                        .fontWeight(.semibold)
+                }
+                .buttonStyle(.borderedProminent)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             }
         }
-    }
-
-    private func presentLimitedLibraryPicker() {
-        guard let scene = UIApplication.shared.connectedScenes
-                .compactMap({ $0 as? UIWindowScene }).first,
-              let root = scene.keyWindow?.rootViewController
-        else { return }
-        PHPhotoLibrary.shared().presentLimitedLibraryPicker(from: root)
+        .onChange(of: scenePhase) { _, phase in
+            // Back from Settings → re-check; Full Access now → ignite.
+            if phase == .active { Task { await engine.retryAfterSettings() } }
+        }
     }
 }
 
