@@ -77,7 +77,7 @@ struct LibraryInfoView: View {
                 if let v = await VisionEngine.classifyAsset(localIdentifier: id) {
                     await Task.detached {
                         LocalStore.shared.classify(localIdentifier: id, isVehicle: v.isVehicle,
-                                                   isPersonal: v.isPersonal, labels: v.labels)
+                                                   isPersonal: v.isPersonal, hasPerson: v.hasPerson, labels: v.labels)
                     }.value
                     l = await Task.detached { LocalStore.shared.ledger(for: id) }.value
                 }

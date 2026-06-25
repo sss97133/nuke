@@ -125,6 +125,13 @@ final class LocalStore {
                 t.column("sessionDate", .text)
             }
         }
+        m.registerMigration("v2_has_person") { db in
+            try db.alter(table: "appearance") { t in t.add(column: "hasPerson", .boolean) }
+            // The personal verdict rule changed (no longer auto-hides untagged work
+            // photos — the arbitrary over-blur). Reset existing verdicts so every photo
+            // re-classifies under the new rule on next view.
+            try db.execute(sql: "UPDATE appearance SET isPersonal = NULL, isVehicle = NULL")
+        }
         return m
     }
 
@@ -224,31 +231,32 @@ final class LocalStore {
 
     /// Record one photo's T0 verdict (vehicle/personal + labels). Upsert in place so
     /// it never clobbers other columns (taken_at/GPS) an ingest may have written.
-    func classify(localIdentifier: String, isVehicle: Bool, isPersonal: Bool, labels: [String], now: Date = Date()) {
+    func classify(localIdentifier: String, isVehicle: Bool, isPersonal: Bool, hasPerson: Bool, labels: [String], now: Date = Date()) {
         let labelsJSON = (try? JSONEncoder().encode(labels)).flatMap { String(data: $0, encoding: .utf8) }
         do {
             try dbQueue.write { db in
                 try db.execute(sql: """
-                    INSERT INTO appearance (localIdentifier, sourceType, isVehicle, isPersonal, appleMLLabelsJSON, analyzedAt, createdAt)
-                    VALUES (?, 'local_filesystem', ?, ?, ?, ?, ?)
+                    INSERT INTO appearance (localIdentifier, sourceType, isVehicle, isPersonal, hasPerson, appleMLLabelsJSON, analyzedAt, createdAt)
+                    VALUES (?, 'local_filesystem', ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(localIdentifier) DO UPDATE SET
                         isVehicle = excluded.isVehicle,
                         isPersonal = excluded.isPersonal,
+                        hasPerson = excluded.hasPerson,
                         appleMLLabelsJSON = excluded.appleMLLabelsJSON,
                         analyzedAt = excluded.analyzedAt
-                    """, arguments: [localIdentifier, isVehicle, isPersonal, labelsJSON, now, now])
+                    """, arguments: [localIdentifier, isVehicle, isPersonal, hasPerson, labelsJSON, now, now])
             }
         } catch { NSLog("LocalStore.classify failed: %@", String(describing: error)) }
     }
 
     /// Read the cached verdicts for a batch of cells (only rows already classified).
-    func classification(for localIdentifiers: [String]) -> [String: (isPersonal: Bool, isVehicle: Bool, labels: [String])] {
+    func classification(for localIdentifiers: [String]) -> [String: (isPersonal: Bool, isVehicle: Bool, hasPerson: Bool, labels: [String])] {
         guard !localIdentifiers.isEmpty else { return [:] }
-        var out: [String: (isPersonal: Bool, isVehicle: Bool, labels: [String])] = [:]
+        var out: [String: (isPersonal: Bool, isVehicle: Bool, hasPerson: Bool, labels: [String])] = [:]
         do {
             try dbQueue.read { db in
                 let rows = try Row.fetchAll(db, sql: """
-                    SELECT localIdentifier AS lid, isPersonal AS p, isVehicle AS v, appleMLLabelsJSON AS labels
+                    SELECT localIdentifier AS lid, isPersonal AS p, isVehicle AS v, hasPerson AS hp, appleMLLabelsJSON AS labels
                     FROM appearance
                     WHERE isPersonal IS NOT NULL AND localIdentifier IN (\(databaseQuestionMarks(count: localIdentifiers.count)))
                     """, arguments: StatementArguments(localIdentifiers))
@@ -256,9 +264,10 @@ final class LocalStore {
                     let lid: String = r["lid"]
                     let p: Bool = r["p"] ?? false
                     let v: Bool = r["v"] ?? false
+                    let hp: Bool = r["hp"] ?? false
                     let labelsStr: String? = r["labels"]
                     let labels = labelsStr.flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) } ?? []
-                    out[lid] = (p, v, labels)
+                    out[lid] = (p, v, hp, labels)
                 }
             }
         } catch { NSLog("LocalStore.classification failed: %@", String(describing: error)) }
