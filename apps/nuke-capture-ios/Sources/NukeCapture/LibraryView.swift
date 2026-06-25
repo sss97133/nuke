@@ -185,6 +185,7 @@ struct LibraryView: View {
     @ObservedObject private var store = LibraryStore.shared
     @State private var detailIndex: Int?
     @AppStorage("personalMode") private var personalMode = PersonalMode.show
+    @Namespace private var zoomNS
 
     @State private var columns = 3
     @State private var gestureStartColumns: Int?
@@ -218,6 +219,7 @@ struct LibraryView: View {
                 ) {
                     ForEach(0..<store.count, id: \.self) { idx in
                         LibraryCell(index: idx)
+                            .matchedTransitionSource(id: idx, in: zoomNS)
                             .onTapGesture { detailIndex = idx }
                     }
                 }
@@ -249,6 +251,7 @@ struct LibraryView: View {
             set: { detailIndex = $0?.id }
         )) { box in
             LibraryDetailView(startIndex: box.id)
+                .navigationTransition(.zoom(sourceID: box.id, in: zoomNS))
         }
     }
 }
