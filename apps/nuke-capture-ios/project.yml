@@ -26,6 +26,10 @@ packages:
   Supabase:
     url: https://github.com/supabase/supabase-swift
     from: 2.0.0
+  # On-device local store — the app's own DB (local-first pipeline, the notebook).
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: 6.0.0
 
 targets:
   NukeCapture-iOS:
@@ -41,6 +45,8 @@ targets:
     dependencies:
       - package: Supabase
         product: Supabase
+      - package: GRDB
+        product: GRDB
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ag.nuke.capture
