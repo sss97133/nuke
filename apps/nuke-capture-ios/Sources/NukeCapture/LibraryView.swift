@@ -20,6 +20,7 @@ struct LibraryView: View {
     @ObservedObject private var overlay = LibraryOverlayStore.shared
     @State private var selectMode = false
     @State private var selected: Set<Int> = []
+    @State private var showDays = false
 
     @State private var columns = 3
     @State private var gestureStartColumns: Int?
@@ -80,6 +81,9 @@ struct LibraryView: View {
                 }
                 if !selectMode {
                     ToolbarItem(placement: .topBarTrailing) {
+                        Button { showDays = true } label: { Image(systemName: "calendar") }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             Picker("Personal photos", selection: $personalMode) {
                                 Label("Show", systemImage: "eye").tag(PersonalMode.show)
@@ -123,6 +127,7 @@ struct LibraryView: View {
             LibraryDetailView(startIndex: box.id)
                 .navigationTransition(.zoom(sourceID: box.id, in: zoomNS))
         }
+        .sheet(isPresented: $showDays) { LibraryDaysView() }   // the local-first day receipt
     }
 
     private func applyVerdict(approved: Bool) {
