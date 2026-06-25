@@ -186,8 +186,28 @@ struct LibraryView: View {
     @State private var detailIndex: Int?
     @AppStorage("personalMode") private var personalMode = PersonalMode.show
 
-    private let columns = 3
+    @State private var columns = 3
+    @State private var gestureStartColumns: Int?
+    private let columnSteps = [2, 3, 5, 8]      // pinch density stops: big ↔ dense
     private let spacing: CGFloat = 2
+
+    /// Pinch to change grid density — spread = fewer/bigger, pinch = more/denser.
+    /// Simultaneous with scroll (2-finger pinch vs 1-finger scroll).
+    private var densityPinch: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                if gestureStartColumns == nil { gestureStartColumns = columns }
+                let startIdx = columnSteps.firstIndex(of: gestureStartColumns ?? columns) ?? 1
+                let step = Int((1 - value.magnification) * 3)
+                let newIdx = min(max(startIdx + step, 0), columnSteps.count - 1)
+                if columnSteps[newIdx] != columns {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        columns = columnSteps[newIdx]
+                    }
+                }
+            }
+            .onEnded { _ in gestureStartColumns = nil }
+    }
 
     var body: some View {
         NavigationStack {
@@ -202,6 +222,7 @@ struct LibraryView: View {
                     }
                 }
             }
+            .simultaneousGesture(densityPinch)
             .navigationTitle("Library")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
