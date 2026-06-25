@@ -3,9 +3,10 @@
 // the moment it happens — the UI is a window into this state, nothing more.
 //
 // Order of operations (all on-device, NOTHING uploads during ignition):
-//   1. Permission. Three defined states, no path undefined:
+//   1. Permission. Theory: MAXIMUM VISIBILITY to the source library, so full
+//      access is the only resting state — anything less is escalated:
 //        full    → scan everything
-//        limited → scan the granted subset, report the scope as a fact
+//        limited → partial-access screen → Settings → Full Access (not a slice)
 //        denied  → truthful empty state (Settings is the one action)
 //   2. Scan: enumerate every image asset newest→oldest reading ONLY
 //      creationDate + location (no image data, no network). photosRead ticks
@@ -57,6 +58,7 @@ final class IgnitionEngine: ObservableObject {
         case site           // presenting candidates[candidateIndex]
         case empty          // scan found no located photos — the truth, not a blank app
         case denied
+        case limited        // partial grant — a slice is not the library; escalate to Full
     }
 
     // ─── Published scan state (the windows the UI renders) ──────────────────
@@ -97,10 +99,14 @@ final class IgnitionEngine: ObservableObject {
         case .authorized:
             limitedScope = false
         case .limited:
-            // Defined state, not a degraded one: scan the granted subset and
-            // report the scope as a fact. No upgrade nag — EXPAND exists as
-            // a row (presentLimitedLibraryPicker), nothing more.
+            // THEORY: maximum visibility to the source library. A limited grant
+            // is a hand-picked slice — the opposite — and is NOT a resting state.
+            // Route to the partial-access screen that escalates to Full Access.
+            // (Supersedes the 2026-06-11 "no nag" ruling.)
             limitedScope = true
+            phase = .limited
+            started = false      // re-arm after the Settings round-trip
+            return
         default:
             phase = .denied
             started = false      // re-runs if the owner returns from Settings
@@ -122,7 +128,7 @@ final class IgnitionEngine: ObservableObject {
 
     /// Re-check authorization after a Settings round-trip (denied state).
     func retryAfterSettings() async {
-        guard phase == .denied else { return }
+        guard phase == .denied || phase == .limited else { return }
         await start()
     }
 
