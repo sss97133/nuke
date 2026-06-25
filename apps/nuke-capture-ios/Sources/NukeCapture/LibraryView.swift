@@ -23,20 +23,24 @@ struct LibraryView: View {
 
     @State private var columns = 3
     @State private var gestureStartColumns: Int?
-    private let columnSteps = [2, 3, 5, 8]      // pinch density stops: big ↔ dense
+    private let columnSteps = [2, 3, 4, 6]      // pinch density stops: big ↔ dense (gentle gaps)
     private let spacing: CGFloat = 2
 
     /// Pinch to change grid density — spread = fewer/bigger, pinch = more/denser.
-    /// Simultaneous with scroll (2-finger pinch vs 1-finger scroll).
+    /// Simultaneous with scroll (2-finger pinch vs 1-finger scroll). Symmetric +
+    /// gentle: one density step per ~45% pinch in either direction, so it's
+    /// controllable instead of jumping multiple stops at once.
     private var densityPinch: some Gesture {
         MagnifyGesture()
             .onChanged { value in
                 if gestureStartColumns == nil { gestureStartColumns = columns }
                 let startIdx = columnSteps.firstIndex(of: gestureStartColumns ?? columns) ?? 1
-                let step = Int((1 - value.magnification) * 3)
+                let m = max(value.magnification, 0.05)
+                // Log-symmetric: spread (m>1) → fewer columns; pinch (m<1) → more.
+                let step = Int((-log(m) / log(1.45)).rounded(.towardZero))
                 let newIdx = min(max(startIdx + step, 0), columnSteps.count - 1)
                 if columnSteps[newIdx] != columns {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.88)) {
                         columns = columnSteps[newIdx]
                     }
                 }
