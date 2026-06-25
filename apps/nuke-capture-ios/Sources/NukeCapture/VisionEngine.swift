@@ -173,12 +173,20 @@ enum VisionEngine {
     /// off the main actor. `isPersonal` = not a clean vehicle/work photo (not a
     /// vehicle OR a prominent face). Returns nil for iCloud-only originals not on
     /// device — those classify later, when available.
-    static func classifyAsset(localIdentifier: String) async -> (isVehicle: Bool, isPersonal: Bool, labels: [String])? {
+    static func classifyAsset(localIdentifier: String) async -> (isVehicle: Bool, isPersonal: Bool, hasPerson: Bool, labels: [String])? {
         guard let cg = await loadCGImage(assetID: localIdentifier, maxPixel: 256, allowNetwork: false) else { return nil }
         return await Task.detached(priority: .utility) {
-            let t = triage(cg)
-            guard t.classified else { return nil }
-            return (t.isVehicle, !t.pixelsEligible, t.labels)
+            guard let cls = classify(cg) else { return nil }
+            let face = hasProminentFace(cg)
+            let labels = Array(cls.labels.prefix(12).map { $0.0 })
+            // Auto-hide ONLY a person-centric, NON-vehicle photo (kids/family/selfies).
+            // A work photo is NEVER auto-hidden — not a car-with-a-person (it's a vehicle),
+            // and not a no-face part/engine/interior/document close-up that Apple simply
+            // doesn't tag "vehicle". (Was `!isVehicle || face`, which blurred every untagged
+            // work photo — the arbitrary over-blur.) hasPerson is carried so the Select tool
+            // can let the owner resolve the genuinely borderline (person + vehicle) cases.
+            let isPersonal = face && !cls.isVehicle
+            return (cls.isVehicle, isPersonal, face, labels)
         }.value
     }
 

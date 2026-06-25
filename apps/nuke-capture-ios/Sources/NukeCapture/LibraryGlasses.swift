@@ -26,8 +26,11 @@ final class LibraryOverlayStore: ObservableObject {
     static let shared = LibraryOverlayStore()
     /// Per-cell badges (vehicle/analyzed). Filled off the scroll path.
     @Published private(set) var decorations: [String: LibraryDecoration] = [:]
-    /// localIdentifiers the on-device pass classified PERSONAL (for blur/hide).
+    /// localIdentifiers the on-device pass classified PERSONAL (face + non-vehicle → blur/hide).
     @Published private(set) var personal: Set<String> = []
+    /// Vehicle/work photos that ALSO contain a person — shown (work), but flagged
+    /// borderline so the Select tool can let the owner approve/reject them.
+    @Published private(set) var withPerson: Set<String> = []
 
     private var seen = Set<String>()        // resolved or in flight (dedup)
     private var queue: [String] = []
@@ -44,25 +47,42 @@ final class LibraryOverlayStore: ObservableObject {
     func decoration(for localIdentifier: String) -> LibraryDecoration? { decorations[localIdentifier] }
     func isPersonal(_ localIdentifier: String) -> Bool { personal.contains(localIdentifier) }
 
+    /// Drain the classify queue across a few CONCURRENT lanes — serial was too slow,
+    /// so blur/hide lagged behind the scroll. Each lane pulls an id on the main actor,
+    /// classifies OFF the main actor, applies back on main.
     private func run() async {
-        while !queue.isEmpty {
-            let lid = queue.removeFirst()
-            if let info = await Self.resolve(lid) {
-                if info.isPersonal { personal.insert(lid) }
-                if let g = info.glyph { decorations[lid] = LibraryDecoration(known: true, glyph: g) }
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<4 {
+                group.addTask { [weak self] in
+                    while let lid = await self?.nextLID() {
+                        let info = await Self.resolve(lid)
+                        await self?.apply(lid, info)
+                    }
+                }
             }
         }
         running = false
+        if !queue.isEmpty { running = true; Task { await run() } }   // ids that arrived mid-drain
+    }
+
+    private func nextLID() -> String? { queue.isEmpty ? nil : queue.removeFirst() }
+
+    private func apply(_ lid: String, _ info: (isPersonal: Bool, hasPerson: Bool, glyph: String?)?) {
+        guard let info else { return }
+        if info.isPersonal { personal.insert(lid) }
+        if info.hasPerson { withPerson.insert(lid) }
+        if let g = info.glyph { decorations[lid] = LibraryDecoration(known: true, glyph: g) }
     }
 
     /// Heavy work, OFF the main actor: read the cached verdict, else classify the
     /// photo on-device (Apple tags) and write it to the local store (the ledger).
-    nonisolated private static func resolve(_ lid: String) async -> (isPersonal: Bool, glyph: String?)? {
+    nonisolated private static func resolve(_ lid: String) async -> (isPersonal: Bool, hasPerson: Bool, glyph: String?)? {
         if let c = LocalStore.shared.classification(for: [lid])[lid] {
-            return (c.isPersonal, c.isVehicle ? "car.fill" : nil)
+            return (c.isPersonal, c.hasPerson, c.isVehicle ? "car.fill" : nil)
         }
         guard let v = await VisionEngine.classifyAsset(localIdentifier: lid) else { return nil }
-        LocalStore.shared.classify(localIdentifier: lid, isVehicle: v.isVehicle, isPersonal: v.isPersonal, labels: v.labels)
-        return (v.isPersonal, v.isVehicle ? "car.fill" : nil)
+        LocalStore.shared.classify(localIdentifier: lid, isVehicle: v.isVehicle, isPersonal: v.isPersonal,
+                                   hasPerson: v.hasPerson, labels: v.labels)
+        return (v.isPersonal, v.hasPerson, v.isVehicle ? "car.fill" : nil)
     }
 }
