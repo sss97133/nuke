@@ -18,7 +18,7 @@ name: NukeCapture-iOS
 options:
   bundleIdPrefix: ag.nuke
   deploymentTarget:
-    iOS: "18.0"
+    iOS: "26.0"
   createIntermediateGroups: true
 
 packages:
@@ -35,7 +35,7 @@ targets:
   NukeCapture-iOS:
     type: application
     platform: iOS
-    deploymentTarget: "18.0"
+    deploymentTarget: "26.0"
     sources:
       - path: Sources
       # Privacy manifest must land in the app bundle root as a resource —
