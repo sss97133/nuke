@@ -243,11 +243,17 @@ final class IgnitionEngine: ObservableObject {
             clusters.append(members)
         }
 
-        candidates = clusters
+        let made = clusters
             .filter { $0.count >= Config.siteMinPhotos }
-            .sorted { $0.count > $1.count }
-            .prefix(Config.siteMaxCandidates)
             .map { makeCandidate(memberIndices: $0) }
+        // A real work site RECURS across days; a single-day burst (a trip — e.g. Paris
+        // 2017, 101 photos in one day) is NOT a shop and must not outrank the real shop.
+        // Gate on distinct days, but fall back to all if none qualify (a brand-new user
+        // whose photos are all one day) so onboarding never dead-ends.
+        let multiDay = made.filter { $0.dayCount >= 3 }
+        candidates = Array((multiDay.isEmpty ? made : multiDay)
+            .sorted { $0.photoCount > $1.photoCount }
+            .prefix(Config.siteMaxCandidates))
         candidateIndex = 0
     }
 
