@@ -168,6 +168,20 @@ enum VisionEngine {
                             isVehicle: cls.isVehicle, classified: true)
     }
 
+    /// Classify one library photo by its PHAsset id — the cheap, on-device
+    /// organization verdict. Loads a small LOCAL frame (no network), runs triage
+    /// off the main actor. `isPersonal` = not a clean vehicle/work photo (not a
+    /// vehicle OR a prominent face). Returns nil for iCloud-only originals not on
+    /// device — those classify later, when available.
+    static func classifyAsset(localIdentifier: String) async -> (isVehicle: Bool, isPersonal: Bool, labels: [String])? {
+        guard let cg = await loadCGImage(assetID: localIdentifier, maxPixel: 256, allowNetwork: false) else { return nil }
+        return await Task.detached(priority: .utility) {
+            let t = triage(cg)
+            guard t.classified else { return nil }
+            return (t.isVehicle, !t.pixelsEligible, t.labels)
+        }.value
+    }
+
     // MARK: - 2. Feature print (on-device embedding for similarity)
 
     static func featurePrint(_ cg: CGImage) -> VNFeaturePrintObservation? {

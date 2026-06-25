@@ -130,17 +130,52 @@ struct LibraryDecoration {
     let glyph: String        // SF Symbol, e.g. "car.fill" (attributed) / "sparkles" (analyzed)
 }
 
+/// How personal photos are presented in the grid — toggled from the count control.
+enum PersonalMode: Int { case show = 0, blur = 1, black = 2 }
+
 @MainActor
 final class LibraryOverlayStore: ObservableObject {
     static let shared = LibraryOverlayStore()
+    /// Per-cell badges (vehicle/analyzed). Filled off the scroll path.
     @Published private(set) var decorations: [String: LibraryDecoration] = [:]
+    /// localIdentifiers the on-device pass classified PERSONAL (for blur/hide).
+    @Published private(set) var personal: Set<String> = []
 
-    /// A cell appeared; enqueue its asset id for the (future) batched DB resolve.
-    /// No-op in v1 — the foundation must stand without the glasses wired.
-    func note(_ localIdentifier: String) { /* glasses layer wires the batched resolve next */ }
+    private var seen = Set<String>()        // resolved or in flight (dedup)
+    private var queue: [String] = []
+    private var running = false
 
-    func decoration(for localIdentifier: String) -> LibraryDecoration? {
-        decorations[localIdentifier]
+    /// A cell appeared — classify it cheap, on-device, cached, OFF the scroll path.
+    func note(_ localIdentifier: String) {
+        guard !seen.contains(localIdentifier) else { return }
+        seen.insert(localIdentifier)
+        queue.append(localIdentifier)
+        if !running { running = true; Task { await run() } }
+    }
+
+    func decoration(for localIdentifier: String) -> LibraryDecoration? { decorations[localIdentifier] }
+    func isPersonal(_ localIdentifier: String) -> Bool { personal.contains(localIdentifier) }
+
+    private func run() async {
+        while !queue.isEmpty {
+            let lid = queue.removeFirst()
+            if let info = await Self.resolve(lid) {
+                if info.isPersonal { personal.insert(lid) }
+                if let g = info.glyph { decorations[lid] = LibraryDecoration(known: true, glyph: g) }
+            }
+        }
+        running = false
+    }
+
+    /// Heavy work, OFF the main actor: read the cached verdict, else classify the
+    /// photo on-device (Apple tags) and write it to the local store (the ledger).
+    nonisolated private static func resolve(_ lid: String) async -> (isPersonal: Bool, glyph: String?)? {
+        if let c = LocalStore.shared.classification(for: [lid])[lid] {
+            return (c.isPersonal, c.isVehicle ? "car.fill" : nil)
+        }
+        guard let v = await VisionEngine.classifyAsset(localIdentifier: lid) else { return nil }
+        LocalStore.shared.classify(localIdentifier: lid, isVehicle: v.isVehicle, isPersonal: v.isPersonal, labels: v.labels)
+        return (v.isPersonal, v.isVehicle ? "car.fill" : nil)
     }
 }
 
@@ -149,6 +184,7 @@ final class LibraryOverlayStore: ObservableObject {
 struct LibraryView: View {
     @ObservedObject private var store = LibraryStore.shared
     @State private var detailIndex: Int?
+    @AppStorage("personalMode") private var personalMode = PersonalMode.show
 
     private let columns = 3
     private let spacing: CGFloat = 2
@@ -170,8 +206,20 @@ struct LibraryView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Text("\(store.count)").font(.subheadline).monospacedDigit()
+                    Menu {
+                        Picker("Personal photos", selection: $personalMode) {
+                            Label("Show", systemImage: "eye").tag(PersonalMode.show)
+                            Label("Blur", systemImage: "drop.fill").tag(PersonalMode.blur)
+                            Label("Hide", systemImage: "eye.slash").tag(PersonalMode.black)
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: personalMode == .show ? "slider.horizontal.3" : "eye.slash.circle.fill")
+                                .font(.caption)
+                            Text("\(store.count)").font(.subheadline).monospacedDigit()
+                        }
                         .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
@@ -216,6 +264,9 @@ private struct LibraryCell: View {
     @ObservedObject private var overlay = LibraryOverlayStore.shared
     @StateObject private var loader = LibraryThumbLoader()
     @State private var localID: String?
+    @AppStorage("personalMode") private var personalMode = PersonalMode.show
+
+    private var isPersonal: Bool { localID.map { overlay.isPersonal($0) } ?? false }
 
     var body: some View {
         Color(.secondarySystemFill)
@@ -223,6 +274,12 @@ private struct LibraryCell: View {
             .overlay {
                 if let image = loader.image {
                     Image(uiImage: image).resizable().scaledToFill()
+                        .blur(radius: (personalMode == .blur && isPersonal) ? 14 : 0)
+                }
+            }
+            .overlay {
+                if personalMode == .black && isPersonal {
+                    Color.black   // "Hide" = blacked out; keeps the grid layout intact
                 }
             }
             .overlay(alignment: .bottomTrailing) {
