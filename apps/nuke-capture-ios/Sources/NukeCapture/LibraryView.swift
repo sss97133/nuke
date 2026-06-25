@@ -17,6 +17,9 @@ struct LibraryView: View {
     @State private var detailIndex: Int?
     @AppStorage("personalMode") private var personalMode = PersonalMode.show
     @Namespace private var zoomNS
+    @ObservedObject private var overlay = LibraryOverlayStore.shared
+    @State private var selectMode = false
+    @State private var selected: Set<Int> = []
 
     @State private var columns = 3
     @State private var gestureStartColumns: Int?
@@ -49,31 +52,63 @@ struct LibraryView: View {
                     spacing: spacing
                 ) {
                     ForEach(0..<store.count, id: \.self) { idx in
-                        LibraryCell(index: idx)
+                        LibraryCell(index: idx, selecting: selectMode, isSelected: selected.contains(idx))
                             .matchedTransitionSource(id: idx, in: zoomNS)
-                            .onTapGesture { detailIndex = idx }
+                            .onTapGesture {
+                                if selectMode {
+                                    if selected.contains(idx) { selected.remove(idx) } else { selected.insert(idx) }
+                                } else {
+                                    detailIndex = idx
+                                }
+                            }
                     }
                 }
             }
             .simultaneousGesture(densityPinch)
-            .navigationTitle("Library")
+            .navigationTitle(selectMode ? "\(selected.count) selected" : "Library")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Picker("Personal photos", selection: $personalMode) {
-                            Label("Show", systemImage: "eye").tag(PersonalMode.show)
-                            Label("Blur", systemImage: "drop.fill").tag(PersonalMode.blur)
-                            Label("Hide", systemImage: "eye.slash").tag(PersonalMode.black)
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: personalMode == .show ? "slider.horizontal.3" : "eye.slash.circle.fill")
-                                .font(.caption)
-                            Text("\(store.count)").font(.subheadline).monospacedDigit()
-                        }
-                        .foregroundStyle(.secondary)
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(selectMode ? "Done" : "Select") {
+                        withAnimation { selectMode.toggle() }
+                        selected.removeAll()
                     }
+                }
+                if !selectMode {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Picker("Personal photos", selection: $personalMode) {
+                                Label("Show", systemImage: "eye").tag(PersonalMode.show)
+                                Label("Blur", systemImage: "drop.fill").tag(PersonalMode.blur)
+                                Label("Hide", systemImage: "eye.slash").tag(PersonalMode.black)
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: personalMode == .show ? "slider.horizontal.3" : "eye.slash.circle.fill")
+                                    .font(.caption)
+                                Text("\(store.count)").font(.subheadline).monospacedDigit()
+                            }
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                if selectMode {
+                    HStack(spacing: 12) {
+                        Button(role: .destructive) { applyVerdict(approved: false) } label: {
+                            Label("Reject", systemImage: "eye.slash").frame(maxWidth: .infinity)
+                        }
+                        Button { applyVerdict(approved: true) } label: {
+                            Label("Approve", systemImage: "checkmark.circle").frame(maxWidth: .infinity)
+                        }
+                        .tint(.green)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .disabled(selected.isEmpty)
+                    .padding(.horizontal).padding(.vertical, 8)
+                    .background(.ultraThinMaterial)
                 }
             }
         }
@@ -84,6 +119,12 @@ struct LibraryView: View {
             LibraryDetailView(startIndex: box.id)
                 .navigationTransition(.zoom(sourceID: box.id, in: zoomNS))
         }
+    }
+
+    private func applyVerdict(approved: Bool) {
+        let lids = selected.compactMap { LibraryStore.shared.asset(at: $0)?.localIdentifier }
+        overlay.setVerdict(lids, approved: approved)
+        withAnimation { selected.removeAll() }
     }
 }
 
@@ -116,12 +157,15 @@ final class LibraryThumbLoader: ObservableObject {
 
 private struct LibraryCell: View {
     let index: Int
+    var selecting: Bool = false
+    var isSelected: Bool = false
     @ObservedObject private var overlay = LibraryOverlayStore.shared
     @StateObject private var loader = LibraryThumbLoader()
     @State private var localID: String?
     @AppStorage("personalMode") private var personalMode = PersonalMode.show
 
-    private var isPersonal: Bool { localID.map { overlay.isPersonal($0) } ?? false }
+    /// Owner verdict wins, else the auto verdict (the Select tool's whole point).
+    private var shouldHide: Bool { localID.map { overlay.shouldHide($0) } ?? false }
 
     var body: some View {
         Color(.secondarySystemFill)
@@ -129,12 +173,22 @@ private struct LibraryCell: View {
             .overlay {
                 if let image = loader.image {
                     Image(uiImage: image).resizable().scaledToFill()
-                        .blur(radius: (personalMode == .blur && isPersonal) ? 14 : 0)
+                        .blur(radius: (personalMode == .blur && shouldHide) ? 14 : 0)
                 }
             }
             .overlay {
-                if personalMode == .black && isPersonal {
+                if personalMode == .black && shouldHide {
                     Color.black   // "Hide" = blacked out; keeps the grid layout intact
+                }
+            }
+            .overlay { if selecting && isSelected { Color.accentColor.opacity(0.28) } }
+            .overlay(alignment: .topLeading) {
+                if selecting {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, isSelected ? Color.accentColor : Color.black.opacity(0.35))
+                        .padding(4)
                 }
             }
             .overlay(alignment: .bottomTrailing) {

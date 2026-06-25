@@ -132,6 +132,11 @@ final class LocalStore {
             // re-classifies under the new rule on next view.
             try db.execute(sql: "UPDATE appearance SET isPersonal = NULL, isVehicle = NULL")
         }
+        m.registerMigration("v3_owner_verdict") { db in
+            // Owner's explicit Approve/Reject (the Select tool). Beats the auto verdict
+            // (proven > projected). 'approved' | 'rejected' | null.
+            try db.alter(table: "appearance") { t in t.add(column: "ownerVerdict", .text) }
+        }
         return m
     }
 
@@ -271,6 +276,44 @@ final class LocalStore {
                 }
             }
         } catch { NSLog("LocalStore.classification failed: %@", String(describing: error)) }
+        return out
+    }
+
+    // MARK: Owner verdict — the Select tool (explicit Approve/Reject, overrides auto)
+
+    /// Set the owner's explicit verdict for a batch (upserts even un-classified rows).
+    func setOwnerVerdict(_ localIdentifiers: [String], verdict: String?, now: Date = Date()) {
+        guard !localIdentifiers.isEmpty else { return }
+        do {
+            try dbQueue.write { db in
+                for lid in localIdentifiers {
+                    try db.execute(sql: """
+                        INSERT INTO appearance (localIdentifier, sourceType, ownerVerdict, createdAt)
+                        VALUES (?, 'local_filesystem', ?, ?)
+                        ON CONFLICT(localIdentifier) DO UPDATE SET ownerVerdict = excluded.ownerVerdict
+                        """, arguments: [lid, verdict, now])
+                }
+            }
+        } catch { NSLog("LocalStore.setOwnerVerdict failed: %@", String(describing: error)) }
+    }
+
+    /// Owner verdicts for a batch: lid -> true (approved) / false (rejected).
+    func ownerVerdicts(for localIdentifiers: [String]) -> [String: Bool] {
+        guard !localIdentifiers.isEmpty else { return [:] }
+        var out: [String: Bool] = [:]
+        do {
+            try dbQueue.read { db in
+                let rows = try Row.fetchAll(db, sql: """
+                    SELECT localIdentifier AS lid, ownerVerdict AS ov FROM appearance
+                    WHERE ownerVerdict IS NOT NULL AND localIdentifier IN (\(databaseQuestionMarks(count: localIdentifiers.count)))
+                    """, arguments: StatementArguments(localIdentifiers))
+                for r in rows {
+                    let lid: String = r["lid"]
+                    let ov: String? = r["ov"]
+                    if let ov { out[lid] = (ov == "approved") }
+                }
+            }
+        } catch { NSLog("LocalStore.ownerVerdicts failed: %@", String(describing: error)) }
         return out
     }
 
