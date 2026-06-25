@@ -267,6 +267,64 @@ enum SupabaseService {
         }
     }
 
+    // ─── Reconcile (repair taken_at + GPS from the asset's true EXIF) ─────────
+    //
+    // Rows synced by older builds stored PHAsset.creationDate — the date the
+    // photo was re-ADDED to the library (iCloud restore / device migration),
+    // not the shutter date — as taken_at, and dropped GPS entirely. The asset's
+    // embedded EXIF DateTimeOriginal + PHAsset.location are the source of truth.
+    // SyncEngine re-reads them on-device and calls these to PATCH the
+    // destination row, joined on the localIdentifier we stored at upload time
+    // (exif_data.uuid). Idempotent — safe to re-run.
+
+    struct ReconcileTarget: Decodable, Sendable {
+        let id: String
+        let exif_data: ExifUUID?
+        struct ExifUUID: Decodable, Sendable { let uuid: String? }
+    }
+
+    /// Capture-relay rows for the signed-in user, oldest first. The caller
+    /// re-reads each asset's true EXIF by `exif_data.uuid` and patches it.
+    static func fetchReconcileTargets(limit: Int = 5000) async -> [ReconcileTarget] {
+        guard let userId = currentUserId else { return [] }
+        do {
+            return try await client
+                .from("vehicle_images")
+                .select("id, exif_data")
+                .eq("user_id", value: userId)
+                .eq("exif_data->>synced_by", value: Config.syncedByTag)
+                .order("created_at", ascending: true)
+                .limit(limit)
+                .execute()
+                .value
+        } catch {
+            NSLog("NukeCapture: fetchReconcileTargets failed: %@", String(describing: error))
+            return []
+        }
+    }
+
+    /// Overwrite the authoritative scalar columns (taken_at + lat/lon) for one
+    /// row from the asset's true EXIF. Nil fields are OMITTED (synthesized
+    /// Encodable uses encodeIfPresent), never sent as null — so a missing
+    /// EXIF date leaves the existing value untouched rather than wiping it.
+    static func reconcilePhoto(id: String, takenAt: Date?, latitude: Double?, longitude: Double?) async throws {
+        struct Patch: Encodable {
+            let taken_at: String?
+            let latitude: Double?
+            let longitude: Double?
+        }
+        let patch = Patch(
+            taken_at: takenAt.map { isoFormatter.string(from: $0) },
+            latitude: latitude,
+            longitude: longitude
+        )
+        try await client
+            .from("vehicle_images")
+            .update(patch)
+            .eq("id", value: id)
+            .execute()
+    }
+
     // ─── Upload + insert (one photo) ─────────────────────────────────────────
 
     private static let isoFormatter: ISO8601DateFormatter = {
