@@ -123,3 +123,58 @@ human-confirmed trust climb (proven › attributed › projected) — never sile
 1. **Local-store tech:** SwiftData (native) vs GRDB/SQLite (portable, closest to "app version of our DB").
 2. **The local schema:** which prod tables mirror DOWN (vehicle_images, vehicle_observations, work_sessions, user_sites) and at what grain — the "instruction book" the app gets at download.
 3. **Garage/org tier:** wait for the contributor graph, or design the local store NOW so the federated tier is a later read-up, not a rebuild?
+
+---
+
+## 8. Corroboration contribution — source-wiring + compute-tier evidence (Claude Code, 2026-06-25, later session)
+
+Second agent, same goal. Everything below was **live-probed against prod or read from
+code/build** this session — not inferred. It corroborates §1–§3 and corrects one ledger
+hypothesis.
+
+**A. Axis A proof — T1 currently runs OUTSIDE the app (verified, prod).** The deep verdict
+on Skylar's Mustang frames (e.g. `IMG_0195` = `d0de3544-fff2-4a7c-9a9b-15f64b527b71`,
+`analyzed_at` 2026-06-21) carries `extraction_method: "byok_claude_print_read_tool"`,
+`agent_model: claude-opus-4-8`. That is the Claude CLI reading the image via the Read tool
+in a **script** (dev/launchd), not an in-app call. → Hard confirmation of the addendum's core
+point: the T1 loop is **not in the app**. The app does T0 (Apple Vision `triage` → the noisy
+`apple_ml_labels` on the row) + observe + upload only. **This is the "key-exchange loop is not
+in the app" gap, with provenance.**
+
+**B. Corrects ledger [HYPOTHESIS] §6.1 ("orchestrator dead since 2026-05-03, ~73K unextracted").**
+Partly false. The BYOK deep path produced real `byok_v3_camera_pose` verdicts as recently as
+**2026-06-21** (cited above). "Dead" overstates it — it's "runs only when a human/launchd fires
+the script" (= the same root as A: not in the app). The **backlog** is real (prior session:
+~11.5K of 42K Mustang images ever analyzed), the **"dead orchestrator"** is not.
+
+**C. NEW layer this addendum doesn't yet cover — source-of-truth wiring (EXIF date/GPS).**
+Even where cloud rows exist, capture-relay provenance is corrupt: `taken_at` was written from
+`PHAsset.creationDate` (the iCloud re-add / device-migration date), proven **~6 months off** on
+real frames (file EXIF `2019-04-29` vs stored `2019-10-25`), device wrong (file `iPhone XS` vs
+DB `iPhone 11 Pro`), GPS absent from `exif_data` (it IS in the `latitude`/`longitude` columns).
+The corruption is non-uniform → only re-reading the file fixes it. **Forward fix already in code
+on BOTH branches** (`SupabaseService.swift:345` prefers `exifCaptureDate`; `CameraEXIF.captureDate`
+reads the file's `DateTimeOriginal`); the corrupt rows are from older builds.
+→ **Design consequence for the local store (§7):** the local "app DB" must source date+GPS from
+`PHAsset`/file EXIF, NEVER trust a mirrored cloud `taken_at`. The DB column lies; the file is truth.
+
+**D. The write-back / consequence gap (verified).** The engine self-polices integrity — IMG_0195
+& IMG_0196 verdicts both say *"NOT the subject 1966 Mustang"* with `needs_clarification: true` —
+yet both rows are **still bound to the Mustang with the wrong date.** Nothing forks/demotes on the
+flag. §5's promotion trust-climb needs its inverse: a **demotion/fork path** when a verdict
+contradicts its binding. Today verdicts are produced and parked. A parked verdict = silent failure
+(`production-engineering.md` §6).
+
+**E. Coordination flag (branch divergence — clobber risk).** A backfill reconcile —
+`SyncEngine.reconcileLibrary()` + `SupabaseService.fetchReconcileTargets()/reconcilePhoto()` —
+that re-reads each synced asset's true EXIF **on-device via `PHAsset` (NOT storage re-download —
+egress-safe, honors the §"Images + cost" rule)** and patches `taken_at`+GPS, joined by
+`exif_data.uuid` = `localIdentifier`, is **built + `BUILD SUCCEEDED`** on branch
+`fable5/engine-surface` (worktree `ios-engine`). It is **NOT on `ignition-ios`.** Needs porting/
+reconciling. It is the first concrete "wire source → consequence" artifact (corrects only the date
+half; the fork-on-misattribution half from D is unbuilt).
+
+**Net for the path forward:** §3's missing local store remains the foundation, AND it must be fed
+by a corrected source layer (C) and drain to a consequence layer (D). Three organs, one spine:
+**source-of-truth (file EXIF) → local store (the greenfield) → consequence (correct/fork/promote).**
+Today only the middle has a gate but no body, the source leaks, and the consequence is unwired.
