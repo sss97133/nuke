@@ -24,6 +24,10 @@ struct LibraryInfoView: View {
             List {
                 // ── The photo's own facts (Apple's side) ──
                 Section("Photo") {
+                    // ⚠️ HARD_RULES §7: this is PHAsset.creationDate (the device RE-ADD date),
+                    // proven ~6mo wrong vs file EXIF DateTimeOriginal. Once ingest() populates
+                    // appearance.takenAt, source this from the ledger's EXIF takenAt and tag this
+                    // fallback "(device, unverified)". Do NOT treat it as the true capture time.
                     row("Taken", takenText)
                     row("Dimensions", "\(asset.pixelWidth) × \(asset.pixelHeight)")
                     if let loc = asset.location {

@@ -61,6 +61,15 @@ The missing piece is not the gate — it's the **store** behind it.
 
 ## 3. The VERIFIED gap — there is NO local store (the real greenfield)
 
+> **✅ RESOLVED 2026-06-25 — this gap is CLOSED.** The local store is **built**:
+> `Sources/NukeCapture/LocalStore.swift` (GRDB, identity-first mirror of prod:
+> `image_identity → appearance → vehicle_image`, v1–v3 migrations), wired into the Library
+> glasses + info sheet. **§7 Q1 is decided: GRDB, not SwiftData.** The section below is the
+> original diagnosis — kept for the reasoning, no longer the to-do. **Extend `LocalStore`;
+> do NOT create a second/parallel store.** What's still open is *closing the loop* (wire
+> `ingest()` + a `dayCounts()` window so a record renders network-off) — see the iOS
+> `CLAUDE.md` ▶ NEXT BUILD, not a rebuild of the store.
+
 **Verified (grep, 2026-06-25):** no `GRDB/SQLite/CoreData/SwiftData/Realm` anywhere in
 `Sources/NukeCapture/`. All on-device state is **`UserDefaults`**: counters/flags
 (`totalSynced`, `totalSkipped`, `totalHeldPrivate`, `backfillQueue`, `seenSet`,
@@ -120,7 +129,10 @@ human-confirmed trust climb (proven › attributed › projected) — never sile
 
 ## 7. Open questions — Skylar's / the fleet's to decide
 
-1. **Local-store tech:** SwiftData (native) vs GRDB/SQLite (portable, closest to "app version of our DB").
+> **Q1 CLOSED (2026-06-25): GRDB** — built as `LocalStore.swift`. Q2 partly answered (the
+> identity-first appearance schema is in place). Q3 still open.
+
+1. ~~**Local-store tech:** SwiftData vs GRDB/SQLite.~~ → **GRDB, decided + built (`LocalStore.swift`).**
 2. **The local schema:** which prod tables mirror DOWN (vehicle_images, vehicle_observations, work_sessions, user_sites) and at what grain — the "instruction book" the app gets at download.
 3. **Garage/org tier:** wait for the contributor graph, or design the local store NOW so the federated tier is a later read-up, not a rebuild?
 
