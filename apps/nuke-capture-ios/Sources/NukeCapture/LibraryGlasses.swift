@@ -31,6 +31,9 @@ final class LibraryOverlayStore: ObservableObject {
     /// Vehicle/work photos that ALSO contain a person — shown (work), but flagged
     /// borderline so the Select tool can let the owner approve/reject them.
     @Published private(set) var withPerson: Set<String> = []
+    /// Owner's explicit verdicts (the Select tool) — these OVERRIDE the auto verdict.
+    @Published private(set) var approved: Set<String> = []
+    @Published private(set) var rejected: Set<String> = []
 
     private var seen = Set<String>()        // resolved or in flight (dedup)
     private var queue: [String] = []
@@ -46,6 +49,23 @@ final class LibraryOverlayStore: ObservableObject {
 
     func decoration(for localIdentifier: String) -> LibraryDecoration? { decorations[localIdentifier] }
     func isPersonal(_ localIdentifier: String) -> Bool { personal.contains(localIdentifier) }
+
+    /// Whether a cell should be hidden/blurred — the owner verdict WINS, else the auto verdict.
+    func shouldHide(_ lid: String) -> Bool {
+        if rejected.contains(lid) { return true }
+        if approved.contains(lid) { return false }
+        return personal.contains(lid)
+    }
+
+    /// Owner approves (work) or rejects (hide) a batch — overrides the auto verdict, persisted.
+    func setVerdict(_ lids: [String], approved isApproved: Bool) {
+        for lid in lids {
+            if isApproved { approved.insert(lid); rejected.remove(lid) }
+            else { rejected.insert(lid); approved.remove(lid) }
+        }
+        let verdict = isApproved ? "approved" : "rejected"
+        Task.detached { LocalStore.shared.setOwnerVerdict(lids, verdict: verdict) }
+    }
 
     /// Drain the classify queue across a few CONCURRENT lanes — serial was too slow,
     /// so blur/hide lagged behind the scroll. Each lane pulls an id on the main actor,
@@ -67,22 +87,27 @@ final class LibraryOverlayStore: ObservableObject {
 
     private func nextLID() -> String? { queue.isEmpty ? nil : queue.removeFirst() }
 
-    private func apply(_ lid: String, _ info: (isPersonal: Bool, hasPerson: Bool, glyph: String?)?) {
+    private func apply(_ lid: String, _ info: (isPersonal: Bool, hasPerson: Bool, ownerApproved: Bool?, glyph: String?)?) {
         guard let info else { return }
         if info.isPersonal { personal.insert(lid) }
         if info.hasPerson { withPerson.insert(lid) }
+        if let o = info.ownerApproved { if o { approved.insert(lid) } else { rejected.insert(lid) } }
         if let g = info.glyph { decorations[lid] = LibraryDecoration(known: true, glyph: g) }
     }
 
-    /// Heavy work, OFF the main actor: read the cached verdict, else classify the
-    /// photo on-device (Apple tags) and write it to the local store (the ledger).
-    nonisolated private static func resolve(_ lid: String) async -> (isPersonal: Bool, hasPerson: Bool, glyph: String?)? {
+    /// Heavy work, OFF the main actor: read the owner verdict + cached classification,
+    /// else classify the photo on-device (Apple tags) and write it to the local store.
+    nonisolated private static func resolve(_ lid: String) async -> (isPersonal: Bool, hasPerson: Bool, ownerApproved: Bool?, glyph: String?)? {
+        let owner = LocalStore.shared.ownerVerdicts(for: [lid])[lid]
         if let c = LocalStore.shared.classification(for: [lid])[lid] {
-            return (c.isPersonal, c.hasPerson, c.isVehicle ? "car.fill" : nil)
+            return (c.isPersonal, c.hasPerson, owner, c.isVehicle ? "car.fill" : nil)
         }
-        guard let v = await VisionEngine.classifyAsset(localIdentifier: lid) else { return nil }
+        guard let v = await VisionEngine.classifyAsset(localIdentifier: lid) else {
+            // iCloud-only / unclassifiable, but it may still carry an owner verdict.
+            return owner == nil ? nil : (false, false, owner, nil)
+        }
         LocalStore.shared.classify(localIdentifier: lid, isVehicle: v.isVehicle, isPersonal: v.isPersonal,
                                    hasPerson: v.hasPerson, labels: v.labels)
-        return (v.isPersonal, v.hasPerson, v.isVehicle ? "car.fill" : nil)
+        return (v.isPersonal, v.hasPerson, owner, v.isVehicle ? "car.fill" : nil)
     }
 }
