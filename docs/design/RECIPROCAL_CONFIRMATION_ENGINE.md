@@ -55,10 +55,14 @@ confirmed work-session (`dayCount`/`work_session`) with ≥ K images, or a vehic
 set crosses a count. Cheap signals gate it for free first (located+dated+Apple-labeled). Below
 threshold → stays at the cheap T0 ledger; never burns BYOK on an unconfirmed or trivial group.
 
-## Hard rules (carried from Skylar)
+## Hard rules (carried from Skylar — full list: `docs/design/HARD_RULES.md`)
 - **SOURCE images only.** Read the raw object (`vehicle_images.storage_path` / the public
   `image_url` which equals it), NEVER the rendered/derived `large_url`/`medium_url` transforms,
   and NEVER "work from the DB's processed images" as a shortcut.
+- **Stored images are immutable.** Read the source object to ANALYZE; never overwrite, re-encode,
+  delete, or replace a stored image/render, and never mutate a `vehicle_images` row's pixels or
+  paths. A correction is a NEW claim/observation, never an edit to the stored artifact. (On device:
+  read the local `PHAsset`, never storage re-download — egress.)
 - **File EXIF is truth.** Date/GPS from the file, never the corrupt cloud `taken_at` (PHAsset
   re-add date, ~6mo off).
 - **Promotion is owner-signed.** Reciprocal confidence raises a claim toward owner-grade, but value

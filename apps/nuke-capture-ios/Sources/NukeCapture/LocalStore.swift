@@ -16,6 +16,14 @@
 //
 //  GRDB is thread-safe; this type is NOT main-actor-confined. Callers on the
 //  main actor (LibraryOverlayStore) hop to it async and publish on main.
+//
+//  SUPERSEDE, NEVER OVERWRITE (the project's load-bearing rule, applied here):
+//  three writers own DISJOINT columns and must not clobber each other —
+//    • ingest()          → EXIF/identity (takenAt/GPS/phash/labels/vehicleId/sessionDate), COALESCE-fill
+//    • classify()        → auto verdict (isVehicle/isPersonal/hasPerson), DO UPDATE in place
+//    • setOwnerVerdict() → ownerVerdict (owner-PROVEN, top of trust; never auto-clobbered, never reset)
+//  Any new writer uses ON CONFLICT DO UPDATE SET on its OWN columns only — never
+//  `.replace` (delete+reinsert nulls every other column). See docs/design/HARD_RULES.md.
 
 import Foundation
 import GRDB
@@ -135,6 +143,9 @@ final class LocalStore {
         m.registerMigration("v3_owner_verdict") { db in
             // Owner's explicit Approve/Reject (the Select tool). Beats the auto verdict
             // (proven > projected). 'approved' | 'rejected' | null.
+            // ⚠️ AUTO verdict columns (isVehicle/isPersonal/hasPerson) MAY be reset on a rule
+            // change (see v2). ownerVerdict MUST NEVER be blanket-reset — it is owner-proven
+            // and unrecoverable; it sits at the top of the trust hierarchy.
             try db.alter(table: "appearance") { t in t.add(column: "ownerVerdict", .text) }
         }
         return m
@@ -160,23 +171,42 @@ final class LocalStore {
         if let appleMLLabels, let data = try? JSONEncoder().encode(appleMLLabels) {
             labelsJSON = String(data: data, encoding: .utf8)
         }
+        let analyzedAt: Date? = appleMLLabels == nil ? nil : now
         do {
             try dbQueue.write { db in
                 if let phashHex {
                     try LocalImageIdentity(phashHex: phashHex, contentSha256: nil, firstSeenAt: now)
                         .insert(db, onConflict: .ignore)
                 }
-                try LocalAppearance(
-                    localIdentifier: localIdentifier, phashHex: phashHex, sourceType: sourceType,
-                    takenAt: takenAt, latitude: latitude, longitude: longitude,
-                    cameraMake: cameraMake, cameraModel: cameraModel,
-                    appleMLLabelsJSON: labelsJSON,
-                    analyzedAt: appleMLLabels == nil ? nil : now, createdAt: now
-                ).insert(db, onConflict: .replace)
+                // ⚠️ NEVER `LocalAppearance(...).insert(onConflict: .replace)` here — REPLACE is
+                // delete+reinsert and the struct omits the verdict columns, so it would NULL
+                // isVehicle/isPersonal/hasPerson/ownerVerdict that classify()/setOwnerVerdict()
+                // own (and ownerVerdict is owner-PROVEN — unrecoverable). ingest() writes ONLY
+                // its own EXIF/identity columns, COALESCE so a nil arg never wipes a prior value.
+                try db.execute(sql: """
+                    INSERT INTO appearance (localIdentifier, phashHex, sourceType, takenAt, latitude, longitude, cameraMake, cameraModel, appleMLLabelsJSON, analyzedAt, createdAt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(localIdentifier) DO UPDATE SET
+                        phashHex          = COALESCE(excluded.phashHex, appearance.phashHex),
+                        takenAt           = COALESCE(excluded.takenAt, appearance.takenAt),
+                        latitude          = COALESCE(excluded.latitude, appearance.latitude),
+                        longitude         = COALESCE(excluded.longitude, appearance.longitude),
+                        cameraMake        = COALESCE(excluded.cameraMake, appearance.cameraMake),
+                        cameraModel       = COALESCE(excluded.cameraModel, appearance.cameraModel),
+                        appleMLLabelsJSON = COALESCE(excluded.appleMLLabelsJSON, appearance.appleMLLabelsJSON),
+                        analyzedAt        = COALESCE(excluded.analyzedAt, appearance.analyzedAt)
+                    """, arguments: [localIdentifier, phashHex, sourceType, takenAt, latitude, longitude,
+                                     cameraMake, cameraModel, labelsJSON, analyzedAt, now])
                 if let phashHex {
-                    try LocalVehicleImage(phashHex: phashHex, localIdentifier: localIdentifier,
-                                          vehicleId: vehicleId, sessionDate: sessionDate)
-                        .insert(db, onConflict: .replace)
+                    // Same discipline: fill, never wipe (a later call may add vehicleId/sessionDate).
+                    try db.execute(sql: """
+                        INSERT INTO vehicle_image (phashHex, localIdentifier, vehicleId, sessionDate)
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT(phashHex) DO UPDATE SET
+                            localIdentifier = COALESCE(excluded.localIdentifier, vehicle_image.localIdentifier),
+                            vehicleId       = COALESCE(excluded.vehicleId, vehicle_image.vehicleId),
+                            sessionDate     = COALESCE(excluded.sessionDate, vehicle_image.sessionDate)
+                        """, arguments: [phashHex, localIdentifier, vehicleId, sessionDate])
                 }
             }
         } catch {
