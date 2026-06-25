@@ -58,6 +58,10 @@ final class SyncEngine: ObservableObject {
     /// Today streams these so the user watches analysis land in seconds. A T0 atom
     /// is a DETECTION (a label), never confirmed labor/value/intent.
     @Published private(set) var liveT0Atoms: [T0Atom] = []
+    /// Reconcile pass progress — repairs already-synced rows whose taken_at/GPS
+    /// were written from PHAsset.creationDate by an older build. Empty when idle.
+    @Published private(set) var reconcileStatus: String = ""
+    @Published private(set) var isReconciling = false
     /// Ignition backfill queue depth — TodayView shows this as a ledger row
     /// while the queue drains. 0 = no backfill in flight.
     @Published private(set) var backfillRemaining = 0
@@ -799,6 +803,60 @@ final class SyncEngine: ObservableObject {
         liveT0Atoms.removeAll { $0.assetID == atom.assetID }
         liveT0Atoms.insert(atom, at: 0)
         if liveT0Atoms.count > 12 { liveT0Atoms.removeLast(liveT0Atoms.count - 12) }
+    }
+
+    // ─── Reconcile: repair already-synced rows from the asset's true EXIF ─────
+    //
+    // Rows written by older builds stored PHAsset.creationDate (the iCloud
+    // re-add / migration date) as taken_at and dropped GPS — proven 6 months
+    // off on real frames, with the wrong device, while the shutter truth sat in
+    // the file the whole time. The forward path (SupabaseService.uploadPhoto)
+    // already prefers exifCaptureDate; this is the one-shot mop for the backlog.
+    //
+    // We DON'T re-walk the library — we drive off the destination rows and join
+    // back to the source asset by the localIdentifier stored at upload time
+    // (exif_data.uuid), so we touch only rows we actually wrote. Re-reading the
+    // asset's original bytes on-device is the same extraction the live sync
+    // uses, so the repaired value is identical to a fresh sync. Idempotent.
+    func reconcileLibrary() async {
+        guard !isReconciling else { return }
+        isReconciling = true
+        reconcileStatus = "loading…"
+        defer { isReconciling = false }
+
+        let targets = await SupabaseService.fetchReconcileTargets()
+        guard !targets.isEmpty else { reconcileStatus = "nothing to reconcile"; return }
+
+        var fixed = 0, missing = 0, failed = 0, processed = 0
+        for t in targets {
+            if Task.isCancelled { break }
+            processed += 1
+            guard let uuid = t.exif_data?.uuid else { continue }
+
+            // Join destination row → source asset via the stored localIdentifier.
+            let fetch = PHAsset.fetchAssets(withLocalIdentifiers: [uuid], options: nil)
+            guard let asset = fetch.firstObject else { missing += 1; continue }
+
+            let lat = asset.location?.coordinate.latitude
+            let lon = asset.location?.coordinate.longitude
+            do {
+                let data = try await Self.requestOriginalData(for: asset)
+                let exifDate = CameraEXIF.captureDate(from: data)
+                // Nothing recoverable ⇒ skip (don't issue an empty PATCH).
+                guard exifDate != nil || lat != nil else { continue }
+                try await SupabaseService.reconcilePhoto(
+                    id: t.id, takenAt: exifDate, latitude: lat, longitude: lon
+                )
+                fixed += 1
+            } catch {
+                failed += 1
+                lastError = "reconcile \(uuid.prefix(8)): \(error.localizedDescription)"
+            }
+            if processed % 25 == 0 {
+                reconcileStatus = "\(fixed) repaired · \(missing) gone · \(failed) failed (\(processed)/\(targets.count))"
+            }
+        }
+        reconcileStatus = "done: \(fixed) repaired · \(missing) not in library · \(failed) failed"
     }
 
     // ─── PhotoKit plumbing (identical to Mac) ────────────────────────────────

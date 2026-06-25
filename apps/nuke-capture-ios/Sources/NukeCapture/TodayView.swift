@@ -112,6 +112,21 @@ struct TodayView: View {
                     }
                     .disabled(attribution.isRunning)
 
+                    // Repair photo dates — re-reads each synced asset's true EXIF
+                    // (DateTimeOriginal + GPS) on-device and patches rows that an
+                    // older build stamped with the iCloud re-add date. One-shot.
+                    Button {
+                        Task { await engine.reconcileLibrary() }
+                    } label: {
+                        if engine.isReconciling {
+                            Label(engine.reconcileStatus.isEmpty ? "Repairing…" : engine.reconcileStatus,
+                                  systemImage: "calendar.badge.clock")
+                        } else {
+                            Label("Repair photo dates", systemImage: "calendar.badge.clock")
+                        }
+                    }
+                    .disabled(engine.isReconciling)
+
                     // Confirm sessions — the backlog sweep: one tap routes a day's
                     // photos to a vehicle (handles VIN-less + new-vehicle cases).
                     NavigationLink {
