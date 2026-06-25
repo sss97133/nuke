@@ -262,6 +262,23 @@ final class LocalStore {
         return out
     }
 
+    /// Which of these already carry a real EXIF `takenAt` — so the ingest pass can
+    /// skip the heavy original-data load on a re-run. Pure local read.
+    func identifiersWithTakenAt(in localIdentifiers: [String]) -> Set<String> {
+        guard !localIdentifiers.isEmpty else { return [] }
+        var out: Set<String> = []
+        do {
+            try dbQueue.read { db in
+                let rows = try Row.fetchAll(db, sql: """
+                    SELECT localIdentifier AS lid FROM appearance
+                    WHERE takenAt IS NOT NULL AND localIdentifier IN (\(databaseQuestionMarks(count: localIdentifiers.count)))
+                    """, arguments: StatementArguments(localIdentifiers))
+                for r in rows { let lid: String = r["lid"]; out.insert(lid) }
+            }
+        } catch { NSLog("LocalStore.identifiersWithTakenAt failed: %@", String(describing: error)) }
+        return out
+    }
+
     // MARK: Cheap on-device organization — the Apple-tag classification verdict
 
     /// Record one photo's T0 verdict (vehicle/personal + labels). Upsert in place so

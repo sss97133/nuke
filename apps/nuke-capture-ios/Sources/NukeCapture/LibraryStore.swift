@@ -42,6 +42,16 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
         return assets.object(at: index)
     }
 
+    /// Snapshot the newest `limit` assets (newest-first, the fetch order) for the
+    /// background LocalStore ingest pass. Main-actor read of the PHFetchResult.
+    func newestAssets(_ limit: Int) -> [PHAsset] {
+        let n = min(assets.count, limit)
+        guard n > 0 else { return [] }
+        var out: [PHAsset] = []; out.reserveCapacity(n)
+        for i in 0..<n { out.append(assets.object(at: i)) }
+        return out
+    }
+
     /// Grid request options — OPPORTUNISTIC: PhotoKit delivers a cached low-res
     /// frame instantly, then refines to sharp (the handler fires more than once).
     /// That is the Photos-app feel. (highQualityFormat made every cell wait for the
