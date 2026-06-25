@@ -28,7 +28,10 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15
+    # macOS 26 (Tahoe) image — REQUIRED: the app targets the iOS 26 SDK (Liquid
+    # Glass), which only ships with Xcode 26, which only runs on macOS 26. A
+    # macos-15 runner has at most Xcode 16 → the archive fails on the iOS 26 SDK.
+    runs-on: macos-26
     timeout-minutes: 45
     defaults:
       run:
