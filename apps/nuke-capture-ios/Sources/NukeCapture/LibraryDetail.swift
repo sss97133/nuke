@@ -12,6 +12,7 @@ struct LibraryDetailView: View {
     let startIndex: Int
     @Environment(\.dismiss) private var dismiss
     @State private var index: Int
+    @State private var showInfo = false
 
     init(startIndex: Int) {
         self.startIndex = startIndex
@@ -19,7 +20,7 @@ struct LibraryDetailView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
+        ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
             TabView(selection: $index) {
                 ForEach(0..<LibraryStore.shared.count, id: \.self) { idx in
@@ -29,12 +30,25 @@ struct LibraryDetailView: View {
             .tabViewStyle(.page(indexDisplayMode: .never))
             .ignoresSafeArea()
 
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.headline).foregroundStyle(.white)
-                    .padding(10).background(.black.opacity(0.4), in: Circle())
+            HStack {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.headline).foregroundStyle(.white)
+                        .padding(10).background(.black.opacity(0.4), in: Circle())
+                }
+                Spacer()
+                Button { showInfo = true } label: {
+                    Image(systemName: "info.circle")
+                        .font(.title3).foregroundStyle(.white)
+                        .padding(10).background(.black.opacity(0.4), in: Circle())
+                }
             }
             .padding()
+        }
+        .sheet(isPresented: $showInfo) {
+            if let asset = LibraryStore.shared.asset(at: index) {
+                LibraryInfoView(asset: asset)
+            }
         }
     }
 }

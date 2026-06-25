@@ -56,6 +56,18 @@ struct LocalVehicleImage: Codable, FetchableRecord, PersistableRecord {
     var sessionDate: String?        // 'yyyy-MM-dd' — the day bucket for the receipt
 }
 
+/// The back-of-the-photo ledger for one image — what the local store knows about it.
+struct ImageLedger {
+    let classified: Bool
+    let isVehicle: Bool
+    let isPersonal: Bool
+    let labels: [String]
+    let phashHex: String?
+    let vehicleId: String?
+    let sessionDate: String?
+    let analyzedAt: Date?
+}
+
 // MARK: - The store
 
 final class LocalStore {
@@ -251,5 +263,39 @@ final class LocalStore {
             }
         } catch { NSLog("LocalStore.classification failed: %@", String(describing: error)) }
         return out
+    }
+
+    /// The full ledger for one image — classification + labels + identity + binding.
+    /// Powers the info page (the back of the photo). nil if the row doesn't exist yet.
+    func ledger(for localIdentifier: String) -> ImageLedger? {
+        do {
+            return try dbQueue.read { db -> ImageLedger? in
+                guard let r = try Row.fetchOne(db, sql: """
+                    SELECT a.isVehicle AS v, a.isPersonal AS p, a.appleMLLabelsJSON AS labels,
+                           a.phashHex AS ph, a.analyzedAt AS an,
+                           vi.vehicleId AS vid, vi.sessionDate AS day
+                    FROM appearance a
+                    LEFT JOIN vehicle_image vi ON vi.localIdentifier = a.localIdentifier
+                    WHERE a.localIdentifier = ?
+                    """, arguments: [localIdentifier]) else { return nil }
+                let vOpt: Bool? = r["v"]
+                let pOpt: Bool? = r["p"]
+                let labelsStr: String? = r["labels"]
+                let labels = labelsStr.flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) } ?? []
+                return ImageLedger(
+                    classified: vOpt != nil,
+                    isVehicle: vOpt ?? false,
+                    isPersonal: pOpt ?? false,
+                    labels: labels,
+                    phashHex: r["ph"],
+                    vehicleId: r["vid"],
+                    sessionDate: r["day"],
+                    analyzedAt: r["an"]
+                )
+            }
+        } catch {
+            NSLog("LocalStore.ledger failed: %@", String(describing: error))
+            return nil
+        }
     }
 }
