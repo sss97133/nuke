@@ -1,6 +1,8 @@
-// MainTabView.swift — the app spine: EXPLORE · PROFILE · TODAY.
+// MainTabView.swift — the app spine: LIBRARY · EXPLORE · PROFILE · TODAY.
 //
-// Three tabs, left to right:
+// LIBRARY is the FOUNDATION for a signed-in owner with full access — their whole
+// photo library at Photos speed (the source); everything else rides on top as
+// glasses. Tabs, left to right (Library shown only when signed in + full access):
 //
 //   EXPLORE  the front door (LEFTMOST). The populated world of vehicles + the
 //            cohort market terminal — reachable signed-out, no wall. An anon
@@ -28,15 +30,24 @@ struct MainTabView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("exploreMode") private var exploreMode = false
     @State private var photoGrant = Self.currentPhotoGrant()
+    @State private var fullAccess = (PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized)
     @State private var tab: Tab = .explore
 
-    enum Tab: Hashable { case profile, explore, today }
+    enum Tab: Hashable { case library, profile, explore, today }
 
     var body: some View {
         TabView(selection: $tab) {
-            // EXPLORE — the FRONT DOOR (leftmost): open the app already in the
-            // populated world + the cohort market terminal, never dumped in the
-            // back-office Profile. The anon spine reads explore-first.
+            // LIBRARY — the FOUNDATION (home for owners): the whole on-device
+            // photo library at Photos speed (LibraryView). Maximum visibility to
+            // the source; the DB rides on top as async glasses.
+            if session.isSignedIn && fullAccess {
+                LibraryView()
+                    .tag(Tab.library)
+                    .tabItem { Label("Library", systemImage: "photo.on.rectangle.angled") }
+            }
+
+            // EXPLORE — the FRONT DOOR for anon visitors: the populated world +
+            // the cohort market terminal. The anon spine reads explore-first.
             ExploreView()
                 .tag(Tab.explore)
                 .tabItem { Label("Explore", systemImage: "magnifyingglass") }
@@ -51,17 +62,14 @@ struct MainTabView: View {
                     .tabItem { Label("Today", systemImage: "clock") }
             }
         }
-        .onAppear {
-            // Signed-in owners land on THEIR record (receipt-first); everyone
-            // else lands on Explore — exploring is the front door, not a profile.
-            tab = session.isSignedIn ? .profile : .explore
-        }
-        .onChange(of: session.isSignedIn) { _, signedIn in
-            tab = signedIn ? .profile : .explore
-        }
+        .onAppear { tab = landingTab() }
+        .onChange(of: session.isSignedIn) { _, _ in tab = landingTab() }
         .onChange(of: scenePhase) { _, phase in
             // Settings round-trips can change the grant — re-read it.
-            if phase == .active { photoGrant = Self.currentPhotoGrant() }
+            if phase == .active {
+                photoGrant = Self.currentPhotoGrant()
+                fullAccess = (PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized)
+            }
         }
     }
 
@@ -72,6 +80,13 @@ struct MainTabView: View {
             ownUserId: session.isSignedIn ? SupabaseService.currentUserId : nil,
             onSignIn: session.isSignedIn ? nil : { exploreMode = false }
         )
+    }
+
+    /// Signed-in owners land on their LIBRARY (the foundation) when full access
+    /// exists; otherwise their record; anon visitors land on Explore.
+    private func landingTab() -> Tab {
+        if session.isSignedIn { return fullAccess ? .library : .profile }
+        return .explore
     }
 
     /// Photo grant exists = .authorized or .limited (matches SyncEngine).
