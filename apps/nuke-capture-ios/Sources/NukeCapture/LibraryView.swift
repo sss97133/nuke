@@ -46,33 +46,51 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
         return assets.object(at: index)
     }
 
-    private var thumbOptions: PHImageRequestOptions {
+    /// Grid request options — OPPORTUNISTIC: PhotoKit delivers a cached low-res
+    /// frame instantly, then refines to sharp (the handler fires more than once).
+    /// That is the Photos-app feel. (highQualityFormat made every cell wait for the
+    /// full-quality thumb before showing anything — the grey-tile-then-pop clunk.)
+    /// The SAME options object feeds both requestImage and startCachingImages so
+    /// the cache actually hits.
+    private let gridOptions: PHImageRequestOptions = {
         let o = PHImageRequestOptions()
-        o.deliveryMode = .highQualityFormat   // single callback — no double-resume
+        o.deliveryMode = .opportunistic
         o.resizeMode = .fast
-        o.isNetworkAccessAllowed = true        // pull the small iCloud thumb if the original is optimized off-device
+        o.isNetworkAccessAllowed = true
         return o
+    }()
+
+    /// Request one cell's thumbnail. The completion may fire TWICE (low-res →
+    /// sharp); the caller applies each. Returns the request id so the cell can
+    /// cancel it the instant it scrolls off — no wasted decode on a fast flick.
+    @discardableResult
+    func requestThumbnail(for asset: PHAsset, _ completion: @escaping (UIImage?) -> Void) -> PHImageRequestID {
+        imageManager.requestImage(
+            for: asset, targetSize: thumbSize, contentMode: .aspectFill, options: gridOptions
+        ) { image, _ in if let image { completion(image) } }
     }
 
-    /// Thumbnail for one cell. Async, cached, off the main render pass.
-    func thumbnail(for asset: PHAsset) async -> UIImage? {
-        await withCheckedContinuation { cont in
-            imageManager.requestImage(
-                for: asset, targetSize: thumbSize, contentMode: .aspectFill, options: thumbOptions
-            ) { image, _ in cont.resume(returning: image) }
+    func cancel(_ id: PHImageRequestID) { imageManager.cancelImageRequest(id) }
+
+    /// Slide the caching window WITH the scroll: cache a forward run, STOP caching
+    /// what is now far behind. Bounded memory → no thrash on a 75K library. (The old
+    /// prefetch only ever started caching and never stopped — the memory-thrash jank.)
+    private var cachedRange: Range<Int> = 0..<0
+    func updateCache(around index: Int) {
+        let ahead = 60, behind = 24
+        let target = max(0, index - behind) ..< min(assets.count, index + ahead)
+        guard target != cachedRange else { return }
+        let stop  = cachedRange.filter { !target.contains($0) }
+        let start = target.filter { !cachedRange.contains($0) }
+        if !stop.isEmpty {
+            imageManager.stopCachingImages(for: stop.map { assets.object(at: $0) },
+                                           targetSize: thumbSize, contentMode: .aspectFill, options: gridOptions)
         }
-    }
-
-    /// Warm a forward window so scrolling stays Photos-smooth.
-    func prefetch(around index: Int, window: Int = 30) {
-        let lower = max(0, index)
-        let upper = min(assets.count, index + window)
-        guard lower < upper else { return }
-        var batch: [PHAsset] = []
-        batch.reserveCapacity(upper - lower)
-        for i in lower..<upper { batch.append(assets.object(at: i)) }
-        imageManager.startCachingImages(for: batch, targetSize: thumbSize,
-                                        contentMode: .aspectFill, options: thumbOptions)
+        if !start.isEmpty {
+            imageManager.startCachingImages(for: start.map { assets.object(at: $0) },
+                                            targetSize: thumbSize, contentMode: .aspectFill, options: gridOptions)
+        }
+        cachedRange = target
     }
 
     /// Full-resolution image for the detail pager (large target, not the raw original).
@@ -171,18 +189,39 @@ private struct IndexBox: Identifiable { let id: Int }
 
 // ─── One cell — pure PhotoKit, decorated async ───────────────────────────────
 
+/// Per-cell thumbnail loader: owns the PhotoKit request so it can be cancelled
+/// the instant the cell scrolls off, and receives the opportunistic low-res→sharp
+/// updates. A class (not @State) so the escaping PhotoKit handler updates real state.
+@MainActor
+final class LibraryThumbLoader: ObservableObject {
+    @Published var image: UIImage?
+    private var requestID: PHImageRequestID?
+
+    func load(index: Int) {
+        guard image == nil else { return }            // already have it → instant on re-appear
+        cancel()
+        guard let asset = LibraryStore.shared.asset(at: index) else { return }
+        requestID = LibraryStore.shared.requestThumbnail(for: asset) { [weak self] img in
+            self?.image = img
+        }
+    }
+
+    func cancel() {
+        if let id = requestID { LibraryStore.shared.cancel(id); requestID = nil }
+    }
+}
+
 private struct LibraryCell: View {
     let index: Int
-    @ObservedObject private var store = LibraryStore.shared
     @ObservedObject private var overlay = LibraryOverlayStore.shared
-    @State private var image: UIImage?
+    @StateObject private var loader = LibraryThumbLoader()
     @State private var localID: String?
 
     var body: some View {
         Color(.secondarySystemFill)
             .aspectRatio(1, contentMode: .fill)
             .overlay {
-                if let image {
+                if let image = loader.image {
                     Image(uiImage: image).resizable().scaledToFill()
                 }
             }
@@ -198,13 +237,14 @@ private struct LibraryCell: View {
             }
             .clipped()
             .contentShape(Rectangle())
-            .task(id: index) {
-                guard let asset = store.asset(at: index) else { return }
-                localID = asset.localIdentifier
-                store.prefetch(around: index)
-                overlay.note(asset.localIdentifier)     // async glasses; never blocks
-                image = await store.thumbnail(for: asset)
+            .onAppear {
+                let asset = LibraryStore.shared.asset(at: index)
+                localID = asset?.localIdentifier
+                LibraryStore.shared.updateCache(around: index)   // slide the cache window
+                if let lid = asset?.localIdentifier { overlay.note(lid) }  // async glasses; never blocks
+                loader.load(index: index)
             }
+            .onDisappear { loader.cancel() }
     }
 }
 
