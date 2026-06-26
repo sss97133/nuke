@@ -108,10 +108,16 @@ struct NukeCaptureApp: App {
                         Self.scheduleBackgroundBackfill()
                     }
                 }
-                // Populate the local store from the newest photos' true EXIF so the
-                // day receipt renders offline. Quick, on-device, idempotent; the deep
-                // backlog is the BGProcessingTask's job. Fire-and-forget — never blocks UI.
-                Task { await LibraryIngest.shared.runHeadPass() }
+                // Freshen the local store from the newest photos' true EXIF so the day
+                // receipt renders offline. DEFERRED + low-priority + small: the head pass
+                // loads ORIGINAL bytes through the same PHImageManager the live blur
+                // classifier uses for thumbnails, so running it eagerly on launch starved
+                // blur/hide (it became unreliable). Let the visible grid classify first,
+                // keep this a small freshen; the deep backlog is the BGProcessingTask's job.
+                Task(priority: .background) {
+                    try? await Task.sleep(for: .seconds(3))
+                    await LibraryIngest.shared.runHeadPass(limit: 300)
+                }
                 if !LibraryIngest.shared.backlogComplete {
                     Self.scheduleBackgroundBackfill()
                 }
