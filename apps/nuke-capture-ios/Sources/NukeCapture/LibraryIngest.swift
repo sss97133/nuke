@@ -19,12 +19,14 @@
 //                             make budgeted progress; hosted by the existing
 //                             BGProcessingTask (power + Wi-Fi charging window).
 //
-// CORRECTNESS rests on the per-asset skip-set (identifiersWithTakenAt) — immune to
-// index drift, deletions, and re-runs — NOT on the cursor, which is only a
-// resume hint that avoids re-scanning the already-indexed prefix. The cursor only
-// advances over FULLY-completed batches, so a budget cutoff never steps past an
-// un-ingested asset. iCloud-unavailable originals simply stay out of the skip-set
-// and are retried (head pass while recent; a pull-to-refresh full re-sweep otherwise).
+// CORRECTNESS rests on the per-asset skip-set (a row's facts in LocalStore) — immune
+// to re-runs and additions (new top arrivals shift the cursor over already-done rows
+// the skip-set then skips). The cursor is only a resume HINT (a position into a list
+// that mutates); because deletions shift the frontier ABOVE the cursor, the cursor is
+// RESET when the library count shrinks, so a deletion can never permanently skip a
+// band. The cursor advances only over FULLY-completed batches, so a budget cutoff
+// never steps past an un-ingested asset. iCloud-unavailable originals stay out of the
+// skip-set and are retried (head pass while recent; the deep walk on a later wake).
 //
 // Operating table: source → LibraryStore · store → LocalStore · this file → the
 // populate pass · day window → LibraryDaysView.
@@ -46,6 +48,7 @@ final class LibraryIngest: ObservableObject {
     /// Resume hint: the index (into the newest-first PHFetchResult) the backlog walk
     /// has fully resolved DOWN TO. Persisted so a fresh wake skips the indexed prefix.
     private let cursorKey = "libraryIngestBacklogCursor"
+    private let cursorCountKey = "libraryIngestCursorCount"   // library count when cursor last advanced
     private let completeKey = "libraryIngestBacklogComplete"
     private let versionKey = "libraryIngestProcessingVersion"
     /// Bump when the per-asset "fully processed" definition gains a column, so devices
@@ -94,6 +97,14 @@ final class LibraryIngest: ObservableObject {
     func runBackfillBatch(budget: Int = 4000) async {
         let total = LibraryStore.shared.count
         guard total > 0 else { return }
+        // Deletions shift the frontier ABOVE the position cursor, so a shrunk library
+        // means the cursor is stale and could skip a band — reset and re-walk from the
+        // top (the skip-set keeps the already-done prefix cheap). Additions only grow
+        // the count and need no reset (the head re-scan covers the new top).
+        if !backlogComplete, total < UserDefaults.standard.integer(forKey: cursorCountKey) {
+            cursor = 0
+            UserDefaults.standard.set(total, forKey: cursorCountKey)
+        }
         // New arrivals at the top: full-process the newest window (mostly skip-set hits
         // once steady) so recent days get their phash + vehicle counts.
         await walk(startIndex: 0, positionEnd: min(512, total), workBudget: min(budget, 512), advanceCursor: false, mode: .full)
@@ -165,10 +176,14 @@ final class LibraryIngest: ObservableObject {
             }
 
             // Advance the cursor ONLY over a fully-scanned batch — never past an
-            // asset a budget cutoff or cancellation skipped.
+            // asset a budget cutoff or cancellation skipped. Record the library size
+            // at advance so a later shrink (deletion) can invalidate the position.
             if budgetHit || Task.isCancelled { break }
             i = batchEnd
-            if advanceCursor { cursor = i }
+            if advanceCursor {
+                cursor = i
+                UserDefaults.standard.set(total, forKey: cursorCountKey)
+            }
         }
 
         if advanceCursor && i >= total {
@@ -195,14 +210,15 @@ final class LibraryIngest: ObservableObject {
         // (it would never surface in dayCounts) and don't spend the decode on it.
         guard date != nil || item.lat != nil else { return false }
 
-        // The deep pass decodes one small frame, reused for BOTH the phash and the
-        // T0 verdict (one decode, two disjoint writers).
+        // The deep pass computes the content phash and the T0 verdict. phash always
+        // goes through the SAME source-bytes pipeline (PerceptualHash.dHash(from:)) so
+        // two copies of one shot always hash equal; the 256px frame is decoded only for
+        // the classifier.
         var phash: String?
         var cg: CGImage?
         if mode == .full {
+            phash = PerceptualHash.dHash(from: data)
             cg = SyncEngine.downsampledCGImage(from: data, maxPixel: 256)
-            // Prefer the orientation-corrected 256px frame; fall back to the bytes.
-            phash = cg.flatMap { PerceptualHash.dHash(of: $0) } ?? PerceptualHash.dHash(from: data)
         }
 
         // ingest() owns EXIF/identity; passing phash also seeds image_identity (insert

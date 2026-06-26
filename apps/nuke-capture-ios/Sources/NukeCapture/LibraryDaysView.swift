@@ -72,8 +72,15 @@ struct LibraryDaysView: View {
                 // refreshing the counts as each lands. Resumes via the persisted cursor;
                 // SwiftUI cancels this .task on disappear, which stops the loop.
                 while !ingest.backlogComplete && !Task.isCancelled {
+                    // If a head pass (or another batch) holds the walk, runBackfillBatch
+                    // no-ops instantly — don't tight-loop full-table reloads against it.
+                    if ingest.running {
+                        try? await Task.sleep(for: .seconds(1))
+                        continue
+                    }
                     await ingest.runBackfillBatch(budget: 600)
                     await reload()
+                    try? await Task.sleep(for: .milliseconds(250))   // breathe between batches
                 }
             }
         }
@@ -84,8 +91,8 @@ struct LibraryDaysView: View {
     }
 
     private var footerText: String {
-        // `total` (dated appearances) == LocalStore.datedCount(); show it against the
-        // whole library so progress is honest and the bound is never silent.
+        // Indexed (dated) photos vs the whole library, so progress is honest and the
+        // bound is never silent.
         let total = days.reduce(0) { $0 + $1.count }
         let library = LibraryStore.shared.count
         let base = "Built on-device from your photos' EXIF — no network. \(total) of \(library) photos indexed across \(days.count) days."

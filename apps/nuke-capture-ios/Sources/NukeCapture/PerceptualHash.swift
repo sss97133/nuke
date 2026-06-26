@@ -29,20 +29,15 @@ enum PerceptualHash {
             kCGImageSourceThumbnailMaxPixelSize: 32,            // one cheap downsample
         ]
         guard let thumb = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return nil }
-        return dHash(of: thumb)
-    }
-
-    /// dHash of an already-decoded image — lets the ingest pass reuse a CGImage it
-    /// already made (e.g. the classify thumbnail) instead of decoding twice. The image
-    /// should already be orientation-corrected. Redraws to 9×8 grayscale internally.
-    static func dHash(of image: CGImage) -> String? {
+        // Redraw the (orientation-corrected) thumbnail to 9×8 grayscale and compare
+        // each pixel to its right neighbor → 64 bits.
         let w = 9, h = 8
         var gray = [UInt8](repeating: 0, count: w * h)
         guard let ctx = CGContext(data: &gray, width: w, height: h, bitsPerComponent: 8,
                                   bytesPerRow: w, space: CGColorSpaceCreateDeviceGray(),
                                   bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return nil }
         ctx.interpolationQuality = .low
-        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        ctx.draw(thumb, in: CGRect(x: 0, y: 0, width: w, height: h))
         var bits: UInt64 = 0
         for r in 0 ..< h {
             for c in 0 ..< (w - 1) {
