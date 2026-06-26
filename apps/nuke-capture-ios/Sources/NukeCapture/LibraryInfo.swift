@@ -18,6 +18,7 @@ struct LibraryInfoView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var ledger: ImageLedger?
     @State private var isAnalyzing = false
+    @State private var loadingCloud = false
 
     var body: some View {
         NavigationStack {
@@ -63,6 +64,27 @@ struct LibraryInfoView: View {
                         row("Type", "Not analyzed yet")
                     }
                 }
+
+                // ── Read by Nuke — the prod BYOK verdict, ESCALATED DOWN and cached
+                //    on-device (renders offline once pulled). The rich agent read —
+                //    narrative/intent/scene/phase — over the cheap on-device T0 labels.
+                if let l = ledger, let narrative = l.cloudNarrative {
+                    Section("Read by Nuke") {
+                        Text(narrative)
+                        if let v = l.cloudIntent { row("Intent", token(v)) }
+                        if let v = l.cloudScene { row("Scene", token(v)) }
+                        if let v = l.cloudBuildPhase { row("Build phase", token(v)) }
+                        if let c = l.cloudConfidence { row("Confidence", "\(Int((c * 100).rounded()))%") }
+                        if let a = l.cloudAnalyzedAt { row("Read", relativeText(a)) }
+                        if let m = l.cloudAgentModel { row("By", m) }
+                    }
+                } else if loadingCloud {
+                    Section("Read by Nuke") {
+                        // Genuinely fetching the verdict right now — honest progress.
+                        Label("Reading the record…", systemImage: "sparkles")
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             .navigationTitle("Info")
             .navigationBarTitleDisplayMode(.inline)
@@ -88,7 +110,33 @@ struct LibraryInfoView: View {
                 isAnalyzing = false
             }
             ledger = l
+
+            // Bring the prod BYOK verdict DOWN if it isn't cached yet. Online-only
+            // (offline → [] fast); once cached it renders with no network next open.
+            // Joined by the exact uuid bridge (localIdentifier == exif_data.uuid).
+            if l?.cloudNarrative == nil {
+                loadingCloud = true
+                let verdicts = await SupabaseService.fetchCloudVerdicts(forLocalIdentifiers: [id])
+                if let v = verdicts.first {
+                    await Task.detached {
+                        LocalStore.shared.cacheCloudVerdict(
+                            localIdentifier: id,
+                            narrative: v.narrative, intent: v.intent, scene: v.scene_type,
+                            confidence: v.confidence, buildPhase: v.build_phase,
+                            vehicleId: v.vehicle_id, agentModel: v.agent_model,
+                            analyzedAt: SupabaseService.verdictDate(v.analyzed_at))
+                    }.value
+                    ledger = await Task.detached { LocalStore.shared.ledger(for: id) }.value
+                }
+                loadingCloud = false
+            }
         }
+    }
+
+    /// "body_exterior" → "Body exterior". A token reads as a token, not raw snake_case.
+    private func token(_ s: String) -> String {
+        let spaced = s.replacingOccurrences(of: "_", with: " ")
+        return spaced.prefix(1).uppercased() + spaced.dropFirst()
     }
 
     private func row(_ key: String, _ value: String) -> some View {

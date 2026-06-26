@@ -325,6 +325,48 @@ enum SupabaseService {
             .execute()
     }
 
+    // ─── Cloud BYOK verdict → escalated DOWN to the local store ──────────────
+    // The rich prod analysis (narrative/intent/scene/phase) joined to a device photo
+    // by the EXACT uuid bridge: exif_data.uuid == PHAsset.localIdentifier. Read-only,
+    // owner-gated RPC (get_owner_image_verdicts) that PROJECTS the verdict — no
+    // jsonb-blob egress, no storage re-download (HARD_RULES §6). The caller caches the
+    // result in LocalStore so the back-of-the-photo renders it OFFLINE. The analysis
+    // already ran in prod; this just brings it down. Nothing re-computes.
+
+    struct CloudVerdict: Decodable, Sendable {
+        let local_uuid: String
+        let vehicle_id: String?
+        let narrative: String?
+        let intent: String?
+        let scene_type: String?
+        let confidence: Double?
+        let build_phase: String?
+        let agent_model: String?
+        let analyzed_at: String?   // ISO8601 (fractional sec); parse via verdictDate()
+    }
+
+    /// Parse a verdict's `analyzed_at` (e.g. "2026-06-25T19:49:52.139Z"). Independent of
+    /// the SDK's Postgres-date strategy — the field decodes as a plain String.
+    static func verdictDate(_ s: String?) -> Date? {
+        guard let s else { return nil }
+        return isoFormatter.date(from: s)
+    }
+
+    /// BYOK verdicts for a batch of device photos (keyed by localIdentifier). Returns
+    /// only those that HAVE a verdict in prod; offline / no session → [].
+    static func fetchCloudVerdicts(forLocalIdentifiers ids: [String]) async -> [CloudVerdict] {
+        guard !ids.isEmpty, currentUserId != nil else { return [] }
+        do {
+            return try await client
+                .rpc("get_owner_image_verdicts", params: ["p_uuids": ids])
+                .execute()
+                .value
+        } catch {
+            NSLog("NukeCapture: fetchCloudVerdicts failed: %@", String(describing: error))
+            return []
+        }
+    }
+
     // ─── Upload + insert (one photo) ─────────────────────────────────────────
 
     private static let isoFormatter: ISO8601DateFormatter = {
