@@ -424,6 +424,38 @@ enum SupabaseService {
             .execute()
     }
 
+    // ─── Owner creates a new vehicle profile (the white-truck fork) ───────────────
+    // The same shape api-v1-vehicles' POST writes: owner_id = the authed user, set
+    // server-side by RLS. An owner-initiated create (the owner taps "it's a vehicle I
+    // don't have yet") — the explicit signal an ownership op requires. Direct client
+    // insert under RLS, the proven write pattern this app already uses.
+
+    private struct NewVehicle: Encodable {
+        let year: Int?
+        let make: String?
+        let model: String?
+        let owner_id: String
+        let is_public: Bool
+    }
+    private struct CreatedVehicle: Decodable { let id: String }
+
+    /// Create a vehicle owned by the current user; returns its id. Requires at least
+    /// one of year/make/model (mirrors the api-v1-vehicles contract).
+    static func createVehicle(year: Int?, make: String?, model: String?) async throws -> String {
+        guard let uid = currentUserId else {
+            throw NSError(domain: "NukeCapture", code: 401,
+                          userInfo: [NSLocalizedDescriptionKey: "not signed in"])
+        }
+        let row: CreatedVehicle = try await client
+            .from("vehicles")
+            .insert(NewVehicle(year: year, make: make, model: model, owner_id: uid, is_public: false))
+            .select("id")
+            .single()
+            .execute()
+            .value
+        return row.id
+    }
+
     // ─── Upload + insert (one photo) ─────────────────────────────────────────
 
     private static let isoFormatter: ISO8601DateFormatter = {

@@ -223,6 +223,10 @@ struct AnalyzedEvidenceView: View {
     @State private var reassignError = false
     /// Set once a move succeeds, so the rail reflects "moved" without a refetch.
     @State private var movedTo: SupabaseService.RelinkTarget?
+    // The new-profile fork (the white truck): a minimal create form in the chooser.
+    @State private var newMake = ""
+    @State private var newModel = ""
+    @State private var newYear = ""
 
     var body: some View {
         NavigationStack {
@@ -307,6 +311,25 @@ struct AnalyzedEvidenceView: View {
                         Text("The photo moves to that vehicle with its history kept. Nothing is deleted.")
                     }
                 }
+
+                // The new-profile fork — the white-truck case. Owner-initiated create
+                // (the explicit signal an ownership op needs), then the same move verb.
+                Section {
+                    TextField("Make (e.g. GMC)", text: $newMake)
+                        .textInputAutocapitalization(.words)
+                    TextField("Model (e.g. Sierra)", text: $newModel)
+                        .textInputAutocapitalization(.words)
+                    TextField("Year", text: $newYear)
+                        .keyboardType(.numberPad)
+                    Button { Task { await createAndMove() } } label: {
+                        Text("Create profile & move here")
+                    }
+                    .disabled(reassignBusy || (newMake.trimmingCharacters(in: .whitespaces).isEmpty
+                                               && newModel.trimmingCharacters(in: .whitespaces).isEmpty
+                                               && newYear.trimmingCharacters(in: .whitespaces).isEmpty))
+                } header: {
+                    Text("It's a vehicle I don't have yet")
+                }
             }
             .overlay { if reassignBusy || loadingGarage { ProgressView().controlSize(.large) } }
             .navigationTitle("Not this vehicle?")
@@ -327,6 +350,28 @@ struct AnalyzedEvidenceView: View {
         } catch {
             reassignError = true
             NSLog("NukeCapture relink failed: %@", String(describing: error))
+        }
+        reassignBusy = false
+    }
+
+    /// The fork: create the missing profile (owner-initiated) then move the photo onto it.
+    private func createAndMove() async {
+        reassignBusy = true; reassignError = false
+        let yr = Int(newYear.trimmingCharacters(in: .whitespaces))
+        let mk = newMake.trimmingCharacters(in: .whitespaces); let md = newModel.trimmingCharacters(in: .whitespaces)
+        do {
+            let newId = try await SupabaseService.createVehicle(year: yr,
+                                                                make: mk.isEmpty ? nil : mk,
+                                                                model: md.isEmpty ? nil : md)
+            let why = (deep?.agent_notes?.prefix(120)).map { "owner correction · new profile · " + $0 } ?? "owner correction · new profile"
+            try await SupabaseService.relinkImage(imageId: photo.id.uuidString, toVehicleId: newId, reason: String(why))
+            movedTo = SupabaseService.RelinkTarget(vehicle_id: newId, year: yr,
+                                                   make: mk.isEmpty ? nil : mk, model: md.isEmpty ? nil : md,
+                                                   image_url: nil, relationship: "built")
+            showReassign = false
+        } catch {
+            reassignError = true
+            NSLog("NukeCapture create+relink failed: %@", String(describing: error))
         }
         reassignBusy = false
     }
