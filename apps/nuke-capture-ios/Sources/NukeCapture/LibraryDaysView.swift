@@ -50,12 +50,19 @@ struct LibraryDaysView: View {
             .navigationTitle("Days")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
-            .refreshable { await ingest.run(); await reload() }
+            .refreshable { await ingest.runHeadPass(); await reload() }
             .task {
                 await reload()                 // show whatever's already local first
-                if days.isEmpty { await ingest.run() }
+                if days.isEmpty { await ingest.runHeadPass() }
                 await reload()
                 loaded = true
+                // Grow the receipt while it's open: walk the deep backlog in batches,
+                // refreshing the counts as each lands. Resumes via the persisted cursor;
+                // SwiftUI cancels this .task on disappear, which stops the loop.
+                while !ingest.backlogComplete && !Task.isCancelled {
+                    await ingest.runBackfillBatch(budget: 600)
+                    await reload()
+                }
             }
         }
     }
@@ -65,8 +72,12 @@ struct LibraryDaysView: View {
     }
 
     private var footerText: String {
-        let base = "Built on-device from your photos' EXIF — no network. \(days.reduce(0) { $0 + $1.count }) photos across \(days.count) days."
-        return ingest.capped ? base + " Newest \(ingest.target) scanned so far (v1)." : base
+        // `total` (dated appearances) == LocalStore.datedCount(); show it against the
+        // whole library so progress is honest and the bound is never silent.
+        let total = days.reduce(0) { $0 + $1.count }
+        let library = LibraryStore.shared.count
+        let base = "Built on-device from your photos' EXIF — no network. \(total) of \(library) photos indexed across \(days.count) days."
+        return ingest.backlogComplete ? base : base + " Indexing the rest in the background…"
     }
 
     /// "2019-04-29" → "Mon, Apr 29, 2019".
