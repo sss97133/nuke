@@ -15,7 +15,7 @@ import SwiftUI
 struct LibraryDaysView: View {
     @ObservedObject private var ingest = LibraryIngest.shared
     @Environment(\.dismiss) private var dismiss
-    @State private var days: [(day: String, count: Int)] = []
+    @State private var days: [DayRollup] = []
     @State private var loaded = false
 
     var body: some View {
@@ -42,7 +42,15 @@ struct LibraryDaysView: View {
                                 DayPhotosView(day: d.day, title: pretty(d.day))
                             } label: {
                                 HStack {
-                                    Text(pretty(d.day))
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(pretty(d.day))
+                                        // Only when a real T0 verdict exists for the day —
+                                        // absent classification stays absent, never "0 vehicle".
+                                        if d.classified > 0 {
+                                            Text(rollupSubtitle(d))
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }
                                     Spacer(minLength: 16)
                                     Text("\(d.count)").monospacedDigit().foregroundStyle(.secondary)
                                 }
@@ -82,6 +90,13 @@ struct LibraryDaysView: View {
         let library = LibraryStore.shared.count
         let base = "Built on-device from your photos' EXIF — no network. \(total) of \(library) photos indexed across \(days.count) days."
         return ingest.backlogComplete ? base : base + " Indexing the rest in the background…"
+    }
+
+    /// "8 vehicle/work" — and, when the day is only partly sorted, how much of it is,
+    /// so a low count isn't misread as "only 8 photos here." Caller gates on classified > 0.
+    private func rollupSubtitle(_ d: DayRollup) -> String {
+        let base = "\(d.vehicles) vehicle/work"
+        return d.classified < d.count ? base + " · \(d.classified) of \(d.count) sorted" : base
     }
 
     /// "2019-04-29" → "Mon, Apr 29, 2019".
