@@ -367,6 +367,63 @@ enum SupabaseService {
         }
     }
 
+    // ─── Owner correction — recategorize a misattributed image (the operating verb) ──
+    // The owner's "this isn't that truck" is the highest-trust signal there is, and the
+    // scarce one (rare, but gold as training data). It FORKS, never hides: relink_testimony
+    // supersedes the binding to the target vehicle, keeps lineage, and logs an audit row.
+    // Owner-gated (the owner taps it, p_actor_user_id = currentUserId). Target must already
+    // exist — the new-profile fork is a separate path (create_vehicle, pending).
+
+    /// A garage vehicle as a relink target (the chooser unit). Mirrors get_user_garage.
+    struct RelinkTarget: Decodable, Identifiable, Sendable {
+        let vehicle_id: String
+        let year: Int?
+        let make: String?
+        let model: String?
+        let image_url: String?
+        let relationship: String?
+        var id: String { vehicle_id }
+    }
+
+    /// The owner's garage (built + owned + past), for the "move it to…" chooser.
+    static func fetchGarage() async -> [RelinkTarget] {
+        guard let uid = currentUserId else { return [] }
+        do {
+            return try await client
+                .rpc("get_user_garage", params: ["p_user_id": uid])
+                .execute()
+                .value
+        } catch {
+            NSLog("NukeCapture: fetchGarage failed: %@", String(describing: error))
+            return []
+        }
+    }
+
+    private struct RelinkParams: Encodable {
+        let p_observation_type: String
+        let p_observation_id: String
+        let p_target_vehicle_id: String
+        let p_reason: String
+        let p_actor_user_id: String
+    }
+
+    /// Move one image to the correct vehicle (owner correction). Throws on failure so
+    /// the UI can show "didn't move" rather than a false success.
+    static func relinkImage(imageId: String, toVehicleId: String, reason: String) async throws {
+        guard let uid = currentUserId else {
+            throw NSError(domain: "NukeCapture", code: 401,
+                          userInfo: [NSLocalizedDescriptionKey: "not signed in"])
+        }
+        _ = try await client
+            .rpc("relink_testimony", params: RelinkParams(
+                p_observation_type: "image",
+                p_observation_id: imageId.lowercased(),
+                p_target_vehicle_id: toVehicleId.lowercased(),
+                p_reason: reason,
+                p_actor_user_id: uid))
+            .execute()
+    }
+
     // ─── Upload + insert (one photo) ─────────────────────────────────────────
 
     private static let isoFormatter: ISO8601DateFormatter = {
