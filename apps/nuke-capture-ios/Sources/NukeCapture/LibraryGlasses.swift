@@ -39,6 +39,17 @@ final class LibraryOverlayStore: ObservableObject {
     private var queue: [String] = []
     private var running = false
 
+    // Coalesced publish: classifications land fast during scroll, and mutating the
+    // @Published sets per-photo fired objectWillChange per-photo — re-rendering EVERY
+    // visible cell each time (the scroll-path jank). Stage results here and flush to the
+    // @Published sets in bounded bursts (~6x/sec) so the grid updates calmly.
+    private var pendingPersonal = Set<String>()
+    private var pendingWithPerson = Set<String>()
+    private var pendingApproved = Set<String>()
+    private var pendingRejected = Set<String>()
+    private var pendingDecorations: [String: LibraryDecoration] = [:]
+    private var flushScheduled = false
+
     /// A cell appeared — classify it cheap, on-device, cached, OFF the scroll path.
     func note(_ localIdentifier: String) {
         guard !seen.contains(localIdentifier) else { return }
@@ -89,10 +100,35 @@ final class LibraryOverlayStore: ObservableObject {
 
     private func apply(_ lid: String, _ info: (isPersonal: Bool, hasPerson: Bool, ownerApproved: Bool?, glyph: String?)?) {
         guard let info else { return }
-        if info.isPersonal { personal.insert(lid) }
-        if info.hasPerson { withPerson.insert(lid) }
-        if let o = info.ownerApproved { if o { approved.insert(lid) } else { rejected.insert(lid) } }
-        if let g = info.glyph { decorations[lid] = LibraryDecoration(known: true, glyph: g) }
+        if info.isPersonal { pendingPersonal.insert(lid) }
+        if info.hasPerson { pendingWithPerson.insert(lid) }
+        if let o = info.ownerApproved { if o { pendingApproved.insert(lid) } else { pendingRejected.insert(lid) } }
+        if let g = info.glyph { pendingDecorations[lid] = LibraryDecoration(known: true, glyph: g) }
+        scheduleFlush()
+    }
+
+    /// Push the staged results into the @Published sets at most ~6x/sec. SwiftUI
+    /// coalesces the several property mutations in one flush into a single grid update,
+    /// so a burst of classifications costs one re-render, not one per photo.
+    private func scheduleFlush() {
+        guard !flushScheduled else { return }
+        flushScheduled = true
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(160))
+            self?.flush()
+        }
+    }
+
+    private func flush() {
+        flushScheduled = false
+        if !pendingPersonal.isEmpty { personal.formUnion(pendingPersonal); pendingPersonal.removeAll() }
+        if !pendingWithPerson.isEmpty { withPerson.formUnion(pendingWithPerson); pendingWithPerson.removeAll() }
+        if !pendingApproved.isEmpty { approved.formUnion(pendingApproved); pendingApproved.removeAll() }
+        if !pendingRejected.isEmpty { rejected.formUnion(pendingRejected); pendingRejected.removeAll() }
+        if !pendingDecorations.isEmpty {
+            decorations.merge(pendingDecorations) { _, new in new }
+            pendingDecorations.removeAll()
+        }
     }
 
     /// Heavy work, OFF the main actor: read the owner verdict + cached classification,
