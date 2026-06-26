@@ -1,12 +1,16 @@
-// TodayView.swift — live capture telemetry, the owner's main watch.
+// TodayView.swift — the ENGINE (was "Today"). The engine room, not a daily feed.
 //
-// What makes this screen the native value layer:
-//   • big moving numbers pulled from on-device SyncEngine state
-//   • local PHAsset thumbnails — nothing a web page can do
-//   • queue-drain progress live as backfill empties
-//
-// Design: tight metrics strip + thumbnail strip, no section noise.
-// Privacy caption replaces the old paragraph — one honest line.
+// Why the rename: "Today" was the cloud-relay paradigm's window — watch every photo
+// ship to the cloud and get analyzed there. In the local-first model (the library
+// lives on-device, the agent reads it locally, pixels escalate only on the owner's
+// say-so) that framing is obsolete, and a tab named "Today" that reads 0 most days is
+// a lie. Its real, honest job is two things:
+//   • the WORKLIGHT — the agent reading your photos, live (LiveAnalysisStream + the
+//     on-device T0 reads). Motion = trust; this is the part that's actually alive.
+//   • the WORKBENCH — the operator's tools (sync, analyze, repair, confirm). The
+//     reason the tab earns its keep: a home to develop and run capabilities.
+// The record itself (day-stories, understood days) lives in Profile / the day receipt,
+// not here. The struct name stays TodayView to avoid a churny rename; the tab is "Engine".
 
 import SwiftUI
 import Photos
@@ -72,23 +76,18 @@ struct TodayView: View {
                     }
                 }
 
-                // ── Understanding: the record assembling itself (BUILD_2 §G14) ──
-                // The mesh growing — days/frames becoming understood tick up live
-                // as the analysis engine lands them; the latest understood days
-                // stream in. Distinct from the capture-relay counters above.
-                if let uid = SupabaseService.currentUserId {
-                    UnderstandingPanel(userId: uid)
-                }
+                // Pulled from the Engine on purpose:
+                //  • UnderstandingPanel — its "latest understood" day-stories are the
+                //    RECORD, not the live moment (and rendered 12 days stale here). They
+                //    belong in the day receipt / Profile, where a record is read.
+                //  • Recent uploads — it surfaced personal photos (a newborn) the
+                //    backfill is shipping to the cloud. Hiding the strip doesn't un-ship
+                //    them; the real fix is the upload gate (the backfill must respect the
+                //    local-first site/ownership gate, not brute-force the whole library).
+                //    That's an ownership decision (what leaves the device) — Skylar's call.
 
-                // ── Recent uploads (local thumbnails) ──
-                if !engine.recentUploadIDs.isEmpty {
-                    Section("Recent uploads") {
-                        RecentUploadsStrip(assetIdentifiers: engine.recentUploadIDs)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-                    }
-                }
-
-                // ── Actions + pause toggle ──
+                // ── Tools · the workbench ── the operator levers. This is the honest
+                // reason the Engine tab earns its place: a home to develop + run tools.
                 Section {
                     Button {
                         Task { await engine.sync() }
@@ -148,6 +147,8 @@ struct TodayView: View {
                         get: { !engine.isPaused },
                         set: { engine.setPaused(!$0) }
                     ))
+                } header: {
+                    Label("Tools", systemImage: "wrench.and.screwdriver")
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
                         // Privacy story: one line instead of a paragraph
@@ -160,7 +161,7 @@ struct TodayView: View {
                     .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Today")
+            .navigationTitle("Engine")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
