@@ -38,10 +38,14 @@ struct LibraryDaysView: View {
                 if !days.isEmpty {
                     Section("Days") {
                         ForEach(days, id: \.day) { d in
-                            HStack {
-                                Text(pretty(d.day))
-                                Spacer(minLength: 16)
-                                Text("\(d.count)").monospacedDigit().foregroundStyle(.secondary)
+                            NavigationLink {
+                                DayPhotosView(day: d.day, title: pretty(d.day))
+                            } label: {
+                                HStack {
+                                    Text(pretty(d.day))
+                                    Spacer(minLength: 16)
+                                    Text("\(d.count)").monospacedDigit().foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
@@ -90,5 +94,61 @@ struct LibraryDaysView: View {
         outF.dateStyle = .full
         outF.timeStyle = .none
         return outF.string(from: d)
+    }
+}
+
+// MARK: - The drill: one day's real photos → the existing pager + ledger
+
+/// Tapping a day opens its REAL photos (LocalStore appearances for that takenAt-day,
+/// mapped to the grid's global indices) → the existing fullscreen pager, scoped to
+/// the day → the back-of-photo ledger. Reads LocalStore + PhotoKit only — zero
+/// network. Reuses LibraryCell + LibraryDetailView (no parallel surface).
+private struct DayPhotosView: View {
+    let day: String          // 'yyyy-MM-dd', the same key dayCounts() grouped on
+    let title: String
+    @State private var indices: [Int] = []   // global LibraryStore indices, takenAt-DESC
+    @State private var detailIndex: Int?
+    @State private var loaded = false
+    @Namespace private var zoomNS
+
+    private let columns = 3
+    private let spacing: CGFloat = 2
+
+    var body: some View {
+        ScrollView {
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: columns),
+                spacing: spacing
+            ) {
+                ForEach(indices, id: \.self) { gi in
+                    LibraryCell(index: gi)
+                        .matchedTransitionSource(id: gi, in: zoomNS)
+                        .onTapGesture { detailIndex = gi }
+                }
+            }
+            if loaded && indices.isEmpty {
+                // Honest: counted rows whose assets left the library. No phantom cells.
+                Text("These photos are no longer in your library.")
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 48)
+            }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            // Day → its local identifiers (off-main read) → grid global indices,
+            // preserving the takenAt-DESC order. PhotoKit + LocalStore only.
+            let lids = await Task.detached { LocalStore.shared.localIdentifiers(onDay: day) }.value
+            let map = LibraryStore.shared.indexMap(forLocalIdentifiers: lids)
+            indices = lids.compactMap { map[$0] }
+            loaded = true
+        }
+        .fullScreenCover(item: Binding(
+            get: { detailIndex.map(IndexBox.init) },
+            set: { detailIndex = $0?.id }
+        )) { box in
+            LibraryDetailView(startIndex: box.id, indices: indices)
+                .navigationTransition(.zoom(sourceID: box.id, in: zoomNS))
+        }
     }
 }

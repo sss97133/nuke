@@ -262,6 +262,24 @@ final class LocalStore {
         return out
     }
 
+    /// The local identifiers shot on one day (newest-first), for the day-receipt
+    /// drill. Uses the IDENTICAL `strftime('%Y-%m-%d', takenAt)` key as dayCounts()
+    /// so the day a row counts under is the day it opens under. Pure local read.
+    func localIdentifiers(onDay ymd: String) -> [String] {
+        var out: [String] = []
+        do {
+            try dbQueue.read { db in
+                let rows = try Row.fetchAll(db, sql: """
+                    SELECT localIdentifier AS lid FROM appearance
+                    WHERE takenAt IS NOT NULL AND strftime('%Y-%m-%d', takenAt) = ?
+                    ORDER BY takenAt DESC
+                    """, arguments: [ymd])
+                for r in rows { let lid: String = r["lid"]; out.append(lid) }
+            }
+        } catch { NSLog("LocalStore.localIdentifiers(onDay:) failed: %@", String(describing: error)) }
+        return out
+    }
+
     /// Which of these already carry a real EXIF `takenAt` — so the ingest pass can
     /// skip the heavy original-data load on a re-run. Pure local read. Chunked so a
     /// whole-library batch never blows SQLITE_MAX_VARIABLE_NUMBER.
