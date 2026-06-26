@@ -29,6 +29,7 @@
 // Operating table: source → LibraryStore · store → LocalStore · this file → the
 // populate pass · day window → LibraryDaysView.
 
+import CoreGraphics
 import Photos
 import SwiftUI
 
@@ -46,6 +47,11 @@ final class LibraryIngest: ObservableObject {
     /// has fully resolved DOWN TO. Persisted so a fresh wake skips the indexed prefix.
     private let cursorKey = "libraryIngestBacklogCursor"
     private let completeKey = "libraryIngestBacklogComplete"
+    private let versionKey = "libraryIngestProcessingVersion"
+    /// Bump when the per-asset "fully processed" definition gains a column, so devices
+    /// that completed an older definition re-walk to fill it. 2 = + content phash
+    /// (and the T0 verdict, populated as a byproduct of the same pass).
+    private let processingVersion = 2
     private var cursor: Int {
         get { UserDefaults.standard.integer(forKey: cursorKey) }
         set { UserDefaults.standard.set(newValue, forKey: cursorKey) }
@@ -56,35 +62,54 @@ final class LibraryIngest: ObservableObject {
     /// fetch) is the bottleneck; GRDB serializes the writes internally.
     private let lanes = 4
 
+    /// What a pass writes. The head pass stays cheap for the foreground; the deep
+    /// backfill enriches with the content phash + the on-device T0 verdict.
+    private enum Mode { case exifOnly, full }
+
     private init() {
+        // Processing definition advanced since we last completed → re-walk to fill the
+        // new columns (the skip-set makes already-done EXIF a no-op; phash/classify is
+        // the genuinely new work).
+        if UserDefaults.standard.integer(forKey: versionKey) < processingVersion {
+            UserDefaults.standard.set(0, forKey: cursorKey)
+            UserDefaults.standard.set(false, forKey: completeKey)
+            UserDefaults.standard.set(processingVersion, forKey: versionKey)
+        }
         backlogComplete = UserDefaults.standard.bool(forKey: completeKey)
     }
 
     // MARK: Passes
 
     /// The newest `limit` positions: catch new arrivals quickly on launch/foreground
-    /// and pull-to-refresh. Bounded by POSITION (not work), never advances the cursor.
+    /// and pull-to-refresh. EXIF only (cheap, no Vision) — phash/classify is the
+    /// backfill's job. Bounded by POSITION (not work), never advances the cursor.
     func runHeadPass(limit: Int = 2000) async {
         let total = LibraryStore.shared.count
-        await walk(startIndex: 0, positionEnd: min(limit, total), workBudget: .max, advanceCursor: false)
+        await walk(startIndex: 0, positionEnd: min(limit, total), workBudget: .max, advanceCursor: false, mode: .exifOnly)
     }
 
-    /// Resume the deep backlog from the cursor and ingest up to `budget` assets,
-    /// advancing the cursor over completed batches. The BGProcessingTask host.
+    /// Full processing (EXIF + content phash + T0 verdict). Two sub-passes: a bounded
+    /// head re-scan so NEW arrivals get phash/classify without a whole re-walk, then
+    /// the deep backlog resumed from the cursor. Hosted by the BGProcessingTask.
     func runBackfillBatch(budget: Int = 4000) async {
         let total = LibraryStore.shared.count
+        guard total > 0 else { return }
+        // New arrivals at the top: full-process the newest window (mostly skip-set hits
+        // once steady) so recent days get their phash + vehicle counts.
+        await walk(startIndex: 0, positionEnd: min(512, total), workBudget: min(budget, 512), advanceCursor: false, mode: .full)
+        // Resume the deep backlog from the cursor.
         let start = min(max(0, cursor), total)
         if start >= total {
             backlogComplete = true
             UserDefaults.standard.set(true, forKey: completeKey)
             return
         }
-        await walk(startIndex: start, positionEnd: total, workBudget: budget, advanceCursor: true)
+        await walk(startIndex: start, positionEnd: total, workBudget: budget, advanceCursor: true, mode: .full)
     }
 
     // MARK: The walk
 
-    private func walk(startIndex: Int, positionEnd: Int, workBudget: Int, advanceCursor: Bool) async {
+    private func walk(startIndex: Int, positionEnd: Int, workBudget: Int, advanceCursor: Bool, mode: Mode) async {
         guard !running else { return }
         running = true
         defer { running = false }
@@ -109,7 +134,12 @@ final class LibraryIngest: ObservableObject {
                             lon: a.location?.coordinate.longitude,
                             asset: a)
             }
-            let alreadyDone = LocalStore.shared.identifiersWithTakenAt(in: batch.map { $0.lid })
+            // Skip what this mode considers done: EXIF for the head pass, the full
+            // EXIF+phash+verdict for the backfill (so a head-only row gets enriched).
+            let lids = batch.map { $0.lid }
+            let alreadyDone = mode == .full
+                ? LocalStore.shared.identifiersFullyProcessed(in: lids)
+                : LocalStore.shared.identifiersWithTakenAt(in: lids)
             let todo = batch.filter { !alreadyDone.contains($0.lid) }
             scanned += batch.count - todo.count
 
@@ -124,7 +154,7 @@ final class LibraryIngest: ObservableObject {
             while lo < slice.count && !Task.isCancelled {
                 let group = Array(slice[lo ..< min(lo + lanes, slice.count)])
                 let wrote = await withTaskGroup(of: Bool.self) { g -> Int in
-                    for item in group { g.addTask(priority: .utility) { await Self.ingestOne(item) } }
+                    for item in group { g.addTask(priority: .utility) { await Self.processOne(item, mode: mode) } }
                     var n = 0
                     for await ok in g where ok { n += 1 }
                     return n
@@ -149,24 +179,54 @@ final class LibraryIngest: ObservableObject {
 
     private struct Item { let lid: String; let lat: Double?; let lon: Double?; let asset: PHAsset }
 
-    /// Load one asset's original bytes off-main, parse TRUE EXIF, and write the
-    /// EXIF/identity columns. Returns whether a row was written. `nonisolated` so the
+    /// Load one asset's original bytes off-main and write its facts. Always the TRUE
+    /// EXIF/identity columns; in `.full` mode ALSO the content phash (dedup spine) and
+    /// the cheap on-device T0 verdict — both from the SAME bytes, both off-main, no
+    /// network. Returns whether the EXIF row was written. `nonisolated` so the
     /// task-group child runs off the main actor; LocalStore is thread-safe.
-    private nonisolated static func ingestOne(_ item: Item) async -> Bool {
+    private nonisolated static func processOne(_ item: Item, mode: Mode) async -> Bool {
         guard let data = try? await SyncEngine.requestOriginalData(for: item.asset) else {
             return false   // iCloud unavailable / threw → stays out of the skip-set, retried later
         }
         let date = CameraEXIF.captureDate(from: data)
         let (make, model) = CameraEXIF.cameraInfo(from: data)
-        // Loaded but nothing locatable in time or space → don't write a NULL-day row.
+
+        // Loaded but nothing locatable in time or space → don't write a NULL-day row
+        // (it would never surface in dayCounts) and don't spend the decode on it.
         guard date != nil || item.lat != nil else { return false }
+
+        // The deep pass decodes one small frame, reused for BOTH the phash and the
+        // T0 verdict (one decode, two disjoint writers).
+        var phash: String?
+        var cg: CGImage?
+        if mode == .full {
+            cg = SyncEngine.downsampledCGImage(from: data, maxPixel: 256)
+            // Prefer the orientation-corrected 256px frame; fall back to the bytes.
+            phash = cg.flatMap { PerceptualHash.dHash(of: $0) } ?? PerceptualHash.dHash(from: data)
+        }
+
+        // ingest() owns EXIF/identity; passing phash also seeds image_identity (insert
+        // .ignore → one row per content, firstSeenAt never overwritten) + vehicle_image.
         LocalStore.shared.ingest(
             localIdentifier: item.lid,
             sourceType: "local_filesystem",
+            phashHex: phash,
             takenAt: date,
             latitude: item.lat, longitude: item.lon,
             cameraMake: make, cameraModel: model
         )
+
+        // classify() owns the disjoint verdict columns. Mirror VisionEngine's rule:
+        // isPersonal = prominent face AND not a vehicle/work photo.
+        if mode == .full, let cg, let cls = VisionEngine.classify(cg) {
+            let face = VisionEngine.hasProminentFace(cg)
+            let labels = Array(cls.labels.prefix(12).map { $0.0 })
+            LocalStore.shared.classify(localIdentifier: item.lid,
+                                       isVehicle: cls.isVehicle,
+                                       isPersonal: face && !cls.isVehicle,
+                                       hasPerson: face,
+                                       labels: labels)
+        }
         return true
     }
 }

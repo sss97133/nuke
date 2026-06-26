@@ -320,6 +320,27 @@ final class LocalStore {
         return out
     }
 
+    /// Which of these are FULLY processed — true EXIF day AND a content phash AND a T0
+    /// verdict — so the deep backfill walk can skip them. A row missing any of the three
+    /// is reprocessed (the disjoint writers fill only the missing column). Chunked.
+    func identifiersFullyProcessed(in localIdentifiers: [String]) -> Set<String> {
+        guard !localIdentifiers.isEmpty else { return [] }
+        var out: Set<String> = []
+        do {
+            try dbQueue.read { db in
+                for chunk in localIdentifiers.chunked(900) {
+                    let rows = try Row.fetchAll(db, sql: """
+                        SELECT localIdentifier AS lid FROM appearance
+                        WHERE takenAt IS NOT NULL AND phashHex IS NOT NULL AND isVehicle IS NOT NULL
+                          AND localIdentifier IN (\(databaseQuestionMarks(count: chunk.count)))
+                        """, arguments: StatementArguments(chunk))
+                    for r in rows { let lid: String = r["lid"]; out.insert(lid) }
+                }
+            }
+        } catch { NSLog("LocalStore.identifiersFullyProcessed failed: %@", String(describing: error)) }
+        return out
+    }
+
     /// How many appearances carry a real EXIF day — the "indexed so far" number for
     /// the receipt footer (honest progress against the whole library, never a silent
     /// cap). Pure local read.
