@@ -230,6 +230,7 @@ struct AnalyzedEvidenceView: View {
     @State private var newMake = ""
     @State private var newModel = ""
     @State private var newYear = ""
+    @State private var showChat = false
 
     var body: some View {
         NavigationStack {
@@ -262,6 +263,11 @@ struct AnalyzedEvidenceView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Done") { dismiss() }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    // Ask the agent about THIS photo — the conversational face of the
+                    // same correction verbs, grounded in this photo + its vehicle.
+                    Button { showChat = true } label: { Image(systemName: "bubble.left.and.text.bubble.right") }
+                }
             }
             // No opaque toolbar override — let the system float a Liquid Glass bar
             // over the image (the Photos full-screen idiom), not a flat black slab.
@@ -270,6 +276,10 @@ struct AnalyzedEvidenceView: View {
         .preferredColorScheme(.dark)
         .task { await loadDeep() }
         .sheet(isPresented: $showReassign) { reassignSheet }
+        .sheet(isPresented: $showChat) {
+            AgentChatView(vehicleId: photo.vehicle_id?.uuidString.lowercased(),
+                          imageId: photo.id.uuidString.lowercased())
+        }
     }
 
     private func openReassign() async {
