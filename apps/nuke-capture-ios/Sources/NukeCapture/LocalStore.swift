@@ -64,6 +64,16 @@ struct LocalVehicleImage: Codable, FetchableRecord, PersistableRecord {
     var sessionDate: String?        // 'yyyy-MM-dd' — the day bucket for the receipt
 }
 
+/// One day's receipt line: the dated photos, and — when classified — how many read
+/// as vehicle/work. `classified` is the honesty gate: render the vehicle count ONLY
+/// when classified > 0, so "0 vehicle" from an un-sorted day is never implied.
+struct DayRollup {
+    let day: String          // 'yyyy-MM-dd'
+    let count: Int           // dated appearances that day
+    let classified: Int      // rows carrying a real T0 verdict (isVehicle IS NOT NULL)
+    let vehicles: Int        // rows classified as vehicle/work (isVehicle = 1)
+}
+
 /// The back-of-the-photo ledger for one image — what the local store knows about it.
 struct ImageLedger {
     let classified: Bool
@@ -243,18 +253,28 @@ final class LocalStore {
         return out
     }
 
-    /// Day rollup for the receipt window — image counts per day (newest first),
-    /// computed from the local appearances. Reads local only.
-    func dayCounts() -> [(day: String, count: Int)] {
-        var out: [(String, Int)] = []
+    /// Day rollup for the receipt window — per day (newest first): total dated photos,
+    /// how many carry a T0 verdict, and how many read as vehicle/work. Counts only real
+    /// classified rows (SUM(CASE …)); a day no one has sorted reports classified = 0, so
+    /// the UI can stay silent rather than imply "0 vehicle". Reads local only.
+    func dayCounts() -> [DayRollup] {
+        var out: [DayRollup] = []
         do {
             try dbQueue.read { db in
                 let rows = try Row.fetchAll(db, sql: """
-                    SELECT strftime('%Y-%m-%d', takenAt) AS day, COUNT(*) AS n
+                    SELECT strftime('%Y-%m-%d', takenAt) AS day,
+                           COUNT(*) AS n,
+                           SUM(CASE WHEN isVehicle IS NOT NULL THEN 1 ELSE 0 END) AS classified,
+                           SUM(CASE WHEN isVehicle = 1 THEN 1 ELSE 0 END) AS vehicles
                     FROM appearance WHERE takenAt IS NOT NULL
                     GROUP BY day ORDER BY day DESC
                     """)
-                out = rows.map { ($0["day"] as String? ?? "—", ($0["n"] as Int?) ?? 0) }
+                out = rows.map {
+                    DayRollup(day: $0["day"] as String? ?? "—",
+                              count: ($0["n"] as Int?) ?? 0,
+                              classified: ($0["classified"] as Int?) ?? 0,
+                              vehicles: ($0["vehicles"] as Int?) ?? 0)
+                }
             }
         } catch {
             NSLog("LocalStore.dayCounts failed: %@", String(describing: error))
