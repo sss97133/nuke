@@ -44,9 +44,9 @@ struct LibraryDaysView: View {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(pretty(d.day))
-                                        // Only when a real T0 verdict exists for the day —
-                                        // absent classification stays absent, never "0 vehicle".
-                                        if d.classified > 0 {
+                                        // Only when the day has a real T0 verdict or a cached
+                                        // cloud read — absent stays absent, never "0 vehicle".
+                                        if d.classified > 0 || d.read > 0 {
                                             Text(rollupSubtitle(d))
                                                 .font(.caption).foregroundStyle(.secondary)
                                         }
@@ -68,6 +68,10 @@ struct LibraryDaysView: View {
                 if days.isEmpty { await ingest.runHeadPass() }
                 await reload()
                 loaded = true
+                // Pull "Read by Nuke" down for what's already indexed (online; no-op
+                // offline), so the rollup shows read counts as you browse.
+                await ingest.runCloudBackfill()
+                await reload()
                 // Grow the receipt while it's open: walk the deep backlog in batches,
                 // refreshing the counts as each lands. Resumes via the persisted cursor;
                 // SwiftUI cancels this .task on disappear, which stops the loop.
@@ -82,6 +86,9 @@ struct LibraryDaysView: View {
                     await reload()
                     try? await Task.sleep(for: .milliseconds(250))   // breathe between batches
                 }
+                // Newly-indexed days may carry verdicts too — one more bounded pull.
+                await ingest.runCloudBackfill()
+                await reload()
             }
         }
     }
@@ -95,15 +102,22 @@ struct LibraryDaysView: View {
         // bound is never silent.
         let total = days.reduce(0) { $0 + $1.count }
         let library = LibraryStore.shared.count
-        let base = "Built on-device from your photos' EXIF — no network. \(total) of \(library) photos indexed across \(days.count) days."
+        var base = "Built on-device from your photos' EXIF — no network. \(total) of \(library) photos indexed across \(days.count) days."
+        if ingest.cloudCached > 0 { base += " \(ingest.cloudCached) read by Nuke." }
         return ingest.backlogComplete ? base : base + " Indexing the rest in the background…"
     }
 
-    /// "8 vehicle/work" — and, when the day is only partly sorted, how much of it is,
-    /// so a low count isn't misread as "only 8 photos here." Caller gates on classified > 0.
+    /// "8 vehicle/work · 3 read by Nuke" — vehicle/work count (with sorted-progress when
+    /// partial), then the cloud-read count. Caller gates on classified > 0 OR read > 0.
     private func rollupSubtitle(_ d: DayRollup) -> String {
-        let base = "\(d.vehicles) vehicle/work"
-        return d.classified < d.count ? base + " · \(d.classified) of \(d.count) sorted" : base
+        var parts: [String] = []
+        if d.classified > 0 {
+            var s = "\(d.vehicles) vehicle/work"
+            if d.classified < d.count { s += " · \(d.classified) of \(d.count) sorted" }
+            parts.append(s)
+        }
+        if d.read > 0 { parts.append("\(d.read) read by Nuke") }
+        return parts.joined(separator: " · ")
     }
 
     /// "2019-04-29" → "Mon, Apr 29, 2019".
@@ -159,11 +173,28 @@ private struct DayPhotosView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             // Day → its local identifiers (off-main read) → grid global indices,
-            // preserving the takenAt-DESC order. PhotoKit + LocalStore only.
+            // preserving the takenAt-DESC order. The grid renders from PhotoKit +
+            // LocalStore only (no network).
             let lids = await Task.detached { LocalStore.shared.localIdentifiers(onDay: day) }.value
             let map = LibraryStore.shared.indexMap(forLocalIdentifiers: lids)
             indices = lids.compactMap { map[$0] }
             loaded = true
+            // Online enrichment: pull THIS day's "Read by Nuke" verdicts so they're
+            // cached for the info sheet (offline thereafter). nil = offline → skip,
+            // don't mark checked. Bounded to one day's photos.
+            if !lids.isEmpty, let verdicts = await SupabaseService.fetchCloudVerdicts(forLocalIdentifiers: lids) {
+                await Task.detached {
+                    for v in verdicts {
+                        LocalStore.shared.cacheCloudVerdict(
+                            localIdentifier: v.local_uuid,
+                            narrative: v.narrative, intent: v.intent, scene: v.scene_type,
+                            confidence: v.confidence, buildPhase: v.build_phase,
+                            vehicleId: v.vehicle_id, agentModel: v.agent_model,
+                            analyzedAt: SupabaseService.verdictDate(v.analyzed_at))
+                    }
+                    LocalStore.shared.markCloudChecked(lids)
+                }.value
+            }
         }
         .fullScreenCover(item: Binding(
             get: { detailIndex.map(IndexBox.init) },

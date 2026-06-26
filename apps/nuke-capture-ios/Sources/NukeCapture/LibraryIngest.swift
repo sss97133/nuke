@@ -44,6 +44,8 @@ final class LibraryIngest: ObservableObject {
     @Published private(set) var scanned = 0           // assets examined this pass (skipped + attempted)
     @Published private(set) var target = 0            // assets in scope this pass
     @Published private(set) var backlogComplete = false  // whole library walked at least once
+    @Published private(set) var cloudCached = 0          // photos with a cached "Read by Nuke" verdict
+    private var cloudRunning = false
 
     /// Resume hint: the index (into the newest-first PHFetchResult) the backlog walk
     /// has fully resolved DOWN TO. Persisted so a fresh wake skips the indexed prefix.
@@ -116,6 +118,43 @@ final class LibraryIngest: ObservableObject {
             return
         }
         await walk(startIndex: start, positionEnd: total, workBudget: budget, advanceCursor: true, mode: .full)
+    }
+
+    // MARK: Cloud verdict backfill — bring "Read by Nuke" DOWN for the whole library
+
+    /// Pull the prod BYOK verdicts down for ingested photos not yet checked, in bounded
+    /// batches, and cache them so "Read by Nuke" renders offline + surfaces in the day
+    /// rollup. ONLINE-ONLY by construction: fetchCloudVerdicts returns nil when it can't
+    /// check (offline / no session), which STOPS the run without marking anything — so a
+    /// transient outage never burns a check. Hits cache the verdict (sets the checked
+    /// marker); misses are marked checked so they aren't re-queried. After the library is
+    /// fully checked it no-ops. DB work runs off the main actor.
+    func runCloudBackfill(perRun: Int = 1500) async {
+        guard !cloudRunning else { return }
+        cloudRunning = true
+        defer { cloudRunning = false }
+
+        var processed = 0
+        while processed < perRun && !Task.isCancelled {
+            let batch = await Task.detached { LocalStore.shared.localIdentifiersMissingCloudVerdict(limit: 200) }.value
+            if batch.isEmpty { break }
+            guard let verdicts = await SupabaseService.fetchCloudVerdicts(forLocalIdentifiers: batch) else {
+                break   // offline / no session → leave unchecked, retry on a later open
+            }
+            await Task.detached {
+                for v in verdicts {
+                    LocalStore.shared.cacheCloudVerdict(
+                        localIdentifier: v.local_uuid,
+                        narrative: v.narrative, intent: v.intent, scene: v.scene_type,
+                        confidence: v.confidence, buildPhase: v.build_phase,
+                        vehicleId: v.vehicle_id, agentModel: v.agent_model,
+                        analyzedAt: SupabaseService.verdictDate(v.analyzed_at))
+                }
+                LocalStore.shared.markCloudChecked(batch)   // the misses → not re-queried
+            }.value
+            processed += batch.count
+            cloudCached = await Task.detached { LocalStore.shared.cloudVerdictCount() }.value
+        }
     }
 
     // MARK: The walk

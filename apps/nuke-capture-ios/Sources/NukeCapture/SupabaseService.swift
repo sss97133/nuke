@@ -353,9 +353,12 @@ enum SupabaseService {
     }
 
     /// BYOK verdicts for a batch of device photos (keyed by localIdentifier). Returns
-    /// only those that HAVE a verdict in prod; offline / no session → [].
-    static func fetchCloudVerdicts(forLocalIdentifiers ids: [String]) async -> [CloudVerdict] {
-        guard !ids.isEmpty, currentUserId != nil else { return [] }
+    /// only those that HAVE a verdict in prod. NIL means we could not check (no session
+    /// / offline / error) — distinct from [] ("checked, none analyzed"); the backfill
+    /// marks a photo "checked" only on a non-nil result, so offline never burns a check.
+    static func fetchCloudVerdicts(forLocalIdentifiers ids: [String]) async -> [CloudVerdict]? {
+        guard !ids.isEmpty else { return [] }
+        guard currentUserId != nil else { return nil }
         do {
             return try await client
                 .rpc("get_owner_image_verdicts", params: ["p_uuids": ids])
@@ -363,7 +366,7 @@ enum SupabaseService {
                 .value
         } catch {
             NSLog("NukeCapture: fetchCloudVerdicts failed: %@", String(describing: error))
-            return []
+            return nil
         }
     }
 
