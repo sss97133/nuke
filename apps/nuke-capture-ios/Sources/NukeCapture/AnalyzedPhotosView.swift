@@ -215,6 +215,15 @@ struct AnalyzedEvidenceView: View {
     // renders nothing extra in that case.
     @State private var deep: ImageDeepAnalysis?
 
+    // The owner-correction leaf (the operating verb): "not this vehicle" → move it.
+    @State private var showReassign = false
+    @State private var garage: [SupabaseService.RelinkTarget] = []
+    @State private var loadingGarage = false
+    @State private var reassignBusy = false
+    @State private var reassignError = false
+    /// Set once a move succeeds, so the rail reflects "moved" without a refetch.
+    @State private var movedTo: SupabaseService.RelinkTarget?
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -238,7 +247,8 @@ struct AnalyzedEvidenceView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    EvidenceRail(photo: photo, deep: deep)
+                    EvidenceRail(photo: photo, deep: deep, movedTo: movedTo,
+                                 onReassign: photo.vehicle_id == nil ? nil : { Task { await openReassign() } })
                 }
             }
             .toolbar {
@@ -252,6 +262,73 @@ struct AnalyzedEvidenceView: View {
         }
         .preferredColorScheme(.dark)
         .task { await loadDeep() }
+        .sheet(isPresented: $showReassign) { reassignSheet }
+    }
+
+    private func openReassign() async {
+        if garage.isEmpty {
+            loadingGarage = true
+            garage = await SupabaseService.fetchGarage()
+            loadingGarage = false
+        }
+        showReassign = true
+    }
+
+    /// The chooser: where does this photo actually belong? Lists the owner's other
+    /// vehicles; tapping one MOVES the image (relink_testimony — forks, lineage, logged).
+    /// The new-vehicle fork (the white truck) lands here once create_vehicle exists.
+    @ViewBuilder private var reassignSheet: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(garage.filter { $0.vehicle_id.lowercased() != photo.vehicle_id?.uuidString.lowercased() }) { v in
+                        Button { Task { await move(to: v) } } label: {
+                            HStack(spacing: 12) {
+                                CachedAsyncImage(url: NukeImage.thumb(v.image_url, width: 120)) { img in
+                                    img.resizable().scaledToFill()
+                                } placeholder: {
+                                    Image(systemName: "car.side").foregroundStyle(.secondary)
+                                }
+                                .frame(width: 44, height: 33).clipped()
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                                Text([v.year.map(String.init), v.make, v.model].compactMap { $0 }.joined(separator: " "))
+                                    .font(.callout)
+                                Spacer()
+                            }
+                        }
+                        .disabled(reassignBusy)
+                    }
+                } header: {
+                    Text("Move this photo to")
+                } footer: {
+                    if reassignError {
+                        Text("Didn't move — try again.").foregroundStyle(.orange)
+                    } else {
+                        Text("The photo moves to that vehicle with its history kept. Nothing is deleted.")
+                    }
+                }
+            }
+            .overlay { if reassignBusy || loadingGarage { ProgressView().controlSize(.large) } }
+            .navigationTitle("Not this vehicle?")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Cancel") { showReassign = false } } }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func move(to v: SupabaseService.RelinkTarget) async {
+        reassignBusy = true; reassignError = false
+        // Carry the agent's own doubt into the audit/training reason.
+        let why = (deep?.agent_notes?.prefix(140)).map { "owner correction · " + $0 } ?? "owner correction"
+        do {
+            try await SupabaseService.relinkImage(imageId: photo.id.uuidString, toVehicleId: v.vehicle_id, reason: String(why))
+            movedTo = v
+            showReassign = false
+        } catch {
+            reassignError = true
+            NSLog("NukeCapture relink failed: %@", String(describing: error))
+        }
+        reassignBusy = false
     }
 
     /// Pull the full byok_deep_analysis verdict for this photo. Read-only RPC,
@@ -280,6 +357,14 @@ private struct EvidenceRail: View {
     /// The deep verdict, when loaded. nil → the depth section renders nothing and
     /// the rail looks exactly as before (existing rendering is undisturbed).
     var deep: ImageDeepAnalysis? = nil
+    /// Set after an owner correction lands — the leaf shows where it went.
+    var movedTo: SupabaseService.RelinkTarget? = nil
+    /// Present only when the photo is attributed to a vehicle (so it can be corrected).
+    var onReassign: (() -> Void)? = nil
+
+    private func vehicleLabel(_ v: SupabaseService.RelinkTarget) -> String {
+        [v.year.map(String.init), v.make, v.model].compactMap { $0 }.joined(separator: " ")
+    }
 
     // The three scene atoms that render as capsule chips, in reading order.
     private var chips: [(String, String)] {
@@ -319,6 +404,16 @@ private struct EvidenceRail: View {
                     Text(taken.prefix(10))
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.6))
+                }
+
+                // The agent's OWN doubt, surfaced honestly as the headline (the reason
+                // already prints below in the reasoning/open-questions). Color = data:
+                // the flag is a real signal, not decoration. Hidden once corrected.
+                if deep?.needs_review == true, movedTo == nil {
+                    Label("Nuke flagged this — is it the right vehicle?", systemImage: "flag.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.orange.opacity(0.95))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 if hasAnyAtoms {
@@ -390,6 +485,33 @@ private struct EvidenceRail: View {
                         .background {
                             RoundedRectangle(cornerRadius: 8)
                                 .fill(Color.white.opacity(0.12))
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+
+                // The correction leaf — the operating verb at the bottom of the drill.
+                // Once moved, it states where it went (forks-not-hides, lineage kept).
+                if let moved = movedTo {
+                    Label("Moved to \(vehicleLabel(moved))", systemImage: "checkmark.circle.fill")
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(.green)
+                        .padding(.top, 4)
+                } else if let onReassign {
+                    Button(action: onReassign) {
+                        HStack {
+                            Image(systemName: "arrow.uturn.backward")
+                            Text("Not this vehicle?")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 12)
+                        .background {
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.white.opacity(0.18), lineWidth: 1)
                         }
                     }
                     .padding(.top, 4)
