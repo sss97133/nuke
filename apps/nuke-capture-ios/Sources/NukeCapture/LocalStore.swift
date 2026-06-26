@@ -257,12 +257,18 @@ final class LocalStore {
     /// how many carry a T0 verdict, and how many read as vehicle/work. Counts only real
     /// classified rows (SUM(CASE …)); a day no one has sorted reports classified = 0, so
     /// the UI can stay silent rather than imply "0 vehicle". Reads local only.
+    ///
+    /// `takenAt` is stored UTC, so we bucket with the `'localtime'` modifier → the day
+    /// in the DEVICE's current zone (an evening shot no longer rolls to the next UTC
+    /// day). localIdentifiers(onDay:) uses the IDENTICAL expression so the drill opens
+    /// exactly what the receipt counted. (Cross-timezone travel still buckets by the
+    /// current device zone — acceptable; the alternative needs the per-photo EXIF offset.)
     func dayCounts() -> [DayRollup] {
         var out: [DayRollup] = []
         do {
             try dbQueue.read { db in
                 let rows = try Row.fetchAll(db, sql: """
-                    SELECT strftime('%Y-%m-%d', takenAt) AS day,
+                    SELECT strftime('%Y-%m-%d', takenAt, 'localtime') AS day,
                            COUNT(*) AS n,
                            SUM(CASE WHEN isVehicle IS NOT NULL THEN 1 ELSE 0 END) AS classified,
                            SUM(CASE WHEN isVehicle = 1 THEN 1 ELSE 0 END) AS vehicles
@@ -283,15 +289,15 @@ final class LocalStore {
     }
 
     /// The local identifiers shot on one day (newest-first), for the day-receipt
-    /// drill. Uses the IDENTICAL `strftime('%Y-%m-%d', takenAt)` key as dayCounts()
-    /// so the day a row counts under is the day it opens under. Pure local read.
+    /// drill. Uses the IDENTICAL `strftime('%Y-%m-%d', takenAt, 'localtime')` key as
+    /// dayCounts() so the day a row counts under is the day it opens under. Local read.
     func localIdentifiers(onDay ymd: String) -> [String] {
         var out: [String] = []
         do {
             try dbQueue.read { db in
                 let rows = try Row.fetchAll(db, sql: """
                     SELECT localIdentifier AS lid FROM appearance
-                    WHERE takenAt IS NOT NULL AND strftime('%Y-%m-%d', takenAt) = ?
+                    WHERE takenAt IS NOT NULL AND strftime('%Y-%m-%d', takenAt, 'localtime') = ?
                     ORDER BY takenAt DESC
                     """, arguments: [ymd])
                 for r in rows { let lid: String = r["lid"]; out.append(lid) }
@@ -339,15 +345,6 @@ final class LocalStore {
             }
         } catch { NSLog("LocalStore.identifiersFullyProcessed failed: %@", String(describing: error)) }
         return out
-    }
-
-    /// How many appearances carry a real EXIF day — the "indexed so far" number for
-    /// the receipt footer (honest progress against the whole library, never a silent
-    /// cap). Pure local read.
-    func datedCount() -> Int {
-        (try? dbQueue.read { db in
-            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM appearance WHERE takenAt IS NOT NULL") ?? 0
-        }) ?? 0
     }
 
     // MARK: Cheap on-device organization — the Apple-tag classification verdict
