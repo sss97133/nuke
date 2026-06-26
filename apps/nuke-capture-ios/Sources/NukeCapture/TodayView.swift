@@ -345,15 +345,40 @@ private struct UnderstandingPanel: View {
 
 // ─── Live metrics strip ───────────────────────────────────────────────────────
 
-/// Four big monospaced counters. QUEUED — the live backfill drain — is the
-/// hero: it counts DOWN as the background BGProcessingTask empties the queue
-/// with the screen off (the pour is the show, BUILD_2 G9). ANALYZED drills
-/// into the photos + atoms behind the count. All capture-scoped and fast
-/// (local counters + get_user_analyzed_count), never the all-sources aggregate
-/// that times out on heavy libraries — and the ANALYZED count here is the same
-/// predicate the drill shows, so the number and the photos always agree.
+/// The funnel: local LIBRARY/RELEVANT (ignition scan) over the server record
+/// UPLOADED/DAYS/TODAY (get_user_capture_stats). The whole block taps to the
+/// on-device day-by-day record (LibraryDaysView) — built from LocalStore, renders
+/// with the network OFF. The old ANALYZED cell drilled into AnalyzedPhotosView; that
+/// analyze pipeline is deprecated/halted, and because it was the ONLY NavigationLink
+/// in this single List row, a tap anywhere in the strip fired it (the "everything
+/// pushes to analyzed" bug). Removed — the tap now goes to the live local record.
 private struct LiveMetricsStrip: View {
     @ObservedObject var engine: SyncEngine
+    @State private var showDays = false
+
+    /// The funnel numbers — pure display; the tap target is owned by the caller below.
+    @ViewBuilder private var metricsFunnel: some View {
+        VStack(spacing: 14) {
+            // The owner's own library, organized (C2): LIBRARY = whole on-device count
+            // from the ignition scan; RELEVANT = the confirmed at-site set.
+            if engine.libraryTotal > 0 {
+                HStack(spacing: 0) {
+                    MetricCell(label: "LIBRARY", value: "\(engine.libraryTotal)")
+                    Divider().frame(height: 44)
+                    MetricCell(label: "RELEVANT", value: "\(engine.relevantTotal)")
+                }
+            }
+            // Server truth. Until the first load lands (~9s cold) cells read "…", never
+            // a fake "0" (a 0 reads as a dead, empty record — it isn't).
+            HStack(spacing: 0) {
+                MetricCell(label: "UPLOADED", value: stat(engine.serverStats.total_images))
+                Divider().frame(height: 44)
+                MetricCell(label: "DAYS", value: stat(engine.serverStats.contribution_days))
+                Divider().frame(height: 44)
+                MetricCell(label: "TODAY", value: stat(engine.serverStats.uploaded_today))
+            }
+        }
+    }
 
     /// Honest ETA — only a measured rate produces a time; otherwise "estimating…"
     /// rather than an invented number (C4: every number real).
@@ -380,23 +405,11 @@ private struct LiveMetricsStrip: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            // THE FUNNEL — the owner's own library, organized (C2). LIBRARY is
-            // the whole on-device count from the ignition scan (e.g. 76K);
-            // RELEVANT is the confirmed at-site set. Shown once ignition has
-            // measured them. RUNS ON: IgnitionEngine.scan.
-            if engine.libraryTotal > 0 {
-                HStack(spacing: 0) {
-                    MetricCell(label: "LIBRARY", value: "\(engine.libraryTotal)")
-                    Divider().frame(height: 44)
-                    MetricCell(label: "RELEVANT", value: "\(engine.relevantTotal)")
-                }
-            }
-
-            // THE REAL RECORD — server truth (get_user_capture_stats). Until the
-            // first load lands (the RPC can be ~9s cold) the cells read "…", never
-            // a fake "0" — a 0 here reads as a dead, empty record (it isn't). And a
-            // FAILED first load shows a retry, never a "…" that never resolves.
+            // THE RECORD. A FAILED first server load shows a retry (the local funnel
+            // still renders); otherwise the whole block taps to the on-device
+            // day-by-day record — network-free, the live destination.
             if engine.statsError && !engine.statsLoaded {
+                metricsFunnel
                 HStack {
                     Label("Couldn't load your record", systemImage: "wifi.exclamationmark")
                         .font(.caption).foregroundStyle(.secondary)
@@ -405,35 +418,11 @@ private struct LiveMetricsStrip: View {
                         .font(.caption)
                 }
             } else {
-                HStack(spacing: 0) {
-                    MetricCell(label: "UPLOADED", value: stat(engine.serverStats.total_images))
-                    Divider().frame(height: 44)
-                    // ANALYZED = the REAL vision-analyzed count (engine.analyzedCount,
-                    // get_user_analyzed_count) — the SAME population the drill resolves
-                    // to. NEVER serverStats.analyzed (the 12k work_sessions rollup).
-                    if engine.analyzedCount > 0 {
-                        NavigationLink {
-                            AnalyzedPhotosView(userId: SupabaseService.currentUserId ?? "")
-                        } label: {
-                            MetricCell(label: "ANALYZED",
-                                       value: "\(engine.analyzedCount)",
-                                       caption: "tap to view")
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        MetricCell(
-                            label: "ANALYZED",
-                            value: stat(engine.analyzedCount),
-                            caption: (engine.statsLoaded && engine.serverStats.total_images > 0) ? "analyzing…" : nil
-                        )
-                    }
-                }
-
-                HStack(spacing: 0) {
-                    MetricCell(label: "DAYS", value: stat(engine.serverStats.contribution_days))
-                    Divider().frame(height: 44)
-                    MetricCell(label: "TODAY", value: stat(engine.serverStats.uploaded_today))
-                }
+                Button { showDays = true } label: { metricsFunnel }
+                    .buttonStyle(.plain)
+                Text("Your record · tap for the day-by-day")
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             // The local drain — this device's upload queue with an HONEST ETA
@@ -473,6 +462,9 @@ private struct LiveMetricsStrip: View {
                 Spacer()
             }
         }
+        // The on-device day-by-day record (LibraryDaysView reads LocalStore — no
+        // network). Owns its own NavigationStack + Done, so present as a sheet.
+        .sheet(isPresented: $showDays) { LibraryDaysView() }
         .task {
             // Fetch on appear + keep fresh. Before, the server metrics only
             // refreshed on app-foreground / after sync — so opening Today showed

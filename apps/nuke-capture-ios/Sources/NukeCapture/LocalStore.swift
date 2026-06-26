@@ -84,6 +84,15 @@ struct ImageLedger {
     let vehicleId: String?
     let sessionDate: String?
     let analyzedAt: Date?
+    // The cloud BYOK verdict, cached from prod (nil until pulled down). Rendered as the
+    // rich "what the agent read" layer over the cheap on-device T0 labels.
+    var cloudNarrative: String? = nil
+    var cloudIntent: String? = nil
+    var cloudScene: String? = nil
+    var cloudConfidence: Double? = nil
+    var cloudBuildPhase: String? = nil
+    var cloudAgentModel: String? = nil
+    var cloudAnalyzedAt: Date? = nil
 }
 
 // MARK: - The store
@@ -157,6 +166,26 @@ final class LocalStore {
             // change (see v2). ownerVerdict MUST NEVER be blanket-reset — it is owner-proven
             // and unrecoverable; it sits at the top of the trust hierarchy.
             try db.alter(table: "appearance") { t in t.add(column: "ownerVerdict", .text) }
+        }
+        m.registerMigration("v4_cloud_verdict") { db in
+            // The CLOUD BYOK deep-analysis verdict, ESCALATED DOWN and cached on-device
+            // (data-scope axis: global cloud → local instance). Joined by the exact uuid
+            // bridge (appearance.localIdentifier == vehicle_images.exif_data.uuid). Caching
+            // it here is what lets the rich analysis render with the network OFF — the
+            // analysis ALREADY done in prod just arrives on the photo; nothing re-computes.
+            // A FOURTH disjoint writer (cacheCloudVerdict) owns these columns ONLY; it never
+            // touches EXIF (ingest), T0 (classify), or the owner verdict.
+            try db.alter(table: "appearance") { t in
+                t.add(column: "cloudNarrative", .text)
+                t.add(column: "cloudIntent", .text)
+                t.add(column: "cloudScene", .text)
+                t.add(column: "cloudConfidence", .double)
+                t.add(column: "cloudBuildPhase", .text)
+                t.add(column: "cloudVehicleId", .text)
+                t.add(column: "cloudAgentModel", .text)
+                t.add(column: "cloudAnalyzedAt", .datetime)
+                t.add(column: "cloudCachedAt", .datetime)   // when WE last pulled it down
+            }
         }
         return m
     }
@@ -432,14 +461,52 @@ final class LocalStore {
         return out
     }
 
-    /// The full ledger for one image — classification + labels + identity + binding.
-    /// Powers the info page (the back of the photo). nil if the row doesn't exist yet.
+    // MARK: Cloud verdict — the FOURTH disjoint writer (BYOK analysis, escalated down)
+
+    /// Cache one photo's prod BYOK verdict on-device so the back-of-the-photo renders
+    /// it OFFLINE. Owns ONLY the cloud* columns — never EXIF/T0/owner. The verdict is a
+    /// cloud-sourced projection, so the latest pull supersedes the prior cloud value in
+    /// place (same source refreshing itself); it can never wipe a column another writer
+    /// owns. Upserts a minimal row if the photo wasn't ingested yet.
+    func cacheCloudVerdict(localIdentifier: String,
+                           narrative: String?, intent: String?, scene: String?,
+                           confidence: Double?, buildPhase: String?, vehicleId: String?,
+                           agentModel: String?, analyzedAt: Date?, now: Date = Date()) {
+        do {
+            try dbQueue.write { db in
+                try db.execute(sql: """
+                    INSERT INTO appearance (localIdentifier, sourceType, createdAt,
+                        cloudNarrative, cloudIntent, cloudScene, cloudConfidence,
+                        cloudBuildPhase, cloudVehicleId, cloudAgentModel, cloudAnalyzedAt, cloudCachedAt)
+                    VALUES (?, 'local_filesystem', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(localIdentifier) DO UPDATE SET
+                        cloudNarrative  = excluded.cloudNarrative,
+                        cloudIntent     = excluded.cloudIntent,
+                        cloudScene      = excluded.cloudScene,
+                        cloudConfidence = excluded.cloudConfidence,
+                        cloudBuildPhase = excluded.cloudBuildPhase,
+                        cloudVehicleId  = excluded.cloudVehicleId,
+                        cloudAgentModel = excluded.cloudAgentModel,
+                        cloudAnalyzedAt = excluded.cloudAnalyzedAt,
+                        cloudCachedAt   = excluded.cloudCachedAt
+                    """, arguments: [localIdentifier, now, narrative, intent, scene, confidence,
+                                     buildPhase, vehicleId, agentModel, analyzedAt, now])
+            }
+        } catch { NSLog("LocalStore.cacheCloudVerdict failed: %@", String(describing: error)) }
+    }
+
+    /// The full ledger for one image — classification + labels + identity + binding +
+    /// the cached cloud verdict. Powers the info page (the back of the photo). nil if
+    /// the row doesn't exist yet.
     func ledger(for localIdentifier: String) -> ImageLedger? {
         do {
             return try dbQueue.read { db -> ImageLedger? in
                 guard let r = try Row.fetchOne(db, sql: """
                     SELECT a.isVehicle AS v, a.isPersonal AS p, a.appleMLLabelsJSON AS labels,
                            a.phashHex AS ph, a.analyzedAt AS an,
+                           a.cloudNarrative AS cn, a.cloudIntent AS ci, a.cloudScene AS cs,
+                           a.cloudConfidence AS cc, a.cloudBuildPhase AS cb, a.cloudAgentModel AS cm,
+                           a.cloudAnalyzedAt AS ca,
                            vi.vehicleId AS vid, vi.sessionDate AS day
                     FROM appearance a
                     LEFT JOIN vehicle_image vi ON vi.localIdentifier = a.localIdentifier
@@ -457,7 +524,14 @@ final class LocalStore {
                     phashHex: r["ph"],
                     vehicleId: r["vid"],
                     sessionDate: r["day"],
-                    analyzedAt: r["an"]
+                    analyzedAt: r["an"],
+                    cloudNarrative: r["cn"],
+                    cloudIntent: r["ci"],
+                    cloudScene: r["cs"],
+                    cloudConfidence: r["cc"],
+                    cloudBuildPhase: r["cb"],
+                    cloudAgentModel: r["cm"],
+                    cloudAnalyzedAt: r["ca"]
                 )
             }
         } catch {
