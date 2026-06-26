@@ -52,7 +52,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: ag.nuke.capture
         PRODUCT_NAME: NukeCapture
         MARKETING_VERSION: "1.0.1"
-        CURRENT_PROJECT_VERSION: 36
+        CURRENT_PROJECT_VERSION: 37
         # Swift 5 language mode, same rationale as the Mac relay's
         # Package.swift: PhotoKit's observer/callback surface predates strict
         # Sendable checking. All mutable state is main-actor-confined by hand.
@@ -91,7 +91,7 @@ targets:
         # has no variable to re-expand, so it survives. Bump this by hand before each
         # TestFlight archive (28 -> 29 -> ...). ci_pre_xcodebuild's PlistBuddy timestamp,
         # if it still runs, overwrites this literal with a monotonic epoch (also > 27).
-        CFBundleVersion: "36"
+        CFBundleVersion: "37"
         # OAuth callback scheme for the ASWebAuthenticationSession providers
         # (Google, GitHub). ASWebAuthenticationSession needs this scheme so
         # the Supabase redirect (ag.nuke.capture://login-callback) returns
