@@ -63,9 +63,11 @@ final class LibraryIngest: ObservableObject {
     }
 
     private let batchSize = 400
-    /// A few concurrent lanes per batch — the original-data load (often an iCloud
-    /// fetch) is the bottleneck; GRDB serializes the writes internally.
-    private let lanes = 4
+    /// Concurrent lanes per batch. Kept LOW (2) on purpose: each lane loads ORIGINAL
+    /// bytes through the shared PHImageManager, and the live blur/hide classifier needs
+    /// that same manager for its thumbnails — 4 lanes here starved blur. 2 leaves the
+    /// user-facing path headroom; GRDB serializes the writes internally anyway.
+    private let lanes = 2
 
     /// What a pass writes. The head pass stays cheap for the foreground; the deep
     /// backfill enriches with the content phash + the on-device T0 verdict.
