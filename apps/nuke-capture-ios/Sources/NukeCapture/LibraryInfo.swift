@@ -117,7 +117,7 @@ struct LibraryInfoView: View {
             if l?.cloudNarrative == nil {
                 loadingCloud = true
                 let verdicts = await SupabaseService.fetchCloudVerdicts(forLocalIdentifiers: [id])
-                if let v = verdicts.first {
+                if let v = verdicts?.first {
                     await Task.detached {
                         LocalStore.shared.cacheCloudVerdict(
                             localIdentifier: id,

@@ -72,6 +72,7 @@ struct DayRollup {
     let count: Int           // dated appearances that day
     let classified: Int      // rows carrying a real T0 verdict (isVehicle IS NOT NULL)
     let vehicles: Int        // rows classified as vehicle/work (isVehicle = 1)
+    let read: Int            // rows with a cached cloud BYOK verdict ("Read by Nuke")
 }
 
 /// The back-of-the-photo ledger for one image — what the local store knows about it.
@@ -304,7 +305,8 @@ final class LocalStore {
                     SELECT strftime('%Y-%m-%d', takenAt, 'localtime') AS day,
                            COUNT(*) AS n,
                            SUM(CASE WHEN isVehicle IS NOT NULL THEN 1 ELSE 0 END) AS classified,
-                           SUM(CASE WHEN isVehicle = 1 THEN 1 ELSE 0 END) AS vehicles
+                           SUM(CASE WHEN isVehicle = 1 THEN 1 ELSE 0 END) AS vehicles,
+                           SUM(CASE WHEN cloudNarrative IS NOT NULL THEN 1 ELSE 0 END) AS read
                     FROM appearance WHERE takenAt IS NOT NULL
                     GROUP BY day ORDER BY day DESC
                     """)
@@ -312,7 +314,8 @@ final class LocalStore {
                     DayRollup(day: $0["day"] as String? ?? "—",
                               count: ($0["n"] as Int?) ?? 0,
                               classified: ($0["classified"] as Int?) ?? 0,
-                              vehicles: ($0["vehicles"] as Int?) ?? 0)
+                              vehicles: ($0["vehicles"] as Int?) ?? 0,
+                              read: ($0["read"] as Int?) ?? 0)
                 }
             }
         } catch {
@@ -497,6 +500,51 @@ final class LocalStore {
                                      buildPhase, vehicleId, agentModel, analyzedAt, now])
             }
         } catch { NSLog("LocalStore.cacheCloudVerdict failed: %@", String(describing: error)) }
+    }
+
+    /// Ingested photos we have NOT yet checked for a cloud verdict (newest first), so the
+    /// backfill pulls "Read by Nuke" down in bounded batches. `cloudCachedAt` is the
+    /// checked-marker (set by cacheCloudVerdict on a hit, by markCloudChecked on a miss).
+    func localIdentifiersMissingCloudVerdict(limit: Int) -> [String] {
+        var out: [String] = []
+        do {
+            try dbQueue.read { db in
+                let rows = try Row.fetchAll(db, sql: """
+                    SELECT localIdentifier AS lid FROM appearance
+                    WHERE takenAt IS NOT NULL AND cloudCachedAt IS NULL
+                    ORDER BY takenAt DESC LIMIT ?
+                    """, arguments: [limit])
+                for r in rows { let lid: String = r["lid"]; out.append(lid) }
+            }
+        } catch { NSLog("LocalStore.localIdentifiersMissingCloudVerdict failed: %@", String(describing: error)) }
+        return out
+    }
+
+    /// Mark a batch checked WITHOUT a verdict (none in prod) — sets only cloudCachedAt
+    /// where it's null, so these aren't re-queried. Touches no other writer's columns.
+    func markCloudChecked(_ localIdentifiers: [String], now: Date = Date()) {
+        guard !localIdentifiers.isEmpty else { return }
+        var args: [DatabaseValueConvertible] = [now]
+        for lid in localIdentifiers { args.append(lid) }
+        do {
+            try dbQueue.write { db in
+                try db.execute(sql: """
+                    UPDATE appearance SET cloudCachedAt = ?
+                    WHERE cloudCachedAt IS NULL AND localIdentifier IN (\(databaseQuestionMarks(count: localIdentifiers.count)))
+                    """, arguments: StatementArguments(args))
+            }
+        } catch { NSLog("LocalStore.markCloudChecked failed: %@", String(describing: error)) }
+    }
+
+    /// How many photos carry a cached cloud verdict ("Read by Nuke"). Pure local read.
+    func cloudVerdictCount() -> Int {
+        var n = 0
+        do {
+            try dbQueue.read { db in
+                n = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM appearance WHERE cloudNarrative IS NOT NULL") ?? 0
+            }
+        } catch { NSLog("LocalStore.cloudVerdictCount failed: %@", String(describing: error)) }
+        return n
     }
 
     /// The full ledger for one image — classification + labels + identity + binding +
