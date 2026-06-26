@@ -52,6 +52,22 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
         return out
     }
 
+    /// Map local identifiers → their index in THIS fetch result (the grid's index
+    /// space), so a day's photos (ordered by EXIF takenAt) can drive the existing
+    /// global-index pager + cell. The grid sorts by creationDate, the day by takenAt,
+    /// so a day's photos are NOT contiguous here — map per id. Ids no longer in the
+    /// library (deleted) drop out (NSNotFound), never a phantom. Main-actor read.
+    func indexMap(forLocalIdentifiers lids: [String]) -> [String: Int] {
+        guard !lids.isEmpty else { return [:] }
+        let fetched = PHAsset.fetchAssets(withLocalIdentifiers: lids, options: nil)
+        var out: [String: Int] = [:]
+        fetched.enumerateObjects { asset, _, _ in
+            let i = self.assets.index(of: asset)
+            if i != NSNotFound { out[asset.localIdentifier] = i }
+        }
+        return out
+    }
+
     /// Grid request options — OPPORTUNISTIC: PhotoKit delivers a cached low-res
     /// frame instantly, then refines to sharp (the handler fires more than once).
     /// That is the Photos-app feel. (highQualityFormat made every cell wait for the

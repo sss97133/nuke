@@ -138,7 +138,8 @@ struct LibraryView: View {
 }
 
 /// Identifiable wrapper so an Int index can drive .fullScreenCover(item:).
-private struct IndexBox: Identifiable { let id: Int }
+/// Non-private: the day-receipt drill (LibraryDaysView) reuses it.
+struct IndexBox: Identifiable { let id: Int }
 
 // ─── One cell — pure PhotoKit, decorated async ───────────────────────────────
 
@@ -164,7 +165,9 @@ final class LibraryThumbLoader: ObservableObject {
     }
 }
 
-private struct LibraryCell: View {
+/// Non-private: the day-receipt drill (LibraryDaysView → DayPhotosView) reuses this
+/// cell over a day's global indices.
+struct LibraryCell: View {
     let index: Int
     var selecting: Bool = false
     var isSelected: Bool = false

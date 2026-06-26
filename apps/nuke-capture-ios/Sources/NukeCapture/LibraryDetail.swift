@@ -10,20 +10,27 @@ import UIKit
 
 struct LibraryDetailView: View {
     let startIndex: Int
+    /// Optional scoped page set (global LibraryStore indices). nil = the whole
+    /// library (the grid's behavior); a day drill passes that day's indices so the
+    /// pager swipes only within the day. `startIndex` is always a global index.
+    let indices: [Int]?
     @Environment(\.dismiss) private var dismiss
     @State private var index: Int
     @State private var showInfo = false
 
-    init(startIndex: Int) {
+    init(startIndex: Int, indices: [Int]? = nil) {
         self.startIndex = startIndex
+        self.indices = indices
         _index = State(initialValue: startIndex)
     }
+
+    private var pages: [Int] { indices ?? Array(0..<LibraryStore.shared.count) }
 
     var body: some View {
         ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
             TabView(selection: $index) {
-                ForEach(0..<LibraryStore.shared.count, id: \.self) { idx in
+                ForEach(pages, id: \.self) { idx in
                     LibraryDetailPage(index: idx).tag(idx)
                 }
             }
