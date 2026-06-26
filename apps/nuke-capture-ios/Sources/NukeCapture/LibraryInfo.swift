@@ -25,10 +25,10 @@ struct LibraryInfoView: View {
             List {
                 // ── The photo's own facts (Apple's side) ──
                 Section("Photo") {
-                    // ⚠️ HARD_RULES §7: this is PHAsset.creationDate (the device RE-ADD date),
-                    // proven ~6mo wrong vs file EXIF DateTimeOriginal. Once ingest() populates
-                    // appearance.takenAt, source this from the ledger's EXIF takenAt and tag this
-                    // fallback "(device, unverified)". Do NOT treat it as the true capture time.
+                    // HARD_RULES §7: the file's EXIF DateTimeOriginal is the only trusted
+                    // capture time (it's also the day this photo is filed under). Show it when
+                    // ingest() has read it; fall back to PHAsset.creationDate (the re-add date,
+                    // proven ~6mo wrong) ONLY tagged "(device, unverified)".
                     row("Taken", takenText)
                     row("Dimensions", "\(asset.pixelWidth) × \(asset.pixelHeight)")
                     if let loc = asset.location {
@@ -148,11 +148,14 @@ struct LibraryInfoView: View {
     }
 
     private var takenText: String {
-        guard let d = asset.creationDate else { return "—" }
         let f = DateFormatter()
         f.dateStyle = .medium
         f.timeStyle = .short
-        return f.string(from: d)
+        // True EXIF capture time when we have it — the same date the photo is filed under.
+        if let exif = ledger?.takenAt { return f.string(from: exif) }
+        // Fall back to the device re-add date, honestly tagged (HARD_RULES §7).
+        guard let d = asset.creationDate else { return "—" }
+        return f.string(from: d) + "  (device, unverified)"
     }
 
     private func relativeText(_ d: Date) -> String {
