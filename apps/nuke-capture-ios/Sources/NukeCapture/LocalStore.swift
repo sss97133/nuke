@@ -84,6 +84,10 @@ struct ImageLedger {
     let vehicleId: String?
     let sessionDate: String?
     let analyzedAt: Date?
+    // The file's TRUE capture time (EXIF DateTimeOriginal) — the only trusted date
+    // (HARD_RULES §7). nil until ingest() has run for this photo; the info sheet falls
+    // back to PHAsset.creationDate ONLY tagged "(device, unverified)".
+    var takenAt: Date? = nil
     // The cloud BYOK verdict, cached from prod (nil until pulled down). Rendered as the
     // rich "what the agent read" layer over the cheap on-device T0 labels.
     var cloudNarrative: String? = nil
@@ -181,7 +185,7 @@ final class LocalStore {
                 t.add(column: "cloudScene", .text)
                 t.add(column: "cloudConfidence", .double)
                 t.add(column: "cloudBuildPhase", .text)
-                t.add(column: "cloudVehicleId", .text)
+                t.add(column: "cloudVehicleId", .text)   // cached, NOT a binding — never render as "Vehicle" without the confirmed-membership gate (HARD_RULES §10)
                 t.add(column: "cloudAgentModel", .text)
                 t.add(column: "cloudAnalyzedAt", .datetime)
                 t.add(column: "cloudCachedAt", .datetime)   // when WE last pulled it down
@@ -503,7 +507,7 @@ final class LocalStore {
             return try dbQueue.read { db -> ImageLedger? in
                 guard let r = try Row.fetchOne(db, sql: """
                     SELECT a.isVehicle AS v, a.isPersonal AS p, a.appleMLLabelsJSON AS labels,
-                           a.phashHex AS ph, a.analyzedAt AS an,
+                           a.phashHex AS ph, a.analyzedAt AS an, a.takenAt AS tk,
                            a.cloudNarrative AS cn, a.cloudIntent AS ci, a.cloudScene AS cs,
                            a.cloudConfidence AS cc, a.cloudBuildPhase AS cb, a.cloudAgentModel AS cm,
                            a.cloudAnalyzedAt AS ca,
@@ -525,6 +529,7 @@ final class LocalStore {
                     vehicleId: r["vid"],
                     sessionDate: r["day"],
                     analyzedAt: r["an"],
+                    takenAt: r["tk"],
                     cloudNarrative: r["cn"],
                     cloudIntent: r["ci"],
                     cloudScene: r["cs"],
