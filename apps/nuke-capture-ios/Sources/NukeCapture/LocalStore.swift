@@ -263,20 +263,32 @@ final class LocalStore {
     }
 
     /// Which of these already carry a real EXIF `takenAt` — so the ingest pass can
-    /// skip the heavy original-data load on a re-run. Pure local read.
+    /// skip the heavy original-data load on a re-run. Pure local read. Chunked so a
+    /// whole-library batch never blows SQLITE_MAX_VARIABLE_NUMBER.
     func identifiersWithTakenAt(in localIdentifiers: [String]) -> Set<String> {
         guard !localIdentifiers.isEmpty else { return [] }
         var out: Set<String> = []
         do {
             try dbQueue.read { db in
-                let rows = try Row.fetchAll(db, sql: """
-                    SELECT localIdentifier AS lid FROM appearance
-                    WHERE takenAt IS NOT NULL AND localIdentifier IN (\(databaseQuestionMarks(count: localIdentifiers.count)))
-                    """, arguments: StatementArguments(localIdentifiers))
-                for r in rows { let lid: String = r["lid"]; out.insert(lid) }
+                for chunk in localIdentifiers.chunked(900) {
+                    let rows = try Row.fetchAll(db, sql: """
+                        SELECT localIdentifier AS lid FROM appearance
+                        WHERE takenAt IS NOT NULL AND localIdentifier IN (\(databaseQuestionMarks(count: chunk.count)))
+                        """, arguments: StatementArguments(chunk))
+                    for r in rows { let lid: String = r["lid"]; out.insert(lid) }
+                }
             }
         } catch { NSLog("LocalStore.identifiersWithTakenAt failed: %@", String(describing: error)) }
         return out
+    }
+
+    /// How many appearances carry a real EXIF day — the "indexed so far" number for
+    /// the receipt footer (honest progress against the whole library, never a silent
+    /// cap). Pure local read.
+    func datedCount() -> Int {
+        (try? dbQueue.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM appearance WHERE takenAt IS NOT NULL") ?? 0
+        }) ?? 0
     }
 
     // MARK: Cheap on-device organization — the Apple-tag classification verdict
@@ -396,5 +408,14 @@ final class LocalStore {
             NSLog("LocalStore.ledger failed: %@", String(describing: error))
             return nil
         }
+    }
+}
+
+private extension Array {
+    /// Split into sub-arrays of at most `size` — keeps `IN (?,…)` parameter lists
+    /// under SQLite's variable limit when querying a whole-library batch.
+    func chunked(_ size: Int) -> [[Element]] {
+        guard size > 0, count > size else { return [self] }
+        return stride(from: 0, to: count, by: size).map { Array(self[$0 ..< Swift.min($0 + size, count)]) }
     }
 }

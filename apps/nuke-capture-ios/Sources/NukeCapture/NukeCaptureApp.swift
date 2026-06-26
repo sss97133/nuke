@@ -108,6 +108,13 @@ struct NukeCaptureApp: App {
                         Self.scheduleBackgroundBackfill()
                     }
                 }
+                // Populate the local store from the newest photos' true EXIF so the
+                // day receipt renders offline. Quick, on-device, idempotent; the deep
+                // backlog is the BGProcessingTask's job. Fire-and-forget — never blocks UI.
+                Task { await LibraryIngest.shared.runHeadPass() }
+                if !LibraryIngest.shared.backlogComplete {
+                    Self.scheduleBackgroundBackfill()
+                }
             case .background:
                 // Ask iOS to wake us later. The system decides when (earliest
                 // 15 min out; in practice it learns usage patterns).
@@ -218,13 +225,18 @@ struct NukeCaptureApp: App {
             let drained = await SyncEngine.shared.drainUntilEmpty(
                 requireWiFi: Config.backfillRequiresWiFi
             )
+            // Cheap-local-then-network: index a budgeted slice of the WHOLE library
+            // into the local store (true EXIF → LocalStore) so the day receipt grows
+            // offline. Resumable via its own cursor; this is the deep-backlog organ.
+            await LibraryIngest.shared.runBackfillBatch()
             // Then ATTRIBUTE: route the day's freshly-uploaded orphans home
             // on-device (VIN-match + session inheritance). This is the nightly
             // charging-window slot — upload, then send photos to their vehicle.
             await AttributionEngine.shared.run()
-            // Reschedule when work remains — either the queue still has assets,
-            // or the drain bailed early (metered link / paused / cancelled).
-            if SyncEngine.shared.backfillRemaining > 0 || !drained {
+            // Reschedule when work remains — the upload queue still has assets, the
+            // drain bailed early (metered link / paused / cancelled), or the
+            // local-store backlog isn't fully indexed yet.
+            if SyncEngine.shared.backfillRemaining > 0 || !drained || !LibraryIngest.shared.backlogComplete {
                 scheduleBackgroundBackfill()
             }
             task.setTaskCompleted(success: drained)
