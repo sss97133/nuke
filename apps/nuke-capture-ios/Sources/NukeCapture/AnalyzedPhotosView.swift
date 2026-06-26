@@ -68,6 +68,9 @@ struct ImageDeepAnalysis: Decodable {
     let components: [Component]?
     let open_questions: [String]?
     let needs_review: Bool?
+    /// The agent's "is this the subject vehicle?" doubt. The precise attribution flag
+    /// (needs_review is a separate, often-false secondary). nil until the RPC projects it.
+    let needs_clarification: Bool?
 
     struct Component: Decodable, Identifiable {
         let label: String?
@@ -454,7 +457,7 @@ private struct EvidenceRail: View {
                 // The agent's OWN doubt, surfaced honestly as the headline (the reason
                 // already prints below in the reasoning/open-questions). Color = data:
                 // the flag is a real signal, not decoration. Hidden once corrected.
-                if deep?.needs_review == true, movedTo == nil {
+                if (deep?.needs_review == true || deep?.needs_clarification == true), movedTo == nil {
                     Label("Nuke flagged this — is it the right vehicle?", systemImage: "flag.fill")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.orange.opacity(0.95))
