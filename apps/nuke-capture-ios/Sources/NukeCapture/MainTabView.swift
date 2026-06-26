@@ -56,10 +56,14 @@ struct MainTabView: View {
                 .tag(Tab.profile)
                 .tabItem { Label("Profile", systemImage: "person") }
 
+            // ENGINE (was "Today") — the engine room: the live worklight (the agent
+            // reading your photos) + the workbench (operator tools). Renamed because a
+            // "Today" that reads 0 most days was the old cloud-relay paradigm leaking
+            // through; in the local-first model this is honestly the engine, not a feed.
             if session.isSignedIn && photoGrant {
                 TodayView()
                     .tag(Tab.today)
-                    .tabItem { Label("Today", systemImage: "clock") }
+                    .tabItem { Label("Engine", systemImage: "gauge.medium") }
             }
         }
         .onAppear { tab = landingTab() }
