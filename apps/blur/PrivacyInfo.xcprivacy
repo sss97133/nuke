@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  PrivacyInfo.xcprivacy — Apple privacy manifest for Blur (v0, free/local tier).
+
+  The honest story is the marketing story: Blur v0 collects NOTHING. All photo
+  access and organization happen on-device; nothing is transmitted off the
+  phone, so there are no collected data types to declare and no tracking.
+
+  This must match the App Privacy questionnaire in App Store Connect — which
+  for v0 should be answered "Data Not Collected".
+
+  When the paid "automatic image handling" upgrade lands (accounts + a
+  dedicated backend), this manifest gains Email + User ID (App Functionality,
+  not tracking) and the questionnaire is updated in lockstep. Not before.
+
+  Required-reason API: UserDefaults (CA92.1 — the app reads/writes only its own
+  defaults: scan watermark, gallery membership cache, UI preferences).
+-->
+<plist version="1.0">
+<dict>
+    <key>NSPrivacyTracking</key>
+    <false/>
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
