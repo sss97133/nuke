@@ -1,0 +1,94 @@
+# project.yml — XcodeGen spec for Blur (iOS).
+#
+# Blur is a Nuke product: a private, on-device photo organizer. v0 (the FREE
+# tier) is PURE LOCAL — no account, no network, no upload. Photos and the
+# organization layer never leave the phone. The paid "automatic image
+# handling" upgrade (StoreKit + a dedicated backend) is a later phase and is
+# deliberately NOT wired here, to keep the first App Review surface tiny.
+#
+# The .xcodeproj is GENERATED, never committed:
+#
+#   brew install xcodegen
+#   cd <repo>/ (or apps/blur while staged in the nuke monorepo)
+#   ./generate.sh            # stamps a fresh monotonic build number
+#   open Blur.xcodeproj
+#
+# Then in Xcode: select the Blur target → Signing & Capabilities → set Team
+# (DEVELOPMENT_TEAM intentionally NOT pinned so the spec works for any team;
+# "Automatically manage signing" handles the rest).
+#
+# Spec reference: https://github.com/yonaskolb/XcodeGen/blob/master/Docs/ProjectSpec.md
+
+name: Blur
+
+options:
+  bundleIdPrefix: ag.nuke
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+# v0 has NO Swift package dependencies — it is pure Apple frameworks
+# (SwiftUI, Photos, Vision, BackgroundTasks). The Supabase SDK + StoreKit
+# enter with the paid upgrade phase, not before.
+
+targets:
+  Blur:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Sources
+      # Privacy manifest must land in the app bundle root as a resource —
+      # App Store Connect scans for it at upload time.
+      - path: PrivacyInfo.xcprivacy
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ag.nuke.blur
+        PRODUCT_NAME: Blur
+        MARKETING_VERSION: "1.0.0"
+        # CFBundleVersion is stamped by generate.sh (seconds since 2024-01-01),
+        # so it is always monotonic — never hand-bump it. App Store Connect
+        # rejects any upload whose build number is not strictly higher than the
+        # last accepted one for the same MARKETING_VERSION. See generate.sh.
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"          # iPhone only — keep review surface small
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+    info:
+      path: Generated/Info.plist
+      properties:
+        CFBundleDisplayName: Blur
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}                    # empty dict = system launch screen
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        # ── Photo library (read) — the ONLY sensitive permission v0 asks for. ──
+        # This exact string also goes in the App Privacy questionnaire answers.
+        # Honest and on-brand: organization happens on-device, nothing uploads.
+        NSPhotoLibraryUsageDescription: >-
+          Blur reads your photo library on this device to organize it into
+          galleries you can find and show fast. Your photos never leave your
+          phone.
+        # ── Background Modes (BGTaskScheduler) — light, optional passive rescan. ──
+        # The "capability" in Xcode's UI is just these plist keys; no
+        # entitlement file is required for fetch/processing.
+        UIBackgroundModes:
+          - fetch
+          - processing
+        BGTaskSchedulerPermittedIdentifiers:
+          - ag.nuke.blur.refresh
+        # v0 makes NO network calls at all → trivially export-compliance exempt.
+        ITSAppUsesNonExemptEncryption: false
+
+schemes:
+  Blur:
+    build:
+      targets:
+        Blur: all
+    run:
+      config: Debug
+    archive:
+      config: Release
