@@ -117,6 +117,30 @@ zone and (until today) two live defects violated it.** Evidence (full numbers in
 | PR debt | #278 stale-conflicting; #286-289 deployed-but-unmerged records; #293 mergeable + needed | Reconcile; repo must match prod (production-engineering law 1) |
 | Legacy jsonb sediment | ~100 one-off keys on <500 images each | The crystallization organ: periodic key census → promote or retire |
 
+## IV-b. The Blur lesson — identity is sealed at the source (Skylar, 2026-07-02)
+
+"It's corrupt cuz we didn't figure out what we solved with BLUR." The capture-relay
+corruption class (scrambled filename↔content, misdated taken_at, partial relays — June
+13/18/19, recovered by hand) was structural, not accidental: the relay shipped bytes with
+only CIRCUMSTANTIAL identity (filename, upload timestamp), so a scramble in transit was
+undetectable — the cloud had no independent identity to verify against. Blur is immune by
+construction: the ledger lives with the photos, EXIF is read from the file at the source,
+Vision facts are computed on-device against content, identity (dHash) derives from pixels.
+
+**The sealed-capture rule (intake law from here):** no byte enters `vehicle_images` without
+a content identity computed AT THE SOURCE and VERIFIED at the door.
+1. Every uploader computes content hashes BEFORE upload (device: sha256 + dHash of source
+   bytes; Mac daemon: file_hash + phash from the file) and sends them WITH the payload.
+2. The receiving path recomputes the byte hash on the stored object and QUARANTINES on
+   mismatch — the scramble is caught at the door, not two weeks later in a day sheet.
+3. All intake converges on `ingest_image_identity_first` (the chokepoint exists; the
+   callers — photo-sync-daemon, the iOS relay — must migrate to it).
+4. The local ledger (LocalStore / Blur's engine) is the recovery source by construction —
+   the June recoveries are the proof.
+Gate for the universal content join (Seam 2): dHash parity between the Swift implementation
+(PerceptualHash.swift, 9×8 → 64-bit → 16 hex) and a cloud-side implementation, byte-verified
+on known pairs before any cross-world matching is trusted.
+
 ## V. Standing orders (how the lead operates from here)
 
 1. **Every new writer ships with full DNA or doesn't ship.** The organs exist
