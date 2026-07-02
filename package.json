@@ -46,6 +46,7 @@
     "backfill:ownership-classification:dry-run": "dotenvx run -- node scripts/backfill-ownership-classification.mjs --dry-run",
     "ops:signals": "dotenvx run -- node scripts/backfill-analysis-signals.mjs",
     "ops:signals:dry-run": "dotenvx run -- node scripts/backfill-analysis-signals.mjs --dry-run",
+    "ops:orphan-proposals": "dotenvx run -- node scripts/orphan-attribution-proposals.mjs",
     "backfill:condition": "dotenvx run -- node scripts/backfill-condition-observations.mjs",
     "numbers:ingest": "dotenvx run -- scripts/.venv-numbers/bin/python scripts/numbers-files-ingest.py",
     "numbers:ingest:dry-run": "dotenvx run -- scripts/.venv-numbers/bin/python scripts/numbers-files-ingest.py --dry-run",
