@@ -246,7 +246,8 @@
     "capture:analyze-ingest": "dotenvx run -- node scripts/daily-receipt/analyze-capture-photos.mjs ingest",
     "day:build": "dotenvx run -- node scripts/daily-receipt/build-day.mjs",
     "day:synthesize": "dotenvx run -- node scripts/daily-receipt/synthesize-day.mjs",
-    "day:classify": "dotenvx run -- node scripts/daily-receipt/classify-unfiled-day.mjs"
+    "day:classify": "dotenvx run -- node scripts/daily-receipt/classify-unfiled-day.mjs",
+    "ops:schema-census": "dotenvx run -- node scripts/schema-pressure-census.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.62",

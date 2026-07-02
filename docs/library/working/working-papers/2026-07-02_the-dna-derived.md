@@ -60,8 +60,19 @@ Six threads, stable across 16 months:
    `get_image_component_targets` (migration 20260702061000).
 
 **The context loop (the crux he named):** observe → land testimony with DNA → patterns stack →
-schema crystallizes from patterns → deeper observation becomes possible. The DB "is set to
-grow organically" exactly when data pressure creates schema, not when architects mint tables.
+schema crystallizes from patterns → deeper observation becomes possible.
+
+**CORRECTED by Skylar 2026-07-02 (delta on this paper's first draft):** "natural growth of a
+db is a misnomer… for me it means the schema expands WITHOUT HUMAN INTERACTION — the agent
+knows how and where to expand the structural side, the schema. We can't stop til it's
+self-sufficient." So the loop's test is not "does data pressure eventually produce schema"
+(a human can be the mechanism) but **autonomous crystallization**: an organ that (1) measures
+data pressure (jsonb key census, fill rates, type stability, write recency), (2) decides
+where structure should grow (promote / namespace / retire), (3) executes the additive
+expansion itself with the same source-DNA discipline as any other write (the migration cites
+the census evidence that justified it), and (4) re-measures. The June JSONB→reserved-columns
+promotion (PR #308-311) proved the mechanics but was human-triggered. Self-sufficiency is
+the halt condition.
 
 ## II. The loop, measured (does the DB actually grow organically?)
 
