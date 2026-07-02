@@ -115,6 +115,77 @@ const args = process.argv.slice(2);
 const mode = args[0];
 const arg = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : d; };
 
+// ─── EXTRACTION LEDGER — saturation-driven passes. A pass pays only for the DELTA.
+// An image is SATURATED when the agent has extracted everything gettable at the CURRENT schema
+// version; a saturated image is SKIPPED (zero tokens). "Capped" facts (illegible / occluded /
+// bad angle) count as best-effort-reached — they do NOT keep an image open, so we never re-burn
+// tokens re-failing the unreadable. Schema growth (append a new version below with new fact-keys)
+// re-opens ONLY images stamped at an older version, for just the delta → cost is a convergent series.
+const SCHEMA_VERSIONS = [
+  { version: 'byok_v3_camera_pose_2026-05-23',
+    facts: ['scene_type', 'build_phase_guess', 'camera_pose', 'components_seen', 'text_regions',
+            'damage_localized', 'state_observations', 'workshop_signals', 'presence', 'intent',
+            'narrative_one_line'] },
+  // To evolve: append { version, facts:[...new keys...] }. Only images stamped at an older
+  // version re-open, and only for the new keys.
+];
+const CURRENT_SCHEMA_VERSION = SCHEMA_VERSIONS[SCHEMA_VERSIONS.length - 1].version;
+
+// Open-questions split two ways: RESOLVABLE-LATER (an adjacent frame / a receipt / more context
+// will close them → keep the image open) vs CAPPED (nothing in THIS pixel will ever close them →
+// best-effort reached, never retry).
+const CAPPED_QUESTION_RE = /illegible|can'?t read|cannot read|too (blurry|dark|small|far)|occlud|out of frame|cut off|bad angle|resolution|glare|obscur|not visible|cannot make out|blurry|motion blur/i;
+function classifyOpenQuestions(qs) {
+  const open = [], capped = [];
+  for (const q of (Array.isArray(qs) ? qs : [])) {
+    (CAPPED_QUESTION_RE.test(String(q)) ? capped : open).push(q);
+  }
+  return { open, capped };
+}
+
+// A fingerprint of the material facts in a verdict — used to detect a DRY pass (a re-analysis
+// that produced nothing new). Scene/phase + the counts of the accumulating arrays + the open-set.
+function factFingerprint(d) {
+  if (!d) return '';
+  const n = (x) => (Array.isArray(x) ? x.length : 0);
+  const oq = Array.isArray(d.open_questions) ? d.open_questions.slice().sort().join('|') : '';
+  return [d.scene_type, d.build_phase_guess, n(d.components_seen), n(d.text_regions), n(d.damage_localized), oq].join('~');
+}
+const DRY_PASS_LIMIT = 2; // after this many fruitless re-runs, saturate even a nominally-open frame
+
+// The saturation marker stored inside the verdict. saturated=true ⇒ zero-cost to look at again.
+// The agent's OWN declaration is the per-fact truth (absence of text is a valid answer, not a gap).
+// `prior` is the previously-stored byok_deep_analysis (for the dry-pass counter); null on first pass.
+function computeSaturation(v, prior, nowIso) {
+  const { open, capped } = classifyOpenQuestions(v?.open_questions);
+  const stillOpen = v?.context_complete === false || v?.needs_clarification === true || open.length > 0;
+  const priorSat = (prior && prior.saturation) || {};
+  const passes = (priorSat.passes || 0) + 1;
+  // Dry pass = re-analysis that yielded materially the SAME facts. If the resolving context hasn't
+  // arrived, re-running gains nothing — count it dry and, at DRY_PASS_LIMIT, saturate anyway. Further
+  // gain then requires an EVENT (new receipt / adjacent frame) to explicitly re-open, not a blind re-run.
+  // This is what makes the OPEN bucket converge — the "gradual passes reduce token" guarantee.
+  let dry = priorSat.dry_passes || 0;
+  if (prior && stillOpen) dry = (factFingerprint(v) === factFingerprint(prior)) ? dry + 1 : 0;
+  const saturated = !stillOpen || dry >= DRY_PASS_LIMIT;
+  return {
+    version: CURRENT_SCHEMA_VERSION,
+    saturated,
+    open_facts: saturated ? [] : open,   // resolvable-later — re-pass when more context exists
+    capped,                              // best-effort reached — never re-queue for these
+    passes,
+    dry_passes: dry,
+    resolved_at: saturated ? (nowIso || null) : null,
+  };
+}
+
+// Is a row's verdict saturated at the CURRENT schema version? Used by the worklist to SKIP it.
+function isSaturatedRow(r) {
+  const d = (r?.ai_scan_metadata || {}).byok_deep_analysis;
+  const s = d && d.saturation;
+  return !!(s && s.saturated === true && s.version === CURRENT_SCHEMA_VERSION);
+}
+
 async function prepare() {
   const VEHICLE_ID = arg('--vehicle-id');
   const LIMIT = parseInt(arg('--limit', '20'));
@@ -130,9 +201,13 @@ async function prepare() {
   for (let offset = 0; ; offset += PAGE) {
     const { data, error } = await sb
       .from('vehicle_images')
-      .select('id, image_url, file_name, taken_at, created_at, source, ai_scan_metadata, latitude, longitude, location_name, exif_data, stale')
+      .select('id, user_id, image_url, file_name, taken_at, created_at, source, ai_scan_metadata, apple_ml_labels, latitude, longitude, location_name, exif_data, stale')
       .eq('vehicle_id', VEHICLE_ID)
-      .eq('vision_gate_status', 'approved')
+      // Match the GALLERY whitelist (null OR approved), not just approved. The vision gate
+      // stalled and left ~12k frames at null/pending — null-gate frames are SHOWN in the
+      // gallery but were never analyzed (browse → image with no data). Analyze what the
+      // gallery displays. Explicit rejects (rejected_personal/misattributed) stay excluded.
+      .or('vision_gate_status.is.null,vision_gate_status.eq.approved')
       .order('created_at', { ascending: true })
       .range(offset, offset + PAGE - 1);
     if (error) {
@@ -150,14 +225,16 @@ async function prepare() {
   const hash8 = (s) => parseInt(createHash('md5').update(s).digest('hex').slice(0, 8), 16);
   const dayOf = (r) => (r.taken_at || r.created_at || '').slice(0, 10) || 'unknown';
 
-  // Two queues per the accumulation model:
+  // Two queues, saturation-driven (the extraction ledger):
   //   default  → frames with NO verdict yet (first pass).
-  //   --rehash → frames that HAVE a verdict but were marked stale=true because their
-  //              first claim was incomplete; re-analyze them now that more context exists
-  //              (the new verdict supersedes the old — see ingest).
+  //   --rehash → frames that HAVE a verdict but are NOT saturated at the CURRENT schema version.
+  //              That means resolvable-open facts (more context now exists) OR an older schema
+  //              version (a new fact-key was added → extract just the delta). A SATURATED verdict
+  //              — including one whose only gaps are CAPPED (illegible/occluded) — is skipped and
+  //              costs zero. This kills the old bug where any open question re-failed forever.
   const REHASH = args.includes('--rehash');
   const pendingAll = REHASH
-    ? all.filter((r) => ((r.ai_scan_metadata || {}).byok_deep_analysis) && r.stale === true)
+    ? all.filter((r) => ((r.ai_scan_metadata || {}).byok_deep_analysis) && !isSaturatedRow(r))
     : all.filter((r) => !((r.ai_scan_metadata || {}).byok_deep_analysis));
 
   let pending;
@@ -195,15 +272,30 @@ async function prepare() {
   mkdirSync(dirname(WORKLIST), { recursive: true });
   // EXIF is invisible in the (Supabase-stripped) pixels the agent reads — extract it
   // from the row and hand it over: true capture time, GPS, resolved location, camera.
+  //
+  // CRITICAL: the authoritative capture date is the `taken_at` COLUMN (the iOS capture
+  // relay writes asset.creationDate there; see apps/nuke-capture-ios SupabaseService.swift),
+  // NOT exif_data. The relay's exif_data carries no date field and stores the camera as
+  // flat `camera_make`/`camera_model` keys — so the previous code, which read shot_at
+  // from exif_data date fields and the camera from a nested `e.camera.make` object,
+  // returned shot_at=null + camera=null for the ENTIRE iOS-synced library. With no
+  // temporal anchor the detective inferred a date from image content (a 2017 build photo
+  // could land on a 2026 frame). taken_at is primary; exif_data is fallback for
+  // exiftool-backfilled storage images only.
   const exifOf = (r) => {
     const e = r.exif_data || {};
-    const cam = e.camera && typeof e.camera === 'object' ? `${e.camera.make || ''} ${e.camera.model || ''}`.trim()
-      : (typeof e.camera === 'string' ? e.camera : null);
-    const shotAt = e.dateTaken || e.dateTime || e.DateTimeOriginal || e.technical?.dateTaken || null;
+    const shotAt = r.taken_at
+      || e.dateTaken || e.dateTime || e.DateTimeOriginal || e.technical?.dateTaken || e.CreateDate || null;
+    const camMake = e.camera_make || e.Make || (e.camera && typeof e.camera === 'object' ? e.camera.make : null) || null;
+    const camModel = e.camera_model || e.Model || (e.camera && typeof e.camera === 'object' ? e.camera.model : null) || null;
+    const cam = [camMake, camModel].filter(Boolean).join(' ').trim()
+      || (typeof e.camera === 'string' ? e.camera : null) || null;
     const lat = r.latitude ?? e.gps?.latitude ?? e.location?.latitude ?? null;
     const lon = r.longitude ?? e.gps?.longitude ?? e.location?.longitude ?? null;
     return {
-      shot_at: shotAt, camera: cam || null,
+      shot_at: shotAt,
+      shot_at_source: r.taken_at ? 'taken_at' : (shotAt ? 'exif_data' : null),
+      camera: cam,
       gps: (lat != null && lon != null) ? { lat: Number(lat), lon: Number(lon) } : null,
       location_name: r.location_name || null,
       exif_present: !!(cam || shotAt || (lat != null)),
@@ -228,9 +320,29 @@ async function prepare() {
       source: r.source,
       day: dayOf(r),
       exif: exifOf(r),
+      // T0 prior: the FREE on-device Apple Vision tags already computed at capture. Noisy hints
+      // (a truck can read as "airplane"), NEVER truth — the detective uses them to orient/confirm
+      // or override. This is the cheap foundation layer feeding the expensive pass.
+      apple_hints: Array.isArray(r.apple_ml_labels) ? r.apple_ml_labels.slice(0, 12) : [],
     }),
   );
   writeFileSync(WORKLIST, lines.join('\n') + '\n');
+  // Live feed: these frames are now in flight — emit an 'analyzing' stage per frame so
+  // the pipeline visualizer (analysis_events → get_pipeline_events) shows the journey as
+  // it happens, not after. Guarded: telemetry must never block the drain.
+  try {
+    const analyzingEvents = pending.map((r) => ({
+      user_id: r.user_id ?? null,
+      vehicle_id: VEHICLE_ID,
+      image_id: r.id,
+      stage: 'analyzing',
+      detail: { day: dayOf(r), source: r.source ?? null },
+    }));
+    if (analyzingEvents.length) {
+      const { error: aerr } = await sb.from('analysis_events').insert(analyzingEvents);
+      if (aerr) console.error(`  (non-fatal) analysis_events analyzing insert: ${aerr.message}`);
+    }
+  } catch (e) { console.error(`  (non-fatal) analyzing emit: ${e.message}`); }
   if (chosenDay) {
     writeFileSync(`${WORKLIST}.date`, chosenDay + '\n');
     const remaining = (pendingAll.filter((r) => dayOf(r) === chosenDay).length) - pending.length;
@@ -262,6 +374,7 @@ async function ingest() {
   const lines = readFileSync(SINK, 'utf-8').split('\n').filter(Boolean);
   let wrote = 0, failed = 0;
   const now = new Date().toISOString();
+  const landedEvents = []; // live pipeline feed (analysis_events) — collected, inserted once, guarded
 
   for (const line of lines) {
     let v;
@@ -279,10 +392,11 @@ async function ingest() {
     // Merge new analysis into existing ai_scan_metadata.byok_deep_analysis
     const { data: imgRow } = await sb
       .from('vehicle_images')
-      .select('ai_scan_metadata')
+      .select('ai_scan_metadata, user_id')
       .eq('id', v.image_id)
       .maybeSingle();
     const existingMeta = (imgRow?.ai_scan_metadata) || {};
+    const sat = computeSaturation(v, existingMeta.byok_deep_analysis || null, now);
     const updatedMeta = {
       ...existingMeta,
       byok_deep_analysis: {
@@ -305,7 +419,8 @@ async function ingest() {
         open_questions: v.open_questions ?? [],
         agent_notes: v.agent_notes ?? null,
         analyzed_at: now,
-        prompt_version: 'byok_v3_camera_pose_2026-05-23',
+        prompt_version: CURRENT_SCHEMA_VERSION,
+        saturation: sat,
         // Source DNA stamped by the harness (byok-image-batch.sh sanitize stage).
         // A bare verdict without who/how/cost is a schema failure.
         agent_model: v.provenance?.agent_model ?? null,
@@ -318,18 +433,13 @@ async function ingest() {
       },
     };
 
-    // Accumulation model: a frame whose claim is incomplete is NOT done — it goes
-    // stale=true and re-enters the queue (prepare --rehash) to be re-analyzed once
-    // more context exists. Completeness is declared by the agent or inferred from
-    // low confidence / open questions.
-    const incomplete = v.context_complete === false
-      || v.needs_review === true || v.needs_clarification === true
-      || (typeof v.confidence === 'number' && v.confidence < 0.55)
-      || (Array.isArray(v.open_questions) && v.open_questions.length > 0);
-
+    // Saturation model (replaces the crude "any open question ⇒ stale" that re-failed the
+    // unreadable on every rehash): re-queue ONLY when there are RESOLVABLE-LATER open facts.
+    // A verdict whose only gaps are CAPPED (illegible/occluded) is saturated → stale=false →
+    // never re-queued. Schema growth re-opens it via the version check in prepare, not via stale.
     const { error: upErr } = await sb
       .from('vehicle_images')
-      .update({ ai_scan_metadata: updatedMeta, stale: incomplete, last_rerun_at: now, vision_model_version: v.provenance?.agent_model ?? 'byok_v3_opus48' })
+      .update({ ai_scan_metadata: updatedMeta, stale: !sat.saturated, last_rerun_at: now, vision_model_version: v.provenance?.agent_model ?? 'byok_v3_opus48' })
       .eq('id', v.image_id);
     if (upErr) {
       console.error(`  fail update image ${v.image_id}: ${upErr.message}`);
@@ -430,48 +540,30 @@ async function ingest() {
       }
     }
 
-    // ─── ARM 2b: the search/convergence ENGINE row (image_observations) — Tier 2.
-    // W2 fix: until now the deep writer wrote ai_scan_metadata + a vehicle_observation but
-    // NOT this row, so visual search was dark (placed_t2 ~5%). Mirror the cascade's ARM2b
-    // (process-photo-cascade.mjs) so every deep verdict also lands in the engine. The deep
-    // writer OWNS image_observations (observed_by='caller-byok'); ingest_image_observation
-    // is idempotent (dedups by image_id+observed_by+agent_version), so this is re-run safe.
-    try {
-      const so = v.state_observations || {};
-      const cp = v.camera_pose || {};
-      const role = v.scene_type === 'data_plate' ? 'vin'
-                 : (v.intent === 'parts_sourcing' || v.scene_type === 'product_screenshot') ? 'part'
-                 : 'subject';
-      const comps = Array.isArray(v.components_seen) ? v.components_seen : [];
-      const primary = comps.filter((c) => Array.isArray(c?.bbox))
-        .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))[0];
-      const vsig = {
-        ...(so.paint_state ? { paint_state: so.paint_state } : {}),
-        ...(so.rust_severity ? { rust: so.rust_severity } : {}),
-        ...(v.build_phase_guess ? { build_phase: v.build_phase_guess } : {}),
-        ...(typeof cp.azimuth_deg === 'number' ? { camera_azimuth_deg: cp.azimuth_deg } : {}),
-        scene_type: v.scene_type ?? 'unknown',
-      };
-      const { error: ioErr } = await sb.rpc('ingest_image_observation', {
-        p_image_id: v.image_id, p_vehicle_id: v.vehicle_id, p_role: role,
-        p_confidence: v.confidence ?? 0.7,
-        p_observed_by: 'caller-byok', p_agent_version: v.provenance?.agent_model ?? 'byok_v3_opus48',
-        p_confidence_basis: { source: 'deep_byok', scene_type: v.scene_type ?? null, intent: v.intent ?? null, narrative: v.narrative_one_line ?? null },
-        p_layer_version: { writer: 'deep-image-analysis-byok', prompt_version: 'byok_v3_camera_pose_2026-05-23' },
-      });
-      if (ioErr) console.error(`  image_observations rpc failed for ${String(v.image_id).slice(0,8)}: ${ioErr.message}`);
-      else if (primary?.bbox || Object.keys(vsig).length) {
-        await sb.from('image_observations')
-          .update({ ...(primary?.bbox ? { bbox: primary.bbox } : {}), visual_signature: vsig })
-          .eq('image_id', v.image_id).eq('observed_by', 'caller-byok').eq('is_active', true);
-      }
-    } catch (e) {
-      console.error(`  image_observations write threw for ${String(v.image_id).slice(0,8)}: ${e.message}`);
-    }
-
     wrote++;
+    // Live feed: this frame's verdict just landed — the "money hitting the account"
+    // moment. Record it for the pipeline visualizer (analysis_events).
+    landedEvents.push({
+      user_id: imgRow?.user_id ?? null,
+      vehicle_id: v.vehicle_id,
+      image_id: v.image_id,
+      stage: 'verdict_landed',
+      detail: {
+        scene_type: v.scene_type ?? null,
+        build_phase: v.build_phase_guess ?? null,
+        narrative: v.narrative_one_line ?? null,
+        component_count: Array.isArray(v.components_seen) ? v.components_seen.length : 0,
+        ocr_count: Array.isArray(v.text_regions) ? v.text_regions.length : 0,
+        confidence: v.confidence ?? null,
+      },
+    });
   }
 
+  // One guarded batch insert of the landed events — telemetry, never fatal to ingest.
+  if (landedEvents.length) {
+    const { error: evErr } = await sb.from('analysis_events').insert(landedEvents);
+    if (evErr) console.error(`  (non-fatal) analysis_events insert: ${evErr.message}`);
+  }
   console.log(`ingest: wrote ${wrote}, failed ${failed} from ${SINK}`);
 }
 
@@ -563,6 +655,64 @@ async function buildContext() {
     }
   } catch { /* optional */ }
 
+  // ROSTER — the vehicle's KNOWN PARTS from receipts (the CLAIM side). The detective
+  // confirms components against THIS list instead of authoring them open-ended, and
+  // resolves part_number_guess to a real receipt PN when a component matches. This is
+  // the reciprocal-confirmation seam: receipt = claim, image = confirmation. Honesty
+  // guard is in the prompt block below — never force a match, an as-found/old part is
+  // NOT the new rostered part.
+  let roster = [];
+  try {
+    const { data } = await sb.from('receipt_items')
+      .select('description, part_number, category, receipts!inner(vehicle_id)')
+      .eq('receipts.vehicle_id', VEHICLE_ID)
+      .not('part_number', 'is', null)
+      .limit(400);
+    if (data && data.length) {
+      const seen = new Set();
+      for (const r of data) {
+        const pn = (r.part_number || '').trim();
+        if (!pn || pn.toLowerCase() === 'null' || seen.has(pn)) continue;
+        seen.add(pn);
+        roster.push({ cat: r.category || 'other', desc: (r.description || '').trim(), pn });
+      }
+      roster.sort((a, b) => a.cat.localeCompare(b.cat) || a.desc.localeCompare(b.desc));
+    }
+  } catch { /* optional — a vehicle with no receipts just gets no roster */ }
+
+  // USER GARAGE — the owner's OWNED builds, via get_user_garage (ownership relations), NOT image
+  // authorship. The user photographs the whole shop (Viva lot, shows), so keying off vehicle_images.
+  // user_id pulls 100+ non-owned cars and would POISON attribution. Ownership is the right roster.
+  // A capture/library frame may show any owned build, a bench part, or an off-subject/shop car;
+  // injecting the owned garage cures the "this is NOT the subject Mustang" negation failure — the
+  // detective ATTRIBUTES the frame to the right build, or flags it off-roster.
+  let garage = [];
+  try {
+    const { data: owner } = await sb.from('vehicle_images')
+      .select('user_id').eq('vehicle_id', VEHICLE_ID).not('user_id', 'is', null).limit(1).maybeSingle();
+    if (owner?.user_id) {
+      const { data: g } = await sb.rpc('get_user_garage', { p_user_id: owner.user_id });
+      if (g?.length) {
+        const ids = g.map((r) => r.vehicle_id).filter(Boolean);
+        const colorById = new Map();
+        if (ids.length) {
+          const { data: cols } = await sb.from('vehicles').select('id, color').in('id', ids);
+          for (const c of (cols || [])) colorById.set(c.id, c.color || null);
+        }
+        const seen = new Map();
+        for (const r of g) {
+          if (!r.vehicle_id || seen.has(r.vehicle_id)) continue;
+          seen.set(r.vehicle_id, {
+            label: `${r.year || ''} ${r.make || ''} ${r.model || ''}${r.trim_name ? ' ' + r.trim_name : ''}`.replace(/\s+/g, ' ').trim(),
+            color: colorById.get(r.vehicle_id) || null,
+            rel: r.relationship || 'owner',
+            subject: r.vehicle_id === VEHICLE_ID });
+        }
+        garage = [...seen.values()].sort((a, b) => (b.subject ? 1 : 0) - (a.subject ? 1 : 0));
+      }
+    }
+  } catch { /* optional */ }
+
   const lines = [];
   lines.push(`# VEHICLE CONTEXT — know this before you analyze`);
   if (dossier?.vehicle) {
@@ -590,6 +740,21 @@ async function buildContext() {
     lines.push(`Each frame below carries its GPS — resolve it against this legend. A frame shot away from the main shop is off_property work (and tells you WHO/WHERE: e.g. upholstery shop, a vendor, the owner's dad's lot).`);
   }
   if (lifecycle) lines.push(`\n**Already deep-analyzed (day:phases):** ${lifecycle}`);
+  if (roster.length) {
+    lines.push(`\n**KNOWN PARTS ON THIS BUILD — ${roster.length} parts bought for it (from receipts, the CLAIM side).**`);
+    lines.push(`This is the roster to CONFIRM against. When a component in the frame matches one of these, set that component's \`part_number_guess\` to the exact PN listed here, and note the confirmation in \`agent_notes\`. Two hard rules: (1) NEVER invent a part number that isn't on this list — a component with no roster match keeps \`part_number_guess: null\`. (2) NEVER force a match — an as-found, rusty, or old part is NOT the new rostered part; lifecycle matters. A rostered part not yet installed in this frame is a future install, not a confirmation. Honest non-confirmation is correct; a false PN is a failure.`);
+    let curCat = '';
+    for (const r of roster) {
+      if (r.cat !== curCat) { curCat = r.cat; lines.push(`  · _${curCat}_`); }
+      lines.push(`    - ${r.desc} — \`${r.pn}\``);
+    }
+  }
+  if (garage.length > 1) {
+    lines.push(`\n**THE OWNER'S GARAGE — ${garage.length} vehicles. A frame from this owner's library may show ANY of these, a bench part, or an off-subject car (a friend's, a car at a show) — do NOT assume it is the subject vehicle. ATTRIBUTE the frame to the right vehicle by visual evidence (body style, color, badges, interior, engine family) cross-checked with GPS + the EXIF capture date. Naming WHICH garage vehicle a frame belongs to is the high-value output; negating against the subject ("this is not the Mustang") is a wasted verdict. If a frame is a bench part or off-subject, say so plainly. When unsure between two of the owner's vehicles, name both as candidates with your reasoning — never force one.**`);
+    for (const v of garage) {
+      lines.push(`    - ${v.label}${v.color ? ` · ${v.color}` : ''} · ${v.rel}${v.subject ? '  ◀── the subject vehicle this drain is keyed to' : ''}`);
+    }
+  }
   lines.push(`\nUse this to ground every verdict: recognize THIS build's known parts (e.g. the engine swap, axle, brakes), place the day in the arc (early teardown vs late assembly), track components across days (a part rusty earlier may be the one being installed here), and use each frame's GPS/timestamp/camera as hard evidence of where, when, and on what device it was shot.`);
 
   mkdirSync(dirname(OUT), { recursive: true });
@@ -597,13 +762,139 @@ async function buildContext() {
   console.log(`context: wrote briefing → ${OUT} (dossier=${dossier ? 'yes' : 'THIN'}, timeline=${dossier?.timeline?.length || 0} days)`);
 }
 
+// queue — print this user's vehicle_ids that have approved frames, most-first.
+// Used by byok-image-drain.sh to self-drive the steady launchd cron across ALL
+// vehicles instead of one hardcoded car. Cheap (scoped to approved frames);
+// prepare skips already-analyzed frames, so a fully-drained vehicle returns
+// instantly and the drain's cursor advances past it.
+async function queue() {
+  const VEHICLE_USER = arg('--user-id');
+  if (!VEHICLE_USER) { console.error('queue: --user-id required'); process.exit(1); }
+  const approved = new Map();   // vehicle_id -> approved frame count
+  const analyzed = new Map();   // vehicle_id -> frames already carrying a byok verdict
+  const PAGE = 1000;
+  // Pass 1: all eligible frames per vehicle (gallery whitelist: null OR approved — see
+  // prepare()). Pass 2: the subset already analyzed.
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await sb
+      .from('vehicle_images')
+      .select('vehicle_id')
+      .eq('user_id', VEHICLE_USER)
+      .or('vision_gate_status.is.null,vision_gate_status.eq.approved')
+      .not('vehicle_id', 'is', null)
+      .order('vehicle_id', { ascending: true })
+      .range(offset, offset + PAGE - 1);
+    if (error) { console.error(`queue: ${error.message}`); process.exit(1); }
+    if (!data || data.length === 0) break;
+    for (const r of data) approved.set(r.vehicle_id, (approved.get(r.vehicle_id) || 0) + 1);
+    if (data.length < PAGE) break;
+  }
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await sb
+      .from('vehicle_images')
+      .select('vehicle_id')
+      .eq('user_id', VEHICLE_USER)
+      .or('vision_gate_status.is.null,vision_gate_status.eq.approved')
+      .not('vehicle_id', 'is', null)
+      .not('ai_scan_metadata->byok_deep_analysis', 'is', null)
+      .order('vehicle_id', { ascending: true })
+      .range(offset, offset + PAGE - 1);
+    // Non-fatal: if this filter is rejected, fall back to pending-desc ordering rather
+    // than killing the drain (an empty `analyzed` map just means everyone reads as 0).
+    if (error) { console.error(`queue: analyzed-count pass skipped (${error.message})`); break; }
+    if (!data || data.length === 0) break;
+    for (const r of data) analyzed.set(r.vehicle_id, (analyzed.get(r.vehicle_id) || 0) + 1);
+    if (data.length < PAGE) break;
+  }
+  // Coverage-first: vehicles with the FEWEST analyzed frames lead, so zero-coverage cars
+  // (empty when browsed) get a verdict before fully-drained ones. Tiebreak by pending desc
+  // (more undone work first), then by id for stability. Combined with the drain's round-robin
+  // loop, every vehicle gets a batch fast instead of one big car hogging the run.
+  const order = [...approved.keys()].sort((a, b) => {
+    const da = analyzed.get(a) || 0, db = analyzed.get(b) || 0;
+    if (da !== db) return da - db;                       // least-analyzed first
+    const pa = (approved.get(a) || 0) - da, pb = (approved.get(b) || 0) - db;
+    if (pa !== pb) return pb - pa;                        // most pending first
+    return a < b ? -1 : 1;
+  });
+  for (const vid of order) console.log(vid);
+}
+
+// resolve: print the user's chosen compute as shell-exportable lines. This is the
+// "broker" — it turns the per-user Settings row (user_analysis_settings) into the env
+// the drain needs, so the cloud runner stops being hardwired to one GitHub secret.
+//   nuke_hosted      -> NUKE_ANALYSIS_METHOD=nuke_hosted (runner falls back to platform creds)
+//   byo_subscription -> CLAUDE_CODE_OAUTH_TOKEN=<decrypted vault secret>
+//   byo_api_key      -> ANTHROPIC_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY per provider
+// The secret is decrypted server-side via the service-role-only RPC; we never log it.
+async function resolve() {
+  const VEHICLE_USER = arg('--user-id');
+  if (!VEHICLE_USER) { console.error('resolve: --user-id required'); process.exit(1); }
+  const { data: row, error } = await sb
+    .from('user_analysis_settings')
+    .select('method, provider, model, enabled')
+    .eq('user_id', VEHICLE_USER)
+    .maybeSingle();
+  if (error) { console.error(`resolve: ${error.message}`); process.exit(1); }
+
+  // No row yet, or hosted, or disabled → hosted (drain uses whatever the workflow provides).
+  const method = row?.method || 'nuke_hosted';
+  const enabled = row ? row.enabled : true;
+  const out = [`NUKE_ANALYSIS_METHOD=${method}`, `NUKE_ANALYSIS_ENABLED=${enabled ? '1' : '0'}`];
+  if (row?.model) out.push(`BYOK_MODEL=${row.model}`);
+
+  if ((method === 'byo_subscription' || method === 'byo_api_key') && enabled) {
+    const { data: secret, error: se } = await sb.rpc('get_analysis_credential', { p_user_id: VEHICLE_USER });
+    if (se) { console.error(`resolve: credential decrypt failed: ${se.message}`); process.exit(1); }
+    if (!secret) { console.error('resolve: method is byo_* but no credential stored — falling back to hosted'); out[0] = 'NUKE_ANALYSIS_METHOD=nuke_hosted'; }
+    else if (method === 'byo_subscription') out.push(`CLAUDE_CODE_OAUTH_TOKEN=${secret}`);
+    else {
+      const env = { anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY', google: 'GOOGLE_API_KEY' }[row.provider || 'anthropic'];
+      out.push(`${env}=${secret}`);
+    }
+  }
+
+  // Fallback to the APP's "Connected accounts" screen. AIProviderSettings.tsx saves the user's
+  // key to user_ai_providers with base64 "obfuscation" (btoa) — NOT Vault — and with no method
+  // field. That is a separate credential system the broker historically ignored, so a user who
+  // set their key in the app got no per-user compute (the drain silently ran on the platform
+  // repo secret instead). If the secure Vault path above produced no byo credential, honor the
+  // app connection: base64-decode and route by token prefix — sk-ant-oat = Claude subscription
+  // (CLAUDE_CODE_OAUTH_TOKEN, flat cost), sk-ant-api = pay-per-token key (ANTHROPIC_API_KEY).
+  // SECURITY DEBT: a subscription token stored base64-only is weak; the real fix is to make the
+  // app save via set_analysis_credential (Vault) so both systems share one encrypted source.
+  if (method === 'nuke_hosted' && enabled) {
+    const { data: prov } = await sb.rpc('get_user_api_key_info', { p_user_id: VEHICLE_USER, p_provider: 'anthropic' });
+    const r0 = Array.isArray(prov) ? prov[0] : prov;
+    if (r0?.api_key_encrypted) {
+      let tok = '';
+      try { tok = Buffer.from(r0.api_key_encrypted, 'base64').toString('utf8').trim(); } catch { tok = ''; }
+      if (tok.startsWith('sk-ant-oat')) {
+        out[0] = 'NUKE_ANALYSIS_METHOD=byo_subscription';
+        out.push(`CLAUDE_CODE_OAUTH_TOKEN=${tok}`);
+      } else if (tok.startsWith('sk-ant-api')) {
+        out[0] = 'NUKE_ANALYSIS_METHOD=byo_api_key';
+        out.push(`ANTHROPIC_API_KEY=${tok}`);
+      }
+      if (r0.model_name && !row?.model && tok.startsWith('sk-ant-')) out.push(`BYOK_MODEL=${r0.model_name}`);
+    }
+  }
+
+  for (const line of out) console.log(line);
+}
+
+// Pure ledger functions exported for unit tests (importing does not run the pipeline — see isMain).
+export { computeSaturation, classifyOpenQuestions, factFingerprint, isSaturatedRow, CURRENT_SCHEMA_VERSION, DRY_PASS_LIMIT };
+
 const isMain = process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (!['prepare', 'ingest', 'context'].includes(mode)) {
-    console.error('mode must be "prepare", "ingest", or "context"');
+  if (!['prepare', 'ingest', 'context', 'queue', 'resolve'].includes(mode)) {
+    console.error('mode must be "prepare", "ingest", "context", "queue", or "resolve"');
     process.exit(1);
   }
   if (mode === 'prepare') await prepare();
   else if (mode === 'context') await buildContext();
+  else if (mode === 'queue') await queue();
+  else if (mode === 'resolve') await resolve();
   else await ingest();
 }

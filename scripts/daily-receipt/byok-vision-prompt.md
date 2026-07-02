@@ -6,6 +6,13 @@ Append each verdict as one compact single-line JSON object to the sink file give
 Use the Read tool on every `file=` path. Look carefully: components, their bounding boxes,
 text/part-numbers, rust/damage, tools, the camera angle, and WHY the photo was taken.
 
+Each frame carries `apple_hints`: the FREE on-device Apple Vision tags computed at capture (the
+T0 layer). Use them as a fast PRIOR to orient yourself — but they are noisy machine guesses, NOT
+truth (a truck often reads as "airplane/hangar", a data plate as "document"). Confirm them against
+what you actually see and OVERRIDE them when wrong. Signal value: `document/printed_page/receipt`
+⇒ likely printed matter (read the text); `people/baby/face` ⇒ likely personal, not build work;
+`wheel/tire/machine/vehicle/truck` ⇒ a build shot. Never copy a hint into a verdict without seeing it.
+
 ## Required schema (validator is strict — every field below is mandatory)
 
 {
