@@ -1,6 +1,6 @@
 # 2026-05-24 — Substrate: (x,y,z) Spatial Anchors for vehicle_observations
 
-**Status:** design proposal, awaiting approval. **NO DDL APPLIED.**
+**Status:** IMPLEMENTED 2026-07-02 (owner approved: "i hope you can actually implement them"). DDL applied to prod + committed as `supabase/migrations/20260702051500_xyz_spatial_anchors.sql`. First frame row = K5 via `https://nuke.ag/models/k5-blazer.glb` (origin UNVERIFIED, trust 0.5 — inspect before first pin). Anchors land only from real registration; pin-drop viewer + photogrammetry still open.
 **Author:** Substrate design pass (agent under Skylar)
 **Lane:** `vehicle_observations` only + one new table `vehicle_coordinate_frames`. Does NOT touch `vehicles` or `vehicle_images` (agent 72093 owns those).
 **Companion:** `2026-05-24_substrate_pgvector-embedding-design.md`
