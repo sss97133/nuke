@@ -14,8 +14,13 @@
  * user context. Strays surface at /inbox.
  *
  * State: ~/.nuke/photo-sync-state.json   Log: ~/.nuke/photo-sync.log
- * Engine: osxphotos (same as iphoto-intake.mjs). Row shape cloned from
- * iphoto-intake so downstream behavior (hero trust, pipeline) is identical.
+ * Engine: osxphotos (same as iphoto-intake.mjs).
+ *
+ * SEALED CAPTURE (2026-07-02, the-dna-derived.md §IV-b): no byte enters
+ * vehicle_images without a content identity computed AT THE SOURCE. This
+ * daemon sha256s the LOCAL file bytes before upload and routes the insert
+ * through the ingest_image_identity_first RPC (identity root → appearance →
+ * leaf; ownership DERIVED from endpoint provenance, never stamped leaf-first).
  *
  * Usage:
  *   dotenvx run -- node scripts/photo-sync-daemon.mjs            # sync new
@@ -24,8 +29,9 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { createHash } from 'crypto';
 import { spawnSync, execSync } from 'child_process';
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, rmSync, existsSync, appendFileSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, appendFileSync } from 'fs';
 import { join, extname } from 'path';
 import { homedir, tmpdir } from 'os';
 import dns from 'dns';
@@ -142,9 +148,19 @@ function exportPhotos(uuids, destDir) {
   return readdirSync(destDir).filter(f => IMAGE_EXT.has(extname(f).toLowerCase()));
 }
 
-// ─── 3. Upload one photo (row shape cloned from iphoto-intake.mjs) ───────────
+// ─── 3. Upload one photo — sealed capture, identity-first ───────────────────
+// The insert goes through ingest_image_identity_first (the ordered chokepoint:
+// image_identities root → image_appearances instance → vehicle_images leaf).
+// Ownership (documented_by_user_id, is_external) is DERIVED server-side from
+// endpoint provenance: source_type='local_filesystem' + owner_verified → own.
+// Known RPC leaf gaps (info preserved elsewhere, never raw-written around):
+//   file_name      → identity.original_filename, appearance.source_filename,
+//                    exif_data.original_filename
+//   location_name  → exif_data.place_name
 async function uploadPhoto(filePath, filename, meta) {
-  const fileSize = statSync(filePath).size;
+  const bytes = readFileSync(filePath);
+  const contentSha256 = createHash('sha256').update(bytes).digest('hex'); // identity sealed at the source, pre-upload
+  const fileSize = bytes.length;
   const ext = extname(filename).toLowerCase();
   const mimeType = ext === '.png' ? 'image/png' : ext === '.heic' ? 'image/heic' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
   // Personal library namespace — no vehicle yet; server pipeline resolves it
@@ -152,47 +168,62 @@ async function uploadPhoto(filePath, filename, meta) {
 
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
-    .upload(storagePath, readFileSync(filePath), { contentType: mimeType, upsert: false });
+    .upload(storagePath, bytes, { contentType: mimeType, upsert: false });
   if (uploadError && !String(uploadError.message || '').includes('already exists')) {
     return { ok: false, err: uploadError.message };
   }
 
   const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
 
-  const row = {
-    vehicle_id: null,                              // pipeline files it (GPS → rolling context)
+  const hasLabels = Array.isArray(meta.labels) && meta.labels.length > 0;
+  const payload = {
+    // identity root: content equality key from LOCAL bytes (RPC keys phash_hex
+    // on 'sha256:<hex>' until a caller-side perceptual hash exists; leaf
+    // file_hash = this sha). Dedup/idempotency ride on it.
+    content_sha256: contentSha256,
     image_url: publicUrl,
     storage_path: storagePath,
-    source: 'iphoto',                              // owner-trust source (hero selection, provenance)
-    mime_type: mimeType,
-    file_name: filename,
-    file_size: fileSize,
-    is_external: false,
-    ai_processing_status: 'pending',               // INSERT trigger + drain cron take over
+    // endpoint provenance — classification input, not a stamp
+    source: 'iphoto',                             // owner-trust source (hero selection, provenance)
+    source_type: 'local_filesystem',              // this Mac's Photos library is the endpoint
+    source_identifier: meta.uuid || storagePath,  // Photos asset UUID dedups the appearance
+    source_path: meta.path || filePath,
+    source_filename: filename,
+    original_filename: meta.original_filename || filename,
+    owner_verified: true,                         // daemon syncs only the owner's own library
     user_id: USER_ID,
-    documented_by_user_id: USER_ID,
-    ...(meta.latitude != null && { latitude: meta.latitude }),
-    ...(meta.longitude != null && { longitude: meta.longitude }),
-    ...(meta.place?.name && { location_name: meta.place.name }),
+    // vehicle_id omitted → NULL leaf; pipeline files it (GPS → rolling context)
+    mime_type: mimeType,
+    file_size_bytes: fileSize,
+    ...(meta.original_width != null && { width_px: meta.original_width }),
+    ...(meta.original_height != null && { height_px: meta.original_height }),
+    // real EXIF only — straight from the Photos-library original via osxphotos
+    ...(meta.exif_info?.camera_make && { camera_make: meta.exif_info.camera_make }),
+    ...(meta.exif_info?.camera_model && { camera_model: meta.exif_info.camera_model }),
     ...(meta.date && { taken_at: meta.date }),
+    ...(meta.latitude != null && { gps_latitude: meta.latitude }),
+    ...(meta.longitude != null && { gps_longitude: meta.longitude }),
     exif_data: {
       ...(meta.exif_info || {}),
       uuid: meta.uuid,
       original_filename: meta.original_filename,
       synced_by: 'photo-sync-daemon',
+      ...(meta.place?.name && { place_name: meta.place.name }),
+      // which Apple pass produced apple_ml_labels (additive provenance):
+      // Photos' on-device media analysis (photoanalysisd), read via osxphotos
+      ...(hasLabels && { labels_source: 'apple_photos_on_device_media_analysis_via_osxphotos' }),
     },
     // Pass Apple's on-device labels through — photo-pipeline-orchestrator
     // reads apple_ml_labels for its non-automotive fast-path.
-    ...(Array.isArray(meta.labels) && meta.labels.length > 0 && { apple_ml_labels: meta.labels }),
+    ...(hasLabels && { apple_ml_labels: meta.labels }),
   };
 
-  const { error: insertError } = await supabase.from('vehicle_images').insert(row);
-  if (insertError) {
-    const m = String(insertError.message || '');
-    if (m.includes('duplicate') || m.includes('unique')) return { ok: true, dup: true };
-    return { ok: false, err: m };
-  }
-  return { ok: true };
+  const { data, error } = await supabase.rpc('ingest_image_identity_first', { p_payload: payload });
+  if (error) return { ok: false, err: String(error.message || error) };
+  if (!data?.ok) return { ok: false, err: `rpc returned ${JSON.stringify(data)}` };
+  // RPC is idempotent on (file_hash, source): a reused leaf is this content
+  // already ingested through this channel — the old unique-violation dup case.
+  return { ok: true, dup: data.reused_leaf === true };
 }
 
 // ─── Label audit: measure Apple's classification before trusting it ─────────
