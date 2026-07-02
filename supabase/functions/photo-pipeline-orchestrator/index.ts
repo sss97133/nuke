@@ -525,24 +525,13 @@ async function resolveVehicle(
     }
   }
 
-  // Strategy 3: User's most recent vehicle with work activity
-  if (userId) {
-    const { data: recentVehicle } = await supabase
-      .from("vehicle_images")
-      .select("vehicle_id")
-      .eq("user_id", userId)
-      .not("vehicle_id", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (recentVehicle?.vehicle_id) {
-      console.log("[photo-pipeline] Vehicle resolved via recent activity");
-      return recentVehicle.vehicle_id;
-    }
-  }
-
-  console.log("[photo-pipeline] Could not resolve vehicle");
+  // Strategy 3 (REMOVED 2026-07-02): "user's most recent vehicle with work activity" stamped
+  // ANY unresolved photo onto whatever vehicle was touched last — zero evidence, the exact
+  // anti-pattern HARD_RULES §10 outlaws ("recent camera roll ≠ this build"). It auto-filed
+  // 14 freshly-recovered owner-pool photos onto the Mustang 22s after insert while the
+  // classifier was rate-limited. Attribution follows evidence (VIN, GPS>0.7) or stays NULL —
+  // the owner pool + confirm queue are the honest home for unresolved frames.
+  console.log("[photo-pipeline] Could not resolve vehicle — leaving in owner pool (no evidence)");
   return null;
 }
 
