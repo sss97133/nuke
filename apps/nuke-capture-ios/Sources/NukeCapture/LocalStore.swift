@@ -547,6 +547,46 @@ final class LocalStore {
         return n
     }
 
+    // MARK: Tag push — read side of LocalTagPush (lives here for dbQueue access)
+
+    /// One classified appearance row destined for the cloud.
+    struct TagSyncRow {
+        let localIdentifier: String
+        let labels: [String]
+        let isVehicle: Bool?
+        let isPersonal: Bool?
+        let ownerVerdict: String?
+    }
+
+    /// Classified appearance rows (T0 labels present), paged by rowid for a resumable push.
+    func appearanceTagsForSync(limit: Int, afterRowId: Int64 = 0) -> (rows: [TagSyncRow], lastRowId: Int64) {
+        var out: [TagSyncRow] = []
+        var last = afterRowId
+        do {
+            try dbQueue.read { db in
+                let rows = try Row.fetchAll(db, sql: """
+                    SELECT rowid AS rid, localIdentifier AS lid, appleMLLabelsJSON AS labels,
+                           isVehicle AS v, isPersonal AS p, ownerVerdict AS ov
+                    FROM appearance
+                    WHERE appleMLLabelsJSON IS NOT NULL AND rowid > ?
+                    ORDER BY rowid ASC LIMIT ?
+                    """, arguments: [afterRowId, limit])
+                for r in rows {
+                    last = r["rid"]
+                    let lid: String = r["lid"]
+                    let labelsStr: String? = r["labels"]
+                    let labels = labelsStr.flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) } ?? []
+                    out.append(TagSyncRow(localIdentifier: lid,
+                                          labels: labels,
+                                          isVehicle: r["v"],
+                                          isPersonal: r["p"],
+                                          ownerVerdict: r["ov"]))
+                }
+            }
+        } catch { NSLog("LocalStore.appearanceTagsForSync failed: %@", String(describing: error)) }
+        return (out, last)
+    }
+
     /// The full ledger for one image — classification + labels + identity + binding +
     /// the cached cloud verdict. Powers the info page (the back of the photo). nil if
     /// the row doesn't exist yet.

@@ -72,6 +72,9 @@ struct LibraryDaysView: View {
                 // offline), so the rollup shows read counts as you browse.
                 await ingest.runCloudBackfill()
                 await reload()
+                // And push the other direction: on-device tags UP to the cloud ledger
+                // (bounded; resumes via its own persisted cursor; no-op offline).
+                await LocalTagPush.run(perRun: 1000)
                 // Grow the receipt while it's open: walk the deep backlog in batches,
                 // refreshing the counts as each lands. Resumes via the persisted cursor;
                 // SwiftUI cancels this .task on disappear, which stops the loop.

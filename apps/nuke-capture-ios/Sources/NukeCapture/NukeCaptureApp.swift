@@ -235,6 +235,9 @@ struct NukeCaptureApp: App {
             // into the local store (true EXIF → LocalStore) so the day receipt grows
             // offline. Resumable via its own cursor; this is the deep-backlog organ.
             await LibraryIngest.shared.runBackfillBatch()
+            // Reverse of runCloudBackfill: push the on-device Apple Vision tags UP to
+            // vehicle_images (exif-uuid bridge). Idempotent; resumes via its own cursor.
+            await LocalTagPush.run()
             // Then ATTRIBUTE: route the day's freshly-uploaded orphans home
             // on-device (VIN-match + session inheritance). This is the nightly
             // charging-window slot — upload, then send photos to their vehicle.
