@@ -141,6 +141,19 @@ Gate for the universal content join (Seam 2): dHash parity between the Swift imp
 (PerceptualHash.swift, 9×8 → 64-bit → 16 hex) and a cloud-side implementation, byte-verified
 on known pairs before any cross-world matching is trusted.
 
+**GATE VERDICT (2026-07-02, measured — full spec in
+docs/library/working/2026-07-02_dhash-parity-verdict.md): bit-exact parity REFUTED.** Apple's
+ImageIO stage-1 thumbnail resampler matches no standard kernel (probed vs lanczos/cubic/
+mitchell/linear/box); same bytes hash 3-16 hamming apart across implementations, and 2-7 of
+64 comparisons per image sit at ≤1 gray level of margin. The luma and stage-2 sampling WERE
+solved exactly (0-hamming when fed ImageIO's own thumbnail) — the resampler is the sole
+blocker. Therefore the Seam-2 design is: **contentSha256 of source bytes is the equality key**
+(deterministic in every language); the device dHash is an OPAQUE perceptual key — cloud
+backfills its own tagged `dhash_js_v1` and matches cross-side by hamming threshold (~10,
+inside the near-dup band), confirming candidates via sha256 or pixel compare. Hash values
+carry their algorithm tag like every number carries its method. True cross-side equality
+would need a fully-specified v2 resampler on-device — owner decision, queued.
+
 ## V. Standing orders (how the lead operates from here)
 
 1. **Every new writer ships with full DNA or doesn't ship.** The organs exist
