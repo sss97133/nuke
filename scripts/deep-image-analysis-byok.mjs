@@ -260,6 +260,91 @@ export function bumpConfidence(base, basis) {
   return b;
 }
 
+// ─── RECEIPT-CONTEXT BRIDGE (day-context pass) — Skylar 2026-06-16: "contextual squares
+// showing the receipt — often the extract of the group of images." The day is the context
+// unit: when the SAME day (same vehicle, same taken_at UTC date) contains a receipt_document
+// frame whose OCR literally transcribed a roster PN (i.e. that frame landed a component with
+// match_basis='ocr_text'), the receipt items proven on-paper that day become SOFT context for
+// the day's labor frames. A labor component whose label shares >=2 significant tokens with
+// such an item's description lands status='day_context' (NOT 'confirmed' — the PN was never
+// read in the labor pixels), confidence +0.1 capped 0.85, citing the receipt frame + item.
+// "Never force", in rule form:
+//   - anchor: scene_type='receipt_document' AND basis='ocr_text' only — part_number_guess
+//     confirms are NOT day anchors (one inference away is too weak to radiate context);
+//   - targets: intent='labor' frames on the same vehicle + same UTC date only;
+//   - only components with NO roster match of their own are eligible (a real confirm is never
+//     downgraded; an inferred is only softly lifted);
+//   - token gate: >=2 significant description tokens (>=4 chars, positional/generic words
+//     stripped). The day_context row carries NO part_number — no PN invention; the receipt
+//     item id/PN live only in the citation + source_references;
+//   - anchors are discovered WITHIN the landing batch: the entities day-batch path (--date)
+//     bridges; single-frame ingest calls don't (cross-call bridging would need a same-day DB
+//     query — deliberately out of scope for this conservative v1).
+const DAY_CONTEXT_STOP_TOKENS = new Set([
+  'with', 'from', 'type', 'pair', 'pack', 'left', 'right', 'front', 'rear', 'inner', 'outer',
+  'upper', 'lower', 'assembly', 'replacement', 'original', 'style', 'requires', 'required',
+]);
+export function significantTokens(s) {
+  return [...new Set(String(s || '').toLowerCase().split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 4 && !DAY_CONTEXT_STOP_TOKENS.has(t)))];
+}
+// >=2 significant description tokens must appear in the component label → matched tokens;
+// otherwise null. Descriptions with <2 significant tokens can never anchor (too thin).
+export function dayContextTokenMatch(label, description) {
+  const want = significantTokens(description);
+  if (want.length < 2) return null;
+  const have = new Set(significantTokens(label));
+  const hit = want.filter((t) => have.has(t));
+  return hit.length >= 2 ? hit : null;
+}
+// Soft lift, documented: +0.1 capped at 0.85 — deliberately below every 'confirmed' bump.
+export function dayContextBump(base) {
+  const b = typeof base === 'number' ? base : 0.5;
+  return Math.min(0.85, b + 0.1);
+}
+const frameDay = (it) => (it && it.taken_at ? String(it.taken_at).slice(0, 10) : null);
+// entries: [{ it, matches }] as built in landEntityPage. Returns Map `${vehicle}|${day}` →
+// [{ receipt_image_id, item }] (deduped by receipt item id).
+export function buildDayAnchors(entries) {
+  const byDay = new Map();
+  for (const e of entries) {
+    if (e.it?.verdict?.scene_type !== 'receipt_document') continue;
+    const day = frameDay(e.it);
+    if (!day) continue;
+    for (const m of e.matches || []) {
+      if (m.match?.basis !== 'ocr_text') continue;
+      const key = `${e.it.vehicle_id}|${day}`;
+      const arr = byDay.get(key) || [];
+      if (!arr.some((a) => a.item.id === m.match.item.id)) arr.push({ receipt_image_id: e.it.image_id, item: m.match.item });
+      byDay.set(key, arr);
+    }
+  }
+  return byDay;
+}
+// Mutates entries: sets m.dayContext on eligible components and e.dayContextKey (a stable,
+// sorted anchor fingerprint — the idempotency key stored in reference_coverage_snapshot).
+export function annotateDayContext(entries, anchors) {
+  for (const e of entries) {
+    const day = frameDay(e.it);
+    if (!day || e.it?.verdict?.intent !== 'labor') continue;
+    const dayAnchors = anchors.get(`${e.it.vehicle_id}|${day}`);
+    if (!dayAnchors || !dayAnchors.length) continue;
+    const used = new Set();
+    for (const m of e.matches || []) {
+      if (m.match) continue; // a real receipt confirm outranks context — never touched
+      for (const a of dayAnchors) {
+        const hit = dayContextTokenMatch(m.comp?.label, a.item.description);
+        if (hit) {
+          m.dayContext = { receipt_image_id: a.receipt_image_id, item: a.item, day, matched_tokens: hit };
+          used.add(`${a.receipt_image_id}:${a.item.id}`);
+          break;
+        }
+      }
+    }
+    if (used.size) e.dayContextKey = [...used].sort().join(',');
+  }
+}
+
 // Coarse family for component_identifications.component_type (existing rows use snake_case
 // families). Form, not fact — the verbatim label is preserved in `identification`. First hit wins.
 const COMPONENT_FAMILIES = [
@@ -332,7 +417,7 @@ const ENTITY_WRITER_NOTE = 'byok_deep_analysis entity landing';
 // verdict lands fresh and CHAINS the prior record via superseded_by (never deleted — its
 // component children stay attached to it as history).
 async function landEntityPage(items, rosterIndex, { dryRun = false } = {}) {
-  const res = { frames: 0, components: 0, confirmed: 0, skipped: 0 };
+  const res = { frames: 0, components: 0, confirmed: 0, day_context: 0, skipped: 0 };
   const withComponents = items.filter((it) => Array.isArray(it.verdict?.components_seen) && it.verdict.components_seen.length > 0);
   if (!withComponents.length) return res;
 
@@ -354,31 +439,49 @@ async function landEntityPage(items, rosterIndex, { dryRun = false } = {}) {
   }
 
   const now = new Date().toISOString();
-  const toLand = [];
-  for (const it of withComponents) {
-    const prior = priorByImage.get(it.image_id) || null;
-    if (prior && prior.reference_coverage_snapshot?.verdict_analyzed_at === (it.verdict?.analyzed_at || null)) { res.skipped++; continue; }
-    const matches = (it.verdict.components_seen || []).map((comp) => ({
+  // Match every candidate frame BEFORE any skip decision: day-context anchors must be
+  // discovered across the whole batch, including frames whose own landing will be skipped.
+  const entries = withComponents.map((it) => ({
+    it,
+    prior: priorByImage.get(it.image_id) || null,
+    matches: (it.verdict.components_seen || []).map((comp) => ({
       comp, match: matchComponentToRoster(comp, it.verdict.text_regions, rosterIndex),
-    }));
-    toLand.push({ it, prior, matches });
+    })),
+  }));
+  annotateDayContext(entries, buildDayAnchors(entries));
+
+  const toLand = [];
+  for (const e of entries) {
+    const priorSnap = e.prior?.reference_coverage_snapshot;
+    const sameVerdict = e.prior && priorSnap?.verdict_analyzed_at === (e.it.verdict?.analyzed_at || null);
+    // An already-landed frame re-lands ONLY when a day-context anchor it has never seen
+    // appears (supersede-never-overwrite: the prior record is chained, not lost). Second
+    // run with the same anchors → keys equal → skip: idempotent.
+    const anchorNews = !!e.dayContextKey && priorSnap?.day_context_anchor_key !== e.dayContextKey;
+    if (sameVerdict && !anchorNews) { res.skipped++; continue; }
+    e.supersededReason = sameVerdict && anchorNews ? 'day-context receipt anchor landed' : 'newer byok verdict landed';
+    toLand.push(e);
   }
   if (!toLand.length) return res;
 
   res.frames = toLand.length;
   res.components = toLand.reduce((n, e) => n + e.matches.length, 0);
   res.confirmed = toLand.reduce((n, e) => n + e.matches.filter((m) => m.match).length, 0);
+  res.day_context = toLand.reduce((n, e) => n + e.matches.filter((m) => !m.match && m.dayContext).length, 0);
 
   if (dryRun) {
     for (const { it, matches } of toLand) {
-      for (const { comp, match } of matches) {
-        console.log(`  DRY ${String(it.image_id).slice(0, 8)} ${match ? 'CONFIRMED' : 'inferred '} "${comp.label}"${match ? ` ⇐ ${match.item.pn} (${match.basis})` : ''}`);
+      for (const { comp, match, dayContext } of matches) {
+        const tag = match ? 'CONFIRMED' : dayContext ? 'DAY-CTX  ' : 'inferred ';
+        const cite = match ? ` ⇐ ${match.item.pn} (${match.basis})`
+          : dayContext ? ` ⇐ same-day receipt ${String(dayContext.receipt_image_id).slice(0, 8)} ${dayContext.item.pn} [${dayContext.matched_tokens.join(',')}]` : '';
+        console.log(`  DRY ${String(it.image_id).slice(0, 8)} ${tag} "${comp.label}"${cite}`);
       }
     }
     return res;
   }
 
-  const records = toLand.map(({ it, prior, matches }) => ({
+  const records = toLand.map(({ it, prior, matches, dayContextKey }) => ({
     image_id: it.image_id,
     vehicle_id: it.vehicle_id,
     analysis_tier: 2,
@@ -386,7 +489,10 @@ async function landEntityPage(items, rosterIndex, { dryRun = false } = {}) {
     analyzed_by_model: it.verdict.agent_model || 'byok_claude_print',
     confirmed_findings: matches.filter((m) => m.match).map((m) => ({
       label: m.comp.label, part_number: m.match.item.pn, receipt_item_id: m.match.item.id, basis: m.match.basis })),
-    inferred_findings: matches.filter((m) => !m.match).map((m) => ({ label: m.comp.label })),
+    inferred_findings: matches.filter((m) => !m.match).map((m) => ({
+      label: m.comp.label,
+      ...(m.dayContext ? { day_context: { receipt_image_id: m.dayContext.receipt_image_id, receipt_item_id: m.dayContext.item.id } } : {}),
+    })),
     citation_count: matches.filter((m) => m.match).length,
     inference_count: matches.filter((m) => !m.match).length,
     overall_confidence: typeof it.verdict.confidence === 'number'
@@ -395,33 +501,40 @@ async function landEntityPage(items, rosterIndex, { dryRun = false } = {}) {
       verdict_analyzed_at: it.verdict.analyzed_at || null,
       prompt_version: it.verdict.prompt_version || CURRENT_SCHEMA_VERSION,
       roster_size: rosterIndex.length,
+      ...(dayContextKey ? { day_context_anchor_key: dayContextKey } : {}),
     },
     handoff_notes: `${ENTITY_WRITER_NOTE}; verdict at vehicle_images.ai_scan_metadata.byok_deep_analysis`,
     supersedes: prior?.id ?? null,
   }));
   const { data: recRows, error: rErr } = await sb.from('image_analysis_records')
     .insert(records).select('id, image_id');
-  if (rErr) { console.error(`entity records insert: ${rErr.message}`); return { ...res, frames: 0, components: 0, confirmed: 0 }; }
+  if (rErr) { console.error(`entity records insert: ${rErr.message}`); return { ...res, frames: 0, components: 0, confirmed: 0, day_context: 0 }; }
   const recByImage = new Map((recRows || []).map((r) => [r.image_id, r.id]));
 
   const compRows = [];
   for (const { it, matches } of toLand) {
     const recId = recByImage.get(it.image_id);
     if (!recId) continue;
-    for (const { comp, match } of matches) {
+    for (const { comp, match, dayContext } of matches) {
+      const dc = !match && dayContext ? dayContext : null;
       compRows.push({
         analysis_record_id: recId,
         image_id: it.image_id,
         vehicle_id: it.vehicle_id,
         component_type: componentFamily(comp.label),
         identification: comp.label,
+        // day_context carries NO part_number — the PN was never read in THESE pixels
+        // (no PN invention; the receipt item's PN lives in the citation only).
         part_number: match ? match.item.pn : null,
-        status: match ? 'confirmed' : 'inferred',
+        status: match ? 'confirmed' : dc ? 'day_context' : 'inferred',
         // Clamped: legacy pre-gate verdicts can carry out-of-range confidence; the DB
         // CHECK (0–1) would reject the whole insert chunk over one bad value.
-        confidence: Math.max(0, Math.min(1, Math.round(bumpConfidence(comp.confidence, match?.basis) * 100) / 100)),
-        inference_method: match ? `byok_vision+receipt_pn_${match.basis}` : 'byok_vision',
-        citation_text: match ? `Receipt item ${match.item.id}: ${match.item.pn} — ${match.item.description}` : null,
+        confidence: Math.max(0, Math.min(1, Math.round(
+          (dc ? dayContextBump(comp.confidence) : bumpConfidence(comp.confidence, match?.basis)) * 100) / 100)),
+        inference_method: match ? `byok_vision+receipt_pn_${match.basis}` : dc ? 'byok_vision+day_context_receipt' : 'byok_vision',
+        citation_text: match ? `Receipt item ${match.item.id}: ${match.item.pn} — ${match.item.description}`
+          : dc ? `Day-context ${dc.day}: same-day receipt frame ${dc.receipt_image_id} OCR-matched receipt item ${dc.item.id}: ${dc.item.pn} — ${dc.item.description}; label shares tokens [${dc.matched_tokens.join(', ')}]`
+          : null,
         bounding_box: isBbox(comp.bbox) ? { x1: comp.bbox[0], y1: comp.bbox[1], x2: comp.bbox[2], y2: comp.bbox[3], scale: 999 } : null,
         source_references: {
           writer: 'byok_deep_analysis',
@@ -433,21 +546,22 @@ async function landEntityPage(items, rosterIndex, { dryRun = false } = {}) {
           // a confirm on a physical scene is the part itself seen. Downstream must not conflate.
           scene_type: it.verdict.scene_type ?? null,
           ...(match ? { receipt_item_id: match.item.id, match_basis: match.basis, matched_token: match.token ?? null } : {}),
+          ...(dc ? { day_context: { receipt_image_id: dc.receipt_image_id, receipt_item_id: dc.item.id, matched_tokens: dc.matched_tokens, day: dc.day } } : {}),
         },
       });
     }
   }
   for (let i = 0; i < compRows.length; i += 500) {
     const { error } = await sb.from('component_identifications').insert(compRows.slice(i, i + 500));
-    if (error) { console.error(`entity components insert: ${error.message}`); return { ...res, components: i, confirmed: 0 }; }
+    if (error) { console.error(`entity components insert: ${error.message}`); return { ...res, components: i, confirmed: 0, day_context: 0 }; }
   }
 
-  for (const { it, prior } of toLand) {
+  for (const { it, prior, supersededReason } of toLand) {
     if (!prior) continue;
     const recId = recByImage.get(it.image_id);
     if (!recId) continue;
     const { error } = await sb.from('image_analysis_records')
-      .update({ superseded_by: recId, superseded_at: now, superseded_reason: 'newer byok verdict landed' })
+      .update({ superseded_by: recId, superseded_at: now, superseded_reason: supersededReason || 'newer byok verdict landed' })
       .eq('id', prior.id);
     if (error) console.error(`  (non-fatal) entity supersede ${prior.id}: ${error.message}`);
   }
@@ -456,38 +570,46 @@ async function landEntityPage(items, rosterIndex, { dryRun = false } = {}) {
 
 // entities — backfill the entity layer from ALREADY-LANDED verdicts (no vision cost: the
 // 11k+ component claims sitting in ai_scan_metadata become queryable identification rows).
-//   node scripts/deep-image-analysis-byok.mjs entities --vehicle-id <id> [--limit N] [--dry-run]
+//   node scripts/deep-image-analysis-byok.mjs entities --vehicle-id <id> [--limit N] [--date YYYY-MM-DD] [--dry-run]
+// --date scopes to one UTC day AND makes that day land as one batch — required for the
+// day-context pass to see a receipt anchor and its labor frames together (pages are
+// otherwise id-ordered, which scatters a day across batches).
 async function entities() {
   const VEHICLE_ID = arg('--vehicle-id');
   const LIMIT = parseInt(arg('--limit', '0')) || Infinity;
+  const DATE = arg('--date');
   const DRY = args.includes('--dry-run');
   if (!VEHICLE_ID) { console.error('entities: --vehicle-id required'); process.exit(1); }
+  if (DATE && !/^\d{4}-\d{2}-\d{2}$/.test(DATE)) { console.error('entities: --date must be YYYY-MM-DD'); process.exit(1); }
   const roster = await getReceiptRoster(VEHICLE_ID);
-  console.log(`entities: roster ${roster.length} PN-bearing receipt items for ${VEHICLE_ID}${DRY ? ' (DRY RUN)' : ''}`);
+  console.log(`entities: roster ${roster.length} PN-bearing receipt items for ${VEHICLE_ID}${DATE ? ` day ${DATE}` : ''}${DRY ? ' (DRY RUN)' : ''}`);
   const PAGE = 400;
-  const totals = { frames: 0, components: 0, confirmed: 0, skipped: 0 };
+  const totals = { frames: 0, components: 0, confirmed: 0, day_context: 0, skipped: 0 };
   let processed = 0;
   for (let offset = 0; processed < LIMIT; offset += PAGE) {
-    const { data, error } = await sb.from('vehicle_images')
-      .select('id, vehicle_id, ai_scan_metadata')
+    let q = sb.from('vehicle_images')
+      .select('id, vehicle_id, taken_at, ai_scan_metadata')
       .eq('vehicle_id', VEHICLE_ID)
-      .not('ai_scan_metadata->byok_deep_analysis', 'is', null)
-      .order('id', { ascending: true })
-      .range(offset, offset + PAGE - 1);
+      .not('ai_scan_metadata->byok_deep_analysis', 'is', null);
+    if (DATE) {
+      const next = new Date(Date.parse(`${DATE}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+      q = q.gte('taken_at', DATE).lt('taken_at', next);
+    }
+    const { data, error } = await q.order('id', { ascending: true }).range(offset, offset + PAGE - 1);
     if (error) { console.error(`entities: ${error.message}`); process.exit(1); }
     if (!data || !data.length) break;
     const items = data
-      .map((r) => ({ image_id: r.id, vehicle_id: r.vehicle_id, verdict: r.ai_scan_metadata?.byok_deep_analysis }))
+      .map((r) => ({ image_id: r.id, vehicle_id: r.vehicle_id, taken_at: r.taken_at, verdict: r.ai_scan_metadata?.byok_deep_analysis }))
       .filter((it) => Array.isArray(it.verdict?.components_seen) && it.verdict.components_seen.length > 0)
       .slice(0, Math.max(0, LIMIT - processed));
     processed += items.length;
     const r = await landEntityPage(items, roster, { dryRun: DRY });
     for (const k of Object.keys(totals)) totals[k] += r[k];
-    console.log(`entities: page@${offset} → frames ${r.frames}, components ${r.components}, confirmed ${r.confirmed}, skipped ${r.skipped}`);
+    console.log(`entities: page@${offset} → frames ${r.frames}, components ${r.components}, confirmed ${r.confirmed}, day-context ${r.day_context}, skipped ${r.skipped}`);
     if (data.length < PAGE) break;
     await new Promise((s) => setTimeout(s, 100)); // breathe between pages (db-safety)
   }
-  console.log(`entities: TOTAL frames ${totals.frames}, components ${totals.components}, receipt-CONFIRMED ${totals.confirmed}, already-landed skipped ${totals.skipped}`);
+  console.log(`entities: TOTAL frames ${totals.frames}, components ${totals.components}, receipt-CONFIRMED ${totals.confirmed}, day-CONTEXT ${totals.day_context}, already-landed skipped ${totals.skipped}`);
 }
 
 async function prepare() {
@@ -855,7 +977,7 @@ async function ingest() {
     try {
       if (Array.isArray(v.components_seen) && v.components_seen.length) {
         const landed = await landEntityPage(
-          [{ image_id: v.image_id, vehicle_id: v.vehicle_id, observation_id: obsRow.id, verdict: updatedMeta.byok_deep_analysis }],
+          [{ image_id: v.image_id, vehicle_id: v.vehicle_id, observation_id: obsRow.id, taken_at: v.taken_at || null, verdict: updatedMeta.byok_deep_analysis }],
           await getReceiptRoster(v.vehicle_id));
         if (landed.components) console.log(`  entities: ${landed.components} components landed (${landed.confirmed} receipt-confirmed)`);
       }
