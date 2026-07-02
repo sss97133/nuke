@@ -283,6 +283,24 @@ export function componentFamily(label) {
   return 'unclassified';
 }
 
+// ─── ATTRIBUTION DOUBT — the verdict's reading must be OBEYED, not just stored.
+// A frame whose own reading contradicts its vehicle attribution (screen material or
+// acquisition reference landing on a concrete build) gets flagged structurally and
+// evented for the confirm queue — never silently headlined as the vehicle.
+// (Skylar 2026-07-02: a marketplace screenshot of a candidate K5 rendered as
+// "1977 CHEVROLET K5 BLAZER" in the feed while its own verdict said "not obviously
+// the subject K5". The reading was right; nothing acted on it.)
+export function attributionDoubt(v) {
+  const scene = v?.scene_type;
+  if (scene === 'product_screenshot' || scene === 'spreadsheet') {
+    return `scene_type=${scene} — screen material (saved listing / document), not a frame of the attributed vehicle`;
+  }
+  if (scene === 'cross_reference' && v?.intent === 'acquisition') {
+    return 'cross_reference + acquisition — reference material for a candidate purchase, not the attributed build';
+  }
+  return null;
+}
+
 // The vehicle's PN-bearing receipt items (the CLAIM side), normalized for matching.
 // Cached per vehicle for the life of the process — both ingest and the entities backfill reuse it.
 const rosterCacheByVehicle = new Map();
@@ -683,6 +701,10 @@ async function ingest() {
       .maybeSingle();
     const existingMeta = (imgRow?.ai_scan_metadata) || {};
     const sat = computeSaturation(v, existingMeta.byok_deep_analysis || null, now);
+    // Doubt gate: a reading that contradicts the attribution forces the clarification
+    // flag (the app's doubt UI reads it) and lands an attribution_doubt event below.
+    const doubt = attributionDoubt(v);
+    if (doubt) v.needs_clarification = true;
     const updatedMeta = {
       ...existingMeta,
       byok_deep_analysis: {
@@ -701,6 +723,7 @@ async function ingest() {
         intent_confidence: v.intent_confidence ?? null,
         needs_review: v.needs_review ?? false,
         needs_clarification: v.needs_clarification ?? false,
+        attribution_doubt: doubt,
         context_complete: v.context_complete ?? null,
         open_questions: v.open_questions ?? [],
         agent_notes: v.agent_notes ?? null,
@@ -837,6 +860,18 @@ async function ingest() {
         if (landed.components) console.log(`  entities: ${landed.components} components landed (${landed.confirmed} receipt-confirmed)`);
       }
     } catch (e) { console.error(`  (non-fatal) entity landing ${v.image_id}: ${e.message}`); }
+
+    // Doubt event: the confirm queue's worklist entry, carrying the evidence.
+    if (doubt) {
+      landedEvents.push({
+        user_id: imgRow?.user_id ?? null,
+        vehicle_id: v.vehicle_id,
+        image_id: v.image_id,
+        stage: 'attribution_doubt',
+        detail: { reason: doubt, scene_type: v.scene_type ?? null, intent: v.intent ?? null,
+                  narrative: v.narrative_one_line ?? null },
+      });
+    }
 
     wrote++;
     // Live feed: this frame's verdict just landed — the "money hitting the account"
