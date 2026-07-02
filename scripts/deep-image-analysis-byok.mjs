@@ -186,6 +186,292 @@ function isSaturatedRow(r) {
   return !!(s && s.saturated === true && s.version === CURRENT_SCHEMA_VERSION);
 }
 
+// ─── ENTITY CONFIRMATION — the reciprocal seam: receipt = CLAIM, image = CONFIRMATION.
+// A verdict's components_seen are free-text labels until they LAND as component_identifications
+// rows anchored to an image_analysis_records row (tier 2 = deep pass). A component whose PN
+// evidence (model roster-guess or OCR'd text region) matches a receipt_items part number lands
+// status='confirmed' with a citation to the receipt item — "bought AND seen", the defensible-worth
+// unit. Everything else lands status='inferred'. Never forced: no PN evidence → no match.
+
+// PN normalization: uppercase alphanumerics only; needs ≥4 chars AND a digit so pure words
+// ("BOLT") never match. Comparison: exact, or containment at ≥5 chars (catches
+// "ACDelco 08831PFP52" vs "08831PFP52" and OCR prefix/suffix noise).
+export function normalizePartNumber(s) {
+  if (typeof s !== 'string') return null;
+  const n = s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return n.length >= 4 && /\d/.test(n) ? n : null;
+}
+
+function pnEquals(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return a.length >= 5 && b.length >= 5 && (a.includes(b) || b.includes(a));
+}
+
+// Does a text region plausibly belong to a component? (TWVP bboxes, 0–999.)
+// Text center inside the component box, or ≥30% of the text area overlapping it.
+function bboxAttaches(textBox, compBox) {
+  if (!isBbox(textBox) || !isBbox(compBox)) return false;
+  const [tx1, ty1, tx2, ty2] = textBox, [cx1, cy1, cx2, cy2] = compBox;
+  const cx = (tx1 + tx2) / 2, cy = (ty1 + ty2) / 2;
+  if (cx >= cx1 && cx <= cx2 && cy >= cy1 && cy <= cy2) return true;
+  const ox = Math.max(0, Math.min(tx2, cx2) - Math.max(tx1, cx1));
+  const oy = Math.max(0, Math.min(ty2, cy2) - Math.max(ty1, cy1));
+  const tArea = Math.max(1, (tx2 - tx1) * (ty2 - ty1));
+  return (ox * oy) / tArea >= 0.3;
+}
+
+// Match ONE component against the receipt roster. Two bases, strongest first:
+//   ocr_text          — a text region ATTACHED to this component's bbox transcribes a roster PN
+//                       (the pixels literally show the part number)
+//   part_number_guess — the model resolved the component to a roster PN (the prompt directs it
+//                       to only use roster PNs, so a guess IS a roster claim)
+export function matchComponentToRoster(comp, textRegions, rosterIndex) {
+  if (!comp || !Array.isArray(rosterIndex) || rosterIndex.length === 0) return null;
+  for (const tr of Array.isArray(textRegions) ? textRegions : []) {
+    if (!bboxAttaches(tr?.bbox, comp?.bbox)) continue;
+    const tokens = String(tr?.text || '').split(/\s+/).map(normalizePartNumber).filter(Boolean);
+    const whole = normalizePartNumber(String(tr?.text || ''));
+    if (whole) tokens.push(whole);
+    for (const item of rosterIndex) {
+      const hit = tokens.find((t) => pnEquals(t, item.pnNorm));
+      // matched_token makes every confirm drillable to the exact text that matched —
+      // the audit trail for the rare OCR collision (a dollar amount / order number
+      // that normalizes into a roster PN).
+      if (hit) return { item, basis: 'ocr_text', token: hit };
+    }
+  }
+  const guess = normalizePartNumber(comp.part_number_guess);
+  if (guess) {
+    for (const item of rosterIndex) {
+      if (pnEquals(guess, item.pnNorm)) return { item, basis: 'part_number_guess', token: guess };
+    }
+  }
+  return null;
+}
+
+// Receipt-confirmed confidence bump — documented, not vibed:
+//   ocr_text          → the PN is readable in the pixels: max(base, 0.95)
+//   part_number_guess → model-resolved roster match: +0.2, capped 0.95 (one inference away)
+export function bumpConfidence(base, basis) {
+  const b = typeof base === 'number' ? base : 0.5;
+  if (basis === 'ocr_text') return Math.max(b, 0.95);
+  if (basis === 'part_number_guess') return Math.min(0.95, b + 0.2);
+  return b;
+}
+
+// Coarse family for component_identifications.component_type (existing rows use snake_case
+// families). Form, not fact — the verbatim label is preserved in `identification`. First hit wins.
+const COMPONENT_FAMILIES = [
+  ['brake', /brake|rotor|caliper|master cylinder|booster|brake drum|brake pad/i],
+  ['engine', /engine|intake|throttle|damper|pulley|alternator|distributor|valve cover|header|manifold|piston|crank|camshaft|\bls[0-9]\b|\bv8\b|short block|long block|oil pan|starter|flexplate|flywheel/i],
+  ['cooling', /radiator|cooling fan|water pump|thermostat|coolant|fan shroud/i],
+  ['fuel', /fuel|gas tank|injector|carburetor|carb\b/i],
+  ['exhaust', /exhaust|muffler|tailpipe|downpipe|catalytic/i],
+  ['transmission_drivetrain', /transmission|clutch|driveshaft|transfer case|differential|axle|\bdana\b|gearbox|shifter|torque converter|u-joint/i],
+  ['suspension_steering', /suspension|shock|spring|control arm|sway bar|steering|tie rod|leaf pack|coilover|spindle|ball joint/i],
+  ['wheel_tire', /wheel|tire|\brim\b|hubcap|lug nut/i],
+  ['electrical', /wiring|harness|battery|fuse|relay|switch|gauge|headlight|taillight|light|bulb|\becu\b|\bpdm\b|ignition coil/i],
+  ['body_exterior', /fender|door|hood|tailgate|bumper|grille|quarter panel|bed side|rocker|windshield|glass|mirror|emblem|badge|body trim|paint/i],
+  ['interior', /seat|dash|console|carpet|headliner|door panel|upholstery|steering wheel|seat belt/i],
+  ['fastener_hardware', /bolt|nut\b|washer|screw|clamp|bracket|fastener|rivet|grommet/i],
+  ['fluid_consumable', /\boil\b|fluid|grease|sealant|primer|filter/i],
+];
+export function componentFamily(label) {
+  const s = String(label || '');
+  for (const [fam, re] of COMPONENT_FAMILIES) if (re.test(s)) return fam;
+  return 'unclassified';
+}
+
+// The vehicle's PN-bearing receipt items (the CLAIM side), normalized for matching.
+// Cached per vehicle for the life of the process — both ingest and the entities backfill reuse it.
+const rosterCacheByVehicle = new Map();
+async function getReceiptRoster(vehicleId) {
+  if (rosterCacheByVehicle.has(vehicleId)) return rosterCacheByVehicle.get(vehicleId);
+  const out = [];
+  try {
+    const { data, error } = await sb.from('receipt_items')
+      .select('id, description, part_number, receipts!inner(vehicle_id)')
+      .eq('receipts.vehicle_id', vehicleId)
+      .not('part_number', 'is', null)
+      .limit(500);
+    if (error) throw new Error(error.message);
+    for (const r of data || []) {
+      const pnNorm = normalizePartNumber(r.part_number);
+      if (!pnNorm) continue;
+      out.push({ id: r.id, pn: r.part_number.trim(), pnNorm, description: (r.description || '').trim() });
+    }
+  } catch (e) { console.error(`entity roster ${vehicleId}: ${e.message}`); }
+  rosterCacheByVehicle.set(vehicleId, out);
+  return out;
+}
+
+const ENTITY_WRITER_NOTE = 'byok_deep_analysis entity landing';
+
+// Land one page of verdicts' components as component_identifications rows, each frame anchored
+// by ONE new image_analysis_records row. Idempotent by verdict identity: a frame whose current
+// non-superseded byok record already carries this verdict's analyzed_at is skipped; a NEWER
+// verdict lands fresh and CHAINS the prior record via superseded_by (never deleted — its
+// component children stay attached to it as history).
+async function landEntityPage(items, rosterIndex, { dryRun = false } = {}) {
+  const res = { frames: 0, components: 0, confirmed: 0, skipped: 0 };
+  const withComponents = items.filter((it) => Array.isArray(it.verdict?.components_seen) && it.verdict.components_seen.length > 0);
+  if (!withComponents.length) return res;
+
+  // Chunked: a 400-uuid `in` list builds a ~14KB GET URL and the fetch dies at the
+  // transport level (observed: TypeError fetch failed on most pages). 100 ids ≈ 4KB.
+  const ids = withComponents.map((it) => it.image_id);
+  const priorByImage = new Map();
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data: priors, error: pErr } = await sb.from('image_analysis_records')
+      .select('id, image_id, reference_coverage_snapshot')
+      .in('image_id', ids.slice(i, i + 100))
+      .is('superseded_by', null)
+      .ilike('handoff_notes', `${ENTITY_WRITER_NOTE}%`)
+      .order('created_at', { ascending: false });
+    if (pErr) { console.error(`entity priors: ${pErr.message}`); return res; }
+    // Newest-first + first-wins: if a crash between insert and supersede ever left two
+    // non-superseded records for one image, the NEWEST is the live prior we chain from.
+    for (const p of priors || []) if (!priorByImage.has(p.image_id)) priorByImage.set(p.image_id, p);
+  }
+
+  const now = new Date().toISOString();
+  const toLand = [];
+  for (const it of withComponents) {
+    const prior = priorByImage.get(it.image_id) || null;
+    if (prior && prior.reference_coverage_snapshot?.verdict_analyzed_at === (it.verdict?.analyzed_at || null)) { res.skipped++; continue; }
+    const matches = (it.verdict.components_seen || []).map((comp) => ({
+      comp, match: matchComponentToRoster(comp, it.verdict.text_regions, rosterIndex),
+    }));
+    toLand.push({ it, prior, matches });
+  }
+  if (!toLand.length) return res;
+
+  res.frames = toLand.length;
+  res.components = toLand.reduce((n, e) => n + e.matches.length, 0);
+  res.confirmed = toLand.reduce((n, e) => n + e.matches.filter((m) => m.match).length, 0);
+
+  if (dryRun) {
+    for (const { it, matches } of toLand) {
+      for (const { comp, match } of matches) {
+        console.log(`  DRY ${String(it.image_id).slice(0, 8)} ${match ? 'CONFIRMED' : 'inferred '} "${comp.label}"${match ? ` ⇐ ${match.item.pn} (${match.basis})` : ''}`);
+      }
+    }
+    return res;
+  }
+
+  const records = toLand.map(({ it, prior, matches }) => ({
+    image_id: it.image_id,
+    vehicle_id: it.vehicle_id,
+    analysis_tier: 2,
+    analyzed_at: it.verdict.analyzed_at || now,
+    analyzed_by_model: it.verdict.agent_model || 'byok_claude_print',
+    confirmed_findings: matches.filter((m) => m.match).map((m) => ({
+      label: m.comp.label, part_number: m.match.item.pn, receipt_item_id: m.match.item.id, basis: m.match.basis })),
+    inferred_findings: matches.filter((m) => !m.match).map((m) => ({ label: m.comp.label })),
+    citation_count: matches.filter((m) => m.match).length,
+    inference_count: matches.filter((m) => !m.match).length,
+    overall_confidence: typeof it.verdict.confidence === 'number'
+      ? Math.max(0, Math.min(1, it.verdict.confidence)) : null,
+    reference_coverage_snapshot: {
+      verdict_analyzed_at: it.verdict.analyzed_at || null,
+      prompt_version: it.verdict.prompt_version || CURRENT_SCHEMA_VERSION,
+      roster_size: rosterIndex.length,
+    },
+    handoff_notes: `${ENTITY_WRITER_NOTE}; verdict at vehicle_images.ai_scan_metadata.byok_deep_analysis`,
+    supersedes: prior?.id ?? null,
+  }));
+  const { data: recRows, error: rErr } = await sb.from('image_analysis_records')
+    .insert(records).select('id, image_id');
+  if (rErr) { console.error(`entity records insert: ${rErr.message}`); return { ...res, frames: 0, components: 0, confirmed: 0 }; }
+  const recByImage = new Map((recRows || []).map((r) => [r.image_id, r.id]));
+
+  const compRows = [];
+  for (const { it, matches } of toLand) {
+    const recId = recByImage.get(it.image_id);
+    if (!recId) continue;
+    for (const { comp, match } of matches) {
+      compRows.push({
+        analysis_record_id: recId,
+        image_id: it.image_id,
+        vehicle_id: it.vehicle_id,
+        component_type: componentFamily(comp.label),
+        identification: comp.label,
+        part_number: match ? match.item.pn : null,
+        status: match ? 'confirmed' : 'inferred',
+        // Clamped: legacy pre-gate verdicts can carry out-of-range confidence; the DB
+        // CHECK (0–1) would reject the whole insert chunk over one bad value.
+        confidence: Math.max(0, Math.min(1, Math.round(bumpConfidence(comp.confidence, match?.basis) * 100) / 100)),
+        inference_method: match ? `byok_vision+receipt_pn_${match.basis}` : 'byok_vision',
+        citation_text: match ? `Receipt item ${match.item.id}: ${match.item.pn} — ${match.item.description}` : null,
+        bounding_box: isBbox(comp.bbox) ? { x1: comp.bbox[0], y1: comp.bbox[1], x2: comp.bbox[2], y2: comp.bbox[3], scale: 999 } : null,
+        source_references: {
+          writer: 'byok_deep_analysis',
+          image_id: it.image_id,
+          observation_id: it.observation_id ?? null,
+          verdict_path: 'vehicle_images.ai_scan_metadata.byok_deep_analysis',
+          part_number_guess: comp.part_number_guess ?? null,
+          // A confirm on a receipt_document frame links the PAPER trail (invoice photographed);
+          // a confirm on a physical scene is the part itself seen. Downstream must not conflate.
+          scene_type: it.verdict.scene_type ?? null,
+          ...(match ? { receipt_item_id: match.item.id, match_basis: match.basis, matched_token: match.token ?? null } : {}),
+        },
+      });
+    }
+  }
+  for (let i = 0; i < compRows.length; i += 500) {
+    const { error } = await sb.from('component_identifications').insert(compRows.slice(i, i + 500));
+    if (error) { console.error(`entity components insert: ${error.message}`); return { ...res, components: i, confirmed: 0 }; }
+  }
+
+  for (const { it, prior } of toLand) {
+    if (!prior) continue;
+    const recId = recByImage.get(it.image_id);
+    if (!recId) continue;
+    const { error } = await sb.from('image_analysis_records')
+      .update({ superseded_by: recId, superseded_at: now, superseded_reason: 'newer byok verdict landed' })
+      .eq('id', prior.id);
+    if (error) console.error(`  (non-fatal) entity supersede ${prior.id}: ${error.message}`);
+  }
+  return res;
+}
+
+// entities — backfill the entity layer from ALREADY-LANDED verdicts (no vision cost: the
+// 11k+ component claims sitting in ai_scan_metadata become queryable identification rows).
+//   node scripts/deep-image-analysis-byok.mjs entities --vehicle-id <id> [--limit N] [--dry-run]
+async function entities() {
+  const VEHICLE_ID = arg('--vehicle-id');
+  const LIMIT = parseInt(arg('--limit', '0')) || Infinity;
+  const DRY = args.includes('--dry-run');
+  if (!VEHICLE_ID) { console.error('entities: --vehicle-id required'); process.exit(1); }
+  const roster = await getReceiptRoster(VEHICLE_ID);
+  console.log(`entities: roster ${roster.length} PN-bearing receipt items for ${VEHICLE_ID}${DRY ? ' (DRY RUN)' : ''}`);
+  const PAGE = 400;
+  const totals = { frames: 0, components: 0, confirmed: 0, skipped: 0 };
+  let processed = 0;
+  for (let offset = 0; processed < LIMIT; offset += PAGE) {
+    const { data, error } = await sb.from('vehicle_images')
+      .select('id, vehicle_id, ai_scan_metadata')
+      .eq('vehicle_id', VEHICLE_ID)
+      .not('ai_scan_metadata->byok_deep_analysis', 'is', null)
+      .order('id', { ascending: true })
+      .range(offset, offset + PAGE - 1);
+    if (error) { console.error(`entities: ${error.message}`); process.exit(1); }
+    if (!data || !data.length) break;
+    const items = data
+      .map((r) => ({ image_id: r.id, vehicle_id: r.vehicle_id, verdict: r.ai_scan_metadata?.byok_deep_analysis }))
+      .filter((it) => Array.isArray(it.verdict?.components_seen) && it.verdict.components_seen.length > 0)
+      .slice(0, Math.max(0, LIMIT - processed));
+    processed += items.length;
+    const r = await landEntityPage(items, roster, { dryRun: DRY });
+    for (const k of Object.keys(totals)) totals[k] += r[k];
+    console.log(`entities: page@${offset} → frames ${r.frames}, components ${r.components}, confirmed ${r.confirmed}, skipped ${r.skipped}`);
+    if (data.length < PAGE) break;
+    await new Promise((s) => setTimeout(s, 100)); // breathe between pages (db-safety)
+  }
+  console.log(`entities: TOTAL frames ${totals.frames}, components ${totals.components}, receipt-CONFIRMED ${totals.confirmed}, already-landed skipped ${totals.skipped}`);
+}
+
 async function prepare() {
   const VEHICLE_ID = arg('--vehicle-id');
   const LIMIT = parseInt(arg('--limit', '20'));
@@ -540,6 +826,18 @@ async function ingest() {
       }
     }
 
+    // ENTITY LANDING — the reciprocal-confirmation seam made queryable: this verdict's
+    // components land as component_identifications rows (receipt-PN matches → 'confirmed').
+    // Non-fatal: an entity-landing failure never blocks the verdict itself.
+    try {
+      if (Array.isArray(v.components_seen) && v.components_seen.length) {
+        const landed = await landEntityPage(
+          [{ image_id: v.image_id, vehicle_id: v.vehicle_id, observation_id: obsRow.id, verdict: updatedMeta.byok_deep_analysis }],
+          await getReceiptRoster(v.vehicle_id));
+        if (landed.components) console.log(`  entities: ${landed.components} components landed (${landed.confirmed} receipt-confirmed)`);
+      }
+    } catch (e) { console.error(`  (non-fatal) entity landing ${v.image_id}: ${e.message}`); }
+
     wrote++;
     // Live feed: this frame's verdict just landed — the "money hitting the account"
     // moment. Record it for the pipeline visualizer (analysis_events).
@@ -888,13 +1186,14 @@ export { computeSaturation, classifyOpenQuestions, factFingerprint, isSaturatedR
 
 const isMain = process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (!['prepare', 'ingest', 'context', 'queue', 'resolve'].includes(mode)) {
-    console.error('mode must be "prepare", "ingest", "context", "queue", or "resolve"');
+  if (!['prepare', 'ingest', 'context', 'queue', 'resolve', 'entities'].includes(mode)) {
+    console.error('mode must be "prepare", "ingest", "context", "queue", "resolve", or "entities"');
     process.exit(1);
   }
   if (mode === 'prepare') await prepare();
   else if (mode === 'context') await buildContext();
   else if (mode === 'queue') await queue();
   else if (mode === 'resolve') await resolve();
+  else if (mode === 'entities') await entities();
   else await ingest();
 }
