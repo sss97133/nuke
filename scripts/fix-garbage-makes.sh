@@ -3,7 +3,7 @@
 # Step 1: Dump IDs + parsed make/model to a temp file
 # Step 2: Batch UPDATE by ID
 
-export PGPASSWORD="RbzKq32A0uhqvJMQ"
+export PGPASSWORD="${SUPABASE_DB_PASSWORD}"
 PSQL="psql -h aws-0-us-west-1.pooler.supabase.com -p 5432 -U postgres.qkgaybvrernstplzjaam -d postgres"
 TMPFILE="/tmp/garbage-makes-ids.csv"
 

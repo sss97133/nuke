@@ -12,7 +12,7 @@
 set -u
 cd "$(dirname "$0")/../.." || exit 1
 export PATH="/Users/skylar/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:$PATH"
-export PGPASSWORD="RbzKq32A0uhqvJMQ"
+export PGPASSWORD="${SUPABASE_DB_PASSWORD}"
 CONN="host=aws-0-us-west-1.pooler.supabase.com port=6543 user=postgres.qkgaybvrernstplzjaam dbname=postgres sslmode=require"
 LOG=/Users/skylar/nuke/logs/rebuild-worth.log
 log(){ echo "$(date '+%F %T') | $*" | tee -a "$LOG"; }

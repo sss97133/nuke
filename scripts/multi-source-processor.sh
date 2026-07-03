@@ -63,7 +63,7 @@ log "🚀 Multi-Source Extraction Processor"
 log "===================================="
 
 # Get pending items from non-BaT sources first, then BaT
-PENDING=$(PGPASSWORD="RbzKq32A0uhqvJMQ" psql \
+PENDING=$(PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql \
   -h aws-0-us-west-1.pooler.supabase.com \
   -p 6543 \
   -U postgres.qkgaybvrernstplzjaam \
@@ -104,7 +104,7 @@ echo "$PENDING" | while IFS='|' read -r queue_id url; do
   processed=$((processed + 1))
 
   # Update to processing
-  PGPASSWORD="RbzKq32A0uhqvJMQ" psql \
+  PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql \
     -h aws-0-us-west-1.pooler.supabase.com \
     -p 6543 \
     -U postgres.qkgaybvrernstplzjaam \
@@ -112,7 +112,7 @@ echo "$PENDING" | while IFS='|' read -r queue_id url; do
     -c "UPDATE import_queue SET status='processing', locked_at=NOW(), attempts=attempts+1 WHERE id='$queue_id';" 2>/dev/null
 
   if process_url "$url" "$queue_id"; then
-    PGPASSWORD="RbzKq32A0uhqvJMQ" psql \
+    PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql \
       -h aws-0-us-west-1.pooler.supabase.com \
       -p 6543 \
       -U postgres.qkgaybvrernstplzjaam \
@@ -120,7 +120,7 @@ echo "$PENDING" | while IFS='|' read -r queue_id url; do
       -c "UPDATE import_queue SET status='complete', processed_at=NOW() WHERE id='$queue_id';" 2>/dev/null
     succeeded=$((succeeded + 1))
   else
-    PGPASSWORD="RbzKq32A0uhqvJMQ" psql \
+    PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql \
       -h aws-0-us-west-1.pooler.supabase.com \
       -p 6543 \
       -U postgres.qkgaybvrernstplzjaam \

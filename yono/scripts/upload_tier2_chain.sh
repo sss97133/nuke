@@ -103,7 +103,7 @@ dotenvx run --env-file "$NUKE_DIR/.env" -- psql \
     -c "UPDATE agent_tasks SET status='completed', completed_at=NOW(), result='{\"summary\":\"${SUMMARY}\"}'::jsonb WHERE id='${TASK_ID}';" \
     2>&1 | tee -a "$CHAIN_LOG" || {
         # Fallback: try direct psql with known credentials
-        PGPASSWORD="RbzKq32A0uhqvJMQ" psql \
+        PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql \
             -h aws-0-us-west-1.pooler.supabase.com \
             -p 6543 \
             -U postgres.qkgaybvrernstplzjaam \

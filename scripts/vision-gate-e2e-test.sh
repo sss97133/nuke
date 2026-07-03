@@ -24,8 +24,8 @@ assert() {
 
 # Each test queries an assertion via SQL through the supabase MCP equivalent.
 # Use psql via dotenvx + the pooler URL (pre-approved per CLAUDE.md).
-PGPASSWORD="${SUPABASE_DB_PASSWORD:-RbzKq32A0uhqvJMQ}" \
-  PGCONN="postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD:-RbzKq32A0uhqvJMQ}@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
+PGPASSWORD="${SUPABASE_DB_PASSWORD}" \
+  PGCONN="postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
 
 q() { psql "$PGCONN" -tA -c "$1" 2>/dev/null; }
 
