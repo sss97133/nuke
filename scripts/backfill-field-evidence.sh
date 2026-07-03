@@ -20,7 +20,7 @@ elif [ "$FIELD_NAME" = "description" ]; then
   EXTRA_FILTER="AND length(v.${VEHICLE_COL}::text) > 20"
 fi
 
-export PGPASSWORD="RbzKq32A0uhqvJMQ"
+export PGPASSWORD="${SUPABASE_DB_PASSWORD}"
 PG="psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres"
 
 echo "[$(date)] Field evidence backfill: ${FIELD_NAME} from ${VEHICLE_COL} (confidence=${CONFIDENCE})"

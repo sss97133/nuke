@@ -29,7 +29,7 @@ for (( i=1; i<=MAX_CYCLES; i++ )); do
   echo "[$i/$MAX_CYCLES] $(date '+%H:%M:%S')" | tee -a "$LOG_FILE"
 
   # 1. Get current counts
-  COUNTS=$(PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -F'|' -c "
+  COUNTS=$(PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -F'|' -c "
     SELECT
       (SELECT count(*) FROM comment_discoveries) as cd,
       (SELECT count(*) FROM vehicle_sentiment) as vs,

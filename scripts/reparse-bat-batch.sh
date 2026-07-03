@@ -4,7 +4,7 @@
 # No re-crawling — all data comes from already-archived pages
 set -uo pipefail
 
-DB="postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
+DB="postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
 WORK_DIR="/tmp/nuke-bat-reparse"
 LOG="$WORK_DIR/progress.log"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

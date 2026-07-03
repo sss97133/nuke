@@ -28,7 +28,7 @@ VEH=()
 if [ -n "$VLIST" ] && [ -f "$VLIST" ]; then
   VEH=($(grep -E '^[0-9a-f-]{36}$' "$VLIST"))
 else
-  VEH=($(PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
+  VEH=($(PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
     -U postgres.qkgaybvrernstplzjaam -d postgres -t -A -c \
     "SELECT vi.vehicle_id FROM vehicle_images vi WHERE vi.source='user_upload' AND vi.vision_gate_status='approved' GROUP BY vi.vehicle_id ORDER BY count(*) DESC;" 2>>"$LOG" | grep -E '^[0-9a-f-]{36}$'))
 fi

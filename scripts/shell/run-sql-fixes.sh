@@ -7,7 +7,7 @@ echo "🔧 Applying SQL fixes to production database..."
 echo ""
 
 # Use the credentials from .env files
-DB_PASSWORD="RbzKq32A0uhqvJMQ"
+DB_PASSWORD="${SUPABASE_DB_PASSWORD}"
 PROJECT_REF="qkgaybvrernstplzjaam"
 DB_URL="postgresql://postgres:${DB_PASSWORD}@db.${PROJECT_REF}.supabase.co:5432/postgres"
 

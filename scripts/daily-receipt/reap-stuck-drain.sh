@@ -16,7 +16,7 @@ cd /Users/skylar/nuke || exit 1
 LOCK=/tmp/com.nuke.reap-stuck.lock
 mkdir "$LOCK" 2>/dev/null || { echo "$(date '+%H:%M:%S') reap-drain: prior fire running — skip"; exit 0; }
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT
-export PGPASSWORD="RbzKq32A0uhqvJMQ"
+export PGPASSWORD="${SUPABASE_DB_PASSWORD}"
 CONN="host=aws-0-us-west-1.pooler.supabase.com port=6543 user=postgres.qkgaybvrernstplzjaam dbname=postgres sslmode=require"
 LOG=/Users/skylar/nuke/logs/reap-stuck.log
 echo "=== $(date '+%H:%M:%S') reap-drain fire (bounded 60 batches x 500) ===" >> "$LOG"

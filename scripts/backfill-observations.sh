@@ -10,7 +10,7 @@ SOURCE_SLUG="${2:?Usage: $0 <vehicle.source value> <observation_sources.slug>}"
 BATCH_SIZE="${3:-1000}"
 SLEEP_SECS="0.3"
 
-export PGPASSWORD="RbzKq32A0uhqvJMQ"
+export PGPASSWORD="${SUPABASE_DB_PASSWORD}"
 PG_OPTS="-h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A"
 
 echo "[$(date)] Starting observation backfill: source='${SOURCE_FIELD}' -> slug='${SOURCE_SLUG}' batch=${BATCH_SIZE}"

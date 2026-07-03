@@ -4,7 +4,7 @@ set -u
 cd "$(dirname "$0")/.."
 
 probe() {
-  PGPASSWORD="RbzKq32A0uhqvJMQ" timeout 8 psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
+  PGPASSWORD="${SUPABASE_DB_PASSWORD}" timeout 8 psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
     -U postgres.qkgaybvrernstplzjaam -d postgres -c "SELECT 1" >/dev/null 2>&1
 }
 
@@ -16,7 +16,7 @@ echo "$(date +%H:%M:%S) === retry: daily-receipt EXIF backfill ==="
 dotenvx run -- node scripts/backfill_daily_receipt_exif.mjs 2>&1 | tail -8
 
 echo "$(date +%H:%M:%S) === catch-up: device_attributions for iphoto rows missing it ==="
-PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
+PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
   -U postgres.qkgaybvrernstplzjaam -d postgres -v ON_ERROR_STOP=1 <<'SQL'
 SET statement_timeout='120s';
 INSERT INTO device_attributions (

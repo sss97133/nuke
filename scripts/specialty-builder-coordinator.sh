@@ -108,7 +108,7 @@ LIMIT 20;
 echo ""
 echo "Querying pending extractions..."
 
-pending=$(PGPASSWORD="RbzKq32A0uhqvJMQ" psql \
+pending=$(PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql \
   -h aws-0-us-west-1.pooler.supabase.com \
   -p 6543 \
   -U postgres.qkgaybvrernstplzjaam \

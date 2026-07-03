@@ -31,7 +31,7 @@ for entry in "${QUEUE[@]}"; do
   echo "$(date +%H:%M:%S) [$LABEL] done"
 
   # After each intake: catch-up device_attributions
-  PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
+  PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
     -U postgres.qkgaybvrernstplzjaam -d postgres -v ON_ERROR_STOP=1 <<SQL
 SET statement_timeout='120s';
 INSERT INTO device_attributions (
