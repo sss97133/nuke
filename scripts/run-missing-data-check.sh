@@ -2,7 +2,7 @@
 # Quick script to check missing profile data via Supabase REST API
 
 SUPABASE_URL="https://qkgaybvrernstplzjaam.supabase.co"
-SERVICE_KEY="REDACTED-ROTATE-THIS-KEY"
+SERVICE_KEY="${SUPABASE_SERVICE_ROLE_KEY:?Set SUPABASE_SERVICE_ROLE_KEY in the environment}"
 
 echo "═══════════════════════════════════════════════════════"
 echo "   Missing Profile Data Check"

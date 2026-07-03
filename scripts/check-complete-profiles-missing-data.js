@@ -5,7 +5,11 @@
  */
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co';
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'REDACTED-ROTATE-THIS-KEY';
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!SERVICE_KEY) {
+  console.error("Missing required env var SUPABASE_SERVICE_ROLE_KEY");
+  process.exit(1);
+}
 
 async function checkMissingData() {
   console.log('═══════════════════════════════════════════════════════');
