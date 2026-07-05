@@ -27,7 +27,35 @@
 
 import type { ResultKind } from "./types.ts";
 
-export type SubjectKind = "vehicle" | "image" | "person" | "cluster";
+export type SubjectKind = "vehicle" | "image" | "person" | "cluster" | "user";
+
+// ── Evidence-class binding (the anti-laundering rule) ────────────────────────
+// Every attribute declares which classes of evidence may legitimately CITE it.
+// A photo cannot show horsepower; a VIN decode cannot show the current paint.
+// submit_attribute_value rejects any claim whose citation class is not admissible
+// for the attribute — so a high-tier fact can't be laundered in behind a low-tier
+// (or simply wrong-modality) citation.
+//
+//   image         — visible in a photograph of THIS asset (current color, seat count,
+//                   body style, visible mods, condition, plate/VIN read).
+//   vin_decode    — derived from the VIN per a factory decode rule (hp, torque,
+//                   displacement, engine/trans codes, factory equipment).
+//   document      — a record: build sheet / Marti report / title / service history
+//                   (original color, mileage, ownership chain).
+//   owner_claim   — the owner asserts it. Universally admissible but LOWEST tier and
+//                   upgradable — a confirming image/document/decode supersedes it.
+//   context_atoms — derived from Nuke's own graph (user/cluster substrate joins);
+//                   the "evidence" is existing attributed atoms, not an external source.
+export type EvidenceClass =
+  | "image"
+  | "vin_decode"
+  | "document"
+  | "owner_claim"
+  | "context_atoms";
+
+export const EVIDENCE_CLASSES: readonly EvidenceClass[] = [
+  "image", "vin_decode", "document", "owner_claim", "context_atoms",
+];
 
 export type ExpectedShape =
   | "string"
@@ -84,6 +112,11 @@ export interface AttributeDefinition {
 
   // Versioning so prompt drift is observable. Bump when the prompt changes.
   prompt_version: string;
+
+  // Admissible evidence classes for this attribute. Optional on the definition;
+  // the authoritative binding is ADMISSIBLE_EVIDENCE below (one auditable block).
+  // admissibleEvidence(attribute) resolves the effective set.
+  admissible_evidence?: EvidenceClass[];
 }
 
 // ============================================================================
@@ -290,6 +323,83 @@ const L2: AttributeDefinition[] = [
 // ============================================================================
 
 const L3: AttributeDefinition[] = [
+  // ── Factory-spec facts (VIN-decode tier) ───────────────────────────────────
+  // A photograph cannot show these; admissible evidence is the VIN decode (factory
+  // rule), a document (build sheet / window sticker), or a low-tier owner_claim.
+  {
+    attribute: "vehicle.horsepower",
+    subject_kind: "vehicle",
+    result_kind: "substrate",
+    layer: 3,
+    modalities: ["context_atoms"],
+    admissible_evidence: ["vin_decode", "document", "owner_claim"],
+    prompt:
+      "Report the factory-rated gross horsepower for this VIN's engine code. " +
+      "Cite the decode rule (e.g. 1966 Ford 289 2V C-code = 200 hp gross). Do NOT " +
+      "infer from a photo — a photo cannot show horsepower. Return an integer.",
+    expected_shape: "number",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "vehicle.torque",
+    subject_kind: "vehicle",
+    result_kind: "substrate",
+    layer: 3,
+    modalities: ["context_atoms"],
+    admissible_evidence: ["vin_decode", "document", "owner_claim"],
+    prompt:
+      "Report the factory-rated gross torque (lb-ft) for this VIN's engine code. " +
+      "Cite the decode rule (e.g. 1966 Ford 289 2V C-code = 282 lb-ft). Return an integer.",
+    expected_shape: "number",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "vehicle.displacement",
+    subject_kind: "vehicle",
+    result_kind: "substrate",
+    layer: 3,
+    modalities: ["context_atoms"],
+    admissible_evidence: ["vin_decode", "document", "owner_claim"],
+    prompt:
+      "Report the factory engine displacement for this VIN's engine code, as cubic " +
+      "inches or liters (e.g. '289' or '4.7L'). Cite the decode rule. Return a string.",
+    expected_shape: "string",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "vehicle.seat_count",
+    subject_kind: "vehicle",
+    result_kind: "substrate",
+    layer: 3,
+    modalities: ["image", "context_atoms"],
+    admissible_evidence: ["image", "vin_decode", "document", "owner_claim"],
+    prompt:
+      "Report the number of factory seating positions. May be counted from an interior " +
+      "photo OR derived from the body style via VIN decode (e.g. 1966 Mustang hardtop " +
+      "coupe = 4). Return an integer.",
+    expected_shape: "number",
+    prompt_version: "v1",
+  },
+  {
+    // Market disposition. The single most fraud-prone and contamination-prone field on an
+    // asset: "sold" vs "for sale" vs "owner-retained" drives value perception AND leaks across
+    // records in bulk auction scrapes. Admissible evidence is a DOCUMENT (title / bill of sale —
+    // who legally holds it), an IMAGE (ongoing possession / restoration), or an owner_claim.
+    attribute: "vehicle.sale_disposition",
+    subject_kind: "vehicle",
+    result_kind: "substrate",
+    layer: 3,
+    modalities: ["ocr", "image", "context_atoms"],
+    admissible_evidence: ["document", "image", "owner_claim"],
+    expected_shape: "enum",
+    enum_values: ["for_sale", "sold", "owner_retained", "in_restoration", "withdrawn", "unknown"],
+    prompt:
+      "What is the asset's true market disposition RIGHT NOW? 'sold' means it changed hands to a " +
+      "new owner; 'owner_retained' / 'in_restoration' mean the current owner still holds it (a " +
+      "title in their name + ongoing possession/build photos prove this and OVERRIDE a stale " +
+      "auction-scrape 'sold'). Cite the title/bill-of-sale (document) or possession photos (image).",
+    prompt_version: "v1",
+  },
   {
     attribute: "vehicle.exterior_color",
     subject_kind: "vehicle",
@@ -304,6 +414,42 @@ const L3: AttributeDefinition[] = [
       "raw_metal, primer, satin_black, etc.) and a sRGB hex approximation. " +
       "If the vehicle is mid-restoration with multiple panel colors, list each " +
       "panel and its color separately.",
+    expected_shape: "structured",
+    prompt_version: "v1",
+  },
+  // ── Color decomposition (time-varying) ─────────────────────────────────────
+  // The single `exterior_color` field conflates two different facts with different
+  // evidence: what color it IS now (a photo shows it) vs what color it LEFT THE
+  // FACTORY (only a document — Marti report / door tag — can prove it). They are
+  // separate claims; a refinish_event links them. The canonical profile projects
+  // current as the headline and retains original + the change history.
+  {
+    attribute: "vehicle.current_color",
+    subject_kind: "vehicle",
+    result_kind: "substrate",
+    layer: 3,
+    modalities: ["image"],
+    admissible_evidence: ["image", "owner_claim"],
+    depends_on: ["image.vehicle_bboxes", "vehicle.viewpoint"],
+    prompt:
+      "What color IS the vehicle now? Read it from the body panels in a current " +
+      "photograph (ignore background, glass, wheels). Return { color, hex }. This is " +
+      "present-state — a refinished car reports its refinished color, not the factory color.",
+    expected_shape: "structured",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "vehicle.original_color",
+    subject_kind: "vehicle",
+    result_kind: "substrate",
+    layer: 3,
+    modalities: ["ocr", "context_atoms"],
+    admissible_evidence: ["document", "owner_claim"],
+    prompt:
+      "What color did the vehicle LEAVE THE FACTORY? This is NOT visible in a photo of " +
+      "a refinished car — it requires a document: a Marti report, build sheet, window " +
+      "sticker, or the door-jamb paint code. Return { color, code, source_doc }. If you " +
+      "only have a photo, you cannot answer this — submit it as vehicle.current_color instead.",
     expected_shape: "structured",
     prompt_version: "v1",
   },
@@ -366,6 +512,26 @@ const L3: AttributeDefinition[] = [
 // ============================================================================
 
 const L4: AttributeDefinition[] = [
+  {
+    // Links original_color → current_color as an explicit state-change in the append-only
+    // log. result_kind 'projection' — it's an inference ABOUT a change in the world, not a
+    // direct measurement. Evidence can be a before/after image pair, a paint receipt
+    // (document), or the owner's account.
+    attribute: "vehicle.refinish_event",
+    subject_kind: "vehicle",
+    result_kind: "projection",
+    layer: 4,
+    modalities: ["image", "ocr", "context_atoms"],
+    admissible_evidence: ["image", "document", "owner_claim"],
+    depends_on: ["vehicle.current_color"],
+    prompt:
+      "Record a documented repaint/refinish as a state change. Return " +
+      "{ from_color, to_color, observed_change_date?, method? (respray|wrap|patina_preserve), " +
+      "shop? }. Cite the evidence: a before/after image pair, a paint/body invoice, or the " +
+      "owner's statement. This is what reconciles a 'factory blue' original with a 'black now' current.",
+    expected_shape: "structured",
+    prompt_version: "v1",
+  },
   {
     attribute: "image.location_class",
     subject_kind: "image",
@@ -487,7 +653,188 @@ const COMPOUND: AttributeDefinition[] = [
   },
 ];
 
-const REGISTRY: AttributeDefinition[] = [...L1, ...L2, ...L3, ...L4, ...L5, ...COMPOUND];
+// ============================================================================
+// USER — first-class subject_kind added 2026-05-24 per Skylar directive:
+// "user profiles are the drivers of progress on the platform otherwise the
+// system is dead. its a shell without a driver just a bunch of boring useless
+// assets." Vehicles/images are derivative; users are the source-of-truth subject.
+// These attributes are answerable by a caller agent reading the user-substrate
+// (user_profiles + user_emails + user_phones + user_addresses + user_roles +
+// user_observations + user_contributions + vehicle_images.user_id), not from
+// an image directly. Modality is predominantly context_atoms.
+// ============================================================================
+const USER: AttributeDefinition[] = [
+  // L1 — existence/identity baseline
+  {
+    attribute: "user.has_profile",
+    subject_kind: "user",
+    result_kind: "substrate",
+    layer: 1,
+    modalities: ["context_atoms"],
+    prompt:
+      "Does this user have a `user_profiles` row with at minimum a display_name " +
+      "and a primary email? Answer true if both exist and verified, false otherwise. " +
+      "This is the gate for whether any higher-layer user attribute can be queried.",
+    expected_shape: "boolean",
+    prompt_version: "v1",
+  },
+  // L2 — identity surface
+  {
+    attribute: "user.display_identity",
+    subject_kind: "user",
+    result_kind: "substrate",
+    layer: 2,
+    modalities: ["context_atoms"],
+    depends_on: ["user.has_profile"],
+    prompt:
+      "Return the user's display identity: display_name + preferred_username + " +
+      "primary email + locale + timezone. Pull from user_profiles + user_emails. " +
+      "All directly from substrate — no inference.",
+    expected_shape: "structured",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "user.contact_surface",
+    subject_kind: "user",
+    result_kind: "substrate",
+    layer: 2,
+    modalities: ["context_atoms"],
+    depends_on: ["user.has_profile"],
+    prompt:
+      "Enumerate all multi-valued contact rows: every email in user_emails, " +
+      "every phone in user_phones, every address in user_addresses. Return as " +
+      "structured arrays with type, primary flag, verified flag. Substrate only.",
+    expected_shape: "structured",
+    prompt_version: "v1",
+  },
+  // L3 — derived profile/state
+  {
+    attribute: "user.role_set",
+    subject_kind: "user",
+    result_kind: "substrate",
+    layer: 3,
+    modalities: ["context_atoms"],
+    depends_on: ["user.has_profile"],
+    prompt:
+      "List all active user_roles for this user — role + scope_type + scope_id + " +
+      "granted_at. Exclude revoked_at IS NOT NULL. This answers 'what can this " +
+      "user do, and inside which organizations/vehicles.'",
+    expected_shape: "structured",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "user.possession_set",
+    subject_kind: "user",
+    result_kind: "substrate",
+    layer: 3,
+    modalities: ["context_atoms"],
+    depends_on: ["user.has_profile"],
+    prompt:
+      "List all vehicles this user owns or stewards via vehicle_user_permissions " +
+      "(verified_owner / previous_owner / contributor / etc). Include vehicle_id, " +
+      "year/make/model, permission_level, evidence_count. Substrate join, no inference.",
+    expected_shape: "structured",
+    prompt_version: "v1",
+  },
+  // L4 — projection (inference about behavior/pattern)
+  {
+    attribute: "user.vendor_preference_signal",
+    subject_kind: "user",
+    result_kind: "projection",
+    layer: 4,
+    modalities: ["context_atoms"],
+    depends_on: ["user.has_profile"],
+    prompt:
+      "From user_observations of kind='vendor_preference' joined with " +
+      "user_contributions (qb_txn, email, imessage), produce the user's top-N " +
+      "vendors by spend + frequency, with recency-decay weighting. Return ranked " +
+      "list with (vendor, spend_total, txn_count, last_txn_date, signal_score). " +
+      "Per Skylar 2026-05-23: $ totals from QB are flagged unverified — surface " +
+      "qualitative ranking (vendor exists / frequency / recency) as primary; " +
+      "dollars as secondary with .unverified suffix.",
+    expected_shape: "structured",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "user.daily_activity_density",
+    subject_kind: "user",
+    result_kind: "projection",
+    layer: 4,
+    modalities: ["context_atoms"],
+    depends_on: ["user.has_profile"],
+    prompt:
+      "Compose a GitHub-style 365-day activity heatmap from v_user_daily_activity. " +
+      "Return per-day (date, contribution_count, dominant_kind, subject_breakdown). " +
+      "This is THE product per Skylar (session 5d0848ba): 'once we're able to fully " +
+      "establish user behavior then we're able to establish asset growth.'",
+    expected_shape: "structured",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "user.relationship_map",
+    subject_kind: "user",
+    result_kind: "projection",
+    layer: 4,
+    modalities: ["context_atoms"],
+    depends_on: ["user.has_profile"],
+    prompt:
+      "From user_observations of kind='counterparty_relationship' joined with " +
+      "contacts + payment_events + apple_cash data, produce the user's " +
+      "relationship graph: per-counterparty (name, relationship_type, txn_count, " +
+      "total_value, last_interaction, evidence_sources). Tag spouse/family/" +
+      "contractor/vendor/customer where determinable. Per Skylar: Jenny is wife, " +
+      "Apple Cash to her is spousal not commercial.",
+    expected_shape: "structured",
+    prompt_version: "v1",
+  },
+];
+
+// ============================================================================
+// CLUSTER — temporal-change (dT) over the work-session chain. Added 2026-05-31.
+// The transition unit is a `work_sessions` row (the labor ledger — "work story
+// lives in work_sessions"). Consecutive sessions for one vehicle are ordered by
+// `session_date`; the predecessor is simply the prior work_sessions row for that
+// vehicle_id (no predecessor/successor columns needed — ORDER BY session_date IS
+// the chain). Member photos resolve via `vehicle_images.work_session_id`; per-
+// image state lives at ai_scan_metadata->'byok_deep_analysis'->'state_observations'.
+// The dT signal — what WORK happened — lives in the transition between a session
+// and the prior one, not in any single frame (per engineering-manual ch.19 and
+// feedback_photo_intent_must_be_confirmed_not_assumed). subject_kind="cluster",
+// subject_id = the later work_session.id. It is a HYPOTHESIS generator:
+// result_kind=projection, owner-confirmation gated downstream — value accrues to
+// work_sessions only from confirmed labor, never from the delta alone.
+// ============================================================================
+const CLUSTER: AttributeDefinition[] = [
+  {
+    attribute: "cluster.work_transition",
+    subject_kind: "cluster",
+    result_kind: "projection",
+    layer: 5,
+    modalities: ["image", "context_atoms"],
+    // Consumes the state atoms on THIS work_session's images and on the prior
+    // work_session (same vehicle_id, previous session_date). Dependency is
+    // encoded in the prompt rather than via depends_on because the per-image
+    // condition atoms live in ai_scan_metadata, not declared as registry attrs.
+    prompt:
+      "You are given two consecutive work_sessions for one vehicle, ordered by " +
+      "session_date: THIS session (subject_id) and the prior session for the same " +
+      "vehicle_id. For each, you have the member photos (vehicle_images where " +
+      "work_session_id = the session) and their already-extracted state atoms from " +
+      "ai_scan_metadata.byok_deep_analysis.state_observations (rust_severity, " +
+      "paint_state, completeness, build_phase_guess, damage_callouts, scene_type). " +
+      "Diff them and return the TRANSITION: { state_before, state_after, change_type " +
+      "one of [teardown|repair|fabrication|surface_prep|paint|assembly|wiring|" +
+      "interior|diagnosis|none], zones_changed[], evidence_image_ids[], confidence }. " +
+      "Report ONLY change you can see across the pair. If nothing changed, return " +
+      "change_type='none'. Do NOT estimate labor hours or value — that is decided " +
+      "by owner confirmation downstream, not by you. If there is no prior session or " +
+      "the pair is not comparable (different vehicle/zone), return null.",
+    expected_shape: "structured",
+    prompt_version: "v1",
+  },
+];
+
+const REGISTRY: AttributeDefinition[] = [...L1, ...L2, ...L3, ...L4, ...L5, ...USER, ...COMPOUND, ...CLUSTER];
 
 const BY_NAME: Record<string, AttributeDefinition> = Object.fromEntries(
   REGISTRY.map((a) => [a.attribute, a])
@@ -523,6 +870,85 @@ export function getAttribute(name: string): AttributeDefinition | null {
 
 export function listAttributes(): string[] {
   return REGISTRY.map((a) => a.attribute);
+}
+
+// ── Evidence-class binding (authoritative table) ─────────────────────────────
+// One auditable block (Skylar's call: registry code is source of truth, not a DB
+// table). Attributes whose definitions carry an inline `admissible_evidence` win;
+// this map covers the rest. The anti-laundering invariant to eyeball here: no
+// spec fact (hp/torque/displacement/codes) lists "image".
+const ADMISSIBLE_EVIDENCE: Record<string, EvidenceClass[]> = {
+  // Pure vision tasks — only a photo can answer them.
+  "image.has_vehicle": ["image"],
+  "image.classification": ["image"],
+  "image.vehicle_bboxes": ["image"],
+  "image.ocr_regions": ["image"],
+  "image.location_class": ["image"],
+  "image.in_progress_work": ["image"],
+  "image.likely_vehicle_id": ["image", "context_atoms"],
+  "vehicle.viewpoint": ["image"],
+  "vehicle.vin_visible": ["image"],
+  "vehicle.plate_redacted": ["image"],
+  // Identity — establishable from a badge (image), the VIN, a document, or the owner.
+  "vehicle.year_range": ["image", "vin_decode", "document", "owner_claim"],
+  "vehicle.make": ["image", "vin_decode", "document", "owner_claim"],
+  "vehicle.model": ["image", "vin_decode", "document", "owner_claim"],
+  // Observed present-state — what a photo (or the owner) shows now.
+  "vehicle.exterior_color": ["image", "owner_claim"],
+  "vehicle.condition_cues": ["image", "owner_claim"],
+  "vehicle.modifications": ["image", "owner_claim"],
+  // Mileage — read off the odometer (image), a title/service doc, or owner.
+  "vehicle.odometer_reading": ["image", "document", "owner_claim"],
+  // Artifacts — documents (optionally photographed).
+  "vehicle.invoice_artifact": ["document", "image"],
+  "vehicle.work_log_artifact": ["document", "image", "owner_claim"],
+  // User / cluster — substrate joins over Nuke's own attributed graph.
+  "user.has_profile": ["context_atoms"],
+  "user.display_identity": ["context_atoms", "owner_claim"],
+  "user.contact_surface": ["context_atoms", "owner_claim"],
+  "user.role_set": ["context_atoms", "owner_claim"],
+  "user.possession_set": ["context_atoms"],
+  "user.vendor_preference_signal": ["context_atoms"],
+  "user.daily_activity_density": ["context_atoms"],
+  "user.relationship_map": ["context_atoms"],
+  "cluster.work_transition": ["context_atoms", "image"],
+};
+
+/**
+ * Resolve the admissible evidence classes for an attribute:
+ *   1. inline `admissible_evidence` on the definition (spec attrs use this)
+ *   2. the ADMISSIBLE_EVIDENCE table
+ *   3. a conservative default derived from modalities (image→[image,owner_claim],
+ *      else [context_atoms]) — never silently confers vin_decode/document.
+ * Returns [] for an unknown attribute (caller treats as reject).
+ */
+export function admissibleEvidence(attribute: string): EvidenceClass[] {
+  const def = BY_NAME[attribute];
+  if (!def) return [];
+  if (def.admissible_evidence && def.admissible_evidence.length) return def.admissible_evidence;
+  if (ADMISSIBLE_EVIDENCE[attribute]) return ADMISSIBLE_EVIDENCE[attribute];
+  return def.modalities.includes("image") ? ["image", "owner_claim"] : ["context_atoms"];
+}
+
+/**
+ * The anti-laundering gate. Returns null if `evidenceClass` may legitimately cite
+ * `attribute`, else an error string. This is what makes a photo-cited horsepower
+ * claim fail: "image" is not in horsepower's admissible set.
+ */
+export function validateEvidenceClass(
+  attribute: string,
+  evidenceClass: unknown,
+): string | null {
+  const def = BY_NAME[attribute];
+  if (!def) return `unknown attribute: ${attribute}`;
+  if (typeof evidenceClass !== "string" || !EVIDENCE_CLASSES.includes(evidenceClass as EvidenceClass)) {
+    return `unknown evidence class '${String(evidenceClass)}'; must be one of [${EVIDENCE_CLASSES.join(", ")}]`;
+  }
+  const adm = admissibleEvidence(attribute);
+  if (!adm.includes(evidenceClass as EvidenceClass)) {
+    return `evidence class '${evidenceClass}' is not admissible for ${attribute} (a ${evidenceClass} can't establish it); admissible: [${adm.join(", ")}]`;
+  }
+  return null;
 }
 
 /**
