@@ -176,6 +176,12 @@ async function uploadPhoto(filePath, filename, meta) {
   const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
 
   const hasLabels = Array.isArray(meta.labels) && meta.labels.length > 0;
+  // True capture instant: osxphotos' `date_original` (and exif_info.date,
+  // same value) is the never-rewritten EXIF DateTimeOriginal. `meta.date` is
+  // Apple's MUTABLE internal date — it gets reset on iCloud restore/migration/
+  // library merge and does not represent when the photo was actually taken.
+  // Only fall back to it when the true capture date is unavailable.
+  const capturedAt = meta.date_original || meta.exif_info?.date || meta.date;
   const payload = {
     // identity root: content equality key from LOCAL bytes (RPC keys phash_hex
     // on 'sha256:<hex>' until a caller-side perceptual hash exists; leaf
@@ -200,7 +206,7 @@ async function uploadPhoto(filePath, filename, meta) {
     // real EXIF only — straight from the Photos-library original via osxphotos
     ...(meta.exif_info?.camera_make && { camera_make: meta.exif_info.camera_make }),
     ...(meta.exif_info?.camera_model && { camera_model: meta.exif_info.camera_model }),
-    ...(meta.date && { taken_at: meta.date }),
+    ...(capturedAt && { taken_at: capturedAt }),
     ...(meta.latitude != null && { gps_latitude: meta.latitude }),
     ...(meta.longitude != null && { gps_longitude: meta.longitude }),
     exif_data: {

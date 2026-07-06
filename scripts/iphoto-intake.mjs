@@ -290,10 +290,17 @@ function extractPhotoMeta(p) {
   if (p.score) exifData.score = p.score;
   if (p.labels) exifData.labels = p.labels;
 
+  // True capture instant: prefer osxphotos' `date_original` (never-rewritten
+  // EXIF DateTimeOriginal), then exif_info.date (same value, nested), and
+  // only fall back to `p.date` — Apple's MUTABLE internal date, which gets
+  // reset on iCloud restore/migration/library merge and does not represent
+  // when the photo was actually taken.
+  const takenAt = p.date_original || exif.date || p.date || null;
+
   return {
     latitude: p.latitude || null,
     longitude: p.longitude || null,
-    taken_at: p.date || null,
+    taken_at: takenAt,
     location_name: locationName,
     exif_data: Object.keys(exifData).length > 0 ? exifData : null,
   };
