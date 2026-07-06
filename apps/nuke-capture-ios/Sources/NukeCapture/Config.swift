@@ -13,7 +13,22 @@ import Foundation
 
 enum Config {
     // ─── Supabase project (mirrors nuke_frontend env) ────────────────────────
-    static let supabaseURL = URL(string: "https://qkgaybvrernstplzjaam.supabase.co")!
+    static let supabaseURL: URL = {
+        #if DEBUG
+        // Screenshot-loop hook ONLY (same DEBUG-gated convention as the
+        // NUKE_DEBUG_SCREEN/_VEHICLE_ID deep-links in NukeCaptureApp.swift):
+        // NUKE_DEBUG_FORCE_OFFLINE=1 points the client at localhost on a port
+        // nothing listens on, so every live call gets an immediate TCP
+        // connection-refused (no 60s connect-timeout wait like a black-holed
+        // IP would cause) — proves the offline-cache fallback path for real,
+        // fast enough for a screenshot loop. DEBUG builds only; never
+        // compiled into a release/TestFlight binary.
+        if ProcessInfo.processInfo.environment["NUKE_DEBUG_FORCE_OFFLINE"] == "1" {
+            return URL(string: "https://127.0.0.1:65535")!
+        }
+        #endif
+        return URL(string: "https://qkgaybvrernstplzjaam.supabase.co")!
+    }()
     static let supabaseAnonKey =
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." +
         "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0." +
