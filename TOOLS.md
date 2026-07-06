@@ -94,7 +94,10 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | MCP: Prepare listing | `mcp-connector` → `prepare_listing` | Read-only preview |
 | MCP: Auction briefing | `mcp-connector` → `get_auction_briefing` | One-call composite: identity, auction data, valuation, seller profile, comps, market history, sentiment, condition. Accepts vehicle_id or listing_url. |
 | HTTP: Auction briefing | `get-auction-briefing` | Standalone edge function — same composite briefing as MCP tool but callable via HTTP POST. Body: `{vehicle_id}` or `{listing_url}`. Returns identity, auction metrics, seller analytics, comps, sentiment, condition. |
-| Seller analytics (SQL) | `get_seller_analytics(p_seller_username)` | Returns seller profile from bat_listings: sell-through rate, pricing stats, engagement metrics, reserve behavior, recent sales, primary makes. ~60ms even for 1400-listing sellers. |
+| Seller analytics (SQL) | `get_seller_analytics(p_seller_username)` | Returns seller profile from bat_listings: sell-through rate, pricing stats, engagement metrics, reserve behavior, recent sales, primary makes. ~60ms even for 1400-listing sellers. **Case-sensitive exact match on `seller_username`** — misses casing variants (see `get_seller_stats` note). |
+| Seller hammer revenue (SQL) | `get_seller_stats(p_handle, p_since, p_until)` | Dealer-level total hammer revenue for a BaT seller handle. Matches **case-insensitively** on `seller_username` (the `seller_external_identity_id` FK is populated on only 4 of 157,088 `bat_listings` rows platform-wide — don't join on it alone). Dedupes bat_listings by normalized `bat_listing_url` (strips trailing slash / comment fragment) before summing — re-scraped duplicate rows are a platform-wide pattern (23,304 excess rows / 14.8% of the table as of 2026-07-05), not a one-off. Excludes self-purchases (buyer_username = seller_username). Added by the 2026-07-05 VLVA revenue reconciliation (migration `20260705000000_bat_seller_revenue_dedup.sql`). |
+| HTTP: Seller hammer revenue | `api-v1-seller-stats` | Thin wrapper over `get_seller_stats()`. Body/query: `{handle, since?, until?}`. |
+| MCP: Seller hammer revenue | `nuke-mcp-server` → `seller_stats` | Same, via the published MCP server (`mcp-server/src/index.ts`). |
 
 ---
 
