@@ -32,13 +32,52 @@ enum VisionEngine {
     ]
     static var allVehicleLabels: Set<String> { coreVehicleLabels.union(supportingVehicleLabels) }
 
+    // MARK: - "Unnecessary" (clutter) detection — POSITIVE junk signals only
+    //
+    // The essential gate: use Vision to keep the clutter (screenshots, shopping
+    // captures, memes, documents) out of the way, so the real photos read clean.
+    // CRITICAL: key on AFFIRMATIVE junk (a screenshot, or a top label that IS a
+    // document/web/product capture) — NEVER on "absence of vehicle". A no-face
+    // engine/part/interior close-up is a NECESSARY work photo Apple simply doesn't
+    // tag "vehicle" (that was the arbitrary over-blur we already fixed in
+    // classifyAsset). A document here is BOTH clutter AND the sensitive-doc case
+    // (a title/registration) — gating it declutters and protects in one move.
+
+    static let junkLabels: Set<String> = [
+        "document", "text", "menu", "receipt", "paper", "printout",
+        "poster", "advertisement", "packaging", "envelope", "label",
+        "book_jacket", "business_card", "website", "web_site", "screenshot",
+        "spreadsheet", "invoice", "id_card", "form", "newspaper", "magazine",
+    ]
+
+    /// PHAsset-level screenshot flag — FREE (a PhotoKit fact, no Vision, no decode).
+    static func isScreenshot(localIdentifier: String) -> Bool {
+        let f = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
+        return f.firstObject?.mediaSubtypes.contains(.photoScreenshot) ?? false
+    }
+
+    /// "Unnecessary"/clutter verdict from POSITIVE signals: a screenshot, or a top
+    /// on-device label that is a document/web/product capture. Conservative by design
+    /// — only the strongest few labels vote, so a faint "text" tag on a real photo (a
+    /// plate, a garage sign) does NOT gate it, and "not a vehicle" NEVER gates.
+    static func isUnnecessary(labels: [String], isScreenshot: Bool) -> Bool {
+        if isScreenshot { return true }
+        for l in labels.prefix(3) where junkLabels.contains(l.lowercased()) { return true }
+        return false
+    }
+
     // MARK: - Asset → CGImage (local, no network by default)
 
     /// Load a PHAsset (by localIdentifier) as a CGImage sized for Vision.
     /// Local-only by default — attribution should not spend cellular pulling
     /// iCloud originals; the originals are on the device that shot them.
+    ///
+    /// `timeoutSeconds` only applies when `allowNetwork` is true (the local path
+    /// never hangs — PhotoKit answers a local-availability check fast — so the
+    /// extra race machinery would be pure overhead there). When set, a slow/stalled
+    /// iCloud fetch is cancelled and this returns nil instead of hanging the caller.
     static func loadCGImage(assetID: String, maxPixel: CGFloat = 512,
-                            allowNetwork: Bool = false) async -> CGImage? {
+                            allowNetwork: Bool = false, timeoutSeconds: Double? = nil) async -> CGImage? {
         let fetch = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
         guard let asset = fetch.firstObject else { return nil }
 
@@ -49,14 +88,95 @@ enum VisionEngine {
         opts.isSynchronous = false
         let target = CGSize(width: maxPixel, height: maxPixel)
 
-        return await withCheckedContinuation { cont in
-            PHImageManager.default().requestImage(
-                for: asset, targetSize: target, contentMode: .aspectFit, options: opts
-            ) { image, info in
-                if let cg = image?.cgImage { cont.resume(returning: cg) }
-                else { cont.resume(returning: nil) }
+        guard allowNetwork, let timeoutSeconds else {
+            return await withCheckedContinuation { cont in
+                PHImageManager.default().requestImage(
+                    for: asset, targetSize: target, contentMode: .aspectFit, options: opts
+                ) { image, info in
+                    if let cg = image?.cgImage { cont.resume(returning: cg) }
+                    else { cont.resume(returning: nil) }
+                }
             }
         }
+
+        // Network path with a hard timeout: race the PhotoKit callback against a
+        // sleep and cancel the in-flight request if the sleep wins, so one stalled
+        // iCloud download (throttled connection, huge backlog) can never block the
+        // classify queue indefinitely.
+        let box = PHRequestIDBox()
+        return await withTaskGroup(of: CGImage??.self) { group in
+            group.addTask {
+                let cg: CGImage? = await withCheckedContinuation { cont in
+                    let rid = PHImageManager.default().requestImage(
+                        for: asset, targetSize: target, contentMode: .aspectFit, options: opts
+                    ) { image, info in
+                        if let cg = image?.cgImage { cont.resume(returning: cg) }
+                        else { cont.resume(returning: nil) }
+                    }
+                    Task { await box.set(rid) }
+                }
+                return .some(cg)
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(timeoutSeconds))
+                if let rid = await box.get() { PHImageManager.default().cancelImageRequest(rid) }
+                return .some(nil)
+            }
+            let first = await group.next() ?? .some(nil)
+            group.cancelAll()
+            return first ?? nil
+        }
+    }
+
+    /// Tiny actor box so the timeout task can cancel the in-flight PHImageRequestID
+    /// the request task hands back — PHImageRequestID needs to cross this boundary.
+    private actor PHRequestIDBox {
+        private var id: PHImageRequestID?
+        func set(_ v: PHImageRequestID) { id = v }
+        func get() -> PHImageRequestID? { id }
+    }
+
+    // MARK: - Network-classification throttle
+    //
+    // `classifyAsset` falls back to a network (iCloud) fetch when a photo isn't
+    // decodable locally (Optimize Storage). That's a DIFFERENT contention source
+    // than local decode: it competes with LibraryIngest's own original-bytes
+    // network pulls (LibraryIngest.swift — `lanes = 2`, kept low on purpose because
+    // heavy PHImageManager network requests starved the live classifier once
+    // already — see c51cdd2ed) through the same underlying iCloud-download queue,
+    // and NukeCaptureApp's foreground head pass (deferred 3s, capped at 300) is
+    // ANOTHER consumer of that same lane. So the network-classify path gets its own
+    // ceiling, deliberately AT/BELOW LibraryIngest's lanes — never the 4-wide
+    // fan-out LibraryGlasses uses for cheap local decode.
+    private actor NetworkClassifyGate {
+        static let shared = NetworkClassifyGate()
+        private var active = 0
+        private let limit = 2   // matches LibraryIngest.lanes — the two network
+                                 // consumers of PHImageManager stay within the same
+                                 // budget instead of compounding.
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+
+        func acquire() async {
+            if active < limit { active += 1; return }
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                waiters.append(cont)
+            }
+            // Resumed ⇒ a slot was transferred directly to us; `active` unchanged.
+        }
+        func release() {
+            if !waiters.isEmpty { waiters.removeFirst().resume() }
+            else { active -= 1 }
+        }
+    }
+
+    /// Gated + time-boxed network fetch for classification. Only reached when the
+    /// local-only probe (see `classifyAsset`) came back empty, so the common
+    /// already-on-device case never touches this gate at all.
+    private static func networkFallbackImage(_ assetID: String) async -> CGImage? {
+        await NetworkClassifyGate.shared.acquire()
+        let cg = await loadCGImage(assetID: assetID, maxPixel: 256, allowNetwork: true, timeoutSeconds: 8)
+        await NetworkClassifyGate.shared.release()
+        return cg
     }
 
     // MARK: - 1. Classification
@@ -169,12 +289,30 @@ enum VisionEngine {
     }
 
     /// Classify one library photo by its PHAsset id — the cheap, on-device
-    /// organization verdict. Loads a small LOCAL frame (no network), runs triage
-    /// off the main actor. `isPersonal` = not a clean vehicle/work photo (not a
-    /// vehicle OR a prominent face). Returns nil for iCloud-only originals not on
-    /// device — those classify later, when available.
+    /// organization verdict. Tries a LOCAL decode first (free, uncapped — matches
+    /// LibraryGlasses' 4-lane fan-out); only when that comes back empty (an
+    /// iCloud-optimized original not cached on-device) does it fall back to a
+    /// NETWORK fetch, gated + time-boxed (see `networkFallbackImage`) so iCloud
+    /// coverage no longer means every scroll-triggered classify can freely hammer
+    /// PhotoKit's network queue. Runs triage off the main actor. `isPersonal` = not
+    /// a clean vehicle/work photo (not a vehicle OR a prominent face).
     static func classifyAsset(localIdentifier: String) async -> (isVehicle: Bool, isPersonal: Bool, hasPerson: Bool, labels: [String])? {
-        guard let cg = await loadCGImage(assetID: localIdentifier, maxPixel: 256, allowNetwork: false) else { return nil }
+        // Local-only probe first — matches Blur's tagger for the common case (most
+        // library photos ARE on-device) without touching the network gate at all.
+        // With allowNetwork OFF here, an iCloud-only original returns nil FAST (a
+        // local-availability check, no download attempted) — that's what made the
+        // original bug ("iCloud-only photos never classify") cheap to detect and
+        // cheap to fall back from.
+        var cg = await loadCGImage(assetID: localIdentifier, maxPixel: 256, allowNetwork: false)
+        if cg == nil {
+            // Not cached locally (Optimize Storage). Pulling the user's OWN iCloud
+            // original DOWN to their device for on-device Vision is not "pixels
+            // leaving to us" — it never touches our cloud, so the local-first/privacy
+            // doctrine holds. But it IS a real network fetch, so it goes through the
+            // dedicated gate + timeout, never straight through PHImageManager.
+            cg = await networkFallbackImage(localIdentifier)
+        }
+        guard let cg else { return nil }
         return await Task.detached(priority: .utility) {
             guard let cls = classify(cg) else { return nil }
             let face = hasProminentFace(cg)
