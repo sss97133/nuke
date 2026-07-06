@@ -31,6 +31,14 @@ final class LibraryOverlayStore: ObservableObject {
     /// Vehicle/work photos that ALSO contain a person — shown (work), but flagged
     /// borderline so the Select tool can let the owner approve/reject them.
     @Published private(set) var withPerson: Set<String> = []
+    /// localIdentifiers the on-device pass classified UNNECESSARY (screenshots, docs,
+    /// shopping/web captures) — clutter gated out of the way by default. Owner-approve
+    /// (Select tool) overrides. Derived from POSITIVE junk signals, never "not a vehicle".
+    @Published private(set) var junk: Set<String> = []
+    /// Per-photo TOP on-device vision label (humanized) — makes tag propagation VISIBLE:
+    /// a chip appears on each cell the instant the live classifier reads it. This is the
+    /// proof surface (Blur has it; Nuke didn't) — you watch the tags land, or see nothing.
+    @Published private(set) var topLabel: [String: String] = [:]
     /// Owner's explicit verdicts (the Select tool) — these OVERRIDE the auto verdict.
     @Published private(set) var approved: Set<String> = []
     @Published private(set) var rejected: Set<String> = []
@@ -44,6 +52,8 @@ final class LibraryOverlayStore: ObservableObject {
     // visible cell each time (the scroll-path jank). Stage results here and flush to the
     // @Published sets in bounded bursts (~6x/sec) so the grid updates calmly.
     private var pendingPersonal = Set<String>()
+    private var pendingJunk = Set<String>()
+    private var pendingTopLabel: [String: String] = [:]
     private var pendingWithPerson = Set<String>()
     private var pendingApproved = Set<String>()
     private var pendingRejected = Set<String>()
@@ -67,6 +77,17 @@ final class LibraryOverlayStore: ObservableObject {
         if approved.contains(lid) { return false }
         return personal.contains(lid)
     }
+
+    /// Whether a cell is UNNECESSARY clutter (screenshot/doc/shopping) gated out by
+    /// default — the essential Vision gate. Owner-approve (Select) un-gates it.
+    func isGatedJunk(_ lid: String) -> Bool {
+        if approved.contains(lid) { return false }
+        return junk.contains(lid)
+    }
+
+    /// The top on-device vision label for a cell (humanized), once classified — the
+    /// visible proof that local vision ran on THIS photo. nil = not yet read.
+    func label(for lid: String) -> String? { topLabel[lid] }
 
     /// Owner approves (work) or rejects (hide) a batch — overrides the auto verdict, persisted.
     func setVerdict(_ lids: [String], approved isApproved: Bool) {
@@ -98,9 +119,11 @@ final class LibraryOverlayStore: ObservableObject {
 
     private func nextLID() -> String? { queue.isEmpty ? nil : queue.removeFirst() }
 
-    private func apply(_ lid: String, _ info: (isPersonal: Bool, hasPerson: Bool, ownerApproved: Bool?, glyph: String?)?) {
+    private func apply(_ lid: String, _ info: (isPersonal: Bool, isJunk: Bool, hasPerson: Bool, label: String?, ownerApproved: Bool?, glyph: String?)?) {
         guard let info else { return }
         if info.isPersonal { pendingPersonal.insert(lid) }
+        if info.isJunk { pendingJunk.insert(lid) }
+        if let l = info.label { pendingTopLabel[lid] = l }
         if info.hasPerson { pendingWithPerson.insert(lid) }
         if let o = info.ownerApproved { if o { pendingApproved.insert(lid) } else { pendingRejected.insert(lid) } }
         if let g = info.glyph { pendingDecorations[lid] = LibraryDecoration(known: true, glyph: g) }
@@ -122,6 +145,8 @@ final class LibraryOverlayStore: ObservableObject {
     private func flush() {
         flushScheduled = false
         if !pendingPersonal.isEmpty { personal.formUnion(pendingPersonal); pendingPersonal.removeAll() }
+        if !pendingJunk.isEmpty { junk.formUnion(pendingJunk); pendingJunk.removeAll() }
+        if !pendingTopLabel.isEmpty { topLabel.merge(pendingTopLabel) { _, new in new }; pendingTopLabel.removeAll() }
         if !pendingWithPerson.isEmpty { withPerson.formUnion(pendingWithPerson); pendingWithPerson.removeAll() }
         if !pendingApproved.isEmpty { approved.formUnion(pendingApproved); pendingApproved.removeAll() }
         if !pendingRejected.isEmpty { rejected.formUnion(pendingRejected); pendingRejected.removeAll() }
@@ -133,17 +158,26 @@ final class LibraryOverlayStore: ObservableObject {
 
     /// Heavy work, OFF the main actor: read the owner verdict + cached classification,
     /// else classify the photo on-device (Apple tags) and write it to the local store.
-    nonisolated private static func resolve(_ lid: String) async -> (isPersonal: Bool, hasPerson: Bool, ownerApproved: Bool?, glyph: String?)? {
+    nonisolated private static func resolve(_ lid: String) async -> (isPersonal: Bool, isJunk: Bool, hasPerson: Bool, label: String?, ownerApproved: Bool?, glyph: String?)? {
         let owner = LocalStore.shared.ownerVerdicts(for: [lid])[lid]
         if let c = LocalStore.shared.classification(for: [lid])[lid] {
-            return (c.isPersonal, c.hasPerson, owner, c.isVehicle ? "car.fill" : nil)
+            // Junk is DERIVED (not a stored column) from the cached T0 labels + the free
+            // screenshot flag — so it needs no migration and re-tunes as the label set evolves.
+            let junk = VisionEngine.isUnnecessary(labels: c.labels, isScreenshot: VisionEngine.isScreenshot(localIdentifier: lid))
+            return (c.isPersonal, junk, c.hasPerson, humanize(c.labels.first), owner, c.isVehicle ? "car.fill" : nil)
         }
         guard let v = await VisionEngine.classifyAsset(localIdentifier: lid) else {
             // iCloud-only / unclassifiable, but it may still carry an owner verdict.
-            return owner == nil ? nil : (false, false, owner, nil)
+            return owner == nil ? nil : (false, false, false, nil, owner, nil)
         }
         LocalStore.shared.classify(localIdentifier: lid, isVehicle: v.isVehicle, isPersonal: v.isPersonal,
                                    hasPerson: v.hasPerson, labels: v.labels)
-        return (v.isPersonal, v.hasPerson, owner, v.isVehicle ? "car.fill" : nil)
+        let junk = VisionEngine.isUnnecessary(labels: v.labels, isScreenshot: VisionEngine.isScreenshot(localIdentifier: lid))
+        return (v.isPersonal, junk, v.hasPerson, humanize(v.labels.first), owner, v.isVehicle ? "car.fill" : nil)
+    }
+
+    /// "sports_car" → "Sports Car" — the on-device label, made human for the chip.
+    nonisolated private static func humanize(_ raw: String?) -> String? {
+        raw.map { $0.replacingOccurrences(of: "_", with: " ").capitalized }
     }
 }

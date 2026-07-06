@@ -16,6 +16,7 @@ struct LibraryView: View {
     @ObservedObject private var store = LibraryStore.shared
     @State private var detailIndex: Int?
     @AppStorage("personalMode") private var personalMode = PersonalMode.show
+    @AppStorage("showVisionTags") private var showVisionTags = false
     @Namespace private var zoomNS
     @ObservedObject private var overlay = LibraryOverlayStore.shared
     @State private var selectMode = false
@@ -89,6 +90,10 @@ struct LibraryView: View {
                                 Label("Show", systemImage: "eye").tag(PersonalMode.show)
                                 Label("Blur", systemImage: "drop.fill").tag(PersonalMode.blur)
                                 Label("Hide", systemImage: "eye.slash").tag(PersonalMode.black)
+                            }
+                            Divider()
+                            Toggle(isOn: $showVisionTags) {
+                                Label("Show vision tags", systemImage: "tag")
                             }
                         } label: {
                             HStack(spacing: 4) {
@@ -175,9 +180,15 @@ struct LibraryCell: View {
     @StateObject private var loader = LibraryThumbLoader()
     @State private var localID: String?
     @AppStorage("personalMode") private var personalMode = PersonalMode.show
+    @AppStorage("showVisionTags") private var showVisionTags = false
 
     /// Owner verdict wins, else the auto verdict (the Select tool's whole point).
     private var shouldHide: Bool { localID.map { overlay.shouldHide($0) } ?? false }
+    /// The on-device vision label for this cell, once the live classifier read it.
+    private var visionTag: String? { localID.flatMap { overlay.label(for: $0) } }
+    /// Unnecessary clutter (screenshot/doc/shopping) — the Vision gate softens it out
+    /// of the way by DEFAULT (independent of the personal toggle). Owner-approve reveals.
+    private var gatedJunk: Bool { localID.map { overlay.isGatedJunk($0) } ?? false }
 
     var body: some View {
         Color(.secondarySystemFill)
@@ -185,12 +196,26 @@ struct LibraryCell: View {
             .overlay {
                 if let image = loader.image {
                     Image(uiImage: image).resizable().scaledToFill()
-                        .blur(radius: (personalMode == .blur && shouldHide) ? 14 : 0)
+                        .blur(radius: (gatedJunk || (personalMode == .blur && shouldHide)) ? 14 : 0)
                 }
             }
             .overlay {
                 if personalMode == .black && shouldHide {
                     Color.black   // "Hide" = blacked out; keeps the grid layout intact
+                }
+            }
+            .overlay {
+                if gatedJunk {
+                    // Clutter set aside by default: a faint scrim + a glyph so it reads as
+                    // "filtered noise", still tappable to reveal, never fully removed.
+                    Color.black.opacity(0.28)
+                }
+            }
+            .overlay(alignment: .center) {
+                if gatedJunk {
+                    Image(systemName: "rectangle.on.rectangle.slash")
+                        .font(.body)
+                        .foregroundStyle(.white.opacity(0.7))
                 }
             }
             .overlay { if selecting && isSelected { Color.accentColor.opacity(0.28) } }
@@ -210,6 +235,20 @@ struct LibraryCell: View {
                         .foregroundStyle(.white)
                         .padding(3)
                         .background(.black.opacity(0.45), in: Circle())
+                        .padding(3)
+                }
+            }
+            .overlay(alignment: .bottomLeading) {
+                // Vision-tag propagation, made visible (Blur has this; Nuke didn't): the
+                // label appears the instant the live classifier reads the photo; a dim dot
+                // means "not read yet". Toggle in the toolbar menu.
+                if showVisionTags && !selecting {
+                    Text(visionTag ?? "·")
+                        .font(.system(size: 8, weight: .semibold))
+                        .lineLimit(1)
+                        .padding(.horizontal, 3).padding(.vertical, 1)
+                        .background(.black.opacity(0.55), in: Capsule())
+                        .foregroundStyle(visionTag == nil ? .white.opacity(0.5) : .white)
                         .padding(3)
                 }
             }
