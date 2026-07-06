@@ -272,6 +272,11 @@ struct ProfileView: View {
     @State private var garage: [GarageVehicle] = []
     @State private var garageLoaded = false      // gate the empty state so it never flashes
     @State private var garageError = false        // a FAILED load must never read as "no vehicles"
+    // Offline fallback (LocalStore garage_vehicle mirror, write-through cache of
+    // get_user_garage). When the live call fails, we render the last-cached rows
+    // instead of the error card — but the UI must say so, never pretend it's live.
+    @State private var garageIsCached = false
+    @State private var garageCachedAt: Date?
     @State private var openVehicle: GarageVehicle?
     @State private var showPast = false           // "Past & contributions" stays collapsed
 
@@ -590,6 +595,17 @@ struct ProfileView: View {
     @ViewBuilder private var garageSection: some View {
         if !currentGarage.isEmpty {
             Section {
+                // Offline mirror notice — never let cached rows silently pass as
+                // live. Shown once per section, not per row.
+                if garageIsCached {
+                    Label {
+                        Text("Showing saved data" + (garageCachedAt.map { " from \(RelativeDateTimeFormatter().localizedString(for: $0, relativeTo: Date()))" } ?? "") + " — may be out of date")
+                    } icon: {
+                        Image(systemName: "wifi.slash")
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
                 ForEach(currentGarage) { v in garageRow(v) }
             } header: {
                 // "The fleet" (was "Garage") — the worth/labor headline lives up in
@@ -667,11 +683,38 @@ struct ProfileView: View {
                 .execute()
                 .value
             garage = rows
+            garageIsCached = false
+            garageCachedAt = nil
+            // Write-through: mirror the live rows into the offline cache (same
+            // pattern as LocalStore's v4 cloud-verdict cache) so a later
+            // network-down load can render this instead of the error card.
+            LocalStore.shared.cacheGarage(userId: userId, vehicles: rows.map {
+                (vehicleId: $0.vehicle_id, year: $0.year, make: $0.make, model: $0.model,
+                 trimName: $0.trim_name, imageUrl: $0.image_url, currentValue: $0.current_value,
+                 imageCount: $0.image_count, relationship: $0.relationship)
+            })
         } catch {
-            // Don't swallow: a failed load must surface as "couldn't load", never
-            // fall through to the empty state.
-            garageError = true
             NSLog("NukeCapture garage load failed: %@", String(describing: error))
+            // No network (or a real server error) — fall back to the offline
+            // mirror rather than the error card, IF we have one cached. A truly
+            // fresh account/device with nothing cached yet still surfaces the
+            // honest "couldn't load" state, same as before this change.
+            if let cached = LocalStore.shared.cachedGarage(userId: userId), !cached.vehicles.isEmpty {
+                garage = cached.vehicles.map {
+                    GarageVehicle(vehicle_id: $0.vehicleId, year: $0.year, make: $0.make,
+                                  model: $0.model, trim_name: $0.trimName, image_url: $0.imageUrl,
+                                  current_value: $0.currentValue, image_count: $0.imageCount,
+                                  relationship: $0.relationship)
+                }
+                garageIsCached = true
+                garageCachedAt = cached.cachedAt
+                garageError = false
+            } else {
+                // Don't swallow: a failed load with nothing cached must surface as
+                // "couldn't load", never fall through to the empty state.
+                garageError = true
+                garageIsCached = false
+            }
         }
         garageLoaded = true
     }

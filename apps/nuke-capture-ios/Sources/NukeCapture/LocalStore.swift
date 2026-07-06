@@ -75,6 +75,24 @@ struct DayRollup {
     let read: Int            // rows with a cached cloud BYOK verdict ("Read by Nuke")
 }
 
+/// One row of the offline garage mirror. Mirrors prod `get_user_garage` exactly
+/// (same field set as ProfileTab's `GarageVehicle`) so the cache can round-trip
+/// straight into that view model with no lossy translation.
+struct LocalGarageVehicle: Codable, FetchableRecord, PersistableRecord {
+    static let databaseTableName = "garage_vehicle"
+    var userId: String              // the profile this row belongs to (own or another's)
+    var vehicleId: String
+    var year: Int?
+    var make: String?
+    var model: String?
+    var trimName: String?
+    var imageUrl: String?
+    var currentValue: Double?
+    var imageCount: Int
+    var relationship: String
+    var cachedAt: Date              // when WE last pulled this row down
+}
+
 /// The back-of-the-photo ledger for one image — what the local store knows about it.
 struct ImageLedger {
     let classified: Bool
@@ -190,6 +208,32 @@ final class LocalStore {
                 t.add(column: "cloudAgentModel", .text)
                 t.add(column: "cloudAnalyzedAt", .datetime)
                 t.add(column: "cloudCachedAt", .datetime)   // when WE last pulled it down
+            }
+        }
+        m.registerMigration("v5_garage_cache") { db in
+            // Offline mirror of get_user_garage — "my garage" on airplane mode.
+            // Unlike `appearance` (many disjoint writers sharing one row), this
+            // table has exactly ONE writer (cacheGarage), and each successful
+            // live call is the COMPLETE, current list for that user — a vehicle
+            // that drops out of the response (sold, re-attributed away) must not
+            // linger as a ghost row here. So the writer clears-and-replaces the
+            // user's rows in one transaction, not an UPSERT of individual columns.
+            // This does not conflict with the SUPERSEDE-never-overwrite rule
+            // above: that rule protects shared rows across independent writers;
+            // here there is only one writer and one source of truth per read.
+            try db.create(table: "garage_vehicle") { t in
+                t.column("userId", .text).notNull()
+                t.column("vehicleId", .text).notNull()
+                t.column("year", .integer)
+                t.column("make", .text)
+                t.column("model", .text)
+                t.column("trimName", .text)
+                t.column("imageUrl", .text)
+                t.column("currentValue", .double)
+                t.column("imageCount", .integer).notNull()
+                t.column("relationship", .text).notNull()
+                t.column("cachedAt", .datetime).notNull()
+                t.primaryKey(["userId", "vehicleId"])
             }
         }
         return m
@@ -545,6 +589,59 @@ final class LocalStore {
             }
         } catch { NSLog("LocalStore.cloudVerdictCount failed: %@", String(describing: error)) }
         return n
+    }
+
+    // MARK: Garage cache — offline mirror of get_user_garage (write-through)
+
+    /// Write-through cache: call this with the exact rows a live `get_user_garage`
+    /// call just returned. Replaces this user's prior cached rows in one
+    /// transaction (see the v5 migration note on why full-replace is correct here,
+    /// unlike the disjoint-column pattern used elsewhere in this file).
+    func cacheGarage(userId: String,
+                     vehicles: [(vehicleId: String, year: Int?, make: String?, model: String?,
+                                 trimName: String?, imageUrl: String?, currentValue: Double?,
+                                 imageCount: Int, relationship: String)],
+                     now: Date = Date()) {
+        do {
+            try dbQueue.write { db in
+                try db.execute(sql: "DELETE FROM garage_vehicle WHERE userId = ?", arguments: [userId])
+                for v in vehicles {
+                    try LocalGarageVehicle(userId: userId, vehicleId: v.vehicleId, year: v.year,
+                                           make: v.make, model: v.model, trimName: v.trimName,
+                                           imageUrl: v.imageUrl, currentValue: v.currentValue,
+                                           imageCount: v.imageCount, relationship: v.relationship,
+                                           cachedAt: now)
+                        .insert(db)
+                }
+            }
+        } catch { NSLog("LocalStore.cacheGarage failed: %@", String(describing: error)) }
+    }
+
+    /// Read the offline garage mirror for the network-down fallback. Returns nil
+    /// when nothing has ever been cached for this user (so the caller can still
+    /// show the honest "couldn't load" card rather than a fake empty garage).
+    /// `cachedAt` is the OLDEST row's stamp (a conservative "may be out of date
+    /// since at least this long ago" — a partial re-cache never looks fresher
+    /// than its stalest member).
+    func cachedGarage(userId: String) -> (vehicles: [LocalGarageVehicle], cachedAt: Date)? {
+        do {
+            return try dbQueue.read { db -> (vehicles: [LocalGarageVehicle], cachedAt: Date)? in
+                // ORDER BY rowid: rows are inserted in the live RPC's own order on
+                // each cacheGarage() call, so this reproduces that order instead of
+                // SQLite's unspecified default — the offline list reads the same
+                // as the live one did, not reshuffled.
+                let rows = try LocalGarageVehicle.fetchAll(db, sql: """
+                    SELECT userId, vehicleId, year, make, model, trimName, imageUrl,
+                           currentValue, imageCount, relationship, cachedAt
+                    FROM garage_vehicle WHERE userId = ? ORDER BY rowid ASC
+                    """, arguments: [userId])
+                guard !rows.isEmpty, let oldest = rows.map(\.cachedAt).min() else { return nil }
+                return (rows, oldest)
+            }
+        } catch {
+            NSLog("LocalStore.cachedGarage failed: %@", String(describing: error))
+            return nil
+        }
     }
 
     // MARK: Tag push — read side of LocalTagPush (lives here for dbQueue access)
