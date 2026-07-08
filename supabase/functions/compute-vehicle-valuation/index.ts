@@ -154,8 +154,8 @@ async function getBuildClass(supabase: any, vehicleId: string): Promise<string> 
 // Class-aware anchor: pick the percentile of the comp pool that matches the subject's
 // build class, instead of always taking the stock-dominated median. Unknown class →
 // the prior recency-weighted median (no behavior change).
-function classAwareAnchor(rows: any[], buildClass: string): number {
-  if (buildClass === "unknown") return recencyWeightedMedian(rows);
+function classAwareAnchor(rows: any[], buildClass: string, subjectYear: number | null = null): number {
+  if (buildClass === "unknown") return recencyWeightedMedian(rows, subjectYear);
   const prices = rows.map((r) => r.best_price).filter((p) => p > 0).sort((a, b) => a - b);
   if (prices.length === 0) return 0;
   const pct = (p: number) => prices[Math.min(prices.length - 1, Math.max(0, Math.round((p / 100) * (prices.length - 1))))];
@@ -163,7 +163,7 @@ function classAwareAnchor(rows: any[], buildClass: string): number {
     case "restomod": return pct(82);   // documented high-end build → upper tail
     case "survivor": return pct(55);
     case "project":  return pct(30);
-    default:         return recencyWeightedMedian(rows);
+    default:         return recencyWeightedMedian(rows, subjectYear);
   }
 }
 
@@ -182,8 +182,13 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
 
   // Subject build class → which percentile of the comp pool anchors the estimate.
   const buildClass = await getBuildClass(supabase, vehicle.id);
-  const anchor = (rows: any[]) => classAwareAnchor(rows, buildClass);
-  const label = (tier: string) => (buildClass !== "unknown" ? "class_stratified" : tier);
+  // Subject body class → hard mismatch filter on the comp pool (Stage-2-lite).
+  const bodyClass = subjectBodyClass(vehicle);
+  const anchor = (rows: any[]) => classAwareAnchor(rows, buildClass, year);
+  const label = (tier: string, stratified = false) => {
+    const base = buildClass !== "unknown" ? "class_stratified" : tier;
+    return stratified ? `${base}_bodied` : base;
+  };
 
   // ---- Tier 1: Canonical model aliases (best quality match) ----
   if (model) {
@@ -251,7 +256,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
     if (bestCanonical) {
       const { data: canonComps } = await supabase
         .from("clean_vehicle_prices")
-        .select("best_price, is_sold, updated_at, price_source")
+        .select("vehicle_id, year, model, best_price, is_sold, updated_at, price_source")
         .ilike("make", make)
         .ilike("model", `%${bestCanonical}%`)
         .gte("year", year - 5)
@@ -261,7 +266,8 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
         .limit(300);
 
       if (canonComps && canonComps.length >= 3) {
-        return { basePrice: anchor(canonComps), compCount: canonComps.length, method: label("canonical") };
+        const s = await stratifyByBody(supabase, canonComps, bodyClass);
+        return { basePrice: anchor(s.rows), compCount: s.rows.length, method: label("canonical", s.stratified) };
       }
     }
   }
@@ -270,7 +276,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
   if (model) {
     const { data: compRows } = await supabase
       .from("clean_vehicle_prices")
-      .select("best_price, is_sold, updated_at")
+      .select("vehicle_id, year, model, best_price, is_sold, updated_at, price_source")
       .ilike("make", make)
       .ilike("model", `%${model}%`)
       .gte("year", year - 5)
@@ -280,7 +286,8 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
       .limit(300);
 
     if (compRows && compRows.length >= 3) {
-      return { basePrice: anchor(compRows), compCount: compRows.length, method: label("exact") };
+      const s = await stratifyByBody(supabase, compRows, bodyClass);
+      return { basePrice: anchor(s.rows), compCount: s.rows.length, method: label("exact", s.stratified) };
     }
   }
 
@@ -290,7 +297,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
     if (normalizedModel && normalizedModel !== model.toLowerCase()) {
       const { data: normComps } = await supabase
         .from("clean_vehicle_prices")
-        .select("best_price, is_sold, updated_at, price_source")
+        .select("vehicle_id, year, model, best_price, is_sold, updated_at, price_source")
         .ilike("make", make)
         .ilike("model", `%${normalizedModel}%`)
         .gte("year", year - 5)
@@ -300,7 +307,8 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
         .limit(300);
 
       if (normComps && normComps.length >= 3) {
-        return { basePrice: anchor(normComps), compCount: normComps.length, method: label("normalized") };
+        const s = await stratifyByBody(supabase, normComps, bodyClass);
+        return { basePrice: anchor(s.rows), compCount: s.rows.length, method: label("normalized", s.stratified) };
       }
     }
   }
@@ -311,7 +319,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
     if (coreModel && coreModel.length >= 2) {
       const { data: coreComps } = await supabase
         .from("clean_vehicle_prices")
-        .select("best_price, is_sold, updated_at, price_source")
+        .select("vehicle_id, year, model, best_price, is_sold, updated_at, price_source")
         .ilike("make", make)
         .ilike("model", `%${coreModel}%`)
         .gte("year", year - 5)
@@ -321,7 +329,8 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
         .limit(300);
 
       if (coreComps && coreComps.length >= 3) {
-        return { basePrice: anchor(coreComps), compCount: coreComps.length, method: label("core_model") };
+        const s = await stratifyByBody(supabase, coreComps, bodyClass);
+        return { basePrice: anchor(s.rows), compCount: s.rows.length, method: label("core_model", s.stratified) };
       }
     }
   }
@@ -329,7 +338,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
   // ---- Tier 5: Make-only fallback with wider year range ----
   const { data: makeComps } = await supabase
     .from("clean_vehicle_prices")
-    .select("best_price, is_sold, updated_at")
+    .select("year, best_price, is_sold, updated_at, price_source")
     .ilike("make", make)
     .gte("year", year - 10)
     .lte("year", year + 10)
@@ -339,10 +348,79 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
 
   if (makeComps && makeComps.length > 0) {
     // Make-only is too coarse to trust a class anchor → keep the median even when classed.
-    return { basePrice: recencyWeightedMedian(makeComps), compCount: makeComps.length, method: "make_fallback" };
+    return { basePrice: recencyWeightedMedian(makeComps, year), compCount: makeComps.length, method: "make_fallback" };
   }
 
   return { basePrice: 0, compCount: 0, method: "none" };
+}
+
+// ============================================================================
+// STAGE-2-LITE SIMILARITY — body-style stratification + year proximity
+// (valuation-methodology.md Part II §2.2). Without this, a C-code coupe gets
+// priced against fastback/convertible/Shelby money: the raw first-gen Mustang
+// pool medians ~$42K while the coupe-only slice medians ~$24K (2026-07-07).
+// Body style is a hard mismatch filter (mismatched comps dropped), unknown
+// bodies stay at half weight; year distance becomes a weight per the paper.
+// ============================================================================
+const BODY_TOKEN_CLASSES: [RegExp, string][] = [
+  [/fastback|sportsroof|liftback/i, "FASTBACK"],
+  [/convertible|cabriolet|drophead|roadster|spyder|spider/i, "CONVERTIBLE"],
+  [/coupe|hardtop|notchback/i, "COUPE"],
+  [/wagon|estate/i, "WAGON"],
+  [/pickup|stepside|fleetside/i, "PICKUP"],
+];
+
+function bodyClassFromStrings(...parts: (string | null | undefined)[]): string | null {
+  const hay = parts.filter(Boolean).join(" ");
+  for (const [re, cls] of BODY_TOKEN_CLASSES) if (re.test(hay)) return cls;
+  return null;
+}
+
+function subjectBodyClass(vehicle: any): string | null {
+  if (vehicle.canonical_body_style) return String(vehicle.canonical_body_style).toUpperCase();
+  return bodyClassFromStrings(vehicle.body_style, vehicle.model, vehicle.trim, vehicle.series);
+}
+
+// Comps come from clean_vehicle_prices, which has no body columns — enrich from
+// vehicles in batched .in() queries, fall back to body tokens in the model string.
+async function stratifyByBody(supabase: any, rows: any[], subjectBody: string | null): Promise<{ rows: any[]; stratified: boolean }> {
+  if (!subjectBody || !rows?.length) return { rows: rows || [], stratified: false };
+  const ids = rows.map((r) => r.vehicle_id).filter(Boolean);
+  const bodyById = new Map<string, string | null>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await supabase
+      .from("vehicles")
+      .select("id, canonical_body_style, body_style, model, trim")
+      .in("id", ids.slice(i, i + 200));
+    if (error) console.error("[valuation] body enrich error:", error.message);
+    for (const v of data || []) {
+      const body = v.canonical_body_style
+        ? String(v.canonical_body_style).toUpperCase()
+        : bodyClassFromStrings(v.body_style, v.model, v.trim);
+      bodyById.set(v.id, body);
+    }
+  }
+  const kept = rows
+    .map((r) => {
+      const body = bodyById.get(r.vehicle_id) ?? bodyClassFromStrings(r.model);
+      if (!body) return { ...r, sim_weight: 0.5 }; // unknown body — half weight (§3.5 asymmetry spirit)
+      return body === subjectBody ? { ...r, sim_weight: 1.0 } : null; // hard mismatch → dropped
+    })
+    .filter(Boolean);
+  // Thin-market guard (§2.5): if stratification starves the pool, fall back unstratified.
+  if (kept.length < 3) return { rows: rows.map((r) => ({ ...r, sim_weight: 0.5 })), stratified: false };
+  return { rows: kept, stratified: true };
+}
+
+// Year proximity weight per the paper's similarity table (±1 → 0.8, ±2 → 0.5, ±5 → 0.2).
+function yearProximityWeight(subjectYear: number | null, compYear: number | null): number {
+  if (!subjectYear || !compYear) return 0.5;
+  const d = Math.abs(subjectYear - compYear);
+  if (d === 0) return 1.0;
+  if (d <= 1) return 0.8;
+  if (d <= 2) return 0.5;
+  if (d <= 5) return 0.2;
+  return 0.05;
 }
 
 // Consecration of a price by its TYPE — the field's authority to confer worth.
@@ -358,13 +436,13 @@ const PRICE_CONSECRATION: Record<string, number> = {
   current_value: 0.25, // owner/derived estimate
 };
 
-function recencyWeightedMedian(rows: any[]): number {
+function recencyWeightedMedian(rows: any[], subjectYear: number | null = null): number {
   const now = Date.now();
   const sixMonths = 180 * 24 * 60 * 60 * 1000;
   const oneYear = 365 * 24 * 60 * 60 * 1000;
   const twoYears = 730 * 24 * 60 * 60 * 1000;
 
-  // Apply recency + consecration weights
+  // Apply recency + consecration + similarity weights
   const weighted: { price: number; weight: number }[] = rows.map((r: any) => {
     const age = now - new Date(r.updated_at).getTime();
     let weight = 0.3;
@@ -375,6 +453,9 @@ function recencyWeightedMedian(rows: any[]): number {
     if (r.is_sold) weight *= 1.2;
     // Consecration: weight by how much the price TYPE confers worth (sale >> ask)
     weight *= PRICE_CONSECRATION[r.price_source as string] ?? 0.5;
+    // Stage-2-lite similarity: body match (set upstream) and year proximity
+    weight *= r.sim_weight ?? 1.0;
+    weight *= yearProximityWeight(subjectYear, r.year ?? null);
     return { price: Number(r.best_price), weight };
   });
 
@@ -753,7 +834,7 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
   // Fetch vehicle data
   const { data: vehicle, error: vErr } = await supabase
     .from("vehicles")
-    .select("id, year, make, model, series, trim, vin, mileage, sale_price, asking_price, current_value, sale_status, sale_date, created_at, updated_at, discovery_url, profile_origin")
+    .select("id, year, make, model, series, trim, vin, mileage, body_style, canonical_body_style, sale_price, asking_price, current_value, sale_status, sale_date, created_at, updated_at, discovery_url, profile_origin")
     .eq("id", vehicleId)
     .maybeSingle();
 

@@ -457,49 +457,25 @@ export class ForensicReceiptService {
   }
   
   /**
-   * Call the generate-work-logs edge function for comprehensive analysis
-   * This is the heart of the forensic system - it extracts the 5Ws from image bundles
+   * Formerly called the `generate-work-logs` edge function for comprehensive
+   * analysis. That function is not deployed (confirmed 2026-07-06 — every
+   * invocation 404'd "Requested function was not found", including from this
+   * call site on every real photo upload through Capture/AddVehicle) and its
+   * write targets (event_participants, work_order_materials,
+   * event_financial_records, ai_scan_field_confidence,
+   * image_forensic_attribution) no longer exist in the schema — it was
+   * superseded, not just undeployed. Work-log composition now happens at READ
+   * time via the mcp-connector `project_work_log` tool (composes
+   * vehicle_observations + work_order_{labor,parts,payments}; see TOOLS.md).
+   * There is no client-callable write-time equivalent, so this short-circuits
+   * to the existing null fallback (`getDefaultWorkLog`) instead of spending a
+   * network round trip on a guaranteed 404.
    */
   private static async generateWorkLog(
-    session: ForensicWorkSession,
-    organizationId?: string
+    _session: ForensicWorkSession,
+    _organizationId?: string
   ): Promise<ForensicAnalysisResult['workLog'] | null> {
-    try {
-      console.log(`🔬 [ForensicReceipt] Calling generate-work-logs for ${session.imageIds.length} images`);
-      
-      // The generate-work-logs function requires both vehicleId AND organizationId
-      // If we don't have an org, create a placeholder or skip the detailed analysis
-      const effectiveOrgId = organizationId || '00000000-0000-0000-0000-000000000000'; // Placeholder
-      
-      const { data, error } = await supabase.functions.invoke('generate-work-logs', {
-        body: {
-          vehicleId: session.vehicleId,
-          organizationId: effectiveOrgId,
-          imageIds: session.imageIds,
-          eventDate: session.startTime.toISOString().split('T')[0]
-        }
-      });
-      
-      if (error) {
-        console.warn('🔬 [ForensicReceipt] generate-work-logs failed:', error);
-        return null;
-      }
-      
-      if (data?.success) {
-        console.log(`🔬 [ForensicReceipt] Work log generated: "${data.workLog?.title}"`);
-        console.log(`  - Parts: ${data.partsCount || 0}`);
-        console.log(`  - Labor tasks: ${data.laborTasksCount || 0}`);
-        console.log(`  - Event ID: ${data.eventId}`);
-        
-        return data.workLog || null;
-      }
-      
-      return null;
-      
-    } catch (err) {
-      console.warn('🔬 [ForensicReceipt] Failed to generate work log:', err);
-      return null;
-    }
+    return null;
   }
   
   // NOTE: createSyntheticReceipt and createTimelineEvent are handled by

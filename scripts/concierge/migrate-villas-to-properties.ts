@@ -45,23 +45,10 @@ async function main() {
   console.log(`Found ${villas?.length || 0} villas to migrate\n`);
 
   let migrated = 0;
-  let skipped = 0;
   let errors = 0;
 
   for (const villa of villas || []) {
     const meta = villa.metadata || {};
-
-    // Check if already migrated
-    const { data: existing } = await supabase
-      .from('properties')
-      .select('id')
-      .eq('external_id', meta.sibarth_id?.toString() || villa.id)
-      .single();
-
-    if (existing) {
-      skipped++;
-      continue;
-    }
 
     // Determine owner org (the rental agency)
     let ownerOrgId: string | null = null;
@@ -123,38 +110,107 @@ async function main() {
       },
     };
 
-    // Insert property
-    const { data: newProp, error: insertError } = await supabase
-      .from('properties')
-      .insert(property)
-      .select()
-      .single();
+    // Upsert property. Real upsert against the DB-level unique index on
+    // (property_type, source_url) — re-running this script (e.g. a re-scrape)
+    // now UPDATEs the existing row instead of minting a fresh UUID each time.
+    // This is the fix for the 2026-01/02 runaway-duplication incident (3,090
+    // dead rows across 10 villas from a broken check-then-insert pattern).
+    let propId: string | null = null;
 
-    if (insertError) {
-      console.error(`Error migrating ${villa.business_name}: ${insertError.message}`);
-      errors++;
-      continue;
+    if (!property.source_url) {
+      // Without a source_url the (property_type, source_url) unique index
+      // can't dedupe this row via upsert. Fall back to a manual check
+      // against external_id (always populated: meta.sibarth_id or
+      // villa.id) so these villas still migrate exactly once instead of
+      // being silently dropped, mirroring the self-healing check-then-
+      // branch pattern used in import-sibarth-villas.ts for its 23505
+      // conflict handling.
+      const { data: existingByExternalId, error: existingLookupError } = await supabase
+        .from('properties')
+        .select('id')
+        .eq('property_type', 'villa')
+        .eq('external_id', property.external_id)
+        .maybeSingle();
+
+      if (existingLookupError) {
+        // Do NOT fall through to insert on a failed existence check — that
+        // is exactly how the 2026-01/02 runaway duplication happened.
+        console.error(`Error migrating ${villa.business_name}: existence check failed: ${existingLookupError.message}`);
+        errors++;
+        continue;
+      }
+
+      if (existingByExternalId) {
+        const { error: updateError } = await supabase
+          .from('properties')
+          .update(property)
+          .eq('id', existingByExternalId.id);
+        if (updateError) {
+          console.error(`Error migrating ${villa.business_name}: ${updateError.message}`);
+          errors++;
+          continue;
+        }
+        propId = existingByExternalId.id;
+      } else {
+        const { data: inserted, error: insertError } = await supabase
+          .from('properties')
+          .insert(property)
+          .select()
+          .single();
+        if (insertError) {
+          console.error(`Error migrating ${villa.business_name}: ${insertError.message}`);
+          errors++;
+          continue;
+        }
+        propId = inserted?.id ?? null;
+      }
+    } else {
+      const { data: newProp, error: upsertError } = await supabase
+        .from('properties')
+        .upsert(property, { onConflict: 'property_type,source_url' })
+        .select()
+        .single();
+
+      if (upsertError) {
+        console.error(`Error migrating ${villa.business_name}: ${upsertError.message}`);
+        errors++;
+        continue;
+      }
+      propId = newProp?.id ?? null;
     }
 
-    // Add images if available
-    if (meta.images && Array.isArray(meta.images) && newProp) {
-      const images = meta.images.map((url: string, i: number) => ({
-        property_id: newProp.id,
-        url,
-        sort_order: i,
-        is_primary: i === 0,
-        category: i === 0 ? 'exterior' : 'interior',
-      }));
+    // Add images if available — dedupe against what's already attached so
+    // re-running this script doesn't re-stack duplicate property_images rows
+    // the same way the old properties duplication happened. Applies to both
+    // paths above: villas without a source_url still get their photos synced,
+    // not just the source_url upsert path.
+    if (meta.images && Array.isArray(meta.images) && propId) {
+      const { data: existingImages } = await supabase
+        .from('property_images')
+        .select('url')
+        .eq('property_id', propId);
 
-      await supabase.from('property_images').insert(images);
+      const existingUrls = new Set((existingImages || []).map((img: { url: string }) => img.url));
+      const newImages = meta.images.filter((url: string) => !existingUrls.has(url));
+
+      if (newImages.length > 0) {
+        const images = newImages.map((url: string, i: number) => ({
+          property_id: propId,
+          url,
+          sort_order: existingUrls.size + i,
+          is_primary: existingUrls.size === 0 && i === 0,
+          category: existingUrls.size === 0 && i === 0 ? 'exterior' : 'interior',
+        }));
+
+        await supabase.from('property_images').insert(images);
+      }
     }
 
     migrated++;
   }
 
   console.log('Migration complete!');
-  console.log(`  Migrated: ${migrated}`);
-  console.log(`  Skipped (already exists): ${skipped}`);
+  console.log(`  Migrated (inserted or updated): ${migrated}`);
   console.log(`  Errors: ${errors}`);
 
   // Verify

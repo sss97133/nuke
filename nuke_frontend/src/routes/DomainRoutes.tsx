@@ -218,7 +218,11 @@ export const DomainRoutes = () => {
 
         {/* ── Hub convenience redirects → homepage tabs ─────────────────── */}
         <Route path="/garage" element={<Navigate to="/?tab=garage" replace />} />
-        <Route path="/map" element={<Navigate to="/?tab=map" replace />} />
+        {/* /map is NOT redirected here — it's served by the real MapPage route
+            declared above (line ~181). A duplicate redirect route used to live
+            here; it was dead code (React Router resolves same-path ties to the
+            earlier-declared route, so this one could never fire). Removed
+            2026-07-06 QA pass — see nuke.ag QA findings. */}
         <Route path="/feed" element={<Navigate to="/?tab=feed" replace />} />
 
         {/* ── Protected routes (require sign-in) ───────────────────────── */}

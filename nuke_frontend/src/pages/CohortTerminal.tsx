@@ -37,6 +37,14 @@ interface CohortTerminalEnvelope {
     n?: number; median?: number; p25?: number; p75?: number;
     min?: number; max?: number; observed_at?: string;
   };
+  price_points?: PopulatedFlag & {
+    n?: number; n_dated?: number;
+    points?: Array<{
+      vehicle_id: string; price: number; date: string | null;
+      date_exact?: boolean; source: string | null;
+      miles: number | null; url: string | null;
+    }>;
+  };
   market_flow?: PopulatedFlag & {
     series?: Array<{ quarter: string; sales: number; median_price: number }>;
   };
@@ -301,6 +309,177 @@ function PriceDistribution({ pd }: { pd: NonNullable<CohortTerminalEnvelope['pri
   );
 }
 
+// ─── Price points scatter ───────────────────────────────────────────────
+// The HONEST surface: every individual cohort sale plotted, not a median.
+// Dated sales sit on a real time axis; undated sales (price known, sale date
+// not captured) go in a labelled gutter so they're never dropped or faked
+// onto the timeline. Colour = source platform (data, not decoration). Each
+// dot drills to its source listing.
+
+const SOURCE_PALETTE = [
+  '#2b6cb0', '#9c4221', '#2f855a', '#6b46c1', '#b7791f',
+  '#c53030', '#00707f', '#97266d', '#4a5568', '#0b7285',
+];
+const SOURCE_FALLBACK = '#a0aec0';
+
+// PROVEN ≠ PROJECTED. A market sale is an arms-length hammer price. An owner /
+// user submission / estimate is a projected valuation — it must NOT sit in the
+// comp cloud as if it were a sale. These render as hollow rings, and this is the
+// slot a vehicle's forming valuation (from image analysis + build data) lands in
+// as it firms up — distinct from comps, never masquerading as one.
+// (Source-string classification is the honest stopgap; the durable home for this
+//  is a provenance/trust attribute on vehicle_events, not a frontend list.)
+const PROJECTED_SOURCES = new Set([
+  'user-submission', 'user_submission', 'owner', 'owner-estimate',
+  'estimate', 'projection', 'nuke-estimate',
+]);
+const isProjectedSource = (s: string | null): boolean =>
+  PROJECTED_SOURCES.has((s ?? '').toLowerCase().trim());
+
+const fmtSource = (s: string | null): string =>
+  !s ? 'unknown' : s.replace(/[-_]/g, ' ');
+
+function PricePoints({ pp }: { pp: NonNullable<CohortTerminalEnvelope['price_points']> }) {
+  const points = (pp.points ?? []).filter(p => p && p.price != null && isFinite(p.price) && p.price > 0);
+  if (points.length < 2) {
+    return <DarkBlock label="Price Points" reason="Not enough individual priced sales to plot the cohort cloud yet." />;
+  }
+
+  // Source → colour, ranked by frequency so the densest platforms get the
+  // earliest (most distinct) swatches.
+  const counts = new Map<string, number>();
+  for (const p of points) counts.set(p.source ?? 'unknown', (counts.get(p.source ?? 'unknown') ?? 0) + 1);
+  const sources = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  const colorOf = new Map<string, string>();
+  sources.forEach(([s], i) => colorOf.set(s, i < SOURCE_PALETTE.length ? SOURCE_PALETTE[i] : SOURCE_FALLBACK));
+
+  const isDated = (p: typeof points[number]) => p.date_exact === true && !!p.date && !isNaN(new Date(p.date).getTime());
+  const dated = points.filter(isDated);
+  const undated = points.filter(p => !isDated(p));
+  const projectedCount = points.filter(p => isProjectedSource(p.source)).length;
+  const provenCount = points.length - projectedCount;
+
+  // Scales. Price (Y) spans the full set; time (X) spans only dated sales.
+  const prices = points.map(p => p.price);
+  const pMin = Math.min(...prices), pMax = Math.max(...prices);
+  const times = dated.map(p => new Date(p.date as string).getTime());
+  const tMin = times.length ? Math.min(...times) : 0;
+  const tMax = times.length ? Math.max(...times) : 1;
+
+  // viewBox geometry (scales to container width via width:100%).
+  const VBW = 1000, VBH = 300;
+  const padT = 12, padB = 30, padL = 52;
+  const gutterW = undated.length ? 84 : 0;
+  const gutterGap = undated.length ? 14 : 0;
+  const plotX0 = padL, plotX1 = VBW - 8 - gutterW - gutterGap;
+  const gX0 = plotX1 + gutterGap, gX1 = VBW - 8;
+  const plotY0 = padT, plotY1 = VBH - padB;
+
+  const yOf = (price: number) =>
+    pMax <= pMin ? (plotY0 + plotY1) / 2 : plotY1 - ((price - pMin) / (pMax - pMin)) * (plotY1 - plotY0);
+  const xOfTime = (t: number) =>
+    tMax <= tMin ? (plotX0 + plotX1) / 2 : plotX0 + ((t - tMin) / (tMax - tMin)) * (plotX1 - plotX0);
+  // Stable deterministic jitter for the undated gutter (hash the vehicle_id).
+  const jitter = (id: string) => {
+    let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) & 0xffff;
+    return (h / 0xffff);
+  };
+
+  // Y gridlines at min / mid / max.
+  const yTicks = [pMin, (pMin + pMax) / 2, pMax];
+  // X gridlines: ~5 even time ticks.
+  const xTicks = tMax > tMin
+    ? Array.from({ length: 5 }, (_, i) => tMin + (i / 4) * (tMax - tMin))
+    : [tMin];
+
+  const Dot = (p: typeof points[number], cx: number, k: string) => {
+    const projected = isProjectedSource(p.source);
+    const color = colorOf.get(p.source ?? 'unknown');
+    return (
+      <a key={k} href={p.url ?? undefined}
+         target="_blank" rel="noopener noreferrer"
+         style={{ cursor: p.url ? 'pointer' : 'default' }}>
+        {/* proven sale = filled dot; projected/owner valuation = hollow ring */}
+        <circle cx={cx} cy={yOf(p.price)} r={projected ? 4 : 3}
+          fill={projected ? 'var(--bg)' : color} fillOpacity={projected ? 1 : 0.78}
+          stroke={projected ? color : 'var(--bg)'} strokeWidth={projected ? 1.5 : 0.5}>
+          <title>{`${fmtUsdExact(p.price)} · ${fmtSource(p.source)}${projected ? ' · PROJECTED / owner valuation (not a market sale)' : ''}${isDated(p) ? ` · ${fmtDate(p.date)}` : ' · date not captured'}${p.miles != null ? ` · ${fmtMiles(p.miles)}` : ''}`}</title>
+        </circle>
+      </a>
+    );
+  };
+
+  return (
+    <div style={panelStyle}>
+      <SectionHeader
+        label="Price Points"
+        meta={`${fmtInt(provenCount)} market sales${projectedCount ? ` · ${fmtInt(projectedCount)} projected` : ''} · ${fmtInt(pp.n_dated ?? dated.length)} dated · uncapped`}
+      />
+      <div style={{ width: '100%' }}>
+        <svg viewBox={`0 0 ${VBW} ${VBH}`} width="100%" style={{ display: 'block', overflow: 'visible' }}
+             preserveAspectRatio="none">
+          {/* Y gridlines + price labels */}
+          {yTicks.map((v, i) => (
+            <g key={`y${i}`}>
+              <line x1={plotX0} y1={yOf(v)} x2={plotX1} y2={yOf(v)} stroke="var(--border)" strokeOpacity={0.4} />
+              <text x={plotX0 - 6} y={yOf(v) + 3} textAnchor="end"
+                fontFamily="'Courier New', monospace" fontSize={9} fill="var(--text-muted)">
+                {fmtUsd(v)}
+              </text>
+            </g>
+          ))}
+          {/* X time ticks */}
+          {dated.length > 0 && xTicks.map((t, i) => (
+            <text key={`x${i}`} x={xOfTime(t)} y={plotY1 + 14} textAnchor="middle"
+              fontFamily="'Courier New', monospace" fontSize={9} fill="var(--text-muted)">
+              {new Date(t).getUTCFullYear()}
+            </text>
+          ))}
+          {/* dated cloud */}
+          {dated.map((p, i) => Dot(p, xOfTime(new Date(p.date as string).getTime()), `d${i}`))}
+          {/* undated gutter */}
+          {undated.length > 0 && (
+            <g>
+              <line x1={gX0 - gutterGap / 2} y1={plotY0} x2={gX0 - gutterGap / 2} y2={plotY1}
+                stroke="var(--border)" strokeDasharray="2 3" />
+              {undated.map((p, i) => Dot(p, gX0 + 8 + jitter(p.vehicle_id) * (gX1 - gX0 - 16), `u${i}`))}
+              <text x={(gX0 + gX1) / 2} y={plotY1 + 14} textAnchor="middle"
+                fontFamily="'Courier New', monospace" fontSize={8} fontWeight={800}
+                fill="var(--text-muted)" letterSpacing="1px">
+                UNDATED
+              </text>
+            </g>
+          )}
+        </svg>
+      </div>
+      {/* source legend */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginTop: '8px' }}>
+        {sources.slice(0, 12).map(([s, n]) => (
+          <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '4px',
+            fontFamily: "'Courier New', monospace", fontSize: '9px', color: 'var(--text-muted)' }}>
+            <span style={{
+              width: '8px', height: '8px', flexShrink: 0,
+              background: isProjectedSource(s) ? 'var(--bg)' : colorOf.get(s),
+              border: isProjectedSource(s) ? `1.5px solid ${colorOf.get(s)}` : 'none',
+              borderRadius: '50%',
+            }} />
+            <span style={{ color: 'var(--text-secondary)' }}>{fmtSource(s)}</span>
+            <span>{fmtInt(n)}</span>
+          </div>
+        ))}
+      </div>
+      {/* proven ≠ projected: tell the reader what the hollow ring means */}
+      {projectedCount > 0 && (
+        <div style={{ marginTop: '6px', fontFamily: "'Courier New', monospace", fontSize: '8px',
+          color: 'var(--text-muted)', letterSpacing: '0.3px' }}>
+          ○ hollow = projected / owner valuation, not a market sale — the slot a build's own
+          valuation fills as it firms up from its receipts, images and build record.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Market flow chart ──────────────────────────────────────────────────
 
 function MarketFlowTooltip({ active, payload, label }: any) {
@@ -529,7 +708,7 @@ function Comps({ comps }: { comps: NonNullable<CohortTerminalEnvelope['comps']> 
             {rows.map((r, i) => {
               const vehicleLabel = [r.year, r.make, r.model, r.trim].filter(Boolean).join(' ');
               return (
-                <tr key={r.vehicle_id || i} style={{ borderTop: '1px solid var(--border)' }}>
+                <tr key={`${r.vehicle_id ?? 'row'}-${i}`} style={{ borderTop: '1px solid var(--border)' }}>
                   <td style={{ padding: '3px 6px 3px 0', width: '44px' }}>
                     {r.image_url ? (
                       <Link to={`/vehicle/${r.vehicle_id}`} style={{ display: 'block' }}>
@@ -629,6 +808,7 @@ export default function CohortTerminal() {
 
   const cc = data.cohort_count;
   const pd = data.price_distribution;
+  const pp = data.price_points;
   const mf = data.market_flow;
   const sent = data.sentiment;
   const df = data.dealer_flow;
@@ -693,7 +873,12 @@ export default function CohortTerminal() {
         </div>
       </div>
 
-      {/* ── Price distribution ── */}
+      {/* ── Price points (the honest cloud — every sale, not a median) ── */}
+      {pp?.populated
+        ? <PricePoints pp={pp} />
+        : <DarkBlock label="Price Points" reason="No individual priced sales captured yet — the cohort cloud is an intake gap, not a market verdict." />}
+
+      {/* ── Price distribution (the summary band) ── */}
       {pd?.populated
         ? <PriceDistribution pd={pd} />
         : <DarkBlock label="Price Distribution" reason="No defensible price spread captured yet." />}
