@@ -224,10 +224,30 @@ export function decodeHtmlEntities(s: string | null | undefined): string | null 
  * Normalize a vehicle make to its canonical form.
  * Returns title-cased make if no alias match is found.
  */
+/**
+ * True when a make value is a never-valid shape: digit-led ("12", "427",
+ * "2004"), letterless (".", "-", "'83"), a single char ("C"), or year-shaped.
+ * No real make matches — MG/AC/MV/OM/"AM General" all pass. Mirrors the
+ * DB guard public.is_garbage_make() so the code path and the trg_sanitize_make
+ * chokepoint agree. Two-char letter fragments (Ez/El/Go) are NOT flagged here;
+ * the title parsers reject those via their own fallback guard.
+ */
+export function isGarbageMake(make: string | null | undefined): boolean {
+  if (!make || typeof make !== 'string') return false;
+  const t = make.trim();
+  return (
+    /^[0-9]/.test(t) ||        // starts with a digit
+    !/[A-Za-z]/.test(t) ||     // no letters at all
+    t.length === 1 ||          // single char
+    /^(19|20)\d{2}$/.test(t)   // year-shaped
+  );
+}
+
 export function normalizeMake(make: string | null | undefined): string | null {
   if (!make || typeof make !== 'string') return null;
   const trimmed = make.trim();
   if (!trimmed) return null;
+  if (isGarbageMake(trimmed)) return null;
 
   const lower = trimmed.toLowerCase();
   if (MAKE_ALIASES[lower]) return MAKE_ALIASES[lower];
