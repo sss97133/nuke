@@ -13,9 +13,25 @@
  *   { "feed_id": "uuid" }      -- poll a specific feed
  *   { "batch_size": 10 }       -- how many feeds to poll (default: 10)
  *   { "force": true }          -- ignore poll interval, poll now
+ *
+ * Fetch strategies:
+ *   - Default: fetch feed_url directly and parse RSS/Atom XML.
+ *   - search_criteria.fetch_strategy = "firecrawl_html": Craigslist killed RSS,
+ *     so the search page is fetched as curated HTML, listing detail URLs are
+ *     extracted from the HTML/markdown, and unknown ones are POSTed to the
+ *     `ingest` edge function (capped per poll). Firecrawl is tried first, but
+ *     Firecrawl refuses craigslist.org outright (HTTP 403 "we do not support
+ *     this site"), so on failure we fall back to a direct archiveFetch -- the
+ *     static search page carries a full page of /view/d/ share links (verified
+ *     2026-07-01). Failures are ALWAYS written to the feed row
+ *     (last_error / error_count) -- a silent 0 is a lie.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { firecrawlScrape } from "../_shared/firecrawl.ts";
+import { archiveFetch } from "../_shared/archiveFetch.ts";
+import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
+import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -98,6 +114,41 @@ function decodeEntities(str: string): string {
     .replace(/&#x2F;/g, "/");
 }
 
+/**
+ * Fetch an RSS/Atom feed URL with a bounded timeout and Nuke's standard bot
+ * User-Agent/Accept headers, then parse it into FeedItem[]. Throws (does not
+ * swallow) on abort/network failure or a non-2xx response — callers decide
+ * how to surface that (failFeed() vs the outer per-feed try/catch), so this
+ * stays opinion-free on error handling. Shared by both the rss_direct_ingest
+ * strategy and the legacy per-feed RSS loop, which previously duplicated
+ * this exact fetch+timeout+parse sequence with an unexplained 20s/15s
+ * timeout mismatch between the two copies.
+ */
+async function fetchAndParseRssFeed(
+  feedUrl: string,
+  timeoutMs = 15000
+): Promise<FeedItem[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(feedUrl, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (compatible; NukeBot/1.0; vehicle-research)",
+        Accept:
+          "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    return parseRSS(await response.text());
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 // ─── Listing Data Extraction ──────────────────────────────────────
 
 function parseVehicleFromTitle(
@@ -108,9 +159,11 @@ function parseVehicleFromTitle(
   if (ymm) {
     const year = parseInt(ymm[1], 10);
     if (year >= 1900 && year <= 2030) {
+      const rawMake = ymm[2].trim();
+      // Drop a garbage-shaped make (single char / year) — unknown, not garbage. (Gate 5.)
       return {
         year,
-        make: ymm[2].trim(),
+        make: isGarbageMake(rawMake) ? undefined : rawMake,
         model: ymm[3].replace(/\s*[-–]\s*\$[\d,]+.*$/, "").trim(), // Remove price from title
       };
     }
@@ -150,6 +203,367 @@ function cleanListingUrl(url: string, sourceSlug: string): string {
   }
 
   return cleaned;
+}
+
+// ─── Firecrawl HTML Strategy (Craigslist search pages) ───────────
+
+/** Cost bound: max NEW listings sent to `ingest` per feed per poll. */
+const MAX_NEW_INGESTS_PER_POLL = 20;
+
+interface FeedResult {
+  feed: string;
+  source: string;
+  items_found: number;
+  new_queued?: number; // RSS path
+  new_ingested?: number; // firecrawl_html path
+  matched_existing?: number; // firecrawl_html path
+  rejected?: number; // firecrawl_html path
+  ingest_outcomes?: Array<{
+    url: string;
+    status: string;
+    vehicle_id?: string | null;
+    error?: string;
+    reason?: string;
+  }>;
+  error: string | null;
+}
+
+/**
+ * Extract Craigslist listing detail URLs from search-page HTML/markdown.
+ * Handles both URL shapes, deduped by listing ID / share token:
+ *   https://<city>.craigslist.org/<cat>/d/<slug>/<digits>.html  (canonical)
+ *   https://www.craigslist.org/view/d/<slug>/<id-or-base62-token>
+ * The current www search UI emits ONLY the share form with base62 tokens
+ * (e.g. /view/d/las-vegas-1965-ford-mustang/8436xEWWj3kDbhbnMUV8Fi);
+ * `ingest` resolves those to the canonical regional URL before dedup.
+ */
+function extractCraigslistListingUrls(
+  html: string | null,
+  markdown: string | null
+): string[] {
+  const haystack = `${html || ""}\n${markdown || ""}`;
+  const byId = new Map<string, string>();
+  let m: RegExpExecArray | null;
+
+  // City form first -- it's the canonical shape vehicles.listing_url stores.
+  for (const { id, url } of extractCraigslistCanonicalUrls(haystack)) {
+    byId.set(id, cleanListingUrl(url, "craigslist"));
+  }
+
+  // View form only fills gaps -- same listing ID never yields two URLs.
+  // Accepts both legacy numeric IDs and the base62 share tokens the current
+  // www search UI emits.
+  const viewRegex =
+    /https:\/\/www\.craigslist\.org\/view\/d\/[^\/\s"'<>)\]]+\/([A-Za-z0-9]{6,})/gi;
+  while ((m = viewRegex.exec(haystack)) !== null) {
+    if (!byId.has(m[1])) byId.set(m[1], cleanListingUrl(m[0], "craigslist"));
+  }
+
+  return [...new Set(byId.values())];
+}
+
+/**
+ * Poll one firecrawl_html feed: Firecrawl-fetch the search page, extract
+ * listing URLs, ingest unknown ones (capped), and write honest bookkeeping
+ * to the feed row. Never throws; every failure lands in last_error.
+ */
+async function pollFirecrawlHtmlFeed(
+  supabase: any,
+  feed: any
+): Promise<FeedResult> {
+  const result: FeedResult = {
+    feed: feed.display_name,
+    source: feed.source_slug,
+    items_found: 0,
+    new_ingested: 0,
+    matched_existing: 0,
+    rejected: 0,
+    ingest_outcomes: [],
+    error: null,
+  };
+
+  const failFeed = async (message: string): Promise<FeedResult> => {
+    result.error = message;
+    console.error(`[poll-feeds] ${feed.display_name}: ${message}`);
+    // Deliberately no auto-disable here: this is a curated feed, and a
+    // silently-disabled feed is exactly the green lie this path exists to kill.
+    await supabase
+      .from("listing_feeds")
+      .update({
+        last_polled_at: new Date().toISOString(),
+        last_poll_count: result.items_found,
+        error_count: (feed.error_count || 0) + 1,
+        last_error: message.slice(0, 500),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", feed.id);
+    return result;
+  };
+
+  // Acquire listing URLs. Two strategies share the ingest/ledger tail below:
+  //  - rss_direct_ingest: plain RSS fetch (e.g. BaT /feed/ -- publicly served,
+  //    verified 2026-07-02). Item links become listing URLs and go straight
+  //    through `ingest`. Bypasses import_queue entirely: nothing drains that
+  //    queue (cron 420 off) and refilling it is the 2026-07-01 editorial-slop
+  //    landmine.
+  //  - firecrawl_html (default): Firecrawl first (renders JS when it works),
+  //    but Firecrawl refuses craigslist.org at the API level (403 "we do not
+  //    support this site"), so fall back to a direct fetch through
+  //    archiveFetch -- the static page carries a full page of /view/d/ share
+  //    links (verified 2026-07-01), and the snapshot is archived as a bonus.
+  let urls: string[] = [];
+  let blockNote = "";
+
+  if (feed.search_criteria?.fetch_strategy === "rss_direct_ingest") {
+    try {
+      const items = await fetchAndParseRssFeed(feed.feed_url);
+      urls = [
+        ...new Set(
+          items
+            .filter((i) => i.link)
+            .map((i) => cleanListingUrl(i.link, feed.source_slug))
+        ),
+      ];
+    } catch (err: any) {
+      return await failFeed(`fetch_failed: rss ${err?.message || String(err)}`);
+    }
+  } else {
+    let html: string | null = null;
+    let markdown: string | null = null;
+    const fetchErrors: string[] = [];
+
+    if ((Deno.env.get("FIRECRAWL_API_KEY") || "").trim()) {
+      try {
+        const scrape = await firecrawlScrape({
+          url: feed.feed_url,
+          formats: ["html", "markdown"],
+          onlyMainContent: false,
+          waitFor: 3000,
+          timeout: 30000,
+        });
+        html = scrape.data.html;
+        markdown = scrape.data.markdown;
+        if (scrape.blocked) {
+          blockNote = ` (blocked: ${scrape.blockedSignals.join(", ")})`;
+        }
+        if (!html && !markdown) {
+          fetchErrors.push(
+            `firecrawl: ${scrape.error || `HTTP ${scrape.httpStatus}, empty payload`}`
+          );
+        }
+      } catch (err: any) {
+        fetchErrors.push(`firecrawl: ${err?.message || String(err)}`);
+      }
+    } else {
+      fetchErrors.push("firecrawl: FIRECRAWL_API_KEY missing");
+    }
+
+    if (!html && !markdown) {
+      try {
+        const direct = await archiveFetch(feed.feed_url, {
+          platform: feed.source_slug || "craigslist",
+          skipCache: true, // hourly poll needs a fresh page, not yesterday's
+          useFirecrawl: false,
+          includeMarkdown: false,
+          callerName: "poll-listing-feeds",
+        });
+        html = direct.html;
+        if (!html && direct.error) fetchErrors.push(`direct: ${direct.error}`);
+      } catch (err: any) {
+        fetchErrors.push(`direct: ${err?.message || String(err)}`);
+      }
+    }
+
+    if (!html && !markdown) {
+      return await failFeed(
+        `fetch_failed: ${fetchErrors.join(" | ") || "empty payload"}`
+      );
+    }
+
+    urls = extractCraigslistListingUrls(html, markdown);
+  }
+
+  result.items_found = urls.length;
+
+  if (urls.length === 0) {
+    return await failFeed(`parsed_zero${blockNote}`);
+  }
+
+  console.log(
+    `[poll-feeds] ${feed.display_name}: ${urls.length} listing URLs on search page`
+  );
+
+  // Skip listings we already have. Two lookups, both needed:
+  //  - vehicles.listing_url stores the CANONICAL regional URL, so it only
+  //    matches if a feed ever emits that form directly.
+  //  - import_queue.listing_url is THIS poller's ledger of share URLs already
+  //    pushed through ingest (written below after each settled outcome).
+  //    Without it, the share-vs-canonical mismatch made every listing look
+  //    unknown and the 20-cap burned on the same page-top URLs each poll —
+  //    the page tail never drained (found 2026-07-02: 24 ingested in 24h
+  //    instead of ~150).
+  // Chunked: 150+ long share URLs in one .in() overflows the request line
+  // (HTTP/2 stream error), so query in batches of 40.
+  const knownUrls = new Set<string>();
+  for (let i = 0; i < urls.length; i += 40) {
+    const chunk = urls.slice(i, i + 40);
+    // Independent tables, neither query depends on the other's result —
+    // run concurrently instead of paying two sequential round trips per chunk.
+    const [
+      { data: known, error: knownError },
+      { data: ledgered, error: ledgerError },
+    ] = await Promise.all([
+      supabase.from("vehicles").select("listing_url").in("listing_url", chunk),
+      supabase
+        .from("import_queue")
+        .select("listing_url")
+        .in("listing_url", chunk)
+        .in("status", ["complete", "skipped"]),
+    ]);
+
+    if (knownError) {
+      return await failFeed(
+        `fetch_failed: known-url lookup: ${knownError.message}`
+      );
+    }
+    for (const v of known || []) knownUrls.add(v.listing_url);
+
+    if (ledgerError) {
+      return await failFeed(
+        `fetch_failed: ledger lookup: ${ledgerError.message}`
+      );
+    }
+    for (const q of ledgered || []) knownUrls.add(q.listing_url);
+  }
+  result.matched_existing = knownUrls.size;
+
+  const newUrls = urls.filter((u) => !knownUrls.has(u));
+  const toIngest = newUrls.slice(0, MAX_NEW_INGESTS_PER_POLL);
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  for (const url of toIngest) {
+    try {
+      const controller = new AbortController();
+      // ingest's own enrichment call (tryAutoEnrich) uses a 75s internal
+      // timeout (ingest/index.ts), so a shorter caller-side timeout here
+      // aborts mid-enrichment on any listing taking 30-75s to extract,
+      // reports it back as a client "error" — which is NOT ledgered (errors
+      // retry next poll, by design) — and re-burns a MAX_NEW_INGESTS_PER_POLL
+      // slot on the exact same slow URL every future poll. Must exceed 75s.
+      const timeout = setTimeout(() => controller.abort(), 85000);
+
+      const resp = await fetch(`${supabaseUrl}/functions/v1/ingest`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      const ingest = await resp.json().catch(() => ({
+        status: "error",
+        error: `ingest HTTP ${resp.status} (non-JSON body)`,
+      }));
+      const status = ingest.status || "error";
+
+      result.ingest_outcomes!.push({
+        url,
+        status,
+        vehicle_id: ingest.vehicle_id ?? null,
+        ...(ingest.error ? { error: String(ingest.error).slice(0, 200) } : {}),
+        ...(ingest.reason ? { reason: String(ingest.reason).slice(0, 200) } : {}),
+      });
+
+      if (status === "created") result.new_ingested!++;
+      else if (status === "matched" || status === "duplicate")
+        result.matched_existing!++;
+      else if (status === "rejected") result.rejected!++;
+
+      // Ledger the settled outcome so future polls skip this share URL
+      // (vehicles stores the canonical form, which never matches the share
+      // form — see the known-check above). Errors are NOT ledgered: they
+      // retry next poll. Rejections only ledger when STRUCTURAL (editorial /
+      // not-a-vehicle / implausible-year / quality-gate reject); identity-
+      // insufficient rejects are often a transient enrichment failure and
+      // deserve a retry (the 2026-07-02 VW Thing miss).
+      // "quality_gate_reject" covers deterministic gate rejects (e.g.
+      // vin_make_mismatch) added 2026-07-07 — the same URL fails the same
+      // way every time, so without this it burns a MAX_NEW_INGESTS_PER_POLL
+      // slot on every future poll forever.
+      const rejectReason = String(ingest.reason || ingest.error || "");
+      const structuralReject =
+        status === "rejected" &&
+        /editorial|not_a_vehicle|not a vehicle|implausible|quality_gate_reject/i.test(rejectReason);
+      if (
+        ["created", "matched", "duplicate"].includes(status) ||
+        structuralReject
+      ) {
+        const { error: ledgerWriteError } = await supabase
+          .from("import_queue")
+          .upsert(
+            {
+              listing_url: url,
+              status: status === "rejected" ? "skipped" : "complete",
+              vehicle_id: ingest.vehicle_id ?? null,
+              processed_at: new Date().toISOString(),
+              raw_data: {
+                feed_id: feed.id,
+                ingested_via: "poll_firecrawl_html",
+                ingest_status: status,
+                ...(ingest.reason ? { reject_reason: String(ingest.reason).slice(0, 200) } : {}),
+              },
+            },
+            { onConflict: "listing_url" }
+          );
+        if (ledgerWriteError) {
+          // Non-fatal, but say so — a silent ledger gap re-burns cap slots.
+          console.error(
+            `[poll-feeds] ledger write failed for ${url}: ${ledgerWriteError.message}`
+          );
+        }
+      }
+    } catch (err: any) {
+      result.ingest_outcomes!.push({
+        url,
+        status: "error",
+        error: (err?.message || String(err)).slice(0, 200),
+      });
+    }
+
+    // Small delay between ingests to be polite
+    await new Promise((r) => setTimeout(r, 250));
+  }
+
+  // If every attempted ingest errored, that's a failure too -- say so.
+  const ingestErrors = result.ingest_outcomes!.filter(
+    (o) => o.status === "error"
+  ).length;
+  if (toIngest.length > 0 && ingestErrors === toIngest.length) {
+    return await failFeed(
+      `ingest_failed: ${ingestErrors}/${toIngest.length} ingest calls errored`
+    );
+  }
+
+  // Success path bookkeeping.
+  await supabase
+    .from("listing_feeds")
+    .update({
+      last_polled_at: new Date().toISOString(),
+      last_poll_count: urls.length,
+      total_items_found: (feed.total_items_found || 0) + urls.length,
+      error_count: 0,
+      last_error: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", feed.id);
+
+  return result;
 }
 
 // ─── Main Handler ──────────────────────────────────────────────────
@@ -222,45 +636,84 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`[poll-feeds] Polling ${feeds.length} feeds...`);
+    // Honor each feed's own poll_interval_minutes (the SQL filter above is
+    // only a coarse 10-minute gate; a 60-min feed must not poll every cron tick).
+    const dueFeeds = force
+      ? feeds
+      : feeds.filter((f: any) => {
+          if (!f.last_polled_at) return true;
+          const lastPolledMs = new Date(f.last_polled_at).getTime();
+          if (Number.isNaN(lastPolledMs)) {
+            // Unparseable timestamp would make `Date.now() - NaN >= intervalMs`
+            // false forever, silently excluding this feed from every future
+            // poll with nothing to signal it's stuck. Treat as due instead.
+            console.error(`[poll-feeds] ${f.display_name}: unparseable last_polled_at "${f.last_polled_at}" — treating as due`);
+            return true;
+          }
+          const intervalMs = (f.poll_interval_minutes || 60) * 60 * 1000;
+          return Date.now() - lastPolledMs >= intervalMs;
+        });
 
-    const results: Array<{
-      feed: string;
-      source: string;
-      items_found: number;
-      new_queued: number;
-      error: string | null;
-    }> = [];
+    if (dueFeeds.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "No feeds due for polling (per-feed interval)",
+          feeds_polled: 0,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`[poll-feeds] Polling ${dueFeeds.length} feeds...`);
+
+    const results: FeedResult[] = [];
 
     let totalQueued = 0;
     let totalFound = 0;
+    let totalIngested = 0;
 
-    for (const feed of feeds) {
+    // Stay safely under the platform's edge-function wall-clock ceiling.
+    // Sequential per-feed processing with an 85s-per-URL ceiling and up to
+    // MAX_NEW_INGESTS_PER_POLL=20 URLs/feed has no upper bound today — a
+    // busy multi-feed poll (single-feed bursts have already been observed
+    // near 190s in production) can run long enough to be killed mid-loop.
+    // A kill mid-loop is safe (each feed's last_polled_at/error_count is
+    // only written at the clean end of its own processing, so an unfinished
+    // feed simply stays "due" and gets picked up next cron tick), but
+    // stopping intentionally, before the platform does it forcibly, is
+    // strictly better — and this codebase has already paid for this exact
+    // failure mode once (docs/library/technical/extraction-playbook.md
+    // FAILURE 14: edge-function batch size too large -> 504).
+    const FEED_LOOP_TIME_BUDGET_MS = 240_000;
+
+    for (const feed of dueFeeds) {
+      if (Date.now() - startTime > FEED_LOOP_TIME_BUDGET_MS) {
+        console.log(`[poll-feeds] Time budget exceeded (${Date.now() - startTime}ms) — stopping early, ${dueFeeds.length - results.length} feed(s) deferred to next cron tick`);
+        break;
+      }
+      // Curated direct-ingest strategies (Craigslist HTML via Firecrawl, BaT
+      // RSS). Both bypass the legacy import_queue path entirely and route
+      // through `ingest` with the share-URL ledger.
+      if (
+        ["firecrawl_html", "rss_direct_ingest"].includes(
+          feed.search_criteria?.fetch_strategy
+        )
+      ) {
+        const fcResult = await pollFirecrawlHtmlFeed(supabase, feed);
+        results.push(fcResult);
+        totalFound += fcResult.items_found;
+        totalIngested += fcResult.new_ingested || 0;
+
+        // Small delay between feeds to be polite
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+
       try {
         console.log(`[poll-feeds] Fetching: ${feed.display_name} (${feed.feed_url.slice(0, 80)}...)`);
 
-        // Fetch the feed with a timeout
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
-
-        const response = await fetch(feed.feed_url, {
-          signal: controller.signal,
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (compatible; NukeBot/1.0; vehicle-research)",
-            Accept:
-              "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
-          },
-        });
-
-        clearTimeout(timeout);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const xml = await response.text();
-        const items = parseRSS(xml);
+        const items = await fetchAndParseRssFeed(feed.feed_url);
 
         console.log(`[poll-feeds] ${feed.display_name}: ${items.length} items in feed`);
         totalFound += items.length;
@@ -401,15 +854,16 @@ Deno.serve(async (req) => {
 
     const elapsed = Date.now() - startTime;
     console.log(
-      `[poll-feeds] Done. ${feeds.length} feeds polled, ${totalFound} items found, ${totalQueued} new queued in ${elapsed}ms`
+      `[poll-feeds] Done. ${dueFeeds.length} feeds polled, ${totalFound} items found, ${totalQueued} new queued, ${totalIngested} new ingested in ${elapsed}ms`
     );
 
     return new Response(
       JSON.stringify({
         success: true,
-        feeds_polled: feeds.length,
+        feeds_polled: dueFeeds.length,
         total_items_found: totalFound,
         total_new_queued: totalQueued,
+        total_new_ingested: totalIngested,
         elapsed_ms: elapsed,
         results,
       }),
