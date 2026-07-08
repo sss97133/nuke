@@ -21,7 +21,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Intent | Use This | Notes |
 |--------|----------|-------|
 | Extract any listing URL (unknown source) | `extract-vehicle-data-ai` | Handles generic AI extraction |
-| Extract Bring a Trailer listing | `complete-bat-import` | Two-step: extract-bat-core + extract-auction-comments. |
+| Extract Bring a Trailer listing | `extract-bat-core` | Call directly, then trigger `extract-auction-comments` yourself — not auto-chained. (`complete-bat-import` was deleted from deployment in the March 2026 triage; it 404s live.) |
 | Extract Cars & Bids listing | `extract-cars-and-bids-core` | Handles C&B structure |
 | Extract Hagerty Marketplace listing | `extract-hagerty-listing` | |
 | Extract PCarMarket listing | `import-pcarmarket-listing` | |
@@ -260,7 +260,7 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 | Monitor a BaT seller | `bat-seller-monitors` table | Insert record to start monitoring |
 | Monitor a BaT buyer | `bat-buyer-monitors` table | Insert record to start monitoring |
 | Parse BaT snapshot HTML | `bat-snapshot-parser` | Parses archived BaT pages |
-| Extract a BaT listing (entry point) | `complete-bat-import` | Calls extract-bat-core + extract-auction-comments in sequence |
+| Extract a BaT listing (entry point) | `extract-bat-core` | Standalone entry point — call directly, then trigger `extract-auction-comments` yourself. (`complete-bat-import` is deleted/404s — see `_shared/approved-extractors.ts`.) |
 
 ---
 
@@ -465,7 +465,7 @@ These are the most common "agent reimplementation" antipatterns. If you find you
 | A vehicle valuation calculator | `compute-vehicle-valuation` |
 | A comment sentiment analyzer | `discover-comment-data` |
 | A search endpoint | `universal-search` |
-| A BaT scraper | `complete-bat-import` |
+| A BaT scraper | `extract-bat-core` (+ `extract-auction-comments` for comments) |
 | A Craigslist scraper | `extract-craigslist` or `discover-cl-squarebodies` |
 | A Facebook scraper | `extract-facebook-marketplace` |
 | A market trend calculator | `calculate-market-trends` |

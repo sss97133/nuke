@@ -10,6 +10,7 @@ const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/veh
 // WiringQueryContextBar removed — wiring canvas replaced with data view
 const PartsQuoteGenerator = React.lazy(() => import('../../components/PartsQuoteGenerator').then(m => ({ default: m.PartsQuoteGenerator })));
 const InvestmentLedger = React.lazy(() => import('./InvestmentLedger'));
+const BuildLedger = React.lazy(() => import('./BuildLedger'));
 const WorthEngineCard = React.lazy(() => import('./WorthEngineCard'));
 const PhotoAuthenticationCard = React.lazy(() => import('./PhotoAuthenticationCard'));
 const VehicleFindingsCard = React.lazy(() => import('./VehicleFindingsCard'));
@@ -218,6 +219,13 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
             <React.Suspense fallback={null}>
               <InvestmentLedger vehicleId={vehicle.id} vehicle={vehicle} isOwnerView />
+            </React.Suspense>
+          )}
+
+          {/* Build Ledger — evidence-tiered financial audit draft (owner-scoped via get_vehicle_build_ledger RPC) */}
+          {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
+            <React.Suspense fallback={null}>
+              <BuildLedger vehicleId={vehicle.id} />
             </React.Suspense>
           )}
 

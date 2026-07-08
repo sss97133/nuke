@@ -24,6 +24,14 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 // Extractor versioning - update on each significant change
 const EXTRACTOR_VERSION = 'extract-bat-core:3.0.0';
 
+// Shared column list for the four vehicle-existence lookups below
+// (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
+// branches). Was hand-duplicated identically in all four places — a single
+// source of truth means a future column addition can't silently drift and
+// produce inconsistent read-back data across the branches.
+const VEHICLE_MATCH_COLUMNS =
+  "id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, listing_kind, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -1189,7 +1197,7 @@ Deno.serve(async (req) => {
     if (!vehicleId) {
       const { data } = await supabase
         .from("vehicles")
-        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, listing_kind, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid")
+        .select(VEHICLE_MATCH_COLUMNS)
         .in("discovery_url", urlCandidates)
         .limit(1)
         .maybeSingle();
@@ -1201,8 +1209,24 @@ Deno.serve(async (req) => {
     if (!vehicleId) {
       const { data } = await supabase
         .from("vehicles")
-        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, listing_kind, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid")
+        .select(VEHICLE_MATCH_COLUMNS)
         .in("bat_auction_url", urlCandidates)
+        .limit(1)
+        .maybeSingle();
+      if (data?.id) {
+        existing = data;
+        vehicleId = String(data.id);
+      }
+    }
+    // Also resolve by vehicles.listing_url — rows created through the `ingest`
+    // front door store the canonical URL THERE (not discovery_url /
+    // bat_auction_url), and idx_vehicles_listing_url_unique makes a blind
+    // insert crash with a duplicate-key error (hit 2026-07-02).
+    if (!vehicleId) {
+      const { data } = await supabase
+        .from("vehicles")
+        .select(VEHICLE_MATCH_COLUMNS)
+        .in("listing_url", urlCandidates)
         .limit(1)
         .maybeSingle();
       if (data?.id) {
@@ -1311,7 +1335,7 @@ Deno.serve(async (req) => {
       if (!existing) {
         const { data } = await supabase
           .from("vehicles")
-          .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, listing_kind, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid")
+          .select(VEHICLE_MATCH_COLUMNS)
           .eq("id", vehicleId)
           .maybeSingle();
         existing = data || null;
@@ -1334,7 +1358,17 @@ Deno.serve(async (req) => {
         modelLower.includes("for sale on bat auctions") ||
         modelLower.includes("bring a trailer") ||
         modelLower.includes("|") ||
-        modelLower.includes("auction preview");
+        modelLower.includes("auction preview") ||
+        // Slug-parse garbage from the pre-2026-07-02 ingest fallback: "f"
+        // (hyphen-truncated F-100), "benz sl500" (multi-word-make echo). A
+        // present-but-garbage model must lose to a clean re-extraction.
+        // Length threshold is <=1, NOT <=2: real 2-char model names are
+        // common across this exact dataset (Audi A4/A6/A8/Q5/Q7/R8, BMW
+        // M3/M5/X3/X5/Z4/TT, Ford GT, and K5 — Nuke's own flagship
+        // reference vehicle, the K5 Blazer). A blanket <=2 would flag every
+        // existing K5 as "polluted" and overwrite it on re-extraction.
+        modelLower.trim().length <= 1 ||
+        /^(benz|rover|romeo|martin|davidson)\s/.test(modelLower.trim());
 
       const looksLikeBatBoilerplate = (t: string): boolean => {
         const s = String(t || "").toLowerCase();

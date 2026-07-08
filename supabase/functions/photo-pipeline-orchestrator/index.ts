@@ -54,6 +54,14 @@ interface ClassificationResult {
     year_range?: string;
     color?: string;
   };
+  /**
+   * false = this is NOT a real Gemini verdict — it's a stand-in produced because
+   * the classifier was rate-limited, errored, or unconfigured. Root-cause fix
+   * (2026-07-06, the 429/hollow-completion incident): this flag is what lets
+   * Step 7 stop lying with ai_processing_status='completed'. Absent/true = a
+   * real classification (or no classifier condition applies).
+   */
+  classifier_ok?: boolean;
 }
 
 interface PipelineInput {
@@ -80,18 +88,64 @@ Deno.serve(async (req) => {
     // Batch mode: process images stuck in 'pending' (cleanup/catchup)
     if (input.action === "process_pending") {
       const limit = input.limit || 5;
-      const { data: pendingImages } = await supabase
+
+      // 2026-07-06 perf fix: this used to be a single query ordered by
+      // (user_id DESC NULLS LAST, created_at DESC). That combined ORDER BY has
+      // no supporting index over a table where ~32.7M rows are
+      // ai_processing_status='pending' (mostly scraped/NULL-user backlog), so
+      // Postgres fell back to a Parallel Seq Scan + Sort across all of them,
+      // which blew the statement timeout on every single invocation. The error
+      // was swallowed by `if (!pendingImages...)`, so this action silently
+      // no-op'd as "No pending images" on every cron tick (job 478, */5 min)
+      // instead of ever draining the queue. Split into two indexed passes that
+      // preserve the same "owner uploads first" intent:
+      //   1. idx_vehicle_images_pending_user (user_id IS NOT NULL AND status='pending')
+      //   2. idx_vehicle_images_pending_processing (status='pending'), top-up only
+      const { data: ownerPending, error: ownerErr } = await supabase
         .from("vehicle_images")
         .select("id, image_url, vehicle_id, user_id")
         .eq("ai_processing_status", "pending")
         .eq("is_duplicate", false)
         .not("image_url", "is", null)
-        // Owner uploads first (user_id NOT NULL, nulls last), newest first —
-        // a freshly-synced user photo must classify before the scraped backlog,
-        // not wait behind a million oldest-first rows.
-        .order("user_id", { ascending: false, nullsFirst: false })
+        .not("user_id", "is", null)
         .order("created_at", { ascending: false })
         .limit(limit);
+
+      if (ownerErr) {
+        console.error(`[photo-pipeline] process_pending owner-query error: ${ownerErr.message}`);
+      }
+
+      let pendingImages = ownerPending ?? [];
+
+      if (pendingImages.length < limit) {
+        const seenIds = new Set(pendingImages.map((r) => r.id));
+        // Fetch a full `limit` rows (not just the remaining gap) as a buffer:
+        // the backlog query has no user_id filter, so it can re-surface rows
+        // already in pendingImages (owner rows are a subset of "pending"
+        // overall) — the dedup loop below drops those, and over-fetching by
+        // seenIds.size keeps this batch at `limit` total after dedup instead
+        // of falling short and needing another cron tick to catch up.
+        const { data: backlogPending, error: backlogErr } = await supabase
+          .from("vehicle_images")
+          .select("id, image_url, vehicle_id, user_id")
+          .eq("ai_processing_status", "pending")
+          .eq("is_duplicate", false)
+          .not("image_url", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+
+        if (backlogErr) {
+          console.error(`[photo-pipeline] process_pending backlog-query error: ${backlogErr.message}`);
+        }
+
+        for (const row of backlogPending ?? []) {
+          if (!seenIds.has(row.id)) {
+            pendingImages.push(row);
+            seenIds.add(row.id);
+          }
+          if (pendingImages.length >= limit) break;
+        }
+      }
 
       if (!pendingImages || pendingImages.length === 0) {
         return new Response(
@@ -262,14 +316,39 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Step 7: Mark as completed (single update)
+    // Step 7: Mark as completed — UNLESS the classifier itself never actually ran
+    // (rate-limited / errored / unconfigured). Root-cause fix for the 429/hollow-
+    // completion incident (2026-07-06): 13,718 rows were hitting Gemini 429s and
+    // 7,138 of those settled as ai_processing_status='completed' with nothing but
+    // a failure string in ai_scan_metadata — the flag was lying about what
+    // happened. classifier_ok===false means classifyImage() never got a real
+    // verdict; the honest terminal state is 'failed', NOT 'completed'. The rest
+    // of the pipeline (resolveVehicle/routeByType/enqueueDeepByok/createObservation)
+    // still ran above — this only changes the status label, so the BYOK deep-tier
+    // rescue path is untouched.
+    //
+    // Why 'failed' and not a new 'needs_retry' status: reset_stuck_photo_pipeline_images()
+    // (15-min cron) ALREADY sweeps 'failed' with exactly the retry-budgeted semantics
+    // this needs (ai_retry_count < 3 -> reset to 'pending' for a fresh whole-pipeline
+    // pass with new jittered backoff; >= 3 -> stays 'failed', an honest terminal state)
+    // — verified live against the deployed function. The 2026-06-18 comment this
+    // replaces believed re-throwing here caused an infinite failed->pending loop; that
+    // is not what the live cron does (it's retry-count-gated), so the workaround
+    // (silently faking 'completed') is no longer needed. A distinct 'needs_retry'
+    // status was tried first but would need its own partial index — CONCURRENTLY
+    // build on this table's 39M rows exceeds the 120s statement_timeout ceiling even
+    // for a narrow predicate (confirmed empirically, twice, cleanly rolled back) — so
+    // reusing 'failed' (zero new indexes, zero schema risk, already the flag frontend
+    // code already renders) is the correct-not-just-easier choice.
     const durationMs = Date.now() - startedAt;
+    const classifierFailed = classification.classifier_ok === false;
     const scanMeta: Record<string, any> = {
       pipeline_version: "v2",
       classification,
       route_result: routeResult.summary,
       duration_ms: durationMs,
       processed_at: new Date().toISOString(),
+      classifier_failed: classifierFailed, // queryable top-level flag, not buried in nested JSON
     };
     // P3.2: stamp the observable deep-queue marker here (step 7 rewrites
     // ai_scan_metadata, so enqueueDeepByok deliberately doesn't write it itself —
@@ -283,7 +362,7 @@ Deno.serve(async (req) => {
       };
     }
     const updatePayload: Record<string, any> = {
-      ai_processing_status: "completed",
+      ai_processing_status: classifierFailed ? "failed" : "completed",
       ai_scan_metadata: scanMeta,
     };
     if (resolvedVehicleId && !vehicle_id) {
@@ -298,13 +377,14 @@ Deno.serve(async (req) => {
       .update(updatePayload)
       .eq("id", image_id);
 
-    console.log(`[photo-pipeline] Completed in ${durationMs}ms`);
+    console.log(`[photo-pipeline] ${classifierFailed ? "Needs retry" : "Completed"} in ${durationMs}ms`);
 
     return new Response(
       JSON.stringify({
         success: true,
         image_id,
         classification: classification.image_type,
+        classifier_ok: !classifierFailed,
         vehicle_id: resolvedVehicleId,
         vehicle_resolved: !!resolvedVehicleId,
         route: routeResult.summary,
@@ -344,15 +424,18 @@ Deno.serve(async (req) => {
 // ============================================================
 
 // Terminal "unclassified" result — used whenever the classifier is absent,
-// rate-limited, or errors. Settles the image as 'completed' (low confidence)
-// instead of 'failed', so the reset-stuck cron never re-churns it. BYOK deep
-// analysis / owner confirmation is the real classifier downstream.
+// rate-limited, or errors. Sets classifier_ok:false, which Step 7 reads to
+// write ai_processing_status='failed' (not a fake 'completed') — the
+// reset_stuck_photo_pipeline_images() cron (15-min, retry-count-gated) is
+// what actually re-churns it, not this function. BYOK deep analysis / owner
+// confirmation is the real classifier downstream once retries exhaust.
 function UNCLASSIFIED_FALLBACK(reason: string): ClassificationResult {
   return {
     image_type: "other",
     confidence: 0.2,
     is_automotive: true,
     description: `Unclassified (classifier unavailable: ${String(reason).slice(0, 120)}) — left for BYOK/owner review`,
+    classifier_ok: false,
   };
 }
 
@@ -370,6 +453,7 @@ async function classifyImage(imageUrl: string): Promise<ClassificationResult> {
       confidence: 0.3,
       is_automotive: true,
       description: "No AI classification available",
+      classifier_ok: false,
     };
   }
 
@@ -381,8 +465,23 @@ async function classifyImage(imageUrl: string): Promise<ClassificationResult> {
   );
   const mimeType = imageResponse.headers.get("content-type") || "image/jpeg";
 
-  const MAX_RETRIES = 3;
-  const BASE_DELAY_MS = 1000; // 1s, 2s, 4s exponential backoff
+  // Root-cause note (2026-07-06 429/hollow-completion incident): this per-invocation
+  // backoff can't fix a THUNDERING HERD — the orchestrator is a per-row pg_net trigger
+  // (AFTER INSERT ... FOR EACH ROW), so a single bulk photo sync (hundreds of rows in
+  // one INSERT batch) fires hundreds of concurrent invocations that each independently
+  // hit the same Gemini key's RPM quota at once. Fixed exponential delays (1s/2s/4s in
+  // lockstep across every concurrent invocation) synchronize the retries right back
+  // into the same collision. MAX_RETRIES 3->5 + a delay cap + +/-30% jitter de-syncs
+  // the herd (textbook thundering-herd mitigation) — it reduces, but cannot alone
+  // eliminate, collisions under a large burst. The real backstop is Step 7 below no
+  // longer lying about 'completed' when this budget is exhausted.
+  const MAX_RETRIES = 5;
+  const BASE_DELAY_MS = 1000;
+  const MAX_DELAY_MS = 8000;
+  const jitteredDelay = (attempt: number) => {
+    const capped = Math.min(BASE_DELAY_MS * Math.pow(2, attempt), MAX_DELAY_MS);
+    return Math.round(capped * (0.7 + Math.random() * 0.6)); // +/-30% jitter
+  };
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
@@ -430,9 +529,10 @@ image_medium definitions:
         },
       );
 
-      // Rate limited — retry with exponential backoff
+      // Rate limited — retry with capped exponential backoff + jitter (de-syncs
+      // concurrent invocations from the same bulk-insert burst; see note above)
       if (response.status === 429) {
-        const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+        const delay = jitteredDelay(attempt);
         console.warn(`[photo-pipeline] Gemini 429 (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${delay}ms`);
         await new Promise((r) => setTimeout(r, delay));
         continue;
@@ -462,19 +562,25 @@ image_medium definitions:
         image_medium: parsed.image_medium || "photograph",
         medium_context: parsed.medium_context,
         vehicle_hints: parsed.vehicle_hints,
+        classifier_ok: true,
       };
     } catch (error: any) {
-      // Classifier failure must NOT churn. The old code threw → outer handler
-      // marked 'failed' → reset-stuck cron flipped back to 'pending' → infinite
-      // loop, ai_retry_count climbing, image never settles. An unclassified
-      // photo is fine (BYOK/owner is the real classifier) — settle it as a
-      // low-confidence unclassified completion instead of failing.
+      // Classifier failure must NOT churn the row itself (this function still never
+      // throws — the caller always gets a usable ClassificationResult so downstream
+      // resolveVehicle/routeByType/enqueueDeepByok/createObservation keep running).
+      // What changed 2026-07-06: churn is no longer avoided by mislabeling the row
+      // 'completed'. classifier_ok:false tells Step 7 to write 'failed' instead, and
+      // reset_stuck_photo_pipeline_images() (15-min cron) already sweeps 'failed' with
+      // a retry budget (ai_retry_count < 3 -> reset to 'pending' for a fresh pass with
+      // new jittered backoff; >= 3 -> stays 'failed', honest terminal) — verified live
+      // against the deployed function, so this does not reopen an infinite-loop.
       console.error(`[photo-pipeline] Classification error (attempt ${attempt + 1}): ${error.message}`);
       return UNCLASSIFIED_FALLBACK(error.message);
     }
   }
 
-  // All retries exhausted on 429 — settle unclassified rather than fail/churn.
+  // All retries exhausted on 429 — classifier_ok:false routes this to 'failed'
+  // (Step 7's honest terminal state), not a silent fake 'completed'.
   return UNCLASSIFIED_FALLBACK("Gemini rate limited (429) after retries");
 }
 
@@ -625,30 +731,40 @@ async function routeByType(
     }
 
     case "progress_shot": {
-      // Work documentation → generate work logs + labor estimation pipeline
-      const workLogResult = await callGenerateWorkLogs(imageId, imageUrl, vehicleId, userId);
-
-      if (vehicleId) {
-        try {
-          // DEEP TIER: enqueue for BYOK fleet deep analysis (replaces dead
-          // yono-analyze). The BYOK verdict carries the zone/stage/condition/
-          // damage the old sidecar produced; zone-based before/after clustering
-          // is handled by the backlog fleet, not synchronously on inflow (the
-          // yono-dependent escalation-router + detect-before-after branches were
-          // dead — yono-analyze returns {available:false} from the 404 sidecar).
-          workLogResult.deep_enqueued = await enqueueDeepByok(imageId, vehicleId);
-
-          // Compute labor estimate (independent of the deep verdict).
-          callEdgeFunction("compute-labor-estimate", {
-            vehicle_id: vehicleId,
-          }).catch((e: any) => console.warn("[photo-pipeline] compute-labor-estimate:", e.message));
-
-        } catch (e: any) {
-          console.warn("[photo-pipeline] Labor estimation pipeline error:", e.message);
-        }
+      // Work documentation → BYOK deep-fleet analysis.
+      // Repointed 2026-07-06 off the dead `generate-work-logs` edge function
+      // (undeployed — every call 404'd "Requested function was not found",
+      // confirmed on 443 vehicle_images rows going back to at least 2026-05-24
+      // and still firing daily). That function's write targets
+      // (event_participants, work_order_materials, event_financial_records,
+      // ai_scan_field_confidence, image_forensic_attribution) no longer exist
+      // in the schema either — it wasn't a deploy slip, it was superseded.
+      // Work-log composition now happens at READ time via the mcp-connector
+      // `project_work_log` tool (composes vehicle_observations +
+      // work_order_{labor,parts,payments} per day, see TOOLS.md). The
+      // write-time job for a progress shot is just the same BYOK deep-fleet
+      // enqueue every other route already uses (see callAnalyzeImage, which
+      // was repointed off the dead yono-analyze sidecar the same way).
+      // `compute-labor-estimate` (called here previously) was deleted in the
+      // Phase 5 edge-function triage (commit 34d110a38) — labor estimation is
+      // now `estimate_labor_from_description()` / `resolve_labor_rate()` SQL
+      // RPCs, not a fire-and-forget edge call, so it's dropped rather than
+      // redirected.
+      if (!vehicleId) {
+        return {
+          summary: "progress_shot: skipped (no vehicle_id)",
+          handler: "byok-deep-enqueue",
+        };
       }
 
-      return workLogResult;
+      const enqueued = await enqueueDeepByok(imageId, vehicleId);
+      return {
+        summary: enqueued
+          ? "progress_shot: enqueued for fleet deep analysis"
+          : "progress_shot: not enqueued (rejected gate or already deep)",
+        handler: "byok-deep-enqueue",
+        deep_enqueued: enqueued,
+      };
     }
 
     default: {
@@ -862,54 +978,6 @@ async function callReceiptPhotoOcr(
   }
 }
 
-async function callGenerateWorkLogs(
-  imageId: string,
-  imageUrl: string,
-  vehicleId: string | null,
-  userId: string | null,
-): Promise<RouteResult> {
-  if (!vehicleId) {
-    return {
-      summary: "generate-work-logs: skipped (no vehicle_id)",
-      handler: "generate-work-logs",
-    };
-  }
-
-  try {
-    // Get image IDs for this vehicle's recent session (last 30 min)
-    const { data: recentImages } = await supabase
-      .from("vehicle_images")
-      .select("id")
-      .eq("vehicle_id", vehicleId)
-      .gte("created_at", new Date(Date.now() - 30 * 60 * 1000).toISOString())
-      .order("created_at", { ascending: true });
-
-    const imageIds = recentImages?.map((i: any) => i.id) || [imageId];
-
-    const data = await callEdgeFunction("generate-work-logs", {
-      vehicleId,
-      imageIds,
-    });
-
-    return {
-      summary: `generate-work-logs: ${data?.success ? "ok" : "partial"}`,
-      handler: "generate-work-logs",
-      extracted_fields: data?.workLog ? {
-        work_title: data.workLog.title,
-        labor_hours: data.workLog.estimatedLaborHours,
-        parts_count: data.partsCount,
-      } : undefined,
-      response_data: data,
-    };
-  } catch (error: any) {
-    console.warn(`[photo-pipeline] generate-work-logs failed: ${error.message}`);
-    return {
-      summary: `generate-work-logs: failed (${error.message})`,
-      handler: "generate-work-logs",
-    };
-  }
-}
-
 // ============================================================
 // CREATE OBSERVATION via ingest-observation
 // ============================================================
@@ -936,12 +1004,31 @@ async function createObservation(
       ? "work_record"
       : "media";
 
+    const sourceIdentifier = `photo-pipeline:${imageId}`;
+
+    // ingest-observation's own content_hash dedup includes observed_at,
+    // and this function stamps a fresh new Date() on every call — so a
+    // retry of the SAME image (the classifier_ok:false -> 'failed' ->
+    // reset_stuck_photo_pipeline_images() retry path this diff adds)
+    // would otherwise create a new duplicate vehicle_observations row on
+    // every retry instead of being recognized as the same testimony.
+    // sourceIdentifier is stable across retries (keyed on imageId, not
+    // time), so check for an existing row on it first.
+    const { data: existingObs } = await supabase
+      .from("vehicle_observations")
+      .select("id")
+      .eq("source_identifier", sourceIdentifier)
+      .eq("kind", kind)
+      .limit(1)
+      .maybeSingle();
+    if (existingObs) return;
+
     await callEdgeFunction("ingest-observation", {
       source_slug: sourceSlug,
       kind,
       observed_at: new Date().toISOString(),
       source_url: imageUrl,
-      source_identifier: `photo-pipeline:${imageId}`,
+      source_identifier: sourceIdentifier,
       content_text: classification.description,
       structured_data: {
         image_id: imageId,
