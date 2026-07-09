@@ -95,7 +95,13 @@ Deno.serve(async (req) => {
     // support). Same shape as ingest-receipts-as-observations. Decode the role claim
     // rather than string-comparing the bearer — the gateway may re-sign the header.
     // A user JWT can never reach this branch: getUser() would have resolved an id.
-    const isServiceRole = roleOf(authHeader) === "service_role";
+    // Two ways to be an operator: a service_role JWT from outside, or an internal
+    // call from derive-dispatch. Supabase's gateway rewrites Authorization on
+    // function-to-function calls, so the forwarded role claim cannot be trusted —
+    // the dispatcher proves itself with the shared secret instead.
+    const internalSecret = req.headers.get("x-nuke-internal");
+    const isServiceRole = roleOf(authHeader) === "service_role"
+      || (!!internalSecret && internalSecret === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
     const bodyPeek = await req.clone().json().catch(() => ({}));
     const userId = userData?.user?.id ?? (isServiceRole ? bodyPeek.user_id : undefined);
     if (!userId) return json({ error: "Invalid session", service_role: isServiceRole }, 401);

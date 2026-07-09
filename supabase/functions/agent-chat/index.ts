@@ -93,6 +93,23 @@ const TOOLS = [
     },
   },
   {
+    name: "request_derivation",
+    description:
+      "Queue the owner's own evidence to be READ by a registered extractor, so the system derives cited claims from it instead of being told what is true. Use when the owner says something like 'you have my titles, why don't you know what I own', 'read my documents', 'figure out when I sold it'. This does not answer the question itself — it schedules the reading, and the claims arrive as observations and confirmation cards. Say plainly that it runs on their own Claude subscription.",
+    input_schema: {
+      type: "object",
+      properties: {
+        evidence_type: {
+          type: "string",
+          description: "which evidence to read: secure_document (titles, bills of sale)",
+          enum: ["secure_document"],
+        },
+        note: { type: "string", description: "the owner's words, recorded on the work item so the derivation's origin is auditable" },
+      },
+      required: ["evidence_type"],
+    },
+  },
+  {
     name: "list_pending_confirmations",
     description:
       "List the Build Ledger entries on a vehicle that are waiting on the owner's ruling — money the audit could not attribute without them. Call this FIRST whenever the owner asks what needs confirming, and before answer_confirmation, so you quote real questions and real observation ids. Returns each entry's observation_id, the exact question, the drafted amount (may be null when the amount itself is what's being asked), the counterparty and the evidence tier.",
@@ -277,6 +294,46 @@ function pendingFromLedger(rows: any[]) {
 
 async function runTool(supabase: any, userId: string, name: string, input: any, ctx: any = {}) {
   try {
+    if (name === "request_derivation") {
+      // The app receiving a message and acting on it: the owner's sentence becomes
+      // work items. derive-dispatch drains them on a schedule, on their compute.
+      const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+      if (input.evidence_type !== "secure_document") return { error: "no reader registered for that evidence yet" };
+
+      // Only the caller's own, human-approved evidence. Identity comes from the JWT.
+      const { data: docs } = await admin
+        .from("secure_documents")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("document_type", "vehicle_title")
+        .eq("verification_status", "approved");
+      if (!docs?.length) return { queued: 0, note: "no approved title documents to read" };
+
+      const rows = docs.map((d: any) => ({
+        user_id: userId,
+        evidence_type: "secure_document",
+        evidence_id: d.id,
+        extractor_slug: "title-document-reader",
+        requested_by: "agent",
+        request_note: input.note ?? null,
+        priority: 50, // a human asked; ahead of background backfill
+      }));
+      // Unique (evidence_type, evidence_id, extractor_slug): asking twice is a no-op.
+      const { error } = await admin.from("derivation_queue").upsert(rows, {
+        onConflict: "evidence_type,evidence_id,extractor_slug",
+        ignoreDuplicates: true,
+      });
+      if (error) throw error;
+
+      const { count } = await admin
+        .from("derivation_queue")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId).eq("status", "pending");
+
+      return { queued_or_already_queued: rows.length, pending_now: count ?? null, runs_on: "your own Claude subscription" };
+    }
+
     if (name === "list_pending_confirmations") {
       const vehicleId = input.vehicle_id || ctx.vehicle_id;
       if (!vehicleId) return { error: "no vehicle in context — ask the owner which vehicle" };
