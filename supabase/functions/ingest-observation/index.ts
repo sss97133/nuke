@@ -65,6 +65,19 @@ interface ObservationInput {
   agent_duration_ms?: number;
   extraction_method?: string;
   raw_source_ref?: string;
+  // A claim derived from a document must be able to point at the document.
+  // Without this the observation is an assertion, not evidence.
+  citation?: {
+    // The shared reference library (service manuals, brochures).
+    document_id?: string;          // → reference_documents.id
+    // The OWNER's own evidence (title, bill of sale). Different table, different FK.
+    secure_document_id?: string;   // → secure_documents.id
+    page_number?: number;
+    excerpt?: string;              // the verbatim text the claim was read from
+  };
+  // Wikidata-style precedence: a permanent instrument (title, build sheet) is
+  // 'preferred'; a decaying assertion about the same fact is 'normal'.
+  rank?: "preferred" | "normal" | "deprecated";
 }
 
 async function hashContent(content: string): Promise<string> {
@@ -325,7 +338,13 @@ Deno.serve(async (req) => {
         agent_cost_cents: input.agent_cost_cents || null,
         agent_duration_ms: input.agent_duration_ms || null,
         extraction_method: input.extraction_method || null,
-        raw_source_ref: input.raw_source_ref || null
+        raw_source_ref: input.raw_source_ref || null,
+        // Provenance of the claim itself: which document, which page, which words.
+        citation_document_id: input.citation?.document_id ?? null,
+        citation_secure_document_id: input.citation?.secure_document_id ?? null,
+        citation_page_number: input.citation?.page_number ?? null,
+        citation_excerpt: input.citation?.excerpt ?? null,
+        ...(input.rank ? { rank: input.rank } : {})
       })
       .select()
       .maybeSingle();
