@@ -386,6 +386,17 @@ Agent: → UPDATE location_zone = 'dash' in manifest
 
 ---
 
+## Derivation Loop (evidence → cited claims)
+
+Evidence lands → a trigger enqueues a work item in `derivation_queue` → cron `derivation-queue-drain` (every 10m) calls `derive-dispatch` → dispatch reads `observation_extractors` to learn which reader handles that evidence → the reader emits observations through `ingest-observation`. Adding a new evidence type is a row in `observation_sources` + `observation_extractors` and one edge function. **Never** a change to `derive-dispatch`.
+
+| Intent | Use This | Notes |
+|--------|----------|-------|
+| Drain pending derivation work | `derive-dispatch` | service_role only. Claims via `claim_derivation_work` (FOR UPDATE SKIP LOCKED). Requeues on 429 (owner rate-limited) and 402 (no credential) rather than failing. |
+| Read a title → cited ownership | `derive-title-ownership` | Runs on the OWNER's compute (`runWithChain`). Emits `kind=ownership` with `citation_secure_document_id`, `citation_excerpt`, `rank='preferred'` when the title names the uploader. Ungroundable claims become `needs_owner_confirmation`. |
+| Recover a photo's capture time | `derive-image-exif` | **Pure function, no model, no credential.** Range-requests the first 256KB, parses the JPEG APP1/TIFF IFD, writes `taken_at` + `exif_data`. Never falls back to `created_at` — upload time is not capture time. |
+| Turn an owner's sentence into work | `agent-chat` tool `request_derivation` | Enqueues the caller's own evidence with `requested_by='agent'` and the owner's words in `request_note`. |
+
 ## In-App Agent (`agent-chat`)
 
 The conversational face of the same verbs the drill buttons use. Runs as the caller (their JWT → RLS); Anthropic tool-use loop. Mounted on the vehicle profile as the **Ask** panel (`nuke_frontend/src/components/agent/AgentChat.tsx`).
