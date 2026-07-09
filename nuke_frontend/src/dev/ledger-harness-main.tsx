@@ -14,6 +14,25 @@ import LedgerHarness, { FIXTURE_ROWS } from './LedgerHarness';
   return { data: null, error: { message: `harness: unmocked rpc ${fn}` } };
 };
 
+// The agent panel's transport. Stubbed so the harness exercises the real component
+// (seed-on-Answer, thread rendering, invalidate-on-write) with no network and no
+// model. It must never reach the live agent-chat from a fixture vehicle.
+// `functions` is a getter that mints a fresh FunctionsClient on every access, so
+// patching the returned object does nothing — redefine the getter itself. Without
+// this the harness reaches the live agent-chat with a fixture vehicle id.
+Object.defineProperty(supabase, 'functions', {
+  configurable: true,
+  get: () => ({
+    invoke: async (_fn: string, opts: { body?: { messages?: { content: string }[] } }) => {
+      const last = opts?.body?.messages?.at(-1)?.content ?? '';
+      return {
+        data: { reply: `harness stub — the live agent would answer:\n"${last}"`, actions: [] },
+        error: null,
+      };
+    },
+  }),
+});
+
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <LedgerHarness />

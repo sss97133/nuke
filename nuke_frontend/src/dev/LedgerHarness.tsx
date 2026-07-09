@@ -13,6 +13,7 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import BuildLedger from '../pages/vehicle-profile/BuildLedger';
+import AgentChat from '../components/agent/AgentChat';
 
 // Row shape mirrors RawLedgerRow in useBuildLedger.ts
 export interface HarnessRawRow {
@@ -245,6 +246,7 @@ const LedgerHarness: React.FC = () => {
           style={{ width: '420px', height: 'auto', overflow: 'visible', border: '1px solid var(--vp-ghost)' }}
         >
           <BuildLedger vehicleId={HARNESS_VEHICLE_ID} />
+          <AgentChat vehicleId={HARNESS_VEHICLE_ID} />
         </div>
       </div>
     </QueryClientProvider>

@@ -382,6 +382,25 @@ Agent: → UPDATE location_zone = 'dash' in manifest
 | Ingest observations in bulk | `ingest-observation-batch` | Wraps `ingest-observation` for batch processing. Max 200 per request. Options: `gap_fill` (backfill vehicles table), `write_evidence` (field_evidence rows). |
 | Write observation + gap-fill + evidence (from code) | `import { writeObservation } from "../_shared/observationWriter.ts"` | Shared module for edge functions. Wraps observation + Tetris gap-fill + field_evidence in one call. |
 | Migrate legacy data to observations | `migrate-to-observations` | Ports existing auction_comments, vehicle_events, etc. to vehicle_observations |
+| Mark an observation replaced by a corrected one | RPC `supersede_observation(original_id, successor_id)` | The supersession primitive. Owner-authorized on `auth.uid()`, idempotent, writes NO testimony — it only flips `is_superseded` / `superseded_by` / `superseded_at` and appends `lineage_chain`. Write the successor through `ingest-observation` first, then call this. Never `UPDATE` a testimony row to correct it. |
+
+---
+
+## In-App Agent (`agent-chat`)
+
+The conversational face of the same verbs the drill buttons use. Runs as the caller (their JWT → RLS); Anthropic tool-use loop. Mounted on the vehicle profile as the **Ask** panel (`nuke_frontend/src/components/agent/AgentChat.tsx`).
+
+**Compute is the caller's.** `agent-chat` calls `runWithChain()` (`_shared/claudeSubscriptionAuth.ts`), which resolves per-user in funnel order: their Claude subscription (OAuth bearer + `anthropic-beta: oauth-2025-04-20`) → their own Anthropic API key (`x-api-key`) → the platform key, metered against their prepaid `ai_credit_ledger` balance. A rate-limited subscription is reported back to the user (HTTP 429 + `retry_after_seconds`), never silently upgraded onto a bill. The response carries `source` and `charged_cents` so the cost-bearer is always visible. Users connect a credential at **`/settings/ai`** (`pages/settings/AIAccessPage.tsx` → `AIProviderSettings`, which also renders the Connect-Claude card). Credential resolution + metering use a service-role client (`ai_credit_ledger` has no INSERT policy for `authenticated`); identity always comes from the verified JWT, never from that client.
+
+| Intent | Use This | Notes |
+|--------|----------|-------|
+| List a vehicle's open owner questions | tool `list_pending_confirmations(vehicle_id)` | Reads `get_vehicle_build_ledger` (SECURITY DEFINER, owner-scoped). Skips drafts that already have a successor, so a partial write never re-asks. |
+| Record the owner's ruling on a ledger entry | tool `answer_confirmation(observation_id, confirmed, owner_answer, amount_usd?)` | Sign-tier. Writes the successor through `ingest-observation` (`source_slug=owner-input`, `extraction_method=owner_confirmed_v1` \| `owner_rejected_v1`), then `supersede_observation`. `structured_data.owner_confirmed=true` adds a +0.30 confidence factor → `verified`. Self-heals a prior partial write instead of double-booking. |
+| Move a photo to the right vehicle | tool `move_photo(image_id, vehicle_id)` | `relink_testimony` — forks, keeps lineage, logged. |
+| Find the owner's photos | tool `find_photos(text?, vehicle_id?, date_from?, …)` | Text search only reaches analyzed frames. |
+| Ground the agent in what exists | tool `list_garage()` | Never invent vehicle ids. |
+
+Ledger read set: `get_vehicle_build_ledger` returns `extraction_method IN ('audit_draft_v0','owner_confirmed_v1')`. A rejected entry's `owner_rejected_v1` successor is deliberately excluded — the ruling persists as testimony, the row leaves the ledger.
 
 ---
 

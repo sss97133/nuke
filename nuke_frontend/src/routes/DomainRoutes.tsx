@@ -96,6 +96,7 @@ const TeamInbox = React.lazy(() => import('../pages/TeamInbox'));
 const PersonalPhotoLibrary = React.lazy(() => import('../pages/PersonalPhotoLibrary').then(m => ({ default: m.PersonalPhotoLibrary })));
 
 const ApiKeysPage = React.lazy(() => import('../pages/settings/ApiKeysPage'));
+const AIAccessPage = React.lazy(() => import('../pages/settings/AIAccessPage'));
 const ConnectedAgentsPage = React.lazy(() => import('../pages/settings/ConnectedAgentsPage'));
 const WebhooksPage = React.lazy(() => import('../pages/settings/WebhooksPage'));
 const UsageDashboardPage = React.lazy(() => import('../pages/settings/UsageDashboardPage'));
@@ -276,6 +277,8 @@ export const DomainRoutes = () => {
           {/* Settings (protected) */}
           <Route element={<ProtectedRoute />}>
             <Route path="/settings/api-keys" element={<ApiKeysPage />} />
+            {/* Where the user brings their own compute for the in-app agent. */}
+            <Route path="/settings/ai" element={<AIAccessPage />} />
             <Route path="/settings/connected-agents" element={<ConnectedAgentsPage />} />
             <Route path="/settings/webhooks" element={<WebhooksPage />} />
             <Route path="/settings/usage" element={<UsageDashboardPage />} />

@@ -277,6 +277,10 @@ Deno.serve(async (req) => {
     if (vehicleMatchConfidence >= 0.95) confidenceFactors.vehicle_match = 0.1;
     if (input.source_url) confidenceFactors.has_source_url = 0.05;
     if (input.content_text && input.content_text.length > 100) confidenceFactors.substantial_content = 0.05;
+    // The owner signing off on a fact about their own vehicle is the highest-trust
+    // testimony the system can hold. owner-input's base_trust_score (0.70) would
+    // otherwise render an owner's signature as merely "medium".
+    if (input.structured_data?.owner_confirmed === true) confidenceFactors.owner_confirmed = 0.30;
 
     const confidenceScore = Math.min(1.0,
       (source.base_trust_score || 0.5) +

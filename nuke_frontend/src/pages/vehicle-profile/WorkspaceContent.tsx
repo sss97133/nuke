@@ -11,6 +11,7 @@ const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/veh
 const PartsQuoteGenerator = React.lazy(() => import('../../components/PartsQuoteGenerator').then(m => ({ default: m.PartsQuoteGenerator })));
 const InvestmentLedger = React.lazy(() => import('./InvestmentLedger'));
 const BuildLedger = React.lazy(() => import('./BuildLedger'));
+const AgentChat = React.lazy(() => import('../../components/agent/AgentChat'));
 const WorthEngineCard = React.lazy(() => import('./WorthEngineCard'));
 const PhotoAuthenticationCard = React.lazy(() => import('./PhotoAuthenticationCard'));
 const VehicleFindingsCard = React.lazy(() => import('./VehicleFindingsCard'));
@@ -226,6 +227,14 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
             <React.Suspense fallback={null}>
               <BuildLedger vehicleId={vehicle.id} />
+            </React.Suspense>
+          )}
+
+          {/* Ask — the in-app agent. Answers the ledger's pending owner questions and
+              signs them off through ingest-observation. Same owner gate as the ledger. */}
+          {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
+            <React.Suspense fallback={null}>
+              <AgentChat vehicleId={vehicle.id} />
             </React.Suspense>
           )}
 
