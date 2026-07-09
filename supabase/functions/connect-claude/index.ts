@@ -32,6 +32,7 @@ import {
   exchangeCode,
   storeSubscriptionToken,
 } from "../_shared/claudeSubscriptionAuth.ts";
+import { decryptSecret } from "../_shared/secretBox.ts";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -129,8 +130,14 @@ Deno.serve(async (req) => {
         .eq("is_active", true)
         .maybeSingle();
       if (!data?.api_key_encrypted) return json({ connected: false });
+      // The bundle is an AES-GCM blob ("enc:v1:…"), not base64 JSON — atob() threw
+      // here and was swallowed, so /status always reported expires_at: null.
       let expires_at: number | null = null;
-      try { expires_at = JSON.parse(atob(data.api_key_encrypted)).expires_at ?? null; } catch { /* ignore */ }
+      try {
+        expires_at = JSON.parse(await decryptSecret(data.api_key_encrypted)).expires_at ?? null;
+      } catch (e) {
+        console.error("[connect-claude] status: could not read token bundle:", e instanceof Error ? e.message : e);
+      }
       return json({ connected: true, expires_at, source: "subscription" });
     }
 

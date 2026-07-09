@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
+import { askAgent } from '../../components/agent/askAgent';
 import { useBuildLedger, type BuildLedgerEntry, type BuildLedgerGroup } from './hooks/useBuildLedger';
 
 // ── Formatting ──
@@ -123,12 +124,14 @@ const BuildRow: React.FC<{ entry: BuildLedgerEntry }> = ({ entry }) => {
   const isLiability = entry.direction === 'liability';
   const evColor = EVIDENCE_COLOR[String(entry.evidenceTier)] ?? 'var(--vp-pencil, #888)';
 
-  const confirmStub = (e: React.MouseEvent) => {
+  // Confirming a ledger entry is a Sign-tier action: it writes back through
+  // ingest-observation (superseding the draft), never a raw client mutation. The
+  // write lives in the agent-chat tool `answer_confirmation`; this button hands the
+  // question to the agent panel and lets the owner state the answer in their own
+  // words. It seeds the box — it never sends. A signature is pressed, not inferred.
+  const openInAgent = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // TODO(Sign-tier): this confirm is intentionally a no-op in this pass.
-    // Confirming a ledger entry is a Sign-tier action — it must write back through
-    // ingest-observation (resolving needs_owner_confirmation / superseding the draft),
-    // never a raw client mutation. Wire the write path in the follow-up pass.
+    askAgent(entry.confirmationQuestion ?? 'What needs my confirmation?');
   };
 
   return (
@@ -192,16 +195,15 @@ const BuildRow: React.FC<{ entry: BuildLedgerEntry }> = ({ entry }) => {
             <span style={{ color: 'var(--vp-ink)' }}>{entry.confirmationQuestion}</span>
           </span>
           <button
-            onClick={confirmStub}
-            disabled
-            title="Sign-tier write path pending"
+            onClick={openInAgent}
+            title="Answer this in the agent panel"
             style={{
               fontFamily: 'var(--vp-font-mono)', fontSize: '8px', fontWeight: 700, letterSpacing: '0.1em',
-              textTransform: 'uppercase', padding: '3px 8px', cursor: 'default', whiteSpace: 'nowrap', opacity: 0.5,
+              textTransform: 'uppercase', padding: '3px 8px', cursor: 'pointer', whiteSpace: 'nowrap',
               border: '2px solid var(--vp-gulf-orange, #EE7623)', color: 'var(--vp-gulf-orange, #EE7623)', background: 'transparent',
             }}
           >
-            Confirm
+            Answer
           </button>
         </div>
       )}

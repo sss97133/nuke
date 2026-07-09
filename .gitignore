@@ -158,6 +158,9 @@ reports/
 # Agent state and logs
 .extraction-agent/
 agent/
+# ...but `agent/` is unanchored, so it also swallowed the Ask panel's source dir.
+# Product code is not agent state.
+!nuke_frontend/src/components/agent/
 extraction-agent
 
 # Playwright reports (generated)
@@ -294,3 +297,7 @@ docs/spec/data/
 
 # Library text extractions — regenerable from reference_documents/*.pdf via scripts/library_index.py
 docs/library/_extracted/
+
+# User substrate — never in a public repo. Receipts, bank slips, titles, names.
+# These belong in the Nuke DB as observations with provenance.
+output/vision-receipt-recovery-*/

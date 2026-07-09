@@ -14,10 +14,13 @@
  *                               ├─ user's own API key  (BYOK — their bill)
  *                               └─ platform key        (we meter + bill them)
  *
- * STORAGE: the subscription token bundle is stored as JSON in
+ * STORAGE: the subscription token bundle is stored as encrypted JSON in
  * `user_ai_providers.api_key_encrypted` under `provider = 'anthropic_subscription'`.
- * No schema change — `api_key_encrypted` is already a free-text blob and `provider`
- * is unconstrained text. The bundle shape is `StoredSubscriptionToken` below.
+ * `provider` IS constrained — `anthropic_subscription` was added to the CHECK in
+ * 20260709160000_allow_anthropic_subscription_provider.sql. Before that migration
+ * every connect attempt died with a check_violation. (An earlier version of this
+ * comment claimed the column was unconstrained text; it never was.)
+ * The bundle shape is `StoredSubscriptionToken` below.
  *
  * ──────────────────────────────────────────────────────────────────────────────
  * ⚠️  UNSANCTIONED CLIENT — READ BEFORE PRODUCTION.
