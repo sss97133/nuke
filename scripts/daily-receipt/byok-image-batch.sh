@@ -47,8 +47,15 @@ log "=== batch start vehicle=$VEHICLE_ID size=$BATCH run=$RUN ==="
 
 # 1) PREPARE (network) — pull the next DAY's pending frames for this vehicle.
 # --by-day: the day is the unit of analysis; workers shard by day, never split one.
+# Resolution-pass env knobs (additive; steady-drain callers unaffected):
+#   BYOK_REHASH=1          → re-open unsaturated already-verdicted frames (closure pass)
+#   BYOK_DATE=YYYY-MM-DD   → target ONE specific day instead of the earliest pending
+#   BYOK_EXTRA_CONTEXT=<f> → extra briefing (e.g. a resolution dossier) appended to the prompt
+PREP_EXTRA=""
+[ "${BYOK_REHASH:-0}" = "1" ] && PREP_EXTRA="$PREP_EXTRA --rehash"
+[ -n "${BYOK_DATE:-}" ] && PREP_EXTRA="$PREP_EXTRA --date $BYOK_DATE"
 dotenvx run -- node scripts/deep-image-analysis-byok.mjs prepare \
-  --vehicle-id "$VEHICLE_ID" --limit "$BATCH" --worklist "$WORK" --by-day \
+  --vehicle-id "$VEHICLE_ID" --limit "$BATCH" --worklist "$WORK" --by-day $PREP_EXTRA \
   --shard-count "$SHARD_COUNT" --shard-index "$SHARD_INDEX" >>"$LOG" 2>&1
 PREP_RC=$?
 N=$( [ -f "$WORK" ] && wc -l < "$WORK" | tr -d ' ' || echo 0 )
@@ -118,6 +125,9 @@ PROMPT_FILE="$DIR/prompt.txt"
   echo "together with the new DuraStop brakes' — not 'a metal disc on a floor.'"
   echo
   if [ -f "$CTX" ]; then cat "$CTX"; echo; fi
+  # Resolution dossier seam: a closure pass hands the detective the day's researched
+  # answers (entity resolutions, receipt citations, arc placement) as extra briefing.
+  if [ -n "${BYOK_EXTRA_CONTEXT:-}" ] && [ -f "${BYOK_EXTRA_CONTEXT}" ]; then cat "${BYOK_EXTRA_CONTEXT}"; echo; fi
   cat scripts/daily-receipt/byok-vision-prompt.md
   echo
   echo "## THIS IS ONE WORK DAY: ${DAY:-unknown}"
