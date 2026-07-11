@@ -68,6 +68,9 @@ struct NukeCaptureApp: App {
                     DebugProfileDeepLink()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "today" {
                     DebugTodayDeepLink()
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "days" {
+                    // Days + the day receipt are entirely LocalStore — anon, no session.
+                    LibraryDaysView()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "signdays" {
                     DebugScreenDeepLink()
                 } else if let dbgVehicle = ProcessInfo.processInfo.environment["NUKE_DEBUG_VEHICLE_ID"],
