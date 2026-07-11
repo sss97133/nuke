@@ -158,7 +158,14 @@ const DRY_PASS_LIMIT = 2; // after this many fruitless re-runs, saturate even a 
 // `prior` is the previously-stored byok_deep_analysis (for the dry-pass counter); null on first pass.
 function computeSaturation(v, prior, nowIso) {
   const { open, capped } = classifyOpenQuestions(v?.open_questions);
-  const stillOpen = v?.context_complete === false || v?.needs_clarification === true || open.length > 0;
+  // needs_clarification is the OWNER-confirm queue's flag (the $410 intent gate) — it is
+  // NOT agent-unsaturation. The sanitizer forces it true whenever intent_confidence<0.6,
+  // so counting it here kept every owner-gated frame in the re-vision queue forever: the
+  // model would re-read pixels it had fully extracted, waiting on a signature no re-pass
+  // can produce (caught live on the 2024-10-03 closure pass: 15/15 fully-closed verdicts
+  // re-queued). Saturation = "nothing more the MODEL can extract at this schema version";
+  // the clarification flag rides to the confirm UI on its own lane.
+  const stillOpen = v?.context_complete === false || open.length > 0;
   const priorSat = (prior && prior.saturation) || {};
   const passes = (priorSat.passes || 0) + 1;
   // Dry pass = re-analysis that yielded materially the SAME facts. If the resolving context hasn't
@@ -659,9 +666,18 @@ async function prepare() {
   //              — including one whose only gaps are CAPPED (illegible/occluded) — is skipped and
   //              costs zero. This kills the old bug where any open question re-failed forever.
   const REHASH = args.includes('--rehash');
-  const pendingAll = REHASH
+  let pendingAll = REHASH
     ? all.filter((r) => ((r.ai_scan_metadata || {}).byok_deep_analysis) && !isSaturatedRow(r))
     : all.filter((r) => !((r.ai_scan_metadata || {}).byok_deep_analysis));
+
+  // --date YYYY-MM-DD: target ONE specific day (resolution passes re-run a chosen day
+  // with enriched context instead of whatever day sorts earliest). Composes with
+  // --rehash: "re-open this day's unsaturated frames" is the closure-pass shape.
+  const DATE = arg('--date');
+  if (DATE) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(DATE)) { console.error('prepare: --date must be YYYY-MM-DD'); process.exit(1); }
+    pendingAll = pendingAll.filter((r) => dayOf(r) === DATE);
+  }
 
   let pending;
   let chosenDay = null;
@@ -1086,8 +1102,37 @@ async function buildContext() {
     }
   } catch { /* optional */ }
 
-  // LOCATION LEGEND — GPS clusters → known shops/places. Lets the detective resolve a
-  // frame's coordinates to "Ernie's Upholstery" vs "Viva Las Vegas (off-property)" etc.
+  // RESOLVED LOCATION ENTITIES — known_places is the CURATED resolver substrate
+  // (name + GPS + radius, optionally bridged to an organizations row via
+  // metadata.organization_id). These are answers, not hints: a frame whose GPS falls
+  // inside a radius IS at that place — the detective must use the canonical name and
+  // never open a "where is this?" question the legend already closes.
+  let knownPlaces = [];
+  try {
+    const { data: kps } = await sb.from('known_places')
+      .select('name, place_type, latitude, longitude, radius_m, address, metadata');
+    if (kps && kps.length) {
+      const orgIds = kps.map((p) => p.metadata?.organization_id).filter(Boolean);
+      const orgById = new Map();
+      if (orgIds.length) {
+        const { data: orgs } = await sb.from('organizations')
+          .select('id, name, business_type').in('id', orgIds);
+        for (const o of (orgs || [])) orgById.set(o.id, o);
+      }
+      knownPlaces = kps.map((p) => {
+        const org = orgById.get(p.metadata?.organization_id);
+        return {
+          name: p.name, type: p.place_type,
+          lat: Number(p.latitude), lon: Number(p.longitude), radius_m: Number(p.radius_m),
+          address: p.address || null,
+          org: org ? `${org.name}${org.business_type ? ` (${org.business_type})` : ''}` : null,
+        };
+      });
+    }
+  } catch { /* optional — legend falls back to GPS clusters below */ }
+
+  // LOCATION LEGEND (fallback) — GPS clusters → most-seen location_name. Covers
+  // coordinates OUTSIDE every known_places radius.
   let locLegend = [];
   try {
     const { data } = await sb.from('vehicle_images')
@@ -1189,11 +1234,19 @@ async function buildContext() {
     if (DATE && !dossier.timeline.some((t) => t.date === DATE))
       lines.push(`- ${DATE} · **THIS DAY (not yet rolled up — you are analyzing it now)**`);
   }
-  if (locLegend.length) {
-    lines.push(`\n**Location legend (GPS cluster → place):**`);
-    for (const l of locLegend) lines.push(`- ${l}`);
-    lines.push(`Each frame below carries its GPS — resolve it against this legend. A frame shot away from the main shop is off_property work (and tells you WHO/WHERE: e.g. upholstery shop, a vendor, the owner's dad's lot).`);
+  if (knownPlaces.length) {
+    lines.push(`\n**RESOLVED LOCATION ENTITIES (known_places — canonical, use these names verbatim):**`);
+    for (const p of knownPlaces) {
+      lines.push(`- ${p.lat.toFixed(5)},${p.lon.toFixed(5)} r=${p.radius_m}m → **${p.name}** (${p.type})${p.org ? ` — org: ${p.org}` : ''}${p.address ? ` — ${p.address}` : ''}`);
+    }
+    lines.push(`A frame whose GPS falls within a radius above IS at that place. Set \`presence.place_hint\` to the canonical name EXACTLY as written (no suffixes like "(lot)" or "(workbench)" — put sub-location detail in agent_notes). NEVER emit an open question asking to identify a location this legend resolves; an address is never an answer when the entity is known.`);
   }
+  if (locLegend.length) {
+    lines.push(`\n**Location legend (GPS cluster fallback — for coordinates outside every radius above):**`);
+    for (const l of locLegend) lines.push(`- ${l}`);
+    lines.push(`Each frame below carries its GPS — resolve it against the entities first, then this fallback. A frame shot away from the main shop is off_property work (and tells you WHO/WHERE: e.g. upholstery shop, a vendor, the owner's dad's lot).`);
+  }
+  lines.push(`\n**RESOLVE, DON'T PUNT:** before writing any \`open_questions\` entry, check whether THIS briefing (location entities, parts roster, timeline, the day's other frames) already answers it. A question the briefing answers gets CLOSED — state the answer in the verdict (agent_notes with its citation), don't re-ask it. Only two kinds of question may survive: pixel-capped (illegible/occluded — say so) and genuinely graph-dry (say what you'd need). An owner-signature item (labor value / intent confirmation) is \`needs_clarification\`, not an open question.`);
   if (lifecycle) lines.push(`\n**Already deep-analyzed (day:phases):** ${lifecycle}`);
   if (roster.length) {
     lines.push(`\n**KNOWN PARTS ON THIS BUILD — ${roster.length} parts bought for it (from receipts, the CLAIM side).**`);
