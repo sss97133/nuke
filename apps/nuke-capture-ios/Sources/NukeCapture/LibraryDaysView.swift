@@ -17,6 +17,12 @@ struct LibraryDaysView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var days: [DayRollup] = []
     @State private var loaded = false
+    #if DEBUG
+    // Screenshot-loop deep-link: NUKE_DEBUG_DAY=yyyy-MM-dd pushes straight into that
+    // day's receipt (simctl has no tap CLI). DEBUG only; never ships.
+    @State private var debugDayPushed = false
+    private let debugDay = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY"]
+    #endif
 
     var body: some View {
         NavigationStack {
@@ -61,6 +67,12 @@ struct LibraryDaysView: View {
             }
             .navigationTitle("Days")
             .navigationBarTitleDisplayMode(.inline)
+            #if DEBUG
+            .navigationDestination(isPresented: $debugDayPushed) {
+                if let d = debugDay { DayPhotosView(day: d, title: pretty(d)) }
+            }
+            .onAppear { if debugDay != nil { debugDayPushed = true } }
+            #endif
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
             .refreshable { await ingest.runHeadPass(); await reload() }
             .task {
@@ -138,16 +150,22 @@ struct LibraryDaysView: View {
 
 // MARK: - The drill: one day's real photos → the existing pager + ledger
 
-/// Tapping a day opens its REAL photos (LocalStore appearances for that takenAt-day,
-/// mapped to the grid's global indices) → the existing fullscreen pager, scoped to
-/// the day → the back-of-photo ledger. Reads LocalStore + PhotoKit only — zero
-/// network. Reuses LibraryCell + LibraryDetailView (no parallel surface).
+/// Tapping a day opens its RECEIPT (DayReceiptCard: measured span/bursts/site + the
+/// cached read layer) above its REAL photos (LocalStore appearances for that
+/// takenAt-day, mapped to the grid's global indices) → the existing fullscreen
+/// pager, scoped to the day → the back-of-photo ledger. Reads LocalStore +
+/// SiteStore + PhotoKit only — zero network in the render path (the .task's
+/// verdict pull is online enrichment that no-ops offline). Reuses LibraryCell +
+/// LibraryDetailView (no parallel surface).
 private struct DayPhotosView: View {
     let day: String          // 'yyyy-MM-dd', the same key dayCounts() grouped on
     let title: String
     @State private var indices: [Int] = []   // global LibraryStore indices, takenAt-DESC
     @State private var detailIndex: Int?
     @State private var loaded = false
+    @State private var receipt: LocalDayReceipt?
+    @State private var vehicleLabel: String?  // offline garage-mirror resolve of the agent's read
+    @State private var siteName: String?      // confirmed work site containing the day's GPS median
     @Namespace private var zoomNS
 
     private let columns = 3
@@ -155,6 +173,7 @@ private struct DayPhotosView: View {
 
     var body: some View {
         ScrollView {
+            if let r = receipt { DayReceiptCard(receipt: r, vehicleLabel: vehicleLabel, siteName: siteName) }
             LazyVGrid(
                 columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: columns),
                 spacing: spacing
@@ -182,6 +201,7 @@ private struct DayPhotosView: View {
             let map = LibraryStore.shared.indexMap(forLocalIdentifiers: lids)
             indices = lids.compactMap { map[$0] }
             loaded = true
+            await reloadReceipt()
             // Online enrichment: pull THIS day's "Read by Nuke" verdicts so they're
             // cached for the info sheet (offline thereafter). nil = offline → skip,
             // don't mark checked. Bounded to one day's photos.
@@ -197,6 +217,8 @@ private struct DayPhotosView: View {
                     }
                     LocalStore.shared.markCloudChecked(lids)
                 }.value
+                // Freshly-cached verdicts change the read layer — recompute the receipt.
+                await reloadReceipt()
             }
         }
         .fullScreenCover(item: Binding(
@@ -206,5 +228,103 @@ private struct DayPhotosView: View {
             LibraryDetailView(startIndex: box.id, indices: indices)
                 .navigationTransition(.zoom(sourceID: box.id, in: zoomNS))
         }
+    }
+
+    /// Rebuild the receipt from LocalStore (off-main), then resolve its two lookups:
+    /// the agent-read vehicle via the offline garage mirror, and the confirmed work
+    /// site containing the day's GPS median (SiteStore, device-local). Zero network.
+    private func reloadReceipt() async {
+        let r = await Task.detached { LocalStore.shared.dayReceipt(onDay: day) }.value
+        receipt = r
+        guard let r else { vehicleLabel = nil; siteName = nil; return }
+        if let vid = r.agentVehicleId {
+            vehicleLabel = await Task.detached { LocalStore.shared.garageVehicleLabel(vehicleId: vid) }.value
+        } else {
+            vehicleLabel = nil
+        }
+        if let lat = r.medianLat, let lon = r.medianLon {
+            siteName = SiteStore.shared.sites.first {
+                Geo.distanceMeters(lat1: $0.latitude, lon1: $0.longitude, lat2: lat, lon2: lon) <= $0.radiusMeters
+            }?.name
+        } else {
+            siteName = nil
+        }
+    }
+}
+
+// MARK: - The receipt card — the day-level synthesis, entirely from the local store
+
+/// Renders above the day's grid. Three layers, each shown only when its data exists
+/// (absent stays absent — never a fake "0" row):
+///   measured — EXIF times (span, bursts) + GPS (located count / site). Facts from files.
+///   sorted   — the T0 on-device classification rollup.
+///   read     — cached cloud BYOK verdicts: intents, the labor-time estimate
+///              (web-formula over shoot intervals — labeled estimated, never signed),
+///              and the agent's vehicle read (a read, NOT a confirmed binding).
+private struct DayReceiptCard: View {
+    let receipt: LocalDayReceipt
+    let vehicleLabel: String?
+    let siteName: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(measuredLine)
+                .font(.subheadline.weight(.medium)).monospacedDigit()
+            if receipt.classified > 0 {
+                Text(sortedLine)
+                    .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            }
+            if receipt.read > 0 {
+                Text(readLine)
+                    .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                if let vehicleLabel {
+                    // The agent's read from pixels — presented as such, not as ownership.
+                    Text("\(vehicleLabel) — agent read, \(receipt.agentVehicleFrames) frames")
+                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                }
+            }
+            if let siteName {
+                Label(siteName, systemImage: "mappin.and.ellipse")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Text(provenanceLine)
+                .font(.caption2).foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+    }
+
+    private var measuredLine: String {
+        var parts = ["\(receipt.count) frames"]
+        if let f = receipt.firstShot, let l = receipt.lastShot, f != l {
+            let t = Date.FormatStyle(date: .omitted, time: .shortened)
+            parts.append("\(f.formatted(t))–\(l.formatted(t))")
+        }
+        if receipt.bursts > 1 { parts.append("\(receipt.bursts) bursts") }
+        if receipt.locatedCount > 0 { parts.append("\(receipt.locatedCount) located") }
+        return parts.joined(separator: " · ")
+    }
+
+    private var sortedLine: String {
+        var s = "\(receipt.vehicles) vehicle/work"
+        if receipt.classified < receipt.count { s += " · \(receipt.classified) of \(receipt.count) sorted" }
+        return s
+    }
+
+    private var readLine: String {
+        var parts = ["Read by Nuke: \(receipt.read)"]
+        // Top intents, e.g. "14 labor · 3 documentation" — from the cached verdicts only.
+        for (intent, n) in receipt.intents.prefix(2) { parts.append("\(n) \(intent)") }
+        if let mins = receipt.laborMinutes {
+            parts.append("~\(mins / 60 > 0 ? "\(mins / 60) h " : "")\(mins % 60) min worked")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private var provenanceLine: String {
+        var s = "Times from photo EXIF · built on-device"
+        if receipt.laborMinutes != nil { s = "Work time estimated from shoot intervals · " + s }
+        return s
     }
 }

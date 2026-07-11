@@ -75,6 +75,30 @@ struct DayRollup {
     let read: Int            // rows with a cached cloud BYOK verdict ("Read by Nuke")
 }
 
+/// One day's receipt — the day-level synthesis the drill renders ABOVE its photos.
+/// Everything here is computed from LocalStore rows only (network-off by design):
+/// the measured layer (EXIF times → span/bursts, GPS → located count) is fact from
+/// the files; the read layer (intents, labor minutes, agent vehicle) exists only
+/// where cloud verdicts were cached down — absent stays absent.
+struct LocalDayReceipt {
+    let day: String                 // 'yyyy-MM-dd' (device-zone bucket, same key as DayRollup)
+    let count: Int                  // dated frames this day
+    let classified: Int             // rows with a T0 verdict
+    let vehicles: Int               // T0 vehicle/work rows
+    let read: Int                   // rows with a cached cloud BYOK verdict
+    let firstShot: Date?            // EXIF takenAt of the day's first/last frame
+    let lastShot: Date?
+    let bursts: Int                 // shoot clusters (>45 min gap splits), all frames
+    let laborFrames: Int            // cached verdicts: intent='labor', confidence ≥ 0.6
+    let laborMinutes: Int?          // web-formula estimate over labor frames; nil when none
+    let intents: [(String, Int)]    // cached intent counts, desc
+    let agentVehicleId: String?     // modal cloudVehicleId — the agent's read, NOT a binding
+    let agentVehicleFrames: Int
+    let locatedCount: Int           // frames carrying GPS
+    let medianLat: Double?
+    let medianLon: Double?
+}
+
 /// One row of the offline garage mirror. Mirrors prod `get_user_garage` exactly
 /// (same field set as ProfileTab's `GarageVehicle`) so the cache can round-trip
 /// straight into that view model with no lossy translation.
@@ -384,6 +408,127 @@ final class LocalStore {
             }
         } catch { NSLog("LocalStore.localIdentifiers(onDay:) failed: %@", String(describing: error)) }
         return out
+    }
+
+    /// The day-level receipt: measured layer from EXIF/GPS, read layer from cached
+    /// cloud verdicts. Pure local read (zero network). Uses the IDENTICAL
+    /// `strftime('%Y-%m-%d', takenAt, 'localtime')` day key as dayCounts()/
+    /// localIdentifiers(onDay:), so the receipt describes exactly the frames the
+    /// drill shows. Labor minutes mirror the web's recompute_worth_minutes v3
+    /// formula (>45 min gap splits a burst; per burst max(span, n×5) + 10 min;
+    /// day capped at 480) over cached intent='labor' frames at confidence ≥ 0.6 —
+    /// an ESTIMATE: the cache carries the verdict's overall confidence, not prod's
+    /// intent_confidence, so the caller must label it as estimated, never signed.
+    func dayReceipt(onDay ymd: String) -> LocalDayReceipt? {
+        struct Frame {
+            let takenAt: Date
+            let isVehicle: Bool?
+            let lat: Double?
+            let lon: Double?
+            let intent: String?
+            let confidence: Double?
+            let vehicleId: String?
+            let read: Bool
+        }
+        var frames: [Frame] = []
+        do {
+            try dbQueue.read { db in
+                let rows = try Row.fetchAll(db, sql: """
+                    SELECT takenAt AS tk, isVehicle AS v, latitude AS lat, longitude AS lon,
+                           cloudIntent AS ci, cloudConfidence AS cc, cloudVehicleId AS cv,
+                           (cloudNarrative IS NOT NULL) AS rd
+                    FROM appearance
+                    WHERE takenAt IS NOT NULL AND strftime('%Y-%m-%d', takenAt, 'localtime') = ?
+                    ORDER BY takenAt ASC
+                    """, arguments: [ymd])
+                for r in rows {
+                    guard let tk: Date = r["tk"] else { continue }
+                    frames.append(Frame(takenAt: tk, isVehicle: r["v"], lat: r["lat"], lon: r["lon"],
+                                        intent: r["ci"], confidence: r["cc"], vehicleId: r["cv"],
+                                        read: (r["rd"] as Bool?) ?? false))
+                }
+            }
+        } catch {
+            NSLog("LocalStore.dayReceipt failed: %@", String(describing: error))
+            return nil
+        }
+        guard !frames.isEmpty else { return nil }
+
+        // Measured: shoot bursts over ALL frames (>45 min gap splits — same split the web uses).
+        let gap: TimeInterval = 45 * 60
+        var bursts = 1
+        for (a, b) in zip(frames, frames.dropFirst()) where b.takenAt.timeIntervalSince(a.takenAt) > gap {
+            bursts += 1
+        }
+
+        // Read: the web labor formula over cached labor frames (estimate — see doc comment).
+        let labor = frames.filter { $0.intent == "labor" && ($0.confidence ?? 0) >= 0.6 }
+        var laborMinutes: Int?
+        if !labor.isEmpty {
+            var total = 0
+            var burst: [Frame] = []
+            func close() {
+                guard let first = burst.first, let last = burst.last else { return }
+                let span = Int((last.takenAt.timeIntervalSince(first.takenAt) / 60).rounded())
+                total += max(span, burst.count * 5) + 10
+                burst = []
+            }
+            for f in labor {
+                if let prev = burst.last, f.takenAt.timeIntervalSince(prev.takenAt) > gap { close() }
+                burst.append(f)
+            }
+            close()
+            laborMinutes = min(480, total)
+        }
+
+        var intentCounts: [String: Int] = [:]
+        for f in frames { if let i = f.intent { intentCounts[i, default: 0] += 1 } }
+        var vehicleCounts: [String: Int] = [:]
+        for f in frames { if let v = f.vehicleId { vehicleCounts[v, default: 0] += 1 } }
+        let topVehicle = vehicleCounts.max { ($0.value, $1.key) < ($1.value, $0.key) }
+
+        let located = frames.compactMap { f in (f.lat != nil && f.lon != nil) ? (f.lat!, f.lon!) : nil }
+        let medLat = located.isEmpty ? nil : located.map(\.0).sorted()[located.count / 2]
+        let medLon = located.isEmpty ? nil : located.map(\.1).sorted()[located.count / 2]
+
+        return LocalDayReceipt(
+            day: ymd,
+            count: frames.count,
+            classified: frames.filter { $0.isVehicle != nil }.count,
+            vehicles: frames.filter { $0.isVehicle == true }.count,
+            read: frames.filter(\.read).count,
+            firstShot: frames.first?.takenAt,
+            lastShot: frames.last?.takenAt,
+            bursts: bursts,
+            laborFrames: labor.count,
+            laborMinutes: laborMinutes,
+            intents: intentCounts.sorted { ($0.value, $1.key) > ($1.value, $0.key) },
+            agentVehicleId: topVehicle?.key,
+            agentVehicleFrames: topVehicle?.value ?? 0,
+            locatedCount: located.count,
+            medianLat: medLat,
+            medianLon: medLon)
+    }
+
+    /// Resolve a vehicleId to its canonical display name via the offline garage
+    /// mirror ("1972 Chevrolet K5 Blazer"). Read-only; nil when the mirror has
+    /// never cached this vehicle (caller omits the line — never a fake label).
+    func garageVehicleLabel(vehicleId: String) -> String? {
+        do {
+            return try dbQueue.read { db -> String? in
+                guard let r = try Row.fetchOne(db, sql: """
+                    SELECT year, make, model FROM garage_vehicle WHERE vehicleId = ? LIMIT 1
+                    """, arguments: [vehicleId]) else { return nil }
+                let year: Int? = r["year"]
+                let make: String? = r["make"]
+                let model: String? = r["model"]
+                let parts = [year.map(String.init), make, model].compactMap { $0 }
+                return parts.isEmpty ? nil : parts.joined(separator: " ")
+            }
+        } catch {
+            NSLog("LocalStore.garageVehicleLabel failed: %@", String(describing: error))
+            return nil
+        }
     }
 
     /// Which of these already carry a real EXIF `takenAt` — so the ingest pass can
