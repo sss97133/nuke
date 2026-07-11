@@ -293,7 +293,9 @@ struct ExploreView: View {
                     metroStat("turnover", "\(t.formatted(.number.precision(.fractionLength(1))))%")
                 }
                 metroStat("active", "\(m.active)")
-                if let s = m.sold, s > 0 { metroStat("sold", "\(s)") }
+                // sold is a real count from the view (0 is a fact, not a missing field) —
+                // always render it so the stat columns line up row-to-row.
+                if let s = m.sold { metroStat("sold", "\(s)") }
                 if let y = m.avg_year { metroStat("avg yr", "\(y)") }
             }
         }
