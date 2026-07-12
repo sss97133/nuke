@@ -22,25 +22,32 @@ struct TreemapNode: Decodable, Identifiable, Hashable {
     let avg_year: Int?
     let image_url: String?     // representative car (the priciest in the group)
     let sell_through: Int?     // velocity % — drives the heatmap color at every level
+    // Pulse metrics (migration 20260712120000): venue medians for the Gap lens.
+    // Optional with defaults so the matview path (market_pulse), which lacks them,
+    // still decodes — absent = neutral cell, never a fabricated color.
+    var price_n: Int? = nil        // rows in the group that HAVE a price (honesty gate)
+    var auction_med: Int? = nil    // median price among auction sources
+    var market_med: Int? = nil     // median price among marketplace sources
     var id: String { name }
 }
 
 /// The COLOR LENS — what the cell fill encodes. Area is always inventory (the one thing
 /// measured cleanly); color is a SELECTABLE second variable so the map shows what the
-/// data can do. Only lenses we can defend from real coverage: Era (year, 92%), Price
-/// (sold comps, 74%), Size (inventory, ~100%). No fake "velocity" — sold-flag coverage
-/// is a data artifact, not liquidity (241/5185 Mustangs flagged sold), so it's gone.
+/// data can do. Only lenses defensible from real coverage: Era (year, 92%), Price (sold
+/// comps, 74%), Gap (auction-vs-marketplace venue medians — the arbitrage read; NULL
+/// medians render neutral). No fake "velocity" — sold-flag coverage is a data artifact,
+/// not liquidity (241/5185 Mustangs flagged sold), so it's gone.
 enum ColorLens: String, CaseIterable, Identifiable {
-    case era, price
+    case era, price, gap
     var id: String { rawValue }
     var label: String {
-        switch self { case .era: return "Era"; case .price: return "Price" }
+        switch self { case .era: return "Era"; case .price: return "Price"; case .gap: return "Gap" }
     }
     var lo: String {
-        switch self { case .era: return "CLASSIC"; case .price: return "VALUE" }
+        switch self { case .era: return "CLASSIC"; case .price: return "VALUE"; case .gap: return "PARITY" }
     }
     var hi: String {
-        switch self { case .era: return "MODERN"; case .price: return "PREMIUM" }
+        switch self { case .era: return "MODERN"; case .price: return "PREMIUM"; case .gap: return "WIDE" }
     }
 }
 
@@ -95,6 +102,8 @@ private struct MarketPulseParams: Encodable { let p_dimension: String; let p_lim
 private struct PositionRow: Decodable {
     let name: String; let volume: Int; let sell_through: Int
     let demand: Int?; let avg_year: Int?; let median_price: Int?
+    // Pulse metrics (20260712120000) — carried into TreemapNode for the Gap lens.
+    let price_n: Int?; let auction_med: Int?; let market_med: Int?
 }
 private struct PulseFilterParams: Encodable {
     let p_group_by: String
@@ -198,6 +207,14 @@ struct MarketTreemapView: View {
                 return (n.median_price ?? 0) > 0 ? 0.5 : nil
             }
             return max(0, min(1, (log10(Double(p)) - priceLo) / (priceHi - priceLo)))
+        case .gap:
+            // Auction median over marketplace median − 1: how far retail asks lag
+            // auction-discovered value. Fixed 0…150% scale (Chevy ≈ +164% is the known
+            // ceiling); needs BOTH venue medians and ≥8 priced rows, else neutral.
+            guard let a = n.auction_med, let m = n.market_med, m > 0,
+                  (n.price_n ?? 0) >= 8 else { return nil }
+            let gap = Double(a) / Double(m) - 1
+            return max(0, min(1, gap / 1.5))
         }
     }
 
@@ -212,6 +229,8 @@ struct MarketTreemapView: View {
             return Color(red: m(0.42, 0.42), green: m(0.24, 0.74), blue: m(0.14, 0.80))
         case .price: // value deep green → premium bright gold (lightness climbs with price)
             return Color(red: m(0.10, 0.92), green: m(0.34, 0.74), blue: m(0.24, 0.20))
+        case .gap:   // parity cool slate → wide-gap hot ember (opportunity draws the eye)
+            return Color(red: m(0.28, 0.90), green: m(0.34, 0.38), blue: m(0.42, 0.16))
         }
     }
 
@@ -664,7 +683,10 @@ struct MarketTreemapView: View {
                 nodes = sorted.map { TreemapNode(name: $0.name, count: $0.volume, value: $0.volume,
                                                  median_price: $0.median_price, sold_count: nil,
                                                  avg_year: $0.avg_year, image_url: nil,
-                                                 sell_through: $0.sell_through) }
+                                                 sell_through: $0.sell_through,
+                                                 price_n: $0.price_n,
+                                                 auction_med: $0.auction_med,
+                                                 market_med: $0.market_med) }
                 tail = nil; loading = false
                 return
             }
