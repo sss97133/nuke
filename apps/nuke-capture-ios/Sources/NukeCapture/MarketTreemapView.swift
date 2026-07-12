@@ -117,7 +117,6 @@ struct MarketTreemapView: View {
     // launches. Selection is haptic (the whole point: the metric IS a control).
     @AppStorage("pulse.colorLens") private var lensRaw: String = ColorLens.era.rawValue
     private var lens: ColorLens { ColorLens(rawValue: lensRaw) ?? .era }
-    private let pick = UISelectionFeedbackGenerator()
     @State private var nodes: [TreemapNode] = []
     @State private var loading = true
     @State private var failed = false
@@ -169,7 +168,6 @@ struct MarketTreemapView: View {
     // Interaction layer: every cell is a tradeable instrument you can watch/save (right-
     // click / long-press), with haptics. Persisted locally, real state.
     @StateObject private var lists = PulseLists.shared
-    private let haptic = UIImpactFeedbackGenerator(style: .medium)
 
     // ─── Color lens: fill encodes the SELECTED variable (area is always inventory). ──
     // Price domain is log-scaled across what's on screen (prices span 3 orders of
@@ -227,12 +225,12 @@ struct MarketTreemapView: View {
         let saved = lists.saved.contains(n.name)
         Section(n.name) {
             Button {
-                haptic.impactOccurred(); lists.toggleWatch(n.name)
+                watched ? Haptics.watchOff() : Haptics.watchOn(); lists.toggleWatch(n.name)
             } label: {
                 Label(watched ? "Watching" : "Watch", systemImage: watched ? "eye.fill" : "eye")
             }
             Button {
-                haptic.impactOccurred(); lists.toggleSave(n.name)
+                saved ? Haptics.saveOff() : Haptics.saveOn(); lists.toggleSave(n.name)
             } label: {
                 Label(saved ? "Saved" : "Save", systemImage: saved ? "bookmark.fill" : "bookmark")
             }
@@ -256,7 +254,7 @@ struct MarketTreemapView: View {
                         HStack(spacing: 7) {
                             ForEach(PulseDim.allCases) { d in
                                 let on = (d == dim)
-                                Button { pick.selectionChanged(); dim = d } label: {
+                                Button { Haptics.tick(); dim = d } label: {
                                     Text(d.label)
                                         .font(.system(.subheadline).weight(on ? .semibold : .regular))
                                         .padding(.horizontal, 13).padding(.vertical, 6)
@@ -348,13 +346,73 @@ struct MarketTreemapView: View {
         if isTail(n) {
             NavigationLink(value: PulseTailPage(nodes: tail, filters: filters,
                                                 groupBy: groupBy.rawValue, title: n.name)) {
-                cellBody(n, tail: true)
+                foldCell(n, tail: tail)
             }
             .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded { Haptics.drawer() })
         } else {
-            NavigationLink(value: step(n)) { cellBody(n) }
+            let s = step(n)
+            NavigationLink(value: s) { cellBody(n) }
                 .buttonStyle(.plain)
                 .contextMenu { cellMenu(n) }
+                // The drill gets a felt weight: LANDING when the next step is the cars,
+                // else a DROP that deepens with each level. (Was silent — the app's most
+                // important gesture.)
+                .simultaneousGesture(TapGesture().onEnded {
+                    if s.groupBy == nil { Haptics.landing() }
+                    else { Haptics.drill(depth: s.filters.count - 1) }
+                })
+        }
+    }
+
+    // The fold cell as a DOORWAY, not a void (the experts' #1 make-page fix): a live mosaic
+    // of the makes folded inside (real areas, current lens colors) under a recessed scrim,
+    // with the marquee of what's in the drawer + an Explore affordance. It reads as "a whole
+    // world, folded" — the eye is pulled toward the one cell that used to repel it.
+    @ViewBuilder private func foldCell(_ n: TreemapNode, tail: [TreemapNode]) -> some View {
+        GeometryReader { g in
+            let top = Array(tail.prefix(48))
+            let laid = squarify(top, in: CGRect(origin: .zero, size: g.size))
+            let big = g.size.width >= 144 && g.size.height >= 92
+            ZStack(alignment: .topLeading) {
+                // The mosaic: each folded make as a tiny tile, colored by the active lens.
+                Canvas { ctx, _ in
+                    for item in laid {
+                        let r = item.rect.insetBy(dx: 0.5, dy: 0.5)
+                        guard r.width > 0, r.height > 0 else { continue }
+                        ctx.fill(Path(roundedRect: r, cornerRadius: 1), with: .color(cellFill(item.node)))
+                    }
+                }
+                // Recessed scrim — sits the cell BELOW the plane of the solid tiles and makes
+                // the overlaid text legible on any mosaic.
+                LinearGradient(colors: [.black.opacity(0.10), .black.opacity(0.42)],
+                               startPoint: .top, endPoint: .bottom)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(n.name)
+                        .font(.system(size: big ? 21 : 15, weight: .semibold))
+                        .foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.5)
+                    Text(n.count.formatted())
+                        .font(.system(size: big ? 14 : 11, weight: .regular).monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.65))
+                    if big {
+                        Text(tail.prefix(6).map(\.name).joined(separator: " · ") + " …")
+                            .font(.system(size: 12)).foregroundStyle(.white.opacity(0.72))
+                            .lineLimit(2).padding(.top, 2)
+                    }
+                    Spacer(minLength: 0)
+                    HStack {
+                        Spacer()
+                        Text("Explore →")
+                            .font(.system(size: 12, weight: .semibold))
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .foregroundStyle(.white)
+                    }
+                }
+                .padding(big ? 12 : 6)
+            }
+            .overlay(Rectangle().stroke(.black.opacity(0.06), lineWidth: 0.5))
+            .contentShape(Rectangle())
         }
     }
 
@@ -442,8 +500,8 @@ struct MarketTreemapView: View {
             .padding(.horizontal, 11).padding(.vertical, 6)
             .background(Color(uiColor: .secondarySystemFill), in: Capsule())
         }
-        .onChange(of: lensRaw) { _, _ in pick.selectionChanged() }
-        .onAppear { pick.prepare() }
+        .onChange(of: lensRaw) { _, _ in Haptics.tick() }
+        .onAppear { Haptics.warm() }
     }
 
     // The tail as an honest one-line footer — never a proportional block that would
