@@ -1,0 +1,43 @@
+-- =============================================================================
+-- vehicles write-path slimming — BaT backfill devour unblock
+-- Deployed manually to prod 2026-07-12 via psql (CREATE INDEX CONCURRENTLY;
+-- recorded here as IF NOT EXISTS for migration-history parity).
+--
+-- DIAGNOSIS (measured with EXPLAIN ANALYZE on a representative BaT-shaped
+-- INSERT inside a rolled-back transaction):
+--   Total insert time BEFORE: 42,961 ms
+--   - trg_enforce_vin_uniqueness ............ 40,804 ms  (95% of total)
+--   - trigger_auto_link_origin_org ...........  1,317 ms  (cold cache; indexed fine)
+--   - all other 36 triggers combined .........   <600 ms  (10 are already no-op fns)
+--
+-- ROOT CAUSE: enforce_vin_uniqueness() checks
+--     WHERE upper(trim(vin)) = v_norm
+--   but the only expression index was idx_vehicles_vin_upper on upper(vin)
+--   (plus partial btree(vin) indexes). The expression upper(trim(vin)) matched
+--   NO index -> full seq scan of ~919K-row, ~330-column vehicles table on
+--   EVERY insert/update carrying a VIN (~34% of rows have VINs; all BaT
+--   extractions with VINs hit this).
+--
+-- FIX: one expression index matching the trigger's exact predicate.
+-- No trigger logic was changed. No triggers were disabled or deferred.
+--
+-- Total insert time AFTER: 232 ms (first call, cold plans);
+--   50-row sequential insert batch: median 38 ms, p90 55 ms, max 196 ms.
+--   trg_enforce_vin_uniqueness: 40,804 ms -> 0.66 ms.
+-- =============================================================================
+
+-- Applied on prod as:
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_vehicles_vin_norm_trim
+--     ON public.vehicles (upper(trim(vin)));
+-- (11.0 s build, zero lock waiters)
+CREATE INDEX IF NOT EXISTS idx_vehicles_vin_norm_trim
+  ON public.vehicles (upper(trim(vin)));
+
+-- =============================================================================
+-- REVERT
+-- -----------------------------------------------------------------------------
+-- The index is purely additive; reverting restores the pre-fix (pathological)
+-- seq-scan behavior in enforce_vin_uniqueness:
+--
+--   DROP INDEX CONCURRENTLY IF EXISTS public.idx_vehicles_vin_norm_trim;
+-- =============================================================================
