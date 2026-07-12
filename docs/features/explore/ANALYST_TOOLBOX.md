@@ -70,6 +70,23 @@ year-curve is the yield curve. Condition/provenance = credit quality; receipts/p
 are the underwriting file. No derivatives exist → hammer_predictions is the closest
 thing this asset class has to a futures market.
 
+## The refactor law (Skylar, 2026-07-12: "bat_listings probably needs to be refactored")
+
+Agreed on the need, constrained on the method: **refactor by reading layer, never by
+rebuilding a pumping organ** (strangler fig — the repo's own migration doctrine).
+bat_listings is a live daily writer with 18 months of irreplaceable tape; it is never
+renamed/reshaped in place. Instead the mecca gets two additive layers, and ALL analyst
+tools read them (never the BaT-shaped table directly):
+1. **`market_events`** — venue-agnostic auction-event layer (venue, canonical cohort
+   keys, start/end, outcome incl. unsold, prices, bid/watch/view counts). Unions
+   bat_listings today; Mecum/Barrett-Jackson/marketplace-lifecycle rows land tomorrow
+   and every panel gets them for free.
+2. **`mv_cohort_metrics`** — per canonical-cohort per month: sell-through, bid depth,
+   watcher→bidder conversion, reserve-met rate, percentile bands. The single source for
+   the liquidity panel, momentum ribbon, and indices.
+The old shape withers when nothing reads it. Same law applies to every legacy organ the
+toolbox touches: add the clean interface, migrate the readers, let disuse do the demo.
+
 ## THE FIVE MOVES (sequenced; each names its existing organ)
 1. **Wire the bell curve + overlay** (price_histogram + DistributionBar) — days of work,
    defines the product's visual identity.
