@@ -190,6 +190,14 @@ struct ExploreView: View {
                     FilteredVehicleGrid(filters: step.filters)
                 }
             }
+            .navigationDestination(for: PulseTailPage.self) { page in
+                // The folded tail: a treemap of just the makes too small to draw above,
+                // now with room to be legible. Drills onward like any other cell.
+                MarketTreemapView(filters: page.filters,
+                                  fixedGroupBy: PulseDim(rawValue: page.groupBy),
+                                  injectedNodes: page.nodes,
+                                  injectedTitle: page.title)
+            }
             .task { await loadMetros() }
             .task(id: query) {
                 let term = query.trimmingCharacters(in: .whitespaces)

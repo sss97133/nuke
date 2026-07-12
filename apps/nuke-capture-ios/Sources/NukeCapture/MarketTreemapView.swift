@@ -76,6 +76,16 @@ struct TreemapStep: Hashable {
     let groupBy: String?
 }
 
+/// The folded tail: makes too small to draw legibly at this size, collected into one
+/// honest, drillable cell. Tapping it opens a treemap of ONLY those makes, where they
+/// finally have room. Nothing hidden — everything is one tap away, never sub-pixel confetti.
+struct PulseTailPage: Hashable {
+    let nodes: [TreemapNode]
+    let filters: [String: String]
+    let groupBy: String
+    let title: String
+}
+
 /// The drill order — a pulse narrows through make → model → year, then the cars.
 /// Tapping any cell adds its value as a filter and advances to the first of these
 /// not yet pinned; when all three are pinned, the next step is the leaf grid.
@@ -101,6 +111,10 @@ struct MarketTreemapView: View {
     /// when we're drilled (nil at top → the segmented picker chooses).
     var filters: [String: String] = [:]
     var fixedGroupBy: PulseDim? = nil
+    /// When set, this treemap renders these nodes directly (the folded-tail sub-page) —
+    /// no RPC, no pivot bar, just a titled treemap of the makes that didn't fit above.
+    var injectedNodes: [TreemapNode]? = nil
+    var injectedTitle: String? = nil
 
     @State private var dim: PulseDim = .make
     // The color lens — persisted so the market keeps reading the same variable across
@@ -115,8 +129,31 @@ struct MarketTreemapView: View {
     // thin honest footer instead of a giant block that would dominate the head.
     @State private var tail: (groups: Int, cars: Int)? = nil
 
-    private var isTop: Bool { filters.isEmpty && fixedGroupBy == nil }
+    private var isTop: Bool { filters.isEmpty && fixedGroupBy == nil && injectedNodes == nil }
     private var groupBy: PulseDim { fixedGroupBy ?? dim }
+
+    // ─── Legibility floor: never draw a cell too small to read. Sub-floor makes fold
+    // into ONE drillable tail cell. A treemap cell's area ≈ value/total × canvas, so we
+    // can decide the fold before layout. Keeps the head honest (bigger) and kills confetti.
+    private func pack(_ ns: [TreemapNode], canvas: Double) -> (head: [TreemapNode], tail: [TreemapNode]) {
+        guard canvas > 0, ns.count > 6 else { return (ns, []) }
+        let total = ns.reduce(0.0) { $0 + Double(max($1.value, 0)) }
+        guard total > 0 else { return (ns, []) }
+        let minArea = 2900.0                      // ≈ 62×46 pt — room for a label without slivers
+        // ns is sorted desc, so the first sub-floor cell marks where the tail begins.
+        let cut = ns.firstIndex { Double($0.value) / total * canvas < minArea } ?? ns.count
+        // Only fold if the tail is worth folding (≥3 makes); else draw them all.
+        guard cut < ns.count - 2 else { return (ns, []) }
+        return (Array(ns[..<cut]), Array(ns[cut...]))
+    }
+    private func tailNode(_ tail: [TreemapNode]) -> TreemapNode {
+        TreemapNode(name: "＋\(tail.count) \(groupBy.label.lowercased())s",
+                    count: tail.reduce(0) { $0 + $1.count },
+                    value: tail.reduce(0) { $0 + max($1.value, 0) },
+                    median_price: nil, sold_count: nil, avg_year: nil,
+                    image_url: nil, sell_through: nil)
+    }
+    private func isTail(_ n: TreemapNode) -> Bool { n.name.hasPrefix("＋") }
 
     private var maxCount: Int { nodes.map(\.count).max() ?? 1 }
     private var minCount: Int { nodes.map(\.count).min() ?? 0 }
@@ -262,26 +299,22 @@ struct MarketTreemapView: View {
                 } else if nodes.isEmpty {
                     ContentUnavailableView("No data", systemImage: "square.grid.2x2")
                 } else {
-                    VStack(spacing: 0) {
-                        GeometryReader { geo in
-                            let laid = squarify(nodes, in: CGRect(origin: .zero, size: geo.size))
-                            ZStack(alignment: .topLeading) {
-                                ForEach(laid, id: \.node.id) { item in
-                                    // Tap → deeper treemap / the cars. Long-press (right-
-                                    // click) → the instrument menu: watch, save, share.
-                                    NavigationLink(value: step(item.node)) { cellBody(item.node) }
-                                        .buttonStyle(.plain)
-                                        .contextMenu { cellMenu(item.node) }
-                                        .frame(width: max(item.rect.width - 1, 0),
-                                               height: max(item.rect.height - 1, 0))
-                                        .offset(x: item.rect.minX, y: item.rect.minY)
-                                }
+                    GeometryReader { geo in
+                        // Fold the sub-legible tail into one drillable cell, THEN lay out.
+                        let packed = pack(nodes, canvas: Double(geo.size.width * geo.size.height))
+                        let draw = packed.tail.isEmpty ? packed.head : packed.head + [tailNode(packed.tail)]
+                        let laid = squarify(draw, in: CGRect(origin: .zero, size: geo.size))
+                        ZStack(alignment: .topLeading) {
+                            ForEach(laid, id: \.node.id) { item in
+                                cell(for: item.node, tail: packed.tail)
+                                    .frame(width: max(item.rect.width - 1, 0),
+                                           height: max(item.rect.height - 1, 0))
+                                    .offset(x: item.rect.minX, y: item.rect.minY)
                             }
                         }
-                        .padding(1)
-                        .background(Color(uiColor: .systemGroupedBackground))
-                        tailFooter
                     }
+                    .padding(1)
+                    .background(Color(uiColor: .systemGroupedBackground))
                 }
             }
         }
@@ -293,8 +326,9 @@ struct MarketTreemapView: View {
     // The pin path so a drilled treemap says where it is: "Chevrolet › Corvette · by year".
     private var breadcrumb: some View {
         let pins = ["make", "model", "year", "metro", "dow"].compactMap { filters[$0] }
+        let head = injectedTitle ?? pins.joined(separator: " › ")
         return HStack(spacing: 6) {
-            Text(pins.joined(separator: " › "))
+            Text(head)
                 .font(.system(.subheadline).weight(.semibold)).lineLimit(1)
             Spacer(minLength: 8)
             Text("by \(groupBy.label)")
@@ -314,9 +348,25 @@ struct MarketTreemapView: View {
     // the name anchors the top and the big TABULAR count anchors the BOTTOM, so the
     // stat spans the cell height instead of floating in a void. Contrast-aware text,
     // single-line name (scaled to fit — never a mid-word hyphen).
-    @ViewBuilder private func cellBody(_ n: TreemapNode) -> some View {
-        let fill = cellFill(n)
-        let ink = fg(on: fill)
+    // A drawn cell: a normal make/model/cohort (tap → drill, long-press → instrument
+    // menu) or the folded-tail cell (tap → a treemap of just those makes).
+    @ViewBuilder private func cell(for n: TreemapNode, tail: [TreemapNode]) -> some View {
+        if isTail(n) {
+            NavigationLink(value: PulseTailPage(nodes: tail, filters: filters,
+                                                groupBy: groupBy.rawValue, title: n.name)) {
+                cellBody(n, tail: true)
+            }
+            .buttonStyle(.plain)
+        } else {
+            NavigationLink(value: step(n)) { cellBody(n) }
+                .buttonStyle(.plain)
+                .contextMenu { cellMenu(n) }
+        }
+    }
+
+    @ViewBuilder private func cellBody(_ n: TreemapNode, tail: Bool = false) -> some View {
+        let fill: Color = tail ? Color(uiColor: .secondarySystemFill) : cellFill(n)
+        let ink: Color = tail ? .primary : fg(on: fill)
         GeometryReader { g in
             let big = g.size.width >= 144 && g.size.height >= 92
             let mid = g.size.height >= 50 && g.size.width >= 80
@@ -332,11 +382,22 @@ struct MarketTreemapView: View {
                         .font(.system(size: big ? 34 : 15, weight: .semibold).monospacedDigit())
                         .foregroundStyle(ink.opacity(0.9))
                         .lineLimit(1).minimumScaleFactor(0.5)
+                    if tail {
+                        Text("cars · tap to explore")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .padding(big ? 11 : 6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .background(fill)
+            .overlay(alignment: .bottomTrailing) {
+                if tail {
+                    Image(systemName: "chevron.right.circle.fill")
+                        .font(.system(size: 15)).foregroundStyle(.secondary).padding(6)
+                }
+            }
             .overlay(alignment: .topTrailing) {
                 if mid, lists.watched.contains(n.name) || lists.saved.contains(n.name) {
                     Image(systemName: lists.watched.contains(n.name) ? "eye.fill" : "bookmark.fill")
@@ -404,11 +465,16 @@ struct MarketTreemapView: View {
     }
 
     private func load() async {
+        // The folded-tail sub-page renders injected nodes directly — no RPC.
+        if let injected = injectedNodes {
+            nodes = injected.sorted { $0.count > $1.count }
+            tail = nil; loading = false; failed = false
+            return
+        }
         loading = true; failed = false
         do {
-            // The un-pinned MAKE view is the full heatmap: area = inventory, color =
-            // sell-through velocity (market_position). Every other lens is the neutral
-            // magnitude ramp (no velocity metric baked for those dims yet).
+            // The un-pinned MAKE view is the make-level pulse (market_position carries
+            // avg_year + median_price so the Era/Price lenses work at the top level).
             if isTop && groupBy == .make {
                 let prows: [PositionRow] = try await SupabaseService.client
                     .rpc("market_position", params: MarketPulseParams(p_dimension: "make", p_limit: 250))
