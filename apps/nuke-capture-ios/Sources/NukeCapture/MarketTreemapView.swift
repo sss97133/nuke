@@ -20,6 +20,7 @@ struct TreemapNode: Decodable, Identifiable, Hashable {
     let median_price: Int?
     let sold_count: Int?
     let avg_year: Int?
+    let image_url: String?     // representative car (the priciest in the group)
     var id: String { name }
 }
 
@@ -150,37 +151,52 @@ struct MarketTreemapView: View {
         return TreemapStep(filters: f, groupBy: nextGroupBy(after: f))
     }
 
-    // A read cell: name + count + median + typical year. Area IS the count, so box size
-    // means what the label says.
+    // A photo-mosaic cell: the group's representative car fills the box, a scrim keeps
+    // the label legible. Area IS the count, so box size means what the label says.
     @ViewBuilder private func cellBody(_ n: TreemapNode) -> some View {
         GeometryReader { g in
             let tight = g.size.height < 54 || g.size.width < 74
-            VStack(alignment: .leading, spacing: 2) {
-                Text(n.name)
-                    .font(.system(.subheadline).weight(.semibold))
-                    .lineLimit(tight ? 1 : 2)
-                    .minimumScaleFactor(0.7)
-                if !tight {
-                    Text(n.count.formatted())
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    if let p = n.median_price, p > 0, g.size.height > 76 {
-                        Text("$\(p.formatted())")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.secondary)
+            let hasImg = (n.image_url?.isEmpty == false)
+            ZStack(alignment: .topLeading) {
+                if let url = n.image_url, !url.isEmpty {
+                    CachedAsyncImage(url: NukeImage.thumb(url, width: 320)) { img in
+                        img.resizable().scaledToFill()
+                    } placeholder: {
+                        Color(uiColor: .secondarySystemGroupedBackground)
                     }
-                    if let y = n.avg_year, y > 1885, g.size.height > 100 {
-                        Text("~'\(String(format: "%02d", y % 100))")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.tertiary)
-                    }
+                    .frame(width: g.size.width, height: g.size.height)
+                    .clipped()
+                    // Scrim: dark at the top-left where the label sits, clear below.
+                    LinearGradient(colors: [.black.opacity(0.65), .black.opacity(0.15), .clear],
+                                   startPoint: .top, endPoint: .center)
+                } else {
+                    Color(uiColor: .secondarySystemGroupedBackground)
                 }
-                Spacer(minLength: 0)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(n.name)
+                        .font(.system(.subheadline).weight(.semibold))
+                        .foregroundStyle(hasImg ? .white : .primary)
+                        .lineLimit(tight ? 1 : 2)
+                        .minimumScaleFactor(0.7)
+                        .shadow(color: hasImg ? .black.opacity(0.5) : .clear, radius: 1, y: 0.5)
+                    if !tight {
+                        Text(n.count.formatted())
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(hasImg ? .white.opacity(0.9) : Color.secondary)
+                        if let p = n.median_price, p > 0, g.size.height > 76 {
+                            Text("$\(p.formatted())")
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundStyle(hasImg ? .white.opacity(0.85) : Color.secondary)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(6)
             }
-            .padding(6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Color(uiColor: .secondarySystemGroupedBackground))
             .overlay(Rectangle().stroke(Color(uiColor: .separator), lineWidth: 0.5))
+            .clipped()
             .contentShape(Rectangle())
         }
     }
@@ -236,7 +252,10 @@ private func squarify(_ nodes: [TreemapNode], in bounds: CGRect) -> [Laid] {
         let s = r.reduce(0.0) { $0 + $1.area }
         guard s > 0 else { return }
         let horizontal = rect.width >= rect.height
-        let thickness = s / Double(horizontal ? rect.width : rect.height)
+        // A wide rect lays a column spanning its HEIGHT (thickness = area / height);
+        // a tall rect lays a row spanning its WIDTH. Dividing by the wrong side leaves
+        // the rect unconsumed — the empty grey box.
+        let thickness = s / Double(horizontal ? rect.height : rect.width)
         guard thickness > 0 else { return }
         var pos = horizontal ? Double(rect.minY) : Double(rect.minX)
         for it in r {
