@@ -169,50 +169,30 @@ struct MarketTreemapView: View {
         return TreemapStep(filters: f, groupBy: nextGroupBy(after: f))
     }
 
-    // A photo-mosaic cell: the group's representative car fills the box, a scrim keeps
-    // the label legible. Area IS the count, so box size means what the label says.
+    // A clean cell: the group name and its inventory count. No image (one photo can't
+    // represent a make, and there's no quality metric to pick it) — the AREA is the
+    // datum, the count confirms it. The count scales up in bigger cells so magnitude
+    // reads at a glance. This is the honest "N cars" the box promises.
     @ViewBuilder private func cellBody(_ n: TreemapNode) -> some View {
         GeometryReader { g in
-            let tight = g.size.height < 54 || g.size.width < 74
-            let hasImg = (n.image_url?.isEmpty == false)
-            ZStack(alignment: .topLeading) {
-                if let url = n.image_url, !url.isEmpty {
-                    CachedAsyncImage(url: NukeImage.thumb(url, width: 320)) { img in
-                        img.resizable().scaledToFill()
-                    } placeholder: {
-                        Color(uiColor: .systemGray5)
-                    }
-                    .frame(width: g.size.width, height: g.size.height)
-                    .clipped()
-                    // Scrim: dark at the top-left where the label sits, clear below.
-                    LinearGradient(colors: [.black.opacity(0.6), .black.opacity(0.12), .clear],
-                                   startPoint: .top, endPoint: .center)
-                } else {
-                    Color(uiColor: .systemGray5)
+            let big = g.size.width >= 150 && g.size.height >= 90
+            let tight = g.size.height < 40 || g.size.width < 58
+            VStack(alignment: .leading, spacing: big ? 3 : 1) {
+                Text(n.name)
+                    .font(.system(big ? .title3 : .subheadline).weight(.semibold))
+                    .lineLimit(2).minimumScaleFactor(0.6)
+                if !tight {
+                    Text(n.count.formatted())
+                        .font(.system(big ? .title : .footnote, design: .rounded).weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .minimumScaleFactor(0.7).lineLimit(1)
                 }
-
-                // Label + inventory count only. No median/avg price — a group aggregate
-                // isn't a defensible number; the count is what the box area already means.
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(n.name)
-                        .font(.system(.subheadline).weight(.semibold))
-                        .foregroundStyle(hasImg ? .white : .primary)
-                        .lineLimit(tight ? 1 : 2)
-                        .minimumScaleFactor(0.7)
-                        .shadow(color: hasImg ? .black.opacity(0.5) : .clear, radius: 1, y: 0.5)
-                    if !tight {
-                        Text("\(n.count.formatted()) listed")
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(hasImg ? .white.opacity(0.9) : Color.secondary)
-                            .shadow(color: hasImg ? .black.opacity(0.5) : .clear, radius: 1, y: 0.5)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .padding(6)
+                Spacer(minLength: 0)
             }
+            .padding(big ? 10 : 6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Color(uiColor: .secondarySystemGroupedBackground))
             .overlay(Rectangle().stroke(Color(uiColor: .separator), lineWidth: 0.5))
-            .clipped()
             .contentShape(Rectangle())
         }
     }

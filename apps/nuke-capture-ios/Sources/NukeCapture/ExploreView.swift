@@ -163,6 +163,10 @@ struct ExploreView: View {
             }
             .navigationTitle("Explore")
             .navigationBarTitleDisplayMode(.inline)
+            // Reclaim the title bar on the landing — the tab already says "Explore",
+            // and the Map/Pulse toggle is the real header. (Restored while searching so
+            // the search field keeps its chrome.)
+            .toolbar(isSearching ? .visible : .hidden, for: .navigationBar)
             .searchable(text: $query, prompt: "Year, make, or model")
             .navigationDestination(for: VehicleHeaderRow.self) { v in
                 // PUSH (back chevron) — kills the Done-only dead-end.
