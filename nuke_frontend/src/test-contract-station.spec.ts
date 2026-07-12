@@ -87,7 +87,8 @@ describe('Contract Station - Plan Implementation', () => {
       // Should use .in('id', ...) for batch fetching
       expect(code).toContain(".in('id', byType.vehicle)");
       expect(code).toContain(".in('id', byType.organization)");
-      expect(code).toContain(".in('id', byType.bond)");
+      // bond fetch removed 2026-07-12: vehicle_bonds table does not exist (ghost-ref; see docs/ledger/FINISH_ROADMAP.md)
+      expect(code).not.toContain(".from('vehicle_bonds')");
       expect(code).toContain(".in('id', byType.stake)");
     });
 
