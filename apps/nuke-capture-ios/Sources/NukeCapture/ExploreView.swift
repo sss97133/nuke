@@ -74,6 +74,10 @@ struct ExploreView: View {
     // The Worklight: report the stage, never a blank spinner; a stall reads as an
     // honest failure with retry, never "nothing here".
     @State private var feedStage = "Reading the market…"
+    // Landing has two lenses on the SAME market: the metro list (where) and the
+    // treemap (what, by volume). Both drill into the cohort terminal.
+    @State private var landingMode: LandingMode = .map
+    enum LandingMode: Hashable { case metros, treemap, map }
 
     // 3-column square grid, 2pt gutters — the SEARCH-results photo grid.
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
@@ -174,6 +178,14 @@ struct ExploreView: View {
                 // PUSH the metro's make breakdown (the C10 drill on a metro number).
                 MetroDetailView(metro: m)
             }
+            .navigationDestination(for: TreemapStep.self) { step in
+                // Recursive pulse: a cell → the deeper treemap, or the cars at the leaf.
+                if let gb = step.groupBy, let dim = PulseDim(rawValue: gb) {
+                    MarketTreemapView(filters: step.filters, fixedGroupBy: dim)
+                } else {
+                    FilteredVehicleGrid(filters: step.filters)
+                }
+            }
             .task { await loadMetros() }
             .task(id: query) {
                 let term = query.trimmingCharacters(in: .whitespaces)
@@ -185,8 +197,28 @@ struct ExploreView: View {
         }
     }
 
-    // ─── LANDING — the market pulse by metro (the read terminal) ────────────────
+    // ─── LANDING — two lenses on one market (metros / treemap), segmented toggle ─
     @ViewBuilder private var marketLanding: some View {
+        VStack(spacing: 0) {
+            // Two lenses on one market: the Map (geography) and the Pulse (a treemap
+            // pivotable by make/model/year/metro/day). "Metros" retired — it was just
+            // one grouping; it now lives inside the Pulse's Metro dimension.
+            Picker("View", selection: $landingMode) {
+                Text("Map").tag(LandingMode.map)
+                Text("Pulse").tag(LandingMode.treemap)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 12).padding(.top, 6).padding(.bottom, 4)
+            switch landingMode {
+            case .metros:  metroList
+            case .map:     MarketMapView()
+            case .treemap: MarketTreemapView()
+            }
+        }
+    }
+
+    // ─── The metro-list lens (the market pulse by metro) ─────────────────────────
+    @ViewBuilder private var metroList: some View {
         if loadingFeed && metros.isEmpty {
             // Worklight: a labeled, live stage — never a dead blank spinner.
             VStack(spacing: 10) {
