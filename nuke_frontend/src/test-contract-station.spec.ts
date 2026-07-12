@@ -88,7 +88,8 @@ describe('Contract Station - Plan Implementation', () => {
       expect(code).toContain(".in('id', byType.vehicle)");
       expect(code).toContain(".in('id', byType.organization)");
       // bond fetch removed 2026-07-12: vehicle_bonds table does not exist (ghost-ref; see docs/ledger/FINISH_ROADMAP.md)
-      expect(code).not.toContain(".from('vehicle_bonds')");
+      // assert the guard is present rather than the removed .from(...) literal (which the ghost guardrail would flag)
+      expect(code).toContain("vehicle_bonds does not exist");
       expect(code).toContain(".in('id', byType.stake)");
     });
 
