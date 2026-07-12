@@ -121,7 +121,10 @@ struct MarketTreemapView: View {
     // The treemap lays out taller-than-screen (scroll) and pinch-zooms (the fold is
     // zoom-adaptive: pinch in → the canvas grows → fewer makes fold → the tail emerges).
     @State private var zoom: CGFloat = 1
-    @State private var lastZoom: CGFloat = 1
+    @State private var pan: CGSize = .zero
+    @State private var gZoomBase: CGFloat? = nil   // zoom at pinch start
+    @State private var gPanBase: CGSize = .zero    // pan at pinch start
+    @State private var dragBase: CGSize? = nil     // pan at drag start
     @State private var nodes: [TreemapNode] = []
     @State private var loading = true
     @State private var failed = false
@@ -266,6 +269,13 @@ struct MarketTreemapView: View {
         return (cells, tail.isEmpty ? nil : hHead, max(height, screenH))
     }
 
+    // Hold the canvas within the viewport (pan ≤ 0; centered when content < viewport).
+    private func clampPan(_ p: CGSize, content: CGSize, viewport: CGSize) -> CGSize {
+        let minX = min(0, viewport.width - content.width)
+        let minY = min(0, viewport.height - content.height)
+        return CGSize(width: max(minX, min(0, p.width)), height: max(minY, min(0, p.height)))
+    }
+
     // A drill cell (head or tail): tap → deeper, long-press → instrument menu, felt weight.
     @ViewBuilder private func drillCell(_ n: TreemapNode) -> some View {
         let s = step(n)
@@ -361,30 +371,61 @@ struct MarketTreemapView: View {
                     ContentUnavailableView("No data", systemImage: "square.grid.2x2")
                 } else {
                     GeometryReader { geo in
-                        // A REAL treemap: EVERY cell's area = its exact share of the data, no
-                        // floors, no uniform tail. The canvas is taller than the screen (a
-                        // window you scroll) and grows with pinch zoom — re-laid at each zoom
-                        // so a small make and its label enlarge honestly as you zoom in.
-                        let W = geo.size.width
-                        let canvasW = W * zoom
-                        let canvasH = geo.size.height * 2.6 * zoom
-                        let laid = squarify(nodes, in: CGRect(x: 0, y: 0, width: canvasW, height: canvasH))
-                        ScrollView([.vertical, .horizontal], showsIndicators: false) {
-                            ZStack(alignment: .topLeading) {
-                                ForEach(laid, id: \.node.id) { item in
-                                    drillCell(item.node)
-                                        .frame(width: item.rect.width, height: item.rect.height)
-                                        .offset(x: item.rect.minX, y: item.rect.minY)
-                                }
+                        // A REAL treemap laid out ONCE at zoom-1. The canvas W×(2.6·H) is
+                        // self-similar under zoom, so every cell is a pure ×zoom scale — crisp
+                        // labels, exact focal math. We manage pan+zoom ourselves (not a
+                        // ScrollView) so pinch zooms WHERE THE FINGERS ARE (Photos-style), and
+                        // every NavigationLink/contextMenu/haptic on the cells stays intact.
+                        let W = geo.size.width, VH = geo.size.height
+                        let canvasH = VH * 2.6
+                        let laid = squarify(nodes, in: CGRect(x: 0, y: 0, width: W, height: canvasH))
+                        ZStack(alignment: .topLeading) {
+                            ForEach(laid, id: \.node.id) { item in
+                                drillCell(item.node)
+                                    .frame(width: item.rect.width * zoom, height: item.rect.height * zoom)
+                                    .offset(x: item.rect.minX * zoom, y: item.rect.minY * zoom)
                             }
-                            .frame(width: canvasW, height: canvasH, alignment: .topLeading)
                         }
-                        .contentMargins(.bottom, 64, for: .scrollContent)   // clear the search pill
+                        .frame(width: W * zoom, height: canvasH * zoom, alignment: .topLeading)
+                        .offset(pan)
+                        .frame(width: W, height: VH, alignment: .topLeading)
+                        .clipped()
+                        .contentShape(Rectangle())
                         .background(Color(uiColor: .systemGroupedBackground))
-                        .simultaneousGesture(
-                            MagnificationGesture()
-                                .onChanged { v in zoom = min(6, max(1, lastZoom * v)) }
-                                .onEnded { _ in lastZoom = zoom }
+                        .gesture(
+                            MagnifyGesture(minimumScaleDelta: 0)
+                                .onChanged { v in
+                                    if gZoomBase == nil { gZoomBase = zoom; gPanBase = pan }
+                                    let base = gZoomBase ?? zoom
+                                    let f = v.startLocation
+                                    let zNew = min(8, max(1, base * v.magnification))
+                                    // keep the point under the fingers fixed as scale changes
+                                    let np = CGSize(width: f.x - (f.x - gPanBase.width) * (zNew / base),
+                                                    height: f.y - (f.y - gPanBase.height) * (zNew / base))
+                                    zoom = zNew
+                                    pan = clampPan(np, content: CGSize(width: W * zNew, height: canvasH * zNew),
+                                                   viewport: geo.size)
+                                }
+                                .onEnded { _ in gZoomBase = nil }
+                                .simultaneously(with:
+                                    DragGesture(minimumDistance: 12)
+                                        .onChanged { d in
+                                            if dragBase == nil { dragBase = pan }
+                                            let b = dragBase ?? pan
+                                            pan = clampPan(CGSize(width: b.width + d.translation.width,
+                                                                  height: b.height + d.translation.height),
+                                                           content: CGSize(width: W * zoom, height: canvasH * zoom),
+                                                           viewport: geo.size)
+                                        }
+                                        .onEnded { d in
+                                            let b = dragBase ?? pan
+                                            let target = clampPan(CGSize(width: b.width + d.predictedEndTranslation.width,
+                                                                         height: b.height + d.predictedEndTranslation.height),
+                                                                  content: CGSize(width: W * zoom, height: canvasH * zoom),
+                                                                  viewport: geo.size)
+                                            withAnimation(.easeOut(duration: 0.4)) { pan = target }   // flick momentum
+                                            dragBase = nil
+                                        })
                         )
                     }
                 }
