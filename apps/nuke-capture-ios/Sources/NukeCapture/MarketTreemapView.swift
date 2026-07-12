@@ -125,6 +125,7 @@ struct MarketTreemapView: View {
     @State private var gZoomBase: CGFloat? = nil   // zoom at pinch start
     @State private var gPanBase: CGSize = .zero    // pan at pinch start
     @State private var dragBase: CGSize? = nil     // pan at drag start
+    private let topInset: CGFloat = 96             // reserve space under the floating glass chrome
     @State private var nodes: [TreemapNode] = []
     @State private var loading = true
     @State private var failed = false
@@ -321,38 +322,41 @@ struct MarketTreemapView: View {
         return s
     }
 
-    var body: some View {
-        VStack(spacing: 0) {
+    // Floating iOS 26 Liquid Glass chrome over the live treemap — no opaque white bar.
+    // Each control carries its own glass; the gaps show the blurred market beneath.
+    private var chrome: some View {
+        VStack(spacing: 6) {
             if !nodes.isEmpty { pulseHeader }
-
             HStack(spacing: 8) {
-                if isTop {
-                    // GROUP BY: one market, regrouped by whatever the question needs.
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 7) {
-                            ForEach(PulseDim.allCases) { d in
-                                let on = (d == dim)
-                                Button { Haptics.tick(); dim = d } label: {
-                                    Text(d.label)
-                                        .font(.system(.subheadline).weight(on ? .semibold : .regular))
-                                        .padding(.horizontal, 13).padding(.vertical, 6)
-                                        .background(on ? Color.primary : Color(uiColor: .secondarySystemFill),
-                                                    in: Capsule())
-                                        .foregroundStyle(on ? Color(uiColor: .systemBackground) : .primary)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.leading, 12)
-                    }
-                } else {
-                    breadcrumb
-                }
+                if isTop { pivotBar } else { breadcrumb }
                 if !nodes.isEmpty { colorMenu.padding(.trailing, 12) }
             }
-            .padding(.vertical, 6)
+        }
+        .padding(.top, 4).padding(.bottom, 6)
+    }
+    // GROUP BY — native glass capsule chips; selection reads as TINTED glass (not a solid
+    // black slab), grouped so they sample light and morph together.
+    private var pivotBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            GlassEffectContainer(spacing: 7) {
+                HStack(spacing: 7) {
+                    ForEach(PulseDim.allCases) { d in
+                        let on = (d == dim)
+                        Button { Haptics.tick(); dim = d } label: {
+                            Text(d.label).font(.system(.subheadline).weight(on ? .semibold : .regular))
+                        }
+                        .buttonStyle(.glass)
+                        .tint(on ? .accentColor : nil)
+                        .buttonBorderShape(.capsule)
+                    }
+                }
+                .padding(.leading, 12)
+            }
+        }
+    }
 
-            Group {
+    var body: some View {
+        Group {
                 if loading && nodes.isEmpty {
                     VStack(spacing: 10) {
                         ProgressView()
@@ -387,6 +391,7 @@ struct MarketTreemapView: View {
                             }
                         }
                         .frame(width: W * zoom, height: canvasH * zoom, alignment: .topLeading)
+                        .padding(.top, topInset)          // content starts below the glass chrome
                         .offset(pan)
                         .frame(width: W, height: VH, alignment: .topLeading)
                         .clipped()
@@ -403,7 +408,7 @@ struct MarketTreemapView: View {
                                     let np = CGSize(width: f.x - (f.x - gPanBase.width) * (zNew / base),
                                                     height: f.y - (f.y - gPanBase.height) * (zNew / base))
                                     zoom = zNew
-                                    pan = clampPan(np, content: CGSize(width: W * zNew, height: canvasH * zNew),
+                                    pan = clampPan(np, content: CGSize(width: W * zNew, height: canvasH * zNew + topInset),
                                                    viewport: geo.size)
                                 }
                                 .onEnded { _ in gZoomBase = nil }
@@ -414,14 +419,14 @@ struct MarketTreemapView: View {
                                             let b = dragBase ?? pan
                                             pan = clampPan(CGSize(width: b.width + d.translation.width,
                                                                   height: b.height + d.translation.height),
-                                                           content: CGSize(width: W * zoom, height: canvasH * zoom),
+                                                           content: CGSize(width: W * zoom, height: canvasH * zoom + topInset),
                                                            viewport: geo.size)
                                         }
                                         .onEnded { d in
                                             let b = dragBase ?? pan
                                             let target = clampPan(CGSize(width: b.width + d.predictedEndTranslation.width,
                                                                          height: b.height + d.predictedEndTranslation.height),
-                                                                  content: CGSize(width: W * zoom, height: canvasH * zoom),
+                                                                  content: CGSize(width: W * zoom, height: canvasH * zoom + topInset),
                                                                   viewport: geo.size)
                                             withAnimation(.easeOut(duration: 0.4)) { pan = target }   // flick momentum
                                             dragBase = nil
@@ -430,10 +435,10 @@ struct MarketTreemapView: View {
                     }
                 }
             }
-        }
-        .task(id: "\(groupBy.rawValue)|\(filters.sorted { $0.key < $1.key }.map { "\($0)=\($1)" }.joined(separator: ","))") {
-            await load()
-        }
+            .overlay(alignment: .top) { chrome }
+            .task(id: "\(groupBy.rawValue)|\(filters.sorted { $0.key < $1.key }.map { "\($0)=\($1)" }.joined(separator: ","))") {
+                await load()
+            }
     }
 
     // The pin path so a drilled treemap says where it is: "Chevrolet › Corvette · by year".
@@ -618,8 +623,8 @@ struct MarketTreemapView: View {
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
             }
             .foregroundStyle(.primary)
-            .padding(.horizontal, 11).padding(.vertical, 6)
-            .background(Color(uiColor: .secondarySystemFill), in: Capsule())
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .glassEffect(.regular.tint(.accentColor.opacity(0.5)).interactive(), in: .capsule)
         }
         .onChange(of: lensRaw) { _, _ in Haptics.tick() }
         .onAppear { Haptics.warm() }
