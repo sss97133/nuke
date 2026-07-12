@@ -405,19 +405,44 @@ Redirecting to vehicle profile...`);
       // URL is new - proceed with scraping
       console.log('New URL - scraping data:', url);
 
-      // Auto-fill from URL is unavailable: scrape-vehicle and simple-scraper are
-      // not deployed (both 404 — docs/ledger/CAPABILITY_MAP.md). Do NOT "fix" this
-      // by calling `ingest` from here: this handler fires on a 1s debounce after
-      // paste, long before the user has stated ownership intent, attached a title
-      // scan, or queued photos — ingest CREATES the vehicle server-side and would
-      // file an owner's car as a third-party discovery (2026-07-12 adversarial
-      // review, .claude/ISSUES.md). Until ingest grows a preview/dry-run mode,
-      // degrade gracefully: manual entry keeps the full submit path (ownership,
-      // title verification, image queue) and the listing URL is saved at submit.
+      // Prefill via the canonical `ingest` in PREVIEW mode: parse-only, writes
+      // NOTHING (.claude/rules/liveness-and-intent.md — intent is captured at
+      // Sign; the vehicle is created by the normal submit path below, which
+      // keeps ownership intent, title verification, and the image queue). Never
+      // call ingest here without preview:true — it would mint the vehicle on a
+      // 1s paste-debounce (2026-07-12 adversarial review, .claude/ISSUES.md).
       let result: any = null;
-      throw new Error(
-        'Auto-fill from this URL is unavailable — fill in the details below. The listing URL will be saved with the vehicle.'
-      );
+
+      const { data: prev, error: prevErr } = await supabase.functions.invoke('ingest', {
+        body: { url, preview: true },
+      });
+      if (prevErr) {
+        throw new Error('Auto-fill from this URL is unavailable — fill in the details below. The listing URL will be saved with the vehicle.');
+      }
+      if (prev?.status === 'duplicate' && prev?.vehicle_id) {
+        // This user already ingested this URL — take them to their vehicle.
+        setIsScrapingUrl(false);
+        if (mode === 'modal' && onClose) onClose();
+        navigate(`/vehicle/${prev.vehicle_id}`);
+        return;
+      }
+      if (prev?.status === 'preview' && (prev.parsed?.year || prev.parsed?.make)) {
+        // Adapter into the legacy scraped-data shape the mapping block below expects.
+        result = {
+          success: true,
+          data: {
+            success: true,
+            year: prev.parsed?.year ?? undefined,
+            make: prev.parsed?.make ?? undefined,
+            model: prev.parsed?.model ?? undefined,
+            price: prev.price ?? undefined,
+            location: prev.location ?? undefined,
+          },
+        };
+      }
+      if (!result) {
+        throw new Error('Auto-fill found nothing usable in this URL — fill in the details below. The listing URL will be saved with the vehicle.');
+      }
 
       // `scrape-vehicle` returns { success: true, ...fields } while `simple-scraper` returns { success: true, data: {...} }
       const payload = result?.data && result?.success ? result.data : result;
