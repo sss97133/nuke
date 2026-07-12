@@ -31,15 +31,15 @@ floor with `CI_WRITE_BASELINE=1`. Never raise it.
 
 The ghost ratchet uses `git grep`, so it sees committed/staged files (exactly what a push carries).
 
-## Rollout status (set up 2026-07-12, warn mode)
+## Rollout status (set up 2026-07-12, ENFORCE mode)
 
 - `scripts/ci/verify.sh` + `scripts/ci/baseline.json` — the gate, seeded and self-tested (a planted
   ghost ref was confirmed to trip it).
-- `.git/hooks/pre-push` — **installed, WARN mode**: it prints the report on every `git push` but does
-  **not** block. This is deliberate so nothing bricks unattended.
-  - Make it block: `CI_ENFORCE=1 git push`, or add `export CI_ENFORCE=1` at the top of the hook, or
-    delete the final `exit 0` line so `verify.sh`'s own exit code stands.
-  - Bypass once: `git push --no-verify`.  Remove: `rm .git/hooks/pre-push`.
+- `.git/hooks/pre-push` — **installed, ENFORCE mode** (runs `CI_ENFORCE=1 verify.sh`): it **blocks**
+  a push that regresses a guardrail, fails typecheck, or commits a secret. Confirmed passing on the
+  current tree.
+  - Bypass once: `git push --no-verify`.  Soften to warn-only: remove `CI_ENFORCE=1` from the hook.
+    Remove entirely: `rm .git/hooks/pre-push`.
 
 ## Opt-in: keep AI agents on rails (not installed — your call)
 
