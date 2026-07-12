@@ -361,29 +361,29 @@ struct MarketTreemapView: View {
                     ContentUnavailableView("No data", systemImage: "square.grid.2x2")
                 } else {
                     GeometryReader { geo in
-                        // The canvas is bigger than the window: taller than the screen (so it
-                        // scrolls) and scaled by pinch zoom (so you dive into dense corners).
-                        // More makes ⇒ taller canvas ⇒ everything stays legible by scrolling.
+                        // A REAL treemap: EVERY cell's area = its exact share of the data, no
+                        // floors, no uniform tail. The canvas is taller than the screen (a
+                        // window you scroll) and grows with pinch zoom — re-laid at each zoom
+                        // so a small make and its label enlarge honestly as you zoom in.
                         let W = geo.size.width
-                        let plan = hybridLayout(nodes, width: W, screenH: geo.size.height)
+                        let canvasW = W * zoom
+                        let canvasH = geo.size.height * 2.6 * zoom
+                        let laid = squarify(nodes, in: CGRect(x: 0, y: 0, width: canvasW, height: canvasH))
                         ScrollView([.vertical, .horizontal], showsIndicators: false) {
                             ZStack(alignment: .topLeading) {
-                                ForEach(plan.cells) { c in
-                                    drillCell(c.node)
-                                        .frame(width: c.rect.width, height: c.rect.height)
-                                        .offset(x: c.rect.minX, y: c.rect.minY)
+                                ForEach(laid, id: \.node.id) { item in
+                                    drillCell(item.node)
+                                        .frame(width: item.rect.width, height: item.rect.height)
+                                        .offset(x: item.rect.minX, y: item.rect.minY)
                                 }
-                                if let seamY = plan.seamY { seam(width: W).offset(y: seamY - 12) }
                             }
-                            .frame(width: W, height: plan.height, alignment: .topLeading)
-                            .scaleEffect(zoom, anchor: .topLeading)
-                            .frame(width: W * zoom, height: plan.height * zoom, alignment: .topLeading)
+                            .frame(width: canvasW, height: canvasH, alignment: .topLeading)
                         }
                         .contentMargins(.bottom, 64, for: .scrollContent)   // clear the search pill
                         .background(Color(uiColor: .systemGroupedBackground))
                         .simultaneousGesture(
                             MagnificationGesture()
-                                .onChanged { v in zoom = min(4, max(1, lastZoom * v)) }
+                                .onChanged { v in zoom = min(6, max(1, lastZoom * v)) }
                                 .onEnded { _ in lastZoom = zoom }
                         )
                     }
