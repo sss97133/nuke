@@ -224,6 +224,69 @@ struct MarketTreemapView: View {
         return (0.299 * r + 0.587 * g + 0.114 * b) > 0.62 ? Color(white: 0.12) : .white
     }
 
+    // ─── Hybrid layout (treemap-expert verdict) ──────────────────────────────────
+    // The head is EXACTLY area-proportional (squarified) down to the count where an
+    // honest cell would fall below a text-legible floor; below that, every make gets a
+    // uniform labeled box with its TRUE count printed, joined by a seam that discloses
+    // where the area channel stops. No fold. Every box holds text. Honest: distortion is
+    // quarantined to a zone that openly renounces area, never silently faked in the head.
+    private struct PlacedCell: Identifiable {
+        let node: TreemapNode; let rect: CGRect; let proportional: Bool
+        var id: String { node.name }
+    }
+    private func hybridLayout(_ ns: [TreemapNode], width W: CGFloat, screenH: CGFloat)
+    -> (cells: [PlacedCell], seamY: CGFloat?, height: CGFloat) {
+        guard let top = ns.first?.count, top > 0, W > 0 else { return ([], nil, screenH) }
+        let minW: CGFloat = 108, minH: CGFloat = 60, cols = 3          // text-legible floor
+        let aFloor = Double(minW * minH)
+        let s = Double(W) * 0.34 * Double(screenH) / Double(top)        // pt² per car, hero-pinned
+        let nStar = aFloor / max(s, 0.0001)                            // crossover count
+        let headEnd = ns.firstIndex { Double($0.count) < nStar } ?? ns.count
+        let head = Array(ns[..<headEnd]), tail = Array(ns[headEnd...])
+
+        var cells: [PlacedCell] = []
+        var hHead: CGFloat = 0
+        if !head.isEmpty {
+            let headSum = head.reduce(0.0) { $0 + Double($1.count) }
+            hHead = CGFloat(s * headSum) / W
+            let laid = squarify(head, in: CGRect(x: 0, y: 0, width: W, height: hHead))
+            cells = laid.map { PlacedCell(node: $0.node, rect: $0.rect, proportional: true) }
+        }
+        // Tail: uniform labeled grid, still strictly count-descending.
+        let cellW = W / CGFloat(cols)
+        for (i, n) in tail.enumerated() {
+            let r = i / cols, c = i % cols
+            cells.append(PlacedCell(node: n,
+                rect: CGRect(x: CGFloat(c) * cellW, y: hHead + CGFloat(r) * minH,
+                             width: cellW, height: minH),
+                proportional: false))
+        }
+        let tailRows = Int(ceil(Double(tail.count) / Double(cols)))
+        let height = hHead + CGFloat(tailRows) * minH
+        return (cells, tail.isEmpty ? nil : hHead, max(height, screenH))
+    }
+
+    // A drill cell (head or tail): tap → deeper, long-press → instrument menu, felt weight.
+    @ViewBuilder private func drillCell(_ n: TreemapNode) -> some View {
+        let s = step(n)
+        NavigationLink(value: s) { cellBody(n) }
+            .buttonStyle(.plain)
+            .contextMenu { cellMenu(n) }
+            .simultaneousGesture(TapGesture().onEnded {
+                if s.groupBy == nil { Haptics.landing() } else { Haptics.drill(depth: s.filters.count - 1) }
+            })
+    }
+    // The honest seam: where exact area stops and equal-sized labels begin.
+    private func seam(width: CGFloat) -> some View {
+        VStack(spacing: 3) {
+            Rectangle().fill(Color.secondary.opacity(0.35)).frame(height: 0.5)
+            Text("equal size below — the number is the true count")
+                .font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 8)
+        }
+        .frame(width: width)
+    }
+
     // The instrument menu — every make/model/cohort is a thing you can watch, save, share.
     @ViewBuilder private func cellMenu(_ n: TreemapNode) -> some View {
         let watched = lists.watched.contains(n.name)
@@ -301,23 +364,20 @@ struct MarketTreemapView: View {
                         // The canvas is bigger than the window: taller than the screen (so it
                         // scrolls) and scaled by pinch zoom (so you dive into dense corners).
                         // More makes ⇒ taller canvas ⇒ everything stays legible by scrolling.
-                        let hFactor = min(2.0, max(1.0, Double(nodes.count) / 60.0))
-                        let base = CGSize(width: geo.size.width, height: geo.size.height * hFactor)
-                        let canvas = CGSize(width: base.width * zoom, height: base.height * zoom)
-                        // Fold is zoom-adaptive: it recomputes against the (growing) canvas, so
-                        // pinching in dissolves the doorway and reveals the tail.
-                        let packed = pack(nodes, canvas: Double(canvas.width * canvas.height))
-                        let draw = packed.tail.isEmpty ? packed.head : packed.head + [tailNode(packed.tail)]
-                        let laid = squarify(draw, in: CGRect(origin: .zero, size: canvas))
+                        let W = geo.size.width
+                        let plan = hybridLayout(nodes, width: W, screenH: geo.size.height)
                         ScrollView([.vertical, .horizontal], showsIndicators: false) {
                             ZStack(alignment: .topLeading) {
-                                ForEach(laid, id: \.node.id) { item in
-                                    cell(for: item.node, tail: packed.tail)
-                                        .frame(width: item.rect.width, height: item.rect.height)
-                                        .offset(x: item.rect.minX, y: item.rect.minY)
+                                ForEach(plan.cells) { c in
+                                    drillCell(c.node)
+                                        .frame(width: c.rect.width, height: c.rect.height)
+                                        .offset(x: c.rect.minX, y: c.rect.minY)
                                 }
+                                if let seamY = plan.seamY { seam(width: W).offset(y: seamY - 12) }
                             }
-                            .frame(width: canvas.width, height: canvas.height, alignment: .topLeading)
+                            .frame(width: W, height: plan.height, alignment: .topLeading)
+                            .scaleEffect(zoom, anchor: .topLeading)
+                            .frame(width: W * zoom, height: plan.height * zoom, alignment: .topLeading)
                         }
                         .contentMargins(.bottom, 64, for: .scrollContent)   // clear the search pill
                         .background(Color(uiColor: .systemGroupedBackground))
