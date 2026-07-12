@@ -20,30 +20,32 @@ the build number — never bump it).
 density) + a make filter ("where are the most X") — DONE, keep it. **Pulse** currently
 renders `MarketTreemapView` and it is the unresolved piece.
 
-### The hard-won lesson (do not repeat it)
-Across this session I built a treemap, a donut/rose, an isotype ("Fleet"), and a spiral
-("nautilus"). **Every one failed for the same reason: they each encode exactly ONE
-number — count per make — in decorative geometry. That's a ranked bar chart in a
-costume. Chartjunk.** "Chevrolet > Ford" is not an insight, so no amount of fancy
-geometry made them intelligent.
+### The hard-won lesson (RESOLVED — this is the conclusion, don't relitigate it)
+The answer is a **treemap** — the standard, industry-grade market-heatmap treemap
+(finviz convention). It's live: `MarketTreemapView` renders it, complete (ALL makes, no
+"Other" bucket), area ∝ count, magnitude ramp, labels only where they fit, and it drills.
 
-**DO NOT build another single-variable magnitude shape. Specifically do NOT build a
-treemap, pie/donut, spiral, or isotype for this.** (The four dead attempts —
-Constellation, RadialBloom, Fleet, Spiral — were already deleted; the lesson is in this
-paragraph, not the code.)
+The mistake this session was **ditching the treemap to chase novelty.** Skylar's notes
+on it (kill the "Other" blob, fix proportions, drop the bad images) were fixes to
+*finish* it — I misread them as "start over" and burned hours on a donut, an isotype, a
+spiral, and a scatter. Skylar's ruling: **"good = the collective industry standard —
+professional / institutional / government / industry-grade." Do NOT invent novel forms.
+Execute the standard graph rigorously.** All four novelty attempts were rejected and
+deleted; the scatter ("MarketFieldView", still in the tree) was also rejected —
+`MarketFieldView.swift` can be deleted.
 
-### What "intelligent" means here
-A graph that reveals a **relationship you can't get from a sorted list** — which means
-**position** (the highest-accuracy visual channel; Cleveland & McGill) on **two real
-market variables at once**, points sized by inventory. The revealing pairs:
-- **volume × velocity** (inventory vs turnover / how fast it sells) → *where the action
-  is* — the trader's pulse. **(Default choice unless Skylar says otherwise.)**
-- **price × volume** → market structure: cheap commodity mass vs rare-and-dear frontier.
-- **typical-year × price** → the depreciation-into-appreciation curve.
-
-The Constellation's era-axis was the one right instinct in the whole exploration
-(position by a real variable); it was abandoned only because its data query was 14s.
-**Fix the data, don't abandon the idea.**
+### What's left to make it institutional-grade (finish THIS, don't restart)
+1. **Color a SECOND variable** (currently color = magnitude, redundant with area). finviz
+   colors by performance. The data is ready: `market_position(p_dimension,p_limit)` (fast
+   matview `mv_market_position`, ~0.3s) returns per make `{volume, sell_through, demand,
+   avg_year, median_price}`. Color cells by **sell_through (velocity)** — a diverging
+   cold→hot ramp (stagnant→liquid) — so the treemap encodes TWO real variables
+   (area = inventory, color = how fast it moves). That is the full market heatmap.
+   (`mv_market_position` is make-only; extend it to model/year/etc. for the other pivot
+   dims, or fall back to the magnitude ramp on dims without velocity.)
+2. **Polish**: de-collide the few labels that overlap in dense regions; a subtle
+   "drill/zoom" cue for the tiny tail cells.
+3. **Keep** the pivot (9 dims) + recursive drill — both work.
 
 ### Data — do this FIRST (the 14s trap)
 `market_pulse(p_dimension, p_limit)` → `{name, count, value, median_price, image_url}`

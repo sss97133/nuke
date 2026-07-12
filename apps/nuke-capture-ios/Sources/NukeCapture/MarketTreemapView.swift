@@ -61,6 +61,11 @@ func nextGroupBy(after filters: [String: String]) -> String? {
 
 /// Params for market_pulse (top-level) and market_pulse_filtered (drilled).
 private struct MarketPulseParams: Encodable { let p_dimension: String; let p_limit: Int }
+/// market_position — carries the velocity metric (sell_through) for the heatmap color.
+private struct PositionRow: Decodable {
+    let name: String; let volume: Int; let sell_through: Int
+    let demand: Int?; let avg_year: Int?; let median_price: Int?
+}
 private struct PulseFilterParams: Encodable {
     let p_group_by: String
     let p_filters: [String: String]
@@ -97,6 +102,29 @@ struct MarketTreemapView: View {
         let s = max(0, min(1, t)).squareRoot()
         func mix(_ a: Double, _ b: Double) -> Double { a + (b - a) * s }
         return Color(red: mix(0.95, 0.13), green: mix(0.95, 0.15), blue: mix(0.96, 0.19))
+    }
+
+    // Per-make sell-through % (velocity), keyed by name — drives the heatmap color when
+    // available (make dim). finviz colors by performance, not size; here color = how fast
+    // the segment actually moves. Empty for dims without a velocity metric.
+    @State private var velocity: [String: Int] = [:]
+
+    // Diverging heatmap: stagnant (low sell-through) = muted red → slate → liquid = green.
+    // All tones dark enough for white text. Anchored on a fixed 0–55% scale so color means
+    // the same thing regardless of which makes are on screen.
+    private func velocityColor(_ pct: Int) -> Color {
+        let t = max(0, min(1, Double(pct) / 55.0))
+        func m(_ a: Double, _ b: Double, _ u: Double) -> Double { a + (b - a) * u }
+        if t < 0.5 { let u = t / 0.5
+            return Color(red: m(0.62, 0.34, u), green: m(0.20, 0.36, u), blue: m(0.22, 0.40, u)) }
+        let u = (t - 0.5) / 0.5
+        return Color(red: m(0.34, 0.13, u), green: m(0.36, 0.52, u), blue: m(0.40, 0.30, u))
+    }
+    // The cell's fill + whether text should be light. Velocity heatmap where we have it,
+    // else the neutral magnitude ramp.
+    private func cellColor(_ n: TreemapNode) -> (fill: Color, dark: Bool) {
+        if let s = velocity[n.name] { return (velocityColor(s), true) }
+        let t = magnitude(n.count); return (rampColor(t), t.squareRoot() > 0.46)
     }
 
     var body: some View {
@@ -160,6 +188,7 @@ struct MarketTreemapView: View {
                         }
                         .padding(1)
                         .background(Color(uiColor: .systemGroupedBackground))
+                        .overlay(alignment: .topTrailing) { if !velocity.isEmpty { heatLegend } }
                         tailFooter
                     }
                 }
@@ -195,8 +224,7 @@ struct MarketTreemapView: View {
     // stat spans the cell height instead of floating in a void. Contrast-aware text,
     // single-line name (scaled to fit — never a mid-word hyphen).
     @ViewBuilder private func cellBody(_ n: TreemapNode) -> some View {
-        let t = magnitude(n.count)
-        let dark = t.squareRoot() > 0.46
+        let (fill, dark) = cellColor(n)
         GeometryReader { g in
             let big = g.size.width >= 144 && g.size.height >= 92
             let mid = g.size.height >= 50 && g.size.width >= 80
@@ -217,10 +245,25 @@ struct MarketTreemapView: View {
             }
             .padding(big ? 11 : 6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .background(rampColor(t))
+            .background(fill)
             .overlay(Rectangle().stroke(.black.opacity(0.06), lineWidth: 0.5))
             .contentShape(Rectangle())
         }
+    }
+
+    // What the color means: sell-through velocity, slow (red) → fast (green).
+    private var heatLegend: some View {
+        HStack(spacing: 5) {
+            Text("SLOW").font(.system(size: 8, weight: .semibold, design: .monospaced))
+            LinearGradient(colors: [velocityColor(5), velocityColor(28), velocityColor(52)],
+                           startPoint: .leading, endPoint: .trailing)
+                .frame(width: 40, height: 5).clipShape(Capsule())
+            Text("FAST").font(.system(size: 8, weight: .semibold, design: .monospaced))
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .background(.black.opacity(0.35), in: Capsule())
+        .padding(8)
     }
 
     // The tail as an honest one-line footer — never a proportional block that would
@@ -241,6 +284,22 @@ struct MarketTreemapView: View {
     private func load() async {
         loading = true; failed = false
         do {
+            // The un-pinned MAKE view is the full heatmap: area = inventory, color =
+            // sell-through velocity (market_position). Every other lens is the neutral
+            // magnitude ramp (no velocity metric baked for those dims yet).
+            if isTop && groupBy == .make {
+                let prows: [PositionRow] = try await SupabaseService.client
+                    .rpc("market_position", params: MarketPulseParams(p_dimension: "make", p_limit: 250))
+                    .execute().value
+                let sorted = prows.filter { $0.volume > 0 }.sorted { $0.volume > $1.volume }
+                nodes = sorted.map { TreemapNode(name: $0.name, count: $0.volume, value: $0.volume,
+                                                 median_price: $0.median_price, sold_count: nil,
+                                                 avg_year: $0.avg_year, image_url: nil) }
+                var vel = [String: Int](); for r in sorted { vel[r.name] = r.sell_through }
+                velocity = vel
+                tail = nil; loading = false
+                return
+            }
             let rows: [TreemapNode]
             // Fast matview for the un-pinned landing (except model, whose matview name is
             // "Make Model" and can't be re-filtered); everything drilled goes live+filtered.
@@ -257,6 +316,7 @@ struct MarketTreemapView: View {
             // Industry standard (finviz market heatmap): show EVERY category, sized to
             // scale — no "Other" bucket, no data hidden. The power-law tail is small
             // cells (that's the truth), labeled only where they fit; drill for the rest.
+            velocity = [:]
             nodes = rows.filter { $0.count > 0 }.sorted { $0.count > $1.count }
             tail = nil
             loading = false
