@@ -27,13 +27,17 @@ struct TreemapNode: Decodable, Identifiable, Hashable {
 /// The pivot dimension — the same market grouped a different way. "Metros" used to be
 /// one of these frozen into its own tab; here it's just one choice among five.
 enum PulseDim: String, CaseIterable, Identifiable {
-    case make, model, year, metro, dow
+    case make, model, year, price, mileage, color, popularity, metro, dow
     var id: String { rawValue }
     var label: String {
         switch self {
         case .make: return "Make"
         case .model: return "Model"
         case .year: return "Year"
+        case .price: return "Price"
+        case .mileage: return "Mileage"
+        case .color: return "Color"
+        case .popularity: return "Popularity"
         case .metro: return "Metro"
         case .dow: return "Day"
         }
@@ -78,12 +82,26 @@ struct MarketTreemapView: View {
     var body: some View {
         VStack(spacing: 0) {
             if isTop {
-                // The pivot: one market, grouped by whatever the question needs.
-                Picker("Group by", selection: $dim) {
-                    ForEach(PulseDim.allCases) { Text($0.label).tag($0) }
+                // The pivot: one market, grouped by whatever the question needs — a
+                // scrolling bar of dimensions (too many now for a segmented control).
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 7) {
+                        ForEach(PulseDim.allCases) { d in
+                            let on = (d == dim)
+                            Button { dim = d } label: {
+                                Text(d.label)
+                                    .font(.system(.subheadline).weight(on ? .semibold : .regular))
+                                    .padding(.horizontal, 13).padding(.vertical, 6)
+                                    .background(on ? Color.primary : Color(uiColor: .secondarySystemFill),
+                                                in: Capsule())
+                                    .foregroundStyle(on ? Color(uiColor: .systemBackground) : .primary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 12)
                 }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 12).padding(.top, 4).padding(.bottom, 6)
+                .padding(.top, 4).padding(.bottom, 6)
             } else {
                 breadcrumb
             }
@@ -162,17 +180,19 @@ struct MarketTreemapView: View {
                     CachedAsyncImage(url: NukeImage.thumb(url, width: 320)) { img in
                         img.resizable().scaledToFill()
                     } placeholder: {
-                        Color(uiColor: .secondarySystemGroupedBackground)
+                        Color(uiColor: .systemGray5)
                     }
                     .frame(width: g.size.width, height: g.size.height)
                     .clipped()
                     // Scrim: dark at the top-left where the label sits, clear below.
-                    LinearGradient(colors: [.black.opacity(0.65), .black.opacity(0.15), .clear],
+                    LinearGradient(colors: [.black.opacity(0.6), .black.opacity(0.12), .clear],
                                    startPoint: .top, endPoint: .center)
                 } else {
-                    Color(uiColor: .secondarySystemGroupedBackground)
+                    Color(uiColor: .systemGray5)
                 }
 
+                // Label + inventory count only. No median/avg price — a group aggregate
+                // isn't a defensible number; the count is what the box area already means.
                 VStack(alignment: .leading, spacing: 2) {
                     Text(n.name)
                         .font(.system(.subheadline).weight(.semibold))
@@ -181,14 +201,10 @@ struct MarketTreemapView: View {
                         .minimumScaleFactor(0.7)
                         .shadow(color: hasImg ? .black.opacity(0.5) : .clear, radius: 1, y: 0.5)
                     if !tight {
-                        Text(n.count.formatted())
+                        Text("\(n.count.formatted()) listed")
                             .font(.system(.caption, design: .monospaced))
                             .foregroundStyle(hasImg ? .white.opacity(0.9) : Color.secondary)
-                        if let p = n.median_price, p > 0, g.size.height > 76 {
-                            Text("$\(p.formatted())")
-                                .font(.system(.caption2, design: .monospaced))
-                                .foregroundStyle(hasImg ? .white.opacity(0.85) : Color.secondary)
-                        }
+                            .shadow(color: hasImg ? .black.opacity(0.5) : .clear, radius: 1, y: 0.5)
                     }
                     Spacer(minLength: 0)
                 }
