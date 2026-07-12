@@ -58,11 +58,27 @@ strengthening, and does it feed the loop?**
 | TRACK | Watch/Save (UserDefaults) + badges | server-side watchlist; change detection + alerts ("your cohort moved"); pin-to-widget |
 | USE | ShareLink text stub | cohort instrument header (designed); market cards (images); reports; comps-for-sale flow |
 
+## The identity law (added 2026-07-12, Skylar: "if the data is bad we fix the data")
+
+Pivots group by **canonical identity, never raw strings**. Measured: raw `model` has
+113,327 distinct strings (junk — trim/casing/free-text) vs `canonical_models` = 3,454
+real nameplates; raw `make` 8,962 vs ~300 real. View-side caps (top-300) were masking
+this and are banned — "all models" means all 3,454 canonical nameplates, which render
+uncapped. The unresolved remainder (canonical make 65%, normalized model 51% today)
+appears as ONE honest "unresolved identity · N cars" region — simultaneously true
+rendering and the visible work queue that the resolution organs (alias matching, image
+analysis, dossier analysis) burn down. The graph exposes the data debt; the data fix
+improves the graph. Never patch taxonomy in the view.
+
 ## Build order
 
-1. FIND: wire remaining live lenses (dispersion, demand) — data already in prod RPCs.
-2. TRACK: server-side watchlist + the BaT momentum matview (sell-through/median by month
+1. **Canonical pivot rebuild**: mv_market_pulse/mv_market_position on canonical
+   identity + "unresolved" group; alias-match backfill (mechanical first pass), then
+   image/dossier resolution for the hard tail. (ISSUES.md entry filed.)
+2. FIND: wire remaining live lenses (dispersion, demand) — data already in prod RPCs;
+   bell-curve distribution views (price_histogram RPC live, 20260712130000).
+3. TRACK: server-side watchlist + the BaT momentum matview (sell-through/median by month
    per cohort — the first honest movement feed) → "what changed" for watched cohorts.
-3. USE: cohort header card → shareable market card (the first content artifact).
-4. EXPLORE polish: seamless zoom-drill ZUI, year histogram.
-5. Marketplace lifecycle capture (extends movement beyond the BaT slice).
+4. USE: cohort header card → shareable market card (the first content artifact).
+5. EXPLORE polish: seamless zoom-drill ZUI, year histogram.
+6. Marketplace lifecycle capture (extends movement beyond the BaT slice).
