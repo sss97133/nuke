@@ -70,6 +70,25 @@ year-curve is the yield curve. Condition/provenance = credit quality; receipts/p
 are the underwriting file. No derivatives exist → hammer_predictions is the closest
 thing this asset class has to a futures market.
 
+## The Data Foundation (Skylar, 2026-07-12: "paths aren't enough — prices, bids, bid
+## velocity, comments, images — it's all there; all our sources should be feeding our db")
+
+Measured: the foundation is largely CAPTURED but DISCONNECTED from the analyst layer —
+**auction_comments 13.9M rows** (BaT bids are timestamped comment events → bid-by-bid
+velocity is derivable from held data), **vehicle_images 39.9M**, **listing_page_snapshots
+628K raw page archives** (deepen extraction from disk, never re-fetch), observations 7.8M.
+The program, gated on the write-path fix (throughput):
+1. **Bid-timeline extraction** — structured bid events (ts, amount, bidder) from
+   auction_comments + snapshots → bid velocity/late-bid dynamics per auction → feeds
+   the liquidity panel and hammer predictions.
+2. **Re-extraction passes over listing_page_snapshots** — pull what the first pass
+   skipped (bid ladders, watcher history, options/spec blocks) from already-saved raw.
+3. **Feed audit** — for every source in `vehicles.source` (50+): live cron vs one-time
+   load vs dead; probe-before-schedule; success = rows landed (fleet rules). Marketplace
+   lifecycle capture rides this.
+Third instance tonight of the pattern: the organ existed (unsold denominator, canonical
+taxonomy, now comments/images/raw). ALWAYS inventory before acquiring.
+
 ## The refactor law (Skylar, 2026-07-12: "bat_listings probably needs to be refactored")
 
 Agreed on the need, constrained on the method: **refactor by reading layer, never by
