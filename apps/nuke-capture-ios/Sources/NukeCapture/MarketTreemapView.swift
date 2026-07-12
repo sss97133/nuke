@@ -25,6 +25,29 @@ struct TreemapNode: Decodable, Identifiable, Hashable {
     var id: String { name }
 }
 
+/// The COLOR LENS — what the cell fill encodes. Area is always inventory (the one thing
+/// measured cleanly); color is a SELECTABLE second variable so the map shows what the
+/// data can do. Only lenses we can defend from real coverage: Era (year, 92%), Price
+/// (sold comps, 74%), Size (inventory, ~100%). No fake "velocity" — sold-flag coverage
+/// is a data artifact, not liquidity (241/5185 Mustangs flagged sold), so it's gone.
+enum ColorLens: String, CaseIterable, Identifiable {
+    case size, era, price
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .size: return "Size"
+        case .era: return "Era"
+        case .price: return "Price"
+        }
+    }
+    var lo: String {
+        switch self { case .size: return "FEW"; case .era: return "CLASSIC"; case .price: return "VALUE" }
+    }
+    var hi: String {
+        switch self { case .size: return "MANY"; case .era: return "MODERN"; case .price: return "PREMIUM" }
+    }
+}
+
 /// The pivot dimension — the same market grouped a different way. "Metros" used to be
 /// one of these frozen into its own tab; here it's just one choice among five.
 enum PulseDim: String, CaseIterable, Identifiable {
@@ -80,6 +103,11 @@ struct MarketTreemapView: View {
     var fixedGroupBy: PulseDim? = nil
 
     @State private var dim: PulseDim = .make
+    // The color lens — persisted so the market keeps reading the same variable across
+    // launches. Selection is haptic (the whole point: the metric IS a control).
+    @AppStorage("pulse.colorLens") private var lensRaw: String = ColorLens.era.rawValue
+    private var lens: ColorLens { ColorLens(rawValue: lensRaw) ?? .era }
+    private let pick = UISelectionFeedbackGenerator()
     @State private var nodes: [TreemapNode] = []
     @State private var loading = true
     @State private var failed = false
@@ -110,24 +138,58 @@ struct MarketTreemapView: View {
     @StateObject private var lists = PulseLists.shared
     private let haptic = UIImpactFeedbackGenerator(style: .medium)
 
-    // Diverging heatmap: stagnant (low sell-through) = muted red → slate → liquid = green.
-    // All tones dark enough for white text. Anchored on a fixed 0–55% scale so color means
-    // the same thing regardless of which makes are on screen.
-    private func velocityColor(_ pct: Int) -> Color {
-        let t = max(0, min(1, Double(pct) / 55.0))
-        func m(_ a: Double, _ b: Double, _ u: Double) -> Double { a + (b - a) * u }
-        if t < 0.5 { let u = t / 0.5
-            return Color(red: m(0.62, 0.34, u), green: m(0.20, 0.36, u), blue: m(0.22, 0.40, u)) }
-        let u = (t - 0.5) / 0.5
-        return Color(red: m(0.34, 0.13, u), green: m(0.36, 0.52, u), blue: m(0.40, 0.30, u))
+    // ─── Color lens: fill encodes the SELECTED variable (area is always inventory). ──
+    // Price domain is log-scaled across what's on screen (prices span 3 orders of
+    // magnitude); era is a fixed classic→modern window so the hue means the same thing
+    // regardless of which cohort is shown.
+    private var priceLogs: [Double] { nodes.compactMap { $0.median_price }.filter { $0 > 0 }.map { log10(Double($0)) } }
+    private var priceLo: Double { priceLogs.min() ?? 3 }
+    private var priceHi: Double { priceLogs.max() ?? 5 }
+
+    /// Normalized [0,1] position of a node on the current lens — nil when the node lacks
+    /// the datum (→ a neutral cell, never a fabricated color).
+    private func lensT(_ n: TreemapNode) -> Double? {
+        switch lens {
+        case .size:
+            return magnitude(n.count)
+        case .era:
+            guard let y = n.avg_year else { return nil }
+            return max(0, min(1, (Double(y) - 1955) / (2010 - 1955)))
+        case .price:
+            guard let p = n.median_price, p > 0, priceHi > priceLo else {
+                return (n.median_price ?? 0) > 0 ? 0.5 : nil
+            }
+            return max(0, min(1, (log10(Double(p)) - priceLo) / (priceHi - priceLo)))
+        }
     }
-    // The cell's fill + whether text should be light. Velocity heatmap where we have it,
-    // else the neutral magnitude ramp.
-    private func cellColor(_ n: TreemapNode) -> (fill: Color, dark: Bool) {
-        if let s = n.sell_through { return (velocityColor(s), true) }
-        let t = magnitude(n.count); return (rampColor(t), t.squareRoot() > 0.46)
+
+    /// Each lens its own ramp — distinct enough that switching is instantly visible.
+    private func lensRamp(_ t: Double) -> Color {
+        let s = max(0, min(1, t))
+        func m(_ a: Double, _ b: Double) -> Double { a + (b - a) * s }
+        switch lens {
+        case .size:  // pale slate → deep ink (sequential, redundant-by-design with area)
+            let q = s.squareRoot()
+            func mq(_ a: Double, _ b: Double) -> Double { a + (b - a) * q }
+            return Color(red: mq(0.90, 0.13), green: mq(0.91, 0.15), blue: mq(0.93, 0.19))
+        case .era:   // classic warm rust → modern cool teal
+            return Color(red: m(0.74, 0.16), green: m(0.44, 0.44), blue: m(0.20, 0.62))
+        case .price: // value cool green → premium warm gold
+            return Color(red: m(0.24, 0.82), green: m(0.46, 0.60), blue: m(0.38, 0.16))
+        }
     }
-    private var hasVelocity: Bool { nodes.contains { $0.sell_through != nil } }
+
+    /// Cell fill for the current lens; neutral grey when the datum is missing.
+    private func cellFill(_ n: TreemapNode) -> Color {
+        guard let t = lensT(n) else { return Color(white: 0.45) }
+        return lensRamp(t)
+    }
+    /// Contrast-correct text for any fill (luminance test) — works across every ramp.
+    private func fg(on fill: Color) -> Color {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(fill).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return (0.299 * r + 0.587 * g + 0.114 * b) > 0.62 ? Color(white: 0.12) : .white
+    }
 
     // The instrument menu — every make/model/cohort is a thing you can watch, save, share.
     @ViewBuilder private func cellMenu(_ n: TreemapNode) -> some View {
@@ -149,7 +211,7 @@ struct MarketTreemapView: View {
     }
     private func shareText(_ n: TreemapNode) -> String {
         var s = "\(n.name) — \(n.count.formatted()) in the market"
-        if let v = n.sell_through { s += " · \(v)% sell-through" }
+        if let y = n.avg_year { s += " · typ. '\(String(format: "%02d", y % 100))" }
         return s
     }
 
@@ -179,6 +241,8 @@ struct MarketTreemapView: View {
             } else {
                 breadcrumb
             }
+
+            if !nodes.isEmpty { lensSelector }
 
             Group {
                 if loading && nodes.isEmpty {
@@ -216,7 +280,6 @@ struct MarketTreemapView: View {
                         }
                         .padding(1)
                         .background(Color(uiColor: .systemGroupedBackground))
-                        .overlay(alignment: .topTrailing) { if hasVelocity { heatLegend } }
                         tailFooter
                     }
                 }
@@ -252,22 +315,22 @@ struct MarketTreemapView: View {
     // stat spans the cell height instead of floating in a void. Contrast-aware text,
     // single-line name (scaled to fit — never a mid-word hyphen).
     @ViewBuilder private func cellBody(_ n: TreemapNode) -> some View {
-        let (fill, dark) = cellColor(n)
+        let fill = cellFill(n)
+        let ink = fg(on: fill)
         GeometryReader { g in
             let big = g.size.width >= 144 && g.size.height >= 92
             let mid = g.size.height >= 50 && g.size.width >= 80
-            let fg: Color = dark ? .white : Color(white: 0.12)
             // Name + number as one block, vertically CENTERED — balanced whitespace on
             // any cell shape (no one-sided void in tall-thin cells).
             VStack(alignment: .leading, spacing: big ? 4 : 1) {
                 Text(n.name)
                     .font(.system(big ? .title3 : (mid ? .subheadline : .caption)).weight(.semibold))
                     .lineLimit(1).minimumScaleFactor(0.45).allowsTightening(true)
-                    .foregroundStyle(fg)
+                    .foregroundStyle(ink)
                 if mid {
                     Text(n.count.formatted())
                         .font(.system(size: big ? 34 : 15, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(fg.opacity(0.9))
+                        .foregroundStyle(ink.opacity(0.9))
                         .lineLimit(1).minimumScaleFactor(0.5)
                 }
             }
@@ -277,7 +340,7 @@ struct MarketTreemapView: View {
             .overlay(alignment: .topTrailing) {
                 if mid, lists.watched.contains(n.name) || lists.saved.contains(n.name) {
                     Image(systemName: lists.watched.contains(n.name) ? "eye.fill" : "bookmark.fill")
-                        .font(.system(size: 8)).foregroundStyle(dark ? .white : Color(white: 0.2))
+                        .font(.system(size: 8)).foregroundStyle(ink)
                         .padding(5)
                 }
             }
@@ -286,19 +349,43 @@ struct MarketTreemapView: View {
         }
     }
 
-    // What the color means: sell-through velocity, slow (red) → fast (green).
-    private var heatLegend: some View {
-        HStack(spacing: 5) {
-            Text("SLOW").font(.system(size: 8, weight: .semibold, design: .monospaced))
-            LinearGradient(colors: [velocityColor(5), velocityColor(28), velocityColor(52)],
-                           startPoint: .leading, endPoint: .trailing)
-                .frame(width: 40, height: 5).clipShape(Capsule())
-            Text("FAST").font(.system(size: 8, weight: .semibold, design: .monospaced))
+    // The color-lens selector: what the fill encodes. Haptic on every pick — the metric
+    // is the instrument. Sits under the pivot so it reads "group by X · color by Y".
+    private var lensSelector: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "paintpalette").font(.system(size: 11)).foregroundStyle(.secondary)
+            ForEach(ColorLens.allCases) { l in
+                let on = (l == lens)
+                Button {
+                    pick.selectionChanged()
+                    lensRaw = l.rawValue
+                } label: {
+                    Text(l.label)
+                        .font(.system(.caption).weight(on ? .semibold : .regular))
+                        .padding(.horizontal, 11).padding(.vertical, 4)
+                        .background(on ? Color.primary.opacity(0.9) : Color(uiColor: .tertiarySystemFill),
+                                    in: Capsule())
+                        .foregroundStyle(on ? Color(uiColor: .systemBackground) : .primary)
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer(minLength: 0)
+            legendStrip
         }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 8).padding(.vertical, 4)
-        .background(.black.opacity(0.35), in: Capsule())
-        .padding(8)
+        .padding(.horizontal, 12).padding(.bottom, 6)
+        .onAppear { pick.prepare() }
+    }
+
+    // The live legend — endpoints + the current lens's actual ramp.
+    private var legendStrip: some View {
+        HStack(spacing: 4) {
+            Text(lens.lo).font(.system(size: 8, weight: .semibold, design: .monospaced))
+            LinearGradient(colors: [lensRamp(0), lensRamp(0.5), lensRamp(1)],
+                           startPoint: .leading, endPoint: .trailing)
+                .frame(width: 34, height: 5).clipShape(Capsule())
+            Text(lens.hi).font(.system(size: 8, weight: .semibold, design: .monospaced))
+        }
+        .foregroundStyle(.secondary)
     }
 
     // The tail as an honest one-line footer — never a proportional block that would
