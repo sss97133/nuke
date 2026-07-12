@@ -14,6 +14,7 @@ const Extension = React.lazy(() => import('../pages/Extension'));
 // Search: lazy-loaded (chunk retry logic in main.tsx handles failures)
 const Search = React.lazy(() => import('../pages/Search'));
 const BrowseVehicles = React.lazy(() => import('../pages/BrowseVehicles'));
+const LiveFloor = React.lazy(() => import('../live/LiveFloor'));
 // Cohort terminal — Bloomberg-for-a-cohort (year-make-model landing)
 const CohortTerminal = React.lazy(() => import('../pages/CohortTerminal'));
 // R&D: white-label / "make this my app" showroom
@@ -98,7 +99,6 @@ const PersonalPhotoLibrary = React.lazy(() => import('../pages/PersonalPhotoLibr
 const ApiKeysPage = React.lazy(() => import('../pages/settings/ApiKeysPage'));
 const AIAccessPage = React.lazy(() => import('../pages/settings/AIAccessPage'));
 const ConnectedAgentsPage = React.lazy(() => import('../pages/settings/ConnectedAgentsPage'));
-const WebhooksPage = React.lazy(() => import('../pages/settings/WebhooksPage'));
 const UsageDashboardPage = React.lazy(() => import('../pages/settings/UsageDashboardPage'));
 const DevelopersPage = React.lazy(() => import('../pages/developers'));
 const ApiLanding = React.lazy(() => import('../pages/ApiLanding'));
@@ -179,6 +179,7 @@ export const DomainRoutes = () => {
         <Route path="/search" element={<Search />} />
         <Route path="/cohort/:make/:model/:year" element={<CohortTerminal />} />
         <Route path="/browse" element={<BrowseVehicles />} />
+        <Route path="/live" element={<LiveFloor />} />
         <Route path="/map" element={<MapPage />} />
         <Route path="/valuation" element={<Valuation />} />
         {/* Public auction listings */}
@@ -280,7 +281,6 @@ export const DomainRoutes = () => {
             {/* Where the user brings their own compute for the in-app agent. */}
             <Route path="/settings/ai" element={<AIAccessPage />} />
             <Route path="/settings/connected-agents" element={<ConnectedAgentsPage />} />
-            <Route path="/settings/webhooks" element={<WebhooksPage />} />
             <Route path="/settings/usage" element={<UsageDashboardPage />} />
             <Route path="/developers/dashboard" element={<DeveloperDashboard />} />
             <Route path="/business/settings" element={<BusinessSettings />} />

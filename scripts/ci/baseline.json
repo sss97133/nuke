@@ -2,7 +2,7 @@
   "generated": "2026-07-12",
   "note": "Ratchet floor for scripts/ci/verify.sh. The gate fails only when a count EXCEEDS these. Ratchet DOWN as violations are burned; never raise.",
   "guardrails": {
-    "no-dead-asset-references": { "errors": 18, "note": "ghost-table refs on live paths. 12 = webhooks (pending strip, NEEDS_SKYLAR #2); 6 = vehicle_transactions (guarded crash-safe, half-built)." },
+    "no-dead-asset-references": { "errors": 6, "note": "ghost-table refs on live paths. 12 = webhooks (pending strip, NEEDS_SKYLAR #2); 6 = vehicle_transactions (guarded crash-safe, half-built)." },
     "no-raw-fetch":             { "violations": 144, "note": "external fetches bypassing archiveFetch. Burn down opportunistically." },
     "no-raw-testimony-insert":  { "violations": 2, "note": "raw writes to testimony tables. Should trend to 0." },
     "no-committed-secrets":     { "violations": 0, "note": "HARD zero — any hit blocks regardless of mode." },
