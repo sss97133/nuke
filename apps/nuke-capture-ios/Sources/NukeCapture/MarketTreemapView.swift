@@ -134,7 +134,6 @@ struct MarketTreemapView: View {
     @State private var gZoomBase: CGFloat? = nil   // zoom at pinch start
     @State private var gPanBase: CGSize = .zero    // pan at pinch start
     @State private var dragBase: CGSize? = nil     // pan at drag start
-    private let topInset: CGFloat = 96             // reserve space under the floating glass chrome
     @State private var nodes: [TreemapNode] = []
     @State private var loading = true
     @State private var failed = false
@@ -410,7 +409,6 @@ struct MarketTreemapView: View {
                             }
                         }
                         .frame(width: W * zoom, height: canvasH * zoom, alignment: .topLeading)
-                        .padding(.top, topInset)          // content starts below the glass chrome
                         .offset(pan)
                         .frame(width: W, height: VH, alignment: .topLeading)
                         .clipped()
@@ -427,7 +425,7 @@ struct MarketTreemapView: View {
                                     let np = CGSize(width: f.x - (f.x - gPanBase.width) * (zNew / base),
                                                     height: f.y - (f.y - gPanBase.height) * (zNew / base))
                                     zoom = zNew
-                                    pan = clampPan(np, content: CGSize(width: W * zNew, height: canvasH * zNew + topInset),
+                                    pan = clampPan(np, content: CGSize(width: W * zNew, height: canvasH * zNew),
                                                    viewport: geo.size)
                                 }
                                 .onEnded { _ in gZoomBase = nil }
@@ -438,14 +436,14 @@ struct MarketTreemapView: View {
                                             let b = dragBase ?? pan
                                             pan = clampPan(CGSize(width: b.width + d.translation.width,
                                                                   height: b.height + d.translation.height),
-                                                           content: CGSize(width: W * zoom, height: canvasH * zoom + topInset),
+                                                           content: CGSize(width: W * zoom, height: canvasH * zoom),
                                                            viewport: geo.size)
                                         }
                                         .onEnded { d in
                                             let b = dragBase ?? pan
                                             let target = clampPan(CGSize(width: b.width + d.predictedEndTranslation.width,
                                                                          height: b.height + d.predictedEndTranslation.height),
-                                                                  content: CGSize(width: W * zoom, height: canvasH * zoom + topInset),
+                                                                  content: CGSize(width: W * zoom, height: canvasH * zoom),
                                                                   viewport: geo.size)
                                             withAnimation(.easeOut(duration: 0.4)) { pan = target }   // flick momentum
                                             dragBase = nil
@@ -454,7 +452,7 @@ struct MarketTreemapView: View {
                     }
                 }
             }
-            .overlay(alignment: .top) { chrome }
+            .safeAreaInset(edge: .top, spacing: 0) { chrome }
             .task(id: "\(groupBy.rawValue)|\(filters.sorted { $0.key < $1.key }.map { "\($0)=\($1)" }.joined(separator: ","))") {
                 await load()
             }
@@ -610,10 +608,16 @@ struct MarketTreemapView: View {
     // a census — a true movement 'pulse' needs data we don't yet defend). Color = lens.
     private var pulseHeader: some View {
         let total = nodes.reduce(0) { $0 + $1.count }
+        // Honesty: pivots load the TOP-N groups (p_limit), so their sum is NOT the
+        // market. Say exactly what's shown — "top 300 models · 167,501 cars" — never
+        // let a truncated sum masquerade as the whole. (Make view via market_position
+        // is complete, so it reads plain "N listed".)
+        let truncated = isTop && groupBy != .make && nodes.count >= 250
         return HStack(spacing: 8) {
             Text(total.formatted()).font(.system(.subheadline, design: .rounded).weight(.semibold))
                 .monospacedDigit()
-            Text("listed").font(.system(.caption)).foregroundStyle(.secondary)
+            Text(truncated ? "in top \(nodes.count) \(groupBy.label.lowercased())s" : "listed")
+                .font(.system(.caption)).foregroundStyle(.secondary)
             Spacer(minLength: 6)
             // The live color key — endpoints + the current ramp.
             Text(lens.lo).font(.system(size: 9, weight: .semibold, design: .monospaced))
