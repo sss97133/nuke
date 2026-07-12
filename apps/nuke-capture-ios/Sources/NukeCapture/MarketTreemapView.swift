@@ -117,6 +117,11 @@ struct MarketTreemapView: View {
     // launches. Selection is haptic (the whole point: the metric IS a control).
     @AppStorage("pulse.colorLens") private var lensRaw: String = ColorLens.era.rawValue
     private var lens: ColorLens { ColorLens(rawValue: lensRaw) ?? .era }
+    // The phone is a WINDOW onto a larger canvas, not a frame the market is squeezed into.
+    // The treemap lays out taller-than-screen (scroll) and pinch-zooms (the fold is
+    // zoom-adaptive: pinch in → the canvas grows → fewer makes fold → the tail emerges).
+    @State private var zoom: CGFloat = 1
+    @State private var lastZoom: CGFloat = 1
     @State private var nodes: [TreemapNode] = []
     @State private var loading = true
     @State private var failed = false
@@ -293,20 +298,35 @@ struct MarketTreemapView: View {
                     ContentUnavailableView("No data", systemImage: "square.grid.2x2")
                 } else {
                     GeometryReader { geo in
-                        // Fold the sub-legible tail into one drillable cell, THEN lay out.
-                        let packed = pack(nodes, canvas: Double(geo.size.width * geo.size.height))
+                        // The canvas is bigger than the window: taller than the screen (so it
+                        // scrolls) and scaled by pinch zoom (so you dive into dense corners).
+                        // More makes ⇒ taller canvas ⇒ everything stays legible by scrolling.
+                        let hFactor = min(2.0, max(1.0, Double(nodes.count) / 60.0))
+                        let base = CGSize(width: geo.size.width, height: geo.size.height * hFactor)
+                        let canvas = CGSize(width: base.width * zoom, height: base.height * zoom)
+                        // Fold is zoom-adaptive: it recomputes against the (growing) canvas, so
+                        // pinching in dissolves the doorway and reveals the tail.
+                        let packed = pack(nodes, canvas: Double(canvas.width * canvas.height))
                         let draw = packed.tail.isEmpty ? packed.head : packed.head + [tailNode(packed.tail)]
-                        let laid = squarify(draw, in: CGRect(origin: .zero, size: geo.size))
-                        ZStack(alignment: .topLeading) {
-                            ForEach(laid, id: \.node.id) { item in
-                                cell(for: item.node, tail: packed.tail)
-                                    .frame(width: item.rect.width, height: item.rect.height)
-                                    .offset(x: item.rect.minX, y: item.rect.minY)
+                        let laid = squarify(draw, in: CGRect(origin: .zero, size: canvas))
+                        ScrollView([.vertical, .horizontal], showsIndicators: false) {
+                            ZStack(alignment: .topLeading) {
+                                ForEach(laid, id: \.node.id) { item in
+                                    cell(for: item.node, tail: packed.tail)
+                                        .frame(width: item.rect.width, height: item.rect.height)
+                                        .offset(x: item.rect.minX, y: item.rect.minY)
+                                }
                             }
+                            .frame(width: canvas.width, height: canvas.height, alignment: .topLeading)
                         }
+                        .contentMargins(.bottom, 64, for: .scrollContent)   // clear the search pill
+                        .background(Color(uiColor: .systemGroupedBackground))
+                        .simultaneousGesture(
+                            MagnificationGesture()
+                                .onChanged { v in zoom = min(4, max(1, lastZoom * v)) }
+                                .onEnded { _ in lastZoom = zoom }
+                        )
                     }
-                    .padding(1)
-                    .background(Color(uiColor: .systemGroupedBackground))
                 }
             }
         }
