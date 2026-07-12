@@ -21,6 +21,7 @@ struct TreemapNode: Decodable, Identifiable, Hashable {
     let sold_count: Int?
     let avg_year: Int?
     let image_url: String?     // representative car (the priciest in the group)
+    let sell_through: Int?     // velocity % — drives the heatmap color at every level
     var id: String { name }
 }
 
@@ -104,10 +105,10 @@ struct MarketTreemapView: View {
         return Color(red: mix(0.95, 0.13), green: mix(0.95, 0.15), blue: mix(0.96, 0.19))
     }
 
-    // Per-make sell-through % (velocity), keyed by name — drives the heatmap color when
-    // available (make dim). finviz colors by performance, not size; here color = how fast
-    // the segment actually moves. Empty for dims without a velocity metric.
-    @State private var velocity: [String: Int] = [:]
+    // Interaction layer: every cell is a tradeable instrument you can watch/save (right-
+    // click / long-press), with haptics. Persisted locally, real state.
+    @StateObject private var lists = PulseLists.shared
+    private let haptic = UIImpactFeedbackGenerator(style: .medium)
 
     // Diverging heatmap: stagnant (low sell-through) = muted red → slate → liquid = green.
     // All tones dark enough for white text. Anchored on a fixed 0–55% scale so color means
@@ -123,8 +124,33 @@ struct MarketTreemapView: View {
     // The cell's fill + whether text should be light. Velocity heatmap where we have it,
     // else the neutral magnitude ramp.
     private func cellColor(_ n: TreemapNode) -> (fill: Color, dark: Bool) {
-        if let s = velocity[n.name] { return (velocityColor(s), true) }
+        if let s = n.sell_through { return (velocityColor(s), true) }
         let t = magnitude(n.count); return (rampColor(t), t.squareRoot() > 0.46)
+    }
+    private var hasVelocity: Bool { nodes.contains { $0.sell_through != nil } }
+
+    // The instrument menu — every make/model/cohort is a thing you can watch, save, share.
+    @ViewBuilder private func cellMenu(_ n: TreemapNode) -> some View {
+        let watched = lists.watched.contains(n.name)
+        let saved = lists.saved.contains(n.name)
+        Section(n.name) {
+            Button {
+                haptic.impactOccurred(); lists.toggleWatch(n.name)
+            } label: {
+                Label(watched ? "Watching" : "Watch", systemImage: watched ? "eye.fill" : "eye")
+            }
+            Button {
+                haptic.impactOccurred(); lists.toggleSave(n.name)
+            } label: {
+                Label(saved ? "Saved" : "Save", systemImage: saved ? "bookmark.fill" : "bookmark")
+            }
+        }
+        ShareLink(item: shareText(n)) { Label("Share", systemImage: "square.and.arrow.up") }
+    }
+    private func shareText(_ n: TreemapNode) -> String {
+        var s = "\(n.name) — \(n.count.formatted()) in the market"
+        if let v = n.sell_through { s += " · \(v)% sell-through" }
+        return s
     }
 
     var body: some View {
@@ -177,9 +203,11 @@ struct MarketTreemapView: View {
                             let laid = squarify(nodes, in: CGRect(origin: .zero, size: geo.size))
                             ZStack(alignment: .topLeading) {
                                 ForEach(laid, id: \.node.id) { item in
-                                    // Tap → deeper treemap, or the cars at the leaf.
+                                    // Tap → deeper treemap / the cars. Long-press (right-
+                                    // click) → the instrument menu: watch, save, share.
                                     NavigationLink(value: step(item.node)) { cellBody(item.node) }
                                         .buttonStyle(.plain)
+                                        .contextMenu { cellMenu(item.node) }
                                         .frame(width: max(item.rect.width - 1, 0),
                                                height: max(item.rect.height - 1, 0))
                                         .offset(x: item.rect.minX, y: item.rect.minY)
@@ -188,7 +216,7 @@ struct MarketTreemapView: View {
                         }
                         .padding(1)
                         .background(Color(uiColor: .systemGroupedBackground))
-                        .overlay(alignment: .topTrailing) { if !velocity.isEmpty { heatLegend } }
+                        .overlay(alignment: .topTrailing) { if hasVelocity { heatLegend } }
                         tailFooter
                     }
                 }
@@ -246,6 +274,13 @@ struct MarketTreemapView: View {
             .padding(big ? 11 : 6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .background(fill)
+            .overlay(alignment: .topTrailing) {
+                if mid, lists.watched.contains(n.name) || lists.saved.contains(n.name) {
+                    Image(systemName: lists.watched.contains(n.name) ? "eye.fill" : "bookmark.fill")
+                        .font(.system(size: 8)).foregroundStyle(dark ? .white : Color(white: 0.2))
+                        .padding(5)
+                }
+            }
             .overlay(Rectangle().stroke(.black.opacity(0.06), lineWidth: 0.5))
             .contentShape(Rectangle())
         }
@@ -294,9 +329,8 @@ struct MarketTreemapView: View {
                 let sorted = prows.filter { $0.volume > 0 }.sorted { $0.volume > $1.volume }
                 nodes = sorted.map { TreemapNode(name: $0.name, count: $0.volume, value: $0.volume,
                                                  median_price: $0.median_price, sold_count: nil,
-                                                 avg_year: $0.avg_year, image_url: nil) }
-                var vel = [String: Int](); for r in sorted { vel[r.name] = r.sell_through }
-                velocity = vel
+                                                 avg_year: $0.avg_year, image_url: nil,
+                                                 sell_through: $0.sell_through) }
                 tail = nil; loading = false
                 return
             }
@@ -316,7 +350,6 @@ struct MarketTreemapView: View {
             // Industry standard (finviz market heatmap): show EVERY category, sized to
             // scale — no "Other" bucket, no data hidden. The power-law tail is small
             // cells (that's the truth), labeled only where they fit; drill for the rest.
-            velocity = [:]
             nodes = rows.filter { $0.count > 0 }.sorted { $0.count > $1.count }
             tail = nil
             loading = false
@@ -464,4 +497,25 @@ struct FilteredVehicleGrid: View {
 /// Params for vehicles_by_filters — p_filters lands as jsonb.
 private struct VehiclesByFiltersParams: Encodable {
     let p_filters: [String: String]
+}
+
+// ─── Watchlist + saved: real, persisted (UserDefaults). Every pulse cell is a thing
+// you can track. Shared so the badges + menu stay in sync across views. ────────────
+final class PulseLists: ObservableObject {
+    static let shared = PulseLists()
+    @Published private(set) var watched: Set<String>
+    @Published private(set) var saved: Set<String>
+    private let d = UserDefaults.standard
+    private init() {
+        watched = Set(d.stringArray(forKey: "pulse.watched") ?? [])
+        saved = Set(d.stringArray(forKey: "pulse.saved") ?? [])
+    }
+    func toggleWatch(_ n: String) {
+        if watched.contains(n) { watched.remove(n) } else { watched.insert(n) }
+        d.set(Array(watched), forKey: "pulse.watched")
+    }
+    func toggleSave(_ n: String) {
+        if saved.contains(n) { saved.remove(n) } else { saved.insert(n) }
+        d.set(Array(saved), forKey: "pulse.saved")
+    }
 }
