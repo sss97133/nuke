@@ -405,24 +405,19 @@ Redirecting to vehicle profile...`);
       // URL is new - proceed with scraping
       console.log('New URL - scraping data:', url);
 
-      // Prefer robust server-side scraper (supports Firecrawl structured extraction).
-      // Fallback to legacy `simple-scraper` if needed.
+      // Auto-fill from URL is unavailable: scrape-vehicle and simple-scraper are
+      // not deployed (both 404 — docs/ledger/CAPABILITY_MAP.md). Do NOT "fix" this
+      // by calling `ingest` from here: this handler fires on a 1s debounce after
+      // paste, long before the user has stated ownership intent, attached a title
+      // scan, or queued photos — ingest CREATES the vehicle server-side and would
+      // file an owner's car as a third-party discovery (2026-07-12 adversarial
+      // review, .claude/ISSUES.md). Until ingest grows a preview/dry-run mode,
+      // degrade gracefully: manual entry keeps the full submit path (ownership,
+      // title verification, image queue) and the listing URL is saved at submit.
       let result: any = null;
-      let fnError: any = null;
-
-      const robust = await supabase.functions.invoke('scrape-vehicle', { body: { url } });
-      result = robust.data;
-      fnError = robust.error;
-
-      if (fnError || !result?.success) {
-        const legacy = await supabase.functions.invoke('simple-scraper', { body: { url } });
-        result = legacy.data;
-        fnError = legacy.error;
-      }
-
-      if (fnError) {
-        throw new Error(`Scraping failed: ${fnError.message || fnError}`);
-      }
+      throw new Error(
+        'Auto-fill from this URL is unavailable — fill in the details below. The listing URL will be saved with the vehicle.'
+      );
 
       // `scrape-vehicle` returns { success: true, ...fields } while `simple-scraper` returns { success: true, data: {...} }
       const payload = result?.data && result?.success ? result.data : result;

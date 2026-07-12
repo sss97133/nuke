@@ -238,6 +238,7 @@
     "backfill:bat-bids:dry": "dotenvx run -- node scripts/bat-bid-backfill.mjs --dry-run --limit 10",
     "compute:bat-profiles": "dotenvx run -- node scripts/bat-compute-profiles.mjs",
     "byok:image-batch": "bash scripts/daily-receipt/byok-image-batch.sh",
+    "byok:bbox-annotate": "python3 scripts/daily-receipt/bbox-annotate.py",
     "byok:image-prepare": "dotenvx run -- node scripts/deep-image-analysis-byok.mjs prepare",
     "byok:image-ingest": "dotenvx run -- node scripts/deep-image-analysis-byok.mjs ingest",
     "byok:image-burst": "bash scripts/daily-receipt/byok-image-parallel.sh",
@@ -248,7 +249,8 @@
     "day:build": "dotenvx run -- node scripts/daily-receipt/build-day.mjs",
     "day:synthesize": "dotenvx run -- node scripts/daily-receipt/synthesize-day.mjs",
     "day:classify": "dotenvx run -- node scripts/daily-receipt/classify-unfiled-day.mjs",
-    "ops:schema-census": "dotenvx run -- node scripts/schema-pressure-census.mjs"
+    "ops:schema-census": "dotenvx run -- node scripts/schema-pressure-census.mjs",
+    "ledger:facts": "node scripts/ledger/refresh-facts.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.62",
