@@ -31,20 +31,16 @@ struct TreemapNode: Decodable, Identifiable, Hashable {
 /// (sold comps, 74%), Size (inventory, ~100%). No fake "velocity" — sold-flag coverage
 /// is a data artifact, not liquidity (241/5185 Mustangs flagged sold), so it's gone.
 enum ColorLens: String, CaseIterable, Identifiable {
-    case size, era, price
+    case era, price
     var id: String { rawValue }
     var label: String {
-        switch self {
-        case .size: return "Size"
-        case .era: return "Era"
-        case .price: return "Price"
-        }
+        switch self { case .era: return "Era"; case .price: return "Price" }
     }
     var lo: String {
-        switch self { case .size: return "FEW"; case .era: return "CLASSIC"; case .price: return "VALUE" }
+        switch self { case .era: return "CLASSIC"; case .price: return "VALUE" }
     }
     var hi: String {
-        switch self { case .size: return "MANY"; case .era: return "MODERN"; case .price: return "PREMIUM" }
+        switch self { case .era: return "MODERN"; case .price: return "PREMIUM" }
     }
 }
 
@@ -187,8 +183,6 @@ struct MarketTreemapView: View {
     /// the datum (→ a neutral cell, never a fabricated color).
     private func lensT(_ n: TreemapNode) -> Double? {
         switch lens {
-        case .size:
-            return magnitude(n.count)
         case .era:
             guard let y = n.avg_year else { return nil }
             return max(0, min(1, (Double(y) - 1955) / (2010 - 1955)))
@@ -200,25 +194,24 @@ struct MarketTreemapView: View {
         }
     }
 
-    /// Each lens its own ramp — distinct enough that switching is instantly visible.
+    /// Perceptually-graded ramps: hue AND lightness move together (the expert fix — a
+    /// heatmap needs value contrast, not hue-only). Both lenses share one lightness
+    /// envelope (dark low → light high) so switching feels like the same instrument.
     private func lensRamp(_ t: Double) -> Color {
         let s = max(0, min(1, t))
         func m(_ a: Double, _ b: Double) -> Double { a + (b - a) * s }
         switch lens {
-        case .size:  // pale slate → deep ink (sequential, redundant-by-design with area)
-            let q = s.squareRoot()
-            func mq(_ a: Double, _ b: Double) -> Double { a + (b - a) * q }
-            return Color(red: mq(0.90, 0.13), green: mq(0.91, 0.15), blue: mq(0.93, 0.19))
-        case .era:   // classic warm rust → modern cool teal
-            return Color(red: m(0.74, 0.16), green: m(0.44, 0.44), blue: m(0.20, 0.62))
-        case .price: // value cool green → premium warm gold
-            return Color(red: m(0.24, 0.82), green: m(0.46, 0.60), blue: m(0.38, 0.16))
+        case .era:   // classic deep amber → modern light teal (lightness climbs with year)
+            return Color(red: m(0.42, 0.42), green: m(0.24, 0.74), blue: m(0.14, 0.80))
+        case .price: // value deep green → premium bright gold (lightness climbs with price)
+            return Color(red: m(0.10, 0.92), green: m(0.34, 0.74), blue: m(0.24, 0.20))
         }
     }
 
-    /// Cell fill for the current lens; neutral grey when the datum is missing.
+    /// Cell fill for the current lens; a flat elevated neutral when the datum is missing
+    /// (never a fabricated color, never a redundant size-ramp).
     private func cellFill(_ n: TreemapNode) -> Color {
-        guard let t = lensT(n) else { return Color(white: 0.45) }
+        guard let t = lensT(n) else { return Color(uiColor: .tertiarySystemFill) }
         return lensRamp(t)
     }
     /// Contrast-correct text for any fill (luminance test) — works across every ramp.
@@ -254,32 +247,34 @@ struct MarketTreemapView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if isTop {
-                // The pivot: one market, grouped by whatever the question needs — a
-                // scrolling bar of dimensions (too many now for a segmented control).
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 7) {
-                        ForEach(PulseDim.allCases) { d in
-                            let on = (d == dim)
-                            Button { dim = d } label: {
-                                Text(d.label)
-                                    .font(.system(.subheadline).weight(on ? .semibold : .regular))
-                                    .padding(.horizontal, 13).padding(.vertical, 6)
-                                    .background(on ? Color.primary : Color(uiColor: .secondarySystemFill),
-                                                in: Capsule())
-                                    .foregroundStyle(on ? Color(uiColor: .systemBackground) : .primary)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                }
-                .padding(.top, 4).padding(.bottom, 6)
-            } else {
-                breadcrumb
-            }
+            if !nodes.isEmpty { pulseHeader }
 
-            if !nodes.isEmpty { lensSelector }
+            HStack(spacing: 8) {
+                if isTop {
+                    // GROUP BY: one market, regrouped by whatever the question needs.
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 7) {
+                            ForEach(PulseDim.allCases) { d in
+                                let on = (d == dim)
+                                Button { pick.selectionChanged(); dim = d } label: {
+                                    Text(d.label)
+                                        .font(.system(.subheadline).weight(on ? .semibold : .regular))
+                                        .padding(.horizontal, 13).padding(.vertical, 6)
+                                        .background(on ? Color.primary : Color(uiColor: .secondarySystemFill),
+                                                    in: Capsule())
+                                        .foregroundStyle(on ? Color(uiColor: .systemBackground) : .primary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.leading, 12)
+                    }
+                } else {
+                    breadcrumb
+                }
+                if !nodes.isEmpty { colorMenu.padding(.trailing, 12) }
+            }
+            .padding(.vertical, 6)
 
             Group {
                 if loading && nodes.isEmpty {
@@ -307,8 +302,7 @@ struct MarketTreemapView: View {
                         ZStack(alignment: .topLeading) {
                             ForEach(laid, id: \.node.id) { item in
                                 cell(for: item.node, tail: packed.tail)
-                                    .frame(width: max(item.rect.width - 1, 0),
-                                           height: max(item.rect.height - 1, 0))
+                                    .frame(width: item.rect.width, height: item.rect.height)
                                     .offset(x: item.rect.minX, y: item.rect.minY)
                             }
                         }
@@ -365,32 +359,30 @@ struct MarketTreemapView: View {
     }
 
     @ViewBuilder private func cellBody(_ n: TreemapNode, tail: Bool = false) -> some View {
-        let fill: Color = tail ? Color(uiColor: .secondarySystemFill) : cellFill(n)
+        let fill: Color = tail ? Color(uiColor: .systemFill) : cellFill(n)
         let ink: Color = tail ? .primary : fg(on: fill)
         GeometryReader { g in
             let big = g.size.width >= 144 && g.size.height >= 92
             let mid = g.size.height >= 50 && g.size.width >= 80
             // Name + number as one block, vertically CENTERED — balanced whitespace on
             // any cell shape (no one-sided void in tall-thin cells).
-            VStack(alignment: .leading, spacing: big ? 4 : 1) {
+            // The MAKE is the headline; the count is a quiet caption beneath it (never
+            // larger — area already carries the quantity). Top-left anchored, instrument
+            // grammar. (Expert-unanimous fix: kill the 90pt billboard number.)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(n.name)
-                    .font(.system(big ? .title3 : (mid ? .subheadline : .caption)).weight(.semibold))
-                    .lineLimit(1).minimumScaleFactor(0.45).allowsTightening(true)
+                    .font(.system(size: big ? 21 : (mid ? 15 : 12), weight: .semibold))
+                    .lineLimit(1).minimumScaleFactor(0.5).allowsTightening(true)
                     .foregroundStyle(ink)
                 if mid {
                     Text(n.count.formatted())
-                        .font(.system(size: big ? 34 : 15, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(ink.opacity(0.9))
-                        .lineLimit(1).minimumScaleFactor(0.5)
-                    if tail {
-                        Text("cars · tap to explore")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                    }
+                        .font(.system(size: big ? 14 : 11, weight: .regular).monospacedDigit())
+                        .foregroundStyle(ink.opacity(0.6))
+                        .lineLimit(1).minimumScaleFactor(0.7)
                 }
             }
-            .padding(big ? 11 : 6)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .padding(big ? 12 : 6)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(fill)
             .overlay(alignment: .bottomTrailing) {
                 if tail {
@@ -410,43 +402,48 @@ struct MarketTreemapView: View {
         }
     }
 
-    // The color-lens selector: what the fill encodes. Haptic on every pick — the metric
-    // is the instrument. Sits under the pivot so it reads "group by X · color by Y".
-    private var lensSelector: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "paintpalette").font(.system(size: 11)).foregroundStyle(.secondary)
-            ForEach(ColorLens.allCases) { l in
-                let on = (l == lens)
-                Button {
-                    pick.selectionChanged()
-                    lensRaw = l.rawValue
-                } label: {
-                    Text(l.label)
-                        .font(.system(.caption).weight(on ? .semibold : .regular))
-                        .padding(.horizontal, 11).padding(.vertical, 4)
-                        .background(on ? Color.primary.opacity(0.9) : Color(uiColor: .tertiarySystemFill),
-                                    in: Capsule())
-                        .foregroundStyle(on ? Color(uiColor: .systemBackground) : .primary)
-                }
-                .buttonStyle(.plain)
-            }
-            Spacer(minLength: 0)
-            legendStrip
-        }
-        .padding(.horizontal, 12).padding(.bottom, 6)
-        .onAppear { pick.prepare() }
-    }
-
-    // The live legend — endpoints + the current lens's actual ramp.
-    private var legendStrip: some View {
-        HStack(spacing: 4) {
-            Text(lens.lo).font(.system(size: 8, weight: .semibold, design: .monospaced))
+    // Orientation: what am I looking at? Total supply + the encoding key, stated once
+    // (the experts' "no title/verdict" fix). Area = inventory (honest: this is supply,
+    // a census — a true movement 'pulse' needs data we don't yet defend). Color = lens.
+    private var pulseHeader: some View {
+        let total = nodes.reduce(0) { $0 + $1.count }
+        return HStack(spacing: 8) {
+            Text(total.formatted()).font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .monospacedDigit()
+            Text("listed").font(.system(.caption)).foregroundStyle(.secondary)
+            Spacer(minLength: 6)
+            // The live color key — endpoints + the current ramp.
+            Text(lens.lo).font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.secondary)
             LinearGradient(colors: [lensRamp(0), lensRamp(0.5), lensRamp(1)],
                            startPoint: .leading, endPoint: .trailing)
-                .frame(width: 34, height: 5).clipShape(Capsule())
-            Text(lens.hi).font(.system(size: 8, weight: .semibold, design: .monospaced))
+                .frame(width: 42, height: 6).clipShape(Capsule())
+            Text(lens.hi).font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.secondary)
         }
-        .foregroundStyle(.secondary)
+        .padding(.horizontal, 14).padding(.top, 6).padding(.bottom, 2)
+    }
+
+    // COLOR BY: a compact menu, not a competing chip row — resolves the duplicate-"Price"
+    // collision the experts flagged. Haptic on change. Swatch shows the current lens.
+    private var colorMenu: some View {
+        Menu {
+            Picker("Color by", selection: $lensRaw) {
+                ForEach(ColorLens.allCases) { l in Text(l.label).tag(l.rawValue) }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Circle().fill(lensRamp(0.8)).frame(width: 10, height: 10)
+                    .overlay(Circle().stroke(.white.opacity(0.5), lineWidth: 0.5))
+                Text(lens.label).font(.system(.subheadline).weight(.medium))
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 11).padding(.vertical, 6)
+            .background(Color(uiColor: .secondarySystemFill), in: Capsule())
+        }
+        .onChange(of: lensRaw) { _, _ in pick.selectionChanged() }
+        .onAppear { pick.prepare() }
     }
 
     // The tail as an honest one-line footer — never a proportional block that would
