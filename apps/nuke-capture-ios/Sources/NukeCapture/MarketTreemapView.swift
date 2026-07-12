@@ -59,10 +59,12 @@ func nextGroupBy(after filters: [String: String]) -> String? {
     ["make", "model", "year"].first { filters[$0] == nil }
 }
 
-/// Params for market_pulse_filtered — p_filters lands as jsonb.
+/// Params for market_pulse (top-level) and market_pulse_filtered (drilled).
+private struct MarketPulseParams: Encodable { let p_dimension: String; let p_limit: Int }
 private struct PulseFilterParams: Encodable {
     let p_group_by: String
     let p_filters: [String: String]
+    let p_limit: Int
 }
 
 struct MarketTreemapView: View {
@@ -75,9 +77,27 @@ struct MarketTreemapView: View {
     @State private var nodes: [TreemapNode] = []
     @State private var loading = true
     @State private var failed = false
+    // The power-law tail we did NOT draw as cells (too many, too small) — surfaced as a
+    // thin honest footer instead of a giant block that would dominate the head.
+    @State private var tail: (groups: Int, cars: Int)? = nil
 
     private var isTop: Bool { filters.isEmpty && fixedGroupBy == nil }
     private var groupBy: PulseDim { fixedGroupBy ?? dim }
+
+    private var maxCount: Int { nodes.map(\.count).max() ?? 1 }
+    private var minCount: Int { nodes.map(\.count).min() ?? 0 }
+    private func magnitude(_ c: Int) -> Double {
+        let hi = Double(maxCount), lo = Double(minCount)
+        guard hi > lo else { return 0.55 }
+        return (Double(c) - lo) / (hi - lo)
+    }
+    // A designed neutral ramp (mode-independent): pale slate → deep ink. sqrt spreads
+    // the crowded low end so mid-size cells still read as distinct.
+    private func rampColor(_ t: Double) -> Color {
+        let s = max(0, min(1, t)).squareRoot()
+        func mix(_ a: Double, _ b: Double) -> Double { a + (b - a) * s }
+        return Color(red: mix(0.95, 0.13), green: mix(0.95, 0.15), blue: mix(0.96, 0.19))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -124,23 +144,24 @@ struct MarketTreemapView: View {
                 } else if nodes.isEmpty {
                     ContentUnavailableView("No data", systemImage: "square.grid.2x2")
                 } else {
-                    GeometryReader { geo in
-                        let laid = squarify(nodes, in: CGRect(origin: .zero, size: geo.size))
-                        ZStack(alignment: .topLeading) {
-                            ForEach(laid, id: \.node.id) { item in
-                                // Tap → narrow the pulse: deeper treemap, or the cars at the leaf.
-                                NavigationLink(value: step(item.node)) {
-                                    cellBody(item.node)
+                    VStack(spacing: 0) {
+                        GeometryReader { geo in
+                            let laid = squarify(nodes, in: CGRect(origin: .zero, size: geo.size))
+                            ZStack(alignment: .topLeading) {
+                                ForEach(laid, id: \.node.id) { item in
+                                    // Tap → deeper treemap, or the cars at the leaf.
+                                    NavigationLink(value: step(item.node)) { cellBody(item.node) }
+                                        .buttonStyle(.plain)
+                                        .frame(width: max(item.rect.width - 1, 0),
+                                               height: max(item.rect.height - 1, 0))
+                                        .offset(x: item.rect.minX, y: item.rect.minY)
                                 }
-                                .buttonStyle(.plain)
-                                .frame(width: max(item.rect.width - 2, 0),
-                                       height: max(item.rect.height - 2, 0))
-                                .offset(x: item.rect.minX, y: item.rect.minY)
                             }
                         }
+                        .padding(1)
+                        .background(Color(uiColor: .systemGroupedBackground))
+                        tailFooter
                     }
-                    .padding(2)
-                    .background(Color(uiColor: .systemGroupedBackground))
                 }
             }
         }
@@ -169,31 +190,51 @@ struct MarketTreemapView: View {
         return TreemapStep(filters: f, groupBy: nextGroupBy(after: f))
     }
 
-    // A clean cell: the group name and its inventory count. No image (one photo can't
-    // represent a make, and there's no quality metric to pick it) — the AREA is the
-    // datum, the count confirms it. The count scales up in bigger cells so magnitude
-    // reads at a glance. This is the honest "N cars" the box promises.
+    // The cell. Surface tinted by magnitude (deep = big) so hierarchy reads instantly;
+    // the name anchors the top and the big TABULAR count anchors the BOTTOM, so the
+    // stat spans the cell height instead of floating in a void. Contrast-aware text,
+    // single-line name (scaled to fit — never a mid-word hyphen).
     @ViewBuilder private func cellBody(_ n: TreemapNode) -> some View {
+        let t = magnitude(n.count)
+        let dark = t.squareRoot() > 0.46
         GeometryReader { g in
-            let big = g.size.width >= 150 && g.size.height >= 90
-            let tight = g.size.height < 40 || g.size.width < 58
-            VStack(alignment: .leading, spacing: big ? 3 : 1) {
+            let big = g.size.width >= 144 && g.size.height >= 92
+            let mid = g.size.height >= 50 && g.size.width >= 80
+            let fg: Color = dark ? .white : Color(white: 0.12)
+            // Name + number as one block, vertically CENTERED — balanced whitespace on
+            // any cell shape (no one-sided void in tall-thin cells).
+            VStack(alignment: .leading, spacing: big ? 4 : 1) {
                 Text(n.name)
-                    .font(.system(big ? .title3 : .subheadline).weight(.semibold))
-                    .lineLimit(2).minimumScaleFactor(0.6)
-                if !tight {
+                    .font(.system(big ? .title3 : (mid ? .subheadline : .caption)).weight(.semibold))
+                    .lineLimit(1).minimumScaleFactor(0.45).allowsTightening(true)
+                    .foregroundStyle(fg)
+                if mid {
                     Text(n.count.formatted())
-                        .font(.system(big ? .title : .footnote, design: .rounded).weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .minimumScaleFactor(0.7).lineLimit(1)
+                        .font(.system(size: big ? 34 : 15, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(fg.opacity(0.9))
+                        .lineLimit(1).minimumScaleFactor(0.5)
                 }
-                Spacer(minLength: 0)
             }
-            .padding(big ? 10 : 6)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Color(uiColor: .secondarySystemGroupedBackground))
-            .overlay(Rectangle().stroke(Color(uiColor: .separator), lineWidth: 0.5))
+            .padding(big ? 11 : 6)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .background(rampColor(t))
+            .overlay(Rectangle().stroke(.black.opacity(0.06), lineWidth: 0.5))
             .contentShape(Rectangle())
+        }
+    }
+
+    // The tail as an honest one-line footer — never a proportional block that would
+    // swamp the head (the tail is often a third of the market).
+    @ViewBuilder private var tailFooter: some View {
+        if let t = tail {
+            HStack {
+                Text("+\(t.groups) more \(groupBy.label.lowercased())s · \(t.cars.formatted()) cars not shown")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 12).padding(.vertical, 5)
+            .background(Color(uiColor: .systemGroupedBackground))
         }
     }
 
@@ -205,14 +246,21 @@ struct MarketTreemapView: View {
             // "Make Model" and can't be re-filtered); everything drilled goes live+filtered.
             if filters.isEmpty && groupBy != .model {
                 rows = try await SupabaseService.client
-                    .rpc("market_pulse", params: ["p_dimension": groupBy.rawValue]).execute().value
+                    .rpc("market_pulse", params: MarketPulseParams(p_dimension: groupBy.rawValue, p_limit: 300))
+                    .execute().value
             } else {
                 rows = try await SupabaseService.client
                     .rpc("market_pulse_filtered",
-                         params: PulseFilterParams(p_group_by: groupBy.rawValue, p_filters: filters))
+                         params: PulseFilterParams(p_group_by: groupBy.rawValue, p_filters: filters, p_limit: 300))
                     .execute().value
             }
-            nodes = Array(rows.filter { $0.count > 0 }.sorted { $0.count > $1.count }.prefix(24))
+            // Draw the top cells at a readable size; the power-law tail becomes a thin
+            // footer, not slivers and not a dominating block.
+            let sorted = rows.filter { $0.count > 0 }.sorted { $0.count > $1.count }
+            let cap = 16
+            nodes = Array(sorted.prefix(cap))
+            let rest = sorted.dropFirst(cap)
+            tail = rest.isEmpty ? nil : (groups: rest.count, cars: rest.reduce(0) { $0 + $1.count })
             loading = false
         } catch {
             failed = true; loading = false
