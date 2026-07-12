@@ -96,15 +96,11 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     .limit(100) : { data: [] };
 
   // Get bids (auction bids + BaT listings where user is buyer)
-  const { data: userBids } = await supabase
-    .from('auction_bids')
-    .select(`
-      *,
-      auction:auction_listings(*, vehicle:vehicles(*))
-    `)
-    .eq('bidder_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(100);
+  // TODO(ghost-ref 2026-07-12): auction_bids does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+  // Was native-auction bids by profiles.id (bidder_id), joined to the also-missing auction_listings.
+  // No repoint target: bat_bids/external_auction_bids key on platform usernames, not Nuke user ids.
+  // BaT-buyer activity is still covered by the batBids query on vehicle_events below.
+  const userBids: any[] = [];
 
   const { data: batBids } = identityIds.length > 0 ? await supabase
     .from('vehicle_events')
@@ -118,16 +114,17 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     .limit(100) : { data: [] };
 
   // Get comments (BaT comments + auction comments) - EXCLUDE bids
-  // NOTE: bat_comments still joins to bat_listings via FK (bat_listing_id) — keep until bat_comments migrated
+  // ghost-ref 2026-07-12: bat_comments does not exist — repointed to unified auction_comments (platform='bat'); see docs/ledger/FINISH_ROADMAP.md
   const { data: batComments } = identityIds.length > 0 ? await supabase
-    .from('bat_comments')
+    .from('auction_comments')
     .select(`
       *,
-      listing:bat_listings(*, vehicle:vehicles(*))
+      listing:auction_events(*, vehicle:vehicles(*))
     `)
     .in('external_identity_id', identityIds)
-    .or('contains_bid.is.null,contains_bid.eq.false')
-    .order('comment_timestamp', { ascending: false })
+    .eq('platform', 'bat')
+    .is('bid_amount', null)
+    .order('posted_at', { ascending: false })
     .limit(100) : { data: [] };
 
   const { data: auctionComments } = identityIds.length > 0 ? await supabase
@@ -166,16 +163,17 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     .limit(20);
 
   // Get comments of note (highly liked/engaged comments)
-  // NOTE: bat_comments still joins to bat_listings via FK (bat_listing_id) — keep until bat_comments migrated
+  // ghost-ref 2026-07-12: bat_comments does not exist — repointed to unified auction_comments (platform='bat'); see docs/ledger/FINISH_ROADMAP.md
   const { data: commentsOfNote } = identityIds.length > 0 ? await supabase
-    .from('bat_comments')
+    .from('auction_comments')
     .select(`
       *,
-      listing:bat_listings(*, vehicle:vehicles(*))
+      listing:auction_events(*, vehicle:vehicles(*))
     `)
     .in('external_identity_id', identityIds)
-    .gt('likes_count', 5)
-    .order('likes_count', { ascending: false })
+    .eq('platform', 'bat')
+    .gt('comment_likes', 5)
+    .order('comment_likes', { ascending: false })
     .limit(20) : { data: [] };
 
   // Calculate stats
@@ -257,16 +255,17 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     .limit(100);
 
   // Get comments - EXCLUDE bids
-  // NOTE: bat_comments still joins to bat_listings via FK (bat_listing_id) — keep until bat_comments migrated
+  // ghost-ref 2026-07-12: bat_comments does not exist — repointed to unified auction_comments (platform='bat'); see docs/ledger/FINISH_ROADMAP.md
   const { data: batComments } = await supabase
-    .from('bat_comments')
+    .from('auction_comments')
     .select(`
       *,
-      listing:bat_listings(*, vehicle:vehicles(*))
+      listing:auction_events(*, vehicle:vehicles(*))
     `)
     .eq('external_identity_id', externalIdentity.id)
-    .or('contains_bid.is.null,contains_bid.eq.false')
-    .order('comment_timestamp', { ascending: false })
+    .eq('platform', 'bat')
+    .is('bid_amount', null)
+    .order('posted_at', { ascending: false })
     .limit(100);
 
   const { data: auctionComments } = await supabase
@@ -399,16 +398,10 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
 
   const contributorIds = orgContributors?.map(oc => oc.user_id) || [];
 
-  const { data: bids } = contributorIds.length > 0 ? await supabase
-    .from('auction_bids')
-    .select(`
-      *,
-      auction:auction_listings(*, vehicle:vehicles(*)),
-      bidder:profiles(*)
-    `)
-    .in('bidder_id', contributorIds)
-    .order('created_at', { ascending: false })
-    .limit(100) : { data: [] };
+  // TODO(ghost-ref 2026-07-12): auction_bids does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+  // Was native-auction bids by profiles.id (bidder_id), joined to the also-missing auction_listings.
+  // No repoint target: bat_bids/external_auction_bids key on platform usernames, not Nuke user ids.
+  const bids: any[] = [];
 
   // Get comments (from organization members)
   let comments: any[] = [];
@@ -422,15 +415,16 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     const identityIds = externalIdentities?.map(ei => ei.id) || [];
     
     if (identityIds.length > 0) {
-      // NOTE: bat_comments still joins to bat_listings via FK (bat_listing_id) — keep until bat_comments migrated
+      // ghost-ref 2026-07-12: bat_comments does not exist — repointed to unified auction_comments (platform='bat'); see docs/ledger/FINISH_ROADMAP.md
       const { data: batComments } = await supabase
-        .from('bat_comments')
+        .from('auction_comments')
         .select(`
           *,
-          listing:bat_listings(*, vehicle:vehicles(*))
+          listing:auction_events(*, vehicle:vehicles(*))
         `)
         .in('external_identity_id', identityIds)
-        .order('comment_timestamp', { ascending: false })
+        .eq('platform', 'bat')
+        .order('posted_at', { ascending: false })
         .limit(100);
 
       comments = batComments || [];

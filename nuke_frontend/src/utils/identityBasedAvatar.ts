@@ -77,19 +77,20 @@ async function loadUserIdentity(
       };
     }
 
-    // Get comments from bat_comments table
+    // Get comments from the unified auction_comments table (BaT-only path)
     const { data: comments } = await supabase
-      .from('bat_comments')
-      .select('comment_text, vehicle_id, comment_timestamp, vehicle:vehicles(title)')
-      .eq('bat_username', seed)
-      .order('comment_timestamp', { ascending: false })
+      .from('auction_comments')
+      .select('comment_text, vehicle_id, posted_at, vehicle:vehicles(title)')
+      .eq('platform', 'bat')
+      .eq('author_username', seed)
+      .order('posted_at', { ascending: false })
       .limit(50);
 
     if (comments && comments.length > 0) {
       identity.comments = comments.map(c => ({
         vehicle_title: (c.vehicle as any)?.title || 'Unknown',
         comment_text: c.comment_text,
-        posted_at: c.comment_timestamp || new Date().toISOString()
+        posted_at: c.posted_at || new Date().toISOString()
       }));
     }
   }

@@ -57,13 +57,18 @@ export function UploadProgressNotifications({
               vehicleId: image.vehicle_id
             });
 
-            // Fetch extracted data from vehicle_title_documents
+            // Fetch extracted data from the title-document store
             if (docType === 'title') {
-              const { data: titleData } = await supabase
-                .from('vehicle_title_documents')
-                .select('*')
-                .eq('image_id', image.id)
-                .single();
+              // TODO(ghost-ref 2026-07-12): vehicle_title_documents does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+              // The extraction store keyed by image_id was never built. deal_documents is not a fit
+              // (no image_id column; vin/odometer/owner/state would be nested in ocr_data, not top-level).
+              // Guard by skipping the fetch so the detection notification path still works.
+              const titleData: {
+                vin?: string;
+                odometer_reading?: number;
+                owner_name?: string;
+                state?: string;
+              } | null = null;
 
               if (titleData) {
                 const fields = [];

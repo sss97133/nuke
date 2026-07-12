@@ -70,26 +70,18 @@ Deno.serve(async (req) => {
     const systemArea = imageData.image_spatial_metadata?.[0]?.system_area;
     const angleCategory = imageData.vehicle_image_angles?.[0]?.image_coverage_angles?.category;
 
-    // Get available manuals for this vehicle
-    const { data: manualLinks } = await supabase
-      .from('vehicle_manual_links')
-      .select(`
-        manual_id,
-        match_confidence,
-        vehicle_manuals (
-          id,
-          title,
-          manual_type,
-          file_url,
-          storage_path
-        )
-      `)
-      .eq('vehicle_id', vehicleId)
-      .order('match_confidence', { ascending: false });
+    // TODO(ghost-ref 2026-07-12): vehicle_manual_links, vehicle_manuals, and
+    // manual_image_references do not exist (half-built feature) — guarded; see
+    // docs/ledger/FINISH_ROADMAP.md . service_manual_chunks is not a fit (no
+    // vehicle_id / manual-link / image-reference columns). Return the same
+    // empty-manuals shape the downstream code already produces so callers don't
+    // break, and skip the dead vehicle_manual_links / manual_image_references
+    // queries entirely.
+    const manualLinks: any[] = [];
 
     if (!manualLinks || manualLinks.length === 0) {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           manuals: [],
           message: 'No manuals available for this vehicle'
         }),
