@@ -995,10 +995,14 @@ interface IngestInput {
   enrich?: boolean; // attempt to auto-enrich from source URL
   _source?: string; // source hint from caller (e.g. "facebook_saved")
   sold?: boolean; // sold status from caller
+  // Parse-only mode: detect platform + parse identity, WRITE NOTHING, return
+  // status "preview". For form prefill — creation stays at the caller's explicit
+  // submit (Sign tier — .claude/rules/liveness-and-intent.md).
+  preview?: boolean;
 }
 
 interface IngestResult {
-  status: "created" | "matched" | "duplicate" | "rejected" | "error";
+  status: "created" | "matched" | "duplicate" | "rejected" | "error" | "preview";
   vehicle_id?: string | null;
   discovery_id?: string | null;
   is_new_vehicle?: boolean;
@@ -1014,10 +1018,18 @@ interface IngestResult {
   issues?: string[];
   suggestions?: Record<string, string>;
   needs_review?: boolean;
+  // preview mode only: what was parsed without writing
+  parsed?: { year: number | null; make: string | null; model: string | null };
+  price?: number | null;
+  location?: string | null;
 }
 
 async function ingestOne(input: IngestInput, userId: string | null): Promise<IngestResult> {
   try {
+    // Strict boolean: a JSON string "false" must not silently turn a real ingest
+    // into a preview (refuter finding, 2026-07-12).
+    const isPreview = input.preview === true;
+
     // Determine source
     let platform = "manual";
     let externalId: string | null = null;
@@ -1043,7 +1055,11 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       // are frequently transient-blocked (verified 2026-07-01/02), and a
       // second attempt materially reduces how often we fall back to the
       // uncertain-identity path below.
-      if (platform === "craigslist" && CRAIGSLIST_SHARE_RE.test(input.url)) {
+      // Skipped in preview: resolution calls archiveFetch (external fetch +
+      // listing_page_snapshots insert) — preview must stay zero-fetch/zero-write.
+      // A CL share URL in preview simply yields no slug → caller falls back to
+      // manual entry.
+      if (platform === "craigslist" && CRAIGSLIST_SHARE_RE.test(input.url) && !isPreview) {
         let canonical = await resolveCraigslistShareUrl(input.url);
         if (!canonical) canonical = await resolveCraigslistShareUrl(input.url);
         if (canonical) {
@@ -1112,6 +1128,25 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           external_id: externalId,
         };
       }
+    }
+
+    // PREVIEW MODE — parse-only, never write. Returns what could be read from the
+    // URL/text so a form can prefill; creation happens at the caller's explicit
+    // submit (Sign tier — .claude/rules/liveness-and-intent.md). Deliberately
+    // placed BEFORE tryAutoEnrich: platform extractors (extract-bat-core et al)
+    // write vehicles as a side effect, which preview must never trigger. The
+    // user-dedupe check above still runs first (read-only), so a URL the user
+    // already ingested returns "duplicate" + vehicle_id and the caller can
+    // navigate instead of prefilling.
+    if (isPreview) {
+      return {
+        status: "preview",
+        source: platform,
+        external_id: externalId,
+        parsed,
+        price: input.price ?? null,
+        location: input.location ?? null,
+      };
     }
 
     // Auto-enrich: call the platform's extractor to get full listing data
@@ -1597,6 +1632,7 @@ Deno.serve(async (req: Request) => {
         notes:        { type: "string",   required: false, description: "User notes about the vehicle" },
         tags:         { type: "string[]", required: false, example: ["project", "barn find"], description: "User-defined tags" },
         enrich:       { type: "boolean",  required: false, default: true, description: "Auto-enrich from source URL extractors" },
+        preview:      { type: "boolean",  required: false, default: false, description: "Parse-only: detect platform + parse identity, write NOTHING, return status 'preview' with {parsed, price, location}. For form prefill — creation stays at the caller's explicit submit." },
         batch:        { type: "array",    required: false, description: "Array of up to 50 items (each an object with fields above)" },
         user_id:      { type: "string",   required: false, description: "Explicit user ID (service role only)" },
       },
@@ -1619,6 +1655,7 @@ Deno.serve(async (req: Request) => {
         matched:  { description: "Matched existing vehicle (enriched)", fields: ["vehicle_id", "quality_score"] },
         duplicate:{ description: "Same user+URL already ingested", fields: ["vehicle_id", "discovery_id"] },
         rejected: { description: "Failed validation or minimum-viability gate (need year+make+model AND a recognized platform or successful extraction)", fields: ["reason", "quality_score", "issues", "suggestions"] },
+        preview:  { description: "preview:true — parsed identity only, nothing written", fields: ["parsed", "price", "location", "source", "external_id"] },
         error:    { description: "Server error", fields: ["error"] },
       },
       example_curl: 'curl -X POST .../functions/v1/ingest -H "Authorization: Bearer <key>" -H "Content-Type: application/json" -d \'{"year":1978,"make":"Chevrolet","model":"Caprice Classic","price":10500,"location":"Sun City, AZ"}\'',
@@ -1669,7 +1706,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const results = await Promise.all(
-      body.batch.map((item: IngestInput) => ingestOne(item, userId))
+      // Top-level preview:true propagates to every batch item (an explicit
+      // item-level preview wins) — without this, {"preview":true,"batch":[...]}
+      // silently ran the FULL write path (refuter finding, 2026-07-12).
+      body.batch.map((item: IngestInput) =>
+        ingestOne({ preview: body.preview === true, ...item }, userId)
+      )
     );
 
     const summary = {
