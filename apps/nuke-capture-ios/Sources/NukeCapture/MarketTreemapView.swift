@@ -134,6 +134,7 @@ struct MarketTreemapView: View {
     @State private var gZoomBase: CGFloat? = nil   // zoom at pinch start
     @State private var gPanBase: CGSize = .zero    // pan at pinch start
     @State private var dragBase: CGSize? = nil     // pan at drag start
+    private let chromeInset: CGFloat = 100         // at-rest clearance under the floating chrome
     @State private var nodes: [TreemapNode] = []
     @State private var loading = true
     @State private var failed = false
@@ -340,8 +341,9 @@ struct MarketTreemapView: View {
         return s
     }
 
-    // Floating iOS 26 Liquid Glass chrome over the live treemap — no opaque white bar.
-    // Each control carries its own glass; the gaps show the blurred market beneath.
+    // Floating iOS 26 Liquid Glass chrome over the live treemap — no opaque bands.
+    // Each control carries its own glass; bare header text rides a soft gradient scrim
+    // (Maps-style) so the market flows edge-to-edge beneath and stays legible under it.
     private var chrome: some View {
         VStack(spacing: 6) {
             if !nodes.isEmpty { pulseHeader }
@@ -351,6 +353,13 @@ struct MarketTreemapView: View {
             }
         }
         .padding(.top, 4).padding(.bottom, 6)
+        .background(
+            LinearGradient(colors: [Color(uiColor: .systemBackground).opacity(0.9),
+                                    Color(uiColor: .systemBackground).opacity(0.55),
+                                    .clear],
+                           startPoint: .top, endPoint: .bottom)
+                .allowsHitTesting(false)
+        )
     }
     // GROUP BY — native glass capsule chips; selection reads as TINTED glass (not a solid
     // black slab), grouped so they sample light and morph together.
@@ -409,6 +418,9 @@ struct MarketTreemapView: View {
                             }
                         }
                         .frame(width: W * zoom, height: canvasH * zoom, alignment: .topLeading)
+                        // At rest the first labels clear the floating chrome; panning up
+                        // slides the market UNDER it (the scrim keeps the header legible).
+                        .padding(.top, chromeInset)
                         .offset(pan)
                         .frame(width: W, height: VH, alignment: .topLeading)
                         .clipped()
@@ -425,7 +437,7 @@ struct MarketTreemapView: View {
                                     let np = CGSize(width: f.x - (f.x - gPanBase.width) * (zNew / base),
                                                     height: f.y - (f.y - gPanBase.height) * (zNew / base))
                                     zoom = zNew
-                                    pan = clampPan(np, content: CGSize(width: W * zNew, height: canvasH * zNew),
+                                    pan = clampPan(np, content: CGSize(width: W * zNew, height: canvasH * zNew + chromeInset),
                                                    viewport: geo.size)
                                 }
                                 .onEnded { _ in gZoomBase = nil }
@@ -436,14 +448,14 @@ struct MarketTreemapView: View {
                                             let b = dragBase ?? pan
                                             pan = clampPan(CGSize(width: b.width + d.translation.width,
                                                                   height: b.height + d.translation.height),
-                                                           content: CGSize(width: W * zoom, height: canvasH * zoom),
+                                                           content: CGSize(width: W * zoom, height: canvasH * zoom + chromeInset),
                                                            viewport: geo.size)
                                         }
                                         .onEnded { d in
                                             let b = dragBase ?? pan
                                             let target = clampPan(CGSize(width: b.width + d.predictedEndTranslation.width,
                                                                          height: b.height + d.predictedEndTranslation.height),
-                                                                  content: CGSize(width: W * zoom, height: canvasH * zoom),
+                                                                  content: CGSize(width: W * zoom, height: canvasH * zoom + chromeInset),
                                                                   viewport: geo.size)
                                             withAnimation(.easeOut(duration: 0.4)) { pan = target }   // flick momentum
                                             dragBase = nil
@@ -452,7 +464,8 @@ struct MarketTreemapView: View {
                     }
                 }
             }
-            .safeAreaInset(edge: .top, spacing: 0) { chrome }
+            .overlay(alignment: .top) { chrome }
+            .ignoresSafeArea(edges: .bottom)
             .task(id: "\(groupBy.rawValue)|\(filters.sorted { $0.key < $1.key }.map { "\($0)=\($1)" }.joined(separator: ","))") {
                 await load()
             }
