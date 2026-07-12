@@ -10,6 +10,7 @@
 
 import SwiftUI
 import UIKit
+import Charts
 
 /// One treemap cell. market_pulse / market_pulse_filtered — avg_year is present only
 /// on the filtered path (nil on the fast matview), so it's optional.
@@ -827,6 +828,10 @@ struct FilteredVehicleGrid: View {
                 ContentUnavailableView("No photographed cars", systemImage: "car.side")
             } else {
                 ScrollView {
+                    // Analyst Toolbox move 1: the cohort's price distribution rides
+                    // above its holdings — the shape IS the price (no printed median).
+                    CohortDistributionCard(filters: filters)
+                        .padding(.horizontal, 10).padding(.top, 8).padding(.bottom, 6)
                     LazyVGrid(columns: columns, spacing: 2) {
                         ForEach(rows) { v in
                             NavigationLink(value: v) { cell(v) }.buttonStyle(.plain)
@@ -870,6 +875,327 @@ struct FilteredVehicleGrid: View {
 /// Params for vehicles_by_filters — p_filters lands as jsonb.
 private struct VehiclesByFiltersParams: Encodable {
     let p_filters: [String: String]
+}
+
+// ─── COHORT DISTRIBUTION (Analyst Toolbox move 1) ─────────────────────────────
+// The bell curve over the cohort leaf: price_histogram (log-spaced $500…$10M,
+// only n>0 buckets returned) rendered as a smoothed silhouette. Doctrine: the
+// SHAPE is the answer — never a printed average/median; axis labels at the
+// extremes only; the median is an unlabeled position tick. Overlay ("vs"): the
+// parent cohort (year filter dropped) as a quiet outline behind the fill — the
+// desk's most-used comparison. Honest: <3 non-empty buckets or a failed RPC
+// renders one quiet line, never a fake curve.
+
+/// One returned histogram bucket. lo/hi are bucket edges in dollars.
+struct PriceBucket: Decodable {
+    let bucket: Int
+    let lo: Int
+    let hi: Int
+    let n: Int
+}
+private struct PriceHistogramParams: Encodable {
+    let p_filters: [String: String]
+    let p_buckets: Int
+}
+
+/// A point on a distribution silhouette: x is log10(price), y is the bucket
+/// count normalized to the series' own peak (shape comparison — populations
+/// differ by design and are printed as counts in the legend).
+private struct DistPoint: Identifiable {
+    let series: String
+    let logX: Double
+    let y: Double
+    var id: String { "\(series)|\(logX)" }
+}
+
+struct CohortDistributionCard: View {
+    let filters: [String: String]
+
+    private enum Phase { case loading, ready, sparse }
+    @State private var phase: Phase = .loading
+    @State private var primary: [PriceBucket] = []
+    @State private var parent: [PriceBucket] = []
+    @State private var listed: Int? = nil      // cohort population (market_pulse_filtered)
+    @State private var overlayOn = true
+
+    // ── Cohort grammar ──
+    private var hasYear: Bool { filters["year"] != nil }
+    /// "1985 Chevrolet K10" — the full identity, year first (owner rule: the card
+    /// states the year and the numbers, always).
+    private var title: String {
+        [filters["year"], filters["make"], filters["model"]].compactMap { $0 }.joined(separator: " ")
+    }
+    /// "1985 K10" — the pinned cohort.
+    private var primaryLabel: String {
+        [filters["year"], filters["model"] ?? filters["make"]].compactMap { $0 }.joined(separator: " ")
+    }
+    /// "ALL K10" — same make+model, every year.
+    private var parentLabel: String { "all \(filters["model"] ?? filters["make"] ?? "years")" }
+    private var parentFilters: [String: String] {
+        var f = filters; f.removeValue(forKey: "year"); return f
+    }
+
+    // The overlay is drawable only when it adds an honest second shape.
+    private var parentDrawable: Bool { hasYear && parent.count >= 3 }
+    private var showOverlay: Bool { overlayOn && parentDrawable }
+
+    private var primaryN: Int { primary.reduce(0) { $0 + $1.n } }
+    private var parentN: Int { parent.reduce(0) { $0 + $1.n } }
+
+    // ── Geometry ──
+    // Bucket edges are globally log-spaced, so a series' silhouette is exact in
+    // log10(price). Gaps between returned buckets are TRUE zeros (the RPC omits
+    // n=0 by design) — reconstruct them from the returned edges so the smoother
+    // never invents density across a gap; anchor each series to the baseline at
+    // its own outer edges so the shape closes.
+    private func silhouette(_ buckets: [PriceBucket], series: String) -> [DistPoint] {
+        let sorted = buckets.sorted { $0.bucket < $1.bucket }
+        guard let first = sorted.first, let last = sorted.last, first.lo > 0 else { return [] }
+        let step = log10(Double(first.hi)) - log10(Double(first.lo))     // constant by construction
+        let base = log10(Double(first.lo)) - Double(first.bucket - 1) * step
+        let peak = Double(sorted.map(\.n).max() ?? 1)
+        guard peak > 0, step > 0 else { return [] }
+        let byIndex = Dictionary(uniqueKeysWithValues: sorted.map { ($0.bucket, $0.n) })
+        var pts: [DistPoint] = [DistPoint(series: series, logX: log10(Double(first.lo)), y: 0)]
+        for i in first.bucket...last.bucket {
+            let mid = base + (Double(i) - 0.5) * step
+            pts.append(DistPoint(series: series, logX: mid, y: Double(byIndex[i] ?? 0) / peak))
+        }
+        pts.append(DistPoint(series: series, logX: log10(Double(last.hi)), y: 0))
+        return pts
+    }
+
+    /// The median as a POSITION in log space — interpolated inside its bucket
+    /// from the real counts. Rendered as an unlabeled tick, never a number.
+    private func medianLog(_ buckets: [PriceBucket]) -> Double? {
+        let sorted = buckets.sorted { $0.bucket < $1.bucket }
+        let total = sorted.reduce(0) { $0 + $1.n }
+        guard total > 0 else { return nil }
+        let target = Double(total) / 2
+        var cum = 0.0
+        for b in sorted {
+            let next = cum + Double(b.n)
+            if next >= target, b.n > 0 {
+                let f = (target - cum) / Double(b.n)
+                return log10(Double(b.lo)) + f * (log10(Double(b.hi)) - log10(Double(b.lo)))
+            }
+            cum = next
+        }
+        return nil
+    }
+
+    /// The drawn x-domain: the union of every rendered series' edges.
+    private var domain: ClosedRange<Double> {
+        var los = primary.map { log10(Double($0.lo)) }
+        var his = primary.map { log10(Double($0.hi)) }
+        if showOverlay {
+            los += parent.map { log10(Double($0.lo)) }
+            his += parent.map { log10(Double($0.hi)) }
+        }
+        let lo = los.min() ?? 2, hi = his.max() ?? 7
+        return lo...(hi > lo ? hi : lo + 1)
+    }
+
+    /// Compact dollar label for the axis EXTREMES only — "$6k … $58k" grammar.
+    private static func money(_ v: Double) -> String {
+        switch v {
+        case 1_000_000...: return "$\(trim(v / 1_000_000))M"
+        case 1_000...:     return "$\(trim(v / 1_000))k"
+        default:           return "$\(Int(v.rounded()))"
+        }
+    }
+    private static func trim(_ v: Double) -> String {
+        v >= 10 ? String(Int(v.rounded())) : String(format: "%.1f", v).replacingOccurrences(of: ".0", with: "")
+    }
+
+    var body: some View {
+        Group {
+            switch phase {
+            case .loading:
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("reading priced sales…")
+                        .font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 132)
+            case .sparse:
+                // Honest fallback — the identity + a quiet line, never a fake curve.
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("not enough priced sales to draw a distribution"
+                         + (primaryN > 0 ? " (\(primaryN) priced)" : ""))
+                        .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 6)
+            case .ready:
+                VStack(alignment: .leading, spacing: 6) {
+                    identityRow
+                    legendRow
+                    chart.frame(height: 68)
+                    footerRow
+                }
+            }
+        }
+        .padding(14)
+        .background(Color(uiColor: .systemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+        .task(id: filters.sorted { $0.key < $1.key }.map { "\($0)=\($1)" }.joined(separator: ",")) {
+            await load()
+        }
+    }
+
+    // Identity line (owner rule): the YEAR and the numbers, stated plainly.
+    // Counts are printable — the no-print rule is for PRICES only.
+    private var identityRow: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1).minimumScaleFactor(0.7)
+            Spacer(minLength: 8)
+            Text((listed.map { "\($0.formatted()) listed · " } ?? "") + "\(primaryN) priced")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // Small-caps series key + the "vs" control. Every curve states the n that
+    // backs it, always.
+    private var legendRow: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 5) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.accentColor.opacity(0.45))
+                    .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Color.accentColor, lineWidth: 1))
+                    .frame(width: 9, height: 9)
+                Text("\(primaryLabel) (n=\(primaryN))")
+                    .font(.system(size: 11, weight: .semibold).smallCaps().monospacedDigit())
+            }
+            if showOverlay {
+                HStack(spacing: 5) {
+                    // A line sample, not a box — this series is a stroke, and a
+                    // hollow square beside a filled one misreads as a checkbox.
+                    Capsule().fill(Color.secondary.opacity(0.7))
+                        .frame(width: 12, height: 2)
+                    Text("\(parentLabel) (n=\(parentN))")
+                        .font(.system(size: 11).smallCaps().monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 6)
+            if parentDrawable {
+                Button {
+                    Haptics.tick()
+                    withAnimation(.easeInOut(duration: 0.2)) { overlayOn.toggle() }
+                } label: {
+                    Text("vs")
+                        .font(.system(size: 11, weight: .semibold).smallCaps())
+                        .padding(.horizontal, 9).padding(.vertical, 3)
+                        .background(Capsule().fill(overlayOn ? Color.accentColor.opacity(0.16) : Color(uiColor: .tertiarySystemFill)))
+                        .overlay(Capsule().strokeBorder(overlayOn ? Color.accentColor.opacity(0.5) : .clear, lineWidth: 0.5))
+                        .foregroundStyle(overlayOn ? Color.accentColor : .secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var chart: some View {
+        let primaryPts = silhouette(primary, series: "primary")
+        let parentPts = showOverlay ? silhouette(parent, series: "parent") : []
+        return Chart {
+            // Parent first — a quiet outline BEHIND the filled primary.
+            ForEach(parentPts) { p in
+                LineMark(x: .value("price", p.logX), y: .value("share", p.y),
+                         series: .value("series", p.series))
+                    .interpolationMethod(.monotone)
+                    .lineStyle(StrokeStyle(lineWidth: 1.2))
+                    .foregroundStyle(Color.secondary.opacity(0.55))
+            }
+            ForEach(primaryPts) { p in
+                AreaMark(x: .value("price", p.logX), y: .value("share", p.y),
+                         series: .value("series", p.series))
+                    .interpolationMethod(.monotone)
+                    .foregroundStyle(
+                        LinearGradient(colors: [Color.accentColor.opacity(0.32),
+                                                Color.accentColor.opacity(0.04)],
+                                       startPoint: .top, endPoint: .bottom))
+                LineMark(x: .value("price", p.logX), y: .value("share", p.y),
+                         series: .value("series", p.series))
+                    .interpolationMethod(.monotone)
+                    .lineStyle(StrokeStyle(lineWidth: 1.6))
+                    .foregroundStyle(Color.accentColor)
+            }
+            // Median POSITION — an unlabeled tick. Never a number.
+            if let m = medianLog(primary) {
+                RuleMark(x: .value("median", m), yStart: .value("", 0), yEnd: .value("", 1.0))
+                    .lineStyle(StrokeStyle(lineWidth: 1.5))
+                    .foregroundStyle(Color.accentColor.opacity(0.85))
+            }
+        }
+        .chartXScale(domain: domain)
+        .chartYScale(domain: 0...1.08)
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartLegend(.hidden)
+    }
+
+    // Axis EXTREMES only — the drawn domain's edges. No number in the middle:
+    // the median stays a position, never a print.
+    private var footerRow: some View {
+        HStack {
+            Text(Self.money(pow(10, domain.lowerBound)))
+            Spacer()
+            Text(Self.money(pow(10, domain.upperBound)))
+        }
+        .font(.system(size: 10, design: .monospaced))
+        .foregroundStyle(.secondary)
+    }
+
+    /// One histogram call with a single measured retry: the RPC's first cold
+    /// pass can ride into the anon statement timeout (57014) — the cancelled
+    /// statement still warms the cache, so the second pass completes (measured
+    /// 3.7s cold → 2.1s warm).
+    private func histogram(_ f: [String: String]) async throws -> [PriceBucket] {
+        let params = PriceHistogramParams(p_filters: f, p_buckets: 24)
+        do {
+            return try await SupabaseService.client
+                .rpc("price_histogram", params: params).execute().value
+        } catch {
+            try await Task.sleep(nanoseconds: 500_000_000)
+            return try await SupabaseService.client
+                .rpc("price_histogram", params: params).execute().value
+        }
+    }
+
+    private func load() async {
+        phase = .loading
+        overlayOn = hasYear
+        parent = []
+        // The primary curve first, alone — sequenced so three heavy RPCs never
+        // contend; the card shows the shape the moment it lands.
+        do {
+            primary = try await histogram(filters)
+            phase = primary.count >= 3 ? .ready : .sparse
+        } catch {
+            NSLog("NukeCapture price_histogram load failed: %@", String(describing: error))
+            phase = .sparse
+            return
+        }
+        // Enrichments after — their failure never sinks the card.
+        // LISTED population (the honest denominator): one row from the pulse
+        // RPC, keyed on the pinned value. Absent = omitted, never guessed.
+        let groupKey = hasYear ? "year" : (filters["model"] != nil ? "model" : "make")
+        let pop: [TreemapNode]? = try? await SupabaseService.client
+            .rpc("market_pulse_filtered",
+                 params: PulseFilterParams(p_group_by: groupKey, p_filters: filters, p_limit: 5))
+            .execute().value
+        listed = pop?.first { $0.name == filters[groupKey] }?.count
+        if hasYear, phase == .ready {
+            // The overlay: the same shape with the year filter dropped.
+            parent = (try? await histogram(parentFilters)) ?? []
+        }
+    }
 }
 
 // ─── Watchlist + saved: real, persisted (UserDefaults). Every pulse cell is a thing
