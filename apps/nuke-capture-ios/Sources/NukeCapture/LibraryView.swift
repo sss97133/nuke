@@ -15,7 +15,10 @@ import SwiftUI
 struct LibraryView: View {
     @ObservedObject private var store = LibraryStore.shared
     @State private var detailIndex: Int?
-    @AppStorage("personalMode") private var personalMode = PersonalMode.show
+    // Nuke is a vehicle library: irrelevant (personal, no-vehicle) photos are softened
+    // by DEFAULT, the owner reveals via this toggle or Select. Was `.show` — which opened
+    // the whole camera roll wide (79k daycare/family shots) in a vehicle app.
+    @AppStorage("personalMode.v2") private var personalMode = PersonalMode.blur
     @AppStorage("showVisionTags") private var showVisionTags = false
     @Namespace private var zoomNS
     @ObservedObject private var overlay = LibraryOverlayStore.shared
@@ -179,7 +182,7 @@ struct LibraryCell: View {
     @ObservedObject private var overlay = LibraryOverlayStore.shared
     @StateObject private var loader = LibraryThumbLoader()
     @State private var localID: String?
-    @AppStorage("personalMode") private var personalMode = PersonalMode.show
+    @AppStorage("personalMode.v2") private var personalMode = PersonalMode.blur
     @AppStorage("showVisionTags") private var showVisionTags = false
 
     /// Owner verdict wins, else the auto verdict (the Select tool's whole point).
