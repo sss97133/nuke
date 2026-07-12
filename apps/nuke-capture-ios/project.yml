@@ -42,6 +42,9 @@ targets:
       # App Store Connect scans for it at upload time.
       - path: PrivacyInfo.xcprivacy
         buildPhase: resources
+      # US county polygons (FIPS-keyed GeoJSON) for the market choropleth map.
+      - path: Resources
+        buildPhase: resources
     dependencies:
       - package: Supabase
         product: Supabase
