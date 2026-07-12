@@ -34,9 +34,16 @@ A weak model can't see the difference — these files draw the outline so it doe
 Runtime evidence (rows, active crons, callers) tells you if a thing is *breathing*. It **cannot**
 tell waste from incompletion — an empty table is identical to a shelved prototype from where the
 code sits. Intent (recovered from 5,131 sessions of history + git + docs) tells you if it was
-*meant to be*. The disposition of anything = (runtime state) × (intent). **Never archive off the
-runtime ledger alone** — `disposition.json` carries the corrected, intent-aware fates (it already
-overrides several false "0 rows / dead" runtime verdicts, e.g. the acquisition pipeline).
+*meant to be*. The disposition of anything = (runtime state) × (intent).
+
+**⚠️ NEVER execute an archive/delete straight off `disposition.json` (or any ledger doc).** The
+intent classifier judges by *story*, not by live data. Verified 2026-07-12: of 33 tables it marked
+"safe to archive," ~23 actually held rows, one (`vehicle_value_recompute_queue`) is drained by an
+*active* cron, and `app_config` is live config. Before archiving ANY asset, re-verify against
+runtime at execution time: tables → `count(*)==0` AND no code refs (`git grep`) AND no incoming FK
+AND not touched by a cron/routine; edge functions → not in the deploy list AND no callers (removing
+a deployed function's source just creates a load-bearing zombie); files → git-tracked so the delete
+is recoverable. Archive by moving (tables → an `archive` schema; files → git rm), never DROP.
 
 ## Regenerating
 
