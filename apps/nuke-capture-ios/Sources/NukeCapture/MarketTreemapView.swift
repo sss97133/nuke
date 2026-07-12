@@ -254,13 +254,11 @@ struct MarketTreemapView: View {
                          params: PulseFilterParams(p_group_by: groupBy.rawValue, p_filters: filters, p_limit: 300))
                     .execute().value
             }
-            // Draw the top cells at a readable size; the power-law tail becomes a thin
-            // footer, not slivers and not a dominating block.
-            let sorted = rows.filter { $0.count > 0 }.sorted { $0.count > $1.count }
-            let cap = 16
-            nodes = Array(sorted.prefix(cap))
-            let rest = sorted.dropFirst(cap)
-            tail = rest.isEmpty ? nil : (groups: rest.count, cars: rest.reduce(0) { $0 + $1.count })
+            // Industry standard (finviz market heatmap): show EVERY category, sized to
+            // scale — no "Other" bucket, no data hidden. The power-law tail is small
+            // cells (that's the truth), labeled only where they fit; drill for the rest.
+            nodes = rows.filter { $0.count > 0 }.sorted { $0.count > $1.count }
+            tail = nil
             loading = false
         } catch {
             failed = true; loading = false
