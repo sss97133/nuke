@@ -135,10 +135,16 @@ struct MarketTreemapView: View {
     @State private var gZoomBase: CGFloat? = nil   // zoom at pinch start
     @State private var gPanBase: CGSize = .zero    // pan at pinch start
     @State private var dragBase: CGSize? = nil     // pan at drag start
-    private let chromeInset: CGFloat = 100         // at-rest clearance under the floating chrome
+    private let chromeInset: CGFloat = 150         // at-rest clearance: floating toggle + header + pivot row
     @State private var nodes: [TreemapNode] = []
     @State private var loading = true
     @State private var failed = false
+    // Rank-spread of the active lens across the visible nodes (plan: quantile-rank
+    // spreading when cells bunch). Absolute era/price/gap values cluster in the mid-range,
+    // so most cells would land on the same hue; ranking spends the full ramp so adjacent
+    // cohorts separate. Recomputed on load + lens change; missing datum → not in the map
+    // → neutral cell. The legend still reads lo→hi (rank preserves order).
+    @State private var rankT: [String: Double] = [:]
     // The power-law tail we did NOT draw as cells (too many, too small) — surfaced as a
     // thin honest footer instead of a giant block that would dominate the head.
     @State private var tail: (groups: Int, cars: Int)? = nil
@@ -219,27 +225,68 @@ struct MarketTreemapView: View {
         }
     }
 
-    /// Perceptually-graded ramps: hue AND lightness move together (the expert fix — a
-    /// heatmap needs value contrast, not hue-only). Both lenses share one lightness
-    /// envelope (dark low → light high) so switching feels like the same instrument.
+    /// Perceptually-graded ramps interpolated in HSB, not RGB. Linear RGB between two hues
+    /// slumps through desaturated GRAY at the midpoint (amber→teal = mud) — the exact
+    /// "muddy palette" defect. In HSB, saturation stays high the whole way, so every cell
+    /// reads as a live heat value. Hue AND brightness climb together (one lightness
+    /// envelope across lenses); saturation stays vivid so mid-range cells still separate.
+    private func lerpHue(_ a: Double, _ b: Double, _ t: Double, longWay: Bool = false) -> Double {
+        var d = b - a
+        if longWay { if abs(d) < 0.5 { d += (d >= 0 ? -1.0 : 1.0) } }
+        else       { if abs(d) > 0.5 { d += (d >= 0 ? -1.0 : 1.0) } }
+        var h = a + d * t
+        if h < 0 { h += 1 }; if h > 1 { h -= 1 }
+        return h
+    }
     private func lensRamp(_ t: Double) -> Color {
         let s = max(0, min(1, t))
         func m(_ a: Double, _ b: Double) -> Double { a + (b - a) * s }
         switch lens {
-        case .era:   // classic deep amber → modern light teal (lightness climbs with year)
-            return Color(red: m(0.42, 0.42), green: m(0.24, 0.74), blue: m(0.14, 0.80))
-        case .price: // value deep green → premium bright gold (lightness climbs with price)
-            return Color(red: m(0.10, 0.92), green: m(0.34, 0.74), blue: m(0.24, 0.20))
-        case .gap:   // parity cool slate → wide-gap hot ember (opportunity draws the eye)
-            return Color(red: m(0.28, 0.90), green: m(0.34, 0.38), blue: m(0.42, 0.16))
+        case .era:   // classic warm amber → modern cool cyan, hue sweeping through vivid
+                     // orange/green (never gray); brightness climbs with the year.
+            return Color(hue: lerpHue(0.075, 0.505, s), saturation: m(0.82, 0.70), brightness: m(0.74, 0.94))
+        case .price: // value green → premium gold: a saturated "money" sequential ramp,
+                     // brightness climbing so premium cohorts glow.
+            return Color(hue: lerpHue(0.385, 0.130, s), saturation: m(0.68, 0.90), brightness: m(0.58, 0.97))
+        case .gap:   // parity muted slate → wide-gap hot ember. Hue takes the LONG way
+                     // (slate→indigo→magenta→red) to skip green, so widening gaps read as
+                     // rising heat; saturation ramps hard so opportunity draws the eye.
+            return Color(hue: lerpHue(0.585, 1.02, s, longWay: true), saturation: m(0.24, 0.92), brightness: m(0.60, 0.95))
         }
     }
 
     /// Cell fill for the current lens; a flat elevated neutral when the datum is missing
-    /// (never a fabricated color, never a redundant size-ramp).
+    /// (never a fabricated color, never a redundant size-ramp). Uses the rank-spread
+    /// position so bunched values still separate, falling back to the raw position for
+    /// nodes rendered outside the top set (e.g. the folded tail's own children).
     private func cellFill(_ n: TreemapNode) -> Color {
+        // The "Unresolved" work-queue bucket is not a real cohort — it has no defensible
+        // era/price/gap, so it never takes a lens color. A quiet desaturated slate marks
+        // it as "not yet sorted," so it never out-shouts a real make on the heat map.
+        if n.name == "Unresolved" { return Color(uiColor: .systemGray3) }
+        if let r = rankT[n.name] { return lensRamp(r) }
         guard let t = lensT(n) else { return Color(uiColor: .tertiarySystemFill) }
         return lensRamp(t)
+    }
+    /// Rank-spread the active lens across the visible nodes. Ties share a midpoint rank so
+    /// identical values read identically. O(n log n), recomputed only on load/lens change.
+    private func recomputeRank() {
+        let vals: [(String, Double)] = nodes.compactMap { n in lensT(n).map { (n.name, $0) } }
+        guard vals.count > 1 else {
+            rankT = vals.reduce(into: [:]) { $0[$1.0] = 0.5 }; return
+        }
+        let sorted = vals.sorted { $0.1 < $1.1 }
+        let denom = Double(sorted.count - 1)
+        var out: [String: Double] = [:]
+        var i = 0
+        while i < sorted.count {
+            var j = i
+            while j + 1 < sorted.count && sorted[j + 1].1 == sorted[i].1 { j += 1 }  // tie run
+            let rank = (Double(i) + Double(j)) / 2 / denom                             // shared midpoint
+            for k in i...j { out[sorted[k].0] = rank }
+            i = j + 1
+        }
+        rankT = out
     }
     /// Contrast-correct text for any fill (luminance test) — works across every ramp.
     private func fg(on fill: Color) -> Color {
@@ -298,9 +345,9 @@ struct MarketTreemapView: View {
     }
 
     // A drill cell (head or tail): tap → deeper, long-press → instrument menu, felt weight.
-    @ViewBuilder private func drillCell(_ n: TreemapNode) -> some View {
+    @ViewBuilder private func drillCell(_ n: TreemapNode, labelTopInset: CGFloat = 0) -> some View {
         let s = step(n)
-        NavigationLink(value: s) { cellBody(n) }
+        NavigationLink(value: s) { cellBody(n, labelTopInset: labelTopInset) }
             .buttonStyle(.plain)
             .contextMenu { cellMenu(n) }
             .simultaneousGesture(TapGesture().onEnded {
@@ -353,12 +400,19 @@ struct MarketTreemapView: View {
                 if !nodes.isEmpty { colorMenu.padding(.trailing, 12) }
             }
         }
-        .padding(.top, 4).padding(.bottom, 6)
+        // Clear the floating Map/Pulse toggle that rides above (ExploreView), so the
+        // header + pivot row sit just beneath it as one continuous glass stack.
+        .padding(.top, 44).padding(.bottom, 8)
+        // UNIFORM frosted material (not a translucent color wash) so the header reads as
+        // one consistent piece of chrome regardless of the cell hue beneath it — no
+        // two-tone bleed, no seam showing through. Fades into the live market at its edge.
         .background(
-            LinearGradient(colors: [Color(uiColor: .systemBackground).opacity(0.9),
-                                    Color(uiColor: .systemBackground).opacity(0.55),
-                                    .clear],
-                           startPoint: .top, endPoint: .bottom)
+            Rectangle().fill(.regularMaterial)
+                .mask(LinearGradient(stops: [.init(color: .black, location: 0),
+                                             .init(color: .black, location: 0.72),
+                                             .init(color: .clear, location: 1)],
+                                     startPoint: .top, endPoint: .bottom))
+                .ignoresSafeArea(edges: .top)
                 .allowsHitTesting(false)
         )
     }
@@ -378,9 +432,15 @@ struct MarketTreemapView: View {
                         .buttonBorderShape(.capsule)
                     }
                 }
-                .padding(.leading, 12)
+                .padding(.leading, 12).padding(.trailing, 4)
             }
         }
+        // Fade the strip's trailing edge so chips dissolve INTO the lens button instead of
+        // being guillotined by its hard edge — the two controls read as one row, not a collision.
+        .mask(LinearGradient(stops: [.init(color: .black, location: 0),
+                                     .init(color: .black, location: 0.9),
+                                     .init(color: .clear, location: 1)],
+                             startPoint: .leading, endPoint: .trailing))
     }
 
     var body: some View {
@@ -409,19 +469,22 @@ struct MarketTreemapView: View {
                         // ScrollView) so pinch zooms WHERE THE FINGERS ARE (Photos-style), and
                         // every NavigationLink/contextMenu/haptic on the cells stays intact.
                         let W = geo.size.width, VH = geo.size.height
-                        let canvasH = VH * 2.6
+                        // Canvas is taller than the viewport (pan to see the tail), but not
+                        // SO tall that the big makes stretch into full-width bands — 1.7·H
+                        // keeps the head packing as a 2D mosaic (finviz), tail still one pan away.
+                        let canvasH = VH * 1.7
                         let laid = squarify(nodes, in: CGRect(x: 0, y: 0, width: W, height: canvasH))
                         ZStack(alignment: .topLeading) {
                             ForEach(laid, id: \.node.id) { item in
-                                drillCell(item.node)
+                                // The market flows EDGE-TO-EDGE (cells from y=0, behind the
+                                // floating chrome); only the top-row cells inset their LABEL
+                                // so the name clears the glass while the color bleeds up under it.
+                                drillCell(item.node, labelTopInset: max(0, chromeInset - item.rect.minY))
                                     .frame(width: item.rect.width * zoom, height: item.rect.height * zoom)
                                     .offset(x: item.rect.minX * zoom, y: item.rect.minY * zoom)
                             }
                         }
                         .frame(width: W * zoom, height: canvasH * zoom, alignment: .topLeading)
-                        // At rest the first labels clear the floating chrome; panning up
-                        // slides the market UNDER it (the scrim keeps the header legible).
-                        .padding(.top, chromeInset)
                         .offset(pan)
                         .frame(width: W, height: VH, alignment: .topLeading)
                         .clipped()
@@ -438,7 +501,7 @@ struct MarketTreemapView: View {
                                     let np = CGSize(width: f.x - (f.x - gPanBase.width) * (zNew / base),
                                                     height: f.y - (f.y - gPanBase.height) * (zNew / base))
                                     zoom = zNew
-                                    pan = clampPan(np, content: CGSize(width: W * zNew, height: canvasH * zNew + chromeInset),
+                                    pan = clampPan(np, content: CGSize(width: W * zNew, height: canvasH * zNew),
                                                    viewport: geo.size)
                                 }
                                 .onEnded { _ in gZoomBase = nil }
@@ -449,14 +512,14 @@ struct MarketTreemapView: View {
                                             let b = dragBase ?? pan
                                             pan = clampPan(CGSize(width: b.width + d.translation.width,
                                                                   height: b.height + d.translation.height),
-                                                           content: CGSize(width: W * zoom, height: canvasH * zoom + chromeInset),
+                                                           content: CGSize(width: W * zoom, height: canvasH * zoom),
                                                            viewport: geo.size)
                                         }
                                         .onEnded { d in
                                             let b = dragBase ?? pan
                                             let target = clampPan(CGSize(width: b.width + d.predictedEndTranslation.width,
                                                                          height: b.height + d.predictedEndTranslation.height),
-                                                                  content: CGSize(width: W * zoom, height: canvasH * zoom + chromeInset),
+                                                                  content: CGSize(width: W * zoom, height: canvasH * zoom),
                                                                   viewport: geo.size)
                                             withAnimation(.easeOut(duration: 0.4)) { pan = target }   // flick momentum
                                             dragBase = nil
@@ -466,10 +529,31 @@ struct MarketTreemapView: View {
                 }
             }
             .overlay(alignment: .top) { chrome }
+            // The cells run under the OS search field; a bottom scrim that reaches SOLID
+            // background masks them fully so no make name bleeds through the search chrome
+            // (Apple pattern — content is never the search field's backdrop).
+            .overlay(alignment: .bottom) {
+                LinearGradient(stops: [.init(color: .clear, location: 0),
+                                       .init(color: Color(uiColor: .systemBackground).opacity(0.75), location: 0.45),
+                                       .init(color: Color(uiColor: .systemBackground), location: 0.8)],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: 150)
+                    .allowsHitTesting(false)
+                    .ignoresSafeArea(edges: .bottom)
+            }
             .ignoresSafeArea(edges: .bottom)
             .task(id: "\(groupBy.rawValue)|\(filters.sorted { $0.key < $1.key }.map { "\($0)=\($1)" }.joined(separator: ","))") {
                 await load()
             }
+            .onChange(of: lensRaw) { recomputeRank() }   // re-spread when the lens switches
+            #if DEBUG
+            // Screenshot loop: NUKE_DEBUG_PULSE_LENS=era|price|gap forces the color lens
+            // so the board can capture each lens deterministically. DEBUG only.
+            .onAppear {
+                if let l = ProcessInfo.processInfo.environment["NUKE_DEBUG_PULSE_LENS"],
+                   ColorLens(rawValue: l) != nil { lensRaw = l }
+            }
+            #endif
     }
 
     // The pin path so a drilled treemap says where it is: "Chevrolet › Corvette · by year".
@@ -573,7 +657,7 @@ struct MarketTreemapView: View {
         }
     }
 
-    @ViewBuilder private func cellBody(_ n: TreemapNode, tail: Bool = false) -> some View {
+    @ViewBuilder private func cellBody(_ n: TreemapNode, tail: Bool = false, labelTopInset: CGFloat = 0) -> some View {
         let fill: Color = tail ? Color(uiColor: .systemFill) : cellFill(n)
         let ink: Color = tail ? .primary : fg(on: fill)
         GeometryReader { g in
@@ -591,12 +675,15 @@ struct MarketTreemapView: View {
                     .foregroundStyle(ink)
                 if mid {
                     Text(n.count.formatted())
-                        .font(.system(size: big ? 14 : 11, weight: .regular).monospacedDigit())
-                        .foregroundStyle(ink.opacity(0.6))
+                        .font(.system(size: big ? 14 : 11, weight: .medium).monospacedDigit())
+                        .foregroundStyle(ink.opacity(0.82))
                         .lineLimit(1).minimumScaleFactor(0.7)
                 }
             }
             .padding(big ? 12 : 6)
+            // Top-row cells fill edge-to-edge behind the floating chrome; their label is
+            // pushed down so the name clears the glass (the fill still bleeds up under it).
+            .padding(.top, labelTopInset)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(fill)
             .overlay(alignment: .bottomTrailing) {
@@ -683,6 +770,7 @@ struct MarketTreemapView: View {
     }
 
     private func load() async {
+        defer { recomputeRank() }   // re-spread the lens whenever the node set changes
         // The folded-tail sub-page renders injected nodes directly — no RPC.
         if let injected = injectedNodes {
             nodes = injected.sorted { $0.count > $1.count }

@@ -76,7 +76,14 @@ struct ExploreView: View {
     @State private var feedStage = "Reading the market…"
     // Landing has two lenses on the SAME market: the metro list (where) and the
     // treemap (what, by volume). Both drill into the cohort terminal.
-    @State private var landingMode: LandingMode = .map
+    @State private var landingMode: LandingMode = {
+        #if DEBUG
+        // Screenshot loop: NUKE_DEBUG_EXPLORE_MODE=pulse roots straight on the treemap
+        // (matches the NUKE_DEBUG_* deep-link pattern; DEBUG only, never ships).
+        if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "pulse" { return .treemap }
+        #endif
+        return .map
+    }()
     enum LandingMode: Hashable { case metros, treemap, map }
 
     // 3-column square grid, 2pt gutters — the SEARCH-results photo grid.
@@ -210,8 +217,17 @@ struct ExploreView: View {
     }
 
     // ─── LANDING — two lenses on one market (metros / treemap), segmented toggle ─
+    // The market flows EDGE-TO-EDGE; the Map/Pulse toggle FLOATS over it as glass (no
+    // opaque strip). Each lens carries its own floating chrome below the toggle.
     @ViewBuilder private var marketLanding: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .top) {
+            Group {
+                switch landingMode {
+                case .metros:  metroList
+                case .map:     MarketMapView()
+                case .treemap: MarketTreemapView()
+                }
+            }
             // Two lenses on one market: the Map (geography) and the Pulse (a treemap
             // pivotable by make/model/year/metro/day). "Metros" retired — it was just
             // one grouping; it now lives inside the Pulse's Metro dimension.
@@ -220,12 +236,19 @@ struct ExploreView: View {
                 Text("Pulse").tag(LandingMode.treemap)
             }
             .pickerStyle(.segmented)
-            .padding(.horizontal, 12).padding(.top, 6).padding(.bottom, 4)
-            switch landingMode {
-            case .metros:  metroList
-            case .map:     MarketMapView()
-            case .treemap: MarketTreemapView()
-            }
+            .padding(.horizontal, 12).padding(.top, 4).padding(.bottom, 10)
+            // Floating glass: one UNIFORM frosted material for the toggle + status bar so
+            // it reads as chrome (not a color wash that samples the cells below), fading
+            // into the live market at its lower edge.
+            .background(
+                Rectangle().fill(.regularMaterial)
+                    .mask(LinearGradient(stops: [.init(color: .black, location: 0),
+                                                 .init(color: .black, location: 0.7),
+                                                 .init(color: .clear, location: 1)],
+                                         startPoint: .top, endPoint: .bottom))
+                    .ignoresSafeArea(edges: .top)
+                    .allowsHitTesting(false)
+            )
         }
     }
 
