@@ -105,3 +105,32 @@ defensible from measured coverage — when in doubt, measure prod first (that's 
 velocity died). Skylar's rulings this session: industry standard > novelty; the metric is
 a haptic control; the phone is a window, not a frame; size must be the math of the data;
 native Liquid Glass, no white blockout.
+
+---
+
+## END-OF-NIGHT ADDENDUM (written at close-out, ~9:30pm)
+
+**Detached machines running overnight (no session needed):**
+- BaT devour: 5 workers, ~390/hr, self-healing supervisor, ~61K tail (~6.5 days;
+  BaT-side throttle is the ceiling). State: ~/bat-backfill/ (done.txt/backfill.log).
+- Canonical finisher: scratchpad/finish_canonical.sh (nohup, logged to
+  finish_canonical.log): drains last make-map rows → atomic canonical pivot swap →
+  county-map PostGIS deploy → verification. Check the log for final numbers.
+
+**Landed tonight (all pushed, chain …→8580b9102):** Gap lens (arbitrage), edge-to-edge
+Liquid Glass, collision+honesty fixes, price_histogram RPC, CohortDistributionCard
+(bell curve + overlay — Analyst Toolbox move 1), write-path fix (42.96s→38ms: ONE
+missing index on upper(trim(vin)), not 38 triggers), pulse-metrics + histogram +
+write-path migrations committed in nuke repo.
+
+**Doctrine now governing (docs/features/explore/):** THEORY.md (the loop:
+EXPLORE→FIND→TRACK→USE; identity law; One Query Language) + ANALYST_TOOLBOX.md
+(8-family gap map, Data Foundation: 13.9M comments/39.9M images/628K raw snapshots
+held-not-connected, refactor law: reading layers over rebuilds, the FIVE moves).
+
+**Next session, in order:** (1) verify canonical swap results + wire iOS pivots to
+canonical groups w/ Unresolved cell; (2) Toolbox move 2 — BaT liquidity panel
+(mv_cohort_metrics reading layer); (3) auction calendar + score the hammer_predictions
+maturity **2026-07-15 — DO NOT MISS**; (4) saved screens → alerts.
+Flags: price_histogram can exceed anon timeout under load (index/timeout look);
+vehicles_by_filters wants the one-retry pattern.
