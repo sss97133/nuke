@@ -263,6 +263,52 @@ function extractCraigslistListingUrls(
 }
 
 /**
+ * Generic listing-URL extraction for non-Craigslist firecrawl_html feeds,
+ * driven by per-feed config instead of code:
+ *   search_criteria.listing_url_regex  — JS regex source, run with 'gi';
+ *     each full match (m[0]) is one listing URL.
+ *   search_criteria.listing_url_prefix — origin prepended to relative matches
+ *     (a match not starting with http). Relative match + no prefix = dropped.
+ * Bounded at 500 distinct URLs — a regex that matches more than that on one
+ * search page is matching navigation, not listings.
+ */
+function extractListingUrlsByRegex(
+  html: string | null,
+  markdown: string | null,
+  regexSource: string,
+  prefix: string | null,
+  sourceSlug: string
+): string[] {
+  const haystack = `${html || ""}\n${markdown || ""}`;
+  let re: RegExp;
+  try {
+    re = new RegExp(regexSource, "gi");
+  } catch (_) {
+    // Invalid regex is a config error — surface it as parsed_zero (the feed
+    // row's last_error will carry it via the caller's failFeed path).
+    console.error(`[poll-feeds] invalid listing_url_regex for ${sourceSlug}: ${regexSource}`);
+    return [];
+  }
+  const out = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(haystack)) !== null && out.size < 500) {
+    // Zero-width match would loop forever — bump lastIndex like the spec does.
+    if (m[0] === "") {
+      re.lastIndex++;
+      continue;
+    }
+    const raw = m[0];
+    const abs = raw.startsWith("http")
+      ? raw
+      : prefix
+        ? `${prefix.replace(/\/+$/, "")}${raw.startsWith("/") ? "" : "/"}${raw}`
+        : null;
+    if (abs) out.add(cleanListingUrl(abs, sourceSlug));
+  }
+  return [...out];
+}
+
+/**
  * Poll one firecrawl_html feed: Firecrawl-fetch the search page, extract
  * listing URLs, ingest unknown ones (capped), and write honest bookkeeping
  * to the feed row. Never throws; every failure lands in last_error.
@@ -324,6 +370,20 @@ async function pollFirecrawlHtmlFeed(
             .map((i) => cleanListingUrl(i.link, feed.source_slug))
         ),
       ];
+      // Optional per-feed filter: an RSS feed that mixes listings with
+      // editorial (or links out to third-party listing pages in the body)
+      // can restrict what reaches `ingest` to links matching the configured
+      // regex. Same config key as the firecrawl_html path.
+      if (feed.search_criteria?.listing_url_regex) {
+        try {
+          const re = new RegExp(feed.search_criteria.listing_url_regex, "i");
+          urls = urls.filter((u) => re.test(u));
+        } catch (_) {
+          return await failFeed(
+            `config_error: invalid listing_url_regex ${feed.search_criteria.listing_url_regex}`
+          );
+        }
+      }
     } catch (err: any) {
       return await failFeed(`fetch_failed: rss ${err?.message || String(err)}`);
     }
@@ -332,14 +392,41 @@ async function pollFirecrawlHtmlFeed(
     let markdown: string | null = null;
     const fetchErrors: string[] = [];
 
-    if ((Deno.env.get("FIRECRAWL_API_KEY") || "").trim()) {
+    // Server-rendered sources (KSL, Hagerty, ClassicCars) carry their listing
+    // links in plain HTML — fetching them through Firecrawl works but spends
+    // credits for nothing. prefer_direct_fetch=true tries the free direct
+    // fetch first; Firecrawl below remains the fallback either way.
+    if (feed.search_criteria?.prefer_direct_fetch === true) {
+      try {
+        const direct = await archiveFetch(feed.feed_url, {
+          platform: feed.source_slug || "unknown",
+          skipCache: true,
+          useFirecrawl: false,
+          includeMarkdown: false,
+          callerName: "poll-listing-feeds",
+        });
+        html = direct.html;
+        if (!html && direct.error)
+          fetchErrors.push(`direct-first: ${direct.error}`);
+      } catch (err: any) {
+        fetchErrors.push(`direct-first: ${err?.message || String(err)}`);
+      }
+    }
+
+    if (!html && (Deno.env.get("FIRECRAWL_API_KEY") || "").trim()) {
       try {
         const scrape = await firecrawlScrape({
           url: feed.feed_url,
           formats: ["html", "markdown"],
           onlyMainContent: false,
-          waitFor: 3000,
+          // JS-heavy SPAs (Cars & Bids, Mecum) need longer render waits;
+          // bot-walled sites (Hemmings, eBay) need the stealth proxy. Both
+          // are per-feed config, not code.
+          waitFor: feed.search_criteria?.firecrawl_wait_for ?? 3000,
           timeout: 30000,
+          ...(feed.search_criteria?.firecrawl_proxy
+            ? { proxy: feed.search_criteria.firecrawl_proxy }
+            : {}),
         });
         html = scrape.data.html;
         markdown = scrape.data.markdown;
@@ -380,7 +467,17 @@ async function pollFirecrawlHtmlFeed(
       );
     }
 
-    urls = extractCraigslistListingUrls(html, markdown);
+    // Per-feed regex config generalizes this path beyond Craigslist; feeds
+    // without a listing_url_regex keep the CL extractor (the original behavior).
+    urls = feed.search_criteria?.listing_url_regex
+      ? extractListingUrlsByRegex(
+          html,
+          markdown,
+          feed.search_criteria.listing_url_regex,
+          feed.search_criteria.listing_url_prefix || null,
+          feed.source_slug
+        )
+      : extractCraigslistListingUrls(html, markdown);
   }
 
   result.items_found = urls.length;
