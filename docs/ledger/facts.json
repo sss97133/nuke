@@ -3,10 +3,10 @@
   "project_ref": "qkgaybvrernstplzjaam",
   "counts": {
     "fn_dirs_on_disk": 201,
-    "deployed": 290,
+    "deployed": 291,
     "invoked_by_frontend": 92,
     "dynamic_invoke_sites_unresolved": 12,
-    "broken_frontend_calls": 44,
+    "broken_frontend_calls": 43,
     "ghost_ref_errors": 6
   },
   "deployed": [
@@ -72,6 +72,7 @@
     "check-vendor-balances",
     "classify-receipt-scope",
     "collecting-cars-discovery",
+    "complete-bat-import",
     "compute-build-timeline",
     "compute-data-quality-snapshot",
     "compute-org-seller-stats",
@@ -611,7 +612,6 @@
     "backfill-profile-stats",
     "calculate-advanced-metrics",
     "calculate-market-indexes",
-    "complete-bat-import",
     "create-payout",
     "create-setup-session",
     "create-shipping-listing",
@@ -645,6 +645,7 @@
     "vehicle-expert-agent"
   ],
   "drift": [
+    "DEAD fn \"complete-bat-import\" is deployed AND invoked by the frontend — verdict stale",
     "DEAD fn \"sync-bat-listing\" is deployed AND invoked by the frontend — verdict stale",
     "DEAD fn \"unified-scraper-orchestrator\" is deployed AND invoked by the frontend — verdict stale",
     "DEAD fn \"analyze-image\" is deployed AND invoked by the frontend — verdict stale",
