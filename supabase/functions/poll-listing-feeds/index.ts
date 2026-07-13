@@ -308,6 +308,178 @@ function extractListingUrlsByRegex(
   return [...out];
 }
 
+/** Cost bound for rss_article_hop: max articles fetched per feed per poll. */
+const MAX_ARTICLE_HOPS_PER_POLL = 8;
+
+/**
+ * Poll one rss_article_hop feed (e.g. Barn Finds): the RSS items are curated
+ * ARTICLES, each covering one for-sale vehicle listed elsewhere; the article
+ * body carries the ORIGINAL listing URL (CL/eBay/FB). Two hops:
+ *   RSS → new article URLs → fetch article → extract target listing URL via
+ *   search_criteria.article_link_regex (first capture group, or m[0] if no
+ *   group) → POST the TARGET to `ingest`.
+ * Ledger discipline differs from the one-hop path on purpose: the ARTICLE URL
+ * is ledgered once processed regardless of the target's ingest outcome —
+ * curated posts age out of the RSS within a day, and a login-walled target
+ * (FB) would otherwise burn a hop slot retrying forever. One shot per article.
+ */
+async function pollArticleHopFeed(supabase: any, feed: any): Promise<FeedResult> {
+  const result: FeedResult = {
+    feed: feed.display_name,
+    source: feed.source_slug,
+    items_found: 0,
+    new_ingested: 0,
+    matched_existing: 0,
+    rejected: 0,
+    ingest_outcomes: [],
+    error: null,
+  };
+
+  const failFeed = async (message: string): Promise<FeedResult> => {
+    result.error = message;
+    console.error(`[poll-feeds] ${feed.display_name}: ${message}`);
+    await supabase
+      .from("listing_feeds")
+      .update({
+        last_polled_at: new Date().toISOString(),
+        last_poll_count: result.items_found,
+        error_count: (feed.error_count || 0) + 1,
+        last_error: message.slice(0, 500),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", feed.id);
+    return result;
+  };
+
+  const linkRegexSource = feed.search_criteria?.article_link_regex;
+  if (!linkRegexSource) {
+    return await failFeed("config_error: rss_article_hop requires search_criteria.article_link_regex");
+  }
+  let linkRegex: RegExp;
+  try {
+    linkRegex = new RegExp(linkRegexSource, "i");
+  } catch (_) {
+    return await failFeed(`config_error: invalid article_link_regex ${linkRegexSource}`);
+  }
+
+  let articleUrls: string[] = [];
+  try {
+    const items = await fetchAndParseRssFeed(feed.feed_url);
+    articleUrls = [
+      ...new Set(
+        items.filter((i) => i.link).map((i) => cleanListingUrl(i.link, feed.source_slug))
+      ),
+    ];
+  } catch (err: any) {
+    return await failFeed(`fetch_failed: rss ${err?.message || String(err)}`);
+  }
+  result.items_found = articleUrls.length;
+  if (articleUrls.length === 0) return await failFeed("parsed_zero");
+
+  // Skip articles already processed (ledgered under the ARTICLE url).
+  const known = new Set<string>();
+  for (let i = 0; i < articleUrls.length; i += 40) {
+    const chunk = articleUrls.slice(i, i + 40);
+    const { data: ledgered, error: ledgerError } = await supabase
+      .from("import_queue")
+      .select("listing_url")
+      .in("listing_url", chunk)
+      .in("status", ["complete", "skipped"]);
+    if (ledgerError) return await failFeed(`fetch_failed: ledger lookup: ${ledgerError.message}`);
+    for (const q of ledgered || []) known.add(q.listing_url);
+  }
+  result.matched_existing = known.size;
+  const fresh = articleUrls.filter((u) => !known.has(u)).slice(0, MAX_ARTICLE_HOPS_PER_POLL);
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  for (const articleUrl of fresh) {
+    let targetUrl: string | null = null;
+    let outcome = "no_target";
+    let detail: string | undefined;
+    try {
+      const page = await archiveFetch(articleUrl, {
+        platform: feed.source_slug,
+        useFirecrawl: false,
+        includeMarkdown: false,
+        callerName: "poll-listing-feeds",
+      });
+      const m = page.html ? linkRegex.exec(page.html) : null;
+      targetUrl = m ? (m[1] ?? m[0]) : null;
+
+      if (targetUrl) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 85000); // > ingest's 75s internal enrich timeout
+        const resp = await fetch(`${supabaseUrl}/functions/v1/ingest`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ url: targetUrl }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        const ingest = await resp.json().catch(() => ({
+          status: "error",
+          error: `ingest HTTP ${resp.status} (non-JSON body)`,
+        }));
+        outcome = ingest.status || "error";
+        detail = ingest.error || ingest.reason;
+        if (outcome === "created") result.new_ingested!++;
+        else if (outcome === "matched" || outcome === "duplicate") result.matched_existing!++;
+        else if (outcome === "rejected") result.rejected!++;
+      }
+    } catch (err: any) {
+      outcome = "error";
+      detail = (err?.message || String(err)).slice(0, 200);
+    }
+
+    result.ingest_outcomes!.push({
+      url: targetUrl || articleUrl,
+      status: outcome,
+      ...(detail ? { error: String(detail).slice(0, 200) } : {}),
+    });
+
+    // One shot per article, whatever happened (see doc comment above).
+    const { error: ledgerWriteError } = await supabase.from("import_queue").upsert(
+      {
+        listing_url: articleUrl,
+        status: ["created", "matched", "duplicate"].includes(outcome) ? "complete" : "skipped",
+        processed_at: new Date().toISOString(),
+        raw_data: {
+          feed_id: feed.id,
+          ingested_via: "rss_article_hop",
+          target_url: targetUrl,
+          target_outcome: outcome,
+          ...(detail ? { detail: String(detail).slice(0, 200) } : {}),
+        },
+      },
+      { onConflict: "listing_url" }
+    );
+    if (ledgerWriteError) {
+      console.error(`[poll-feeds] article-hop ledger write failed for ${articleUrl}: ${ledgerWriteError.message}`);
+    }
+
+    await new Promise((r) => setTimeout(r, 250));
+  }
+
+  await supabase
+    .from("listing_feeds")
+    .update({
+      last_polled_at: new Date().toISOString(),
+      last_poll_count: articleUrls.length,
+      total_items_found: (feed.total_items_found || 0) + articleUrls.length,
+      error_count: 0,
+      last_error: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", feed.id);
+
+  return result;
+}
+
 /**
  * Poll one firecrawl_html feed: Firecrawl-fetch the search page, extract
  * listing URLs, ingest unknown ones (capped), and write honest bookkeeping
@@ -792,6 +964,15 @@ Deno.serve(async (req) => {
       // Curated direct-ingest strategies (Craigslist HTML via Firecrawl, BaT
       // RSS). Both bypass the legacy import_queue path entirely and route
       // through `ingest` with the share-URL ledger.
+      if (feed.search_criteria?.fetch_strategy === "rss_article_hop") {
+        const hopResult = await pollArticleHopFeed(supabase, feed);
+        results.push(hopResult);
+        totalFound += hopResult.items_found;
+        totalIngested += hopResult.new_ingested || 0;
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+
       if (
         ["firecrawl_html", "rss_direct_ingest"].includes(
           feed.search_criteria?.fetch_strategy
