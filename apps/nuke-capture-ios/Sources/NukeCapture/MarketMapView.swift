@@ -66,7 +66,8 @@ struct MarketMapView: View {
                 }
                 Spacer()
             }
-            .padding(.horizontal, 12).padding(.top, 8)
+            // Clear the floating Map/Pulse toggle riding above (ExploreView).
+            .padding(.horizontal, 12).padding(.top, 52)
 
             if loading {
                 HStack(spacing: 8) {
@@ -77,7 +78,7 @@ struct MarketMapView: View {
                 }
                 .padding(.horizontal, 12).padding(.vertical, 8)
                 .background(.ultraThinMaterial, in: Capsule())
-                .padding(.top, 8)
+                .padding(.top, 52)
             } else if failed {
                 ContentUnavailableView {
                     Label("Couldn't load map", systemImage: "map")
