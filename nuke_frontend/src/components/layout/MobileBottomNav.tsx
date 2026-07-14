@@ -11,9 +11,15 @@ export const MobileBottomNav: React.FC = () => {
     let cancelled = false;
     const fetchCount = async () => {
       try {
+        // Scope to the signed-in user: hits the partial index
+        // idx_vehicle_images_unorganized (user_id, created_at) WHERE vehicle_id IS NULL.
+        // The unscoped variant counted every user's orphans and timed out (15s 500).
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
         const { count } = await supabase
           .from('vehicle_images')
           .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
           .is('vehicle_id', null)
           .or('organization_status.eq.unorganized,organization_status.is.null');
         if (!cancelled && count != null) setInboxCount(count);

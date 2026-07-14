@@ -79,8 +79,27 @@ export function VehicleLedgerDocumentsCard(props: {
       if (docsRes.error) throw docsRes.error;
       if (receiptsRes.error) throw receiptsRes.error;
 
+      let receiptRows = (receiptsRes.data as any[]) || [];
+
+      // Fallback for anon / non-owner visitors: base `receipts` is owner-only
+      // RLS (2026-07-06 RLS lockdown). For a public vehicle, pull the same
+      // safe columns from `receipts_public_summary` instead.
+      if (receiptRows.length === 0) {
+        const publicReceiptsRes = await supabase
+          .from('receipts_public_summary')
+          .select('id,source_document_id,source_document_table,processing_status,vendor_name,total,currency,created_at')
+          .eq('source_document_table', 'vehicle_documents')
+          .eq('scope_type', 'vehicle')
+          .eq('scope_id', vehicleId)
+          .order('created_at', { ascending: false })
+          .limit(2000);
+        if (!publicReceiptsRes.error && publicReceiptsRes.data) {
+          receiptRows = publicReceiptsRes.data as any[];
+        }
+      }
+
       setDocs((docsRes.data as any[]) || []);
-      setReceipts((receiptsRes.data as any[]) || []);
+      setReceipts(receiptRows);
     } catch (e: any) {
       setDocs([]);
       setReceipts([]);

@@ -13,11 +13,26 @@ export default function SystemStatus() {
   const [expandedSection, setExpandedSection] = useState<ExpandedSection>(null);
   const [listData, setListData] = useState<any[]>([]);
   const [selectedImage, setSelectedImage] = useState<any>(null);
+  const [pulse, setPulse] = useState<any>(null);
 
   useEffect(() => {
     loadStats();
     const interval = setInterval(loadStats, 2000); // Fast refresh
     return () => clearInterval(interval);
+  }, []);
+
+  // Pipeline pulse: throughput per organ per day. Exit codes lie (workflows
+  // reported green while ingestion flatlined Jun 3-10); rows/day does not.
+  useEffect(() => {
+    const loadPulse = async () => {
+      try {
+        const { data } = await supabase.rpc('get_pipeline_pulse', { p_days: 14 });
+        if (data && !data.error) setPulse(data);
+      } catch { /* pulse is supplementary */ }
+    };
+    loadPulse();
+    const t = setInterval(loadPulse, 60_000);
+    return () => clearInterval(t);
   }, []);
 
   const loadListData = async (section: ExpandedSection) => {
@@ -197,6 +212,70 @@ export default function SystemStatus() {
           Updates every 2s • Last: {stats.lastUpdate}
         </p>
       </div>
+
+      {/* Pipeline Pulse — rows landing per organ per day (red day = dead organ) */}
+      {pulse?.organs && (
+        <div style={{ border: '2px solid var(--text)', padding: '12px', marginBottom: '16px', background: 'var(--bg)' }}>
+          <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '8px' }}>
+            PIPELINE PULSE — NEW ROWS / DAY (LAST {pulse.days}D)
+          </div>
+          {(() => {
+            const dayKeys: string[] = [];
+            for (let i = pulse.days - 1; i >= 0; i--) {
+              const d = new Date(); d.setDate(d.getDate() - i);
+              dayKeys.push(d.toISOString().slice(0, 10));
+            }
+            const organLabels: Record<string, string> = {
+              vehicles: 'VEHICLES', images: 'IMAGES', observations: 'OBSERVATIONS', auction_comments: 'AUCTION COMMENTS',
+            };
+            return (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ borderCollapse: 'collapse', fontFamily: "'Courier New', monospace", fontSize: '10px' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left', paddingRight: 10, fontFamily: 'Arial, sans-serif', fontSize: '8px', letterSpacing: '0.1em' }}>ORGAN</th>
+                      {dayKeys.map((d) => (
+                        <th key={d} style={{ padding: '0 4px', fontWeight: 400, color: 'var(--text-secondary)', fontSize: '8px' }}>{d.slice(5)}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(organLabels).map(([key, label]) => {
+                      const series: Record<string, number> = {};
+                      (pulse.organs[key] || []).forEach((p: any) => { series[p.d] = p.n; });
+                      return (
+                        <tr key={key}>
+                          <td style={{ fontFamily: 'Arial, sans-serif', fontSize: '8px', fontWeight: 700, letterSpacing: '0.08em', paddingRight: 10, whiteSpace: 'nowrap' }}>{label}</td>
+                          {dayKeys.map((d) => {
+                            const n = series[d] ?? 0;
+                            return (
+                              <td key={d} style={{
+                                padding: '2px 4px', textAlign: 'right', border: '1px solid var(--border)',
+                                color: n === 0 ? 'var(--bg)' : 'var(--text)',
+                                background: n === 0 ? 'var(--error, #a00)' : 'transparent',
+                                fontWeight: n === 0 ? 700 : 400,
+                              }}>
+                                {n.toLocaleString()}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {pulse.backlogs && (
+                  <div style={{ marginTop: 8, fontSize: '10px', fontFamily: "'Courier New', monospace", color: 'var(--text-secondary)' }}>
+                    BACKLOGS — import_queue pending: {Number(pulse.backlogs.import_queue_pending ?? 0).toLocaleString()}
+                    {' · '}images analysis pending: {Number(pulse.backlogs.images_analysis_pending ?? 0).toLocaleString()}
+                    {' · '}failed: {Number(pulse.backlogs.images_analysis_failed ?? 0).toLocaleString()}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Main Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>

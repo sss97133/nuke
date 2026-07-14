@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useUserProfile } from './UserProfileContext';
 import { supabase } from '../../lib/supabase';
+import TextScaleControl from '../../components/TextScaleControl';
 
 const ChangePasswordForm = React.lazy(
   () => import('../../components/auth/ChangePasswordForm')
@@ -125,6 +126,12 @@ const UserSettingsDrawer: React.FC<UserSettingsDrawerProps> = ({ open: openProp,
           </button>
         </div>
         <div className="up-drawer__body">
+          {/* ── DISPLAY ── */}
+          <div className="up-dossier-group">
+            <div className="up-dossier-group__label">DISPLAY</div>
+            <TextScaleControl />
+          </div>
+
           {/* ── PROFILE ── */}
           <div className="up-dossier-group">
             <div className="up-dossier-group__label">PROFILE</div>

@@ -42,9 +42,8 @@ export function optimizeImageUrl(url: string | null | undefined, size: ImageSize
     }
 
     // Supabase Storage - use render API
-    // resize=contain is required when only width is specified — the default
-    // (cover) crops to fill, which mangles portrait iPhone photos because
-    // Supabase picks an arbitrary tall crop ratio when no height is given.
+    // resize=contain required — /render/image defaults to resize=cover, which
+    // crops portrait iPhone photos (standing rule: feedback_supabase_render_default_crops).
     if (url.includes('/storage/v1/object/public/')) {
       return url
         .replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
