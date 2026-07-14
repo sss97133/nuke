@@ -299,7 +299,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Delete ${selectedPhotos.size} photos?`)) return;
+    if (!confirm(`Remove ${selectedPhotos.size} photos from your library? (Hidden, not destroyed — recoverable.)`)) return;
     try {
       await PersonalPhotoLibraryService.deletePhotos(Array.from(selectedPhotos));
       setSelectedPhotos(new Set());

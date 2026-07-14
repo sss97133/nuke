@@ -105,12 +105,11 @@ Deno.serve(async (req) => {
         .from("vehicle_images")
         .select("id, image_url, vehicle_id, user_id")
         .eq("ai_processing_status", "pending")
+        .not("user_id", "is", null)
         .eq("is_duplicate", false)
         .not("image_url", "is", null)
-        .not("user_id", "is", null)
         .order("created_at", { ascending: false })
         .limit(limit);
-
       if (ownerErr) {
         console.error(`[photo-pipeline] process_pending owner-query error: ${ownerErr.message}`);
       }
@@ -631,13 +630,44 @@ async function resolveVehicle(
     }
   }
 
-  // Strategy 3 (REMOVED 2026-07-02): "user's most recent vehicle with work activity" stamped
-  // ANY unresolved photo onto whatever vehicle was touched last — zero evidence, the exact
-  // anti-pattern HARD_RULES §10 outlaws ("recent camera roll ≠ this build"). It auto-filed
-  // 14 freshly-recovered owner-pool photos onto the Mustang 22s after insert while the
-  // classifier was rate-limited. Attribution follows evidence (VIN, GPS>0.7) or stays NULL —
-  // the owner pool + confirm queue are the honest home for unresolved frames.
-  console.log("[photo-pipeline] Could not resolve vehicle — leaving in owner pool (no evidence)");
+  // Strategy 3: rolling user context — SUGGEST-ONLY, never hard-assign.
+  // (The hard-assign version was REMOVED 2026-07-02: it stamped ANY unresolved
+  // photo onto whatever vehicle was touched last — zero evidence, the exact
+  // anti-pattern HARD_RULES §10 outlaws. Attribution follows evidence (VIN,
+  // GPS>0.7) or stays NULL; a SUGGESTION is not attribution.)
+  // The hard-assign version cascaded: one filed photo became "most recent
+  // vehicle" for the next, which filed and reinforced it — 102 of user 0's
+  // June frames landed on one truck with no content check (2026-06-10,
+  // pixel-verified the bucket held 2+ different vehicles). Context is a
+  // PRIOR, not evidence: it goes in suggested_vehicle_id for the inbox /
+  // owner-confirmation flow. Only physical evidence (unambiguous GPS above)
+  // may hard-file. Time-bounded 7 days so a stale project never suggests.
+  if (userId) {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    const { data: recentVehicle } = await supabase
+      .from("vehicle_images")
+      .select("vehicle_id")
+      .eq("user_id", userId)
+      .not("vehicle_id", "is", null)
+      .gte("created_at", sevenDaysAgo)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (recentVehicle?.vehicle_id) {
+      console.log("[photo-pipeline] Rolling context suggests vehicle (not assigning):", recentVehicle.vehicle_id);
+      await supabase
+        .from("vehicle_images")
+        .update({
+          suggested_vehicle_id: recentVehicle.vehicle_id,
+          image_vehicle_match_status: "ambiguous",
+        })
+        .eq("id", imageId)
+        .is("vehicle_id", null);
+    }
+  }
+
+  console.log("[photo-pipeline] No hard evidence — photo stays in inbox (suggestion recorded if context existed)");
   return null;
 }
 

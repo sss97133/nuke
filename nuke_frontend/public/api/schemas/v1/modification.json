@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nuke.ag/api/schemas/v1/modification.json",
+  "title": "External Agent Write API — Modification Event Payload (v1.0)",
+  "description": "Payload shape for envelope.event_type='modification'. Routes to vehicle_observations with observation_kind='work_record', source slug 'agent-submission'. Use when the work changes the vehicle's spec away from factory: engine swap, lift, brake upgrade, rewire, paint change. Distinct from 'service' (maintenance restoring factory function) so build provenance can be filtered.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "modification_type", "zones_modified"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "1–2 sentence headline of the modification (e.g. 'Swapped Edelbrock RPM intake for stock cast iron').",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "narrative": {
+      "type": "string",
+      "description": "Free-form long-form description, including motivation and outcome.",
+      "maxLength": 32768
+    },
+    "modification_type": {
+      "type": "string",
+      "description": "Coarse category of the modification. Drives downstream classifiers (e.g. valuation impact, originality scoring).",
+      "enum": [
+        "performance",
+        "cosmetic",
+        "drivetrain_swap",
+        "suspension",
+        "brakes",
+        "electrical",
+        "interior",
+        "wheels_tires",
+        "fuel_system",
+        "ignition",
+        "cooling",
+        "body",
+        "audio",
+        "safety",
+        "other"
+      ]
+    },
+    "zones_modified": {
+      "type": "array",
+      "description": "Subsystems physically changed by this modification.",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "engine_bay",
+          "undercarriage",
+          "interior",
+          "wheels",
+          "drivetrain",
+          "cooling",
+          "electrical",
+          "fuel",
+          "ignition",
+          "suspension",
+          "brakes",
+          "body",
+          "other"
+        ]
+      }
+    },
+    "reversibility": {
+      "type": "string",
+      "description": "How easily this modification can be undone. Affects originality scoring.",
+      "enum": ["bolt_on", "minor_irreversible", "major_irreversible"]
+    },
+    "from_spec": {
+      "type": "string",
+      "description": "What the vehicle had before this modification (free-form, e.g. 'stock 305 SBC, factory carburetor').",
+      "maxLength": 1000
+    },
+    "to_spec": {
+      "type": "string",
+      "description": "What the vehicle has after this modification.",
+      "maxLength": 1000
+    },
+    "parts": {
+      "type": "array",
+      "description": "Parts installed (or removed and retained) as part of the modification.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "manufacturer": { "type": "string", "maxLength": 200 },
+          "part_number": { "type": "string", "maxLength": 200 },
+          "quantity": { "type": "number", "minimum": 0 },
+          "status": {
+            "type": "string",
+            "enum": ["needed", "ordered", "installed", "considered_rejected", "removed_retained"]
+          },
+          "cost_usd": { "type": "number", "minimum": 0 },
+          "supplier": { "type": "string", "maxLength": 200 },
+          "notes": { "type": "string", "maxLength": 1000 }
+        }
+      }
+    },
+    "labor_minutes": {
+      "type": "number",
+      "description": "Wrench time consumed performing the modification.",
+      "minimum": 0,
+      "maximum": 100000
+    },
+    "shop_ref": {
+      "type": "string",
+      "description": "Free-form shop or workspace identifier.",
+      "maxLength": 200
+    },
+    "photos_referenced": {
+      "type": "array",
+      "description": "Caller-side identifiers of photos that document the change (before/after preferred).",
+      "items": { "type": "string", "maxLength": 1024 }
+    }
+  }
+}

@@ -285,6 +285,11 @@ const sessionRow = {
   total_labor_cost: Number(laborCost.toFixed(2)),
   total_job_cost: Number((laborCost + parts_value).toFixed(2)),
   image_count: photos.length,
+  // Session↔image linkage. Without these the session stores only a count and is
+  // unnavigable to its photos (the confirmation loop / COGS / timeline all need
+  // to reach the day's frames). photos is ordered by taken_at ascending.
+  start_image_id: photos[0].id,
+  end_image_id: photos[photos.length - 1].id,
 };
 // metadata.synthesis — the full day picture (progression, w5, worth-reasoning, frame-id→
 // evidence map). Lands in work_sessions.metadata (jsonb), already read by the RPCs' shape-
@@ -331,6 +336,20 @@ if (existing && existing.length > 0) {
   sessionId = ins.data.id;
   console.log(`[insert] work_session ${sessionId} for ${DATE}`);
 }
+
+// Write the back-link onto the day's photos so the session is navigable both ways.
+// Idempotent; only this day's gated photos. (Batched to stay gentle on the per-row
+// valuation-recompute trigger on vehicle_images.)
+const photoIds = photos.map(p => p.id);
+for (let i = 0; i < photoIds.length; i += 200) {
+  const batch = photoIds.slice(i, i + 200);
+  const { error: linkErr } = await supabase
+    .from('vehicle_images')
+    .update({ work_session_id: sessionId })
+    .in('id', batch);
+  if (linkErr) console.error('link photos→session:', linkErr.message);
+}
+console.log(`[link] ${photoIds.length} photos → work_session ${sessionId}`);
 
 // 4c. Refresh the lead/hero. primary_image_url must DERIVE from the latest
 // analyzed exterior owner photo, never a stored field that drifts (Skylar's rule:

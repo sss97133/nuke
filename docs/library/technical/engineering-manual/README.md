@@ -50,6 +50,11 @@ How to deploy edge functions, run migrations, manage cron jobs. The Supabase CLI
 
 How each data source is scraped. Bring a Trailer (direct fetch with HTML parsing), Facebook Marketplace (logged-out GraphQL with `doc_id`, no tokens, residential IP required), Craigslist, PCarMarket (API), Cars and Bids (Firecrawl for JS rendering), and generic sources (Firecrawl fallback). Access methods, rate limits, and data quality per source.
 
+### Chapter 16: The Image Attribution Harness
+`16-image-attribution-harness.md`
+
+Why a good per-frame analysis can still produce a wrong vehicle profile, and how to fix it. Models the expert glance (gestalt over priors, confidence by convergence, context as prior, calibrated humility) and defines the vocabulary — subject identity, anchors, detail frames, capture sessions, inheritance, component DNA, the kin network, the authority/resolution ladder, the two-speed engine. The architecture for binding each verdict to the right vehicle: structured subject extraction, sessionize → anchor → inherit, reversible re-homing via `image_attribution_review` and `reconcile_vehicle_attribution`. Includes the empirical proof that subject identity cannot be done in SQL.
+
 ---
 
 ## How to Read This Manual

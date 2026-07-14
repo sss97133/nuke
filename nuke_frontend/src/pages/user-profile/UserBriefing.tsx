@@ -2,33 +2,21 @@
  * UserBriefing — Intelligence headline + stat pills.
  * Mirrors VehicleBriefing pattern.
  *
- * Priority order for headline:
- * 1. Onboarding prompt (own profile, missing data)
- * 2. Active auctions count
- * 3. Reputation milestone
- * 4. Collection summary
- * 5. Recent activity summary
- * 6. null (don't render)
+ * Priority order for headline (each fact appears exactly ONCE — tenet 2):
+ * 1. Onboarding prompt (own profile, missing data) — unique to briefing
+ * 2. Active auctions count — unique to briefing
+ * 3. null (don't render)
+ *
+ * Collection summary ("N worked on, N listed") and "member since" headlines
+ * were REMOVED: the header already carries WORKED ON / LISTINGS pills and a
+ * "SINCE {year}" meta line. Restating them here was the redundancy Skylar
+ * flagged (PROFILE_BUILD_ORDER #9). The briefing now adds only what the header
+ * lacks.
  *
  * Self-guarding: returns null if no headline AND no stats.
  */
 import React, { useMemo } from 'react';
 import { useUserProfile } from './UserProfileContext';
-
-// ---------------------------------------------------------------------------
-// Date formatting
-// ---------------------------------------------------------------------------
-
-function formatMemberSince(dateStr: string | null | undefined): string | null {
-  if (!dateStr) return null;
-  try {
-    const d = new Date(dateStr);
-    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-    return `${months[d.getMonth()]} ${d.getFullYear()}`;
-  } catch {
-    return null;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -42,11 +30,15 @@ const UserBriefing: React.FC = () => {
   const headline = useMemo(() => {
     if (!profile) return null;
 
-    // 1. Onboarding prompt
+    // Worked-on count (vehicles_count = distinct vehicles with real activity),
+    // NOT total_vehicles (record-authorship, ~half scraped — number doctrine).
+    const vehicles = stats?.vehicles_count ?? 0;
+
+    // 1. Onboarding prompt — unique to the briefing (header has no such call).
     if (isOwnProfile) {
       const missingAvatar = !profile.avatar_url;
       const missingBio = !profile.bio;
-      const missingVehicles = !profile.total_vehicles || profile.total_vehicles === 0;
+      const missingVehicles = vehicles === 0;
       if (missingAvatar || missingBio || missingVehicles) {
         const missing: string[] = [];
         if (missingAvatar) missing.push('profile photo');
@@ -56,7 +48,7 @@ const UserBriefing: React.FC = () => {
       }
     }
 
-    // 2. Active auctions
+    // 2. Active auctions — unique, time-sensitive (header shows totals, not live).
     const activeListings = comprehensiveData?.listings?.filter(
       (l: any) => l.status === 'active' || l.auction_status === 'live'
     ) || [];
@@ -64,28 +56,8 @@ const UserBriefing: React.FC = () => {
       return `${activeListings.length} active auction${activeListings.length > 1 ? 's' : ''} right now`;
     }
 
-    // 3. Reputation milestone
-    const rep = profile.reputation_score;
-    if (rep && rep > 0) {
-      if (rep >= 1000) return 'Legendary community member';
-      if (rep >= 500) return 'Highly respected contributor';
-      if (rep >= 100) return 'Active community participant';
-      return `Building reputation: ${rep} points`;
-    }
-
-    // 4. Collection summary
-    const vehicles = profile.total_vehicles || 0;
-    const listed = stats?.total_listings || 0;
-    if (vehicles > 0) {
-      return `${vehicles} vehicle${vehicles > 1 ? 's' : ''} in collection${listed > 0 ? `, ${listed} listed` : ''}`;
-    }
-
-    // 5. Recent activity
-    const since = formatMemberSince(profile.member_since || profile.created_at);
-    if (since) {
-      return `Active member since ${since}`;
-    }
-
+    // Collection-summary and member-since headlines removed: pure restatement of
+    // header WORKED ON / LISTINGS pills and the "SINCE {year}" meta (tenet 2).
     return null;
   }, [profile, isOwnProfile, stats, comprehensiveData]);
 
@@ -96,26 +68,13 @@ const UserBriefing: React.FC = () => {
 
     const items: { label: string; value: string | number }[] = [];
 
-    if (profile.total_vehicles != null && profile.total_vehicles > 0) {
-      items.push({ label: 'VEHICLES', value: profile.total_vehicles });
-    }
-
-    if (profile.contribution_count != null && profile.contribution_count > 0) {
-      items.push({ label: 'CONTRIBUTIONS', value: profile.contribution_count });
-    }
-
-    if (profile.reputation_score != null && profile.reputation_score > 0) {
-      items.push({ label: 'REPUTATION', value: profile.reputation_score });
-    }
-
-    const memberSince = formatMemberSince(profile.member_since || profile.created_at);
-    if (memberSince) {
-      items.push({ label: 'MEMBER SINCE', value: memberSince });
-    }
-
-    const auctions = stats?.total_auction_wins || 0;
-    if (auctions > 0) {
-      items.push({ label: 'AUCTIONS', value: auctions });
+    // CONTRIBUTIONS is the ONLY stat the header doesn't already carry, so it's
+    // the only pill the briefing keeps. WORKED ON, MEMBER SINCE (header meta
+    // "SINCE {year}"), and AUCTIONS (header "AUCTIONS WON") were removed —
+    // each was a verbatim restatement of a header fact (tenet 2: every fact
+    // appears exactly once). PROFILE_BUILD_ORDER #9.
+    if (stats?.total_contributions != null && stats.total_contributions > 0) {
+      items.push({ label: 'CONTRIBUTIONS', value: stats.total_contributions });
     }
 
     return items;
