@@ -1,0 +1,28 @@
+# Generated from vehicle_canonical — substrate-driven, not file-driven.
+# Vehicle: e08bf694-970f-4cbe-8a74-8715158a0f2e
+# Loom: HOLLEY 558-499 T43 TCU — CAN BUS EXTENSION
+# Wires projected: 1
+
+metadata:
+  title: K5 HOLLEY 558-499 T43 TCU — CAN BUS EXTENSION
+  description: |
+    Projection of 1 wires from public.vehicle_canonical for
+    vehicle_id=e08bf694-970f-4cbe-8a74-8715158a0f2e. Source of truth is the DB; this YAML
+    is regenerated on demand. Cite-by-cell provenance retained in
+    structured_data on each underlying observation row.
+
+connectors:
+  M130_A:  {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  M130_B:  {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+  PDM30_A: {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  PDM30_B: {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+
+cables:
+  W125:
+    # gauge: substrate gap
+    notes: "TCU CAN Bus Tap | from splice on #62 trunk 22 AWG TWISTED PAIR   WHT/GRN     2.0ft   CAN-H + CAN-L stub from main CAN trunk to Holley T43 module connector (16-pin Kostal LKS 1.5 / Holley 19303772). Module mounts inside cab per Holley 558-499 install spec. Power feed handled by existing #58. | sources=k5_cut_list_v2"
+
+# Connection list intentionally omitted in this MVP — needs the
+# from_pin → connector pin mapping logic that lives in
+# docs/wiring/output/generate_wireviz_yaml.py. Next pass: refactor
+# that generator to consume the per-wire dicts produced above.

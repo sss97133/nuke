@@ -574,7 +574,7 @@
 
 <!-- ============================================================ -->
 <!-- INTAKE AIR TEMPERATURE SENSOR                                 -->
-<!-- M130:B03 AN_TEMP2 | Wire #109 | 22AWG TXL | TAN             -->
+<!-- M130:B03 AN_TEMP2 | Wire #109 | 22AWG TEFZEL | TAN             -->
 <!-- ============================================================ -->
 <g id="iat-sensor">
   <use href="#sym-thermistor" x="280" y="840" width="50" height="50"/>
@@ -589,7 +589,7 @@
 
 <!-- ============================================================ -->
 <!-- COOLANT TEMPERATURE SENSOR                                    -->
-<!-- M130:B04 AN_TEMP3 | Wire #110 | 22AWG TXL | TAN/WHT         -->
+<!-- M130:B04 AN_TEMP3 | Wire #110 | 22AWG TEFZEL | TAN/WHT         -->
 <!-- ============================================================ -->
 <g id="clt-sensor">
   <use href="#sym-thermistor" x="280" y="930" width="50" height="50"/>
@@ -604,7 +604,7 @@
 
 <!-- ============================================================ -->
 <!-- OIL TEMPERATURE SENSOR                                        -->
-<!-- M130:B05 AN_TEMP4 | Wire #113 | 22AWG TXL | TAN/BLK         -->
+<!-- M130:B05 AN_TEMP4 | Wire #113 | 22AWG TEFZEL | TAN/BLK         -->
 <!-- ============================================================ -->
 <g id="oil-temp-sensor">
   <use href="#sym-thermistor" x="280" y="1020" width="50" height="50"/>
@@ -666,7 +666,7 @@
 
 <!-- ============================================================ -->
 <!-- MAP SENSOR                                                    -->
-<!-- M130:A15 AV2 | Wire #108 | 22AWG TXL | VIO/WHT              -->
+<!-- M130:A15 AV2 | Wire #108 | 22AWG TEFZEL | VIO/WHT              -->
 <!-- ============================================================ -->
 <g id="map-sensor">
   <use href="#sym-pressure" x="280" y="1390" width="40" height="40"/>
@@ -681,7 +681,7 @@
 
 <!-- ============================================================ -->
 <!-- FUEL PRESSURE SENSOR                                          -->
-<!-- M130:A16 AV3 | Wire #112 | 22AWG TXL | VIO/BLK              -->
+<!-- M130:A16 AV3 | Wire #112 | 22AWG TEFZEL | VIO/BLK              -->
 <!-- ============================================================ -->
 <g id="fuel-pressure-sensor">
   <use href="#sym-pressure" x="280" y="1470" width="40" height="40"/>
@@ -696,7 +696,7 @@
 
 <!-- ============================================================ -->
 <!-- OIL PRESSURE SENSOR (ECU)                                     -->
-<!-- M130:A14 AV1 | Wire #102 | 22AWG TXL | VIO                   -->
+<!-- M130:A14 AV1 | Wire #102 | 22AWG TEFZEL | VIO                   -->
 <!-- NOTE: Cut list shows A14 for both Oil Press and TPS1.         -->
 <!-- TPS1 is correct at A14. Oil press likely uses A25 (AV5).     -->
 <!-- Drawn per cut list but flagged.                               -->

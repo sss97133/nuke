@@ -1,0 +1,102 @@
+# Generated from vehicle_canonical — substrate-driven, not file-driven.
+# Vehicle: e08bf694-970f-4cbe-8a74-8715158a0f2e
+# Loom: DAKOTA DIGITAL DUAL-SENDER
+# Wires projected: 11
+
+metadata:
+  title: K5 DAKOTA DIGITAL DUAL-SENDER
+  description: |
+    Projection of 11 wires from public.vehicle_canonical for
+    vehicle_id=e08bf694-970f-4cbe-8a74-8715158a0f2e. Source of truth is the DB; this YAML
+    is regenerated on demand. Cite-by-cell provenance retained in
+    structured_data on each underlying observation row.
+
+connectors:
+  M130_A:  {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  M130_B:  {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+  PDM30_A: {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  PDM30_B: {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+
+cables:
+  W114:
+    gauge: 22 AWG
+    length: 8.0
+    length_unit: ft
+    colors: [BNWH]
+    type: M22759/32
+    notes: "Dakota CTS Sender | from FACTORY GM CTS | sources=k5_cut_list_v2"
+  W115:
+    gauge: 22 AWG
+    length: 8.0
+    length_unit: ft
+    colors: [VTWH]
+    type: M22759/32
+    notes: "Dakota Oil Pressure Sender | from FACTORY GM OPS | sources=k5_cut_list_v2"
+  W116:
+    gauge: 22 AWG
+    length: 8.0
+    length_unit: ft
+    colors: [WHBK]
+    type: M22759/32
+    notes: "Dakota Tach Signal | from M130:A31 | sources=k5_cut_list_v2"
+  W117:
+    gauge: 22 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [OGRD]
+    type: M22759/32
+    notes: "Dakota Fuel Level Sender | from FACTORY GM FUEL | sources=k5_cut_list_v2"
+  W118:
+    gauge: 22 AWG
+    length: 11.5
+    length_unit: ft
+    colors: [WHYE]
+    type: M22759/32
+    notes: "Dakota VSS Speedometer | from M130:A32 | sources=k5_cut_list_v2"
+  W119:
+    gauge: 22 AWG
+    length: 1.5
+    length_unit: ft
+    colors: [BU]
+    type: M22759/32
+    notes: "Dakota Turn Signal L | from tap #80 at dash | sources=k5_cut_list_v2"
+  W120:
+    gauge: 22 AWG
+    length: 1.5
+    length_unit: ft
+    colors: [BU]
+    type: M22759/32
+    notes: "Dakota Turn Signal R | from tap #82 at dash | sources=k5_cut_list_v2"
+  W121:
+    gauge: 22 AWG
+    length: 2.0
+    length_unit: ft
+    colors: [GN]
+    type: M22759/32
+    notes: "Dakota High Beam | from TBD | sources=k5_cut_list_v2"
+  W122:
+    gauge: 22 AWG
+    length: 1.5
+    length_unit: ft
+    colors: [OGWH]
+    type: M22759/32
+    notes: "Dakota Brake Indicator | from tap #53 at dash | sources=k5_cut_list_v2"
+  W123:
+    gauge: 22 AWG
+    length: 3.0
+    length_unit: ft
+    colors: [BK]
+    type: M22759/32
+    notes: "Dakota Ground | from STAR GND DASH | sources=k5_cut_list_v2"
+  W124:
+    gauge: 22 AWG
+    length: 3.0
+    length_unit: ft
+    colors: [OGRD]
+    type: M22759/32
+    notes: "Dakota Switched +12V Backup | from PDM30:OUT29 splice | sources=k5_cut_list_v2"
+
+# Connection list intentionally omitted in this MVP — needs the
+# from_pin → connector pin mapping logic that lives in
+# docs/wiring/output/generate_wireviz_yaml.py. Next pass: refactor
+# that generator to consume the per-wire dicts produced above.

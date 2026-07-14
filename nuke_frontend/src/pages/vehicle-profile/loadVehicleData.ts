@@ -124,7 +124,7 @@ export async function selectBestHeroImage(
         const query: Promise<any[] | null> = supabase
           .from('vehicle_images')
           .select(
-            'image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at'
+            'image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at, category, image_type'
           )
           .eq('vehicle_id', vehicleId)
           // Order by recency first — latest owner photo wins per restoration_lead_image_must_be_latest.
@@ -180,11 +180,42 @@ export async function selectBestHeroImage(
         || src === 'tech_capture'
         || src.startsWith('direct_pull');
     };
+
+    // A hero must be a presentable EXTERIOR of the whole vehicle — never a detail
+    // closeup, engine bay, undercarriage, interior, document, or transport/delivery
+    // shot. Skylar 2026-05-30: "engine bay isn't a primary, post-delivery isn't a
+    // primary — there should be flags that inhibit that image from being the hero."
+    const NON_HERO_ZONE = /^(detail_|int_|eng|under|trunk|doc|receipt|data_plate|transport|delivery|ship)/i;
+    const EXT_ZONE = /(^ext_)|profile|three.?quarter|(^3q)/i;
+    const NON_HERO_CAT = new Set([
+      'engine_bay', 'engine', 'undercarriage', 'interior', 'vehicle_interior',
+      'documentation', 'receipt_document', 'data_plate', 'trunk_storage', 'transport', 'delivery',
+    ]);
+    const isHeroEligible = (img: any): boolean => {
+      if (img?.is_document === true) return false;
+      const z = (img?.vehicle_zone || '').toLowerCase();
+      const c = (img?.category || '').toLowerCase();
+      const t = (img?.image_type || '').toLowerCase();
+      if (NON_HERO_ZONE.test(z)) return false;
+      if (NON_HERO_CAT.has(c) || NON_HERO_CAT.has(t)) return false;
+      return true;
+    };
+    const isExterior = (img: any): boolean => {
+      const z = (img?.vehicle_zone || '').toLowerCase();
+      const c = (img?.category || '').toLowerCase();
+      return EXT_ZONE.test(z) || c === 'exterior' || c === 'exterior_body' || c === 'vehicle_exterior';
+    };
+
     const ownerOwned = usable.filter((img: any) => isOwnerTrustSource(img?.source));
     if (ownerOwned.length > 0) {
-      // Already ordered by taken_at DESC, created_at DESC from the query.
-      // Take the newest. buildHeroResult handles medium/large URL preference.
-      return buildHeroResult(ownerOwned[0]);
+      // Candidates are ordered taken_at DESC. Latest owner EXTERIOR shot wins;
+      // else latest owner hero-eligible shot (not a detail/engine/interior/transport).
+      // Only if NEITHER exists do we fall through to the exterior/quality priorities below
+      // — better to fall through than pin a closeup or shipping photo as the face of the truck.
+      const ownerExt = ownerOwned.filter(isExterior);
+      if (ownerExt.length > 0) return buildHeroResult(ownerExt[0]);
+      const ownerOk = ownerOwned.filter(isHeroEligible);
+      if (ownerOk.length > 0) return buildHeroResult(ownerOk[0]);
     }
 
     // Priority 1: explicit is_primary (fallback for vehicles with no owner-trust uploads, e.g. BaT-only imports).

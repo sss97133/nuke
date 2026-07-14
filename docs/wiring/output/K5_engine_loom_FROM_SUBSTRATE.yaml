@@ -1,0 +1,240 @@
+# Generated from vehicle_canonical — substrate-driven, not file-driven.
+# Vehicle: e08bf694-970f-4cbe-8a74-8715158a0f2e
+# Loom: ENGINE LOOM
+# Wires projected: 33
+
+metadata:
+  title: K5 ENGINE LOOM
+  description: |
+    Projection of 33 wires from public.vehicle_canonical for
+    vehicle_id=e08bf694-970f-4cbe-8a74-8715158a0f2e. Source of truth is the DB; this YAML
+    is regenerated on demand. Cite-by-cell provenance retained in
+    structured_data on each underlying observation row.
+
+connectors:
+  M130_A:  {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  M130_B:  {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+  PDM30_A: {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  PDM30_B: {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+
+cables:
+  W4a:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BN]
+    type: M22759/32
+    notes: "ETB TAC Motor 2 | from M130:A01 | sources=k5_cut_list_v2"
+  W4b:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [YE]
+    type: M22759/32
+    notes: "ETB TAC Motor 1 | from M130:A18 | sources=k5_cut_list_v2"
+  W4c:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GN]
+    type: M22759/32
+    notes: "ETB TPS1 Signal | from M130:A14 | sources=k5_cut_list_v2"
+  W4d:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [VT]
+    type: M22759/32
+    notes: "ETB TPS2 Signal | from M130:A17 | sources=k5_cut_list_v2"
+  W4e:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GY]
+    type: M22759/32
+    notes: "ETB 5V Reference | from M130:A02 | sources=k5_cut_list_v2"
+  W4f:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BK]
+    type: M22759/32
+    notes: "ETB Signal Ground | from M130:B15 | sources=k5_cut_list_v2"
+  W5:
+    gauge: 20 AWG
+    length: 2.5
+    length_unit: ft
+    colors: [WH]
+    type: M22759/32
+    notes: "Ignition Coil 3 | from M130:A03 | sources=k5_cut_list_v2"
+  W7:
+    gauge: 20 AWG
+    length: 2.5
+    length_unit: ft
+    colors: [WHWH]
+    type: M22759/32
+    notes: "Ignition Coil 5 | from M130:A04 | sources=k5_cut_list_v2"
+  W8:
+    gauge: 20 AWG
+    length: 2.5
+    length_unit: ft
+    colors: [WHBK]
+    type: M22759/32
+    notes: "Ignition Coil 7 | from M130:A05 | sources=k5_cut_list_v2"
+  W9:
+    gauge: 20 AWG
+    length: 2.5
+    length_unit: ft
+    colors: [WHRD]
+    type: M22759/32
+    notes: "Ignition Coil 2 | from M130:A06 | sources=k5_cut_list_v2"
+  W10:
+    gauge: 20 AWG
+    length: 2.5
+    length_unit: ft
+    colors: [WHBU]
+    type: M22759/32
+    notes: "Ignition Coil 4 | from M130:A07 | sources=k5_cut_list_v2"
+  W11:
+    gauge: 20 AWG
+    length: 2.5
+    length_unit: ft
+    colors: [WHYE]
+    type: M22759/32
+    notes: "Ignition Coil 6 | from M130:A08 | sources=k5_cut_list_v2"
+  W12:
+    gauge: 20 AWG
+    length: 2.5
+    length_unit: ft
+    colors: [WHVT]
+    type: M22759/32
+    notes: "Ignition Coil 8 | from M130:A12 | sources=k5_cut_list_v2"
+  W13:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GN]
+    type: M22759/32
+    notes: "Fuel Injector 1 | from M130:A19 | term_b=Pre-terminated by WPINJ40 pigtail (EV6/USCAR female terminals at sensor end) | sources=k5_cut_list_v2,k5_wire_closure_receipts"
+  W14:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GNWH]
+    type: M22759/32
+    notes: "Fuel Injector 2 | from M130:A20 | sources=k5_cut_list_v2"
+  W15:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GNBK]
+    type: M22759/32
+    notes: "Fuel Injector 3 | from M130:A21 | sources=k5_cut_list_v2"
+  W16:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GNRD]
+    type: M22759/32
+    notes: "Fuel Injector 4 | from M130:A22 | sources=k5_cut_list_v2"
+  W17:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GNBU]
+    type: M22759/32
+    notes: "Fuel Injector 5 | from M130:A27 | sources=k5_cut_list_v2"
+  W18:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GNYE]
+    type: M22759/32
+    notes: "Fuel Injector 6 | from M130:A28 | sources=k5_cut_list_v2"
+  W19:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GNVT]
+    type: M22759/32
+    notes: "Fuel Injector 7 | from M130:A29 | sources=k5_cut_list_v2"
+  W20:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GNOG]
+    type: M22759/32
+    notes: "Fuel Injector 8 | from M130:A30 | sources=k5_cut_list_v2"
+  W24:
+    gauge: 20 AWG
+    length: 2.5
+    length_unit: ft
+    colors: [WHOG]
+    type: M22759/32
+    notes: "Ignition Coil 1 | from M130:A13 | sources=k5_cut_list_v2"
+  W97:
+    gauge: 20 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [BUWH]
+    type: M22759/32
+    notes: "Rear Backup Camera | from PDM30:OUT15 | sources=k5_cut_list_v2"
+  W99:
+    # gauge: substrate gap
+    notes: "Crank Position Sensor | from M130:B01      22 AWG SHIELDED 2C    BLU/WHT/WHT 4.6ft   2-conductor shielded cable | sources=k5_cut_list_v2"
+  W101:
+    # gauge: substrate gap
+    notes: "Cam Position Sensor | from M130:B02      22 AWG SHIELDED 2C    BLU/WHT/BLK 4.6ft   2-conductor shielded cable | sources=k5_cut_list_v2"
+  W102:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [VT]
+    type: M22759/32
+    notes: "Oil Pressure Sensor (ECU) | from M130:A14 | sources=k5_cut_list_v2"
+  W103:
+    # gauge: substrate gap
+    notes: "Knock Sensor Bank 1 | from M130:B07      22 AWG SHIELDED 2C    GRY         4.6ft   2-conductor shielded cable | sources=k5_cut_list_v2"
+  W104:
+    # gauge: substrate gap
+    notes: "Knock Sensor Bank 2 | from M130:B13      22 AWG SHIELDED 2C    GRY/WHT     4.6ft   2-conductor shielded cable | sources=k5_cut_list_v2"
+  W108:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [VTWH]
+    type: M22759/32
+    notes: "MAP Sensor | from M130:A15 | sources=k5_cut_list_v2"
+  W109:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BN]
+    type: M22759/32
+    notes: "Intake Air Temp Sensor | from M130:B03 | sources=k5_cut_list_v2"
+  W110:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BNWH]
+    type: M22759/32
+    notes: "Coolant Temp Sensor (ECU) | from M130:B04 | term_b=Pre-terminated by WPCTS30 pigtail (Metri-Pack 150.2 female terminals) | sources=k5_cut_list_v2,k5_wire_closure_receipts"
+  W112:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [VTBK]
+    type: M22759/32
+    notes: "Fuel Pressure Sensor | from M130:A16 | sources=k5_cut_list_v2"
+  W113:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BNBK]
+    type: M22759/32
+    notes: "Oil Temperature Sensor | from M130:B05 | sources=k5_cut_list_v2"
+
+# Connection list intentionally omitted in this MVP — needs the
+# from_pin → connector pin mapping logic that lives in
+# docs/wiring/output/generate_wireviz_yaml.py. Next pass: refactor
+# that generator to consume the per-wire dicts produced above.

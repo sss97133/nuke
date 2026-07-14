@@ -162,7 +162,7 @@
 <circle cx="454" cy="220" r="2.5" class="dot"/>
 <circle cx="3437" cy="220" r="2.5" class="dot"/>
 <text x="1727" y="214" class="lbl">INJ1  18AWG  GRN</text>
-<text x="1727" y="236" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="236" class="lbl-sm">4.6 FT  TEFZEL</text>
 <rect x="3588" y="204" width="28" height="32" class="comp"/>
 <line x1="3602" y1="210" x2="3602" y2="230" stroke="black" stroke-width="1"/>
 <polygon points="3597,226 3607,226 3602,234" fill="black"/>
@@ -176,7 +176,7 @@
 <circle cx="454" cy="292" r="2.5" class="dot"/>
 <circle cx="3437" cy="292" r="2.5" class="dot"/>
 <text x="1727" y="286" class="lbl">INJ2  18AWG  GRN/WHT</text>
-<text x="1727" y="308" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="308" class="lbl-sm">4.6 FT  TEFZEL</text>
 <rect x="3588" y="276" width="28" height="32" class="comp"/>
 <line x1="3602" y1="282" x2="3602" y2="302" stroke="black" stroke-width="1"/>
 <polygon points="3597,298 3607,298 3602,306" fill="black"/>
@@ -190,7 +190,7 @@
 <circle cx="454" cy="364" r="2.5" class="dot"/>
 <circle cx="3437" cy="364" r="2.5" class="dot"/>
 <text x="1727" y="358" class="lbl">INJ3  18AWG  GRN/BLK</text>
-<text x="1727" y="380" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="380" class="lbl-sm">4.6 FT  TEFZEL</text>
 <rect x="3588" y="348" width="28" height="32" class="comp"/>
 <line x1="3602" y1="354" x2="3602" y2="374" stroke="black" stroke-width="1"/>
 <polygon points="3597,370 3607,370 3602,378" fill="black"/>
@@ -204,7 +204,7 @@
 <circle cx="454" cy="436" r="2.5" class="dot"/>
 <circle cx="3437" cy="436" r="2.5" class="dot"/>
 <text x="1727" y="430" class="lbl">INJ4  18AWG  GRN/RED</text>
-<text x="1727" y="452" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="452" class="lbl-sm">4.6 FT  TEFZEL</text>
 <rect x="3588" y="420" width="28" height="32" class="comp"/>
 <line x1="3602" y1="426" x2="3602" y2="446" stroke="black" stroke-width="1"/>
 <polygon points="3597,442 3607,442 3602,450" fill="black"/>
@@ -218,7 +218,7 @@
 <circle cx="454" cy="508" r="2.5" class="dot"/>
 <circle cx="3437" cy="508" r="2.5" class="dot"/>
 <text x="1727" y="502" class="lbl">INJ5  18AWG  GRN/BLU</text>
-<text x="1727" y="524" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="524" class="lbl-sm">4.6 FT  TEFZEL</text>
 <rect x="3588" y="492" width="28" height="32" class="comp"/>
 <line x1="3602" y1="498" x2="3602" y2="518" stroke="black" stroke-width="1"/>
 <polygon points="3597,514 3607,514 3602,522" fill="black"/>
@@ -232,7 +232,7 @@
 <circle cx="454" cy="580" r="2.5" class="dot"/>
 <circle cx="3437" cy="580" r="2.5" class="dot"/>
 <text x="1727" y="574" class="lbl">INJ6  18AWG  GRN/YEL</text>
-<text x="1727" y="596" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="596" class="lbl-sm">4.6 FT  TEFZEL</text>
 <rect x="3588" y="564" width="28" height="32" class="comp"/>
 <line x1="3602" y1="570" x2="3602" y2="590" stroke="black" stroke-width="1"/>
 <polygon points="3597,586 3607,586 3602,594" fill="black"/>
@@ -246,7 +246,7 @@
 <circle cx="454" cy="652" r="2.5" class="dot"/>
 <circle cx="3437" cy="652" r="2.5" class="dot"/>
 <text x="1727" y="646" class="lbl">INJ7  18AWG  GRN/VIO</text>
-<text x="1727" y="668" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="668" class="lbl-sm">4.6 FT  TEFZEL</text>
 <rect x="3588" y="636" width="28" height="32" class="comp"/>
 <line x1="3602" y1="642" x2="3602" y2="662" stroke="black" stroke-width="1"/>
 <polygon points="3597,658 3607,658 3602,666" fill="black"/>
@@ -260,7 +260,7 @@
 <circle cx="454" cy="724" r="2.5" class="dot"/>
 <circle cx="3437" cy="724" r="2.5" class="dot"/>
 <text x="1727" y="718" class="lbl">INJ8  18AWG  GRN/ORG</text>
-<text x="1727" y="740" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="740" class="lbl-sm">4.6 FT  TEFZEL</text>
 <rect x="3588" y="708" width="28" height="32" class="comp"/>
 <line x1="3602" y1="714" x2="3602" y2="734" stroke="black" stroke-width="1"/>
 <polygon points="3597,730 3607,730 3602,738" fill="black"/>

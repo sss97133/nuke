@@ -1,0 +1,82 @@
+{
+  "date": "2026-05-21",
+  "owner_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+  "summary": {
+    "vehicles_touched": ["1966 Ford Mustang Coupe Black (eeb9fa61)", "unidentified red British roadster (likely MG TD/TF)"],
+    "sessions": [
+      {"start": "12:52", "end": "12:52", "kind": "parts_run", "location": "Home Hardware & Variety, 100 Canyon Rd, Boulder City NV"},
+      {"start": "15:41", "end": "15:42", "kind": "exhaust_install", "location": "707 Yucca St, Boulder City NV (shop)"},
+      {"start": "18:59", "end": "18:59", "kind": "non_mustang_pivot", "location": "shop interior"}
+    ],
+    "milestone": "Mustang stainless dual exhaust install — polished tubing, X-pipe, flex section with fresh weld heat tint, polished oval muffler. Underbody view shows fresh red-oxide primer on body (restoration prep).",
+    "spend": "~$95 cash at Home Hardware & Variety (EMT connector, pipe fittings, bolts)",
+    "negative_space": "After ~6h focus on Mustang (parts run 12:52 + install 15:41-15:42), pivoted to a different vehicle (red British roadster, MG TD/TF likely) by 18:59"
+  },
+  "atoms": [
+    {
+      "kind": "photo",
+      "observed_at": "2026-05-21T12:52:53+00:00",
+      "source_identifier": "IMG_0815.HEIC",
+      "vehicle_id": "eeb9fa61-01e8-49a6-8eab-a7cc0e23d30f",
+      "vehicle_attribution_basis": "contextual — receipt for work on Mustang same day",
+      "scene_class": "receipt",
+      "vendor": "Home Hardware & Variety",
+      "vendor_address": "100 Canyon Rd, Boulder City, NV 89005",
+      "purchase_total_estimate_usd": 95,
+      "items_visible": ["EMT connector (electrical conduit)", "pipe fittings (1/4, 1/2, 5/8, 11/4 in)", "bolts/nuts"],
+      "payment_method": "cash $100",
+      "confidence": 0.85,
+      "description": "Receipt from Home Hardware & Variety, Boulder City NV, dated 05/21/2026 12:52. Itemized hardware including EMT connector and pipe fittings.",
+      "apple_ml_labels": ["Document", "Receipt"]
+    },
+    {
+      "kind": "photo",
+      "observed_at": "2026-05-21T15:41:43+00:00",
+      "source_identifier": "IMG_0817.HEIC",
+      "vehicle_id": "eeb9fa61-01e8-49a6-8eab-a7cc0e23d30f",
+      "vehicle_attribution_basis": "visual — underbody view consistent with classic Mustang chassis + same shop GPS as other Mustang work",
+      "scene_class": "undercarriage",
+      "action": "exhaust_install",
+      "parts_visible": ["polished stainless steel dual exhaust", "X-pipe or H-pipe crossover", "stainless flex section (fresh weld heat tint)", "polished oval muffler/resonator", "solid rear axle (Ford 8 or 9 inch)", "rear sway bar", "rear shock", "parking brake cable"],
+      "condition_notes": "Body painted with red-oxide rust primer — restoration prep visible. Exhaust components show fresh weld colors — recently installed.",
+      "location_lat": 35.972862,
+      "location_lng": -114.855522,
+      "location_address": "707 Yucca St, Boulder City, NV 89005",
+      "confidence": 0.9,
+      "description": "Underbody view of Mustang showing newly-installed polished stainless steel dual exhaust system with X-pipe crossover and flex section. Body in red-oxide restoration primer.",
+      "apple_ml_labels": ["Machine", "Vehicle", "Vehicle Engine"]
+    },
+    {
+      "kind": "photo",
+      "observed_at": "2026-05-21T15:42:33+00:00",
+      "source_identifier": "IMG_0818.HEIC",
+      "vehicle_id": "eeb9fa61-01e8-49a6-8eab-a7cc0e23d30f",
+      "vehicle_attribution_basis": "visual — same exhaust install session as IMG_0817, 50s later, same GPS",
+      "scene_class": "undercarriage",
+      "action": "exhaust_install",
+      "parts_visible": ["stainless steel flex pipe (corrugated, fresh weld heat tint)", "polished oval stainless muffler with logo/branding", "EMT conduit (electrical wiring channel routed along top)", "brake line", "spark plug wires"],
+      "condition_notes": "Close-up of flex section shows blue/gold heat tint colors — welded within hours of photo",
+      "location_lat": 35.972687,
+      "location_lng": -114.855658,
+      "location_address": "707 Yucca St, Boulder City, NV 89005",
+      "confidence": 0.95,
+      "description": "Close-up of Mustang stainless exhaust flex section and muffler. Visible weld heat tint. Wiring conduit and brake line routed above.",
+      "apple_ml_labels": ["Machine", "Vehicle", "Vehicle Engine"]
+    },
+    {
+      "kind": "photo",
+      "observed_at": "2026-05-21T18:59:17+00:00",
+      "source_identifier": "IMG_0819.HEIC",
+      "vehicle_id": null,
+      "vehicle_attribution_basis": "visual — bright red 1950s British roadster (MG TD/TF profile, chrome bumpers, rear-mounted spare on chrome rack) — NOT the Mustang. Needs cross-match against the 147 owned vehicles.",
+      "scene_class": "other_vehicle",
+      "action": null,
+      "parts_visible": ["chrome front bumper", "chrome rear bumper bow", "rear-mounted spare tire on chrome rack", "chrome detail throughout", "Nevada plate (3TF J65 approximate)"],
+      "subject_vehicle_hint": {"era": "1950s British roadster", "candidates": ["MG TD (1950-53)", "MG TF (1953-55)"], "color": "red", "plate_partial": "3TF J65"},
+      "location_address": "shop interior (corrugated metal walls visible)",
+      "confidence": 0.7,
+      "description": "Bright red classic British roadster (likely MG TD or TF) in shop, white SUV in background. Day-end transition off the Mustang work.",
+      "apple_ml_labels": []
+    }
+  ]
+}

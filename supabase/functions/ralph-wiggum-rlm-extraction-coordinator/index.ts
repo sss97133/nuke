@@ -148,16 +148,22 @@ Deno.serve(async (req) => {
 
     let vehicleImageAnalysis: { total: number; analyzed: number; pending: number } | null = null;
     try {
-      const [{ count: totalImages }, { count: analyzedImages }, { count: pendingImages }] = await Promise.all([
-        supabase.from("vehicle_images").select("*", { count: "estimated", head: true }),
-        supabase.from("vehicle_images").select("*", { count: "estimated", head: true }).not("ai_scan_metadata->appraiser->primary_label", "is", null),
-        supabase.from("vehicle_images").select("*", { count: "estimated", head: true }).is("ai_scan_metadata->appraiser->primary_label", null),
-      ]);
-      if (totalImages != null && analyzedImages != null && pendingImages != null) {
+      // CANONICAL coverage marker. The old code counted ai_scan_metadata->appraiser->
+      // primary_label — a phantom key NO writer emits, so "analyzed" always read 0 and the
+      // brief lied. It also ran count(estimated) over the 38.9M-row table (slow). Now we
+      // read get_fleet_analysis_scoreboard(): the SAME per-vehicle coverage counter the
+      // coverage RPC and the vehicle-profile UI use. Personal corpus (is_external=false),
+      // T1 = ai_scan_metadata?byok_deep_analysis. See migration
+      // 20260617000000_image_analysis_coverage_rpc.sql.
+      const { data: scoreboard, error: sbErr } = await supabase.rpc("get_fleet_analysis_scoreboard");
+      const row = Array.isArray(scoreboard) ? scoreboard[0] : scoreboard;
+      if (!sbErr && row) {
+        const gated = Number(row.gated_t0) || 0;
+        const seen = Number(row.seen_t1) || 0;
         vehicleImageAnalysis = {
-          total: totalImages || 0,
-          analyzed: analyzedImages || 0,
-          pending: pendingImages || 0,
+          total: gated,                       // deep-eligible (T0-gated) personal images
+          analyzed: seen,                     // T1 — a deep BYOK verdict exists
+          pending: Math.max(0, gated - seen), // gated but not yet deep-analyzed
         };
       }
     } catch {

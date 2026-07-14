@@ -233,10 +233,12 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
   }, [eventId]);
 
   useEffect(() => {
+    // Use getSession() instead of getUser() to avoid Web Locks API contention
+    // on sb-*-auth-token (cause of 2026-05-24 garage hang). See lib/supabase.ts.
     let active = true;
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
-      setCurrentUserId(data?.user?.id ?? null);
+      setCurrentUserId(data?.session?.user?.id ?? null);
     });
     return () => {
       active = false;
@@ -558,7 +560,8 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId);
       if (!isUuid) throw new Error('This event cannot be analyzed (not a database event).');
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) throw new Error('Authentication required');
 
       const vehicleId = workOrder?.vehicle_id || baseEvent?.vehicle_id;
@@ -627,7 +630,8 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
       setGeneratingInvoice(true);
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId);
       if (!isUuid) throw new Error('This event cannot generate an invoice (not a database event).');
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) throw new Error('Authentication required');
 
       const { error } = await supabase.functions.invoke('backfill-invoice-drafts', {

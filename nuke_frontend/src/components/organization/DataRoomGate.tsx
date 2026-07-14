@@ -70,7 +70,10 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
   const [emailIdentifier, setEmailIdentifier] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user: u } }) => {
+    // Use getSession() instead of getUser() to avoid Web Locks API contention
+    // on sb-*-auth-token (cause of 2026-05-24 garage hang). See lib/supabase.ts.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const u = session?.user;
       if (u) {
         setUser({
           id: u.id,

@@ -1,8 +1,19 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { CollapsibleWidget } from '../../components/ui/CollapsibleWidget';
 import { supabase } from '../../lib/supabase';
 import { useInvestmentLedger, type OwnerEpoch } from './hooks/useInvestmentLedger';
 import type { WorkOrderReceipt, VehicleReceipt } from './hooks/useBuildStatus';
+
+const vendorSlug = (name: string | null | undefined): string | null => {
+  if (!name) return null;
+  const s = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (!s || s === 'unknown-vendor' || s === 'unknown') return null;
+  return s;
+};
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
@@ -279,7 +290,9 @@ const EpochSection: React.FC<{
           }}>
             PARTS ORDERS ({epoch.receipts.length})
           </div>
-          {epoch.receipts.map(r => (
+          {epoch.receipts.map(r => {
+            const slug = vendorSlug(r.vendor_name);
+            return (
             <div
               key={r.id}
               style={{
@@ -292,16 +305,31 @@ const EpochSection: React.FC<{
               <span style={{ color: 'var(--vp-pencil)' }}>
                 {r.receipt_date ? fmtDateShort(r.receipt_date) : '\u2014'}
               </span>
-              <span style={{
-                fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                fontFamily: 'var(--vp-font-sans)',
-              }}>
-                {r.vendor_name || 'Unknown vendor'}
-              </span>
+              {slug ? (
+                <Link
+                  to={`/vehicle/${vehicleId}/vendor/${slug}`}
+                  style={{
+                    fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    fontFamily: 'var(--vp-font-sans)',
+                    color: 'inherit', textDecoration: 'none',
+                  }}
+                >
+                  {r.vendor_name}
+                </Link>
+              ) : (
+                <span style={{
+                  fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  fontFamily: 'var(--vp-font-sans)',
+                }}>
+                  {r.vendor_name || 'Unknown vendor'}
+                </span>
+              )}
               <span style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(r.total)}</span>
             </div>
-          ))}
+            );
+          })}
           <div style={{
             fontSize: '8px', fontWeight: 700, textAlign: 'right',
             fontFamily: 'var(--vp-font-mono)', padding: '2px 6px', color: 'var(--vp-pencil)',

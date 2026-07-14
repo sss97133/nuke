@@ -376,6 +376,62 @@ async function generateObservations(
     }
   }
 
+  // Emit consensus atoms (projection_event) for the provenance fields a title /
+  // ownership doc establishes — so decoded documents feed synthesize_attribute,
+  // not just the observation stream. Document-class evidence, citing the
+  // observation just created. Only emit fields actually present (no inference).
+  if (vehicleId && observationIds.length) {
+    const evObsId = observationIds[0];
+    // OCR uses "N/A" / "None" / "Unknown" as MISSING sentinels — treat them as
+    // absent, never as values (else a blank lienholder reads as a lien, etc.).
+    const present = (v: unknown): string | null => {
+      const s = String(v ?? "").trim();
+      const l = s.toLowerCase();
+      return s && l !== "n/a" && l !== "none" && l !== "unknown" && l !== "null" ? s : null;
+    };
+    const TITLE_ENUM = ["clean", "salvage", "rebuilt", "flood", "lemon", "junk", "bonded", "lien"];
+    let titleStatus: string | null = null;
+    const brand = (present(data.brand || data.title_status || data.title_brand) ?? "").toLowerCase();
+    if (brand === "clear") titleStatus = "clean";
+    else if (TITLE_ENUM.includes(brand)) titleStatus = brand;
+    else if (present(data.lienholder_name)) titleStatus = "lien";
+    const zipMatch = String(present(data.owner_address || data.address) ?? "").match(/\b(\d{5})(?:-\d{4})?\b/);
+    const yearMatch = String(present(data.issue_date || data.title_date) ?? "").match(/\b(19|20)\d{2}\b/);
+    const stateRaw = present(data.state || data.title_state) ?? "";
+
+    const atoms: Array<{ attribute: string; value: unknown; confidence: number }> = [];
+    if (titleStatus) atoms.push({ attribute: "vehicle.title_status", value: titleStatus, confidence: 0.9 });
+    if (/^[A-Za-z]{2}$/.test(stateRaw)) atoms.push({ attribute: "vehicle.title_state", value: stateRaw.toUpperCase(), confidence: 0.9 });
+    if (zipMatch) atoms.push({ attribute: "vehicle.zip", value: zipMatch[1], confidence: 0.85 });
+    if (yearMatch) atoms.push({ attribute: "vehicle.owned_time", value: Number(yearMatch[0]), confidence: 0.8 });
+
+    for (const a of atoms) {
+      try {
+        await fetch(`${baseUrl}/functions/v1/mcp-connector`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0", id: 1, method: "tools/call",
+            params: {
+              name: "submit_attribute_value",
+              arguments: {
+                attribute: a.attribute, subject_id: vehicleId, subject_kind: "vehicle", value: a.value,
+                evidence: { class: "document", ref: { document: docType, observation_id: evObsId, storage_path: storagePath } },
+                model_slug: "link-document-entities", confidence: a.confidence, observation_ids: [evObsId],
+              },
+            },
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+      } catch (e) {
+        console.warn(`Failed to submit atom ${a.attribute}:`, (e as Error).message);
+      }
+    }
+  }
+
   return observationIds;
 }
 

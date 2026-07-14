@@ -27,7 +27,7 @@
 
 import type { ResultKind } from "./types.ts";
 
-export type SubjectKind = "vehicle" | "image" | "person" | "cluster" | "user";
+export type SubjectKind = "vehicle" | "image" | "person" | "cluster" | "user" | "make_model";
 
 // ── Evidence-class binding (the anti-laundering rule) ────────────────────────
 // Every attribute declares which classes of evidence may legitimately CITE it.
@@ -117,6 +117,14 @@ export interface AttributeDefinition {
   // the authoritative binding is ADMISSIBLE_EVIDENCE below (one auditable block).
   // admissibleEvidence(attribute) resolves the effective set.
   admissible_evidence?: EvidenceClass[];
+
+  // Temporal character of the fact (P5 — the "now" resolver reads this).
+  // 'present_state' = a fact about the vehicle's CURRENT condition (color now,
+  //   rust now, disposition) — synthesis must recency-weight by EVIDENCE CAPTURE
+  //   time (image taken_at), so the latest era state beats a stale teardown atom.
+  // 'timeless' (default when omitted) = a fact that does not change once true
+  //   (VIN, factory original_color, year) — no recency decay.
+  temporal?: "present_state" | "timeless";
 }
 
 // ============================================================================
@@ -387,6 +395,7 @@ const L3: AttributeDefinition[] = [
     // who legally holds it), an IMAGE (ongoing possession / restoration), or an owner_claim.
     attribute: "vehicle.sale_disposition",
     subject_kind: "vehicle",
+    temporal: "present_state",
     result_kind: "substrate",
     layer: 3,
     modalities: ["ocr", "image", "context_atoms"],
@@ -400,9 +409,68 @@ const L3: AttributeDefinition[] = [
       "auction-scrape 'sold'). Cite the title/bill-of-sale (document) or possession photos (image).",
     prompt_version: "v1",
   },
+  // ── Provenance / title (the Decode tier) ────────────────────────────────────
+  // These come from the title / registration / bill of sale — a DOCUMENT, never a photo
+  // of the car. Admissible: document (the title itself) or owner_claim (lowest tier, a
+  // confirming document supersedes it). They feed the listing's location + title block.
+  {
+    attribute: "vehicle.title_status",
+    subject_kind: "vehicle",
+    result_kind: "substrate",
+    layer: 3,
+    modalities: ["ocr", "context_atoms"],
+    admissible_evidence: ["document", "owner_claim"],
+    expected_shape: "enum",
+    enum_values: ["clean", "salvage", "rebuilt", "flood", "lemon", "junk", "bonded", "lien", "unknown"],
+    prompt:
+      "What is the legal title brand/status? Read it from a certificate of title, registration, " +
+      "or bill of sale. A blank lienholder block and no brand date = 'clean'; 'lien' if a " +
+      "lienholder is listed. This is a legal fact from the document — never inferred from a photo of the car.",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "vehicle.title_state",
+    subject_kind: "vehicle",
+    result_kind: "substrate",
+    layer: 3,
+    modalities: ["ocr", "context_atoms"],
+    admissible_evidence: ["document", "owner_claim"],
+    expected_shape: "string",
+    prompt:
+      "Which jurisdiction issued the title? Return the 2-letter US state (or country) from the " +
+      "issuing authority on the certificate of title. Cite the document.",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "vehicle.zip",
+    subject_kind: "vehicle",
+    result_kind: "substrate",
+    layer: 3,
+    modalities: ["ocr", "context_atoms"],
+    admissible_evidence: ["document", "owner_claim"],
+    expected_shape: "string",
+    prompt:
+      "The postal/ZIP code where the vehicle is located, from the owner's address on the title or " +
+      "registration (document), or an owner statement. Used for the listing's location.",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "vehicle.owned_time",
+    subject_kind: "vehicle",
+    result_kind: "substrate",
+    layer: 3,
+    modalities: ["ocr", "context_atoms"],
+    admissible_evidence: ["document", "owner_claim"],
+    expected_shape: "number",
+    prompt:
+      "The year the current owner acquired the vehicle. Use the title issue/transfer date on the " +
+      "certificate of title (document) as the acquisition year, or an owner statement. Return the 4-digit year.",
+    prompt_version: "v1",
+  },
   {
     attribute: "vehicle.exterior_color",
     subject_kind: "vehicle",
+    temporal: "present_state",
     result_kind: "substrate",
     layer: 3,
     modalities: ["image"],
@@ -426,6 +494,7 @@ const L3: AttributeDefinition[] = [
   {
     attribute: "vehicle.current_color",
     subject_kind: "vehicle",
+    temporal: "present_state",
     result_kind: "substrate",
     layer: 3,
     modalities: ["image"],
@@ -456,6 +525,7 @@ const L3: AttributeDefinition[] = [
   {
     attribute: "vehicle.condition_cues",
     subject_kind: "vehicle",
+    temporal: "present_state",
     result_kind: "substrate",
     layer: 3,
     modalities: ["image"],
@@ -834,7 +904,122 @@ const CLUSTER: AttributeDefinition[] = [
   },
 ];
 
-const REGISTRY: AttributeDefinition[] = [...L1, ...L2, ...L3, ...L4, ...L5, ...USER, ...COMPOUND, ...CLUSTER];
+// ============================================================================
+// MAKE_MODEL — cohort attributes. The subject is a year-make-model (e.g.
+// "1966 Ford Mustang"), NOT a single VIN. Truth = weighted consensus of
+// evidence-cited claims, exactly like a vehicle subject, but the evidence is
+// cohort-scale: production records, the graph's own aggregates, survivor
+// estimates. A photo can never answer a cohort statistic — `image` is never
+// admissible here. These fill the dark blocks on get_make_model_terminal.
+// ============================================================================
+const MAKE_MODEL: AttributeDefinition[] = [
+  {
+    attribute: "make_model.production_count",
+    subject_kind: "make_model",
+    result_kind: "projection",
+    layer: 5,
+    modalities: ["context_atoms", "text"],
+    admissible_evidence: ["document", "context_atoms"],
+    prompt:
+      "How many of this exact year-make-model were originally produced (factory " +
+      "build total)? Cite a production record — Marti report for Ford, a marque " +
+      "registry, or a documented production figure. Return the integer count and " +
+      "name the source. If no authoritative figure exists, return null — do not estimate.",
+    expected_shape: "number",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "make_model.rarity_tier",
+    subject_kind: "make_model",
+    result_kind: "projection",
+    layer: 5,
+    modalities: ["context_atoms", "text"],
+    admissible_evidence: ["document", "context_atoms"],
+    prompt:
+      "Classify this cohort's rarity tier from its production volume and survivor " +
+      "scarcity. Mirror vehicle_production_data.rarity_level. Return one of the enum " +
+      "values; null if production volume is unknown.",
+    expected_shape: "enum",
+    enum_values: ["ULTRA_RARE", "RARE", "UNCOMMON", "COMMON", "MASS_PRODUCTION"],
+    prompt_version: "v1",
+  },
+  {
+    attribute: "make_model.survival_estimate",
+    subject_kind: "make_model",
+    result_kind: "projection",
+    layer: 5,
+    modalities: ["context_atoms", "text"],
+    admissible_evidence: ["document", "context_atoms"],
+    prompt:
+      "Estimate the fraction of original production still extant (0..1), from " +
+      "documented attrition/survival data (e.g. Hagerty survival rates) or a marque " +
+      "survivor registry. The count of known surviving examples in the graph is a " +
+      "lower-bound floor, not the estimate. Return the ratio and cite the basis; " +
+      "null if there is no defensible source.",
+    expected_shape: "ratio_0_1",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "make_model.price_band",
+    subject_kind: "make_model",
+    result_kind: "projection",
+    layer: 5,
+    modalities: ["context_atoms"],
+    admissible_evidence: ["context_atoms"],
+    prompt:
+      "Summarize the cohort's price structure by condition tier from its consummated " +
+      "sales (driver / clean / concours, or the tiers the data supports). Return " +
+      "{ tiers: [{ label, low, typical, high, n }], currency, basis }. Use only " +
+      "consecrated sale prices; never asking prices alone. null if too few sales.",
+    expected_shape: "structured",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "make_model.sentiment",
+    subject_kind: "make_model",
+    result_kind: "projection",
+    layer: 5,
+    modalities: ["context_atoms"],
+    admissible_evidence: ["context_atoms"],
+    prompt:
+      "Aggregate market/community sentiment toward this cohort from analyzed auction " +
+      "commentary and discussion (-1 negative .. +1 positive). Return the mean score " +
+      "and the n it rests on; null if there is no scored commentary.",
+    expected_shape: "number",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "make_model.active_builds",
+    subject_kind: "make_model",
+    result_kind: "projection",
+    layer: 5,
+    modalities: ["context_atoms"],
+    admissible_evidence: ["context_atoms"],
+    prompt:
+      "Count how many of this cohort are currently in active restoration/build (not " +
+      "merely owned or sold) per the graph's owner/build/work-session atoms. Return " +
+      "the integer and the basis; null if build state is not tracked for this cohort.",
+    expected_shape: "number",
+    prompt_version: "v1",
+  },
+  {
+    attribute: "make_model.parts_availability",
+    subject_kind: "make_model",
+    result_kind: "projection",
+    layer: 5,
+    modalities: ["context_atoms", "text"],
+    admissible_evidence: ["document", "context_atoms"],
+    prompt:
+      "Assess how readily restoration parts are available for this cohort, from the " +
+      "supply-side catalog/fitment data and known reproduction support. Return one of " +
+      "the enum values; null if parts coverage is unknown.",
+    expected_shape: "enum",
+    enum_values: ["abundant", "moderate", "scarce", "unobtainium"],
+    prompt_version: "v1",
+  },
+];
+
+const REGISTRY: AttributeDefinition[] = [...L1, ...L2, ...L3, ...L4, ...L5, ...USER, ...COMPOUND, ...CLUSTER, ...MAKE_MODEL];
 
 const BY_NAME: Record<string, AttributeDefinition> = Object.fromEntries(
   REGISTRY.map((a) => [a.attribute, a])

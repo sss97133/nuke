@@ -160,7 +160,7 @@ Generated: 3/23/2026 | ECU: M130 | PDM: PDM30
 
 >> WIRE AND CONSUMABLES (4 items)
 ------------------------------------------------------------------------------------------
-  1x TXL Wire assorted (825 ft est) — $124
+  1x TEFZEL Wire assorted (825 ft est) — $124
   15x DTM Connector Kits (assorted) — $105
   1x DR-25 Heat Shrink assorted — $70
   1x Terminals, boots, consumables — $100

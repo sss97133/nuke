@@ -50,6 +50,7 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({
         <div className="user-dropdown-section">
           <div className="user-dropdown-section-label">ACCOUNT</div>
           <button onClick={() => go(`/profile/${session?.user?.id || ''}`)}>Profile</button>
+          <button onClick={() => go('/brand-studio')}>Modes</button>
           <button onClick={() => go('/inbox')}>
             Inbox
           </button>

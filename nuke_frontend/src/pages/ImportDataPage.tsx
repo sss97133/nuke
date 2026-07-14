@@ -170,6 +170,9 @@ export default function ImportDataPage() {
       if (result.status === 'error') {
         throw new Error(result.error || 'Ingestion failed');
       }
+      if (result.status === 'rejected') {
+        throw new Error(result.reason || 'Submission rejected');
+      }
 
       if (result.vehicle_id) {
         // Navigate directly to the created/matched vehicle
