@@ -1,0 +1,370 @@
+[
+  {
+    "order": 0,
+    "image_id": "fa35975c-307c-4247-a8aa-9327ecc30e55",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "K5 rear quarter panel near taillight, black topcoat with multi-color paint history exposed (blue, white, beige) — matches custom paint history note. Tape measure documenting damage/measurement.",
+    "paperwork": null
+  },
+  {
+    "order": 1,
+    "image_id": "8e89613a-e854-46bc-a61b-f53e1596eef4",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body Chevy front end on a lift (image rotated 180), Chevy bowtie grille, chrome bumper, headlight bezel — consistent with K5/square-body GM. Shop environment matches build context.",
+    "paperwork": null
+  },
+  {
+    "order": 2,
+    "image_id": "6d3788f6-221e-44c8-b111-930ba6ee52f4",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Steering column U-joint/coupler with disintegrated rag-joint detail. Mechanical detail consistent with K5 build work. Generic but in-context.",
+    "paperwork": null
+  },
+  {
+    "order": 3,
+    "image_id": "5298a2fd-a5a1-411d-9dbd-88bc8da37bd7",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "K5 dashboard interior with factory speedometer reading 71794 mi (matches vehicle attribute) and Auto Meter Phantom gauges visible on diamond plate panel (matches modification note). Custom blue paint visible under dash.",
+    "paperwork": "ODOMETER: 71794 mi visible on speedometer cluster — matches vehicle record"
+  },
+  {
+    "order": 4,
+    "image_id": "5e3ea0f1-bacb-444d-a7f9-b7d92bb35258",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Square-body body panel with cut oval hole, exposing surrounding multi-color paint history (blue specks, beige) and surface rust. Welding repair patch visible. Custom paint history matches K5 record.",
+    "paperwork": null
+  },
+  {
+    "order": 5,
+    "image_id": "ddebb1ab-ccc5-49c8-b913-9d09aebe43cb",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Lower body/wheel arch corner showing layered paint history (black topcoat over yellow, blue specks) — matches custom paint history of multi-color stripes.",
+    "paperwork": null
+  },
+  {
+    "order": 6,
+    "image_id": "db94eefe-d6a7-42ab-add0-021fb0b8ee51",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Interior diamond plate floor and lower body seam with rust and paint history. Consistent with K5 interior diamond plate floor seen in other approved frames.",
+    "paperwork": null
+  },
+  {
+    "order": 7,
+    "image_id": "eddcba36-0df4-48f4-8d88-f44979ee3043",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Body seam/lower edge with diamond plate floor at left, custom blue paint chunks visible on body panel — matches K5 paint history and known diamond plate interior.",
+    "paperwork": null
+  },
+  {
+    "order": 8,
+    "image_id": "32448991-06a3-4a21-a4d2-9b2465422d69",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Rocker/sill area with rust, custom paint chips (blue) under black topcoat. Body restoration work-in-progress photo for K5.",
+    "paperwork": null
+  },
+  {
+    "order": 9,
+    "image_id": "83b6e943-6f54-4abf-be90-ff674576059e",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Interior diamond plate floor with rocker sill, red seat fabric visible, custom paint badge plaque on floor — matches K5 diamond plate interior.",
+    "paperwork": null
+  },
+  {
+    "order": 10,
+    "image_id": "ea582da8-d96a-41c8-939d-ec13f712e2dd",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "GM data plate / VIN tag on door jamb: VIN 'CKY184F130930'. CKY = 1974 Chevrolet K-series 4WD short wheelbase, body code 184 = Blazer K5. GVWR 6200 lb, front 3300, rear 3400. Directly confirms 1974 K5 Blazer identity.",
+    "paperwork": "VIN: CKY184F130930 (1974 Chevrolet K5 Blazer 4WD). GVWR 6200 / front 3300 / rear 3400. GM data plate on door jamb. Authoritative identification."
+  },
+  {
+    "order": 11,
+    "image_id": "83d6cc3b-0260-495b-809e-4149201bb489",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Body panel weld seam with extensive multi-color paint history (orange, blue, white) — matches the custom paint history note (blue/red/yellow/purple) plus additional orange layer.",
+    "paperwork": null
+  },
+  {
+    "order": 12,
+    "image_id": "a0bc69c1-455f-4df1-9398-67ece1adbb07",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Body panel corner showing layered paint: black over blue chips over yellow primer — direct evidence of custom paint history matching K5 record.",
+    "paperwork": null
+  },
+  {
+    "order": 13,
+    "image_id": "150620da-fdc1-4f3e-8e71-b28bb3814da6",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Rear quarter panel near taillight with paint stripping exposing blue/white custom paint layers — matches K5 paint history. Looks like the same area as image 000 from a different angle.",
+    "paperwork": null
+  },
+  {
+    "order": 14,
+    "image_id": "ff99754d-28cf-40e2-a49a-1ee238086f05",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "K5 interior cargo/rear floor with full diamond plate covering, transmission tunnel/console, shifter boot — matches diamond plate interior treatment seen across this set. Orange/red sill visible at bottom.",
+    "paperwork": null
+  },
+  {
+    "order": 15,
+    "image_id": "c50ca891-6cb0-4976-b2b9-9d4b87e96fac",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Rear cargo area diamond plate floor, lower body panel with blue custom paint chips and beige primer exposed — matches K5 diamond plate + paint history.",
+    "paperwork": null
+  },
+  {
+    "order": 16,
+    "image_id": "f0928545-a3b5-4469-82e5-6aa5b6e4b9dc",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Lower rocker/sill with orange primer/topcoat layer, diamond plate floor edge visible, custom badge plaque — K5 body restoration evidence.",
+    "paperwork": null
+  },
+  {
+    "order": 17,
+    "image_id": "a85272fc-5bc4-48de-bd7d-919783d1a964",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Welded body patch with bolt/grommet on a black panel, orange/rust paint edge above. Body restoration work, consistent with K5 build.",
+    "paperwork": null
+  },
+  {
+    "order": 18,
+    "image_id": "7c697294-2a4e-4998-ac24-99be819cac47",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Inner body structure / wheel well area with paint history (orange, white, blue, beige) and tire visible at left. Custom multi-color paint matches K5 record.",
+    "paperwork": null
+  },
+  {
+    "order": 19,
+    "image_id": "decce946-a0f1-41db-97eb-8c91c14938c0",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Square-body interior door panel or cab structure with chrome trim around rectangular opening, orange interior color visible. K5/square-body interior detail.",
+    "paperwork": null
+  },
+  {
+    "order": 20,
+    "image_id": "41685c21-3838-4ea3-9a0c-f09fd0ccb46f",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Lower body sill/rocker with extensive paint history (yellow, orange, blue chips under black) — matches K5 custom paint history.",
+    "paperwork": null
+  },
+  {
+    "order": 21,
+    "image_id": "bb4c000f-5e62-4f4d-9beb-78cd9f07e725",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Body crease/inner panel with rust and tar/seam sealer. Body restoration detail consistent with K5 work.",
+    "paperwork": null
+  },
+  {
+    "order": 22,
+    "image_id": "04347e93-82fe-4d07-ba0a-ca4c113a8dc7",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Underside/lower body panel detail in shop. Generic body shot but in-context with this body restoration set.",
+    "paperwork": null
+  },
+  {
+    "order": 23,
+    "image_id": "db81869b-2ecd-4238-bdda-438e1562aa15",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Heavy paint stripping showing layered paint history: black over silver over RED over ORANGE primer over rust — matches K5 multi-color custom paint history (blue/red/yellow/purple plus more). Striking documentation of vehicle's paint past.",
+    "paperwork": null
+  },
+  {
+    "order": 24,
+    "image_id": "70dbe31b-6199-4e6f-8b28-0b9c892218b4",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Body panel corner with extensive multi-color paint history (BRIGHT BLUE under black topcoat, silver, rust, orange primer) — direct evidence of custom blue paint layer documented in K5 record. Knobby tire of K5 visible at right.",
+    "paperwork": null
+  },
+  {
+    "order": 25,
+    "image_id": "b7f1749f-5aa7-40ba-a8c1-f6123fff89d1",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Body panel corner with multi-color paint history: black over BLUE over YELLOW primer — directly matches K5 paint history (blue + yellow stripes documented).",
+    "paperwork": null
+  },
+  {
+    "order": 26,
+    "image_id": "266d59a7-34ac-4dda-865c-a201aebbe7b6",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Frame VIN stamping visible: 'C4F130930' — matches the sequence F130930 from the GM data plate (image 010, CKY184F130930). Frame VIN stamp authoritatively confirms vehicle identity. Critical paperwork.",
+    "paperwork": "FRAME VIN STAMP: 'C4F130930' — partial VIN stamped into frame rail, matches sequence number 130930 from door-jamb data plate. Authoritative chassis ID."
+  },
+  {
+    "order": 27,
+    "image_id": "9faf0e7d-3f24-4126-8c3c-b6d6b5aee3c6",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Engine bay shot of K5 with V8 small-block Chevy, intake manifold, carburetor, distributor visible. Front clip with radiator support. Blue body panel visible at right (matches custom paint history). In-process build photo.",
+    "paperwork": null
+  },
+  {
+    "order": 28,
+    "image_id": "db3e6d0b-cc9c-4bc7-8bdc-21178b3bdee5",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Engine bay of K5 from drivers side, V8 small-block Chevy with yellow air cleaner, master cylinder, distributor, headers. Blue/white firewall with paint stripping visible. Direct K5 build photo.",
+    "paperwork": null
+  },
+  {
+    "order": 29,
+    "image_id": "44933983-2937-4e06-a8b3-459e78793f6e",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Hardtop/roof shell of K5 sitting on stand, black painted — matches removable hardtop feature of K5 Blazer. Pressure washer/generator behind. Shop environment.",
+    "paperwork": null
+  },
+  {
+    "order": 30,
+    "image_id": "64438e6e-1c4b-4277-a654-9376e9785258",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Replacement front fender (square-body Chevy 1973-1980 style) sitting on cardboard packaging with part number label visible: 'CT-712/73-80 REPLACEMENT FENDER'. K5 build part.",
+    "paperwork": "PART LABEL: 'CT-712/73-80 REPLACEMENT FENDER' on cardboard packaging — confirms 73-80 square-body fender (K5 era)."
+  },
+  {
+    "order": 31,
+    "image_id": "ad443b52-d9bd-4842-bd73-983fea49e9a2",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 view of square-body Chevy (K5 era) with quad-headlight grille and Chevy bowtie, front clip apart for restoration, blue custom paint visible on hood/fenders, knobby tire and front axle visible. Another classic car (early-70s Chevy) on lift in background. Direct K5 build documentation.",
+    "paperwork": null
+  },
+  {
+    "order": 33,
+    "image_id": "8ef1ad04-dc50-4858-87f9-fb4e5f97e1a1",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "K5 with hardtop removed showing engine bay, firewall, fender well from above (image rotated). V8 engine, BFGoodrich All-Terrain tire visible. Direct K5 build documentation.",
+    "paperwork": null
+  },
+  {
+    "order": 34,
+    "image_id": "a255e7f4-799a-4a15-8619-7fda55c44979",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Square-body K5 front-end (rotated) with quad round headlights per side, Chevy bowtie grille, chrome bumper, front axle visible. Clean K5 frontal view in shop.",
+    "paperwork": null
+  },
+  {
+    "order": 35,
+    "image_id": "df7e7d54-e16d-4b94-b3bd-bce96b7c8271",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Same K5 frontal angle as 034 (rotated), quad-headlight grille, Chevy bowtie, body removed front clip on stands. Direct K5 documentation.",
+    "paperwork": null
+  },
+  {
+    "order": 37,
+    "image_id": "e59985e1-813b-44d2-b0b5-4cb8e502f5d6",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body grille assembly close-up with single headlight bucket and grille bars, freshly painted black with masking tape residue. K5 grille restoration.",
+    "paperwork": null
+  },
+  {
+    "order": 38,
+    "image_id": "d8359e9e-49bd-44d7-a71a-70cafa5cdf9b",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Square-body grille bars detail with masking tape, freshly painted black. K5 grille restoration in progress.",
+    "paperwork": null
+  },
+  {
+    "order": 39,
+    "image_id": "24af47ef-8142-411c-a3c7-979ff02b59d3",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Square-body grille bars detail with radiator visible behind, masking tape residue. K5 grille restoration.",
+    "paperwork": null
+  },
+  {
+    "order": 40,
+    "image_id": "12999f91-cdd9-4e56-87fc-ee6331bcc68c",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body grille from front with chrome surround and quad-light pattern visible at top. Masking tape on chrome. K5 grille restoration.",
+    "paperwork": null
+  },
+  {
+    "order": 41,
+    "image_id": "d510e63c-af22-4915-9344-b209e8fda7c3",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Square-body K5 front quarter with single round headlight, classic 1973-1974-era grille (vertical bars), chrome surround, parking light below, prerunner-style tubular bumper. Direct K5 frontal detail. Single round headlights match vehicle description.",
+    "paperwork": null
+  },
+  {
+    "order": 43,
+    "image_id": "51090209-9ddd-4cd5-8341-dc0ae86057a1",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Heater core box or HVAC defrost vent housing (square plastic part) on workbench. K5/square-body HVAC part being worked on.",
+    "paperwork": null
+  },
+  {
+    "order": 44,
+    "image_id": "7262d706-dabe-47e8-93da-301c81250236",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Square-body headlight bucket and parking light close-up, fresh black paint texture. K5 front clip restoration detail.",
+    "paperwork": null
+  },
+  {
+    "order": 45,
+    "image_id": "27def9a4-d809-4881-b1e8-8a74f623ae9d",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Square-body headlight bucket close-up with H6024 sealed beam round headlight, fresh black texture paint. K5 single-headlight bucket restoration.",
+    "paperwork": null
+  },
+  {
+    "order": 46,
+    "image_id": "732dfecc-4c47-4555-8fa0-745a0a82c938",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Square-body headlight bucket with sealed beam and parking light below, fresh black texture paint. K5 front clip restoration.",
+    "paperwork": null
+  },
+  {
+    "order": 47,
+    "image_id": "1cc3a203-6015-41d9-938e-cf24a9db9da2",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "K5 hood on stand, black painted, in shop environment with pressure washer and other equipment. K5 hood off-car for restoration.",
+    "paperwork": null
+  },
+  {
+    "order": 49,
+    "image_id": "b4c520ea-04ae-4617-92ea-52c1b9676215",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Shop scene with K5 (square-body front end with single headlight visible at left) and a metal table/panel + pressure washer in foreground. Same K5 visible in background — body restoration session.",
+    "paperwork": null
+  }
+]

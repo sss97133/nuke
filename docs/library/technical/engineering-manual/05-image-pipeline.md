@@ -449,6 +449,63 @@ The full script is at `scripts/iphoto-intake.mjs`. The key operations are:
 
 ---
 
+## Vision Gate (L0–L4 cheap-first cascade)
+
+Added 2026-05-03, expanded 2026-05-05.
+
+The vision gate decides which images appear on a vehicle's public profile. It defends against three failure modes simultaneously: personal photos leaking onto vehicle profiles (Jenny's iMessage thread → K2500), photos of one vehicle landing on another (cross-square-body bleed: K5/K10/K20/C10 photos appearing on K2500), and bulk ingestion accumulating un-gated NULL rows.
+
+**Verdict space:** `approved | rejected_personal | rejected_misattributed | review_needed | pending`. `rejected_*` rows are not deleted; they remain as testimony per `agent-trust-invariants.md`, hidden from active queries via `is_superseded` and the verdict status.
+
+**Layered cascade — cheapest signal first, pixels last:**
+
+| Layer | Signal | Cost | Hits |
+|-------|--------|------|------|
+| L0 | caption / file_name / user_notes / image_context keyword scoring | free (in-row) | textual evidence |
+| L0.5 | sender_contact_affinity lookup (per-library contact pattern) | free (indexed lookup) | "this contact's photos historically go to vehicle profiles or don't" |
+| L1 | source rules (bat_*, mecum, gopro, receipt-scan auto-approve; imessage/iphoto/dropbox fall through) | free (in-row) | pipeline provenance |
+| L2 | apple_ml_labels intersection with vehicle/personal/doc lexicons | free (in-row) | Apple's on-device ML output |
+| L3 | is_sensitive / is_document boolean flags | free (in-row) | definitive flags |
+| L4 | caller-agent vision via `/vision-gate-l4` slash command (Claude Code Read on rendered storage URL) | caller compute (BYOK) | pixels |
+
+First layer with confidence ≥ 0.85 wins. Falls through to next on insufficient confidence. L4 is opt-in (run via `--call-vision` flag or the L4 worklist harness).
+
+### L0.5 sender-contact affinity
+
+Per-library affinity scoring derived from existing verdict history. Generic — works for any user's image library, no curation required.
+
+- Table `sender_contact_affinity` (`user_scope_id`, `contact_identifier`, `vehicle_affinity` 0–1, `confidence`, `observation_count`)
+- Function `recompute_sender_contact_affinity(p_user_scope_id)` rebuilds from current `vehicle_images` verdicts (group by `photographer_attribution` or `documented_by_device`)
+- Cold-start safe: < 10 observations → affinity NULL → layer returns null → falls through to L2/L3/L4
+- Rules: affinity > 0.8 → approved (vehicle-pattern contact), < 0.2 → rejected_personal, 0.2–0.8 → fall through
+
+### L4 caller-agent harness (BYOK)
+
+The "laser-tag" model: Nuke owns the worklist + verdict ingest; the caller agent owns compute. Per `feedback_vision_is_caller_byok_laser_tag.md`. No Anthropic API spend — uses Claude Code's free Read over rendered Supabase storage URLs (`/storage/v1/render/image/public/?width=1024`).
+
+Two-phase interface (`scripts/vision-gate-l4.mjs`):
+1. **prepare** claims rows by writing `vision_gate_agent_reasoning='L4-claimed: <ts>'`, validates URLs (drops 404/timeout), emits JSONL worklist.
+2. **ingest** reads JSONL verdicts written by the caller agent, applies them to `vehicle_images`.
+
+Slash command `/vision-gate-l4 <vehicle-id> <limit>` (`.claude/commands/vision-gate-l4.md`) wraps the cycle and spawns one `general-purpose` subagent (Explore refuses Write).
+
+### Reattribution pipeline
+
+Per `agent-trust-invariants.md`: testimony is never deleted. When an image is misattributed (caught at L4 or by user correction), it must be **reattributed** to the correct vehicle, not deleted. Per Skylar 2026-05-05: "images can only exist in one spot."
+
+- Function `reattribute_observation(observation_type, observation_id, target_vehicle_id, reason, actor_user_id)` — atomic, idempotent supersession move
+- Writes new row at target vehicle with `merged_from_vehicle_id = old_vehicle_id` (lineage)
+- Marks old row `is_superseded=true`, `superseded_by=NEW_ID`, `superseded_at=NOW()`
+- Logs to immutable `reattribution_audit` table
+- Works for both `vehicle_images` and `vehicle_observations`
+- Resets `vision_gate_status='pending'` on the new row (re-gate in new context)
+
+### Pipeline orchestrator gap (2026-05-05)
+
+Investigation of an 11,121-row NULL `vision_gate_status` pile found 93% of rows had `ai_processing_status='completed'` from `yono-analyze` but never had `yono-classify` (gate decision) execute. The `photo-pipeline-orchestrator` shows repeated 500 errors. Fix options: restore yono-classify dispatch, OR (simpler) make the L0–L3 cheap cascade the canonical gate at intake, treating L4 as the optional pixel-confirmation step. The cheap cascade plus L0.5 resolves the bulk of NULL rows without API spend (K10 test: 1,536 of 1,666 NULL → approved by L1=bat_import provenance alone).
+
+---
+
 ## Known Problems
 
 1. **External CDN URLs expire.** BaT image URLs are persistent, but Facebook, Craigslist, and some auction house CDN URLs expire. Images should be downloaded and stored locally during extraction, but many extractors only store the URL.

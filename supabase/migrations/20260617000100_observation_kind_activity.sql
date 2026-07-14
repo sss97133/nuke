@@ -1,0 +1,26 @@
+-- 20260617000100_observation_kind_activity.sql
+--
+-- KEYSTONE STEP 3 — add the 'activity' observation kind.
+-- Design: docs/library/technical/engineering-manual/20-polymorphic-subject-build-guide.md §4.
+-- Approved by Skylar 2026-06-17.
+--
+-- WHY a NEW kind rather than reusing 'work_record' (don't-mint check):
+--   'work_record'  = CONFIRMED, value-bearing labor performed on/for a subject.
+--   'activity'     = an OBSERVED action whose intent/value is NOT yet owner-
+--                    confirmed (a drive, a supply run, comms, an inspection).
+--                    Value accrues ONLY after the owner confirms intent, at which
+--                    point it is promoted to a 'work_record'. This is the
+--                    photo-intent rule made structural (never assert labor/value
+--                    from an observed action alone — see
+--                    feedback_photo_intent_must_be_confirmed_not_assumed).
+-- The two are non-overlapping: 'activity' is the pre-confirmation state.
+--
+-- The CEO-drives-for-supplies case is an 'activity' with subject_type='organization'
+-- and structured_data = { actor_id, work_order_id, geo_path, duration_min,
+-- cost:{mileage_usd,labor_usd,receipt_id}, intent }. intent is owner-confirmed,
+-- never inferred.
+--
+-- SAFETY: ALTER TYPE ... ADD VALUE is additive and online (no table rewrite, no
+-- lock on vehicle_observations). IF NOT EXISTS makes it idempotent.
+
+ALTER TYPE observation_kind ADD VALUE IF NOT EXISTS 'activity';

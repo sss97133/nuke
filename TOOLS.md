@@ -21,7 +21,7 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Intent | Use This | Notes |
 |--------|----------|-------|
 | Extract any listing URL (unknown source) | `extract-vehicle-data-ai` | Handles generic AI extraction |
-| Extract Bring a Trailer listing | `complete-bat-import` | Two-step: extract-bat-core + extract-auction-comments. |
+| Extract Bring a Trailer listing | `extract-bat-core` | Call directly, then trigger `extract-auction-comments` yourself — not auto-chained. (`complete-bat-import` was deleted from deployment in the March 2026 triage; it 404s live.) |
 | Extract Cars & Bids listing | `extract-cars-and-bids-core` | Handles C&B structure |
 | Extract Hagerty Marketplace listing | `extract-hagerty-listing` | |
 | Extract PCarMarket listing | `import-pcarmarket-listing` | |
@@ -263,7 +263,7 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 | Monitor a BaT seller | `bat-seller-monitors` table | Insert record to start monitoring |
 | Monitor a BaT buyer | `bat-buyer-monitors` table | Insert record to start monitoring |
 | Parse BaT snapshot HTML | `bat-snapshot-parser` | Parses archived BaT pages |
-| Extract a BaT listing (entry point) | `complete-bat-import` | Calls extract-bat-core + extract-auction-comments in sequence |
+| Extract a BaT listing (entry point) | `extract-bat-core` | Standalone entry point — call directly, then trigger `extract-auction-comments` yourself. (`complete-bat-import` is deleted/404s — see `_shared/approved-extractors.ts`.) |
 
 ---
 
@@ -371,6 +371,7 @@ Agent: → UPDATE location_zone = 'dash' in manifest
 | Search vehicles, orgs, users, tags | `universal-search` | Magic input handler with thumbnails |
 | API vehicle search | `api-v1-search` | REST API endpoint |
 | Get vehicle history | `api-v1-vehicle-history` | Historical data |
+| **Get build dossier (Proof-of-Ownership + Build-History)** | `api-v1-vehicle-history/{vin\|uuid}?view=dossier` | Returns `nuke.dossier/v1`: identity, ownership signals, documented build summary (days/hours/est-labor/photos), valuation, dated timeline. Every number carries source+method. Builder: `_shared/dossier.ts`. CLI: `npm run dossier:build -- --vehicle-id <id>` (renders printable HTML). MCP tool: `dossier`. |
 | Get auction data | `api-v1-vehicle-auction` | Auction-specific fields |
 | Get observations for a vehicle | `api-v1-observations` | All source observations |
 
@@ -384,6 +385,36 @@ Agent: → UPDATE location_zone = 'dash' in manifest
 | Ingest observations in bulk | `ingest-observation-batch` | Wraps `ingest-observation` for batch processing. Max 200 per request. Options: `gap_fill` (backfill vehicles table), `write_evidence` (field_evidence rows). |
 | Write observation + gap-fill + evidence (from code) | `import { writeObservation } from "../_shared/observationWriter.ts"` | Shared module for edge functions. Wraps observation + Tetris gap-fill + field_evidence in one call. |
 | Migrate legacy data to observations | `migrate-to-observations` | Ports existing auction_comments, vehicle_events, etc. to vehicle_observations |
+| Mark an observation replaced by a corrected one | RPC `supersede_observation(original_id, successor_id)` | The supersession primitive. Owner-authorized on `auth.uid()`, idempotent, writes NO testimony — it only flips `is_superseded` / `superseded_by` / `superseded_at` and appends `lineage_chain`. Write the successor through `ingest-observation` first, then call this. Never `UPDATE` a testimony row to correct it. |
+
+---
+
+## Derivation Loop (evidence → cited claims)
+
+Evidence lands → a trigger enqueues a work item in `derivation_queue` → cron `derivation-queue-drain` (every 10m) calls `derive-dispatch` → dispatch reads `observation_extractors` to learn which reader handles that evidence → the reader emits observations through `ingest-observation`. Adding a new evidence type is a row in `observation_sources` + `observation_extractors` and one edge function. **Never** a change to `derive-dispatch`.
+
+| Intent | Use This | Notes |
+|--------|----------|-------|
+| Drain pending derivation work | `derive-dispatch` | service_role only. Claims via `claim_derivation_work` (FOR UPDATE SKIP LOCKED). Requeues on 429 (owner rate-limited) and 402 (no credential) rather than failing. |
+| Read a title → cited ownership | `derive-title-ownership` | Runs on the OWNER's compute (`runWithChain`). Emits `kind=ownership` with `citation_secure_document_id`, `citation_excerpt`, `rank='preferred'` when the title names the uploader. Ungroundable claims become `needs_owner_confirmation`. |
+| Recover a photo's capture time | `derive-image-exif` | **Pure function, no model, no credential.** Range-requests the first 256KB, parses the JPEG APP1/TIFF IFD, writes `taken_at` + `exif_data`. Never falls back to `created_at` — upload time is not capture time. |
+| Turn an owner's sentence into work | `agent-chat` tool `request_derivation` | Enqueues the caller's own evidence with `requested_by='agent'` and the owner's words in `request_note`. |
+
+## In-App Agent (`agent-chat`)
+
+The conversational face of the same verbs the drill buttons use. Runs as the caller (their JWT → RLS); Anthropic tool-use loop. Mounted on the vehicle profile as the **Ask** panel (`nuke_frontend/src/components/agent/AgentChat.tsx`).
+
+**Compute is the caller's.** `agent-chat` calls `runWithChain()` (`_shared/claudeSubscriptionAuth.ts`), which resolves per-user in funnel order: their Claude subscription (OAuth bearer + `anthropic-beta: oauth-2025-04-20`) → their own Anthropic API key (`x-api-key`) → the platform key, metered against their prepaid `ai_credit_ledger` balance. A rate-limited subscription is reported back to the user (HTTP 429 + `retry_after_seconds`), never silently upgraded onto a bill. The response carries `source` and `charged_cents` so the cost-bearer is always visible. Users connect a credential at **`/settings/ai`** (`pages/settings/AIAccessPage.tsx` → `AIProviderSettings`, which also renders the Connect-Claude card). Credential resolution + metering use a service-role client (`ai_credit_ledger` has no INSERT policy for `authenticated`); identity always comes from the verified JWT, never from that client.
+
+| Intent | Use This | Notes |
+|--------|----------|-------|
+| List a vehicle's open owner questions | tool `list_pending_confirmations(vehicle_id)` | Reads `get_vehicle_build_ledger` (SECURITY DEFINER, owner-scoped). Skips drafts that already have a successor, so a partial write never re-asks. |
+| Record the owner's ruling on a ledger entry | tool `answer_confirmation(observation_id, confirmed, owner_answer, amount_usd?)` | Sign-tier. Writes the successor through `ingest-observation` (`source_slug=owner-input`, `extraction_method=owner_confirmed_v1` \| `owner_rejected_v1`), then `supersede_observation`. `structured_data.owner_confirmed=true` adds a +0.30 confidence factor → `verified`. Self-heals a prior partial write instead of double-booking. |
+| Move a photo to the right vehicle | tool `move_photo(image_id, vehicle_id)` | `relink_testimony` — forks, keeps lineage, logged. |
+| Find the owner's photos | tool `find_photos(text?, vehicle_id?, date_from?, …)` | Text search only reaches analyzed frames. |
+| Ground the agent in what exists | tool `list_garage()` | Never invent vehicle ids. |
+
+Ledger read set: `get_vehicle_build_ledger` returns `extraction_method IN ('audit_draft_v0','owner_confirmed_v1')`. A rejected entry's `owner_rejected_v1` successor is deliberately excluded — the ruling persists as testimony, the row leaves the ledger.
 
 ---
 
@@ -405,6 +436,25 @@ Public agent-writable surface. External LLM agents (Claude, ChatGPT, etc.) submi
 **Auth contract:** `X-API-Key: nk_live_...` (preferred for external agents) OR `Authorization: Bearer <service-role>` (internal). Per-vehicle scope check via `_shared/apiKeyAuth.ts → requireVehicleScope()` and `_shared/scopeGrammar.ts`. Rate limits enforced atomically via `check_api_key_rate_limit(p_key_hash, p_endpoint)` RPC.
 
 **Substrate:** Reuses `vehicle_observations` + `ingest-observation`. Append-only with supersession via `is_superseded`/`superseded_by` (correction_of in envelope).
+
+---
+
+## User Claude Auth (subscription + BYOK funnel)
+
+Lets a Nuke user run analysis on **their own Claude plan**: subscription token as the low-friction floor, API key as the pressure-release. Per-job funnel: `subscription → 429 → slow-down OR upgrade-to-API (user key → platform key)`.
+
+| Intent | Use This | Notes |
+|--------|----------|-------|
+| Link a user's Claude subscription ("Connect Claude" button) | `connect-claude` (POST `/start`, POST `/complete`, GET `/status`, POST `/disconnect`) | Nuke as OAuth *client* to Anthropic (inverse of `oauth-server`). Stores token bundle as JSON in `user_ai_providers.api_key_encrypted` under `provider='anthropic_subscription'` — no schema change. |
+| Run a Claude call through the funnel | `_shared/claudeSubscriptionAuth.ts → runWithChain()` | `mode:"slow"` returns the 429 for the caller to back off; `mode:"upgrade"` re-runs on API. `maxWaitSeconds` forces upgrade if the rate-limit reset is too far out. |
+| Resolve best Claude auth for a user | `_shared/claudeSubscriptionAuth.ts → resolveClaudeAuth()` | Order: subscription → user `anthropic` key → system `ANTHROPIC_API_KEY`. `allowSubscription:false` skips straight to API (the upgrade branch). |
+| BYOK API key (any provider, system fallback) | `_shared/getUserApiKey.ts → getUserApiKey()` | Pre-existing. Returns user-key-or-system with a `source` tag. |
+| Read/move AI credits (prepaid wallet) | `_shared/aiCredits.ts` (`availableCents`, `holdCredits`, `settleHold`, `creditCents`) | Backed by `ai_credit_ledger` (append-only; balance DERIVED via `ai_credit_available_cents()` / `my_ai_credit_balance()` RPC). Platform-key spend reserves→settles here; user never spends past funded balance. |
+| Fund the wallet (Stripe) | `create-api-access-checkout` (`subscription_type: wallet_10/25/50`) → `stripe-webhook` | Checkout sets `metadata.amount_cents`; the webhook credits the ledger idempotently on `checkout.session.completed`. Deploy webhook `--no-verify-jwt`; set `STRIPE_WEBHOOK_SECRET`. |
+| Connect-Claude + balance UI | `nuke_frontend/.../settings/ClaudeSubscriptionSettings.tsx` (mounted in `AIProviderSettings.tsx`) | Settings card: connect subscription, show balance, top up. |
+| Run user analysis on their own Claude (web + iOS) | `analyze-with-claude` | User-JWT entrypoint → `runWithChain`. POST `{ prompt, vehicle_id?, mode?: slow\|upgrade, model?, max_tokens? }`. Returns `{ source, text, chargedCents, needsFunding }`. 429→slow, 402→needs funding. Retires archived `imessage-router`. |
+
+**⚠️ Unsanctioned client:** the subscription flow rides Anthropic's first-party Claude Code OAuth `client_id` (no published third-party client). Fragile + ToS-gray; built for the defensible BYOK case only. Verify `ANTHROPIC_OAUTH` constants against a live `claude setup-token` before prod. See the warning block in `_shared/claudeSubscriptionAuth.ts`.
 
 ---
 
@@ -456,7 +506,7 @@ These are the most common "agent reimplementation" antipatterns. If you find you
 | A vehicle valuation calculator | `compute-vehicle-valuation` |
 | A comment sentiment analyzer | `discover-comment-data` |
 | A search endpoint | `universal-search` |
-| A BaT scraper | `complete-bat-import` |
+| A BaT scraper | `extract-bat-core` (+ `extract-auction-comments` for comments) |
 | A Craigslist scraper | `extract-craigslist` or `discover-cl-squarebodies` |
 | A Facebook scraper | `extract-facebook-marketplace` |
 | A market trend calculator | `calculate-market-trends` |

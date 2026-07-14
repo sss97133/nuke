@@ -1,0 +1,354 @@
+[
+  {
+    "order": 0,
+    "image_id": "68273684-d8b1-4572-939f-08cd2daa5505",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Measuring tape on coil of blue powder-coated coil spring (Wild Horses-style). Marker 'WHF S103' visible on spring - consistent with 710d's Wild Horses suspension. Screenshot framing (Google Messages header) is benign paperwork-style content.",
+    "paperwork": "screenshot (text/chat header visible at top)"
+  },
+  {
+    "order": 1,
+    "image_id": "d1caf4b2-7a4d-47f4-9feb-1c4cf246279e",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Close-up of u-joint/driveshaft yoke and pinion area under vehicle. Build-context detail shot. No vehicle ID features but consistent with bench/lift work on the Bronco build.",
+    "paperwork": null
+  },
+  {
+    "order": 2,
+    "image_id": "8b27f278-2fa1-4c55-888a-7a355a9195aa",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Tight macro of cast iron component (bellhousing or transmission case) showing casting features. Build-detail shot consistent with engine/trans work.",
+    "paperwork": null
+  },
+  {
+    "order": 3,
+    "image_id": "f12ee81d-459d-4829-a154-9c475ef18c0d",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Engine bay: 351W Ford 'POWERED BY FORD' valve cover clearly visible, alternator, Holley/Sniper EFI digital display showing AFR/RPM/voltage. Matches 710d's 351 Windsor.",
+    "paperwork": "Sniper EFI display (gauge screen, not VIN paperwork)"
+  },
+  {
+    "order": 4,
+    "image_id": "e5a54c78-9a50-4c38-8131-7acbd486d570",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "PowerMaster PowerMAX Plus starter mounted to blue-painted bellhousing/block. Battery terminal label visible. Consistent with 351W build in 710d.",
+    "paperwork": "Starter solenoid label (battery terminal max torque sticker)"
+  },
+  {
+    "order": 5,
+    "image_id": "7b7f0c78-3667-4f84-a171-fee44d8fb338",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Front of vehicle - white/cream bodywork, knobby tire visible, coiled blue wire being routed. Build/wiring work on the Bronco.",
+    "paperwork": null
+  },
+  {
+    "order": 6,
+    "image_id": "a6452a76-5036-49f1-92cd-3fbb770610f9",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Loose wire harness pulled out next to vehicle on garage floor. Wires being routed/replaced. Build-context.",
+    "paperwork": null
+  },
+  {
+    "order": 7,
+    "image_id": "75b76da1-3718-411e-8f4e-a378190bf39c",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Hand holding 2-pin Deutsch DT-style connector under vehicle (likely sensor connector). Build-detail shot.",
+    "paperwork": null
+  },
+  {
+    "order": 9,
+    "image_id": "a989b107-bc0b-40e1-b270-f86070e350b8",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "351W 'POWERED BY' Ford valve cover visible, Fluke multimeter measuring voltage, red battery cable, electrical work on the engine. Tattooed forearms consistent with shop work on 710d.",
+    "paperwork": null
+  },
+  {
+    "order": 10,
+    "image_id": "d5f36cd3-8a19-4a8a-b257-a79ff1a54c1c",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Engine bay shot - 351W Ford engine with alternator (V1117458), brake booster, EFI sticker, cream/white inner fenders. Mechanic with tattooed arm working. Clearly 710d build.",
+    "paperwork": "Alternator tag V1117458 visible"
+  },
+  {
+    "order": 11,
+    "image_id": "61a547d4-ad94-4b54-8ccd-f577ec6e211c",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Hero shot of completed cream/tan early Bronco on lift, full grille with FORD letters, round headlights, BFGoodrich and aggressive off-road tires on Vision-style wheels. Classic early Bronco (1966-1977).",
+    "paperwork": null
+  },
+  {
+    "order": 12,
+    "image_id": "5ba8b4cd-a25b-40a0-b42f-c185fcff6b4b",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 of cream early Bronco with FORD grille (red letters), open top showing roll cage and tan diamond-stitch seats, knobby off-road tires. Matches 710d perfectly.",
+    "paperwork": null
+  },
+  {
+    "order": 14,
+    "image_id": "5a23ce25-7863-4b84-ab33-60d77983666c",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Engine bay viewed from front with heater box, blower motor, radiator, cream/white inner fenders, billet aluminum dash panel. Early Bronco engine compartment matching 710d build state.",
+    "paperwork": null
+  },
+  {
+    "order": 15,
+    "image_id": "66d71f94-e9af-4e82-9212-69ff1b8bf22a",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Cream/tan early Bronco front 3/4 view - LED round headlights, classic grille, knobby off-road spare tires nearby, roll cage visible above. Classic 710d.",
+    "paperwork": null
+  },
+  {
+    "order": 16,
+    "image_id": "b237bbb7-fe4a-4ec6-a75a-e81afbb4765b",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Side profile of cream early Bronco - 'Bronco' script badge on fender, round headlight, knobby tire, white roll cage. Classic 710d.",
+    "paperwork": "'Bronco' fender script badge"
+  },
+  {
+    "order": 17,
+    "image_id": "09ebc5c9-101a-4ca6-95dc-8dc723316bd9",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Tan/brown diamond-stitch leather seats, white roll cage with padding, center console. Exactly matches 710d's specified tan diamond-stitch interior.",
+    "paperwork": null
+  },
+  {
+    "order": 18,
+    "image_id": "c48d4376-f4bb-4b83-8ced-f2e61087d261",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Interior view: tan diamond-stitch passenger seat, exposed wiring under dash (red/yellow/pink), HVAC unit being installed/serviced. Dash schematic paper visible on right.",
+    "paperwork": "Dash wiring schematic/diagram visible on right side"
+  },
+  {
+    "order": 19,
+    "image_id": "b08ec399-dbd1-4698-8688-812f8a078e45",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Rear of cream early Bronco - 'FORD' tailgate lettering, white roll cage, spare tires, tan headrests visible inside. Classic 710d.",
+    "paperwork": "'FORD' tailgate badge"
+  },
+  {
+    "order": 20,
+    "image_id": "3349ab31-82d3-4c02-a44e-096f1df48429",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Rear 3/4 of cream early Bronco - taillight, tailgate, roll cage with tan headrests, off-road tire/wheel combo on cardboard. Classic 710d.",
+    "paperwork": null
+  },
+  {
+    "order": 21,
+    "image_id": "52abf4a2-dac5-4738-8f2e-e3e1d1d17604",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Wide shop shot of cream early Bronco with hood up, white roll cage, tan seats, knobby tires, parts laid out on workbench. Mid-build state matching 710d.",
+    "paperwork": null
+  },
+  {
+    "order": 22,
+    "image_id": "ba329664-d123-4a63-828c-582c96fb0cd1",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Body mount bushing/cushion on frame rail of vehicle - early Bronco frame architecture. Build-detail shot.",
+    "paperwork": null
+  },
+  {
+    "order": 23,
+    "image_id": "b86349dd-b2b6-4dd1-bff1-6da12909440c",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Small stainless bracket/tab on cardboard - parts staging for build. Likely a mounting tab from the 710d kit.",
+    "paperwork": null
+  },
+  {
+    "order": 25,
+    "image_id": "668e42da-d56e-4039-a7d6-5ccf29eacee9",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Bare-metal bracket and bag of hardware on cardboard - parts staging for build. Consistent with mid-build sub-assembly.",
+    "paperwork": null
+  },
+  {
+    "order": 26,
+    "image_id": "19d412b9-e5b8-4eff-98e7-3a793ad41680",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Two black-painted parts: a sleeve/spacer and a hook/lever (possibly hood prop or transmission lever). Parts staging.",
+    "paperwork": null
+  },
+  {
+    "order": 27,
+    "image_id": "95665321-b66e-4f51-8c63-643fdd369e97",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Inside body cavity - frame rail/crossmember with threaded rod, factory cavity. Build-context view.",
+    "paperwork": null
+  },
+  {
+    "order": 28,
+    "image_id": "3b9d43fe-b6b2-4590-aad1-e630b62604ea",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Red-painted differential pinion area showing pinion shaft and crush sleeve - rebuilt diff. Consistent with 710d's drivetrain refurb (Dana 44 front or 9-inch rear).",
+    "paperwork": null
+  },
+  {
+    "order": 29,
+    "image_id": "1e9a093c-c60e-4da8-96b3-4b97726a88d8",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Red-painted axle housing/diff cover area showing splined yoke. Drivetrain rebuild matching 710d.",
+    "paperwork": null
+  },
+  {
+    "order": 30,
+    "image_id": "63f08f2a-6fe2-4807-9827-a43ccac21091",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Front axle with blue powder-coated radius arm, blue coil spring, knobby Atturo/AT tire - exactly matches 710d's blue powdercoat + Wild Horses springs + Atturo Trail Blade XT spec.",
+    "paperwork": null
+  },
+  {
+    "order": 31,
+    "image_id": "25a3bec6-2626-4a4c-b425-0c9e94df52c9",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "AN-fitting plumbing on blue powder-coated engine/intake area - braided/anodized AN fittings. Blue powdercoat matches 710d build.",
+    "paperwork": null
+  },
+  {
+    "order": 32,
+    "image_id": "fca10ce9-bc22-40f1-9b34-ece5f5f8cee7",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Thermostat housing/water neck on blue painted intake manifold with stainless braided hose attached. Blue paint + braided lines = 710d build state.",
+    "paperwork": null
+  },
+  {
+    "order": 33,
+    "image_id": "b5694930-3212-40cc-bd5e-5770ff27f585",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Brass/copper electrical lug, oil pressure sender or similar fitting with copper connecting strap. Engine bay wiring detail.",
+    "paperwork": null
+  },
+  {
+    "order": 34,
+    "image_id": "bedc44fb-a827-4fbf-804f-9d954d699845",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Engine bay: HEI distributor cap, brass fittings on aluminum heads, blue-painted block edge, red plug wires, serpentine belt, AC compressor pulley. Small 'V8' tag visible. Clearly 351W engine build for 710d.",
+    "paperwork": "Yellow tag visible on distributor 'V/B' marking"
+  },
+  {
+    "order": 35,
+    "image_id": "5985d1b0-2877-48ba-942c-5f7d3dbd6ef9",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Under-dash or rear corner showing antenna mount, wire loom routing, factory body channel. Build-detail shot consistent with wiring work on 710d.",
+    "paperwork": null
+  },
+  {
+    "order": 37,
+    "image_id": "8923513d-b607-45ad-8912-26e49483e0dd",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine bay showing blue paint, serpentine belt, water pump pulley, exhaust manifold/header heat shield. Blue powdercoat consistent with 710d.",
+    "paperwork": null
+  },
+  {
+    "order": 39,
+    "image_id": "40c5085c-a53e-425e-aa1c-96060ae631c3",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Engine bay: '351 Powered By Ford' valve cover, white firewall with brass/copper bulkhead pass-throughs, EFI wiring loom. Exact 710d engine bay character.",
+    "paperwork": "'351 Powered by Ford' valve cover badge"
+  },
+  {
+    "order": 41,
+    "image_id": "8b519a11-f6bb-4b0a-81f6-fb84d59a37d0",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Throttle linkage / kickdown bracket on aluminum intake manifold or trans. Engine/throttle plumbing detail consistent with build.",
+    "paperwork": null
+  },
+  {
+    "order": 42,
+    "image_id": "1ec38de3-3555-4dfc-8091-bcab992faf89",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Steering column shaft with u-joints and lower coupler, brake master cylinder/booster (black) mounted to bracket. Steering + brake assembly for early Bronco build (firewall-mount Bronco-style hanger).",
+    "paperwork": null
+  },
+  {
+    "order": 43,
+    "image_id": "042172fa-94d5-4a33-a9c5-48038add3c98",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Two brake booster + master cylinder assemblies on hangers/pedal boxes - parts staging for early Bronco brake conversion. Build-staging.",
+    "paperwork": null
+  },
+  {
+    "order": 44,
+    "image_id": "b16a5f96-8237-44f3-abdf-900c7ce490ac",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Polished stainless headers/exhaust manifold with red roll cage tube visible above and blue painted block. Engine bay of 710d.",
+    "paperwork": null
+  },
+  {
+    "order": 45,
+    "image_id": "70410511-eacc-4e20-a940-325251bc582e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Pedal box / brake/clutch pedal assembly mounted to bracket with rubber boot. Component staging for build.",
+    "paperwork": null
+  },
+  {
+    "order": 46,
+    "image_id": "9353b980-caeb-4f94-85a0-f5b6c01e40c6",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Workbench with hardware bin organizer (nuts/bolts/washers sorted), early Bronco front clip (FORD grille, round headlight) visible in background on garage floor. Build-organization shot for 710d.",
+    "paperwork": "USPS box, hardware organizer labels"
+  },
+  {
+    "order": 47,
+    "image_id": "f7b18626-8ab1-425d-8861-ad7edb08cf5a",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Dennis Carpenter Ford Restoration Parts bag with label 'C6TZ-9606A08-A Glove Box Door Check Cable'. Restoration parts for early Bronco - exact match for 710d build supplier.",
+    "paperwork": "Dennis Carpenter parts label - C6TZ-9606A08-A Glove Box Door Check Cable (Ford restoration PN)"
+  },
+  {
+    "order": 48,
+    "image_id": "b33c2778-292e-42ec-a506-9fc2dd380b1a",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Cream/white body panel (door panel or trim) and matching black piece - parts staging during paint/assembly. Body color matches 710d.",
+    "paperwork": null
+  },
+  {
+    "order": 49,
+    "image_id": "f3551117-b908-47e7-b3d0-ad3c4562a2de",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Cream/white body panel with speaker grille mount cutout and switch knob - kick panel or interior trim. Color matches 710d body.",
+    "paperwork": null
+  }
+]

@@ -647,3 +647,39 @@ These migrations exist in the codebase but were never applied to production:
 | $14,000 | C10 Short Bed | BaT | Stock condition |
 
 **The spread is $14K to $214K.** The variable is build quality. That's why the build plan matters.
+
+---
+
+## 2026-06-15 Update — Sharpened by the FJ40 miss
+
+Three months after the $10K C10, a **1968 Toyota FJ40 listed at ~$6,000** was missed the exact same way: Skylar found it ~30 minutes late, actually messaged the seller, got a response, but the deal was gone. A $6K FJ40 is a $12K+ flip. The system that should have caught it is **built but unplugged** (watchlist/deal tables never created; CL queue processor stalled since Feb 25; FB sweeps died Jun 13 on a transient Supabase 522 and never restarted). **The problem is execution and latency, not strategy.** Four corrections to the spec above:
+
+**1. The human is the KEY, not the judge.** The original spec frames the buyer as deciding ("Acquire / Pass") off a rich deal package (Layers 2-5: comps, cost, vendor, timeline). Skylar's correction: he does not need the machine to *judge* the deal. His eye is the edge ("I know when the stars align"). He is in the loop only as the **capital authorization** (the key), and only because capital is scarce. If capital were unlimited and judgment trustworthy, the machine would transact with no human at all. This is the [[everything-is-an-entity / humans only touch the machine to sign keys]] doctrine pointed at Skylar himself. **Implication: the MVP does not need the full comp/cost/vendor stack. It needs Layer 1 at extreme speed plus a one-tap authorize.**
+
+**2. The latency target is wrong.** The spec's "< 15 min listing-to-notification" is a sticky note. A mispriced deal sells in 30 minutes. **Real target: ~1 second from listing-live to in-front-of-Skylar.** The MVP's single KPI is detection-to-surface latency, measured in seconds, on Skylar's high-value targets. Broad+slow national coverage and narrow+fast personal coverage are two different loops; the money loop is narrow+fast.
+
+**3. The moat is instant settlement, not the deal package.** Manual spread-harvesting on mispriced/distressed assets is a hack any flipper does by hand. The defensible, VC-legible thing is making a physical asset **clear like a share of stock**: pre-written contracts + escrow holding the title. Two speeds: (a) **cold-listing acquisition** — you can't force a millisecond transaction on a random FB seller, so you win by being the most frictionless offer that exists (instant escrow-backed cash, zero flake), making "yes to you" the seller's easiest yes; (b) **on-rails clearing** — true millisecond settlement, but only once *both* sides are on the exchange. That is stage 2.
+
+**4. The edge is reflexive — two-stage business.** Skylar's own point: if everyone runs this, the spread compresses to zero (exactly what HFT did to stock spreads). So the edge is private and temporary. **Stage 1:** private weapon — Skylar flips off an edge nobody else has, makes money now, proves the inefficiency is real. **Stage 2:** when the spread erodes, don't sell the edge, become the **exchange** — the order-filling/settlement layer for the asset class that takes a cut of every transaction. The house, not the player. That is the VC-legible "settlement layer for a trillion-dollar asset class," and it's the same order-filling thesis monetized as infrastructure. The private bot funds and validates the platform.
+
+### Revised MVP (smaller than the 6-layer plan)
+
+Not "click yes on a full deal package." The bridge is: **machine surfaces the right listing in ~1 second, Skylar (the key) taps yes, the machine fires the first contact.** Concretely:
+
+- **P0 — unplug-to-plugged:** restart the dead ingestion (CL queue stalled Feb 25; FB sweeps dead since Jun 13). Add 522-retry so a transient backend blip doesn't kill the day.
+- **P1 — turn on the dormant matching:** apply the three written-but-unapplied migrations (`20251127000001_vehicle_watchlist_system`, `20251108_marketplace_deal_alerts`, `20251103000002_notification_system`). This is a **schema change → needs Skylar's explicit go** per the ask-first rule.
+- **P1 — wire match → INSTANT alert:** ingestion → `check_watchlist_match()` → instant Telegram with a one-tap "I'm in" that fires a pre-templated first message to the seller. Reuse the existing Telegram bot + `_telegram.ts`.
+- **P1 — fast lane:** poll Skylar's actual flip targets (now including classic 4x4 / Land Cruiser, added to `fb-watchlist-scraper.ts` 2026-06-15) at seconds-cadence, his region first, instead of the 6-hour national sweep.
+
+Capital, comps, cost models, vendor network, and the full "click yes" package (Layers 2-6) remain the long game. The thing that catches the next FJ40 is P0 + P1 at one-second latency. Mostly turning on what already exists.
+
+### Status 2026-06-16 — fast lane SHIPPED
+
+The MVP fast lane is built and live. `scripts/fb-fast-lane.mjs` (+ `fb-fast-lane.sh`, `com.nuke.fb-fast-lane.plist`, npm `fast-lane`/`fast-lane:test`), running every 10 min via launchd.
+
+- **Acquisition finding (important):** the old `fb-watchlist-scraper.ts` HTML-regex method is DEAD — logged-out FB returns HTML with zero listing IDs. That's why nothing ever fired. The WORKING path is the sweep's GraphQL endpoint (`api/graphql/`, doc_id `33269364996041474`, `marketplace_feed_stories`). Fast lane is built on that. Do not rebuild on the HTML method.
+- **Free deal signal:** FB exposes `comparable_price` per listing. Fast lane flags `% under` comp and sorts deals first (🔥 ≥15% under) — no need for Nuke's own (shaky) comps for the alert.
+- **Hygiene:** skips `is_sold`/`is_pending`, marks `if_gk_just_listed_tag`, dedups via `logs/fast-lane-seen.json`, caps 10 alerts/pass, `--prime` records silently when widening coverage.
+- **Coverage:** Vegas + Henderson + St George + Phoenix + LA + Riverside (drive range), ~432 listings/pass. Targets are a plain array in the script — edit freely.
+- **Human = key:** alert lands on Telegram, Skylar taps through and messages the seller. No auto-buy.
+- The dormant watchlist/auto-buy migrations were NOT applied (would add tables nothing calls + risk against drifted schema). Deeper edge-pipeline (Layers 2-6) remains the long game.

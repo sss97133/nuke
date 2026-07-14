@@ -1,0 +1,26 @@
+[
+  {
+    "image_id": "a5729fe4-53eb-408e-950d-c2bacdfacb34",
+    "verdict": "review_needed",
+    "confidence": 0.35,
+    "reasoning": "Extreme close-up of glossy body panel with chrome reflections showing circular wheel/rim shapes. Body color (tan/beige) is consistent with the other square-body K10 photos in this batch, but image is too tight and reflection-dominated to confirm square-body GM C/K body style on its own. Body-style ambiguity."
+  },
+  {
+    "image_id": "6d723824-ca6a-484b-9819-97bc9926591d",
+    "verdict": "default_approved",
+    "confidence": 0.97,
+    "reasoning": "Tan/beige square-body Chevrolet truck (1981-87 generation) clearly visible: stacked rectangular headlights, signature square-body cab, 'Silverado 10' fender badge, chrome wraparound bumper, spare tire mounted in bed. Matches 1985 K10 SWB profile exactly. Square-body GM C/K — default approved."
+  },
+  {
+    "image_id": "d02e21b4-e7df-4881-89e3-617ebcb6baf0",
+    "verdict": "default_approved",
+    "confidence": 0.95,
+    "reasoning": "Same tan square-body Chevrolet truck — bedside and cab view showing two-tone paint, chrome trim, cab back glass, spare tire in bed, square-body roofline. Square-body GM C/K — default approved."
+  },
+  {
+    "image_id": "4f747607-dc25-4583-b14f-c05301b608bf",
+    "verdict": "default_approved",
+    "confidence": 0.96,
+    "reasoning": "Square-body GM truck quarter/fender view: stacked rectangular headlight bezel, 'Silverado' door emblem, two-tone tan-over-brown paint scheme with pinstripe, square wheel-arch flare, all-terrain tire. Square-body GM C/K — default approved."
+  }
+]

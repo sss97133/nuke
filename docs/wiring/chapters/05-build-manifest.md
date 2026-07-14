@@ -101,3 +101,34 @@ With grouping: 30 channels used → fits exactly → zero headroom warning.
 | Amplifier (30A) | Exceeds 20A PDM max | Direct fused battery wire |
 | All sensors | Powered from ECU 5V ref | ECU connector pins |
 | Injectors + coils | Powered from PDM rail channels | Individual control from ECU pins |
+
+## Companion Wire Naming Convention (added 2026-05-14)
+
+Signal-type wire counts (analog_5v = 3, analog_temp = 2, low_side_drive = 2, logic_coil_drive = 4) require multiple physical conductors per circuit. The cut list previously enumerated only the *signal* wire and treated companions as implicit. To make terminal counts and routing accurate, companion wires now have explicit IDs.
+
+| Suffix | Role | Example | Wire spec |
+|---|---|---|---|
+| `g` | Sensor ground return | #110g = CLT ground → M130:B16 | 22 AWG M22759/32 BLK |
+| `r` | 5V reference companion | #108r = MAP 5V ref → M130:A02 (SEN_5V_A) | 22 AWG M22759/32 GRY |
+| `s` | Shield drain (M27500-style cables) | #99s = CKP shield drain → M130:B15 | 22 AWG bare/BLK |
+
+**SEN_0V pairing rule (from `motec_m1_hardware_techspec.pdf` p17):**
+
+| AT input | Pullup rail | Companion ground (SEN_0V) |
+|---|---|---|
+| AT1 (B03) | SEN_5V_A | B15 |
+| AT2 (B04) | SEN_5V_B | B16 |
+| AT3 (B05) | SEN_5V_A | B15 |
+| AT4 (B06) | SEN_5V_B | B16 |
+
+Same convention extended to AV inputs by builder choice. The rule keeps each sensor's pullup and ground on the same letter (A or B) to minimize ground-loop voltage offset.
+
+**Bus rails (not parented to a signal wire):**
+
+| Rail ID | Role | Source | Gauge |
+|---|---|---|---|
+| `#INJ_PWR` | Injector +12V rail (8x daisy-chained at fuel rail via WPINJ40 pigtails) | PDM30 channel TBD | 16 AWG |
+| `#COIL_PWR` | Coil +12V rail (DEL-Stributor bracket bus, 8 coils) | PDM30 channel TBD | 14 AWG |
+| `#COIL_GND` | Coil ground rail (bracket → engine block ground stud) | Engine block | 14 AWG |
+
+See `K5_cut_list_v2.txt` addendum and `receipts/2026-05-14_amendment-cut-list-companion-wires.md` for the full enumerated list.

@@ -10,7 +10,7 @@
  *   2. vehicle_observation atom via ingest-observation (same as v1)
  *   3. technician_work_evidence atom (NEW — requires technicians table from migration 20260523080100)
  *   4. equipment_usage_evidence atom (NEW — requires equipment table from migration 20260523080200)
- *   5. consumable consumption decrement (NEW — requires consumables table)
+ *   5. consumable_usage_evidence atom — PRESENCE testimony (NEW — consumables + consumable_usage_evidence, migration 20260617093000)
  *   6. parts_observed entry in vehicle_images.ai_scan_metadata (NEW — feeds parts_catalog later)
  *
  * REQUIRES the cascade migrations (20260523080100, 20260523080200) to be applied.
@@ -52,8 +52,10 @@
  *       { "equipment_id": null, "name": "Yellow two-post lift", "use_context": "vehicle_mounted" }
  *     ],
  *     "ppe_visible": ["nitrile_gloves_purple"],
+ *     // consumable_id null is fine — resolve_consumable(name) folds the observed material
+ *     // onto a seeded consumable. We record PRESENCE, not a fabricated consumed quantity.
  *     "consumables_used": [
- *       { "consumable_id": null, "name": "nitrile gloves", "quantity_inferred": 1 }
+ *       { "consumable_id": null, "name": "masking tape", "use_context": "in_use" }
  *     ]
  *   }
  */
@@ -87,6 +89,33 @@ if (!PHOTO || !VEHICLE_ID || !TAKEN_AT || !CLASSIFICATION_FILE) {
 
 const classification = JSON.parse(readFileSync(CLASSIFICATION_FILE, 'utf-8'));
 const USER_ID = '0b9f107a-d124-49de-9ded-94698f63c1c4'; // Skylar
+
+// ─── Normalize v1 + DEEP (byok-vision-prompt) verdict shapes, derive geometric fields ───
+// v1:   scene_class / parts_visible / action / caption / fabrication_stage
+// deep: scene_type / components_seen[{label,bbox}] / build_phase_guess / narrative_one_line
+//       / camera_pose / state_observations / damage_localized / vehicle_zone
+const C = classification;
+const sceneType   = C.scene_type || C.scene_class || null;
+const caption     = C.narrative_one_line || C.caption || null;
+const stage       = C.build_phase_guess || C.fabrication_stage || null;
+const operation   = C.action || C.intent || null;
+const components  = Array.isArray(C.components_seen) ? C.components_seen : null;
+const partsArr    = components ? components.map(c => c.label).filter(Boolean)
+                  : (Array.isArray(C.parts_visible) ? C.parts_visible : []);
+const SCENE_TO_ZONE = { engine_bay:'engine_bay', body_interior:'interior', undercarriage:'ext_undercarriage',
+  wheel_assembly:'wheel', paint_booth:'body', body_exterior:'ext_unknown', fabrication_in_progress:'detail',
+  data_plate:'detail_badge', receipt_document:'document' };
+const vehicleZone = C.vehicle_zone || SCENE_TO_ZONE[sceneType] || null;
+const damageFlags = Array.isArray(C.damage_localized) ? C.damage_localized.map(d => d.label).filter(Boolean) : null;
+const st = C.state_observations || {};
+const conditionScore = st.rust_severity ? ({none:95,surface:80,pitting:60,perforation:35,unknown:null}[st.rust_severity]) : null;
+// Vehicle frame bbox = union of component bboxes = the visible extent of the vehicle (the "visible area").
+let vehicleBbox = null;
+if (components && components.some(c => Array.isArray(c.bbox))) {
+  const bs = components.filter(c => Array.isArray(c.bbox)).map(c => c.bbox);
+  vehicleBbox = { x1: Math.min(...bs.map(b=>b[0])), y1: Math.min(...bs.map(b=>b[1])),
+                  x2: Math.max(...bs.map(b=>b[2])), y2: Math.max(...bs.map(b=>b[3])), norm:'0-999', frame:'as_shown' };
+}
 
 const fileBuf = readFileSync(PHOTO);
 const sha = createHash('sha256').update(fileBuf).digest('hex');
@@ -144,13 +173,19 @@ async function armVehicleImageAndObservation() {
       // Publish surfaces must filter on vision_gate_status='approved'.
       vision_gate_status: 'review_needed',
       documented_by_user_id: USER_ID,
-      area: classification.area || classification.scene_class,
-      part: Array.isArray(classification.parts_visible) ? classification.parts_visible.join(', ').slice(0, 200) : null,
-      operation: classification.action,
-      fabrication_stage: classification.fabrication_stage,
-      image_type: classification.scene_class,
-      category: classification.scene_class,
-      caption: classification.caption,
+      area: C.area || sceneType,
+      part: partsArr.length ? partsArr.join(', ').slice(0, 200) : null,
+      operation,
+      fabrication_stage: stage,
+      image_type: sceneType,
+      category: sceneType,
+      caption,
+      // DEEP fields promoted into queryable columns (not buried in ai_scan_metadata):
+      vehicle_zone: vehicleZone,
+      ...(C.camera_pose ? { camera_pose: C.camera_pose } : {}),
+      ...(components ? { components } : {}),
+      ...(damageFlags && damageFlags.length ? { damage_flags: damageFlags } : {}),
+      ...(conditionScore != null ? { condition_score: conditionScore } : {}),
       ai_scan_metadata: {
         classifier: 'caller-byok-cascade',
         classifier_model: 'claude-opus-4-7-1m',
@@ -195,6 +230,37 @@ async function armVehicleImageAndObservation() {
   } else {
     cascade.observation = 'dry-run-obs-id';
   }
+
+  // ─── ARM 2b: the image-analysis ENGINE row (image_observations) ───
+  // The tiered, searchable layer. Without this the cascade fed everything EXCEPT
+  // the engine that powers visual search + convergence. role/bbox/visual_signature
+  // come from the deep verdict. Written through the sanctioned ingest function.
+  if (!DRY_RUN && imageId) {
+    const role = sceneType === 'data_plate' ? 'vin'
+               : (C.intent === 'parts_sourcing' || sceneType === 'product_screenshot') ? 'part'
+               : 'subject';
+    const vsig = {
+      ...(st.paint_state ? { paint_state: st.paint_state } : {}),
+      ...(st.rust_severity ? { rust: st.rust_severity } : {}),
+      ...(vehicleZone ? { zone: vehicleZone } : {}),
+      ...(C.camera_pose?.azimuth_deg != null ? { camera_azimuth_deg: C.camera_pose.azimuth_deg } : {}),
+    };
+    const { error: ioErr } = await supabase.rpc('ingest_image_observation', {
+      p_image_id: imageId, p_vehicle_id: VEHICLE_ID, p_role: role,
+      p_confidence: C.confidence ?? 0.7,
+      p_observed_by: 'caller-byok-cascade', p_agent_version: 'claude-opus-4-7-1m',
+      p_confidence_basis: { source: 'deep_cascade', scene_type: sceneType, intent: C.intent ?? null, narrative: caption },
+      p_layer_version: { writer: 'process-photo-cascade-v2' },
+    });
+    if (ioErr) { errors.push(`image_observations: ${ioErr.message}`); }
+    else if (vehicleBbox || Object.keys(vsig).length) {
+      await supabase.from('image_observations')
+        .update({ ...(vehicleBbox ? { bbox: vehicleBbox } : {}),
+                  ...(Object.keys(vsig).length ? { visual_signature: vsig } : {}) })
+        .eq('image_id', imageId).eq('observed_by', 'caller-byok-cascade').eq('is_active', true);
+    }
+  }
+
   return imageId;
 }
 
@@ -267,32 +333,55 @@ async function armEquipmentEvidence(imageId) {
   }
 }
 
-// ─── ARM 5: consumable consumption decrement (NEW) ───
-async function armConsumables() {
+// ─── ARM 5: consumable PRESENCE testimony (per applied-ontology) ───
+// A photo can observe that a consumable is PRESENT/in-use — it cannot measure how much was
+// consumed. So the atom we write is a consumable_usage_evidence row (presence testimony,
+// mirroring equipment_usage_evidence), NOT a fabricated stock decrement. We resolve a null
+// consumable_id via resolve_consumable(name) — the same folding the SQL cascade uses — so the
+// arm no longer silently drops every observed consumable for lack of an id.
+async function armConsumables(imageId) {
   if (!Array.isArray(classification.consumables_used) || classification.consumables_used.length === 0) return;
   if (!(await tableExists('consumables'))) {
     if (VERBOSE) console.log('[skip] consumables table not present');
     return;
   }
+  const hasEvidence = await tableExists('consumable_usage_evidence');
+  const techId = classification.person_visible?.technician_id;
   for (const c of classification.consumables_used) {
-    if (!c.consumable_id) {
-      if (VERBOSE) console.log(`[skip] consumable "${c.name}" has no consumable_id`);
+    // Resolve the entity from the observed material name when the caller didn't supply one.
+    let consumableId = c.consumable_id;
+    if (!consumableId && c.name) {
+      const { data: rid } = await supabase.rpc('resolve_consumable', { p_str: c.name });
+      consumableId = rid || null;
+    }
+    if (!consumableId) {
+      if (VERBOSE) console.log(`[skip] consumable "${c.name}" unresolved — seed it in consumables first`);
       continue;
     }
     if (DRY_RUN) { cascade.consumables.push(`dry-run-${c.name}`); continue; }
-    const { error } = await supabase.rpc('decrement_consumable_stock', {
-      p_consumable_id: c.consumable_id,
-      p_quantity: c.quantity_inferred || 1,
-    });
-    if (error) {
-      // Fallback: simple UPDATE if RPC doesn't exist
-      const { error: e2 } = await supabase
-        .from('consumables')
-        .update({ current_stock_estimate: supabase.sql`current_stock_estimate - ${c.quantity_inferred || 1}` })
-        .eq('id', c.consumable_id);
-      if (e2) { errors.push(`consumable ${c.name}: ${e2.message}`); continue; }
+
+    // Primary atom: PRESENCE testimony. visible_state is 'present_in_frame', never a count.
+    if (hasEvidence && imageId) {
+      const row = {
+        consumable_id: consumableId,
+        derived_from_image_id: imageId,
+        vehicle_id: VEHICLE_ID,
+        technician_id: techId,
+        observed_at: TAKEN_AT,
+        use_context: c.use_context || 'observed_in_frame',
+        visible_state: 'present_in_frame',
+        notes: `cascade from photo ${basename(PHOTO)}`,
+        source_method: 'caller-vision-Read-tool',
+        confidence: classification.confidence,
+      };
+      // Idempotent on (consumable_id, derived_from_image_id) — swallow the dup-key conflict.
+      const ins = await supabase
+        .from('consumable_usage_evidence')
+        .upsert(row, { onConflict: 'consumable_id,derived_from_image_id', ignoreDuplicates: true })
+        .select('id');
+      if (ins.error) { errors.push(`consumable_usage_evidence[${c.name}]: ${ins.error.message}`); continue; }
     }
-    cascade.consumables.push(c.consumable_id);
+    cascade.consumables.push(consumableId);
   }
 }
 
@@ -301,7 +390,7 @@ const imageId = await armVehicleImageAndObservation();
 if (imageId) {
   await armTechnicianEvidence(imageId);
   await armEquipmentEvidence(imageId);
-  await armConsumables();
+  await armConsumables(imageId);
 }
 
 console.log(JSON.stringify({

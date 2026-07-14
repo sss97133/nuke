@@ -1,0 +1,38 @@
+{
+  "captured_at": "2026-05-11T22:31:05Z",
+  "captured_by": "Claude Code via mcp__claude-in-chrome",
+  "evidence_chain_of_custody": "Direct browser capture from logged-out / cached IG session; URLs verified live as of capture time",
+  "items": [
+    {
+      "file": "01_nukeltd_scam_warning_profile.png",
+      "url": "https://www.instagram.com/nukeltd_scam_warning/",
+      "observed_state": "Account active. 1 post. 0 followers. 0 following.",
+      "significance": "Confirms the @nukeltd_scam_warning account exists and is publishing publicly. The single post is the WARNING attack on Skylar."
+    },
+    {
+      "file": "02_nukeltd_scam_warning_post_DUYGTAEDiWp.png",
+      "url": "https://www.instagram.com/p/DUYGTAEDiWp/",
+      "permalink_id": "DUYGTAEDiWp",
+      "post_date": "2026-02-05",
+      "post_age_at_capture": "13w (13 weeks)",
+      "likes": 0,
+      "comments": 2,
+      "full_caption_text": "BEWARE of This Shop located at 674 Wells Road Boulder City and performing work at 707 Yucca Street Boulder City, Nevada 89005. These Skyar Williams makes false promises, leaves town all the time not working on your car. Invoices and request payments for work never performed. Damages parts and does not disclose or reimburse when discovered. Then when discovered fabricated a false invoice. Do your self a favor and take your car anywhere else but here. Happy to share my personal experience photos and videos and notes to support this claim.",
+      "comment_from_same_account": "THIEF",
+      "image_overlay_text": "WARNING. Do Not send your Vehicle to Slykar Williams Shop NUKE LTD located at 674 Wells Rd. Boulder City NV 89005 He is a Liar and a Thief. They are not qualified to perform any repairs. They Destroy parts and do [continues]",
+      "significance": "Defamatory statements per US tort law including accusations of: (1) fraud \u2014 'Invoices and request payments for work never performed', 'fabricated a false invoice'; (2) theft \u2014 'THIEF', 'Liar and a Thief'. These are defamation per se in most US jurisdictions \u2014 damages presumed without proof of specific harm."
+    },
+    {
+      "file": "03_kickassclassics_profile.png",
+      "url": "https://www.instagram.com/kickassclassics/",
+      "display_name": "Kickass Classics",
+      "category": "Product/service",
+      "followers": 9953,
+      "following": 4100,
+      "posts": 138,
+      "bio": "Success is all about going from failure to failure without losing enthusiasm.",
+      "significance": "This is Farrell Goodman's primary public Instagram account \u2014 9,953 followers as of capture. The same handle posted the public defamatory comments on Skylar's @nukeltd page on 2026-02-09 (per IMG_7579, IMG_7580). The follower count establishes the reach / scope of the defamation: each comment by this account is published to nearly 10K followers."
+    }
+  ],
+  "tie_to_extortion_threat": "Post date 2026-02-05 falls within the 'by Friday' deadline Farrell stated in WhatsApp on 2026-02-02 14:11:07 ('I will have my team instructed by Friday to start the campaign'). The Friday after 2026-02-02 is 2026-02-06 \u2014 post landed one day earlier."
+}

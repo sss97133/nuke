@@ -1,0 +1,32 @@
+# Generated from vehicle_canonical — substrate-driven, not file-driven.
+# Vehicle: e08bf694-970f-4cbe-8a74-8715158a0f2e
+# Loom: LOW_SIDE_DRIVE
+# Wires projected: 1
+
+metadata:
+  title: K5 LOW_SIDE_DRIVE
+  description: |
+    Projection of 1 wires from public.vehicle_canonical for
+    vehicle_id=e08bf694-970f-4cbe-8a74-8715158a0f2e. Source of truth is the DB; this YAML
+    is regenerated on demand. Cite-by-cell provenance retained in
+    structured_data on each underlying observation row.
+
+connectors:
+  M130_A:  {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  M130_B:  {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+  PDM30_A: {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  PDM30_B: {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+
+cables:
+  WINJ_PWR:
+    gauge: 16 AWG
+    length: 5.0
+    length_unit: ft
+    colors: [RD]
+    type: M22759/32
+    notes: "Injector +12V Rail | from PDM30:OUT? | sources=k5_cut_list_v2"
+
+# Connection list intentionally omitted in this MVP — needs the
+# from_pin → connector pin mapping logic that lives in
+# docs/wiring/output/generate_wireviz_yaml.py. Next pass: refactor
+# that generator to consume the per-wire dicts produced above.

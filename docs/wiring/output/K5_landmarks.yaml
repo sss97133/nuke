@@ -1,0 +1,54 @@
+# K5 landmark distances (inches).
+# Fill values from K5_MASTER_MEASUREMENT_PLAN.md section 3.
+# Leave as ~ (null) until measured. Script will list "blocked" wires for any
+# landmark that's still null.
+#
+# All values are tape-routed inches along the planned path (NOT straight-line),
+# WITHOUT service loop. Service loop, bend allowance, etc. are added by the
+# compute script.
+
+vehicle: K5_1977_CCL187Z210370
+measured_by: ~
+measured_date: ~
+
+landmarks:
+  # 3.1 Engine bay
+  L01: ~  # M130 → FWG-MAIN
+  L02: ~  # FWG-MAIN → intake valley junction (interior firewall through to top of intake)
+  L03: ~  # Intake valley junction → Cyl 1 coil (DVC front)
+  L04: ~  # Cyl-to-cyl pitch DRIVER bank (cyl 1 → cyl 3 single gap, used 1×, 2×, 3× for cyl 3/5/7)
+  L05: ~  # Intake valley junction → Cyl 2 coil (PVC front, across intake)
+  L06: ~  # Cyl-to-cyl pitch PASSENGER bank (cyl 2 → cyl 4 single gap, used 1×, 2×, 3× for cyl 4/6/8)
+  L07: ~  # Coil-to-injector at same cylinder (top of valve cover → side of fuel rail)
+  L08: ~  # Intake valley junction → throttle body
+  L09: ~  # Intake valley junction → MAP sensor port
+  L10: ~  # M130 (B-conn) → CKP at bellhousing rear (shielded)
+  L11: ~  # M130 (B-conn) → CMP at front timing cover
+  L12: ~  # M130 (B-conn) → KS1 driver block below exhaust (shielded)
+  L13: ~  # M130 (B-conn) → KS2 passenger block below exhaust (shielded)
+  L14: ~  # BAT+ → ALT stud
+  L15: ~  # BAT+ → STARTER stud
+
+  # 3.2 Cab / dash
+  L16: ~  # PDM30 → FWG-MAIN (interior side)
+  L17: ~  # PDM30 → steering column (ignition / column switch)
+  L18: ~  # PDM30 → headlight switch in dash
+  L19: ~  # PDM30 → brake pedal switch
+  L20: ~  # PDM30 → driver door boot
+  L21: ~  # Driver door boot → door lock / window / speaker (inside door)
+  L22: ~  # PDM30 → passenger door boot
+  L23: ~  # PDM30 → dome light (up A-pillar, across headliner)
+
+  # 3.3 Frame / chassis
+  L24: ~  # PDM30 → FLOOR-RR grommet (under driver seat or rocker entry)
+  L25: ~  # FLOOR-RR → rear axle area (rear loom split point)
+  L26: ~  # Rear junction → tailgate light cluster center
+  L27: ~  # Rear junction → fuel tank sender / pump
+  L28: ~  # PDM30 → 6L80E switches (transfer case / NSS / reverse), through tunnel grommet
+
+  # 3.4 Engine bay → underbody
+  L29: ~  # M130 (engine bay side) → O2 bung driver exhaust
+  L30: ~  # M130 (engine bay side) → O2 bung passenger exhaust
+
+# When done measuring, run:
+#   python3 scripts/compute_wire_lengths.py --variance

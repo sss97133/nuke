@@ -77,6 +77,26 @@ const WATCHLIST = [
     yearMin: 1973,
     yearMax: 1991,
   },
+  {
+    name: "Classic 4x4 / Land Cruiser",
+    searches: [
+      "fj40",
+      "fj55",
+      "fj60",
+      "fj62",
+      "fj80",
+      "land cruiser",
+      "toyota land cruiser",
+      "early bronco",
+      "ford bronco 1972",
+      "international scout",
+      "scout 800",
+      "toyota pickup 4x4",
+      "first gen 4runner",
+    ],
+    yearMin: 1960,
+    yearMax: 1996,
+  },
 ];
 
 const CONFIG = {

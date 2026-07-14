@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="8.5in" height="11in" viewBox="0 0 850 1100" font-family="Courier New, monospace">
+<rect width="850" height="1100" fill="#fff"/>
+<text x="60" y="80" font-size="32" font-weight="bold" fill="#000">K5 WIRING DIAGRAM</text>
+<text x="60" y="110" font-size="14" fill="#666">1977 Chevrolet K5 Blazer · VIN CKR187F127263 · LS3 6.2L · MoTeC M130 + PDM30</text>
+<line x1="60" y1="125" x2="790" y2="125" stroke="#000" stroke-width="2"/>
+<text x="60" y="165" font-size="11" fill="#000" font-weight="bold">CLIENT</text>
+<text x="60" y="185" font-size="11" fill="#000">Scott · scott@li3go.com</text>
+<text x="280" y="165" font-size="11" fill="#000" font-weight="bold">BUILDER</text>
+<text x="280" y="185" font-size="11" fill="#000">NUKE LTD · 676 Wells Rd, Boulder City NV 89005</text>
+<text x="280" y="200" font-size="11" fill="#000">Wiring sub: Desert Performance (same address)</text>
+<text x="60" y="245" font-size="11" fill="#000" font-weight="bold">SPECIFICATION</text>
+<text x="60" y="265" font-size="11" fill="#000">Wire spec : M22759/32 Tefzel (12–22 AWG) + M22759/16 Tefzel (4–10 AWG) — "Pro tier"</text>
+<text x="60" y="280" font-size="11" fill="#000">ECU       : MoTeC M130 with GPR firmware · 34+26 pin Tyco Superseal</text>
+<text x="60" y="295" font-size="11" fill="#000">PDM       : MoTeC PDM30 (30 outputs, at 30/30 capacity)</text>
+<text x="60" y="310" font-size="11" fill="#000">Engine    : GM LS3 6.2L Gen-IV V8 (Delmo Speed kit on GM crate)</text>
+<text x="60" y="325" font-size="11" fill="#000">Intake    : Holley 300-131 · ETB GM 12605109 90mm DBW</text>
+<text x="60" y="340" font-size="11" fill="#000">Coils     : 8× D510C on DEL-Stributor central bracket</text>
+<text x="60" y="355" font-size="11" fill="#000">Source    : K5_cut_list_v2.txt (canonical) · 7-loom breakdown derived from cut list section headers</text>
+<text x="60" y="410" font-size="14" fill="#000" font-weight="bold">CONTENTS</text>
+<line x1="60" y1="420" x2="790" y2="420" stroke="#000" stroke-width="1"/>
+<text x="60" y="445" font-size="11" fill="#000" font-weight="bold">PAGE</text>
+<text x="120" y="445" font-size="11" fill="#000" font-weight="bold">LOOM</text>
+<text x="380" y="445" font-size="11" fill="#000" font-weight="bold">WIRES</text>
+<text x="460" y="445" font-size="11" fill="#000" font-weight="bold">FT</text>
+<text x="540" y="445" font-size="11" fill="#000" font-weight="bold">SOURCE FILE</text>
+<line x1="60" y1="453" x2="790" y2="453" stroke="#000" stroke-width="0.5"/>
+<text x="60" y="475" font-size="11" fill="#000">2</text>
+<text x="120" y="475" font-size="11" fill="#000">ENGINE LOOM</text>
+<text x="380" y="475" font-size="11" fill="#000">33</text>
+<text x="460" y="475" font-size="11" fill="#000">148.8</text>
+<text x="540" y="475" font-size="10" fill="#666">K5_engine_loom_wireviz_v7.svg</text>
+<text x="60" y="497" font-size="11" fill="#000">3</text>
+<text x="120" y="497" font-size="11" fill="#000">EXTERIOR / BODY</text>
+<text x="380" y="497" font-size="11" fill="#000">27</text>
+<text x="460" y="497" font-size="11" fill="#000">240.7</text>
+<text x="540" y="497" font-size="10" fill="#666">K5_exterior___body_wireviz_v3.svg</text>
+<text x="60" y="519" font-size="11" fill="#000">4</text>
+<text x="120" y="519" font-size="11" fill="#000">INTERIOR / DASH</text>
+<text x="380" y="519" font-size="11" fill="#000">18</text>
+<text x="460" y="519" font-size="11" fill="#000">94.7</text>
+<text x="540" y="519" font-size="10" fill="#666">K5_interior___dash_wireviz_v3.svg</text>
+<text x="60" y="541" font-size="11" fill="#000">5</text>
+<text x="120" y="541" font-size="11" fill="#000">CHASSIS / UNDERBODY</text>
+<text x="380" y="541" font-size="11" fill="#000">12</text>
+<text x="460" y="541" font-size="11" fill="#000">110.4</text>
+<text x="540" y="541" font-size="10" fill="#666">K5_chassis___underbody_wireviz_v3.svg</text>
+<text x="60" y="563" font-size="11" fill="#000">6</text>
+<text x="120" y="563" font-size="11" fill="#000">AUDIO</text>
+<text x="380" y="563" font-size="11" fill="#000">13</text>
+<text x="460" y="563" font-size="11" fill="#000">178.3</text>
+<text x="540" y="563" font-size="10" fill="#666">K5_audio_wireviz_v2.svg</text>
+<text x="60" y="585" font-size="11" fill="#000">7</text>
+<text x="120" y="585" font-size="11" fill="#000">POWER / COMM</text>
+<text x="380" y="585" font-size="11" fill="#000">4</text>
+<text x="460" y="585" font-size="11" fill="#000">17.3</text>
+<text x="540" y="585" font-size="10" fill="#666">K5_power___comm_wireviz_v3.svg</text>
+<text x="60" y="607" font-size="11" fill="#000">8</text>
+<text x="120" y="607" font-size="11" fill="#000">MISC</text>
+<text x="380" y="607" font-size="11" fill="#000">16</text>
+<text x="460" y="607" font-size="11" fill="#000">115.2</text>
+<text x="540" y="607" font-size="10" fill="#666">K5_misc_wireviz_v2.svg</text>
+<line x1="60" y1="614" x2="790" y2="614" stroke="#000" stroke-width="0.5"/>
+<text x="120" y="629" font-size="11" fill="#000" font-weight="bold">TOTAL (7 looms)</text>
+<text x="380" y="629" font-size="11" fill="#000" font-weight="bold">123</text>
+<text x="460" y="629" font-size="11" fill="#000" font-weight="bold">905.4</text>
+<text x="60" y="689" font-size="14" fill="#cc0000" font-weight="bold">KNOWN GAPS (cite-or-unknown rule applied honestly)</text>
+<line x1="60" y1="699" x2="790" y2="699" stroke="#cc0000" stroke-width="1"/>
+<text x="60" y="724" font-size="11" fill="#000">Companion ground/power wires not enumerated in cut list for analog sensors, coils, injectors.</text>
+<text x="60" y="740" font-size="11" fill="#000">These pages show only the signal wires as written; ground returns are pigtail-bundled (e.g. WPCTS30 covers</text>
+<text x="60" y="756" font-size="11" fill="#000">both CTS pins) and 5V ref / +12V power wires need separate enumeration in a future cut list revision.</text>
+<text x="60" y="772" font-size="11" fill="#000"></text>
+<text x="60" y="788" font-size="11" fill="#000">Lighting, switch, audio, and accessory connector PNs not in K5_connector_shopping_list.txt — these render</text>
+<text x="60" y="804" font-size="11" fill="#000">as "(connector PN unknown)" on their respective pages. Filling these requires vendor doc lookup.</text>
+<text x="60" y="820" font-size="11" fill="#000"></text>
+<text x="60" y="836" font-size="11" fill="#000">Wire lengths are zone-distance estimates (cut list +15%/+20% pad). True measured lengths require physical</text>
+<text x="60" y="852" font-size="11" fill="#000">tape work on the vehicle and population of K5_landmarks.yaml (currently all values null).</text>
+<text x="60" y="1040" font-size="10" fill="#888">Generated 2026-05-14 · Pipeline: K5_cut_list_v2.txt → generate_wireviz_yaml.py → WireViz → Kroki.io → SVG → PDF</text>
+<text x="60" y="1055" font-size="10" fill="#888">Combined PDF: K5_complete_wiring_diagram.pdf · Generator: build_complete_pdf.sh · Log: LOOP_LOG.md</text>
+</svg>

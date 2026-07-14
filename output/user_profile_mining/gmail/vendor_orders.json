@@ -1,0 +1,1974 @@
+{
+  "ebay": {
+    "total_msgs": 3409,
+    "order_msgs_count": 577,
+    "amount_parseable": 269,
+    "amount_sum_in_subj": 443528.13,
+    "first_order": "2012-07-19T04:51:41",
+    "last_order": "2026-01-19T19:31:56",
+    "samples": [
+      {
+        "date": "2026-01-19T19:31:56",
+        "subj": "Was $8,699.00 now $8,100.00\u2013come and save on Leica M11 Rangefinder Camera (Glossy Blac...",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": 8699.0
+      },
+      {
+        "date": "2026-01-16T08:30:39",
+        "subj": "Seller offered a special discount $12.68 on BMPCC DC 2.5 *0.7mm 12V Power Cable for B...",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": 12.68
+      },
+      {
+        "date": "2026-01-15T08:27:54",
+        "subj": "Seller offered a special discount $21.77 on BMPCC DC 2.5 *0.7mm to USB-C PD Power Cab...",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": 21.77
+      },
+      {
+        "date": "2026-01-07T17:51:35",
+        "subj": "Was $400.00 now $380.00\u2013come and save on Panasonic Lumix DMC-GX1X + 14-42mm X PZ F...",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": 400.0
+      },
+      {
+        "date": "2025-12-29T14:19:51",
+        "subj": "\ud83d\udce6ORDER DELIVERED: FOR 1981 1982 1983 1...",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-12-24T09:22:32",
+        "subj": "\ud83d\udce6ORDER DELIVERED: Mtg. Elspeth, Storm ...",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-12-22T05:46:54",
+        "subj": "\ud83d\ude9a Order update: Mtg. Elspeth, Storm Slayer. Foil Showcase. Tarkir: Dragonstorm. Pack Fresh",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-12-21T04:31:35",
+        "subj": "Order confirmed: Mtg. Elspeth, Storm Slayer. Foil Showcase. Tarkir: Dragonstorm. Pack Fresh",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-12-20T10:21:43",
+        "subj": "A $2,500 Ohtani grail is in play \u26be\ufe0f",
+        "addr": "ebay@reply.ebay.com",
+        "amount_in_subj": 2500.0
+      },
+      {
+        "date": "2025-12-19T16:54:50",
+        "subj": "\ud83d\ude9a Order update: FOR 1981 1982 1983 1984 1985 1986 1987 CHEVY GMC TRUCK A/C DASH VENT SET 4 PCS",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-12-19T14:11:02",
+        "subj": "Order confirmed: FOR 1981 1982 1983 1984 1985 1986 1987 CHEVY GMC TRUCK A/C DASH VENT SET 4 PCS",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-12-10T11:35:16",
+        "subj": "Skylar, save up to $50 with Klarna \ud83c\udf81",
+        "addr": "ebay@reply.ebay.com",
+        "amount_in_subj": 50.0
+      },
+      {
+        "date": "2025-12-05T12:16:50",
+        "subj": "Enter to win $1,500 in credit on Goldin \ud83c\udfc6",
+        "addr": "ebay@reply.ebay.com",
+        "amount_in_subj": 1500.0
+      },
+      {
+        "date": "2025-11-27T09:56:48",
+        "subj": "Get $5 off when you check out with Venmo",
+        "addr": "ebay@reply.ebay.com",
+        "amount_in_subj": 5.0
+      },
+      {
+        "date": "2025-11-17T11:28:05",
+        "subj": "Hey Skylar, get $10 off with PayPal \u2b50",
+        "addr": "ebay@reply.ebay.com",
+        "amount_in_subj": 10.0
+      },
+      {
+        "date": "2025-11-03T08:29:22",
+        "subj": "Recently viewed: 1980 Chevrolet Silverado Factory GM Original Dealer Color  Sales Order Album HTF",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-11-02T10:22:52",
+        "subj": "Skylar, save up to $50 when you pay with Klarna \ud83d\udcb0",
+        "addr": "ebay@reply.ebay.com",
+        "amount_in_subj": 50.0
+      },
+      {
+        "date": "2025-10-29T14:06:14",
+        "subj": "\ud83d\udce6ORDER DELIVERED: 1981 1982 1983 1984 1985 1986 1987 CHEVROLET GMC TRUCK BLACK ARM REST PAD SET",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-10-24T10:30:36",
+        "subj": "\ud83d\ude9a Order update: 1981 1982 1983 1984 1985 1986 1987 CHEVROLET GMC TRUCK BLACK ARM REST PAD SET",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-10-23T16:22:47",
+        "subj": "Order confirmed: 1981 1982 1983 1984 1985 1986 1987 CHEVROLET GMC TRUCK BLACK ARM REST PAD SET",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-10-20T13:41:12",
+        "subj": "\ud83d\udce6ORDER DELIVERED: FOR 1981 1982 1983 84 85 1986 1987 CHEVROLET GMC TRUCK DOOR PULL STRAP COVER 4PC",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-10-20T13:40:18",
+        "subj": "\ud83d\udce6ORDER DELIVERED: Vintage ARP Racing Car T Shirt Adult L some distressing",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-10-20T13:40:06",
+        "subj": "\ud83d\udce6ORDER DELIVERED: INTERIOR SCREWS FITS ALL 1973-87 GM GMC TRUCK C10 S10 PICKUP SUBURBAN ETC 60 pcs",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-10-17T11:49:35",
+        "subj": "\ud83d\udce6ORDER DELIVERED: 1981-87 Chevrolet Gmc C10 Blazer Sub Interior Chrome Door Handles And Bezels Kit",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-10-16T14:53:04",
+        "subj": "\ud83d\udce6ORDER DELIVERED: Door Panels Black Front Pair For Chevrolet C10 K5 Blazer 1981-1987",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-10-16T12:43:05",
+        "subj": "\ud83d\udce6ORDER DELIVERED: Brothers Trucks 05-214 Instrument Cluster Lens",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-10-16T11:12:41",
+        "subj": "\ud83d\ude9a Order update: Vintage ARP Racing Car T Shirt Adult L some distressing",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-10-16T09:33:45",
+        "subj": "Order confirmed: Vintage ARP Racing Car T Shirt Adult L some distressing",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-10-16T07:56:38",
+        "subj": "\u2705You've submitted an offer: $18.00 for Vintage ARP Racing C... (297684334939)",
+        "addr": "ebay@ebay.com",
+        "amount_in_subj": 18.0
+      },
+      {
+        "date": "2025-10-14T19:28:06",
+        "subj": "Order information from ebay",
+        "addr": "vinylm_musl2298oifa@members.ebay.com.hk",
+        "amount_in_subj": null
+      }
+    ]
+  },
+  "holley": {
+    "total_msgs": 80,
+    "order_msgs_count": 9,
+    "amount_parseable": 0,
+    "amount_sum_in_subj": 0,
+    "first_order": "2022-03-24T09:19:14",
+    "last_order": "2024-08-30T13:26:17",
+    "samples": [
+      {
+        "date": "2024-08-30T13:26:17",
+        "subj": "An item from your order (C004548803) has been delivered!",
+        "addr": "noreply@holley.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-09-10T05:45:50",
+        "subj": "Holley Shipment Notification for order #C002926653",
+        "addr": "noreply@holley.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-09-06T14:30:38",
+        "subj": "Holley Shipment Notification for order #C002926702",
+        "addr": "noreply@holley.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-09-05T22:48:47",
+        "subj": "Thanks For Your Order! Now Grab Some Holley Swag!",
+        "addr": "motorlife@holley.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-09-04T22:37:22",
+        "subj": "Order Confirmation",
+        "addr": "noreply@holley.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-09-04T21:25:02",
+        "subj": "Your order receipt from Holley",
+        "addr": "HolleyOrders@holley.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-09-04T20:59:32",
+        "subj": "Order Confirmation",
+        "addr": "noreply@holley.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-03-24T13:45:28",
+        "subj": "Holley Shipment Notification for order #C002553657",
+        "addr": "noreply@holley.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-03-24T09:19:14",
+        "subj": "Order Confirmation",
+        "addr": "noreply@holley.com",
+        "amount_in_subj": null
+      }
+    ]
+  },
+  "paypal": {
+    "total_msgs": 1524,
+    "order_msgs_count": 635,
+    "amount_parseable": 412,
+    "amount_sum_in_subj": 26368.69,
+    "first_order": "2019-10-30T16:40:49",
+    "last_order": "2026-05-01T15:32:21",
+    "samples": [
+      {
+        "date": "2026-05-01T15:32:21",
+        "subj": "Microsoft Corporatio...: $7.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 7.99
+      },
+      {
+        "date": "2026-04-30T19:49:37",
+        "subj": "Apple Services: $34.97\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 34.97
+      },
+      {
+        "date": "2026-04-29T22:59:05",
+        "subj": "Apple Services: $10.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 10.99
+      },
+      {
+        "date": "2026-04-25T07:07:31",
+        "subj": "Apple Services: $39.96\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 39.96
+      },
+      {
+        "date": "2026-04-21T17:29:28",
+        "subj": "Apple Services: $9.98\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 9.98
+      },
+      {
+        "date": "2026-04-20T22:22:44",
+        "subj": "Microsoft Corporatio...: $29.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 29.99
+      },
+      {
+        "date": "2026-04-15T21:46:03",
+        "subj": "Apple Services: $49.96\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 49.96
+      },
+      {
+        "date": "2026-04-11T00:14:09",
+        "subj": "Apple Services: $29.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 29.99
+      },
+      {
+        "date": "2026-04-08T14:46:52",
+        "subj": "Apple Services: $14.98\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 14.98
+      },
+      {
+        "date": "2026-04-08T02:48:32",
+        "subj": "Apple Services: $9.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 9.99
+      },
+      {
+        "date": "2026-04-07T07:44:03",
+        "subj": "Apple Services: $12.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 12.99
+      },
+      {
+        "date": "2026-04-01T17:55:30",
+        "subj": "Microsoft Corporatio...: $7.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 7.99
+      },
+      {
+        "date": "2026-03-31T00:23:45",
+        "subj": "Apple Services: $29.97\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 29.97
+      },
+      {
+        "date": "2026-03-29T23:04:06",
+        "subj": "Apple Services: $10.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 10.99
+      },
+      {
+        "date": "2026-03-26T23:52:55",
+        "subj": "Apple Services: $44.96\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 44.96
+      },
+      {
+        "date": "2026-03-21T00:33:41",
+        "subj": "Microsoft Corporatio...: $29.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 29.99
+      },
+      {
+        "date": "2026-03-15T21:47:27",
+        "subj": "Apple Services: $54.95\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 54.95
+      },
+      {
+        "date": "2026-03-12T15:08:22",
+        "subj": "eBay Commerce Inc.: $38.25\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 38.25
+      },
+      {
+        "date": "2026-03-11T11:03:58",
+        "subj": "Microsoft Corporatio...: $24.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 24.99
+      },
+      {
+        "date": "2026-03-11T07:04:03",
+        "subj": "Microsoft Corporatio...: $24.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 24.99
+      },
+      {
+        "date": "2026-03-11T00:12:07",
+        "subj": "Apple Services: $29.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 29.99
+      },
+      {
+        "date": "2026-03-08T17:22:27",
+        "subj": "Microsoft Corporatio...: $24.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 24.99
+      },
+      {
+        "date": "2026-03-08T17:21:59",
+        "subj": "Microsoft Corporatio...: $24.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 24.99
+      },
+      {
+        "date": "2026-03-08T08:40:11",
+        "subj": "Microsoft Corporatio...: $49.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 49.99
+      },
+      {
+        "date": "2026-03-08T03:48:28",
+        "subj": "Apple Services: $9.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 9.99
+      },
+      {
+        "date": "2026-03-07T07:42:33",
+        "subj": "Apple Services: $12.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 12.99
+      },
+      {
+        "date": "2026-03-07T07:23:55",
+        "subj": "Microsoft Corporatio...: $2.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 2.99
+      },
+      {
+        "date": "2026-03-07T07:10:28",
+        "subj": "Apple Services: $39.96\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 39.96
+      },
+      {
+        "date": "2026-03-02T15:53:53",
+        "subj": "Microsoft Corporatio...: $24.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 24.99
+      },
+      {
+        "date": "2026-03-01T02:56:14",
+        "subj": "Microsoft Corporatio...: $7.99\u00a0USD",
+        "addr": "service@paypal.com",
+        "amount_in_subj": 7.99
+      }
+    ]
+  },
+  "bringatrailer": {
+    "total_msgs": 1655,
+    "order_msgs_count": 0,
+    "amount_parseable": 0,
+    "amount_sum_in_subj": 0,
+    "first_order": null,
+    "last_order": null,
+    "samples": []
+  },
+  "jegs": {
+    "total_msgs": 820,
+    "order_msgs_count": 84,
+    "amount_parseable": 67,
+    "amount_sum_in_subj": 7382.0,
+    "first_order": "2018-10-30T23:22:53",
+    "last_order": "2026-04-27T21:37:14",
+    "samples": [
+      {
+        "date": "2026-04-27T21:37:14",
+        "subj": "\u26a0\ufe0f EXPIRES SOON: Your Coupon Up To $150 Off",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 150.0
+      },
+      {
+        "date": "2026-04-26T17:01:51",
+        "subj": "LAST DAY To Save Up To $120 Off!",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2026-04-14T17:01:41",
+        "subj": "Use Code \"JEGS\" To Save Up To $120",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2026-03-23T17:02:04",
+        "subj": "Save Up To $65 Off With Code: \"BUILT\"",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 65.0
+      },
+      {
+        "date": "2026-03-16T17:02:28",
+        "subj": "Last Day To Save Up To $120 Off!",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2026-01-12T17:02:04",
+        "subj": "Use Code: \"RESTO\" To Save Up To $65",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 65.0
+      },
+      {
+        "date": "2025-12-11T17:02:40",
+        "subj": "Christmas Countdown at JEGS: Up to $65 Off with Code: \"LASTCALL\"",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 65.0
+      },
+      {
+        "date": "2025-12-06T17:02:49",
+        "subj": "ENDS SOON | Save Up To $120 With Code: \"CYBER\"",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2025-12-04T17:02:34",
+        "subj": "Cyber Week Deal Alert: Grab $120 Off Now",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2025-12-01T06:20:54",
+        "subj": "\u26a0\ufe0f Cyber Monday Savings: Up To $120 Off + 50% Off Doorbusters \u26a0\ufe0f",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2025-11-28T04:52:28",
+        "subj": "\ud83d\udca5Black Friday Madness: $120 OFF + 50% OFF Doorbusters!\ud83d\udca5",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2025-11-27T04:51:44",
+        "subj": "\u26a0\ufe0f Code: \"DEALS\" Unlocks Savings Up to $120 Off \u26a0\ufe0f",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2025-11-15T09:38:33",
+        "subj": "Shop Early Holiday Deals & Save Up To $120",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2025-11-12T17:02:41",
+        "subj": "Save Up To $120 Before the Holiday Rush",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2025-11-08T17:02:05",
+        "subj": "Early Access: Save Up to $120 Before the Holidays Hit",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2025-10-31T17:02:19",
+        "subj": "Turn Back Time: Save Up to $65 Now",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 65.0
+      },
+      {
+        "date": "2025-10-20T17:12:45",
+        "subj": "Don\u2019t Ghost These Deals: Scary Good Savings Up to $65 Off",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 65.0
+      },
+      {
+        "date": "2025-10-16T17:02:13",
+        "subj": "\ud83d\udc7b Spooky Season Savings: Save Up To $65 Off",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 65.0
+      },
+      {
+        "date": "2025-10-15T19:38:31",
+        "subj": "\ud83d\udd0d Looking for something? Free Shipping On Orders Over $199* \ud83d\udd0d",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 199.0
+      },
+      {
+        "date": "2025-08-18T04:39:55",
+        "subj": "Summer Restoration Sale: Save Up to $65 Today!",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 65.0
+      },
+      {
+        "date": "2025-08-12T04:39:15",
+        "subj": "Use Coupon: \"SIZZLIN\" To Save Up To $120 Off",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2025-08-10T15:40:31",
+        "subj": "Final Hours: Save up to $65 on Garage Essentials!",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 65.0
+      },
+      {
+        "date": "2025-08-02T05:39:56",
+        "subj": "Garage Essentials: Save Up To $65 Off",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 65.0
+      },
+      {
+        "date": "2025-07-24T16:58:34",
+        "subj": "Special Deals Inside: Save Up To $120 Off",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2025-07-21T04:54:56",
+        "subj": "Hotrod Heatwave: Up To $120 Off With Our Coupon",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2025-07-14T04:56:24",
+        "subj": "Restoring The Classics: Save Up To $65 Off",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 65.0
+      },
+      {
+        "date": "2025-06-30T16:55:38",
+        "subj": "Salute the Savings: Up To $120 Off This 4th of July",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2025-06-27T04:55:56",
+        "subj": "\ud83c\uddfa\ud83c\uddf8 NEW SALE: Up To $120 Off This 4th Of July Weekend \ud83c\uddfa\ud83c\uddf8",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2025-06-09T04:52:05",
+        "subj": "Celebrate Father's Day With Savings Up To $120",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      },
+      {
+        "date": "2025-05-26T04:52:29",
+        "subj": "Memorial Day Sale: Shop Deals Up To $120 Off",
+        "addr": "jegs@e.jegs.com",
+        "amount_in_subj": 120.0
+      }
+    ]
+  },
+  "amazon": {
+    "total_msgs": 1399,
+    "order_msgs_count": 787,
+    "amount_parseable": 28,
+    "amount_sum_in_subj": 2206.98,
+    "first_order": "2009-10-29T09:50:17",
+    "last_order": "2026-04-29T07:53:54",
+    "samples": [
+      {
+        "date": "2026-04-29T07:53:54",
+        "subj": "Did your recent Amazon order meet your expectations? Review it on Amazon",
+        "addr": "no-reply@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-27T05:00:56",
+        "subj": "Did your recent Amazon order meet your expectations? Review it on Amazon",
+        "addr": "no-reply@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-24T13:06:39",
+        "subj": "Delivered: \u20662\u2069 \"Performance 2.5 Inch...\" and \u20661\u2069 more item",
+        "addr": "order-update@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-24T13:06:37",
+        "subj": "Delivered: \"PM Auto Set of 4 Front Rear...\"",
+        "addr": "order-update@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-22T10:57:53",
+        "subj": "Shipped: \"PM Auto Set of 4 Front Rear...\"",
+        "addr": "shipment-tracking@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-22T10:09:42",
+        "subj": "Shipped: 2 \"Performance 2.5 Inch...\" and 1 more item",
+        "addr": "shipment-tracking@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-21T13:09:09",
+        "subj": "Delivered: \"KILMAT 80 Mil (2 mm) 36...\"",
+        "addr": "order-update@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-21T11:36:40",
+        "subj": "Shipped: \"KILMAT 80 Mil (2 mm) 36...\"",
+        "addr": "shipment-tracking@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-21T11:10:12",
+        "subj": "Ordered: \"PM Auto Set of 4 Front Rear...\"",
+        "addr": "auto-confirm@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-21T10:55:32",
+        "subj": "Ordered: \"6 x 48 inch Sanding Belts...\"",
+        "addr": "auto-confirm@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-21T10:30:36",
+        "subj": "Ordered: \"KILMAT 80 Mil (2 mm) 36...\" and 2 more items",
+        "addr": "auto-confirm@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-13T17:24:21",
+        "subj": "Did your recent Amazon order meet your expectations? Review it on Amazon",
+        "addr": "no-reply@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-11T10:15:23",
+        "subj": "Amazon.com order of The Super Mario Bros. Movie.",
+        "addr": "digital-no-reply@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-09T08:26:35",
+        "subj": "Amazon.com order of The Super Mario Bros. Movie.",
+        "addr": "digital-no-reply@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-09T08:26:13",
+        "subj": "Important Notice: Your Amazon Order #D01-5176096-9773054",
+        "addr": "digital-no-reply@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-09T08:25:49",
+        "subj": "Important Notice: Your Amazon Order #D01-1900462-5085005",
+        "addr": "digital-no-reply@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-09T00:32:17",
+        "subj": "Did your recent Amazon order meet your expectations? Review it on Amazon",
+        "addr": "no-reply@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-08T20:29:07",
+        "subj": "Delivered: \"HYAT O2 Oxygen Sensor Bung,...\"",
+        "addr": "order-update@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-08T12:57:13",
+        "subj": "Delivered: \"Cotonlake OD 2.5 Inch 45...\"",
+        "addr": "order-update@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-08T12:57:12",
+        "subj": "Delivered: 2 \"FORDECO 2.5\" ID T304...\"",
+        "addr": "order-update@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-08T12:57:12",
+        "subj": "Delivered: \"YOUEON 6 Pcs 2.5 Inch 45...\" and 2 more items",
+        "addr": "order-update@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-07T12:59:39",
+        "subj": "Delivered: \"2.5 Inch Straight Pipe...\"",
+        "addr": "order-update@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-07T12:59:37",
+        "subj": "Delivered: \"2.5 Inch Straight Pipe...\"",
+        "addr": "order-update@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-07T12:59:37",
+        "subj": "Delivered: \"2.5 Inch Straight Pipe...\"",
+        "addr": "order-update@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-07T08:46:15",
+        "subj": "Delivered: \"EVIL ENERGY 2.5 Inch 2 Bolt...\"",
+        "addr": "order-update@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-07T05:53:55",
+        "subj": "Shipped: \"YOUEON 6 Pcs 2.5 Inch 45...\" and 2 more items",
+        "addr": "shipment-tracking@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-07T01:11:57",
+        "subj": "Shipped: 2 \"FORDECO 2.5\" ID T304...\"",
+        "addr": "shipment-tracking@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-07T00:26:22",
+        "subj": "Shipped: \"HYAT O2 Oxygen Sensor Bung,...\"",
+        "addr": "shipment-tracking@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-06T21:57:43",
+        "subj": "Shipped: \"2.5 Inch Straight Pipe...\"",
+        "addr": "shipment-tracking@amazon.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-06T21:55:01",
+        "subj": "Shipped: \"2.5 Inch Straight Pipe...\"",
+        "addr": "shipment-tracking@amazon.com",
+        "amount_in_subj": null
+      }
+    ]
+  },
+  "harbor_freight": {
+    "total_msgs": 818,
+    "order_msgs_count": 140,
+    "amount_parseable": 77,
+    "amount_sum_in_subj": 4914.97,
+    "first_order": "2023-02-13T16:50:48",
+    "last_order": "2026-05-01T13:01:06",
+    "samples": [
+      {
+        "date": "2026-05-01T13:01:06",
+        "subj": "Your receipt from Harbor Freight | HENDERSON  NV #00608",
+        "addr": "no-reply@harborfreight.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-26T06:15:08",
+        "subj": "Skylar, Ends Today! Get 30% Off All Items $20 and Under!",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 20.0
+      },
+      {
+        "date": "2026-04-25T08:02:23",
+        "subj": "Skylar, Your 30% Off Savings Weekend Is Here! Save on All Items $20 & Under",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 20.0
+      },
+      {
+        "date": "2026-04-23T19:18:28",
+        "subj": "Just for You, Skylar! Save 30% Off All Items $20 and Under!",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 20.0
+      },
+      {
+        "date": "2026-04-01T11:29:24",
+        "subj": "Your receipt from Harbor Freight | HENDERSON  NV #00608",
+        "addr": "no-reply@harborfreight.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-28T06:21:45",
+        "subj": "2 Days Left of Double Deals: 15% Off Any Single Item! 30% Off Any Item Under $10  \u2013 Use Both Today!",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 10.0
+      },
+      {
+        "date": "2026-03-27T06:18:35",
+        "subj": "15% Off Any Single Item + 30% Off Any Single Item Under $10! Double Deals All Weekend!",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 10.0
+      },
+      {
+        "date": "2026-03-24T21:56:42",
+        "subj": "10 DAYS OF DEALS! Day 10: Up to $400 Off PREDATOR Generators",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 400.0
+      },
+      {
+        "date": "2026-03-23T21:42:34",
+        "subj": "10 DAYS OF DEALS! Day 9: $50 Off This PREDATOR Power Station + 35% Off All Towing Hitches and Receivers",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 50.0
+      },
+      {
+        "date": "2026-03-21T21:46:10",
+        "subj": "10 DAYS OF DEALS! Day 7: $70 Off This DAYTONA 3 Ton Professional Floor Jack with RAPID PUMP",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 70.0
+      },
+      {
+        "date": "2026-03-19T21:52:06",
+        "subj": "10 DAYS OF DEALS! Day 5: HERCULES Bundle Deal + $40 Off This ICON 1/2 in. Drive Torque Wrench",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 40.0
+      },
+      {
+        "date": "2026-03-12T14:10:22",
+        "subj": "Celebrating Excellent Teachers. $2 Million in Cash Prizes.",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 2.0
+      },
+      {
+        "date": "2026-03-04T17:23:29",
+        "subj": "Your receipt from Harbor Freight | HENDERSON  NV #00608",
+        "addr": "no-reply@harborfreight.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-03T10:56:14",
+        "subj": "Harbor Freight Tools | INSIDE TRACK CLUB Order Confirmation #129878307",
+        "addr": "hft@order-status.harborfreight.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-02-20T15:30:19",
+        "subj": "Your receipt from Harbor Freight | LAS VEGAS SUNSET  NV #00179",
+        "addr": "no-reply@harborfreight.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-02-20T14:54:04",
+        "subj": "Your receipt from Harbor Freight | HENDERSON  NV #00608",
+        "addr": "no-reply@harborfreight.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-02-10T14:51:19",
+        "subj": "Your receipt from Harbor Freight | HENDERSON  NV #00608",
+        "addr": "no-reply@harborfreight.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-02-01T06:29:18",
+        "subj": "Skylar, Ends Today! Get 30% Off All Items $20 and Under!",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 20.0
+      },
+      {
+        "date": "2026-01-31T08:33:35",
+        "subj": "Skylar, Your 30% Off Savings Weekend Is Here! Save on All Items $20 & Under",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 20.0
+      },
+      {
+        "date": "2026-01-29T19:55:29",
+        "subj": "Just for You, Skylar! Save 30% Off All Items $20 and Under!",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 20.0
+      },
+      {
+        "date": "2025-12-28T06:53:18",
+        "subj": "Skylar, Ends Today! Get 30% Off All Items $20 and Under!",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 20.0
+      },
+      {
+        "date": "2025-12-27T08:25:37",
+        "subj": "Skylar, Your 30% Off Savings Weekend Is Here! Save on All Items $20 & Under",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 20.0
+      },
+      {
+        "date": "2025-12-25T23:36:40",
+        "subj": "Just for You, Skylar! Save 30% Off All Items $20 and Under!",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 20.0
+      },
+      {
+        "date": "2025-12-22T21:43:24",
+        "subj": "12 DAYS OF DEALS! Day 12: $180 Off These BADLAND Winches + 30% Off All HAUL-MASTER Tie-Downs and Elastic Straps",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 180.0
+      },
+      {
+        "date": "2025-12-20T21:52:04",
+        "subj": "12 DAYS OF DEALS! Day 10: 40% Off All U.S. GENERAL Magnetic Storage Attachments and Drawer Organizers + $500 Off This U.S. GENERAL Roll Cab",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 500.0
+      },
+      {
+        "date": "2025-12-18T21:57:21",
+        "subj": "12 DAYS OF DEALS! Day 8: $400 Off These PREDATOR Generators",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 400.0
+      },
+      {
+        "date": "2025-12-17T22:11:41",
+        "subj": "12 DAYS OF DEALS! Day 7: $65 Off This PREDATOR Auger + 30% Off Pumps",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 65.0
+      },
+      {
+        "date": "2025-12-14T21:51:15",
+        "subj": "12 DAYS OF DEALS! Day 4: $70 Off This PITTSBURGH Floor Jack + $50 Off This BADLAND Off-Road Jack",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 70.0
+      },
+      {
+        "date": "2025-12-11T22:00:00",
+        "subj": "12 DAYS OF DEALS! Day 1: $80 Off This U.S. GENERAL 4-Drawer Cart + 40% Off All ICON Lights",
+        "addr": "HarborFreight@e.harborfreight.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2025-12-10T10:40:45",
+        "subj": "Your receipt from Harbor Freight | HENDERSON  NV #00608",
+        "addr": "no-reply@harborfreight.com",
+        "amount_in_subj": null
+      }
+    ]
+  },
+  "cj_pony": {
+    "total_msgs": 807,
+    "order_msgs_count": 98,
+    "amount_parseable": 15,
+    "amount_sum_in_subj": 1729.0,
+    "first_order": "2024-05-20T16:05:35",
+    "last_order": "2026-04-22T07:19:34",
+    "samples": [
+      {
+        "date": "2026-04-22T07:19:34",
+        "subj": "\u2b50SPECIAL: Free Shipping on Orders $75+",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": 75.0
+      },
+      {
+        "date": "2026-04-20T11:13:14",
+        "subj": "skylar, Take $10 Off Today!",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": 10.0
+      },
+      {
+        "date": "2026-04-02T11:23:20",
+        "subj": "skylar, Take $10 Off Today!",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": 10.0
+      },
+      {
+        "date": "2026-03-25T07:32:11",
+        "subj": "LAST CHANCE: Free Shipping on Orders $75+",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": 75.0
+      },
+      {
+        "date": "2026-03-23T07:10:34",
+        "subj": "3 Days Only! Free Shipping on Orders $75+",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": 75.0
+      },
+      {
+        "date": "2026-03-20T14:03:44",
+        "subj": "Your Order Is On Its Way! #80901503",
+        "addr": "Ship-Confirmation@cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-15T11:15:18",
+        "subj": "Lucky You! See Which Parts Were Delivered To Your Inbox Today",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-09T13:24:33",
+        "subj": "An Update On Your Order #80901503",
+        "addr": "no-reply@cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-05T16:29:48",
+        "subj": "An Update On Your Order #80901503",
+        "addr": "no-reply@cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-05T14:34:56",
+        "subj": "Your Order Is On Its Way! #80881375",
+        "addr": "Ship-Confirmation@cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-05T14:27:55",
+        "subj": "An Update On Your Order #80881375",
+        "addr": "no-reply@cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-05T13:34:40",
+        "subj": "We've Got Your Order! #80881375",
+        "addr": "Order-Confirmation@cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-04T17:28:28",
+        "subj": "Your Order Is On Its Way! #80884019",
+        "addr": "Ship-Confirmation@cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-04T15:02:56",
+        "subj": "We've Got Your Order! #80884019",
+        "addr": "Order-Confirmation@cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-04T13:01:48",
+        "subj": "We've Got Your Order! #80881375",
+        "addr": "Order-Confirmation@cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-02-02T07:16:41",
+        "subj": "3 DAYS ONLY: Free Shipping on Orders $75+",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": 75.0
+      },
+      {
+        "date": "2025-12-13T12:11:43",
+        "subj": "\u231bTIME IS RUNNING OUT! Place Your Order Today",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-12-11T15:18:27",
+        "subj": "Free Shipping on Orders $49+ (& Get It In Time!\ud83c\udf81)",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": 49.0
+      },
+      {
+        "date": "2025-11-27T08:53:43",
+        "subj": "Thank You, From Us (Earn $15+ in Points!)",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": 15.0
+      },
+      {
+        "date": "2025-11-19T15:01:20",
+        "subj": "Still Need Help With This? Order ready for pickup - Order #",
+        "addr": "customerservice@cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-11-17T14:01:25",
+        "subj": "Still Need Our Help? Order ready for pickup - Order #",
+        "addr": "customerservice@cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-11-12T13:09:33",
+        "subj": "Order ready for pickup - Order #",
+        "addr": "customerservice@cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-10-20T17:49:38",
+        "subj": "Free Shipping on Orders $49+ Today!",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": 49.0
+      },
+      {
+        "date": "2025-10-20T08:06:44",
+        "subj": "\u231b FINAL HOURS: Free Shipping for $49+",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": 49.0
+      },
+      {
+        "date": "2025-09-12T15:42:03",
+        "subj": "LAST CHANCE: Free Shipping on Orders $49+",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": 49.0
+      },
+      {
+        "date": "2025-07-03T09:37:59",
+        "subj": "We\u2019re Refunding an Entire Order - Here's Your Chance to Win!",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-07-01T09:27:17",
+        "subj": "Imagine Getting Your Entire Order for FREE\u2026\ud83d\udc40",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-06-27T11:01:06",
+        "subj": "TODAY ONLY: Orders $49+ Ship Free \ud83d\udce6",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": 49.0
+      },
+      {
+        "date": "2025-06-04T17:46:41",
+        "subj": "Last Chance to Ship Your Order For Less!",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-06-04T08:13:43",
+        "subj": "Free Shipping on Orders Over $49 Ends Today!",
+        "addr": "cjautomotive@mktg.cjponyparts.com",
+        "amount_in_subj": 49.0
+      }
+    ]
+  },
+  "discount_tire": {
+    "total_msgs": 152,
+    "order_msgs_count": 91,
+    "amount_parseable": 88,
+    "amount_sum_in_subj": 10850.0,
+    "first_order": "2024-10-10T05:57:26",
+    "last_order": "2026-05-02T06:44:36",
+    "samples": [
+      {
+        "date": "2026-05-02T06:44:36",
+        "subj": "Shop $80 off select tires before your next drive",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-04-25T06:45:04",
+        "subj": "$160 off your next set of tires & wheels!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 160.0
+      },
+      {
+        "date": "2026-04-22T06:19:18",
+        "subj": "Turn heads with $80 off Voxx wheel sets!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-04-14T06:13:01",
+        "subj": "Save $160 on select tires & wheels today",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 160.0
+      },
+      {
+        "date": "2026-04-11T06:50:14",
+        "subj": "$160 off your next set of tires and wheels!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 160.0
+      },
+      {
+        "date": "2026-04-07T06:04:25",
+        "subj": "$80 off Bridgestone and Nitto tires just dropped!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-04-01T06:19:21",
+        "subj": "April Fools? Not this deal\u2014$80 off tires",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-03-24T05:57:42",
+        "subj": "$80 off tires just dropped! \ud83e\udd11\ud83d\udede",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-03-16T06:26:55",
+        "subj": "Save up to $240 with deals that'll have you rolling!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 240.0
+      },
+      {
+        "date": "2026-03-14T06:17:39",
+        "subj": "Up to $240 off tires and wheels: Drive your tax refund further.",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 240.0
+      },
+      {
+        "date": "2026-03-11T06:21:26",
+        "subj": "Your Tax Season Savings Are Here: Up to $240 Off!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 240.0
+      },
+      {
+        "date": "2026-03-10T06:49:26",
+        "subj": "Get Up to $240 Off Tires & Wheels\u2014Tax Season Savings Starts Now!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 240.0
+      },
+      {
+        "date": "2026-03-07T05:33:22",
+        "subj": "$80 off select tire sets! Let your tax refund carry the load. \ud83d\udefb",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-03-04T05:23:34",
+        "subj": "$80 Tire Savings! Tax Time Tire Deals keep on rolling!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-02-10T05:13:24",
+        "subj": "Presidents Day Sale: Up to $240 off!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 240.0
+      },
+      {
+        "date": "2026-02-07T05:48:41",
+        "subj": "$80 off all Goodyear & select Cooper tires!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-02-03T05:21:05",
+        "subj": "$80 instant savings on wheels!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-01-31T05:30:30",
+        "subj": "Get up to $160 off tires & wheels!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 160.0
+      },
+      {
+        "date": "2026-01-24T06:18:55",
+        "subj": "Up to $80 off tires!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-01-21T06:35:30",
+        "subj": "Up to $80 instant savings on tires!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-01-20T05:21:58",
+        "subj": "Up to $80 off wheels!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-01-17T05:40:22",
+        "subj": "Up to $160 off tires & wheels!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 160.0
+      },
+      {
+        "date": "2026-01-14T05:46:55",
+        "subj": "Get $80 instant savings on wheels!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-01-13T05:34:14",
+        "subj": "Up to $80 off tires!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-01-10T06:10:07",
+        "subj": "$80 instant savings on Pirelli sets!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-01-09T05:17:49",
+        "subj": "Up to $80 off Pirelli sets.",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-01-03T06:12:14",
+        "subj": "$80 instant savings on Goodyear sets.",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2026-01-02T06:17:37",
+        "subj": "$80 off Goodyear sets.",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 80.0
+      },
+      {
+        "date": "2025-12-27T05:46:29",
+        "subj": "Save up to $100 on select Bridgestone sets!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 100.0
+      },
+      {
+        "date": "2025-12-21T05:30:21",
+        "subj": "Keep the savings rolling up to $100 off!",
+        "addr": "dtc-email@discounttire-email.com",
+        "amount_in_subj": 100.0
+      }
+    ]
+  },
+  "autozone": {
+    "total_msgs": 16,
+    "order_msgs_count": 2,
+    "amount_parseable": 0,
+    "amount_sum_in_subj": 0,
+    "first_order": "2023-11-07T13:00:47",
+    "last_order": "2023-11-08T14:51:29",
+    "samples": [
+      {
+        "date": "2023-11-08T14:51:29",
+        "subj": "Your AutoZone package has been delivered.",
+        "addr": "orders@autozone.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2023-11-07T13:00:47",
+        "subj": "Your AutoZone package has been delivered.",
+        "addr": "orders@autozone.narvar.com",
+        "amount_in_subj": null
+      }
+    ]
+  },
+  "lmc_truck": {
+    "total_msgs": 4,
+    "order_msgs_count": 0,
+    "amount_parseable": 0,
+    "amount_sum_in_subj": 0,
+    "first_order": null,
+    "last_order": null,
+    "samples": []
+  },
+  "home_depot": {
+    "total_msgs": 30,
+    "order_msgs_count": 12,
+    "amount_parseable": 0,
+    "amount_sum_in_subj": 0,
+    "first_order": "2019-11-23T20:28:11",
+    "last_order": "2025-04-21T13:12:15",
+    "samples": [
+      {
+        "date": "2025-04-21T13:12:15",
+        "subj": "Order #WG86807118 Delivered: Let us know how we did!",
+        "addr": "HomeDepot@order.homedepot.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-04-21T08:55:14",
+        "subj": "Order #WG86807118 is Out for Delivery Today, Skylar!",
+        "addr": "HomeDepot@order.homedepot.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-04-18T14:58:20",
+        "subj": "Order #WG86807118 Shipped: Your order is on its way, Skylar!",
+        "addr": "HomeDepot@order.homedepot.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-04-17T20:39:14",
+        "subj": "Order #WG86807118 Received: Thank you for shopping with us!",
+        "addr": "HomeDepot@order.homedepot.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2023-02-14T17:46:30",
+        "subj": "Your Electronic Receipt",
+        "addr": "HomeDepot@order.homedepot.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-03-22T05:26:12",
+        "subj": "Your order WD97969268 is out for delivery, Skylar!",
+        "addr": "HomeDepot@order.homedepot.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-03-20T17:39:12",
+        "subj": "We received your order!",
+        "addr": "HomeDepotPro@order.homedepot.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2021-09-12T16:44:27",
+        "subj": "Your order is ready! Pick it up by 09/19.",
+        "addr": "HomeDepotPro@order.homedepot.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2021-08-25T07:03:41",
+        "subj": "Your order WD79599860 is out for delivery, Skylar!",
+        "addr": "HomeDepot@order.homedepot.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2021-08-24T15:47:44",
+        "subj": "Your order WD79599860 just shipped, Skylar",
+        "addr": "HomeDepotPro@order.homedepot.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2021-08-24T10:17:18",
+        "subj": "We received your order!",
+        "addr": "HomeDepot@order.homedepot.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2019-11-23T20:28:11",
+        "subj": "Your Electronic Receipt",
+        "addr": "HomeDepot@order.homedepot.com",
+        "amount_in_subj": null
+      }
+    ]
+  },
+  "summit_racing": {
+    "total_msgs": 112,
+    "order_msgs_count": 77,
+    "amount_parseable": 0,
+    "amount_sum_in_subj": 0,
+    "first_order": "2020-03-23T10:47:28",
+    "last_order": "2026-04-23T10:06:53",
+    "samples": [
+      {
+        "date": "2026-04-23T10:06:53",
+        "subj": "Your Package has Been Delivered!",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-23T08:36:22",
+        "subj": "Your order is out for delivery.",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-22T21:24:05",
+        "subj": "NO REPLY - Here's your Tracking # 1Z1XW7200304335814 - Your Order Has Shipped!",
+        "addr": "CustomerService@SummitRacing.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-22T14:12:35",
+        "subj": "Confirmation & Order Status for your Order # 9768457",
+        "addr": "CustomerService@SummitRacing.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-22T14:04:48",
+        "subj": "Here's Your Return Shipping Label for Summit Racing Order No. 6281375",
+        "addr": "CustomerService@SummitRacing.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-01T12:37:21",
+        "subj": "Your Package has Been Delivered!",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-04-01T10:45:34",
+        "subj": "Your order is out for delivery.",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-31T17:36:40",
+        "subj": "NO REPLY - Here's your Tracking # D10017260769056 - Your Order Has Shipped!",
+        "addr": "CustomerService@SummitRacing.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-31T11:32:19",
+        "subj": "Confirmation & Order Status for your Order # 6846639",
+        "addr": "CustomerService@SummitRacing.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-18T14:10:53",
+        "subj": "Your Package has Been Delivered!",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-18T10:46:01",
+        "subj": "Your order is out for delivery.",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-17T17:29:32",
+        "subj": "NO REPLY - Here's your Tracking # D10017222285199 - Your Order Has Shipped!",
+        "addr": "CustomerService@SummitRacing.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-16T22:31:26",
+        "subj": "Confirmation & Order Status for your Order # 6242597",
+        "addr": "CustomerService@SummitRacing.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-11T14:54:27",
+        "subj": "Your Package has Been Delivered!",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-11T05:48:07",
+        "subj": "Your order is out for delivery.",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-10T15:16:50",
+        "subj": "Your Package has Been Delivered!",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-10T04:37:36",
+        "subj": "Your order is out for delivery.",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-06T21:16:42",
+        "subj": "NO REPLY - Here's your Tracking # 1Z045WV80357734562 - Your Order Has Shipped!",
+        "addr": "CustomerService@SummitRacing.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-06T16:38:48",
+        "subj": "Your Package has Been Delivered!",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-06T14:40:51",
+        "subj": "Your Package has Been Delivered!",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-06T14:40:49",
+        "subj": "Your Package has Been Delivered!",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-06T13:43:31",
+        "subj": "Confirmation & Order Status for your Order # 6555575",
+        "addr": "CustomerService@SummitRacing.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-06T04:43:45",
+        "subj": "Your order is out for delivery.",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-06T04:31:40",
+        "subj": "Your order is out for delivery.",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-06T04:06:11",
+        "subj": "Your order is out for delivery.",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-05T15:09:00",
+        "subj": "Your Package has Been Delivered!",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-05T12:03:47",
+        "subj": "Your Package has Been Delivered!",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-05T07:17:25",
+        "subj": "Your order is out for delivery.",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-05T04:21:32",
+        "subj": "Your order is out for delivery.",
+        "addr": "summitracing@summitracing.narvar.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-04T21:21:54",
+        "subj": "NO REPLY - Here's your Tracking # 513487679202 - Your Order Has Shipped!",
+        "addr": "CustomerService@SummitRacing.com",
+        "amount_in_subj": null
+      }
+    ]
+  },
+  "advance_auto": {
+    "total_msgs": 25,
+    "order_msgs_count": 13,
+    "amount_parseable": 10,
+    "amount_sum_in_subj": 95.0,
+    "first_order": "2019-12-07T10:10:25",
+    "last_order": "2022-10-14T18:10:37",
+    "samples": [
+      {
+        "date": "2022-10-14T18:10:37",
+        "subj": "Your Order is on Its Way!",
+        "addr": "reply@email-advanceautoparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-10-14T15:26:44",
+        "subj": "Thank You for Your Order",
+        "addr": "reply@email-advanceautoparts.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-02-02T01:02:53",
+        "subj": "Congratulations! You've Received $10 Perks Bucks!",
+        "addr": "advanceauto@E-speedperks.com",
+        "amount_in_subj": 10.0
+      },
+      {
+        "date": "2021-03-27T10:40:35",
+        "subj": "Congratulations! You've Received $5 Perks Bucks!",
+        "addr": "advanceauto@E-speedperks.com",
+        "amount_in_subj": 5.0
+      },
+      {
+        "date": "2020-06-04T08:30:15",
+        "subj": "Congratulations! You've Received $5 Perks Bucks!",
+        "addr": "advanceauto@E-speedperks.com",
+        "amount_in_subj": 5.0
+      },
+      {
+        "date": "2020-06-04T05:10:19",
+        "subj": "Save $10 Off $40, $20 Off $80 or $30 Off $120 on Summer Essentials",
+        "addr": "advanceauto@email-advanceautoparts.com",
+        "amount_in_subj": 10.0
+      },
+      {
+        "date": "2020-05-29T14:07:05",
+        "subj": "Congratulations! You've Received $5 Perks Bucks!",
+        "addr": "advanceauto@E-speedperks.com",
+        "amount_in_subj": 5.0
+      },
+      {
+        "date": "2020-05-29T14:07:04",
+        "subj": "Congratulations! You've Received $10 Perks Bucks!",
+        "addr": "advanceauto@E-speedperks.com",
+        "amount_in_subj": 10.0
+      },
+      {
+        "date": "2020-05-29T14:02:01",
+        "subj": "Congratulations! You've Received $5 Perks Bucks!",
+        "addr": "advanceauto@E-speedperks.com",
+        "amount_in_subj": 5.0
+      },
+      {
+        "date": "2020-05-28T04:24:57",
+        "subj": "Save $10 off $40, $15 off $60 or $30 off $100 + Get Ready for Summer",
+        "addr": "advanceauto@email-advanceautoparts.com",
+        "amount_in_subj": 10.0
+      },
+      {
+        "date": "2020-05-02T05:52:47",
+        "subj": "Save 20% Online + Get Free Delivery with Advance Same Day or with a $25+ Purchase",
+        "addr": "advanceauto@email-advanceautoparts.com",
+        "amount_in_subj": 25.0
+      },
+      {
+        "date": "2019-12-09T12:15:50",
+        "subj": "Congratulations! You've Received $10 Perks Bucks!",
+        "addr": "advanceauto@E-speedperks.com",
+        "amount_in_subj": 10.0
+      },
+      {
+        "date": "2019-12-07T10:10:25",
+        "subj": "Thank You for Your Order",
+        "addr": "reply@email-advanceautoparts.com",
+        "amount_in_subj": null
+      }
+    ]
+  },
+  "classic_industries": {
+    "total_msgs": 37,
+    "order_msgs_count": 7,
+    "amount_parseable": 0,
+    "amount_sum_in_subj": 0,
+    "first_order": "2018-10-13T22:52:52",
+    "last_order": "2022-05-19T12:02:13",
+    "samples": [
+      {
+        "date": "2022-05-19T12:02:13",
+        "subj": "Great News!! Your Classic Industries Order has Shipped! # 14341315",
+        "addr": "no-reply-notifications@classicindustries.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-05-18T22:58:08",
+        "subj": "Congratulations! Your Classic Industries Order is Confirmed! # 14341315",
+        "addr": "no-reply-notifications@classicindustries.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-05-18T22:52:17",
+        "subj": "Classic Industries Order 14341315 Confirmation",
+        "addr": "info-desk@classicindustries.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-03-21T17:47:33",
+        "subj": "Great News!! Your Classic Industries Order has Shipped! # 14237496",
+        "addr": "no-reply-notifications@classicindustries.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-03-17T01:26:13",
+        "subj": "Congratulations! Your Classic Industries Order is Confirmed! # 14237496",
+        "addr": "no-reply-notifications@classicindustries.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2022-03-17T01:20:50",
+        "subj": "Classic Industries Order 14237496 Confirmation",
+        "addr": "info-desk@classicindustries.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2018-10-13T22:52:52",
+        "subj": "Classic Industries Order 12711411 Confirmation",
+        "addr": "orderconfirmation@classicindustries.com",
+        "amount_in_subj": null
+      }
+    ]
+  },
+  "rockauto": {
+    "total_msgs": 18,
+    "order_msgs_count": 1,
+    "amount_parseable": 0,
+    "amount_sum_in_subj": 0,
+    "first_order": "2025-10-17T12:06:16",
+    "last_order": "2025-10-17T12:06:16",
+    "samples": [
+      {
+        "date": "2025-10-17T12:06:16",
+        "subj": "RockAuto Order 325898389 Delivery",
+        "addr": "noreply@rockauto.com",
+        "amount_in_subj": null
+      }
+    ]
+  },
+  "oreilly": {
+    "total_msgs": 5,
+    "order_msgs_count": 3,
+    "amount_parseable": 0,
+    "amount_sum_in_subj": 0,
+    "first_order": "2025-10-16T07:45:17",
+    "last_order": "2025-10-23T10:56:07",
+    "samples": [
+      {
+        "date": "2025-10-23T10:56:07",
+        "subj": "We are unable to fill your online order.",
+        "addr": "messages@email.oreillyauto.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-10-16T10:50:02",
+        "subj": "Order K49286773R93516 is ready for pickup",
+        "addr": "messages@email.oreillyauto.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2025-10-16T07:45:17",
+        "subj": "We are processing your order. Please wait for another email with next steps.",
+        "addr": "messages@email.oreillyauto.com",
+        "amount_in_subj": null
+      }
+    ]
+  },
+  "eckler": {
+    "total_msgs": 46,
+    "order_msgs_count": 12,
+    "amount_parseable": 9,
+    "amount_sum_in_subj": 30028.0,
+    "first_order": "2026-03-04T14:52:43",
+    "last_order": "2026-05-01T11:12:01",
+    "samples": [
+      {
+        "date": "2026-05-01T11:12:01",
+        "subj": "$12K Giveaway + Instant Savings on Top Brands!",
+        "addr": "Ecklers@email.ecklers.com",
+        "amount_in_subj": 12.0
+      },
+      {
+        "date": "2026-04-22T04:12:24",
+        "subj": "Enter to win the $12K Summer Sweeps + SITEWIDE OFFER!",
+        "addr": "Ecklers@email.ecklers.com",
+        "amount_in_subj": 12.0
+      },
+      {
+        "date": "2026-04-06T04:33:10",
+        "subj": "Are You the $2,000 Winner? Plus,  C10 Coupons Inside!",
+        "addr": "Ecklers@email.ecklers.com",
+        "amount_in_subj": 2000.0
+      },
+      {
+        "date": "2026-04-01T04:13:35",
+        "subj": "Coupons On Top Brands + Enter to Win $20,000 Mega Sweeps!",
+        "addr": "Ecklers@email.ecklers.com",
+        "amount_in_subj": 20000.0
+      },
+      {
+        "date": "2026-03-24T05:09:21",
+        "subj": "$2,000 Winner Revealed!",
+        "addr": "Ecklers@email.ecklers.com",
+        "amount_in_subj": 2000.0
+      },
+      {
+        "date": "2026-03-23T04:15:34",
+        "subj": "$2,000 Winner Revealed!",
+        "addr": "Ecklers@email.ecklers.com",
+        "amount_in_subj": 2000.0
+      },
+      {
+        "date": "2026-03-19T04:15:36",
+        "subj": "\ud83d\udcb0 $4K Giveaway + Free Gear \u2014 Claim Yours Now!",
+        "addr": "Ecklers@email.ecklers.com",
+        "amount_in_subj": 4.0
+      },
+      {
+        "date": "2026-03-10T04:06:23",
+        "subj": "Are You the $2,000 WINNER? \ud83d\udc40",
+        "addr": "Ecklers@email.ecklers.com",
+        "amount_in_subj": 2000.0
+      },
+      {
+        "date": "2026-03-09T04:15:31",
+        "subj": "Are You the $2,000 WINNER? \ud83d\udc40",
+        "addr": "Ecklers@email.ecklers.com",
+        "amount_in_subj": 2000.0
+      },
+      {
+        "date": "2026-03-05T23:19:30",
+        "subj": "About Your Last Order\u2026",
+        "addr": "Ecklers@email.ecklers.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-05T12:36:49",
+        "subj": "Your Order has shipped",
+        "addr": "Ecklers@email.ecklers.com",
+        "amount_in_subj": null
+      },
+      {
+        "date": "2026-03-04T14:52:43",
+        "subj": "Your Order Has Been Received",
+        "addr": "Ecklers@email.ecklers.com",
+        "amount_in_subj": null
+      }
+    ]
+  }
+}

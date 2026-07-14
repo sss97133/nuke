@@ -1,0 +1,209 @@
+{
+  "$schema": "../schemas/wire-closure.schema.json",
+  "wire_id": "13",
+  "label": "Fuel Injector 1",
+  "loom": "ENGINE LOOM",
+  "bundle": "B2-Drv Inj",
+  "from": {
+    "device": {
+      "value": "MoTeC M130 ECU",
+      "source": "K5_WIRING_STATE.md \u00a71; chapters/appendix-d-k5-build.md"
+    },
+    "connector": {
+      "value": "Connector A (Tyco Superseal 34 Position Keying 1 \u2014 MoTeC #65044)",
+      "source": "reference_documents/component_drawings/motec_m1_hardware_techspec.pdf p16; K5_connector_shopping_list.txt:13"
+    },
+    "pin": {
+      "value": "A19",
+      "source": "K5_cut_list_v2.txt:23"
+    },
+    "pin_function": {
+      "value": "INJ_PH1 \u2014 Peak Hold Injector 1 (low-side driver for saturated/EV6 injectors)",
+      "source": "reference_documents/component_drawings/motec_m1_hardware_techspec.pdf p16 (\"A19 INJ_PH1 Peak Hold Injector 1\"); K5_connector_schedule.txt:20"
+    },
+    "signal_type": {
+      "value": "low_side_drive",
+      "source": "chapters/05-build-manifest.md \u00a7ECU-Connected Signal Types (\"low_side_drive = Injectors, coils = 2 wires\")"
+    },
+    "expected_wire_count": 2
+  },
+  "to": {
+    "device": {
+      "value": "GM/Bosch EV6/USCAR fuel injector (cylinder 1, driver bank front)",
+      "source": "K5_connector_schedule.txt:20 (\"12576341 EV6/USCAR connector\"); K5_shopping_list.md:45"
+    },
+    "device_pn": {
+      "value": "GM 12576341 (EV6/USCAR-style injector)",
+      "source": "K5_connector_schedule.txt:20; K5_shopping_list.md:45"
+    },
+    "connector_type": {
+      "value": "EV6/USCAR 2-pin sealed injector connector",
+      "source": "K5_shopping_list.md:45 (\"EV6/USCAR injector pigtail (2-pin)\")"
+    },
+    "physical_location": {
+      "unknown": true,
+      "needs": "LS3 cylinder 1 injector boss on driver-side head/intake junction. Specific physical location relative to bay datum requires LS3 service manual citation or measurement. K5_harness_build_sheets_v2.md:42 places injectors at \"valve covers\" generally, not per-cylinder."
+    },
+    "pigtail_pn": {
+      "value": "WPINJ40 (ICT Billet, $8) \u2014 pre-terminated 2-pin EV6/USCAR pigtail with 12\" leads",
+      "source": "K5_connector_shopping_list.txt:25; K5_shopping_list.md:45"
+    }
+  },
+  "wire_spec": {
+    "gauge_awg": 18,
+    "spec": "M22759/32",
+    "color": "GRN",
+    "shielding": false
+  },
+  "routing": {
+    "landmark_path": [
+      "L01",
+      "L02",
+      "L03",
+      "L07"
+    ],
+    "total_length_in": {
+      "value": 66.2,
+      "method": "zone_distance_estimate",
+      "estimate_basis": "K5_cut_list_v2.txt:23 baseline 4.6 ft + 20% engine bay pad \u2192 5.52 ft = 66.2 in. Real path through L01-L02-L03-L07 cannot be computed; K5_landmarks.yaml has all four values null. L07 = \"Coil-to-injector at same cylinder (top of valve cover \u2192 side of fuel rail)\" per K5_landmarks.yaml:22 \u2014 appropriate for injector landing."
+    }
+  },
+  "termination": {
+    "from_terminal_pn": {
+      "unknown": true,
+      "needs": "Tyco Superseal terminal PN for the 34-pin keyed-1 housing. motec_m1_hardware_techspec.pdf p16 names the connector (MoTeC #65044) but not the individual terminal. MoTeC connector kit likely includes terminals; verify via MoTeC dealer or Tyco Superseal datasheet."
+    },
+    "from_seal_pn": {
+      "unknown": true,
+      "needs": "Same source as from_terminal_pn"
+    },
+    "to_terminal_pn": {
+      "value": "Pre-terminated by WPINJ40 pigtail (EV6/USCAR female terminals at sensor end)",
+      "source": "K5_connector_shopping_list.txt:25"
+    },
+    "to_seal_pn": {
+      "value": "Pre-terminated by WPINJ40 pigtail (sealed EV6 cable seals)",
+      "source": "K5_connector_shopping_list.txt:25"
+    }
+  },
+  "companion_wires": [
+    {
+      "role": "high_side_pwr",
+      "wire_id_or_status": {
+        "value": "#INJ_PWR (injector +12V rail, added 2026-05-14 per Option B amendment)",
+        "source": "K5_cut_list_v2.txt addendum; receipts/2026-05-14_amendment-cut-list-companion-wires.md. Daisy-chained at fuel rail via WPINJ40 pigtails, so injector 1's +12V comes from the rail, not a per-cylinder wire."
+      },
+      "target_pin": {
+        "unknown": true,
+        "needs": "PDM30 OUT channel for #INJ_PWR is TBD \u2014 needs review of K5_pdm30_channel_plan.md to identify the injector-power channel"
+      }
+    }
+  ],
+  "fuse": {
+    "not_applicable": true,
+    "reason": "The control wire (this wire) carries no continuous current \u2014 it switches the injector low-side via the M130's INJ_PH output driver. The driver itself has built-in protection. The COMPANION +12V power wire (see companion_wires above) is the one needing fuse/PDM channel ampacity protection."
+  },
+  "heat_shrink": {
+    "label_end_a": {
+      "unknown": true,
+      "needs": "Per-end label text not yet split"
+    },
+    "label_end_b": {
+      "unknown": true,
+      "needs": "Per-end label text not yet split"
+    },
+    "termination_end_a_inner_seal_pn": {
+      "unknown": true,
+      "needs": "SCL PN (M23053/4 Class 2 or 3) at end A \u2014 not yet specified in build docs; pick from research \u00a73 sizing math"
+    },
+    "termination_end_a_outer_cover_pn": {
+      "unknown": true,
+      "needs": "DR-25 PN (M23053/16) at end A \u2014 not yet specified"
+    },
+    "termination_end_b_inner_seal_pn": {
+      "unknown": true,
+      "needs": "SCL PN at end B"
+    },
+    "termination_end_b_outer_cover_pn": {
+      "unknown": true,
+      "needs": "DR-25 PN at end B"
+    },
+    "boot_at_terminals": {
+      "unknown": true,
+      "needs": "Same systemic gap"
+    }
+  },
+  "open_unknowns": [
+    {
+      "field": "to.physical_location",
+      "needs": "LS3 cylinder 1 injector physical position relative to bay datum",
+      "blocks": [
+        "accurate L03/L07 landmark distance for this wire"
+      ]
+    },
+    {
+      "field": "termination.from_terminal_pn",
+      "needs": "Tyco Superseal 34-pin Keying 1 terminal PN \u2014 likely in MoTeC #65044 connector kit but explicit PN needs Tyco datasheet or MoTeC dealer query (systemic to all M130:A and PDM30:A wires)",
+      "blocks": [
+        "terminal order for entire harness"
+      ]
+    },
+    {
+      "field": "termination.from_seal_pn",
+      "needs": "Same source as from_terminal_pn",
+      "blocks": [
+        "seal order for entire harness"
+      ]
+    },
+    {
+      "field": "_companion_wires_resolved",
+      "needs": "PARTIALLY RESOLVED 2026-05-14: #INJ_PWR added to cut list. Remaining gap: PDM30 channel for that rail \u2014 check K5_pdm30_channel_plan.md.",
+      "blocks": [
+        "#INJ_PWR PDM source identification"
+      ]
+    },
+    {
+      "field": "routing.total_length_in.value",
+      "needs": "Measure L01, L02, L03, L07 on the actual truck",
+      "blocks": [
+        "accurate length for all engine-loom wires using L01-L07"
+      ]
+    },
+    {
+      "field": "heat_shrink.label_text",
+      "needs": "Add #13 label to K5_wire_labels.md per a documented convention",
+      "blocks": []
+    },
+    {
+      "field": "heat_shrink.label_locations",
+      "needs": "Systemic \u2014 same as #110/#109",
+      "blocks": [
+        "all wires"
+      ]
+    },
+    {
+      "field": "heat_shrink.boot_at_terminals",
+      "needs": "Systemic \u2014 same as #110/#109",
+      "blocks": [
+        "all wires"
+      ]
+    }
+  ],
+  "substrate_inconsistencies": [
+    {
+      "doc_a": "chapters/05-build-manifest.md",
+      "doc_b": "K5_cut_list_v2.txt",
+      "field": "Wire count for low_side_drive signal type (injectors)",
+      "doc_a_says": "low_side_drive = 2 wires (power + control)",
+      "doc_b_says": "(pre-2026-05-14) Only enumerates control wire",
+      "preferred": "RESOLVED 2026-05-14 via receipts/2026-05-14_amendment-cut-list-companion-wires.md. Cut list now enumerates #INJ_PWR rail wire feeding all 8 injectors via daisy-chain pigtails."
+    }
+  ],
+  "closure": {
+    "status": "PARTIAL",
+    "fields_cited": 14,
+    "fields_gapped": 11,
+    "total_fields": 25,
+    "ratio": "14/25"
+  }
+}

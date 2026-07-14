@@ -1,0 +1,314 @@
+[
+  {
+    "uuid": "181A5FBA-B40B-4753-A14F-D0428A26D706",
+    "burst_start": "2019-12-24 18:46:35",
+    "burst_count": 417,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/181A5FBA_2019-12-24_18-46-35.jpg"
+  },
+  {
+    "uuid": "7EC25401-295D-4DBA-85FD-044A1584F001",
+    "burst_start": "2020-04-18 19:00:35",
+    "burst_count": 208,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/7EC25401_2020-04-18_19-00-35.jpg"
+  },
+  {
+    "uuid": "A51A26A7-9917-4EEA-95EE-BBB43CFFA146",
+    "burst_start": "2020-05-27 18:43:25",
+    "burst_count": 190,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/A51A26A7_2020-05-27_18-43-25.jpg"
+  },
+  {
+    "uuid": "A04BDAB5-35C0-4640-AB53-E5BEDD4DB4CB",
+    "burst_start": "2020-05-01 20:07:24",
+    "burst_count": 144,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/A04BDAB5_2020-05-01_20-07-24.jpg"
+  },
+  {
+    "uuid": "E37CAC60-760A-447F-BB54-037F9F5C64EF",
+    "burst_start": "2018-09-23 03:01:12",
+    "burst_count": 133,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/E37CAC60_2018-09-23_03-01-12.jpg"
+  },
+  {
+    "uuid": "B360A45F-3203-4447-A17D-E05E7331872E",
+    "burst_start": "2019-11-01 20:57:57",
+    "burst_count": 116,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/B360A45F_2019-11-01_20-57-57.jpg"
+  },
+  {
+    "uuid": "2D9224B2-1E55-43FC-A6E3-EEEF93EE7C2D",
+    "burst_start": "2021-08-30 17:47:27",
+    "burst_count": 100,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/2D9224B2_2021-08-30_17-47-27.jpg"
+  },
+  {
+    "uuid": "72F2F904-F143-46C5-AA15-87330144C77E",
+    "burst_start": "2020-12-21 00:35:32",
+    "burst_count": 92,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/72F2F904_2020-12-21_00-35-32.jpg"
+  },
+  {
+    "uuid": "703DC2E3-6BF9-4E67-AA33-9E8267647B7C",
+    "burst_start": "2020-01-24 01:12:59",
+    "burst_count": 87,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/703DC2E3_2020-01-24_01-12-59.jpg"
+  },
+  {
+    "uuid": "3ACC256D-23AB-4B92-AFD3-AF05C1D132CC",
+    "burst_start": "2022-11-19 18:53:34",
+    "burst_count": 80,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/3ACC256D_2022-11-19_18-53-34.jpg"
+  },
+  {
+    "uuid": "2071E525-7B55-4867-BD08-3B15719C71A5",
+    "burst_start": "2019-12-22 00:46:39",
+    "burst_count": 78,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/2071E525_2019-12-22_00-46-39.jpg"
+  },
+  {
+    "uuid": "4F58A2CF-38AE-4CEB-864C-A9C37326CBE3",
+    "burst_start": "2021-06-12 21:02:21",
+    "burst_count": 78,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/4F58A2CF_2021-06-12_21-02-21.jpg"
+  },
+  {
+    "uuid": "C9725335-9EB9-4812-99B8-553E01AA4D6A",
+    "burst_start": "2022-01-25 04:33:10",
+    "burst_count": 77,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/C9725335_2022-01-25_04-33-10.jpg"
+  },
+  {
+    "uuid": "D29B0662-0E9D-45D7-A0E1-E0E420B05FBE",
+    "burst_start": "2020-05-25 16:07:02",
+    "burst_count": 73,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/D29B0662_2020-05-25_16-07-02.jpg"
+  },
+  {
+    "uuid": "596F593C-666D-4688-980A-213CCC51E25A",
+    "burst_start": "2019-04-29 19:50:09",
+    "burst_count": 70,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/596F593C_2019-04-29_19-50-09.jpg"
+  },
+  {
+    "uuid": "7513CDCD-AF2B-4914-B4DD-FFC03A563DEF",
+    "burst_start": "2021-04-06 21:38:59",
+    "burst_count": 63,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/7513CDCD_2021-04-06_21-38-59.jpg"
+  },
+  {
+    "uuid": "3F0EF731-4290-4C0C-A285-48118AB0A3FD",
+    "burst_start": "2022-04-19 18:08:37",
+    "burst_count": 63,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/3F0EF731_2022-04-19_18-08-37.jpg"
+  },
+  {
+    "uuid": "6E3DA8B8-F4D2-40E1-98C5-E844A24AE890",
+    "burst_start": "2022-09-29 16:23:04",
+    "burst_count": 63,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/6E3DA8B8_2022-09-29_16-23-04.jpg"
+  },
+  {
+    "uuid": "7FA8C621-72EB-4937-8849-BE4D0820FAF7",
+    "burst_start": "2019-09-12 06:36:22",
+    "burst_count": 60,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/7FA8C621_2019-09-12_06-36-22.jpg"
+  },
+  {
+    "uuid": "74E4A619-D4B2-4878-9AEE-F875A04BD66E",
+    "burst_start": "2021-07-19 00:10:59",
+    "burst_count": 60,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/74E4A619_2021-07-19_00-10-59.jpg"
+  },
+  {
+    "uuid": "657900BF-2966-483D-9737-F603569B138E",
+    "burst_start": "2020-08-30 20:05:59",
+    "burst_count": 59,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/657900BF_2020-08-30_20-05-59.jpg"
+  },
+  {
+    "uuid": "697362A4-0D4D-4FB0-9A82-C45C8C0E7835",
+    "burst_start": "2022-08-12 19:07:24",
+    "burst_count": 55,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/697362A4_2022-08-12_19-07-24.jpg"
+  },
+  {
+    "uuid": "972E8C3D-BE85-4CA8-8816-AE76B1069684",
+    "burst_start": "2018-08-28 18:21:25",
+    "burst_count": 54,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/972E8C3D_2018-08-28_18-21-25.jpg"
+  },
+  {
+    "uuid": "EF5616FD-9AFD-4668-B8D0-943E7FDFB625",
+    "burst_start": "2021-05-15 16:53:32",
+    "burst_count": 54,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/EF5616FD_2021-05-15_16-53-32.jpg"
+  },
+  {
+    "uuid": "91F173FB-401F-4F9B-AE49-EBA8B32F31C4",
+    "burst_start": "2021-01-15 22:14:51",
+    "burst_count": 53,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/91F173FB_2021-01-15_22-14-51.jpg"
+  },
+  {
+    "uuid": "7E8789A2-17A6-462E-AEAE-8DBCC7AAFF4F",
+    "burst_start": "2018-02-28 14:50:58",
+    "burst_count": 50,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/7E8789A2_2018-02-28_14-50-58.jpg"
+  },
+  {
+    "uuid": "8F1FB8C8-581A-4C01-B780-D0887A0E8221",
+    "burst_start": "2022-06-16 17:18:39",
+    "burst_count": 49,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/8F1FB8C8_2022-06-16_17-18-39.jpg"
+  },
+  {
+    "uuid": "DA9954FA-F502-4903-A54A-026F91966CFC",
+    "burst_start": "2019-10-07 22:44:06",
+    "burst_count": 48,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/DA9954FA_2019-10-07_22-44-06.jpg"
+  },
+  {
+    "uuid": "9B120B09-226A-4F95-AA4A-5B191FAF4967",
+    "burst_start": "2021-12-24 02:16:20",
+    "burst_count": 48,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/9B120B09_2021-12-24_02-16-20.jpg"
+  },
+  {
+    "uuid": "50443191-1427-44D6-B982-691A32F79CBE",
+    "burst_start": "2021-01-05 20:31:12",
+    "burst_count": 47,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/50443191_2021-01-05_20-31-12.jpg"
+  },
+  {
+    "uuid": "4051E404-619B-4ED5-BF81-A7B93AD97C39",
+    "burst_start": "2021-09-23 21:03:49",
+    "burst_count": 46,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/4051E404_2021-09-23_21-03-49.jpg"
+  },
+  {
+    "uuid": "70C56901-C9D8-4245-886A-5B3A9B715052",
+    "burst_start": "2020-01-04 16:44:27",
+    "burst_count": 45,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/70C56901_2020-01-04_16-44-27.jpg"
+  },
+  {
+    "uuid": "B9CE6BCA-1B84-4815-8B16-CAE26525D78B",
+    "burst_start": "2021-02-21 19:13:26",
+    "burst_count": 44,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/B9CE6BCA_2021-02-21_19-13-26.jpg"
+  },
+  {
+    "uuid": "6EECD396-F9BB-405A-B13B-C5D8D660B503",
+    "burst_start": "2019-04-28 21:50:55",
+    "burst_count": 43,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/6EECD396_2019-04-28_21-50-55.jpg"
+  },
+  {
+    "uuid": "1D92525C-3D26-4468-8F46-898845FC1100",
+    "burst_start": "2020-03-26 21:02:29",
+    "burst_count": 43,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/1D92525C_2020-03-26_21-02-29.jpg"
+  },
+  {
+    "uuid": "03EE9E32-756B-44D9-8F71-6B8D746265E0",
+    "burst_start": "2020-04-01 22:53:31",
+    "burst_count": 43,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/03EE9E32_2020-04-01_22-53-31.jpg"
+  },
+  {
+    "uuid": "2DC83DDA-8BD1-4B80-A3B8-6297D8166D52",
+    "burst_start": "2021-05-15 01:22:10",
+    "burst_count": 42,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/2DC83DDA_2021-05-15_01-22-10.jpg"
+  },
+  {
+    "uuid": "8F362263-64EF-427D-A6AB-930DBD734127",
+    "burst_start": "2022-03-06 18:49:55",
+    "burst_count": 42,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/8F362263_2022-03-06_18-49-55.jpg"
+  },
+  {
+    "uuid": "7CCC1640-7281-4914-995C-318A515712EB",
+    "burst_start": "2019-09-25 02:34:01",
+    "burst_count": 41,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/7CCC1640_2019-09-25_02-34-01.jpg"
+  },
+  {
+    "uuid": "66B8929C-39C6-407B-ABC0-B7D541E39367",
+    "burst_start": "2019-11-23 16:58:40",
+    "burst_count": 41,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/66B8929C_2019-11-23_16-58-40.jpg"
+  },
+  {
+    "uuid": "B9A4810C-2437-404E-A7DD-A39907079FE6",
+    "burst_start": "2019-09-02 21:34:33",
+    "burst_count": 40,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/B9A4810C_2019-09-02_21-34-33.jpg"
+  },
+  {
+    "uuid": "469593FE-F052-40B1-AD14-24DFC489C859",
+    "burst_start": "2021-07-01 22:56:27",
+    "burst_count": 40,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/469593FE_2021-07-01_22-56-27.jpg"
+  },
+  {
+    "uuid": "BA46AC18-113C-4921-8BB3-805997733ED1",
+    "burst_start": "2021-11-07 22:56:43",
+    "burst_count": 40,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/BA46AC18_2021-11-07_22-56-43.jpg"
+  },
+  {
+    "uuid": "E3664C31-37B7-430C-975F-1F4430F96F38",
+    "burst_start": "2020-02-28 18:40:52",
+    "burst_count": 38,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/E3664C31_2020-02-28_18-40-52.jpg"
+  },
+  {
+    "uuid": "11BBA7F6-8B29-4C71-B739-FB3AFACA471C",
+    "burst_start": "2022-03-03 01:42:39",
+    "burst_count": 38,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/11BBA7F6_2022-03-03_01-42-39.jpg"
+  },
+  {
+    "uuid": "F82AEC4E-7F8D-4797-B847-8718C586633F",
+    "burst_start": "2018-02-01 17:06:26",
+    "burst_count": 37,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/F82AEC4E_2018-02-01_17-06-26.jpg"
+  },
+  {
+    "uuid": "81884262-10D3-470B-B92B-8C852D38FC60",
+    "burst_start": "2022-06-07 12:47:51",
+    "burst_count": 37,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/81884262_2022-06-07_12-47-51.jpg"
+  },
+  {
+    "uuid": "D242AF6B-98D4-4836-8848-7F01AD0759E5",
+    "burst_start": "2018-10-16 20:10:36",
+    "burst_count": 36,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/D242AF6B_2018-10-16_20-10-36.jpg"
+  },
+  {
+    "uuid": "50F9FD82-9C22-4CE0-AA26-5B9401B8E14A",
+    "burst_start": "2020-04-11 23:51:33",
+    "burst_count": 36,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/50F9FD82_2020-04-11_23-51-33.jpg"
+  },
+  {
+    "uuid": "46B79103-AD55-4097-821D-BA67EB0D554A",
+    "burst_start": "2022-10-07 15:54:56",
+    "burst_count": 36,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/46B79103_2022-10-07_15-54-56.jpg"
+  },
+  {
+    "uuid": "2607E396-7A10-4653-A17A-C3696971D110",
+    "burst_start": "2018-10-26 23:45:19",
+    "burst_count": 35,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/2607E396_2018-10-26_23-45-19.jpg"
+  },
+  {
+    "uuid": "F11B8B65-F599-4857-BEF4-656234856C4E",
+    "burst_start": "2019-07-14 05:49:35",
+    "burst_count": 35,
+    "path": "/Users/skylar/nuke/.context/d150_early_sweep/F11B8B65_2019-07-14_05-49-35.jpg"
+  }
+]

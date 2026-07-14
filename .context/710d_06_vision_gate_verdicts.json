@@ -1,0 +1,389 @@
+[
+  {
+    "order": 0,
+    "image_id": "874d1038-238d-446c-bf88-8a90ef256f92",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/000_874d1038.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Engine bay close-up of harness, relay, MaxiFuse, split-loom conduit on textured cream/white firewall. Consistent with Bronco build photography.",
+    "paperwork": null
+  },
+  {
+    "order": 1,
+    "image_id": "f6445367-98af-439e-8202-8026d232632a",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/001_f6445367.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Engine bay shot showing '351 POWERED BY FORD' valve cover - exact match for vehicle's 351W spec. White inner fenders consistent with Early Bronco engine bay.",
+    "paperwork": "351 Powered by Ford valve cover badge"
+  },
+  {
+    "order": 2,
+    "image_id": "89b71f12-35df-43d5-83b3-164718da5d49",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/002_89b71f12.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Detail of black-painted body bracket against gray carpet floor in shop. Build documentation, no disqualifying features.",
+    "paperwork": null
+  },
+  {
+    "order": 3,
+    "image_id": "bea79223-ee30-430f-9f5c-a483dff6c359",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/003_bea79223.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine bay detail - serpentine belt, hose, blue powdercoat bracket visible. Blue powdercoat matches vehicle profile.",
+    "paperwork": null
+  },
+  {
+    "order": 4,
+    "image_id": "5f0937de-abe1-46e6-ae3e-e44ee8d15adf",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/004_5f0937de.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine front - serpentine belt, AC compressor, alternator pulleys. Consistent with Bronco's 351W front dress.",
+    "paperwork": null
+  },
+  {
+    "order": 5,
+    "image_id": "ae37144a-5cb3-411e-8be6-1afefb90058a",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/005_ae37144a.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "'351 POWERED BY FORD' valve cover prominent, carb/intake detail, blue spark plug wires. Direct match to Bronco's 351W engine.",
+    "paperwork": "351 Powered by Ford valve cover badge"
+  },
+  {
+    "order": 6,
+    "image_id": "b465ebd6-9762-4ab8-a1a3-e6cc22a9c832",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/006_b465ebd6.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "White-painted body sheetmetal panel (looks like dash/cluster bezel) on shop floor. Build component, color matches Bronco cream/tan body.",
+    "paperwork": null
+  },
+  {
+    "order": 7,
+    "image_id": "618cc2aa-5bf7-4069-b172-9a1f33655928",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/007_618cc2aa.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Polished aluminum 3-spoke steering wheel hub on workbench. Build part, no disqualifying features.",
+    "paperwork": null
+  },
+  {
+    "order": 8,
+    "image_id": "2fc4de71-776f-4965-a18a-a5cc784145f1",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/008_2fc4de71.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Multi-pin electrical connector (likely fuse block/headlight switch) being held. Build component for Bronco wiring work.",
+    "paperwork": null
+  },
+  {
+    "order": 9,
+    "image_id": "474efded-6a0d-45b3-8711-54355562a8e7",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/009_474efded.jpg",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Painless Wiring 'GM CONVERSION KIT' part #30806 in retail packaging. Product is GM-specific, not Ford/Bronco. May be misattributed OR generic terminal kit being used in Bronco wiring. Flag for review.",
+    "paperwork": "Painless Performance Wiring Accessories - GM Conversion Kit, P/N 30806, UPC 7-46623-30806-0"
+  },
+  {
+    "order": 10,
+    "image_id": "d9116352-7e8a-4704-988d-d73c0eb824d5",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/010_d9116352.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Multi-pin connector being held over harness wire mess. Build component for wiring work.",
+    "paperwork": null
+  },
+  {
+    "order": 11,
+    "image_id": "7a92a07e-a31f-46ac-aef7-0b254494c031",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/011_7a92a07e.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Two headlight switches and choke/handle bezels on workbench. Generic restoration parts, no disqualifying features. Painless packaging visible upper-left.",
+    "paperwork": null
+  },
+  {
+    "order": 12,
+    "image_id": "c4d3bff7-baee-4af0-a59f-daf31ea23bdb",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/012_c4d3bff7.jpg",
+    "verdict": "approved",
+    "confidence": 0.6,
+    "reasoning": "Auto glass with ANSI Z97.1-2009 / DOT marking, FGC marking, partial '120-H-II' visible. Likely Bronco windshield or side glass being prepped.",
+    "paperwork": "Auto glass safety markings: ANSI Z97.1-2009, FGC, 120-H-II"
+  },
+  {
+    "order": 13,
+    "image_id": "3552da4f-cba1-4d41-8ded-f2e320e7559f",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/013_3552da4f.jpg",
+    "verdict": "approved",
+    "confidence": 0.55,
+    "reasoning": "Close-up of auto glass with protective film and channel/weatherstrip. Build part for Bronco, low specificity but consistent.",
+    "paperwork": null
+  },
+  {
+    "order": 14,
+    "image_id": "272ef341-6a70-4cc2-a841-03a5d4989049",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/014_272ef341.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Door window channels/runs and a coil of bulb weatherstrip on workbench. Restoration parts.",
+    "paperwork": null
+  },
+  {
+    "order": 15,
+    "image_id": "e4e134fa-7435-4957-b8e5-b6b72902cc93",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/015_e4e134fa.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Door window glass with run channel laid on workbench, 3M Strip-Calk box visible. Bronco glass install prep.",
+    "paperwork": "3M Strip-Calk product visible"
+  },
+  {
+    "order": 16,
+    "image_id": "29801b66-725a-4271-a98f-174b5c2ec8c9",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/016_29801b66.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Inside-door view showing window regulator gear and channel against textured tan body. Bronco door internals.",
+    "paperwork": null
+  },
+  {
+    "order": 17,
+    "image_id": "4f5f2449-72cd-4566-8a15-850980850d95",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/017_4f5f2449.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "HERO SHOT: Early Bronco with tan/cream body, tan diamond-stitch leather front buckets, integrated white roll cage, vintage side mirror. Exact match to vehicle profile.",
+    "paperwork": null
+  },
+  {
+    "order": 19,
+    "image_id": "bf05af71-efdd-4ae9-a42b-7b1e5c0b331f",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/019_bf05af71.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Rampage Products instructions for 'BRONCO ZIPPER FASTBACK TOP, Part #984xx, BRONCO 1966-1977'. Direct paperwork match to Early Bronco 1966-77.",
+    "paperwork": "Rampage Products Bronco Zipper Fastback Top installation instructions, Part #984xx, Bronco 1966-1977"
+  },
+  {
+    "order": 20,
+    "image_id": "82dfc9de-3f0f-46c1-b03f-1b130e199247",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/020_82dfc9de.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "White-painted body panel detail in foreground, tan diamond-stitch leather seats visible behind. Bronco interior.",
+    "paperwork": null
+  },
+  {
+    "order": 21,
+    "image_id": "2a32e1a4-5d57-48a5-8110-bdac423855f4",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/021_2a32e1a4.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Cream body Bronco from upper rear-quarter angle showing rear-roof / tailgate area and LED light bar, hand on grab handle. Workshop ceiling.",
+    "paperwork": null
+  },
+  {
+    "order": 22,
+    "image_id": "586be21a-0ac7-4a2d-b818-ed7ca9193dec",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/022_586be21a.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "White-painted body panel detail with tan diamond-stitch seats visible in background. Matches Bronco interior precisely.",
+    "paperwork": null
+  },
+  {
+    "order": 23,
+    "image_id": "f9518270-ada8-4021-bebc-2bbe0b52d375",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/023_f9518270.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Steering column/u-joint/shifter mount and a vintage red-piped seat back/cushion being restored on workbench. Restoration work.",
+    "paperwork": null
+  },
+  {
+    "order": 24,
+    "image_id": "7b6d095b-1da6-4864-a810-414dcf6e74a0",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/024_7b6d095b.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Door window frame assemblies, weatherstrip, hardware kit, and aluminum brackets laid out on workbench. Bronco door rebuild.",
+    "paperwork": null
+  },
+  {
+    "order": 25,
+    "image_id": "a1744e0a-e126-4de5-842f-b3dbfa0548f3",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/025_a1744e0a.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Window glass, door frame channels, and weatherstrip seals laid out for assembly. Bronco glass/door work.",
+    "paperwork": null
+  },
+  {
+    "order": 26,
+    "image_id": "fbf46ff5-ba90-4545-9fc5-d70ecda04ae8",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/026_fbf46ff5.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Holley Sniper EFI 'SYSTEM INSTALLATION OVERVIEW' diagram - tech support 1-866-464-6553. Build documentation for engine work on Bronco's 351W (Sniper EFI is a common upgrade).",
+    "paperwork": "Holley Sniper EFI System Installation Overview diagram - 3.5-inch display, 12V battery, fuel pump, ignition switch wiring"
+  },
+  {
+    "order": 27,
+    "image_id": "1016cf76-eb42-426c-8cf5-cbaf611a8e8d",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/027_1016cf76.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "HERO: Early Bronco rotated view - cream/tan body, vintage Ford grille, round headlight, tan seats with roll cage. Exact vehicle.",
+    "paperwork": null
+  },
+  {
+    "order": 28,
+    "image_id": "1eb1f6ae-6c0d-400c-89ac-166104992a2e",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/028_1eb1f6ae.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Hand-drawn 'UPPER RADIATOR BRACKETS' diagram on AWI Supply (Hot Springs/Benton, AR) notepad - 2 3/4\" dimension, cut-through and slice slot annotations. Build fabrication notes.",
+    "paperwork": "AWI Supply (Arkansas) notepad - hand-drawn Upper Radiator Brackets fabrication sketch with dimensions"
+  },
+  {
+    "order": 29,
+    "image_id": "334e9ada-5d32-41d4-b800-dfbff727b62c",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/029_334e9ada.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "'Ford AOD Hi-Tech Kickdown Kit Installation Instructions' (Lokar) - Ford AOD transmission specific paperwork. Common for early Bronco builds running Ford auto trans.",
+    "paperwork": "Lokar Ford AOD Hi-Tech Kickdown Kit installation instructions, Fig. 8"
+  },
+  {
+    "order": 30,
+    "image_id": "3b5bc04a-3697-43d8-b841-871e1a3fdad5",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/030_3b5bc04a.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Vintage Air packing list - 'Streamline 3-Knob Horizontal Wide Control Panel (Black Anodized)' P/N 491253 + Universal Control Harness 232007-VUR. Build paperwork for AC installation.",
+    "paperwork": "Vintage Air packing list - Streamline 3-Knob Horizontal Wide Control Panel P/N 491253, Universal Control Harness P/N 232007-VUR"
+  },
+  {
+    "order": 31,
+    "image_id": "197b08e6-7509-402f-bee7-ba22ee2a54f1",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/031_197b08e6.jpg",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Red leather strip with white stitching and white/gray leather scraps on bench. Could be upholstery samples but vehicle has TAN diamond-stitch interior, not red. May be from a different project (e.g., Mustang or other vehicle) or upholstery scrap/sample. Flag for review.",
+    "paperwork": null
+  },
+  {
+    "order": 32,
+    "image_id": "fb6262ca-8471-412d-8df1-d7b8a23eb163",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/032_fb6262ca.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Workshop wide shot (rotated 90deg) - cream Early Bronco front 3/4 visible, parts bins, workbench. Bronco in build context.",
+    "paperwork": null
+  },
+  {
+    "order": 33,
+    "image_id": "2e52ee8d-1a22-4e9f-9df7-46995206c3b1",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/033_2e52ee8d.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "HERO workshop shot - cream/tan Early Bronco front 3/4 with vintage Ford grille, round headlights, tan diamond-stitch buckets, roll cage. Trophy truck visible in background (unrelated workshop). Subject is the Bronco.",
+    "paperwork": null
+  },
+  {
+    "order": 34,
+    "image_id": "e488c075-2805-4315-9287-3ec8baf17669",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/034_e488c075.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Close-up of Lokar Kickdown Kit instruction diagram (same documentation as #029). Build paperwork.",
+    "paperwork": "Lokar Kickdown Kit instruction diagram close-up - Carburetor base, kickdown mounting bracket, Lokar throttle cable"
+  },
+  {
+    "order": 35,
+    "image_id": "896bf3cf-7056-4445-92ef-750422c3ee87",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/035_896bf3cf.jpg",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Dana/Spicer transfer case ID tag on red-painted housing. SERIAL 102206-90, B/M 300687-3, Dana Corporation patents 2425304/2433841/2595209/3048607. Almost certainly Dana 20 transfer case - factory fitment in 1966-1977 Bronco. Paperwork/tag evidence.",
+    "paperwork": "Dana/Spicer transfer case ID plate - SERIAL 102206-90, B/M 300687-3, Dana patents listed (likely Dana 20)"
+  },
+  {
+    "order": 36,
+    "image_id": "83872392-081c-47fd-b69b-3adfb645b4e5",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/036_83872392.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Red-painted Dana transfer case output shaft (splined) with seal and ID tag visible. Bronco drivetrain detail.",
+    "paperwork": null
+  },
+  {
+    "order": 38,
+    "image_id": "b1b57dfe-a38c-4a8c-9af3-7433efc8ed7e",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/038_b1b57dfe.jpg",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Dakota Digital speed sensor installed on red-painted Dana transfer case. Cast number '29' visible. Drivetrain detail consistent with restomod Bronco.",
+    "paperwork": "Dakota Digital labeled sensor; cast number '29' on transfer case"
+  },
+  {
+    "order": 39,
+    "image_id": "4a04504e-4adc-4f68-a741-bc8074618531",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/039_4a04504e.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Workshop scene (rotated 90deg) - cream Bronco with hood up visible, race truck in foreground. Subject is the Bronco in workshop context.",
+    "paperwork": null
+  },
+  {
+    "order": 40,
+    "image_id": "8e56aece-a949-46db-8da3-e91f39c7445d",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/040_8e56aece.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Workshop scene (rotated 90deg) - cream Early Bronco front-end with grille visible. Workshop build context.",
+    "paperwork": null
+  },
+  {
+    "order": 41,
+    "image_id": "64dea126-31c2-4bbb-8bca-249bdb44659c",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/041_64dea126.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Engine bay detail showing '351 POWERED BY FORD' valve cover, steering column u-joint, gas strut, white firewall. Direct match to Bronco 351W.",
+    "paperwork": "351 Powered by Ford valve cover badge"
+  },
+  {
+    "order": 42,
+    "image_id": "1a00ea8e-ae66-49b1-8365-7a2f7ee84080",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/042_1a00ea8e.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Engine bay - power brake booster and master cylinder mounted on firewall, '351 POWERED BY FORD' valve cover visible. Bronco engine bay.",
+    "paperwork": "351 Powered by Ford valve cover badge"
+  },
+  {
+    "order": 43,
+    "image_id": "cd99cdd7-39c1-4898-be1f-7974520d8150",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/043_cd99cdd7.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underside view showing aluminum tie-rod / drag link mounted to red painted axle housing with blue intake/cover visible. Wild Horses-style suspension/steering hardware consistent with Bronco build.",
+    "paperwork": null
+  },
+  {
+    "order": 44,
+    "image_id": "cb232655-178d-4c77-9b30-0911373c6a59",
+    "path": "/Users/skylar/nuke/.context/710d_06_vision_gate/044_cb232655.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "HERO: White/cream Bronco with 'BRONCO' badge in grille, round headlights, off-road tires, hood open. Tie rods/steering linkage on workbench in foreground. Direct vehicle match.",
+    "paperwork": "Ford BRONCO grille badge visible"
+  }
+]

@@ -1,0 +1,236 @@
+[
+  {
+    "uuid": "64AE7449-FB2E-4926-90FF-509DF28F99E7",
+    "observed_at": "2022-05-18T20:16:08Z",
+    "kind": "condition",
+    "summary": "Driver-side body shot — turquoise paint, original side trim/rocker, lower fender row of small holes (likely badge/emblem mounting holes), surface contamination but body looks solid.",
+    "extracted_data": {
+      "work_type": "condition_documentation",
+      "components_visible": ["driver_side_door", "rocker_panel", "side_trim", "fender", "wheel_wagon_wheel_style"],
+      "exterior_color": "turquoise_blue",
+      "notes": "row of small holes on lower rear door/quarter; original chrome rocker trim intact"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid": "18E25495-9BE4-44CC-84BC-BD2C492AC2F8",
+    "observed_at": "2022-05-18T20:16:39Z",
+    "kind": "specification",
+    "summary": "Engine bay shot — original Ford 289 V8 (Ford Blue paint, MUSTANG-stamped valve cover), chrome air cleaner, distributor + plug wires installed, drivable as-is.",
+    "extracted_data": {
+      "work_type": "factory_drivetrain_documentation",
+      "components_visible": ["ford_289_v8", "chrome_air_cleaner", "mustang_valve_cover", "distributor", "plug_wires", "carburetor", "exhaust_manifold", "power_steering_pump_absent"],
+      "engine": "Ford 289 V8 (factory)",
+      "engine_paint": "Ford blue",
+      "notes": "Factory-original drivetrain still in place. NOT a Coyote/LS swap — this is the original 289 the car was bought with."
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid": "177BAF80-865D-48B4-A141-7961BF0BD16D",
+    "observed_at": "2022-05-18T20:15:29Z",
+    "kind": "sighting",
+    "summary": "Three-quarter rear shot in front of garage, Utah plate 04AP4 visible. Mustang next to another vehicle (a green/teal Ford LTD or similar). Car is drivable and parked at a residence.",
+    "extracted_data": {
+      "work_type": "vehicle_arrival_or_storage",
+      "components_visible": ["rear_quarter", "taillights_original", "rear_bumper_chrome", "trunk_lid", "styled_steel_wheels"],
+      "license_plate": "Utah 04AP4",
+      "location_context": "residential_driveway"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid": "80D27414-A7BA-4177-90DD-D99A95004A8E",
+    "observed_at": "2022-10-12T20:42:55Z",
+    "kind": "media",
+    "summary": "Screenshot of a BLACK 1966 Mustang coupe on a checkerboard showroom floor — clearly NOT Skylar's turquoise car. Likely a dealer/listing reference photo for color/styling comparison or inspiration.",
+    "extracted_data": {
+      "work_type": "research_reference",
+      "components_visible": ["1966_mustang_coupe_black", "magnum_500_style_wheels", "cooper_cobra_radial_gt_tires"],
+      "notes": "Reference image of a different 1966 Mustang — likely saved for color/wheel/trim inspiration."
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid": "E0376EC1-DAFA-4ADB-9C53-4DCD49F17430",
+    "observed_at": "2022-10-12T20:43:12Z",
+    "kind": "media",
+    "summary": "Screenshot of another BLACK 1966 Mustang coupe (UK-looking environment, hedge gate). Same day as 80D27414, also a reference image — looks like a YouTube video frame.",
+    "extracted_data": {
+      "work_type": "research_reference",
+      "components_visible": ["1966_mustang_coupe_black", "magnum_500_wheels", "hood_scoop_or_decal", "GT_style_trim"],
+      "notes": "Second reference image of a black 1966 — likely Skylar researching black paint conversion or styling cues. Has 'MUSTANG' fender script and 289 badge."
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid": "31E5E8F0-EABE-4DF3-B837-44C2E175B516",
+    "observed_at": "2024-03-08T23:07:02Z",
+    "kind": "work_record",
+    "summary": "Advance Auto Parts order confirmation — Order #377508419 placed 03/08/2024, $30.58 total ($19.92 items + $1.67 tax + $8.99 shipping). 8 items, same-day home delivery to 676 Wells Road, Boulder City NV.",
+    "extracted_data": {
+      "work_type": "parts_purchase",
+      "vendor": "Advance Auto Parts",
+      "order_number": "377508419",
+      "order_date": "2024-03-08",
+      "amount_usd": 30.58,
+      "items_subtotal_usd": 19.92,
+      "tax_usd": 1.67,
+      "shipping_usd": 8.99,
+      "item_count": 8,
+      "ship_to": "676 Wells Road, Boulder City, NV"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid": "F006F76B-44C2-4C61-BD24-DBFD6D76B996",
+    "observed_at": "2024-03-08T17:22:25Z",
+    "kind": "work_record",
+    "summary": "Email/receipt for interior restoration parts shipment #W25480788 to Skylar Williams, 674 Wells Rd, Boulder City NV. Items: PONY seat foam ($57.99), 16 ft black windlace ($24.99), 2x Pony/67 Deluxe black door cups ($30.94 total), trunk filler board ($9.99). Vendor appears to be a classic Mustang restoration parts supplier (CJ Pony Parts or NPD-style).",
+    "extracted_data": {
+      "work_type": "interior_parts_purchase",
+      "shipment_number": "W25480788",
+      "purchase_date_approx": "2024-03-08",
+      "ship_to": "674 Wells Rd, Boulder City, NV 89005-1717",
+      "phone_on_invoice": "(702) 624-6793",
+      "line_items": [
+        {"part_number": "SF53", "description": "1965-1966 Pony seat foam with listing wire", "qty": 1, "unit_usd": 57.99, "ext_usd": 57.99},
+        {"part_number": "WL1B20", "description": "16 feet black windlace", "qty": 1, "unit_usd": 24.99, "ext_usd": 24.99},
+        {"part_number": "HW1493", "description": "65-66 Pony/67 Deluxe black door cup", "qty": 2, "unit_usd": 15.47, "ext_usd": 30.94},
+        {"description": "1965-1966 trunk filler board", "qty": 1, "unit_usd": 9.99, "ext_usd": 9.99}
+      ],
+      "amount_usd_partial": 123.91,
+      "notes": "Interior restoration order — seat foam, door weatherstrip seal, door panel cups, trunk board. Likely part of a larger order; bottom of invoice not visible."
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid": "15FDDAD0-075E-4BD7-AE56-D38D8811DB54",
+    "observed_at": "2024-07-13T01:53:18Z",
+    "kind": "media",
+    "summary": "Screenshot of stuttcars.com article on '1968 Porsche 8-digit VIN' decoding. Has nothing to do with the Mustang — wrong attribution. Likely a Porsche research session.",
+    "extracted_data": {
+      "work_type": "wrong_attribution",
+      "actual_topic": "1968_porsche_vin_decoding",
+      "notes": "Not a Mustang photo. Belongs with Porsche-related research, not vehicle 83f6f033."
+    },
+    "confidence": "low"
+  },
+  {
+    "uuid": "93590215-00BF-44AB-8A86-738F5A471A94",
+    "observed_at": "2022-05-17T21:57:03Z",
+    "kind": "specification",
+    "summary": "KSL.com listing interior photo — original turquoise/blue interior, wood-rim steering wheel, factory dash with Rally-Pac-style gauges, 2-tone blue seats with cream inserts, bench-style rear, console. Yellow upholstery showing through holes/tears.",
+    "extracted_data": {
+      "work_type": "pre_purchase_condition_evidence",
+      "source": "KSL.com classified",
+      "components_visible": ["interior_dash", "wood_steering_wheel", "gauge_cluster", "blue_vinyl_seats", "rear_bench", "center_console", "interior_blue_paint"],
+      "interior_color": "blue",
+      "condition": "poor — seats torn, foam exposed",
+      "notes": "Documents pre-restoration interior — explains the 2024 interior parts purchases (seat foam, windlace, door cups)."
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid": "6DD3AECA-1D4F-4703-B2B0-A7838A4F449F",
+    "observed_at": "2022-05-17T21:57:00Z",
+    "kind": "specification",
+    "summary": "KSL.com listing front-3/4 exterior photo — 1966 Mustang coupe, turquoise, original chrome grille with running pony emblem, Utah plate 04AP4. Mountains in background (Wasatch front).",
+    "extracted_data": {
+      "work_type": "pre_purchase_listing_photo",
+      "source": "KSL.com classified",
+      "components_visible": ["front_grille", "pony_emblem", "headlights", "front_bumper", "hood", "fenders"],
+      "license_plate": "Utah 04AP4",
+      "notes": "Pre-purchase listing photo. KSL.com shows '1966 Ford Mustang' with 130 views, 7 favorites."
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid": "01AC0308-25D3-473E-9E19-ECDDFCC24760",
+    "observed_at": "2022-05-17T21:57:18Z",
+    "kind": "specification",
+    "summary": "KSL.com listing SPECIFICATIONS panel — VIN 6F07C219593 confirmed, 109,000 miles, Exterior Condition: Fair, Interior Condition: Poor, Title Type: Clean, Drive: RWD, Color: Blue/Blue, Clean Title.",
+    "extracted_data": {
+      "work_type": "acquisition_listing_specs",
+      "source": "KSL.com classified",
+      "vin": "6F07C219593",
+      "mileage": 109000,
+      "exterior_color": "Blue",
+      "interior_color": "Blue",
+      "exterior_condition": "Fair",
+      "interior_condition": "Poor",
+      "title_type": "Clean Title",
+      "drive_type": "RWD",
+      "notes": "Confirms VIN matches DB record (vehicle_id 83f6f033). Mileage at acquisition = 109,000."
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid": "400CFC79-8C80-495B-8296-24DCD434BF19",
+    "observed_at": "2022-05-17T21:56:53Z",
+    "kind": "specification",
+    "summary": "KSL.com listing rear-3/4 photo — turquoise Mustang from rear, Utah plate 04AP4, red sedan parked behind on residential street.",
+    "extracted_data": {
+      "work_type": "pre_purchase_listing_photo",
+      "source": "KSL.com classified",
+      "components_visible": ["rear_quarter", "taillights", "trunk", "rear_bumper", "styled_wheels"],
+      "license_plate": "Utah 04AP4"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid": "2882074B-AC6D-4313-8A4B-75DD5EE1B868",
+    "observed_at": "2022-05-17T21:56:55Z",
+    "kind": "specification",
+    "summary": "KSL.com listing direct rear photo — turquoise Mustang, Utah plate 04AP4, parked on suburban street with white sedan visible behind.",
+    "extracted_data": {
+      "work_type": "pre_purchase_listing_photo",
+      "source": "KSL.com classified",
+      "components_visible": ["rear_panel", "taillights", "rear_bumper", "trunk_lid", "license_plate_area"],
+      "license_plate": "Utah 04AP4"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid": "F4195DBF-826E-478C-90BE-449FC95DEBFD",
+    "observed_at": "2022-05-17T21:56:58Z",
+    "kind": "specification",
+    "summary": "KSL.com listing — same rear photo as 2882074B (duplicate from carousel navigation).",
+    "extracted_data": {
+      "work_type": "pre_purchase_listing_photo_duplicate",
+      "source": "KSL.com classified",
+      "license_plate": "Utah 04AP4",
+      "notes": "Duplicate of 2882074B — different carousel position."
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid": "14578DE5-183B-4531-862F-419DC34484DB",
+    "observed_at": "2022-05-17T21:57:09Z",
+    "kind": "specification",
+    "summary": "KSL.com listing DESCRIPTION text — seller writes: 'Super cool car with a lot of funny stories. It simply needs a better home. I actually got this from the original family that bought it new after growing up seeing it at their house. It's probably the car that got me into cars. I drive it to work sometimes, it does start right up and drives but I have so many cars I can't give it the love and real attention and work it does need, it is indeed a project and needs and deserves a restoration. It's still all stock with the a 289 and C4 transmission.'",
+    "extracted_data": {
+      "work_type": "acquisition_provenance",
+      "source": "KSL.com classified seller description",
+      "provenance_claim": "Acquired from original family that bought it new",
+      "running_condition": "Drives, starts right up",
+      "drivetrain_claim": "All stock — 289 V8 + C4 automatic transmission",
+      "seller_intent": "Project car / needs restoration",
+      "notes": "CRITICAL provenance: seller acquired from original family. This establishes provenance chain. Drivetrain confirmed: factory 289 + C4 auto (no LS/Coyote swap)."
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid": "A5EF577C-3287-49E4-813D-06823E34A233",
+    "observed_at": "2022-10-11T16:40:41Z",
+    "kind": "media",
+    "summary": "Mecum Auctions screenshot — 1987 GMC Sierra 1500 pickup, Lot F222, Orlando 2022 (July 6-9), 5.7L automatic, white/red interior, lifted on mud tires, HIGH BID $26,500. NOT a Mustang — wrong attribution.",
+    "extracted_data": {
+      "work_type": "wrong_attribution",
+      "actual_topic": "1987_gmc_sierra_1500_mecum_lot_F222",
+      "actual_vehicle": "1987 GMC Sierra 1500 pickup, 5.7L, white",
+      "notes": "Not a Mustang photo. Belongs with K10/K20/K30 GMC research, not vehicle 83f6f033. Likely Skylar researching square-body pricing."
+    },
+    "confidence": "low"
+  }
+]

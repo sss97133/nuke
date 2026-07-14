@@ -1,0 +1,110 @@
+[
+  {
+    "date": "2026-05-02T05:15:39",
+    "addr": "marketing@email.wildhorses4x4.com",
+    "subj": "Cold Air. No Waiting. Your Bronco\u2019s Ready for It.",
+    "matched": "old air"
+  },
+  {
+    "date": "2025-12-09T17:02:32",
+    "addr": "jegs@e.jegs.com",
+    "subj": "Shop Top Performance Parts: SPAL Fans, QA1 Coilovers & More",
+    "matched": "spal"
+  },
+  {
+    "date": "2024-11-02T07:58:47",
+    "addr": "cjautomotive@mktg.cjponyparts.com",
+    "subj": "A/C Upgrades from Old Air Products!",
+    "matched": "old air"
+  },
+  {
+    "date": "2024-10-31T16:30:19",
+    "addr": "jegs@e.jegs.com",
+    "subj": "Shop Your Next Upgrade From: CSF, Mr. Gasket, SPAL",
+    "matched": "spal"
+  },
+  {
+    "date": "2023-11-09T19:27:24",
+    "addr": "shipment-tracking@amazon.com",
+    "subj": "Your Amazon.com order of \"ICT Billet SBC Vehicle to...\" and 1 more item has shipped!",
+    "matched": "ict billet"
+  },
+  {
+    "date": "2023-07-01T07:06:25",
+    "addr": "motorlife@holley.com",
+    "subj": "COLD AIR INTAKES: Grant Your Ride Airflow Freedom",
+    "matched": "old air"
+  },
+  {
+    "date": "2018-11-24T21:03:57",
+    "addr": "vfe-campaign-response@amazon.com",
+    "subj": "Skylar J. Williams :'MASTERCOOL 72475-PRC Blue and...' and more",
+    "matched": "mastercool"
+  },
+  {
+    "date": "2018-08-11T15:36:06",
+    "addr": "vfe-campaign-response@amazon.com",
+    "subj": "MASTERCOOL (71300 Black Push...",
+    "matched": "mastercool"
+  },
+  {
+    "date": "2018-07-20T14:56:17",
+    "addr": "vfe-campaign-response@amazon.com",
+    "subj": "Mastercool 70027 Mini Tube...",
+    "matched": "mastercool"
+  },
+  {
+    "date": "2018-07-17T12:44:56",
+    "addr": "vfe-campaign-response@amazon.com",
+    "subj": "Mastercool (71300) Black Push...",
+    "matched": "mastercool"
+  },
+  {
+    "date": "2018-07-16T20:45:01",
+    "addr": "shipment-tracking@amazon.com",
+    "subj": "Your Amazon.com order of \"MASTERCOOL 3/16 DOUBLE...\" has shipped!",
+    "matched": "mastercool"
+  },
+  {
+    "date": "2018-07-13T23:58:22",
+    "addr": "shipment-tracking@amazon.com",
+    "subj": "Your Amazon.com order of \"Mastercool 71097-03 Adapter\" has shipped!",
+    "matched": "mastercool"
+  },
+  {
+    "date": "2018-07-13T16:07:00",
+    "addr": "auto-confirm@amazon.com",
+    "subj": "Your Amazon.com order of MASTERCOOL 3/16 DOUBLE... and 2 more items.",
+    "matched": "mastercool"
+  },
+  {
+    "date": "2018-07-11T13:49:05",
+    "addr": "shipment-tracking@amazon.com",
+    "subj": "Your Amazon.com order of \"Mastercool (71700) Black...\" has shipped!",
+    "matched": "mastercool"
+  },
+  {
+    "date": "2018-07-10T12:10:08",
+    "addr": "auto-confirm@amazon.com",
+    "subj": "Your Amazon.com order of \"Mastercool (71700) Black...\".",
+    "matched": "mastercool"
+  },
+  {
+    "date": "2013-08-05T10:50:08",
+    "addr": "news@kayak.com",
+    "subj": "Alert: European Escapes Incl. Tuscany Estate Vacation, Ireland  Four Seasons Getaway & more",
+    "matched": "four seasons"
+  },
+  {
+    "date": "2013-06-28T17:00:47",
+    "addr": "email@cmasender.com",
+    "subj": "Canon EOS Rebel T3 DSLR Camera, LG Portable Air Conditioner, Xbox 360 250GB Spring Console Bundle",
+    "matched": "air condition"
+  },
+  {
+    "date": "2013-06-07T14:37:14",
+    "addr": "email@cmasender.com",
+    "subj": "Samsonite Winfield Roller Luggage Set, Mizone Primrose Comforter Set, LG 9000 BTU Portable Air Conditioner",
+    "matched": "air condition"
+  }
+]

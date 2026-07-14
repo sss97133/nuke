@@ -405,23 +405,43 @@ Redirecting to vehicle profile...`);
       // URL is new - proceed with scraping
       console.log('New URL - scraping data:', url);
 
-      // Prefer robust server-side scraper (supports Firecrawl structured extraction).
-      // Fallback to legacy `simple-scraper` if needed.
+      // Prefill via the canonical `ingest` in PREVIEW mode: parse-only, writes
+      // NOTHING (.claude/rules/liveness-and-intent.md — intent is captured at
+      // Sign; the vehicle is created by the normal submit path below, which
+      // keeps ownership intent, title verification, and the image queue). Never
+      // call ingest here without preview:true — it would mint the vehicle on a
+      // 1s paste-debounce (2026-07-12 adversarial review, .claude/ISSUES.md).
       let result: any = null;
-      let fnError: any = null;
 
-      const robust = await supabase.functions.invoke('scrape-vehicle', { body: { url } });
-      result = robust.data;
-      fnError = robust.error;
-
-      if (fnError || !result?.success) {
-        const legacy = await supabase.functions.invoke('simple-scraper', { body: { url } });
-        result = legacy.data;
-        fnError = legacy.error;
+      const { data: prev, error: prevErr } = await supabase.functions.invoke('ingest', {
+        body: { url, preview: true },
+      });
+      if (prevErr) {
+        throw new Error('Auto-fill from this URL is unavailable — fill in the details below. The listing URL will be saved with the vehicle.');
       }
-
-      if (fnError) {
-        throw new Error(`Scraping failed: ${fnError.message || fnError}`);
+      if (prev?.status === 'duplicate' && prev?.vehicle_id) {
+        // This user already ingested this URL — take them to their vehicle.
+        setIsScrapingUrl(false);
+        if (mode === 'modal' && onClose) onClose();
+        navigate(`/vehicle/${prev.vehicle_id}`);
+        return;
+      }
+      if (prev?.status === 'preview' && (prev.parsed?.year || prev.parsed?.make)) {
+        // Adapter into the legacy scraped-data shape the mapping block below expects.
+        result = {
+          success: true,
+          data: {
+            success: true,
+            year: prev.parsed?.year ?? undefined,
+            make: prev.parsed?.make ?? undefined,
+            model: prev.parsed?.model ?? undefined,
+            price: prev.price ?? undefined,
+            location: prev.location ?? undefined,
+          },
+        };
+      }
+      if (!result) {
+        throw new Error('Auto-fill found nothing usable in this URL — fill in the details below. The listing URL will be saved with the vehicle.');
       }
 
       // `scrape-vehicle` returns { success: true, ...fields } while `simple-scraper` returns { success: true, data: {...} }

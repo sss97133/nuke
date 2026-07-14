@@ -1,0 +1,370 @@
+[
+  {
+    "order": 0,
+    "image_id": "ac91bf55-9496-431c-92a3-cad41c076cc9",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Square-body GM crew-cab dually, white, 4WD lifted, Bowtie grille, dual rear wheels visible. Vegas Strip background (Excalibur/NY-NY visible).",
+    "notes": "Front 3/4 view, Las Vegas Strip backdrop, Cooper-style tires visible, no license plate readable"
+  },
+  {
+    "order": 1,
+    "image_id": "8b406673-4770-4cd8-ae9e-712c5a0ea276",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Undercarriage view of square-body chassis with C-channel frame, leaf springs, exhaust. Background shows shop yard with parked vehicles and 'Diesel Truck' style signage (inverted).",
+    "notes": "Undercarriage shot, shop yard background"
+  },
+  {
+    "order": 2,
+    "image_id": "47ccbcf9-b074-4b3b-9139-ffc79fefcca1",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Undercarriage view showing solid front axle, leaf springs, transfer case. BetMGM signage visible in background indicating Vegas location. Consistent with V3500 chassis.",
+    "notes": "Undercarriage, BetMGM sign visible (Vegas)"
+  },
+  {
+    "order": 3,
+    "image_id": "b7cebba3-3e87-4d73-bfc2-4683139e7219",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Solid front axle with Roadone Cavalry M/T tire (matches V3500 tire spec), leaf springs, drag link visible. BetMGM signage in background.",
+    "notes": "Roadone Cavalry M/T tire visible — matches V3500 tire spec listed in profile"
+  },
+  {
+    "order": 4,
+    "image_id": "9f6a62a7-ce3f-4eef-94fe-dfd847e2fcc6",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "NP-style transfer case visible with twin output shafts, custom crossmember/skid, solid axle suspension. Consistent with squarebody 4WD truck.",
+    "notes": "Transfer case + custom crossmember shot"
+  },
+  {
+    "order": 5,
+    "image_id": "d3416762-bcb2-4a39-8d29-af15a1e5721e",
+    "verdict": "approved",
+    "confidence": 0.88,
+    "reasoning": "Front driveshaft, leaf springs, front diff pumpkin, transfer case output visible. Squarebody 4WD undercarriage.",
+    "notes": "Front driveshaft and diff visible"
+  },
+  {
+    "order": 6,
+    "image_id": "8bec9a72-76bd-4e5c-a821-ef62aa7e041d",
+    "verdict": "approved",
+    "confidence": 0.82,
+    "reasoning": "C-channel frame rail, transmission cooler, mounting points consistent with squarebody dually. Could be V3500 chassis area.",
+    "notes": "Frame rail and trans cooler"
+  },
+  {
+    "order": 8,
+    "image_id": "08ea61b2-415b-42b7-a598-67bf21aabc4d",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Mid-chassis undercarriage view with crossmember, fuel tank/skid, frame rails. Squarebody truck chassis.",
+    "notes": "Mid-chassis undercarriage"
+  },
+  {
+    "order": 9,
+    "image_id": "ed79ec62-79f5-4e47-8442-3ce54133252e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Transmission pan with ribbed cover, dual leaf spring, transfer case adapter. Heavy-duty trans likely Allison.",
+    "notes": "Allison-style transmission pan visible"
+  },
+  {
+    "order": 10,
+    "image_id": "8bf40c75-80f9-48d9-aa3c-f48c09aa29df",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Allison transmission ID plate: Model MT 643, Serial P 6070, Part No 28048282, UAW 933 Indianapolis. MT643 is a medium-duty Allison commonly fitted to commercial trucks/Cummins applications. Could be V3500 with Allison swap, OR Skylar's 93 Cummins truck. Unable to confirm vehicle without body context.",
+    "notes": "Allison MT 643 ID plate: Model MT 643, Serial P 6070, Part 28048282, UAW 933 Indianapolis. Dated paperwork/data plate."
+  },
+  {
+    "order": 11,
+    "image_id": "9276e6db-8db7-42f7-8c7f-a1287d5c9a0f",
+    "verdict": "approved",
+    "confidence": 0.82,
+    "reasoning": "Front driveshaft with U-joints, leaf springs, transmission/transfer case area. Squarebody 4WD chassis.",
+    "notes": "Front driveshaft + transmission/t-case junction"
+  },
+  {
+    "order": 12,
+    "image_id": "b2625ae5-399c-4a12-af57-f7447f0ba8e1",
+    "verdict": "approved",
+    "confidence": 0.82,
+    "reasoning": "Front solid axle, leaf springs, sway bar bracket, custom crossmember. Squarebody 4WD undercarriage.",
+    "notes": "Front axle area"
+  },
+  {
+    "order": 13,
+    "image_id": "5b8c54b1-6fe8-47c2-9d83-0da6d5e16f82",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rear differential pumpkin with cover, dual rear wheels visible at sides confirming dually configuration, leaf springs, axle tubes. V3500 rear axle.",
+    "notes": "Rear diff cover, dual rear wheels visible = dually confirmation"
+  },
+  {
+    "order": 14,
+    "image_id": "8b7d02cc-7da6-4c68-9762-cb937790ded7",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Engine bay with turbocharged diesel, large intake piping, Duralast battery, intercooler. Inline-6 layout suggests Cummins 5.9 rather than GM 6.2/6.5 V8 expected in factory V3500. May be Skylar's 93 Cummins truck or a V3500 with Cummins swap. Body-style ambiguous from this view.",
+    "notes": "Cummins-style inline-6 turbo diesel engine bay; Duralast battery sticker; no VIN/badge visible"
+  },
+  {
+    "order": 15,
+    "image_id": "17fc2de6-6ae8-4809-96bf-318ebef37415",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Turbocharger close-up with aftermarket cone air filter, exhaust manifold visible. Inline-6 diesel turbo (Cummins-style). Could be V3500 with Cummins swap or the 93 Cummins truck.",
+    "notes": "Turbo + cone air filter, inline-6 diesel"
+  },
+  {
+    "order": 16,
+    "image_id": "a4799941-b857-492f-b300-b639f10d7192",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Engine bay top view showing inline-6 valve cover area with '690' marking visible on side, intake piping, battery box. Inline-6 layout inconsistent with factory V3500 GM 6.2L V8.",
+    "notes": "'690' or 'S690' marking visible on engine block side; inline-6 valve cover suggests Cummins"
+  },
+  {
+    "order": 17,
+    "image_id": "ae6b69ca-d39e-4bb5-9657-debece395335",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Engine bay shot with inline-6 valve cover layout, injection pump area, exhaust manifold runners. Likely Cummins 5.9 — not stock V3500 powertrain.",
+    "notes": "Inline-6 valve cover, injection pump visible"
+  },
+  {
+    "order": 18,
+    "image_id": "9a7fdbf2-5529-462d-af67-47ee22cc50a0",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Injection pump close-up showing Bosch-style P-pump or similar mechanical injection pump. Consistent with Cummins 5.9 12V/P-pump engine. Not factory V3500 6.2L Stanadyne setup.",
+    "notes": "P-pump / mechanical injection pump close-up"
+  },
+  {
+    "order": 19,
+    "image_id": "eea89fc0-7e47-41cd-841d-c6d49d75b7d2",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Engine bay with turbo, cone air filter, downpipe, fuel filter housing. Inline-6 diesel turbo layout. Cummins-style not V3500 factory.",
+    "notes": "Turbo + downpipe + cone filter"
+  },
+  {
+    "order": 20,
+    "image_id": "297b5c06-8d86-4e02-9155-233e77424338",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Engine bay wiring/loom view with intake elbow, injection lines, custom wiring. Inline-6 diesel engine bay.",
+    "notes": "Engine bay wiring + intake elbow"
+  },
+  {
+    "order": 21,
+    "image_id": "096694db-b40e-49be-a56f-bd2d58af2da3",
+    "verdict": "review_needed",
+    "confidence": 0.35,
+    "reasoning": "Clear inline-6 diesel engine view with 6 individual injector covers along valve cover, turbocharger, fuel injection lines. This is unambiguously an inline-6 (Cummins 5.9 12V or similar) — NOT a GM 6.2/6.5 V8. V3500 was factory 6.2L V8 diesel. This is either a Cummins swap into V3500 or the 93 Cummins truck.",
+    "notes": "Cummins 12V inline-6 engine — 6 visible injector covers on valve cover, P-pump injection lines visible. Diagnostic for non-V3500-factory powertrain."
+  },
+  {
+    "order": 23,
+    "image_id": "22bc80d1-ec62-45c9-88e1-147c7b7f9f99",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Crew cab side view of squarebody truck with crew cab doors, vent windows, body-color paint, Hollywood Cars Museum signage in background (Las Vegas). Consistent with V3500 crew cab dually.",
+    "notes": "Hollywood Cars Museum signage visible (Las Vegas); crew cab profile"
+  },
+  {
+    "order": 24,
+    "image_id": "ebce610c-b1f1-42d8-9cae-14c5d760833c",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Dually rear fender with bulged dual-wheel housing, amber side marker, fuel door, square-body styling. Vegas Strip casino skyline (Excalibur/Tropicana visible) in background. Diagnostic V3500 dually feature.",
+    "notes": "Dually wide rear fender visible, Vegas Strip skyline, mud terrain tire"
+  },
+  {
+    "order": 25,
+    "image_id": "50abd562-8ea7-4749-920b-d41da133a0cb",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Squarebody crew-cab door panel showing factory door pull, lock plunger, brown/tan interior. Reflection shows what appears to be 'DIESEL' related signage in side mirror.",
+    "notes": "Door panel close-up; reflected diesel-related signage in mirror"
+  },
+  {
+    "order": 26,
+    "image_id": "42072c9e-39f5-4040-8610-baab3294161a",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Squarebody dashboard with aftermarket Autometer gauge cluster (6 gauges in factory bezel), Momo steering wheel, dual sun visors, factory dash structure. V3500 cabin.",
+    "notes": "Aftermarket Autometer 6-gauge cluster, Momo steering wheel; 'BRAKE RELEASE' label visible"
+  },
+  {
+    "order": 27,
+    "image_id": "e569a6d6-9605-4183-9daf-45589cee1736",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Squarebody crew cab interior — rear bench seat, cloth/velour upholstery (gray), rear door panel with manual window crank position, sliding rear window visible. Consistent with V3500 crew cab.",
+    "notes": "Crew cab rear interior, gray cloth seats, sliding rear window with warning decal"
+  },
+  {
+    "order": 28,
+    "image_id": "b6883810-bdc9-403d-bbd0-a14ef7759b12",
+    "verdict": "approved",
+    "confidence": 0.88,
+    "reasoning": "Squarebody dash passenger side, glove box, factory HVAC vent, passenger door panel, side mirror. Velour bench seat visible. V3500 cabin.",
+    "notes": "Dash passenger side view"
+  },
+  {
+    "order": 29,
+    "image_id": "c2777605-3452-4ee2-80a6-d4eaa73f14a1",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Squarebody dash detail — 'LIGHTS' knob bezel (headlight switch removed), blue rocker switch (aftermarket), steering column collar, ignition area. Factory dash structure of squarebody.",
+    "notes": "Aftermarket blue rocker switch, headlight switch missing, LIGHTS label visible"
+  },
+  {
+    "order": 30,
+    "image_id": "feeddb24-0032-4420-8adc-768752b403b3",
+    "verdict": "approved",
+    "confidence": 0.78,
+    "reasoning": "Close-up of mud-terrain tire tread (Roadone Cavalry M/T style — matches V3500 tire spec). No vehicle context but tire matches profile.",
+    "notes": "M/T tire tread close-up — matches Roadone Cavalry M/T spec"
+  },
+  {
+    "order": 31,
+    "image_id": "d4303b07-5af9-4604-bbe6-f439eaec922c",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Rear undercarriage with solid rear axle, leaf springs, dual exhaust tips, fuel tank, dual rear wheels visible on both sides confirming dually. V3500 rear chassis.",
+    "notes": "Dual exhaust tips, dual rear wheels visible = dually confirmed"
+  },
+  {
+    "order": 32,
+    "image_id": "fba1163c-92aa-470d-8ae5-eee4f27d3056",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Rear 3/4 view of squarebody dually truck — wide rear dually fenders, diamond-plate bed sides, dual rear wheels, factory tail lights, Nevada-style license plate visible on rear bumper. Hitch receiver. White paint. V3500.",
+    "notes": "Nevada license plate visible on rear bumper (text not fully legible in this orientation); diamond-plate bedsides; dual rear wheels"
+  },
+  {
+    "order": 33,
+    "image_id": "b1c787ca-5d40-48f6-a370-fe9f0dfed7d5",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Bed/cab view with sliding rear window, fuel/jerry can strapped down, ribbed bed floor (likely white-painted). Looks like squarebody bed and rear of cab. 'REPAIR' signage visible in background.",
+    "notes": "Bed top view with jerry can strap, sliding rear window, REPAIR sign in background"
+  },
+  {
+    "order": 35,
+    "image_id": "e59538a1-6872-4947-8fb3-740e63a5b30b",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Driver-side dually rear fender — wide dually bulge, amber side marker, fuel door, square-body styling. Vegas skyline visible. Diagnostic V3500 feature.",
+    "notes": "Driver-side dually fender + Vegas backdrop"
+  },
+  {
+    "order": 36,
+    "image_id": "b897ec66-ebd9-4f9f-b13e-26b6d8c10091",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Crew cab profile passenger side — squarebody crew cab doors, vent windows, manual mirror, white paint. Reflection in upper mirror shows 'DIESEL' signage. Side step bars.",
+    "notes": "DIESEL signage reflected in side window; crew cab passenger side profile"
+  },
+  {
+    "order": 37,
+    "image_id": "374d87c4-1dc1-4b03-a5f0-ad9d6133fd2a",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Front 3/4 view of squarebody — Bowtie grille (silver bezel), single round headlamps with brow, Cavalry M/T tire visible (matches V3500 spec), white paint, Bosch service signage and diesel shop signage in background ('S DIESEL', '(702) 736-8526', 'BOSCH'). Vegas location.",
+    "notes": "Bosch service sign + 'S DIESEL' sign + phone (702) 736-8526; Cavalry M/T tire confirmed"
+  },
+  {
+    "order": 38,
+    "image_id": "89dc59bb-b1a0-4c6c-9541-c9fe1b5bf41b",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front view of squarebody truck near 'Hollywood Cars Museum' building (address 5115), '522-9999' phone, 'TROVERDE' or similar signage. White squarebody. Las Vegas.",
+    "notes": "Hollywood Cars Museum, address 5115, phone 522-9999"
+  },
+  {
+    "order": 39,
+    "image_id": "bf3c90a1-760c-469b-85fe-d8415b64b0f3",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Wide shot of dually parked in lot, '5115 Hollywood Cars Museum HERE' signage visible. Vegas. Squarebody dually long-bed crew cab.",
+    "notes": "Hollywood Cars Museum 5115 signage; lot shot"
+  },
+  {
+    "order": 40,
+    "image_id": "6ad4d57c-c5a4-480f-8f07-afb61cbeaebb",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Squarebody crew cab dually parked at night next to 'NEVADA AMMUNITION' building, with adjacent 'GIRLS DIRECT TO YOU' Vegas truck. White lifted dually with aluminum dually wheels.",
+    "notes": "Nevada Ammunition building, GIRLS DIRECT TO YOU billboard truck (Vegas), nighttime; aluminum dually wheels visible"
+  },
+  {
+    "order": 41,
+    "image_id": "2ab53308-1f78-4753-9940-61e3d45aee0c",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Same scene as #40 — Nevada Ammunition + GIRLS DIRECT TO YOU truck + squarebody dually at night. Confirmed V3500.",
+    "notes": "Nevada Ammunition + GIRLS DIRECT TO YOU at night"
+  },
+  {
+    "order": 42,
+    "image_id": "37bd1eea-05a7-4cb7-9213-a4a4e6a4b447",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rear 3/4 night shot of squarebody dually next to Nevada Ammunition. Dually rear visible.",
+    "notes": "Nighttime Nevada Ammunition scene, rear 3/4"
+  },
+  {
+    "order": 43,
+    "image_id": "332b5923-3cdd-4538-bf0f-dc64400f5f7a",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Vegas Strip night shot — squarebody dually crew cab on flatbed tow truck, Mandalay Bay and Luxor light beam visible in background. Same V3500.",
+    "notes": "Mandalay Bay + Luxor light beam in background, truck on tow flatbed"
+  },
+  {
+    "order": 44,
+    "image_id": "05c1838d-6753-461c-9bc2-59700d2168aa",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Squarebody crew cab dually being loaded on tow truck flatbed at night, Vegas Strip backdrop. Side profile shows dually rear fender and crew cab doors.",
+    "notes": "Truck on tow flatbed, Vegas backdrop; dually fender + crew cab visible"
+  },
+  {
+    "order": 45,
+    "image_id": "8e408ef1-2810-4c3f-ab80-e789a10e50d1",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Rear of squarebody truck in shop bay — primer-white paint, tailgate removed/under prep, red oil-filter wrench hanging, dual rear wheels (mud terrain) under wide dually fenders. In a paint or body shop bay.",
+    "notes": "Shop bay rear view, white primer paint, fire extinguisher visible"
+  },
+  {
+    "order": 46,
+    "image_id": "d3257cde-b755-44fc-ba28-fe99560116b0",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rear 3/4 view in shop bay — GMC tailgate badge visible (GMC variant of squarebody C/K dually, sister to Chevrolet V3500), dually fender bulge, dual rear wheels, white paint. Note: badge says 'GMC' not 'Chevrolet' — V3500 is Chevrolet, GMC equivalent is R3500. Could indicate badge swap, or this is actually a GMC R3500 mis-attributed. Surface as note but body-style is identical squarebody dually so still approved.",
+    "notes": "GMC TAILGATE BADGE VISIBLE — V3500 is Chevrolet branded; GMC equivalent is R3500. Possible badge swap OR mis-attribution as GMC. Red oil filter wrench hanging on tailgate."
+  },
+  {
+    "order": 47,
+    "image_id": "1b296a5c-670c-4eba-8b8f-93404ec5ceb4",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Same shop bay rear view as #46, slightly different angle. GMC tailgate visible. Dually fenders, squarebody styling.",
+    "notes": "Shop bay rear view #2; GMC tailgate visible"
+  },
+  {
+    "order": 49,
+    "image_id": "edd46770-87f2-4958-999e-52ce2d175efb",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "POV driving shot through windshield — desert highway, mountains, squarebody dashboard with Autometer gauges, hand on steering wheel with watch. Consistent with V3500 cabin from #26. Las Vegas-area desert driving.",
+    "notes": "Driving POV through windshield, desert/mountains, Autometer gauges, wristwatch visible"
+  }
+]

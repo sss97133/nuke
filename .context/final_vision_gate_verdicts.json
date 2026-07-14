@@ -1,0 +1,17 @@
+[
+  {"image_id": "5481ec3b-a119-4e44-8ed7-ee5ee0bc19df", "verdict": "rejected_personal", "confidence": 0.99, "reasoning": "Screenshot of Google Flights itinerary Sint Maarten to Las Vegas — not vehicle-related"},
+  {"image_id": "b5d31dfa-a703-455f-a768-fc4892073eb7", "verdict": "rejected_personal", "confidence": 0.99, "reasoning": "Screenshot of WhatsApp chat with Oriane in French about lice — personal communication"},
+  {"image_id": "b7ef4e0a-cfe5-4ae0-82a1-6e580b6f9ee6", "verdict": "rejected_personal", "confidence": 0.99, "reasoning": "Apple emoji of a sweating mouse face — not vehicle-related"},
+  {"image_id": "4729f12b-f556-4326-b08f-4feb8ff16da5", "verdict": "approved", "confidence": 0.97, "reasoning": "Turquoise 1966 Mustang rear fender/quarter panel close-up with Magnum 500 wheel and pony hub cap — matches Mustang profile"},
+  {"image_id": "5561780f-d530-4176-aae8-0b33dbbb8a02", "verdict": "approved", "confidence": 0.98, "reasoning": "Turquoise 1966 Mustang coupe rear three-quarter in driveway — matches Mustang"},
+  {"image_id": "962ea98c-0cfa-4f92-b740-ceb04220b8ac", "verdict": "approved", "confidence": 0.98, "reasoning": "Turquoise 1966 Mustang coupe rear with Utah plate 04AP4 next to another car — matches Mustang"},
+  {"image_id": "7082480a-5ce4-4ea8-adda-4d8401dad11b", "verdict": "approved", "confidence": 0.95, "reasoning": "Overhead view of turquoise 1966 Mustang next to a blue Galaxie/Fairlane; Mustang clearly present"},
+  {"image_id": "e950efbe-7c11-47e3-b24d-7b0c686cfcbd", "verdict": "approved", "confidence": 0.95, "reasoning": "KSL.com listing description screenshot mentioning 289 + C4 — listing documentation for the Mustang"},
+  {"image_id": "e1957e4f-6494-4259-9c47-b376b566fe6a", "verdict": "approved", "confidence": 0.98, "reasoning": "KSL.com screenshot showing 1966 Mustang interior — listing photo of the Mustang"},
+  {"image_id": "511cd7a6-b138-4bd8-a448-5cd29a9d1853", "verdict": "approved", "confidence": 0.98, "reasoning": "KSL.com screenshot of turquoise 1966 Mustang side profile — listing photo of the Mustang"},
+  {"image_id": "2230db77-74bf-41a7-be1a-964034c6baba", "verdict": "approved", "confidence": 0.98, "reasoning": "KSL.com screenshot 1966 Mustang front with 04AP4 plate — listing photo of the Mustang"},
+  {"image_id": "8f6df32b-a2b1-42ea-a024-cf8e52c70df2", "verdict": "approved", "confidence": 0.98, "reasoning": "KSL.com screenshot 1966 Mustang rear with 04AP4 plate — listing photo of the Mustang"},
+  {"image_id": "67937deb-a4e2-4f33-9c30-0c92f097509a", "verdict": "approved", "confidence": 0.98, "reasoning": "KSL.com screenshot 1966 Mustang rear with 04AP4 plate (duplicate of previous) — listing photo of the Mustang"},
+  {"image_id": "e3717765-a900-4cd3-82b9-b74672581c2b", "verdict": "approved", "confidence": 0.98, "reasoning": "KSL.com screenshot 1966 Mustang rear three-quarter in driveway — listing photo of the Mustang"},
+  {"image_id": "32358c7c-db0c-4161-9459-70706ac0e737", "verdict": "approved", "confidence": 0.98, "reasoning": "KSL.com screenshot 1966 Mustang side profile — listing photo of the Mustang"}
+]

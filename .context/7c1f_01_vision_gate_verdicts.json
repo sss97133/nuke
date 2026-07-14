@@ -1,0 +1,452 @@
+[
+  {
+    "order": 0,
+    "image_id": "2f594a32-d2d7-427d-9d6e-70386a1b6e10",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/000_2f594a32.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Dealer/auction recon worksheet matching this vehicle: '1976 Chevrolet Silverado C20 3+3 454ci, VIN CCS246Z153447, Lime Green + Light Green, sold Oct 5 2024, $63,000 sale to Hughes Brothers Equipment LLC Clovis NM, consignor Richard Stevenson Utah, acquired Jan 15 2024, ACL Doug 0902 stock #RM, 44,001 mi. BaT listing fee shown, gross profit $16,776.03. Major paperwork artifact.",
+    "paperwork": "Stock card / dealer invoice with VIN CCS246Z153447, sold date, consignor name + address, buyer (Hughes Brothers Equipment LLC, 586 US 70, Clovis NM 88101), phone (575) 309-6371, email hughesbros@yucca.net, sale $63,000, gross profit $16,776.03, 454ci engine, C20 3+3, Lime Green + Light Green color, 44,001 odometer, BaT listing fee line, ACL Doug 0902"
+  },
+  {
+    "order": 1,
+    "image_id": "08841510-8b68-4e59-ba32-f623aaba5b17",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/001_08841510.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Same dealer recon worksheet as image 000 but rotated 180 degrees. Same VIN, sale, financial data.",
+    "paperwork": "Same as 000: VIN CCS246Z153447, $63,000 sale, Hughes Brothers Equipment, ACL Doug 0902 (image inverted)"
+  },
+  {
+    "order": 2,
+    "image_id": "37d0498b-9803-47f6-b5b9-1b78c435c6a0",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/002_37d0498b.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Rear quarter / tailgate area of a square-body Chevrolet truck masked for paint in spray booth. Lime green color matches the C20. CHEVROLET stamped tailgate. Restoration documentation.",
+    "paperwork": null
+  },
+  {
+    "order": 3,
+    "image_id": "162ab5b7-d648-4875-83e8-b91db56016ca",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/003_162ab5b7.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Square-body tailgate / rear corner masked in spray booth. Lime green paint matches vehicle. Restoration documentation.",
+    "paperwork": null
+  },
+  {
+    "order": 4,
+    "image_id": "c3f5b5db-3c3d-48cc-a80f-fcd4b2f6fc66",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/004_c3f5b5db.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Wider view of same square-body C20 masked in spray booth, lime green, CHEVROLET tailgate visible. Restoration.",
+    "paperwork": null
+  },
+  {
+    "order": 5,
+    "image_id": "d39f555b-92f0-4453-81ba-3b3683816102",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/005_d39f555b.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Rear 3/4 view of completed 1976 Chevrolet C20 crew cab long bed, two-tone lime green, Rally wheels with Chevy bowtie center caps, dual fuel tanks (chrome filler caps visible in image 6). Clearly C-prefix 2WD (low ride height, no front diff). Yellow Nevada plate fragment '31228' / 'NV' visible.",
+    "paperwork": "Nevada license plate fragment '31228'"
+  },
+  {
+    "order": 6,
+    "image_id": "b00a6e62-403a-4fb7-92d5-f7bc64b7e120",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/006_b00a6e62.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Same 1976 C20 crew cab long bed lime green truck, rear 3/4 in shop, chrome dual fuel filler necks on cab side. C-prefix 2WD square-body.",
+    "paperwork": "Partial yellow plate visible on tailgate"
+  },
+  {
+    "order": 7,
+    "image_id": "860b801e-b847-4b6d-a2ca-115df7318fbe",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/007_860b801e.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Driver-side profile of the 1976 Chevrolet C20 crew cab long bed (3+3), two-tone lime green, Rally wheels, sun shining. C-prefix 2WD square-body confirmed by low stance and front-axle geometry.",
+    "paperwork": null
+  },
+  {
+    "order": 8,
+    "image_id": "10f338e1-62d2-4367-b3b9-93caf8c527d9",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/008_10f338e1.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Driver-side profile, full sun, 1976 C20 crew cab long bed, Silverado trim visible on door, two-tone lime green, chrome trim package. Same vehicle.",
+    "paperwork": null
+  },
+  {
+    "order": 9,
+    "image_id": "d618664e-9800-4a00-90e6-28bd26e75ebc",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/009_d618664e.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 view (image rotated 180) of 1976 C20 crew cab. Single round headlights, CHEVROLET grille block letters, yellow Chevy bowtie hood emblem, two-tone lime green. C-prefix square-body confirmed.",
+    "paperwork": null
+  },
+  {
+    "order": 10,
+    "image_id": "ca546d8e-0fda-494d-b346-966f26d60f9c",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/010_ca546d8e.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 view (rotated 180) of same 1976 C20 crew cab. Single round headlight grille, CHEVROLET block letters, lime green. Same vehicle.",
+    "paperwork": null
+  },
+  {
+    "order": 11,
+    "image_id": "04e72e9c-661f-4a7b-82da-edea227b3f81",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/011_04e72e9c.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 (rotated 180) of same 1976 C20 crew cab parked in lot. CHEVROLET grille, single round headlights, Silverado script on fender, lime green two-tone.",
+    "paperwork": null
+  },
+  {
+    "order": 12,
+    "image_id": "f84ad718-24e7-4a22-8af2-cb7c5c49aad6",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/012_f84ad718.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Side view (rotated 90) of the same lime green C20 crew cab in shop, white roof, two-tone. Square-body.",
+    "paperwork": null
+  },
+  {
+    "order": 13,
+    "image_id": "89d7655a-db3b-4fa9-a963-4070b2ac40ad",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/013_89d7655a.jpg",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Engine bay close-up showing 454ci big-block valve cover (orange Chevy engine paint), carburetor air cleaner snorkel, factory wiring loom. Matches the 454ci big-block called out on the dealer paperwork.",
+    "paperwork": null
+  },
+  {
+    "order": 14,
+    "image_id": "9a68467a-6431-4171-aca8-f845c28cc89e",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/014_9a68467a.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Macro close-up of a steel hose fitting / hose end on a yellow shop towel with orange engine block in background. Restoration / detailing context for the C20.",
+    "paperwork": null
+  },
+  {
+    "order": 15,
+    "image_id": "20bc9452-6d5d-4bbf-a8f2-05a3a44465c5",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/015_20bc9452.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Macro of same hose fitting at slightly different angle, orange engine, yellow towel. Detailing context.",
+    "paperwork": null
+  },
+  {
+    "order": 16,
+    "image_id": "61613d38-1d20-4bb3-85b6-7647594475d5",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/016_61613d38.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Macro close-up of cut/flared steel hose end - looks like a brake or fuel line being fabricated, yellow towel. Restoration fabrication.",
+    "paperwork": null
+  },
+  {
+    "order": 17,
+    "image_id": "d10f875f-6d11-43be-9196-d952ea094379",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/017_d10f875f.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Macro of cut steel line end with double-flare visible, threads. Brake/fuel line fab for the C20.",
+    "paperwork": null
+  },
+  {
+    "order": 18,
+    "image_id": "a0e2ba6f-072b-47d6-aaca-3f45c66ca670",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/018_a0e2ba6f.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Macro of steel line flare and fitting threads. Brake/fuel line work.",
+    "paperwork": null
+  },
+  {
+    "order": 19,
+    "image_id": "56dcda98-ccff-4147-8955-24ec434c8d0a",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/019_56dcda98.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Macro of steel line flare and fitting. Brake/fuel line work on the C20.",
+    "paperwork": null
+  },
+  {
+    "order": 20,
+    "image_id": "bcd0ce61-f134-4b5b-a3e9-36f518413503",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/020_bcd0ce61.jpg",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Engine-bay shot showing brake/fuel fitting with flared end, orange engine block visible. Restoration of the C20.",
+    "paperwork": null
+  },
+  {
+    "order": 21,
+    "image_id": "a8393645-252d-4020-ad09-2502d98d1189",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/021_a8393645.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Engine bay showing brake master cylinder, brake proportioning/distribution block, carburetor linkage, orange engine paint - consistent with restored 454 C20 setup.",
+    "paperwork": null
+  },
+  {
+    "order": 22,
+    "image_id": "ccafd407-9cb0-4847-9001-e2fac03e2808",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/022_ccafd407.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine bay (rotated 90) showing 454 big-block with carburetor, factory wiring harness, vacuum lines, lime green inner fender. Matches the C20.",
+    "paperwork": null
+  },
+  {
+    "order": 23,
+    "image_id": "15baf8d1-2ee7-4584-abbf-38b0d1d6187a",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/023_15baf8d1.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Copper brake/fuel line with fitting being fabricated in shop. Restoration parts.",
+    "paperwork": null
+  },
+  {
+    "order": 24,
+    "image_id": "8d4ab162-e3f1-4a17-8110-5cc6863d9fc0",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/024_8d4ab162.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Copper brake/fuel line with fitting in shop. Restoration parts.",
+    "paperwork": null
+  },
+  {
+    "order": 25,
+    "image_id": "a11c23d2-8b29-49d6-a319-d72cf11aab39",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/025_a11c23d2.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Copper brake/fuel line with flared end and fitting in shop. Restoration parts.",
+    "paperwork": null
+  },
+  {
+    "order": 26,
+    "image_id": "ccb5bfe5-5222-4fe7-b866-cd848a6c4924",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/026_ccb5bfe5.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Copper line with double-flare and fitting. Restoration parts.",
+    "paperwork": null
+  },
+  {
+    "order": 27,
+    "image_id": "cc84e7c4-413c-4481-a764-ad9bf74e643b",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/027_cc84e7c4.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Fabricated copper brake/fuel hard line, bent to fit, with fittings on both ends - clearly a custom replacement line for the C20 restoration.",
+    "paperwork": null
+  },
+  {
+    "order": 28,
+    "image_id": "0b086b65-e72e-4866-b7ae-d3cc90c98fb4",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/028_0b086b65.jpg",
+    "verdict": "rejected_personal",
+    "confidence": 0.95,
+    "reasoning": "Selfie - person's face (mustache, eye) clearly visible in foreground holding tool/handle. Not vehicle content.",
+    "paperwork": null
+  },
+  {
+    "order": 29,
+    "image_id": "77ad50e0-bc63-4f0c-9a68-3741004d30a4",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/029_77ad50e0.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front of dark green square-body Chevrolet (rotated 90) showing single round headlights, Chevy bowtie grille, lime green roof, on lift in shop. Square-body GM C/K. Likely the C20 mid-restoration in primer stage. C-prefix 2WD is consistent with 7c1f. APPROVED per attribution rule (square-body GM, restoration context).",
+    "paperwork": null
+  },
+  {
+    "order": 30,
+    "image_id": "454a905d-6234-4561-b3e3-20407eb321c5",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/030_454a905d.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Front wheel/fender shot of the lime green 1976 C20 - Rally wheel with Chevy bowtie cap, BFGoodrich tire, two-tone lime green body. C-prefix 2WD (no front diff visible, low stance).",
+    "paperwork": null
+  },
+  {
+    "order": 31,
+    "image_id": "24a11667-08eb-4ac6-abc8-933ebff509a1",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/031_24a11667.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Wheel/fender shot of lime green C20 with Rally wheel, BFGoodrich Commercial T/A tire. Same vehicle.",
+    "paperwork": null
+  },
+  {
+    "order": 32,
+    "image_id": "b26a8d8c-71d8-4120-9dd4-687fe255cbb6",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/032_b26a8d8c.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Four steel wheels primed white hanging in paint booth - restoration parts for the C20 (likely the Rally wheel centers being prepped). Restoration context.",
+    "paperwork": null
+  },
+  {
+    "order": 33,
+    "image_id": "5746904c-8e1d-45fc-8b48-05018c3f538c",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/033_5746904c.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Same four steel wheels primed in paint booth - restoration parts for the C20.",
+    "paperwork": null
+  },
+  {
+    "order": 34,
+    "image_id": "125cd974-9a5d-4559-9282-2d5d99d6d60a",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/034_125cd974.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "U.S. Wheel boxes (P/N 659-7840 visible) - wheel parts shipment for the C20 restoration. Approved as restoration receipt/shipping evidence.",
+    "paperwork": "U.S. Wheel shipping box, P/N 659-7840"
+  },
+  {
+    "order": 35,
+    "image_id": "93f204bd-3614-4446-9a26-72020ad5b00e",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/035_93f204bd.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Holley-style carburetor on top of orange-painted intake manifold, plug wires, distributor visible. 454 big-block of the C20.",
+    "paperwork": null
+  },
+  {
+    "order": 36,
+    "image_id": "cc784e4e-7476-40cc-9aa3-2f334acc99ca",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/036_cc784e4e.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Carburetor throttle linkage, kickdown bracket, orange intake manifold. Engine work on the C20.",
+    "paperwork": null
+  },
+  {
+    "order": 37,
+    "image_id": "65d59c8c-a566-4804-ab65-6931a4f6a2a1",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/037_65d59c8c.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Top-down view of orange-painted 454 big-block with Holley carburetor, intake, distributor, vacuum lines, plug wires. Lime green inner fender visible. Engine bay of the C20.",
+    "paperwork": null
+  },
+  {
+    "order": 38,
+    "image_id": "fa19a856-1979-48d1-b23a-99530caa6a92",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/038_fa19a856.jpg",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Cab headliner panel laid flat with new perforated fabric stretched over it (with dome-light hole). Upholstery restoration part for the C20 crew cab.",
+    "paperwork": null
+  },
+  {
+    "order": 39,
+    "image_id": "c37dad92-269a-4215-80ee-8879fa3f1943",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/039_c37dad92.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Interior of the 1976 C20 crew cab via open driver door - woodgrain dash, brown bench seat, column shift, woodgrain door panel, lime green sheet metal. Matches the vehicle.",
+    "paperwork": null
+  },
+  {
+    "order": 40,
+    "image_id": "214a4b86-28ad-4105-b58f-4ff8ad4f4921",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/040_214a4b86.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front view (rotated 90) of the lime green C20 in shop on a frame machine/lift with photo lighting. Single round headlights, Chevy bowtie grille. Same vehicle being detailed/photographed.",
+    "paperwork": null
+  },
+  {
+    "order": 41,
+    "image_id": "44e5783b-66bf-4cdb-a05a-fb4a1dbdc28f",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/041_44e5783b.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front quarter (rotated 90) of lime green C20 with door open - door jamb sticker (likely tire pressure/factory) visible but text unreadable at this resolution. Single round headlights, chrome bumper, Chevy fender script.",
+    "paperwork": "Door-jamb sticker visible (text not legible from this angle - likely tire pressure decal, possibly trim tag area)"
+  },
+  {
+    "order": 42,
+    "image_id": "8d9b14cf-1959-4e38-be25-5d6768ffe398",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/042_8d9b14cf.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "C20 (rotated 90) in shop with a bed-mounted slide-in camper (white with wood-grain panels). Square-body 2WD truck. May be a different square-body in the shop, but tail-light cluster and body lines match a 73-80 GM C/K truck. Approved per attribution rule.",
+    "paperwork": null
+  },
+  {
+    "order": 43,
+    "image_id": "9529db16-ca50-4f9d-99d7-2445011bb096",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/043_9529db16.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Shop scene with the dark green square-body C/K truck (in primer/mid-restoration) parked under 76 station sign. Square-body, restoration context. Likely the C20 in process.",
+    "paperwork": null
+  },
+  {
+    "order": 44,
+    "image_id": "9514e342-2bb3-4926-afa7-ad36ab1b506f",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/044_9514e342.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Lime green square-body truck on a two-post lift with camper shell/slide-in camper on bed, wheels off. Restoration in progress. C-prefix 2WD square-body.",
+    "paperwork": null
+  },
+  {
+    "order": 45,
+    "image_id": "e5387c4c-11a5-4afb-86ae-7d67397281c0",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/045_e5387c4c.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Underside view (rotated 90) showing freshly painted black frame, leaf-spring rear suspension, exhaust, fuel tanks (dual), differential. Lime green body sheet metal visible. Matches the C20.",
+    "paperwork": null
+  },
+  {
+    "order": 46,
+    "image_id": "726120a1-5a30-4083-a6ec-dbb48bf43d8b",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/046_726120a1.jpg",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Close-up of freshly painted black frame rail / floor pan / rocker area. Restoration detail of the C20.",
+    "paperwork": null
+  },
+  {
+    "order": 47,
+    "image_id": "97eb66d4-ade9-4216-9565-4096b1d07530",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/047_97eb66d4.jpg",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Frame rail / crossmember / fuel tank strap area, freshly painted. Restoration detail of the C20 underside.",
+    "paperwork": null
+  },
+  {
+    "order": 48,
+    "image_id": "f09f01b9-b750-42af-86c3-7222ee36f748",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/048_f09f01b9.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underside on lift showing front suspension, leaf springs, fuel tanks, freshly painted frame. Other square-bodies visible in background (Skylar's shop). Matches the C20 mid-restoration.",
+    "paperwork": null
+  },
+  {
+    "order": 49,
+    "image_id": "32600af4-f83d-4e66-bd2e-e32930e66cc8",
+    "path": "/Users/skylar/nuke/.context/7c1f_01_vision_gate/049_32600af4.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Underside view of the truck on a two-post lift outside, with a row of square-body trucks visible in the background (Skylar's shop yard - K10s, K20s, Blazers, V3500s). The truck overhead is consistent with the C20 chassis. Strong restoration / shop context evidence.",
+    "paperwork": null
+  }
+]

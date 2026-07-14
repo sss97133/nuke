@@ -1,0 +1,58 @@
+[
+  {
+    "order": 0,
+    "image_id": "d4def950-e32c-4156-ac86-35acb25c1e4e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underside detail of square-body GM truck frame/leaf-spring shackle area, photographed from below on shop floor. Consistent with K10 chassis. afcf bucket default-approved.",
+    "paperwork": null
+  },
+  {
+    "order": 1,
+    "image_id": "ecfcbcf3-97f8-403f-9adc-83504b82697a",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underside frame detail of square-body GM truck, looking up at frame rail / crossmember / leaf spring mount. afcf bucket default-approved.",
+    "paperwork": null
+  },
+  {
+    "order": 2,
+    "image_id": "ddf3bfaf-9a6c-4646-b789-c3c850298dd3",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Vehicle on 2-post lift, full underside view showing solid front axle (4WD), differential, driveshafts, leaf springs — consistent with 1979 K10 4WD chassis. afcf bucket.",
+    "paperwork": null
+  },
+  {
+    "order": 3,
+    "image_id": "24490fce-8664-458b-aa55-fe354fca1367",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Maroon-over-tan square-body Chevrolet truck on 2-post lift with visible 'Cheyenne' trim badge on the cab — exact match to canonical 1979 K10 (maroon/tan Cheyenne). Image is rotated 90 degrees.",
+    "paperwork": "Cheyenne badge visible on cab side"
+  },
+  {
+    "order": 5,
+    "image_id": "d82bf2b4-b965-4c2a-8132-91e8321699e9",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Maroon square-body GM truck in foreground at a desert lot, with multiple other square-body / GMT400-era trucks in background. Primary subject is consistent with the K10. afcf bucket — square-body content default-approved.",
+    "paperwork": null
+  },
+  {
+    "order": 6,
+    "image_id": "b05da349-8ef2-4943-94f1-97308814e2ca",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Car-hauler trailer loaded with multiple square-body GM C/K trucks including one with maroon/tan two-tone matching K10 livery. Multi-vehicle haul photo — squarely within afcf square-body content.",
+    "paperwork": null
+  },
+  {
+    "order": 7,
+    "image_id": "f02eeabe-38c0-4cfb-a549-16b8271fc252",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Long row of square-body GM C/K trucks parked in a high-desert lot with mountain backdrop — typical Skylar/afcf inventory yard photo. All visible vehicles are square-body GM trucks.",
+    "paperwork": null
+  }
+]

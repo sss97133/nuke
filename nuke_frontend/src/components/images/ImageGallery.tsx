@@ -542,6 +542,11 @@ const ImageGallery = ({
   // vehicle) and race setAllImages against the real loader — it never actually loaded
   // vehicle meta (its setVehicleMeta was a self-assignment) and was removed.
   const [vehicleMeta, setVehicleMeta] = useState<any | null>(null);
+  // NOTE: a second, redundant `vehicle_images` SELECT * loader used to live here. It
+  // double-loaded the gallery on every profile open (unprojected SELECT *, no row cap)
+  // and never resolved `loading`, contributing to the connection-pool storm that hung
+  // the gallery for 30s+. The canonical `fetchImages` effect below is the single loader
+  // (projected columns via fetchVehicleImages + dedup + BaT overlay + finally→setLoading(false)).
 
   // Default BaT-only view for BaT-origin vehicles, with a user-toggle to show all sources
   const isBatVehicle = useMemo(() => {

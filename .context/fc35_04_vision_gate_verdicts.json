@@ -1,0 +1,331 @@
+[
+  {
+    "order": 0,
+    "image_id": "de1c45f4-9d07-498f-8961-801f2a72eae6",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "K5 cowl/firewall area during teardown — windshield frame, wiper motor, firewall with paint stripping in progress. Consistent with this K5 restoration."
+  },
+  {
+    "order": 1,
+    "image_id": "5d8634a1-8e9a-4145-8e62-9e3708fb1607",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine bay/radiator support under squarebody truck with front leaf-sprung axle visible. Consistent with K5 Blazer chassis work."
+  },
+  {
+    "order": 2,
+    "image_id": "adc3b821-0622-4a2b-b648-51eef518a809",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body Chevy front-end detail: single round headlight bezel and rectangular parking light — characteristic 1973-1980 K5 grille area mid-paint-stripping."
+  },
+  {
+    "order": 3,
+    "image_id": "cfe4bcd5-e44b-4722-bea5-8858db9fcbaf",
+    "verdict": "review_needed",
+    "confidence": 0.4,
+    "reasoning": "Dark shop scene with what appears to be a media blaster/generator setup and a hoist platform; vehicle not clearly visible. Shop context related to the build but no K5 in frame."
+  },
+  {
+    "order": 4,
+    "image_id": "c4a9e0e6-9c9a-45ec-a0a4-5ae197406e8d",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Removed K5 Blazer hardtop/removable roof shell sitting on forklift tines — the canonical K5 signature part being stripped."
+  },
+  {
+    "order": 7,
+    "image_id": "19b34b2c-6fbf-46f5-9d72-51252454eaae",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine bay shot inside shop showing small-block Chevy with chrome air cleaner; windshield/cowl context matches squarebody K5 — likely original SBC pre-LS swap."
+  },
+  {
+    "order": 8,
+    "image_id": "2a6f4662-ff62-4db1-b7ea-71a914733797",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Front end with grille shell removed showing single round headlight bucket, radiator support, BFG All-Terrain tire — squarebody K5 mid-teardown."
+  },
+  {
+    "order": 9,
+    "image_id": "e47c7b14-5ca1-4fdd-8db5-181d258cf549",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine bay with small-block Chevy, intake, exhaust manifold, and BFG K/O2 tire visible. Squarebody K5 chassis."
+  },
+  {
+    "order": 10,
+    "image_id": "c3b78660-aed2-4894-ae6d-3bafef1546df",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Brake line / fuel line component on shop floor — removed part likely from K5 teardown. No vehicle in frame but consistent with parts pulled."
+  },
+  {
+    "order": 11,
+    "image_id": "1966761b-436b-4674-8b69-4424dae41069",
+    "verdict": "approved",
+    "confidence": 0.6,
+    "reasoning": "Close-up of PCV/EEC vacuum hose with '3/8\" 19.5mm 50 PSI 3.4 Bar' markings — replacement hose for K5 build. Paperwork-adjacent (component spec)."
+  },
+  {
+    "order": 12,
+    "image_id": "2fecca9f-3748-43aa-b82b-023b5dcd98f8",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Battery cut-off / master disconnect solenoid with battery cables — wiring component pulled from or going into K5 electrical."
+  },
+  {
+    "order": 14,
+    "image_id": "7d3320a6-4282-4d32-97dc-d1f91e1d2710",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Bedliner-coated interior panel (likely floorpan/rocker area) with paint peeling — consistent with K5 interior teardown showing prior bed-liner overspray."
+  },
+  {
+    "order": 15,
+    "image_id": "bb4a620e-d964-4e6f-99e4-634ceab01f06",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Bedliner / textured paint surface, cracking — interior panel detail from K5."
+  },
+  {
+    "order": 16,
+    "image_id": "338271df-f3b9-4b5c-a961-d70ed4d596a4",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Side mirror, A-pillar, and rear quarter of K5 hardtop visible inside shop — squarebody with characteristic rear quarter window opening."
+  },
+  {
+    "order": 17,
+    "image_id": "7f5405b9-9c1c-4af4-bd69-b92f8d3abc33",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rocker/sill area with fresh red-oxide primer over freshly-welded steel patch — K5 floor/rocker repair, GM ignition key visible upper left."
+  },
+  {
+    "order": 18,
+    "image_id": "d60fd7b5-ffa6-4091-b89a-e9046910991c",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rocker/sill close-up: bare welded steel above red-oxide primered structural member — K5 floor patch."
+  },
+  {
+    "order": 19,
+    "image_id": "346f3379-513f-40cb-980b-5c34dca956f2",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Sill / inner rocker bare metal with red oxide primer below — K5 floor reconstruction."
+  },
+  {
+    "order": 20,
+    "image_id": "25d0ce6c-df69-4aac-8761-76999e0131ca",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Sill seam with fresh weld and red-oxide primer — K5 rocker/door-jamb repair."
+  },
+  {
+    "order": 21,
+    "image_id": "6916fbbd-86b5-40a2-8a9c-c8193f4f5639",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Cabin floor view with seat-base mounting bracket, diamond plate floor, kick panel, and fresh red-oxide sill — K5 interior reconstruction."
+  },
+  {
+    "order": 22,
+    "image_id": "0677f3a3-4165-40eb-844d-e1659525d7e1",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "K5 cabin floor with red-oxide primered rocker/seam, diamond plate floor — interior body reconstruction."
+  },
+  {
+    "order": 23,
+    "image_id": "6c00eefd-a442-47fd-8c55-c8060733257a",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Bare metal welded sill above heavy-rust rocker — K5 cab corner / floor repair documenting rot found and addressed."
+  },
+  {
+    "order": 24,
+    "image_id": "e122435a-69a3-43ba-9048-369f47cf88b5",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rust-perforated A-pillar / cowl junction at floor; steering wheel and pedals visible — K5 cab interior showing rot before repair."
+  },
+  {
+    "order": 25,
+    "image_id": "de1a57ef-f7db-41d9-8cdb-12b49783d0e9",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same area: rust-perforated rocker/A-pillar with K5 steering wheel visible — pre-repair documentation."
+  },
+  {
+    "order": 26,
+    "image_id": "7cc1cb5a-6c93-48b3-aa81-35958b3469cb",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Severe rust at A-pillar/rocker/floor junction — K5 cab structural rot documentation."
+  },
+  {
+    "order": 27,
+    "image_id": "5d084008-6b72-458f-ba7c-3b08ed4c31c8",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Cabin floor with sill cap removed exposing rusted-out rocker — K5 floor repair in progress."
+  },
+  {
+    "order": 28,
+    "image_id": "0c92f0f2-2149-441e-bf3e-61332547d94f",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Welded patch panel along sill, oxidized prior sill — K5 floor repair."
+  },
+  {
+    "order": 29,
+    "image_id": "48ca24d5-4dad-44be-a2cc-96a6dcbe484c",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Heavy rust on rocker/frame area against yellow-and-black painted lift edge — K5 underbody rot doc."
+  },
+  {
+    "order": 30,
+    "image_id": "bd7b3949-9c9f-41df-8c60-7d15ab70b1e9",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Continued severe rust on rocker / cab corner — K5 underbody documentation."
+  },
+  {
+    "order": 31,
+    "image_id": "1b376776-67c4-496f-9792-c1210f4b5561",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Heavy rust perforation on rocker / cab corner — K5 underbody documentation."
+  },
+  {
+    "order": 32,
+    "image_id": "d0b39adf-39f6-4724-9ebf-e388eddf7119",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Cabin doorway / sill view from outside with rust along rocker base, diamond plate floor inside — K5 cab structural inspection."
+  },
+  {
+    "order": 33,
+    "image_id": "98727546-daf0-4983-81ef-3b0b02f32aad",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Sill with outer skin cut/peeled back exposing the rusted inner rocker — K5 rocker reconstruction."
+  },
+  {
+    "order": 34,
+    "image_id": "b68b8e1c-e970-4fc5-a1a4-ce074cbe5a44",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rocker outer skin peeled showing rotted inner rocker — K5 rocker rebuild."
+  },
+  {
+    "order": 35,
+    "image_id": "2d5e56f3-2ba1-44e3-ad39-61b04599ea44",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rocker with outer skin removed exposing rotted inner — K5 rocker rebuild."
+  },
+  {
+    "order": 36,
+    "image_id": "24fd57f2-883a-441e-89e5-ca217f294020",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Cabin floor view with rusted rocker visible from inside, gas pedal/firewall visible — K5 floor/rocker repair."
+  },
+  {
+    "order": 37,
+    "image_id": "9ab4f289-8055-4b2b-9b3a-cbf9144cf9d8",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Pile of squarebody Chevy interior seats (light-blue / burgundy) stacked in K5 bed — old/donor upholstery being hauled. Shot is rotated 90 degrees."
+  },
+  {
+    "order": 38,
+    "image_id": "ff7d2ce2-d3f2-41c1-9f72-378ce6ce097a",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Black K5 Blazer up on a lift (image rotated): squarebody profile, removable hardtop on, BFG All-Terrain tires on Rally wheels — clearly the subject K5."
+  },
+  {
+    "order": 39,
+    "image_id": "742597a4-d5c0-477a-a5d9-8991f25c3bd6",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Black K5 Blazer outside with new BFG All-Terrain T/A tires lined up next to it — wheel/tire upgrade photo for this K5."
+  },
+  {
+    "order": 40,
+    "image_id": "c4b3b6a5-7302-40ed-9c70-ff3cb6cfd99f",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Black lifted K5 Blazer with rear-mounted spare; small child standing beside truck (subject is the truck, not the child). Approve for K5 content. Note: includes a person."
+  },
+  {
+    "order": 41,
+    "image_id": "c500dc1d-0992-4100-81dc-5af7c2ed2526",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Rear-three-quarter of black K5 Blazer at sunset, top off (convertible mode), rear bumper with hitch, Nevada-style plate. Subject K5. Plate visible — paperwork-adjacent."
+  },
+  {
+    "order": 42,
+    "image_id": "e42758ce-0379-442e-8575-0a942698f544",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Driver-side rear-three-quarter of black K5 Blazer, top off, lifted, in front of house. Subject K5."
+  },
+  {
+    "order": 43,
+    "image_id": "d0f9a791-acdb-4038-ac20-185645f431c5",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Driver-side profile of black K5 Blazer, top off, lifted, with house and Toyota Land Cruiser in background. Subject K5."
+  },
+  {
+    "order": 44,
+    "image_id": "b0dac2b3-c28e-4739-a1cd-9dc38a7f7733",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Front-three-quarter driver side of black K5 Blazer, top on, single round headlights, factory bowtie grille — subject K5."
+  },
+  {
+    "order": 45,
+    "image_id": "88d2fa01-6e67-45a5-930f-1892d7eff59d",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Dead-on front view of black K5 Blazer, single round headlights, bowtie grille, lifted with BFGs — subject K5."
+  },
+  {
+    "order": 46,
+    "image_id": "a335ec88-fcb3-4523-9757-0820d2c9496a",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Passenger-side front-three-quarter of black K5 Blazer, top off, lifted, in desert lot — subject K5."
+  },
+  {
+    "order": 47,
+    "image_id": "f0809f42-7e10-4715-86c0-23312e528e10",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Passenger-side profile of black K5 Blazer, top off, lifted, with desert/mountains behind — subject K5."
+  },
+  {
+    "order": 48,
+    "image_id": "6b51a5e6-7ef2-429e-9d84-a6647ebcb7c3",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Passenger-side rear-three-quarter of black K5 Blazer, top off, lifted, at sunset — subject K5."
+  },
+  {
+    "order": 49,
+    "image_id": "898c93c5-78ba-4dca-adea-be58080c4dda",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Solid front axle steering knuckle / tie rod / drag link detail on red jack stand — K5 front-axle (Dana 44) work, consistent with squarebody 4WD chassis."
+  }
+]

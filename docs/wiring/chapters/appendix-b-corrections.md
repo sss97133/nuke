@@ -48,6 +48,16 @@ Every single assignment was wrong. The scaffold was constructed by an LLM that k
 |------|-------|-----|-----|-------|
 | 2026-03-22 | wire_color_gm | ORG | ORN | All circuits (standardized Orange abbreviation) |
 
+## Substrate Spec Corrections (build-doc claims)
+
+Claims found wrong in the build documentation, with the inline source line marked SUPERSEDED. Where the corrected value has no ingested external source yet, the entry flags the wrong claim and records that the replacement awaits ingestion — the citation is NOT invented.
+
+| Date | Location | Field | Was | Now | Source |
+|------|----------|-------|-----|-----|--------|
+| 2026-06-18 | `chapters/03-tier-system.md:46` | Concentric twist construction | Wires twisted in **alternating-direction** layers around a core | Each layer laid the **same rotational direction at the same pitch (lay)** | PENDING INGESTION: HP Academy concentric-twist module / MIL-W-22759 wire construction |
+| 2026-06-18 | `output/K5_harness_protection_catalog.md:627` | 22 AWG crimp pull-force minimum | 10 lbf | **8 lbf** | `docs/wiring/research/2026-05-21_milspec_heatshrink_protocols.md:157` (IPC/WHMA-A-620 §19.1) |
+| 2026-06-18 | `output/K5_wire_spec_and_costs.md:138` | 4 AWG wire spec | "Welding cable or marine-grade" (PVC/rubber) | **M22759/16** (Tefzel-only rule) | `K5_WIRING_STATE.md:21` (locked: ONLY TEFZEL; :23 4–10 AWG = M22759/16) |
+
 ## Circuit Verification Summary
 
 As of 2026-03-23:

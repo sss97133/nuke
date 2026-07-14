@@ -70,7 +70,7 @@ export const AnnotoriousImageTagger: React.FC<AnnotoriousImageTaggerProps> = ({
       const tagName = tagBody?.value || 'Untitled';
 
       // Save to database (x, y, width, height are already percentages 0-1, convert to 0-100)
-      const { error } = await supabase.from('vehicle_image_tags').insert({
+      const { error } = await supabase.from('image_tags').insert({
         vehicle_id: vehicleId,
         image_id: imageId,
         tag_name: tagName,
@@ -132,7 +132,7 @@ export const AnnotoriousImageTagger: React.FC<AnnotoriousImageTaggerProps> = ({
       }
 
       const { error } = await supabase
-        .from('vehicle_image_tags')
+        .from('image_tags')
         .update({
           tag_name: tagName,
           x_position: x * 100,
@@ -159,7 +159,7 @@ export const AnnotoriousImageTagger: React.FC<AnnotoriousImageTaggerProps> = ({
 
     try {
       const { error } = await supabase
-        .from('vehicle_image_tags')
+        .from('image_tags')
         .delete()
         .eq('id', annotation.id);
 

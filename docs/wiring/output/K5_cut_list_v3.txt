@@ -1,0 +1,255 @@
+CUT LIST — 1977 chevrolet blazer
+Generated: 4/4/2026 | Pro tier (M22759/32 + M22759/16 + Marine) | v2 (corrected ETB, speakers, coil routing)
+Amended: 2026-05-11 — Replaced "TXL" placeholder with correct per-gauge spec. See receipt 2026-05-11_k5-cut-list-tefzel-amendment.md
+Amended: 2026-05-14 — Gauges audited per chapter 6 doctrine (I × R ≤ 3% Vdrop, +25% safety). 22 AWG floor for signals. See receipts/2026-05-14_substrate-amendment-gauge-audit.md
+123 wires | 905.4 ft total | 4 shielded | 1 twisted pair
+==========================================================================================
+
+>> ENGINE LOOM (33 wires, 148.8 ft)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#4a  ETB TAC Motor 2                 M130:A01      20 AWG M22759/32            BRN         4.6ft   GM 12605109 Pin A → OUT_HB2
+#4b  ETB TAC Motor 1                 M130:A18      20 AWG M22759/32            YEL         4.6ft   GM 12605109 Pin B → OUT_HB1
+#4c  ETB TPS1 Signal                 M130:A14      22 AWG M22759/32            DK GRN      4.6ft   GM 12605109 Pin C → AV1
+#4d  ETB TPS2 Signal                 M130:A17      22 AWG M22759/32            PPL         4.6ft   GM 12605109 Pin D → AV4
+#4e  ETB 5V Reference                M130:A02      22 AWG M22759/32            GRY         4.6ft   GM 12605109 Pin E → SEN_5V0_A
+#4f  ETB Signal Ground               M130:B15      22 AWG M22759/32            BLK         4.6ft   GM 12605109 Pin F → SEN_0V_A
+#5   Ignition Coil 3                 M130:A03      22 AWG M22759/32            WHT         2.5ft   DEL-Stributor central mount
+#7   Ignition Coil 5                 M130:A04      22 AWG M22759/32            WHT/WHT     2.5ft   DEL-Stributor central mount
+#8   Ignition Coil 7                 M130:A05      22 AWG M22759/32            WHT/BLK     2.5ft   DEL-Stributor central mount
+#9   Ignition Coil 2                 M130:A06      22 AWG M22759/32            WHT/RED     2.5ft   DEL-Stributor central mount
+#10  Ignition Coil 4                 M130:A07      22 AWG M22759/32            WHT/BLU     2.5ft   DEL-Stributor central mount
+#11  Ignition Coil 6                 M130:A08      22 AWG M22759/32            WHT/YEL     2.5ft   DEL-Stributor central mount
+#12  Ignition Coil 8                 M130:A12      22 AWG M22759/32            WHT/VIO     2.5ft   DEL-Stributor central mount
+#13  Fuel Injector 1                 M130:A19      22 AWG M22759/32            GRN         4.6ft
+#14  Fuel Injector 2                 M130:A20      22 AWG M22759/32            GRN/WHT     4.6ft
+#15  Fuel Injector 3                 M130:A21      22 AWG M22759/32            GRN/BLK     4.6ft
+#16  Fuel Injector 4                 M130:A22      22 AWG M22759/32            GRN/RED     4.6ft
+#17  Fuel Injector 5                 M130:A27      22 AWG M22759/32            GRN/BLU     4.6ft
+#18  Fuel Injector 6                 M130:A28      22 AWG M22759/32            GRN/YEL     4.6ft
+#19  Fuel Injector 7                 M130:A29      22 AWG M22759/32            GRN/VIO     4.6ft
+#20  Fuel Injector 8                 M130:A30      22 AWG M22759/32            GRN/ORG     4.6ft
+#24  Ignition Coil 1                 M130:A13      22 AWG M22759/32            WHT/ORG     2.5ft   DEL-Stributor central mount
+#97  Rear Backup Camera              PDM30:OUT15   22 AWG M22759/32            BLU/WHT     18.4ft
+#99  Crank Position Sensor           M130:B01      22 AWG SHIELDED 2C    BLU/WHT/WHT 4.6ft   2-conductor shielded cable
+#101 Cam Position Sensor             M130:B02      22 AWG SHIELDED 2C    BLU/WHT/BLK 4.6ft   2-conductor shielded cable
+#102 Oil Pressure Sensor (ECU)       M130:A14      22 AWG M22759/32            VIO         4.6ft
+#103 Knock Sensor Bank 1             M130:B07      22 AWG SHIELDED 2C    GRY         4.6ft   2-conductor shielded cable
+#104 Knock Sensor Bank 2             M130:B13      22 AWG SHIELDED 2C    GRY/WHT     4.6ft   2-conductor shielded cable
+#108 MAP Sensor                      M130:A15      22 AWG M22759/32            VIO/WHT     4.6ft
+#109 Intake Air Temp Sensor          M130:B03      22 AWG M22759/32            TAN         4.6ft
+#110 Coolant Temp Sensor (ECU)       M130:B04      22 AWG M22759/32            TAN/WHT     4.6ft
+#112 Fuel Pressure Sensor            M130:A16      22 AWG M22759/32            VIO/BLK     4.6ft
+#113 Oil Temperature Sensor          M130:B05      22 AWG M22759/32            TAN/BLK     4.6ft
+
+>> EXTERIOR / BODY (27 wires, 240.7 ft)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#33  Turn Signal Switch              ECU           22 AWG M22759/32            ORN/BLU     3.5ft
+#39  Headlight Switch                ECU           22 AWG M22759/32            ORN/ORG     3.5ft
+#46  Wiper/Washer Switch             ECU           22 AWG M22759/32            ORN/VIO     3.5ft
+#48  Horn                            PDM30:OUT14   16 AWG M22759/32            ORN/ORG     4.6ft
+#49  Windshield Wiper Motor          PDM30:OUT12   18 AWG M22759/32            PPL         4.6ft
+#50  Washer Pump                     PDM30:OUT26   22 AWG M22759/32            ORN/BLK/RED 4.6ft
+#53  Brake Light Switch              ECU           22 AWG M22759/32            ORN/WHT     3.5ft
+#54  Electric Parking Brake          PDM30:OUT7    16 AWG M22759/32            ORN/BLK/YEL 18.4ft
+#75  Tail Light Right                PDM30:OUT13   22 AWG M22759/32            BRN/YEL     18.4ft
+#76  Backup Light Right              PDM30:OUT15   22 AWG M22759/32            BRN/VIO     18.4ft
+#77  Side Marker Rear Left           PDM30:OUT19   22 AWG M22759/32            BRN/ORG     18.4ft
+#78  Side Marker Rear Right          PDM30:OUT19   22 AWG M22759/32            BRN         18.4ft
+#79  Cab Clearance Light Left        PDM30:OUT19   22 AWG M22759/32            BRN/WHT     3.5ft
+#80  Turn Signal Left Front          PDM30:OUT27   22 AWG M22759/32            LT BLU      4.6ft
+#81  Tail Light Left                 PDM30:OUT13   22 AWG M22759/32            BRN/BLK     18.4ft
+#82  Turn Signal Right Front         PDM30:OUT28   22 AWG M22759/32            DK BLU      4.6ft
+#83  Parking Light Left Front        PDM30:OUT13   22 AWG M22759/32            BRN/RED     4.6ft
+#84  Parking Light Right Front       PDM30:OUT13   22 AWG M22759/32            BRN/BLU     4.6ft
+#85  LED Headlight Left              PDM30:OUT17   20 AWG M22759/32            LT GRN      4.6ft
+#86  LED Headlight Right             PDM30:OUT18   20 AWG M22759/32            LT GRN/WHT  4.6ft
+#87  Side Marker Front Left          PDM30:OUT19   22 AWG M22759/32            BRN/YEL     4.6ft
+#88  Side Marker Front Right         PDM30:OUT19   22 AWG M22759/32            BRN/VIO     4.6ft
+#89  Backup Light Left               PDM30:OUT15   22 AWG M22759/32            BRN/ORG     18.4ft
+#90  Cab Clearance Light Center      PDM30:OUT19   22 AWG M22759/32            BRN         3.5ft
+#91  Cab Clearance Light Right       PDM30:OUT19   22 AWG M22759/32            BRN/WHT     3.5ft
+#92  License Plate Light             PDM30:OUT19   22 AWG M22759/32            BRN/BLK     18.4ft
+#93  Third Brake Light               PDM30:OUT15   22 AWG M22759/32            BRN/RED     18.4ft
+
+>> INTERIOR / DASH (18 wires, 94.7 ft)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#34  Power Window Motor Left         PDM30:OUT3    16 AWG M22759/32            DK BLU      6.9ft
+#35  Power Window Motor Right        PDM30:OUT4    16 AWG M22759/32            DK BLU/WHT  6.9ft
+#36  Window Switch Master (Driver)   ECU           22 AWG M22759/32            ORN/YEL     6.9ft
+#37  Window Switch Passenger         ECU           22 AWG M22759/32            ORN/VIO     6.9ft
+#38  Power Lock Actuator Left        PDM30:OUT21   20 AWG M22759/32            BLK         6.9ft
+#42  Door Switch Left                ECU           22 AWG M22759/32            ORN/BLK     6.9ft
+#43  Door Switch Right               ECU           22 AWG M22759/32            ORN/RED     6.9ft
+#44  Lock Switch                     ECU           22 AWG M22759/32            ORN/BLU     6.9ft
+#45  Blower Speed Switch/Control     ECU           22 AWG M22759/32            ORN/YEL     3.5ft
+#47  Power Lock Actuator Right       PDM30:OUT22   20 AWG M22759/32            BLK/WHT     6.9ft
+#51  Heater Blower Motor             PDM30:OUT6    10 AWG M22759/32            ORN/BLK/BLU 4.6ft
+#65  Display/Dash                    PDM30:OUT29   22 AWG M22759/32            ORN/RED     3.5ft
+#67  Dome Light                      PDM30:OUT25   22 AWG M22759/32            BRN         3.5ft
+#68  Under-Dash LED Lights           PDM30:OUT25   22 AWG M22759/32            BRN/WHT     3.5ft
+#69  Footwell Lights                 PDM30:OUT25   22 AWG M22759/32            BRN/BLK     3.5ft
+#70  USB Charging Port               PDM30:OUT30   22 AWG M22759/32            ORN/YEL     3.5ft
+#71  Dakota Digital Gauge Cluster    PDM30         22 AWG M22759/32            ORN/VIO     3.5ft
+#72  Cigarette Lighter / 12V Outlet  PDM30:OUT8    14 AWG M22759/32            ORN/ORG     3.5ft
+
+>> CHASSIS / UNDERBODY (12 wires, 110.4 ft)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#1   AMP Research Step Left          PDM30:OUT9    18 AWG M22759/32            ORN/BLK     11.5ft
+#2   AMP Research Step Right         PDM30:OUT10   18 AWG M22759/32            ORN/BLK/WHT 11.5ft
+#3   AMP Research Controller         PDM30:OUT11   22 AWG M22759/32            ORN/BLK/BLK 11.5ft
+#21  Radiator Fan 1                  PDM30:OUT1    12 AWG M22759/32            ORN/WHT     4.6ft
+#22  Radiator Fan 2                  PDM30:OUT2    12 AWG M22759/32            ORN/BLK     4.6ft
+#25  Electric Water Pump             PDM30:OUT5    14 AWG M22759/32            ORN/BLU     4.6ft
+#64  Wideband Lambda Controller      PDM30:OUT24   22 AWG M22759/32            ORN/BLK     4.6ft
+#66  Fuel Pump                       ECU            8 AWG M22759/16            ORN/BLU     18.4ft
+#94  Fuel Pump Relay                 PDM30         22 AWG M22759/32            ORN         4.6ft
+#100 Vehicle Speed Sensor            ECU           22 AWG M22759/32            ORN/BLU     11.5ft
+#106 Wideband O2 Sensor 1            ECU           22 AWG M22759/32            VIO/BLU     11.5ft
+#107 Wideband O2 Sensor 2            ECU           22 AWG M22759/32            VIO/BLU/WHT 11.5ft
+
+>> AUDIO (13 wires, 178.3 ft)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#26a Speaker Front Left (+)          AMP CH1+      18 AWG M22759/32            ORN/YEL     6.9ft   Positive
+#26b Speaker Front Left (-)          AMP CH1-      18 AWG M22759/32            ORN/YEL/BLK 6.9ft   Negative (return)
+#27a Speaker Front Right (+)         AMP CH2+      18 AWG M22759/32            ORN/VIO     6.9ft   Positive
+#27b Speaker Front Right (-)         AMP CH2-      18 AWG M22759/32            ORN/VIO/BLK 6.9ft   Negative (return)
+#28a Speaker Rear Left (+)           AMP CH3+      16 AWG M22759/32            ORN/ORG     18.4ft  Positive
+#28b Speaker Rear Left (-)           AMP CH3-      16 AWG M22759/32            ORN/ORG/BLK 18.4ft  Negative (return)
+#29a Speaker Rear Right (+)          AMP CH4+      16 AWG M22759/32            ORN         18.4ft  Positive
+#29b Speaker Rear Right (-)          AMP CH4-      16 AWG M22759/32            ORN/BLK     18.4ft  Negative (return)
+#30a Subwoofer (+)                   AMP SUB+      10 AWG M22759/32            ORN/WHT     18.4ft  Positive
+#30b Subwoofer (-)                   AMP SUB-      10 AWG M22759/32            ORN/WHT/BLK 18.4ft  Negative (return)
+#31  Radio/Head Unit                 PDM30:OUT20   22 AWG M22759/32            ORN/BLK     3.5ft
+#32  Amplifier                       ECU           8 AWG M22759/16             ORN/RED     18.4ft
+#96  Amplifier Relay                 ECU           22 AWG M22759/32            ORN/BLK     18.4ft
+
+>> POWER / COMM (4 wires, 17.3 ft)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#6   Starter Motor                   ECU            0 AWG M22759/16                ORN         4.6ft
+#59  Alternator                      ECU            0 AWG M22759/16             ORN/VIO     4.6ft
+#62  CAN Bus Network                 ECU           24 AWG TWISTED PAIR   WHT/GRN     3.5ft   120-ohm termination each end
+#63  Battery Disconnect              ECU            0 AWG M22759/16                ORN/WHT     4.6ft
+
+>> MISC (16 wires, 115.2 ft)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#23  A/C Compressor Clutch           PDM30:OUT16   20 AWG M22759/32            ORN/RED     4.6ft
+#40  Ignition Switch                 ECU           22 AWG M22759/32            ORN         3.5ft
+#41  Hazard Flasher                  ECU           22 AWG M22759/32            ORN/WHT     3.5ft
+#52  Bosch V4 Electric Brake Booste  ECU            8 AWG M22759/16            ORN         4.6ft
+#55  Transfer Case Indicator         PDM30         22 AWG M22759/32            ORN/BLK     11.5ft
+#56  Neutral Safety Switch           PDM30         22 AWG M22759/32            ORN/RED     11.5ft
+#57  Reverse Light Switch            PDM30         22 AWG M22759/32            ORN/BLU     11.5ft
+#58  Transmission Controller         PDM30:OUT23   22 AWG M22759/32            ORN/YEL     3.5ft
+#60  ECU                             ECU           22 AWG M22759/32            ORN/ORG     4.6ft
+#61  Power Distribution Module       ECU           22 AWG M22759/32            ORN         3.5ft
+#73  Underhood Light                 PDM30:OUT25   22 AWG M22759/32            BRN/RED     4.6ft
+#74  Cargo/Bed Light                 PDM30:OUT25   22 AWG M22759/32            BRN/BLU     18.4ft
+#95  Bosch iBooster Relay            PDM30         22 AWG M22759/32            ORN/WHT     2.3ft
+#98  Fuel Level Sender               ECU           22 AWG M22759/32            ORN/RED     18.4ft
+#105 A/C Pressure Switch Low         ECU           22 AWG M22759/32            ORN/YEL     4.6ft
+#111 A/C Pressure Switch High        ECU           22 AWG M22759/32            ORN/VIO     4.6ft
+
+==========================================================================================
+WIRE PURCHASE SUMMARY
+------------------------------------------------------------------------------------------
+4 AWG M22759/16:           9.2ft needed  -> order 10ft  (2 colors)
+8 AWG M22759/16:          23.0ft needed  -> order 25ft  (2 colors)
+10 AWG M22759/16:         23.0ft needed  -> order 25ft  (2 colors)
+12 AWG M22759/32:         27.6ft needed  -> order 50ft  (5 colors)
+14 AWG M22759/32:        142.8ft needed  -> order 200ft (16 colors)
+16 AWG M22759/32:         20.7ft needed  -> order 25ft  (3 colors)
+18 AWG M22759/32:        408.7ft needed  -> order 450ft (49 colors)
+20 AWG M22759/32:        103.0ft needed  -> order 150ft (18 colors)
+22 AWG M22759/32:        125.5ft needed  -> order 200ft (21 colors)
+22 AWG TWISTED PAIR: 3.5ft needed  -> order 10ft  (1 color)
+22 AWG SHIELDED 2C: 18.4ft needed  -> order 25ft  (4 colors)
+
+==========================================================================================
+CHANGE LOG (v1 -> v2)
+------------------------------------------------------------------------------------------
+1. ETB: Replaced single wire #4 with 6 wires (#4a-#4f) matching GM 12605109
+   6-pin connector. Pin A/B = 18AWG motor drives, Pin C-F = 22AWG signals.
+   Net: +5 wires, +23.0ft
+
+2. SPEAKERS: Split wires #26-30 into + and - pairs (#26a/b through #30b).
+   Each speaker channel now has positive and negative (return) conductor.
+   Source changed from generic "ECU" to amplifier channel assignments.
+   Net: +5 wires, +69.0ft
+
+3. COILS: Updated all 8 ignition coil wires from 4.6ft to 2.5ft.
+   Delmo Speed DEL-Stributor bracket mounts all 8 D510C coils centrally
+   near firewall (distributor-style), not spread across valve covers.
+   Single coil branch routes to central mount point.
+   Net: 0 wires, -16.8ft
+
+TOTALS: 113 -> 123 wires | 830.0 -> 905.4 ft
+
+==========================================================================================
+ADDENDUM 2026-05-14 — COMPANION WIRES (Option B per receipts/2026-05-14_decision-companion-ground-wires.md, accepted by Skylar)
+==========================================================================================
+Naming convention: Ng = ground return for signal wire N; Nr = 5V reference for signal wire N;
+Ns = shield drain for shielded signal wire N. Companion wires inherit parent's gauge, length,
+routing path, and bundle assignment unless otherwise noted. M22759/32 22 AWG color is BLK for
+grounds, WHT for 5V refs, BLK/WHT or bare for shield drains.
+
+>> ANALOG_TEMP COMPANION GROUND RETURNS (3 wires, sensor pin 2 → M130:B15/B16 SEN_0V)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#109g IAT Sensor Ground              M130:B15      22 AWG M22759/32      BLK         4.6ft   Pigtail-supplied. Paired with AT1 (B03) via SEN_5V_A pullup
+#110g CLT Sensor Ground              M130:B16      22 AWG M22759/32      BLK         4.6ft   Pigtail-supplied. Paired with AT2 (B04) via SEN_5V_B pullup
+#113g OTS Sensor Ground              M130:B15      22 AWG M22759/32      BLK         4.6ft   Pigtail-supplied. Paired with AT3 (B05) via SEN_5V_A pullup
+
+>> ANALOG_5V COMPANION GROUND + 5V REF (6 wires per sensor pinout)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#102g OPS Sensor Ground              M130:B16      22 AWG M22759/32      BLK         4.6ft   Pigtail WP0IL40. OPS is analog_5v → 3-wire (signal + 5V + GND)
+#102r OPS 5V Reference               M130:A02      22 AWG M22759/32      GRY         4.6ft   SEN_5V_A
+#108g MAP Sensor Ground              M130:B15      22 AWG M22759/32      BLK         4.6ft   Pigtail ACDelco PT2293 / Bosch 3-pin
+#108r MAP 5V Reference               M130:A09      22 AWG M22759/32      GRY         4.6ft   SEN_5V_B
+#112g Fuel Pressure Ground           M130:B16      22 AWG M22759/32      BLK         4.6ft   Pigtail TBD
+#112r Fuel Pressure 5V Reference     M130:A02      22 AWG M22759/32      GRY         4.6ft   SEN_5V_A
+
+>> ECU_CRANK_CAM SHIELDED COMPANIONS (6 wires — shielded conductor 2 + drain)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#99g  CKP Sensor Ground (conductor 2 of #99 shielded 2C cable) M130:B15  22 AWG    BLK         4.6ft   In the M27500-style shielded cable
+#99r  CKP 5V Reference               M130:A02      22 AWG M22759/32      GRY         4.6ft   3-pin Metri-Pack CKP needs 5V supply
+#99s  CKP Shield Drain               M130:B15      22 AWG bare/BLK       BARE        4.6ft   Drain to SEN_0V at ECU end only (no sensor-end ground per K5_connector_schedule.txt:38)
+#101g CMP Sensor Ground (conductor 2 of #101 shielded 2C)      M130:B16  22 AWG    BLK         4.6ft
+#101r CMP 5V Reference               M130:A09      22 AWG M22759/32      GRY         4.6ft   SEN_5V_B
+#101s CMP Shield Drain               M130:B16      22 AWG bare/BLK       BARE        4.6ft
+
+>> PIEZOELECTRIC KNOCK COMPANIONS (4 wires — shielded conductor 2 + drain, no 5V)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#103g Knock B1 Sensor Ground (conductor 2)                     M130:B15  22 AWG    BLK         4.6ft   Knock is 2-pin (signal+ground), no 5V supply
+#103s Knock B1 Shield Drain          M130:B15      22 AWG bare/BLK       BARE        4.6ft
+#104g Knock B2 Sensor Ground (conductor 2)                     M130:B16  22 AWG    BLK         4.6ft
+#104s Knock B2 Shield Drain          M130:B16      22 AWG bare/BLK       BARE        4.6ft
+
+>> LOW_SIDE_DRIVE (INJECTOR) +12V POWER RAIL (1 bus wire to a junction, then short branches via WPINJ40 pigtails)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#INJ_PWR Injector +12V Rail          PDM30:OUT?    16 AWG M22759/32      RED         5.0ft   Feeds 8x EV6/USCAR injectors via daisy-chain at fuel rail. PDM channel TBD — check K5_pdm30_channel_plan.md.
+
+>> LOGIC_COIL_DRIVE (COIL) POWER + GROUND RAILS (2 bus wires to DEL-Stributor central bracket)
+------------------------------------------------------------------------------------------
+#    LABEL                           FROM          SPEC                  COLOR       LENGTH  NOTES
+#COIL_PWR Coil +12V Rail              PDM30:OUT?    16 AWG M22759/32      RED         3.0ft   Feeds 8x D510C coils via bracket bus. PDM channel TBD.
+#COIL_GND Coil Ground Rail            ENGINE BLOCK  16 AWG M22759/32      BLK         3.0ft   To engine block star ground (e.g. bell housing bolt). 8x coils daisy-chained at bracket.
+
+ADDENDUM TOTALS: +22 wires (3 AT_g + 6 AV_g+r + 6 CKP/CMP companions + 4 knock companions + 3 power/ground rails)
+                 145 wires total (123 original + 22 companion)
+                 Estimated additional length: ~110 ft (most are 4.6 ft each)
+
+KNOWN GAPS (deferred):
+- Injector and coil PDM channels are TBD — need to look up in K5_pdm30_channel_plan.md
+- Companion shield-drain wires may need different gauge or routing in practice
+- Spare AT4 (B06) has no signal wire yet — when assigned, will need #NNg companion

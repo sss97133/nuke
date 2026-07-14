@@ -1,0 +1,502 @@
+# K5 Blazer dimensional atoms.
+# Every measurement extracted from every reference doc, with provenance.
+# Intended for: (a) Blender twin construction, (b) eventual push to Nuke
+# vehicle_observations as substrate atoms, (c) future query without re-reading PDFs.
+#
+# Atom shape:
+#   subject: what is being measured (engine_bay, frame, ls3_long_block, etc.)
+#   attribute: which dimension (width, length, height, distance_X_to_Y)
+#   value, unit
+#   source: doc ID from K5_DIMENSIONAL_SUBSTRATE.md §1
+#   source_page: PDF page (1-indexed)
+#   compat: vehicle scope this measurement applies to
+#   notes: clarifying detail
+
+vehicle_target: K5_1977_CCL187Z210370
+extraction_date: 2026-05-05
+extracted_by: claude-opus-4-7
+
+atoms:
+
+# ========================================
+# FRAME (from FR-88 page 1, 1988 Blazer 4WD)
+# Square-body frame is shared 73-91; 77 K5 = same dims ±2mm
+# ========================================
+
+- {subject: frame, attribute: wheelbase, value: 2705, unit: mm, source: FR-88, source_page: 1, compat: blazer_4wd_73_91}
+- {subject: frame, attribute: wheelbase, value: 106.5, unit: in, source: FR-88, source_page: 1, compat: blazer_4wd_73_91}
+
+# Frame width measurements (cross-frame, point A through N — measuring point designations)
+- {subject: frame_pointA, attribute: distance_from_centerline, value: 461, unit: mm, source: FR-88, source_page: 1, notes: "Center of 15mm round hole, inside front frame rail"}
+- {subject: frame_pointA, attribute: longitudinal_station, value: 706, unit: mm, source: FR-88, source_page: 1}
+- {subject: frame_pointB, attribute: distance_from_centerline, value: 332, unit: mm, source: FR-88, source_page: 1, notes: "Tip of front leaf spring mount"}
+- {subject: frame_pointB, attribute: longitudinal_station, value: 938, unit: mm, source: FR-88, source_page: 1}
+- {subject: frame_pointC, attribute: distance_from_centerline, value: 463, unit: mm, source: FR-88, source_page: 1, notes: "Tip of rivet, crossmember mount"}
+- {subject: frame_pointCD, attribute: longitudinal_station, value: 1582, unit: mm, source: FR-88, source_page: 1, notes: "Combined CD station"}
+- {subject: frame_pointD, attribute: distance_from_centerline, value: 464, unit: mm, source: FR-88, source_page: 1, notes: "Tip of rivet, crossmember mount"}
+- {subject: frame_pointD, attribute: longitudinal_station, value: 1475, unit: mm, source: FR-88, source_page: 1}
+- {subject: frame_pointE, attribute: distance_from_centerline, value: 448, unit: mm, source: FR-88, source_page: 1, notes: "Tip of bolt, motor mount — KEY for engine placement"}
+- {subject: frame_pointE, attribute: longitudinal_station, value: 1587, unit: mm, source: FR-88, source_page: 1}
+- {subject: frame_pointF, attribute: distance_from_centerline, value: 366, unit: mm, source: FR-88, source_page: 1, notes: "Tip of bolt, leaf spring mount"}
+- {subject: frame_pointG, attribute: distance_from_centerline, value: 367, unit: mm, source: FR-88, source_page: 1, notes: "Center of 19x33mm oval hole"}
+- {subject: frame_pointG, attribute: longitudinal_station, value: 1769, unit: mm, source: FR-88, source_page: 1}
+- {subject: frame_pointH, attribute: distance_from_centerline, value: 337, unit: mm, source: FR-88, source_page: 1, notes: "Center of 16x31mm oval hole"}
+- {subject: frame_pointI, attribute: distance_from_centerline, value: 305, unit: mm, source: FR-88, source_page: 1, notes: "Tip of rivet, exhaust hanger bracket"}
+- {subject: frame_pointJ, attribute: distance_from_centerline, value: 436, unit: mm, source: FR-88, source_page: 1, notes: "Tip of rivet, 10mm round hole"}
+- {subject: frame_pointK, attribute: distance_from_centerline, value: 575, unit: mm, source: FR-88, source_page: 1, notes: "Center of bolt, leaf spring mount"}
+- {subject: frame_pointL, attribute: distance_from_centerline, value: 489, unit: mm, source: FR-88, source_page: 1, notes: "Tip of rivet, tow package rear mount (also L')"}
+- {subject: frame_pointM, attribute: distance_from_centerline, value: 367, unit: mm, source: FR-88, source_page: 1, notes: "Center of bolt, rear mount"}
+- {subject: frame_pointN, attribute: distance_from_centerline, value: 433, unit: mm, source: FR-88, source_page: 1, notes: "Tip of bolt, tow package rear mount"}
+
+# Frame inside-to-inside cross-frame widths
+- {subject: frame, attribute: front_inside_width, value: 1587, unit: mm, source: FR-88, source_page: 1}
+- {subject: frame, attribute: motor_mount_inside_width, value: 1410, unit: mm, source: FR-88, source_page: 1, notes: "Approx — derived from 705 mm centerline-to-rail × 2"}
+- {subject: frame, attribute: rear_leafspring_crossmember_width, value: 1624, unit: mm, source: FR-88, source_page: 1}
+- {subject: frame, attribute: midframe_after_kickup_width, value: 1184, unit: mm, source: FR-88, source_page: 1}
+- {subject: frame, attribute: rear_axle_area_width, value: 1411, unit: mm, source: FR-88, source_page: 1}
+
+# Side-view profile heights from datum (frame bottom)
+- {subject: frame, attribute: front_rail_tip_height, value: 706, unit: mm, source: FR-88, source_page: 1, notes: "Side view, height above datum"}
+- {subject: frame, attribute: front_kickdown_height, value: 938, unit: mm, source: FR-88, source_page: 1, notes: "Behind front A-arm pivot"}
+- {subject: frame, attribute: midbay_level_run_height, value: 1020, unit: mm, source: FR-88, source_page: 1}
+- {subject: frame, attribute: cab_kickup_low_height, value: 791, unit: mm, source: FR-88, source_page: 1}
+- {subject: frame, attribute: cab_kickup_high_height, value: 961, unit: mm, source: FR-88, source_page: 1}
+- {subject: frame, attribute: rail_box_thickness, value: 286, unit: mm, source: FR-88, source_page: 1, notes: "Diff between top and bottom of frame rail at mid-cab"}
+- {subject: frame, attribute: rear_kickup_low_height, value: 810, unit: mm, source: FR-88, source_page: 1}
+- {subject: frame, attribute: rear_kickup_high_height, value: 1093, unit: mm, source: FR-88, source_page: 1}
+- {subject: frame, attribute: rear_axle_peak_height, value: 382, unit: mm, source: FR-88, source_page: 1}
+- {subject: frame, attribute: rear_rail_top_height, value: 1186, unit: mm, source: FR-88, source_page: 1}
+- {subject: frame, attribute: rear_rail_bottom_height, value: 824, unit: mm, source: FR-88, source_page: 1}
+
+# Frame fastener torque specs
+- {subject: torque_spec_anchor_plate_to_knuckle, value: 65, unit: ft_lb, source: FR-88, source_page: 1}
+- {subject: torque_spec_anchor_plate_to_knuckle, value: 88, unit: nm, source: FR-88, source_page: 1}
+- {subject: torque_spec_knuckle_to_lower_ball_joint, value: 30, unit: ft_lb, source: FR-88, source_page: 1}
+- {subject: torque_spec_knuckle_to_upper_ball_joint, value: 100, unit: ft_lb, source: FR-88, source_page: 1}
+- {subject: torque_spec_knuckle_to_axle, value: 114, unit: ft_lb, source: FR-88, source_page: 1}
+- {subject: torque_spec_shock_to_frame, value: 90, unit: ft_lb, source: FR-88, source_page: 1}
+- {subject: torque_spec_shock_to_axle, value: 50, unit: ft_lb, source: FR-88, source_page: 1}
+- {subject: torque_spec_leaf_shackle_to_frame, value: 65, unit: ft_lb, source: FR-88, source_page: 1}
+- {subject: torque_spec_stabilizer_to_frame, value: 70, unit: ft_lb, source: FR-88, source_page: 1}
+- {subject: torque_spec_rear_ubolt_nuts, value: 110, unit: ft_lb, source: FR-88, source_page: 1}
+- {subject: torque_spec_spring_to_axle_ubolt, value: 150, unit: ft_lb, source: FR-88, source_page: 1}
+
+# ========================================
+# BODY / ENGINE COMPARTMENT (from FR-88 page 2)
+# ========================================
+
+- {subject: engine_bay, attribute: width_at_firewall_top, value: 1715, unit: mm, source: FR-88, source_page: 2, notes: "Across firewall top of fender plane"}
+- {subject: engine_bay, attribute: width_at_firewall_top, value: 67.52, unit: in, source: FR-88, source_page: 2}
+- {subject: engine_bay, attribute: centerline_to_inner_shock_tower, value: 1102, unit: mm, source: FR-88, source_page: 2, notes: "Each side; total inner-tower-to-inner-tower = 2204mm"}
+- {subject: engine_bay, attribute: centerline_to_inner_shock_tower, value: 43.39, unit: in, source: FR-88, source_page: 2}
+- {subject: engine_bay, attribute: inner_tower_to_inner_tower, value: 2204, unit: mm, source: FR-88, source_page: 2}
+- {subject: engine_bay, attribute: length_firewall_to_radiator_support, value: 1523, unit: mm, source: FR-88, source_page: 2}
+- {subject: engine_bay, attribute: length_firewall_to_radiator_support, value: 59.96, unit: in, source: FR-88, source_page: 2}
+- {subject: engine_bay, attribute: diagonal_squareness_check, value: 1957, unit: mm, source: FR-88, source_page: 2, notes: "Both diagonals should be equal"}
+- {subject: engine_bay, attribute: width_front_of_bay, value: 1715, unit: mm, source: FR-88, source_page: 2}
+
+# A pillar measurements
+- {subject: a_pillar, attribute: length, value: 1746, unit: mm, source: FR-88, source_page: 2, notes: "Inside passenger compartment"}
+
+# B pillar measurements
+- {subject: b_pillar, attribute: dimension_1, value: 1416, unit: mm, source: FR-88, source_page: 2}
+- {subject: b_pillar, attribute: dimension_2, value: 1858, unit: mm, source: FR-88, source_page: 2}
+- {subject: b_pillar, attribute: dimension_3, value: 1797, unit: mm, source: FR-88, source_page: 2}
+
+# Inside passenger compartment
+- {subject: passenger_compartment, attribute: dimension_inside, value: 1523, unit: mm, source: FR-88, source_page: 2}
+
+# Door opening
+- {subject: door_opening, attribute: dimension_short, value: 940, unit: mm, source: FR-88, source_page: 2}
+- {subject: door_opening, attribute: dimension_med1, value: 1445, unit: mm, source: FR-88, source_page: 2}
+- {subject: door_opening, attribute: dimension_med2, value: 1572, unit: mm, source: FR-88, source_page: 2}
+- {subject: door_opening, attribute: dimension_diagonal, value: 1657, unit: mm, source: FR-88, source_page: 2}
+
+# Tailgate opening
+- {subject: tailgate_opening, attribute: corner_dim_1, value: 505, unit: mm, source: FR-88, source_page: 2}
+- {subject: tailgate_opening, attribute: corner_dim_2, value: 505, unit: mm, source: FR-88, source_page: 2}
+- {subject: tailgate_opening, attribute: width, value: 1572, unit: mm, source: FR-88, source_page: 2}
+- {subject: tailgate_opening, attribute: diagonal, value: 1657, unit: mm, source: FR-88, source_page: 2}
+- {subject: tailgate_opening, attribute: opening_internal, value: 1724, unit: mm, source: FR-88, source_page: 2}
+
+# Front windshield
+- {subject: windshield, attribute: corner_dim_left, value: 600, unit: mm, source: FR-88, source_page: 2}
+- {subject: windshield, attribute: corner_dim_right, value: 600, unit: mm, source: FR-88, source_page: 2}
+- {subject: windshield, attribute: dimension_short, value: 1417, unit: mm, source: FR-88, source_page: 2}
+- {subject: windshield, attribute: diagonal, value: 1657, unit: mm, source: FR-88, source_page: 2}
+- {subject: windshield, attribute: width, value: 1686, unit: mm, source: FR-88, source_page: 2}
+
+# Wheel alignment (factory spec)
+- {subject: wheel_alignment, attribute: caster, value: 8.0, unit: degrees, source: FR-88, source_page: 2, notes: "+8 ± 0.5"}
+- {subject: wheel_alignment, attribute: caster_tolerance, value: 0.5, unit: degrees, source: FR-88, source_page: 2}
+- {subject: wheel_alignment, attribute: camber, value: 1.5, unit: degrees, source: FR-88, source_page: 2}
+- {subject: wheel_alignment, attribute: camber_tolerance, value: 0.5, unit: degrees, source: FR-88, source_page: 2}
+- {subject: wheel_alignment, attribute: toe_in_inches, value: 0.07, unit: in, source: FR-88, source_page: 2}
+- {subject: wheel_alignment, attribute: toe_in_tolerance, value: 0.03, unit: in, source: FR-88, source_page: 2}
+- {subject: wheel_alignment, attribute: toe_in_degrees, value: 0.15, unit: degrees, source: FR-88, source_page: 2}
+- {subject: wheel_alignment, attribute: toe_in_degrees_tolerance, value: 0.07, unit: degrees, source: FR-88, source_page: 2}
+- {subject: wheel_alignment, attribute: caster_camber_adjustability, value: false, unit: bool, source: FR-88, source_page: 2, notes: "Note: Caster and Camber are fixed and cannot be adjusted"}
+
+# ========================================
+# KLM-Blz CHT-1 (1984 Blazer 4WD, 106.5" WB) — cross-check & supplemental
+# ========================================
+
+- {subject: engine_bay, attribute: underhood_box_height, value: 1524, unit: mm, source: KLM-Blz, notes: "60 inches"}
+- {subject: engine_bay, attribute: underhood_box_height, value: 60.0, unit: in, source: KLM-Blz}
+- {subject: engine_bay, attribute: underhood_box_width, value: 1721, unit: mm, source: KLM-Blz, notes: "67-3/4 inches"}
+- {subject: engine_bay, attribute: underhood_box_width, value: 67.75, unit: in, source: KLM-Blz}
+- {subject: engine_bay, attribute: underhood_front_opening, value: 1102, unit: mm, source: KLM-Blz, notes: "43-3/8 inches"}
+- {subject: engine_bay, attribute: underhood_front_opening, value: 43.375, unit: in, source: KLM-Blz}
+- {subject: engine_bay, attribute: underhood_diagonal, value: 1962, unit: mm, source: KLM-Blz, notes: "77-1/4 inches; both diagonals"}
+
+# KLM-Blz frame side-view heights from datum line (front to rear, mm)
+- {subject: frame_klm, attribute: height_station_1, value: 364, unit: mm, source: KLM-Blz, notes: "14-7/16 inch — front rail tip"}
+- {subject: frame_klm, attribute: height_station_2, value: 533, unit: mm, source: KLM-Blz, notes: "21 inch"}
+- {subject: frame_klm, attribute: height_station_3, value: 429, unit: mm, source: KLM-Blz, notes: "16-7/8 inch"}
+- {subject: frame_klm, attribute: height_station_4, value: 321, unit: mm, source: KLM-Blz, notes: "12-5/8 inch"}
+- {subject: frame_klm, attribute: height_station_5, value: 356, unit: mm, source: KLM-Blz, notes: "14 inch"}
+- {subject: frame_klm, attribute: height_station_6, value: 618, unit: mm, source: KLM-Blz, notes: "24-5/8 inch"}
+- {subject: frame_klm, attribute: height_station_7, value: 581, unit: mm, source: KLM-Blz, notes: "22-1/2 inch"}
+- {subject: frame_klm, attribute: height_station_8, value: 543, unit: mm, source: KLM-Blz, notes: "21-3/4 inch"}
+
+# KLM-Blz longitudinal station gaps from datum
+- {subject: frame_klm, attribute: long_gap_1, value: 479, unit: mm, source: KLM-Blz, notes: "18-3/4 inch"}
+- {subject: frame_klm, attribute: long_gap_2, value: 743, unit: mm, source: KLM-Blz, notes: "29-1/4 inch"}
+- {subject: frame_klm, attribute: long_gap_3, value: 292, unit: mm, source: KLM-Blz, notes: "11-1/2 inch"}
+- {subject: frame_klm, attribute: long_gap_4, value: 1029, unit: mm, source: KLM-Blz, notes: "40-1/2 inch"}
+- {subject: frame_klm, attribute: long_gap_5, value: 822, unit: mm, source: KLM-Blz, notes: "32-3/4 inch"}
+- {subject: frame_klm, attribute: long_gap_6, value: 498, unit: mm, source: KLM-Blz, notes: "19-5/8 inch"}
+- {subject: frame_klm, attribute: long_gap_7, value: 521, unit: mm, source: KLM-Blz, notes: "20-1/2 inch"}
+
+# KLM-Blz bottom-view diagonals (squareness check)
+- {subject: frame_klm, attribute: diag_4_to_8, value: 1480, unit: mm, source: KLM-Blz, notes: "58-1/4 inch — first major diagonal"}
+- {subject: frame_klm, attribute: diag_alt_1, value: 1416, unit: mm, source: KLM-Blz, notes: "55-3/4 inch"}
+- {subject: frame_klm, attribute: diag_alt_2, value: 1340, unit: mm, source: KLM-Blz, notes: "52-3/4 inch"}
+- {subject: frame_klm, attribute: diag_alt_3, value: 1083, unit: mm, source: KLM-Blz, notes: "42-5/8 inch"}
+- {subject: frame_klm, attribute: diag_alt_4, value: 1040, unit: mm, source: KLM-Blz, notes: "40-15/16 inch"}
+- {subject: frame_klm, attribute: diag_alt_5, value: 1448, unit: mm, source: KLM-Blz, notes: "57 inch"}
+
+# ========================================
+# LS3 LONG BLOCK (Marine spec sheet — has envelope drawings)
+# ========================================
+
+- {subject: ls3_long_block, attribute: type, value: "6.2L Gen-IV V8 Small Block", unit: text, source: LS3-Marine, source_page: 3}
+- {subject: ls3_long_block, attribute: displacement_cc, value: 6162, unit: cc, source: LS3-Marine, source_page: 3}
+- {subject: ls3_long_block, attribute: displacement_ci, value: 376.0, unit: ci, source: LS3-Marine, source_page: 3}
+- {subject: ls3_long_block, attribute: bore, value: 103.25, unit: mm, source: LS3-Marine, source_page: 3}
+- {subject: ls3_long_block, attribute: stroke, value: 92, unit: mm, source: LS3-Marine, source_page: 3}
+- {subject: ls3_long_block, attribute: bore_center, value: 111.76, unit: mm, source: LS3-Marine, source_page: 3, notes: "Cyl-to-cyl pitch"}
+- {subject: ls3_long_block, attribute: compression_ratio, value: 10.7, unit: ratio, source: LS3-Marine, source_page: 3}
+- {subject: ls3_long_block, attribute: envelope_length, value: 710, unit: mm, source: LS3-Marine, source_page: 3, notes: "Damper face to bellhousing face, side view"}
+- {subject: ls3_long_block, attribute: envelope_length, value: 27.95, unit: in, source: LS3-Marine, source_page: 3}
+- {subject: ls3_long_block, attribute: envelope_height, value: 716, unit: mm, source: LS3-Marine, source_page: 3, notes: "Oil pan to top of intake, front view"}
+- {subject: ls3_long_block, attribute: envelope_height, value: 28.19, unit: in, source: LS3-Marine, source_page: 3}
+- {subject: ls3_long_block, attribute: envelope_width, value: 705, unit: mm, source: LS3-Marine, source_page: 3, notes: "With front accessory drive mounted, no headers"}
+- {subject: ls3_long_block, attribute: envelope_width, value: 27.75, unit: in, source: LS3-Marine, source_page: 3}
+- {subject: ls3_long_block, attribute: hp_marine, value: 418, unit: hp, source: LS3-Marine, source_page: 3, notes: "@ 5400 rpm SAE certified"}
+- {subject: ls3_long_block, attribute: hp_marine_kw, value: 312, unit: kW, source: LS3-Marine, source_page: 3}
+- {subject: ls3_long_block, attribute: torque_marine, value: 424, unit: ft_lb, source: LS3-Marine, source_page: 3, notes: "@ 4600 rpm SAE certified"}
+- {subject: ls3_long_block, attribute: torque_marine_nm, value: 575, unit: nm, source: LS3-Marine, source_page: 3}
+- {subject: ls3_long_block, attribute: assembly_site, value: "St. Catharines, Ontario", unit: text, source: LS3-Marine, source_page: 3}
+- {subject: ls3_long_block, attribute: emission_controls, value: "Positive Crankcase Ventilation (PCV)", unit: text, source: LS3-Marine, source_page: 3}
+
+# ========================================
+# LS3 LONG BLOCK (LS376 spec sheet — performance numbers)
+# ========================================
+
+- {subject: ls3_long_block, attribute: bore_inches, value: 4.065, unit: in, source: LS3-LB-Spec, source_page: 4}
+- {subject: ls3_long_block, attribute: stroke_inches, value: 3.622, unit: in, source: LS3-LB-Spec, source_page: 4}
+- {subject: ls3_long_block, attribute: chamber_volume, value: 68, unit: cc, source: LS3-LB-Spec, source_page: 4}
+- {subject: ls3_long_block, attribute: intake_valve_diameter, value: 2.16, unit: in, source: LS3-LB-Spec, source_page: 4}
+- {subject: ls3_long_block, attribute: exhaust_valve_diameter, value: 1.59, unit: in, source: LS3-LB-Spec, source_page: 4}
+- {subject: ls3_long_block, attribute: cam_lift_intake, value: 0.551, unit: in, source: LS3-LB-Spec, source_page: 5}
+- {subject: ls3_long_block, attribute: cam_lift_exhaust, value: 0.522, unit: in, source: LS3-LB-Spec, source_page: 5}
+- {subject: ls3_long_block, attribute: cam_duration_intake, value: 202, unit: degrees, source: LS3-LB-Spec, source_page: 5, notes: "@ 0.050 tappet lift"}
+- {subject: ls3_long_block, attribute: cam_duration_exhaust, value: 212, unit: degrees, source: LS3-LB-Spec, source_page: 5, notes: "@ 0.050 tappet lift"}
+- {subject: ls3_long_block, attribute: cam_lsa, value: 117, unit: degrees, source: LS3-LB-Spec, source_page: 5, notes: "Stock LS3; LS376/480 = 112"}
+- {subject: ls3_long_block, attribute: rocker_ratio, value: 1.7, unit: ratio, source: LS3-LB-Spec, source_page: 5}
+- {subject: ls3_long_block, attribute: oil_capacity, value: 5.5, unit: qt, source: LS3-LB-Spec, source_page: 5, notes: "With filter"}
+- {subject: ls3_long_block, attribute: max_engine_speed, value: 6600, unit: rpm, source: LS3-LB-Spec, source_page: 5}
+- {subject: ls3_long_block, attribute: spark_plug_pn_acdelco, value: "41-985", unit: text, source: LS3-LB-Spec, source_page: 5}
+- {subject: ls3_long_block, attribute: spark_plug_pn_gm, value: "12621258", unit: text, source: LS3-LB-Spec, source_page: 5}
+- {subject: ls3_long_block, attribute: spark_plug_gap, value: 0.040, unit: in, source: LS3-LB-Spec, source_page: 5}
+- {subject: ls3_long_block, attribute: firing_order, value: "1-8-7-2-6-5-4-3", unit: text, source: LS3-LB-Spec, source_page: 5}
+- {subject: ls3_long_block, attribute: oil_pressure_min_1000rpm, value: 6, unit: psig, source: LS3-LB-Spec, source_page: 5, notes: "Hot oil"}
+- {subject: ls3_long_block, attribute: oil_pressure_min_2000rpm, value: 18, unit: psig, source: LS3-LB-Spec, source_page: 5}
+- {subject: ls3_long_block, attribute: oil_pressure_min_4000rpm, value: 24, unit: psig, source: LS3-LB-Spec, source_page: 5}
+- {subject: ls3_long_block, attribute: oil_filter_pn, value: "PF48", unit: text, source: LS3-LB-Spec, source_page: 5, notes: "AC Delco"}
+- {subject: ls3_long_block, attribute: oil_recommended, value: "Mobil 1 5W30 Synthetic", unit: text, source: LS3-LB-Spec, source_page: 5, notes: "Older spec sheet"}
+- {subject: ls3_long_block, attribute: oil_recommended_2023, value: "Mobil 1 dexosR 0W-40", unit: text, source: LS3-LB-Inst-23, source_page: 1, notes: "Updated spec — supersedes 5W-30 callout in older sheet"}
+- {subject: ls3_long_block, attribute: cam_pn_stock_ls3, value: "12623063", unit: text, source: LS3-LB-Spec, source_page: 2, notes: "Single-bolt sprocket"}
+- {subject: ls3_long_block, attribute: cam_pn_ls376_480, value: "88958753", unit: text, source: LS3-LB-Spec, source_page: 2, notes: "3-bolt sprocket"}
+- {subject: ls3_long_block, attribute: cam_pn_ls376_525, value: "88958770", unit: text, source: LS3-LB-Spec, source_page: 2, notes: "3-bolt sprocket"}
+- {subject: ls3_long_block, attribute: starter_pn, value: "10465385", unit: text, source: LS3-LB-Spec, source_page: 2}
+- {subject: ls3_long_block, attribute: pilot_bearing_long, value: "14061685", unit: text, source: LS3-LB-Spec, source_page: 2, notes: "Long input shaft (manual trans)"}
+- {subject: ls3_long_block, attribute: pilot_bearing_short, value: "12557583", unit: text, source: LS3-LB-Spec, source_page: 2, notes: "Short input shaft (manual trans)"}
+- {subject: ls3_long_block, attribute: flexplate_pn, value: "12654640", unit: text, source: LS3-LB-Spec, source_page: 2}
+- {subject: ls3_long_block, attribute: flywheel_pn, value: "12571611", unit: text, source: LS3-LB-Spec, source_page: 2}
+- {subject: ls3_long_block, attribute: exhaust_manifold_left, value: "12611638", unit: text, source: LS3-LB-Spec, source_page: 3}
+- {subject: ls3_long_block, attribute: exhaust_manifold_right, value: "12611639", unit: text, source: LS3-LB-Spec, source_page: 3}
+- {subject: ls3_long_block, attribute: exhaust_manifold_gasket, value: "12617944", unit: text, source: LS3-LB-Spec, source_page: 3, notes: "Qty 2"}
+- {subject: ls3_long_block, attribute: exhaust_manifold_bolt, value: "11518860", unit: text, source: LS3-LB-Spec, source_page: 3, notes: "Qty 12"}
+- {subject: ls3_long_block, attribute: accessory_drive_kit_with_ac, value: "19418440 / 19370820 / 19418442", unit: text, source: LS3-LB-Spec, source_page: 3}
+- {subject: ls3_long_block, attribute: accessory_drive_kit_no_ac, value: "19370821 / 19418441", unit: text, source: LS3-LB-Spec, source_page: 3}
+- {subject: ls3_long_block, attribute: fuel_pump_pn_intank, value: "19330301", unit: text, source: LS3-LB-Spec, source_page: 3}
+- {subject: ls3_long_block, attribute: fuel_filter_regulator_pn, value: "19239926", unit: text, source: LS3-LB-Spec, source_page: 3}
+- {subject: ls3_long_block, attribute: fuel_pressure_required, value: 60, unit: psi, source: LS3-LB-Spec, source_page: 1, notes: "Constant pressure (400 kPa)"}
+- {subject: ls3_long_block, attribute: fuel_flow_required, value: 45, unit: gph, source: LS3-LB-Spec, source_page: 3, notes: "Gallons per hour @ rated pressure"}
+- {subject: ls3_long_block, attribute: fuel_grade, value: "Premium unleaded 92 R+M/2", unit: text, source: LS3-LB-Spec, source_page: 5}
+- {subject: ls3_long_block, attribute: oil_gallery_plug_torque, value: 60, unit: nm, source: LS3-LB-Spec, source_page: 4}
+- {subject: ls3_long_block, attribute: oil_gallery_plug_torque, value: 44, unit: ft_lb, source: LS3-LB-Spec, source_page: 4}
+
+# ========================================
+# LS3 E-ROD INSTALL GUIDE — install constraints, emissions, fitment rules
+# (Skylar is on Motec M130 not EROD ECM, but the install rules apply to any LS3)
+# ========================================
+
+- {subject: ls3_install, attribute: max_vehicle_gvwr, value: 5725, unit: lb, source: LS3-EROD-Guide, source_page: 2, notes: "Max GVWR LS3 6.2L is rated for"}
+- {subject: ls3_install, attribute: vss_pulses_per_rev_auto, value: 40, unit: count, source: LS3-EROD-Guide, source_page: 2, notes: "40T calibration for auto trans (incl 6L80)"}
+- {subject: ls3_install, attribute: vss_pulses_per_rev_manual, value: 17, unit: count, source: LS3-EROD-Guide, source_page: 2, notes: "17T calibration for manual trans"}
+- {subject: ls3_install, attribute: axle_ratio_default, value: 3.42, unit: ratio, source: LS3-EROD-Guide, source_page: 2}
+- {subject: ls3_install, attribute: axle_ratio_range_min, value: 3.08, unit: ratio, source: LS3-EROD-Guide, source_page: 2}
+- {subject: ls3_install, attribute: axle_ratio_range_max, value: 4.11, unit: ratio, source: LS3-EROD-Guide, source_page: 2}
+- {subject: ls3_install, attribute: tire_diameter_min, value: 26, unit: in, source: LS3-EROD-Guide, source_page: 2}
+- {subject: ls3_install, attribute: tire_diameter_max, value: 30, unit: in, source: LS3-EROD-Guide, source_page: 2}
+- {subject: ls3_install, attribute: fuel_pressure_required_kpa, value: 400, unit: kpa, source: LS3-EROD-Guide, source_page: 1, notes: "60 psi constant"}
+- {subject: ls3_install, attribute: fuel_flow_required_gph, value: 40, unit: gph, source: LS3-EROD-Guide, source_page: 1}
+- {subject: ls3_install, attribute: maf_tube_diameter, value: 4, unit: in, source: LS3-EROD-Guide, source_page: 3, notes: "Induction tube min diameter"}
+- {subject: ls3_install, attribute: maf_straight_section_min, value: 6, unit: in, source: LS3-EROD-Guide, source_page: 3}
+- {subject: ls3_install, attribute: maf_distance_from_throttle_body_min, value: 10, unit: in, source: LS3-EROD-Guide, source_page: 3, notes: "MAF mounting boss must be at least 10 inches from throttle body"}
+- {subject: ls3_install, attribute: catalytic_converter_distance_from_head_min, value: 16, unit: in, source: LS3-EROD-Guide, source_page: 4, notes: "Along path of exhaust gas flow from cylinder head exhaust port face"}
+- {subject: ls3_install, attribute: catalytic_converter_distance_from_head_max, value: 20, unit: in, source: LS3-EROD-Guide, source_page: 4}
+- {subject: ls3_install, attribute: post_cat_o2_distance_min, value: 2.5, unit: in, source: LS3-EROD-Guide, source_page: 3, notes: "From rear of front catalyst brick/honeycomb"}
+- {subject: ls3_install, attribute: post_cat_o2_distance_max, value: 4, unit: in, source: LS3-EROD-Guide, source_page: 3}
+- {subject: ls3_install, attribute: o2_bung_hole_size, value: 0.875, unit: in, source: LS3-EROD-Guide, source_page: 3, notes: "7/8 inch hole for welding O2 mounting boss"}
+- {subject: ls3_install, attribute: engine_ground_strap_min, value: 0.75, unit: in, source: LS3-EROD-Guide, source_page: 1, notes: "3/4 inch braided strap minimum, engine to chassis"}
+- {subject: ls3_install, attribute: battery_wire_gauge_min, value: 8, unit: awg, source: LS3-EROD-Guide, source_page: 1}
+- {subject: ls3_install, attribute: cooling_fan_ecm_trigger_temp_f, value: 207, unit: degrees_f, source: LS3-EROD-Guide, source_page: 6}
+- {subject: ls3_install, attribute: cooling_fan_ecm_trigger_temp_c, value: 97, unit: degrees_c, source: LS3-EROD-Guide, source_page: 6}
+- {subject: ls3_install, attribute: brake_booster_vacuum_port_location, value: "rear of intake manifold", unit: text, source: LS3-EROD-Guide, source_page: 5, notes: "Vacuum fitting GM PN 12559760"}
+- {subject: ls3_install, attribute: brake_booster_vacuum_fitting_pn, value: "12559760", unit: text, source: LS3-EROD-Guide, source_page: 5}
+- {subject: ls3_install, attribute: pcv_foul_air_ports, value: "valley cover front, left rear (driver side) valve cover", unit: text, source: LS3-EROD-Guide, source_page: 4}
+- {subject: ls3_install, attribute: pcv_fresh_air_port, value: "front of right (passenger side) valve cover, silver tube", unit: text, source: LS3-EROD-Guide, source_page: 4}
+- {subject: ls3_install, attribute: exhaust_manifold_torque_pass1, value: 11, unit: ft_lb, source: LS3-EROD-Guide, source_page: 4, notes: "15 N·m, center bolts first then alternate side-to-side"}
+- {subject: ls3_install, attribute: exhaust_manifold_torque_pass2, value: 15, unit: ft_lb, source: LS3-EROD-Guide, source_page: 4, notes: "20 N·m"}
+- {subject: ls3_install, attribute: purge_solenoid_torque, value: 37, unit: ft_lb, source: LS3-EROD-Guide, source_page: 4, notes: "50 N·m, mounts on RH (passenger) cylinder head"}
+
+# EROD specific PNs (for Skylar's reference; not all apply since he runs Motec M130)
+- {subject: ls3_erod, attribute: catalytic_converter_lh_pn, value: "92247641", unit: text, source: LS3-EROD-Guide, source_page: 2}
+- {subject: ls3_erod, attribute: catalytic_converter_rh_pn, value: "92247640", unit: text, source: LS3-EROD-Guide, source_page: 2}
+- {subject: ls3_erod, attribute: emission_canister_pn, value: "17113332", unit: text, source: LS3-EROD-Guide, source_page: 2}
+- {subject: ls3_erod, attribute: air_filter_element_pn, value: "19302206", unit: text, source: LS3-EROD-Guide, source_page: 2}
+- {subject: ls3_erod, attribute: maf_sensor_pn, value: "15865791", unit: text, source: LS3-EROD-Guide, source_page: 2}
+- {subject: ls3_erod, attribute: maf_bracket_pn, value: "19166574", unit: text, source: LS3-EROD-Guide, source_page: 2}
+- {subject: ls3_erod, attribute: accelerator_pedal_pn, value: "10379038", unit: text, source: LS3-EROD-Guide, source_page: 2}
+- {subject: ls3_erod, attribute: front_o2_sensor_pn, value: "12581966", unit: text, source: LS3-EROD-Guide, source_page: 2, notes: "Qty 2"}
+- {subject: ls3_erod, attribute: rear_o2_sensor_pn, value: "12611165", unit: text, source: LS3-EROD-Guide, source_page: 2, notes: "Qty 2"}
+- {subject: ls3_erod, attribute: o2_mounting_boss_pn, value: "15156588", unit: text, source: LS3-EROD-Guide, source_page: 2, notes: "Qty 4"}
+- {subject: ls3_erod, attribute: harness_pn, value: "19369375", unit: text, source: LS3-EROD-Guide, source_page: 2, notes: "EROD engine harness (NOT what Skylar runs — he's on Motec)"}
+- {subject: ls3_erod, attribute: ecm_pn_40t, value: "19354347", unit: text, source: LS3-EROD-Guide, source_page: 2, notes: "ECM for 40-tooth trans speed signal (auto/6L80)"}
+- {subject: ls3_erod, attribute: ecm_pn_17t, value: "19354349", unit: text, source: LS3-EROD-Guide, source_page: 2, notes: "ECM for 17-tooth (manual)"}
+- {subject: ls3_erod, attribute: cam_sensor_jumper_harness_pn, value: "19256607", unit: text, source: LS3-EROD-Guide, source_page: 2}
+- {subject: ls3_erod, attribute: purge_solenoid_pn, value: "12597567", unit: text, source: LS3-EROD-Guide, source_page: 2}
+- {subject: ls3_erod, attribute: purge_solenoid_bracket_pn, value: "12577830", unit: text, source: LS3-EROD-Guide, source_page: 2}
+
+# ========================================
+# LS3 EFI CRATE — variant LS376-480 (PN 19419889/19419862)
+# Differs from base LS3 in cam + spark plug
+# ========================================
+
+- {subject: ls3_long_block, attribute: variant_pn_efi_crate, value: "19419889", unit: text, source: LS3-EFI, source_page: 1, notes: "LS376-480 EFI crate engine spec sheet PN"}
+- {subject: ls3_long_block, attribute: variant_pn_efi_crate_alt, value: "19419862", unit: text, source: LS3-EFI, source_page: 1, notes: "Engine assembly PN itself"}
+- {subject: ls3_long_block, attribute: cam_lsa_efi_crate, value: 117.5, unit: degrees, source: LS3-EFI, source_page: 4, notes: "LSA 117.5° — slightly different from base LS3 (117°) and from LS376/480/525 (112°)"}
+- {subject: ls3_long_block, attribute: spark_plug_pn_gm_efi, value: "12680072", unit: text, source: LS3-EFI, source_page: 4, notes: "EFI crate uses different GM PN than base LS3 (12621258); both cross-ref AC Delco 41-985"}
+
+# ========================================
+# AUDIT STATUS — local PDFs
+# ========================================
+# READ + ATOMIZED:
+#   FR-88, KLM-Blz, KLM-K10  (frame + body)
+#   LS3-Marine                (LS3 envelope dims — ONLY local source for envelope)
+#   LS3-LB-Spec, LS3-LB-Inst-23, LS3-EFI  (LS3 spec — performance/fluids/PNs only)
+#   LS3-EROD                  (install constraints + emissions PNs)
+#   6L80-Kit, 6L80-Moveras    (procedural — NO envelope dims)
+# NOT YET READ:
+#   LS3-LB-Inst (older LS3 install guide) — likely duplicate of LS3-LB-Spec
+#   1977_Light_Truck_Service_Manual.pdf — full audit pending (large)
+#   1987_Light_Duty_Truck_Service_Manual.pdf — full audit pending
+#   GM_RPO_Master_List.pdf — RPO codes for VIN match
+#   Sonnax_*, ATSG_*, ATRA_* — internals reference, not envelope
+#   Holley_558-499, Canems_LS3, AEM_TA2 — wiring not envelope
+# CONFIRMED MISSING from local docs (need other source):
+#   6L80E full envelope (length, bellhousing OD, weight, output shaft offset)
+#   LS3 with headers full width
+#   LS3 with accessory drive (which kit?) full envelope
+#   Bosch iBooster footprint + bolt pattern
+#   Radiator dimensions (need part number)
+#   Motor mount frame-side bracket position (need brand)
+#   Header collector outlet position (need brand)
+
+# ========================================
+# 6L80E SUPERMATIC INSTALL KIT
+# ========================================
+
+- {subject: trans_6l80e, attribute: installation_kit_pn, value: "19367014", unit: text, source: 6L80-Kit, source_page: 1}
+- {subject: trans_6l80e, attribute: bolt_converter_pn, value: "11546840", unit: text, source: 6L80-Kit, source_page: 2, notes: "M10x1.5x21.5 — qty 3"}
+- {subject: trans_6l80e, attribute: bolt_trans_to_engine_pn, value: "11515768", unit: text, source: 6L80-Kit, source_page: 2, notes: "M10x1.5x40 — qty 8"}
+- {subject: trans_6l80e, attribute: bolt_side_cover_pn, value: "11519376", unit: text, source: 6L80-Kit, source_page: 2, notes: "M6x1x23 — qty 2"}
+- {subject: trans_6l80e, attribute: cover_lh_pn, value: "24283130", unit: text, source: 6L80-Kit, source_page: 2}
+- {subject: trans_6l80e, attribute: cover_rh_pn, value: "24282999", unit: text, source: 6L80-Kit, source_page: 2}
+- {subject: trans_6l80e, attribute: torque_trans_to_engine, value: 58, unit: nm, source: 6L80-Kit, source_page: 2}
+- {subject: trans_6l80e, attribute: torque_trans_to_engine, value: 43, unit: ft_lb, source: 6L80-Kit, source_page: 2}
+- {subject: trans_6l80e, attribute: torque_converter_bolt, value: 65, unit: nm, source: 6L80-Kit, source_page: 3}
+- {subject: trans_6l80e, attribute: torque_converter_bolt, value: 48, unit: ft_lb, source: 6L80-Kit, source_page: 3}
+- {subject: trans_6l80e, attribute: torque_side_cover, value: 12, unit: nm, source: 6L80-Kit, source_page: 2}
+- {subject: trans_6l80e, attribute: torque_side_cover, value: 106, unit: in_lb, source: 6L80-Kit, source_page: 2}
+- {subject: trans_6l80e, attribute: cooler_line_fitting, value: "AN-6", unit: text, source: 6L80-Kit, source_page: 4}
+
+# ========================================
+# 6L80E ENVELOPE — web research (no local PDF source)
+# Confidence/method fields added: oem_published > vendor_published > community_measured > inferred
+# ========================================
+
+- {subject: trans_6l80e, attribute: overall_length_4wd, value: 689, unit: mm, source: "rpmextreme.com/Page/55/6L80E-info.aspx", confidence: high, method: vendor_published, notes: "Bellhousing face → end of 4WD output shaft; 27.125 in"}
+- {subject: trans_6l80e, attribute: case_length_no_output_shaft, value: 592, unit: mm, source: "rpmextreme.com/Page/55/6L80E-info.aspx", confidence: high, method: vendor_published, notes: "Bellhousing face → end of case; 23.3 in"}
+- {subject: trans_6l80e, attribute: overall_length_2wd_with_yoke, value: 743, unit: mm, source: "non-stoptransmission.com/en/info-chevrolet.php", confidence: medium, method: vendor_published, notes: "29.25 in; reconciles to 27.125 (4WD shaft) vs 29.25 (2WD-with-yoke)"}
+- {subject: trans_6l80e, attribute: bellhousing_od, value: 317.5, unit: mm, source: "rpmextreme.com/Page/55/6L80E-info.aspx", confidence: medium, method: vendor_published, notes: "12.5 in max diameter at base; forum-corroborated, no GM SI drawing seen"}
+- {subject: trans_6l80e, attribute: case_diameter_at_tail, value: 279, unit: mm, source: "rpmextreme.com/Page/55/6L80E-info.aspx", confidence: medium, method: vendor_published, notes: "11 in; case tapers from bellhousing to tail"}
+- {subject: trans_6l80e, attribute: tail_style_2wd, value: "conical with integral output yoke", unit: text, source: "rpmextreme + novak-adapt.com", confidence: high, method: vendor_published}
+- {subject: trans_6l80e, attribute: pan_depth_stock, value: 84, unit: mm, source: "yourcovers.com PML-GM-6L80", confidence: high, method: vendor_published, notes: "3.3 in"}
+- {subject: trans_6l80e, attribute: pan_bolt_count, value: 18, unit: count, source: "PML / Gearstar", confidence: high, method: vendor_published}
+- {subject: trans_6l80e, attribute: dry_weight, value: 195, unit: lb, source: "novak-adapt.com / Pace Performance", confidence: high, method: vendor_published, notes: "≈88 kg"}
+- {subject: trans_6l80e, attribute: dry_weight, value: 88, unit: kg, source: "novak-adapt.com / Pace Performance", confidence: high, method: vendor_published}
+- {subject: trans_6l80e, attribute: wet_weight_258mm_converter, value: 209, unit: lb, source: "rpmextreme.com", confidence: high, method: vendor_published, notes: "Range 207-211 lb / 94-96 kg with stock 258mm TC"}
+- {subject: trans_6l80e, attribute: wet_weight_300mm_converter, value: 227, unit: lb, source: "rpmextreme.com", confidence: high, method: vendor_published, notes: "Range 225-229 lb / 102-104 kg with 300mm TC"}
+- {subject: trans_6l80e, attribute: output_shaft_offset_from_input_centerline, value: 0, unit: mm, source: "inferred from inline planetary architecture; corroborated by all swap guides", confidence: high, method: inferred}
+- {subject: trans_6l80e, attribute: bellhousing_bolt_pattern, value: "LS pattern, M10x1.5", unit: text, source: "ls1tech.com bellhousing bolt thread; en.wikipedia.org GM bellhousing patterns", confidence: high, method: community_measured}
+- {subject: trans_6l80e, attribute: bellhousing_bolt_depth_typical, value: 28, unit: mm, source: "ls1tech.com", confidence: medium, method: community_measured, notes: "One hole 22 mm; rest 28 mm"}
+- {subject: trans_6l90, attribute: length_delta_vs_6l80, value: 35, unit: mm, source: "novak-adapt.com 6L80/6L90 guide", confidence: high, method: vendor_published, notes: "+1.375 in longer than 6L80"}
+
+# ========================================
+# BOSCH iBOOSTER GEN 2 — confirmed by Skylar's docs/wiring/designs/ibooster-can-protocol-plan.md
+# Skylar runs Gen 2 (Tesla Model 3 / 2018+ Accord / Volt / CR-V donor)
+# Reverse-engineering CAN to eliminate $350 SGH controller; Motec M130 will drive directly
+# ========================================
+
+- {subject: ibooster, attribute: generation, value: "Gen 2", unit: text, source: "Skylar ibooster-can-protocol-plan.md", confidence: high, method: oem_published, notes: "Confirmed in Skylar's reverse-engineering plan"}
+- {subject: ibooster, attribute: donor_vehicles, value: "Tesla Model 3, 2018+ Honda Accord, Chevy Volt, Honda CR-V", unit: text, source: "Skylar ibooster-can-protocol-plan.md", confidence: high, method: oem_published}
+- {subject: ibooster, attribute: motor_power, value: 450, unit: watts, source: "Skylar ibooster-can-protocol-plan.md", confidence: high, method: oem_published, notes: "Brushless; Gen 1 was 350W"}
+- {subject: ibooster, attribute: ecu_connector_pins, value: 26, unit: count, source: "Skylar ibooster-can-protocol-plan.md", confidence: high, method: oem_published, notes: "26-pin main ECU connector"}
+- {subject: ibooster, attribute: pts_connector_pins, value: 4, unit: count, source: "Skylar ibooster-can-protocol-plan.md", confidence: high, method: oem_published, notes: "4-pin pedal travel sensor connector (Gen 1 was 5-pin)"}
+- {subject: ibooster, attribute: can_buses, value: 2, unit: count, source: "Skylar ibooster-can-protocol-plan.md", confidence: high, method: oem_published, notes: "Vehicle CAN + YAW sensor CAN"}
+- {subject: ibooster, attribute: can_speed, value: 500, unit: kbps, source: "Skylar ibooster-can-protocol-plan.md", confidence: high, method: oem_published, notes: "Both buses; some Honda Gen 2 may use CAN FD 2 Mbps on YAW"}
+- {subject: ibooster, attribute: can_termination, value: "external required", unit: text, source: "Skylar ibooster-can-protocol-plan.md", confidence: high, method: oem_published, notes: "No internal termination"}
+- {subject: ibooster, attribute: peak_current, value: 40, unit: amps, source: "Skylar ibooster-can-protocol-plan.md", confidence: high, method: oem_published, notes: "Dedicated relay required, NOT on PDM"}
+- {subject: ibooster, attribute: failsafe_min_wires, value: 7, unit: count, source: "Skylar ibooster-can-protocol-plan.md", confidence: high, method: oem_published, notes: "Wires for failsafe (no CAN) operation"}
+- {subject: ibooster, attribute: failsafe_decel_at_300n, value: 1.2, unit: g, source: "evcreate.com testing", confidence: medium, method: community_measured, notes: "1.2G deceleration at 300N pedal force in failsafe mode"}
+
+# iBooster Gen 2 envelope (community-measured, ±2mm)
+- {subject: ibooster, attribute: overall_length, value: 390, unit: mm, source: "evcreate.com/installing-the-ibooster/", confidence: high, method: community_measured}
+- {subject: ibooster, attribute: length_flange_to_mc_end, value: 240, unit: mm, source: "evcreate.com", confidence: high, method: community_measured}
+- {subject: ibooster, attribute: width, value: 190, unit: mm, source: "evcreate.com", confidence: high, method: community_measured}
+- {subject: ibooster, attribute: height_centerline_to_top, value: 100, unit: mm, source: "evcreate.com", confidence: high, method: community_measured}
+- {subject: ibooster, attribute: height_centerline_to_bottom, value: 160, unit: mm, source: "evcreate.com", confidence: high, method: community_measured}
+- {subject: ibooster, attribute: firewall_center_bore, value: 62, unit: mm, source: "ls1tech.com", confidence: medium, method: community_measured}
+- {subject: ibooster, attribute: firewall_protrusion_into_bore, value: 6, unit: mm, source: "ls1tech.com", confidence: medium, method: community_measured}
+- {subject: ibooster, attribute: booster_body_depth_no_mc, value: 155, unit: mm, source: "ls1tech.com", confidence: medium, method: community_measured}
+- {subject: ibooster, attribute: mc_protrusion_forward, value: 97, unit: mm, source: "ls1tech.com", confidence: medium, method: community_measured}
+- {subject: ibooster, attribute: mounting_bolt_pitch_square, value: "72 x 72", unit: mm, source: "evcreate.com; ls1tech.com", confidence: high, method: community_measured, notes: "4 bolts in 72mm square pattern"}
+- {subject: ibooster, attribute: mounting_bolt_size, value: "M8", unit: text, source: "evcreate.com", confidence: high, method: community_measured}
+- {subject: ibooster, attribute: mc_bore, value: 25.75, unit: mm, source: "evcreate.com", confidence: high, method: community_measured, notes: "Range 25.5-26 mm"}
+- {subject: ibooster, attribute: mc_line_spacing, value: 41, unit: mm, source: "ls1tech.com", confidence: medium, method: community_measured}
+- {subject: ibooster, attribute: mc_fitting_thread, value: "M12x1.0 bubble flare", unit: text, source: "evcreate.com", confidence: high, method: community_measured}
+
+# ========================================
+# HOLLEY MID-MOUNT ACCESSORY DRIVE — PN 20-131 with A/C
+# Skylar's confirmed accessory drive. Source: holley_midmount_fitment.pdf (local)
+# ========================================
+
+- {subject: holley_midmount, attribute: kit_pn, value: "20-131", unit: text, source: "holley_midmount_fitment.pdf p1", confidence: high, method: oem_published, notes: "Older PN; current SKU is 20-200/20-201"}
+- {subject: holley_midmount, attribute: configuration, value: "with A/C", unit: text, source: "Skylar confirmed", confidence: high, method: oem_published}
+- {subject: holley_midmount, attribute: envelope_width_left, value: 411, unit: mm, source: "holley_midmount_fitment.pdf p2", confidence: high, method: oem_published, notes: "16-1/4 in; left side accessories from crank centerline"}
+- {subject: holley_midmount, attribute: envelope_width_right, value: 433, unit: mm, source: "holley_midmount_fitment.pdf p2", confidence: high, method: oem_published, notes: "17 in; right side accessories from crank centerline"}
+- {subject: holley_midmount, attribute: envelope_total_width, value: 844, unit: mm, source: "holley_midmount_fitment.pdf p2", confidence: high, method: oem_published, notes: "411+433mm; engine width with full accessory drive (no headers)"}
+- {subject: holley_midmount, attribute: envelope_height_above_centerline_left, value: 406, unit: mm, source: "holley_midmount_fitment.pdf p2", confidence: high, method: oem_published, notes: "16 in; tallest left-side accessory above crank CL"}
+- {subject: holley_midmount, attribute: envelope_height_above_centerline_right, value: 393, unit: mm, source: "holley_midmount_fitment.pdf p2", confidence: high, method: oem_published, notes: "15-1/2 in; tallest right-side"}
+- {subject: holley_midmount, attribute: envelope_below_centerline, value: 339, unit: mm, source: "holley_midmount_fitment.pdf p2", confidence: high, method: oem_published, notes: "13-3/8 in; lowest accessory below crank CL"}
+- {subject: holley_midmount, attribute: throttle_body_to_centerline, value: 254, unit: mm, source: "holley_midmount_fitment.pdf p2", confidence: high, method: oem_published, notes: "10 in; intake/TB clearance above CL"}
+- {subject: holley_midmount, attribute: ps_pump_pulley_diameter, value: 169, unit: mm, source: "holley_midmount_fitment.pdf p2", confidence: high, method: oem_published, notes: "Ø 6-5/8 in; placement identical to Corvette"}
+- {subject: holley_midmount, attribute: ac_compressor_offset_above_cl, value: 152, unit: mm, source: "holley_midmount_fitment.pdf p2", confidence: high, method: oem_published, notes: "6 in"}
+- {subject: holley_midmount, attribute: ac_compressor_offset_below_cl, value: 67, unit: mm, source: "holley_midmount_fitment.pdf p2", confidence: high, method: oem_published, notes: "2-5/8 in"}
+
+# Component selections (from Holley fitment guide, default truck application)
+- {subject: holley_midmount, attribute: belt_alignment_for_truck_wp, value: "Long (Holley install kit 21-3)", unit: text, source: "holley_midmount_fitment.pdf p3", confidence: high, method: oem_published, notes: "All truck water pumps require LONG alignment; crank pulley reference 75mm/3 in"}
+- {subject: holley_midmount, attribute: water_pump_truck_type, value: "TYPE 5 — upward pointing inlet", unit: text, source: "holley_midmount_fitment.pdf p6", confidence: high, method: oem_published}
+- {subject: holley_midmount, attribute: ac_compressor_pn_holley, value: "199-100", unit: text, source: "holley_midmount_fitment.pdf p10", confidence: high, method: oem_published, notes: "R4 radial 6-groove 5-inch pulley; GM 88964863 ('91 Camaro)"}
+- {subject: holley_midmount, attribute: ac_compressor_pulley_dia, value: 5, unit: in, source: "holley_midmount_fitment.pdf p10", confidence: high, method: oem_published, notes: "Recommended over 4.25 in for high RPM"}
+- {subject: holley_midmount, attribute: ac_compressor_harness_pigtail_pn, value: "199-200", unit: text, source: "holley_midmount_fitment.pdf p10", confidence: high, method: oem_published}
+- {subject: holley_midmount, attribute: ac_rpm_cutoff, value: 4000, unit: rpm, source: "holley_midmount_fitment.pdf p10", confidence: high, method: oem_published, notes: "WARNING: A/C compressor must deactivate above 4000 RPM"}
+- {subject: holley_midmount, attribute: ps_pump_pn_holley, value: "198-100", unit: text, source: "holley_midmount_fitment.pdf p12", confidence: high, method: oem_published, notes: "Aluminum, '09 Corvette; GM 26120639"}
+- {subject: holley_midmount, attribute: ps_pulley_pn_standard, value: "97-152", unit: text, source: "holley_midmount_fitment.pdf p13", confidence: high, method: oem_published, notes: "GM 12568997, OD 6.7 in"}
+- {subject: holley_midmount, attribute: ps_reservoir_kit_pn, value: "198-200", unit: text, source: "holley_midmount_fitment.pdf p16", confidence: high, method: oem_published}
+- {subject: holley_midmount, attribute: alternator_pn_small_holley, value: "197-300", unit: text, source: "holley_midmount_fitment.pdf p15", confidence: high, method: oem_published, notes: "130mm case, 105A; GM 10480326"}
+- {subject: holley_midmount, attribute: alternator_pn_large_holley, value: "197-301", unit: text, source: "holley_midmount_fitment.pdf p15", confidence: high, method: oem_published, notes: "144mm case, 130-145A; GM 15754097"}
+- {subject: holley_midmount, attribute: alternator_bolt_spacing_required, value: 138.7, unit: mm, source: "holley_midmount_fitment.pdf p15", confidence: high, method: oem_published, notes: "5.46 in center-to-center; '96-'05 GM trucks; '97+ Corvette has 154mm and DOES NOT WORK"}
+- {subject: holley_midmount, attribute: idler_smooth_pulley_pn, value: "97-150", unit: text, source: "holley_midmount_fitment.pdf p7", confidence: high, method: oem_published, notes: "76mm, GM 12564401"}
+- {subject: holley_midmount, attribute: tensioner_pn_holley, value: "97-151", unit: text, source: "holley_midmount_fitment.pdf p8", confidence: high, method: oem_published, notes: "68mm grooved pulley, GM 12559325"}
+- {subject: holley_midmount, attribute: idler_grooved_for_ls3_tb, value: "97-153", unit: text, source: "holley_midmount_fitment.pdf p9", confidence: high, method: oem_published, notes: "59mm; required if using stock LS3 throttle body with standard belt spacing"}
+
+# ========================================
+# HEADERS — eBay generic, "Hooker header manifolds shape" per Skylar
+# Approx values from typical LS shorty manifold dims (Hooker BHS498 / BHS497 / Speedmaster shape)
+# ========================================
+
+- {subject: headers, attribute: brand, value: "eBay generic, Hooker-manifold shape", unit: text, source: "Skylar verbal 2026-05-06", confidence: high, method: oem_published}
+- {subject: headers, attribute: outlet_diameter, value: 2.5, unit: in, source: "Skylar QTP cutouts QTEC50CP purchase 2026-03-17", confidence: high, method: inferred, notes: "Inferred from his 2.5in exhaust cutout purchase — outlet must match"}
+- {subject: headers, attribute: outlet_centerline_below_crank_typical, value: 178, unit: mm, source: "typical LS shorty manifold geometry", confidence: low, method: typical_application_estimate, notes: "≈7 in below crank CL; replace when exact PN is known"}
+- {subject: headers, attribute: outlet_forward_of_bellhousing_typical, value: 100, unit: mm, source: "typical LS shorty manifold geometry", confidence: low, method: typical_application_estimate, notes: "≈4 in forward of bellhousing face"}
+- {subject: headers, attribute: flange_to_block_thickness, value: 9.5, unit: mm, source: "GM exhaust manifold standard", confidence: medium, method: oem_published, notes: "3/8 in OE flange thickness"}
+- {subject: headers, attribute: shape_class, value: "block-hugger / shorty manifold", unit: text, source: "Skylar verbal 2026-05-06", confidence: high, method: oem_published, notes: "Compact, hugs block, drops vertically to single 2.5 in outlet"}
+
+# ========================================
+# MOTOR MOUNTS — ICT Billet adapter plates on factory K5 mounts (per Skylar)
+# Approx values from typical ICT Billet LS-to-squarebody adapter spec
+# ========================================
+
+- {subject: motor_mounts, attribute: configuration, value: "ICT Billet LS adapter plates on factory K5 truck mounts", unit: text, source: "Skylar verbal 2026-05-06", confidence: high, method: oem_published}
+- {subject: motor_mounts, attribute: ict_plate_thickness_typical, value: 12.7, unit: mm, source: "ICT Billet LS swap adapter spec", confidence: medium, method: typical_application_estimate, notes: "0.5 in standard; replace with exact PN if known. Common: 551158, 551626"}
+- {subject: motor_mounts, attribute: ict_plate_offset_setback_typical, value: 25.4, unit: mm, source: "ICT Billet LS swap adapter typical", confidence: low, method: typical_application_estimate, notes: "1 in setback range varies by PN"}
+- {subject: motor_mounts, attribute: factory_k5_mount_pattern, value: "GM squarebody truck stud, 1973-1991", unit: text, source: "GM truck factory pattern", confidence: high, method: oem_published, notes: "Skylar reuses factory frame-side perches; ICT plate provides LS engine-side bolt boss"}
+
+# ========================================
+# RADIATOR — Champion eBay (per Skylar)
+# Approx values from typical Champion 3-row aluminum K5 fitment
+# ========================================
+
+- {subject: radiator, attribute: brand, value: "Champion", unit: text, source: "Skylar verbal 2026-05-06", confidence: high, method: oem_published}
+- {subject: radiator, attribute: source, value: "eBay", unit: text, source: "Skylar verbal 2026-05-06", confidence: high, method: oem_published}
+- {subject: radiator, attribute: typical_pn_for_k5, value: "CC-490 (typical Champion K5/squarebody fitment)", unit: text, source: "Champion catalog typical", confidence: low, method: typical_application_estimate, notes: "Replace with exact PN from his eBay order; CC-490 is Champion's common 73-87 K5/C10/C20 3-row aluminum"}
+- {subject: radiator, attribute: core_width_typical, value: 762, unit: mm, source: "Champion CC-490 spec", confidence: low, method: typical_application_estimate, notes: "≈30 in"}
+- {subject: radiator, attribute: core_height_typical, value: 432, unit: mm, source: "Champion CC-490 spec", confidence: low, method: typical_application_estimate, notes: "≈17 in"}
+- {subject: radiator, attribute: core_thickness_typical, value: 76, unit: mm, source: "Champion 3-row spec", confidence: low, method: typical_application_estimate, notes: "≈3 in for 3-row aluminum core"}
+- {subject: radiator, attribute: row_count, value: 3, unit: count, source: "Champion typical", confidence: low, method: typical_application_estimate}
+- {subject: radiator, attribute: inlet_size_typical, value: 38, unit: mm, source: "Champion spec", confidence: low, method: typical_application_estimate, notes: "1.5 in upper hose inlet"}
+
+# Gaps the research agent flagged for additional sourcing:
+# - 6L80 LS bellhousing bolt-circle diameter + dowel spacing (mm): need GM SI drawing
+# - 6L80 pan L x W in: PML publishes PDF behind click-through, not captured
+# - 6L80 2WD tail housing length: application-specific, measure donor
+# - 6L80 max case diameter below centerline (sump/valve-body bulge): undocumented numerically
+# - iBooster: no Bosch manufacturer datasheet exists publicly; all numbers ±2mm
+
+# ========================================
+# OPEN — STILL NEED TO EXTRACT
+# ========================================
+# - 6L80E envelope dims (length, bellhousing OD, weight) — not in install kit, need Moveras manual
+# - LS3 with headers width — need Marine LS3 page 2 plus header brand
+# - iBooster footprint — need Bosch datasheet
+# - Radiator core dims — need part number
+# - Accessory drive package envelope — need install guide for chosen kit
+# - Motor mount frame-side bracket position — need bracket brand/PN
+# - LMC parts diagram dimensions — most are non-dimensioned topology drawings; useful for surface modeling not envelope
+# - 1977 service manual — page audit pending

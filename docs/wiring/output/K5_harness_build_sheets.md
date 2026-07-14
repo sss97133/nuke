@@ -665,7 +665,7 @@ Wideband O2 x2 + vehicle speed sensor. Mid-vehicle routing along exhaust/drivetr
 
 | Parameter | Value |
 |-----------|-------|
-| Cable | 22 AWG twisted pair, TXL rated |
+| Cable | 22 AWG twisted pair, TEFZEL rated |
 | Colors | WHT/GRN + GRN/WHT |
 | Termination | 120 ohm resistor at each end |
 | Twist rate | Minimum 1 twist per inch (25 twists/ft) |
@@ -938,7 +938,7 @@ The complete harness system should be built in this order. Each phase should be 
 
 ## 11. WIRE DIAMETER REFERENCE
 
-Approximate outer diameter (OD) for TXL automotive wire with insulation:
+Approximate outer diameter (OD) for TEFZEL automotive wire with insulation:
 
 | Gauge | Single Wire OD | Notes |
 |-------|---------------|-------|

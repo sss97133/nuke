@@ -317,6 +317,14 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 // Main component
 // ---------------------------------------------------------------------------
 
+// Auto-pinned build was a Week-1 placeholder that ranked vehicles by
+// last-event recency and forced one to the top. Skylar found this annoying
+// (no explicit pin signal, no opt-out, can't reorder). Disabled until
+// explicit user-driven pinning ships.
+function pickPinnedBuild(_vehicles: GarageVehicle[]): GarageVehicle | null {
+  return null;
+}
+
 export default function GarageTab({ dashboard }: { dashboard: VehiclesDashboardState }) {
   const {
     sections,
@@ -350,7 +358,13 @@ export default function GarageTab({ dashboard }: { dashboard: VehiclesDashboardS
     setTimeout(() => refresh(), 600);
   }, [refresh]);
 
-  const showSections = sections.length > 1;
+  const pinned = pickPinnedBuild(vehicles);
+  const sectionsExcludingPinned = pinned
+    ? sections
+        .map((s) => ({ ...s, vehicles: s.vehicles.filter((v) => v.id !== pinned.id) }))
+        .filter((s) => s.vehicles.length > 0)
+    : sections;
+  const showSections = sectionsExcludingPinned.length > 1;
 
   const dragProps = {
     draggingVehicle,
@@ -368,8 +382,24 @@ export default function GarageTab({ dashboard }: { dashboard: VehiclesDashboardS
         <EmptyState filterMode={filterMode} onClearFilter={clearFilter} />
       ) : (
         <div style={{ ...s.content, paddingBottom: draggingVehicle ? 132 : undefined }}>
+          {pinned && (
+            <div>
+              <SectionHeaderRow title="PINNED BUILD" count={1} />
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
+                <GarageVehicleCard
+                  vehicle={pinned}
+                  viewMode="GRID"
+                  onRefresh={refresh}
+                  onDragStart={() => handleDragStart(pinned)}
+                  onDragEnd={handleDragEnd}
+                  isDragging={draggingVehicle?.id === pinned.id}
+                  isTriageActive={draggingVehicle !== null && draggingVehicle.id !== pinned.id}
+                />
+              </div>
+            </div>
+          )}
           {showSections
-            ? sections.map((section) => (
+            ? sectionsExcludingPinned.map((section) => (
                 <div key={section.relationship_type}>
                   <SectionHeaderRow
                     title={section.relationship_type}
@@ -378,7 +408,7 @@ export default function GarageTab({ dashboard }: { dashboard: VehiclesDashboardS
                   <SectionVehicles section={section} viewMode={viewMode} onRefresh={refresh} {...dragProps} />
                 </div>
               ))
-            : sections.map((section) => (
+            : sectionsExcludingPinned.map((section) => (
                 <SectionVehicles
                   key={section.relationship_type}
                   section={section}

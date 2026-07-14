@@ -1,0 +1,67 @@
+# Generated from vehicle_canonical — substrate-driven, not file-driven.
+# Vehicle: e08bf694-970f-4cbe-8a74-8715158a0f2e
+# Loom: ANALOG_5V COMPANION GROUND + 5V REF
+# Wires projected: 6
+
+metadata:
+  title: K5 ANALOG_5V COMPANION GROUND + 5V REF
+  description: |
+    Projection of 6 wires from public.vehicle_canonical for
+    vehicle_id=e08bf694-970f-4cbe-8a74-8715158a0f2e. Source of truth is the DB; this YAML
+    is regenerated on demand. Cite-by-cell provenance retained in
+    structured_data on each underlying observation row.
+
+connectors:
+  M130_A:  {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  M130_B:  {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+  PDM30_A: {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  PDM30_B: {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+
+cables:
+  W102g:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BK]
+    type: M22759/32
+    notes: "OPS Sensor Ground | from M130:B16 | sources=k5_cut_list_v2"
+  W102r:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GY]
+    type: M22759/32
+    notes: "OPS 5V Reference | from M130:A02 | sources=k5_cut_list_v2"
+  W108g:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BK]
+    type: M22759/32
+    notes: "MAP Sensor Ground | from M130:B15 | sources=k5_cut_list_v2"
+  W108r:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GY]
+    type: M22759/32
+    notes: "MAP 5V Reference | from M130:A09 | sources=k5_cut_list_v2"
+  W112g:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BK]
+    type: M22759/32
+    notes: "Fuel Pressure Ground | from M130:B16 | sources=k5_cut_list_v2"
+  W112r:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GY]
+    type: M22759/32
+    notes: "Fuel Pressure 5V Reference | from M130:A02 | sources=k5_cut_list_v2"
+
+# Connection list intentionally omitted in this MVP — needs the
+# from_pin → connector pin mapping logic that lives in
+# docs/wiring/output/generate_wireviz_yaml.py. Next pass: refactor
+# that generator to consume the per-wire dicts produced above.

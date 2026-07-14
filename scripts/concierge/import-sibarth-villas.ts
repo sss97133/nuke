@@ -181,6 +181,16 @@ async function main() {
   let updated = 0;
   let errors = 0;
 
+  // Root-cause fix (2026-07-05): the DB now enforces
+  // uq_organizations_sibarth_id — a unique index on organizations
+  // ((metadata->>'sibarth_id')) where not null (businesses is a view over
+  // organizations). That index is the real backstop against runaway
+  // duplication. The check-then-branch below is kept (PostgREST upsert
+  // can't target an expression-based unique index via onConflict), but a
+  // 23505 unique-violation on insert — e.g. a concurrent run, or the
+  // .single() lookup racing another process — now self-heals into an
+  // UPDATE instead of silently erroring, so this can never again pile up
+  // duplicate rows the way the 2026-01/02 incident did (3,090 dead rows).
   for (const villa of data.villas) {
     const insert = toBusinessInsert(villa);
 
@@ -208,11 +218,36 @@ async function main() {
       // Insert new
       const { error } = await supabase.from('businesses').insert(insert);
 
-      if (error) {
+      if (!error) {
+        inserted++;
+      } else if (error.code === '23505') {
+        // Unique-violation on sibarth_id: someone else inserted it between
+        // our check and our insert. Self-heal by updating that row instead
+        // of leaving it as a dangling error (the old failure mode).
+        const { data: raced } = await supabase
+          .from('businesses')
+          .select('id')
+          .eq('metadata->>sibarth_id', villa.id.toString())
+          .single();
+
+        if (raced) {
+          const { error: updateError } = await supabase
+            .from('businesses')
+            .update(insert)
+            .eq('id', raced.id);
+          if (updateError) {
+            console.error(`Error self-healing ${villa.name}: ${updateError.message}`);
+            errors++;
+          } else {
+            updated++;
+          }
+        } else {
+          console.error(`Unique violation but couldn't find row for ${villa.name}`);
+          errors++;
+        }
+      } else {
         console.error(`Error inserting ${villa.name}: ${error.message}`);
         errors++;
-      } else {
-        inserted++;
       }
     }
   }

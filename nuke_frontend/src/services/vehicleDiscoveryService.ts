@@ -53,8 +53,11 @@ export class VehicleDiscoveryService {
   // Track vehicle view
   static async trackVehicleView(vehicleId: string, duration?: number): Promise<void> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
+      // Use getSession() instead of getUser() to avoid Web Locks API contention
+      // on sb-*-auth-token (cause of 2026-05-24 garage hang). See lib/supabase.ts.
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+
       await supabase
         .from('vehicle_views')
         .insert({
@@ -103,7 +106,8 @@ export class VehicleDiscoveryService {
     priority: 'low' | 'medium' | 'high' = 'medium'
   ): Promise<boolean> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) return false;
 
       const { error } = await supabase
@@ -133,7 +137,8 @@ export class VehicleDiscoveryService {
   // Mark contribution request as fulfilled
   static async fulfillContributionRequest(requestId: string): Promise<boolean> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) return false;
 
       const { error } = await supabase

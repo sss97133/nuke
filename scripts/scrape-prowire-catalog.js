@@ -66,38 +66,76 @@ async function getFirecrawlApiKey() {
   process.exit(1);
 }
 
-// ProWire catalog URLs to scrape
+// ProWire catalog URLs to scrape — covers K5 harness BOM categories
 const CATALOG_URLS = [
-  {
-    name: 'Deutsch DT Series Assembly Manual',
-    url: 'https://www.prowireusa.com/deutsch-kit-builder.html',
-    type: 'assembly_manual'
-  },
-  {
-    name: 'Deutsch DT Series Heat Shrink Boots',
-    url: 'https://www.prowireusa.com/content/9660/Deutsch%20DT%20Series%20Heat%20Shrink%20Boots',
-    type: 'product_category'
-  },
-  {
-    name: 'Deutsch DTM Rubber Boots',
-    url: 'https://www.prowireusa.com/deutsch-dtm-rubber-boots',
-    type: 'product_category'
-  },
-  {
-    name: 'Deutsch DT Rubber Boots',
-    url: 'https://www.prowireusa.com/deutsch-dt-rubber-boots',
-    type: 'product_category'
-  },
-  {
-    name: 'Deutsch DTP Rubber Boots',
-    url: 'https://www.prowireusa.com/deutsch-dtp-rubber-boots',
-    type: 'product_category'
-  },
-  {
-    name: 'ProWire Homepage',
-    url: 'https://www.prowireusa.com/',
-    type: 'catalog_index'
-  }
+  // Wire
+  { name: 'DR-25 Heat Shrink Sleeving', url: 'https://www.prowireusa.com/dr25', type: 'product_category' },
+  { name: 'Heat Shrink', url: 'https://www.prowireusa.com/heat-shrink', type: 'product_category' },
+  { name: 'Heat Shrink Kit', url: 'https://www.prowireusa.com/heat-shrink-kit', type: 'product_category' },
+  { name: 'TXL Wire', url: 'https://www.prowireusa.com/txl-wire', type: 'product_category' },
+  { name: 'TXL High-Flex', url: 'https://www.prowireusa.com/txl-hf', type: 'product_category' },
+  { name: 'GXL Wire', url: 'https://www.prowireusa.com/gxl-wire', type: 'product_category' },
+  { name: 'AMP Wire', url: 'https://www.prowireusa.com/amp-wire', type: 'product_category' },
+  { name: 'Speaker Wire', url: 'https://www.prowireusa.com/speaker-wire', type: 'product_category' },
+  { name: 'Shielded Cable', url: 'https://www.prowireusa.com/shielded-cable', type: 'product_category' },
+  { name: 'RCA Cable', url: 'https://www.prowireusa.com/rca-cable', type: 'product_category' },
+  { name: 'Tefzel 14 AWG', url: 'https://www.prowireusa.com/tefzel-14', type: 'product_category' },
+
+  // Welding cable by gauge
+  { name: 'Welding Cable 1/0 AWG', url: 'https://prowireusa.com/wire/welding-cable/1-0-awg', type: 'product_category' },
+  { name: 'Welding Cable 2 AWG', url: 'https://prowireusa.com/wire/welding-cable/2-awg', type: 'product_category' },
+  { name: 'Welding Cable 6 AWG', url: 'https://prowireusa.com/wire/welding-cable/6-awg', type: 'product_category' },
+  { name: 'Welding Cable 8 AWG', url: 'https://prowireusa.com/wire/welding-cable/8-awg', type: 'product_category' },
+
+  // Deutsch connectors
+  { name: 'Deutsch DTM Connectors', url: 'https://www.prowireusa.com/dtm-connectors', type: 'product_category' },
+  { name: 'Deutsch DTM 4-pin', url: 'https://www.prowireusa.com/dtm-4-pin', type: 'product_category' },
+  { name: 'Deutsch DTM 18-pin', url: 'https://www.prowireusa.com/dtm-18-pin', type: 'product_category' },
+  { name: 'Deutsch DTM Seals', url: 'https://www.prowireusa.com/dtm-seals', type: 'product_category' },
+  { name: 'Deutsch DTM Terminals', url: 'https://www.prowireusa.com/dtm-terminals', type: 'product_category' },
+  { name: 'Deutsch DTP Collection', url: 'https://prowireusa.com/collections/deutsch-dtp', type: 'product_category' },
+  { name: 'Deutsch DTM Collection', url: 'https://prowireusa.com/connectors/deutsch-dtm', type: 'product_category' },
+
+  // Weatherpack
+  { name: 'Weatherpack Connectors', url: 'https://prowireusa.com/connectors/weatherpack', type: 'product_category' },
+  { name: 'Weatherpack 2-pin', url: 'https://www.prowireusa.com/weatherpack-2-pin', type: 'product_category' },
+  { name: 'Weatherpack Seals', url: 'https://www.prowireusa.com/weatherpack-seals', type: 'product_category' },
+  { name: 'Weatherpack Terminals', url: 'https://www.prowireusa.com/weatherpack-terminals', type: 'product_category' },
+
+  // Terminals
+  { name: 'Terminals Collection', url: 'https://prowireusa.com/collections/terminals', type: 'product_category' },
+  { name: 'Ring Terminals', url: 'https://www.prowireusa.com/ring-terminals', type: 'product_category' },
+  { name: 'Faston Terminals', url: 'https://prowireusa.com/terminals/faston', type: 'product_category' },
+  { name: 'Blade Terminals', url: 'https://www.prowireusa.com/blade-terminals', type: 'product_category' },
+  { name: 'Butt Caps', url: 'https://www.prowireusa.com/butt-caps', type: 'product_category' },
+
+  // Relays
+  { name: 'Relays Collection', url: 'https://prowireusa.com/collections/relays', type: 'product_category' },
+  { name: 'Relays', url: 'https://www.prowireusa.com/relays', type: 'product_category' },
+  { name: 'ISO Mini Relays', url: 'https://prowireusa.com/relays/iso-mini', type: 'product_category' },
+  { name: 'Relay Sockets', url: 'https://www.prowireusa.com/relay-sockets', type: 'product_category' },
+
+  // Fuses
+  { name: 'ANL Fuses', url: 'https://www.prowireusa.com/anl-fuses', type: 'product_category' },
+  { name: 'ANL Holders', url: 'https://www.prowireusa.com/anl-holders', type: 'product_category' },
+
+  // Pigtails / sensor connectors
+  { name: 'Pigtails Collection', url: 'https://prowireusa.com/collections/pigtails', type: 'product_category' },
+  { name: 'Socket Pigtails', url: 'https://prowireusa.com/collections/socket-pigtails', type: 'product_category' },
+  { name: 'Headlight Connectors', url: 'https://prowireusa.com/collections/headlight-connectors', type: 'product_category' },
+
+  // Misc hardware
+  { name: 'Adel Clamps', url: 'https://prowireusa.com/misc/adel-clamps', type: 'product_category' },
+  { name: 'Cable Ties', url: 'https://prowireusa.com/misc/cable-ties', type: 'product_category' },
+  { name: 'P-Clips', url: 'https://www.prowireusa.com/p-clips', type: 'product_category' },
+  { name: 'Zip Ties', url: 'https://www.prowireusa.com/zipties', type: 'product_category' },
+  { name: 'Grommets', url: 'https://www.prowireusa.com/grommets', type: 'product_category' },
+  { name: 'Firewall Grommets', url: 'https://prowireusa.com/grommets/firewall', type: 'product_category' },
+  { name: 'Switches', url: 'https://www.prowireusa.com/switches', type: 'product_category' },
+  { name: 'Tools Collection', url: 'https://prowireusa.com/collections/tools', type: 'product_category' },
+
+  // Deutsch kit builder (assembly reference)
+  { name: 'Deutsch Kit Builder', url: 'https://www.prowireusa.com/deutsch-kit-builder.html', type: 'assembly_manual' },
 ];
 
 // Product extraction schema

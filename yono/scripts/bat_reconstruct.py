@@ -60,7 +60,7 @@ for line in (NUKE_DIR / ".env").read_text().splitlines():
     if k and v and k not in os.environ:
         os.environ[k] = v
 
-PG_CONN = "postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
+PG_CONN = f"postgresql://postgres.qkgaybvrernstplzjaam:{os.environ['SUPABASE_DB_PASSWORD']}@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
 YONO_DIR = Path(__file__).parent.parent
 
 # COLMAP settings

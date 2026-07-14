@@ -56,7 +56,7 @@ const VehicleFindingsCard: React.FC<Props> = ({ vehicleId }) => {
       const { data, error } = await supabase
         .from('vehicle_images')
         .select(
-          'classifier:ai_scan_metadata->classifier, error:ai_scan_metadata->error, vin:ai_scan_metadata->vin, license_plate:ai_scan_metadata->license_plate, engine:ai_scan_metadata->engine, engine_guess:ai_scan_metadata->engine_guess, engine_badge:ai_scan_metadata->engine_badge, transmission:ai_scan_metadata->transmission, color_visible:ai_scan_metadata->color_visible, interior_trim:ai_scan_metadata->interior_trim, odometer:ai_scan_metadata->odometer, mileage_at_listing:ai_scan_metadata->mileage_at_listing, source:ai_scan_metadata->source, part_number:ai_scan_metadata->part_number, critical:ai_scan_metadata->critical, privacy_concern:ai_scan_metadata->privacy_concern, attribution_concern:ai_scan_metadata->attribution_concern, phase:ai_scan_metadata->phase, scene_class:ai_scan_metadata->scene_class, make_guess:ai_scan_metadata->make_guess, model_guess:ai_scan_metadata->model_guess, year_guess:ai_scan_metadata->year_guess, confidence:ai_scan_metadata->confidence',
+          'classifier:ai_scan_metadata->classifier, error:ai_scan_metadata->error, vin:ai_scan_metadata->vin, license_plate:ai_scan_metadata->license_plate, engine:ai_scan_metadata->engine, engine_guess:ai_scan_metadata->engine_guess, engine_badge:ai_scan_metadata->engine_badge, transmission:ai_scan_metadata->transmission, color_visible:ai_scan_metadata->color_visible, interior_trim:ai_scan_metadata->interior_trim, odometer:ai_scan_metadata->odometer, mileage_at_listing:ai_scan_metadata->mileage_at_listing, source:ai_scan_metadata->source, part_number:ai_scan_metadata->part_number, critical:ai_scan_metadata->critical, privacy_concern:ai_scan_metadata->privacy_concern, attribution_concern:ai_scan_metadata->attribution_concern, phase:ai_scan_metadata->phase, scene_class:ai_scan_metadata->scene_class, make_guess:ai_scan_metadata->make_guess, model_guess:ai_scan_metadata->model_guess, year_guess:ai_scan_metadata->year_guess, confidence:ai_scan_metadata->confidence, byok_scene_type:ai_scan_metadata->byok_deep_analysis->scene_type, byok_build_phase_guess:ai_scan_metadata->byok_deep_analysis->build_phase_guess, byok_confidence:ai_scan_metadata->byok_deep_analysis->confidence',
         )
         .eq('vehicle_id', vehicleId)
         .limit(5000);
@@ -103,7 +103,16 @@ const VehicleFindingsCard: React.FC<Props> = ({ vehicleId }) => {
       for (const r of rows) {
         // Arrow projections land the keys flat on the row, same names as before.
         const m = r as Record<string, any>;
-        if (m.classifier === 'claude-opus-4-7-byok') out.classified++;
+        // Canonical T1 marker: the BYOK deep pass writes a NESTED byok_deep_analysis
+        // object, NOT the flat `classifier` string the old code looked for (which no
+        // writer emits — so this card read 0 analyzed for every byok vehicle). Its
+        // scalar subfields are projected flat as byok_* (see select above) so the
+        // multi-MB blobs stay server-side while the canonical marker still counts.
+        const hasByokDeep = m.byok_scene_type != null || m.byok_build_phase_guess != null || m.byok_confidence != null;
+        if (hasByokDeep || m.classifier === 'claude-opus-4-7-byok' || m.classifier === 'caller-byok-cascade') out.classified++;
+        if (m.byok_scene_type) inc(out.scenes, String(m.byok_scene_type));
+        if (m.byok_build_phase_guess) inc(out.phases, String(m.byok_build_phase_guess));
+        if (typeof m.byok_confidence === 'number') { out.confidenceSum += m.byok_confidence; out.confidenceCount++; }
         if (m.error) out.errors++;
         if (m.vin) vins.add(String(m.vin));
         if (m.license_plate) plates.add(String(m.license_plate));
@@ -311,7 +320,7 @@ const VehicleFindingsCard: React.FC<Props> = ({ vehicleId }) => {
         })()}
 
         <div style={{ marginTop: 14, paddingTop: 8, borderTop: '1px solid var(--text-disabled, #ddd)', fontSize: 9, color: 'var(--text-secondary, #666)', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-          <span>{findings.classified}/{findings.total} photos analyzed by claude-opus-4-7-byok</span>
+          <span>{findings.classified}/{findings.total} photos deep-analyzed (BYOK)</span>
           {findings.confidenceCount > 0 && (
             <span>avg confidence {(findings.confidenceSum / findings.confidenceCount).toFixed(2)}</span>
           )}

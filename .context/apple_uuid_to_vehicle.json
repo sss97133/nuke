@@ -1,0 +1,723 @@
+{
+ "64AE7449-FB2E-4926-90FF-509DF28F99E7": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_3630.jpeg",
+  "taken_at": "2022-05-18 20:16:08",
+  "lat": 41.170145,
+  "lng": -111.93851333333333
+ },
+ "CBB0BD3A-571D-4806-A391-C83FC9C8AD3B": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_9510.JPG",
+  "taken_at": "2023-09-10 23:22:29",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "0CB473E0-AFA9-4E38-AC1D-F946D0BD1E1C": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_8909.jpg",
+  "taken_at": "2026-01-05 02:16:54",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "6E5E221B-2447-482E-8BF7-8444C60C42FE": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_3629.jpeg",
+  "taken_at": "2022-05-18 20:15:59",
+  "lat": 41.170161666666665,
+  "lng": -111.938605
+ },
+ "64A0B62C-445F-4708-B178-52BBE902B1C1": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_3908.JPG",
+  "taken_at": "2025-01-20 02:49:50",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "183B0823-2CE0-48ED-BDCB-16E6B0D02221": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_3627.jpeg",
+  "taken_at": "2022-05-18 20:15:42",
+  "lat": 41.170125,
+  "lng": -111.938605
+ },
+ "18E25495-9BE4-44CC-84BC-BD2C492AC2F8": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_3632.jpeg",
+  "taken_at": "2022-05-18 20:16:39",
+  "lat": 41.17008666666667,
+  "lng": -111.93848333333334
+ },
+ "80D27414-A7BA-4177-90DD-D99A95004A8E": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_0568.JPG",
+  "taken_at": "2022-10-12 20:42:55",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "9961F64F-94B8-415F-90D5-813D7611B3D1": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_3628.jpeg",
+  "taken_at": "2022-05-18 20:15:52",
+  "lat": 41.17017,
+  "lng": -111.93861333333334
+ },
+ "169E3EA2-6890-4D20-A7DE-D3303EF24E91": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_8908.jpg",
+  "taken_at": "2026-01-05 02:16:54",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "177BAF80-865D-48B4-A141-7961BF0BD16D": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_3625.jpeg",
+  "taken_at": "2022-05-18 20:15:29",
+  "lat": 41.16986166666667,
+  "lng": -111.93833833333333
+ },
+ "93590215-00BF-44AB-8A86-738F5A471A94": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_5046.PNG",
+  "taken_at": "2022-05-17 21:57:03",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "031D26C9-B60B-4957-8ABD-6DAACE328556": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_3624.jpeg",
+  "taken_at": "2022-05-18 20:13:47",
+  "lat": 41.170045,
+  "lng": -111.9385
+ },
+ "145F91D0-EEBE-4F46-B013-B8608145256D": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_3626.jpeg",
+  "taken_at": "2022-05-18 20:15:37",
+  "lat": 41.17006666666666,
+  "lng": -111.938645
+ },
+ "E0376EC1-DAFA-4ADB-9C53-4DCD49F17430": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_0569.JPG",
+  "taken_at": "2022-10-12 20:43:12",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "31E5E8F0-EABE-4DF3-B837-44C2E175B516": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_5045.PNG",
+  "taken_at": "2024-03-08 23:07:02",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "A19AFEA2-4AF7-426C-93B3-5514C923C33D": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_3631.jpeg",
+  "taken_at": "2022-05-18 20:16:15",
+  "lat": 41.17014666666667,
+  "lng": -111.93852166666667
+ },
+ "6DD3AECA-1D4F-4703-B2B0-A7838A4F449F": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_5044.PNG",
+  "taken_at": "2022-05-17 21:57:00",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "01AC0308-25D3-473E-9E19-ECDDFCC24760": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_5048.PNG",
+  "taken_at": "2022-05-17 21:57:18",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "F006F76B-44C2-4C61-BD24-DBFD6D76B996": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_5036.PNG",
+  "taken_at": "2024-03-08 17:22:25",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "400CFC79-8C80-495B-8296-24DCD434BF19": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_5041.PNG",
+  "taken_at": "2022-05-17 21:56:53",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "2882074B-AC6D-4313-8A4B-75DD5EE1B868": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_5042.PNG",
+  "taken_at": "2022-05-17 21:56:55",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "F4195DBF-826E-478C-90BE-449FC95DEBFD": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_5043.PNG",
+  "taken_at": "2022-05-17 21:56:58",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "14578DE5-183B-4531-862F-419DC34484DB": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_5047.PNG",
+  "taken_at": "2022-05-17 21:57:09",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "15FDDAD0-075E-4BD7-AE56-D38D8811DB54": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_8716.PNG",
+  "taken_at": "2024-07-13 01:53:18",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "A5EF577C-3287-49E4-813D-06823E34A233": {
+  "vehicle_id": "83f6f033-a3c3-4cf4-a85e-a60d2c588838",
+  "fname": "IMG_8750.PNG",
+  "taken_at": "2022-10-11 16:40:41",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "0C654D46-9AC1-4F08-AA43-7762EFDE7785": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0107.JPG",
+  "taken_at": "2024-05-24 11:26:58",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "1256F7D1-ECBD-4DE1-B826-73002A690356": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0662.JPG",
+  "taken_at": "2024-09-21 18:22:14",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "D9053F61-0F02-4247-B93C-0BC35B845759": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0664.JPG",
+  "taken_at": "2024-09-21 18:23:49",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "ACDC23DC-A068-47D6-9B08-4D5780FF0611": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0336.JPG",
+  "taken_at": "2023-10-03 21:01:08",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "EFEA1275-6AB6-4802-B287-927B0C084384": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0346.JPG",
+  "taken_at": "2022-07-30 05:47:37",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "458FCD4C-63A4-4AFC-AC64-573675EE8B10": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0325.JPG",
+  "taken_at": "2023-10-03 21:08:45",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "7889FD34-A18E-4598-898B-274152BA29DE": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0199.PNG",
+  "taken_at": "2024-08-26 21:01:18",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "5F44B6B1-D3CA-4AF3-B3AD-6C21DD024A3C": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0335.JPG",
+  "taken_at": "2023-10-03 21:04:50",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "56307608-26A8-44EE-AFAA-692F69AFD5DD": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0252.JPG",
+  "taken_at": "2024-08-30 19:54:44",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "5F0F5053-32B0-4647-8B4E-138A7E1B2845": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0347.JPG",
+  "taken_at": "2022-07-30 05:47:44",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "CD40E368-0A8D-4CD3-8BFC-4A3C7BEFA8DE": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0686.JPG",
+  "taken_at": "2022-12-05 09:33:49",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "1089C899-A48B-41F0-AA7C-74BBA852F68A": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0312.JPG",
+  "taken_at": "2024-09-01 22:20:48",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "F9DC5240-5A54-42A5-9268-B15F3629011F": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0329.JPG",
+  "taken_at": "2022-12-21 11:13:17",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "631A9BB7-96D3-4534-8C7B-3D32F9F6CCDE": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0317.JPG",
+  "taken_at": "2023-10-03 21:15:01",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "AD69617C-5F75-4476-A4FA-7DFAD243169B": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0322.JPG",
+  "taken_at": "2023-10-01 20:46:31",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "860A8815-EE47-4F6C-A29A-2DBBB9B4A237": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0334.JPG",
+  "taken_at": "2023-10-03 21:04:55",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "8A21A938-23F3-49B3-A47E-97600575EB56": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0310.JPG",
+  "taken_at": "2023-10-01 20:42:03",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "36531AC4-5CED-467C-90CF-F6AB88BA0D46": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0320.JPG",
+  "taken_at": "2023-10-01 20:42:10",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "17E0D251-1C79-4787-BC5B-B6ABCD1935CC": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0394.JPG",
+  "taken_at": "2022-12-24 04:12:59",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "F13FABA8-1D28-4AA0-A868-1287B61F2EA6": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0316.JPG",
+  "taken_at": "2024-09-01 22:21:13",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "997BF1BD-C2AA-413F-A377-11CFA6A899EB": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0319.JPG",
+  "taken_at": "2023-10-03 21:14:18",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "0DDEADAB-E84D-4ECC-AF34-A8C8E23AFB00": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0201.PNG",
+  "taken_at": "2024-08-27 00:13:31",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "33FA1C96-9E99-442F-B943-16076BFC89FC": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0321.JPG",
+  "taken_at": "2023-10-03 21:14:09",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "3498A28F-8319-40F0-9E84-60E90712FFE7": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0348.JPG",
+  "taken_at": "2022-07-30 05:47:47",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "C2369B1B-EB76-4296-A581-8286532ADC4F": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0255.JPG",
+  "taken_at": "2024-08-30 19:56:21",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "2F124510-9E3F-4582-B25B-3A6DE889FE9E": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0396.JPG",
+  "taken_at": "2022-12-24 04:15:25",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "987A5701-91BF-4332-A651-46FE15547661": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0311.JPG",
+  "taken_at": "2023-10-01 20:44:25",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "B8477CB9-C31D-4D51-A8F3-14732482A455": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0313.JPG",
+  "taken_at": "2024-09-01 22:20:52",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "98BCB5C3-3404-4733-8CF4-FDC0559E05C1": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0333.JPG",
+  "taken_at": "2022-12-21 13:26:04",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "A33DD720-D574-4A8C-9CAE-3F40853A8857": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0349.JPG",
+  "taken_at": "2022-07-30 05:47:51",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "CEE7CED3-5082-429E-B690-4E30BFA7E8E1": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0251.JPG",
+  "taken_at": "2024-08-30 19:54:33",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "619CE80B-5B03-4A0B-9F8C-6A2C02633889": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0345.JPG",
+  "taken_at": "2022-07-30 05:47:31",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "E2C08A7B-0EC6-4F6A-8B07-3E3674A2DA67": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0323.JPG",
+  "taken_at": "2023-10-03 21:10:11",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "23E7EA2D-5CAA-469F-91CB-9AC061A952E1": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0328.JPG",
+  "taken_at": "2023-10-01 20:41:57",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "F8088E60-00AC-48D9-8EA2-4A9A13611100": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0048.jpg",
+  "taken_at": "2023-06-09 15:32:11",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "78DBCB50-705C-4341-8E02-E3941E74848C": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0309.JPG",
+  "taken_at": "2023-10-03 21:21:28",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "93EB5C83-E518-47DB-B644-9BC0AC25993A": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0202.PNG",
+  "taken_at": "2024-08-27 00:13:33",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "42E52AE8-0258-4FA5-A44B-AF696B8C191E": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0318.JPG",
+  "taken_at": "2023-10-01 20:46:42",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "2BB038E9-4353-476C-B5D3-DFBCD801050C": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0254.JPG",
+  "taken_at": "2024-08-30 19:56:07",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "C97EA1C3-EF76-4BD8-B0AB-9C57E9D03574": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0344.JPG",
+  "taken_at": "2022-07-30 05:47:25",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "6522550C-DF86-4241-86DD-95A874BA438C": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0315.JPG",
+  "taken_at": "2024-09-01 22:21:09",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "09566D1F-9BEB-45EE-A71C-C497D889B294": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0331.JPG",
+  "taken_at": "2023-10-03 21:06:12",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "3C73AE01-5471-49FB-AA47-7E4997792278": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0327.JPG",
+  "taken_at": "2022-12-21 11:13:07",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "0D344B67-AAD7-4EA7-9645-E8D4D74D1EC3": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0200.PNG",
+  "taken_at": "2024-08-27 00:13:29",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "9F255BA1-235F-45D1-AAA3-50B25F6B68B9": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0330.JPG",
+  "taken_at": "2023-10-01 20:42:17",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "E2B7624A-970C-42CE-87C0-BE2B0E7E670A": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0332.JPG",
+  "taken_at": "2023-10-01 20:46:37",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "99A223C7-9692-4BF0-8648-563F86BBA9A3": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0343.JPG",
+  "taken_at": "2023-10-03 22:38:52",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "4FFAEC5A-046A-4652-A532-4AA82BFB5174": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0464.JPG",
+  "taken_at": "2021-12-09 00:10:18",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "72C05D1C-6DF9-4663-A2E3-CFD6A9E84AD9": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0326.JPG",
+  "taken_at": "2023-10-01 20:46:25",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "D2CF9A33-B81A-407F-A8C0-258EB6BDB099": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0324.JPG",
+  "taken_at": "2023-10-01 20:44:22",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "1428C101-5692-411E-9C57-CB1EC861A100": {
+  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+  "fname": "IMG_0314.JPG",
+  "taken_at": "2024-09-01 22:20:59",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "5CD8471F-F03D-4E99-B759-F557544147DD": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_3699.jpeg",
+  "taken_at": "2026-02-21 23:16:54",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "B5CA910B-F27B-4581-9FD8-2D599B7AA4A0": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_4511.PNG",
+  "taken_at": "2025-02-14 01:11:20",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "738C4385-0FA4-425D-A6EF-E50570D6BBAA": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_7773.jpeg",
+  "taken_at": "2025-07-09 17:11:35",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "C8561EFE-0123-4E38-8281-C34B5ED021B0": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8179.JPG",
+  "taken_at": "2026-02-27 12:28:19",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "DFE35D86-D842-4498-B281-E9FF3B59A55A": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_4510.PNG",
+  "taken_at": "2025-02-14 01:10:39",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "E293D80D-2215-48EC-BE7B-27DAE3452933": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8174.JPG",
+  "taken_at": "2026-02-27 12:27:55",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "9C5F6E78-C04E-4912-B206-F33B693BB5A1": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8307.JPG",
+  "taken_at": "2026-03-06 19:32:18",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "92F9856D-8AD2-4C81-B07A-459FC7D2378E": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8176.JPG",
+  "taken_at": "2026-02-27 12:28:02",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "EC015290-72A3-4E89-B214-B08B3712B6A5": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_4509.PNG",
+  "taken_at": "2025-02-14 01:10:20",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "2E2169D3-73BF-4A8A-BDC8-7460C480F547": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8170.JPG",
+  "taken_at": "2026-02-27 12:27:39",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "147FAF01-1B44-49A8-9B09-7797D08E9CA3": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8019.JPG",
+  "taken_at": "2026-02-11 23:15:36",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "951C07CB-954C-4D31-B8F1-0B76533392AC": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8020.JPG",
+  "taken_at": "2026-02-11 23:15:50",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "24CFFE29-39EE-440C-BACC-4A4CD726AFCD": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8017.JPG",
+  "taken_at": "2026-02-11 23:15:21",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "B3495291-74ED-4DC1-829E-8F95D50FA2EC": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8025.JPG",
+  "taken_at": "2026-02-11 23:18:49",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "E2604A18-514F-4E5D-94A5-BD6217B1E710": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8173.JPG",
+  "taken_at": "2026-02-27 12:27:50",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "4EAEA3B8-693D-4E2B-B608-1352B9242742": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8022.JPG",
+  "taken_at": "2026-02-11 23:16:28",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "708F35EB-60D3-4FB6-9B82-9F5D5BCC34B4": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8181.JPG",
+  "taken_at": "2026-02-27 18:51:53",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "16D4D6DC-D8FC-42C0-B5D1-FDF82505FDF6": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8182.JPG",
+  "taken_at": "2026-02-27 18:51:58",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "19A2DF69-C913-4F55-BFD9-53EF5B0A2F96": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8171.JPG",
+  "taken_at": "2026-02-27 12:27:42",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "DABD7CCF-C25F-45CE-BB2C-77253E8D4023": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8177.JPG",
+  "taken_at": "2026-02-27 12:28:09",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "ABCDD5EA-1B5B-4B8A-BD24-04A1EE118359": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_8175.JPG",
+  "taken_at": "2026-02-27 12:27:58",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "DB0863FD-A801-41D4-B41F-B1A2EF240672": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_4578.jpeg",
+  "taken_at": "2023-10-18 15:27:18",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "73BF307B-A047-4D1A-9157-27B58B266BD5": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_4131.JPG",
+  "taken_at": "2025-11-03 18:29:16",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "1982B756-A3D4-4BED-8883-346065F156BA": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_4303.JPG",
+  "taken_at": "2025-02-06 00:53:33",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "56D01D9A-35E9-4DA9-9164-D8845585A867": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_4579.jpeg",
+  "taken_at": "2023-10-18 15:40:56",
+  "lat": -180.0,
+  "lng": -180.0
+ },
+ "6F397FCC-9092-4844-9E06-AC109F01A683": {
+  "vehicle_id": "a90c008a-3379-41d8-9eb2-b4eda365d74c",
+  "fname": "IMG_9223.JPG",
+  "taken_at": "2023-08-30 18:30:22",
+  "lat": -180.0,
+  "lng": -180.0
+ }
+}

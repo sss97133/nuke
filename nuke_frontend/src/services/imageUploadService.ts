@@ -390,12 +390,16 @@ export class ImageUploadService {
           ? `vehicles/${vehicleId}/${storageFolder}/${safeCategory}/${fileName}`
           : `users/${user.id}/unorganized/${fileName}`; // Personal library
 
-      // Use photo date if available, otherwise use current time or file modified date
-      const photoDate = listingCapturedAt 
-        || metadata.dateTaken 
-        || (file.lastModified ? new Date(file.lastModified) : new Date());
-      console.log('File date:', photoDate);
-      console.log('Using date for timeline:', photoDate.toISOString());
+      // Capture date is real testimony — only assert it from a real capture signal.
+      // EXIF DateTimeOriginal / a source listing's capture time / the file's own
+      // mtime are all genuine. Upload-now is NOT a capture date: stamping it makes
+      // an old photo bucket onto the day it was uploaded/analyzed (the "wrong day"
+      // bug). When no capture signal exists, leave taken_at NULL — absence held
+      // open beats a fabricated timestamp.
+      const photoDate: Date | null = listingCapturedAt
+        || metadata.dateTaken
+        || (file.lastModified ? new Date(file.lastModified) : null);
+      console.log('Using date for timeline:', photoDate ? photoDate.toISOString() : '(none — taken_at left null)');
 
       // Upload original to storage (use compressed version if available)
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -555,7 +559,7 @@ export class ImageUploadService {
           is_duplicate: Boolean(duplicateOf),
           is_primary: count === 0 && !isDocument, // First image becomes primary (not documents)
           is_sensitive: false, // Required field
-          taken_at: photoDate.toISOString(), // Use actual photo date for timeline
+          taken_at: photoDate ? photoDate.toISOString() : null, // Real capture signal only; null when unknown
           latitude: latitude || null, // Store at top level for easier querying
           longitude: longitude || null, // Store at top level for easier querying
           variants: variants, // Store all variant URLs
