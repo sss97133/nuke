@@ -1,5 +1,6 @@
 import React from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
+import { supabase } from '../../lib/supabase';
 
 interface ScoreConfig {
   label: string;
@@ -11,11 +12,13 @@ interface ScoreConfig {
 
 const SCORES: ScoreConfig[] = [
   {
+    // Reads the Eye's rollup (vehicle_condition_scores), not the dead
+    // vehicles.condition_rating column — injected in the component below.
     label: 'Condition',
-    field: 'vehicles.condition_rating',
-    getValue: (v) => v?.condition_rating ?? null,
-    format: (v) => `${v}/10`,
-    maxValue: 10,
+    field: 'vehicle_condition_scores.condition_score',
+    getValue: (v) => v?.condition_rating != null ? v.condition_rating * 10 : null,
+    format: (v) => `${Math.round(v)}/100`,
+    maxValue: 100,
   },
   {
     label: 'Value Score',
@@ -50,9 +53,29 @@ const SCORES: ScoreConfig[] = [
 const VehicleScoresWidget: React.FC = () => {
   const { vehicle } = useVehicleProfile();
   const [collapsed, setCollapsed] = React.useState(false);
+  const [eyeCondition, setEyeCondition] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (!vehicle?.id) return;
+    let alive = true;
+    supabase
+      .from('vehicle_condition_scores')
+      .select('condition_score')
+      .eq('vehicle_id', vehicle.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (alive && data?.condition_score != null) setEyeCondition(Number(data.condition_score));
+      });
+    return () => { alive = false; };
+  }, [vehicle?.id]);
+
+  const valueFor = (score: ScoreConfig) =>
+    score.field === 'vehicle_condition_scores.condition_score' && eyeCondition != null
+      ? eyeCondition
+      : score.getValue(vehicle);
 
   // Don't render if all scores are null
-  const hasAnyScore = SCORES.some((score) => score.getValue(vehicle) != null);
+  const hasAnyScore = SCORES.some((score) => valueFor(score) != null);
   if (!hasAnyScore) return null;
 
   return (
@@ -79,7 +102,7 @@ const VehicleScoresWidget: React.FC = () => {
       </div>
       <div className="widget__body">
         {SCORES.map((score) => {
-          const val = score.getValue(vehicle);
+          const val = valueFor(score);
           const pct = val != null ? (val / score.maxValue) * 100 : 0;
           return (
             <div className="score-row" key={score.field}>
