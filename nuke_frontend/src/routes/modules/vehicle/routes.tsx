@@ -20,6 +20,7 @@ const VendorsPage = React.lazy(() => import('../../../pages/vehicle-profile/Vend
 const LifecyclePage = React.lazy(() => import('../../../pages/vehicle-profile/LifecyclePage'));
 const TablePage = React.lazy(() => import('../../../pages/vehicle-profile/TablePage'));
 const AnalysisStreamPage = React.lazy(() => import('../../../pages/vehicle-profile/AnalysisStreamPage'));
+const EyeDossierPage = React.lazy(() => import('../../../pages/vehicle-profile/EyeDossierPage'));
 
 const VehiclePortfolio = React.lazy(() => import('../../../pages/VehiclePortfolio'));
 const VehicleListFromPhotos = React.lazy(() => import('../../../pages/VehicleListFromPhotos'));
@@ -44,6 +45,7 @@ const VehicleModuleRoutes = () => {
         <Route path="/:vehicleId/lifecycle" element={<LifecyclePage />} />
         <Route path="/:vehicleId/table" element={<TablePage />} />
         <Route path="/:vehicleId/analysis-stream" element={<AnalysisStreamPage />} />
+        <Route path="/:vehicleId/dossier" element={<EyeDossierPage />} />
 
         {/* Protected: write / owner-only actions */}
         <Route element={<ProtectedRoute />}>

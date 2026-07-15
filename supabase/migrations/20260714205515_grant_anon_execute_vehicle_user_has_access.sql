@@ -1,0 +1,11 @@
+-- DRIFT REPAIR (committed 2026-07-15): apply_migration'd directly to prod on
+-- 2026-07-14T20:55:15Z, absent from repo migrations. Recovered from the crashed
+-- session transcript (fc88a377) and verified against live (anon HAS execute).
+--
+-- Fix sitewide logged-out gallery failure: RLS policies on vehicle_images call
+-- vehicle_user_has_access(), but the RLS-hardening pass (#329) granted EXECUTE to
+-- authenticated/service_role only. anon must be able to EVALUATE the gate function
+-- (the function itself still decides access; this reopens no data hole). This is
+-- why logged-out visitors were "stuck on one image" — the hero loads by a
+-- different path than the gallery.
+GRANT EXECUTE ON FUNCTION public.vehicle_user_has_access(uuid, uuid) TO anon;
