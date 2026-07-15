@@ -409,3 +409,25 @@ had no owner guard. Gate 2 + Gate 3a close this class.
 4. The 70 "urls-differ" disarmed rows were classified by raw-text inequality; some may
    normalize to the same listing. Disarming is conservative (re-detectable); all unowned.
 
+
+---
+
+# Class 1 — hamming-distance widening pass — 2026-07-15 (READ-ONLY; nothing written)
+
+NUKE-MAINFRAME, autonomous run. The Phase-1 exact-match census found 5 cross-vehicle pairs; this is the promised "widen the net" hamming pass. **Nothing was merged or reattributed — every action here is owner-gated.**
+
+**Method (space discipline enforced).** The matchable space is the node-canvas 9×8 dHash = 64 bits = **16 hex chars** (`HASH_SPACE = "dhash boxmean/area-avg 9x8 v2"`, per `dhash-backfill.mjs` header). `image_identities.phash_hex` is polluted with other spaces (len-71 legacy `phash` ×11,416; a few len-19/35/36), so the pass filtered to `length(phash_hex)=16` (7,703 unique hashes over 9,386 identity→vehicle tuples, joined via `vehicle_images.image_identity_id` — now indexed). Cross-space contamination is a non-issue at this threshold: two hashes ≤4 bits apart are near-identical images in the SAME encoding; a legacy-space hash lands ~32 bits from any new-space hash. Pairwise hamming ≤4, then linked to distinct `vehicle_id`s.
+
+**Result: 46 near-dupe hash pairs → 38 cross-vehicle vehicle-pairs.** Enriched with year/make/model/VIN/platform/owner/status. The decisive read:
+
+- **Only 2 of 38 are genuine DUPLICATE-RECORD candidates** (same make+model, ≤1yr apart) — both **owner-gated (Skylar's vehicles)**:
+  1. **`e04bf9c5` (1977 Chevrolet Blazer, VIN CCL187Z210370, gaa-classic-cars, 298 img) ↔ `e08bf694` (1977 Chevrolet Blazer, VIN CKR187F127263, OWNED, 1650 img)** — **184 bit-identical images**. `e08bf694` is Skylar's canonical Blazer (it absorbed `21501c21` in the 2026-07-08 K5-incident resolution). 184 identical images = the GAA-auction record and Skylar's truck carry the same photographs — either the GAA listing was OF this truck (→ merge the listing record in) or its images were scraped onto it (→ reattribute). Owner call + eyes. #1 candidate.
+  2. **`a90c008a` (1983 GMC K2500, VIN 1GTGK24M1DJ514592, bat, OWNED, 2202 img) ↔ `d6a01df2` (1983 GMC K2500, no VIN, user-submission, OWNED, 1457 img)** — same Y/M/M, both OWNED, ~6 shared images (weaker). Plausible one-truck-two-records (bat listing vs user submission); reconcile VIN onto the richer record if confirmed. Owner call.
+
+- **36 of 38 are MISATTRIBUTION / shop-mixed images, NOT duplicate records** — different make/model sharing bit-identical images. Smoking gun: a **2005 Ferrari 360 Spider shares 34 identical images with a 1979 GMC K15** — impossible for a real duplicate. These are Class 2 (a photo attributed to the wrong vehicle), overwhelmingly from bulk/shop-mixed ingests: **8 pairs touch the 2026-03-20 `iphoto` bulk-ingest cluster** (Charger/Ferrari/85-K10/F-350/72-K10/74-K5 all created 2026-03-20 via `iphoto`), the rest are Skylar's fleet photographed in the same shop sessions (e.g. 1984 Chevy K10 ↔ 1983 GMC K2500, 114 shared). Per `feedback_recent_unalbumed_photos_are_shop_mixed` + `feedback_album_is_prior_not_ground_truth`, these need **eyes on the image to find its true home**, then `reattribute_observation()`/`resort_image()` with `merged_from_vehicle_id` lineage — NEVER a merge (merging a Ferrari into a GMC would be catastrophic).
+
+**Takeaway that reframes Class 1:** cross-vehicle image overlap on this substrate is **~95% shop-mixed misattribution, ~5% duplicate records.** A naive "merge everything that shares images" would have corrupted 36 distinct vehicles. The real backlogs are (a) 2 owner-gated dup-record decisions, (b) a ~36-pair Class-2 reattribution queue that needs image-eyes (the 2026-03-20 iphoto ingest is the largest single contaminator — worth auditing that ingest's attribution logic at source).
+
+Evidence on disk (scratchpad, this run): `candidates.json` (38 pairs w/ hash examples), `classified.json` (+ metadata + class), `idhash.tsv` (raw tuples). Reproduce: `dhash-backfill.mjs` space + the `length(phash_hex)=16` filter + hamming≤4.
+
+**Owner decisions queued (nothing executed):** (1) rule on the `e04bf9c5`↔`e08bf694` Blazer pair (merge listing-in vs reattribute); (2) rule on the `a90c008a`↔`d6a01df2` K2500 pair; (3) authorize the Class-2 reattribution queue (image-eyes pass on the 36 shop-mixed pairs, iphoto-2026-03-20 cluster first).
