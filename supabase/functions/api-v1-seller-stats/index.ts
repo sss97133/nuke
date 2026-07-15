@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "handle parameter is required" }, 400);
     }
 
-    const rpcRes = await fetch(
+    const rpcRes = await fetch( // guardrail-allow: raw-fetch — internal Supabase REST RPC
       `${supabaseUrl}/rest/v1/rpc/get_seller_stats`,
       {
         method: "POST",

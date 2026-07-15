@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
     if (settings?.model) inputs.model = settings.model;
     if (vehicleId) inputs.vehicle_id = vehicleId;
 
-    const res = await fetch(
+    const res = await fetch( // guardrail-allow: raw-fetch — GitHub Actions dispatch (service API, not archivable content)
       `https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}/dispatches`,
       {
         method: "POST",
