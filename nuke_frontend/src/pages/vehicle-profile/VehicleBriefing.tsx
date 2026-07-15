@@ -12,57 +12,14 @@
  * Design: see docs/library/technical/design-book/11-intelligence-surface.md
  * Philosophy: see docs/library/intellectual/discourses/the-knowing-system.md
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
-import { supabase } from '../../lib/supabase';
+import { usePopup } from '../../components/popups/usePopup';
+import { freshnessOf, agoLabel } from './valueFreshness';
+import { useEyeRead, type EyeRead } from './hooks/useEyeRead';
 import type { VehicleIntel, CommentIntel, Apparition, CompSale } from './hooks/useVehicleIntel';
 
-// ---------------------------------------------------------------------------
-// Eye read — the evidence-graded appraisal (vehicle_condition_scores).
-// When present it OWNS the value story; the model estimate is demoted.
-// A price we can't defend is never the headline (valuation-block doctrine).
-// ---------------------------------------------------------------------------
-
-interface EyeRead {
-  band: [number, number] | null;
-  conditionClass: string | null;
-  tier: string;
-  score: number;
-  frames: number | null;
-  method: string;
-  computedAt: string;
-}
-
-function useEyeRead(vehicleId: string | undefined): EyeRead | null {
-  const [read, setRead] = useState<EyeRead | null>(null);
-  useEffect(() => {
-    if (!vehicleId) return;
-    let alive = true;
-    supabase
-      .from('vehicle_condition_scores')
-      .select('condition_score, condition_tier, descriptor_summary, observation_count, computed_at, computation_version')
-      .eq('vehicle_id', vehicleId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!alive || !data) return;
-        const ds: any = data.descriptor_summary || {};
-        const band = Array.isArray(ds.as_is_band_usd) && ds.as_is_band_usd[0] != null
-          ? [Number(ds.as_is_band_usd[0]), Number(ds.as_is_band_usd[1])] as [number, number]
-          : null;
-        setRead({
-          band,
-          conditionClass: typeof ds.condition_class === 'string' ? ds.condition_class.split('(')[0].trim() : null,
-          tier: data.condition_tier,
-          score: Number(data.condition_score),
-          frames: data.observation_count,
-          method: data.computation_version || 'appraisal',
-          computedAt: data.computed_at,
-        });
-      });
-    return () => { alive = false; };
-  }, [vehicleId]);
-  return read;
-}
+const EyeLedgerPopup = React.lazy(() => import('./EyeLedgerPopup'));
 
 // ---------------------------------------------------------------------------
 // Design tokens — matches vehicle-profile.css system
@@ -241,6 +198,9 @@ const StatPill: React.FC<StatPillProps> = ({ label, value, accent }) => (
 
 const CompRow: React.FC<{ comp: CompSale }> = ({ comp }) => {
   const fmt = (n: number) => '$' + Math.round(n).toLocaleString();
+  // Staleness is structural: a comp's age decays its weight as evidence. Fade
+  // and mark stale comps rather than showing them as if they were current.
+  const fresh = freshnessOf(comp.sale_date);
   return (
     <div style={{
       display: 'grid',
@@ -249,6 +209,7 @@ const CompRow: React.FC<{ comp: CompSale }> = ({ comp }) => {
       alignItems: 'center',
       padding: '3px 0',
       borderBottom: '1px solid var(--border, #eee)',
+      opacity: fresh?.opacity ?? 1,
       ...MONO,
     }}>
       {comp.thumbnail ? (
@@ -260,8 +221,10 @@ const CompRow: React.FC<{ comp: CompSale }> = ({ comp }) => {
         {comp.year ? `'${String(comp.year).slice(2)} ` : ''}{comp.model || '—'}
       </span>
       <span style={{ fontWeight: 700, color: 'var(--vp-sold, #000)' }}>{fmt(comp.sale_price)}</span>
-      <span style={{ color: 'var(--text-secondary, #999)', fontSize: '8px' }}>
-        {comp.sale_date ? new Date(comp.sale_date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }) : ''}
+      <span style={{ fontSize: '8px', color: fresh && fresh.tier !== 'fresh' ? fresh.color : 'var(--text-secondary, #999)', whiteSpace: 'nowrap' }}>
+        {comp.sale_date
+          ? `${new Date(comp.sale_date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}${fresh?.tier === 'stale' ? ' · STALE' : ''}`
+          : 'undated'}
       </span>
     </div>
   );
@@ -275,10 +238,26 @@ const VehicleBriefing: React.FC = () => {
   const { vehicle, vehicleIntel, vehicleIntelLoading, observationCount } = useVehicleProfile();
   const [showComps, setShowComps] = useState(false);
   const eyeRead = useEyeRead(vehicle?.id);
+  const { openPopup } = usePopup();
 
   if (!vehicle || vehicleIntelLoading) return null;
 
   const headline = generateHeadline(vehicle, vehicleIntel, observationCount, eyeRead);
+  // The Eye's headline drills to its ledger — the price is a button, per
+  // drillable-ontology doctrine. Other headline sources have no drill target.
+  const headlineIsEye = Boolean(eyeRead?.band);
+  const drillPrice = vehicle?.sale_price || vehicle?.sold_price || vehicle?.asking_price || vehicle?.price;
+  const openLedger = () => {
+    if (!vehicle?.id || !eyeRead) return;
+    openPopup(
+      <React.Suspense fallback={<div style={{ padding: '12px', fontSize: '8px', fontFamily: 'var(--vp-font-sans, Arial, sans-serif)' }}>Opening the ledger…</div>}>
+        <EyeLedgerPopup vehicleId={vehicle.id} eyeRead={eyeRead} price={drillPrice} />
+      </React.Suspense>,
+      'THE LEDGER',
+      560,
+      false,
+    );
+  };
   const estimate = vehicle.nuke_estimate;
   const scores = vehicleIntel?.scores;
   const comps = vehicleIntel?.recent_comps;
@@ -295,9 +274,12 @@ const VehicleBriefing: React.FC = () => {
       label: 'EYE READ',
       value: `$${Math.round(lo / 100) / 10}k–$${Math.round(hi / 100) / 10}k`,
     });
+    // The read is a dated fact; carry its age and decay it visibly.
+    const readFresh = freshnessOf(eyeRead.computedAt);
     pills.push({
-      label: 'READ ON',
-      value: new Date(eyeRead.computedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      label: 'READ',
+      value: `${new Date(eyeRead.computedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${agoLabel(eyeRead.computedAt)}`,
+      accent: readFresh?.tier !== 'fresh' ? readFresh?.color : undefined,
     });
     if (eyeRead.frames) {
       pills.push({ label: 'FRAMES', value: String(eyeRead.frames) });
@@ -341,19 +323,35 @@ const VehicleBriefing: React.FC = () => {
 
   return (
     <div style={{ margin: '0 12px 8px' }}>
-      {/* L0: Headline */}
+      {/* L0: Headline — the Eye's headline is a button into the ledger */}
       {headline && (
-        <div style={{
-          padding: '6px 10px',
-          background: SEVERITY_BG[headline.severity] || SEVERITY_BG.neutral,
-          borderLeft: `3px solid ${SEVERITY_BORDER[headline.severity] || SEVERITY_BORDER.neutral}`,
-          fontFamily: 'var(--vp-font-sans, Arial, sans-serif)',
-          fontSize: '9px',
-          lineHeight: '1.5',
-          color: 'var(--text, #000)',
-          marginBottom: '6px',
-        }}>
+        <div
+          onClick={headlineIsEye ? openLedger : undefined}
+          role={headlineIsEye ? 'button' : undefined}
+          style={{
+            padding: '6px 10px',
+            background: SEVERITY_BG[headline.severity] || SEVERITY_BG.neutral,
+            borderLeft: `3px solid ${SEVERITY_BORDER[headline.severity] || SEVERITY_BORDER.neutral}`,
+            fontFamily: 'var(--vp-font-sans, Arial, sans-serif)',
+            fontSize: '9px',
+            lineHeight: '1.5',
+            color: 'var(--text, #000)',
+            marginBottom: '6px',
+            cursor: headlineIsEye ? 'pointer' : undefined,
+          }}
+        >
           {headline.text}
+          {headlineIsEye && (
+            <span style={{
+              float: 'right',
+              fontSize: '8px',
+              fontWeight: 700,
+              letterSpacing: '0.05em',
+              color: 'var(--text-secondary, #666)',
+            }}>
+              ▸ THE LEDGER
+            </span>
+          )}
         </div>
       )}
 
@@ -381,6 +379,10 @@ const VehicleBriefing: React.FC = () => {
             }}
           >
             {showComps ? '▲ HIDE' : '▼ VIEW'} {comps.length} COMPARABLE SALE{comps.length !== 1 ? 'S' : ''}
+            {(() => {
+              const stale = comps.filter(c => freshnessOf(c.sale_date)?.tier === 'stale').length;
+              return stale > 0 ? ` · ${stale} STALE` : '';
+            })()}
           </button>
           {showComps && (
             <div style={{ marginTop: '4px' }}>
