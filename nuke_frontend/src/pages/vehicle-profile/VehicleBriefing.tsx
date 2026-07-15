@@ -16,6 +16,7 @@ import React, { useState, useEffect } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
 import { usePopup } from '../../components/popups/usePopup';
+import { freshnessOf, agoLabel } from './valueFreshness';
 import type { VehicleIntel, CommentIntel, Apparition, CompSale } from './hooks/useVehicleIntel';
 
 const EyeLedgerPopup = React.lazy(() => import('./EyeLedgerPopup'));
@@ -244,6 +245,9 @@ const StatPill: React.FC<StatPillProps> = ({ label, value, accent }) => (
 
 const CompRow: React.FC<{ comp: CompSale }> = ({ comp }) => {
   const fmt = (n: number) => '$' + Math.round(n).toLocaleString();
+  // Staleness is structural: a comp's age decays its weight as evidence. Fade
+  // and mark stale comps rather than showing them as if they were current.
+  const fresh = freshnessOf(comp.sale_date);
   return (
     <div style={{
       display: 'grid',
@@ -252,6 +256,7 @@ const CompRow: React.FC<{ comp: CompSale }> = ({ comp }) => {
       alignItems: 'center',
       padding: '3px 0',
       borderBottom: '1px solid var(--border, #eee)',
+      opacity: fresh?.opacity ?? 1,
       ...MONO,
     }}>
       {comp.thumbnail ? (
@@ -263,8 +268,10 @@ const CompRow: React.FC<{ comp: CompSale }> = ({ comp }) => {
         {comp.year ? `'${String(comp.year).slice(2)} ` : ''}{comp.model || '—'}
       </span>
       <span style={{ fontWeight: 700, color: 'var(--vp-sold, #000)' }}>{fmt(comp.sale_price)}</span>
-      <span style={{ color: 'var(--text-secondary, #999)', fontSize: '8px' }}>
-        {comp.sale_date ? new Date(comp.sale_date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }) : ''}
+      <span style={{ fontSize: '8px', color: fresh && fresh.tier !== 'fresh' ? fresh.color : 'var(--text-secondary, #999)', whiteSpace: 'nowrap' }}>
+        {comp.sale_date
+          ? `${new Date(comp.sale_date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}${fresh?.tier === 'stale' ? ' · STALE' : ''}`
+          : 'undated'}
       </span>
     </div>
   );
@@ -314,9 +321,12 @@ const VehicleBriefing: React.FC = () => {
       label: 'EYE READ',
       value: `$${Math.round(lo / 100) / 10}k–$${Math.round(hi / 100) / 10}k`,
     });
+    // The read is a dated fact; carry its age and decay it visibly.
+    const readFresh = freshnessOf(eyeRead.computedAt);
     pills.push({
-      label: 'READ ON',
-      value: new Date(eyeRead.computedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      label: 'READ',
+      value: `${new Date(eyeRead.computedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${agoLabel(eyeRead.computedAt)}`,
+      accent: readFresh?.tier !== 'fresh' ? readFresh?.color : undefined,
     });
     if (eyeRead.frames) {
       pills.push({ label: 'FRAMES', value: String(eyeRead.frames) });
@@ -416,6 +426,10 @@ const VehicleBriefing: React.FC = () => {
             }}
           >
             {showComps ? '▲ HIDE' : '▼ VIEW'} {comps.length} COMPARABLE SALE{comps.length !== 1 ? 'S' : ''}
+            {(() => {
+              const stale = comps.filter(c => freshnessOf(c.sale_date)?.tier === 'stale').length;
+              return stale > 0 ? ` · ${stale} STALE` : '';
+            })()}
           </button>
           {showComps && (
             <div style={{ marginTop: '4px' }}>
