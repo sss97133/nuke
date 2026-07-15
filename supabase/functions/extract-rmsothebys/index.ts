@@ -377,6 +377,13 @@ async function saveVehicle(
       });
   }
 
+  // Resolve the real auction (sale) date from the auction code, not extraction time.
+  const knownAuctionDate = getKnownAuctions()
+    .find(a => a.code === vehicle.auction_code)?.date || null;
+  const soldAtIso = vehicle.sold
+    ? (knownAuctionDate ? new Date(`${knownAuctionDate}T12:00:00Z`).toISOString() : null)
+    : null;
+
   // Create vehicle_events record
   await supabase
     .from('vehicle_events')
@@ -389,7 +396,7 @@ async function saveVehicle(
         source_listing_id: listingUrlKey || vehicle.lot_number,
         event_status: vehicle.sold ? 'sold' : (vehicle.is_still_for_sale ? 'active' : 'ended'),
         final_price: vehicle.sold_price,
-        sold_at: vehicle.sold ? new Date().toISOString() : null,
+        sold_at: soldAtIso,
         metadata: {
           lot_number: vehicle.lot_number,
           auction_name: vehicle.auction_name,
@@ -410,7 +417,7 @@ async function saveVehicle(
     await supabase.from('timeline_events').insert({
       vehicle_id: vehicleId,
       event_type: 'auction_sold',
-      event_date: new Date().toISOString().split('T')[0],
+      event_date: knownAuctionDate || new Date().toISOString().split('T')[0],
       title: `Sold at ${vehicle.auction_name} (Lot ${vehicle.lot_number})`,
       description: `Sold for ${vehicle.sold_price_text || vehicle.sold_price.toLocaleString()} at RM Sotheby's ${vehicle.auction_name}`,
       source: 'rmsothebys_import',

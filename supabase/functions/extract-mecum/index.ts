@@ -762,6 +762,12 @@ async function saveVehicle(
 
   if (!existingListing) {
     try {
+      // Run date IS the sale date for an auction lot. It was parsed above
+      // (vehicle.auction_date) but never persisted — the cause of the empty
+      // price-over-time charts. Persist it to sold_at.
+      const mecumSoldAt = vehicle.auction_date && !isNaN(Date.parse(vehicle.auction_date))
+        ? new Date(vehicle.auction_date).toISOString()
+        : null;
       await supabase.from("vehicle_events").insert({
         vehicle_id: vehicleId,
         source_platform: "mecum",
@@ -770,7 +776,8 @@ async function saveVehicle(
         source_listing_id: vehicle.lot_number || null,
         final_price: vehicle.sale_price,
         event_status: vehicle.status || "listed",
-        metadata: { title: vehicle.title },
+        sold_at: mecumSoldAt,
+        metadata: { title: vehicle.title, auction_date: vehicle.auction_date || null },
       });
     } catch { /* non-fatal */ }
   }

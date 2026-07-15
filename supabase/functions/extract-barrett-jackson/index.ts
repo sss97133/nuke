@@ -64,6 +64,7 @@ interface BJVehicle {
   sale_price: number | null;
   description: string | null;
   auction_name: string | null;
+  event_date: string | null;
   lot_number: string | null;
   status: string | null;
   image_urls: string[];
@@ -233,6 +234,11 @@ function parseRscVehicleData(html: string, url: string): BJVehicle | null {
     // Event slug -> auction name
     const eventField = searchBlock.match(/\\?"event_slug\\?":\s*\\?"([^"\\]+)\\?"/);
     if (eventField) vehicle.auction_name = titleCase(eventField[1].replace(/-/g, " "));
+
+    // Event start date = the sale date. It sits in the RSC payload but was never
+    // read — the cause of BJ's 0% dated events. Pull the first ISO date.
+    const startDateField = html.match(/\\?"start_date\\?":\s*\\?"(\d{4}-\d{2}-\d{2})/);
+    if (startDateField) vehicle.event_date = startDateField[1];
 
     // Is sold
     const soldField = searchBlock.match(/\\?"is_sold\\?":\s*(true|false)/);
@@ -665,6 +671,7 @@ function newEmptyVehicle(url: string): BJVehicle {
     sale_price: null,
     description: null,
     auction_name: null,
+    event_date: null,
     lot_number: null,
     status: null,
     image_urls: [],
@@ -1075,9 +1082,13 @@ async function saveVehicle(
                         vehicle.status?.toLowerCase() === "withdrawn" ? "cancelled" :
                         "ended",
         final_price: vehicle.sale_price || null,
+        sold_at: vehicle.event_date && !isNaN(Date.parse(vehicle.event_date))
+          ? new Date(vehicle.event_date).toISOString()
+          : null,
         metadata: {
           lot_number: vehicle.lot_number,
           auction_name: vehicle.auction_name,
+          event_date: vehicle.event_date,
           extraction_method: vehicle.extraction_method,
           extractor_version: EXTRACTOR_VERSION,
         },

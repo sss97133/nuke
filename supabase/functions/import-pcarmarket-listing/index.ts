@@ -1010,7 +1010,10 @@ Deno.serve(async (req: Request) => {
       }
       if (listing.auctionOutcome === 'sold') {
         vehicleEventData.final_price = listing.salePrice;
-        vehicleEventData.sold_at = new Date().toISOString();
+        // Real auction end date (parsed from page), never the scrape time.
+        // Fall back to saleDate; only if neither is present do we omit sold_at.
+        const soldAt = listing.auctionEndDate || listing.saleDate || null;
+        if (soldAt) vehicleEventData.sold_at = soldAt;
       }
 
       // Check if vehicle_event already exists

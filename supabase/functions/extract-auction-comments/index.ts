@@ -664,9 +664,10 @@ Deno.serve(async (req) => {
       // Safety net: If the core extractor didn't set final_price, infer it from the SOLD system comment.
       // CRITICAL: Only use system-generated "sold" comments, NOT user comments that happen to contain
       // "sold for" text. User comments like "should have sold for $160k" pollute price extraction.
-      const soldCommentText =
-        commentsWithIdentities.find((c: any) => String(c?.comment_type || '').toLowerCase() === 'sold')?.comment_text ||
+      const soldComment =
+        commentsWithIdentities.find((c: any) => String(c?.comment_type || '').toLowerCase() === 'sold') ||
         null
+      const soldCommentText = soldComment?.comment_text || null
 
       const parseMoney = (raw: string | null): number | null => {
         const m = String(raw || '').match(/\$([0-9,]+)/)
@@ -695,7 +696,9 @@ Deno.serve(async (req) => {
           : (inferredSoldPriceFromComment || null)
 
       const inferredSaleDate = (() => {
-        const t = extListing?.sold_at || extListing?.ended_at || null
+        // Prefer an existing event date; else fall back to the SOLD system comment's
+        // timestamp — on BaT that comment is posted at the auction-end/sale moment.
+        const t = extListing?.sold_at || extListing?.ended_at || soldComment?.posted_at || null
         if (!t) return null
         const d = new Date(t)
         if (!Number.isFinite(d.getTime())) return null
@@ -752,7 +755,7 @@ Deno.serve(async (req) => {
               event_status: 'sold',
               final_price: inferredFinalPrice,
               current_price: inferredFinalPrice,
-              sold_at: extListing?.sold_at || extListing?.ended_at || nowIso,
+              sold_at: extListing?.sold_at || extListing?.ended_at || inferredSaleDate || nowIso,
               metadata: {
                 ...existingMeta,
                 ...(inferredBuyerFromComment ? { buyer_username: inferredBuyerFromComment } : {}),
