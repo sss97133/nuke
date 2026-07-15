@@ -30,7 +30,7 @@ const EXTRACTOR_VERSION = 'extract-bat-core:3.0.0';
 // source of truth means a future column addition can't silently drift and
 // produce inconsistent read-back data across the branches.
 const VEHICLE_MATCH_COLUMNS =
-  "id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, listing_kind, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid";
+  "id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, city, state, listing_kind, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1280,6 +1280,11 @@ Deno.serve(async (req) => {
         bat_buyer: essentials.buyer_username || null,
         bat_location: essentials.location || null,
         listing_location: parsedLocation.clean,
+        // Split city/state into their own columns — the market-read views
+        // (marketplace_metro_pulse / velocity) roll up by city+state, so a location
+        // that only lives in listing_location never reaches EXPLORE's metro map.
+        city: parsedLocation.city,
+        state: parsedLocation.state,
         listing_location_raw: parsedLocation.raw,
         listing_location_source: 'bat',
         listing_location_confidence: parsedLocation.confidence,
@@ -1493,6 +1498,10 @@ Deno.serve(async (req) => {
         updatePayload.listing_location_confidence = parsedLocation.confidence;
         updatePayload.listing_location_observed_at = new Date().toISOString();
       }
+      // Fill city/state whenever we have a parse and they're not already set —
+      // feeds the EXPLORE metro map without clobbering a prior value.
+      if (parsedLocation.city && !existing?.city) updatePayload.city = parsedLocation.city;
+      if (parsedLocation.state && !existing?.state) updatePayload.state = parsedLocation.state;
       if ((!existing?.bat_lot_number || listingIsLatestOrEqual) && essentials.lot_number) updatePayload.bat_lot_number = essentials.lot_number;
       if (!existing?.body_style && bestBodyStyle) updatePayload.body_style = bestBodyStyle;
 

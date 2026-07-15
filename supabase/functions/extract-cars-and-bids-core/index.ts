@@ -958,6 +958,8 @@ Deno.serve(async (req) => {
       current_price: extracted.currentBid,
       event_status: extracted.auctionStatus || "active",
       ended_at: extracted.endDate,
+      // sold_at = the auction end moment when the auction actually sold (C&B "Ended" = sold unless reserve not met)
+      sold_at: extracted.auctionStatus === 'sold' ? extracted.endDate : null,
       metadata: {
         title: extracted.title,
         seller_id: extracted.sellerId,
