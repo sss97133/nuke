@@ -16,6 +16,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
+import { freshnessOf, agoLabel } from './valueFreshness';
 
 interface EyeReadHeader {
   band: [number, number] | null;
@@ -221,6 +222,7 @@ const EyeLedgerPopup: React.FC<EyeLedgerPopupProps> = ({ vehicleId, eyeRead, pri
   }, [checks]);
 
   const band = eyeRead.band;
+  const readFresh = freshnessOf(eyeRead.computedAt);
   const bandUsd = payload?.band_usd;
   const iiv = payload?.if_it_verifies;
   const wwctn: string[] = Array.isArray(payload?.what_would_change_the_number) ? payload.what_would_change_the_number : [];
@@ -252,11 +254,19 @@ const EyeLedgerPopup: React.FC<EyeLedgerPopupProps> = ({ vehicleId, eyeRead, pri
         </div>
         <div style={{ ...MONO, fontSize: '8px', color: 'var(--text-secondary, #666)', marginTop: '2px' }}>
           READ {new Date(eyeRead.computedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          {' '}(<span style={{ color: readFresh && readFresh.tier !== 'fresh' ? readFresh.color : 'inherit' }}>{agoLabel(eyeRead.computedAt)}</span>)
           {eyeRead.frames ? ` · ${eyeRead.frames} FRAMES` : ''}
           {totalChecks > 0 ? ` · ${totalChecks} CHECKS` : ''}
           {payload?.confidence != null ? ` · CONF ${Number(payload.confidence).toFixed(2)}` : ''}
           {` · ${eyeRead.method}`}
         </div>
+        {readFresh && readFresh.tier !== 'fresh' && (
+          <div style={{ ...MONO, fontSize: '8px', color: readFresh.color, marginTop: '3px' }}>
+            {readFresh.tier === 'stale'
+              ? `⚠ This read is ${readFresh.label} old — the market may have moved. Re-run the Eye before trusting the band.`
+              : `This read is ${readFresh.label} old — confidence decays with age; a fresh read tightens it.`}
+          </div>
+        )}
       </div>
 
       {!payload && totalChecks === 0 && (
