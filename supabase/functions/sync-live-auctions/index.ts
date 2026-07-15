@@ -154,7 +154,9 @@ async function syncBaT(): Promise<{ auctions: LiveAuction[]; error: string | nul
           title: item.title,
           platform: "bringatrailer",
           auction_end_date: new Date(item.timestamp_end * 1000).toISOString(),
-          current_bid: item.current_bid,
+          // BaT sends current_bid: false for no-bid lots — that is "no bid yet",
+          // not a number. 'false'::int aborted whole upsert chunks (2026-07-11).
+          current_bid: typeof item.current_bid === "number" ? item.current_bid : null,
           bid_count: null, // Not available in initial data
           no_reserve: item.noreserve,
           reserve_met: null,
@@ -649,80 +651,48 @@ async function syncToDatabase(
       updated_at: now,
     }));
 
-    // Upsert in chunks of 100 — ON CONFLICT updates auction-critical fields only
-    const UPSERT_BATCH = 100;
+    // Upsert via RPC in chunks of 500. supabase-js .upsert({onConflict:'listing_url'})
+    // CANNOT be used here: the unique index on vehicles.listing_url is PARTIAL
+    // (WHERE deleted_at IS NULL AND listing_url<>''), which a bare ON CONFLICT
+    // (listing_url) can't match — it silently errored and dropped every live auction.
+    // upsert_live_auction_vehicles() runs the ON CONFLICT ... WHERE <predicate> that
+    // matches the partial index, and marks new live auctions is_public for the floor.
+    const UPSERT_BATCH = 500;
     for (let i = 0; i < upsertRows.length; i += UPSERT_BATCH) {
       const chunk = upsertRows.slice(i, i + UPSERT_BATCH);
-      const { error, data } = await supabase
-        .from("vehicles")
-        .upsert(chunk, {
-          onConflict: "listing_url",
-          ignoreDuplicates: false,
-        })
-        .select("id");
-
+      const { data, error } = await supabase.rpc("upsert_live_auction_vehicles", {
+        p_rows: chunk,
+      });
       if (!error) {
-        stats.new_count += data?.length ?? chunk.length;
+        stats.new_count += typeof data === "number" ? data : chunk.length;
       } else {
-        // If upsert fails (e.g., no unique constraint on listing_url), fall back to insert-only
-        console.warn(`[sync-live-auctions] Upsert error: ${error.message}, trying insert with ignore`);
-        const { error: insErr, data: insData } = await supabase
-          .from("vehicles")
-          .upsert(chunk, {
-            onConflict: "listing_url",
-            ignoreDuplicates: true,
-          })
-          .select("id");
-        if (!insErr) {
-          stats.new_count += insData?.length ?? 0;
-        } else {
-          console.error(`[sync-live-auctions] Insert fallback also failed: ${insErr.message}`);
-        }
+        console.error(`[sync-live-auctions] upsert_live_auction_vehicles failed: ${error.message}`);
       }
     }
 
-  // Ensure vehicle_events rows exist for all live auctions (needed for bid snapshots + comments)
-  // Uses upsert on (vehicle_id, source_platform, source_url) to avoid duplicates
-  try {
-    const eventRows = auctions
-      .filter(a => a.url)
-      .map(a => ({
-        source_platform: platform === "bringatrailer" ? "bat" : platform,
-        source_url: a.url,
-        event_type: "auction",
-        event_status: "active",
-        current_price: a.current_bid ? String(a.current_bid) : null,
-        bid_count: a.bid_count,
-        ended_at: a.auction_end_date,
-        updated_at: now,
-      }));
-
-    // Match against vehicles to get vehicle_ids
-    const urls = auctions.map(a => a.url).filter(Boolean);
-    const { data: vehRows } = await supabase
-      .from("vehicles")
-      .select("id, listing_url")
-      .in("listing_url", urls.slice(0, 200));
-
-    const urlToVehicle = new Map((vehRows ?? []).map(v => [v.listing_url, v.id]));
-
-    const eventsToInsert = eventRows
-      .filter(e => urlToVehicle.has(e.source_url))
-      .map(e => ({ ...e, vehicle_id: urlToVehicle.get(e.source_url) }));
-
-    if (eventsToInsert.length > 0) {
-      // Batch upsert — only insert if no existing active event for this vehicle+platform
-      for (let i = 0; i < eventsToInsert.length; i += 100) {
-        await supabase.from("vehicle_events").upsert(
-          eventsToInsert.slice(i, i + 100),
-          { onConflict: "vehicle_id,source_platform,source_url", ignoreDuplicates: true }
-        );
+    // Mirror live auction STATE into vehicle_listings — the realtime table the /live
+    // floor subscribes to (useLiveFloor.ts postgres_changes on INSERT). Same p_rows;
+    // upsert_live_auction_listings() resolves vehicle_id by listing_url (the vehicles
+    // upsert above ran first), keys on metadata->>'listing_url', and expires mirror
+    // rows whose auction_end_time has passed. Native seller listings are never touched.
+    for (let i = 0; i < upsertRows.length; i += UPSERT_BATCH) {
+      const chunk = upsertRows.slice(i, i + UPSERT_BATCH);
+      const { data, error } = await supabase.rpc("upsert_live_auction_listings", {
+        p_rows: chunk,
+      });
+      if (error) {
+        console.error(`[sync-live-auctions] upsert_live_auction_listings failed: ${error.message}`);
+      } else {
+        stats.updated_count += typeof data === "number" ? data : 0;
+        console.log(`[sync-live-auctions] Mirrored ${data ?? chunk.length} live rows into vehicle_listings`);
       }
     }
-    console.log(`[sync-live-auctions] Ensured ${eventsToInsert.length} vehicle_events for ${platform}`);
-  } catch (e) {
-    console.error("[sync-live-auctions] vehicle_events creation error (non-fatal):", e);
-  }
+
+  // vehicle_events rows (bid snapshots + prediction reads) are ensured inside
+  // upsert_live_auction_listings() above. The old supabase-js upsert here used a bare
+  // ON CONFLICT (vehicle_id,source_platform,source_url) which can NEVER match the
+  // PARTIAL unique index idx_vehicle_events_dedup_url (WHERE source_url IS NOT NULL
+  // AND source_listing_id IS NULL) — it errored on every run. Removed 2026-07-11.
 
   return stats;
 }
