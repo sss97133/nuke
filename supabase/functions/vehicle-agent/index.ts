@@ -162,35 +162,59 @@ Deno.serve(async (req) => {
       try { proposed = JSON.parse(m[1]).observations || []; } catch { /* ignore malformed */ }
     }
 
-    // ── Provenance-stamped writes (rank normal, on behalf of the user) ───────
+    // ── Provenance-stamped writes, on behalf of the user ─────────────────────
+    // Route through the canonical `ingest-observation` rail (dedup + confidence +
+    // trust scoring), NEVER a raw INSERT into vehicle_observations — that bypasses
+    // the testimony invariants (.claude/rules/agent-trust-invariants.md). Same
+    // pattern as the sibling agent-chat fn. source_slug='agent-submission' is the
+    // machine-agent voice (0.55 base trust); it now supports the full kind set this
+    // fn emits (migration 20260715170000).
     const wrote: any[] = [];
     if (allowWrites && Array.isArray(proposed) && proposed.length) {
       const now = new Date().toISOString();
-      const rows = proposed
-        .filter((o) => o && ALLOWED_KINDS.has(o.kind))
-        .slice(0, 5)
-        .map((o) => ({
-          vehicle_id: vehicleId,
-          subject_type: "vehicle",
-          observed_at: now,
-          kind: o.kind,
-          rank: "normal",
-          structured_data: o.fields && typeof o.fields === "object" ? o.fields : {},
-          content_text: typeof o.summary === "string" ? o.summary : null,
-          confidence: CONFIDENCE.has(o.confidence) ? o.confidence : "low",
-          submitted_by_user_id: user.id,
-          agent_model: model,
-          agent_tier: "interactive",
-          extraction_method: "interactive_agent",
-          extracted_by: "vehicle-agent",
-          agent_duration_ms: durationMs,
-          processing_metadata: { surface: "vehicle-agent", on_behalf_of: user.id },
-        }));
-      if (rows.length) {
-        const { data: ins, error: ie } = await supabase
-          .from("vehicle_observations").insert(rows).select("id, kind, content_text");
-        if (ie) reply += `\n\n_(Note: I couldn't save the observation: ${ie.message})_`;
-        else wrote.push(...(ins || []));
+      const ingestUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/ingest-observation`;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
+      const toWrite = proposed.filter((o) => o && ALLOWED_KINDS.has(o.kind)).slice(0, 5);
+      for (let i = 0; i < toWrite.length; i++) {
+        const o = toWrite[i];
+        try {
+          const res = await fetch(ingestUrl, { // guardrail-allow: raw-fetch — internal /functions/v1/ingest-observation call (ingestUrl built from SUPABASE_URL)
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+            body: JSON.stringify({
+              source_slug: "agent-submission",
+              kind: o.kind,
+              observed_at: now,
+              vehicle_id: vehicleId,
+              // Distinct per row so same-turn observations never collapse on the dedup hash.
+              source_identifier: `vehicle-agent:${vehicleId}:${now}:${i}`,
+              content_text: typeof o.summary === "string" ? o.summary : null,
+              structured_data: o.fields && typeof o.fields === "object" ? o.fields : {},
+              rank: "normal",
+              agent_tier: "interactive",
+              agent_model: model,
+              agent_duration_ms: durationMs,
+              extraction_method: "interactive_agent",
+              // Preserve the attribution + self-assessed confidence the raw path carried;
+              // ingest-observation computes its own confidence_score from source trust.
+              observer_raw: {
+                extracted_by: "vehicle-agent",
+                on_behalf_of: user.id,
+                submitted_by_user_id: user.id,
+                self_assessed_confidence: CONFIDENCE.has(o.confidence) ? o.confidence : "low",
+              },
+              extraction_metadata: { surface: "vehicle-agent", on_behalf_of: user.id },
+            }),
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok || body?.error) {
+            reply += `\n\n_(Note: I couldn't save the observation: ${body?.error || res.status})_`;
+          } else if (body?.observation_id) {
+            wrote.push({ id: body.observation_id, kind: o.kind, content_text: o.summary ?? null, duplicate: !!body.duplicate });
+          }
+        } catch (e) {
+          reply += `\n\n_(Note: I couldn't save the observation: ${e instanceof Error ? e.message : "ingest failed"})_`;
+        }
       }
     }
 
