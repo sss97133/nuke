@@ -242,7 +242,7 @@ Deno.serve(async (req) => {
     // Step 1: Mark as processing + read pre-computed Apple ML data
     const { data: imageRow } = await supabase
       .from("vehicle_images")
-      .select("apple_ml_labels, vehicle_score, latitude, longitude, taken_at")
+      .select("apple_ml_labels, vehicle_score, latitude, longitude, taken_at, is_external")
       .eq("id", image_id)
       .maybeSingle();
 
@@ -250,6 +250,44 @@ Deno.serve(async (req) => {
       .from("vehicle_images")
       .update({ ai_processing_status: "processing" })
       .eq("id", image_id);
+
+    // Step 1.5: Cross-sweep moment dedup. A library re-sweep (iphoto /
+    // hd_archive / ssd_blast-style bulk ingest) re-lands an already-ingested
+    // capture moment as a new export — different file_hash (invisible to
+    // trg_flag_duplicate_image) and no phash yet (invisible to
+    // flag_image_burst_duplicates). Run the third sibling detector on this
+    // image's (vehicle, capture-day) BEFORE classification: if this frame just
+    // lost a keeper election it skips Gemini entirely and never reaches the
+    // BYOK deep queue. Scoped to is_external=false because that is the
+    // detector's whole corpus (~98% of inflow is scraped and would pay a
+    // no-op RPC per image otherwise); scoped to taken_at because a null
+    // taken_at can never join a moment bucket.
+    if (vehicle_id && imageRow?.taken_at && imageRow?.is_external === false) {
+      const marked = await flagCrossSweepDuplicates(vehicle_id, imageRow.taken_at);
+      if (marked > 0) {
+        const { data: self } = await supabase
+          .from("vehicle_images")
+          .select("is_duplicate, ai_scan_metadata")
+          .eq("id", image_id)
+          .maybeSingle();
+        if (self?.is_duplicate) {
+          // Merge, never replace: the detector just wrote its
+          // duplicate_collapse breadcrumb into ai_scan_metadata.
+          await supabase.from("vehicle_images").update({
+            ai_processing_status: "completed",
+            ai_scan_metadata: {
+              ...(self.ai_scan_metadata || {}),
+              pipeline_version: "v2",
+              skipped: "cross_sweep_duplicate",
+            },
+          }).eq("id", image_id);
+          return new Response(
+            JSON.stringify({ success: true, image_id, classification: "cross_sweep_duplicate", skipped: true, duration_ms: Date.now() - startedAt }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
+    }
 
     const appleLabels: string[] = imageRow?.apple_ml_labels || [];
     const vehicleScore: number | null = imageRow?.vehicle_score;
@@ -377,6 +415,16 @@ Deno.serve(async (req) => {
       .update(updatePayload)
       .eq("id", image_id);
 
+    // Late-resolution dedup pass: Step 1.5 could only see this row in the
+    // detector's corpus if it was INSERTed with a vehicle_id. When the vehicle
+    // was resolved during this run (VIN/GPS), the row only just acquired its
+    // vehicle_id in the update above — sweep its capture day now. Without this,
+    // a late-resolved re-sweep frame that happens to be the LAST row landed for
+    // its moment group would never get swept (no later sibling re-runs the day).
+    if (resolvedVehicleId && !vehicle_id && imageRow?.taken_at && imageRow?.is_external === false) {
+      await flagCrossSweepDuplicates(resolvedVehicleId, imageRow.taken_at);
+    }
+
     console.log(`[photo-pipeline] ${classifierFailed ? "Needs retry" : "Completed"} in ${durationMs}ms`);
 
     return new Response(
@@ -418,6 +466,43 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+// ============================================================
+// CROSS-SWEEP MOMENT DEDUP (sibling of trg_flag_duplicate_image / burst dedup)
+// ============================================================
+
+// Drains flag_cross_sweep_moment_duplicates() for one (vehicle, capture-day).
+// p_max_groups (default 25) bounds a single call's write set because
+// trg_sync_vehicle_primary_image fires per marked row and a dense unbounded
+// UPDATE exceeds statement_timeout — so loop until rows_marked=0. The 8-pass
+// cap (200 groups) is far past any real day (densest observed: 19 groups); if
+// a pathological day ever exceeds it, the next landed image's pass continues
+// the drain. Best-effort: dedup failure must never fail the pipeline.
+async function flagCrossSweepDuplicates(vehicleId: string, takenAt: string): Promise<number> {
+  const day = String(takenAt).slice(0, 10); // timestamptz arrives ISO-8601 UTC; detector buckets in UTC too
+  let total = 0;
+  try {
+    for (let pass = 0; pass < 8; pass++) {
+      const { data, error } = await supabase.rpc("flag_cross_sweep_moment_duplicates", {
+        p_vehicle_id: vehicleId,
+        p_day: day,
+      });
+      if (error) {
+        console.warn(`[photo-pipeline] cross-sweep dedup ${vehicleId} ${day}: ${error.message}`);
+        break;
+      }
+      const marked = Number((data as Record<string, unknown> | null)?.rows_marked ?? 0);
+      total += marked;
+      if (marked === 0) break;
+    }
+  } catch (e: any) {
+    console.warn(`[photo-pipeline] cross-sweep dedup ${vehicleId} ${day}: ${e.message}`);
+  }
+  if (total > 0) {
+    console.log(`[photo-pipeline] cross-sweep dedup: marked ${total} duplicate rows (vehicle ${vehicleId}, day ${day})`);
+  }
+  return total;
+}
 
 // ============================================================
 // CLASSIFY IMAGE (Gemini Flash — cheap and fast)
