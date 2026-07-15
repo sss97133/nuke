@@ -255,6 +255,7 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 
 | Intent | Use This | Notes |
 |--------|----------|-------|
+| Sync LIVE BaT auctions (the /live floor feed) | `sync-live-auctions` `{"action":"sync","platform":"bat"}` | Cron `sync-live-auctions` (*/15). Scrapes `auctionsCurrentInitialData` free-path, upserts `vehicles` (`upsert_live_auction_vehicles()`), then `upsert_live_auction_listings()` mirrors bid/end-time/status into `vehicle_listings` (realtime), ensures `vehicle_events`, and tops up `bat_extraction_queue`. /live reads `search_vehicles_browse('newest')` + overlays `vehicle_listings`. (2026-07-11) |
 | Queue BaT listings for extraction | `crawl-bat-active` | Discovers active auctions |
 | Process BaT extraction queue | `process-bat-extraction-queue` | Works `bat_extraction_queue` |
 | Monitor a BaT seller | `bat-seller-monitors` table | Insert record to start monitoring |
