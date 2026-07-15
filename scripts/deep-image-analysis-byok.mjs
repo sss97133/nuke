@@ -70,7 +70,9 @@ const PAINT = new Set(["bare_metal","primer","sealer","base","clear","aged","unk
 const COMPLETE = new Set(["stripped","partial","assembled","unknown"]);
 const INTENT = new Set(["labor","inspection","parts_sourcing","communication","acquisition","documentation","unknown"]);
 const INTENT_CONFIRM_THRESHOLD = 0.6; // below this, intent must be flagged for the ask-the-technician loop
-const isBbox = (b) => Array.isArray(b) && b.length === 4 && b.every((n) => typeof n === "number" && n >= 0 && n <= 999);
+// Ordering guard (x1<x2, y1<y2) added 2026-07-11: a degenerate/inverted box is geometry noise —
+// it can't crop, can't overlay, can't project to (x,y,z) — reject it like a missing box.
+const isBbox = (b) => Array.isArray(b) && b.length === 4 && b.every((n) => typeof n === "number" && n >= 0 && n <= 999) && b[0] < b[2] && b[1] < b[3];
 
 export function validateVerdict(v) {
   const errs = [];
@@ -126,6 +128,14 @@ const SCHEMA_VERSIONS = [
     facts: ['scene_type', 'build_phase_guess', 'camera_pose', 'components_seen', 'text_regions',
             'damage_localized', 'state_observations', 'workshop_signals', 'presence', 'intent',
             'narrative_one_line'] },
+  // v4 — geometry re-emission (audit 2026-07-11: 7/7 sampled K5 2024-10-03 frames carried wrong
+  // bboxes in per-frame-inconsistent encodings; the v1→annotate→teacher loop was never wired into
+  // the batch harness, so verdicts shipped as unchecked v1). The delta re-opened on v3 frames is
+  // GEOMETRY (the three bbox arrays) + state_observations (same audit: paint_state='aged' template
+  // bleed from a background truck onto a fresh chassis). Semantic fields are preserved at ingest
+  // (--merge-mode geometry); only rehash callers re-open — the steady fleet drain never rehashes.
+  { version: 'byok_v4_bbox_teacher_2026-07-11',
+    facts: ['components_seen', 'text_regions', 'damage_localized', 'state_observations'] },
   // To evolve: append { version, facts:[...new keys...] }. Only images stamped at an older
   // version re-open, and only for the new keys.
 ];
@@ -597,6 +607,10 @@ async function entities() {
     let q = sb.from('vehicle_images')
       .select('id, vehicle_id, taken_at, ai_scan_metadata')
       .eq('vehicle_id', VEHICLE_ID)
+      // Duplicates carry verdicts too (analyzed before being marked) — landing their
+      // components would double-count every part on the day.
+      .not('is_duplicate', 'is', true)
+      .not('is_superseded', 'is', true)
       .not('ai_scan_metadata->byok_deep_analysis', 'is', null);
     if (DATE) {
       const next = new Date(Date.parse(`${DATE}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
@@ -641,6 +655,12 @@ async function prepare() {
       // gallery but were never analyzed (browse → image with no data). Analyze what the
       // gallery displays. Explicit rejects (rejected_personal/misattributed) stay excluded.
       .or('vision_gate_status.is.null,vision_gate_status.eq.approved')
+      // Duplicate/superseded rows never enter the worklist: the same capture moment was
+      // re-ingested by up to 4 library sweeps as different exports (see migration
+      // 20260711210000_cross_sweep_moment_duplicates) — analyzing them re-reads the same
+      // pixels. The keeper row carries the moment; the coverage RPCs exclude these too.
+      .not('is_duplicate', 'is', true)
+      .not('is_superseded', 'is', true)
       .order('created_at', { ascending: true })
       .range(offset, offset + PAGE - 1);
     if (error) {
@@ -751,6 +771,22 @@ async function prepare() {
     if (fromUrl && /\.(jpe?g|png|heic|webp)$/i.test(fromUrl)) return fromUrl;
     return `${r.id}.jpg`;
   };
+  // Rehash worklists carry the PRIOR verdict's semantic reading: the closure pass sees what
+  // it already established, and the geometry re-emission pass (BYOK_GEOMETRY=1) gets the exact
+  // element roster to re-localize — labels/PNs/texts verbatim, only the boxes re-drawn.
+  const priorOf = (r) => {
+    const d = (r.ai_scan_metadata || {}).byok_deep_analysis;
+    if (!d) return null;
+    return {
+      scene_type: d.scene_type ?? null,
+      narrative: d.narrative_one_line ?? null,
+      components: (d.components_seen || []).map((c) => ({ label: c.label, pn: c.part_number_guess ?? null })),
+      text_regions: (d.text_regions || []).map((t) => ({ text: t.text, confidence: t.confidence ?? null })),
+      damage: (d.damage_localized || []).map((x) => ({ label: x.label, severity: x.severity ?? null })),
+      state_observations: d.state_observations || {},
+      open_questions: d.open_questions || [],
+    };
+  };
   const lines = pending.map((r) =>
     JSON.stringify({
       image_id: r.id,
@@ -766,6 +802,7 @@ async function prepare() {
       // (a truck can read as "airplane"), NEVER truth — the detective uses them to orient/confirm
       // or override. This is the cheap foundation layer feeding the expensive pass.
       apple_hints: Array.isArray(r.apple_ml_labels) ? r.apple_ml_labels.slice(0, 12) : [],
+      ...(REHASH ? { prior: priorOf(r) } : {}),
     }),
   );
   writeFileSync(WORKLIST, lines.join('\n') + '\n');
@@ -795,10 +832,50 @@ async function prepare() {
   console.log(`         pool total = ${all.length}, pending = ${all.length - pending.length} not in this batch`);
 }
 
+// GEOMETRY MERGE (--merge-mode geometry) — the v4 re-emission contract: the incoming line is a
+// PARTIAL verdict carrying only re-localized geometry ({image_id, components_seen, text_regions,
+// damage_localized, state_observations, geometry_notes}) and the stored prior verdict supplies
+// every semantic field unchanged. Semantic labels/PNs were pixel-honest in the audit — only the
+// boxes (and the subject-vs-background state read) re-open. The merged object then flows through
+// the NORMAL landing path: full validation, supersession chain, entity re-landing, saturation.
+function mergeGeometry(nv, prior) {
+  const note = `geometry re-emission ${CURRENT_SCHEMA_VERSION}${nv.geometry_notes ? ` — ${nv.geometry_notes}` : ''}`;
+  return {
+    image_id: nv.image_id,
+    vehicle_id: nv.vehicle_id,
+    taken_at: nv.taken_at,
+    created_at: nv.created_at,
+    scene_type: prior.scene_type,
+    build_phase_guess: prior.build_phase_guess,
+    intent: prior.intent,
+    intent_confidence: prior.intent_confidence,
+    needs_clarification: prior.needs_clarification ?? false,
+    needs_review: prior.needs_review ?? false,
+    camera_pose: prior.camera_pose,
+    components_seen: nv.components_seen ?? [],
+    text_regions: nv.text_regions ?? [],
+    damage_localized: nv.damage_localized ?? [],
+    state_observations: nv.state_observations ?? prior.state_observations ?? {},
+    workshop_signals: prior.workshop_signals ?? {},
+    presence: prior.presence ?? {},
+    narrative_one_line: prior.narrative_one_line,
+    confidence: prior.confidence,
+    context_complete: prior.context_complete ?? null,
+    open_questions: prior.open_questions ?? [],
+    agent_notes: [prior.agent_notes, note].filter(Boolean).join(' | '),
+    provenance: nv.provenance, // the re-emission run's source DNA, not the prior's
+  };
+}
+
 async function ingest() {
   const SINK = arg('--sink');
+  const MERGE_MODE = arg('--merge-mode'); // 'geometry' → partial verdicts merged over the prior
   if (!SINK || !existsSync(SINK)) {
     console.error('ingest: --sink required and file must exist');
+    process.exit(1);
+  }
+  if (MERGE_MODE && MERGE_MODE !== 'geometry') {
+    console.error(`ingest: unknown --merge-mode ${MERGE_MODE} (only 'geometry')`);
     process.exit(1);
   }
 
@@ -823,6 +900,25 @@ async function ingest() {
     try { v = JSON.parse(line); } catch { failed++; continue; }
     if (!v.image_id || !v.vehicle_id) { failed++; continue; }
 
+    // Fetched BEFORE validation: geometry mode needs the prior verdict to build the
+    // full object the validator judges.
+    const { data: imgRow } = await sb
+      .from('vehicle_images')
+      .select('ai_scan_metadata, user_id')
+      .eq('id', v.image_id)
+      .maybeSingle();
+    const existingMeta = (imgRow?.ai_scan_metadata) || {};
+
+    if (MERGE_MODE === 'geometry') {
+      const prior = existingMeta.byok_deep_analysis;
+      if (!prior) {
+        console.error(`  REJECT ${String(v.image_id).slice(0,8)}: geometry merge but no prior verdict — run a full pass instead`);
+        failed++;
+        continue;
+      }
+      v = mergeGeometry(v, prior);
+    }
+
     // Schema-as-DNA gate: reject non-conforming verdicts before they can land.
     const verdictErrs = validateVerdict(v);
     if (verdictErrs.length) {
@@ -830,14 +926,6 @@ async function ingest() {
       failed++;
       continue;
     }
-
-    // Merge new analysis into existing ai_scan_metadata.byok_deep_analysis
-    const { data: imgRow } = await sb
-      .from('vehicle_images')
-      .select('ai_scan_metadata, user_id')
-      .eq('id', v.image_id)
-      .maybeSingle();
-    const existingMeta = (imgRow?.ai_scan_metadata) || {};
     const sat = computeSaturation(v, existingMeta.byok_deep_analysis || null, now);
     // Doubt gate: a reading that contradicts the attribution forces the clarification
     // flag (the app's doubt UI reads it) and lands an attribution_doubt event below.
@@ -1289,6 +1377,8 @@ async function queue() {
       .select('vehicle_id')
       .eq('user_id', VEHICLE_USER)
       .or('vision_gate_status.is.null,vision_gate_status.eq.approved')
+      .not('is_duplicate', 'is', true)
+      .not('is_superseded', 'is', true)
       .not('vehicle_id', 'is', null)
       .order('vehicle_id', { ascending: true })
       .range(offset, offset + PAGE - 1);
@@ -1303,6 +1393,8 @@ async function queue() {
       .select('vehicle_id')
       .eq('user_id', VEHICLE_USER)
       .or('vision_gate_status.is.null,vision_gate_status.eq.approved')
+      .not('is_duplicate', 'is', true)
+      .not('is_superseded', 'is', true)
       .not('vehicle_id', 'is', null)
       .not('ai_scan_metadata->byok_deep_analysis', 'is', null)
       .order('vehicle_id', { ascending: true })
@@ -1392,7 +1484,7 @@ async function resolve() {
 }
 
 // Pure ledger functions exported for unit tests (importing does not run the pipeline — see isMain).
-export { computeSaturation, classifyOpenQuestions, factFingerprint, isSaturatedRow, CURRENT_SCHEMA_VERSION, DRY_PASS_LIMIT };
+export { computeSaturation, classifyOpenQuestions, factFingerprint, isSaturatedRow, mergeGeometry, CURRENT_SCHEMA_VERSION, DRY_PASS_LIMIT };
 
 const isMain = process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {

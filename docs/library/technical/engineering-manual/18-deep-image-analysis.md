@@ -309,3 +309,52 @@ the verdict already captures (`components_seen`, `workshop_signals`, `presence`)
 preserved in `ai_scan_metadata.byok_deep_analysis` + the vehicle_observation's
 `structured_data`, ready for that resolution pass to consume — the data isn't lost, the
 resolver is what's unbuilt.
+
+---
+
+## 2026-07-11 update — the teacher loop is finally IN the harness (bbox geometry incident)
+
+An adversarial audit of K5 day 2024-10-03 found **7/7 sampled frames with wrong bbox geometry**
+in per-frame-inconsistent encodings (y normalized by width; uniform up-left shifts; raw 640×480
+pixel coords) while semantic labels/PNs stayed pixel-honest. Root cause: the v1→annotate→teacher
+loop described above lived only as `/tmp` artifacts from the original live session — it was
+**never wired into `scripts/daily-receipt/byok-image-batch.sh`**, so every batch shipped
+unchecked v1 boxes. Blind validation can't catch these (the coords are in-range, just wrong);
+only re-vision over the overlay can.
+
+What shipped (all in the harness now, not /tmp):
+
+- **`scripts/daily-receipt/bbox-annotate.py`** — durable overlay renderer (numbered C#/T#/D#
+  boxes on ≤1024px copies; full-res **zoom insets** for boxes <90 TWVP units, because small-text
+  misses survive teacher grading at 1024px). npm: `byok:bbox-annotate`.
+- **Two-pass protocol in every batch**: the same `claude --print` session writes draft verdicts,
+  runs the annotator (local python — the no-network sandbox can't bite it), Reads every overlay
+  + zoom inset, and recomputes any frame whose boxes miss before writing the final sink.
+- **`scripts/daily-receipt/byok-bbox-convention.md`** — the single-source TWVP spec (per-axis
+  0–999, top-left origin, worked example per orientation, the three observed wrong encodings as
+  anti-patterns), cat'd into both prompt modes.
+- **Geometry re-emission mode** (`BYOK_GEOMETRY=1`): schema version
+  `byok_v4_bbox_teacher_2026-07-11` re-opens v3-stamped frames for **rehash callers only**
+  (the fleet cron never rehashes). The worklist carries each frame's prior elements verbatim;
+  the model re-localizes them; `ingest --merge-mode geometry` merges new
+  bboxes + `state_observations` over the stored verdict — semantics preserved, supersession
+  chain + entity re-landing as normal. `state_observations` rides along because the same audit
+  found `paint_state='aged'` template-bleed from a background truck onto the fresh chassis
+  (subject-vs-background rule now in both prompts).
+
+Operational findings from the acceptance run (K5 2024-10-03, adversarial crop spot-check):
+
+1. **The teacher pass earns its cost**: 9/15 frames corrected in batch 1, including one frame
+   where every box was uniformly re-scaled (the classic whole-frame mapping error) and two
+   false-empty `text_regions` filled with legible text.
+2. **The Read tool does NOT apply EXIF rotation** (observed on an orientation=6 frame). TWVP
+   "as shown" = raw stored orientation. The annotator must NOT `exif_transpose` — it would draw
+   the overlay in a different frame than the coordinates.
+3. **Known residual**: small text boxes on portrait frames can still miss even after the teacher
+   pass — hence the zoom insets. Component boxes (what the bbox×camera_pose→(x,y,z) projection
+   consumes) spot-checked clean.
+4. Enum discipline needs the enum IN the prompt mode being used: the first geometry batch coined
+   `paint_state='fresh'` (not in the enum) because the geometry prompt didn't list values —
+   sanitize coerced to 'unknown' (honest, but wasted signal). The paint enum
+   (`bare_metal|primer|sealer|base|clear|aged|unknown`) also has no value for "brand-new
+   finish" — schema-evolution candidate, not something a pass should coin.

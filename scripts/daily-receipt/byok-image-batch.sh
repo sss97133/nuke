@@ -51,8 +51,12 @@ log "=== batch start vehicle=$VEHICLE_ID size=$BATCH run=$RUN ==="
 #   BYOK_REHASH=1          → re-open unsaturated already-verdicted frames (closure pass)
 #   BYOK_DATE=YYYY-MM-DD   → target ONE specific day instead of the earliest pending
 #   BYOK_EXTRA_CONTEXT=<f> → extra briefing (e.g. a resolution dossier) appended to the prompt
+#   BYOK_GEOMETRY=1        → geometry re-emission (schema v4): re-open already-verdicted frames
+#                            and re-draw ONLY bboxes + state_observations; every semantic field
+#                            is preserved at ingest (--merge-mode geometry). Implies rehash.
+GEOM="${BYOK_GEOMETRY:-0}"
 PREP_EXTRA=""
-[ "${BYOK_REHASH:-0}" = "1" ] && PREP_EXTRA="$PREP_EXTRA --rehash"
+{ [ "${BYOK_REHASH:-0}" = "1" ] || [ "$GEOM" = "1" ]; } && PREP_EXTRA="$PREP_EXTRA --rehash"
 [ -n "${BYOK_DATE:-}" ] && PREP_EXTRA="$PREP_EXTRA --date $BYOK_DATE"
 dotenvx run -- node scripts/deep-image-analysis-byok.mjs prepare \
   --vehicle-id "$VEHICLE_ID" --limit "$BATCH" --worklist "$WORK" --by-day $PREP_EXTRA \
@@ -108,64 +112,144 @@ PY
 
 # 2.5) CONTEXT (network) — the fact base the detective must KNOW before analyzing:
 # vehicle identity, the build so far, and where THIS day sits in the timeline arc.
+# Geometry re-emission skips it: the prior verdicts ARE the context — the pass only re-draws boxes.
 CTX="$DIR/context.md"
-dotenvx run -- node scripts/deep-image-analysis-byok.mjs context \
-  --vehicle-id "$VEHICLE_ID" --date "$DAY" --out "$CTX" >>"$LOG" 2>&1 || log "context assembly failed (proceeding thin)"
+if [ "$GEOM" != "1" ]; then
+  dotenvx run -- node scripts/deep-image-analysis-byok.mjs context \
+    --vehicle-id "$VEHICLE_ID" --date "$DAY" --out "$CTX" >>"$LOG" 2>&1 || log "context assembly failed (proceeding thin)"
+fi
 
-# 3) ANALYZE (NO network) — headless Claude reads each local image, writes verdicts
+# 3) ANALYZE (NO network*) — headless Claude reads each local image, writes verdicts.
+# (*the annotate step runs local python only — the sandbox that drops network can't bite it.)
 PROMPT_FILE="$DIR/prompt.txt"
+DRAFT="$DIR/verdicts_v1.jsonl"
+OVERLAY="$DIR/overlay"
+mkdir -p "$OVERLAY"
 {
-  # PERSONA — the agent operates as the owner's knowledgeable build detective, not a captioner.
-  echo "# YOU ARE THE OWNER'S EXPERT BUILD ANALYST — a knowledgeable detective working on their behalf."
-  echo "You are NOT labeling isolated photos. You KNOW this specific vehicle and its whole build:"
-  echo "its history, its parts, its quirks, where it is in the restoration. Internalize the fact base"
-  echo "below, hold the entire build in your head, then read each frame as evidence you already"
-  echo "understand — recognizing known parts, placing the moment in the timeline, and reasoning about"
-  echo "what the owner was doing and why. Be the expert who would say 'that's the Dana 44 going back"
-  echo "together with the new DuraStop brakes' — not 'a metal disc on a floor.'"
+  if [ "$GEOM" = "1" ]; then
+    # GEOMETRY RE-EMISSION PERSONA — re-draw the boxes, keep the findings (schema v4).
+    echo "# GEOMETRY RE-EMISSION PASS — fix the boxes, keep the findings."
+    echo "These frames already carry verdicts whose SEMANTIC findings (labels, part numbers, text"
+    echo "reads) are pixel-honest, but whose bbox GEOMETRY is wrong (mixed coordinate encodings —"
+    echo "adversarial audit 2026-07-11). Your ONLY job: re-localize each frame's prior elements"
+    echo "with correct TWVP bboxes and re-judge state_observations. Do NOT re-do the analysis;"
+    echo "do NOT rewrite labels."
+    echo
+    echo "Per frame in the worklist below:"
+    echo "1. Read the local image file."
+    echo "2. Re-emit every PRIOR ELEMENT listed under it, keeping label / part_number_guess / text"
+    echo "   VERBATIM as given, with a fresh bbox computed per the convention below."
+    echo "   - DROP an element only if it is genuinely not visible in the frame (say why in geometry_notes)."
+    echo "   - You MAY ADD a text_regions element for clearly legible text the prior verdict missed"
+    echo "     (verbatim transcription + confidence + bbox) — the audit found false-empty text_regions."
+    echo "3. Re-emit state_observations: they describe THE SUBJECT VEHICLE/WORKPIECE OF THE FRAME"
+    echo "   ONLY — never a background vehicle. A freshly powder-coated chassis is NOT"
+    echo "   paint_state=aged because an aged truck sits behind it. Emit all four keys, values"
+    echo "   STRICTLY from these enums (an invented value is coerced to unknown — wasted signal):"
+    echo "     rust_severity: none|surface|pitting|perforation|unknown"
+    echo "     paint_state:   bare_metal|primer|sealer|base|clear|aged|unknown"
+    echo "                    (pick the SUBJECT's coating stage — a brand-new powder/paint finish"
+    echo "                    is its stage, e.g. base or clear, never 'aged'; do NOT coin 'fresh')"
+    echo "     completeness:  stripped|partial|assembled|unknown"
+    echo "     damage_callouts: array of strings (empty if none)"
+    echo
+    echo "Emit ONE compact single-line JSON object per image in EXACTLY this partial shape (NOT the"
+    echo "full verdict schema — the harness merges it over the stored verdict):"
+    echo '{"image_id":"<from worklist>","components_seen":[{"label":"<verbatim>","confidence":0.0-1.0,"bbox":[x1,y1,x2,y2],"part_number_guess":"<verbatim or null>"}],"text_regions":[{"text":"<verbatim>","bbox":[x1,y1,x2,y2],"confidence":0.0-1.0}],"damage_localized":[{"label":"<verbatim>","bbox":[x1,y1,x2,y2],"severity":"surface|pitting|perforation"}],"state_observations":{"rust_severity":"...","paint_state":"...","completeness":"...","damage_callouts":[]},"geometry_notes":"dropped/added elements, teacher-pass corrections"}'
+  else
+    # PERSONA — the agent operates as the owner's knowledgeable build detective, not a captioner.
+    echo "# YOU ARE THE OWNER'S EXPERT BUILD ANALYST — a knowledgeable detective working on their behalf."
+    echo "You are NOT labeling isolated photos. You KNOW this specific vehicle and its whole build:"
+    echo "its history, its parts, its quirks, where it is in the restoration. Internalize the fact base"
+    echo "below, hold the entire build in your head, then read each frame as evidence you already"
+    echo "understand — recognizing known parts, placing the moment in the timeline, and reasoning about"
+    echo "what the owner was doing and why. Be the expert who would say 'that's the Dana 44 going back"
+    echo "together with the new DuraStop brakes' — not 'a metal disc on a floor.'"
+    echo
+    if [ -f "$CTX" ]; then cat "$CTX"; echo; fi
+    # Resolution dossier seam: a closure pass hands the detective the day's researched
+    # answers (entity resolutions, receipt citations, arc placement) as extra briefing.
+    if [ -n "${BYOK_EXTRA_CONTEXT:-}" ] && [ -f "${BYOK_EXTRA_CONTEXT}" ]; then cat "${BYOK_EXTRA_CONTEXT}"; echo; fi
+    cat scripts/daily-receipt/byok-vision-prompt.md
+  fi
   echo
-  if [ -f "$CTX" ]; then cat "$CTX"; echo; fi
-  # Resolution dossier seam: a closure pass hands the detective the day's researched
-  # answers (entity resolutions, receipt citations, arc placement) as extra briefing.
-  if [ -n "${BYOK_EXTRA_CONTEXT:-}" ] && [ -f "${BYOK_EXTRA_CONTEXT}" ]; then cat "${BYOK_EXTRA_CONTEXT}"; echo; fi
-  cat scripts/daily-receipt/byok-vision-prompt.md
+  # THE coordinate spec — single source, cat'd into BOTH modes (never duplicate its wording).
+  cat scripts/daily-receipt/byok-bbox-convention.md
   echo
-  echo "## THIS IS ONE WORK DAY: ${DAY:-unknown}"
-  echo "All $N frames below were shot on the SAME day — treat them as a single work"
-  echo "session, not isolated photos. Before writing verdicts, look across the whole"
-  echo "set: identify the day's build phase, follow one component across angles and"
-  echo "before/after (e.g. rusty rotor -> new rotor at the same wheel station), and let"
-  echo "each frame's narrative reference the day's activity. Granular per-image verdicts,"
-  echo "but informed by the whole day. (The day rolls up into a work_session afterward.)"
-  echo
-  echo "WORKLIST — each frame's hard EXIF evidence (you CANNOT see this in the pixels; use it)."
-  echo "Resolve gps against the Location legend above. Set camera_pose.exif_present=true when shot_at/gps"
-  echo "is given; set presence.place_hint to the resolved location; use scene_type=off_property when the"
-  echo "gps is away from the main shop. Read EACH local file and emit one verdict line per image:"
-  python3 - "$WORK" "$IMG" <<'PY'
+  if [ "$GEOM" != "1" ]; then
+    echo "## THIS IS ONE WORK DAY: ${DAY:-unknown}"
+    echo "All $N frames below were shot on the SAME day — treat them as a single work"
+    echo "session, not isolated photos. Before writing verdicts, look across the whole"
+    echo "set: identify the day's build phase, follow one component across angles and"
+    echo "before/after (e.g. rusty rotor -> new rotor at the same wheel station), and let"
+    echo "each frame's narrative reference the day's activity. Granular per-image verdicts,"
+    echo "but informed by the whole day. (The day rolls up into a work_session afterward.)"
+    echo
+    echo "WORKLIST — each frame's hard EXIF evidence (you CANNOT see this in the pixels; use it)."
+    echo "Resolve gps against the Location legend above. Set camera_pose.exif_present=true when shot_at/gps"
+    echo "is given; set presence.place_hint to the resolved location; use scene_type=off_property when the"
+    echo "gps is away from the main shop. Read EACH local file and emit one verdict line per image:"
+  else
+    echo "WORKLIST — each frame with its PRIOR ELEMENTS to re-localize (keep their text verbatim):"
+  fi
+  python3 - "$WORK" "$IMG" "$GEOM" <<'PY'
 import json,sys,os
 work,imgdir=sys.argv[1],sys.argv[2]
+geom=len(sys.argv)>3 and sys.argv[3]=="1"
 for l in open(work):
     r=json.loads(l); e=r.get("exif",{}) or {}
     g=e.get("gps"); gps=f'{g["lat"]},{g["lon"]}' if g else "none"
     path=os.path.join(imgdir, r["file_name"])
     print(f'- image_id={r["image_id"]} file={path}')
     print(f'    shot_at={e.get("shot_at") or r.get("taken_at")} | gps={gps} | location={e.get("location_name") or "?"} | camera={e.get("camera") or "?"}')
+    p=r.get("prior")
+    if geom and p:
+        print(f'    prior scene={p.get("scene_type")} | narrative: {p.get("narrative")}')
+        print( '    PRIOR ELEMENTS TO RE-LOCALIZE:')
+        for i,c in enumerate(p.get("components") or [], 1):
+            print(f'      C{i} label="{c.get("label")}" pn={json.dumps(c.get("pn"))}')
+        for i,t in enumerate(p.get("text_regions") or [], 1):
+            print(f'      T{i} text="{t.get("text")}"')
+        for i,d in enumerate(p.get("damage") or [], 1):
+            print(f'      D{i} label="{d.get("label")}" severity={json.dumps(d.get("severity"))}')
+        print(f'    prior state_observations={json.dumps(p.get("state_observations") or {})}')
 PY
   echo
-  echo "Write ALL verdict lines (one compact JSON per line) to: $SINK"
-  echo "Do not write anything else. When done, stop."
+  echo "## TWO-PASS PROTOCOL — never ship unchecked boxes (v1 → overlay → teacher → final)"
+  echo "1. DRAFT: write one verdict line per image to: $DRAFT"
+  echo "2. ANNOTATE (local python, no network) — run exactly:"
+  echo "   python3 scripts/daily-receipt/bbox-annotate.py --worklist \"$WORK\" --verdicts \"$DRAFT\" --imgdir \"$IMG\" --outdir \"$OVERLAY\""
+  echo "3. TEACHER PASS: Read EVERY overlay image in $OVERLAY (one per frame; your draft boxes are"
+  echo "   drawn and numbered C#=component, T#=text, D#=damage). Grade every rectangle: does it"
+  echo "   enclose its labeled object, tightly? If ANY box in a frame misses its object, your axis"
+  echo "   mapping for that whole frame was wrong — recompute EVERY box in that frame from the"
+  echo "   convention; do not nudge single boxes. A box the annotator reported as INVALID is wrong"
+  echo "   by definition — recompute it."
+  echo "   SMALL boxes (text regions especially) also get a full-res ZOOM inset named"
+  echo "   <id8>_<TAG>_zoom.jpg — Read every zoom inset too. The labeled text/object must sit"
+  echo "   INSIDE the drawn rectangle in the zoom; if it is outside or clipped, that box is wrong"
+  echo "   even when the 1024px overlay looked plausible. Small-text misses on portrait frames are"
+  echo "   the known failure mode — be harshest there."
+  echo "4. FINAL: write the corrected verdict lines (same shape as the draft) to: $SINK"
+  echo "If (and only if) the annotate command itself fails, copy your draft lines unchanged to the"
+  if [ "$GEOM" = "1" ]; then
+    echo "sink and note 'overlay check unavailable' in each verdict's geometry_notes."
+  else
+    echo "sink and note 'overlay check unavailable' in each verdict's agent_notes."
+  fi
+  echo "Write nothing else to the sink. When done, stop."
 } > "$PROMPT_FILE"
 
-log "invoking claude for vision on $N images"
+log "invoking claude for vision on $N images (mode=$([ "$GEOM" = "1" ] && echo geometry || echo full), two-pass overlay check)"
 # Prompt MUST go via stdin (the positional-arg form is unreliable with --add-dir).
 # Sonnet is fast + accurate enough for the bulk drain; never force CLAUDE_EFFORT=high
-# here (it makes a per-batch agent run for 10+ min). 90s/image ceiling as a backstop.
+# here (it makes a per-batch agent run for 10+ min). Per-image ceiling covers TWO reads
+# per frame now (raw + teacher overlay) — still just a runaway backstop.
 # MODEL is hoisted so provenance (stamped in sanitize below) can never drift from
 # the model that actually ran — numbers carry source DNA.
 MODEL="${BYOK_MODEL:-claude-opus-4-8}"
 T_VISION_START=$(date +%s)
-env -u CLAUDE_EFFORT timeout $(( N * 150 + 60 )) \
+env -u CLAUDE_EFFORT timeout $(( N * 240 + 180 )) \
   claude --print --model "$MODEL" --permission-mode bypassPermissions --add-dir "$DIR" \
   < "$PROMPT_FILE" >>"$LOG" 2>&1 || log "claude --print returned non-zero/timeout (ingesting whatever landed)"
 BATCH_MS=$(( ( $(date +%s) - T_VISION_START ) * 1000 ))
@@ -180,17 +264,23 @@ if [ "$V" -eq 0 ]; then log "no verdicts produced — abort ingest"; exit 1; fi
 #      or mislabels). Match by position when the echoed image_id isn't a worklist id.
 #  (2) Drop localized elements missing a valid bbox (the validator rejects the whole
 #      verdict otherwise) — keep the rest so the image still lands.
-python3 - "$SINK" "$WORK" "$VEHICLE_ID" "$MODEL" "$BATCH_MS" "$RUN" "$N" >>"$LOG" 2>&1 <<'PY'
+python3 - "$SINK" "$WORK" "$VEHICLE_ID" "$MODEL" "$BATCH_MS" "$RUN" "$N" "$GEOM" >>"$LOG" 2>&1 <<'PY'
 import json,sys
 sink,work,vehicle_id=sys.argv[1],sys.argv[2],sys.argv[3]
 model,batch_ms,run_id,n_imgs=sys.argv[4],int(sys.argv[5]),sys.argv[6],max(1,int(sys.argv[7]))
+geom=len(sys.argv)>8 and sys.argv[8]=="1"
 wl=[json.loads(l) for l in open(work) if l.strip()]
 ids=[w["image_id"] for w in wl]; idset=set(ids)
 by_id={w["image_id"]:w for w in wl}
-def okbox(b): return isinstance(b,list) and len(b)==4 and all(isinstance(n,(int,float)) and 0<=n<=999 for n in b)
+# okbox mirrors the ingest validator: 0-999 AND ordered (x1<x2, y1<y2) — a degenerate or
+# inverted box is geometry noise and is dropped like a missing one.
+def okbox(b): return isinstance(b,list) and len(b)==4 and all(isinstance(n,(int,float)) and 0<=n<=999 for n in b) and b[0]<b[2] and b[1]<b[3]
 SCENES={"engine_bay","body_exterior","body_interior","undercarriage","receipt_document","data_plate","hand_drawn_diagram","shop_context","fabrication_in_progress","paint_booth","wheel_assembly","road_test","off_property","cross_reference","product_screenshot","spreadsheet","unknown"}
 PHASES={"discovery","teardown","metalwork","paint_prep","paint_application","mechanical_assembly","wiring","interior","final_assembly","drivable","show_finish","unknown"}
 INTENTS={"labor","inspection","parts_sourcing","communication","acquisition","documentation","unknown"}
+RUST={"none","surface","pitting","perforation","unknown"}
+PAINT={"bare_metal","primer","sealer","base","clear","aged","unknown"}
+COMPLETE={"stripped","partial","assembled","unknown"}
 import re
 out=[]; dropped=0; fixed_ids=0; coerced=0
 raw=[l for l in open(sink) if l.strip()]
@@ -203,17 +293,26 @@ for i,l in enumerate(raw):
         v["image_id"]=ids[i] if i < len(ids) else ids[0]; fixed_ids+=1
     w=by_id.get(v["image_id"], wl[i] if i < len(wl) else {})
     v["taken_at"]=w.get("taken_at"); v["created_at"]=w.get("created_at")  # proper ISO, never EXIF colon-format
-    # coerce invented enum values to 'unknown' rather than fail the whole verdict
-    if v.get("scene_type") not in SCENES: v["scene_type"]="unknown"; coerced+=1
-    if v.get("build_phase_guess") not in PHASES: v["build_phase_guess"]="unknown"; coerced+=1
-    if v.get("intent") not in INTENTS: v["intent"]="unknown"; v["needs_clarification"]=True; coerced+=1
-    if isinstance(v.get("intent_confidence"),(int,float)) and v["intent_confidence"]<0.6: v["needs_clarification"]=True
-    # scrub the banned "3/4"/"three-quarter" phrasing from camera_pose
-    cp=v.get("camera_pose")
-    if isinstance(cp,dict):
-        for k,val in list(cp.items()):
-            if isinstance(val,str) and re.search(r"3\s*/\s*4|three[- ]?quarter",val,re.I):
-                cp[k]=re.sub(r"3\s*/\s*4|three[- ]?quarter","angled",val,flags=re.I); coerced+=1
+    if not geom:
+        # coerce invented enum values to 'unknown' rather than fail the whole verdict
+        # (geometry re-emissions are partial — scene/phase/intent/camera_pose come from
+        # the stored prior at ingest merge, so there is nothing to coerce here)
+        if v.get("scene_type") not in SCENES: v["scene_type"]="unknown"; coerced+=1
+        if v.get("build_phase_guess") not in PHASES: v["build_phase_guess"]="unknown"; coerced+=1
+        if v.get("intent") not in INTENTS: v["intent"]="unknown"; v["needs_clarification"]=True; coerced+=1
+        if isinstance(v.get("intent_confidence"),(int,float)) and v["intent_confidence"]<0.6: v["needs_clarification"]=True
+        # scrub the banned "3/4"/"three-quarter" phrasing from camera_pose
+        cp=v.get("camera_pose")
+        if isinstance(cp,dict):
+            for k,val in list(cp.items()):
+                if isinstance(val,str) and re.search(r"3\s*/\s*4|three[- ]?quarter",val,re.I):
+                    cp[k]=re.sub(r"3\s*/\s*4|three[- ]?quarter","angled",val,flags=re.I); coerced+=1
+    # state enums coerced in BOTH modes (geometry re-emits state_observations too — the
+    # paint_state subject-vs-background fix): an invented value must not kill the landing.
+    so=v.get("state_observations")
+    if isinstance(so,dict):
+        for key,allowed in (("rust_severity",RUST),("paint_state",PAINT),("completeness",COMPLETE)):
+            if key in so and so[key] not in allowed: so[key]="unknown"; coerced+=1
     for arr in ("components_seen","text_regions","damage_localized"):
         if isinstance(v.get(arr),list):
             keep=[x for x in v[arr] if isinstance(x,dict) and okbox(x.get("bbox"))]
@@ -237,8 +336,11 @@ open(sink,"w").write("\n".join(out)+"\n")
 print(f"sanitize: kept {len(out)} verdicts, forced vehicle_id+taken_at, fixed {fixed_ids} ids, coerced {coerced} enums/phrases, dropped {dropped} un-boxed elements")
 PY
 
-# 4) INGEST (network) — schema-validate + write cascade to remote DB
-dotenvx run -- node scripts/deep-image-analysis-byok.mjs ingest --sink "$SINK" >>"$LOG" 2>&1
+# 4) INGEST (network) — schema-validate + write cascade to remote DB.
+# Geometry re-emissions merge over the stored verdict (semantics preserved, boxes replaced).
+INGEST_EXTRA=""
+[ "$GEOM" = "1" ] && INGEST_EXTRA="--merge-mode geometry"
+dotenvx run -- node scripts/deep-image-analysis-byok.mjs ingest --sink "$SINK" $INGEST_EXTRA >>"$LOG" 2>&1
 WROTE=$(tail -5 "$LOG" | grep -oE "ingest: wrote [0-9]+" | grep -oE "[0-9]+" | tail -1 || echo "?")
 log "ingest wrote $WROTE / $N for day ${DAY:-unknown}"
 
