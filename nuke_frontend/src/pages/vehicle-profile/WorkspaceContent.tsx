@@ -35,6 +35,7 @@ const VehicleListingDetailsCard = React.lazy(() => import('../../components/vehi
 const SimilarSalesSection = React.lazy(() => import('../../components/vehicle/SimilarSalesSection').then(m => ({ default: m.SimilarSalesSection })));
 const PriceHistoryChart = React.lazy(() => import('../../components/vehicle/PriceHistoryChart'));
 const ObservationTimeline = React.lazy(() => import('./ObservationTimeline'));
+const VehicleAgentChat = React.lazy(() => import('./VehicleAgentChat'));
 const InventoryWidgetLink = React.lazy(() => import('./InventoryWidgetLink'));
 // BuildLog removed — work sessions now surface via BarcodeTimeline Day Card popups
 
@@ -158,19 +159,14 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
     }
   };
 
-  // Use CSS variables for sticky positioning
-  const paneHeight = `calc(100vh - var(--vp-sticky-top))`;
-
+  // Sticky position/top/height live in CSS only (.vp-columns in
+  // vehicle-profile.css). Inlining them here overrode the <=768px media
+  // query that unsticks the columns, trapping the whole profile inside a
+  // viewport-height sticky box on mobile — the page became unscrollable
+  // with ~9000px of content overflowing a ~550px pane (fixed 2026-06-11).
   return (
     <div>
-      <div
-        className="vp-columns"
-        style={{
-          position: 'sticky',
-          top: 'var(--vp-sticky-top)',
-          height: paneHeight,
-        }}
-      >
+      <div className="vp-columns">
         {/* LEFT COLUMN */}
         <div
           className="vp-col-left vehicle-profile-left-column"
@@ -180,6 +176,14 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
             <React.Suspense fallback={null}>
               <WorkMemorySection vehicleId={vehicle.id} permissions={permissions} />
+            </React.Suspense>
+          )}
+
+          {/* Vehicle Agent — interactive Claude over this vehicle's data; can record
+              observations on the owner's behalf (provenance-stamped, reversible). */}
+          {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
+            <React.Suspense fallback={null}>
+              <VehicleAgentChat vehicleId={vehicle.id} />
             </React.Suspense>
           )}
 

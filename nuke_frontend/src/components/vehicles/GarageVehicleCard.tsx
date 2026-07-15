@@ -703,7 +703,23 @@ function GridCard({ vehicle, onRefresh, onDragStart, onDragEnd, isDragging, isTr
                 objectFit: 'contain',
                 display: 'block',
               }}
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              onError={(e) => {
+                // Two-stage fallback. The optimized src routes through the Supabase
+                // /render/image transform endpoint — a single sitewide point of failure
+                // (outage/quota blanks every image at once while raw object URLs keep
+                // serving). First error: strip the render prefix/params and retry the
+                // raw /storage/v1/object/public/ URL. Second error: hide.
+                const img = e.target as HTMLImageElement;
+                const renderMarker = '/storage/v1/render/image/public/';
+                if (!img.dataset.rawFallbackTried && img.src.includes(renderMarker)) {
+                  img.dataset.rawFallbackTried = '1';
+                  img.src = img.src
+                    .replace(renderMarker, '/storage/v1/object/public/')
+                    .split('?')[0];
+                  return;
+                }
+                img.style.display = 'none';
+              }}
             />
           ) : (
             <div

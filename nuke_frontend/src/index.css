@@ -11,8 +11,18 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
+/* The document must grow with its content. Locking html/body/#root to
+   height:100% while the app content overflows them desyncs Chrome's
+   compositor scroll from layout: the page paints pinned to the bottom of
+   the viewport below a viewport-tall void (reproduced on /vehicle/:id,
+   2026-06-11, signed-out). html keeps height:100% so percentage chains
+   still resolve; body and #root use min-height and grow naturally. */
+html {
   height: 100%;
+}
+
+#root {
+  min-height: 100%;
 }
 
 body {

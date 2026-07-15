@@ -13,6 +13,7 @@ CREATE OR REPLACE FUNCTION public.get_daily_work_receipt(p_vehicle_id uuid, p_da
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
+ SET search_path = public, pg_temp
 AS $function$
 DECLARE
   result jsonb;
@@ -193,6 +194,7 @@ CREATE OR REPLACE FUNCTION public.get_vehicle_work_dates(p_vehicle_id uuid, p_st
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
+ SET search_path = public, pg_temp
 AS $function$
 DECLARE
   result jsonb;
@@ -236,3 +238,10 @@ BEGIN
   );
 END;
 $function$;
+
+-- These are read-only RPCs consumed by the (signed-out) public vehicle profile,
+-- so anon needs EXECUTE. SECURITY DEFINER + a pinned search_path (above) make the
+-- grant safe. Without explicit grants, functions created after the historical
+-- bulk `GRANT ALL ON ALL FUNCTIONS` are not callable by these roles.
+GRANT EXECUTE ON FUNCTION public.get_daily_work_receipt(uuid, date) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_vehicle_work_dates(uuid, date, date) TO anon, authenticated;

@@ -78,7 +78,8 @@ const AIProviderSettings: React.FC = () => {
       const hasNewKey = !!(apiKey && apiKey.trim());
       if (hasNewKey) {
         // New key → encrypt at rest via set-ai-provider (AES-GCM, server key). The client
-        // never base64s the key into the DB anymore.
+        // never base64s the key into the DB anymore. The security-critical copy for the
+        // analysis drain is additionally written to Vault below via set_analysis_credential.
         const { data, error } = await supabase.functions.invoke('set-ai-provider', {
           body: { provider: provider.provider, api_key: apiKey.trim(), model_name: provider.model_name.trim() },
         });
@@ -100,6 +101,26 @@ const AIProviderSettings: React.FC = () => {
       if (provider.is_default) {
         await supabase.from('user_ai_providers').update({ is_default: false }).eq('user_id', session.user.id).neq('provider', provider.provider);
         await supabase.from('user_ai_providers').update({ is_default: true }).eq('user_id', session.user.id).eq('provider', provider.provider);
+      }
+
+      // Persist the analysis credential to Vault (encrypted) via the broker RPC so the deep-
+      // analysis drain reads a properly-encrypted secret, not the base64 value above. Only for a
+      // freshly-entered Anthropic key (the provider the drain uses); method is detected from the
+      // token prefix — setup-token subscription (sk-ant-oat) vs pay-per-token API key (sk-ant-api).
+      // Best-effort: a failure here must not block the provider save.
+      if (apiKey && apiKey.trim() && provider.provider === 'anthropic') {
+        const raw = apiKey.trim();
+        const method = raw.startsWith('sk-ant-oat') ? 'byo_subscription'
+                     : raw.startsWith('sk-ant-api') ? 'byo_api_key' : null;
+        if (method) {
+          const { error: credErr } = await supabase.rpc('set_analysis_credential', {
+            p_method: method,
+            p_provider: 'anthropic',
+            p_secret: raw,
+            p_model: provider.model_name.trim(),
+          });
+          if (credErr) console.warn('analysis credential (Vault) not stored:', credErr.message);
+        }
       }
 
       showToast('AI provider saved successfully', 'success');

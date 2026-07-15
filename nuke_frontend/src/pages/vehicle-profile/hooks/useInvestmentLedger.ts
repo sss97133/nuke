@@ -66,7 +66,8 @@ export function useInvestmentLedger(vehicleId: string | undefined) {
           .select('*')
           .eq('vehicle_id', vehicleId)
           .order('work_order_created'),
-        // Receipts
+        // Receipts (owner-scoped RLS on the base table — empty for anon/non-owner
+        // visitors on someone else's vehicle even if it's public; see fallback below)
         supabase
           .from('receipts')
           .select('id, vendor_name, total, receipt_date, invoice_number')
@@ -84,6 +85,22 @@ export function useInvestmentLedger(vehicleId: string | undefined) {
       if (dealRes.error) throw new Error(dealRes.error.message);
       if (woRes.error) throw new Error(woRes.error.message);
       if (vehicleRes.error) throw new Error(vehicleRes.error.message);
+
+      // Fallback for anon / non-owner visitors: the base `receipts` table is
+      // owner-only RLS (2026-07-06 RLS lockdown). For a public vehicle, pull
+      // the same safe columns from `receipts_public_summary`, a column-limited
+      // view scoped to is_public=true vehicles — never card/PII fields.
+      if (!receiptsRes.error && (receiptsRes.data == null || receiptsRes.data.length === 0)) {
+        const publicReceiptsRes = await supabase
+          .from('receipts_public_summary')
+          .select('id, vendor_name, total, receipt_date, invoice_number')
+          .eq('vehicle_id', vehicleId)
+          .eq('status', 'processed')
+          .order('receipt_date');
+        if (!publicReceiptsRes.error && publicReceiptsRes.data) {
+          receiptsRes.data = publicReceiptsRes.data;
+        }
+      }
 
       // Parse deal jackets
       const dealJackets: DealJacketRow[] = (dealRes.data || []).map((d: any) => ({

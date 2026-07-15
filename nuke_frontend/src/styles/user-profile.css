@@ -13,6 +13,7 @@
   --up-surface: #ffffff;
   --up-ink: #1a1a1a;
   --up-pencil: #888888;
+  --up-data-dim: #666666; /* de-emphasized but DATA-carrying (values/dates/counts) — >=4.5:1 on light surface */
   --up-ghost: #dddddd;
   --up-text-faint: #bbbbbb;
   --up-row-alt: #f9f9f9;
@@ -55,6 +56,22 @@
   font-family: var(--up-font-sans);
   background: var(--up-bg);
   min-height: 100vh;
+
+  /* ─── One coherent surface treatment ───
+     The profile is drawn on the light --up-* palette, but a few embedded
+     components (UserDiscoveries, VehicleCollection) read the GLOBAL app tokens
+     (--bg / --surface / --text / --border), which resolve dark in the app's
+     dark theme — producing random dark slabs amid the light record. Remap the
+     global tokens to the profile's own light palette for the subtree so every
+     surface is the same light treatment. No new colors: aliases of --up-*. */
+  --bg: var(--up-bg);
+  --surface: var(--up-surface);
+  --surface-hover: var(--up-row-alt);
+  --surface-elevated: var(--up-surface);
+  --text: var(--up-ink);
+  --text-muted: var(--up-data-dim);
+  --border: var(--up-ghost);
+  color-scheme: light;
 }
 
 /* ─── User Header ─── */
@@ -89,7 +106,7 @@
 
 .up-header__name {
   font-family: var(--up-font-sans);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 700;
   color: var(--up-ink);
   white-space: nowrap;
@@ -99,15 +116,15 @@
 
 .up-header__username {
   font-family: var(--up-font-mono);
-  font-size: 9px;
-  color: var(--up-pencil);
+  font-size: var(--fs-9);
+  color: var(--up-data-dim);
   white-space: nowrap;
 }
 
 .up-header__meta {
   font-family: var(--up-font-sans);
-  font-size: 8px;
-  color: var(--up-pencil);
+  font-size: var(--fs-8);
+  color: var(--up-data-dim);
   white-space: nowrap;
 }
 
@@ -132,17 +149,112 @@
   align-items: baseline;
   gap: 3px;
   font-family: var(--up-font-mono);
-  font-size: 9px;
+  font-size: var(--fs-9);
   color: var(--up-ink);
   white-space: nowrap;
 }
 
 .up-stat-pill__label {
   font-family: var(--up-font-sans);
-  font-size: 7px;
+  font-size: calc(7px * var(--font-scale, 1));
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  color: var(--up-pencil);
+}
+
+/* Stat DOOR — pill-as-button (founder law: every stat is a button that
+   expands). Structure only: a clickable pill with a 2px-border-bottom
+   underline cue; colors inherit from .up-stat-pill (no new color here). */
+.up-stat-pill--door {
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  margin: 0;
+  border-bottom: 2px solid transparent;
+}
+.up-stat-pill--door:hover {
+  border-bottom-color: var(--up-pencil);
+}
+.up-stat-pill--door.up-stat-pill--open {
+  border-bottom-color: var(--up-ink);
+}
+
+/* Inline door detail panel — opens under the header bar, full width. */
+.up-stat-door {
+  flex-basis: 100%;
+  width: 100%;
+  border-top: 1px solid var(--up-ghost);
+  margin-top: 6px;
+  padding-top: 6px;
+}
+.up-stat-door__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px 4px;
+}
+.up-stat-door__title {
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-9);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--up-ink);
+}
+.up-stat-door__close {
+  font-size: var(--fs-8);
+}
+.up-stat-door__body {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.up-stat-door__row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 12px;
+  border-top: 1px solid var(--up-ghost);
+  text-decoration: none;
+  color: inherit;
+}
+.up-stat-door__row:hover {
+  background: var(--up-surface);
+}
+.up-stat-door__row-main {
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-10);
+  color: var(--up-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.up-stat-door__row-meta {
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-8);
+  color: var(--up-pencil);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.up-stat-door__cta {
+  display: block;
+  padding: 6px 12px;
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-10);
+  font-weight: 700;
+  color: var(--up-ink);
+  text-decoration: none;
+}
+.up-stat-door__cta:hover {
+  text-decoration: underline;
+}
+.up-stat-door__empty {
+  padding: 8px 12px;
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-9);
   color: var(--up-pencil);
 }
 
@@ -166,12 +278,12 @@
   align-items: center;
   padding: 2px 6px;
   font-family: var(--up-font-mono);
-  font-size: 8px;
+  font-size: var(--fs-8);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   border: 1px solid var(--up-ghost);
-  color: var(--up-pencil);
+  color: var(--up-data-dim);
   white-space: nowrap;
 }
 
@@ -236,7 +348,7 @@
   justify-content: center;
   padding: 3px 8px;
   font-family: var(--up-font-mono);
-  font-size: 8px;
+  font-size: var(--fs-8);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -261,6 +373,73 @@
 .up-btn--primary:hover {
   background: var(--up-gulf-blue);
   border-color: var(--up-gulf-blue);
+}
+
+/* ─── Text Scale Control (A− A A+) ─── */
+.up-textscale {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.up-textscale__label {
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-8);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--up-pencil);
+}
+
+.up-textscale__seg {
+  display: inline-flex;
+  border: 1px solid var(--up-ink);
+}
+
+.up-textscale__btn {
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-8);
+  font-weight: 700;
+  padding: 2px 6px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--up-ink);
+  color: var(--up-ink);
+  cursor: pointer;
+  line-height: 1;
+  transition: background var(--up-speed) var(--up-ease), color var(--up-speed) var(--up-ease);
+}
+
+.up-textscale__btn:last-child {
+  border-right: none;
+}
+
+.up-textscale__btn:hover:not(:disabled) {
+  background: var(--up-ink);
+  color: var(--up-surface);
+}
+
+.up-textscale__btn:disabled {
+  color: var(--up-text-faint);
+  cursor: default;
+}
+
+.up-textscale__btn--active {
+  background: var(--up-ink);
+  color: var(--up-surface);
+}
+
+.up-textscale__value {
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-8);
+  color: var(--up-data-dim);
+  min-width: 28px;
+}
+
+/* Compact variant pushes to the right end of the sub-header */
+.up-textscale--compact {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* ─── Settings Drawer ─── */
@@ -308,7 +487,7 @@
 
 .up-drawer__title {
   font-family: var(--up-font-sans);
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -317,7 +496,7 @@
 .up-drawer__close {
   background: none;
   border: none;
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   cursor: pointer;
   color: var(--up-pencil);
   padding: 4px;
@@ -334,7 +513,7 @@
   gap: 8px;
   padding: 6px 0;
   border-bottom: 1px solid var(--up-ghost);
-  font-size: 9px;
+  font-size: var(--fs-9);
 }
 
 .up-activity-item:last-child {
@@ -343,8 +522,8 @@
 
 .up-activity-item__date {
   font-family: var(--up-font-mono);
-  font-size: 8px;
-  color: var(--up-pencil);
+  font-size: var(--fs-8);
+  color: var(--up-data-dim);
   white-space: nowrap;
   flex-shrink: 0;
   min-width: 60px;
@@ -354,7 +533,7 @@
   display: inline-flex;
   padding: 1px 4px;
   font-family: var(--up-font-mono);
-  font-size: 7px;
+  font-size: calc(7px * var(--font-scale, 1));
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -380,11 +559,15 @@
 /* ─── Dossier Panel ─── */
 .up-dossier-group {
   margin-bottom: 8px;
+  /* Canonical 12px horizontal gutter (frontend.md): the CollapsibleWidget
+     content this sits in has 0 padding, so without this the GITHUB / WEBSITE
+     value ran flush to the viewport edge and clipped at 375px. */
+  padding: 0 12px;
 }
 
 .up-dossier-group__label {
   font-family: var(--up-font-sans);
-  font-size: 7px;
+  font-size: calc(7px * var(--font-scale, 1));
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -399,12 +582,12 @@
   justify-content: space-between;
   align-items: baseline;
   padding: 2px 0;
-  font-size: 9px;
+  font-size: var(--fs-9);
 }
 
 .up-dossier-row__label {
   font-family: var(--up-font-sans);
-  font-size: 8px;
+  font-size: var(--fs-8);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -413,7 +596,7 @@
 
 .up-dossier-row__value {
   font-family: var(--up-font-sans);
-  font-size: 9px;
+  font-size: var(--fs-9);
   color: var(--up-ink);
   text-align: right;
 }
@@ -431,7 +614,7 @@
 
 .up-briefing__headline {
   font-family: var(--up-font-sans);
-  font-size: 10px;
+  font-size: var(--fs-10);
   font-weight: 400;
   line-height: 1.5;
   color: var(--up-ink);
@@ -454,7 +637,7 @@
 
 .up-reputation .score-row__label {
   font-family: var(--up-font-sans);
-  font-size: 8px;
+  font-size: var(--fs-8);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -480,7 +663,7 @@
 
 .up-reputation .score-row__value {
   font-family: var(--up-font-mono);
-  font-size: 9px;
+  font-size: var(--fs-9);
   min-width: 32px;
   text-align: right;
 }
@@ -519,6 +702,25 @@
     order: 3;
     width: 100%;
     justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    column-gap: 12px;
+  }
+
+  /* Dossier rows: let the label hold its width and the value wrap/shrink
+     instead of clipping off the right edge at 375px. */
+  .up-dossier-row {
+    gap: 8px;
+  }
+  .up-dossier-row__label {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .up-dossier-row__value {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .up-drawer {

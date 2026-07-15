@@ -469,16 +469,16 @@ Deno.serve(async (req) => {
         // Pagination (offset > 0): SAME ranked RPC as page 1, just with offset_count,
         // so ordering is identical across every page (no fork, no dupes, no jumps).
         if (offset > 0 && tsqueryStr) {
-          const [ftsResponse, countResponse] = await Promise.all([
-            supabase.rpc('search_vehicles_fts', {
-              query_text: tsqueryStr,
-              limit_count: vehicleLimit,
-              offset_count: offset,
-            }),
-            supabase.rpc('count_vehicles_search', { query_text: tsqueryStr }),
-          ]);
+          // NOTE: count_vehicles_search RPC removed from the critical path —
+          // measured live at 5.2s AND returning 0 for valid queries (broken).
+          // total_count falls back to result length downstream, same as when
+          // the RPC returned null.
+          const ftsResponse = await supabase.rpc('search_vehicles_fts', {
+            query_text: tsqueryStr,
+            limit_count: vehicleLimit,
+            offset_count: offset,
+          });
 
-          if (countResponse.data !== null) vehicleTotalCount = countResponse.data as number;
           const pageRows = (ftsResponse.data || []).filter((r: any) => (r.relevance || 0) >= 0.85);
           if (pageRows.length) {
             const ids = pageRows.map((r: any) => r.id);
@@ -489,19 +489,15 @@ Deno.serve(async (req) => {
         }
         // First page: use RPC for best ranking
         else if (tsqueryStr) {
-          // Run search + count in parallel
-          const [ftsResponse, countResponse] = await Promise.all([
-            supabase.rpc('search_vehicles_fts', {
-              query_text: tsqueryStr,
-              limit_count: vehicleLimit,
-            }),
-            supabase.rpc('count_vehicles_search', { query_text: tsqueryStr }),
-          ]);
+          // NOTE: count_vehicles_search RPC removed — measured live at 5.2s
+          // AND returning 0 for valid queries (broken). It was the slowest
+          // member of this Promise.all, putting +5s on every first-page search.
+          const ftsResponse = await supabase.rpc('search_vehicles_fts', {
+            query_text: tsqueryStr,
+            limit_count: vehicleLimit,
+          });
 
           const { data: ftsResults, error: ftsError } = ftsResponse;
-          if (countResponse.data !== null) {
-            vehicleTotalCount = countResponse.data as number;
-          }
 
           if (!ftsError && ftsResults?.length) {
             // Filter to high-confidence results only (relevance >= 0.85 = strategies 1a/1b).
