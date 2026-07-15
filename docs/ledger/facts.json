@@ -3,10 +3,10 @@
   "project_ref": "qkgaybvrernstplzjaam",
   "counts": {
     "fn_dirs_on_disk": 205,
-    "deployed": 292,
+    "deployed": 293,
     "invoked_by_frontend": 94,
     "dynamic_invoke_sites_unresolved": 12,
-    "broken_frontend_calls": 42,
+    "broken_frontend_calls": 41,
     "ghost_ref_errors": 6
   },
   "deployed": [
@@ -18,6 +18,7 @@
     "analysis-engine-coordinator",
     "analyze-comments-fast",
     "analyze-image",
+    "analyze-vehicle-documents",
     "analyze-vehicle-image-haiku",
     "analyze-with-claude",
     "api-keys-manage",
@@ -610,7 +611,6 @@
     "ai-agent-supervisor",
     "analyze-and-source-pending",
     "analyze-batch-contextual",
-    "analyze-vehicle-documents",
     "auto-detect-vehicle-owner",
     "auto-fix-vehicle-profile",
     "auto-merge-duplicate-orgs",

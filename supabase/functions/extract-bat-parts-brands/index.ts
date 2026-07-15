@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
 
         // Link to matching image tags if requested
         if (linkToImageTags) {
-          await linkToImageTags(stored, vehicleId, supabase);
+          await linkPartToImageTags(stored, vehicleId, supabase);
         }
       }
     }
@@ -262,7 +262,7 @@ Be precise - only extract if you're confident the part/brand is mentioned.`
   return Array.isArray(extracted) ? extracted : [];
 }
 
-async function linkToImageTags(batPart: any, vehicleId: string, supabase: any) {
+async function linkPartToImageTags(batPart: any, vehicleId: string, supabase: any) {
   // Find image tags that match this part name
   const { data: matchingTags } = await supabase
     .from('image_tags')
