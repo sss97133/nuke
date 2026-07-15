@@ -431,3 +431,5 @@ NUKE-MAINFRAME, autonomous run. The Phase-1 exact-match census found 5 cross-veh
 Evidence on disk (scratchpad, this run): `candidates.json` (38 pairs w/ hash examples), `classified.json` (+ metadata + class), `idhash.tsv` (raw tuples). Reproduce: `dhash-backfill.mjs` space + the `length(phash_hex)=16` filter + hamming≤4.
 
 **Owner decisions queued (nothing executed):** (1) rule on the `e04bf9c5`↔`e08bf694` Blazer pair (merge listing-in vs reattribute); (2) rule on the `a90c008a`↔`d6a01df2` K2500 pair; (3) authorize the Class-2 reattribution queue (image-eyes pass on the 36 shop-mixed pairs, iphoto-2026-03-20 cluster first).
+
+**Leak check (is it still growing?):** identities attached to >1 vehicle, by month of last attachment — 2026-03 **224**, 04 38, 05 52, 06 10, **07 none**. Peaked at the March iphoto ingest, decayed through spring, nothing new in July. The misattribution is a **bounded historical backlog, not an actively-leaking pipe** — so the Class-2 reattribution queue is a normal-priority cleanup, and there is no live ingest bug demanding an urgent code fix.
