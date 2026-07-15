@@ -550,17 +550,28 @@ export class PersonalPhotoLibraryService {
   }
 
   /**
-   * Delete photos from personal library
+   * Remove photos from the personal library inbox.
+   *
+   * TRUST INVARIANT: vehicle_images is testimony — never hard-deleted
+   * (.claude/rules/agent-trust-invariants.md). "Delete" from the inbox means
+   * organization_status='ignored': the photo leaves every library surface but
+   * the row, its EXIF/GPS, and attribution lineage survive. Reversible by
+   * setting organization_status back to 'unorganized'. DELETE on
+   * vehicle_images is also revoked from authenticated/anon at the DB layer
+   * (migration 20260611040000_close_destructive_paths.sql).
    */
   static async deletePhotos(imageIds: string[]): Promise<number> {
     const { data, error } = await supabase
       .from('vehicle_images')
-      .delete()
+      .update({
+        organization_status: 'ignored',
+        updated_at: new Date().toISOString()
+      })
       .in('id', imageIds)
       .select('id');
 
     if (error) {
-      console.error('Error deleting photos:', error);
+      console.error('Error ignoring photos:', error);
       throw error;
     }
 

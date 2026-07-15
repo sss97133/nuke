@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nuke.ag/api/schemas/v1/service.json",
+  "title": "External Agent Write API — Service Event Payload (v1.0)",
+  "description": "Payload shape for envelope.event_type='service'. Routes to vehicle_observations with observation_kind='work_record', source slug 'shop'. Tightened in WS-4 from a loose v1.0 prototype to a strict checklist contract: the form-shape Claude reads is the moat. Fields below the root are the canonical structure agents fill from a photo + a sentence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "1–2 sentence headline of the session. Vision- and context-fillable. The single field that must always be present.",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "narrative": {
+      "type": "string",
+      "description": "Free-form, agent-written description of what happened. No length cap beyond JSONB.",
+      "maxLength": 32768
+    },
+    "zones_touched": {
+      "type": "array",
+      "description": "Subsystems the agent physically interacted with this session. Closed enum so timeline filtering is reliable. Vision-fillable when a photo shows the area being worked on.",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "engine_bay",
+          "undercarriage",
+          "interior",
+          "wheels",
+          "drivetrain",
+          "cooling",
+          "electrical",
+          "fuel",
+          "ignition",
+          "suspension",
+          "brakes",
+          "body",
+          "other"
+        ]
+      }
+    },
+    "work_performed": {
+      "type": "array",
+      "description": "Discrete actions completed in this session.",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "work_planned": {
+      "type": "array",
+      "description": "Actions queued for a future session.",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "parts": {
+      "type": "array",
+      "description": "Parts considered, ordered, installed, or rejected during this session.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "manufacturer": { "type": "string", "maxLength": 200 },
+          "part_number": { "type": "string", "maxLength": 200 },
+          "quantity": { "type": "number", "minimum": 0 },
+          "status": {
+            "type": "string",
+            "enum": ["needed", "ordered", "installed", "considered_rejected"]
+          },
+          "cost_usd": { "type": "number", "minimum": 0 },
+          "supplier": { "type": "string", "maxLength": 200 },
+          "notes": { "type": "string", "maxLength": 1000 }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "description": "Decisions made during the session. Captures intent, not just outcome.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["question", "outcome"],
+        "properties": {
+          "question": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "outcome": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "reasoning": { "type": "string", "maxLength": 4000 }
+        }
+      }
+    },
+    "condition_observations": {
+      "type": "array",
+      "description": "Findings about vehicle condition discovered during the session. These are testimony — they appear on the vehicle profile with the agent's attribution and confidence.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["finding", "severity"],
+        "properties": {
+          "system": {
+            "type": "string",
+            "description": "Vehicle subsystem the finding belongs to. Aligned with zones_touched plus engine-internal subdivisions.",
+            "enum": [
+              "engine_bay",
+              "top_end",
+              "bottom_end",
+              "undercarriage",
+              "interior",
+              "wheels",
+              "drivetrain",
+              "cooling",
+              "electrical",
+              "fuel",
+              "ignition",
+              "suspension",
+              "brakes",
+              "body",
+              "other"
+            ]
+          },
+          "finding": { "type": "string", "minLength": 1, "maxLength": 2000 },
+          "severity": {
+            "type": "string",
+            "enum": ["info", "monitor", "concern", "critical"]
+          }
+        }
+      }
+    },
+    "labor_minutes": {
+      "type": "number",
+      "description": "Wrench time consumed, in minutes.",
+      "minimum": 0,
+      "maximum": 100000
+    },
+    "shop_ref": {
+      "type": "string",
+      "description": "Free-form shop or workspace identifier (e.g. 'NUKE LTD bay 2', 'home garage').",
+      "maxLength": 200
+    },
+    "photos_referenced": {
+      "type": "array",
+      "description": "Caller-side identifiers (URL or sha256) of photos this event references. Stored as testimony pointers; storage and rights handling live outside the envelope.",
+      "items": { "type": "string", "maxLength": 1024 }
+    }
+  }
+}
