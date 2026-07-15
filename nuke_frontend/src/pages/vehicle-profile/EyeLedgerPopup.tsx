@@ -13,10 +13,10 @@
  * Design system: Nuke utilitarian — Arial, ALL CAPS 7-8px labels,
  * mono for data, 2px borders, zero radius/shadows/gradients.
  */
-import React, { useEffect, useMemo, useState } from 'react';
-import { supabase } from '../../lib/supabase';
+import React, { useState } from 'react';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
 import { freshnessOf, agoLabel } from './valueFreshness';
+import { useEyeLedger, type CanonCheck } from './hooks/useEyeLedger';
 
 interface EyeReadHeader {
   band: [number, number] | null;
@@ -32,19 +32,6 @@ interface EyeLedgerPopupProps {
   vehicleId: string;
   eyeRead: EyeReadHeader;
   price?: number | null;
-}
-
-interface CanonCheck {
-  observation_id: string;
-  image_id: string | null;
-  image_url: string | null;
-  part: string;
-  canon_ref: string;
-  verdict: 'pass' | 'fail' | 'suspect' | 'indeterminate' | 'cannot_assess';
-  evidence: string;
-  confidence: number | null;
-  method: string | null;
-  observed_at: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -183,43 +170,7 @@ const FindingRow: React.FC<{ c: CanonCheck }> = ({ c }) => {
 /* ------------------------------------------------------------------ */
 
 const EyeLedgerPopup: React.FC<EyeLedgerPopupProps> = ({ vehicleId, eyeRead, price }) => {
-  const [checks, setChecks] = useState<CanonCheck[] | null>(null);
-  const [payload, setPayload] = useState<any | null>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    Promise.all([
-      supabase
-        .from('appraisal_canon_checks')
-        .select('observation_id, image_id, image_url, part, canon_ref, verdict, evidence, confidence, method, observed_at')
-        .eq('vehicle_id', vehicleId),
-      supabase
-        .from('vehicle_observations')
-        .select('structured_data, observed_at')
-        .eq('vehicle_id', vehicleId)
-        .eq('structured_data->>layer', 'appraise')
-        .order('observed_at', { ascending: false })
-        .limit(1),
-    ]).then(([c, a]) => {
-      if (!alive) return;
-      setChecks((c.data as CanonCheck[]) || []);
-      setPayload(a.data?.[0]?.structured_data?.payload ?? null);
-      setLoaded(true);
-    });
-    return () => { alive = false; };
-  }, [vehicleId]);
-
-  const { findings, counts } = useMemo(() => {
-    const all = checks || [];
-    const rank: Record<string, number> = { fail: 0, suspect: 1 };
-    const f = all
-      .filter((c) => c.verdict === 'fail' || c.verdict === 'suspect')
-      .sort((x, y) => (rank[x.verdict] - rank[y.verdict]) || ((Number(y.confidence) || 0) - (Number(x.confidence) || 0)));
-    const n: Record<string, number> = {};
-    for (const c of all) n[c.verdict] = (n[c.verdict] || 0) + 1;
-    return { findings: f, counts: n };
-  }, [checks]);
+  const { payload, loaded, findings, counts, totalChecks, refused } = useEyeLedger(vehicleId);
 
   const band = eyeRead.band;
   const readFresh = freshnessOf(eyeRead.computedAt);
@@ -229,8 +180,6 @@ const EyeLedgerPopup: React.FC<EyeLedgerPopupProps> = ({ vehicleId, eyeRead, pri
   const drivers: string[] = Array.isArray(payload?.top_value_drivers) ? payload.top_value_drivers : [];
   const risks: string[] = Array.isArray(payload?.top_value_risks) ? payload.top_value_risks : [];
   const grades = payload?.system_grades || null;
-  const totalChecks = (checks || []).length;
-  const refused = (counts['indeterminate'] || 0) + (counts['cannot_assess'] || 0);
 
   if (!loaded) {
     return <div style={{ ...BODY, padding: '12px' }}>Opening the ledger…</div>;
@@ -267,6 +216,14 @@ const EyeLedgerPopup: React.FC<EyeLedgerPopupProps> = ({ vehicleId, eyeRead, pri
               : `This read is ${readFresh.label} old — confidence decays with age; a fresh read tightens it.`}
           </div>
         )}
+        <a
+          href={`/vehicle/${vehicleId}/dossier`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ ...MONO, fontSize: '8px', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text, #000)', textDecoration: 'none', display: 'inline-block', marginTop: '4px', borderBottom: '1px solid var(--text, #000)' }}
+        >
+          OPEN FULL DOSSIER ↗ (printable / shareable)
+        </a>
       </div>
 
       {!payload && totalChecks === 0 && (
