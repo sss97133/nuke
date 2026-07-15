@@ -433,3 +433,13 @@ Evidence on disk (scratchpad, this run): `candidates.json` (38 pairs w/ hash exa
 **Owner decisions queued (nothing executed):** (1) rule on the `e04bf9c5`↔`e08bf694` Blazer pair (merge listing-in vs reattribute); (2) rule on the `a90c008a`↔`d6a01df2` K2500 pair; (3) authorize the Class-2 reattribution queue (image-eyes pass on the 36 shop-mixed pairs, iphoto-2026-03-20 cluster first).
 
 **Leak check (is it still growing?):** identities attached to >1 vehicle, by month of last attachment — 2026-03 **224**, 04 38, 05 52, 06 10, **07 none**. Peaked at the March iphoto ingest, decayed through spring, nothing new in July. The misattribution is a **bounded historical backlog, not an actively-leaking pipe** — so the Class-2 reattribution queue is a normal-priority cleanup, and there is no live ingest bug demanding an urgent code fix.
+
+## CORRECTION after image inspection — 2026-07-15 (the answer)
+
+The "2 dup-record candidates" above was a metadata-only guess and is **wrong**. After looking at the actual images: **0 of the 38 pairs are real duplicate vehicle records.** The whole cross-vehicle overlap is bulk-ingest photo contamination, not duplication.
+
+- The strongest "candidate" (`e04bf9c5`↔`e08bf694`, 92 shared images) is proven contamination, not a dup: `e08bf694` is a real, confirmed, evidence-backed vehicle; `e04bf9c5` is a ghost record (an auction-listing label carrying zero scraped listing content and no sale event) populated entirely by the owner's own `iphoto`/`ssd-blast` photos. The 92 shared images are the same personal photos dumped into both buckets. Direct image inspection found a non-vehicle personal photo inside one record and a shop-overview of multiple different trucks inside the other. Merging would repeat the GAA-43671 cardinal incident this whole brief exists to prevent.
+- `a90c008a`↔`d6a01df2` share only 3 images (of 362/496) — incidental, not one truck.
+- **Root cause:** the `iphoto`/`ssd-blast`/`hd-archive` bulk ingests attribute camera-roll batches to a vehicle without per-image vehicle classification (the capture-relay-corrupt / shop-mixed class). Historical, not a live leak.
+- **Real work:** NO merges; a per-image reattribution/detachment cleanup (vision-scale, owned fleet); a classification gate on those ingests if they ever run again.
+- Per-vehicle specifics (VINs, prices, image contents) are in the local `.claude/ISSUES.md` entry, deliberately kept out of this pushed doc.
