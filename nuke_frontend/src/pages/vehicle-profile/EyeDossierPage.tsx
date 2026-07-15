@@ -45,6 +45,7 @@ interface VehicleBasics {
   model: string | null;
   vin: string | null;
   price: number | null;
+  heroUrl: string | null;
 }
 
 function useVehicleBasics(vehicleId: string | undefined): VehicleBasics | null | 'missing' {
@@ -52,19 +53,31 @@ function useVehicleBasics(vehicleId: string | undefined): VehicleBasics | null |
   useEffect(() => {
     if (!vehicleId) return;
     let alive = true;
-    supabase
-      .from('vehicles')
-      .select('id, year, make, model, vin, sale_price, sold_price, asking_price, price')
-      .eq('id', vehicleId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!alive) return;
-        if (!data) { setV('missing'); return; }
-        setV({
-          id: data.id, year: data.year, make: data.make, model: data.model, vin: data.vin,
-          price: data.sale_price || data.sold_price || data.asking_price || data.price || null,
-        });
+    Promise.all([
+      supabase
+        .from('vehicles')
+        .select('id, year, make, model, vin, sale_price, sold_price, asking_price, price')
+        .eq('id', vehicleId)
+        .maybeSingle(),
+      supabase
+        .from('vehicle_images')
+        .select('image_url, large_url')
+        .eq('vehicle_id', vehicleId)
+        .order('is_primary', { ascending: false })
+        .order('display_order', { ascending: true, nullsFirst: false })
+        .order('position', { ascending: true, nullsFirst: false })
+        .limit(1),
+    ]).then(([veh, img]) => {
+      if (!alive) return;
+      const data = veh.data;
+      if (!data) { setV('missing'); return; }
+      const hero = img.data?.[0];
+      setV({
+        id: data.id, year: data.year, make: data.make, model: data.model, vin: data.vin,
+        price: data.sale_price || data.sold_price || data.asking_price || data.price || null,
+        heroUrl: hero?.large_url || hero?.image_url || null,
       });
+    });
     return () => { alive = false; };
   }, [vehicleId]);
   return v;
@@ -167,6 +180,16 @@ const EyeDossierPage: React.FC = () => {
             </Link>
           </div>
         </div>
+
+        {/* Lead photo — the car this dossier is about */}
+        {vehicle && vehicle !== 'missing' && vehicle.heroUrl && (
+          <img
+            src={vehicle.heroUrl}
+            alt={title}
+            style={{ width: '100%', maxHeight: 320, objectFit: 'cover', border: '2px solid #111', marginBottom: 14, breakInside: 'avoid' }}
+            loading="eager"
+          />
+        )}
 
         {!loaded && <div style={BODY}>Assembling the dossier…</div>}
 
