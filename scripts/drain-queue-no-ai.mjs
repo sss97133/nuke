@@ -113,6 +113,53 @@ function normalizeMake(make) {
   return titleCase(make);
 }
 
+// Location-slug state matcher: US states/territories + Canadian provinces,
+// longest suffix wins so two-word states parse correctly
+// ('buffalo-new-york' → Buffalo, NY — NOT city 'buffalo new', state 'YORK').
+const STATE_SLUGS = [
+  ['district-of-columbia', 'DC'], ['newfoundland-and-labrador', 'NL'],
+  ['prince-edward-island', 'PE'], ['northwest-territories', 'NT'],
+  ['british-columbia', 'BC'], ['new-hampshire', 'NH'], ['new-jersey', 'NJ'],
+  ['new-mexico', 'NM'], ['new-york', 'NY'], ['north-carolina', 'NC'],
+  ['north-dakota', 'ND'], ['rhode-island', 'RI'], ['south-carolina', 'SC'],
+  ['south-dakota', 'SD'], ['west-virginia', 'WV'], ['new-brunswick', 'NB'],
+  ['nova-scotia', 'NS'], ['puerto-rico', 'PR'],
+  ['alabama', 'AL'], ['alaska', 'AK'], ['arizona', 'AZ'], ['arkansas', 'AR'],
+  ['california', 'CA'], ['colorado', 'CO'], ['connecticut', 'CT'], ['delaware', 'DE'],
+  ['florida', 'FL'], ['georgia', 'GA'], ['hawaii', 'HI'], ['idaho', 'ID'],
+  ['illinois', 'IL'], ['indiana', 'IN'], ['iowa', 'IA'], ['kansas', 'KS'],
+  ['kentucky', 'KY'], ['louisiana', 'LA'], ['maine', 'ME'], ['maryland', 'MD'],
+  ['massachusetts', 'MA'], ['michigan', 'MI'], ['minnesota', 'MN'], ['mississippi', 'MS'],
+  ['missouri', 'MO'], ['montana', 'MT'], ['nebraska', 'NE'], ['nevada', 'NV'],
+  ['ohio', 'OH'], ['oklahoma', 'OK'], ['oregon', 'OR'], ['pennsylvania', 'PA'],
+  ['tennessee', 'TN'], ['texas', 'TX'], ['utah', 'UT'], ['vermont', 'VT'],
+  ['virginia', 'VA'], ['washington', 'WA'], ['wisconsin', 'WI'], ['wyoming', 'WY'],
+  ['alberta', 'AB'], ['manitoba', 'MB'], ['newfoundland', 'NL'], ['ontario', 'ON'],
+  ['quebec', 'QC'], ['saskatchewan', 'SK'], ['yukon', 'YT'], ['nunavut', 'NU'],
+  ['dc', 'DC'],
+].sort((a, b) => b[0].length - a[0].length);
+
+/**
+ * Parse a hyphenated location slug ('grass-valley-california') into
+ * { city: 'Grass Valley', state: 'CA' }. Returns null when no state matches
+ * (international / malformed / typo'd slugs) — never guesses.
+ */
+function parseLocationSlug(slug) {
+  if (!slug) return null;
+  const s = String(slug).toLowerCase();
+  for (const [stateSlug, code] of STATE_SLUGS) {
+    if (s === stateSlug || s.endsWith('-' + stateSlug)) {
+      const cityPart = s.slice(0, Math.max(s.length - stateSlug.length - 1, 0));
+      const city = cityPart
+        ? cityPart.split('-').filter(Boolean)
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+        : null;
+      return { city, state: code };
+    }
+  }
+  return null;
+}
+
 // ─── Source-specific parsers (NO FETCH) ──────────────────────────────────────
 
 /**
@@ -182,15 +229,15 @@ function parseClassicCars(row) {
     extractor_version: VERSION,
   };
 
-  // Location from raw_data
+  // Location from raw_data — state-aware suffix match; two-word states must not
+  // split on the last token (the 2026-03-26 import wrote state='YORK' ×1,085).
+  // No match (international/malformed slug) → leave city/state unset, never guess.
   if (raw.location) {
-    const parts = raw.location.split('-');
-    if (parts.length >= 2) {
-      const city = parts.slice(0, -1).map(p => titleCase(p)).join(' ');
-      const state = parts[parts.length - 1].toUpperCase();
-      v.location = `${city}, ${state}`;
-      v.city = city;
-      v.state = state;
+    const loc = parseLocationSlug(raw.location);
+    if (loc) {
+      v.city = loc.city;
+      v.state = loc.state;
+      v.location = loc.city ? `${loc.city}, ${loc.state}` : loc.state;
     }
   }
   if (raw.zip) v.zip_code = raw.zip;
