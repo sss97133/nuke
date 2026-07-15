@@ -31,6 +31,7 @@ const OrganizationRoutes = React.lazy(() => import('./modules/organization/route
 const DealerRoutes = React.lazy(() => import('./modules/dealer/routes'));
 const AdminRoutes = React.lazy(() => import('./modules/admin/routes'));
 const MarketplaceRoutes = React.lazy(() => import('./modules/marketplace/routes'));
+const PublishingRoutes = React.lazy(() => import('./modules/publishing/routes'));
 
 // Auth / callbacks (still referenced by many pages/components)
 const Login = React.lazy(() => import('../components/auth/Login'));
@@ -124,6 +125,8 @@ export const DomainRoutes = () => {
         <Route path="/admin/*" element={<AdminRoutes />} />
         {/* Marketplace: mix of public + protected (handled inside the module) */}
         <Route path="/market/*" element={<MarketplaceRoutes />} />
+        {/* Publishing: editorial production, publications, credits — separate from vehicles */}
+        <Route path="/publishing/*" element={<PublishingRoutes />} />
 
         {/* ── Legacy Route Compatibility Shims ─────────────────────────── */}
         <Route path="/vehicles" element={<Navigate to="/vehicle/list" replace />} />
