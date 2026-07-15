@@ -1,0 +1,11 @@
+-- appraisal_canon_checks: read access for the profile's headline→ledger drill.
+--
+-- The matview is the Eye's atom read model (image × part × canon check ×
+-- verdict × evidence, DATA_CONTRACT.md). It renders on the PUBLIC vehicle
+-- profile one layer under the value headline, and its parent substrate
+-- (vehicle_observations, vehicle_condition_scores, vehicle_images) is already
+-- anon-readable — this closes the one gap. Applied to prod 2026-07-15.
+--
+-- NOTE: matview grants survive REFRESH MATERIALIZED VIEW but NOT a
+-- DROP + re-CREATE — re-grant if the view is ever rebuilt.
+GRANT SELECT ON public.appraisal_canon_checks TO anon, authenticated;

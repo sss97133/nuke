@@ -15,7 +15,10 @@
 import React, { useState, useEffect } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
+import { usePopup } from '../../components/popups/usePopup';
 import type { VehicleIntel, CommentIntel, Apparition, CompSale } from './hooks/useVehicleIntel';
+
+const EyeLedgerPopup = React.lazy(() => import('./EyeLedgerPopup'));
 
 // ---------------------------------------------------------------------------
 // Eye read — the evidence-graded appraisal (vehicle_condition_scores).
@@ -275,10 +278,26 @@ const VehicleBriefing: React.FC = () => {
   const { vehicle, vehicleIntel, vehicleIntelLoading, observationCount } = useVehicleProfile();
   const [showComps, setShowComps] = useState(false);
   const eyeRead = useEyeRead(vehicle?.id);
+  const { openPopup } = usePopup();
 
   if (!vehicle || vehicleIntelLoading) return null;
 
   const headline = generateHeadline(vehicle, vehicleIntel, observationCount, eyeRead);
+  // The Eye's headline drills to its ledger — the price is a button, per
+  // drillable-ontology doctrine. Other headline sources have no drill target.
+  const headlineIsEye = Boolean(eyeRead?.band);
+  const drillPrice = vehicle?.sale_price || vehicle?.sold_price || vehicle?.asking_price || vehicle?.price;
+  const openLedger = () => {
+    if (!vehicle?.id || !eyeRead) return;
+    openPopup(
+      <React.Suspense fallback={<div style={{ padding: '12px', fontSize: '8px', fontFamily: 'var(--vp-font-sans, Arial, sans-serif)' }}>Opening the ledger…</div>}>
+        <EyeLedgerPopup vehicleId={vehicle.id} eyeRead={eyeRead} price={drillPrice} />
+      </React.Suspense>,
+      'THE LEDGER',
+      560,
+      false,
+    );
+  };
   const estimate = vehicle.nuke_estimate;
   const scores = vehicleIntel?.scores;
   const comps = vehicleIntel?.recent_comps;
@@ -341,19 +360,35 @@ const VehicleBriefing: React.FC = () => {
 
   return (
     <div style={{ margin: '0 12px 8px' }}>
-      {/* L0: Headline */}
+      {/* L0: Headline — the Eye's headline is a button into the ledger */}
       {headline && (
-        <div style={{
-          padding: '6px 10px',
-          background: SEVERITY_BG[headline.severity] || SEVERITY_BG.neutral,
-          borderLeft: `3px solid ${SEVERITY_BORDER[headline.severity] || SEVERITY_BORDER.neutral}`,
-          fontFamily: 'var(--vp-font-sans, Arial, sans-serif)',
-          fontSize: '9px',
-          lineHeight: '1.5',
-          color: 'var(--text, #000)',
-          marginBottom: '6px',
-        }}>
+        <div
+          onClick={headlineIsEye ? openLedger : undefined}
+          role={headlineIsEye ? 'button' : undefined}
+          style={{
+            padding: '6px 10px',
+            background: SEVERITY_BG[headline.severity] || SEVERITY_BG.neutral,
+            borderLeft: `3px solid ${SEVERITY_BORDER[headline.severity] || SEVERITY_BORDER.neutral}`,
+            fontFamily: 'var(--vp-font-sans, Arial, sans-serif)',
+            fontSize: '9px',
+            lineHeight: '1.5',
+            color: 'var(--text, #000)',
+            marginBottom: '6px',
+            cursor: headlineIsEye ? 'pointer' : undefined,
+          }}
+        >
           {headline.text}
+          {headlineIsEye && (
+            <span style={{
+              float: 'right',
+              fontSize: '8px',
+              fontWeight: 700,
+              letterSpacing: '0.05em',
+              color: 'var(--text-secondary, #666)',
+            }}>
+              ▸ THE LEDGER
+            </span>
+          )}
         </div>
       )}
 
