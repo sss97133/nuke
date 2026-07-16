@@ -263,14 +263,24 @@ export default function PublicMap() {
 
   useEffect(() => {
     async function load() {
-      const { data, error } = await supabase
-        .from('organizations')
-        .select('id, name, slug, latitude, longitude, business_type, brand_design_language')
-        .not('latitude', 'is', null)
-        .limit(5000);
+      // PostgREST silently caps unordered queries at 1,000 rows — page through
+      // everything with GPS instead of a single capped .limit()
+      const PAGE = 1000;
+      const data: any[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data: page, error } = await supabase
+          .from('organizations')
+          .select('id, name, slug, latitude, longitude, business_type, brand_design_language')
+          .not('latitude', 'is', null)
+          .order('id')
+          .range(from, from + PAGE - 1);
+        if (error) { console.error('Org query error:', error); break; }
+        if (!page?.length) break;
+        data.push(...page);
+        if (page.length < PAGE) break;
+      }
 
-      if (error) console.error('Org query error:', error);
-      if (data) {
+      if (data.length) {
         console.log(`Loaded ${data.length} orgs with GPS`);
         setOrgs(data.map((b: any) => {
           const bdl = b.brand_design_language;
