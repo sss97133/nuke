@@ -151,15 +151,19 @@ async function downloadAndStoreImage(
 }
 
 // ─── PRICE VALIDATION ─────────────────────────────────────────────────
-function isSuspiciousPrice(price: number | null): boolean {
+function isSuspiciousPrice(price: number | null, year?: number | null): boolean {
   if (price === null) return false;
   // Obvious placeholder prices
   if (price === 123456 || price === 1234567 || price === 12345) return true;
   // Repeating digit patterns like 111111, 999999
   const s = String(price);
   if (s.length >= 5 && new Set(s.split('')).size === 1) return true;
-  // Too cheap to be real ($0, $1, $2)
-  if (price <= 2) return true;
+  // Sub-$1k is almost always a financing/down-payment/monthly artifact, not a sale price.
+  // FB's listing_price.amount carries payment terms on dealer listings; this was the source
+  // of ~14.5k contaminated sub-$1k asks. Null it → frontend shows "OBO", deal logic stays off.
+  if (price < 1000) return true;
+  // A 2015+ vehicle under $3k is implausible as a real ask — also a financing artifact.
+  if (year && year >= 2015 && price < 3000) return true;
   // Absurdly expensive for what we're looking at
   if (price > 500000) return true;
   return false;
@@ -576,9 +580,9 @@ Deno.serve(async (req) => {
         // If price looks suspicious, null it out (frontend can show "OBO")
         let askingPrice = price;
         let priceNote: string | null = null;
-        if (isSuspiciousPrice(price)) {
+        if (isSuspiciousPrice(price, year)) {
           askingPrice = null;
-          priceNote = 'Price appears suspicious, listed as OBO';
+          priceNote = 'Price implausible (likely financing/down-payment artifact), listed as OBO';
         }
 
         const { city, state } = parseLocation(listing.location);

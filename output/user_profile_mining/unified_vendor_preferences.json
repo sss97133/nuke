@@ -1,0 +1,2335 @@
+[
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "ebay",
+    "qb": {
+      "purchase_count": 45,
+      "total_spend": 8701.34,
+      "first": "2022-05-24",
+      "last": "2026-03-13",
+      "price_tier": "mid",
+      "cadence_days_avg": 31.6
+    },
+    "mail": {
+      "total_msgs": 3409,
+      "order_msgs": 577,
+      "amount_parseable_in_subjects": 443528.13,
+      "first_msg": 1268883354,
+      "last_msg": 1775255681
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "paypal",
+    "qb": {
+      "purchase_count": 592,
+      "total_spend": 84606.24,
+      "first": "2022-01-31",
+      "last": "2026-04-02",
+      "price_tier": "mid",
+      "cadence_days_avg": 2.6
+    },
+    "mail": {
+      "total_msgs": 1524,
+      "order_msgs": 635,
+      "amount_parseable_in_subjects": 26368.69,
+      "first_msg": 1341042524,
+      "last_msg": 1777674741
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "a cars life",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 54660.0,
+      "first": "2022-01-28",
+      "last": "2023-11-01",
+      "price_tier": "major",
+      "cadence_days_avg": 642.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "apple",
+    "qb": {
+      "purchase_count": 296,
+      "total_spend": 38365.0,
+      "first": "2022-06-13",
+      "last": "2026-04-01",
+      "price_tier": "mid",
+      "cadence_days_avg": 4.7
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "eckler",
+    "qb": null,
+    "mail": {
+      "total_msgs": 46,
+      "order_msgs": 12,
+      "amount_parseable_in_subjects": 30028.0,
+      "first_msg": 1772664763,
+      "last_msg": 1777659121
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "jb hart rent 674 wells rd",
+    "qb": {
+      "purchase_count": 18,
+      "total_spend": 30000.0,
+      "first": "2022-01-11",
+      "last": "2025-12-11",
+      "price_tier": "large",
+      "cadence_days_avg": 84.1
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "fbm",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 27003.55,
+      "first": "2025-10-15",
+      "last": "2025-10-15",
+      "price_tier": "major",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "desert performance",
+    "qb": {
+      "purchase_count": 33,
+      "total_spend": 23790.0,
+      "first": "2019-03-09",
+      "last": "2019-03-09",
+      "price_tier": "large",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "el geez",
+    "qb": {
+      "purchase_count": 7,
+      "total_spend": 18551.0,
+      "first": "2022-01-11",
+      "last": "2022-09-12",
+      "price_tier": "major",
+      "cadence_days_avg": 40.7
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "discount_tire",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 1103.44,
+      "first": "2022-09-22",
+      "last": "2022-09-22",
+      "price_tier": "large",
+      "cadence_days_avg": null
+    },
+    "mail": {
+      "total_msgs": 152,
+      "order_msgs": 91,
+      "amount_parseable_in_subjects": 10850.0,
+      "first_msg": 1728565046,
+      "last_msg": 1777729476
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "at&t",
+    "qb": {
+      "purchase_count": 19,
+      "total_spend": 10293.76,
+      "first": "2022-03-19",
+      "last": "2025-11-01",
+      "price_tier": "large",
+      "cadence_days_avg": 73.5
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "amazon",
+    "qb": {
+      "purchase_count": 124,
+      "total_spend": 6907.75,
+      "first": "2022-02-22",
+      "last": "2025-06-23",
+      "price_tier": "small",
+      "cadence_days_avg": 9.9
+    },
+    "mail": {
+      "total_msgs": 1399,
+      "order_msgs": 787,
+      "amount_parseable_in_subjects": 2206.98,
+      "first_msg": 1255598983,
+      "last_msg": 1777671182
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "kellie smith snap on",
+    "qb": {
+      "purchase_count": 47,
+      "total_spend": 8733.45,
+      "first": "2023-03-01",
+      "last": "2026-03-20",
+      "price_tier": "mid",
+      "cadence_days_avg": 24.2
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "cj_pony",
+    "qb": {
+      "purchase_count": 6,
+      "total_spend": 6603.6,
+      "first": "2026-03-04",
+      "last": "2026-03-23",
+      "price_tier": "large",
+      "cadence_days_avg": 3.8
+    },
+    "mail": {
+      "total_msgs": 807,
+      "order_msgs": 98,
+      "amount_parseable_in_subjects": 1729.0,
+      "first_msg": 1461083352,
+      "last_msg": 1777587977
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "credit one bank",
+    "qb": {
+      "purchase_count": 22,
+      "total_spend": 7698.29,
+      "first": "2022-03-22",
+      "last": "2025-11-05",
+      "price_tier": "mid",
+      "cadence_days_avg": 63.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "jegs",
+    "qb": null,
+    "mail": {
+      "total_msgs": 820,
+      "order_msgs": 84,
+      "amount_parseable_in_subjects": 7382.0,
+      "first_msg": 1540966973,
+      "last_msg": 1777680101
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "albertsons",
+    "qb": {
+      "purchase_count": 76,
+      "total_spend": 5878.06,
+      "first": "2022-02-10",
+      "last": "2026-03-17",
+      "price_tier": "small",
+      "cadence_days_avg": 19.9
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "harbor_freight",
+    "qb": null,
+    "mail": {
+      "total_msgs": 818,
+      "order_msgs": 140,
+      "amount_parseable_in_subjects": 4914.97,
+      "first_msg": 1676335848,
+      "last_msg": 1777696730
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "best buy",
+    "qb": {
+      "purchase_count": 3,
+      "total_spend": 4652.99,
+      "first": "2023-12-05",
+      "last": "2025-11-07",
+      "price_tier": "large",
+      "cadence_days_avg": 351.5
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "summit_racing",
+    "qb": {
+      "purchase_count": 8,
+      "total_spend": 2962.21,
+      "first": "2024-09-25",
+      "last": "2026-03-17",
+      "price_tier": "mid",
+      "cadence_days_avg": 76.9
+    },
+    "mail": {
+      "total_msgs": 112,
+      "order_msgs": 77,
+      "amount_parseable_in_subjects": 0,
+      "first_msg": 1574108743,
+      "last_msg": 1776964013
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "sebastien",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 2500.0,
+      "first": "2022-03-16",
+      "last": "2022-03-16",
+      "price_tier": "major",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "jenny mannerheim",
+    "qb": {
+      "purchase_count": 5,
+      "total_spend": 2400.0,
+      "first": "2022-11-09",
+      "last": "2024-02-13",
+      "price_tier": "mid",
+      "cadence_days_avg": 115.2
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "mannerheim & others",
+    "qb": {
+      "purchase_count": 6,
+      "total_spend": 2059.07,
+      "first": "2023-12-31",
+      "last": "2024-01-11",
+      "price_tier": "mid",
+      "cadence_days_avg": 2.2
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "stamps.com",
+    "qb": {
+      "purchase_count": 13,
+      "total_spend": 2054.94,
+      "first": "2022-10-17",
+      "last": "2026-03-12",
+      "price_tier": "mid",
+      "cadence_days_avg": 103.5
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "dennis konkin",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 2000.0,
+      "first": "2025-10-15",
+      "last": "2025-10-15",
+      "price_tier": "major",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "irs",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 2000.0,
+      "first": "2024-09-23",
+      "last": "2024-12-23",
+      "price_tier": "large",
+      "cadence_days_avg": 91.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "american airlines",
+    "qb": {
+      "purchase_count": 3,
+      "total_spend": 1622.64,
+      "first": "2026-03-23",
+      "last": "2026-03-23",
+      "price_tier": "large",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "overdraft fee for",
+    "qb": {
+      "purchase_count": 44,
+      "total_spend": 1525.0,
+      "first": "2022-07-26",
+      "last": "2025-07-22",
+      "price_tier": "small",
+      "cadence_days_avg": 25.4
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "miami rent",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 1480.0,
+      "first": "2022-07-05",
+      "last": "2022-07-05",
+      "price_tier": "large",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "dales sinclair",
+    "qb": {
+      "purchase_count": 49,
+      "total_spend": 1312.81,
+      "first": "2022-02-28",
+      "last": "2026-03-23",
+      "price_tier": "small",
+      "cadence_days_avg": 30.9
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "lasaro corporation",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 1300.0,
+      "first": "2025-10-28",
+      "last": "2025-10-28",
+      "price_tier": "large",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "jacob resort c/o jake schmillen",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 1150.0,
+      "first": "2025-11-17",
+      "last": "2025-11-17",
+      "price_tier": "large",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "costco",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 1110.8,
+      "first": "2023-09-14",
+      "last": "2023-12-04",
+      "price_tier": "large",
+      "cadence_days_avg": 81.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "anthropic",
+    "qb": {
+      "purchase_count": 40,
+      "total_spend": 954.72,
+      "first": "2025-12-04",
+      "last": "2026-03-26",
+      "price_tier": "micro",
+      "cadence_days_avg": 2.9
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "usps",
+    "qb": {
+      "purchase_count": 9,
+      "total_spend": 823.56,
+      "first": "2022-07-07",
+      "last": "2024-12-12",
+      "price_tier": "small",
+      "cadence_days_avg": 111.1
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "smog vets llc",
+    "qb": {
+      "purchase_count": 3,
+      "total_spend": 820.0,
+      "first": "2023-02-27",
+      "last": "2024-01-22",
+      "price_tier": "mid",
+      "cadence_days_avg": 164.5
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "intl st barth",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 801.36,
+      "first": "2022-12-30",
+      "last": "2022-12-30",
+      "price_tier": "mid",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "delta",
+    "qb": {
+      "purchase_count": 8,
+      "total_spend": 740.3,
+      "first": "2022-08-01",
+      "last": "2024-01-05",
+      "price_tier": "small",
+      "cadence_days_avg": 74.6
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "snap on",
+    "qb": {
+      "purchase_count": 6,
+      "total_spend": 700.0,
+      "first": "2022-09-21",
+      "last": "2022-10-19",
+      "price_tier": "mid",
+      "cadence_days_avg": 5.6
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "lacianne roark",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 700.0,
+      "first": "2023-10-24",
+      "last": "2025-10-30",
+      "price_tier": "mid",
+      "cadence_days_avg": 737.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "taco bell",
+    "qb": {
+      "purchase_count": 48,
+      "total_spend": 670.74,
+      "first": "2022-08-19",
+      "last": "2026-03-24",
+      "price_tier": "micro",
+      "cadence_days_avg": 27.9
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "talia brown",
+    "qb": {
+      "purchase_count": 3,
+      "total_spend": 630.0,
+      "first": "2023-11-30",
+      "last": "2024-02-05",
+      "price_tier": "mid",
+      "cadence_days_avg": 33.5
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "oreilly",
+    "qb": {
+      "purchase_count": 8,
+      "total_spend": 620.13,
+      "first": "2023-02-10",
+      "last": "2026-03-14",
+      "price_tier": "small",
+      "cadence_days_avg": 161.1
+    },
+    "mail": {
+      "total_msgs": 5,
+      "order_msgs": 3,
+      "amount_parseable_in_subjects": 0,
+      "first_msg": 1760625917,
+      "last_msg": 1762570597
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "cursor",
+    "qb": {
+      "purchase_count": 12,
+      "total_spend": 597.36,
+      "first": "2025-11-12",
+      "last": "2026-03-13",
+      "price_tier": "small",
+      "cadence_days_avg": 11.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "starlink",
+    "qb": {
+      "purchase_count": 5,
+      "total_spend": 590.0,
+      "first": "2022-09-25",
+      "last": "2024-03-05",
+      "price_tier": "mid",
+      "cadence_days_avg": 131.8
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "harbor freight tools",
+    "qb": {
+      "purchase_count": 6,
+      "total_spend": 570.67,
+      "first": "2022-02-19",
+      "last": "2026-03-05",
+      "price_tier": "small",
+      "cadence_days_avg": 295.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "openai chatgpt",
+    "qb": {
+      "purchase_count": 24,
+      "total_spend": 568.47,
+      "first": "2025-12-17",
+      "last": "2026-03-23",
+      "price_tier": "micro",
+      "cadence_days_avg": 4.2
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "boulder pit stop",
+    "qb": {
+      "purchase_count": 8,
+      "total_spend": 506.43,
+      "first": "2025-10-14",
+      "last": "2026-03-18",
+      "price_tier": "small",
+      "cadence_days_avg": 22.1
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "arco",
+    "qb": {
+      "purchase_count": 15,
+      "total_spend": 504.0,
+      "first": "2022-02-23",
+      "last": "2025-10-30",
+      "price_tier": "small",
+      "cadence_days_avg": 96.1
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "offer up purchase",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 503.5,
+      "first": "2022-11-03",
+      "last": "2022-11-03",
+      "price_tier": "large",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "matthew rodriguez",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 500.0,
+      "first": "2023-10-07",
+      "last": "2023-10-07",
+      "price_tier": "large",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "pharmagustavia",
+    "qb": {
+      "purchase_count": 6,
+      "total_spend": 496.29,
+      "first": "2022-08-22",
+      "last": "2026-03-26",
+      "price_tier": "small",
+      "cadence_days_avg": 262.4
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "firecrawl",
+    "qb": {
+      "purchase_count": 6,
+      "total_spend": 468.0,
+      "first": "2025-12-04",
+      "last": "2026-03-04",
+      "price_tier": "small",
+      "cadence_days_avg": 18.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "true value",
+    "qb": {
+      "purchase_count": 13,
+      "total_spend": 461.09,
+      "first": "2022-09-28",
+      "last": "2026-03-17",
+      "price_tier": "small",
+      "cadence_days_avg": 105.5
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "david parker",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 400.0,
+      "first": "2023-11-18",
+      "last": "2023-11-18",
+      "price_tier": "mid",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "walmart",
+    "qb": {
+      "purchase_count": 5,
+      "total_spend": 337.81,
+      "first": "2022-09-19",
+      "last": "2024-07-29",
+      "price_tier": "small",
+      "cadence_days_avg": 169.8
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "mcdonald's",
+    "qb": {
+      "purchase_count": 17,
+      "total_spend": 326.19,
+      "first": "2022-08-27",
+      "last": "2025-05-05",
+      "price_tier": "micro",
+      "cadence_days_avg": 61.4
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "tst fox smokehous",
+    "qb": {
+      "purchase_count": 4,
+      "total_spend": 316.21,
+      "first": "2023-03-06",
+      "last": "2024-01-08",
+      "price_tier": "small",
+      "cadence_days_avg": 102.7
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "auctane llc",
+    "qb": {
+      "purchase_count": 27,
+      "total_spend": 316.12,
+      "first": "2022-06-07",
+      "last": "2025-12-15",
+      "price_tier": "micro",
+      "cadence_days_avg": 49.5
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "jeff dages",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 300.0,
+      "first": "2023-11-13",
+      "last": "2023-11-13",
+      "price_tier": "mid",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "grailed",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 290.94,
+      "first": "2026-03-12",
+      "last": "2026-03-12",
+      "price_tier": "mid",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "disney",
+    "qb": {
+      "purchase_count": 29,
+      "total_spend": 290.36,
+      "first": "2022-06-20",
+      "last": "2024-02-21",
+      "price_tier": "micro",
+      "cadence_days_avg": 21.8
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "chipotle",
+    "qb": {
+      "purchase_count": 10,
+      "total_spend": 276.93,
+      "first": "2022-06-16",
+      "last": "2023-12-04",
+      "price_tier": "small",
+      "cadence_days_avg": 59.6
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "dmv",
+    "qb": {
+      "purchase_count": 5,
+      "total_spend": 269.0,
+      "first": "2022-03-05",
+      "last": "2023-03-16",
+      "price_tier": "small",
+      "cadence_days_avg": 94.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "starbucks",
+    "qb": {
+      "purchase_count": 17,
+      "total_spend": 257.44,
+      "first": "2022-06-20",
+      "last": "2025-05-01",
+      "price_tier": "micro",
+      "cadence_days_avg": 65.4
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "habanero taco gril",
+    "qb": {
+      "purchase_count": 9,
+      "total_spend": 237.04,
+      "first": "2022-06-14",
+      "last": "2026-03-23",
+      "price_tier": "small",
+      "cadence_days_avg": 172.2
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "chevron",
+    "qb": {
+      "purchase_count": 3,
+      "total_spend": 234.02,
+      "first": "2022-09-24",
+      "last": "2024-10-02",
+      "price_tier": "small",
+      "cadence_days_avg": 369.5
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "ace hardware",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 225.0,
+      "first": "2023-11-10",
+      "last": "2023-11-10",
+      "price_tier": "mid",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "lucali",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 211.77,
+      "first": "2025-11-18",
+      "last": "2026-03-19",
+      "price_tier": "mid",
+      "cadence_days_avg": 121.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "overdraft fee",
+    "qb": {
+      "purchase_count": 6,
+      "total_spend": 210.0,
+      "first": "2023-05-18",
+      "last": "2024-08-27",
+      "price_tier": "small",
+      "cadence_days_avg": 93.4
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "target",
+    "qb": {
+      "purchase_count": 7,
+      "total_spend": 203.71,
+      "first": "2024-01-01",
+      "last": "2024-02-03",
+      "price_tier": "small",
+      "cadence_days_avg": 5.5
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "frontier air",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 192.97,
+      "first": "2025-10-15",
+      "last": "2025-10-15",
+      "price_tier": "mid",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "winco",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 178.04,
+      "first": "2022-06-13",
+      "last": "2022-09-08",
+      "price_tier": "small",
+      "cadence_days_avg": 87.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "shell",
+    "qb": {
+      "purchase_count": 6,
+      "total_spend": 169.45,
+      "first": "2022-09-02",
+      "last": "2023-02-21",
+      "price_tier": "small",
+      "cadence_days_avg": 34.4
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "delmo speed",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 164.0,
+      "first": "2025-11-05",
+      "last": "2025-11-05",
+      "price_tier": "mid",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "lesa's autobody supplies inc",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 160.0,
+      "first": "2025-11-18",
+      "last": "2025-11-18",
+      "price_tier": "mid",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "7-eleven",
+    "qb": {
+      "purchase_count": 12,
+      "total_spend": 154.22,
+      "first": "2022-08-01",
+      "last": "2025-05-01",
+      "price_tier": "micro",
+      "cadence_days_avg": 91.3
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "foreign transaction fee",
+    "qb": {
+      "purchase_count": 86,
+      "total_spend": 153.91,
+      "first": "2023-01-20",
+      "last": "2025-07-09",
+      "price_tier": "micro",
+      "cadence_days_avg": 10.6
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "godaddy",
+    "qb": {
+      "purchase_count": 4,
+      "total_spend": 153.56,
+      "first": "2025-11-25",
+      "last": "2026-01-02",
+      "price_tier": "small",
+      "cadence_days_avg": 12.7
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "uhaul",
+    "qb": {
+      "purchase_count": 11,
+      "total_spend": 148.71,
+      "first": "2022-09-01",
+      "last": "2022-10-21",
+      "price_tier": "micro",
+      "cadence_days_avg": 5.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "carquest",
+    "qb": {
+      "purchase_count": 3,
+      "total_spend": 145.03,
+      "first": "2022-11-04",
+      "last": "2022-11-09",
+      "price_tier": "small",
+      "cadence_days_avg": 2.5
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "united",
+    "qb": {
+      "purchase_count": 4,
+      "total_spend": 140.0,
+      "first": "2022-10-21",
+      "last": "2022-10-26",
+      "price_tier": "small",
+      "cadence_days_avg": 1.7
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "hulu",
+    "qb": {
+      "purchase_count": 17,
+      "total_spend": 130.83,
+      "first": "2022-06-10",
+      "last": "2023-07-10",
+      "price_tier": "micro",
+      "cadence_days_avg": 24.7
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "microsoft",
+    "qb": {
+      "purchase_count": 8,
+      "total_spend": 123.42,
+      "first": "2023-09-15",
+      "last": "2024-09-09",
+      "price_tier": "micro",
+      "cadence_days_avg": 51.4
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "carfax",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 109.99,
+      "first": "2025-11-03",
+      "last": "2025-11-03",
+      "price_tier": "mid",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "toms off road",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 105.42,
+      "first": "2025-11-05",
+      "last": "2025-11-05",
+      "price_tier": "mid",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "fab service llc",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 100.0,
+      "first": "2025-10-22",
+      "last": "2025-10-22",
+      "price_tier": "mid",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "coffee cup",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 96.16,
+      "first": "2024-01-05",
+      "last": "2026-03-05",
+      "price_tier": "small",
+      "cadence_days_avg": 790.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "advance_auto",
+    "qb": null,
+    "mail": {
+      "total_msgs": 25,
+      "order_msgs": 13,
+      "amount_parseable_in_subjects": 95.0,
+      "first_msg": 1559244759,
+      "last_msg": 1665796237
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "panda express",
+    "qb": {
+      "purchase_count": 4,
+      "total_spend": 93.2,
+      "first": "2023-09-05",
+      "last": "2024-01-02",
+      "price_tier": "micro",
+      "cadence_days_avg": 39.7
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "little caesars",
+    "qb": {
+      "purchase_count": 4,
+      "total_spend": 89.94,
+      "first": "2022-03-21",
+      "last": "2023-12-19",
+      "price_tier": "micro",
+      "cadence_days_avg": 212.7
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "quickbooks payments",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 89.75,
+      "first": "2023-12-27",
+      "last": "2024-01-17",
+      "price_tier": "small",
+      "cadence_days_avg": 21.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "vercel",
+    "qb": {
+      "purchase_count": 4,
+      "total_spend": 88.2,
+      "first": "2025-12-03",
+      "last": "2026-03-19",
+      "price_tier": "micro",
+      "cadence_days_avg": 35.3
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "perplexity ai",
+    "qb": {
+      "purchase_count": 3,
+      "total_spend": 70.0,
+      "first": "2026-03-02",
+      "last": "2026-03-06",
+      "price_tier": "micro",
+      "cadence_days_avg": 2.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "99 cents only llc",
+    "qb": {
+      "purchase_count": 4,
+      "total_spend": 68.74,
+      "first": "2022-09-16",
+      "last": "2023-03-07",
+      "price_tier": "micro",
+      "cadence_days_avg": 57.3
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "stormlikes",
+    "qb": {
+      "purchase_count": 10,
+      "total_spend": 61.0,
+      "first": "2022-09-19",
+      "last": "2023-03-15",
+      "price_tier": "micro",
+      "cadence_days_avg": 19.7
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "dropbox",
+    "qb": {
+      "purchase_count": 3,
+      "total_spend": 59.97,
+      "first": "2025-11-04",
+      "last": "2026-01-12",
+      "price_tier": "micro",
+      "cadence_days_avg": 34.5
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "atm fee",
+    "qb": {
+      "purchase_count": 17,
+      "total_spend": 58.0,
+      "first": "2023-01-17",
+      "last": "2025-05-12",
+      "price_tier": "micro",
+      "cadence_days_avg": 52.9
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "vons",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 57.67,
+      "first": "2022-10-18",
+      "last": "2022-10-18",
+      "price_tier": "small",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "big ts cantina",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 57.26,
+      "first": "2023-05-09",
+      "last": "2023-05-09",
+      "price_tier": "small",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "doctor",
+    "qb": {
+      "purchase_count": 4,
+      "total_spend": 54.38,
+      "first": "2022-05-25",
+      "last": "2022-06-04",
+      "price_tier": "micro",
+      "cadence_days_avg": 3.3
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "intl lagerbaren",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 50.25,
+      "first": "2023-03-14",
+      "last": "2023-03-14",
+      "price_tier": "small",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "ups",
+    "qb": {
+      "purchase_count": 5,
+      "total_spend": 49.38,
+      "first": "2022-02-24",
+      "last": "2026-03-05",
+      "price_tier": "micro",
+      "cadence_days_avg": 367.5
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "a&w",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 49.06,
+      "first": "2023-03-21",
+      "last": "2023-03-21",
+      "price_tier": "small",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "supabase",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 35.21,
+      "first": "2025-12-03",
+      "last": "2025-12-03",
+      "price_tier": "small",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "parkup parking app",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 35.0,
+      "first": "2023-02-21",
+      "last": "2023-02-21",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "uber",
+    "qb": {
+      "purchase_count": 3,
+      "total_spend": 34.98,
+      "first": "2024-12-10",
+      "last": "2025-01-30",
+      "price_tier": "micro",
+      "cadence_days_avg": 25.5
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "marshalls",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 34.68,
+      "first": "2024-01-03",
+      "last": "2024-01-03",
+      "price_tier": "small",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "regal cinema",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 31.94,
+      "first": "2023-02-28",
+      "last": "2023-02-28",
+      "price_tier": "small",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "prime video",
+    "qb": {
+      "purchase_count": 5,
+      "total_spend": 28.57,
+      "first": "2025-10-27",
+      "last": "2026-01-30",
+      "price_tier": "micro",
+      "cadence_days_avg": 23.8
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "etsy",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 25.94,
+      "first": "2023-12-05",
+      "last": "2023-12-05",
+      "price_tier": "small",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "uber eats",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 24.46,
+      "first": "2025-10-14",
+      "last": "2025-10-14",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "intl galina",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 23.99,
+      "first": "2023-03-17",
+      "last": "2023-03-17",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "autozone",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 23.98,
+      "first": "2024-08-24",
+      "last": "2024-08-24",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": {
+      "total_msgs": 16,
+      "order_msgs": 2,
+      "amount_parseable_in_subjects": 0,
+      "first_msg": 1699308101,
+      "last_msg": 1773994607
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "dhl",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 19.99,
+      "first": "2025-12-26",
+      "last": "2025-12-26",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "dairy queen",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 19.99,
+      "first": "2022-09-11",
+      "last": "2023-05-03",
+      "price_tier": "micro",
+      "cadence_days_avg": 234.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "raising cane's",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 15.96,
+      "first": "2023-02-21",
+      "last": "2023-02-21",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "kmart",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 15.84,
+      "first": "2023-03-14",
+      "last": "2023-03-14",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "carambole",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 15.08,
+      "first": "2022-08-30",
+      "last": "2022-08-30",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "intl pressbyran",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 14.52,
+      "first": "2023-03-13",
+      "last": "2023-03-13",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "lufthansa",
+    "qb": {
+      "purchase_count": 4,
+      "total_spend": 14.33,
+      "first": "2022-10-11",
+      "last": "2022-10-13",
+      "price_tier": "micro",
+      "cadence_days_avg": 0.7
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "intl lilla",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 13.2,
+      "first": "2023-03-13",
+      "last": "2023-03-13",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "selecta",
+    "qb": {
+      "purchase_count": 4,
+      "total_spend": 11.06,
+      "first": "2023-03-15",
+      "last": "2023-03-15",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "circle k",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 11.02,
+      "first": "2023-09-19",
+      "last": "2023-12-22",
+      "price_tier": "micro",
+      "cadence_days_avg": 94.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "tropical smoothie",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 9.58,
+      "first": "2023-05-08",
+      "last": "2023-05-08",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "jasons deli",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 9.27,
+      "first": "2023-02-21",
+      "last": "2023-02-21",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "jfk camden rj",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 9.24,
+      "first": "2023-03-15",
+      "last": "2023-03-15",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "arby's",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 8.3,
+      "first": "2025-10-21",
+      "last": "2025-10-21",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "odicho livs post",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 7.5,
+      "first": "2023-03-13",
+      "last": "2023-03-13",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "popeye's",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 7.35,
+      "first": "2023-11-06",
+      "last": "2023-11-06",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "whsmith t stockholm",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 6.06,
+      "first": "2023-01-20",
+      "last": "2023-01-20",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "nuke ltd",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 6.0,
+      "first": "2025-10-23",
+      "last": "2025-10-23",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "fiverr",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 4.13,
+      "first": "2023-11-29",
+      "last": "2023-11-29",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "fedex",
+    "qb": {
+      "purchase_count": 4,
+      "total_spend": 3.58,
+      "first": "2026-03-06",
+      "last": "2026-03-06",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "rockauto",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 0.0,
+      "first": "2025-10-17",
+      "last": "2025-10-17",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": {
+      "total_msgs": 18,
+      "order_msgs": 1,
+      "amount_parseable_in_subjects": 0,
+      "first_msg": 1760727976,
+      "last_msg": 1776871146
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "lmc_truck",
+    "qb": null,
+    "mail": {
+      "total_msgs": 4,
+      "order_msgs": 0,
+      "amount_parseable_in_subjects": 0,
+      "first_msg": 1669365265,
+      "last_msg": 1762180785
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "bringatrailer",
+    "qb": null,
+    "mail": {
+      "total_msgs": 1655,
+      "order_msgs": 0,
+      "amount_parseable_in_subjects": 0,
+      "first_msg": 1397043228,
+      "last_msg": 1777725054
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "classic parts of america",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 0.0,
+      "first": "2024-09-22",
+      "last": "2024-09-22",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "tom's offroad",
+    "qb": {
+      "purchase_count": 2,
+      "total_spend": 0.0,
+      "first": "2025-10-17",
+      "last": "2025-11-03",
+      "price_tier": "micro",
+      "cadence_days_avg": 17.0
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "classic_industries",
+    "qb": null,
+    "mail": {
+      "total_msgs": 37,
+      "order_msgs": 7,
+      "amount_parseable_in_subjects": 0,
+      "first_msg": 1539496101,
+      "last_msg": 1656595051
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "quantum fuel systems",
+    "qb": {
+      "purchase_count": 1,
+      "total_spend": 0.0,
+      "first": "2024-09-25",
+      "last": "2024-09-25",
+      "price_tier": "micro",
+      "cadence_days_avg": null
+    },
+    "mail": null,
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "home_depot",
+    "qb": null,
+    "mail": {
+      "total_msgs": 30,
+      "order_msgs": 12,
+      "amount_parseable_in_subjects": 0,
+      "first_msg": 1543273166,
+      "last_msg": 1745266335
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor_key": "holley",
+    "qb": null,
+    "mail": {
+      "total_msgs": 80,
+      "order_msgs": 9,
+      "amount_parseable_in_subjects": 0,
+      "first_msg": 1648138754,
+      "last_msg": 1767214883
+    },
+    "observed_at": "2026-05-23T20:47:17.675090",
+    "trust": "T2"
+  }
+]

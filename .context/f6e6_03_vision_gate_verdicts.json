@@ -1,0 +1,50 @@
+[
+  {
+    "order": 0,
+    "image_id": "bf8dcc2f-b088-409d-adfc-4e612444c7c0",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Square-body GM crew cab dually in gold/tan two-tone at a gas station at night. Matches f6e6 K30 Crew Cab Silverado 3+3 dually exactly. Another square-body GM truck (silver/white) visible in background. Small motorcycle on flatbed trailer behind. No paperwork visible.",
+    "paperwork": null
+  },
+  {
+    "order": 1,
+    "image_id": "32ddded8-0b33-48be-9313-4470041d733e",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Interior dashboard/gauge cluster shot from driver seat through windshield. Square-body GM tan/brown dash with characteristic gauge layout. C10 Nationals 2025 windshield pass-through visible (reversed, number 0246). Open road rural scene.",
+    "paperwork": "C10 Nationals 2025 event windshield pass #0246; additional sticker visible above (text not legible)"
+  },
+  {
+    "order": 2,
+    "image_id": "a84fcb05-5743-4c3a-946c-0a22a361a8d2",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Shot taken from inside a square-body truck cab — chrome west-coast/dually-style side mirror with tubular bracket consistent with K30 dually mirrors. Truck hood/cowl visible at bottom edge. Looking out at a rural lot with old tractors/equipment. Approved by attribution rule + visual cues.",
+    "paperwork": null
+  },
+  {
+    "order": 3,
+    "image_id": "5a020459-4827-4a75-abfd-0e979b31bf4d",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "POV from driver seat over tan/brown square-body GM dashboard and gold hood. Rural intersection scene. Dashboard texture, defroster vents and hood color match f6e6 (gold + tan).",
+    "paperwork": null
+  },
+  {
+    "order": 4,
+    "image_id": "fa055edb-7b66-4cc8-8b8c-2935a1fafb92",
+    "verdict": "approved",
+    "confidence": 0.94,
+    "reasoning": "Rotated interior shot showing square-body GM crew-cab passenger door panel (tan), perforated headliner, and rear bench/jump-seat-style trim — consistent with crew cab interior. Door handle, lock knob, window crank, and vent louvers match square-body cab.",
+    "paperwork": null
+  },
+  {
+    "order": 5,
+    "image_id": "24966a96-27c4-4388-b337-f3e9b9738940",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Rotated interior shot of square-body GM cab — passenger door panel (tan), center console/cup-holder, manual shifter visible, dash vents. Reflection in side mirror shows 'DEALER' signage (likely arriving at or leaving a dealership). Crew-cab tan interior consistent with f6e6.",
+    "paperwork": "Reflected 'DEALER' sign in side mirror (dealership signage; specific dealer not legible)"
+  }
+]

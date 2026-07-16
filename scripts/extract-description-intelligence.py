@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Description Intelligence Extractor — Direct database approach.
 
@@ -26,7 +27,7 @@ except ImportError:
     import psycopg2
     import psycopg2.extras
 
-DB_URL = "postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
+DB_URL = f"postgresql://postgres.qkgaybvrernstplzjaam:{os.environ['SUPABASE_DB_PASSWORD']}@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
 
 
 def extract_tier1(description):

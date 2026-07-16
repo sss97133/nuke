@@ -14,7 +14,13 @@ const Extension = React.lazy(() => import('../pages/Extension'));
 // Search: lazy-loaded (chunk retry logic in main.tsx handles failures)
 const Search = React.lazy(() => import('../pages/Search'));
 const BrowseVehicles = React.lazy(() => import('../pages/BrowseVehicles'));
+const LiveFloor = React.lazy(() => import('../live/LiveFloor'));
+// Cohort terminal — Bloomberg-for-a-cohort (year-make-model landing)
+const CohortTerminal = React.lazy(() => import('../pages/CohortTerminal'));
+// R&D: white-label / "make this my app" showroom
+const BrandStudio = React.lazy(() => import('../pages/BrandStudio'));
 const PublicMap = React.lazy(() => import('../components/map/PublicMap'));
+const Valuation = React.lazy(() => import('../pages/Valuation'));
 
 // Public map page — no auth, no DeckGL
 function MapPage() {
@@ -27,6 +33,9 @@ function MapPage() {
 
 // Lazy load domain modules
 const VehicleRoutes = React.lazy(() => import('./modules/vehicle/routes'));
+// Local-first user-centric vehicle view — reads files, not Supabase
+const LocalVehicle = React.lazy(() => import('../pages/LocalVehicle'));
+const LocalDiscover = React.lazy(() => import('../pages/LocalDiscover'));
 const OrganizationRoutes = React.lazy(() => import('./modules/organization/routes'));
 const DealerRoutes = React.lazy(() => import('./modules/dealer/routes'));
 const AdminRoutes = React.lazy(() => import('./modules/admin/routes'));
@@ -55,8 +64,10 @@ const BusinessSettings = React.lazy(() => import('../pages/BusinessSettings'));
 const QuickBooksCallback = React.lazy(() => import('../pages/QuickBooksCallback'));
 const RestorationIntake = React.lazy(() => import('../pages/RestorationIntake'));
 
+// User Profile v2 — two-column workspace
+const UserProfile = React.lazy(() => import('../pages/UserProfile'));
+
 // Legacy pages (still used by navigation components)
-const Profile = React.lazy(() => import('../pages/Profile'));
 const Capture = React.lazy(() => import('../pages/Capture'));
 const Capsule = React.lazy(() => import('../pages/Capsule'));
 const Library = React.lazy(() => import('../pages/Library'));
@@ -77,14 +88,23 @@ const DailyDebrief = React.lazy(() => import('../pages/DailyDebrief'));
 // Acquisition Pipeline
 const AcquisitionPipeline = React.lazy(() => import('../pages/AcquisitionPipeline'));
 
+// Sell Dashboard
+const SellDashboard = React.lazy(() => import('../pages/SellDashboard'));
+
 // Team Inbox
 const TeamInbox = React.lazy(() => import('../pages/TeamInbox'));
 
 // Photo / Unified Inbox
 const PersonalPhotoLibrary = React.lazy(() => import('../pages/PersonalPhotoLibrary').then(m => ({ default: m.PersonalPhotoLibrary })));
 
+const SettingsHubPage = React.lazy(() => import('../pages/settings/SettingsHubPage'));
 const ApiKeysPage = React.lazy(() => import('../pages/settings/ApiKeysPage'));
-const WebhooksPage = React.lazy(() => import('../pages/settings/WebhooksPage'));
+const AIAccessPage = React.lazy(() => import('../pages/settings/AIAccessPage'));
+const ConnectedAgentsPage = React.lazy(() => import('../pages/settings/ConnectedAgentsPage'));
+const AnalysisSettingsPage = React.lazy(() => import('../pages/settings/AnalysisSettingsPage'));
+const PipelineVisualizer = React.lazy(() => import('../pages/PipelineVisualizer'));
+// WebhooksPage removed 2026-07-12 (8e90e7ba5): feature 404'd at the DB layer
+// (webhook_endpoints/deliveries never migrated); page + edge fn deleted.
 const UsageDashboardPage = React.lazy(() => import('../pages/settings/UsageDashboardPage'));
 const DevelopersPage = React.lazy(() => import('../pages/developers'));
 const ApiLanding = React.lazy(() => import('../pages/ApiLanding'));
@@ -93,6 +113,18 @@ const DeveloperDashboard = React.lazy(() => import('../pages/DeveloperDashboard'
 
 // Transfer party page (buyer/seller, no auth required)
 const TransferPartyPage = React.lazy(() => import('../pages/TransferPartyPage'));
+
+// Build Coordinator dashboard (public, vehicle-scoped)
+const BuildDashboard = React.lazy(() => import('../pages/BuildDashboard'));
+
+// Public projections — journal index + day page
+const JournalIndex = React.lazy(() => import('../pages/journal/JournalIndex'));
+const JournalPage = React.lazy(() => import('../pages/journal/JournalPage'));
+
+// Public intake — Janitor drain (first ship: note event type only)
+const IntakePage = React.lazy(() => import('../pages/intake/IntakePage'));
+// Live intake — owner watches the BYOK fleet burn fill the timeline
+const LiveIntakeScreen = React.lazy(() => import('../pages/intake/LiveIntakeScreen'));
 
 export const DomainRoutes = () => {
   return (
@@ -114,6 +146,13 @@ export const DomainRoutes = () => {
         <Route path="/eula" element={<EULA />} />
         <Route path="/extension" element={<Extension />} />
         <Route path="/data-deletion" element={<DataDeletion />} />
+
+        {/* ── R&D: white-label "make this my app" showroom ──────────────── */}
+        <Route path="/brand-studio" element={<BrandStudio />} />
+
+        {/* Local-first user views — no Supabase, works offline */}
+        <Route path="/my/discover" element={<LocalDiscover />} />
+        <Route path="/my/:slug" element={<LocalVehicle />} />
 
         {/* ── Domain Modules ────────────────────────────────────────────── */}
         {/* Vehicle + Organization modules have internal ProtectedRoute gates */}
@@ -138,7 +177,7 @@ export const DomainRoutes = () => {
         <Route path="/shops/new" element={<Navigate to="/org/create" replace />} />
         <Route path="/database-audit" element={<Navigate to="/admin/database-audit" replace />} />
         <Route path="/data-diagnostic" element={<Navigate to="/admin/data-diagnostic" replace />} />
-        <Route path="/test-contributions" element={<Navigate to="/admin/test-contributions" replace />} />
+
 
         {/* ── Public pages ─────────────────────────────────────────────── */}
         {/* /feed-v2 promoted to main feed tab — redirect for any bookmarks */}
@@ -146,18 +185,21 @@ export const DomainRoutes = () => {
 
         {/* Search + Browse + Map: public */}
         <Route path="/search" element={<Search />} />
+        <Route path="/cohort/:make/:model/:year" element={<CohortTerminal />} />
         <Route path="/browse" element={<BrowseVehicles />} />
+        <Route path="/live" element={<LiveFloor />} />
         <Route path="/map" element={<MapPage />} />
+        <Route path="/valuation" element={<Valuation />} />
         {/* Public auction listings */}
         <Route path="/auctions" element={<AuctionMarketplace />} />
         <Route path="/auction/:listingId" element={<AuctionListing />} />
         <Route path="/listings/:listingId" element={<AuctionListing />} />
-        {/* Community pages */}
-        <Route path="/bat-members" element={<BaTMembers />} />
-        <Route path="/members" element={<BaTMembers />} />
+        {/* Community pages — moved to protected routes below */}
         {/* Public profile views (with userId = public; without = own profile, guarded below) */}
-        <Route path="/profile/:userId" element={<Profile />} />
-        <Route path="/profile/external/:externalIdentityId" element={<Profile />} />
+        <Route path="/profile/:userId" element={<UserProfile />} />
+        <Route path="/profile/external/:externalIdentityId" element={<UserProfile />} />
+        {/* Canonical handle-based user binding (frontend-doctrine §2a primary surface) */}
+        <Route path="/u/:handle" element={<UserProfile />} />
         {/* Investor offering / data room — semi-public fundraising page */}
         {/* Docs / developers landing */}
         <Route path="/developers" element={<DevelopersPage />} />
@@ -169,22 +211,34 @@ export const DomainRoutes = () => {
         <Route path="/developers/signup" element={<DeveloperSignup />} />
         {/* Transfer party page — public, token-accessible */}
         <Route path="/t/:transferId" element={<TransferPartyPage />} />
-        {/* Tech capture & restoration intake — used by shops/techs, not end users */}
-        <Route path="/tech" element={<TechCapture />} />
-        <Route path="/tech/upload" element={<TechShareUpload />} />
-        <Route path="/restoration" element={<RestorationIntake />} />
-        <Route path="/intake" element={<RestorationIntake />} />
-        <Route path="/work-orders/statement" element={<WorkOrderStatement />} />
+        {/* Build Coordinator dashboard — public, vehicle-scoped */}
+        <Route path="/builds/:vehicleId" element={<BuildDashboard />} />
+        {/* Public projections — journal index + day page */}
+        <Route path="/journal" element={<JournalIndex />} />
+        <Route path="/journal/:date" element={<JournalPage />} />
+        {/* Public intake — Janitor drain (first ship: note event type only) */}
+        <Route path="/intake" element={<IntakePage />} />
+        {/* Live intake — fleet burn watch (kept off /intake: that route is the
+            Janitor-drain note form and login returnUrl target) */}
+        <Route path="/intake/live" element={<LiveIntakeScreen />} />
+        {/* Treemap browse experience — preserved at /explore after F6 moved */}
+        {/* the homepage to the Janitor-drain intake variant. */}
+        <Route path="/explore" element={<Navigate to="/?force_treemap=1" replace />} />
+        {/* Tech capture, restoration intake, work orders — moved to protected routes below */}
 
         {/* ── Hub convenience redirects → homepage tabs ─────────────────── */}
         <Route path="/garage" element={<Navigate to="/?tab=garage" replace />} />
-        <Route path="/map" element={<Navigate to="/?tab=map" replace />} />
+        {/* /map is NOT redirected here — it's served by the real MapPage route
+            declared above (line ~181). A duplicate redirect route used to live
+            here; it was dead code (React Router resolves same-path ties to the
+            earlier-declared route, so this one could never fire). Removed
+            2026-07-06 QA pass — see nuke.ag QA findings. */}
         <Route path="/feed" element={<Navigate to="/?tab=feed" replace />} />
 
         {/* ── Protected routes (require sign-in) ───────────────────────── */}
         <Route element={<ProtectedRoute />}>
           {/* Own profile (no userId = current user's profile) */}
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/profile" element={<UserProfile />} />
 
           {/* Personal workspace */}
           <Route path="/capture" element={<Capture />} />
@@ -213,14 +267,31 @@ export const DomainRoutes = () => {
           <Route path="/pipeline" element={<AcquisitionPipeline />} />
           <Route path="/acquisitions" element={<AcquisitionPipeline />} />
 
+          {/* Sell dashboard */}
+          <Route path="/sell" element={<SellDashboard />} />
+
           {/* Identity & social */}
           <Route path="/claim-identity" element={<ClaimExternalIdentity />} />
+
+          {/* Internal tools (moved from public) */}
+          <Route path="/bat-members" element={<BaTMembers />} />
+          <Route path="/members" element={<BaTMembers />} />
+          <Route path="/tech" element={<TechCapture />} />
+          <Route path="/tech/upload" element={<TechShareUpload />} />
+          <Route path="/restoration" element={<RestorationIntake />} />
+          <Route path="/intake/restoration" element={<RestorationIntake />} />
+          <Route path="/work-orders/statement" element={<WorkOrderStatement />} />
 
 
           {/* Settings (protected) */}
           <Route element={<ProtectedRoute />}>
+            <Route path="/settings" element={<SettingsHubPage />} />
             <Route path="/settings/api-keys" element={<ApiKeysPage />} />
-            <Route path="/settings/webhooks" element={<WebhooksPage />} />
+            {/* Where the user brings their own compute for the in-app agent. */}
+            <Route path="/settings/ai" element={<AIAccessPage />} />
+            <Route path="/settings/connected-agents" element={<ConnectedAgentsPage />} />
+            <Route path="/settings/analysis" element={<AnalysisSettingsPage />} />
+            <Route path="/pipeline/analysis" element={<PipelineVisualizer />} />
             <Route path="/settings/usage" element={<UsageDashboardPage />} />
             <Route path="/developers/dashboard" element={<DeveloperDashboard />} />
             <Route path="/business/settings" element={<BusinessSettings />} />

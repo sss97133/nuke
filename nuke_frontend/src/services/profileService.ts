@@ -15,7 +15,23 @@ import type {
 } from '../types/profile';
 
 export class ProfileService {
-  
+
+  // Per-day contribution aggregates for the profile timeline.
+  // Replaces the three wide row-level selects in getProfileData (each silently
+  // capped at 1000 rows by PostgREST db-max-rows, so the timeline rendered an
+  // arbitrary slice of history) with one (day, kind, n) GROUP BY RPC.
+  // kind ∈ photo | event | work. Bogus-EXIF floor (day >= 2000-01-01) is
+  // applied inside the RPC.
+  static async getContributionDays(
+    userId: string
+  ): Promise<Array<{ day: string; kind: string; n: number }>> {
+    const { data, error } = await supabase.rpc('get_user_contribution_days', {
+      p_user_id: userId,
+    });
+    if (error) throw error;
+    return data || [];
+  }
+
   // Get comprehensive profile data
   static async getProfileData(userId: string): Promise<ProfileData | null> {
     try {
@@ -43,8 +59,10 @@ export class ProfileService {
         supabase.from('profile_stats').select('*').eq('user_id', userId).single(),
         // Get ALL timeline events - no date filter, user has historical data going back years
         supabase.from('vehicle_timeline_events').select('id, event_date, event_type, vehicle_id, user_id, metadata, cost_amount, title, description, created_at').eq('user_id', userId).order('event_date', { ascending: false }).limit(5000),
-        // Get ALL images - no date filter for full contribution history
-        supabase.from('vehicle_images').select('id, image_url, created_at, taken_at, exif_data, user_id, vehicle_id').eq('user_id', userId).order('taken_at', { ascending: false }).limit(5000),
+        // Order by created_at (uses idx_vehicle_images_user_created) — taken_at has no index
+        // and times out on users with thousands of images (vehicle_images is ~36M rows / 28GB).
+        // EXIF-based ordering still happens client-side via toDateOnly() over taken_at when present.
+        supabase.from('vehicle_images').select('id, image_url, created_at, taken_at, exif_data, user_id, vehicle_id').eq('user_id', userId).order('created_at', { ascending: false }).limit(5000),
         // Get ALL business events - no date filter
         supabase.from('business_timeline_events').select('id, event_date, event_type, business_id, created_by, title, description, cost_amount, metadata, created_at').eq('created_by', userId).order('event_date', { ascending: false }).limit(5000)
       ]);
@@ -182,9 +200,39 @@ export class ProfileService {
       console.log('ProfileService: Built contributions sample:', realContributions.slice(0, 3));
       console.log('ProfileService: Contribution dates:', realContributions.map(c => c.contribution_date).slice(0, 10));
 
-      // ALWAYS use the real contribution data from timeline events, NEVER the fake user_contributions table
-      // The user_contributions table has inaccurate/fake data that should be ignored
-      const finalContributions = realContributions;
+      // Heatmap counts come from the uncapped server-side aggregate
+      // (get_user_contribution_days), NOT the three wide selects above — those are
+      // silently capped to 1000 rows by PostgREST db-max-rows, so for a >1000-image
+      // user the heatmap rendered an arbitrary recent slice (346 of 1,626 capture-days
+      // for user 0, nothing before 2017, while real history reaches further back). The
+      // RPC groups by COALESCE(taken_at, created_at) over ALL rows and floors bogus
+      // pre-2000 EXIF. Falls back to the capped client-built map if the RPC is
+      // unavailable; business events (not covered by the RPC) are preserved.
+      let finalContributions = realContributions;
+      try {
+        const days = await ProfileService.getContributionDays(userId);
+        if (days && days.length) {
+          const kindToType: Record<string, UserContribution['contribution_type']> = {
+            photo: 'image_upload', event: 'vehicle_data', work: 'vehicle_data',
+          };
+          const rpcContribs: UserContribution[] = days.map((d) => ({
+            id: `${userId}-${d.day}-${d.kind}`,
+            user_id: userId,
+            contribution_date: d.day,
+            contribution_type: kindToType[d.kind] || 'vehicle_data',
+            contribution_count: d.n,
+            metadata: {},
+            related_vehicle_id: null,
+            created_at: d.day,
+          }));
+          const businessContribs = realContributions.filter(
+            (c) => c.contribution_type === 'business_event',
+          );
+          finalContributions = [...rpcContribs, ...businessContribs];
+        }
+      } catch (e) {
+        console.warn('[ProfileService] get_user_contribution_days failed, using capped fallback:', e);
+      }
       
       console.log('ProfileService: Using REAL timeline-built contributions data');
       console.log('ProfileService: Real contributions from timeline events:', realContributions.length);

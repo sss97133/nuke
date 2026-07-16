@@ -47,53 +47,7 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
       setLoading(true);
       const sources: ValidationSource[] = [];
 
-      // 0. VIN-specific: include conclusive, cited sources from data_validation_sources
-      if (fieldName === 'vin') {
-        const { data: vinSources, error: vinSourcesError } = await supabase
-          .from('data_validation_sources')
-          .select('id, source_type, source_image_id, source_url, confidence_score, extraction_method, verification_notes, created_at')
-          .eq('vehicle_id', vehicleId)
-          .eq('data_field', 'vin')
-          .order('confidence_score', { ascending: false })
-          .order('created_at', { ascending: false });
-
-        if (vinSourcesError) {
-          const status = (vinSourcesError as any)?.status;
-          const message = String((vinSourcesError as any)?.message || '');
-          // If migration/table isn't deployed yet, PostgREST returns 404. Ignore silently.
-          if (!(status === 404 || message.includes('404'))) {
-            throw vinSourcesError;
-          }
-        }
-
-        if (vinSources && vinSources.length > 0) {
-          const imageIds = vinSources.map((v: any) => v.source_image_id).filter(Boolean) as string[];
-          const imageUrlById = new Map<string, string>();
-          if (imageIds.length > 0) {
-            const { data: images } = await supabase
-              .from('vehicle_images')
-              .select('id, thumbnail_url, medium_url, image_url')
-              .in('id', imageIds);
-            images?.forEach((img: any) => {
-              imageUrlById.set(img.id, img.thumbnail_url || img.medium_url || img.image_url);
-            });
-          }
-
-          vinSources.forEach((v: any) => {
-            const imgUrl = v.source_image_id ? imageUrlById.get(v.source_image_id) : undefined;
-            sources.push({
-              validation_source: v.source_type || 'unknown_source',
-              confidence_score: typeof v.confidence_score === 'number' ? v.confidence_score : 0,
-              source_url: imgUrl || v.source_url || undefined,
-              notes: [
-                v.extraction_method ? `Method: ${v.extraction_method}` : null,
-                v.verification_notes ? v.verification_notes : null
-              ].filter(Boolean).join(' • '),
-              created_at: v.created_at
-            });
-          });
-        }
-      }
+      // 0. VIN-specific proofs feature unavailable (data_validation_sources table not deployed)
 
       // 1. Get ownership verifications (title, registration uploads)
       const { data: ownershipDocs } = await supabase

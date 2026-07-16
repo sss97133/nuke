@@ -10,6 +10,11 @@ const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/veh
 // WiringQueryContextBar removed — wiring canvas replaced with data view
 const PartsQuoteGenerator = React.lazy(() => import('../../components/PartsQuoteGenerator').then(m => ({ default: m.PartsQuoteGenerator })));
 const InvestmentLedger = React.lazy(() => import('./InvestmentLedger'));
+const BuildLedger = React.lazy(() => import('./BuildLedger'));
+const AgentChat = React.lazy(() => import('../../components/agent/AgentChat'));
+const WorthEngineCard = React.lazy(() => import('./WorthEngineCard'));
+const PhotoAuthenticationCard = React.lazy(() => import('./PhotoAuthenticationCard'));
+const VehicleFindingsCard = React.lazy(() => import('./VehicleFindingsCard'));
 const BuyerQuestionPreview = React.lazy(() => import('../../components/vehicle/BuyerQuestionPreview'));
 const ExternalListingCard = React.lazy(() => import('../../components/vehicle/ExternalListingCard'));
 const VehicleReferenceLibrary = React.lazy(() => import('../../components/vehicle/VehicleReferenceLibrary'));
@@ -22,12 +27,16 @@ const AnalysisSignalsSection = React.lazy(() => import('./AnalysisSignalsSection
 const VehicleIntelligencePanel = React.lazy(() => import('./VehicleIntelligencePanel'));
 const VehicleScoresWidget = React.lazy(() => import('./VehicleScoresWidget'));
 const AuctionReadinessPanel = React.lazy(() => import('./AuctionReadinessPanel'));
+const ChannelSwitchboardCard = React.lazy(() => import('./ChannelSwitchboardCard'));
+const VenueSkinPreviewCard = React.lazy(() => import('./VenueSkinPreviewCard'));
 const ColumnDivider = React.lazy(() => import('./ColumnDivider'));
 const BuildManifestPanel = React.lazy(() => import('./BuildManifestPanel'));
 const VehicleListingDetailsCard = React.lazy(() => import('../../components/vehicle/VehicleListingDetailsCard'));
 const SimilarSalesSection = React.lazy(() => import('../../components/vehicle/SimilarSalesSection').then(m => ({ default: m.SimilarSalesSection })));
 const PriceHistoryChart = React.lazy(() => import('../../components/vehicle/PriceHistoryChart'));
 const ObservationTimeline = React.lazy(() => import('./ObservationTimeline'));
+const VehicleAgentChat = React.lazy(() => import('./VehicleAgentChat'));
+const InventoryWidgetLink = React.lazy(() => import('./InventoryWidgetLink'));
 // BuildLog removed — work sessions now surface via BarcodeTimeline Day Card popups
 
 
@@ -150,19 +159,14 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
     }
   };
 
-  // Use CSS variables for sticky positioning
-  const paneHeight = `calc(100vh - var(--vp-sticky-top))`;
-
+  // Sticky position/top/height live in CSS only (.vp-columns in
+  // vehicle-profile.css). Inlining them here overrode the <=768px media
+  // query that unsticks the columns, trapping the whole profile inside a
+  // viewport-height sticky box on mobile — the page became unscrollable
+  // with ~9000px of content overflowing a ~550px pane (fixed 2026-06-11).
   return (
     <div>
-      <div
-        className="vp-columns"
-        style={{
-          position: 'sticky',
-          top: 'var(--vp-sticky-top)',
-          height: paneHeight,
-        }}
-      >
+      <div className="vp-columns">
         {/* LEFT COLUMN */}
         <div
           className="vp-col-left vehicle-profile-left-column"
@@ -172,6 +176,14 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
             <React.Suspense fallback={null}>
               <WorkMemorySection vehicleId={vehicle.id} permissions={permissions} />
+            </React.Suspense>
+          )}
+
+          {/* Vehicle Agent — interactive Claude over this vehicle's data; can record
+              observations on the owner's behalf (provenance-stamped, reversible). */}
+          {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
+            <React.Suspense fallback={null}>
+              <VehicleAgentChat vehicleId={vehicle.id} />
             </React.Suspense>
           )}
 
@@ -214,6 +226,36 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
               <InvestmentLedger vehicleId={vehicle.id} vehicle={vehicle} isOwnerView />
             </React.Suspense>
           )}
+
+          {/* Build Ledger — evidence-tiered financial audit draft (owner-scoped via get_vehicle_build_ledger RPC) */}
+          {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
+            <React.Suspense fallback={null}>
+              <BuildLedger vehicleId={vehicle.id} />
+            </React.Suspense>
+          )}
+
+          {/* Ask — the in-app agent. Answers the ledger's pending owner questions and
+              signs them off through ingest-observation. Same owner gate as the ledger. */}
+          {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
+            <React.Suspense fallback={null}>
+              <AgentChat vehicleId={vehicle.id} />
+            </React.Suspense>
+          )}
+
+          {/* Worth Engine — 3-method labor substrate triangulation */}
+          <React.Suspense fallback={null}>
+            <WorthEngineCard vehicleId={vehicle.id} />
+          </React.Suspense>
+
+          {/* Photo Authentication — EXIF chain of custody rollup */}
+          <React.Suspense fallback={null}>
+            <PhotoAuthenticationCard vehicleId={vehicle.id} />
+          </React.Suspense>
+
+          {/* Image-Analysis Findings — BYOK identity / powertrain / provenance / evidence rollup */}
+          <React.Suspense fallback={null}>
+            <VehicleFindingsCard vehicleId={vehicle.id} />
+          </React.Suspense>
 
           {/* Description */}
           <VehicleDescriptionCard
@@ -264,7 +306,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
 
           {/* Observation History — all observations for this vehicle, chronological */}
           {observationCount > 0 && (
-            <CollapsibleWidget variant="profile" title="Observation History" defaultCollapsed={true}>
+            <CollapsibleWidget variant="profile" title="Observation History" defaultCollapsed={observationCount > 50}>
               <React.Suspense fallback={null}>
                 <ObservationTimeline />
               </React.Suspense>
@@ -326,6 +368,12 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
               <ExternalListingCard vehicleId={vehicle.id} />
             </React.Suspense>
           </CollapsibleWidget>
+
+          {/* Inventory — parts owned, install evidence pending. Public surface
+              of the lifecycle_status='purchased' substrate slice. */}
+          <React.Suspense fallback={null}>
+            <InventoryWidgetLink vehicleId={vehicle.id} />
+          </React.Suspense>
 
           {/* Owner-only tools */}
           {(isRowOwner || isVerifiedOwner) && (
@@ -485,6 +533,16 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {/* Auction Readiness */}
           <React.Suspense fallback={null}>
             <AuctionReadinessPanel />
+          </React.Suspense>
+
+          {/* Sales Channels — readiness gate + one-toggle submission per outlet */}
+          <React.Suspense fallback={null}>
+            <ChannelSwitchboardCard />
+          </React.Suspense>
+
+          {/* Preview as Venue — render the profile in a venue's real design language */}
+          <React.Suspense fallback={null}>
+            <VenueSkinPreviewCard />
           </React.Suspense>
 
           {/* Videos — VehicleVideoSection self-guards: returns null when no videos */}

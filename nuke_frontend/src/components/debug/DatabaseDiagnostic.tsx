@@ -10,8 +10,10 @@ const DatabaseDiagnostic: React.FC = () => {
     const diagnostics: any = {};
 
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      // Use getSession() instead of getUser() to avoid Web Locks API contention
+      // on sb-*-auth-token (cause of 2026-05-24 garage hang). See lib/supabase.ts.
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) {
         diagnostics.error = 'No authenticated user';
         setResults(diagnostics);

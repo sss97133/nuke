@@ -1,0 +1,287 @@
+[
+  {
+    "uuid_or_filename": "7fcdb521-6a9e-4c1b-88ad-bd2a28cf2bd2",
+    "observed_at": "2025-11-01T19:54:27.205194+00:00",
+    "kind": "condition",
+    "summary": "1973 GMC K5 Jimmy front 3/4 view inside shop bay; chrome bumper and grille, white removable top, lifted on white steel wheels with M/T tires; primer/spray-pattern on hood and door indicating bodywork in progress",
+    "extracted_data": {
+      "work_type": "bodywork_in_progress",
+      "components_visible": ["1973-only chrome grille with round dual headlights", "GMC badge", "chrome front bumper", "white removable hardtop", "white steel wheels", "Mickey Thompson-style M/T tires", "amber turn signals", "primer-spotted hood and door"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": "black exterior with primer/paint spots; white top; AMERICAN flag and shop fluorescents in background"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "efb82e1c-d75c-481b-959f-485cb37db678",
+    "observed_at": "2025-11-01T19:54:33.855447+00:00",
+    "kind": "sighting",
+    "summary": "NOT THE 1973 K5. Rear 3/4 of a late-squarebody (1981-1991) GMC Jimmy in dark blue with heavy paint stripping/sanding; AZ plate B6A 7WP visible; chrome bumper, roof rack with light bar; mounted on white steel wheels with M/T tires",
+    "extracted_data": {
+      "work_type": "paint_stripping",
+      "components_visible": ["GMC tailgate plate", "late-style single-rectangle taillights", "chrome rear bumper", "Arizona license plate B6A 7WP", "factory-style roof rack with light bar mount", "white steel wheels"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": "dark blue with extensive paint stripping showing red oxide primer and bare metal"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "e14e5fb2-feae-4823-95d8-622a97d4448a",
+    "observed_at": "2025-11-01T19:54:36.378694+00:00",
+    "kind": "sighting",
+    "summary": "NOT THE 1973 K5. Rear quarter view of same late-squarebody blue GMC Jimmy outside in lot; AZ plate B6A 7WP; lifted on white steel wheels",
+    "extracted_data": {
+      "work_type": "paint_stripping",
+      "components_visible": ["GMC rear panel badge", "single-rectangle taillights", "factory roof rack with light bar", "chrome rear bumper"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": "dark blue, paint stripped down to multiple substrate layers"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "5bde1261-1cb6-4989-b472-fd29bda1121e",
+    "observed_at": "2025-11-01T19:54:38.978108+00:00",
+    "kind": "sighting",
+    "summary": "NOT THE 1973 K5. Driver-side full profile of late-squarebody (1981-1991) GMC Jimmy with single-rectangle headlight grille; heavy paint stripping all over body panels exposing previous red/orange paint and primer",
+    "extracted_data": {
+      "work_type": "full_body_paint_strip",
+      "components_visible": ["square-style single-rectangle headlights", "egg-crate grille (likely 81-87)", "GMC front badge", "chrome bumpers", "mirror with single arm", "white removable hardtop"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": "dark blue outer over previous red/orange and white primer layers"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "db5416a0-ee4d-47bc-8567-8bfb3506b05a",
+    "observed_at": "2025-11-01T19:54:43.538732+00:00",
+    "kind": "sighting",
+    "summary": "NOT THE 1973 K5. Passenger-side profile of same late-squarebody blue GMC Jimmy; severe paint stripping across whole side; lifted on white wheels",
+    "extracted_data": {
+      "work_type": "full_body_paint_strip",
+      "components_visible": ["passenger door", "fuel filler door cap", "chrome bumpers", "white hardtop"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": "dark blue exterior over heavy primer/bare-metal patches"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "24b0121f-65dd-4d99-a8ae-72dd18cafb86",
+    "observed_at": "2025-11-01T19:54:46.791064+00:00",
+    "kind": "condition",
+    "summary": "Close-up of rear corner of the late-squarebody blue Jimmy showing fuel filler, taillight, and extensive surface rust at rocker and wheel arch; deep pitting and prior paint history (red and white layers) exposed",
+    "extracted_data": {
+      "work_type": "paint_strip_rust_assessment",
+      "components_visible": ["fuel filler door with chrome cap", "single-rectangle taillight assembly", "rear quarter panel"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": "dark blue current; red and white prior; heavy bare-metal/rust at rocker"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "dea4ee48-b7b0-44c1-85cb-254101c9a8d1",
+    "observed_at": "2025-11-01T19:54:49.256024+00:00",
+    "kind": "condition",
+    "summary": "Driver-side front fender of late-squarebody Jimmy with rectangular headlight bezel removed (empty cavity), GMC fender badge visible, heavy paint strip across fender, door, and rocker; M/T mud tire visible on white wheel",
+    "extracted_data": {
+      "work_type": "headlight_removal_and_paint_strip",
+      "components_visible": ["GMC fender badge with displacement/model emblem", "empty headlight bucket (bezel and housing removed)", "amber side marker light", "front fender flare line", "Mud-Terrain M/T tire on white steel wheel"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": "dark blue with prior orange and white paint layers exposed"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "4ccf35fe-63f3-4bbe-920c-527048a28d47",
+    "observed_at": "2025-11-01T19:54:53.418903+00:00",
+    "kind": "condition",
+    "summary": "Close-up of rocker panel and rear quarter of the late-squarebody Jimmy showing dramatic paint-history layers: black outer, orange/red middle, primer base; BFG-style tire visible at left",
+    "extracted_data": {
+      "work_type": "paint_history_documentation",
+      "components_visible": ["rocker panel", "rear quarter lower", "fender flare lip"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": "dark blue current, vivid orange/red previous, white primer base"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "07026721-33c9-4607-b403-f2acb9eb47a7",
+    "observed_at": "2025-11-01T19:54:56.155593+00:00",
+    "kind": "condition",
+    "summary": "Driver-side rear quarter/wheel-arch close-up of late-squarebody Jimmy showing major rust-through at bottom of quarter behind wheel; single exhaust tip exiting under rear bumper; bare-metal sanding pattern",
+    "extracted_data": {
+      "work_type": "rust_repair_assessment",
+      "components_visible": ["rear quarter panel with rust hole", "single exhaust tailpipe with chrome tip", "chrome rear bumper", "taillight housing edge"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": "bare metal with surface rust, dark blue and primer remnants"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "04e58cfb-7525-4ab7-9f73-47f7402fc94b",
+    "observed_at": "2025-11-01T19:54:58.751839+00:00",
+    "kind": "condition",
+    "summary": "Interior of cargo bay of squarebody Jimmy looking forward: original ribbed bed floor with red/oxide primer and black topcoat remnants; rear wheel wells visible; plastic interior trim piece sitting loose on floor; rear seat removed",
+    "extracted_data": {
+      "work_type": "interior_strip",
+      "components_visible": ["ribbed steel bed floor with raised ribs", "wheel arch covers (originally painted black)", "rear bench trim panel sitting loose", "rear gate inner panel with latch hardware", "rear bumper interior visible through window"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": "red oxide primer with black topcoat overspray on bed floor; bare metal at wheel arches"
+    },
+    "confidence": "medium"
+  },
+  {
+    "uuid_or_filename": "1f01f359-fc7e-458a-bc8b-260c60694dc9",
+    "observed_at": "2025-11-01T19:55:03.364848+00:00",
+    "kind": "condition",
+    "summary": "View of squarebody Jimmy with rear cap/top removed showing bed area, fuel filler, and rear quarter inner panel; shows original GM teal/green factory primer on inner panels under multiple paint layers; surface rust",
+    "extracted_data": {
+      "work_type": "top_removed_inspection",
+      "components_visible": ["fuel filler neck (cap removed)", "bed inner panels", "wheel arch", "rocker panel from inside", "M/T tire on white steel wheel"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": "bare metal, red, black, white, and GM factory teal primer all visible"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "a15ce9e4-cc13-48a5-9a45-fe00fc94905d",
+    "observed_at": "2025-11-01T19:55:06.008126+00:00",
+    "kind": "work_record",
+    "summary": "1973 GMC K5 engine bay shot: small-block Chevy (likely original 350) with Edelbrock-style 4bbl carburetor on aluminum intake; blue spark plug wires; chrome air-filter base; battery on driver-side with red cable; vacuum lines and wiring loom visible; engine compartment is dirty/unrestored",
+    "extracted_data": {
+      "work_type": "engine_inspection",
+      "components_visible": ["small-block Chevy V8 (likely 350)", "aluminum 4-barrel intake manifold (looks Edelbrock Performer-style)", "4-barrel carburetor (likely Edelbrock 1406/1407-class)", "chrome air cleaner base", "blue silicone spark plug wires", "factory hood hinges (orange/red oxide painted)", "battery in driver-side tray", "vacuum brake booster"],
+      "vendor": "Edelbrock (probable, by visual)",
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": "engine block painted dark (black/dark green), aluminum intake, blue wires, orange hinges, dirty firewall"
+    },
+    "confidence": "medium"
+  },
+  {
+    "uuid_or_filename": "80084de9-0c03-4a61-9011-f305859de851",
+    "observed_at": "2025-11-01T19:55:08.412003+00:00",
+    "kind": "media",
+    "summary": "Interior windshield view from a modern vehicle (white dash, modern wipers) driving on an Arizona-style desert interstate; semis ahead, mesa formations on horizon. Travel context, likely en route to pick up the K5.",
+    "extracted_data": {
+      "work_type": "transport_in_progress",
+      "components_visible": ["modern vehicle white dashboard and wiper", "desert mesa landscape", "interstate highway"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": null
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "54f5a51b-630e-4462-8492-de7c0860cc39",
+    "observed_at": "2025-11-01T19:55:13.102647+00:00",
+    "kind": "work_record",
+    "summary": "1973 GMC K5 Jimmy loaded on aluminum dual-axle car trailer, evening light, pine tree in background; black body, chrome bumpers/grille intact, 1973-only round dual headlights, dirty/dusty but complete; missing front skid pan, lifted on aluminum 5-spoke wheels with M/T tires. This is the acquisition/hauling shot.",
+    "extracted_data": {
+      "work_type": "acquisition_transport",
+      "components_visible": ["1973-only chrome egg-crate grille with round dual headlights", "GMC front badge", "chrome bumper", "amber turn signals", "factory side mirror", "aluminum 5-spoke wheels", "aggressive M/T tires", "white removable hardtop", "aluminum dual-axle equipment trailer"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": "matte/dirty black exterior with white removable top"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "5321b80e-ff48-4b2c-af9a-4d9af9dc0da2",
+    "observed_at": "2025-11-01T19:55:15.773434+00:00",
+    "kind": "work_record",
+    "summary": "Selfie-angle from hauling vehicle (white SUV) towing the 1973 GMC K5 on aluminum trailer behind; man in red hat in driver seat; desert sky, evening; clear acquisition-day context",
+    "extracted_data": {
+      "work_type": "acquisition_transport",
+      "components_visible": ["white tow vehicle interior", "dual-axle aluminum trailer", "1973 GMC K5 on trailer", "1973-only chrome grille visible", "M/T tires"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": "black K5 with white top"
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "1ed5eae3-510a-4ea8-9320-3d9fca3ef08a",
+    "observed_at": "2025-11-01T19:55:18.163118+00:00",
+    "kind": "media",
+    "summary": "Travel/route context: entering Jerome, AZ (sign visible: 'ENTERING Jerome / ELEVATION 5246 / FOUNDED 1876'). Likely from the K5 acquisition/hauling trip given the time clustering with photos 013/014/015.",
+    "extracted_data": {
+      "work_type": "transport_in_progress",
+      "components_visible": ["Jerome AZ welcome sign", "two-lane mountain road", "modern vehicle dash and wipers"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": null
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "ae920d37-0fb5-483e-8925-15d34058fb31",
+    "observed_at": "2025-11-01T19:55:22.272364+00:00",
+    "kind": "media",
+    "summary": "Window view of a red Chevy Tahoe/Suburban parked in front of a historic two-story HOTEL with white sheet/ghost decorations on the balcony (suggests October Halloween context); 'GHOST CITY INN' partial sign visible bottom-left. Jerome, AZ landmark.",
+    "extracted_data": {
+      "work_type": "travel_stop",
+      "components_visible": ["historic hotel facade with 'HOTEL' sign", "Ghost City Inn sign", "modern red Chevy Tahoe/Suburban", "Halloween ghost decorations on balcony"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": null
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "505b3b27-c937-4aa4-ac7b-241b1e1b6cc7",
+    "observed_at": "2025-11-01T19:55:25.623943+00:00",
+    "kind": "media",
+    "summary": "Cornish Pasty Co. restaurant in Jerome AZ (Spanish-tile-roof tan stucco building); travel-stop photo from the K5 hauling trip; view from inside a vehicle through windshield",
+    "extracted_data": {
+      "work_type": "travel_stop",
+      "components_visible": ["Cornish Pasty Co. signage on stucco building", "Spanish tile roof", "stop sign", "two-lane street"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": null
+    },
+    "confidence": "high"
+  },
+  {
+    "uuid_or_filename": "077f4f46-fee7-4dc3-b7b5-5473318f7ddc",
+    "observed_at": "2025-11-01T19:55:29.585721+00:00",
+    "kind": "media",
+    "summary": "Mountain overlook from Jerome AZ looking out over Verde Valley with rainstorm visible in distance; metal-roof house in foreground, dark SUV parked at curb. Travel-trip context.",
+    "extracted_data": {
+      "work_type": "travel_stop",
+      "components_visible": ["Verde Valley overlook", "rainstorm in distance", "metal-roof building in foreground", "dark SUV parked roadside"],
+      "vendor": null,
+      "amount_usd": null,
+      "part_numbers": [],
+      "color_observed": null
+    },
+    "confidence": "high"
+  }
+]

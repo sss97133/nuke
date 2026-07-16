@@ -1,0 +1,56 @@
+[
+  {
+    "image_id": "3b568190-b0af-460a-b152-0edacf1427ec",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Close-up of blue square-body cab interior corner showing factory body color, wiring harness with red/white twisted pair and black connector. Consistent with subject K2500 interior teardown/wiring work."
+  },
+  {
+    "image_id": "3620d5bf-de12-46ab-80ab-d2702a475fc0",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body GM truck cab interior with carpet removed, manual transmission shifter boot, exposed factory dash harness, blue body color matching subject. Classic K-series floor pan and transmission tunnel geometry."
+  },
+  {
+    "image_id": "a64d7381-d6e0-4165-b890-e5d63305f6b8",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body GM cab floor passenger side with factory dimmer switch, brake pedal pad, dash harness pigtails. Blue interior matches subject K2500. Carpet pulled for restoration work."
+  },
+  {
+    "image_id": "20d97e77-4721-4be1-91f6-6983c42a8bed",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body driver door sill / floor pan with retractor seatbelt and rocker panel detail. Blue body color and floor stamping consistent with subject K2500."
+  },
+  {
+    "image_id": "38aa1f8e-84ed-4df0-a83a-2f3e41529e7f",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Wide shot through open driver door of square-body GM cab interior showing steering wheel, dash, floor, transmission tunnel, shop environment. Blue exterior/interior matches subject K2500."
+  },
+  {
+    "image_id": "5d48d59b-4e90-46f8-a5cb-9165ca3f6d2c",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Shop scene featuring blue lifted square-body GM pickup with chrome wheels matching subject K2500 (hood up for service). Red square-body Blazer and silver hot rod also present but subject vehicle is clearly framed. Default approval for square-body content."
+  },
+  {
+    "image_id": "28c39742-44cd-43c7-a6fd-408bfeef09a7",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Blue square-body GM pickup rear three-quarter (image stored rotated) showing lifted suspension, chrome wheels, off-road A/T tires, two-tone paint break. Matches subject 1983 K2500 description."
+  },
+  {
+    "image_id": "0d4f08da-a6b1-4d68-91cf-843b327a1d71",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Blue square-body GM truck front view (image rotated) with hood open exposing radiator core support and front axle. Lifted 4WD on aggressive tires. Matches subject K2500."
+  },
+  {
+    "image_id": "273e922a-f426-4c5d-be99-8410ab4130e1",
+    "verdict": "rejected_personal",
+    "confidence": 0.85,
+    "reasoning": "Exterior scenery shot: sky, clouds, warehouse rooflines and shade canopy. No vehicle visible. Lower portion of frame is gray-masked. Falls under rejected_personal (scenery)."
+  }
+]

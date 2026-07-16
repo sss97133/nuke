@@ -38,6 +38,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { authenticateRequest } from "../_shared/apiKeyAuth.ts";
+import { cloudAnalyze } from "../_shared/visionFallback.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -135,9 +136,9 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
 
     if (path === "classify") {
-      return await handleClassify(body, t0);
+      return await handleClassify(body, supabase, userId, t0);
     } else if (path === "analyze") {
-      return await handleAnalyze(body, supabase, t0);
+      return await handleAnalyze(body, supabase, userId, t0);
     } else if (path === "batch") {
       return await handleBatch(body, t0);
     } else {
@@ -156,7 +157,7 @@ Deno.serve(async (req) => {
 
 // ── /classify ─────────────────────────────────────────────────────────────
 
-async function handleClassify(body: any, t0: number): Promise<Response> {
+async function handleClassify(body: any, supabase: any, userId: string | null, t0: number): Promise<Response> {
   const { image_url, top_k = 5 } = body;
   if (!image_url) return json({ error: "Missing image_url" }, 400);
 
@@ -177,6 +178,25 @@ async function handleClassify(body: any, t0: number): Promise<Response> {
     });
   }
 
+  // YONO down → BYOK cloud fallback (the caller's connected provider; they pay).
+  const fb = await cloudAnalyze(supabase, userId, image_url);
+  if (fb) {
+    return json({
+      make: fb.make,
+      family: null,
+      family_confidence: null,
+      confidence: fb.confidence,
+      top5: [],
+      is_vehicle: fb.is_vehicle,
+      source: "cloud_fallback",
+      cloud_model: `${fb.provider}/${fb.model}`,
+      cost_bearer: fb.keySource, // 'user' = BYOK (they paid) | 'system' = Nuke bootstrap pool
+      ms: fb.ms,
+      cost_usd: null,
+      elapsed_ms: Date.now() - t0,
+    });
+  }
+
   return json({
     make: null,
     family: null,
@@ -186,7 +206,7 @@ async function handleClassify(body: any, t0: number): Promise<Response> {
     is_vehicle: null,
     source: "unavailable",
     cost_usd: 0,
-    error: "YONO vision service is temporarily unavailable. Retry later.",
+    error: "Vision unavailable: YONO sidecar is down and you have no connected AI provider. Connect your Claude/ChatGPT/Gemini subscription to enable analysis.",
     elapsed_ms: Date.now() - t0,
   }, 503);
 }
@@ -198,6 +218,7 @@ async function handleClassify(body: any, t0: number): Promise<Response> {
 async function handleAnalyze(
   body: any,
   supabase: any,
+  userId: string | null,
   t0: number
 ): Promise<Response> {
   const { image_url, include_comps = false } = body;
@@ -213,6 +234,42 @@ async function handleAnalyze(
   let comps: unknown[] | null = null;
   if (include_comps && classifyResult?.make && classifyResult.is_vehicle) {
     comps = await fetchComps(classifyResult.make, supabase);
+  }
+
+  // Both YONO calls failed → BYOK cloud fallback (the caller's connected provider) before giving up.
+  if (!classifyResult && !analyzeResult) {
+    const fb = await cloudAnalyze(supabase, userId, image_url);
+    if (fb) {
+      let fbComps: unknown[] | null = null;
+      if (include_comps && fb.make && fb.is_vehicle) fbComps = await fetchComps(fb.make, supabase);
+      return json({
+        make: fb.make,
+        family: null,
+        family_confidence: null,
+        confidence: fb.confidence,
+        top5: [],
+        is_vehicle: fb.is_vehicle,
+        vehicle_zone: fb.vehicle_zone,
+        zone_confidence: null,
+        zone_source: "cloud_fallback",
+        condition_score: fb.condition_score,
+        damage_flags: fb.damage_flags,
+        modification_flags: fb.modification_flags,
+        interior_quality: null,
+        photo_quality: fb.photo_quality,
+        photo_type: null,
+        comps: fbComps,
+        source: "cloud_fallback",
+        cost_bearer: fb.keySource, // 'user' = BYOK | 'system' = Nuke bootstrap pool
+        classify_model: `${fb.provider}/${fb.model}`,
+        analyze_model: `${fb.provider}/${fb.model}`,
+        classify_ms: fb.ms,
+        analyze_ms: fb.ms,
+        cost_usd: null,
+        elapsed_ms: Date.now() - t0,
+        image_url,
+      });
+    }
   }
 
   // Merge classify + analyze results into unified response

@@ -67,6 +67,7 @@ export async function getTransactionByToken(
   const column = userType === 'buyer' ? 'buyer_sign_token' : 'seller_sign_token';
   
   const { data, error } = await supabase
+    // TODO(ghost-ref 2026-07-12): vehicle_transactions does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
     .from('vehicle_transactions')
     .select(`
       *,
@@ -77,6 +78,7 @@ export async function getTransactionByToken(
     .eq(column, token)
     .single();
 
+  // Missing table surfaces as an error here; return null so the signing flow degrades gracefully.
   if (error || !data) {
     return null;
   }
@@ -95,9 +97,11 @@ export async function submitSignature(
 ): Promise<{ success: boolean; fullySigned?: boolean }> {
   // Get transaction first
   const transaction = await getTransactionByToken(token, userType);
-  
+
+  // TODO(ghost-ref 2026-07-12): vehicle_transactions does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+  // getTransactionByToken can no longer resolve (table missing); no-op instead of throwing so the caller doesn't crash.
   if (!transaction) {
-    throw new Error('Transaction not found');
+    return { success: false };
   }
 
   const updates: any = {
@@ -110,6 +114,7 @@ export async function submitSignature(
   }
 
   const { error } = await supabase
+    // TODO(ghost-ref 2026-07-12): vehicle_transactions does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
     .from('vehicle_transactions')
     .update(updates)
     .eq('id', transaction.id);
@@ -157,6 +162,7 @@ export async function getUserTransactions(
   userId: string
 ): Promise<VehicleTransaction[]> {
   const { data, error } = await supabase
+    // TODO(ghost-ref 2026-07-12): vehicle_transactions does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
     .from('vehicle_transactions')
     .select(`
       *,
@@ -167,8 +173,9 @@ export async function getUserTransactions(
     .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
     .order('created_at', { ascending: false });
 
+  // Missing table surfaces as an error; return empty list so the UI renders instead of crashing.
   if (error) {
-    throw error;
+    return [];
   }
 
   return (data as VehicleTransaction[]) || [];
@@ -181,15 +188,17 @@ export async function markFundsReceived(
   transactionId: string
 ): Promise<void> {
   const { error } = await supabase
+    // TODO(ghost-ref 2026-07-12): vehicle_transactions does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
     .from('vehicle_transactions')
-    .update({ 
+    .update({
       status: 'funds_transferred',
       metadata: { funds_received_at: new Date().toISOString() }
     })
     .eq('id', transactionId);
 
+  // Missing table surfaces as an error; swallow it so the caller flow doesn't crash.
   if (error) {
-    throw error;
+    return;
   }
 }
 
@@ -200,13 +209,15 @@ export async function completeTransaction(
   transactionId: string
 ): Promise<void> {
   const transaction = await supabase
+    // TODO(ghost-ref 2026-07-12): vehicle_transactions does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
     .from('vehicle_transactions')
     .select('*, vehicle:vehicles(*)')
     .eq('id', transactionId)
     .single();
 
+  // Missing table means no data; no-op instead of throwing so the caller flow doesn't crash.
   if (!transaction.data) {
-    throw new Error('Transaction not found');
+    return;
   }
 
   // Transfer vehicle ownership
@@ -217,6 +228,7 @@ export async function completeTransaction(
 
   // Mark transaction complete
   await supabase
+    // TODO(ghost-ref 2026-07-12): vehicle_transactions does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
     .from('vehicle_transactions')
     .update({ status: 'completed' })
     .eq('id', transactionId);

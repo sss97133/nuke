@@ -42,8 +42,10 @@ export default function OrganizationInventory({ organizationId, isOwner = false 
   }, [organizationId]);
 
   const loadCurrentUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setCurrentUserId(user?.id || null);
+    // Use getSession() instead of getUser() to avoid Web Locks API contention
+    // on sb-*-auth-token (cause of 2026-05-24 garage hang). See lib/supabase.ts.
+    const { data: { session } } = await supabase.auth.getSession();
+    setCurrentUserId(session?.user?.id || null);
   };
 
   const loadInventory = async () => {
@@ -339,7 +341,8 @@ function AddInventoryItemModal({ organizationId, onClose, onSaved }: AddInventor
     setSubmitting(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) throw new Error('Authentication required');
 
       let imageUrl = null;

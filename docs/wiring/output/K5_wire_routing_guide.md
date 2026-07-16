@@ -280,7 +280,7 @@ Wiring to the rear does NOT need to cross a cab-to-bed gap (as on pickup trucks)
 - **Hole size:** approximately 1-1/4" diameter hole in both the cab pillar and the door shell
 - **Grommet:** Install a rubber grommet in each hole for extra protection. The wires pass through the grommet, through the flexible boot, and into the door.
 - Classic Parts PN# 18-860 (1977-87 Power Window/Door Lock Wire Boot) is the correct replacement part
-- **CRITICAL:** This is a flex point. The door opens and closes thousands of times. Use wires rated for flexing (TXL is good). Leave sufficient service loop (8") inside the door so the wires are not taut when the door is fully open.
+- **CRITICAL:** This is a flex point. The door opens and closes thousands of times. Tefzel M22759/32 has excellent flex life — that's the spec'd wire. Leave sufficient service loop (8") inside the door so the wires are not taut when the door is fully open.
 
 #### Step 4: Inside the Door
 - Once inside the door, the wires route along the inner door shell

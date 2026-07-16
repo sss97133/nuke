@@ -6,7 +6,7 @@ set -uo pipefail
 cd /Users/skylar/nuke
 
 PGARGS="-h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -A"
-export PGPASSWORD="RbzKq32A0uhqvJMQ"
+export PGPASSWORD="${SUPABASE_DB_PASSWORD}"
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M")
 ISSUES=0
 
@@ -27,6 +27,17 @@ NULL_STATUS=$(run_sql "SELECT count(*) FROM vehicles WHERE status IS NULL;")
 [ "${BAD_YEARS:-0}" -gt 0 ] 2>/dev/null && { echo "- **WARNING**: $BAD_YEARS vehicles with invalid years"; ISSUES=$((ISSUES+1)); } || echo "- Bad years: 0"
 [ "${DUPE_VINS:-0}" -gt 5 ] 2>/dev/null && { echo "- **WARNING**: $DUPE_VINS duplicate VIN groups"; ISSUES=$((ISSUES+1)); } || echo "- Duplicate VINs: ${DUPE_VINS:-0}"
 [ "${NULL_STATUS:-0}" -gt 0 ] 2>/dev/null && { echo "- **WARNING**: $NULL_STATUS vehicles with NULL status"; ISSUES=$((ISSUES+1)); } || echo "- NULL status vehicles: 0"
+echo ""
+
+# 1b. Price / Estimate Trust (guards the 2026-06-16 data-trust fix from regressing)
+echo "### Price / Estimate Trust"
+# Financing-artifact asks: P1 gate (import-fb-marketplace) + P2 cleanup should keep this ~0.
+SUB1K_ASKS=$(run_sql "SELECT count(*) FROM vehicles WHERE asking_price IS NOT NULL AND asking_price < 1000;")
+# Circular estimates created recently: P1 removed self_price_fallback — new ones mean a regression.
+CIRCULAR_NEW=$(run_sql "SELECT count(*) FROM nuke_estimates WHERE comp_method = 'self_price_fallback' AND calculated_at > now() - interval '2 days';")
+
+[ "${SUB1K_ASKS:-0}" -gt 50 ] 2>/dev/null && { echo "- **WARNING**: $SUB1K_ASKS sub-\$1k asking prices (financing artifacts leaking past the price gate)"; ISSUES=$((ISSUES+1)); } || echo "- Sub-\$1k asks: ${SUB1K_ASKS:-0}"
+[ "${CIRCULAR_NEW:-0}" -gt 0 ] 2>/dev/null && { echo "- **WARNING**: $CIRCULAR_NEW new self_price_fallback estimates (circular valuation regressed — check compute-vehicle-valuation)"; ISSUES=$((ISSUES+1)); } || echo "- New circular estimates (2d): 0"
 echo ""
 
 # 2. Field Fill Rates

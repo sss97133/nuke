@@ -81,6 +81,87 @@ function detectInputType(query: string): 'vin' | 'url' | 'year' | 'text' | 'empt
   return 'text';
 }
 
+interface CohortTarget {
+  year: number;
+  make: string;
+  model: string;
+}
+
+/**
+ * Parse a query into a year-make-model cohort target ("1969 Chevrolet Camaro").
+ * Mirrors the frontend heuristic in nuke_frontend/src/hooks/useSearchPage.ts.
+ * Requires a leading 4-digit year (1885–current+1), a make token, and at least
+ * one model token. Returns null when the query isn't a clean YMM — we never
+ * guess a cohort from a partial query.
+ */
+function parseCohort(q: string): CohortTarget | null {
+  const t = q.trim();
+  const m = t.match(/^(1[89]\d{2}|20\d{2})\s+([A-Za-z][A-Za-z-]*)\s+(.+?)\s*$/);
+  if (!m) return null;
+  const year = parseInt(m[1], 10);
+  if (year < 1885 || year > new Date().getFullYear() + 1) return null;
+  const make = m[2];
+  const model = m[3].trim();
+  if (!model) return null;
+  return { year, make, model };
+}
+
+/**
+ * Register a cohort subject and build the cohort_card for the response.
+ * Never throws — a cohort-registration failure must not break search.
+ */
+/**
+ * Resolve a "year + model" query (no explicit make, e.g. "1966 mustang") into a
+ * cohort by looking the model up in canonical_models (by canonical name or alias)
+ * and borrowing its make. This is how most people actually search — make omitted.
+ * Returns null if the model can't be resolved to a single canonical make.
+ */
+async function resolveCohortFromModel(supabase: any, query: string): Promise<CohortTarget | null> {
+  const m = query.trim().match(/^(1[89]\d{2}|20\d{2})\s+(.+?)\s*$/);
+  if (!m) return null;
+  const year = parseInt(m[1], 10);
+  if (year < 1885 || year > new Date().getFullYear() + 1) return null;
+  const rest = m[2].trim();
+  if (rest.length < 2) return null;
+  // Exact-ish canonical model match first, then alias membership.
+  let { data } = await supabase
+    .from('canonical_models').select('make, canonical_model').ilike('canonical_model', rest).limit(1);
+  if (!data?.length) {
+    ({ data } = await supabase
+      .from('canonical_models').select('make, canonical_model').contains('aliases', [rest.toLowerCase()]).limit(1));
+  }
+  if (!data?.length) return null;
+  return { year, make: data[0].make, model: data[0].canonical_model };
+}
+
+async function buildCohortCard(supabase: any, query: string): Promise<any | undefined> {
+  const c = parseCohort(query) ?? await resolveCohortFromModel(supabase, query);
+  if (!c) return undefined;
+  try {
+    const { data: subjectId, error } = await supabase.rpc('register_make_model_subject', {
+      p_make: c.make,
+      p_model: c.model,
+      p_year: c.year,
+    });
+    if (error || !subjectId) {
+      if (error) console.error('register_make_model_subject failed (non-fatal):', error.message);
+      return undefined;
+    }
+    return {
+      type: 'cohort',
+      year: c.year,
+      make: c.make,
+      model: c.model,
+      subject_id: subjectId,
+      label: `${c.year} ${c.make} ${c.model}`,
+      path: `/cohort/${encodeURIComponent(c.make.toLowerCase())}/${encodeURIComponent(c.model.toLowerCase())}/${c.year}`,
+    };
+  } catch (e) {
+    console.error('Cohort registration failed (non-fatal):', e);
+    return undefined;
+  }
+}
+
 // Normalize and tokenize query for search
 function tokenizeQuery(query: string): string[] {
   return query
@@ -156,7 +237,7 @@ Deno.serve(async (req) => {
 
     const query: string = urlParams.get('query') || urlParams.get('q') || body.query || '';
     const limitRaw = urlParams.get('limit') ?? body.limit;
-    const limit: number = limitRaw ? Number(limitRaw) : 60;
+    const limit: number = limitRaw ? Number(limitRaw) : 100;
     const offsetRaw = urlParams.get('offset') ?? body.offset;
     const offset: number = offsetRaw ? Math.max(0, Math.min(Number(offsetRaw), 10000)) : 0;
     const types: string[] | undefined = urlParams.get('types')?.split(',') ?? body.types;
@@ -329,11 +410,16 @@ Deno.serve(async (req) => {
         }
       }
 
+      // A bare-year query (e.g. "1969") never parses as a clean YMM, so this
+      // returns undefined — included for parity with the text path.
+      const cohortCard = await buildCohortCard(supabase, trimmedQuery);
+
       return new Response(JSON.stringify({
         success: true,
         results,
         query_type: 'year',
         total_count: results.length,
+        cohort_card: cohortCard,
         search_time_ms: Date.now() - startTime
       }), { headers: { ...corsHeaders, ...rlHeaders, 'Content-Type': 'application/json' } });
     }
@@ -380,60 +466,38 @@ Deno.serve(async (req) => {
 
         let vehicles: any[] = [];
 
-        // Pagination (offset > 0): use ILIKE directly for consistent results.
-        // The RPC uses cascading strategies with independent limits that don't paginate well.
+        // Pagination (offset > 0): SAME ranked RPC as page 1, just with offset_count,
+        // so ordering is identical across every page (no fork, no dupes, no jumps).
         if (offset > 0 && tsqueryStr) {
-          let paginationQuery = applyVehicleFilters(supabase
-            .from('vehicles')
-            .select(VEHICLE_SELECT)
-            .eq('is_public', true)
-            .not('year', 'is', null)
-            .not('make', 'is', null)
-            .not('model', 'is', null));
+          // NOTE: count_vehicles_search RPC removed from the critical path —
+          // measured live at 5.2s AND returning 0 for valid queries (broken).
+          // total_count falls back to result length downstream, same as when
+          // the RPC returned null.
+          const ftsResponse = await supabase.rpc('search_vehicles_fts', {
+            query_text: tsqueryStr,
+            limit_count: vehicleLimit,
+            offset_count: offset,
+          });
 
-          const yearMatch = trimmedQuery.match(/^(\d{4})\s+(.+)$/);
-          if (yearMatch) {
-            const year = parseInt(yearMatch[1], 10);
-            const rest = escapeIlike(escapePostgrestValue(yearMatch[2].toLowerCase()));
-            paginationQuery = paginationQuery.eq('year', year)
-              .or(`make.ilike.%${rest}%,model.ilike.%${rest}%,color.ilike.%${rest}%`);
-          } else if (tokens.length >= 2) {
-            const t0 = escapeIlike(escapePostgrestValue(tokens[0]));
-            const tRest = escapeIlike(escapePostgrestValue(tokens.slice(1).join(' ')));
-            paginationQuery = paginationQuery.or(
-              `and(make.ilike.%${t0}%,model.ilike.%${tRest}%),` +
-              `and(model.ilike.%${t0}%,make.ilike.%${tRest}%)`
-            );
-          } else {
-            const t = escapePostgrestValue(searchPattern);
-            paginationQuery = paginationQuery.or(`make.ilike.${t},model.ilike.${t},color.ilike.${t}`);
+          const pageRows = (ftsResponse.data || []).filter((r: any) => (r.relevance || 0) >= 0.85);
+          if (pageRows.length) {
+            const ids = pageRows.map((r: any) => r.id);
+            const { data: enriched } = await supabase.from('vehicles').select(VEHICLE_SELECT).in('id', ids);
+            const map = new Map((enriched || []).map((v: any) => [v.id, v]));
+            vehicles = pageRows.map((r: any) => ({ ...map.get(r.id), relevance: r.relevance })).filter((v: any) => v.id);
           }
-
-          const [paginationResponse, countResponse] = await Promise.all([
-            paginationQuery
-              .order('sale_price', { ascending: false, nullsFirst: false })
-              .range(offset, offset + vehicleLimit - 1),
-            supabase.rpc('count_vehicles_search', { query_text: tsqueryStr }),
-          ]);
-
-          if (countResponse.data !== null) vehicleTotalCount = countResponse.data as number;
-          if (paginationResponse.data?.length) vehicles = paginationResponse.data;
         }
         // First page: use RPC for best ranking
         else if (tsqueryStr) {
-          // Run search + count in parallel
-          const [ftsResponse, countResponse] = await Promise.all([
-            supabase.rpc('search_vehicles_fts', {
-              query_text: tsqueryStr,
-              limit_count: vehicleLimit,
-            }),
-            supabase.rpc('count_vehicles_search', { query_text: tsqueryStr }),
-          ]);
+          // NOTE: count_vehicles_search RPC removed — measured live at 5.2s
+          // AND returning 0 for valid queries (broken). It was the slowest
+          // member of this Promise.all, putting +5s on every first-page search.
+          const ftsResponse = await supabase.rpc('search_vehicles_fts', {
+            query_text: tsqueryStr,
+            limit_count: vehicleLimit,
+          });
 
           const { data: ftsResults, error: ftsError } = ftsResponse;
-          if (countResponse.data !== null) {
-            vehicleTotalCount = countResponse.data as number;
-          }
 
           if (!ftsError && ftsResults?.length) {
             // Filter to high-confidence results only (relevance >= 0.85 = strategies 1a/1b).
@@ -479,7 +543,12 @@ Deno.serve(async (req) => {
         // multi-token queries like "Porsche 997 GT3". Skip for single-token queries
         // when FTS already returned enough results (ILIKE on broad terms like "mustang"
         // scans 30K+ rows and takes 15+ seconds to sort).
-        const skipIlike = vehicles.length >= Math.ceil(vehicleLimit / 2);
+        // Skip the ILIKE fallback when it does more harm than good:
+        //  - pagination (offset>0): it re-ranges by sale_price and breaks page order
+        //  - single-token queries ("mustang"): the ranked FTS RPC already covers these,
+        //    and broad ILIKE merges junk (e.g. "Mustang-Style Pedal Car") that then floats up.
+        // Keep it only for multi-token precision queries ("porsche 997 gt3") on page 1.
+        const skipIlike = offset > 0 || tokens.length < 2 || vehicles.length >= Math.ceil(vehicleLimit / 2);
         if (!skipIlike) {
           const yearMatch = trimmedQuery.match(/^(\d{4})\s+(.+)$/);
           let ilikeQuery = applyVehicleFilters(supabase
@@ -765,20 +834,22 @@ Deno.serve(async (req) => {
     // --- TAGS/CATEGORIES (squarebody, etc.) ---
     if (allowedTypes.includes('tag')) {
       searches.push((async () => {
-        // Search in vehicle_image_tags for common tags
+        // Search in image_tags for common tags (repointed from ghost vehicle_image_tags 2026-07-12)
         const { data: tags } = await supabase
-          .from('vehicle_image_tags')
+          .from('image_tags')
           .select('tag_name, confidence')
           .ilike('tag_name', searchPattern)
           .order('confidence', { ascending: false })
           .limit(10);
 
-        // Dedupe and create tag results
+        // Dedupe and create tag results.
+        // image_tags.confidence is an integer 0-100; normalize to 0-1 to match the
+        // relevance_score scale used elsewhere in this function.
         const uniqueTags = new Map<string, number>();
         for (const t of tags || []) {
           const name = t.tag_name.toLowerCase();
           if (!uniqueTags.has(name)) {
-            uniqueTags.set(name, t.confidence || 0.5);
+            uniqueTags.set(name, (t.confidence ?? 50) / 100);
           }
         }
 
@@ -916,18 +987,28 @@ Deno.serve(async (req) => {
       // const aiResponse = await callOpenAI(`Suggest search terms for: ${trimmedQuery}`);
     }
 
+    // Clean year-make-model query → auto-register cohort subject + attach card.
+    // Only runs when parseCohort succeeds (never for VINs, URLs, bare years, or
+    // single-word queries). Failures are swallowed inside buildCohortCard.
+    const cohortCard = await buildCohortCard(supabase, trimmedQuery);
+
     return new Response(JSON.stringify({
       success: true,
       results: dedupedResults,
       query_type: 'text',
       total_count: dedupedResults.length,
       ai_suggestion: aiSuggestion,
+      cohort_card: cohortCard,
       search_time_ms: Date.now() - startTime,
       meta: {
         total_count: vehicleTotalCount || dedupedResults.length,
         offset,
         limit: sanitizedLimit,
-        has_more: vehicleTotalCount > offset + dedupedResults.length,
+        // When the estimated count is 0/unknown (count RPC timed out), fall back to
+        // "the page came back full" so Load More never wrongly disappears.
+        has_more: vehicleTotalCount > 0
+          ? vehicleTotalCount > offset + dedupedResults.length
+          : dedupedResults.length >= sanitizedLimit,
       },
     }), { headers: { ...corsHeaders, ...rlHeaders, 'Content-Type': 'application/json' } });
 

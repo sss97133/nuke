@@ -13,7 +13,7 @@ call_fn() {
 }
 
 query() {
-  dotenvx run -- bash -c "PGPASSWORD=\"RbzKq32A0uhqvJMQ\" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c \"$1\"" 2>/dev/null
+  dotenvx run -- bash -c "PGPASSWORD=\"${SUPABASE_DB_PASSWORD}\" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -t -c \"$1\"" 2>/dev/null
 }
 
 log "Starting specialty builder extraction"

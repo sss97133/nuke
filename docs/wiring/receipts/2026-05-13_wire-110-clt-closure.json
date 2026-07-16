@@ -1,0 +1,217 @@
+{
+  "$schema": "../schemas/wire-closure.schema.json",
+  "wire_id": "110",
+  "label": "Coolant Temp Sensor (ECU)",
+  "loom": "ENGINE LOOM",
+  "bundle": "B3-Front",
+  "from": {
+    "device": {
+      "value": "MoTeC M130 ECU",
+      "source": "K5_WIRING_STATE.md \u00a71; chapters/appendix-d-k5-build.md"
+    },
+    "connector": {
+      "value": "Connector B (Superseal 26-pin)",
+      "source": "K5_connector_schedule.txt:33"
+    },
+    "pin": {
+      "value": "B04",
+      "source": "K5_cut_list_v2.txt:40"
+    },
+    "pin_function": {
+      "value": "AN_TEMP3 (CLT)",
+      "source": "chapters/appendix-g-diagram-requirements-spec.md:889; K5_connector_shopping_list.txt:38"
+    },
+    "signal_type": {
+      "value": "analog_temp",
+      "source": "chapters/05-build-manifest.md \u00a7ECU-Connected Signal Types; K5_wire_spec_and_costs.md Job 1"
+    },
+    "expected_wire_count": 2
+  },
+  "to": {
+    "device": {
+      "value": "GM CLT sensor",
+      "source": "K5_shopping_list.md:33"
+    },
+    "device_pn": {
+      "value": "GM 19236568",
+      "source": "K5_shopping_list.md:33"
+    },
+    "connector_type": {
+      "value": "Metri-Pack 150.2 series, 2-pin, sealed",
+      "source": "K5_shopping_list.md:33"
+    },
+    "physical_location": {
+      "unknown": true,
+      "needs": "LS3 service manual citation for CTS sensor boss location (likely driver-side cyl head front or coolant crossover). K5_wire_labels.md:80 says \"Front of engine\" \u2014 not specific enough."
+    },
+    "pigtail_pn": {
+      "value": "WPCTS30 (ICT Billet, $10)",
+      "source": "K5_shopping_list.md:33"
+    }
+  },
+  "wire_spec": {
+    "gauge_awg": 22,
+    "spec": "M22759/32",
+    "color": "TAN/WHT",
+    "shielding": false
+  },
+  "routing": {
+    "landmark_path": [
+      "L01",
+      "L02",
+      "L03"
+    ],
+    "total_length_in": {
+      "value": 66.0,
+      "method": "zone_distance_estimate",
+      "estimate_basis": "K5_cut_list_v2.txt baseline 4.6 ft + 20% engine bay pad \u2192 5.5 ft = 66 in. Real path through L01-L03 cannot be computed; K5_landmarks.yaml has all three values null."
+    }
+  },
+  "termination": {
+    "from_terminal_pn": {
+      "unknown": true,
+      "needs": "Read motec_m1_hardware_techspec.pdf p16 for Superseal 26-pin terminal PN"
+    },
+    "from_seal_pn": {
+      "unknown": true,
+      "needs": "Same source as from_terminal_pn"
+    },
+    "to_terminal_pn": {
+      "value": "Pre-terminated by WPCTS30 pigtail (Metri-Pack 150.2 female terminals)",
+      "source": "K5_shopping_list.md:33"
+    },
+    "to_seal_pn": {
+      "value": "Pre-terminated by WPCTS30 pigtail (green cable seals)",
+      "source": "K5_shopping_list.md:33"
+    }
+  },
+  "companion_wires": [
+    {
+      "role": "sensor_ground",
+      "wire_id_or_status": {
+        "value": "#110g (added 2026-05-14 per Option B amendment)",
+        "source": "K5_cut_list_v2.txt addendum; receipts/2026-05-14_amendment-cut-list-companion-wires.md"
+      },
+      "target_pin": {
+        "value": "M130:B16 (SEN_0V_B)",
+        "source": "motec_m1_hardware_techspec.pdf p17 (AT2 \u2192 SEN_5V_B pullup, paired ground to SEN_0V_B); K5_connector_schedule.txt:42 (post-correction)"
+      }
+    }
+  ],
+  "fuse": {
+    "not_applicable": true,
+    "reason": "AT input is powered by M130's internal 1K\u03a9 pullup to 5V; sensor draws no current requiring overcurrent protection. Per K5_wire_spec_and_costs.md Job 1."
+  },
+  "heat_shrink": {
+    "label_end_a": {
+      "unknown": true,
+      "needs": "Per-end label text not yet split"
+    },
+    "label_end_b": {
+      "unknown": true,
+      "needs": "Per-end label text not yet split"
+    },
+    "termination_end_a_inner_seal_pn": {
+      "unknown": true,
+      "needs": "SCL PN (M23053/4 Class 2 or 3) at end A \u2014 not yet specified in build docs; pick from research \u00a73 sizing math"
+    },
+    "termination_end_a_outer_cover_pn": {
+      "unknown": true,
+      "needs": "DR-25 PN (M23053/16) at end A \u2014 not yet specified"
+    },
+    "termination_end_b_inner_seal_pn": {
+      "unknown": true,
+      "needs": "SCL PN at end B"
+    },
+    "termination_end_b_outer_cover_pn": {
+      "unknown": true,
+      "needs": "DR-25 PN at end B"
+    },
+    "boot_at_terminals": {
+      "unknown": true,
+      "needs": "DR-25 heat-shrink boot at M130 connector typical for motorsport spec, but not specified in build docs. Needs spec."
+    }
+  },
+  "open_unknowns": [
+    {
+      "field": "to.physical_location",
+      "needs": "LS3 service manual page citation for CTS sensor boss",
+      "blocks": [
+        "accurate routing length",
+        "L03 landmark redefinition"
+      ]
+    },
+    {
+      "field": "termination.from_terminal_pn",
+      "needs": "Read motec_m1_hardware_techspec.pdf p16",
+      "blocks": [
+        "terminal/seal order placement"
+      ]
+    },
+    {
+      "field": "termination.from_seal_pn",
+      "needs": "Same source as from_terminal_pn",
+      "blocks": [
+        "terminal/seal order placement"
+      ]
+    },
+    {
+      "field": "_companion_wires_resolved",
+      "needs": "RESOLVED 2026-05-14: Skylar accepted Option B. Companion ground enumerated as #110g per receipts/2026-05-14_amendment-cut-list-companion-wires.md",
+      "blocks": []
+    },
+    {
+      "field": "routing.total_length_in.value",
+      "needs": "Measure L01, L02, L03 on the actual truck and populate K5_landmarks.yaml",
+      "blocks": [
+        "all wires using L01-L03 (most engine loom wires)"
+      ]
+    },
+    {
+      "field": "routing.landmark_path[2]",
+      "needs": "L03 currently terminates at \"Cyl 1 coil (DVC front)\" not CTS location. Either redefine L03 or add a CTS-specific landmark (e.g. L31)",
+      "blocks": [
+        "accurate length for #110 specifically"
+      ]
+    },
+    {
+      "field": "heat_shrink.label_locations",
+      "needs": "Document the build's labeling convention (both ends? at grommets? at branch points?)",
+      "blocks": [
+        "all wires (systemic)"
+      ]
+    },
+    {
+      "field": "heat_shrink.boot_at_terminals",
+      "needs": "Document boot/heat-shrink spec at connector exits",
+      "blocks": [
+        "all wires (systemic)"
+      ]
+    }
+  ],
+  "substrate_inconsistencies": [
+    {
+      "doc_a": "K5_cut_list_v2.txt:40",
+      "doc_b": "K5_connector_schedule.txt:50 (pre-correction)",
+      "field": "M130 pin B04 assignment",
+      "doc_a_says": "B04 = CTS",
+      "doc_b_says": "B04 = UNUSED",
+      "preferred": "RESOLVED 2026-05-14 via receipts/2026-05-14_substrate-m130-b03-b06-correction.md. K5_connector_schedule.txt amended to list B04 = AT2 / CTS."
+    },
+    {
+      "doc_a": "chapters/05-build-manifest.md",
+      "doc_b": "K5_cut_list_v2.txt",
+      "field": "Wire count for analog_temp signal type",
+      "doc_a_says": "analog_temp = 2 wires (signal + ground)",
+      "doc_b_says": "(pre-2026-05-14) Only enumerates signal wire",
+      "preferred": "RESOLVED 2026-05-14 via receipts/2026-05-14_amendment-cut-list-companion-wires.md. Cut list now enumerates #110g as the companion ground."
+    }
+  ],
+  "closure": {
+    "status": "PARTIAL",
+    "fields_cited": 15,
+    "fields_gapped": 10,
+    "total_fields": 25,
+    "ratio": "15/25"
+  }
+}

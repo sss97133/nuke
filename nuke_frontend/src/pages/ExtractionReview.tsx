@@ -49,8 +49,11 @@ const ExtractionReview: React.FC = () => {
   const handleApprove = async (extractionId: string) => {
     try {
       setReviewing(true);
-      
-      const { data: { user } } = await supabase.auth.getUser();
+
+      // Use getSession() instead of getUser() to avoid Web Locks API contention
+      // on sb-*-auth-token (cause of 2026-05-24 garage hang). See lib/supabase.ts.
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) throw new Error('Not authenticated');
 
       // Call the apply function

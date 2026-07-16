@@ -112,10 +112,12 @@ export async function saveDeckSlide(
   slideId: string,
   updates: Partial<Pick<DeckSlide, 'content' | 'bg_type' | 'entity_slugs'>>
 ): Promise<{ error: string | null }> {
-  const { data: { user } } = await supabase.auth.getUser();
+  // Use getSession() instead of getUser() to avoid Web Locks API contention
+  // on sb-*-auth-token (cause of 2026-05-24 garage hang). See lib/supabase.ts.
+  const { data: { session } } = await supabase.auth.getSession();
   const { error } = await supabase
     .from('deck_slides')
-    .update({ ...updates, updated_by: user?.id || null })
+    .update({ ...updates, updated_by: session?.user?.id || null })
     .eq('id', slideId);
   return { error: error?.message || null };
 }

@@ -43,12 +43,10 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
             .limit(50);
           break;
         case 'bond':
-          query = supabase
-            .from('vehicle_bonds')
-            .select('id, vehicle_id, principal_amount_cents, interest_rate_pct, status')
-            .eq('status', 'open')
-            .limit(50);
-          break;
+          // TODO(ghost-ref 2026-07-12): vehicle_bonds does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+          setAvailableAssets([]);
+          setLoading(false);
+          return;
         case 'stake':
           query = supabase
             .from('vehicle_funding_rounds')

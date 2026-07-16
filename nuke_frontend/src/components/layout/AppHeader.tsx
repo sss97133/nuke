@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { PrefetchLink } from '../PrefetchLink';
 import { useHeaderHeight } from './hooks/useHeaderHeight';
 import { useSession } from './hooks/useSession';
 import { useNotificationBadge } from './hooks/useNotificationBadge';
@@ -7,6 +8,7 @@ import { useAdminAccess } from '../../hooks/useAdminAccess';
 import AIDataIngestionSearch from '../search/AIDataIngestionSearch';
 import { UserArea } from './UserArea';
 import { UserDropdown } from './UserDropdown';
+import { useBranding } from '../../branding/BrandingContext';
 import GlobalUploadIndicator from '../GlobalUploadIndicator';
 import './AppHeader.css';
 
@@ -18,6 +20,7 @@ const NAV_LINKS = [
   { label: 'FEED', to: '/?tab=feed' },
   { label: 'SEARCH', to: '/search' },
   { label: 'GARAGE', to: '/?tab=garage' },
+  { label: 'JOURNAL', to: '/journal' },
   { label: 'MARKET', to: '/market/trends' },
 ];
 
@@ -36,6 +39,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const userId = session?.user?.id;
   const unreadCount = useNotificationBadge(userId);
   const { isAdmin } = useAdminAccess();
+  const { brand } = useBranding();
   const location = useLocation();
 
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -64,21 +68,27 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   return (
     <div className="header-wrapper" ref={headerRef}>
       <div className="header">
-        {/* Zone 1: Identity */}
-        <Link to="/" className="header-wordmark" aria-label="Nuke — home">
-          NUKE
+        {/* Zone 1: Identity — wears the active brand if one is projected onto
+            the shell, otherwise the Nuke wordmark. */}
+        <Link
+          to="/"
+          className="header-wordmark"
+          aria-label={brand ? `${brand.name} — home` : 'Nuke — home'}
+          title={brand ? 'Powered by Nuke' : undefined}
+        >
+          {brand ? brand.name : 'NUKE'}
         </Link>
 
-        {/* Zone 2: Navigation */}
+        {/* Zone 2: Navigation — hover-prefetch per McMaster benchmark */}
         <nav className="header-nav" aria-label="Main navigation">
           {NAV_LINKS.map(({ label, to }) => (
-            <Link
+            <PrefetchLink
               key={to}
               to={to}
               className={`header-nav-link${isActive(to) ? ' active' : ''}`}
             >
               {label}
-            </Link>
+            </PrefetchLink>
           ))}
         </nav>
 

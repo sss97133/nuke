@@ -81,7 +81,15 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
       if (!data?.success) throw new Error('Import failed');
       
       setImportResult(data);
-      setProgress(`✅ Imported: ${data.imported?.timeline_events || 0} events, ${data.imported?.modifications || 0} mods, ${data.imported?.specs_updated || 0} specs`);
+      // complete-bat-import returns { core: { created_vehicle_ids, updated_vehicle_ids }, comments: {...} }
+      // (the old `data.imported.{timeline_events,modifications,specs_updated}` shape never existed — it
+      //  always rendered 0/0/0). Report the real result.
+      {
+        const created = data.core?.created_vehicle_ids?.length || 0;
+        const updated = data.core?.updated_vehicle_ids?.length || 0;
+        const comments = data.comments?.attempted ? (data.comments.ok ? 'imported' : 'failed') : 'skipped';
+        setProgress(`✅ Imported BaT listing — ${created} created, ${updated} updated · comments ${comments}`);
+      }
       
       // Refresh page after 2 seconds to show new data
       setTimeout(() => {

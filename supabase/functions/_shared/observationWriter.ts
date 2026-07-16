@@ -38,6 +38,14 @@ export interface ObservationSource {
 
 export interface ObservationInput {
   vehicleId: string;
+  /**
+   * Polymorphic subject (engineering-manual/20). Optional + backward-compatible:
+   * when omitted, the observation is a vehicle observation exactly as before.
+   * When subjectType is non-'vehicle', subjectId is required and the vehicle-only
+   * post-processing (gap-fill, field-evidence) is skipped.
+   */
+  subjectType?: string;               // vehicle|organization|user|asset; default vehicle
+  subjectId?: string;                 // required when subjectType !== 'vehicle'
   source: ObservationSource;
   fields: Record<string, any>;       // extracted key-value pairs
   observationKind?: string;           // observation_kind enum; default "specification"
@@ -146,6 +154,8 @@ export async function writeObservation(
 
   const {
     vehicleId,
+    subjectType,
+    subjectId,
     source,
     fields,
     observationKind = "specification",
@@ -159,14 +169,28 @@ export async function writeObservation(
     agentDurationMs,
   } = params;
 
-  if (!vehicleId || !source.platform || !source.url) {
-    errors.push("vehicleId, source.platform, and source.url are required");
+  // A vehicle observation (the default, and every existing caller) requires a
+  // vehicleId. A non-vehicle subject requires a subjectId instead.
+  const isVehicleSubject = !subjectType || subjectType === "vehicle";
+
+  if (!source.platform || !source.url) {
+    errors.push("source.platform and source.url are required");
+    return result;
+  }
+  if (isVehicleSubject && !vehicleId) {
+    errors.push("vehicleId is required for vehicle observations");
+    return result;
+  }
+  if (!isVehicleSubject && !subjectId) {
+    errors.push(`subjectId is required when subjectType is "${subjectType}"`);
     return result;
   }
 
   // --- 1. Write observation (independent of gap-fill) ---
   const observationPromise = writeObservationRow(supabase, {
     vehicleId,
+    subjectType,
+    subjectId,
     source,
     fields,
     observationKind,
@@ -183,19 +207,22 @@ export async function writeObservation(
     return null;
   });
 
-  // --- 2. Gap-fill vehicles table (independent of observation) ---
-  const gapFillPromise = gapFillVehicle(supabase, vehicleId, source, fields, extractionMethod)
-    .catch((e: any) => {
-      errors.push(`gap-fill: ${e?.message || e}`);
-      return null;
-    });
+  // --- 2 & 3. Gap-fill + field-evidence are VEHICLE-only post-processing.
+  // Skip them entirely for non-vehicle subjects (they are keyed on vehicleId).
+  // For vehicle observations this path is unchanged.
+  const gapFillPromise = isVehicleSubject
+    ? gapFillVehicle(supabase, vehicleId, source, fields, extractionMethod).catch((e: any) => {
+        errors.push(`gap-fill: ${e?.message || e}`);
+        return null;
+      })
+    : Promise.resolve(null);
 
-  // --- 3. Write field_evidence rows (independent) ---
-  const evidencePromise = writeFieldEvidence(supabase, vehicleId, source, fields, extractionMethod)
-    .catch((e: any) => {
-      errors.push(`field-evidence: ${e?.message || e}`);
-      return [];
-    });
+  const evidencePromise = isVehicleSubject
+    ? writeFieldEvidence(supabase, vehicleId, source, fields, extractionMethod).catch((e: any) => {
+        errors.push(`field-evidence: ${e?.message || e}`);
+        return [];
+      })
+    : Promise.resolve([] as string[]);
 
   // Await all three in parallel — failures are isolated
   const [obsResult, gapResult, evidenceResult] = await Promise.all([
@@ -264,6 +291,8 @@ async function writeObservationRow(
   supabase: any,
   params: {
     vehicleId: string;
+    subjectType?: string;
+    subjectId?: string;
     source: ObservationSource;
     fields: Record<string, any>;
     observationKind: string;
@@ -327,6 +356,11 @@ async function writeObservationRow(
     .insert({
       vehicle_id: params.vehicleId,
       vehicle_match_confidence: 1.0, // caller provides vehicleId directly
+      // Polymorphic subject (engineering-manual/20). Conditional spread: when the
+      // caller passes no subject, this object is byte-identical to before and the
+      // DB default (subject_type='vehicle', subject_id=NULL) applies.
+      ...(params.subjectType ? { subject_type: params.subjectType } : {}),
+      ...(params.subjectId ? { subject_id: params.subjectId } : {}),
       observed_at: params.observedAt || new Date().toISOString(),
       source_id: resolvedSource.id,
       source_url: params.source.url,

@@ -24,7 +24,11 @@ export const useActivityTracking = () => {
     location
   }: TrackEventParams) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      // getSession() is cached + lock-free; getUser() contends on the
+      // Web Locks API auth-token lock when N feed cards fire in parallel
+      // (the cause of the 2026-05-24 ?tab=garage hang).
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) return;
 
       // Prevent duplicate tracking within 5 seconds

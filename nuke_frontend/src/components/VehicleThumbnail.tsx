@@ -48,7 +48,9 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
           .from('vehicle_images')
           .select('image_url, is_primary')
           .eq('vehicle_id', vehicleId)
+          .not('is_superseded', 'is', true)
           .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
+          .or('vision_gate_status.is.null,vision_gate_status.not.in.("rejected_personal","rejected_misattributed")')
           .order('is_primary', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(10);
@@ -94,9 +96,10 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
 
           // Check if it's a Supabase storage URL that needs transformation
           if (selectedImageUrl.includes('/storage/v1/object/public/')) {
+            // resize=contain required — defaults to cover which crops portrait iPhone photos.
             const transformUrl = selectedImageUrl
               .replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
-              + `?width=${width}&quality=${quality}`;
+              + `?width=${width}&quality=${quality}&resize=contain`;
 
             console.log('🔄 Transform URL:', transformUrl);
             setImageUrl(transformUrl);

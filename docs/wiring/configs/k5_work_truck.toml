@@ -1,0 +1,7 @@
+# Stripped work-truck variant: no audio, no power windows/locks, no steps, no camera
+[toggles]
+AUDIO = false
+POWER_WINDOWS = false
+POWER_LOCKS = false
+AMP_STEPS = false
+CAMERA_REAR = false

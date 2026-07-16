@@ -79,7 +79,7 @@ function thumbUrl(url: string | null | undefined): string | null {
     return url.replace(
       '/storage/v1/object/public/',
       '/storage/v1/render/image/public/'
-    ) + '?width=120&height=80&quality=70&resize=cover';
+    ) + '?width=120&height=80&quality=70&resize=contain';
   }
   return url;
 }

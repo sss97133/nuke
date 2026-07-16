@@ -1,0 +1,378 @@
+[
+  {
+    "order": 1,
+    "image_id": "f1b73144-e00c-4737-946f-3f69008f4483",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/001_f1b73144.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Black flare/fender area showing peeling black paint over silver/blue underlayer (matches K5 multi-color paint history). Tape measure documenting dimensions. Square-body leaf spring and shock mount visible behind. Owner-documentation photo."
+  },
+  {
+    "order": 2,
+    "image_id": "6617c8d3-3cdd-49f8-93e7-d9d262140c47",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/002_6617c8d3.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Same flare measurement series as 001. Peeling black-over-silver-over-blue paint matches K5 history. Tape measure documenting dimensions."
+  },
+  {
+    "order": 3,
+    "image_id": "4f4c3561-cbcb-452b-83d1-73c935a3d4e1",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/003_4f4c3561.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rear bumper / mud flap underside of a 4x4 truck, parking lot background. Consistent with K5 lower body and undercarriage documentation."
+  },
+  {
+    "order": 4,
+    "image_id": "ac01c557-529e-4429-b7b5-0713744144c6",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/004_ac01c557.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underside body/flap detail, undercoated panel and rocker area. Consistent with square-body K5 rocker/wheelwell documentation."
+  },
+  {
+    "order": 5,
+    "image_id": "4ce82db0-feb6-4f46-99c2-2a2c27ba9caa",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/005_4ce82db0.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same rocker/undercarriage detail series as 004. Consistent with K5 documentation."
+  },
+  {
+    "order": 6,
+    "image_id": "67b2ccc1-f5b6-496f-aa2f-124be48ab8de",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/006_67b2ccc1.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rear corner / mud flap of black 4x4 with all-terrain tires, parking lot. Matches K5 stance and color."
+  },
+  {
+    "order": 7,
+    "image_id": "b76a9798-c69e-4dce-b93a-e00ab7fae7a3",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/007_b76a9798.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same outdoor undercarriage / mud flap series, black 4x4. Consistent with K5."
+  },
+  {
+    "order": 8,
+    "image_id": "feccb5db-ab80-4350-9f96-507df629cc40",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/008_feccb5db.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Wheelwell flare being measured. Crackled black paint over blue/orange/silver underlayers exposed at edge (matches K5 multi-color paint history). All-terrain tire visible. Tape measure documentation."
+  },
+  {
+    "order": 9,
+    "image_id": "3313e641-aa1a-458c-880c-dd3178d763df",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/009_3313e641.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Wheelwell flare measurement, same series. Crackled black paint with blue/orange peel at edge. Matches K5 paint history."
+  },
+  {
+    "order": 10,
+    "image_id": "88aad627-eb90-447f-9614-e13bb07754f5",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/010_88aad627.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Same wheelwell flare measurement. Multi-color paint layers exposed. Matches K5."
+  },
+  {
+    "order": 11,
+    "image_id": "9833ffce-da6f-4866-8b15-a52f388c04df",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/011_9833ffce.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Lower rocker / fender area being measured. Damage at corner reveals red/blue/orange paint layers. Matches K5 multi-color paint history."
+  },
+  {
+    "order": 12,
+    "image_id": "c334fdd3-e9b5-4e7f-be33-0d573e889c56",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/012_c334fdd3.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Battery/starter solenoid or master disconnect with heavy cables, copper terminals, factory truck wiring. Consistent with K5 restoration documentation."
+  },
+  {
+    "order": 13,
+    "image_id": "bccadc7c-1d92-4d73-8934-983fe8971524",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/013_bccadc7c.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Front suspension/steering box undercarriage view: solid axle, leaf springs, steering box, drag link, U-joint. Consistent with K5 4x4 front suspension."
+  },
+  {
+    "order": 14,
+    "image_id": "3c01585c-5d51-4997-8871-3e990d5f4662",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/014_3c01585c.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine bay / front clip view showing steering box, frame rail, exhaust manifold, radiator. Square-body / K5 era components."
+  },
+  {
+    "order": 15,
+    "image_id": "48997736-7ec3-4a9c-995d-a5aa8dc2adba",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/015_48997736.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Stamped part code 'K1013PJE' on frame/component. Notable paperwork: looks like an axle housing or component date/source stamp. Worth indexing as identifying mark."
+  },
+  {
+    "order": 16,
+    "image_id": "47bc2e5b-c8e4-41b4-a8e4-f22efbe9f979",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/016_47bc2e5b.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Full vehicle on lift (image rotated 90deg): square-body Chevy front clip with single round headlights, dark green/black paint, BFGoodrich wheels, removable hardtop K5 silhouette. Definitive K5 Blazer."
+  },
+  {
+    "order": 18,
+    "image_id": "c12a77f9-5e94-47ac-ab07-533d98053880",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/018_c12a77f9.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Square-body Chevy K5 on lift (rotated): grille with Chevy bowtie, single round headlights, chrome bumper, BFGoodrich All-Terrain T/A on chrome wheels. Definitive K5/squarebody."
+  },
+  {
+    "order": 19,
+    "image_id": "4475889c-4e62-4d5c-9da4-7c239c12b775",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/019_4475889c.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Engine bay view (rotated): radiator, frame rail, leaf spring, all-terrain tire, period-correct engine accessories. Square-body / K5 engine compartment."
+  },
+  {
+    "order": 21,
+    "image_id": "0fe37b9f-eef3-4563-9093-9f83a9b25e00",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/021_0fe37b9f.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Leaf spring shackle/mount, weathered/painted-over hardware. Consistent with K5 suspension inspection."
+  },
+  {
+    "order": 22,
+    "image_id": "8581bfea-a467-49cb-9043-6a9419a33af3",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/022_8581bfea.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Leaf spring eye and shackle assembly with frame bracket. Consistent with K5 suspension documentation."
+  },
+  {
+    "order": 23,
+    "image_id": "7de8786e-c07e-46dd-9738-c58599d6c65f",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/023_7de8786e.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Body panel detail: crackled black paint with red/yellow/blue diagonal stripe revealed underneath. Matches K5 multi-color custom paint history (blue/red/yellow stripes per attribution rule)."
+  },
+  {
+    "order": 24,
+    "image_id": "7adb0851-d588-4203-b1b8-4376f0779c19",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/024_7adb0851.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Body panel: yellow/blue/red/purple diagonal stripes exposed beneath peeling black. Definitive match to K5 paint history."
+  },
+  {
+    "order": 25,
+    "image_id": "9f8af4d2-a85d-4fc5-82d4-5525f82c3ac5",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/025_9f8af4d2.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Close-up of multi-color stripe paint (red/purple/pink/blue). Matches K5 custom paint history."
+  },
+  {
+    "order": 26,
+    "image_id": "de9b2915-fce3-4c45-aa11-fccfda38defb",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/026_de9b2915.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Body panel cutaway showing rust-through with multi-color stripe paint (yellow/red/blue) exposed nearby. Matches K5 paint history and condition documentation."
+  },
+  {
+    "order": 27,
+    "image_id": "3e509a9d-9a6e-4ccf-a707-8a7ca1801e25",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/027_3e509a9d.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Body panel rust-through hole at corner with blue/silver paint and water/rust staining. Restoration condition photo, consistent with K5."
+  },
+  {
+    "order": 28,
+    "image_id": "179547f8-577d-463e-abf1-58ad720cbca2",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/028_179547f8.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Similar rust-through panel detail with blue paint area. Restoration condition documentation."
+  },
+  {
+    "order": 29,
+    "image_id": "21f12481-03ac-4823-8d01-592c18d5563b",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/029_21f12481.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Side profile (rotated) of black K5 Blazer with side mirror, door, body stripes (yellow/red/blue) revealed under peeling black paint. Square-body single round headlights peripheral. Definitive K5."
+  },
+  {
+    "order": 30,
+    "image_id": "851d6785-c8aa-458b-a4df-b2530db5a13b",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/030_851d6785.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Garage interior shot (rotated) showing full square-body Chevy with Chevy bowtie grille, single round headlights, BFGoodrich tires on lift. Definitive K5/squarebody."
+  },
+  {
+    "order": 31,
+    "image_id": "7a6e737a-4922-4fdb-85e3-c8628f4b54be",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/031_7a6e737a.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Interior cargo area / rear floor with wheelwell hump, ribbed sheetmetal floor, tailgate area, taillight assembly visible. Consistent with K5 Blazer rear cargo area."
+  },
+  {
+    "order": 32,
+    "image_id": "50987268-a451-484f-af8c-081975debb3e",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/032_50987268.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Interior rear cargo / tailgate corner with hinges and rear taillight. Consistent with K5 rear interior."
+  },
+  {
+    "order": 33,
+    "image_id": "7f496886-21d0-4b45-92df-fd02ffe9b27d",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/033_7f496886.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Full rear-3/4 view of dark green/black square-body K5 Blazer in workshop. Removable hardtop, square taillights, lifted on jack stands, BFGoodrich All-Terrain T/A wheels. Definitive 1973-1980 K5."
+  },
+  {
+    "order": 34,
+    "image_id": "8cf9d506-96c8-49ed-a96b-66d01fdbd53c",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/034_8cf9d506.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Full front-3/4 view of dark green square-body K5 Blazer mid-restoration: Chevy grille, single round headlights, hood up, fender removed, BFGoodrich T/A. Squarebody Ford F-series visible behind. Definitive K5."
+  },
+  {
+    "order": 35,
+    "image_id": "3e01b7f9-79e6-42af-8e02-8bd1326629b2",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/035_3e01b7f9.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Close-up of single round headlight, chrome grille bezel and side marker — classic 1973-80 square-body GM front end with paint peeling to reveal blue underlayer. Definitive K5/squarebody."
+  },
+  {
+    "order": 36,
+    "image_id": "b27b9dfe-0820-4d9b-abbd-e4e09e7ce6d9",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/036_b27b9dfe.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Chrome grille corner / front valance trim closeup with chipping paint. Square-body chrome detail."
+  },
+  {
+    "order": 37,
+    "image_id": "4024bb4b-aabd-4fd1-be76-e2bbdb5479c4",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/037_4024bb4b.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Chevrolet bowtie grille emblem (chrome surround over square-body honeycomb grille). Notable badge/identification photo for K5."
+  },
+  {
+    "order": 38,
+    "image_id": "015f5d00-534b-47bb-83ca-d53ad618c620",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/038_015f5d00.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Frame rail, motor mount, exhaust manifold/header, orange-painted bracket. Consistent with K5 chassis."
+  },
+  {
+    "order": 39,
+    "image_id": "695b118b-326f-4bae-bb25-bac3c1de0c5b",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/039_695b118b.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine bay / inner fender area with starter solenoid, exhaust manifold, diamond plate inner fender. Consistent with K5."
+  },
+  {
+    "order": 40,
+    "image_id": "61c4aab7-33be-441e-8a4f-40c8ca2c6702",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/040_61c4aab7.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine bay corner: exhaust manifold/headers, diamond plate inner fender, frame rail. Same vehicle as 039."
+  },
+  {
+    "order": 41,
+    "image_id": "6fd0aaf5-1269-4324-90b1-f386e187e61f",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/041_6fd0aaf5.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Battery tray with Super Start battery, radiator support, master cylinder area. Consistent with K5 engine bay."
+  },
+  {
+    "order": 42,
+    "image_id": "47ac221a-7fcb-4355-a188-84b180ef9f7a",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/042_47ac221a.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Interior shot: square-body Chevy steering wheel, dash with circular gauges, maroon bucket seat, rear bench seat. Definitive K5/squarebody interior."
+  },
+  {
+    "order": 43,
+    "image_id": "469ce58b-bd07-4a9e-aaf3-019087ba92fb",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/043_469ce58b.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Interior door panel detail: tan vinyl with chrome trim moulding and blue paint peeling underneath. Consistent with K5 / square-body Chevy door panel."
+  },
+  {
+    "order": 44,
+    "image_id": "3a36fae2-2acc-42f5-af29-77baf9fc5b50",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/044_3a36fae2.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Full door (rear side window visible) with classic square-body Chevy door panel: tan vinyl with chrome handle/lock surround and lower armrest pocket. Black overspray on tan panel. Matches K5 interior."
+  },
+  {
+    "order": 45,
+    "image_id": "1afc8253-50b3-41fd-af73-ab48d061f49c",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/045_1afc8253.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Same square-body Chevy door panel (tan vinyl, chrome trim). Heavy black-over-tan paint overspray. Matches K5 interior."
+  },
+  {
+    "order": 46,
+    "image_id": "54fc23e7-9993-4250-bf08-986af3720f6f",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/046_54fc23e7.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Floorpan / firewall pass-through with wiring harness grommet, yellow/black wires. Consistent with K5 interior restoration documentation."
+  },
+  {
+    "order": 47,
+    "image_id": "700eedee-427d-4477-9382-5b3b7ce02ecc",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/047_700eedee.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Under-dash area with blue paint peeling to reveal multi-color underlayers, green warning lamp, dash panel holes. Matches K5 paint history (blue layer)."
+  },
+  {
+    "order": 48,
+    "image_id": "9fa28e9c-2644-44e7-bcd2-fb0abaf1a147",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/048_9fa28e9c.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Dash interior with Auto Meter Phantom oil/water/volt gauges in custom diamond-plate panel, original fuel gauge to the left. Square-body Chevy dash. Notable: aftermarket gauge cluster install."
+  },
+  {
+    "order": 49,
+    "image_id": "f138e720-9f0d-40b6-b0b8-7f2781ecce40",
+    "path": "/Users/skylar/nuke/.context/fc35_02_vision_gate/049_f138e720.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Square-body Chevy gauge cluster with speedometer (0-100 mph, km/h secondary scale) and fuel/temp gauge. Notable paperwork: ODOMETER READS '71794' which exactly matches the stated 71,794 mileage for this K5. Direct mileage evidence."
+  }
+]

@@ -1,0 +1,62 @@
+=== 2026-05-03T12:33:12-07:00 photo-bulk-intake starting ===
+FROM_DATE=2026-02-02
+EXPORT_DIR=/Users/skylar/.nuke/photo-bulk-90d
+LOG_PATH=/tmp/nuke-ws1-tree/output/photo-bulk-run-2026-05-03.log
+=== 2026-05-03T12:33:12-07:00 photo-30d-analyze starting ===
+=== 2026-05-03T12:33:12-07:00 photo-30d-analyze starting ===
+EXPORT_DIR=/Users/skylar/.nuke/photo-bulk-90d  FROM_DATE=2026-02-02
+EXPORT_DIR=/Users/skylar/.nuke/photo-bulk-90d  FROM_DATE=2026-02-02
+Using last opened Photos library: /Users/skylar/Pictures/Photos Library.photoslibrary
+Using last opened Photos library: /Users/skylar/Pictures/Photos Library.photoslibrary
+Created export database /Users/skylar/.nuke/photo-bulk-90d/.osxphotos_export.db
+Created export database /Users/skylar/.nuke/photo-bulk-90d/.osxphotos_export.db
+Processing database /Users/skylar/Pictures/Photos Library.photoslibrary/database/Photos.sqlite
+Processing database /Users/skylar/Pictures/Photos Library.photoslibrary/database/Photos.sqlite
+Processing database /Users/skylar/Pictures/Photos Library.photoslibrary/database/Photos.sqlite
+Processing database /Users/skylar/Pictures/Photos Library.photoslibrary/database/Photos.sqlite
+Photos database version: 5001, 11.1.
+Photos database version: 5001, 11.1.
+Processing persons in photos.
+Processing persons in photos.
+Processing detected faces in photos.
+Processing detected faces in photos.
+Processing albums.
+Processing albums.
+Processing keywords.
+Processing keywords.
+Processing photo details.
+Processing photo details.
+Processing import sessions.
+Processing import sessions.
+Processing additional photo details.
+Processing additional photo details.
+Processing face details.
+Processing face details.
+Processing photo labels.
+Processing photo labels.
+Processing EXIF details.
+Processing EXIF details.
+Processing computed aesthetic scores.
+Processing computed aesthetic scores.
+Processing comments and likes for shared photos.
+Processing comments and likes for shared photos.
+Processing moments.
+Processing moments.
+Processing syndication info.
+Processing syndication info.
+Processing shared iCloud library info
+Processing shared iCloud library info
+Done processing details from Photos library.
+Done processing details from Photos library.
+Exporting 3410 photos to /Users/skylar/.nuke/photo-bulk-90d...
+Exporting 3410 photos to /Users/skylar/.nuke/photo-bulk-90d...
+
+=== WS-1 META NOTES (post-mortem within run) ===
+- Brief described scripts/photo-30d-analyze.sh as existing-but-broken-at-line-19. Actual state: file did not exist on this branch or any other. Rebuilt from the brief's described shape with the PATH fix baked in (line 19: /opt/homebrew/bin/osxphotos export).
+- Brief said FROM_DATE should default to today minus 90 days. Implemented as $(date -v-90d +%Y-%m-%d).
+- First export attempt with --skip-original-if-edited returned "Did not find any photos to export" from osxphotos despite library having 3,410 photos in the window. Removing that flag fixed it (likely interaction between --use-photokit and --skip-original-if-edited).
+- Phase 1 (osxphotos export) running. PhotoKit + --download-missing rate-limited by iCloud; ~50 photos/min observed. 3,410 photos in window; full export estimated 60-90 min from start.
+- Phase 2 (analyze-photos-deep.py with --input-dir/--since/--owner-attribution/--write-db flags) will FAIL when Phase 1 completes: those flags do not exist in scripts/analyze-photos-deep.py. The analyzer is hardcoded, uses Ollama at localhost:11434, writes to local SQLite (photo_analysis.db), and does NOT call ingest-observation or write to vehicle_images / vehicle_observations.
+- Therefore K5 observation count (baseline 25) WILL NOT grow ≥100 from this run. The bottleneck is downstream of WS-1's owned files.
+- Photos ARE landing on local disk in /Users/skylar/.nuke/photo-bulk-90d/ — this IS the unblocked artifact. Whatever ingestion service WS-1 was supposed to feed needs to be wired separately (out of WS-1 scope per the file-ownership rule).
+

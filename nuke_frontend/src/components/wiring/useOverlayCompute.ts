@@ -1,13 +1,18 @@
 // useOverlayCompute.ts — React hook for real-time harness computation
 // Recomputes on every manifest change. No API calls. Instant.
 
-import { useMemo, useCallback, useRef, useState } from 'react';
+import { useMemo, useCallback, useRef, useState, useEffect } from 'react';
 import { computeOverlay, computeDelta, type ManifestDevice, type OverlayResult, type OverlayDelta } from './overlayCompute';
 import { computeTerminations, summarizeTerminationReadiness } from './terminationCompute';
 
 export function useOverlayCompute(initialDevices: ManifestDevice[] = []) {
   const [devices, setDevices] = useState<ManifestDevice[]>(initialDevices);
   const previousResult = useRef<OverlayResult | null>(null);
+
+  // Sync internal state when the source manifest array changes (async fetch lands)
+  useEffect(() => {
+    setDevices(initialDevices);
+  }, [initialDevices]);
 
   // Compute overlay — memoized, only recalculates when devices change
   const result = useMemo(() => computeOverlay(devices), [devices]);

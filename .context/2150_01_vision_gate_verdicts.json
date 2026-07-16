@@ -1,0 +1,352 @@
+[
+  {
+    "order": 0,
+    "image_id": "37e65e5c-ec20-4dd7-b0ef-fb4d2a2ac1a8",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Drivetrain/transfer case output flange or transmission tail housing component on engine stand with chain. Build-related part for K5 LS swap context."
+  },
+  {
+    "order": 1,
+    "image_id": "9dbc0366-6d2e-4a8a-904d-c3da1710e391",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Screenshot of parts shopping: LS3/Camaro/Corvette throttle bodies with annotations (X-out and circle marks). Build research for LS swap. Search text 'throttle body intake ls3 ac delco'."
+  },
+  {
+    "order": 2,
+    "image_id": "d6515a2b-e8c3-484b-a802-17e4d0ef1b46",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "PAPERWORK: George's Tire & Auto Repair invoice #18862 dated 06/15/2021. Customer: Williams, Skylar, 676 Wells Rd, 89005 (Boulder City NV). Vehicle: 1977 Chevrolet Blazer K10. Odometer 42626. Alignment service, needs steering gear replaced. Total $95.00 Visa. Phone 702-624-6793. Receipt taped to invoice."
+  },
+  {
+    "order": 3,
+    "image_id": "45018d99-4421-4912-9310-7bd90729b77a",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "PAPERWORK: CarQuest Auto Parts invoices 14981-114079 and 14981-114079 dated 5/6/2021. Customer SKYLAR, Viva Las Vegas Autos, 707 Yucca St, Boulder City NV 89005. Vehicle '1977 CHEVROLET K5 BLAZER NULL'. Parts: BGS A35 bushing, MOG ES3628 tie rod adjusting sleeve, MOG E2026R tie rod end, MOG ES2027L. Totals $48.49 and $347.98."
+  },
+  {
+    "order": 4,
+    "image_id": "0fe7d25f-b015-45f7-84d6-ec1340f8277b",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Differential housing interior with bearing caps removed, gear oil residue. Axle rebuild work consistent with K5 drivetrain refresh."
+  },
+  {
+    "order": 5,
+    "image_id": "63e6d5d8-0e9b-41b5-af08-fcea044e8273",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Close-up of bearing race/yoke/seal area with grease. Drivetrain rebuild detail."
+  },
+  {
+    "order": 6,
+    "image_id": "94c57549-0c9d-4587-a475-89d539cc3dc8",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Bare K5/square-body GM frame freshly painted black, with crossmembers and front suspension brackets visible, stored under carport. Classic K5 squarebody chassis."
+  },
+  {
+    "order": 7,
+    "image_id": "d0f851f3-2c10-47b7-b597-31a7b1a8da06",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Installed Hydroboost/master cylinder assembly on firewall, with orange-painted small-block 'Chevrolet' valve cover visible. Looks like aftermarket Hydroboost in a square-body engine bay."
+  },
+  {
+    "order": 8,
+    "image_id": "a9e6640f-e6c1-4146-9d45-983961e932a6",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Stock photo of a GM 4L/6L automatic transmission. Build research for K5 LS swap drivetrain selection."
+  },
+  {
+    "order": 9,
+    "image_id": "ac6c1c81-8965-40fe-82f0-feed29d85f07",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Screenshot of eBay listing: 'Throttle Body 12699160 For 22-23 Silverado 2500 2832775' from Schram Auto Parts, $99.00, purchased Aug 26 2024. GM truck parts purchase."
+  },
+  {
+    "order": 10,
+    "image_id": "991ee33d-9ffb-4759-bd73-b4a7e5f19f08",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Close-up of aluminum aftermarket steering box mounted to frame rail with blue threadlocker on bolt and witness mark. K5 steering gear install detail."
+  },
+  {
+    "order": 11,
+    "image_id": "62a2b092-26f4-4723-989c-48787d321228",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Transfer case mounted to transmission on a K5/square-body frame, chained for support. Drivetrain assembly stage."
+  },
+  {
+    "order": 12,
+    "image_id": "9e1ac6f0-81e1-4171-8b18-79f1a95eb29f",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Shop interior (image rotated/flipped) showing K5/square-body chassis on stands with engine partially installed, Union 76 sign and American flag on wall. Desert Performance/build shop context for the K5 LS swap."
+  },
+  {
+    "order": 13,
+    "image_id": "1f957fc3-6f14-4be9-bb1e-ee1d025b99ff",
+    "verdict": "approved",
+    "confidence": 0.65,
+    "reasoning": "Black-painted stamped-steel suspension/mount bracket in vise. Build component. Could be axle perch or frame bracket. Square-body context likely."
+  },
+  {
+    "order": 14,
+    "image_id": "4db20838-140e-47ca-ba4a-dbf27e3e9a93",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Bare LS engine (aluminum block, valve cover off, green plastic intake port protectors) being lowered into K5/square-body frame on stands with engine hoist. Core K5 LS swap moment."
+  },
+  {
+    "order": 15,
+    "image_id": "e8381c60-e9a2-4714-8701-cbca5bcd34eb",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "LS engine sitting on K5/square-body rolling chassis frame, intake removed, front axle and front suspension visible. Mid-swap photo."
+  },
+  {
+    "order": 16,
+    "image_id": "18c2e3f0-ddb0-4400-a1ce-aea94518f8d6",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "K5/square-body rolling chassis with LS engine sitting in mounts, front axle, leaf-spring suspension. Shop full of tools. Build progress."
+  },
+  {
+    "order": 17,
+    "image_id": "dca0aaeb-85e5-4ce6-8483-08a0167e7eb3",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Transfer case mated to transmission (likely NP transfer case + 4L/6L) attached to LS bellhousing, sitting on K5/square-body frame. Image is rotated. Drivetrain install."
+  },
+  {
+    "order": 18,
+    "image_id": "804c3a07-b2d5-495c-a7c5-de4ff00fb387",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "K5/square-body bare frame on stands with one wheel mounted at the shop. Mercedes W123 sedan up on lift in background is a different shop vehicle, not in scope."
+  },
+  {
+    "order": 19,
+    "image_id": "90f3632f-d5a1-43c8-aa73-84dd96496a0a",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Restored K5/square-body rolling chassis under 2-post lift, with another red square-body cab body shell up on the lift. Union 76 sign on wall. Same Desert Performance/build shop. Square-body content."
+  },
+  {
+    "order": 20,
+    "image_id": "3a648842-5698-4d38-8e92-4ec367eb95ba",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "K5/square-body bare frame on rolling stands with axles, drive shafts attached. Blue bench seat in background. Build progress."
+  },
+  {
+    "order": 21,
+    "image_id": "c8b7976d-d363-44e4-a1b9-0cff197f0f3e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Cargo area / rear wheel-tub crossmember of a vehicle body shell, blasted/cleaned/coated, taped off with yellow masking. American flag on wall. Likely K5 cargo area metalwork."
+  },
+  {
+    "order": 22,
+    "image_id": "9d9a6747-41ab-4aab-a94e-daa584229e17",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same K5 body shell interior — rear wheel arch / floor seam area cleaned and coated, taped off in yellow. Metalwork prep."
+  },
+  {
+    "order": 23,
+    "image_id": "9e59fcd1-e48d-4a70-9c1e-bcf5b95089ef",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Cargo floor / bed of K5 (or square-body truck) cleaned/sanded, exposed floor pan ribs and seat-mount tracks visible, body mount bolts protruding. Body restoration mid-process."
+  },
+  {
+    "order": 24,
+    "image_id": "a5143e3f-f374-4826-924a-8dca8be3f60f",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underside of a body shell (rotated/flipped), floor pan with seat mounts visible, yellow tie-down straps. Body work on K5 shell. 'bold statement' visible — shop banner."
+  },
+  {
+    "order": 25,
+    "image_id": "bcbe29ab-eae4-47a6-95cf-a394b16091cd",
+    "verdict": "review_needed",
+    "confidence": 0.45,
+    "reasoning": "Red painted body panel with extensive rust corrosion / through-hole and feathered grinding. Red could be the e04b K5 (red/white), but per attribution rule iphoto bucket = default approved unless evidence points to other vehicle. No VIN visible, no fender tag visible. Body-style ambiguity — possibly K5 fender corner or unrelated red car panel. Flag for human review."
+  },
+  {
+    "order": 26,
+    "image_id": "85158688-bb50-4fbc-b332-1d07f55fcae5",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Stripped K5/square-body cab body shell on a lift, rotated image, in shop with 'bold statement' banner. Red oxide primer visible. Body work stage."
+  },
+  {
+    "order": 27,
+    "image_id": "28a4c191-1972-4c87-965b-ba4e251d8f87",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Illustration/render of a red and white two-tone 1973-1980 K5 Blazer with single round headlights, lifted on black wheels. Reference image for build aesthetic."
+  },
+  {
+    "order": 28,
+    "image_id": "0d799670-6f09-4f63-ac1a-fe6add51cc37",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Duplicate / same illustration of red+white K5 Blazer square-body 1973-1980. Reference image."
+  },
+  {
+    "order": 29,
+    "image_id": "e6516144-368c-43ff-a01c-49354a3cd5f8",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Black aftermarket finned aluminum differential cover installed on rear axle, suspended for paint/install. K5 axle build."
+  },
+  {
+    "order": 30,
+    "image_id": "89904d0f-fa87-4260-b875-28fc84775914",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Digital caliper measuring 25.08 mm on a steel bushing/sleeve. Build measurement / parts verification."
+  },
+  {
+    "order": 31,
+    "image_id": "c2c771a4-37b3-4f0a-8106-11c3bda4bcae",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Heavy-duty tie rod ends with threaded shanks, jam nuts, and threaded sleeves on a wood board. Steering linkage rebuild parts (consistent with the CarQuest invoice showing tie rod purchases)."
+  },
+  {
+    "order": 32,
+    "image_id": "c1bc8cab-cd7b-4049-bf8d-f92d3ad83ed6",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Differential ring & pinion / carrier assembly inside diff housing with new spider gears. K5 axle rebuild."
+  },
+  {
+    "order": 33,
+    "image_id": "2264bee5-8af6-4867-aca3-ad82b85707f7",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Assortment of tapered bearings, roller bearings, and races laid out. Axle/transmission rebuild bearings."
+  },
+  {
+    "order": 34,
+    "image_id": "7a69a45c-79fd-430f-b189-19bec319be4f",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Same bearing pile, closer view. Axle/transmission rebuild parts."
+  },
+  {
+    "order": 35,
+    "image_id": "188d8ad3-0651-4266-8a4b-87e244311f75",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "More bearings & races including KOYO USA branded roller bearing. Axle rebuild parts."
+  },
+  {
+    "order": 36,
+    "image_id": "c5ac402f-b5ba-4ac6-a3a5-339f553cde5c",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Differential ring gear inside cleaned housing with dial indicator on the gear measuring backlash. Casting marks visible 16366, 8E E287 33. Professional gear setup."
+  },
+  {
+    "order": 37,
+    "image_id": "a2261c2e-efe4-401d-9ed0-ea7f0efec396",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Disc brake conversion kit components: rotors, calipers (bagged), caliper mounting brackets, hardware kit, flexible brake hose. K5 disc brake upgrade."
+  },
+  {
+    "order": 38,
+    "image_id": "307d11a4-3ad4-4273-8fcd-7c22b8ea2d72",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Front Dana axle housing with knuckle and steering arm, freshly painted black, on welding table (rotated image). K5 front axle rebuild."
+  },
+  {
+    "order": 39,
+    "image_id": "4b918416-6189-47c7-93c9-de18a3d1181a",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Pair of Dana 44 steering knuckles (left and right, with '21G21' casting mark on R knuckle) painted black, with wheel studs. K5 front axle rebuild."
+  },
+  {
+    "order": 40,
+    "image_id": "d74c4781-da20-45a9-b09e-e894603318c9",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rear axle / housing with center section removed, on a hoist/table next to layout with bearing supplies. 'bold statement' banner visible. Red square-body fender visible in background — possibly e04b K5 in same shop. K5 rear axle work."
+  },
+  {
+    "order": 41,
+    "image_id": "a985394a-dc29-4ef5-a0b1-9348ef77bae9",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Axle housing on shop table with sub-assemblies laid out: pinion gear, bearings, ring gear/carrier, shims. Rear axle teardown and prep."
+  },
+  {
+    "order": 42,
+    "image_id": "6e6c723f-aa53-4e48-8d51-219741e6aacb",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Bare 10/12-bolt-style axle housing on table with bearing kit, pinion gear, ring gear sub-assemblies. Square-body axle rebuild. Yellow/red painted truck body in background."
+  },
+  {
+    "order": 43,
+    "image_id": "474150e6-5d72-4d6d-839e-9186b278581a",
+    "verdict": "rejected_personal",
+    "confidence": 0.95,
+    "reasoning": "Text meme: 'Beware of an EBay scam. I ordered some perfume and a few nice sweaters for my wife but I received 4 wheels & a carburetor.' Not vehicle content; humorous text image."
+  },
+  {
+    "order": 44,
+    "image_id": "892a564e-0346-4440-8068-2c714b5ce6f8",
+    "verdict": "rejected_personal",
+    "confidence": 0.95,
+    "reasoning": "Photo of older man in 'Too bad the people who REALLY know how to run the country spend all their time working on OLD CARS!' t-shirt holding a paint spray gun, in front of a brick shop. Person photo, no vehicle in frame."
+  },
+  {
+    "order": 45,
+    "image_id": "960c190b-f22f-47d6-a63d-56ce1cd1f6ea",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Red & white Silverado square-body cab lifted off chassis on a frame-off restoration, with LS engine sitting on the chassis. Orange/red 1970-72 C10 (round headlight era) in background, plus another vehicle. Body-off square-body content — squarely in attribution scope."
+  },
+  {
+    "order": 46,
+    "image_id": "697613f5-110e-46b2-aa26-e182fc4a91a2",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Render/illustration of brown and white 1973-1980 K5 Blazer with 'K5 BLAZER' badge visible, lifted on Rally wheels. Build aesthetic reference."
+  },
+  {
+    "order": 47,
+    "image_id": "f068f925-d08c-42cc-97d9-ea93740f6a37",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Same/similar render of brown and white K5 Blazer with K5 Blazer badge, square-body. Build reference."
+  },
+  {
+    "order": 48,
+    "image_id": "fa71843b-9a3e-4bf1-8eeb-206c991bd357",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Render of brown and white two-tone 1973-1980 C10 long-bed pickup with Rally wheels. Square-body Chevy truck — within attribution scope (per rule: square-body Chevy or GMC truck content is approved)."
+  },
+  {
+    "order": 49,
+    "image_id": "db683496-903b-4f07-93cc-73548467b63c",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "3D wireframe render of a 1973-1980 square-body C10 pickup (Chevrolet bowtie grille visible). Long bed. Square-body Chevy truck content."
+  }
+]

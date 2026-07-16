@@ -21,7 +21,7 @@ for url in "${TEST_URLS[@]}"; do
   echo "Adding: $url"
 
   # Get source_id for the builder
-  source_id=$(PGPASSWORD="RbzKq32A0uhqvJMQ" psql \
+  source_id=$(PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql \
     -h aws-0-us-west-1.pooler.supabase.com \
     -p 6543 \
     -U postgres.qkgaybvrernstplzjaam \
@@ -37,7 +37,7 @@ for url in "${TEST_URLS[@]}"; do
   fi
 
   # Insert to import_queue
-  PGPASSWORD="RbzKq32A0uhqvJMQ" psql \
+  PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql \
     -h aws-0-us-west-1.pooler.supabase.com \
     -p 6543 \
     -U postgres.qkgaybvrernstplzjaam \

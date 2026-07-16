@@ -220,29 +220,11 @@ export class AuctionPaymentService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
-      const { data, error } = await supabase
-        .from('auction_bids')
-        .select(`
-          id,
-          listing_id,
-          displayed_bid_cents,
-          deposit_amount_cents,
-          deposit_status,
-          is_winning,
-          created_at,
-          vehicle_listings (
-            id,
-            vehicle_id,
-            auction_end_time,
-            status
-          )
-        `)
-        .eq('bidder_id', user.id)
-        .eq('deposit_status', 'authorized')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
+      // TODO(ghost-ref 2026-07-12): auction_bids does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+      // Native deposit-hold columns (displayed_bid_cents, deposit_amount_cents, deposit_status, bidder_id) have no
+      // equivalent in bat_bids/external_auction_bids (scraped-auction tables), so a repoint would lose the code's intent.
+      // Return empty so the deposit-holds UI renders "no active deposits" instead of silently swallowing a DB error.
+      return [];
     } catch (error) {
       console.error('Error fetching active deposits:', error);
       return [];

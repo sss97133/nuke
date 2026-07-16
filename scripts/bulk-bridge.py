@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Bulk bridge: Insert baseline + damage observations for ALL unbridged vehicles
 using batch SQL instead of per-image Python round-trips.
@@ -24,7 +25,7 @@ socket.setdefaulttimeout(None)
 DB_PARAMS = dict(
     host=HOST, port=6543, dbname='postgres',
     user='postgres.qkgaybvrernstplzjaam',
-    password='RbzKq32A0uhqvJMQ',
+    password=f"{os.environ['SUPABASE_DB_PASSWORD']}",
     connect_timeout=10,
 )
 

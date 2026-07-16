@@ -1,0 +1,37 @@
+# Generated from vehicle_canonical — substrate-driven, not file-driven.
+# Vehicle: e08bf694-970f-4cbe-8a74-8715158a0f2e
+# Loom: HIGH-BEAM CIRCUIT
+# Wires projected: 4
+
+metadata:
+  title: K5 HIGH-BEAM CIRCUIT
+  description: |
+    Projection of 4 wires from public.vehicle_canonical for
+    vehicle_id=e08bf694-970f-4cbe-8a74-8715158a0f2e. Source of truth is the DB; this YAML
+    is regenerated on demand. Cite-by-cell provenance retained in
+    structured_data on each underlying observation row.
+
+connectors:
+  M130_A:  {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  M130_B:  {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+  PDM30_A: {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  PDM30_B: {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+
+cables:
+  W85a:
+    # gauge: substrate gap
+    notes: "LED Headlight Left LOW | from FLOOR DIMMER LO-OUT 16 AWG M22759/32      LT GRN            4.0ft   Dimmer LOW position routes here. PDM-protected via OUT17/18 upstream. | sources=k5_cut_list_v2"
+  W85b:
+    # gauge: substrate gap
+    notes: "LED Headlight Left HIGH | from FLOOR DIMMER HI-OUT 16 AWG M22759/32      LT GRN/BLK        4.0ft   Dimmer HIGH position. Dakota high-beam indicator #121 taps this wire. | sources=k5_cut_list_v2"
+  W86a:
+    # gauge: substrate gap
+    notes: "LED Headlight Right LOW | from FLOOR DIMMER LO-OUT 16 AWG M22759/32      LT GRN/WHT        4.0ft   Paralleled with #85a at dimmer (single dimmer pattern). | sources=k5_cut_list_v2"
+  W86b:
+    # gauge: substrate gap
+    notes: "LED Headlight Right HIGH | from FLOOR DIMMER HI-OUT 16 AWG M22759/32      LT GRN/WHT/BLK    4.0ft   Paralleled with #85b at dimmer. | sources=k5_cut_list_v2"
+
+# Connection list intentionally omitted in this MVP — needs the
+# from_pin → connector pin mapping logic that lives in
+# docs/wiring/output/generate_wireviz_yaml.py. Next pass: refactor
+# that generator to consume the per-wire dicts produced above.

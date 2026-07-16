@@ -194,19 +194,24 @@ export function sortImagesByPriority(images: VehicleImage[]): VehicleImage[] {
 
   return imagesWithScores
     .sort((a, b) => {
-      // First by score
-      if (Math.abs(a.score - b.score) > 5) {
-        return b.score - a.score;
+      // Chronological FIRST (per Skylar 2026-05-24: gallery must be chronological).
+      // Newest first for hero/normal/historical shots; work docs go to the bottom
+      // (sentinel score < 0) regardless of recency.
+      const aIsWorkDoc = a.score < 0;
+      const bIsWorkDoc = b.score < 0;
+      if (aIsWorkDoc !== bIsWorkDoc) {
+        // Push work docs to the bottom
+        return aIsWorkDoc ? 1 : -1;
       }
-
-      // Within same tier, sort by date
-      if (a.score < 0 && b.score < 0) {
-        // Work docs: oldest first (buried but chronological)
+      if (aIsWorkDoc && bIsWorkDoc) {
+        // Within work docs: oldest first (buried but chronological)
         return a.date.getTime() - b.date.getTime();
-      } else {
-        // Hero/normal shots: newest first
-        return b.date.getTime() - a.date.getTime();
       }
+      // Within non-work-doc tier: newest first.
+      const dateDiff = b.date.getTime() - a.date.getTime();
+      if (dateDiff !== 0) return dateDiff;
+      // Tiebreaker: score (only when dates are equal)
+      return b.score - a.score;
     })
     .map((item) => item.image);
 }

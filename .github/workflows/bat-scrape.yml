@@ -1,5 +1,19 @@
 # Automated BAT Scraping via GitHub Actions
-# Runs every 6 hours, can also be triggered manually
+# Runs every 6 hours, can also be triggered manually.
+#
+# HISTORY: this workflow previously called a `go-grinder` edge function that
+# does not exist in the repo (and never did per git history) — every scheduled
+# run 404'd, which is why BaT ingestion silently stalled. It now calls the
+# functions that actually exist:
+#   1. bat-url-discovery  — scrapes bringatrailer.com/auctions/results/
+#                           pagination and queues new listing URLs to import_queue
+#   2. bat-queue-worker   — drains import_queue (extract-bat-core + comments);
+#                           also scheduled via pg_cron, the drain loop here just
+#                           accelerates fresh batches
+#
+# BACKFILL: for the Mar–Jun 2026 gap, trigger manually with pages=50 a few
+# times (discovery dedupes against existing URLs; ~4k missed listings ≈ 150
+# results pages).
 
 name: BAT Scrape
 
@@ -8,19 +22,19 @@ on:
     - cron: '0 */6 * * *'  # Every 6 hours (12 AM, 6 AM, 12 PM, 6 PM UTC)
   workflow_dispatch:
     inputs:
-      chain_depth:
-        description: 'Chain depth for go-grinder'
+      pages:
+        description: 'Results pages to scan for new listing URLs'
         required: false
-        default: '6'
-      max_listings:
-        description: 'Max listings to process'
+        default: '5'
+      drain_batches:
+        description: 'bat-queue-worker batches to run after discovery'
         required: false
-        default: '800'
+        default: '5'
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - name: Validate Secrets
@@ -38,16 +52,13 @@ jobs:
           fi
           echo "✅ All required secrets are set"
 
-      - name: Trigger BAT Scrape (go-grinder) with retry
+      - name: Discover new BaT listing URLs (bat-url-discovery)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          CHAIN_DEPTH=${{ github.event.inputs.chain_depth || '6' }}
-          MAX_LISTINGS=${{ github.event.inputs.max_listings || '800' }}
-
-          echo "🔍 Starting BaT scrape via go-grinder..."
-          echo "  chain_depth=$CHAIN_DEPTH  max_listings=$MAX_LISTINGS"
+          PAGES=${{ github.event.inputs.pages || '5' }}
+          echo "🔍 Discovering BaT listings (pages=$PAGES)..."
 
           MAX_RETRIES=3
           ATTEMPT=0
@@ -55,20 +66,14 @@ jobs:
 
           while [ $ATTEMPT -lt $MAX_RETRIES ]; do
             ATTEMPT=$((ATTEMPT + 1))
-            echo "\n🔄 Attempt $ATTEMPT / $MAX_RETRIES"
+            echo "🔄 Attempt $ATTEMPT / $MAX_RETRIES"
 
             RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
-              "${SUPABASE_URL}/functions/v1/go-grinder" \
+              "${SUPABASE_URL}/functions/v1/bat-url-discovery" \
               -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
               -H "Content-Type: application/json" \
-              --max-time 90 \
-              -d "{
-                \"do_seed\": true,
-                \"chain_depth\": $CHAIN_DEPTH,
-                \"seed_every\": 1,
-                \"bat_import_batch\": 1,
-                \"max_listings\": $MAX_LISTINGS
-              }")
+              --max-time 300 \
+              -d "{\"action\": \"discover\", \"pages\": $PAGES}")
 
             HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
             BODY=$(echo "$RESPONSE" | sed '$d')
@@ -77,12 +82,13 @@ jobs:
             echo "Response: $BODY" | head -c 2000
 
             if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-              echo "\n✅ BaT scrape triggered successfully (attempt $ATTEMPT)"
-              echo "$BODY" | grep -o '"discovered_listing_urls":[0-9]*' || true
+              echo ""
+              echo "✅ Discovery succeeded (attempt $ATTEMPT)"
               SUCCESS=true
               break
             else
-              echo "\n⚠️  Attempt $ATTEMPT failed (HTTP $HTTP_CODE)"
+              echo ""
+              echo "⚠️  Attempt $ATTEMPT failed (HTTP $HTTP_CODE)"
               if [ $ATTEMPT -lt $MAX_RETRIES ]; then
                 SLEEP_TIME=$((ATTEMPT * 15))
                 echo "⏳ Waiting ${SLEEP_TIME}s before retry..."
@@ -92,13 +98,43 @@ jobs:
           done
 
           if [ "$SUCCESS" = false ]; then
-            echo "\n❌ BaT scrape failed after $MAX_RETRIES attempts"
+            echo "❌ Discovery failed after $MAX_RETRIES attempts"
+            echo "If HTTP 403/503: BaT may be blocking direct fetch — needs Firecrawl fallback"
             exit 1
           fi
+
+      - name: Drain extraction queue (bat-queue-worker)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          BATCHES=${{ github.event.inputs.drain_batches || '5' }}
+          echo "⚙️  Draining import_queue ($BATCHES batches of 20)..."
+
+          for i in $(seq 1 $BATCHES); do
+            echo "--- batch $i / $BATCHES ---"
+            RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
+              "${SUPABASE_URL}/functions/v1/bat-queue-worker" \
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "Content-Type: application/json" \
+              --max-time 300 \
+              -d '{"batch_size": 20}')
+
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+            echo "HTTP $HTTP_CODE: $(echo "$BODY" | head -c 500)"
+
+            # Stop early if the queue is empty (worker reports processed count)
+            if echo "$BODY" | grep -q '"processed":0'; then
+              echo "Queue empty — stopping early"
+              break
+            fi
+          done
+          echo "✅ Drain pass complete (pg_cron continues in background)"
 
       - name: Summary
         if: always()
         run: |
           echo "📊 BaT scrape workflow completed"
-          echo "The go-grinder function will continue processing via self-invocation"
-          echo "Check Supabase logs or scrape_sources table for full results"
+          echo "Discovery queues to import_queue; bat-queue-worker (here + pg_cron) drains it"
+          echo "Check import_queue table for backlog: SELECT status, count(*) FROM import_queue GROUP BY 1"

@@ -1,0 +1,389 @@
+[
+  {
+    "order": 0,
+    "image_id": "b9aa5868-6a71-49aa-817e-b90c244afcd9",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/000_b9aa5868.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "1973-80 square-body Chevy K-series pickup, single round headlights, two-tone burgundy/tan, Cheyenne trim badge visible, raised 4WD stance — matches 1979 K10 profile",
+    "notes": "Cheyenne badge on door; two-tone burgundy over tan with body-side stripe; license plate present but not legible at this angle; fender rust below door; parked at retail lot (palm trees, AZ-style strip mall)"
+  },
+  {
+    "order": 1,
+    "image_id": "d90ba475-5757-4cd2-ae89-369ad3967507",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/001_d90ba475.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body 73-87 Chevy/GMC pickup, burgundy/tan two-tone, parked at shop. Image is sideways/rotated but identifiable",
+    "notes": "Rear quarter view; bedside two-tone matches the K10; license plate visible but small/illegible; concrete shop apron"
+  },
+  {
+    "order": 2,
+    "image_id": "767b26ed-9a78-4cff-a811-a34d40440b49",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/002_767b26ed.jpg",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Square-body Chevy front clip, single round headlight, large Chevy bowtie grille — matches 1979 K10. Shop with lift visible in background showing another square-body on hoist",
+    "notes": "Front 3/4 of burgundy K10; another square-body truck on a two-post lift in background (likely shop fleet)"
+  },
+  {
+    "order": 3,
+    "image_id": "6e448757-53a2-4bda-a809-805e61d0d8c3",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/003_6e448757.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "1979 K10 front 3/4 in shop yard, single round headlights, Chevy bowtie grille, fender Chevrolet badge — period-correct square-body. Shop scene with two additional square-bodies (blue one with hood up, white/primer one on right)",
+    "notes": "Three square-body trucks in frame at shop yard; tube-frame canopy; bowtie badge on grille center; Chevy script on fender visible"
+  },
+  {
+    "order": 4,
+    "image_id": "2f71585d-355d-4739-88c5-4377e8491091",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/004_2f71585d.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Side profile of 1979 K10, burgundy/tan two-tone, Cheyenne badge, 4WD stance — same truck as image 000. Shop yard with white square-body in right background",
+    "notes": "Cheyenne trim badge visible on door; rust around rear wheel arch; long bed; shop yard photo"
+  },
+  {
+    "order": 5,
+    "image_id": "3e4a4b06-c416-4c9d-a0c3-4604dbbddb2c",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/005_3e4a4b06.jpg",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Side profile, driver door open, of square-body K10 — same burgundy/tan paint scheme. Bed has visible rust patina. Shop carport background",
+    "notes": "Driver door open showing tan/cream interior; bed-side rust visible; Cheyenne badge; truck parked at shop"
+  },
+  {
+    "order": 6,
+    "image_id": "69eceecb-9374-4b0e-a40b-1693b0d827cb",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/006_69eceecb.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Utah Allstate Proof of Insurance Card for VIN CKL149F376441, 79 Chevy Trk K1 Series — exact match to vehicle. Insured: H. Zane Deweese / Barbara F., 345 E 100 So, Coalville UT 84017-9719. Policy 0 20 963137 05/12, effective 05/12/05, expiration 11/12/05",
+    "notes": "INSURANCE CARD — VIN CKL149F376441 explicit; owners Deweese (Zane & Barbara), Coalville UT; effective May 2005; this is prior-owner provenance"
+  },
+  {
+    "order": 7,
+    "image_id": "c22f9710-6004-4073-9610-f4fa8c690444",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/007_c22f9710.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Utah Registration / Safety Inspection certificate for VIN CKL149F376441, K10K10 PK, 79 CHEV, plate 211FWM, validated JUL 03 2001, expires JUN 2002. Owner: ROBINSON WESLEY S, 280 E 100 S, Coalville UT 84017-9700. Total $34.50",
+    "notes": "REGISTRATION — VIN CKL149F376441; K10 pickup; plate 211FWM; owner Wesley S Robinson, Coalville UT; 2001 tax year; Summit County"
+  },
+  {
+    "order": 8,
+    "image_id": "319b9411-200e-4fe3-943b-0fa7401c84bd",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/008_319b9411.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Summit County Sheriff Driver Exchange Form documenting a non-reportable accident involving Carlye Cuthbertson (driver) and an unnamed party — likely the truck. References First Sec Insurance, policy AZD000091435523, badge 162. Driver age 17, Coalville UT address",
+    "notes": "ACCIDENT REPORT — Summit County Sheriff Driver Exchange Form; 1989 Ford involved per VEHICLE YEAR/MAKE field; possibly related to truck via insurance match but Ford listed — review needed for direct K10 association"
+  },
+  {
+    "order": 9,
+    "image_id": "2c0b6d19-99bd-4fb2-b7f6-23ab6ce57811",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/009_2c0b6d19.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Utah Allstate Proof of Insurance Card for VIN CKL149F376441, 79 Chevy Truck. Insured: Wesley S Robinson, 280 E 100 So, Coalville UT 84017-9700. Effective 03/18/00, expiration 03/18/01",
+    "notes": "INSURANCE CARD — VIN CKL149F376441; owner Wesley S Robinson, Coalville UT; 2000-2001 policy period"
+  },
+  {
+    "order": 10,
+    "image_id": "bd797255-a18f-4a26-a9fd-93da93d3e2de",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/010_bd797255.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Utah Allstate Proof of Insurance Card for VIN CKL149F376441, 79 Chevy Truck. Insured: Wesley S Robinson, 280 E 100 So, Coalville UT. Effective 03/18/99, expiration 09/18/99",
+    "notes": "INSURANCE CARD — VIN CKL149F376441; Wesley S Robinson; 1999 policy"
+  },
+  {
+    "order": 12,
+    "image_id": "74c46fb2-5317-4041-869e-be43b42b0f90",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/012_74c46fb2.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Utah Registration for VIN CKL149F376441, K10K10 PK, 79 CHEV, plate 211FWM, validated JUN 04 1999, expires JUN 2000. Owner: ROBINSON WESLEY S, 280 E 100 S, Coalville UT. Total $34.50",
+    "notes": "REGISTRATION — VIN CKL149F376441; Wesley Robinson; 1999 tax year"
+  },
+  {
+    "order": 13,
+    "image_id": "2345c963-1501-445d-bed9-feec61f6a3fe",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/013_2345c963.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Utah Registration for VIN CKL149F376441, K10K10 PK, 79 CHEV, plate 211FWM, validated JUN 19 1998, expires JUN 1999. Owner ROBINSON WESLEY S, 280 E 100 South, Coalville UT 84017-0661. Lessee BX 661. Total $32.00",
+    "notes": "REGISTRATION — VIN CKL149F376441; Wesley Robinson; 1998 tax year"
+  },
+  {
+    "order": 14,
+    "image_id": "57ccf16d-62cd-4493-9674-bcca74091b32",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/014_57ccf16d.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Utah OHV Education Course certificate (Parks & Rec) for KELSEY JAMES ROBINSON, 280 East 100 South, Coalville UT, age ~10 (DOB 10/01/82). Same Robinson household / address as truck owner — household provenance / family member document",
+    "notes": "OHV CERTIFICATE — kid (Kelsey James Robinson, b.1982) from the same Robinson household; not about the K10 directly but ties to owner family. Approve as Robinson-household paperwork, marginal relevance to truck"
+  },
+  {
+    "order": 15,
+    "image_id": "1d1529b7-2a8e-45af-b9de-e11fdffbcca6",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/015_1d1529b7.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Utah Safety Inspection Certificate (HPSI-29). Owner Wesley Robinson, Coalville UT; plate 211FWM; year 79; type TC; ODOMETER READING 101712. Cert no 7009473. VIN partially visible: CKL14[9]...",
+    "notes": "INSPECTION CERT — Wesley Robinson; plate 211FWM; ODOMETER 101712 miles (single point-in-time mileage); Coalville Repair station; signed by inspector"
+  },
+  {
+    "order": 16,
+    "image_id": "a4e270ff-598b-47c0-806a-e518bb0c6879",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/016_a4e270ff.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Utah OHV Education Course certificate for DEVON THOMAS ROBINSON, 280 East 100 South, Coalville UT — same Robinson household as truck owner. Inverted/rotated image",
+    "notes": "OHV CERTIFICATE — second Robinson kid (Devon Thomas) from same address; family provenance — marginal relevance to truck"
+  },
+  {
+    "order": 19,
+    "image_id": "cd7cf494-e223-43b1-abf4-0270c3ddde6f",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/019_cd7cf494.jpg",
+    "verdict": "approved",
+    "confidence": 0.5,
+    "reasoning": "Utah State Tax Comm validation stub dated JUL 15 1996, EO 2843, amount $27.42 — likely the receipt half corresponding to a truck registration. No VIN or plate visible on this fragment alone",
+    "notes": "TAX RECEIPT STUB — JUL 15 1996, $27.42; no VIN/plate visible on fragment; likely matches Robinson-era registration"
+  },
+  {
+    "order": 20,
+    "image_id": "410653ad-c5dc-48f9-9fb1-3251752ce2b6",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/020_410653ad.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Utah Allstate Proof of Insurance Card for VIN CKL149F376441, 79 Chevy Truck. Insured: Wesley S Robinson, 280 E 100 So, Coalville UT. Effective 03/18/97, expiration 09/18/97",
+    "notes": "INSURANCE CARD — VIN CKL149F376441; Wesley Robinson; 1997 policy"
+  },
+  {
+    "order": 21,
+    "image_id": "e309ea38-196a-4a92-b0c8-88a5e210b762",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/021_e309ea38.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Utah Registration for VIN CKL149F376441, K10K10 PK, 79 CHEV, plate 211FWM, validated AUG 08 1997, expires JUN 1998. Owner ROBINSON WESLEY S, BX 661, Coalville UT 84017-0661. Total $27.42",
+    "notes": "REGISTRATION — VIN CKL149F376441; Wesley Robinson; 1997 tax year; matches receipt stub in 019"
+  },
+  {
+    "order": 22,
+    "image_id": "82bcd346-4824-4566-8222-9a97bc786cbe",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/022_82bcd346.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Utah State Tax Comm Motor Vehicle Division receipt dated 07/17/95, plate 211FWM (renewal-passenger), total $27.42 — matches Robinson K10 plate. Receipt for a renewal at 12:35",
+    "notes": "TAX RECEIPT — JUL 17 1995, plate 211FWM matches K10 (CKL149F376441); $27.42 renewal; Robinson-era doc"
+  },
+  {
+    "order": 23,
+    "image_id": "d08de938-6629-4485-bfa5-0f0884e1360d",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/023_d08de938.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Utah Safety Inspection Certificate (HPSI-29) folded with plate 211FWM partially visible and 91017 ZIP, Utah Highway Patrol stamp — Wesley Robinson-era inspection for the K10. Inverted/folded so full VIN not visible",
+    "notes": "INSPECTION CERT — partial visibility but plate 211FWM and 326-2931 phone match prior Robinson registrations; same truck"
+  },
+  {
+    "order": 24,
+    "image_id": "d4cd7b37-f1ae-4dc3-9446-4e69900e6c49",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/024_d4cd7b37.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Utah Registration for VIN CKL149F376441, K10K10 PK, 79 CHEV, plate 211FWM, validated JUL 17 1995, expires JUN 1996. Owner ROBINSON WESLEY S, BX 661, 180 E 50 North, Coalville UT 84017. Total $27.42",
+    "notes": "REGISTRATION — VIN CKL149F376441; Wesley Robinson; 1995 tax year; matches receipt stub 022"
+  },
+  {
+    "order": 25,
+    "image_id": "091a1a2e-4a80-45f7-8b71-1ae230da75e4",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/025_091a1a2e.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Utah Registration for VIN CKL149F376441, K10K10 PK, 79 CHEV, plate 1341CD, validated JUN 30 1992, expires JUN 1993. Owner LONDON JEFFREY D, P3 N 435 WEST, MORGAN UT 84050. Tax assessed in Morgan County",
+    "notes": "REGISTRATION — VIN CKL149F376441; EARLIER OWNER Jeffrey D London, Morgan UT (predates Robinson). Plate 1341CD before plate 211FWM. Morgan County. This establishes London->Robinson->Deweese ownership chain"
+  },
+  {
+    "order": 26,
+    "image_id": "def3d5e2-fcbc-4e19-b2e6-1933ee4d5ee2",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/026_def3d5e2.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Utah Motor Vehicle Division decal placement instruction card with 1995 expiration sticker (Utah '95') — generic registration ephemera, but corresponds to a renewal year for this truck",
+    "notes": "DECAL CARD — 1995 Utah registration sticker placement instructions; minor ephemera, no VIN but household paperwork"
+  },
+  {
+    "order": 28,
+    "image_id": "a521867a-a741-4a9d-9ccd-892d1bc1e14a",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/028_a521867a.jpg",
+    "verdict": "review_needed",
+    "confidence": 0.3,
+    "reasoning": "Utah Recreation Vehicle & Boat Temporary Permit for a 1995 HONDA TRX300FWS ATV (VIN/HIN 478TE150X5A705469), 300cc, dated 8/20/94, owner ROBINSON WESLEY (same household as K10 owner). This document is about a Honda ATV, not the K10 — but ties to Robinson household. Per rules: non-square-body GM = rejected_misattributed, BUT it's same-household paperwork. Marking review_needed",
+    "notes": "ATV PERMIT — Honda TRX300FWS (NOT the K10); same owner Wesley Robinson, Coalville UT; household provenance only; ATV is unrelated vehicle"
+  },
+  {
+    "order": 29,
+    "image_id": "5c44221b-9a84-48c8-a3a9-2d7b9b9b8d14",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/029_5c44221b.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Utah State Tax Comm Motor Vehicle Division receipt dated 10/23/93, plate transfer to plate 211FWM, new title, state sales tax $90.00 — this is the title-transfer and plate-issue receipt when Wesley Robinson acquired the K10 from London. Total $120.31",
+    "notes": "TITLE TRANSFER RECEIPT — OCT 23 1993; plate 211FWM newly issued; state sales tax $90 paid; new title; this likely records the London-to-Robinson transfer of the K10"
+  },
+  {
+    "order": 30,
+    "image_id": "c03a5ff5-a46e-4cc9-a8b4-d040f0d90174",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/030_c03a5ff5.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Summit County Certificate of Assessment dated OCT 29 1993 for VIN CKL149F376441 (handwritten), 79 TC, model K10, market value $1430, general tax $24.31. Owner Wes & Roberta Robinson (handwritten 180 E 50, Coalville UT). Property tax cleared",
+    "notes": "ASSESSMENT — VIN CKL149F376441 hand-noted; 1993; market value $1430 (period valuation); owners Wes & Roberta Robinson (also reveals Wesley's spouse name Roberta); Summit County"
+  },
+  {
+    "order": 32,
+    "image_id": "7d8752ef-769c-45d9-b2e9-8a66f348ae52",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/032_7d8752ef.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "NAPA Auto Parts business card for COALVILLE AUTO & FARM SUPPLY, 2 South Main, Coalville UT 84017. Owner/Manager: Wes Robinson, residence (801) 336-2931. Same Wes Robinson as the truck's prior owner — his shop business card",
+    "notes": "BUSINESS CARD — Wes Robinson owned/managed Coalville Auto & Farm Supply (NAPA), 2 South Main, Coalville UT; residence phone 336-2931 matches earlier inspection cert. Establishes Robinson as a local auto-parts shop owner"
+  },
+  {
+    "order": 33,
+    "image_id": "2c45c243-e520-48f6-b6b3-d7c8b80a8481",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/033_2c45c243.jpg",
+    "verdict": "approved",
+    "confidence": 0.5,
+    "reasoning": "Utah Safety Inspection Certificate (HPSI-29 Rev 2000) — blank/partial fields visible, Utah Highway Patrol stamp. Most identifying fields are folded under or illegible at this angle",
+    "notes": "INSPECTION CERT — generic format, content partially obscured; likely Robinson-era K10 paperwork given the document cache but full VIN/plate not legibly visible in this frame"
+  },
+  {
+    "order": 34,
+    "image_id": "fa03be8c-e5e8-4989-83be-175544ed0e23",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/034_fa03be8c.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Four insurance cards laid out: three Allstate cards for VIN CKL149F376441 (Wesley Robinson 03/18 cards; Deweese 05/12 cards) PLUS a State Farm Utah Insurance Card naming insured DEWEESE, ZANE & BARBARA, VIN CKL149F376441, YR 1979, MAKE CHEVROLET, MODEL K10, effective DEC 01 2019 to JUN 01 2020",
+    "notes": "INSURANCE CARDS GROUP — confirms full ownership chain: London (1992) -> Robinson (1993-mid 2000s) -> Deweese (Zane & Barbara, 2005 Allstate, 2019-2020 State Farm); State Farm card explicitly says 'K10' model and gives agent BRYAN & DABELL INS AGCY INC, NAIC 25178, policy 147 1665-F01-44"
+  },
+  {
+    "order": 35,
+    "image_id": "76a788ae-a030-417e-9c8f-026ac167dba9",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/035_76a788ae.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "1979 Chevrolet Light Duty Truck Owner's and Driver's Manual (gasoline) — exact-year factory owner's manual that lives with this truck. 'Keep With Vehicle At All Times' instruction",
+    "notes": "OWNER'S MANUAL — 1979 Chevrolet Light Duty Truck factory manual; gasoline; period-correct paperwork"
+  },
+  {
+    "order": 36,
+    "image_id": "771f037d-d09a-44f3-8f87-cec0b0dadfdc",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/036_771f037d.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Close-up of the K10's factory speedometer cluster — round speedo with 0-100 MPH scale, KM/H inner ring, and visible 5-digit odometer reading approximately 58986 (or similar; partially obscured). Period-correct GM square-body instrument cluster",
+    "notes": "ODOMETER PHOTO — approximate reading 58986 (single digits hard to read, image rotated); factory GM speedo; CRITICAL: this conflicts with 1998 inspection reading of 101712 — so either this is a different point in time, the odometer rolled over (5 digits = max 99999.9), or it's been replaced/reset. Worth flagging"
+  },
+  {
+    "order": 37,
+    "image_id": "ad78688a-739b-4799-8295-f859d27bccb5",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/037_ad78688a.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Same factory speedometer cluster (different angle/rotation) — odometer reading approximately 58986 or similar visible behind dust; period 1979 GM truck instrument",
+    "notes": "ODOMETER PHOTO — companion to image 036; same cluster"
+  },
+  {
+    "order": 39,
+    "image_id": "dbfdc807-eb6e-4909-bf1b-435dede67b90",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/039_dbfdc807.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Factory GM speedometer (0-100 MPH) close-up on K10 dash, needle near 0 with small KM/H inner scale — period-correct square-body instrument",
+    "notes": "ODOMETER PHOTO — needle on zero (engine off); MPH outer, KM/H inner; period GM"
+  },
+  {
+    "order": 40,
+    "image_id": "043e3946-835b-4f2f-a45a-47eac90314a1",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/040_043e3946.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Blurry close-up of the speedometer dial — same 0-100 MPH GM cluster; out of focus but consistent with square-body interior shots",
+    "notes": "ODOMETER PHOTO — blurry; same cluster as 036/037/039"
+  },
+  {
+    "order": 41,
+    "image_id": "cdc98071-0ea3-4cb2-815e-bdbc136f09dc",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/041_cdc98071.jpg",
+    "verdict": "review_needed",
+    "confidence": 0.3,
+    "reasoning": "Heavily motion-blurred image — appears to show something metallic/brushed (possibly an exhaust manifold or transmission tunnel?) but no identifiable subject. Could be an under-hood / under-truck shot from the K10 photo session but cannot confirm",
+    "notes": "BLUR — unrecognizable; possibly part of K10 mechanical inspection series but no identifying features"
+  },
+  {
+    "order": 42,
+    "image_id": "ffe59cd2-6164-4b44-ba3e-34c3620ddf85",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/042_ffe59cd2.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Close-up of the factory GM speedometer (0-100 MPH outer, KM/H inner ring) — same K10 dash cluster as other interior shots",
+    "notes": "ODOMETER PHOTO — clearer view; needle on zero; period GM cluster"
+  },
+  {
+    "order": 43,
+    "image_id": "cb5948db-f37a-4b0e-9679-d62ed336556f",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/043_cb5948db.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "VIN PLATE photo — riveted aluminum/brass plate stamped 'CKL149F376441' (with leading asterisk delimiters typical of factory VIN tags). Plate is mounted on the dashboard/cowl with two screws, surrounded by peeling paint",
+    "notes": "VIN PLATE — physical confirmation of VIN CKL149F376441 stamped on the factory dash plate; ties all paperwork to this exact chassis"
+  },
+  {
+    "order": 44,
+    "image_id": "a47b2694-717c-4ba5-9dbf-134ef32ab3a2",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/044_a47b2694.jpg",
+    "verdict": "approved",
+    "confidence": 1.0,
+    "reasoning": "Same dashboard VIN plate, second angle — VIN 'CKL14[9]F376441' clearly stamped with leading asterisk; peeling paint surround",
+    "notes": "VIN PLATE — second photo angle; same plate, confirms CKL149F376441"
+  },
+  {
+    "order": 45,
+    "image_id": "7b26ce9d-de61-4f95-a8ed-009ee7772517",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/045_7b26ce9d.jpg",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Under-hood / inside-fender shot of the K10 showing wiring harness, expansion tank or charcoal canister, DieHard battery, body crease, master cylinder area — period-correct GM square-body engine bay layout",
+    "notes": "ENGINE BAY — DieHard battery visible (badge legible); ribbed air intake hose; carbureted engine era components; consistent with stock 350 V8 K10"
+  },
+  {
+    "order": 46,
+    "image_id": "09241aae-c725-4e75-bb37-1b5297650ad9",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/046_09241aae.jpg",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Engine bay close-up showing wiring loom, vacuum lines, brake booster, and a 'UNIQUE INDUSTRIES' (scrap/recycling/recovery) paper tag zip-tied to a hose — indicates this truck passed through a salvage / industrial yard at some point",
+    "notes": "ENGINE BAY w/ YARD TAG — 'Unique Industries' scrap-metal / industrial recovery tag visible (illegible phone but logo clear); CRITICAL provenance signal — truck likely acquired from a recycling/recovery yard at some point in its history"
+  },
+  {
+    "order": 47,
+    "image_id": "d70523e9-8ba0-4fba-b0c1-254590ae5a3e",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/047_d70523e9.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine bay overhead — distributor, intake manifold, brake booster, master cylinder, vacuum advance hoses, yellow wire bundle, terra-cotta-colored block (likely a small-block Chevy 350 painted Chevy orange faded); same 'Unique Industries' yard tag faintly visible top-left",
+    "notes": "ENGINE BAY — Chevy small-block layout (likely 350 V8); brake booster, vacuum lines, distributor cap visible; faded orange engine paint; yard tag confirms shared photo session with image 046"
+  },
+  {
+    "order": 48,
+    "image_id": "a65e71f3-dbc9-4ad6-95b0-286dfea83f3e",
+    "path": "/Users/skylar/nuke/.context/afcf_01_vision_gate/048_a65e71f3.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine bay front shot showing the fan/clutch shroud, generator/alternator area, hood release, radiator support, and the front body crossmember of a square-body — period 1979 K10 layout",
+    "notes": "ENGINE BAY FRONT — radiator core support, fan shroud, hood latch visible; some surface rust on inner fenders; consistent with the rest of the K10 engine-bay set"
+  }
+]

@@ -21,6 +21,71 @@ function getSupabase() {
   });
 }
 
+// Derive-on-read (vehicle-profile-computation-surface.md doctrine): for attributes
+// that have a registry definition + recorded atoms, the canonical value is the
+// SYNTHESIZED consensus, not the flat vehicles column (a Phase-1 cache being
+// strangled per observation-model.md Phase 3). We reuse mcp-connector's
+// synthesize_attribute (the one consensus engine) via an internal call rather than
+// duplicate it. Returns null when no atoms exist → caller keeps the flat-column value.
+async function deriveAttr(
+  vehicleId: string,
+  attribute: string,
+): Promise<{ value: unknown; confidence: number | null } | null> {
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/mcp-connector`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "synthesize_attribute", arguments: { subject_id: vehicleId, attribute } },
+      }),
+    });
+    if (!resp.ok) return null;
+    const j = await resp.json();
+    const text = j?.result?.content?.[0]?.text;
+    if (!text) return null;
+    const syn = JSON.parse(text);
+    const c = syn?.consensus;
+    const support = c?.observation_count ?? c?.support ?? 0;
+    if (!c || c.label == null || support < 1) return null;
+    return { value: c.label, confidence: c.weighted_confidence ?? null };
+  } catch {
+    return null; // synthesis unavailable → flat-column fallback, never block the package
+  }
+}
+
+// Identity field → registry attribute. Only these prefer consensus; everything
+// else stays on the flat column until its attribute is registered.
+// Map each identity field to its registry attribute. A `format` coerces a
+// structured consensus label to the SCALAR the consumers expect (BaT fill /
+// eBay mapper want a string for color, never an object) — without it, a
+// structured attribute would corrupt the consumer. `format` returning null
+// skips the override (keeps the flat-column value).
+const titleCase = (s: string) =>
+  s.replace(/\b\w/g, (c) => c.toUpperCase()).replace(/_/g, " ").trim();
+function colorToString(v: unknown): string | null {
+  if (typeof v === "string") return v ? titleCase(v) : null;
+  if (v && typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    const color = o.color ?? o.name ?? o.value;
+    if (!color) return null;
+    const finish = o.finish ? `${o.finish} ` : "";
+    return titleCase(`${finish}${String(color)}`);
+  }
+  return null;
+}
+const DERIVE_MAP: ReadonlyArray<{ key: string; attribute: string; format?: (v: unknown) => unknown }> = [
+  { key: "title_status", attribute: "vehicle.title_status" },
+  { key: "zip", attribute: "vehicle.zip" },
+  { key: "owned_time", attribute: "vehicle.owned_time" },
+  { key: "exterior_color", attribute: "vehicle.current_color", format: colorToString },
+];
+
 interface ListingPackage {
   platform: string;
   ars_score: number | null;
@@ -116,12 +181,17 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Tier vocabulary is single-sourced from compute_auction_readiness() (SQL) and
+    // AuctionReadinessPanel TIER_LABELS: TIER_1_EXCEPTIONAL, TIER_2_COMPETITIVE,
+    // TIER_3_VIABLE, TIER_4_INCOMPLETE, DISCOVERY_ONLY. (EARLY_STAGE / NEEDS_WORK are
+    // legacy rows from an older scorer — they fall through to not-ready.)
+    const tier = (ars?.tier as string) || null;
     const tierWarning =
-      ars?.tier === "AUCTION_READY"
+      tier === "TIER_1_EXCEPTIONAL" || tier === "TIER_2_COMPETITIVE"
         ? null
-        : ars?.tier === "NEARLY_READY"
-          ? "Vehicle is NEARLY_READY — listing may have minor gaps."
-          : `Vehicle is ${ars?.tier || "UNSCORED"} — not ready for submission. Use get_coaching_plan to close gaps.`;
+        : tier === "TIER_3_VIABLE"
+          ? "Vehicle is TIER_3_VIABLE — listing-ready with minor gaps. Use get_coaching_plan to strengthen."
+          : `Vehicle is ${tier || "UNSCORED"} — not ready for submission. Use get_coaching_plan to close gaps.`;
 
     // 2. Pull full vehicle data
     const { data: v, error: vErr } = await supabase
@@ -214,6 +284,9 @@ Deno.serve(async (req: Request) => {
         mileage: v.mileage,
         title_status: v.title_status,
         location: [v.city, v.state].filter(Boolean).join(", ") || v.location,
+        zip: v.zip_code ?? null,
+        // owned_time = the purchase year (BaT asks "what year did you purchase"). Null-safe; never inferred.
+        owned_time: v.purchase_date ? new Date(v.purchase_date).getFullYear() : null,
       },
       listing_content: {
         title: `${v.year} ${v.make} ${v.model}${v.trim ? " " + v.trim : ""}`,
@@ -258,6 +331,31 @@ Deno.serve(async (req: Request) => {
       submission_fields:
         platform === "bat" ? mapToBatFields(v) : null,
     };
+
+    // Derive-on-read pass: override flat-column values with synthesized consensus
+    // where atoms exist, and record per-field provenance (powers the frozen,
+    // attested listing_exports snapshot — what was submitted and why).
+    const fieldProvenance: Record<string, unknown> = {};
+    const derived = await Promise.all(
+      DERIVE_MAP.map(async ({ key, attribute, format }) => {
+        const d = await deriveAttr(vehicleId, attribute);
+        if (!d) return null;
+        const value = format ? format(d.value) : d.value;
+        if (value == null) return null; // formatter rejected the shape → keep flat column
+        return { key, attribute, value, confidence: d.confidence } as const;
+      }),
+    );
+    for (const d of derived) {
+      if (!d) continue;
+      (pkg.identity as Record<string, unknown>)[d.key] = d.value;
+      fieldProvenance[d.key] = {
+        value: d.value,
+        confidence: d.confidence,
+        source: "synthesis",
+        attribute: d.attribute,
+      };
+    }
+    (pkg as Record<string, unknown>).field_provenance = fieldProvenance;
 
     return new Response(JSON.stringify(pkg, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

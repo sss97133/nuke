@@ -45,37 +45,20 @@ export const useValuationIntel = (vehicleId: string | null): ValuationIntelResul
           .limit(1)
           .maybeSingle();
 
-        const componentsPromise = supabase
-          .from('vehicle_valuations_components')
-          .select('*')
-          .eq('vehicle_id', vehicleId)
-          .order('estimated_value', { ascending: false, nulls: 'last' });
+        // 2026-05-24 dead-query-sweep: financial_readiness_snapshots table is not
+        // deployed (404). Short-circuit to null until the feature lands.
+        const readinessRow = null;
 
-        const readinessPromise = supabase
-          .from('financial_readiness_snapshots')
-          .select('*')
-          .eq('vehicle_id', vehicleId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const [{ data: valuationRow, error: valuationError }, { data: componentRows, error: componentsError }, { data: readinessRow, error: readinessError }] =
-          await Promise.all([valuationPromise, componentsPromise, readinessPromise]);
+        const { data: valuationRow, error: valuationError } = await valuationPromise;
 
         if (!isMounted) return;
 
         if (valuationError) {
           throw valuationError;
         }
-        if (componentsError) {
-          throw componentsError;
-        }
-        if (readinessError) {
-          console.warn('[useValuationIntel] readiness snapshot unavailable:', readinessError.message);
-        }
 
         setValuation(valuationRow || null);
-        setComponents(componentRows || []);
+        setComponents(Array.isArray(valuationRow?.components) ? valuationRow.components : []);
         setReadiness(readinessRow || null);
         setRefreshedAt(new Date().toISOString());
       } catch (err: any) {

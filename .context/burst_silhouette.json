@@ -1,0 +1,472 @@
+[
+  {
+    "sample_uuid": "F919E792-A0C0-45C0-9413-D6BC315205BA",
+    "burst_start": "2026-02-06 18:10:01",
+    "burst_count": 531,
+    "has_vehicle": false,
+    "vehicle_class": "document",
+    "vehicle_color": null,
+    "likely_model": "Mustang",
+    "notes": "Handwritten Bill of Sale for a 1966 Ford Mustang, $7,500, VIN 6F08C746662, dated Jul 25 2003 - acquisition document for the Mustang"
+  },
+  {
+    "sample_uuid": "181A5FBA-B40B-4753-A14F-D0428A26D706",
+    "burst_start": "2019-12-24 18:46:35",
+    "burst_count": 417,
+    "has_vehicle": false,
+    "vehicle_class": "other",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Christmas Eve - small child wearing Santa hat in red outfit; family/holiday photo, not vehicle-related"
+  },
+  {
+    "sample_uuid": "0B826AB5-08BB-4F28-B44F-0680199B3F18",
+    "burst_start": "2025-11-04 15:46:05",
+    "burst_count": 416,
+    "has_vehicle": null,
+    "vehicle_class": null,
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "thumbnail too small/blurry to identify - looks like a dark interior surface or shop floor"
+  },
+  {
+    "sample_uuid": "090966DF-A040-489D-9E30-C0FF79C3E8D7",
+    "burst_start": "2024-12-01 16:45:02",
+    "burst_count": 392,
+    "has_vehicle": false,
+    "vehicle_class": "part",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Blurry thumbnail of small metallic parts/hardware - possibly a perforated bracket or panel with rivets/fasteners"
+  },
+  {
+    "sample_uuid": "DF11AC3F-00B2-417C-A0B6-4CCFF9AFB123",
+    "burst_start": "2026-02-10 15:53:19",
+    "burst_count": 354,
+    "has_vehicle": true,
+    "vehicle_class": "pickup",
+    "vehicle_color": "blue/two-tone (light blue over dark blue)",
+    "likely_model": "K20",
+    "notes": "Beautiful square-body GMC Sierra Classic 4x4 pickup, two-tone blue paint, lifted on BFGoodrich AT tires with American Racing wheels, parked in desert with mountains - looks like a finished/showroom-condition truck"
+  },
+  {
+    "sample_uuid": "7986A84C-1B3C-4969-8547-07D5966828CE",
+    "burst_start": "2025-08-26 14:32:59",
+    "burst_count": 241,
+    "has_vehicle": false,
+    "vehicle_class": "document",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Skylar Jacob Williams's State of Utah birth certificate - January 17, 1991, Murray UT"
+  },
+  {
+    "sample_uuid": "7EC25401-295D-4DBA-85FD-044A1584F001",
+    "burst_start": "2020-04-18 19:00:35",
+    "burst_count": 208,
+    "has_vehicle": null,
+    "vehicle_class": null,
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "thumbnail too blurry to identify - looks like an interior view of a building/shop doorway"
+  },
+  {
+    "sample_uuid": "A51A26A7-9917-4EEA-95EE-BBB43CFFA146",
+    "burst_start": "2020-05-27 18:43:25",
+    "burst_count": 190,
+    "has_vehicle": false,
+    "vehicle_class": "other",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Baby/toddler eating - family photo, not vehicle-related"
+  },
+  {
+    "sample_uuid": "05076D2D-62EC-4607-B156-D7DDE6382632",
+    "burst_start": "2025-08-28 16:36:41",
+    "burst_count": 174,
+    "has_vehicle": null,
+    "vehicle_class": null,
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "thumbnail too blurry - appears to be a workbench or shelf with items"
+  },
+  {
+    "sample_uuid": "69ECB3F1-32BB-4B7D-99A4-AFD50ABE4A16",
+    "burst_start": "2025-10-18 19:01:09",
+    "burst_count": 169,
+    "has_vehicle": true,
+    "vehicle_class": "other",
+    "vehicle_color": "dark",
+    "likely_model": "unknown",
+    "notes": "Blurry low-angle shot, possibly underside/chassis or trailer with dark structure - hard to identify"
+  },
+  {
+    "sample_uuid": "AAFBD9D1-D199-4B1A-9BDF-0F892D43DEB7",
+    "burst_start": "2024-01-13 20:49:47",
+    "burst_count": 168,
+    "has_vehicle": true,
+    "vehicle_class": "suv",
+    "vehicle_color": "interior tan/woodgrain trim",
+    "likely_model": "Suburban",
+    "notes": "Interior measurement - tape measure stretched across interior of what looks like a square-body Suburban/Blazer with wood trim, spray-foam insulated ceiling visible above (shop interior shot through open door); measuring vehicle dimensions"
+  },
+  {
+    "sample_uuid": "50FFA956-29BF-415C-9148-9AE26E983AE2",
+    "burst_start": "2024-04-24 23:42:12",
+    "burst_count": 162,
+    "has_vehicle": null,
+    "vehicle_class": null,
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "thumbnail too blurry to identify - appears to be an interior space, possibly a store or restaurant"
+  },
+  {
+    "sample_uuid": "22EE65FB-77B5-4458-B94F-30FCC3AAD70F",
+    "burst_start": "2026-02-03 17:38:22",
+    "burst_count": 155,
+    "has_vehicle": false,
+    "vehicle_class": "part",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Fuelab fuel pump/regulator (model 818xx series) in original box - performance fuel system component, likely for an LS swap or similar build"
+  },
+  {
+    "sample_uuid": "8D146E80-5B64-41B7-A093-699D8A06B86D",
+    "burst_start": "2024-09-22 15:18:51",
+    "burst_count": 154,
+    "has_vehicle": true,
+    "vehicle_class": "pickup",
+    "vehicle_color": "orange (printed brochure illustration)",
+    "likely_model": "K10",
+    "notes": "Page from a vintage Chevrolet Cheyenne brochure showing a square-body pickup (Cheyenne trim) illustration - reference material for a build"
+  },
+  {
+    "sample_uuid": "44D553C9-535D-4B94-88BA-DCA1F1AFCBA0",
+    "burst_start": "2025-09-06 23:00:35",
+    "burst_count": 151,
+    "has_vehicle": null,
+    "vehicle_class": null,
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "thumbnail too blurry to identify - outdoor scene, possibly buildings or storage yard at distance"
+  },
+  {
+    "sample_uuid": "3131D260-4C78-4674-BDCF-39BCBB7D36BE",
+    "burst_start": "2023-04-20 16:02:09",
+    "burst_count": 149,
+    "has_vehicle": false,
+    "vehicle_class": "other",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Beseler PM1A color analyzer (darkroom photography equipment) with instruction booklet - photography gear, not automotive"
+  },
+  {
+    "sample_uuid": "13581A7E-2ABD-48CD-8FC9-34B4D7287635",
+    "burst_start": "2023-07-01 20:36:25",
+    "burst_count": 148,
+    "has_vehicle": null,
+    "vehicle_class": null,
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "thumbnail too blurry to identify - desert landscape at sunset/dusk with structures in foreground"
+  },
+  {
+    "sample_uuid": "A3E9C385-DE84-4819-9203-0584FB140835",
+    "burst_start": "2024-03-15 18:03:16",
+    "burst_count": 148,
+    "has_vehicle": null,
+    "vehicle_class": null,
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "thumbnail too blurry - looks like inside of a public building (airport, museum, or convention center) with blue digital display"
+  },
+  {
+    "sample_uuid": "A04BDAB5-35C0-4640-AB53-E5BEDD4DB4CB",
+    "burst_start": "2020-05-01 20:07:24",
+    "burst_count": 144,
+    "has_vehicle": true,
+    "vehicle_class": "other",
+    "vehicle_color": "dark interior",
+    "likely_model": "unknown",
+    "notes": "Blurry interior shot taken from inside a vehicle looking out windshield/window at desert scene - dashboard visible in foreground"
+  },
+  {
+    "sample_uuid": "501EC936-5DEE-4F86-91EF-2144C3D9EEC0",
+    "burst_start": "2025-09-10 16:54:13",
+    "burst_count": 142,
+    "has_vehicle": false,
+    "vehicle_class": "document",
+    "vehicle_color": null,
+    "likely_model": "K10",
+    "notes": "Vintage GM Service Parts Identification (SPID) label/build sheet - VIN starting CCL187 indicates a 1977 Chevy C/K series; lists options like A01 tinted glass, A31 power windows, B32 floor mats, C60 AC, LS9 engine, M40 Turbo Hydramatic, Y84 Cheyenne package, etc."
+  },
+  {
+    "sample_uuid": "E37CAC60-760A-447F-BB54-037F9F5C64EF",
+    "burst_start": "2018-09-23 03:01:12",
+    "burst_count": 133,
+    "has_vehicle": false,
+    "vehicle_class": "document",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Screenshot of an online auto parts shopping cart - Mr. Gasket carburetor adapter + Edelbrock Performer Series carb adapter plate; California Prop 65 warning visible"
+  },
+  {
+    "sample_uuid": "AF6EBD37-D2D6-490F-AFB3-844400BEEE11",
+    "burst_start": "2025-09-09 15:07:28",
+    "burst_count": 131,
+    "has_vehicle": true,
+    "vehicle_class": "other",
+    "vehicle_color": "white",
+    "likely_model": "unknown",
+    "notes": "Blurry but appears to show a vehicle on a transport/utility trailer or possibly a tow truck/flatbed setup at the shop"
+  },
+  {
+    "sample_uuid": "DBFB9959-9B0D-4127-A880-D6FC89C27989",
+    "burst_start": "2024-06-13 19:25:59",
+    "burst_count": 128,
+    "has_vehicle": true,
+    "vehicle_class": "pickup",
+    "vehicle_color": "B&W illustration",
+    "likely_model": "K10",
+    "notes": "Page from a vintage 1970s Chevrolet truck brochure (Exterior section) showing a square-body C/K pickup illustration - reference material"
+  },
+  {
+    "sample_uuid": "B360A45F-3203-4447-A17D-E05E7331872E",
+    "burst_start": "2019-11-01 20:57:57",
+    "burst_count": 116,
+    "has_vehicle": false,
+    "vehicle_class": "other",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Blurry close-up of a person or face; possibly indoor scene - too unclear to identify"
+  },
+  {
+    "sample_uuid": "759623DC-7CC2-4167-8632-407490B1936B",
+    "burst_start": "2023-12-21 18:56:16",
+    "burst_count": 115,
+    "has_vehicle": false,
+    "vehicle_class": "other",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Blurry close-up - looks like a person holding food or another object; possibly holiday family photo (Dec 21 timing)"
+  },
+  {
+    "sample_uuid": "D918CC7A-C74E-4A2F-BE7B-42FEDEC3CFAF",
+    "burst_start": "2024-04-18 17:42:58",
+    "burst_count": 110,
+    "has_vehicle": false,
+    "vehicle_class": "other",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Family/social scene - woman with two small kids on a brown sofa in front of large blue 'KNEES PRAYER' painted sign; appears to be at a church or community space"
+  },
+  {
+    "sample_uuid": "2D9224B2-1E55-43FC-A6E3-EEEF93EE7C2D",
+    "burst_start": "2021-08-30 17:47:27",
+    "burst_count": 100,
+    "has_vehicle": true,
+    "vehicle_class": "pickup",
+    "vehicle_color": "white",
+    "likely_model": "K10",
+    "notes": "Close-up of white square-body truck body - rocker panel/lower door area showing rust spots and the frame with bolted body mounts; documentation of body condition/rust"
+  },
+  {
+    "sample_uuid": "72F2F904-F143-46C5-AA15-87330144C77E",
+    "burst_start": "2020-12-21 00:35:32",
+    "burst_count": 92,
+    "has_vehicle": null,
+    "vehicle_class": null,
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "thumbnail too blurry - looks like indoor scene with people/objects on a counter; possibly kitchen or shop interior"
+  },
+  {
+    "sample_uuid": "0CE78867-D313-4FC9-B2CA-53012B8EB3FC",
+    "burst_start": "2025-04-25 17:40:04",
+    "burst_count": 91,
+    "has_vehicle": null,
+    "vehicle_class": null,
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "thumbnail too blurry to identify - close-up of light-colored fabric or material, possibly food/baked goods"
+  },
+  {
+    "sample_uuid": "703DC2E3-6BF9-4E67-AA33-9E8267647B7C",
+    "burst_start": "2020-01-24 01:12:59",
+    "burst_count": 87,
+    "has_vehicle": null,
+    "vehicle_class": null,
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "thumbnail too blurry - looks like food on a plate (possibly fish or chicken with sauce) at a meal"
+  },
+  {
+    "sample_uuid": "90752A97-6A63-494A-8A7D-8A314FE99FD2",
+    "burst_start": "2023-04-13 17:36:28",
+    "burst_count": 87,
+    "has_vehicle": false,
+    "vehicle_class": "part",
+    "vehicle_color": "green",
+    "likely_model": null,
+    "notes": "Stanley tape measure showing ~3 inches alongside a green-painted leaf spring or suspension component on a workbench - measuring a part during a build"
+  },
+  {
+    "sample_uuid": "13E8C3F6-0E11-4FE1-8D1C-F76605EE58AA",
+    "burst_start": "2023-07-10 19:35:01",
+    "burst_count": 86,
+    "has_vehicle": false,
+    "vehicle_class": "other",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Snap-on tool roll with set of combination/open-end wrenches in a tool drawer; user wearing work boots visible at bottom - shop tooling"
+  },
+  {
+    "sample_uuid": "CA4D4A08-6CB8-4CB3-86FB-5BBD170D16AC",
+    "burst_start": "2025-10-30 16:24:09",
+    "burst_count": 82,
+    "has_vehicle": false,
+    "vehicle_class": "other",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Shop workbench with gray upholstery/headliner material being cut/fitted; cardboard template visible, spray-foam shop walls in background - interior trim work in progress"
+  },
+  {
+    "sample_uuid": "3ACC256D-23AB-4B92-AFD3-AF05C1D132CC",
+    "burst_start": "2022-11-19 18:53:34",
+    "burst_count": 80,
+    "has_vehicle": true,
+    "vehicle_class": "pickup",
+    "vehicle_color": "red",
+    "likely_model": "K10",
+    "notes": "Rear of a red GMC square-body truck with chrome bumper, Nevada plate '264 M51' (01 sticker), receiver hitch visible - back end shot of his red GMC truck"
+  },
+  {
+    "sample_uuid": "193B2934-624B-43EB-B4F9-29509B650812",
+    "burst_start": "2026-04-27 15:34:20",
+    "burst_count": 80,
+    "has_vehicle": true,
+    "vehicle_class": "pickup",
+    "vehicle_color": "white over yellow",
+    "likely_model": "K10",
+    "notes": "Close-up of body work in progress - white upper / yellow lower two-tone door or cab side with a small bondo/filler spot patched over an old hole; sanding/body prep for repaint"
+  },
+  {
+    "sample_uuid": "2071E525-7B55-4867-BD08-3B15719C71A5",
+    "burst_start": "2019-12-22 00:46:39",
+    "burst_count": 78,
+    "has_vehicle": false,
+    "vehicle_class": "other",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Selfie/portrait of a bearded man in black shirt - person photo, not vehicle"
+  },
+  {
+    "sample_uuid": "4F58A2CF-38AE-4CEB-864C-A9C37326CBE3",
+    "burst_start": "2021-06-12 21:02:21",
+    "burst_count": 78,
+    "has_vehicle": true,
+    "vehicle_class": "other",
+    "vehicle_color": "frame/bare metal",
+    "likely_model": "unknown",
+    "notes": "Underside/chassis shot of a vehicle on a lift, showing transmission crossmember, driveshaft, leaf springs, and frame rails - red Pontiac GTO visible in the background parked behind; chassis inspection work"
+  },
+  {
+    "sample_uuid": "C9725335-9EB9-4812-99B8-553E01AA4D6A",
+    "burst_start": "2022-01-25 04:33:10",
+    "burst_count": 77,
+    "has_vehicle": null,
+    "vehicle_class": null,
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "thumbnail too blurry - very dark, looks like a mechanical part or engine component close-up"
+  },
+  {
+    "sample_uuid": "8F9B59D3-1F0F-47B9-B83E-EDDBB648F959",
+    "burst_start": "2023-07-11 23:33:56",
+    "burst_count": 76,
+    "has_vehicle": null,
+    "vehicle_class": null,
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "thumbnail too blurry - greenish/yellow tinted scene, possibly outdoor with foliage or pavement"
+  },
+  {
+    "sample_uuid": "D29B0662-0E9D-45D7-A0E1-E0E420B05FBE",
+    "burst_start": "2020-05-25 16:07:02",
+    "burst_count": 73,
+    "has_vehicle": false,
+    "vehicle_class": "other",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Dimly-lit room with small lamp - interior of a home/hotel room, not vehicle-related"
+  },
+  {
+    "sample_uuid": "5C3F6A3F-376A-4115-B0AB-9AD7B0E50859",
+    "burst_start": "2025-02-18 18:23:10",
+    "burst_count": 73,
+    "has_vehicle": null,
+    "vehicle_class": null,
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "thumbnail too blurry to identify - looks like an interior space, possibly wood/tile, hard to tell"
+  },
+  {
+    "sample_uuid": "C61DE361-61C9-4D90-8058-6ADCA68BCDC1",
+    "burst_start": "2023-05-20 15:19:34",
+    "burst_count": 72,
+    "has_vehicle": false,
+    "vehicle_class": "document",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Nevada Certificate of Title for a 1990 Dodge D-150 S pickup, VIN 1B7GE06X5LS715014, owner Skylar Jacob Williams, 674 Wells Rd Boulder City - title document for a Dodge truck Skylar owns/owned"
+  },
+  {
+    "sample_uuid": "DA3719FA-1B95-40A3-AB0F-576D12ED8310",
+    "burst_start": "2025-10-05 20:47:50",
+    "burst_count": 72,
+    "has_vehicle": false,
+    "vehicle_class": "document",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "AutoZone commercial invoice billed to 'Viva Las Vegas Autos' (676 Wells Rd, Boulder City) for STP grease tubes, $16.32 cash, dated 8/23/2024"
+  },
+  {
+    "sample_uuid": "DED14731-63BD-4158-89B2-BEA0CB8963CA",
+    "burst_start": "2026-02-02 20:32:16",
+    "burst_count": 71,
+    "has_vehicle": true,
+    "vehicle_class": "part",
+    "vehicle_color": "black/satin black",
+    "likely_model": "K10",
+    "notes": "Rear axle / brake drum backing plate freshly painted satin black - rear differential housing and brake hardware visible; suspension/brake refresh on a square-body axle"
+  },
+  {
+    "sample_uuid": "596F593C-666D-4688-980A-213CCC51E25A",
+    "burst_start": "2019-04-29 19:50:09",
+    "burst_count": 70,
+    "has_vehicle": true,
+    "vehicle_class": "other",
+    "vehicle_color": "dark",
+    "likely_model": "unknown",
+    "notes": "Blurry shot taken from inside a vehicle showing dashboard/hood and out the windshield toward desert highway with another dark vehicle ahead - driving photo"
+  },
+  {
+    "sample_uuid": "3B6C37C3-1AB5-42B2-8B81-37A8EBA67B2E",
+    "burst_start": "2025-04-24 21:25:51",
+    "burst_count": 66,
+    "has_vehicle": false,
+    "vehicle_class": "other",
+    "vehicle_color": null,
+    "likely_model": null,
+    "notes": "Grocery cart with Gatorade bottles, Captain Morgan White Rum bottle, Polar seltzer case, and other items - grocery/liquor shopping run"
+  },
+  {
+    "sample_uuid": "7DBF7094-C810-45B3-BEB7-C22B8C17589A",
+    "burst_start": "2026-04-15 16:58:30",
+    "burst_count": 66,
+    "has_vehicle": true,
+    "vehicle_class": "pickup",
+    "vehicle_color": "dark blue exterior, rusted floor",
+    "likely_model": "K10",
+    "notes": "Underside / wheelwell shot of a square-body truck cab showing extensive rust on the floor pan / cab corner, coil spring visible, dark blue painted body panel - rust assessment / floor pan repair candidate"
+  }
+]

@@ -1,0 +1,394 @@
+[
+  {
+    "order": 0,
+    "image_id": "09682e71-9497-4f40-9b22-37d1623a5c3b",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Handshake / acquisition scene in Circle K parking lot. Black square-body GM SUV (Blazer or Suburban with hardtop) on right being received by Skylar (blue shirt). Gold Corvair coupe on left is another vehicle. Acquisition-context photo for the square-body truck on right.",
+    "notes": "Circle K store sign in background; acquisition handshake; gold Corvair foreground; Skylar visible; Las Vegas/desert parking lot"
+  },
+  {
+    "order": 1,
+    "image_id": "65eaa5ef-e064-4d89-b637-0e9de03126fa",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same acquisition handshake scene as order 0 with black square-body GM SUV on right.",
+    "notes": "Circle K parking lot, handshake variant"
+  },
+  {
+    "order": 2,
+    "image_id": "859541ca-5019-44d8-8007-bcec3be6d2b9",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same acquisition handshake scene with black square-body GM SUV.",
+    "notes": "Circle K parking lot, handshake variant"
+  },
+  {
+    "order": 3,
+    "image_id": "dc2a78d3-09c2-4b7b-b55e-563130ba9c30",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same acquisition handshake scene with black square-body GM SUV.",
+    "notes": "Circle K parking lot, handshake variant"
+  },
+  {
+    "order": 4,
+    "image_id": "689c7875-1a1b-4c92-a498-d3a32140ceb7",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same acquisition handshake scene with black square-body GM SUV.",
+    "notes": "Circle K parking lot, handshake variant"
+  },
+  {
+    "order": 5,
+    "image_id": "1363c944-0b1a-4f14-bf5b-19b4551a58b7",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same acquisition handshake scene with black square-body GM SUV.",
+    "notes": "Circle K parking lot, handshake variant"
+  },
+  {
+    "order": 6,
+    "image_id": "14f9abb3-b221-450d-8a25-73126a6bc4b3",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same acquisition handshake scene with black square-body GM SUV.",
+    "notes": "Circle K parking lot, handshake variant"
+  },
+  {
+    "order": 7,
+    "image_id": "9e98eae7-82fd-49b5-92b1-e1640b93534e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same acquisition handshake scene with black square-body GM SUV.",
+    "notes": "Circle K parking lot, handshake variant"
+  },
+  {
+    "order": 8,
+    "image_id": "9a440633-7d0b-4293-8124-9da90c4f6412",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same acquisition handshake scene with black square-body GM SUV.",
+    "notes": "Circle K parking lot, handshake variant"
+  },
+  {
+    "order": 9,
+    "image_id": "78be569d-de13-4d87-8bf5-95300161a6ce",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Interior view from driver seat showing square-body GM dash bezel removed/in hand. Distinctive 1973-1980 GM truck dashboard cluster housing with TEMP and OIL labels visible. Desert backdrop through windshield.",
+    "notes": "Square-body GM dash bezel; gauge cluster work in progress; desert landscape"
+  },
+  {
+    "order": 10,
+    "image_id": "ae6af183-9174-45c4-9abd-a48b76e8fbcd",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body GM dashboard interior view. 1973-1980 instrument cluster style with twin round gauges plus auxiliary gauges. Desert/Lake Mead area visible through windshield.",
+    "notes": "Square-body dash; aftermarket auxiliary gauges; desert overlook"
+  },
+  {
+    "order": 11,
+    "image_id": "fff12270-21cb-4c3a-a435-768ede68519e",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body GM dash with CHEVROLET-branded steering wheel. Speedometer reads 71794 mi/km. 1973-1980 instrument cluster. Desert vista visible.",
+    "notes": "MILEAGE: 71794 on odometer; CHEVROLET steering wheel; aftermarket auxiliary gauges"
+  },
+  {
+    "order": 12,
+    "image_id": "c97b3e19-a45d-498e-bcb6-fd66c10a5cfc",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body GM front grille close-up with Chevy bowtie badge. Horizontal egg-crate grille pattern with chrome trim, single round headlight on right side. Consistent with 1973-1980 K5 Blazer / Chevy C/K. Blue paint chips visible through black overspray.",
+    "notes": "Chevy bowtie badge; single round headlight; blue underlying paint visible on bumper"
+  },
+  {
+    "order": 13,
+    "image_id": "01a15742-9520-4dd7-9452-3e0f7a4ea517",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Same square-body GM grille close-up with bowtie badge. Blue underlying paint visible.",
+    "notes": "Chevy bowtie badge close-up; blue paint substrate visible"
+  },
+  {
+    "order": 14,
+    "image_id": "d18986bf-0d96-4d59-8976-122a2617abbe",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "K5 Blazer roof / windshield top showing removable hardtop seam with bolts. Distinctive removable-top architecture of 1973-1980 K5 Blazer (not Suburban which has fixed roof). Desert mountain backdrop.",
+    "notes": "Removable hardtop seam clearly visible - confirms K5 Blazer body style"
+  },
+  {
+    "order": 15,
+    "image_id": "044e999c-d5dc-4070-96b5-d1ba26c86170",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "K5 Blazer removable hardtop seam / windshield top. Same vehicle as order 14, different angle.",
+    "notes": "Removable hardtop seam confirms K5 Blazer"
+  },
+  {
+    "order": 16,
+    "image_id": "db91a15f-f350-49f7-9586-ffcda44a5bdb",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Interior cargo area floor view with transmission tunnel / hump cover removed. Square-body Blazer/Suburban cargo bay characteristic with diamond plate over floor pan. Body work / restoration documentation.",
+    "notes": "Diamond plate flooring, transmission tunnel access; restoration in progress"
+  },
+  {
+    "order": 17,
+    "image_id": "dc199532-057e-4ea2-a779-d37f3147bc6b",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Square-body GM truck interior from passenger side showing dash bare with gauge holes, custom diamond plate floor, NP transfer case shifter, manual transmission shifter, red bench seat fragment. Cactus visible through windshield = desert/Arizona-Nevada workshop.",
+    "notes": "Bare dash with gauge holes; aftermarket diamond plate floor; transfer case shifter; manual trans shifter; red bench seat; cactus through windshield"
+  },
+  {
+    "order": 18,
+    "image_id": "86eb5612-d31b-477a-af3d-43895b5c7338",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Door/body panel detail with door catch / hinge area, dark blue paint visible underneath black overspray. Diamond plate visible. Consistent with K5 restoration.",
+    "notes": "Body panel detail; blue paint visible under black; restoration evidence"
+  },
+  {
+    "order": 19,
+    "image_id": "c89493c7-0fbc-40d8-b685-40ab090db772",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Body panel close-up showing multi-color paint history (blue, red, yellow stripes) with rust spot and yellow paint marker note. Multi-stripe paint scheme classic for 1970s/80s K5 Blazer custom paint. Rust evidence at panel junction.",
+    "notes": "Blue/red/yellow stripe paint history (classic 70s/80s K5); rust at panel junction; yellow paint marker annotation 'CR' or similar"
+  },
+  {
+    "order": 20,
+    "image_id": "ab7cff40-028e-411e-8ac3-90851b815256",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Rocker / cab corner showing rust-through hole, blue paint history with yellow stripe, BFG All-Terrain tire visible. Consistent K5 restoration content.",
+    "notes": "Rust through rocker; blue/yellow paint history; BFG A/T tire; restoration rust documentation"
+  },
+  {
+    "order": 21,
+    "image_id": "95d22b91-7c17-438f-96f5-50a748566732",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Square-body GM rear quarter / taillight area with painted-over fuel filler cap, multi-color paint history (blue, purple, etc.), rust at body seam. Consistent with K5/square-body restoration.",
+    "notes": "Fuel filler cap; multi-color paint chips (blue, purple); body seam rust"
+  },
+  {
+    "order": 22,
+    "image_id": "2000d2c4-1481-4bae-964d-86d31ebf9cff",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body GM taillight close-up with visible GM part number markings on the lens. Multi-color paint history with rust at body seam.",
+    "notes": "PART NUMBER VISIBLE ON TAILLIGHT LENS - reads 'GM129' or similar; rust at body seam; multi-color paint chips"
+  },
+  {
+    "order": 23,
+    "image_id": "7d25da53-c8ed-4a08-9022-1a4cafb1edec",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Square-body GM taillight close-up illuminated, with rust at body seam below, body work / weld lines visible. Moon in background.",
+    "notes": "Illuminated taillight with GM part number markings; rust at seam; body weld visible"
+  },
+  {
+    "order": 24,
+    "image_id": "9fcca3c4-7d9c-4028-9a0c-3cbb1c9b14aa",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Square-body GM taillight close-up, fresh weld with body filler primer prep, rust at body seam, desert/dusk backdrop.",
+    "notes": "Taillight + weld repair area; body filler in primer; rust at panel seam"
+  },
+  {
+    "order": 25,
+    "image_id": "432e5069-d1ec-426b-ad72-ee4031c0a421",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Same square-body GM rear corner with taillight and welded/filler repair, primer prep stage.",
+    "notes": "Repaired rear quarter at taillight; primer; weld line"
+  },
+  {
+    "order": 26,
+    "image_id": "28139c61-51e0-45d0-81f2-223b8bbe569d",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Square-body GM rear quarter / wheel arch with body filler prep, taillight (rotated/upside-down photo), leaf spring visible. Restoration body work.",
+    "notes": "Body filler/prep; leaf spring; taillight; rotated orientation"
+  },
+  {
+    "order": 27,
+    "image_id": "ccb2c9dd-326d-41c5-ac60-8426ea64444e",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Square-body GM rear quarter panel with body filler primer prep around taillight, BFG All-Terrain tire visible.",
+    "notes": "Body filler prep at rear quarter; BFG A/T tire"
+  },
+  {
+    "order": 28,
+    "image_id": "ecfe198d-4b3c-4ba5-81fa-0e536467464c",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Rear view of K5 Blazer with removable hardtop, tailgate, twin red round taillights, rear window. Distinctive K5 Blazer profile (not Suburban - no rear barn doors, single tailgate; not pickup - has hardtop with rear window). Desert mountain backdrop.",
+    "notes": "CONFIRMED K5 BLAZER body style (removable hardtop + tailgate); rear shot in desert"
+  },
+  {
+    "order": 29,
+    "image_id": "eaf05157-0a31-4e39-b6ce-752d307bb04f",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "K5 Blazer (rotated/upside-down photo orientation) with hood up, spare tire on hood, multi-color stripe paint visible on side. Round headlights confirm 1973-1980 generation.",
+    "notes": "Hood up; spare tire on hood; multi-color stripes; rotated photo"
+  },
+  {
+    "order": 30,
+    "image_id": "e22c415c-25d5-4403-a573-73d3a5981ab1",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Side profile of K5 Blazer with removable hardtop, lifted suspension, BFG All-Terrain tires on Rally wheels, multi-color stripe paint (blue/red/yellow) visible under black on rocker. Definitive K5 Blazer 1973-1980 body style.",
+    "notes": "CLASSIC K5 BLAZER side profile; lifted; BFG A/T on Rally wheels; multi-color stripes visible; desert/dusk"
+  },
+  {
+    "order": 31,
+    "image_id": "510b826d-489d-49a1-b1f5-6e658c757646",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "3/4 front view of K5 Blazer, single round headlights (pre-1981 generation), Chevy bowtie grille, hardtop visible, multi-color stripes peeking through black, BFG A/T tires. Desert/mountain backdrop.",
+    "notes": "CLASSIC K5 BLAZER 3/4 front; single round headlights = 1973-1980 generation; bowtie grille; lifted; BFG A/T"
+  },
+  {
+    "order": 32,
+    "image_id": "5dcf9fab-6853-45b0-8fe0-b81f2ae86820",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Front view of K5 Blazer, single round headlights, horizontal grille with bowtie, lifted, BFG A/T tires, front bumper. Desert/dusk. Definitive 1973-1980 K5.",
+    "notes": "Front face shot; single round headlights confirm 1973-1980 era; lifted; bowtie grille"
+  },
+  {
+    "order": 33,
+    "image_id": "7f3455cf-4a6e-4d63-8f80-d4e4df4b5a7b",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "3/4 front view of K5 Blazer with hardtop, single round headlights, bowtie grille, lifted with BFG A/T tires. Desert sunset.",
+    "notes": "Classic K5 3/4 front; bowtie grille; hardtop installed; lifted; BFG A/T"
+  },
+  {
+    "order": 34,
+    "image_id": "f9ee4413-dc15-4e65-87c6-3b7a1b839e3e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Top-down / rotated photo of K5 Blazer parked at corner lot with chain link fence. Hardtop on, square body proportions visible, lifted.",
+    "notes": "Rotated/sideways photo; K5 parked at fence; corner lot scene"
+  },
+  {
+    "order": 35,
+    "image_id": "53117a49-b5a7-462e-97fa-5492e8c6dd17",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Square-body GM door interior / panel showing fold-down armrest mount, door catch, hinge, paint chipped showing original colors. Mirror visible. Restoration door work.",
+    "notes": "Door interior; original paint chipping; mirror; door hardware"
+  },
+  {
+    "order": 36,
+    "image_id": "a981ea3a-1f6e-441f-91c8-7dacadc8fd9d",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Interior cargo area / rear hatch / hardtop interior of K5 Blazer with seat partly visible, dash gauge cluster from rear, body interior structure. Rusted floor pan visible.",
+    "notes": "K5 interior cargo area; rear hatch view; rust on floor pan"
+  },
+  {
+    "order": 37,
+    "image_id": "ea0d9356-102f-4d54-aac3-4476b2be35f7",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Speedometer close-up showing 71794 mi/km dual-unit speedometer, classic 1973-1980 square-body GM gauge. Speedometer face partially marked with red sticker / serial.",
+    "notes": "MILEAGE: 71794 (mi-km/h dual unit speedometer); square-body GM speedo"
+  },
+  {
+    "order": 38,
+    "image_id": "22752837-f777-43e3-abe4-0b9faeaffdce",
+    "verdict": "approved",
+    "confidence": 0.88,
+    "reasoning": "Interior view from rear seat showing steering wheel, dash with gauges, red bench seat. Square-body GM truck interior architecture.",
+    "notes": "Interior view from rear; steering wheel; gauges; red bench seat"
+  },
+  {
+    "order": 39,
+    "image_id": "4052f362-9afc-4b15-8c1d-9771794eb015",
+    "verdict": "approved",
+    "confidence": 0.88,
+    "reasoning": "Same interior view from rear seat showing steering wheel and gauges, slightly different angle.",
+    "notes": "Interior view variant; gauge close-up"
+  },
+  {
+    "order": 40,
+    "image_id": "94b3c4b8-e2f4-4651-aab5-b6173736a5ec",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body GM truck rear quarter / taillight (rotated photo, garage interior shop setting). Tilted ceiling view actually shows BFG A/T tire and red taillight from below.",
+    "notes": "Rotated photo; rear quarter of K5; shop/garage interior; BFG A/T"
+  },
+  {
+    "order": 41,
+    "image_id": "42784fc8-5b7c-490d-a162-fcda26ae8e2b",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Square-body GM truck rear tailgate (rotated photo) with BFG A/T tires. K5 Blazer tailgate proportions and integrated rear window opening characteristic.",
+    "notes": "Rotated photo; tailgate close-up; shop interior; K5 rear"
+  },
+  {
+    "order": 42,
+    "image_id": "87b51588-af03-488b-8d84-d96e8a58d957",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Rotated photo showing GM truck front with chrome grille bezel, dual headlight assemblies, blue paint chips. Grille design with chrome surround and 'eyebrow' chrome over headlights looks like 1969-1972 Chevy C/K (pre-square-body 'rounded line' generation), NOT 1973-1980 square-body. Could be a different vehicle in the same shop, or a parts truck. Body-style ambiguity.",
+    "notes": "AMBIGUOUS: chrome grille bezel with eyebrow over single round headlights suggests 1969-72 C/K (pre-square-body); blue paint chips like fc35; rotated photo; could be parts truck or workshop content adjacent to fc35"
+  },
+  {
+    "order": 43,
+    "image_id": "5aa81a2b-0893-4ccd-8d85-1cc32b96c028",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Rotated photo of square-body GM front grille (different angle than 42) with chrome trim, bowtie badge, BFG A/T spare tire on hood. Hood + grille architecture more consistent with square-body 1973-1980.",
+    "notes": "Rotated photo; square-body front grille with bowtie; spare on hood; shop interior"
+  },
+  {
+    "order": 44,
+    "image_id": "c2845960-48e2-477e-bf71-0d4563024327",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Rotated photo of K5 Blazer side profile in shop, hardtop visible with rear quarter window, BFG A/T tires, lifted. Multi-color paint chips visible on side.",
+    "notes": "Rotated photo; K5 side profile in shop; hardtop; lifted; multi-color paint chips"
+  },
+  {
+    "order": 45,
+    "image_id": "09f9ff6a-5659-4902-91c4-cd57dd8ba47c",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Rotated photo of K5 Blazer in shop showing front/side profile with hardtop, BFG A/T tires on Rally wheels.",
+    "notes": "Rotated photo; K5 in shop; BFG A/T; Rally wheels"
+  },
+  {
+    "order": 46,
+    "image_id": "24c66ab5-579a-46b6-a45f-320b3ca5497d",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rear quarter panel close-up with TAPE MEASURE for body work measurement. Black paint with blue and silver/primer paint history chips. Leaf spring and BFG A/T tire visible. Taillight at bottom edge. K5 Blazer restoration documentation with measurement.",
+    "notes": "TAPE MEASURE IN FRAME (24+ inches visible); multi-color paint history (black/blue/silver); leaf spring; restoration measurement"
+  },
+  {
+    "order": 47,
+    "image_id": "58022bcb-b53b-4cff-995e-b5ee4faf73d3",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Same rear quarter with tape measure, different angle, ~24+ inch measurement of damage / rust area on body panel.",
+    "notes": "TAPE MEASURE; rust / paint chips at panel edge; restoration measurement documentation"
+  },
+  {
+    "order": 49,
+    "image_id": "e673c7f5-4eba-4b01-af03-5e74a5a18528",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rear quarter close-up with tape measure being held, body panel curve showing rust hole and multi-color paint chips. Restoration measurement.",
+    "notes": "TAPE MEASURE in hand; rust hole; multi-color paint history; restoration measurement"
+  }
+]

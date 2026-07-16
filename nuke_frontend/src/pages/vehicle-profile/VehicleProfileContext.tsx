@@ -15,8 +15,8 @@ import { useAdminAccess } from '../../hooks/useAdminAccess';
 import { useViewHistory } from '../../hooks/useViewHistory';
 import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
 import { loadVehicleImpl, selectBestHeroImage, type RpcLoadResult } from './loadVehicleData';
-import { loadVehicleImagesImpl } from './loadVehicleImages';
 import { resolveVehicleImages } from './resolveVehicleImages';
+import { withTimeout } from '../../lib/withTimeout';
 import { resolveCurrencyCode } from '../../utils/currency';
 import { useVehicleIntel } from './hooks/useVehicleIntel';
 import type { VehicleIntel } from './hooks/useVehicleIntel';
@@ -212,13 +212,19 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       loadTimelineEvents();
     }
     heroResolvedRef.current = false;
-    selectBestHeroImage(vehicleId, supabase).then((result) => {
-      if (result?.url) {
-        setLeadImageUrl(result.url);
-        setHeroMeta(result.meta);
-        heroResolvedRef.current = true;
-      }
-    }).catch(() => {});
+    // Hero selection runs in exactly one place per load: here when the RPC
+    // delivered the complete image set, otherwise inside loadVehicleImages
+    // (which runs whenever rpcResult.images is false). Running it in both
+    // paths duplicated the 60-row candidate query on every profile load.
+    if (rpcResult.images) {
+      selectBestHeroImage(vehicleId, supabase).then((result) => {
+        if (result?.url) {
+          setLeadImageUrl(result.url);
+          setHeroMeta(result.meta);
+          heroResolvedRef.current = true;
+        }
+      }).catch(() => {});
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicleId, session, navigate]);
 
@@ -246,8 +252,16 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   const loadTimelineEvents = useCallback(async () => {
     if (!vehicleId) return;
     try {
-      // Load timeline_events and work_sessions in parallel, merge into unified timeline
-      const [tlResult, wsResult] = await Promise.all([
+      // Load timeline_events + work_sessions in parallel. image_sets is
+      // supplementary and slow for anon (measured 15s/500 against the anon
+      // statement_timeout) — it merges in asynchronously below and must
+      // never gate the timeline paint.
+      const imageSetsPromise = supabase
+        .from('image_sets')
+        .select('id, name, session_start, session_end, session_duration_minutes, metadata, event_date')
+        .eq('vehicle_id', vehicleId)
+        .order('session_start', { ascending: false });
+      const [tlResult, wsResult] = await withTimeout(Promise.all([
         supabase
           .from('timeline_events')
           .select('*')
@@ -256,17 +270,20 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
           .limit(200),
         supabase
           .from('work_sessions')
-          .select('id, session_date, title, work_type, image_count, duration_minutes, total_parts_cost, work_description, status, total_labor_cost, total_job_cost')
+          .select('id, session_date, title, work_type, image_count, duration_minutes, total_parts_cost, work_description, status, total_labor_cost, total_job_cost, session_type')
+          // Communication-derived sessions (imessage threads, optimistic backfill) are
+          // context, not build labor — exclude them so the timeline shows real work only
+          // and build-hours stop inflating (e.g. K2500 5,009h was 4,860h of texting).
           .eq('vehicle_id', vehicleId)
+          .or('session_type.is.null,session_type.not.in.(imessage_sync,baseline_backfill)')
           .order('session_date', { ascending: false }),
-      ]);
+      ]), 10000, 'loadTimelineEvents');
 
       const events: any[] = [];
       if (!tlResult.error && tlResult.data) events.push(...tlResult.data);
 
       // Convert work_sessions to timeline event shape and merge
       if (!wsResult.error && wsResult.data) {
-        const existingDates = new Set(events.map((e: any) => e.event_date?.slice(0, 10)));
         for (const ws of wsResult.data) {
           // Add as a work_session event type so BarcodeTimeline can render it
           events.push({
@@ -293,13 +310,35 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       }
 
       // Sort by event_date descending
-      events.sort((a: any, b: any) => {
+      const sortByDateDesc = (arr: any[]) => arr.sort((a: any, b: any) => {
         const da = a.event_date || a.session_date || '';
         const db = b.event_date || b.session_date || '';
         return db.localeCompare(da);
       });
+      setTimelineEvents(sortByDateDesc(events));
 
-      setTimelineEvents(events);
+      // Convert image_sets to timeline event shape and merge when it lands.
+      void imageSetsPromise.then((isResult: any) => {
+        if (isResult.error || !Array.isArray(isResult.data) || isResult.data.length === 0) return;
+        const sessionEvents = isResult.data.map((s: any) => ({
+          id: s.id,
+          vehicle_id: vehicleId,
+          event_date: s.event_date || (s.session_start ? s.session_start.slice(0, 10) : null),
+          event_type: 'photo_session',
+          title: s.name || 'Photo session',
+          metadata: {
+            ...(s.metadata || {}),
+            session_start: s.session_start,
+            session_end: s.session_end,
+            session_duration_minutes: s.session_duration_minutes,
+            source: 'context_stitcher',
+          },
+        }));
+        setTimelineEvents((prev: any[]) => {
+          const have = new Set((prev || []).map((e: any) => e.id));
+          return sortByDateDesc([...(prev || []), ...sessionEvents.filter((e: any) => !have.has(e.id))]);
+        });
+      }).catch(() => { /* supplementary */ });
     } catch { /* ignore */ }
   }, [vehicleId]);
 
@@ -326,17 +365,11 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   }, [vehicleId]);
 
   const loadLiveSession = useCallback(async () => {
-    if (!vehicleId) return;
-    try {
-      const { data } = await supabase
-        .from('live_sessions')
-        .select('id, platform, stream_url, title, stream_provider')
-        .eq('vehicle_id', vehicleId)
-        .eq('is_active', true)
-        .maybeSingle();
-      setLiveSession(data || null);
-    } catch { /* ignore */ }
-  }, [vehicleId]);
+    // 2026-05-24 dead-query-sweep: live_sessions table is not deployed (404).
+    // No-op until the live-streaming feature ships. The setLiveSession(null)
+    // default is already set in state init.
+    setLiveSession(null);
+  }, []);
 
   const loadResponsible = useCallback(async () => {
     if (!vehicle) return;
@@ -485,13 +518,25 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   useEffect(() => {
     if (!vehicle?.id) return;
     const id = vehicle.id;
+    // Debounce realtime refetches: the photo pipeline updates each image row
+    // 2-3 times (pending → processing → completed), so a batch upload fires
+    // hundreds of events. Trailing-edge debounce collapses them into one
+    // refetch per quiet period instead of one full gallery fetch per event.
+    const timers: Record<string, ReturnType<typeof setTimeout>> = {};
+    const debounced = (key: string, fn: () => void, ms = 1500) => {
+      if (timers[key]) clearTimeout(timers[key]);
+      timers[key] = setTimeout(fn, ms);
+    };
     const channel = supabase
       .channel(`vp-ctx:${id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vehicles', filter: `id=eq.${id}` }, () => loadVehicle())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_images', filter: `vehicle_id=eq.${id}` }, () => loadVehicleImages())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'timeline_events', filter: `vehicle_id=eq.${id}` }, () => loadTimelineEvents())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vehicles', filter: `id=eq.${id}` }, () => debounced('vehicle', loadVehicle))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_images', filter: `vehicle_id=eq.${id}` }, () => debounced('images', loadVehicleImages))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'timeline_events', filter: `vehicle_id=eq.${id}` }, () => debounced('timeline', loadTimelineEvents))
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      Object.values(timers).forEach(clearTimeout);
+      supabase.removeChannel(channel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle?.id]);
 

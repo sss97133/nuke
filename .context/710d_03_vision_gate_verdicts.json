@@ -1,0 +1,443 @@
+[
+  {
+    "order": 0,
+    "image_id": "9560484e-11ae-4bd3-944f-d401cba05dd2",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/000_9560484e.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Close-up under-hood detail: black brake fluid reservoir cap (FLUID ONLY), white-painted firewall/bodywork with textured finish, yellow zinc hardware. Matches white-paint Bronco engine bay context.",
+    "notes": "Engine bay fluid reservoir detail"
+  },
+  {
+    "order": 1,
+    "image_id": "12006240-3cb0-48bd-b5dc-a6c4d6a212f7",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/001_12006240.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Engine bay plumbing: SAE 50PSI fuel/hydraulic hose, stainless braided lines, hose clamps, white-painted firewall. Consistent with Bronco EFI build engine compartment.",
+    "notes": "EFI/fuel plumbing detail, SAE 50 PSI hose visible"
+  },
+  {
+    "order": 2,
+    "image_id": "f8f591a6-42b2-46df-b768-fcc31476922d",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/002_f8f591a6.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Clear interior shot of early Bronco: white roll cage, tan diamond-stitch upholstery on seats and door panels, white painted dash with classic round gauges, wood-rim steering wheel, manual shifters (transmission + transfer case). Exact match to 710d build.",
+    "notes": "Classic round gauge cluster visible in dash"
+  },
+  {
+    "order": 3,
+    "image_id": "02d84353-9645-42c5-b1fd-72b79e3d8b29",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/003_02d84353.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Three-quarter front view of white early Bronco with FORD grille badge, round headlights, white front bumper, body-color valance, roof rack/cage, tan interior visible. Another early Bronco (gray) and Bronco hardtop visible in shop. Classic uncut early Bronco silhouette.",
+    "notes": "FORD grille badge, BRONCO fender script visible, white paint, BFG-style A/T tires on black wheels"
+  },
+  {
+    "order": 4,
+    "image_id": "977764e4-4845-4dc3-8383-77f20a189605",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/004_977764e4.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Direct front view of white early Bronco with red FORD grille badge, round LED headlights, amber turn signals, white painted front bumper. Tan interior visible through windshield. Definitive early Bronco front fascia.",
+    "notes": "Red FORD lettering on grille; LED projector headlights"
+  },
+  {
+    "order": 5,
+    "image_id": "d8faaf20-540c-4530-8b1f-d6ff75caf4d0",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/005_d8faaf20.jpg",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Body panel detail showing white paint with masking paper wrap during paint/refinish work. Curved bodywork shape consistent with Bronco fender or hood edge. Outdoor industrial setting (paint shop yard).",
+    "notes": "Refinish/paint masking in progress; paint shop yard context"
+  },
+  {
+    "order": 6,
+    "image_id": "aa7f900c-88a5-40c7-984d-d545f7c20c47",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/006_aa7f900c.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Side view over hood of white Bronco showing windshield frame, white painted roll cage with tan seat headrests visible behind windshield. Shop interior. Matches 710d aesthetic.",
+    "notes": "Hood/cowl/windshield view; shop floor visible"
+  },
+  {
+    "order": 7,
+    "image_id": "775878ea-edae-436c-8f9f-8a7e4195a087",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/007_775878ea.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Undercarriage view showing black-painted frame, fresh body mount bushing, rear bumper bracket, and another vehicle's wheel in background. Consistent with restored Bronco chassis detail.",
+    "notes": "Frame/body mount undercarriage detail"
+  },
+  {
+    "order": 8,
+    "image_id": "dbff2f8f-79d6-4634-ac61-705fe3aa3f54",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/008_dbff2f8f.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Interior rear cargo view of early Bronco showing white roll cage (front, mid, rear hoops), tan diamond-stitch front seats, white painted center console, ribbed black floor (bed liner-style), single round gauge visible on dash, white interior body panels. Classic uncut Bronco rear bay.",
+    "notes": "Single round center gauge visible; bedlined cargo floor"
+  },
+  {
+    "order": 9,
+    "image_id": "feaba7f0-9145-4a08-b359-666e29fab9cf",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/009_feaba7f0.jpg",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Interior detail: white roll cage tube, white painted cargo area sidewall, gray suede/Alcantara floor mat, exposed grounding stud/post hardware on rear sidewall. Consistent with 710d Bronco's restoration-grade interior.",
+    "notes": "Ground stud/electrical bonding post visible"
+  },
+  {
+    "order": 10,
+    "image_id": "96755fd8-b0e7-42d9-abd5-6e73450e7df3",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/010_96755fd8.jpg",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Interior detail of white roll cage mount and floor area with gray floor mat partially lifted. White painted body. Matches Bronco interior context.",
+    "notes": "Roll cage floor mount detail"
+  },
+  {
+    "order": 11,
+    "image_id": "ad8514be-5a84-4860-a57f-4691c68bfb86",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/011_ad8514be.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Rotated image showing rear of white open-top early Bronco with white roll cage, tan seats, spare-tire-style tail lights (small round red lenses), spare tire in cargo area on black wheel. Pelican/ICON tool case visible. Classic Bronco rear quarter/roof profile.",
+    "notes": "Round Bronco-style taillights; black wheel spare visible"
+  },
+  {
+    "order": 12,
+    "image_id": "9f0d7aa7-7363-4eda-93a6-1b767b503564",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/012_9f0d7aa7.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Side profile of white early Bronco: short wheelbase, flat fender flares, BRONCO script on fender, white roll cage, tan interior, black off-road wheels with knobby A/T tires, blue coil-over shocks visible behind front wheel. Definitive early Bronco silhouette.",
+    "notes": "BRONCO fender script visible; blue Wild Horses coil-overs"
+  },
+  {
+    "order": 13,
+    "image_id": "d24d423c-415b-464b-bca3-a129fe31990d",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/013_d24d423c.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rotated view of white Bronco on two-post lift, showing roll cage, tan interior, chrome/silver grille, black wheels. Adjacent red toolbox/MIG welder cart and red truck nearby. Same Bronco context.",
+    "notes": "Vehicle on two-post lift in shop"
+  },
+  {
+    "order": 14,
+    "image_id": "0af6b3d8-b2c2-44f3-a9d9-4eb282a99277",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/014_0af6b3d8.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rotated rear three-quarter view of white open-top Bronco with white roll cage, tan seats, round taillights, spare tire on rear, black wheels. Shop floor.",
+    "notes": "Rear quarter view; round taillights"
+  },
+  {
+    "order": 15,
+    "image_id": "f142fc38-ec7d-491e-8cf4-72da164943da",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/015_f142fc38.jpg",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Rotated rear-quarter view of same white Bronco with tan seats, white roll cage, ICON-style protective case in cargo, spare tire. Polaris UTV partially visible adjacent.",
+    "notes": "Rear-quarter exterior shot in shop"
+  },
+  {
+    "order": 16,
+    "image_id": "9320236c-6777-483b-8cb2-149790aa5a46",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/016_9320236c.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Rotated interior view showing wood-rim steering wheel, white painted dash with classic round gauges, tan diamond-stitch seat, white door, exposed under-dash wiring harness (rainbow of conductors and connectors) consistent with EFI/electrical work in progress on the Bronco.",
+    "notes": "Under-dash wiring/harness work in progress; classic gauge cluster"
+  },
+  {
+    "order": 17,
+    "image_id": "0ca3212a-119b-4053-8e80-c1964273add0",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/017_0ca3212a.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Foreground shows raw/unpainted Bronco interior tub sidewall (bare gray metal/primer) being prepped; tan front seat partially visible. Green pickup truck bed (likely F-Series Super Duty) parked in background shop bay. Bronco substrate dominates the foreground.",
+    "notes": "Tub prep work; green truck (different vehicle) in background of shop"
+  },
+  {
+    "order": 19,
+    "image_id": "09f1da9f-1c8b-41e7-a80b-35d4641f217a",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/019_09f1da9f.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Foreground shows interior of Bronco tub/cargo area with HVAC flex ducting laid in (heater/AC install in progress) and tan upholstery edge visible. Background shows another early Bronco (gray, body off frame) and a green F-250 Super Duty in the shop. Foreground is the 710d Bronco.",
+    "notes": "HVAC flex ducting; second early Bronco visible in background; F250 SuperDuty also background"
+  },
+  {
+    "order": 20,
+    "image_id": "a170a8a9-b722-480d-bdd1-7ae9a2f19a70",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/020_a170a8a9.jpg",
+    "verdict": "approved",
+    "confidence": 0.5,
+    "reasoning": "Removed center console/armrest module: rectangular black box with white cushioned lid and twin cupholder openings, orange wire pigtail dangling. Ambiguous but consistent with old Bronco console being removed for restoration work.",
+    "notes": "Old console module removed; possibly a parts-comparison shot"
+  },
+  {
+    "order": 21,
+    "image_id": "f674692b-e571-48af-94c1-ef9da0dfb27d",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/021_f674692b.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Bare-metal stamped frame rails / structural channels staged in paint booth with masking paper, ready for paint. Shape and size consistent with Bronco frame side rails or rocker reinforcement panels under restoration.",
+    "notes": "Frame/structure parts staged for paint in booth"
+  },
+  {
+    "order": 22,
+    "image_id": "2fc2cc56-4e44-4ffe-8932-217287b0c187",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/022_2fc2cc56.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Same frame/structural pieces as 021 — bare-metal channels staged in paint booth. Bronco restoration paint prep.",
+    "notes": "Frame/structure parts staged for paint"
+  },
+  {
+    "order": 23,
+    "image_id": "de29b24d-2d2b-4ab7-ac67-8ae8cee81d69",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/023_de29b24d.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rotated view: tailgate inside panel with reverse-stamped FORD lettering (factory tailgate stamping characteristic of early Broncos), HVAC ducting laying inside cargo area, tan upholstery edge, another vehicle in background. Tailgate identifies Bronco.",
+    "notes": "FORD reverse-stamped on tailgate inner panel; HVAC ducting being routed"
+  },
+  {
+    "order": 24,
+    "image_id": "4dc79734-eb1a-4d2e-8639-0818d2795a1e",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/024_4dc79734.jpg",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Detail of upper body seam/welded joint with masking tape during paint refinish, gas-strut prop hardware visible. Consistent with Bronco hardtop/hood interior structure being refinished.",
+    "notes": "Body seam paint masking; gas strut bracket"
+  },
+  {
+    "order": 25,
+    "image_id": "7927b1c6-52af-4d06-b379-83cd44492763",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/025_7927b1c6.jpg",
+    "verdict": "approved",
+    "confidence": 0.55,
+    "reasoning": "Close-up of glossy white-painted body panel edge with corrugated shop wall in background and dark blue vehicle (different car) further back. The foreground panel matches the 710d Bronco's white paint finish.",
+    "notes": "White paint detail; blue muscle car visible in background"
+  },
+  {
+    "order": 26,
+    "image_id": "8e820c7f-985f-4eec-bd67-ffdfc9a41247",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/026_8e820c7f.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Interior detail showing tab welds where the Bronco's roll cage is integrated to the body structure, with some paint flaking around the welded seams indicating in-progress fabrication and refinish work. White body. Gas strut bracket visible.",
+    "notes": "Roll cage weld-in to body tub; paint flake around weld"
+  },
+  {
+    "order": 27,
+    "image_id": "c160db8c-f872-4bc1-8f47-e060d70d2c32",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/027_c160db8c.jpg",
+    "verdict": "approved",
+    "confidence": 0.55,
+    "reasoning": "White painted body panel curve in foreground with blue muscle car (different vehicle) in shop background. Foreground panel matches Bronco paint.",
+    "notes": "White paint panel; unrelated blue car in background"
+  },
+  {
+    "order": 28,
+    "image_id": "935da0ad-fa7c-4a73-b95c-2f380c76ea76",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/028_935da0ad.jpg",
+    "verdict": "approved",
+    "confidence": 0.5,
+    "reasoning": "Two large white-painted body panels (likely Bronco hood or tub side panels) propped up in shop. Blue car in background unrelated. Foreground matches 710d paint.",
+    "notes": "Body panels staged; unrelated blue car in background"
+  },
+  {
+    "order": 29,
+    "image_id": "abc982cc-63b1-422f-8388-d2fba7ba344d",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/029_abc982cc.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Rotated front-quarter view of white early Bronco with white front bumper, FORD grille, round headlights, amber turn signal, knobby A/T tire on black wheel, white roll cage and tan seats visible inside, shop bay door behind. Definitive Bronco.",
+    "notes": "Front quarter exterior view of Bronco in shop"
+  },
+  {
+    "order": 30,
+    "image_id": "2da5981e-bbfe-4805-87db-9abc02b59967",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/030_2da5981e.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Tape-measure measurement of a black-painted suspension bracket (likely shackle hanger or leaf-spring bracket) against textured white background — consistent with Bronco build measurement/fabrication work.",
+    "notes": "Measurement record: ~10-11 inches on bracket; suspension bracket"
+  },
+  {
+    "order": 31,
+    "image_id": "21b68447-b81b-4115-ad9d-be29b2b9134b",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/031_21b68447.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same suspension bracket as 030 being measured. Bronco build measurement.",
+    "notes": "Measurement record: suspension bracket"
+  },
+  {
+    "order": 32,
+    "image_id": "2bd0fa83-4d9a-4ac3-a292-47e99fe36d34",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/032_2bd0fa83.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Frame-mounted black bracket being measured (~10-11 in) on Bronco chassis with blue coil-over shock (Wild Horses Bronco-specific brand) and blue hose reel in shop background. Bronco suspension fabrication.",
+    "notes": "Measurement on chassis bracket; blue Wild Horses coilover; ~10in"
+  },
+  {
+    "order": 33,
+    "image_id": "9027d136-ea25-471d-85e1-26002d6c6e6f",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/033_9027d136.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Same shot as 032 — measurement on chassis-mounted bracket with Wild Horses blue coilover behind. Bronco.",
+    "notes": "Measurement on chassis bracket"
+  },
+  {
+    "order": 34,
+    "image_id": "42551ade-033c-4cb3-907d-e2bcaec40626",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/034_42551ade.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Rotated: side view of white early Bronco on two-post lift with BRONCO fender script visible, white roll cage, black off-road wheels, knobby A/T tires. Shop ceiling/lift visible. Definitive 710d.",
+    "notes": "BRONCO fender script visible; vehicle on lift"
+  },
+  {
+    "order": 35,
+    "image_id": "546b5137-0810-4c27-9b0d-5de1e3601601",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/035_546b5137.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Rotated: front-quarter shot of white early Bronco on lift showing FORD grille, round headlights, white front bumper, black wheels, BRONCO fender script, white roll cage, tan seats. Other vehicles in shop including green tractor.",
+    "notes": "Front-quarter on lift; FORD grille and BRONCO script"
+  },
+  {
+    "order": 36,
+    "image_id": "2810617f-a1f4-4ecf-972f-ea89f35ce3ef",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/036_2810617f.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Rotated: side view of white early Bronco on lift, BRONCO fender script visible, two black off-road wheels mounted, white roll cage, red toolbox in foreground.",
+    "notes": "Side profile on lift; BRONCO script visible"
+  },
+  {
+    "order": 37,
+    "image_id": "60845986-5a6b-4ef4-a050-41a593f09b27",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/037_60845986.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Under-dash electronics mounting: black control box with multi-pin Molex connector (rainbow ribbon-to-pin harness) on bracket, white painted under-dash panel with mounting holes, HVAC unit and convoluted wire loom visible. Consistent with Bronco EFI/electrical install.",
+    "notes": "Under-dash control module with multi-pin Molex; HVAC blower visible"
+  },
+  {
+    "order": 38,
+    "image_id": "d048f0ab-0852-4b71-9dd1-2651f6f0273f",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/038_d048f0ab.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Wild Horses-branded blue powdercoated coil spring at front suspension shock tower with knobby off-road tire visible at right. Wild Horses is the dominant aftermarket parts brand for early Broncos. Definitive Bronco part on the 710d build.",
+    "notes": "Wild Horses brand logo visible on coil spring; matches 'blue powdercoat' description in vehicle profile"
+  },
+  {
+    "order": 39,
+    "image_id": "bfdf96af-cf58-4b3e-be55-997cc7241d4a",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/039_bfdf96af.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Ford blue painted engine block/intake with Ford script logo, throttle linkage with bellcrank/return spring. This is the 351 Windsor Ford-blue block referenced in the vehicle profile. EFI throttle body linkage matches the 'EFI throttle body + blue block' attribute.",
+    "notes": "Ford-script logo on blue block — 351W identifier; EFI throttle linkage"
+  },
+  {
+    "order": 40,
+    "image_id": "28586338-4ea0-4ba9-a1dc-043c67c589e0",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/040_28586338.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Billet aluminum FUEL filler cap with knurled grip mounted on white-painted body panel. Consistent with restomod Bronco fuel filler.",
+    "notes": "Billet 'FUEL' cap; aftermarket fuel filler"
+  },
+  {
+    "order": 41,
+    "image_id": "644d3736-1850-4245-8c90-e79d305febf1",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/041_644d3736.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underbody view: black-painted body mount bracket, fresh body bushing, fender liner edge, knobby A/T tire visible. White body, black-painted frame. Bronco chassis detail.",
+    "notes": "Body mount/bushing detail; ground strap visible"
+  },
+  {
+    "order": 42,
+    "image_id": "9a73aab1-b5c7-4493-9782-711d97397806",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/042_9a73aab1.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Spare tire well / inside-of-wheel view with steering linkage tie-rod end and pitman arm visible — Bronco solid front axle steering. Black painted black steel/aluminum wheel with knobby tire mounted (likely the spare).",
+    "notes": "Steering linkage and spare tire well; solid-axle steering"
+  },
+  {
+    "order": 43,
+    "image_id": "c5052466-1fc7-4f0d-94c0-8336592e247a",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/043_c5052466.jpg",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Tape-measure measurement of black-painted suspension/shock bracket showing ~10-11 inches across mounting tabs. White-textured background (Bronco firewall or body). Build fabrication measurement.",
+    "notes": "Measurement record on suspension bracket"
+  },
+  {
+    "order": 44,
+    "image_id": "c41b6f73-4ed6-4e03-bc4f-5bf5e8985b4c",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/044_c41b6f73.jpg",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Tape-measure measurement of frame/crossmember on Bronco chassis with Wild Horses blue coilover spring, blue hose reel in background. ~24 inches measured. Bronco fabrication.",
+    "notes": "Frame measurement ~24in; blue Wild Horses coilover visible"
+  },
+  {
+    "order": 45,
+    "image_id": "69d01ee9-ed42-4429-93f8-3e4b0d69c80c",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/045_69d01ee9.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Tape-measure measurement of large hex bolt (frame or suspension fastener) ~5-6 in long under chassis. White work truck in background of outdoor lot. Bronco build measurement.",
+    "notes": "Measurement: large frame/suspension bolt ~5in; work truck in background of outdoor lot"
+  },
+  {
+    "order": 46,
+    "image_id": "e752dcfb-610f-4faf-883d-d3e222d62211",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/046_e752dcfb.jpg",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Tape-measure measurement of black-painted shock or coilover body/upper mount with aggressive mud-terrain tire visible at left, outdoor concrete. Bronco suspension component on the truck outdoors.",
+    "notes": "Shock/coilover length measurement; MT tire visible"
+  },
+  {
+    "order": 47,
+    "image_id": "7d878d16-8262-445d-9d5c-658efcb49fa5",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/047_7d878d16.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Tape-measure measurement across mounting-hole centers of black-painted leaf-spring shackle/hanger bracket. Bronco suspension fab.",
+    "notes": "Measurement across bracket mounting holes"
+  },
+  {
+    "order": 48,
+    "image_id": "c57f85b9-0c7c-454f-a621-d47da6c5d1db",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/048_c57f85b9.jpg",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Tape-measure across Bronco frame crossmember/bracket with Wild Horses blue coilover spring and front suspension visible. Build measurement on the truck.",
+    "notes": "Frame crossmember measurement with Wild Horses coilover"
+  },
+  {
+    "order": 49,
+    "image_id": "1b8ae19e-2976-4722-95ea-c9e81e76f88f",
+    "path": "/Users/skylar/nuke/.context/710d_03_vision_gate/049_1b8ae19e.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Tape-measure measurement of suspension fasteners (large hex bolt + adjuster) on black-painted axle/shock mount under chassis outdoors. Knobby tire and concrete visible. Bronco suspension geometry measurement.",
+    "notes": "Suspension fastener measurement under chassis outdoors"
+  }
+]

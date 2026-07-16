@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nuke.valuation</string>
+    <!-- The pricing engine ON-switch. One paced batch every 15 min: prices unpriced inflow +
+         drains backlog so deal_score / price_is_outlier recompute and deals surface as a byproduct.
+         Small batch (set in valuation-driver.sh) avoids the timeouts that big batches hit. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/skylar/nuke/scripts/valuation-driver.sh</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>900</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/skylar/nuke/logs/valuation-driver.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/skylar/nuke/logs/valuation-driver.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/skylar/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+    <key>Nice</key>
+    <integer>10</integer>
+</dict>
+</plist>

@@ -80,12 +80,16 @@ console.error = (...args) => {
   originalError.apply(console, args);
 };
 
-// Helper function to get the current user ID
+// Helper function to get the current user ID.
+// Uses getSession() (cached, lock-free) instead of getUser() to avoid
+// the Web Locks API contention on `sb-*-auth-token` when many call sites
+// fire on the same render (the cause of the 2026-05-24 ?tab=garage hang).
+// AuthContext is the only consumer that should ever call getUser() directly.
 export const getCurrentUserId = async (): Promise<string | null> => {
   try {
-    const { data, error } = await supabase.auth.getUser();
+    const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
-    return data.user?.id || null;
+    return data.session?.user?.id || null;
   } catch (error) {
     console.error('Error getting user ID:', error);
     return null;

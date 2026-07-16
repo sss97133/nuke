@@ -15,8 +15,13 @@ const corsHeaders = {
 // Mapping of site types to their extractor functions
 const SITE_EXTRACTORS: Record<string, string> = {
   carsandbids: "extract-cars-and-bids-core",
-  bat: "complete-bat-import",
-  bringatrailer: "complete-bat-import",
+  // complete-bat-import (the old single entry point, which also chained
+  // extract-auction-comments) was deleted from deployment in the March
+  // 2026 triage and 404s live — confirmed 2026-07-07. extract-bat-core is
+  // the standalone replacement; see _shared/approved-extractors.ts. It
+  // does NOT auto-chain comments, so that's triggered explicitly below.
+  bat: "extract-bat-core",
+  bringatrailer: "extract-bat-core",
   hagerty: "extract-hagerty-listing",
   pcarmarket: "import-pcarmarket-listing",
   ebaymotors: "extract-ebay-motors",
@@ -43,6 +48,33 @@ const SITE_LISTING_PATTERNS: Record<string, RegExp[]> = {
   barrettjackson: [/barrett-jackson\.com\/Events\/Auction\/Details\/\d+/],
   russoandsteele: [/russoandsteele\.com\/auction-detail\/\d+/],
 };
+
+/**
+ * extract-bat-core returns created_vehicle_ids/updated_vehicle_ids arrays,
+ * not a flat vehicle_id like the other extractors this router calls — this
+ * derives it consistently for both call sites below (index-page discovery
+ * loop and single-listing path).
+ */
+function batVehicleIdFrom(data: any): string | null {
+  return data?.vehicle_id || data?.created_vehicle_ids?.[0] || data?.updated_vehicle_ids?.[0] || null;
+}
+
+/**
+ * extract-bat-core does not chain comment extraction itself (see the
+ * SITE_EXTRACTORS comment above) — trigger it here, fire-and-forget,
+ * mirroring this same file's existing carsandbids comment/bid trigger.
+ */
+function triggerBatComments(supabaseUrl: string, serviceRoleKey: string, listingUrl: string, vehicleId: string) {
+  fetch(`${supabaseUrl}/functions/v1/extract-auction-comments`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${serviceRoleKey}`,
+    },
+    body: JSON.stringify({ auction_url: listingUrl, vehicle_id: vehicleId }),
+    signal: AbortSignal.timeout(120000),
+  }).catch((e: any) => console.warn(`[extract-premium-auction] BaT comment extraction trigger failed for ${listingUrl}:`, e instanceof Error ? e.message : String(e)));
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -113,7 +145,12 @@ Deno.serve(async (req) => {
             errorCount++;
           } else if (data?.success) {
             successCount++;
-            results.push({ url: listingUrl, vehicle_id: data.vehicle_id });
+            const batVehicleId = batVehicleIdFrom(data);
+            results.push({ url: listingUrl, vehicle_id: data.vehicle_id || batVehicleId });
+
+            if ((detectedSiteType === 'bat' || detectedSiteType === 'bringatrailer') && batVehicleId) {
+              triggerBatComments(supabaseUrl, serviceRoleKey, listingUrl, batVehicleId);
+            }
 
             // For Cars & Bids, also trigger comment and bid extraction (non-blocking)
             if (detectedSiteType === 'carsandbids' && data.vehicle_id) {
@@ -180,6 +217,11 @@ Deno.serve(async (req) => {
       throw new Error(`Extractor ${extractorFunction} failed: ${error?.message || error}`);
     }
 
+    const batVehicleId = batVehicleIdFrom(data);
+    if ((detectedSiteType === 'bat' || detectedSiteType === 'bringatrailer') && data?.success && batVehicleId) {
+      triggerBatComments(supabaseUrl, serviceRoleKey, url, batVehicleId);
+    }
+
     // For Cars & Bids, also trigger comment and bid extraction (non-blocking)
     if (detectedSiteType === 'carsandbids' && data?.success && data?.vehicle_id) {
       // Trigger comments extraction
@@ -216,7 +258,7 @@ Deno.serve(async (req) => {
       success: data?.success || false,
       site_type: detectedSiteType,
       extractor: extractorFunction,
-      vehicle_id: data?.vehicle_id,
+      vehicle_id: data?.vehicle_id || batVehicleId,
       vehicles_created: data?.success ? 1 : 0,
       listings_discovered: 1,
       data,

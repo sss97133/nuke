@@ -41,6 +41,7 @@ export const COMMAND_LINE_NAV: NavItem[] = [
 export const SEGMENTED_NAV: NavItem[] = [
   { label: 'SEARCH', path: '/search' },
   { label: 'MARKET', path: '/market' },
+  { label: 'ATLAS', path: '/atlas' },
   { label: 'AUCTIONS', path: '/auctions' },
   { label: 'API', path: '/api' },
 ];
@@ -48,4 +49,5 @@ export const SEGMENTED_NAV: NavItem[] = [
 export const TWO_ROW_NAV: NavItem[] = [
   { label: 'SEARCH', path: '/search' },
   { label: 'MARKET', path: '/market' },
+  { label: 'ATLAS', path: '/atlas' },
 ];

@@ -1,0 +1,32 @@
+[
+  {
+    "image_id": "99d8f048-fb76-4dd2-b241-75206766c74c",
+    "verdict": "review_needed",
+    "confidence": 0.5,
+    "reasoning": "Interior driver's-POV through windshield showing steering wheel, dashboard, and wiper on a desert road. Cannot confirm body style or generation from interior alone; could be the 1966 C10 cab but no exterior cues visible. Flag for human review."
+  },
+  {
+    "image_id": "40d1908f-bdd8-417a-a99d-53e267b4544f",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.95,
+    "reasoning": "White Jeep Cherokee (KL, post-2014) SUV with roof cargo, parked in lot with people and a dog. Non-GM-truck. Also contains people (personal subject)."
+  },
+  {
+    "image_id": "38a10273-f065-4234-999c-2b99295c51fc",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.95,
+    "reasoning": "Same scene as 001 from a wider angle: white Jeep Cherokee SUV with people and dog in a parking lot. Non-GM-truck."
+  },
+  {
+    "image_id": "82422083-3e4d-49a9-9dd0-5f98c867560b",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.95,
+    "reasoning": "White Jeep Cherokee (KL) SUV with roof cargo box and gear strapped on, driver's door open. Non-GM-truck."
+  },
+  {
+    "image_id": "46fc1f96-2c13-4dc2-b383-a50b03b4978f",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.95,
+    "reasoning": "Close-up of white Jeep Cherokee (KL) rear quarter with roof rack loaded with gear, rear door open showing interior. Non-GM-truck."
+  }
+]

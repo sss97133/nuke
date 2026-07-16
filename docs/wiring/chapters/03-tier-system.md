@@ -44,6 +44,7 @@ The custom engine harness ($3,000) and chassis harness ($3,000) from Desert Perf
 **Connectors:** Deutsch Autosport AS (aluminum shell, gold contacts, fluorosilicone seals)
 **Sheathing:** Raychem System 25 — DR-25 + molded boots + RT125 epoxy = fully sealed, watertight
 **Construction:** Concentric twist — wires twisted in alternating-direction layers around a core wire
+> SUPERSEDED — see chapters/appendix-b-corrections.md (was: "alternating-direction layers"; correct: each layer laid the same rotational direction at the same pitch/lay)
 **Crimping:** Daniels AFM8 with position-specific turrets, every crimp pull-tested
 
 A single Autosport bulkhead connector costs $300-500. A typical harness uses 15-30 of them. Connector cost alone: $5,000-$15,000. Labor for concentric-twist construction: 200+ hours at $100-150/hour. This tier exists for vehicles where failure is not an option (racing) or where the documentation and craftsmanship justify the price premium (six-figure collector cars).

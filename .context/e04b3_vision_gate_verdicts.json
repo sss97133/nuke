@@ -1,0 +1,296 @@
+[
+  {
+    "image_id": "5edc1fa6-75d5-469f-9007-bef582331871",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.85,
+    "reasoning": "Holley LS accessory drive packing checklist (P/N 20-186) - LS-engine content; subject K5 is SBC 350 carbureted"
+  },
+  {
+    "image_id": "59dfc968-fb59-4807-8997-0c187e3ea171",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Delmo Speed invoice to Skylar: vintage plug wire kit + Chevrolet SB valve covers - SBC parts consistent with subject K5"
+  },
+  {
+    "image_id": "ac02c942-44ae-42ff-be82-19fea40890d0",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Offroad Design steering box brace kit for 67-87 Chevy 4WD - applicable to 77 K5"
+  },
+  {
+    "image_id": "36d3a45f-30e5-45ae-9ef0-d25be681d841",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Offroad Design GM10 + Dana 44 crossover steering instructions - K5 4WD axle/steering doc"
+  },
+  {
+    "image_id": "f6e32488-6fb4-483f-a9cb-da97a1d96d95",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Offroad Design packing slip to Skylar, line 'KH 77 K5' - explicit 77 K5 reference"
+  },
+  {
+    "image_id": "30d1bf00-fc5a-440d-b47b-3b733f483e78",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.8,
+    "reasoning": "KM Racing Siemens Deka 650cc fuel injectors flow test - EFI/LS-swap content; subject K5 is carbureted"
+  },
+  {
+    "image_id": "bca74938-f8d8-4287-aaea-e5ee9315927d",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Holley carburetor recommendations sheet 5.3-6.0L stock/modified - carb spec doc"
+  },
+  {
+    "image_id": "82738ca2-c0a1-49f1-a4aa-016d4bd5608f",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Carb/throttle body spacer install instructions - generic carb doc, plausible for subject K5"
+  },
+  {
+    "image_id": "f36cf385-c1d7-4c97-86d5-dac7fe28cc90",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.9,
+    "reasoning": "LS Street Single-Plane intake manifold fuel rail instructions - LS EFI content; subject K5 is carbureted SBC"
+  },
+  {
+    "image_id": "0655982c-2100-4c52-b201-785da0230c7a",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.9,
+    "reasoning": "LS3/LS1/LS2/LS6/LS7 intake manifold installation kit dimensions - LS content; subject K5 is SBC carb"
+  },
+  {
+    "image_id": "2b79a5da-8108-40fa-b9ee-a6f65fe75283",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.95,
+    "reasoning": "Holley GM LS Gen III/IV Street Single-Plane Intake Manifold Kits instructions - LS content; subject is SBC carb"
+  },
+  {
+    "image_id": "812f86f4-7f7e-4fac-90ec-1c18891c045d",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.9,
+    "reasoning": "Holley LS3/LS7 + LS1/2/6 intake manifold mounting flange O-ring instructions - LS content"
+  },
+  {
+    "image_id": "4defe63e-097d-4d4b-b59d-4c09f7d873bc",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "AutoZone commercial invoice to Viva Las Vegas Autos, PO=77LS3, harmonic balancer puller+kit - tool purchase for K5"
+  },
+  {
+    "image_id": "7478f2f9-9228-4d94-9cfe-82853ffb768f",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "AutoZone commercial return matching invoice 015, PO=77LS3 - return of harmonic balancer tools"
+  },
+  {
+    "image_id": "83cbffb4-0816-4e03-9867-7e99a67f7498",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Offroad Design tierod/draglink install notes (U9016-NP) - K5 steering hardware doc"
+  },
+  {
+    "image_id": "6a6ac7cf-6ed7-4d85-973b-84511963ff6e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Speedway Motors invoice to Skylar: S-Type muffler 2.5 (BN17A5 215-40842S) - exhaust part for K5"
+  },
+  {
+    "image_id": "8344c08a-14e9-4c37-9c5a-09607c888741",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Offroad Design sway bar kit for 73-87 GM truck with crossover steering - K5 chassis hardware"
+  },
+  {
+    "image_id": "e1f74e17-c105-440c-b0c0-54fcd81bb90a",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Energy Suspension #3.4104 / #3.4105 78-80 + 73-77 Chevy 4x4 body mounts instruction sheet - K5 body mount doc"
+  },
+  {
+    "image_id": "3a052669-cf1f-4f75-9659-db3dc1ded392",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Champion Cooling billet radiator cap install instructions - generic cooling part, plausible for K5"
+  },
+  {
+    "image_id": "b6c4c9aa-5db8-4166-a9a4-f32d5ac47c97",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Z-Parts House invoice to Skylar: polyurethane radiator isolator set (Energy Suspension) - K5 cooling mount"
+  },
+  {
+    "image_id": "ec59dba0-0a45-4204-bc18-3d037caaf5ac",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "AutoZone commercial invoice PO='77 K5': STP grease tubes - explicit 77 K5 reference"
+  },
+  {
+    "image_id": "b4f4b1e9-d07a-470e-931a-46ab8c6b9c20",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "SMS Auto Fabrics invoice: explicit Year 1977 Make Chevrolet Model K5 Blazer - upholstery cloth 77-7438 Beige/Orange/Black"
+  },
+  {
+    "image_id": "ac6cff8b-3efd-482a-bb09-d48686f511d1",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "NV DMV title receipt: STANDARD TITLE FEE for CKR187F127263 CHEV BLAZER K10 1977 - canonical title doc"
+  },
+  {
+    "image_id": "a4696c50-3505-41d3-8406-8de393798180",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.85,
+    "reasoning": "Holley ship packing slip: LS3 dual-plane intake + LS billet fuel rails + LS WP ALT mid-mount system - LS-swap content"
+  },
+  {
+    "image_id": "5950807a-89fc-4d42-9e71-563cfc2e3302",
+    "verdict": "approved",
+    "confidence": 0.6,
+    "reasoning": "Holley warranty claim information tag (blank) - generic Holley doc, low signal but plausibly with K5 paperwork"
+  },
+  {
+    "image_id": "7fb5759e-7c06-4447-942d-4a5c778fd8fe",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "AutoZone register receipt with multiple lines '1977 Chevrolet Truck Blazer 4WD' - explicit 77 Blazer purchases"
+  },
+  {
+    "image_id": "a9c96455-add9-412b-9fed-658105c48ce2",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Home Hardware receipt with handwritten '77 K5 LS3' annotation - explicit K5 attribution (LS3 here = PO label not engine)"
+  },
+  {
+    "image_id": "15582c26-c7e1-4678-8530-3ab56a739a2e",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Home Hardware receipt with handwritten '77 K5 LS3' - nuts/bolts/screws for K5 build"
+  },
+  {
+    "image_id": "2d560eb4-6c64-46c8-a370-2c8b981064ef",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "AutoZone engine mount receipt with handwritten '77 K5 LS3' - K5 part purchase"
+  },
+  {
+    "image_id": "f7771ff3-a52d-40d3-b586-a1f6ae7aff26",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.85,
+    "reasoning": "Quantum Fuel Systems packing slip QFS-H882-367 ARIAS - high-flow fuel pump for EFI build, not carb K5"
+  },
+  {
+    "image_id": "032a40ca-44c0-437e-901a-3cf6467fe888",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.85,
+    "reasoning": "CJ Pony Parts sales order pg1: 'CHEVY/GMC C10 TRUCK' parts (tailgate, stepside, fleetside bumper) - squarebody C10 pickup, not K5 Blazer"
+  },
+  {
+    "image_id": "2eeeb53b-df6a-442b-b9c9-678d8e92cf72",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.85,
+    "reasoning": "CJ Pony Parts sales order pg2 continuation: 'C10 TRUCK' parts (door pull, headlight switch, hood bumper, stepside) - C10 squarebody pickup"
+  },
+  {
+    "image_id": "c3242f99-255b-4d69-ba85-3ada34d927a8",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.8,
+    "reasoning": "CJ Pony Parts sales order detail page: 'CHEVY/GMC C10 TRUCK' line items - C10 squarebody pickup, includes some 'CHEVY BLAZER' tailgate support which is K5 but bulk is C10"
+  },
+  {
+    "image_id": "1c7d7236-df93-4835-8a87-95c5a24d0a3c",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.8,
+    "reasoning": "CJ Pony Parts continuation: C10 TRUCK parts list - squarebody pickup parts"
+  },
+  {
+    "image_id": "2849636e-efa3-4832-bd9f-ce716e2b91d5",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Maroon (GM-71 Red Metallic) painted hood on stand at Dry-Ice Restorations - subject K5 hood in restoration"
+  },
+  {
+    "image_id": "074cc398-40f9-4ff8-a387-d83b15540c8a",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Two maroon K5 doors leaned against white-painted vehicle - subject K5 doors in restoration shop"
+  },
+  {
+    "image_id": "1aa1868c-0806-4e9b-85aa-ff352d5e7897",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "K5 Blazer cab interior firewall with brake booster cutout, maroon body + red oxide primer floor - subject K5 mid-restoration"
+  },
+  {
+    "image_id": "c0bc901a-8ebb-49e7-844f-27afac34b7bf",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "K5 Blazer cab interior (door open) showing dash structure + floor pans in red oxide primer - subject K5 in shop"
+  },
+  {
+    "image_id": "7f77c432-fd07-4ada-b503-c8df1917b272",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Maroon K5 Blazer body shell (rear quarter visible) + maroon squarebody pickup bed on lift in background - subject K5 in restoration shop"
+  },
+  {
+    "image_id": "bc5315b3-46f7-401c-a986-8223ab7eebb3",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "K5 cab interior firewall area with black patch panel welded in, tools visible - subject K5 mid-bodywork"
+  },
+  {
+    "image_id": "9675ac91-8483-48f2-9f2f-658a6180f217",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Maroon K5 cab/firewall section painted GM-71 Red Metallic, hanging in paint booth with infrared heaters - subject K5 freshly painted"
+  },
+  {
+    "image_id": "9df218fe-bad0-4ed4-8835-a62961fa6a95",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Maroon K5 body panel masked off with brown paper in paint booth - subject K5 in paint process"
+  },
+  {
+    "image_id": "6fcce3f6-2f24-408a-85d0-721cbcd1b905",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "K5 cab/body shell viewed from underneath outside metal shop, work light + dolly - subject K5 mid-restoration"
+  },
+  {
+    "image_id": "82de32b3-c169-48f4-a9ca-e73762700ade",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "K5 Blazer cab (rear, white removable hardtop section visible) in maroon primer outside shop - subject K5 vehicle"
+  },
+  {
+    "image_id": "71c0fe0b-86ae-4d47-83e1-807dcf287f47",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Squarebody Chevy interior door panel (tan/buckskin vinyl) on cardboard with ruler measurement - upholstery template for K5 build"
+  },
+  {
+    "image_id": "fecf7a74-7423-47ca-a949-420bada9dcd4",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Cardboard template (door panel pattern, 35in wide) with measurements - upholstery/panel build template, plausibly for K5 interior"
+  },
+  {
+    "image_id": "35d5785d-1356-4a03-b004-c4d366bbad53",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "K5 cab masked off (yellow tape + paper) with white roof section visible in spray booth - subject K5 white removable top during prep"
+  },
+  {
+    "image_id": "dfc4e566-03d2-426c-84b7-79f62186f630",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "K5 front clip/cab masked with paper + tape in paint booth, primer-white area visible - subject K5 in paint prep"
+  },
+  {
+    "image_id": "6f8451d9-0913-49d6-85ab-a530e7f31f7b",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "K5 rear/quarter panel section masked off in paint booth with maroon paint visible at base - subject K5 in paint process"
+  }
+]

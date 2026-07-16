@@ -1,0 +1,309 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="2200" viewBox="0 0 1700 2200">
+<rect x="0" y="0" width="1700" height="2200" fill="#FFFFFF"/>
+<rect x="30.0" y="30.0" width="1640.0" height="2140.0" fill="none" stroke="#1A1A1A" stroke-width="3"/>
+<rect x="38.0" y="38.0" width="1624.0" height="2124.0" fill="none" stroke="#1A1A1A" stroke-width="1"/>
+<text x="850.0" y="86.0" font-family="Courier New, Courier, monospace" font-size="30" font-weight="bold" fill="#1A1A1A" text-anchor="middle">PDM30 — OUTPUT CHANNELS</text>
+<text x="850.0" y="116.0" font-family="Courier New, Courier, monospace" font-size="14" fill="#1A1A1A" text-anchor="middle">1977 CHEVROLET K5 BLAZER — LS3 6.2L — MoTeC PDM30 POWER DISTRIBUTION</text>
+<text x="850.0" y="140.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">CHANNEL PLAN: K5_pdm30_channel_plan.md (2026-04-05, AUTHORITATIVE) — 30/30 CHANNELS USED, 0 SPARE</text>
+<rect x="60.0" y="170.0" width="1580.0" height="34.0" fill="#D8D8D8" stroke="#1A1A1A" stroke-width="1.5"/>
+<text x="68.0" y="192.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="start">CH</text>
+<text x="153.0" y="192.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="start">RATING</text>
+<text x="248.0" y="192.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="start">DEVICE / GROUP</text>
+<text x="728.0" y="192.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="start">EST AMPS</text>
+<text x="838.0" y="192.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="start">WIRE #</text>
+<text x="1078.0" y="192.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="start">COLOR</text>
+<text x="1558.0" y="192.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="start">AWG</text>
+<rect x="60.0" y="204.0" width="1580.0" height="36.0" fill="#FFFFFF" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="228.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT1</text>
+<text x="153.0" y="228.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">20A</text>
+<text x="248.0" y="228.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Radiator Fan 1</text>
+<text x="728.0" y="228.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">18A</text>
+<text x="838.0" y="228.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#21</text>
+<text x="1078.0" y="228.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/WHT</text>
+<text x="1558.0" y="228.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">12</text>
+<rect x="60.0" y="240.0" width="1580.0" height="36.0" fill="#F2F2F2" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="264.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT2</text>
+<text x="153.0" y="264.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">20A</text>
+<text x="248.0" y="264.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Radiator Fan 2</text>
+<text x="728.0" y="264.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">18A</text>
+<text x="838.0" y="264.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#22</text>
+<text x="1078.0" y="264.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/BLK</text>
+<text x="1558.0" y="264.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">12</text>
+<rect x="60.0" y="276.0" width="1580.0" height="36.0" fill="#FFFFFF" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="300.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT3</text>
+<text x="153.0" y="300.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">20A</text>
+<text x="248.0" y="300.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Power Window Motor Left</text>
+<text x="728.0" y="300.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">15A</text>
+<text x="838.0" y="300.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#34</text>
+<text x="1078.0" y="300.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">DK BLU</text>
+<text x="1558.0" y="300.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">16</text>
+<rect x="60.0" y="312.0" width="1580.0" height="36.0" fill="#F2F2F2" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="336.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT4</text>
+<text x="153.0" y="336.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">20A</text>
+<text x="248.0" y="336.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Power Window Motor Right</text>
+<text x="728.0" y="336.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">15A</text>
+<text x="838.0" y="336.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#35</text>
+<text x="1078.0" y="336.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">DK BLU/WHT</text>
+<text x="1558.0" y="336.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">16</text>
+<rect x="60.0" y="348.0" width="1580.0" height="36.0" fill="#FFFFFF" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="372.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT5</text>
+<text x="153.0" y="372.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">20A</text>
+<text x="248.0" y="372.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Electric Water Pump</text>
+<text x="728.0" y="372.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">12A</text>
+<text x="838.0" y="372.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#25</text>
+<text x="1078.0" y="372.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/BLU</text>
+<text x="1558.0" y="372.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">14</text>
+<rect x="60.0" y="384.0" width="1580.0" height="36.0" fill="#F2F2F2" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="408.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT6</text>
+<text x="153.0" y="408.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">20A</text>
+<text x="248.0" y="408.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Heater Blower Motor</text>
+<text x="728.0" y="408.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">12A</text>
+<text x="838.0" y="408.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#51</text>
+<text x="1078.0" y="408.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/BLK/BLU</text>
+<text x="1558.0" y="408.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">10</text>
+<rect x="60.0" y="420.0" width="1580.0" height="52.0" fill="#FFFFFF" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="444.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT7</text>
+<text x="153.0" y="444.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">20A</text>
+<text x="248.0" y="444.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Electric Parking Brake (E-Stopp)</text>
+<text x="728.0" y="444.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">10A</text>
+<text x="838.0" y="444.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#54</text>
+<text x="1078.0" y="444.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/BLK/YEL</text>
+<text x="1558.0" y="444.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">16</text>
+<text x="153.0" y="460.0" font-family="Courier New, Courier, monospace" font-size="11" fill="#8A8A8A" text-anchor="start">v4: #126 dash button trigger (22 AWG ORN/WHT, 10.0ft) → E-Stopp signal pin landed; button PN TBD (Carling-style)</text>
+<rect x="60.0" y="472.0" width="1580.0" height="36.0" fill="#F2F2F2" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="496.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT8</text>
+<text x="153.0" y="496.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">20A</text>
+<text x="248.0" y="496.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Cigarette Lighter / 12V Outlet</text>
+<text x="728.0" y="496.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">10A</text>
+<text x="838.0" y="496.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#72</text>
+<text x="1078.0" y="496.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/ORG</text>
+<text x="1558.0" y="496.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">14</text>
+<rect x="60.0" y="508.0" width="1580.0" height="36.0" fill="#FFFFFF" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="532.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT9</text>
+<text x="153.0" y="532.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="532.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">AMP Research Step Left</text>
+<text x="728.0" y="532.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="838.0" y="532.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#1</text>
+<text x="1078.0" y="532.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/BLK</text>
+<text x="1558.0" y="532.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">18</text>
+<rect x="60.0" y="544.0" width="1580.0" height="36.0" fill="#F2F2F2" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="568.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT10</text>
+<text x="153.0" y="568.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="568.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">AMP Research Step Right</text>
+<text x="728.0" y="568.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="838.0" y="568.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#2</text>
+<text x="1078.0" y="568.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/BLK/WHT</text>
+<text x="1558.0" y="568.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">18</text>
+<rect x="60.0" y="580.0" width="1580.0" height="36.0" fill="#FFFFFF" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="604.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT11</text>
+<text x="153.0" y="604.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="604.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">AMP Research Controller</text>
+<text x="728.0" y="604.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">2A</text>
+<text x="838.0" y="604.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#3</text>
+<text x="1078.0" y="604.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/BLK/BLK</text>
+<text x="1558.0" y="604.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">22</text>
+<rect x="60.0" y="616.0" width="1580.0" height="36.0" fill="#F2F2F2" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="640.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT12</text>
+<text x="153.0" y="640.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="640.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Windshield Wiper Motor</text>
+<text x="728.0" y="640.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">6A</text>
+<text x="838.0" y="640.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#49</text>
+<text x="1078.0" y="640.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">PPL</text>
+<text x="1558.0" y="640.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">18</text>
+<rect x="60.0" y="652.0" width="1580.0" height="42.0" fill="#FFFFFF" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="676.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT13</text>
+<text x="153.0" y="676.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="676.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">park_tail group</text>
+<text x="248.0" y="691.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">(Tail L/R + Park LF/RF)</text>
+<text x="728.0" y="676.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">1.6A</text>
+<text x="838.0" y="676.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#75, 81, 83, 84</text>
+<text x="1078.0" y="676.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">BRN/YEL, BRN/BLK,</text>
+<text x="1078.0" y="691.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">BRN/RED, BRN/BLU</text>
+<text x="1558.0" y="676.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">22</text>
+<rect x="60.0" y="694.0" width="1580.0" height="36.0" fill="#F2F2F2" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="718.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT14</text>
+<text x="153.0" y="718.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="718.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Horn</text>
+<text x="728.0" y="718.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">5A</text>
+<text x="838.0" y="718.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#48</text>
+<text x="1078.0" y="718.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/ORG</text>
+<text x="1558.0" y="718.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">16</text>
+<rect x="60.0" y="730.0" width="1580.0" height="42.0" fill="#FFFFFF" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="754.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT15</text>
+<text x="153.0" y="754.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="754.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">backup group (Backup L/R</text>
+<text x="248.0" y="769.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">+ 3rd Brake + Backup Camera)</text>
+<text x="728.0" y="754.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">3.0–3.5A</text>
+<text x="838.0" y="754.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#76, 89, 93, 97</text>
+<text x="1078.0" y="754.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">BRN/VIO, BRN/ORG,</text>
+<text x="1078.0" y="769.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">BRN/RED, BLU/WHT</text>
+<text x="1558.0" y="754.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">22</text>
+<rect x="60.0" y="772.0" width="1580.0" height="36.0" fill="#F2F2F2" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="796.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT16</text>
+<text x="153.0" y="796.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="796.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">A/C Compressor Clutch</text>
+<text x="728.0" y="796.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">4A</text>
+<text x="838.0" y="796.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#23</text>
+<text x="1078.0" y="796.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/RED</text>
+<text x="1558.0" y="796.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">20</text>
+<rect x="60.0" y="808.0" width="1580.0" height="58.0" fill="#FFFFFF" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="832.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT17</text>
+<text x="153.0" y="832.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="832.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">LED Headlight Left</text>
+<text x="248.0" y="847.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">(→ floor dimmer COMMON)</text>
+<text x="728.0" y="832.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">3.6A</text>
+<text x="838.0" y="832.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#85</text>
+<text x="1078.0" y="832.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">LT GRN</text>
+<text x="1558.0" y="832.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">20</text>
+<text x="153.0" y="863.0" font-family="Courier New, Courier, monospace" font-size="11" fill="#8A8A8A" text-anchor="start">v4: legs #85a LOW / #85b HIGH (16 AWG) dimmer → lamp landed; #121 Dakota high-beam ind taps #85b</text>
+<rect x="60.0" y="866.0" width="1580.0" height="58.0" fill="#F2F2F2" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="890.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT18</text>
+<text x="153.0" y="890.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="890.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">LED Headlight Right</text>
+<text x="248.0" y="905.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">(→ floor dimmer COMMON)</text>
+<text x="728.0" y="890.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">3.6A</text>
+<text x="838.0" y="890.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#86</text>
+<text x="1078.0" y="890.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">LT GRN/WHT</text>
+<text x="1558.0" y="890.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">20</text>
+<text x="153.0" y="921.0" font-family="Courier New, Courier, monospace" font-size="11" fill="#8A8A8A" text-anchor="start">v4: legs #86a LOW / #86b HIGH (16 AWG) paralleled at dimmer; dimmer PN/connector TBD</text>
+<rect x="60.0" y="924.0" width="1580.0" height="42.0" fill="#FFFFFF" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="948.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT19</text>
+<text x="153.0" y="948.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="948.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">markers_clearance group</text>
+<text x="248.0" y="963.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">(8 fixtures)</text>
+<text x="728.0" y="948.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">1.25–1.3A</text>
+<text x="838.0" y="948.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#77, 78, 79, 87,</text>
+<text x="838.0" y="963.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">88, 90, 91, 92</text>
+<text x="1078.0" y="948.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">BRN/ORG, BRN, BRN/WHT(x2), BRN(x2),</text>
+<text x="1078.0" y="963.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">BRN/YEL, BRN/VIO, BRN/BLK</text>
+<text x="1558.0" y="948.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">22</text>
+<rect x="60.0" y="966.0" width="1580.0" height="36.0" fill="#F2F2F2" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="990.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT20</text>
+<text x="153.0" y="990.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="990.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Radio / Head Unit</text>
+<text x="728.0" y="990.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">3A</text>
+<text x="838.0" y="990.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#31</text>
+<text x="1078.0" y="990.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/BLK</text>
+<text x="1558.0" y="990.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">22</text>
+<rect x="60.0" y="1002.0" width="1580.0" height="36.0" fill="#FFFFFF" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="1026.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT21</text>
+<text x="153.0" y="1026.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="1026.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Power Lock Actuator Left</text>
+<text x="728.0" y="1026.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">3A</text>
+<text x="838.0" y="1026.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#38</text>
+<text x="1078.0" y="1026.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">BLK</text>
+<text x="1558.0" y="1026.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">20</text>
+<rect x="60.0" y="1038.0" width="1580.0" height="36.0" fill="#F2F2F2" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="1062.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT22</text>
+<text x="153.0" y="1062.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="1062.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Power Lock Actuator Right</text>
+<text x="728.0" y="1062.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">3A</text>
+<text x="838.0" y="1062.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#47</text>
+<text x="1078.0" y="1062.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">BLK/WHT</text>
+<text x="1558.0" y="1062.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">20</text>
+<rect x="60.0" y="1074.0" width="1580.0" height="52.0" fill="#FFFFFF" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="1098.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT23</text>
+<text x="153.0" y="1098.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="1098.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Transmission Controller</text>
+<text x="728.0" y="1098.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">3A</text>
+<text x="838.0" y="1098.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#58</text>
+<text x="1078.0" y="1098.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/YEL</text>
+<text x="1558.0" y="1098.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">22</text>
+<text x="153.0" y="1114.0" font-family="Courier New, Courier, monospace" font-size="11" fill="#8A8A8A" text-anchor="start">v4: powers Holley 558-499 T43 TCU (3A); CAN via #125 stub off trunk #62</text>
+<rect x="60.0" y="1126.0" width="1580.0" height="36.0" fill="#F2F2F2" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="1150.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT24</text>
+<text x="153.0" y="1150.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="1150.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Wideband Lambda Controller</text>
+<text x="728.0" y="1150.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">3A</text>
+<text x="838.0" y="1150.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#64</text>
+<text x="1078.0" y="1150.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/BLK</text>
+<text x="1558.0" y="1150.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">22</text>
+<rect x="60.0" y="1162.0" width="1580.0" height="42.0" fill="#FFFFFF" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="1186.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT25</text>
+<text x="153.0" y="1186.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="1186.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">interior_courtesy group (Dome,</text>
+<text x="248.0" y="1201.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">U-Dash, Footwell, U-Hood, Cargo)</text>
+<text x="728.0" y="1186.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">1.9–2.5A</text>
+<text x="838.0" y="1186.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#67, 68, 69, 73, 74</text>
+<text x="1078.0" y="1186.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">BRN, BRN/WHT, BRN/BLK,</text>
+<text x="1078.0" y="1201.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">BRN/RED, BRN/BLU</text>
+<text x="1558.0" y="1186.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">22</text>
+<rect x="60.0" y="1204.0" width="1580.0" height="36.0" fill="#F2F2F2" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="1228.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT26</text>
+<text x="153.0" y="1228.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="1228.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Washer Pump</text>
+<text x="728.0" y="1228.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">2A</text>
+<text x="838.0" y="1228.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#50</text>
+<text x="1078.0" y="1228.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/BLK/RED</text>
+<text x="1558.0" y="1228.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">22</text>
+<rect x="60.0" y="1240.0" width="1580.0" height="58.0" fill="#FFFFFF" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="1264.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT27</text>
+<text x="153.0" y="1264.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="1264.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Turn Signal Left Front</text>
+<text x="728.0" y="1264.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">2A</text>
+<text x="838.0" y="1264.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#80</text>
+<text x="838.0" y="1279.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">(+#119 tap)</text>
+<text x="1078.0" y="1264.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">LT BLU</text>
+<text x="1558.0" y="1264.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">22</text>
+<text x="153.0" y="1295.0" font-family="Courier New, Courier, monospace" font-size="11" fill="#8A8A8A" text-anchor="start">v4: #119 Dakota L-turn input = dash-side splice on #80</text>
+<rect x="60.0" y="1298.0" width="1580.0" height="58.0" fill="#F2F2F2" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="1322.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT28</text>
+<text x="153.0" y="1322.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="1322.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Turn Signal Right Front</text>
+<text x="728.0" y="1322.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">2A</text>
+<text x="838.0" y="1322.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#82</text>
+<text x="838.0" y="1337.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">(+#120 tap)</text>
+<text x="1078.0" y="1322.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">DK BLU</text>
+<text x="1558.0" y="1322.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">22</text>
+<text x="153.0" y="1353.0" font-family="Courier New, Courier, monospace" font-size="11" fill="#8A8A8A" text-anchor="start">v4: #120 Dakota R-turn input = dash-side splice on #82</text>
+<rect x="60.0" y="1356.0" width="1580.0" height="74.0" fill="#FFFFFF" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="1380.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT29</text>
+<text x="153.0" y="1380.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="1380.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">Display / Dash (MoTeC C125)</text>
+<text x="728.0" y="1380.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">1A</text>
+<text x="838.0" y="1380.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#65</text>
+<text x="838.0" y="1395.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">(+#124 splice)</text>
+<text x="1078.0" y="1380.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/RED</text>
+<text x="1558.0" y="1380.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">22</text>
+<text x="153.0" y="1411.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#E67300" text-anchor="start">v4: #124 Dakota switched-+12V backup splices OUT29 — verify vs Dakota internal jumper; #124 ORN/RED collides with #117</text>
+<text x="153.0" y="1427.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#E67300" text-anchor="start">— reassign at mockup</text>
+<rect x="60.0" y="1430.0" width="1580.0" height="36.0" fill="#F2F2F2" stroke="#666666" stroke-width="0.75"/>
+<text x="68.0" y="1454.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">OUT30</text>
+<text x="153.0" y="1454.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">8A</text>
+<text x="248.0" y="1454.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">USB Charging Port</text>
+<text x="728.0" y="1454.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">1A</text>
+<text x="838.0" y="1454.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">#70</text>
+<text x="1078.0" y="1454.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">ORN/YEL</text>
+<text x="1558.0" y="1454.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">22</text>
+<line x1="145.0" y1="170.0" x2="145.0" y2="1466.0" stroke="#666666" stroke-width="0.75"/>
+<line x1="240.0" y1="170.0" x2="240.0" y2="1466.0" stroke="#666666" stroke-width="0.75"/>
+<line x1="720.0" y1="170.0" x2="720.0" y2="1466.0" stroke="#666666" stroke-width="0.75"/>
+<line x1="830.0" y1="170.0" x2="830.0" y2="1466.0" stroke="#666666" stroke-width="0.75"/>
+<line x1="1070.0" y1="170.0" x2="1070.0" y2="1466.0" stroke="#666666" stroke-width="0.75"/>
+<line x1="1550.0" y1="170.0" x2="1550.0" y2="1466.0" stroke="#666666" stroke-width="0.75"/>
+<rect x="60.0" y="170.0" width="1580.0" height="1296.0" fill="none" stroke="#1A1A1A" stroke-width="1.5"/>
+<text x="60.0" y="1492.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#E67300" text-anchor="start">POWER RAILS — CHANNEL TBD:</text>
+<text x="70.0" y="1510.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#E67300" text-anchor="start">#INJ_PWR  Injector +12V rail   16 AWG  RED  5.0ft — feeds 8x EV6 injectors @ fuel rail — PDM CHANNEL TBD</text>
+<text x="70.0" y="1528.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#E67300" text-anchor="start">#COIL_PWR Coil +12V rail       16 AWG  RED  3.0ft — feeds 8x D510C @ DEL-Stributor bracket — PDM CHANNEL TBD</text>
+<text x="60.0" y="1552.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#E67300" text-anchor="start">PDM-FED, CHANNEL NOT SPECIFIED IN CUT LIST v4:</text>
+<text x="70.0" y="1570.0" font-family="Courier New, Courier, monospace" font-size="11" fill="#E67300" text-anchor="start">#55 Transfer Case Ind · #56 Neutral Safety Sw · #57 Reverse Light Sw · #71 Dakota Digital (IGN rail tap, not a channel) · #94 Fuel Pump Rly · #95 iBooster Rly</text>
+<rect x="60.0" y="1600.0" width="1580.0" height="130.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.5"/>
+<text x="72.0" y="1624.0" font-family="Courier New, Courier, monospace" font-size="14" font-weight="bold" fill="#1A1A1A" text-anchor="start">NOT ON PDM — DIRECT WIRED</text>
+<text x="72.0" y="1646.0" font-family="Courier New, Courier, monospace" font-size="11" fill="#1A1A1A" text-anchor="start">#59  Alternator           0 AWG  ORN/VIO  (220A source; capacity inconsistent across docs: 250A/220A/150A)</text>
+<text x="72.0" y="1663.0" font-family="Courier New, Courier, monospace" font-size="11" fill="#1A1A1A" text-anchor="start">#6   Starter Motor        0 AWG  ORN      (200A peak)        #63  Battery Disconnect  0 AWG  ORN/WHT (190A)</text>
+<text x="72.0" y="1680.0" font-family="Courier New, Courier, monospace" font-size="11" fill="#1A1A1A" text-anchor="start">#66  Fuel Pump            8 AWG  ORN/BLU  (35A, Aeromotive 16301 relay)</text>
+<text x="72.0" y="1697.0" font-family="Courier New, Courier, monospace" font-size="11" fill="#1A1A1A" text-anchor="start">#52  Bosch iBooster       8 AWG  ORN      (40A peak, dedicated relay)</text>
+<text x="72.0" y="1714.0" font-family="Courier New, Courier, monospace" font-size="11" fill="#1A1A1A" text-anchor="start">#32  Amplifier            8 AWG  ORN/RED  (30A, direct fused battery)   — injectors/coils sw via M130 low-side</text>
+<text x="60.0" y="1754.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">NOTE: stale harness_spec_latest.txt (2026-04-13) carries a different channel map (6x20A + 14x15A + 10x10A, E-Stopp ch7/8, QTP cutouts, keypad) — superseded by the 2026-04-05 authoritative plan shown above.</text>
+<rect x="1020.0" y="1992.0" width="640.0" height="168.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="2"/>
+<line x1="1020.0" y1="2022.0" x2="1660.0" y2="2022.0" stroke="#1A1A1A" stroke-width="1"/>
+<line x1="1020.0" y1="2050.0" x2="1660.0" y2="2050.0" stroke="#1A1A1A" stroke-width="1"/>
+<line x1="1020.0" y1="2078.0" x2="1660.0" y2="2078.0" stroke="#1A1A1A" stroke-width="1"/>
+<line x1="1020.0" y1="2106.0" x2="1660.0" y2="2106.0" stroke="#1A1A1A" stroke-width="1"/>
+<text x="1032.0" y="2013.0" font-family="Courier New, Courier, monospace" font-size="15" font-weight="bold" fill="#1A1A1A" text-anchor="start">NUKE LTD / DESERT PERFORMANCE</text>
+<text x="1032.0" y="2041.0" font-family="Courier New, Courier, monospace" font-size="13" fill="#1A1A1A" text-anchor="start">1977 CHEVROLET K5 BLAZER — VIN CKR187F127263</text>
+<text x="1032.0" y="2069.0" font-family="Courier New, Courier, monospace" font-size="13" fill="#1A1A1A" text-anchor="start">LS3 6.2L / MoTeC M130 + PDM30</text>
+<text x="1032.0" y="2097.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">SHEET 3 OF 3   —   2026-06-09   —   REV A</text>
+<text x="1032.0" y="2123.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">DERIVED FROM K5_cut_list_v4 + pdm30_channel_plan; lengths/land</text>
+<text x="1032.0" y="2144.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">marks per calc engine</text>
+</svg>

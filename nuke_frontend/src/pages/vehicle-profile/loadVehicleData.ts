@@ -5,6 +5,7 @@
  * Extracted from VehicleProfile.tsx to reduce file size.
  * This function has side effects (state setters, supabase calls, navigation) but no React hooks.
  */
+import type React from 'react';
 import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
 import { isMismatchedVehicleImage, scoreMoneyShot } from './imageFilterUtils';
 
@@ -79,6 +80,16 @@ function scoreHeroCandidate(row: any, options: { frontExterior?: boolean } = {})
   return moneyShotScore + qualityScore + zoneScore + getHeroAspectScore(row);
 }
 
+// In-flight dedupe for the hero-candidate query. The identical vehicle_images
+// query was observed firing 2-4x per page load (StrictMode double-mount +
+// RPC-fallback path both selecting a hero). Key = vehicleId — the rest of the
+// query shape is constant. Entries clear when the promise settles, so this is
+// pure concurrent-request coalescing, not a cache.
+const inflightHeroCandidates = new Map<string, Promise<any[] | null>>();
+
+// In-flight dedupe for the main profile RPC (same coalescing pattern).
+const inflightProfileRpc = new Map<string, Promise<any>>();
+
 /**
  * Select the best hero image for a vehicle based on zone, quality, confidence,
  * and banner fit.
@@ -96,98 +107,156 @@ export async function selectBestHeroImage(
   vehicleId: string,
   supabase: any,
   primaryImageUrl?: string | null,
+  prefetchedImages?: any[],
 ): Promise<HeroImageResult | null> {
   try {
-    // Attempt 0: explicit is_primary wins unconditionally.
-    // With contain mode as default, any orientation works — the full image is always visible.
-    const { data: primaryRows, error: primaryErr } = await supabase
-      .from('vehicle_images')
-      .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle')
-      .eq('vehicle_id', vehicleId)
-      .eq('is_primary', true)
-      .not('is_document', 'is', true)
-      .not('is_duplicate', 'is', true)
-      .limit(1);
+    // Coalesce the prior 4 sequential queries into one round-trip.
+    // Strategy: pull a generous candidate window ordered by (is_primary, quality, ai recency),
+    // then apply the same priority logic client-side. If the caller already has the image list,
+    // skip the network call entirely.
+    let candidates: any[] | null = null;
 
-    if (!primaryErr && primaryRows && primaryRows.length > 0) {
-      return buildHeroResult(primaryRows[0]);
+    if (prefetchedImages && prefetchedImages.length > 0) {
+      candidates = prefetchedImages;
+    } else {
+      let pending = inflightHeroCandidates.get(vehicleId);
+      if (!pending) {
+        const query: Promise<any[] | null> = supabase
+          .from('vehicle_images')
+          .select(
+            'image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at, category, image_type'
+          )
+          .eq('vehicle_id', vehicleId)
+          // Order by recency first — latest owner photo wins per restoration_lead_image_must_be_latest.
+          // is_primary remains a tiebreaker fallback further down.
+          .order('taken_at', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false, nullsFirst: false })
+          .order('is_primary', { ascending: false, nullsFirst: false })
+          .order('photo_quality_score', { ascending: false, nullsFirst: false })
+          .limit(60)
+          .then(({ data, error }: { data: any[] | null; error: any }) => {
+            if (error) {
+              console.warn('[selectBestHeroImage] query error:', error);
+            }
+            return data || null;
+          });
+        pending = query.finally(() => inflightHeroCandidates.delete(vehicleId));
+        inflightHeroCandidates.set(vehicleId, pending);
+      }
+      candidates = await pending;
     }
 
-    // Attempt 1: front-facing exterior zones with completed AI processing
-    // Only trust images where match_status is explicitly 'match' or from trusted sources
-    const { data: frontImages, error: frontErr } = await supabase
-      .from('vehicle_images')
-      .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source')
-      .eq('vehicle_id', vehicleId)
-      .eq('ai_processing_status', 'completed')
-      .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
-      .in('vehicle_zone', ['ext_front', 'ext_front_driver', 'ext_front_passenger'])
-      .order('photo_quality_score', { ascending: false })
-      .limit(20);
+    if (!candidates || candidates.length === 0) {
+      if (primaryImageUrl) return { url: primaryImageUrl, meta: {} };
+      return null;
+    }
 
-    if (!frontErr && frontImages && frontImages.length > 0) {
-      // Prefer images from trusted sources (bat_import_mirrored, user_upload) over
-      // unverified bulk imports (iphoto, photo_auto_sync, drop-folder) which may
-      // contain photos from different vehicles.
-      const trustedSources = new Set(['bat_import_mirrored', 'bat_import', 'user_upload', 'manual']);
-      const scored = frontImages.map((img: any) => {
+    // Filter out documents/duplicates, mismatch-flagged rows, and vision-gate rejections.
+    const usable = candidates.filter((img: any) => {
+      if (img?.is_document === true) return false;
+      if (img?.is_duplicate === true) return false;
+      const mvms = img?.image_vehicle_match_status;
+      if (mvms === 'mismatch' || mvms === 'unrelated') return false;
+      const vgs = img?.vision_gate_status;
+      if (vgs === 'rejected_personal' || vgs === 'rejected_misattributed' || vgs === 'rejected') return false;
+      return true;
+    });
+
+    if (usable.length === 0) {
+      if (primaryImageUrl) return { url: primaryImageUrl, meta: {} };
+      return null;
+    }
+
+    // Priority 0 — latest owner-trust photo wins.
+    // Per ~/.claude/projects/-Users-skylar/memory/feedback_restoration_lead_image_must_be_latest.md:
+    // restoration lead image = latest owner-uploaded photo from owner-trust sources only.
+    // The May-22 photo that was pinned as is_primary is no longer load-bearing — the May-24
+    // iphoto upload should be hero on an in-progress restoration.
+    const isOwnerTrustSource = (src: any): boolean => {
+      if (typeof src !== 'string') return false;
+      return src === 'iphoto'
+        || src === 'user_upload'
+        || src === 'manual'
+        || src === 'tech_capture'
+        || src.startsWith('direct_pull');
+    };
+
+    // A hero must be a presentable EXTERIOR of the whole vehicle — never a detail
+    // closeup, engine bay, undercarriage, interior, document, or transport/delivery
+    // shot. Skylar 2026-05-30: "engine bay isn't a primary, post-delivery isn't a
+    // primary — there should be flags that inhibit that image from being the hero."
+    const NON_HERO_ZONE = /^(detail_|int_|eng|under|trunk|doc|receipt|data_plate|transport|delivery|ship)/i;
+    const EXT_ZONE = /(^ext_)|profile|three.?quarter|(^3q)/i;
+    const NON_HERO_CAT = new Set([
+      'engine_bay', 'engine', 'undercarriage', 'interior', 'vehicle_interior',
+      'documentation', 'receipt_document', 'data_plate', 'trunk_storage', 'transport', 'delivery',
+    ]);
+    const isHeroEligible = (img: any): boolean => {
+      if (img?.is_document === true) return false;
+      const z = (img?.vehicle_zone || '').toLowerCase();
+      const c = (img?.category || '').toLowerCase();
+      const t = (img?.image_type || '').toLowerCase();
+      if (NON_HERO_ZONE.test(z)) return false;
+      if (NON_HERO_CAT.has(c) || NON_HERO_CAT.has(t)) return false;
+      return true;
+    };
+    const isExterior = (img: any): boolean => {
+      const z = (img?.vehicle_zone || '').toLowerCase();
+      const c = (img?.category || '').toLowerCase();
+      return EXT_ZONE.test(z) || c === 'exterior' || c === 'exterior_body' || c === 'vehicle_exterior';
+    };
+
+    const ownerOwned = usable.filter((img: any) => isOwnerTrustSource(img?.source));
+    if (ownerOwned.length > 0) {
+      // Candidates are ordered taken_at DESC. Latest owner EXTERIOR shot wins;
+      // else latest owner hero-eligible shot (not a detail/engine/interior/transport).
+      // Only if NEITHER exists do we fall through to the exterior/quality priorities below
+      // — better to fall through than pin a closeup or shipping photo as the face of the truck.
+      const ownerExt = ownerOwned.filter(isExterior);
+      if (ownerExt.length > 0) return buildHeroResult(ownerExt[0]);
+      const ownerOk = ownerOwned.filter(isHeroEligible);
+      if (ownerOk.length > 0) return buildHeroResult(ownerOk[0]);
+    }
+
+    // Priority 1: explicit is_primary (fallback for vehicles with no owner-trust uploads, e.g. BaT-only imports).
+    const primary = usable.find((img: any) => img?.is_primary === true);
+    if (primary) return buildHeroResult(primary);
+
+    const trustedSources = new Set(['bat_import_mirrored', 'bat_import', 'user_upload', 'manual']);
+    const frontZones = new Set(['ext_front', 'ext_front_driver', 'ext_front_passenger']);
+
+    // Priority 1: front-facing exterior, AI completed
+    const fronts = usable.filter(
+      (img: any) => img?.ai_processing_status === 'completed' && frontZones.has(img?.vehicle_zone)
+    );
+    if (fronts.length > 0) {
+      const scored = fronts.map((img: any) => {
         const base = scoreHeroCandidate(img, { frontExterior: true });
         const trusted = trustedSources.has(img.source) ? 50 : 0;
-        return { ...img, _score: base + trusted };
+        return { img, score: base + trusted };
       });
-      scored.sort((a: any, b: any) => b._score - a._score);
-      return buildHeroResult(scored[0]);
+      scored.sort((a, b) => b.score - a.score);
+      return buildHeroResult(scored[0].img);
     }
 
-    // Attempt 2: any zone, but still prefer true "money shot" exterior candidates
-    const { data: anyImages, error: anyErr } = await supabase
-      .from('vehicle_images')
-      .select('image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source')
-      .eq('vehicle_id', vehicleId)
-      .not('photo_quality_score', 'is', null)
-      .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
-      .order('photo_quality_score', { ascending: false })
-      .limit(40);
-
-    if (!anyErr && anyImages && anyImages.length > 0) {
-      const trustedSources = new Set(['bat_import_mirrored', 'bat_import', 'user_upload', 'manual']);
-      const scored = anyImages.map((img: any) => {
+    // Priority 2: any zone with a quality score
+    const scored2 = usable
+      .filter((img: any) => img?.photo_quality_score != null)
+      .map((img: any) => {
         const base = scoreHeroCandidate(img);
         const trusted = trustedSources.has(img.source) ? 50 : 0;
-        return { ...img, _score: base + trusted };
+        return { img, score: base + trusted };
       });
-      scored.sort((a: any, b: any) => b._score - a._score);
-      return buildHeroResult(scored[0]);
+    if (scored2.length > 0) {
+      scored2.sort((a, b) => b.score - a.score);
+      return buildHeroResult(scored2[0].img);
     }
 
-    // Attempt 2.5: any non-document, non-duplicate image (no AI filtering)
-    const { data: anyImage, error: anyImageErr } = await supabase
-      .from('vehicle_images')
-      .select('image_url, medium_url, large_url, exif_data, taken_at')
-      .eq('vehicle_id', vehicleId)
-      .not('is_document', 'is', true)
-      .not('is_duplicate', 'is', true)
-      .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
-      .order('is_primary', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (!anyImageErr && anyImage && anyImage.length > 0) {
-      return buildHeroResult(anyImage[0]);
-    }
-
-    // Attempt 3: fall back to primary_image_url
-    if (primaryImageUrl) {
-      return { url: primaryImageUrl, meta: {} };
-    }
-
-    return null;
+    // Priority 3: any usable image (candidates are already ordered by is_primary, quality, created_at)
+    return buildHeroResult(usable[0]);
   } catch (err) {
     console.warn('[selectBestHeroImage] error:', err);
-    // Non-fatal — fall back to primary
-    if (primaryImageUrl) {
-      return { url: primaryImageUrl, meta: {} };
-    }
+    if (primaryImageUrl) return { url: primaryImageUrl, meta: {} };
     return null;
   }
 }
@@ -250,7 +319,7 @@ export interface LoadVehicleParams {
   setIsPublic: (v: boolean) => void;
   setLeadImageUrl: (url: string) => void;
   setVehicleImages: (images: string[]) => void;
-  setTimelineEvents: (events: any[]) => void;
+  setTimelineEvents: React.Dispatch<React.SetStateAction<any[]>>;
   setAuctionPulse: (pulse: any) => void;
 }
 
@@ -290,14 +359,25 @@ export async function loadVehicleImpl({
     // Only try RPC if vehicleId is a UUID (RPC expects UUID, not VIN)
     if (isUUID) {
       // Wrap RPC in a timeout so a hung connection never leaves the page in an infinite
-      // "Loading vehicle..." state. 2.5 s fires before the anon DB statement_timeout (3 s),
-      // ensuring the client falls back to the fast direct query before the server errors out.
-      const rpcTimeoutMs = 2500;
+      // "Loading vehicle..." state. 6 s, not 2.5 s: the RPC measures 0.5-1.8 s in
+      // isolation, but in-browser it loses the connection-scheduling race under the
+      // page's request flood (~57 vehicle_images requests observed 2026-06-10), so the
+      // 2.5 s wrapper fired spuriously and the fallback cascade then DOUBLED the flood.
+      // 6 s still fires well before the anon DB statement_timeout (15 s).
+      const rpcTimeoutMs = 6000;
       const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
         setTimeout(() => resolve({ data: null, error: new Error('get_vehicle_profile_data timed out') }), rpcTimeoutMs)
       );
+      // Coalesce concurrent identical RPC calls (StrictMode double-mount was
+      // observed firing this 3.7s query twice in parallel).
+      let rpcPending = inflightProfileRpc.get(vehicleId);
+      if (!rpcPending) {
+        rpcPending = Promise.resolve(supabase.rpc('get_vehicle_profile_data', { p_vehicle_id: vehicleId }))
+          .finally(() => inflightProfileRpc.delete(vehicleId));
+        inflightProfileRpc.set(vehicleId, rpcPending);
+      }
       const rpcResult = await Promise.race([
-        supabase.rpc('get_vehicle_profile_data', { p_vehicle_id: vehicleId }),
+        rpcPending,
         timeoutPromise,
       ]);
       rpcData = rpcResult.data;
@@ -349,15 +429,20 @@ export async function loadVehicleImpl({
       vehicleData = rpcData.vehicle;
 
       // RPC caps images at 50 for performance (see get_vehicle_profile_data migration).
-      // If the vehicle has more images than the RPC returned, do NOT use RPC images so
-      // loadVehicleImages runs the direct DB query and gets the full gallery + correct count.
-      const totalImageCount = rpcData.stats?.image_count ?? 0;
+      // Truncation is detected by hitting that cap. Do NOT compare against
+      // stats.image_count: it is the UNFILTERED total while rpcData.images is
+      // filtered (docs/dupes/e2e excluded), so the counts mismatch for almost
+      // every vehicle and forced a full unbounded vehicle_images refetch.
+      const RPC_IMAGE_CAP = 50;
       const rpcImageCount = Array.isArray(rpcData.images) ? rpcData.images.length : 0;
-      const rpcImagesTruncated = totalImageCount > rpcImageCount;
+      const rpcImagesTruncated = rpcImageCount >= RPC_IMAGE_CAP;
 
-      if (rpcData.images && !rpcImagesTruncated) {
+      if (rpcData.images && rpcImageCount > 0) {
+        // Paint the RPC batch immediately — even when truncated — so heavy
+        // vehicles show a gallery right away instead of waiting on the full
+        // paginated fetch (loadVehicleImages still runs to complete the set).
         setVehicleImages(rpcData.images.map((img: any) => img.image_url));
-        rpcLoaded.images = true;
+        rpcLoaded.images = !rpcImagesTruncated;
       }
       if (rpcData.timeline_events) {
         // Merge work_sessions into timeline events (work_sessions table has RLS,
@@ -387,13 +472,49 @@ export async function loadVehicleImpl({
             });
           }
         }
-        events.sort((a: any, b: any) => {
+        const sortByDateDesc = (arr: any[]) => arr.sort((a: any, b: any) => {
           const da = a.event_date || '';
           const db = b.event_date || '';
           return db.localeCompare(da);
         });
+        // Paint the timeline NOW — do not gate first paint on image_sets.
+        sortByDateDesc(events);
         setTimelineEvents(events);
         rpcLoaded.timeline = true;
+        // RPC doesn't include image_sets — supplement asynchronously and merge
+        // when (if) it lands. This query was measured at 15s/HTTP 500 for anon
+        // (RLS policy timeout) and was the single biggest stall in signed-out
+        // first paint: awaiting it held the timeline (and everything sequenced
+        // after) to t+19s. Photo sessions are supplementary — never blocking.
+        void (async () => {
+          try {
+            const { data: imageSets } = await supabase
+              .from('image_sets')
+              .select('id, name, session_start, session_end, session_duration_minutes, metadata, event_date')
+              .eq('vehicle_id', vehicleId)
+              .order('session_start', { ascending: false });
+            if (!Array.isArray(imageSets) || imageSets.length === 0) return;
+            const sessionEvents = imageSets.map((s: any) => ({
+              id: s.id,
+              vehicle_id: vehicleId,
+              event_date: s.event_date || (s.session_start ? String(s.session_start).slice(0, 10) : null),
+              event_type: 'photo_session',
+              title: s.name || 'Photo session',
+              metadata: {
+                ...(s.metadata || {}),
+                session_start: s.session_start,
+                session_end: s.session_end,
+                session_duration_minutes: s.session_duration_minutes,
+                source: 'context_stitcher',
+              },
+            }));
+            setTimelineEvents((prev: any[]) => {
+              const have = new Set((prev || []).map((e: any) => e.id));
+              const merged = [...(prev || []), ...sessionEvents.filter((e: any) => !have.has(e.id))];
+              return sortByDateDesc(merged);
+            });
+          } catch { /* ignore — image_sets is supplementary */ }
+        })();
       }
       // Extract counts from RPC stats to avoid separate count queries
       if (rpcData.stats) {

@@ -32,7 +32,7 @@ check "db-stats" "curl -sf '$SUPABASE_URL/functions/v1/db-stats' -H 'Authorizati
 check "universal-search" "curl -sf '$SUPABASE_URL/functions/v1/universal-search?q=porsche' -H 'Authorization: Bearer $SERVICE_KEY'"
 check "coordinator" "curl -sf -X POST '$SUPABASE_URL/functions/v1/ralph-wiggum-rlm-extraction-coordinator' -H 'Authorization: Bearer $SERVICE_KEY' -H 'Content-Type: application/json' -d '{\"action\": \"brief\"}'"
 check "nuke.ag" "curl -sf 'https://nuke.ag'"
-check "postgres" "PGPASSWORD='RbzKq32A0uhqvJMQ' psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c 'SELECT 1' -t"
+check "postgres" "PGPASSWORD='${SUPABASE_DB_PASSWORD}' psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c 'SELECT 1' -t"
 
 TOTAL=$((PASS + FAIL))
 

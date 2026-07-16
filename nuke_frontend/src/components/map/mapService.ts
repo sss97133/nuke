@@ -113,7 +113,7 @@ export async function fetchMakeHeatmap(make: string): Promise<import('./types').
 export function thumbUrl(url: string | null): string | null {
   if (!url) return null;
   if (url.includes('/storage/v1/object/public/')) {
-    return url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=280&height=160&quality=80&resize=cover';
+    return url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=280&height=160&quality=80&resize=contain';
   }
   return url;
 }

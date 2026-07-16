@@ -1,0 +1,80 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1984 K10 — what the engine knows</title>
+<style>
+:root{--bg:#0f1113;--card:#181b1e;--line:#2a2f34;--ink:#e8eaed;--dim:#8b9197;--accent:#7fd1c1;--warn:#e0a458}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,SF Pro Text,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 20px 80px}
+h1{font-size:22px;margin:0 0 2px;font-weight:650}
+.sub{color:var(--dim);font-size:13px;margin-bottom:4px}
+.mono{font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.note{color:var(--dim);font-size:12.5px;margin:18px 0 22px;border-left:2px solid var(--line);padding-left:12px}
+.compass{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 26px}
+.compass span{font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:999px;padding:3px 9px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.card img{width:100%;aspect-ratio:4/3;object-fit:cover;background:#000;display:block}
+.body{padding:12px 13px 14px}
+.zone{font-size:13px;font-weight:650;letter-spacing:.3px}
+.role{float:right;font-size:10px;color:var(--bg);background:var(--accent);border-radius:4px;padding:1px 6px;font-weight:700;text-transform:uppercase}
+.role.vin{background:var(--warn)}
+.kv{display:grid;grid-template-columns:84px 1fr;gap:2px 8px;margin-top:9px;font-size:12.5px}
+.kv .k{color:var(--dim)}
+.kv .v{color:var(--ink)}
+.chips{margin-top:9px;display:flex;gap:5px;flex-wrap:wrap}
+.chip{font-size:10.5px;color:var(--dim);background:#11151a;border:1px solid var(--line);border-radius:999px;padding:2px 7px}
+.bar{height:4px;background:#11151a;border-radius:3px;overflow:hidden;margin-top:3px}
+.bar>i{display:block;height:100%;background:var(--accent)}
+footer{color:var(--dim);font-size:12px;margin-top:30px;border-top:1px solid var(--line);padding-top:14px}
+</style></head><body><div class="wrap">
+<h1>1984 Chevrolet K10 SWB Scottsdale &middot; <span class="mono">VIN 1GCEK14L9EJ147915</span></h1>
+<div class="sub">Frost White (factory code 12) &middot; blue interior &middot; lifted 4&times;4 short-bed</div>
+<div class="sub">What the analysis engine actually recorded for each photo &mdash; one card per image, the schema filled.</div>
+
+<div class="note">Each card is the image plus the <b>fields the engine filled for it</b>: which area of the truck it shows
+(<b>zone</b>), the camera's 3-D viewpoint (<b>azimuth / elevation / distance</b>), <b>condition</b> and photo quality (0&ndash;100),
+the <b>role</b> (is this the truck, or its VIN plate), and a <b>signature</b> of what was seen. Not every photo fills every
+field &mdash; a VIN plate fills the VIN, a side shot fills the body signature. That sparseness is correct: the schema is vast,
+each photo fills only what it truthfully shows.</div>
+
+<div class="compass"><b style="color:var(--dim);font-size:11px;align-self:center">360&deg; coverage:</b>
+<span>front 0&deg;</span><span>front-&frac34; &plusmn;40&deg;</span><span>driver 90&deg;</span><span>passenger 270&deg;</span>
+<span>rear-&frac34; 135&deg;/225&deg;</span><span>rear 180&deg;</span><span>VIN plate (overhead)</span></div>
+
+<div class="grid" id="g"></div>
+<footer>10 images deep-analyzed &middot; engine table <span class="mono">image_observations</span> + <span class="mono">vehicle_images</span> columns &middot; profile-grounded, no fabricated values.</footer>
+</div>
+<script>
+const R="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/render/image/public/vehicle-photos/6442df03-9cac-43a8-b89e-e4fb4c08ee99/iphoto/";
+const r=(f)=>R+f+".jpg?width=480&height=360&resize=contain";
+const D=[
+{f:"IMG_6642",zone:"FRONT 3/4 (driver)",role:"subject",az:35,el:-5,dist:"~4m",cond:92,q:95,stage:"show_finish",sig:["frost_white","swb_single_cab","lifted_4x4","black_multispoke","6 parts boxed"]},
+{f:"IMG_7939",zone:"FRONT 3/4 (passenger)",role:"subject",az:-40,el:-5,dist:"~3.5m",cond:92,q:90,stage:"show_finish",sig:["frost_white","yellow_calipers","mud_terrain"]},
+{f:"IMG_7941",zone:"FRONT 3/4 (driver)",role:"subject",az:40,el:-5,dist:"~3.5m",cond:92,q:90,stage:"show_finish",sig:["frost_white","chrome_bumper"]},
+{f:"IMG_7940",zone:"FRONT (straight)",role:"subject",az:0,el:0,dist:"~4m",cond:90,q:90,stage:"show_finish",sig:["chevrolet_grille","dual_headlights"]},
+{f:"IMG_7942",zone:"DRIVER SIDE",role:"subject",az:90,el:0,dist:"~5m",cond:92,q:90,stage:"show_finish",sig:["full_profile","lifted_4x4","roll_bar"]},
+{f:"IMG_7946",zone:"PASSENGER SIDE",role:"subject",az:270,el:0,dist:"~5m",cond:92,q:90,stage:"show_finish",sig:["full_profile","short_bed"]},
+{f:"IMG_7945",zone:"REAR 3/4 (driver)",role:"subject",az:135,el:-5,dist:"~3.5m",cond:92,q:90,stage:"show_finish",sig:["CHEVROLET_tailgate","roll_bar_lights"]},
+{f:"IMG_7943",zone:"REAR 3/4 (passenger)",role:"subject",az:225,el:-5,dist:"~3.5m",cond:92,q:90,stage:"show_finish",sig:["CHEVROLET_tailgate"]},
+{f:"IMG_7944",zone:"REAR (straight)",role:"subject",az:180,el:0,dist:"~4m",cond:90,q:90,stage:"show_finish",sig:["dual_taillights","hitch","bg_truck=fleet"]},
+{f:"IMG_7970",zone:"VIN / DATA PLATE",role:"vin",az:90,el:-80,dist:"~0.4m",cond:null,q:90,stage:null,sig:["VIN 1GCEK14L9EJ147915","paint 12 frost white","interior blue vinyl","factory SPID"]}
+];
+const g=document.getElementById("g");
+for(const d of D){
+ const cond = d.cond==null ? '<span class="v" style="color:var(--dim)">n/a</span>'
+   : `<span class="v mono">${d.cond}/100</span><div class="bar"><i style="width:${d.cond}%"></i></div>`;
+ g.insertAdjacentHTML("beforeend",`<div class="card">
+  <img loading="lazy" src="${r(d.f)}" alt="${d.f}">
+  <div class="body">
+   <div class="zone">${d.zone}<span class="role ${d.role}">${d.role}</span></div>
+   <div class="kv">
+     <div class="k">viewpoint</div><div class="v mono">az ${d.az}&deg; &middot; el ${d.el}&deg; &middot; ${d.dist}</div>
+     <div class="k">condition</div><div>${cond}</div>
+     <div class="k">quality</div><div class="v mono">${d.q}/100</div>
+     <div class="k">stage</div><div class="v">${d.stage||'&mdash;'}</div>
+     <div class="k">file</div><div class="v mono">${d.f}</div>
+   </div>
+   <div class="chips">${d.sig.map(s=>`<span class="chip">${s}</span>`).join("")}</div>
+  </div></div>`);
+}
+</script></body></html>

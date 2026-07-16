@@ -1,0 +1,5519 @@
+[
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "PayPal",
+    "purchase_count": 592,
+    "total_spend": 84606.24,
+    "avg_purchase": 142.92,
+    "price_tier": "mid",
+    "cadence_days_avg": 2.6,
+    "first_purchase": "2022-01-31",
+    "last_purchase": "2026-04-02",
+    "span_days": 1522,
+    "primary_category": "unknown",
+    "category_breakdown": {
+      "unknown": 592
+    },
+    "primary_account": "Office expenses:Software & apps",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-01-31",
+        "amount": 99.99,
+        "desc": "POS PURCH : FRONTIER AIRLINE 3132               CO 720-3744390     FRONTIER AIRLINES  US"
+      },
+      {
+        "date": "2022-02-11",
+        "amount": 5.53,
+        "desc": "POS PURCH : CENTURY THEATRES 7832               NV HENDERSON       CENTURY THEATRES 41US"
+      },
+      {
+        "date": "2022-02-19",
+        "amount": 98.99,
+        "desc": "POINT OF SALE PURCHASE US NV BOULDER CITY, CARQUEST 7797"
+      },
+      {
+        "date": "2022-02-19",
+        "amount": 205.54,
+        "desc": "POINT OF SALE PURCHASE US NV BOULDER CITY, CARQUEST 7797"
+      },
+      {
+        "date": "2022-02-24",
+        "amount": 67.33,
+        "desc": "POINT OF SALE PURCHASE US NV BOULDER CITY, CARQUEST 7797"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710572",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "NUKE LTD",
+    "purchase_count": 16,
+    "total_spend": 57518.0,
+    "avg_purchase": 3594.88,
+    "price_tier": "major",
+    "cadence_days_avg": 12.1,
+    "first_purchase": "2024-09-01",
+    "last_purchase": "2025-03-01",
+    "span_days": 181,
+    "primary_category": "nuke_invoice_revenue",
+    "category_breakdown": {
+      "nuke_invoice_revenue": 16
+    },
+    "primary_account": "Vehicle Parts & Materials",
+    "primary_payment_type": null,
+    "samples": [
+      {
+        "date": "2024-09-01",
+        "amount": 2380,
+        "desc": "Various Transmission peripherals package"
+      },
+      {
+        "date": "2024-09-01",
+        "amount": 655,
+        "desc": "Various Brake system package"
+      },
+      {
+        "date": "2024-09-01",
+        "amount": 5645,
+        "desc": "Various Interior package"
+      },
+      {
+        "date": "2024-09-01",
+        "amount": 15000,
+        "desc": "Desert Performance Complete wiring harness installation"
+      },
+      {
+        "date": "2024-09-01",
+        "amount": 2010,
+        "desc": "Various Fuel and exhaust package"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710884",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "a cars life",
+    "purchase_count": 2,
+    "total_spend": 54660.0,
+    "avg_purchase": 27330.0,
+    "price_tier": "major",
+    "cadence_days_avg": 642.0,
+    "first_purchase": "2022-01-28",
+    "last_purchase": "2023-11-01",
+    "span_days": 642,
+    "primary_category": "vehicle_part",
+    "category_breakdown": {
+      "vehicle_part": 2
+    },
+    "primary_account": "Commissions & fees",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-01-28",
+        "amount": 54160,
+        "desc": "BANK TO BANK TRANSFER"
+      },
+      {
+        "date": "2023-11-01",
+        "amount": 500,
+        "desc": "ZELLE CARS LIFE 866-224-2158;330500C0B6TB;2023-11-02;DR ZELLE CARS LIFE 866-224-2158;330"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710564",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Apple",
+    "purchase_count": 296,
+    "total_spend": 38365.0,
+    "avg_purchase": 129.61,
+    "price_tier": "mid",
+    "cadence_days_avg": 4.7,
+    "first_purchase": "2022-06-13",
+    "last_purchase": "2026-04-01",
+    "span_days": 1388,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 296
+    },
+    "primary_account": "General business expenses:Memberships & subscriptions",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-06-13",
+        "amount": 9.99,
+        "desc": "RECURRING PAYMENT AUTHORIZED ON 06/10 APPLE.COM/BILL 866-712-7753 CA S302161254864933 CARD 8759"
+      },
+      {
+        "date": "2022-06-13",
+        "amount": 110,
+        "desc": "APPLECARD GSBANK PAYMENT 061122 10234768 Skylar Williams"
+      },
+      {
+        "date": "2022-06-14",
+        "amount": 1,
+        "desc": "PURCHASE AUTHORIZED ON 06/12 APPLE CASH 1INFINITELOOP CA S582163610908051 CARD 8759"
+      },
+      {
+        "date": "2022-06-15",
+        "amount": 441.9,
+        "desc": "PURCHASE AUTHORIZED ON 06/13 APPLE CASH 1INFINITELOOP CA S302164527284267 CARD 8759"
+      },
+      {
+        "date": "2022-06-22",
+        "amount": 172.99,
+        "desc": "PURCHASE AUTHORIZED ON 06/19 APPLE CASH 1INFINITELOOP CA S462171224507485 CARD 8759"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710639",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "jb hart rent 674 wells rd",
+    "purchase_count": 18,
+    "total_spend": 30000.0,
+    "avg_purchase": 1666.67,
+    "price_tier": "large",
+    "cadence_days_avg": 84.1,
+    "first_purchase": "2022-01-11",
+    "last_purchase": "2025-12-11",
+    "span_days": 1430,
+    "primary_category": "rent",
+    "category_breakdown": {
+      "rent": 18
+    },
+    "primary_account": "Building & property rent",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-01-11",
+        "amount": 1500,
+        "desc": "SHR DRAFT : SHARE DRAFT"
+      },
+      {
+        "date": "2022-02-09",
+        "amount": 1500,
+        "desc": "JRNL ENTRY : CHECKING 75 W/D TO CROSS MEMBER"
+      },
+      {
+        "date": "2022-03-14",
+        "amount": 1500,
+        "desc": "TRANSFER : SCHEDULED TRANSFER                  TO HART LLC SHARE 75"
+      },
+      {
+        "date": "2022-05-07",
+        "amount": 1500,
+        "desc": "TRANSFER : SCHEDULED TRANSFER                  TO HART LLC SHARE 75"
+      },
+      {
+        "date": "2022-06-16",
+        "amount": 1500,
+        "desc": "TRANSFER : SCHEDULED TRANSFER                  TO HART LLC SHARE 75"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710553",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "FBM",
+    "purchase_count": 1,
+    "total_spend": 27003.55,
+    "avg_purchase": 27003.55,
+    "price_tier": "major",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-10-15",
+    "last_purchase": "2025-10-15",
+    "span_days": 0,
+    "primary_category": "unknown",
+    "category_breakdown": {
+      "unknown": 1
+    },
+    "primary_account": "Refunds to customers",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-10-15",
+        "amount": 27003.55,
+        "desc": "BANK TO BANK TRANSFER"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710912",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Desert Performance",
+    "purchase_count": 33,
+    "total_spend": 23790.0,
+    "avg_purchase": 720.91,
+    "price_tier": "large",
+    "cadence_days_avg": null,
+    "first_purchase": "2019-03-09",
+    "last_purchase": "2019-03-09",
+    "span_days": 0,
+    "primary_category": "nuke_invoice_revenue",
+    "category_breakdown": {
+      "nuke_invoice_revenue": 33
+    },
+    "primary_account": "Vehicle Parts & Materials",
+    "primary_payment_type": null,
+    "samples": [
+      {
+        "date": "2019-03-09",
+        "amount": 300,
+        "desc": "Motec RBD 190 remote battery disconnect"
+      },
+      {
+        "date": "2019-03-09",
+        "amount": 120,
+        "desc": "XRP XRP -6 braided fuel line 20ft"
+      },
+      {
+        "date": "2019-03-09",
+        "amount": 20,
+        "desc": "Generic Sintered bronze breather"
+      },
+      {
+        "date": "2019-03-09",
+        "amount": 160,
+        "desc": "Generic Pressure sensor (oil/fuel)"
+      },
+      {
+        "date": "2019-03-09",
+        "amount": 3000,
+        "desc": "Desert Performance Chassis harness"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710531",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "el geez",
+    "purchase_count": 7,
+    "total_spend": 18551.0,
+    "avg_purchase": 2650.14,
+    "price_tier": "major",
+    "cadence_days_avg": 40.7,
+    "first_purchase": "2022-01-11",
+    "last_purchase": "2022-09-12",
+    "span_days": 244,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 7
+    },
+    "primary_account": "Building & property rent",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-01-11",
+        "amount": 2000,
+        "desc": "SHR DRAFT : SHARE DRAFT"
+      },
+      {
+        "date": "2022-01-11",
+        "amount": 750,
+        "desc": "SHR DRAFT : SHARE DRAFT doug\u2019s apartment"
+      },
+      {
+        "date": "2022-01-11",
+        "amount": 822.58,
+        "desc": "SHR DRAFT : SHARE DRAFT electricity"
+      },
+      {
+        "date": "2022-01-11",
+        "amount": 2000,
+        "desc": "SHR DRAFT : SHARE DRAFT"
+      },
+      {
+        "date": "2022-02-09",
+        "amount": 4000,
+        "desc": "JRNL ENTRY : CHECKING 75 W/D TO CROSS MEMBER"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710559",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "AT&T",
+    "purchase_count": 19,
+    "total_spend": 10293.76,
+    "avg_purchase": 541.78,
+    "price_tier": "large",
+    "cadence_days_avg": 73.5,
+    "first_purchase": "2022-03-19",
+    "last_purchase": "2025-11-01",
+    "span_days": 1323,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 19
+    },
+    "primary_account": "Utilities:Phone service",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-03-19",
+        "amount": 831.12,
+        "desc": "VISA - 03/17 ATT* BILL PAYMENT 800-331-0500 TX 016434"
+      },
+      {
+        "date": "2022-06-27",
+        "amount": 470.94,
+        "desc": "RECURRING PAYMENT AUTHORIZED ON 06/26 ATT* BILL PAYMENT 800-331-0500 TX S462177506450388 CARD 8759"
+      },
+      {
+        "date": "2022-07-27",
+        "amount": 312.51,
+        "desc": "RECURRING PAYMENT AUTHORIZED ON 07/26 ATT* BILL PAYMENT 800-331-0500 TX S462207414472100 CARD 8759"
+      },
+      {
+        "date": "2022-09-22",
+        "amount": 977.99,
+        "desc": "POS PURCH : ATT* BILL PAYMEN 4814               TX 800-331-0500    ATT* BILL PAYMENT  US"
+      },
+      {
+        "date": "2022-10-27",
+        "amount": 469.62,
+        "desc": "RECURRING PAYMENT AUTHORIZED ON 10/26 ATT* BILL PAYMENT 800-331-0500 TX S302299576713724 CARD 8759"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710610",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Kellie Smith Snap on",
+    "purchase_count": 47,
+    "total_spend": 8733.45,
+    "avg_purchase": 185.82,
+    "price_tier": "mid",
+    "cadence_days_avg": 24.2,
+    "first_purchase": "2023-03-01",
+    "last_purchase": "2026-03-20",
+    "span_days": 1115,
+    "primary_category": "tool",
+    "category_breakdown": {
+      "tool": 47
+    },
+    "primary_account": "Tools, machinery, and equipment",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-03-01",
+        "amount": 400,
+        "desc": "PURCHASE                                AUTHORIZED ON   02/27 KELLIE SMITH SNAP         LAS VEGAS     NV  S3030587331289"
+      },
+      {
+        "date": "2023-03-08",
+        "amount": 100,
+        "desc": "PURCHASE                                AUTHORIZED ON   03/06 KELLIE SMITH SNAP         LAS VEGAS     NV  S4630656084752"
+      },
+      {
+        "date": "2023-03-15",
+        "amount": 200,
+        "desc": "PURCHASE                                AUTHORIZED ON   03/13 KELLIE SMITH SNAP         LAS VEGAS     NV  S5830725957248"
+      },
+      {
+        "date": "2023-05-03",
+        "amount": 100,
+        "desc": "PURCHASE                                AUTHORIZED ON   05/01 KELLIE SMITH SNAP         LAS VEGAS     NV  S3831215762823"
+      },
+      {
+        "date": "2023-05-10",
+        "amount": 100,
+        "desc": "PURCHASE                                AUTHORIZED ON   05/08 KELLIE SMITH SNAP         LAS VEGAS     NV  S3831285587704"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710777",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Ebay",
+    "purchase_count": 45,
+    "total_spend": 8701.34,
+    "avg_purchase": 193.36,
+    "price_tier": "mid",
+    "cadence_days_avg": 31.6,
+    "first_purchase": "2022-05-24",
+    "last_purchase": "2026-03-13",
+    "span_days": 1389,
+    "primary_category": "vehicle_part",
+    "category_breakdown": {
+      "vehicle_part": 45
+    },
+    "primary_account": "Office expenses:Small tools and equipment",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-05-24",
+        "amount": 130.96,
+        "desc": "Purchase amount -"
+      },
+      {
+        "date": "2022-05-25",
+        "amount": 111.12,
+        "desc": "Purchase amount -"
+      },
+      {
+        "date": "2022-06-13",
+        "amount": 340.13,
+        "desc": "Purchase amount -"
+      },
+      {
+        "date": "2022-09-23",
+        "amount": 36.07,
+        "desc": "POS PURCH : eBay O*24-09145- 5311               CA San Jose        eBay O*24-09145-706US"
+      },
+      {
+        "date": "2022-09-24",
+        "amount": 400.98,
+        "desc": "POS PURCH : eBay O*17-09133- 5311               CA San Jose        eBay O*17-09133-439US"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710620",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "credit one bank",
+    "purchase_count": 22,
+    "total_spend": 7698.29,
+    "avg_purchase": 349.92,
+    "price_tier": "mid",
+    "cadence_days_avg": 63.0,
+    "first_purchase": "2022-03-22",
+    "last_purchase": "2025-11-05",
+    "span_days": 1324,
+    "primary_category": "fee",
+    "category_breakdown": {
+      "fee": 22
+    },
+    "primary_account": "Interest paid:Credit card interest",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-03-22",
+        "amount": 40.95,
+        "desc": "VISA - 03/20 ACI*CREDIT ONE BANK, N.A. 877-825-3242 NV 02"
+      },
+      {
+        "date": "2022-08-23",
+        "amount": 1.19,
+        "desc": "AUTOMATIC WITHDRAWAL, CREDIT ONE BANK PAYMENT WEB (S)"
+      },
+      {
+        "date": "2022-09-12",
+        "amount": 365.96,
+        "desc": "VISA - 09/10 ACI*CREDIT ONE BANK, N.A. 877-825-3242 NV 01"
+      },
+      {
+        "date": "2022-10-19",
+        "amount": 398.9,
+        "desc": "POS PURCH : ACI*CREDIT ONE B 6012               NV 877-825-3242    ACI*CREDIT ONE BANKUS"
+      },
+      {
+        "date": "2022-12-05",
+        "amount": 64.95,
+        "desc": "VISA - 12/02 ACI*CREDIT ONE BANK, N.A. 877-825-3242 NV 00"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710617",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Amazon",
+    "purchase_count": 124,
+    "total_spend": 6907.75,
+    "avg_purchase": 55.71,
+    "price_tier": "small",
+    "cadence_days_avg": 9.9,
+    "first_purchase": "2022-02-22",
+    "last_purchase": "2025-06-23",
+    "span_days": 1217,
+    "primary_category": "unknown",
+    "category_breakdown": {
+      "unknown": 113,
+      "personal": 11
+    },
+    "primary_account": "Supplies",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-02-22",
+        "amount": 1365.51,
+        "desc": "VISA - 02/21 AMZN MKTP US*1I8FA4ER1 AMZN.COM/BILL WA 0194"
+      },
+      {
+        "date": "2022-02-22",
+        "amount": 43.34,
+        "desc": "VISA - 02/20 AMZN MKTP US*1I6GN7NY1 AM AMZN.COM/BILL WA 0"
+      },
+      {
+        "date": "2022-02-23",
+        "amount": 16.85,
+        "desc": "VISA - 02/21 AMZN MKTP US*1I98J3061 AMZN.COM/BILL WA 0195"
+      },
+      {
+        "date": "2022-02-23",
+        "amount": 48.16,
+        "desc": "VISA - 02/21 AMZN MKTP US*1I3MC80B1 AMZN.COM/BILL WA 0196"
+      },
+      {
+        "date": "2022-02-24",
+        "amount": 6.81,
+        "desc": "VISA - 02/23 AMAZON.COM*1I9NU2ZO0 AMZN AMZN.COM/BILL WA 0"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710584",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "CJ Pony Parts",
+    "purchase_count": 6,
+    "total_spend": 6603.6,
+    "avg_purchase": 1100.6,
+    "price_tier": "large",
+    "cadence_days_avg": 3.8,
+    "first_purchase": "2026-03-04",
+    "last_purchase": "2026-03-23",
+    "span_days": 19,
+    "primary_category": "parts",
+    "category_breakdown": {
+      "parts": 3,
+      "vehicle_part": 3
+    },
+    "primary_account": "Vehicle Parts & Materials",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2026-03-04",
+        "amount": 0,
+        "desc": "CJ Pony Parts order (shipped Mar 4)"
+      },
+      {
+        "date": "2026-03-04",
+        "amount": 5874.57,
+        "desc": "CJ Pony Parts 62-item order: wheel opening moldings, dash vent housing, door pull straps, headlight switch, stepside tai"
+      },
+      {
+        "date": "2026-03-06",
+        "amount": 67.94,
+        "desc": "VISA - 03/05 CJ PONY PARTS 1-800-8886473 PA 004620 VISA - 03/05 CJ PONY PARTS 1-800"
+      },
+      {
+        "date": "2026-03-07",
+        "amount": 552.99,
+        "desc": "VISA - 03/05 CJ PONY PARTS 1-800-8886473 PA 004018 VISA - 03/05 CJ PONY PARTS 1-800"
+      },
+      {
+        "date": "2026-03-20",
+        "amount": 0,
+        "desc": "CJ Pony Parts order (shipped Mar 20)"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710993",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Albertsons",
+    "purchase_count": 76,
+    "total_spend": 5878.06,
+    "avg_purchase": 77.34,
+    "price_tier": "small",
+    "cadence_days_avg": 19.9,
+    "first_purchase": "2022-02-10",
+    "last_purchase": "2026-03-17",
+    "span_days": 1496,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 76
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-02-10",
+        "amount": 49.66,
+        "desc": "POS PURCH : ALBERTSONS #0093 5411               NV BOULDER CITY    ALBERTSONS #0093   US"
+      },
+      {
+        "date": "2022-02-23",
+        "amount": 21.31,
+        "desc": "POINT OF SALE PURCHASE US NV BOULDER CITY, ALBERTSONS #0093"
+      },
+      {
+        "date": "2022-06-22",
+        "amount": 4,
+        "desc": "PURCHASE AUTHORIZED ON 06/22 ALBERTSONS #009 BOULDER CITY NV P000000331941432 CARD 8759"
+      },
+      {
+        "date": "2022-06-29",
+        "amount": 49.89,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2022-06-30",
+        "amount": 64.3,
+        "desc": "PayPal Here transaction"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710577",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Best Buy",
+    "purchase_count": 3,
+    "total_spend": 4652.99,
+    "avg_purchase": 1551.0,
+    "price_tier": "large",
+    "cadence_days_avg": 351.5,
+    "first_purchase": "2023-12-05",
+    "last_purchase": "2025-11-07",
+    "span_days": 703,
+    "primary_category": "unknown",
+    "category_breakdown": {
+      "unknown": 3
+    },
+    "primary_account": "Long-term office equipment:Computers & tablets",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-12-05",
+        "amount": 1371.88,
+        "desc": "POINT OF SALE PURCHASE US NV HENDERSON, BEST BUY #358 611 MARKS STREET POINT OF SALE PURCHASE US NV HEN"
+      },
+      {
+        "date": "2023-12-06",
+        "amount": 681.19,
+        "desc": "POINT OF SALE PURCHASE US NV LAS VEGAS, BEST BUY #289 3820 S. MARYLAND PARKWA POINT OF SALE PURCHASE US NV LAS"
+      },
+      {
+        "date": "2025-11-07",
+        "amount": 2599.92,
+        "desc": "VISA - 11/05 PAYPAL *BESTBUY COM 402-935-7733 MN 003745 VISA - 11/05 PAYPAL *BESTBUY COM"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710858",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Summit Racing",
+    "purchase_count": 8,
+    "total_spend": 2962.21,
+    "avg_purchase": 370.28,
+    "price_tier": "mid",
+    "cadence_days_avg": 76.9,
+    "first_purchase": "2024-09-25",
+    "last_purchase": "2026-03-17",
+    "span_days": 538,
+    "primary_category": "parts",
+    "category_breakdown": {
+      "parts": 8
+    },
+    "primary_account": "Vehicle Parts & Materials",
+    "primary_payment_type": null,
+    "samples": [
+      {
+        "date": "2024-09-25",
+        "amount": 0,
+        "desc": "ARP bolts, ADO Starter + heat shield + connector, FEL valve cover gaskets, ARP bellhousing bolts (7 items, prices unavai"
+      },
+      {
+        "date": "2025-02-07",
+        "amount": 193.98,
+        "desc": "RNB-576-300 Dorman Fuel Tank x2 ($96.99 ea)"
+      },
+      {
+        "date": "2025-04-03",
+        "amount": 0,
+        "desc": "Summit Racing order (items TBD from large email)"
+      },
+      {
+        "date": "2025-04-16",
+        "amount": 739.96,
+        "desc": "PCW-1069-6182 Pro Comp Xtreme Alloys Polished Wheels 16x10 x4 ($184.99 ea)"
+      },
+      {
+        "date": "2026-03-01",
+        "amount": 122.44,
+        "desc": "SUM-RP22000 Under Hood Insulation Kit ($45.99) + AGB-MC39308 Raybestos Brake Master Cylinder ($66.99)"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710895",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "sebastien",
+    "purchase_count": 1,
+    "total_spend": 2500.0,
+    "avg_purchase": 2500.0,
+    "price_tier": "major",
+    "cadence_days_avg": null,
+    "first_purchase": "2022-03-16",
+    "last_purchase": "2022-03-16",
+    "span_days": 0,
+    "primary_category": "vehicle_part",
+    "category_breakdown": {
+      "vehicle_part": 1
+    },
+    "primary_account": "Vehicle expenses",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-03-16",
+        "amount": 2500,
+        "desc": "MOBILE BANKING SHARE TRANSFER TO CHECKING"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710606",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Jenny mannerheim",
+    "purchase_count": 5,
+    "total_spend": 2400.0,
+    "avg_purchase": 480.0,
+    "price_tier": "mid",
+    "cadence_days_avg": 115.2,
+    "first_purchase": "2022-11-09",
+    "last_purchase": "2024-02-13",
+    "span_days": 461,
+    "primary_category": "business",
+    "category_breakdown": {
+      "business": 5
+    },
+    "primary_account": "Advertising & marketing",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-11-09",
+        "amount": 100,
+        "desc": "TRANSFER TO MANNERHEIM JENNY ON 11/09 REF #PP0QSYWLK3 XXXXXX8761"
+      },
+      {
+        "date": "2022-11-09",
+        "amount": 100,
+        "desc": "TRANSFER TO MANNERHEIM JENNY ON 11/09 REF #PP0QSYXC43 XXXXXX8761"
+      },
+      {
+        "date": "2023-10-07",
+        "amount": 500,
+        "desc": "ZELLE JENNY MANNERHEI 866-224-2158;328000F0H5MM;2023-10-10;DR ZELLE JENNY MANNERHEI 866-224-21"
+      },
+      {
+        "date": "2023-12-06",
+        "amount": 1500,
+        "desc": "ZELLE JENNY MANNERHEI 866-224-2158;334000O0JKFJ;2023-12-07;DR ZELLE JENNY MANNERHEI 866-224-21"
+      },
+      {
+        "date": "2024-02-13",
+        "amount": 200,
+        "desc": "ZELLE JENNY MANNERHEI 866-224-2158;404400L00KQA;2024-02-14;DR ZELLE JENNY MANNERHEI 866-224-21"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710744",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Mannerheim & others",
+    "purchase_count": 6,
+    "total_spend": 2059.07,
+    "avg_purchase": 343.18,
+    "price_tier": "mid",
+    "cadence_days_avg": 2.2,
+    "first_purchase": "2023-12-31",
+    "last_purchase": "2024-01-11",
+    "span_days": 11,
+    "primary_category": "unknown",
+    "category_breakdown": {
+      "unknown": 6
+    },
+    "primary_account": "Other income",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-12-31",
+        "amount": 1050,
+        "desc": "Paid to Mannerheim & Others"
+      },
+      {
+        "date": "2023-12-31",
+        "amount": 35.74,
+        "desc": "PayPal fees"
+      },
+      {
+        "date": "2024-01-05",
+        "amount": 500,
+        "desc": "Paid to Mannerheim & Others"
+      },
+      {
+        "date": "2024-01-05",
+        "amount": 4.99,
+        "desc": "PayPal fees"
+      },
+      {
+        "date": "2024-01-11",
+        "amount": 450,
+        "desc": "Paid to Mannerheim & Others"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710868",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Stamps.com",
+    "purchase_count": 13,
+    "total_spend": 2054.94,
+    "avg_purchase": 158.07,
+    "price_tier": "mid",
+    "cadence_days_avg": 103.5,
+    "first_purchase": "2022-10-17",
+    "last_purchase": "2026-03-12",
+    "span_days": 1242,
+    "primary_category": "business_saas",
+    "category_breakdown": {
+      "business_saas": 13
+    },
+    "primary_account": "Office expenses:Shipping & postage",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-10-17",
+        "amount": 100,
+        "desc": "PURCHASE AUTHORIZED ON 10/14 STAMPS.COM *USPOS 855-608-2677 CA S302287525532862 CARD 8759"
+      },
+      {
+        "date": "2022-11-29",
+        "amount": 140,
+        "desc": "VISA - 11/27 STAMPS.COM *USPOSTAGE 855-608-2677 TX 026173"
+      },
+      {
+        "date": "2023-03-02",
+        "amount": 50,
+        "desc": "PURCHASE                                AUTHORIZED ON   02/28 STAMPS.COM  *USPOS        855-608-2677  TX  S5830597014770"
+      },
+      {
+        "date": "2023-05-04",
+        "amount": 150,
+        "desc": "PURCHASE                                AUTHORIZED ON   05/02 STAMPS.COM  *USPOS        855-608-2677  TX  S3031227548854"
+      },
+      {
+        "date": "2024-08-23",
+        "amount": 90,
+        "desc": "PURCHASE                                AUTHORIZED ON   08/21 STAMPS.COM  *USPOS        855-608-2677  TX  SXXXXXXXX78298"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710728",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "IRS",
+    "purchase_count": 2,
+    "total_spend": 2000.0,
+    "avg_purchase": 1000.0,
+    "price_tier": "large",
+    "cadence_days_avg": 91.0,
+    "first_purchase": "2024-09-23",
+    "last_purchase": "2024-12-23",
+    "span_days": 91,
+    "primary_category": "unknown",
+    "category_breakdown": {
+      "unknown": 2
+    },
+    "primary_account": "Taxes paid",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2024-09-23",
+        "amount": 1000,
+        "desc": "AUTOMATIC WITHDRAWAL, IRS USATAXPYMT PPD AUTOMATIC WITHDRAWAL, IRS USATAX"
+      },
+      {
+        "date": "2024-12-23",
+        "amount": 1000,
+        "desc": "AUTOMATIC WITHDRAWAL, IRS USATAXPYMT PPD AUTOMATIC WITHDRAWAL, IRS USATAX"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710890",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "dennis konkin",
+    "purchase_count": 1,
+    "total_spend": 2000.0,
+    "avg_purchase": 2000.0,
+    "price_tier": "major",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-10-15",
+    "last_purchase": "2025-10-15",
+    "span_days": 0,
+    "primary_category": "vehicle_part",
+    "category_breakdown": {
+      "vehicle_part": 1
+    },
+    "primary_account": "Vehicle expenses:Vehicle repairs",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-10-15",
+        "amount": 2000,
+        "desc": "ZELLE DENNIS KONKIN 866-224-2158;528800C0KKJA;2025-10-15;DR ZELLE DENNIS KONKIN 866-224-2158"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710909",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Autozone",
+    "purchase_count": 20,
+    "total_spend": 1658.93,
+    "avg_purchase": 82.95,
+    "price_tier": "small",
+    "cadence_days_avg": 40.5,
+    "first_purchase": "2022-02-23",
+    "last_purchase": "2024-04-02",
+    "span_days": 769,
+    "primary_category": "vehicle_part",
+    "category_breakdown": {
+      "vehicle_part": 20
+    },
+    "primary_account": "Vehicle expenses:Vehicle repairs",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-02-23",
+        "amount": 21.82,
+        "desc": "POINT OF SALE PURCHASE US NV BOULDER CITY, AUTOZONE 5724 702"
+      },
+      {
+        "date": "2022-03-04",
+        "amount": 59.54,
+        "desc": "POINT OF SALE PURCHASE US NV BOULDER CITY, AUTOZONE 5724 702"
+      },
+      {
+        "date": "2022-06-29",
+        "amount": 91.53,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2022-07-20",
+        "amount": 192.79,
+        "desc": "PURCHASE AUTHORIZED ON 07/20 AUTOZONE 5724 702 CANYON BOULDER CITY NV P462201605636856 CARD 8759"
+      },
+      {
+        "date": "2022-08-15",
+        "amount": 19.5,
+        "desc": "POINT OF SALE PURCHASE US NV BOULDER CITY, AUTOZONE 5724 702"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710592",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "American Airlines",
+    "purchase_count": 3,
+    "total_spend": 1622.64,
+    "avg_purchase": 540.88,
+    "price_tier": "large",
+    "cadence_days_avg": null,
+    "first_purchase": "2026-03-23",
+    "last_purchase": "2026-03-23",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 3
+    },
+    "primary_account": "Travel",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2026-03-23",
+        "amount": 540.88,
+        "desc": "VISA - 03/21 AMERICAN AIRXXXXXXXX08131 ATHENS GR 021448 VISA - 03/21 AMERICAN AIR0012327"
+      },
+      {
+        "date": "2026-03-23",
+        "amount": 540.88,
+        "desc": "VISA - 03/21 AMERICAN AIRXXXXXXXX08129 ATHENS GR 021448 VISA - 03/21 AMERICAN AIR0012327"
+      },
+      {
+        "date": "2026-03-23",
+        "amount": 540.88,
+        "desc": "VISA - 03/21 AMERICAN AIRXXXXXXXX08127 ATHENS GR 021448 VISA - 03/21 AMERICAN AIR0012327"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.711005",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Overdraft Fee For",
+    "purchase_count": 44,
+    "total_spend": 1525.0,
+    "avg_purchase": 34.66,
+    "price_tier": "small",
+    "cadence_days_avg": 25.4,
+    "first_purchase": "2022-07-26",
+    "last_purchase": "2025-07-22",
+    "span_days": 1092,
+    "primary_category": "fee",
+    "category_breakdown": {
+      "fee": 44
+    },
+    "primary_account": "General business expenses:Bank fees & service charges",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-07-26",
+        "amount": 35,
+        "desc": "OVERDRAFT FEE FOR A TRANSACTION POSTED ON 07/25 $15.99 RECURRING PAYMENT AUTHORI ZED ON 07/22 APPLE.COM/BILL 866-712-"
+      },
+      {
+        "date": "2022-07-26",
+        "amount": 35,
+        "desc": "OVERDRAFT FEE FOR A TRANSACTION POSTED ON 07/25 $39.99 RECURRING PAYMENT AUTHORI ZED ON 07/22 APPLE.COM/BILL 866-712-"
+      },
+      {
+        "date": "2022-07-27",
+        "amount": 35,
+        "desc": "OVERDRAFT FEE FOR A TRANSACTION POSTED ON 07/26 $15.49 RECURRING PAYMENT AUTHORI ZED ON 07/24 APPLE.COM/BILL 408-974-"
+      },
+      {
+        "date": "2022-07-28",
+        "amount": 35,
+        "desc": "OVERDRAFT FEE FOR A TRANSACTION POSTED ON 07/27 $312.51 RECURRING PAYMENT AUTHORI ZED ON 07/26 ATT* BILL PAYMENT 800-331"
+      },
+      {
+        "date": "2022-10-28",
+        "amount": 35,
+        "desc": "OVERDRAFT FEE FOR A TRANSACTION POSTED ON 10/27 $469.62 RECURRING PAYMENT AUTHORIZED ON 10/26 ATT* BILL PAYMENT 800-331-"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710662",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Miami rent",
+    "purchase_count": 1,
+    "total_spend": 1480.0,
+    "avg_purchase": 1480.0,
+    "price_tier": "large",
+    "cadence_days_avg": null,
+    "first_purchase": "2022-07-05",
+    "last_purchase": "2022-07-05",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Building & property rent",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-07-05",
+        "amount": 1480,
+        "desc": "PURCHASE AUTHORIZED ON 07/02 VENMO* Visa Direct NY S582183600886875 CARD 8759"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710655",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Dales Sinclair",
+    "purchase_count": 49,
+    "total_spend": 1312.81,
+    "avg_purchase": 26.79,
+    "price_tier": "small",
+    "cadence_days_avg": 30.9,
+    "first_purchase": "2022-02-28",
+    "last_purchase": "2026-03-23",
+    "span_days": 1484,
+    "primary_category": "service",
+    "category_breakdown": {
+      "service": 49
+    },
+    "primary_account": "Vehicle expenses:Vehicle gas & fuel",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-02-28",
+        "amount": 56,
+        "desc": "POINT OF SALE PURCHASE US NV BOULDER CITY, DALES SINCLAIR 1625 BOULDER CITY"
+      },
+      {
+        "date": "2022-07-18",
+        "amount": 7.19,
+        "desc": "PURCHASE AUTHORIZED ON 07/18 DALES SINCLAIR BOULDER CITY NV P000000975937039 CARD 8759"
+      },
+      {
+        "date": "2022-09-12",
+        "amount": 36.71,
+        "desc": "POINT OF SALE PURCHASE US NV BOULDER CITY, DALES SINCLAIR 1625 BOULDER CITY PKWY"
+      },
+      {
+        "date": "2022-09-22",
+        "amount": 38.97,
+        "desc": "POS PURCH : DALES SINCLAIR   5542               NV BOULDER CITY    1625 BOULDER CITY PUS"
+      },
+      {
+        "date": "2022-09-26",
+        "amount": 7.49,
+        "desc": "POS PURCH : DALES SINCLAIR   5541               NV BOULDER CITY    1625 BOULDER CITY PUS"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710599",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "lasaro corporation",
+    "purchase_count": 1,
+    "total_spend": 1300.0,
+    "avg_purchase": 1300.0,
+    "price_tier": "large",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-10-28",
+    "last_purchase": "2025-10-28",
+    "span_days": 0,
+    "primary_category": "business",
+    "category_breakdown": {
+      "business": 1
+    },
+    "primary_account": "Office expenses:Shipping & postage",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-10-28",
+        "amount": 1300,
+        "desc": "ZELLE LASARO CORPORATI 866-224-2158;530100K0KVVU;2025-10-28;DR ZELLE LASARO CORPORATI 866-224-2"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710938",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "JACOB Resort c/o Jake Schmillen",
+    "purchase_count": 1,
+    "total_spend": 1150.0,
+    "avg_purchase": 1150.0,
+    "price_tier": "large",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-11-17",
+    "last_purchase": "2025-11-17",
+    "span_days": 0,
+    "primary_category": "unknown",
+    "category_breakdown": {
+      "unknown": 1
+    },
+    "primary_account": "Uncategorized Income",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-11-17",
+        "amount": 1150,
+        "desc": "MOBILE BANKING SHARE TRANSFER TO CHECKING MOBILE BANKING SHARE TRANSFER TO"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710956",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Costco",
+    "purchase_count": 2,
+    "total_spend": 1110.8,
+    "avg_purchase": 555.4,
+    "price_tier": "large",
+    "cadence_days_avg": 81.0,
+    "first_purchase": "2023-09-14",
+    "last_purchase": "2023-12-04",
+    "span_days": 81,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 2
+    },
+    "primary_account": "Cost of goods sold:Supplies & materials",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-09-14",
+        "amount": 651.19,
+        "desc": "POINT OF SALE PURCHASE US NV HENDERSON, COSTCO WHSE #0673 POINT OF SALE PURCHASE US NV HEN"
+      },
+      {
+        "date": "2023-12-04",
+        "amount": 459.61,
+        "desc": "POINT OF SALE PURCHASE US NV HENDERSON, COSTCO WHSE #0673 POINT OF SALE PURCHASE US NV HEN"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710824",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "discount tire",
+    "purchase_count": 1,
+    "total_spend": 1103.44,
+    "avg_purchase": 1103.44,
+    "price_tier": "large",
+    "cadence_days_avg": null,
+    "first_purchase": "2022-09-22",
+    "last_purchase": "2022-09-22",
+    "span_days": 0,
+    "primary_category": "vehicle_part",
+    "category_breakdown": {
+      "vehicle_part": 1
+    },
+    "primary_account": "Vehicle expenses:Vehicle repairs",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-09-22",
+        "amount": 1103.44,
+        "desc": "POS PURCH : DISCOUNT TIRE NV 5532               NV HENDERSON       DISCOUNT TIRE NV 43US"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710711",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "anthropic",
+    "purchase_count": 40,
+    "total_spend": 954.72,
+    "avg_purchase": 23.87,
+    "price_tier": "micro",
+    "cadence_days_avg": 2.9,
+    "first_purchase": "2025-12-04",
+    "last_purchase": "2026-03-26",
+    "span_days": 112,
+    "primary_category": "business_saas",
+    "category_breakdown": {
+      "business_saas": 40
+    },
+    "primary_account": "General business expenses:Memberships & subscriptions",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-12-04",
+        "amount": 100,
+        "desc": "VISA - 12/03 ANTHROPIC ANTHROPIC.COM CA 002425 VISA - 12/03 ANTHROPIC ANTHROPIC"
+      },
+      {
+        "date": "2025-12-04",
+        "amount": 100,
+        "desc": "VISA - 12/02 ANTHROPIC ANTHROPIC.COM CA 002676 VISA - 12/02 ANTHROPIC ANTHROPIC"
+      },
+      {
+        "date": "2025-12-23",
+        "amount": 12.68,
+        "desc": "VISA - 12/21 ANTHROPIC ANTHROPIC.COM CA 021713 VISA - 12/21 ANTHROPIC ANTHROPIC"
+      },
+      {
+        "date": "2025-12-23",
+        "amount": 11.14,
+        "desc": "VISA - 12/21 ANTHROPIC ANTHROPIC.COM CA 021650 VISA - 12/21 ANTHROPIC ANTHROPIC"
+      },
+      {
+        "date": "2025-12-23",
+        "amount": 10.96,
+        "desc": "VISA - 12/21 ANTHROPIC ANTHROPIC.COM CA 020229 VISA - 12/21 ANTHROPIC ANTHROPIC"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710976",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "USPS",
+    "purchase_count": 9,
+    "total_spend": 823.56,
+    "avg_purchase": 91.51,
+    "price_tier": "small",
+    "cadence_days_avg": 111.1,
+    "first_purchase": "2022-07-07",
+    "last_purchase": "2024-12-12",
+    "span_days": 889,
+    "primary_category": "business",
+    "category_breakdown": {
+      "business": 9
+    },
+    "primary_account": "Office expenses:Shipping & postage",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-07-07",
+        "amount": 10,
+        "desc": "PURCHASE AUTHORIZED ON 07/06 USPS STAMPS ENDICI 888-434-0055 DC S302187629257895 CARD 8759"
+      },
+      {
+        "date": "2022-07-07",
+        "amount": 26.16,
+        "desc": "PURCHASE AUTHORIZED ON 07/06 USPS STAMPS ENDICI 888-434-0055 DC S382187627544331 CARD 8759"
+      },
+      {
+        "date": "2022-07-07",
+        "amount": 16.16,
+        "desc": "PURCHASE AUTHORIZED ON 07/06 USPS STAMPS ENDICI 888-434-0055 DC S302187628959722 CARD 8759"
+      },
+      {
+        "date": "2023-05-08",
+        "amount": 10,
+        "desc": "PURCHASE                                AUTHORIZED ON   05/04 USPS STAMPS ENDICI        888-434-0055  DC  S4631251284449"
+      },
+      {
+        "date": "2023-05-09",
+        "amount": 663.34,
+        "desc": "PURCHASE                                AUTHORIZED ON   05/08 USPS STAMPS ENDICI        888-434-0055  DC  S3031287992204"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710659",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Smog Vets Llc",
+    "purchase_count": 3,
+    "total_spend": 820.0,
+    "avg_purchase": 273.33,
+    "price_tier": "mid",
+    "cadence_days_avg": 164.5,
+    "first_purchase": "2023-02-27",
+    "last_purchase": "2024-01-22",
+    "span_days": 329,
+    "primary_category": "service",
+    "category_breakdown": {
+      "service": 3
+    },
+    "primary_account": "Repairs & maintenance",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-02-27",
+        "amount": 195,
+        "desc": "PURCHASE                                AUTHORIZED ON   02/24 SMOG VETS LLC             BOULDER CITY  NV  S4630558142426"
+      },
+      {
+        "date": "2023-03-17",
+        "amount": 25,
+        "desc": "PURCHASE                                AUTHORIZED ON   03/16 SMOG VETS LLC             BOULDER CITY  NV  S4630756166811"
+      },
+      {
+        "date": "2024-01-22",
+        "amount": 600,
+        "desc": "POS PURCH : SMOG VETS LLC    753 POS PURCH : SMOG VETS LLC    7538               NV BOULDER CITY    SMOG VETS LLC      U"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710770",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Intl st barth",
+    "purchase_count": 2,
+    "total_spend": 801.36,
+    "avg_purchase": 400.68,
+    "price_tier": "mid",
+    "cadence_days_avg": null,
+    "first_purchase": "2022-12-30",
+    "last_purchase": "2022-12-30",
+    "span_days": 0,
+    "primary_category": "unknown",
+    "category_breakdown": {
+      "unknown": 2
+    },
+    "primary_account": "Office expenses:Merchant account fees",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-12-30",
+        "amount": 223.85,
+        "desc": "VISA - 12/27 S-B ELECTRONIQUE2483943 ST BARTHELEMY GP 027"
+      },
+      {
+        "date": "2022-12-30",
+        "amount": 577.51,
+        "desc": "VISA - 12/27 S-B ELECTRONIQUE2483943 ST BARTHELEMY GP 027"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710747",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Delta",
+    "purchase_count": 8,
+    "total_spend": 740.3,
+    "avg_purchase": 92.54,
+    "price_tier": "small",
+    "cadence_days_avg": 74.6,
+    "first_purchase": "2022-08-01",
+    "last_purchase": "2024-01-05",
+    "span_days": 522,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 8
+    },
+    "primary_account": "Travel:Airfare",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-08-01",
+        "amount": 19.34,
+        "desc": "VISA - 07/29 MTR PENDELTAGEN SOLNA SOLNA SE 029127"
+      },
+      {
+        "date": "2022-08-01",
+        "amount": 19.34,
+        "desc": "VISA - 07/29 MTR PENDELTAGEN SOLNA SOLNA SE 029501"
+      },
+      {
+        "date": "2023-03-16",
+        "amount": 123.01,
+        "desc": "PURCHASE INTL                           AUTHORIZED ON   03/14 DELTA AIR   Pets          STOCKHOLM     SWE S4630732923637"
+      },
+      {
+        "date": "2023-03-16",
+        "amount": 73.81,
+        "desc": "PURCHASE INTL                           AUTHORIZED ON   03/14 DELTA AIR   Baggag        STOCKHOLM     SWE S5830733046687"
+      },
+      {
+        "date": "2023-11-06",
+        "amount": 9,
+        "desc": "VISA - 11/03 DELTA AIR 0060182060264 ATLANTA GA 003652 VISA - 11/03 DELTA AIR 006018206"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710669",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Snap on",
+    "purchase_count": 6,
+    "total_spend": 700.0,
+    "avg_purchase": 116.67,
+    "price_tier": "mid",
+    "cadence_days_avg": 5.6,
+    "first_purchase": "2022-09-21",
+    "last_purchase": "2022-10-19",
+    "span_days": 28,
+    "primary_category": "tool",
+    "category_breakdown": {
+      "tool": 6
+    },
+    "primary_account": "Tools, machinery, and equipment",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-09-21",
+        "amount": 200,
+        "desc": "PURCHASE AUTHORIZED ON 09/19 STANLEY TOCHIKI SN LAS VEGAS NV S462262698329643 CARD 8759"
+      },
+      {
+        "date": "2022-09-21",
+        "amount": 100,
+        "desc": "PURCHASE AUTHORIZED ON 09/19 STANLEY TOCHIKI SN LAS VEGAS NV S582262603826616 CARD 8759"
+      },
+      {
+        "date": "2022-10-05",
+        "amount": 100,
+        "desc": "PURCHASE AUTHORIZED ON 10/03 STANLEY TOCHIKI SN LAS VEGAS NV S302276545760889 CARD 8759"
+      },
+      {
+        "date": "2022-10-12",
+        "amount": 100,
+        "desc": "PURCHASE AUTHORIZED ON 10/10 STANLEY TOCHIKI SN LAS VEGAS NV S582283578692477 CARD 8759"
+      },
+      {
+        "date": "2022-10-12",
+        "amount": 100,
+        "desc": "PURCHASE AUTHORIZED ON 10/10 STANLEY TOCHIKI SN LAS VEGAS NV S382283692842457 CARD 8759"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710708",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "lacianne roark",
+    "purchase_count": 2,
+    "total_spend": 700.0,
+    "avg_purchase": 350.0,
+    "price_tier": "mid",
+    "cadence_days_avg": 737.0,
+    "first_purchase": "2023-10-24",
+    "last_purchase": "2025-10-30",
+    "span_days": 737,
+    "primary_category": "business",
+    "category_breakdown": {
+      "business": 2
+    },
+    "primary_account": "Office expenses:Shipping & postage",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-10-24",
+        "amount": 100,
+        "desc": "ZELLE LACIANNE ROARK 866-224-2158;329700D02M02;2023-10-24;DR ZELLE LACIANNE ROARK 866-224-215"
+      },
+      {
+        "date": "2025-10-30",
+        "amount": 600,
+        "desc": "ZELLE LACIANNE ROARK 866-224-2158;530300G084J0;2025-10-31;DR ZELLE LACIANNE ROARK 866-224-215"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710837",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Taco Bell",
+    "purchase_count": 48,
+    "total_spend": 670.74,
+    "avg_purchase": 13.97,
+    "price_tier": "micro",
+    "cadence_days_avg": 27.9,
+    "first_purchase": "2022-08-19",
+    "last_purchase": "2026-03-24",
+    "span_days": 1313,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 48
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-08-19",
+        "amount": 16.21,
+        "desc": "VISA - 08/16 TACO BELL 031883 BOULDER CITY NV 016608"
+      },
+      {
+        "date": "2022-08-26",
+        "amount": 12,
+        "desc": "VISA - 08/23 TACO BELL 031883 BOULDER CITY NV 023676"
+      },
+      {
+        "date": "2022-08-29",
+        "amount": 9.52,
+        "desc": "VISA - 08/25 TACO BELL 031883 BOULDER CITY NV 025326"
+      },
+      {
+        "date": "2022-09-01",
+        "amount": 10.46,
+        "desc": "VISA - 08/29 TACO BELL 000300036699 MIAMI FL 029004"
+      },
+      {
+        "date": "2022-09-20",
+        "amount": 11.04,
+        "desc": "PURCHASE AUTHORIZED ON 09/18 TACO BELL 031895 LAS VEGAS NV S302261739801764 CARD 8759"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710672",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "talia brown",
+    "purchase_count": 3,
+    "total_spend": 630.0,
+    "avg_purchase": 210.0,
+    "price_tier": "mid",
+    "cadence_days_avg": 33.5,
+    "first_purchase": "2023-11-30",
+    "last_purchase": "2024-02-05",
+    "span_days": 67,
+    "primary_category": "service",
+    "category_breakdown": {
+      "service": 3
+    },
+    "primary_account": "Contract labor",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-11-30",
+        "amount": 200,
+        "desc": "ZELLE TALIAH BROWN 866-224-2158;333400I08PPO;2023-11-30;DR ZELLE TALIAH BROWN 866-224-2158;"
+      },
+      {
+        "date": "2024-02-01",
+        "amount": 250,
+        "desc": "ZELLE TALIAH BROWN 866-224-2158;403200A09GRU;2024-02-01;DR ZELLE TALIAH BROWN 866-224-2158;"
+      },
+      {
+        "date": "2024-02-05",
+        "amount": 180,
+        "desc": "ZELLE TALIAH BROWN 866-224-2158;403600F02JJP;2024-02-05;DR ZELLE TALIAH BROWN 866-224-2158;"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710855",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "O'Reilly Auto Parts",
+    "purchase_count": 8,
+    "total_spend": 620.13,
+    "avg_purchase": 77.52,
+    "price_tier": "small",
+    "cadence_days_avg": 161.1,
+    "first_purchase": "2023-02-10",
+    "last_purchase": "2026-03-14",
+    "span_days": 1128,
+    "primary_category": "vehicle_part",
+    "category_breakdown": {
+      "vehicle_part": 8
+    },
+    "primary_account": "Vehicle expenses:Vehicle repairs",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-02-10",
+        "amount": 21.66,
+        "desc": "PURCHASE                                AUTHORIZED ON   02/10 O'REILLY AUTO PARTS 4748  BOULDER CITY  NV  P3030417330435"
+      },
+      {
+        "date": "2025-10-18",
+        "amount": 80.19,
+        "desc": "VISA - 10/16 O'REILLY 750 800-755-6759 TN 016023 VISA - 10/16 O'REILLY 750 800-75"
+      },
+      {
+        "date": "2025-11-03",
+        "amount": 111.6,
+        "desc": "VISA - 10/31 O'REILLY 4748 BOULDER CITY NV 031848 VISA - 10/31 O'REILLY 4748 BOULD"
+      },
+      {
+        "date": "2026-03-07",
+        "amount": 21.66,
+        "desc": "POINT OF SALE PURCHASE USA NV BOULDER CITY, O'REILLY 4748 - XXXXXXXX1002 POINT OF SALE PURCHASE USA NV BO"
+      },
+      {
+        "date": "2026-03-09",
+        "amount": 27.72,
+        "desc": "POINT OF SALE PURCHASE USA NV BOULDER CITY, O'REILLY 4748 - XXXXXXXX5774 POINT OF SALE PURCHASE USA NV BO"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710758",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Cursor",
+    "purchase_count": 12,
+    "total_spend": 597.36,
+    "avg_purchase": 49.78,
+    "price_tier": "small",
+    "cadence_days_avg": 11.0,
+    "first_purchase": "2025-11-12",
+    "last_purchase": "2026-03-13",
+    "span_days": 121,
+    "primary_category": "business_saas",
+    "category_breakdown": {
+      "business_saas": 12
+    },
+    "primary_account": "General business expenses:Memberships & subscriptions",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-11-12",
+        "amount": 21.34,
+        "desc": "VISA - 11/10 CURSOR USAGE MID NOV CURSOR.COM NY 010212 VISA - 11/10 CURSOR USAGE MID NO"
+      },
+      {
+        "date": "2025-11-17",
+        "amount": 42.34,
+        "desc": "VISA - 11/14 CURSOR USAGE MID NOV CURSOR.COM NY 014998 VISA - 11/14 CURSOR USAGE MID NO"
+      },
+      {
+        "date": "2025-12-22",
+        "amount": 20,
+        "desc": "VISA - 12/20 CURSOR, AI POWERED IDE CURSOR.COM NY 020900 VISA - 12/20 CURSOR, AI POWERED"
+      },
+      {
+        "date": "2025-12-22",
+        "amount": 20,
+        "desc": "VISA - 12/20 CURSOR, AI POWERED IDE CURSOR.COM NY 020675 VISA - 12/20 CURSOR, AI POWERED"
+      },
+      {
+        "date": "2025-12-22",
+        "amount": 28.66,
+        "desc": "VISA - 12/20 CURSOR USAGE NOV CURSOR.COM NY 020787 VISA - 12/20 CURSOR USAGE NOV CU"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710953",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "starlink",
+    "purchase_count": 5,
+    "total_spend": 590.0,
+    "avg_purchase": 118.0,
+    "price_tier": "mid",
+    "cadence_days_avg": 131.8,
+    "first_purchase": "2022-09-25",
+    "last_purchase": "2024-03-05",
+    "span_days": 527,
+    "primary_category": "business_saas",
+    "category_breakdown": {
+      "business_saas": 5
+    },
+    "primary_account": "Utilities:Internet & TV services",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-09-25",
+        "amount": 110,
+        "desc": "POS PURCH : STARLINK INTERNE 4899               CA 310-9708392     STARLINK INTERNET  US"
+      },
+      {
+        "date": "2023-12-04",
+        "amount": 120,
+        "desc": "VISA - 11/30 STARLINK INTERNET 310-6828100 CA 030323 VISA - 11/30 STARLINK INTERNET 3"
+      },
+      {
+        "date": "2024-01-09",
+        "amount": 120,
+        "desc": "VISA - 01/05 STARLINK INTERNET 310-6828100 CA 005903 VISA - 01/05 STARLINK INTERNET 3"
+      },
+      {
+        "date": "2024-02-02",
+        "amount": 120,
+        "desc": "VISA - 01/29 STARLINK INTERNET 310-6828100 CA 030357 VISA - 01/29 STARLINK INTERNET 3"
+      },
+      {
+        "date": "2024-03-05",
+        "amount": 120,
+        "desc": "VISA - 02/29 STARLINK INTERNET 310-6828100 CA 001006 VISA - 02/29 STARLINK INTERNET 3"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710718",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Harbor Freight Tools",
+    "purchase_count": 6,
+    "total_spend": 570.67,
+    "avg_purchase": 95.11,
+    "price_tier": "small",
+    "cadence_days_avg": 295.0,
+    "first_purchase": "2022-02-19",
+    "last_purchase": "2026-03-05",
+    "span_days": 1475,
+    "primary_category": "tool",
+    "category_breakdown": {
+      "tool": 6
+    },
+    "primary_account": "Tools, machinery, and equipment",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-02-19",
+        "amount": 32.5,
+        "desc": "POINT OF SALE PURCHASE US NV HENDERSON, HARBOR FREIGHT TOOLS 433 W LAKE MEAD PA"
+      },
+      {
+        "date": "2022-11-07",
+        "amount": 122.95,
+        "desc": "PURCHASE AUTHORIZED ON 11/07 HARBOR FREIGHT TOOLS 6 HENDERSON NV P000000674418216 CARD 8759"
+      },
+      {
+        "date": "2023-02-28",
+        "amount": 35.37,
+        "desc": "PURCHASE                                AUTHORIZED ON   02/28 HARBOR FREIGHT TOOLS 6    HENDERSON     NV  P0000008820314"
+      },
+      {
+        "date": "2023-12-07",
+        "amount": 174.35,
+        "desc": "PURCHASE                                AUTHORIZED ON   12/07 HARBOR FREIGHT TOOLS 6    HENDERSON     NV  PXXXXXXXX58893"
+      },
+      {
+        "date": "2026-03-04",
+        "amount": 175.51,
+        "desc": "POINT OF SALE PURCHASE USA NV HENDERSON, HARBOR FREIGHT TOOLS USA 433 W LAKE MEAD PARKWAY - XXXXXXXX2315 POINT OF SALE P"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710580",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "OpenAI ChatGPT",
+    "purchase_count": 24,
+    "total_spend": 568.47,
+    "avg_purchase": 23.69,
+    "price_tier": "micro",
+    "cadence_days_avg": 4.2,
+    "first_purchase": "2025-12-17",
+    "last_purchase": "2026-03-23",
+    "span_days": 96,
+    "primary_category": "business_saas",
+    "category_breakdown": {
+      "business_saas": 24
+    },
+    "primary_account": "General business expenses:Memberships & subscriptions",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-12-17",
+        "amount": 20,
+        "desc": "VISA - 12/15 OPENAI *CHATGPT SUBSCR OPENAI.COM CA 015985 VISA - 12/15 OPENAI *CHATGPT SUB"
+      },
+      {
+        "date": "2025-12-23",
+        "amount": 50,
+        "desc": "VISA - 12/21 OPENAI OPENAI.COM CA 021960 VISA - 12/21 OPENAI OPENAI.COM C"
+      },
+      {
+        "date": "2025-12-27",
+        "amount": 20,
+        "desc": "VISA - 12/25 OPENAI *CHATGPT SUBSCR OPENAI.COM CA 025819 VISA - 12/25 OPENAI *CHATGPT SUB"
+      },
+      {
+        "date": "2025-12-27",
+        "amount": 50,
+        "desc": "VISA - 12/26 OPENAI OPENAI.COM CA 025849 VISA - 12/26 OPENAI OPENAI.COM C"
+      },
+      {
+        "date": "2025-12-30",
+        "amount": 10,
+        "desc": "VISA - 12/29 OPENAI OPENAI.COM CA 028701 VISA - 12/29 OPENAI OPENAI.COM C"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710983",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Boulder Pit Stop",
+    "purchase_count": 8,
+    "total_spend": 506.43,
+    "avg_purchase": 63.3,
+    "price_tier": "small",
+    "cadence_days_avg": 22.1,
+    "first_purchase": "2025-10-14",
+    "last_purchase": "2026-03-18",
+    "span_days": 155,
+    "primary_category": "service",
+    "category_breakdown": {
+      "service": 8
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-10-14",
+        "amount": 84.21,
+        "desc": "VISA - 10/10 SQ *BOULDER PIT STOP INC BOULDER CITY NV 010 VISA - 10/10 SQ *BOULDER PIT STO"
+      },
+      {
+        "date": "2025-10-15",
+        "amount": 44.73,
+        "desc": "VISA - 10/13 SQ *BOULDER PIT STOP INC BOULDER CITY NV 013 VISA - 10/13 SQ *BOULDER PIT STO"
+      },
+      {
+        "date": "2025-10-18",
+        "amount": 50.21,
+        "desc": "VISA - 10/16 SQ *BOULDER PIT STOP INC BOULDER CITY NV 016 VISA - 10/16 SQ *BOULDER PIT STO"
+      },
+      {
+        "date": "2025-10-29",
+        "amount": 96.6,
+        "desc": "VISA - 10/27 SQ *BOULDER PIT STOP INC BOULDER CITY NV 027 VISA - 10/27 SQ *BOULDER PIT STO"
+      },
+      {
+        "date": "2026-03-07",
+        "amount": 53.34,
+        "desc": "VISA - 03/05 SQ *BOULDER PIT STOP INC BOULDER CITY NV 005 VISA - 03/05 SQ *BOULDER PIT STO"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710906",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Arco",
+    "purchase_count": 15,
+    "total_spend": 504.0,
+    "avg_purchase": 33.6,
+    "price_tier": "small",
+    "cadence_days_avg": 96.1,
+    "first_purchase": "2022-02-23",
+    "last_purchase": "2025-10-30",
+    "span_days": 1345,
+    "primary_category": "vehicle_fuel",
+    "category_breakdown": {
+      "vehicle_fuel": 15
+    },
+    "primary_account": "Vehicle expenses:Vehicle gas & fuel",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-02-23",
+        "amount": 48.35,
+        "desc": "POINT OF SALE PURCHASE US NV BOULDER CITY, ARCO #6616 1665 NEVADA H"
+      },
+      {
+        "date": "2022-03-31",
+        "amount": 70.36,
+        "desc": "POINT OF SALE PURCHASE US NV BOULDER CITY, ARCO #6616 1665 NEVADA H"
+      },
+      {
+        "date": "2023-02-22",
+        "amount": 8.54,
+        "desc": "PURCHASE                                AUTHORIZED ON   02/22 ARCO66169001              BOULDER CITY  NV  P0000009804608"
+      },
+      {
+        "date": "2023-03-01",
+        "amount": 13.91,
+        "desc": "PURCHASE                                AUTHORIZED ON   02/28 ARCO66169001              BOULDER CITY  NV  P0000008709220"
+      },
+      {
+        "date": "2023-03-06",
+        "amount": 9.84,
+        "desc": "PURCHASE                                AUTHORIZED ON   03/05 ARCO66169001              BOULDER CITY  NV  P0000009808599"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710588",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Offer up purchase",
+    "purchase_count": 1,
+    "total_spend": 503.5,
+    "avg_purchase": 503.5,
+    "price_tier": "large",
+    "cadence_days_avg": null,
+    "first_purchase": "2022-11-03",
+    "last_purchase": "2022-11-03",
+    "span_days": 0,
+    "primary_category": "tool",
+    "category_breakdown": {
+      "tool": 1
+    },
+    "primary_account": "Office expenses:Small tools and equipment",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-11-03",
+        "amount": 503.5,
+        "desc": "NON-WF ATM WITHDRAWAL AUTHORIZED ON 11/02 3480 W SAHARA AVE LAS VEGAS NV 302307056853482 ATM ID SNA0621 CARD 8759"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710737",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "matthew rodriguez",
+    "purchase_count": 1,
+    "total_spend": 500.0,
+    "avg_purchase": 500.0,
+    "price_tier": "large",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-10-07",
+    "last_purchase": "2023-10-07",
+    "span_days": 0,
+    "primary_category": "unknown",
+    "category_breakdown": {
+      "unknown": 1
+    },
+    "primary_account": "Vehicles",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-10-07",
+        "amount": 500,
+        "desc": "ZELLE MATTHEW RODRIGUEZ 866-224-2158;328000G09HEM;2023-10-10;DR ZELLE MATTHEW RODRIGUEZ  for tesla wheels and tires for "
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710834",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Pharmagustavia",
+    "purchase_count": 6,
+    "total_spend": 496.29,
+    "avg_purchase": 82.72,
+    "price_tier": "small",
+    "cadence_days_avg": 262.4,
+    "first_purchase": "2022-08-22",
+    "last_purchase": "2026-03-26",
+    "span_days": 1312,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 6
+    },
+    "primary_account": "Travel",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-08-22",
+        "amount": 53.01,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2022-08-22",
+        "amount": 0.53,
+        "desc": "PayPal fees"
+      },
+      {
+        "date": "2024-01-04",
+        "amount": 19.04,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2024-01-04",
+        "amount": 0.19,
+        "desc": "PayPal fees"
+      },
+      {
+        "date": "2025-10-27",
+        "amount": 62.8,
+        "desc": "VISA - 10/24 PHARMAGUSTAVIA ST BARTHELEMY GP 024262 VISA - 10/24 PHARMAGUSTAVIA ST B"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710676",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Firecrawl",
+    "purchase_count": 6,
+    "total_spend": 468.0,
+    "avg_purchase": 78.0,
+    "price_tier": "small",
+    "cadence_days_avg": 18.0,
+    "first_purchase": "2025-12-04",
+    "last_purchase": "2026-03-04",
+    "span_days": 90,
+    "primary_category": "business_saas",
+    "category_breakdown": {
+      "business_saas": 6
+    },
+    "primary_account": "General business expenses:Memberships & subscriptions",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-12-04",
+        "amount": 99,
+        "desc": "VISA - 12/03 FIRECRAWL.DEV WWW.FIRECRAWL DE 002931 VISA - 12/03 FIRECRAWL.DEV WWW.F"
+      },
+      {
+        "date": "2025-12-29",
+        "amount": 57,
+        "desc": "VISA - 12/27 FIRECRAWL.DEV WWW.FIRECRAWL DE 027009 VISA - 12/27 FIRECRAWL.DEV WWW.F"
+      },
+      {
+        "date": "2025-12-29",
+        "amount": 57,
+        "desc": "VISA - 12/26 FIRECRAWL.DEV WWW.FIRECRAWL DE 026788 VISA - 12/26 FIRECRAWL.DEV WWW.F"
+      },
+      {
+        "date": "2026-01-21",
+        "amount": 57,
+        "desc": "VISA - 01/20 FIRECRAWL.DEV WWW.FIRECRAWL DE 019082 VISA - 01/20 FIRECRAWL.DEV WWW.F"
+      },
+      {
+        "date": "2026-01-26",
+        "amount": 99,
+        "desc": "VISA - 01/24 FIRECRAWL.DEV WWW.FIRECRAWL DE 023243 VISA - 01/24 FIRECRAWL.DEV WWW.F"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710979",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "True value",
+    "purchase_count": 13,
+    "total_spend": 461.09,
+    "avg_purchase": 35.47,
+    "price_tier": "small",
+    "cadence_days_avg": 105.5,
+    "first_purchase": "2022-09-28",
+    "last_purchase": "2026-03-17",
+    "span_days": 1266,
+    "primary_category": "tool",
+    "category_breakdown": {
+      "tool": 13
+    },
+    "primary_account": "Supplies:Supplies & materials",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-09-28",
+        "amount": 9.07,
+        "desc": "POS PURCH : HOME TRUE VALUE  5251               NV BOULDER CITY    706 CANYON RD..    US"
+      },
+      {
+        "date": "2022-10-06",
+        "amount": 33.59,
+        "desc": "POS PURCH : HOME TRUE VALUE  5251               NV BOULDER CITY    706 CANYON RD..    US"
+      },
+      {
+        "date": "2022-10-07",
+        "amount": 18.52,
+        "desc": "POS PURCH : HOME TRUE VALUE  5251               NV BOULDER CITY    706 CANYON RD..    US"
+      },
+      {
+        "date": "2022-10-13",
+        "amount": 7.11,
+        "desc": "POS PURCH : HOME TRUE VALUE  5251               NV BOULDER CITY    706 CANYON RD..    US"
+      },
+      {
+        "date": "2022-10-19",
+        "amount": 98.66,
+        "desc": "POS PURCH : HOME TRUE VALUE  5251               NV BOULDER CITY    706 CANYON RD..    US"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710721",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "david parker",
+    "purchase_count": 1,
+    "total_spend": 400.0,
+    "avg_purchase": 400.0,
+    "price_tier": "mid",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-11-18",
+    "last_purchase": "2023-11-18",
+    "span_days": 0,
+    "primary_category": "unknown",
+    "category_breakdown": {
+      "unknown": 1
+    },
+    "primary_account": "Vehicles",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-11-18",
+        "amount": 400,
+        "desc": "ZELLE DAVID PARKER 866-224-2158;332200I0CVOM;2023-11-20;DR ZELLE DAVID PARKER 866-224-2158;"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710849",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Walmart",
+    "purchase_count": 5,
+    "total_spend": 337.81,
+    "avg_purchase": 67.56,
+    "price_tier": "small",
+    "cadence_days_avg": 169.8,
+    "first_purchase": "2022-09-19",
+    "last_purchase": "2024-07-29",
+    "span_days": 679,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 5
+    },
+    "primary_account": "Supplies",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-09-19",
+        "amount": 43.76,
+        "desc": "PURCHASE AUTHORIZED ON 09/18 Wal-Mart Super Center HENDERSON NV P000000782885822 CARD 8759"
+      },
+      {
+        "date": "2022-09-19",
+        "amount": 23.72,
+        "desc": "PURCHASE AUTHORIZED ON 09/18 Wal-Mart Super Center HENDERSON NV P000000782885822 CARD 8759"
+      },
+      {
+        "date": "2022-10-05",
+        "amount": 27.85,
+        "desc": "POS PURCH : WAL-MART #2050   5411               NV HENDERSON       300 EAST LAKE MEAD US"
+      },
+      {
+        "date": "2023-04-25",
+        "amount": 163.21,
+        "desc": "PURCHASE                                AUTHORIZED ON   04/25 Wal-Mart Super Center     HENDERSON     NV  P0000005894787"
+      },
+      {
+        "date": "2024-07-29",
+        "amount": 79.27,
+        "desc": "PURCHASE AUTHORIZED ON 09/18 Wal-Mart Super Center HENDERSON NV P000000782885822 CARD 8759"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710701",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "McDonald's",
+    "purchase_count": 17,
+    "total_spend": 326.19,
+    "avg_purchase": 19.19,
+    "price_tier": "micro",
+    "cadence_days_avg": 61.4,
+    "first_purchase": "2022-08-27",
+    "last_purchase": "2025-05-05",
+    "span_days": 982,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 17
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-08-27",
+        "amount": 5.73,
+        "desc": "VISA - 08/25 MCDONALD'S 7790 BOULDER CITY NV 024622"
+      },
+      {
+        "date": "2022-09-19",
+        "amount": 13.53,
+        "desc": "PURCHASE AUTHORIZED ON 09/18 MCDONALD'S F7790 BOULDER CITY NV S382262134448708 CARD 8759"
+      },
+      {
+        "date": "2022-09-20",
+        "amount": 19.91,
+        "desc": "PURCHASE AUTHORIZED ON 09/19 MCDONALD'S F7790 BOULDER CITY NV S582263163835956 CARD 8759"
+      },
+      {
+        "date": "2022-10-03",
+        "amount": 3.24,
+        "desc": "PURCHASE AUTHORIZED ON 10/01 MCDONALD'S F7790 BOULDER CITY NV S462274802601463 CARD 8759"
+      },
+      {
+        "date": "2022-11-03",
+        "amount": 16.67,
+        "desc": "PURCHASE AUTHORIZED ON 11/02 MCDONALD'S F7790 BOULDER CITY NV S462307130653560 CARD 8759"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710681",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Tst Fox Smokehous",
+    "purchase_count": 4,
+    "total_spend": 316.21,
+    "avg_purchase": 79.05,
+    "price_tier": "small",
+    "cadence_days_avg": 102.7,
+    "first_purchase": "2023-03-06",
+    "last_purchase": "2024-01-08",
+    "span_days": 308,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 4
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-03-06",
+        "amount": 62.74,
+        "desc": "PURCHASE                                AUTHORIZED ON   03/04 TST* Fox Smokehous        Boulder City  NV  S5830640972919"
+      },
+      {
+        "date": "2023-03-20",
+        "amount": 98.53,
+        "desc": "PURCHASE                                AUTHORIZED ON   03/17 TST* Fox Smokehous        Boulder City  NV  S3030767813187"
+      },
+      {
+        "date": "2023-05-11",
+        "amount": 98.33,
+        "desc": "PURCHASE                                AUTHORIZED ON   05/09 TST* Fox Smokehous        Boulder City  NV  S3031297778954"
+      },
+      {
+        "date": "2024-01-08",
+        "amount": 56.61,
+        "desc": "VISA - 01/06 TST* FOX SMOKEHOUSE BAKER BOULDER CITY NV 00 VISA - 01/06 TST* FOX SMOKEHOUSE"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710781",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Auctane llc",
+    "purchase_count": 27,
+    "total_spend": 316.12,
+    "avg_purchase": 11.71,
+    "price_tier": "micro",
+    "cadence_days_avg": 49.5,
+    "first_purchase": "2022-06-07",
+    "last_purchase": "2025-12-15",
+    "span_days": 1287,
+    "primary_category": "business_saas",
+    "category_breakdown": {
+      "business_saas": 27
+    },
+    "primary_account": "Office expenses:Shipping & postage",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-06-07",
+        "amount": 9,
+        "desc": "ShipStation Starter - ShipStation Starter"
+      },
+      {
+        "date": "2022-07-06",
+        "amount": 10,
+        "desc": "Fund insurance account - Fund insurance account"
+      },
+      {
+        "date": "2022-07-06",
+        "amount": 10,
+        "desc": "Fund insurance account - Fund insurance account"
+      },
+      {
+        "date": "2022-07-07",
+        "amount": 9,
+        "desc": "ShipStation Starter - ShipStation Starter"
+      },
+      {
+        "date": "2022-08-07",
+        "amount": 9,
+        "desc": "ShipStation Starter - ShipStation Starter"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710627",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "jeff dages",
+    "purchase_count": 1,
+    "total_spend": 300.0,
+    "avg_purchase": 300.0,
+    "price_tier": "mid",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-11-13",
+    "last_purchase": "2023-11-13",
+    "span_days": 0,
+    "primary_category": "unknown",
+    "category_breakdown": {
+      "unknown": 1
+    },
+    "primary_account": "Vehicles",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-11-13",
+        "amount": 300,
+        "desc": "ZELLE JEFFREY DAGES 866-224-2158;331600F0B56J;2023-11-13;DR ZELLE JEFFREY DAGES 866-224-2158"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710846",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "grailed",
+    "purchase_count": 1,
+    "total_spend": 290.94,
+    "avg_purchase": 290.94,
+    "price_tier": "mid",
+    "cadence_days_avg": null,
+    "first_purchase": "2026-03-12",
+    "last_purchase": "2026-03-12",
+    "span_days": 0,
+    "primary_category": "business",
+    "category_breakdown": {
+      "business": 1
+    },
+    "primary_account": "General business expenses:Uniforms",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2026-03-12",
+        "amount": 290.94,
+        "desc": "VISA - 03/10 WWW.GRAILED.COM WWW.GRAILED.C CA 006448 VISA - 03/10 WWW.GRAILED.COM WWW"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.711001",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Disney",
+    "purchase_count": 29,
+    "total_spend": 290.36,
+    "avg_purchase": 10.01,
+    "price_tier": "micro",
+    "cadence_days_avg": 21.8,
+    "first_purchase": "2022-06-20",
+    "last_purchase": "2024-02-21",
+    "span_days": 611,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 29
+    },
+    "primary_account": "Utilities:Internet & TV services",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-06-20",
+        "amount": 7.99,
+        "desc": "| Disney Plus Monthly - US - Web -"
+      },
+      {
+        "date": "2022-07-20",
+        "amount": 7.99,
+        "desc": "| Disney Plus Monthly - US - Web -"
+      },
+      {
+        "date": "2022-07-20",
+        "amount": 7.99,
+        "desc": "PAYPAL INST XFER 220720 DISNEY PLUS SKYLAR WILLIAMS"
+      },
+      {
+        "date": "2022-08-20",
+        "amount": 7.99,
+        "desc": "| Disney Plus Monthly - US - Web -"
+      },
+      {
+        "date": "2022-09-20",
+        "amount": 7.99,
+        "desc": "| Disney Plus Monthly - US - Web -"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710652",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Chipotle",
+    "purchase_count": 10,
+    "total_spend": 276.93,
+    "avg_purchase": 27.69,
+    "price_tier": "small",
+    "cadence_days_avg": 59.6,
+    "first_purchase": "2022-06-16",
+    "last_purchase": "2023-12-04",
+    "span_days": 536,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 10
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-06-16",
+        "amount": 30.72,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2022-09-02",
+        "amount": 22.68,
+        "desc": "VISA - 08/31 CHIPOTLE 3963 MIAMI FL 031207"
+      },
+      {
+        "date": "2022-09-04",
+        "amount": 24.55,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2022-09-13",
+        "amount": 26.12,
+        "desc": "VISA - 09/11 CHIPOTLE 0320 HENDERSON NV 011631"
+      },
+      {
+        "date": "2022-10-04",
+        "amount": 26.06,
+        "desc": "POS PURCH : CHIPOTLE 0320    5814               NV HENDERSON       CHIPOTLE 0320      US"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710646",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "DMV",
+    "purchase_count": 5,
+    "total_spend": 269.0,
+    "avg_purchase": 53.8,
+    "price_tier": "small",
+    "cadence_days_avg": 94.0,
+    "first_purchase": "2022-03-05",
+    "last_purchase": "2023-03-16",
+    "span_days": 376,
+    "primary_category": "service",
+    "category_breakdown": {
+      "service": 5
+    },
+    "primary_account": "Vehicle expenses",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-03-05",
+        "amount": 68.25,
+        "desc": "VISA - 03/03 DMV-17 HENDERSON NV 003764"
+      },
+      {
+        "date": "2022-12-17",
+        "amount": 68.25,
+        "desc": "VISA - 12/15 DMV-17 HENDERSON NV 015507"
+      },
+      {
+        "date": "2023-03-13",
+        "amount": 68.25,
+        "desc": "PURCHASE                                AUTHORIZED ON   03/10 DMV-17                    HENDERSON     NV  S4630696910591"
+      },
+      {
+        "date": "2023-03-16",
+        "amount": 3.25,
+        "desc": "PURCHASE                                AUTHORIZED ON   03/15 DMV-44                    775-684-4513  NV  S5830744416668"
+      },
+      {
+        "date": "2023-03-16",
+        "amount": 61,
+        "desc": "PURCHASE                                AUTHORIZED ON   03/15 DMV-44                    775-684-4513  NV  S4630747223037"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710603",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Starbucks",
+    "purchase_count": 17,
+    "total_spend": 257.44,
+    "avg_purchase": 15.14,
+    "price_tier": "micro",
+    "cadence_days_avg": 65.4,
+    "first_purchase": "2022-06-20",
+    "last_purchase": "2025-05-01",
+    "span_days": 1046,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 17
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-06-20",
+        "amount": 16.91,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2022-07-06",
+        "amount": 21.13,
+        "desc": "PURCHASE AUTHORIZED ON 07/04 STARBUCKS STORE 08 BOULDER CITY NV S382185558606686 CARD 8759"
+      },
+      {
+        "date": "2022-07-20",
+        "amount": 18.48,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2022-09-01",
+        "amount": 22.77,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2022-09-05",
+        "amount": 10.4,
+        "desc": "PayPal Here transaction"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710649",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Habanero Taco Gril",
+    "purchase_count": 9,
+    "total_spend": 237.04,
+    "avg_purchase": 26.34,
+    "price_tier": "small",
+    "cadence_days_avg": 172.2,
+    "first_purchase": "2022-06-14",
+    "last_purchase": "2026-03-23",
+    "span_days": 1378,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 9
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-06-14",
+        "amount": 23.67,
+        "desc": "PURCHASE AUTHORIZED ON 06/13 HABANERO TACO GRIL BOULDER CITY NV S462164860133532 CARD 8759"
+      },
+      {
+        "date": "2022-07-21",
+        "amount": 17.79,
+        "desc": "PURCHASE AUTHORIZED ON 07/19 HABANERO TACO GRIL BOULDER CITY NV S582201143292911 CARD 8759"
+      },
+      {
+        "date": "2022-11-09",
+        "amount": 10.12,
+        "desc": "PURCHASE AUTHORIZED ON 11/08 HABANERO TACO GRIL BOULDER CITY NV S302312624213125 CARD 8759"
+      },
+      {
+        "date": "2022-11-14",
+        "amount": 5.4,
+        "desc": "PURCHASE AUTHORIZED ON 11/12 HABANERO TACO GRIL BOULDER CITY NV S582316616697811 CARD 8759"
+      },
+      {
+        "date": "2022-11-14",
+        "amount": 22.82,
+        "desc": "PURCHASE AUTHORIZED ON 11/13 HABANERO TACO GRIL BOULDER CITY NV S582318004817473 CARD 8759"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710642",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Chevron",
+    "purchase_count": 3,
+    "total_spend": 234.02,
+    "avg_purchase": 78.01,
+    "price_tier": "small",
+    "cadence_days_avg": 369.5,
+    "first_purchase": "2022-09-24",
+    "last_purchase": "2024-10-02",
+    "span_days": 739,
+    "primary_category": "vehicle_fuel",
+    "category_breakdown": {
+      "vehicle_fuel": 3
+    },
+    "primary_account": "Vehicle expenses:Vehicle gas & fuel",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-09-24",
+        "amount": 59.89,
+        "desc": "POS PURCH : CHEVRON 0380055  5542               NV BOULDER CITY    CHEVRON 0380055    US"
+      },
+      {
+        "date": "2022-10-16",
+        "amount": 44.54,
+        "desc": "POS PURCH : CHEVRON 0380668  5542               NV HENDERSON       CHEVRON 0380668    US"
+      },
+      {
+        "date": "2024-10-02",
+        "amount": 129.59,
+        "desc": "VISA - 09/30 CHEVRON 0380055 BOULDER CITY NV 030378 VISA - 09/30 CHEVRON 0380055 BOU"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710714",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Ace Hardware",
+    "purchase_count": 1,
+    "total_spend": 225.0,
+    "avg_purchase": 225.0,
+    "price_tier": "mid",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-11-10",
+    "last_purchase": "2023-11-10",
+    "span_days": 0,
+    "primary_category": "tool",
+    "category_breakdown": {
+      "tool": 1
+    },
+    "primary_account": "Personal healthcare",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-11-10",
+        "amount": 225,
+        "desc": "VISA - 11/07 ACE PRIMARY CARE HENDERSON NV 007174 VISA - 11/07 ACE PRIMARY CARE HE"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710843",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "LUCALI",
+    "purchase_count": 2,
+    "total_spend": 211.77,
+    "avg_purchase": 105.89,
+    "price_tier": "mid",
+    "cadence_days_avg": 121.0,
+    "first_purchase": "2025-11-18",
+    "last_purchase": "2026-03-19",
+    "span_days": 121,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 2
+    },
+    "primary_account": "Meals:Meals with clients",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-11-18",
+        "amount": 198.96,
+        "desc": "VISA - 11/15 LUCALI SAINT BARTHEL GP 015635 VISA - 11/15 LUCALI SAINT BARTHE"
+      },
+      {
+        "date": "2026-03-19",
+        "amount": 12.81,
+        "desc": "VISA - 03/17 R3 SBH ST BARTHELEMY GP 917487 VISA - 03/17 R3 SBH ST BARTHELEM"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710959",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Overdraft Fee",
+    "purchase_count": 6,
+    "total_spend": 210.0,
+    "avg_purchase": 35.0,
+    "price_tier": "small",
+    "cadence_days_avg": 93.4,
+    "first_purchase": "2023-05-18",
+    "last_purchase": "2024-08-27",
+    "span_days": 467,
+    "primary_category": "fee",
+    "category_breakdown": {
+      "fee": 6
+    },
+    "primary_account": "General business expenses:Bank fees & service charges",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-05-18",
+        "amount": 35,
+        "desc": "OVERDRAFT FEE FOR A TRANSACTION POSTED ON 05/17 $141.90 RECURRING PAYMENT                       AUTHORIZED ON   05/16 BR"
+      },
+      {
+        "date": "2023-12-19",
+        "amount": 35,
+        "desc": "OVERDRAFT FEE FOR A TRANSACTION POSTED ON 12/18 $125.12 RECURRING PAYMENT                       AUTHORIZED ON   12/16 BR"
+      },
+      {
+        "date": "2024-03-19",
+        "amount": 35,
+        "desc": "OVERDRAFT FEE FOR A TRANSACTION POSTED ON 03/18 $143.27 RECURRING PAYMENT                       AUTHORIZED ON   03/16 BR"
+      },
+      {
+        "date": "2024-03-21",
+        "amount": 35,
+        "desc": "OVERDRAFT FEE FOR A TRANSACTION POSTED ON 03/20 $9.99 PAYPAL           INST XFER  240320 XXXXXXXX58832   SKYLAR WILLIAMS"
+      },
+      {
+        "date": "2024-07-30",
+        "amount": 35,
+        "desc": "OVERDRAFT FEE FOR A TRANSACTION POSTED ON 07/29 $99.00 RECURRING PAYMENT                       AUTHORIZED ON   07/28 ELE"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710818",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Target",
+    "purchase_count": 7,
+    "total_spend": 203.71,
+    "avg_purchase": 29.1,
+    "price_tier": "small",
+    "cadence_days_avg": 5.5,
+    "first_purchase": "2024-01-01",
+    "last_purchase": "2024-02-03",
+    "span_days": 33,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 7
+    },
+    "primary_account": "General business expenses",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2024-01-01",
+        "amount": 12.98,
+        "desc": "POS PURCH : TARGET T-1171    541 POS PURCH : TARGET T-1171    5411               NV Las Vegas       9725 S Eastern Ave U"
+      },
+      {
+        "date": "2024-01-03",
+        "amount": 33.12,
+        "desc": "POS PURCH : TARGET T-2404    541 POS PURCH : TARGET T-2404    5411               NV Henderson       350 W Lake Mead PkwU"
+      },
+      {
+        "date": "2024-01-20",
+        "amount": 24.89,
+        "desc": "POINT OF SALE PURCHASE US NV LAS VEGAS, TARGET T-0850 3550 S RAINBOW BLVD POINT OF SALE PURCHASE US NV LAS"
+      },
+      {
+        "date": "2024-01-22",
+        "amount": 16.92,
+        "desc": "POINT OF SALE PURCHASE US NV LAS VEGAS, TARGET T-1171 9725 S EASTERN AVE POINT OF SALE PURCHASE US NV LAS"
+      },
+      {
+        "date": "2024-01-22",
+        "amount": 34.55,
+        "desc": "POINT OF SALE PURCHASE US NV LAS VEGAS, TARGET T-1171 9725 S EASTERN AVE POINT OF SALE PURCHASE US NV LAS"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710872",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Frontier AIR",
+    "purchase_count": 1,
+    "total_spend": 192.97,
+    "avg_purchase": 192.97,
+    "price_tier": "mid",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-10-15",
+    "last_purchase": "2025-10-15",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Travel:Airfare",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-10-15",
+        "amount": 192.97,
+        "desc": "VISA - 10/13 FRONTIER AI LFKJYZ 720-3744390 CO 013846 VISA - 10/13 FRONTIER AI LFKJYZ"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710915",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Winco",
+    "purchase_count": 2,
+    "total_spend": 178.04,
+    "avg_purchase": 89.02,
+    "price_tier": "small",
+    "cadence_days_avg": 87.0,
+    "first_purchase": "2022-06-13",
+    "last_purchase": "2022-09-08",
+    "span_days": 87,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 2
+    },
+    "primary_account": "Supplies",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-06-13",
+        "amount": 72.48,
+        "desc": "PURCHASE AUTHORIZED ON 06/13 WINCO FOODS #112 80 N Ste Henderson NV P382164710645302 CARD 8759"
+      },
+      {
+        "date": "2022-09-08",
+        "amount": 105.56,
+        "desc": "POINT OF SALE PURCHASE US NV HENDERSON, WINCO FOODS #112 80 N S"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710634",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Shell",
+    "purchase_count": 6,
+    "total_spend": 169.45,
+    "avg_purchase": 28.24,
+    "price_tier": "small",
+    "cadence_days_avg": 34.4,
+    "first_purchase": "2022-09-02",
+    "last_purchase": "2023-02-21",
+    "span_days": 172,
+    "primary_category": "vehicle_fuel",
+    "category_breakdown": {
+      "vehicle_fuel": 6
+    },
+    "primary_account": "Vehicle expenses:Vehicle gas & fuel",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-09-02",
+        "amount": 8.11,
+        "desc": "VISA - 08/30 SHELL OIL 57543871602 DORAL FL 030390"
+      },
+      {
+        "date": "2022-09-19",
+        "amount": 25.25,
+        "desc": "PURCHASE AUTHORIZED ON 09/18 SHELL SERVICE STATION HENDERSON NV P582262087724932 CARD 8759"
+      },
+      {
+        "date": "2022-11-16",
+        "amount": 29.48,
+        "desc": "PURCHASE AUTHORIZED ON 11/16 SHELL SERVICE STATION HENDERSON NV P382320756836330 CARD 8759"
+      },
+      {
+        "date": "2023-02-17",
+        "amount": 58.62,
+        "desc": "PURCHASE                                AUTHORIZED ON   02/17 SHELL SERVICE STATION     PHELAN        CA  P3030488598550"
+      },
+      {
+        "date": "2023-02-17",
+        "amount": 5.49,
+        "desc": "PURCHASE                                AUTHORIZED ON   02/17 SHELL SERVICE STATION     PHELAN        CA  P4630488590958"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710690",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "delmo speed",
+    "purchase_count": 1,
+    "total_spend": 164.0,
+    "avg_purchase": 164.0,
+    "price_tier": "mid",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-11-05",
+    "last_purchase": "2025-11-05",
+    "span_days": 0,
+    "primary_category": "vehicle_part",
+    "category_breakdown": {
+      "vehicle_part": 1
+    },
+    "primary_account": "Vehicle expenses",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-11-05",
+        "amount": 164,
+        "desc": "VISA - 11/03 SP DELMO SPEED DELMOSPEED.CO AZ 003796 VISA - 11/03 SP DELMO SPEED DELM"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710949",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "LESA'S AUTOBODY SUPPLIES INC",
+    "purchase_count": 1,
+    "total_spend": 160.0,
+    "avg_purchase": 160.0,
+    "price_tier": "mid",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-11-18",
+    "last_purchase": "2025-11-18",
+    "span_days": 0,
+    "primary_category": "vehicle_part",
+    "category_breakdown": {
+      "vehicle_part": 1
+    },
+    "primary_account": "Vehicle expenses",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-11-18",
+        "amount": 160,
+        "desc": "ZELLE LESAS AUT 866-224-2158;532200D0G0OO;2025-11-18;DR ZELLE LESAS AUT 866-224-2158;532"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710963",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "7-Eleven",
+    "purchase_count": 12,
+    "total_spend": 154.22,
+    "avg_purchase": 12.85,
+    "price_tier": "micro",
+    "cadence_days_avg": 91.3,
+    "first_purchase": "2022-08-01",
+    "last_purchase": "2025-05-01",
+    "span_days": 1004,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 12
+    },
+    "primary_account": "Vehicle expenses:Vehicle gas & fuel",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-08-01",
+        "amount": 4.16,
+        "desc": "VISA - 07/29 4518127 7-ELEVEN STOCKHOLM SE 029686"
+      },
+      {
+        "date": "2022-09-19",
+        "amount": 5,
+        "desc": "PURCHASE AUTHORIZED ON 09/19 7-ELEVEN BOULDER CITY NV P000000087705421 CARD 8759"
+      },
+      {
+        "date": "2022-11-04",
+        "amount": 5.22,
+        "desc": "PURCHASE AUTHORIZED ON 11/04 7-ELEVEN BOULDER CITY NV P000000574050716 CARD 8759"
+      },
+      {
+        "date": "2022-11-07",
+        "amount": 2.27,
+        "desc": "PURCHASE AUTHORIZED ON 11/06 7-ELEVEN BOULDER CITY NV P000000085283364 CARD 8759"
+      },
+      {
+        "date": "2023-03-16",
+        "amount": 20.84,
+        "desc": "PURCHASE                                AUTHORIZED ON   03/16 7-ELEVEN                  BOULDER CITY  NV  P0000000794601"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710666",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Foreign Transaction Fee",
+    "purchase_count": 86,
+    "total_spend": 153.91,
+    "avg_purchase": 1.79,
+    "price_tier": "micro",
+    "cadence_days_avg": 10.6,
+    "first_purchase": "2023-01-20",
+    "last_purchase": "2025-07-09",
+    "span_days": 901,
+    "primary_category": "fee",
+    "category_breakdown": {
+      "fee": 86
+    },
+    "primary_account": "General business expenses:Bank fees & service charges",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-01-20",
+        "amount": 0.11,
+        "desc": "INTERNATIONAL PURCHASE TRANSACTION FEE"
+      },
+      {
+        "date": "2023-01-24",
+        "amount": 0.22,
+        "desc": "INTERNATIONAL PURCHASE TRANSACTION FEE"
+      },
+      {
+        "date": "2023-01-25",
+        "amount": 1.17,
+        "desc": "INTERNATIONAL PURCHASE TRANSACTION FEE"
+      },
+      {
+        "date": "2023-01-26",
+        "amount": 0.34,
+        "desc": "INTERNATIONAL PURCHASE TRANSACTION FEE"
+      },
+      {
+        "date": "2023-02-07",
+        "amount": 0.29,
+        "desc": "INTERNATIONAL PURCHASE TRANSACTION FEE"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710755",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "GoDaddy",
+    "purchase_count": 4,
+    "total_spend": 153.56,
+    "avg_purchase": 38.39,
+    "price_tier": "small",
+    "cadence_days_avg": 12.7,
+    "first_purchase": "2025-11-25",
+    "last_purchase": "2026-01-02",
+    "span_days": 38,
+    "primary_category": "business_saas",
+    "category_breakdown": {
+      "business_saas": 4
+    },
+    "primary_account": "Office expenses",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-11-25",
+        "amount": 22.19,
+        "desc": "AUTOMATIC WITHDRAWAL, PAYPAL GODADDY.COM INST XFER WEB (S) AUTOMATIC WITHDRAWAL, PAYPAL GOD"
+      },
+      {
+        "date": "2025-12-22",
+        "amount": 24.19,
+        "desc": "AUTOMATIC WITHDRAWAL, PAYPAL GODADDY.COM INST XFER WEB (S) AUTOMATIC WITHDRAWAL, PAYPAL GOD"
+      },
+      {
+        "date": "2026-01-02",
+        "amount": 84.99,
+        "desc": "AUTOMATIC WITHDRAWAL, PAYPAL GODADDY.COM INST XFER WEB (S) AUTOMATIC WITHDRAWAL, PAYPAL GOD"
+      },
+      {
+        "date": "2026-01-02",
+        "amount": 22.19,
+        "desc": "AUTOMATIC WITHDRAWAL, PAYPAL GODADDY.COM INST XFER WEB (S) AUTOMATIC WITHDRAWAL, PAYPAL GOD"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710967",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Uhaul",
+    "purchase_count": 11,
+    "total_spend": 148.71,
+    "avg_purchase": 13.52,
+    "price_tier": "micro",
+    "cadence_days_avg": 5.0,
+    "first_purchase": "2022-09-01",
+    "last_purchase": "2022-10-21",
+    "span_days": 50,
+    "primary_category": "service",
+    "category_breakdown": {
+      "service": 11
+    },
+    "primary_account": "Equipment rental",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-09-01",
+        "amount": 24.51,
+        "desc": "VISA - 08/29 U-HAUL MOVING & STORAGE O MIAMI FL 029458"
+      },
+      {
+        "date": "2022-09-06",
+        "amount": 104.62,
+        "desc": "VISA - 08/29 U-HAUL MOVING & STORAGE O MIAMI FL 029120"
+      },
+      {
+        "date": "2022-10-21",
+        "amount": 2.32,
+        "desc": "VISA - 10/18 U-HAUL TOLLS AND CITATION 800-789-3638 AZ 01"
+      },
+      {
+        "date": "2022-10-21",
+        "amount": 2.32,
+        "desc": "VISA - 10/18 U-HAUL TOLLS AND CITATION 800-789-3638 AZ 01"
+      },
+      {
+        "date": "2022-10-21",
+        "amount": 2.32,
+        "desc": "VISA - 10/18 U-HAUL TOLLS AND CITATION 800-789-3638 AZ 01"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710687",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Carquest",
+    "purchase_count": 3,
+    "total_spend": 145.03,
+    "avg_purchase": 48.34,
+    "price_tier": "small",
+    "cadence_days_avg": 2.5,
+    "first_purchase": "2022-11-04",
+    "last_purchase": "2022-11-09",
+    "span_days": 5,
+    "primary_category": "vehicle_part",
+    "category_breakdown": {
+      "vehicle_part": 3
+    },
+    "primary_account": "Vehicle expenses",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-11-04",
+        "amount": 8.98,
+        "desc": "PURCHASE AUTHORIZED ON 11/06 CARQUEST 7797 BOULDER CITY NV P000000482857122 CARD 8759"
+      },
+      {
+        "date": "2022-11-07",
+        "amount": 83.06,
+        "desc": "PURCHASE AUTHORIZED ON 11/06 CARQUEST 7797 BOULDER CITY NV P000000482857122 CARD 8759"
+      },
+      {
+        "date": "2022-11-09",
+        "amount": 52.99,
+        "desc": "PURCHASE AUTHORIZED ON 11/06 CARQUEST 7797 BOULDER CITY NV P000000482857122 CARD 8759"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710740",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "United",
+    "purchase_count": 4,
+    "total_spend": 140.0,
+    "avg_purchase": 35.0,
+    "price_tier": "small",
+    "cadence_days_avg": 1.7,
+    "first_purchase": "2022-10-21",
+    "last_purchase": "2022-10-26",
+    "span_days": 5,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 4
+    },
+    "primary_account": "Travel:Airfare",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-10-21",
+        "amount": 35,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2022-10-21",
+        "amount": 35,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2022-10-26",
+        "amount": 35,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2022-10-26",
+        "amount": 35,
+        "desc": "PayPal Here transaction"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710734",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Hulu",
+    "purchase_count": 17,
+    "total_spend": 130.83,
+    "avg_purchase": 7.7,
+    "price_tier": "micro",
+    "cadence_days_avg": 24.7,
+    "first_purchase": "2022-06-10",
+    "last_purchase": "2023-07-10",
+    "span_days": 395,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 17
+    },
+    "primary_account": "Utilities:Internet & TV services",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-06-10",
+        "amount": 6.99,
+        "desc": "Hulu - Hulu Monthly Subscription Fee"
+      },
+      {
+        "date": "2022-07-10",
+        "amount": 6.99,
+        "desc": "Hulu - Hulu Monthly Subscription Fee"
+      },
+      {
+        "date": "2022-08-10",
+        "amount": 6.99,
+        "desc": "Hulu - Hulu Monthly Subscription Fee"
+      },
+      {
+        "date": "2022-08-12",
+        "amount": 6.99,
+        "desc": "VISA - 08/09 PAYPAL *HULU 402-935-7733 CA 010116"
+      },
+      {
+        "date": "2022-09-10",
+        "amount": 6.99,
+        "desc": "Hulu - Hulu Monthly Subscription Fee"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710631",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Microsoft",
+    "purchase_count": 8,
+    "total_spend": 123.42,
+    "avg_purchase": 15.43,
+    "price_tier": "micro",
+    "cadence_days_avg": 51.4,
+    "first_purchase": "2023-09-15",
+    "last_purchase": "2024-09-09",
+    "span_days": 360,
+    "primary_category": "business_saas",
+    "category_breakdown": {
+      "business_saas": 8
+    },
+    "primary_account": "Office expenses",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-09-15",
+        "amount": 16.99,
+        "desc": "VISA - WA REDMOND, MICROSOFT CORPORATIO MICROSOFT*ULTIMATE 1 M VISA - WA REDMOND, MICROSOFT COR"
+      },
+      {
+        "date": "2023-10-14",
+        "amount": 16.99,
+        "desc": "VISA - WA REDMOND, MICROSOFT CORPORATIO MICROSOFT*ULTIMATE 1 M VISA - WA REDMOND, MICROSOFT COR"
+      },
+      {
+        "date": "2023-11-15",
+        "amount": 16.99,
+        "desc": "VISA - WA MSBILL.INFO, MICROSOFT*ULTIMATE 1 ONE MICROSOFT WAY VISA - WA MSBILL.INFO, MICROSOFT"
+      },
+      {
+        "date": "2023-12-14",
+        "amount": 16.99,
+        "desc": "VISA - WA REDMON, MICROSOFT 1 MICROSOFT WAY VISA - WA REDMON, MICROSOFT 1 MI"
+      },
+      {
+        "date": "2024-01-22",
+        "amount": 16.99,
+        "desc": "VISA - 01/19 MICROSOFT*ULTIMATE 1 MONT 425-6816830 WA 019 VISA - 01/19 MICROSOFT*ULTIMATE"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710828",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "CARFAX",
+    "purchase_count": 1,
+    "total_spend": 109.99,
+    "avg_purchase": 109.99,
+    "price_tier": "mid",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-11-03",
+    "last_purchase": "2025-11-03",
+    "span_days": 0,
+    "primary_category": "vehicle_part",
+    "category_breakdown": {
+      "vehicle_part": 1
+    },
+    "primary_account": "Vehicle expenses",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-11-03",
+        "amount": 109.99,
+        "desc": "VISA - 11/02 CARFAX *CARFAX.COM CARFAX.COM VA 001710 VISA - 11/02 CARFAX *CARFAX.COM"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710940",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "toms off road",
+    "purchase_count": 1,
+    "total_spend": 105.42,
+    "avg_purchase": 105.42,
+    "price_tier": "mid",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-11-05",
+    "last_purchase": "2025-11-05",
+    "span_days": 0,
+    "primary_category": "vehicle_part",
+    "category_breakdown": {
+      "vehicle_part": 1
+    },
+    "primary_account": "Vehicle expenses",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-11-05",
+        "amount": 105.42,
+        "desc": "VISA - 11/03 SP TOMS OFFROAD TOMSOFFROAD.C OR 003003 VISA - 11/03 SP TOMS OFFROAD TOM"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710947",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "fab service llc",
+    "purchase_count": 1,
+    "total_spend": 100.0,
+    "avg_purchase": 100.0,
+    "price_tier": "mid",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-10-22",
+    "last_purchase": "2025-10-22",
+    "span_days": 0,
+    "primary_category": "unknown",
+    "category_breakdown": {
+      "unknown": 1
+    },
+    "primary_account": "Sales",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-10-22",
+        "amount": 100,
+        "desc": "ZELLE FAB SERVICE L 866-224-2158;529500P0HKAF;2025-10-22;DR ZELLE FAB SERVICE L 866-224-2158"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710927",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "coffee cup",
+    "purchase_count": 2,
+    "total_spend": 96.16,
+    "avg_purchase": 48.08,
+    "price_tier": "small",
+    "cadence_days_avg": 790.0,
+    "first_purchase": "2024-01-05",
+    "last_purchase": "2026-03-05",
+    "span_days": 790,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 2
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2024-01-05",
+        "amount": 40.03,
+        "desc": "POS PURCH : The Coffee Cup C 581 POS PURCH : The Coffee Cup C 5812               NV Boulder City    The Coffee Cup CafeU"
+      },
+      {
+        "date": "2026-03-05",
+        "amount": 56.13,
+        "desc": "VISA - 03/03 THE COFFEE CUP BOULDER CITY NV 003149 VISA - 03/03 THE COFFEE CUP BOUL"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710878",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Panda Express",
+    "purchase_count": 4,
+    "total_spend": 93.2,
+    "avg_purchase": 23.3,
+    "price_tier": "micro",
+    "cadence_days_avg": 39.7,
+    "first_purchase": "2023-09-05",
+    "last_purchase": "2024-01-02",
+    "span_days": 119,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 4
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-09-05",
+        "amount": 32.08,
+        "desc": "VISA - 09/02 PANDA EXPRESS 1378 BOULDER CITY NV 002681 VISA - 09/02 PANDA EXPRESS 1378"
+      },
+      {
+        "date": "2023-12-14",
+        "amount": 23.41,
+        "desc": "VISA - 12/12 PANDA EXPRESS 1378 BOULDER CITY NV 012112 VISA - 12/12 PANDA EXPRESS 1378"
+      },
+      {
+        "date": "2023-12-31",
+        "amount": 21.24,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2024-01-02",
+        "amount": 16.47,
+        "desc": "POS PURCH : PANDA EXPRESS 13 581 POS PURCH : PANDA EXPRESS 13 5814               NV BOULDER CITY    PANDA EXPRESS 1378 U"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710821",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Little Caesars",
+    "purchase_count": 4,
+    "total_spend": 89.94,
+    "avg_purchase": 22.48,
+    "price_tier": "micro",
+    "cadence_days_avg": 212.7,
+    "first_purchase": "2022-03-21",
+    "last_purchase": "2023-12-19",
+    "span_days": 638,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 4
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-03-21",
+        "amount": 16.62,
+        "desc": "VISA - 03/18 LITTLE CAESARS 2298 305-758-3200 FL 018619"
+      },
+      {
+        "date": "2022-03-24",
+        "amount": 35.43,
+        "desc": "VISA - 03/21 LITTLE CAESARS 2306 Q67 313-471-6830 FL 0214"
+      },
+      {
+        "date": "2023-11-17",
+        "amount": 19.49,
+        "desc": "POINT OF SALE PURCHASE US NV HENDERSON, LITTLE CAESARS 1227- 118 E LAKE MEAD PKWY POINT OF SALE PURCHASE US NV HEN"
+      },
+      {
+        "date": "2023-12-19",
+        "amount": 18.4,
+        "desc": "POINT OF SALE PURCHASE US NV HENDERSON, LITTLE CAESARS 1227- 118 E LAKE MEAD PKWY POINT OF SALE PURCHASE US NV HEN"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710613",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "QuickBooks Payments",
+    "purchase_count": 2,
+    "total_spend": 89.75,
+    "avg_purchase": 44.88,
+    "price_tier": "small",
+    "cadence_days_avg": 21.0,
+    "first_purchase": "2023-12-27",
+    "last_purchase": "2024-01-17",
+    "span_days": 21,
+    "primary_category": "fee",
+    "category_breakdown": {
+      "fee": 2
+    },
+    "primary_account": "Office expenses",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-12-27",
+        "amount": 59.85,
+        "desc": "ACH TRANS : INTUIT 46016605 ;122 ACH TRANS : INTUIT 46016605 ;122623;TRAN FEE"
+      },
+      {
+        "date": "2024-01-17",
+        "amount": 29.9,
+        "desc": "ACH TRANS : INTUIT 28052935 ;011 ACH TRANS : INTUIT 28052935 ;011624;TRAN FEE"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710865",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Vercel",
+    "purchase_count": 4,
+    "total_spend": 88.2,
+    "avg_purchase": 22.05,
+    "price_tier": "micro",
+    "cadence_days_avg": 35.3,
+    "first_purchase": "2025-12-03",
+    "last_purchase": "2026-03-19",
+    "span_days": 106,
+    "primary_category": "business_saas",
+    "category_breakdown": {
+      "business_saas": 4
+    },
+    "primary_account": "General business expenses:Memberships & subscriptions",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-12-03",
+        "amount": 20,
+        "desc": "VISA - 12/01 VERCEL INC. VERCEL.COM CA 001235 VISA - 12/01 VERCEL INC. VERCEL."
+      },
+      {
+        "date": "2025-12-22",
+        "amount": 20,
+        "desc": "VISA - 12/20 VERCEL INC. VERCEL.COM CA 020771 VISA - 12/20 VERCEL INC. VERCEL."
+      },
+      {
+        "date": "2026-01-20",
+        "amount": 20,
+        "desc": "VISA - 01/18 VERCEL INC. VERCEL.COM CA 018467 VISA - 01/18 VERCEL INC. VERCEL."
+      },
+      {
+        "date": "2026-03-19",
+        "amount": 28.2,
+        "desc": "VISA - 03/17 VERCEL INC. VERCEL.COM CA 017473 VISA - 03/17 VERCEL INC. VERCEL."
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710970",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Perplexity AI",
+    "purchase_count": 3,
+    "total_spend": 70.0,
+    "avg_purchase": 23.33,
+    "price_tier": "micro",
+    "cadence_days_avg": 2.0,
+    "first_purchase": "2026-03-02",
+    "last_purchase": "2026-03-06",
+    "span_days": 4,
+    "primary_category": "business",
+    "category_breakdown": {
+      "business": 3
+    },
+    "primary_account": "General business expenses:Memberships & subscriptions",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2026-03-02",
+        "amount": 10,
+        "desc": "VISA - 02/28 WWW.PERPLEXITY.AI WWW.PERPLEXIT CA 027441 VISA - 02/28 WWW.PERPLEXITY.AI W"
+      },
+      {
+        "date": "2026-03-02",
+        "amount": 10,
+        "desc": "VISA - 02/27 WWW.PERPLEXITY.AI WWW.PERPLEXIT CA 027418 VISA - 02/27 WWW.PERPLEXITY.AI W"
+      },
+      {
+        "date": "2026-03-06",
+        "amount": 50,
+        "desc": "VISA - 03/04 WWW.PERPLEXITY.AI WWW.PERPLEXIT CA 004358 VISA - 03/04 WWW.PERPLEXITY.AI W"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710990",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "99 Cents Only LLC",
+    "purchase_count": 4,
+    "total_spend": 68.74,
+    "avg_purchase": 17.19,
+    "price_tier": "micro",
+    "cadence_days_avg": 57.3,
+    "first_purchase": "2022-09-16",
+    "last_purchase": "2023-03-07",
+    "span_days": 172,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 4
+    },
+    "primary_account": "Supplies:Supplies & materials",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-09-16",
+        "amount": 17.76,
+        "desc": "PURCHASE AUTHORIZED ON 09/15 99 CENTS ONLY ST # BOULDER CITY NV S382258631759825 CARD 8759"
+      },
+      {
+        "date": "2022-10-05",
+        "amount": 7.5,
+        "desc": "POS PURCH : 99 CENTS ONLY ST 5411               NV BOULDER CITY    99 CENTS ONLY ST #0US"
+      },
+      {
+        "date": "2023-03-01",
+        "amount": 27.94,
+        "desc": "PURCHASE                                AUTHORIZED ON   02/28 99 CENTS ONLY ST #        BOULDER CITY  NV  S4630596616632"
+      },
+      {
+        "date": "2023-03-07",
+        "amount": 15.54,
+        "desc": "PURCHASE                                AUTHORIZED ON   03/06 99 CENTS ONLY ST #        BOULDER CITY  NV  S4630658523503"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710697",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Stormlikes",
+    "purchase_count": 10,
+    "total_spend": 61.0,
+    "avg_purchase": 6.1,
+    "price_tier": "micro",
+    "cadence_days_avg": 19.7,
+    "first_purchase": "2022-09-19",
+    "last_purchase": "2023-03-15",
+    "span_days": 177,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 10
+    },
+    "primary_account": "Travel",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-09-19",
+        "amount": 4.49,
+        "desc": "PURCHASE AUTHORIZED ON 09/16 STORMLIKES.COM Stockholm SWE S302260233659289 CARD 8759"
+      },
+      {
+        "date": "2022-09-26",
+        "amount": 4.18,
+        "desc": "PURCHASE AUTHORIZED ON 09/25 STORMLIKES.COM Stockholm SWE S582268781365109 CARD 8759"
+      },
+      {
+        "date": "2023-01-20",
+        "amount": 3.81,
+        "desc": "PURCHASE INTL                           AUTHORIZED ON   01/18 SL                        STOCKHOLM     SWE S5830190148197"
+      },
+      {
+        "date": "2023-01-24",
+        "amount": 7.59,
+        "desc": "PURCHASE INTL                           AUTHORIZED ON   01/22 SL                        STOCKHOLM     SWE S3030230121545"
+      },
+      {
+        "date": "2023-01-26",
+        "amount": 11.49,
+        "desc": "PURCHASE INTL                           AUTHORIZED ON   01/24 SL                        STOCKHOLM     SWE S3030250121412"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710704",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Dropbox",
+    "purchase_count": 3,
+    "total_spend": 59.97,
+    "avg_purchase": 19.99,
+    "price_tier": "micro",
+    "cadence_days_avg": 34.5,
+    "first_purchase": "2025-11-04",
+    "last_purchase": "2026-01-12",
+    "span_days": 69,
+    "primary_category": "business_saas",
+    "category_breakdown": {
+      "business_saas": 3
+    },
+    "primary_account": "General business expenses",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-11-04",
+        "amount": 19.99,
+        "desc": "VISA - 11/02 DROPBOX*VCR7FG9K8QXK DROPBOX.COM CA 002181 VISA - 11/02 DROPBOX*VCR7FG9K8QX"
+      },
+      {
+        "date": "2025-12-04",
+        "amount": 19.99,
+        "desc": "VISA - 12/02 DROPBOX*BFNT8HNPYT1M DROPBOX.COM CA 002394 VISA - 12/02 DROPBOX*BFNT8HNPYT1"
+      },
+      {
+        "date": "2026-01-12",
+        "amount": 19.99,
+        "desc": "VISA - 01/10 DROPBOX*HKR4WWJQL49S DROPBOX.COM CA 010292 VISA - 01/10 DROPBOX*HKR4WWJQL49"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710944",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "ATM Fee",
+    "purchase_count": 17,
+    "total_spend": 58.0,
+    "avg_purchase": 3.41,
+    "price_tier": "micro",
+    "cadence_days_avg": 52.9,
+    "first_purchase": "2023-01-17",
+    "last_purchase": "2025-05-12",
+    "span_days": 846,
+    "primary_category": "fee",
+    "category_breakdown": {
+      "fee": 17
+    },
+    "primary_account": "General business expenses:Bank fees & service charges",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-01-17",
+        "amount": 5,
+        "desc": "NON-WELLS FARGO ATM TRANSACTION FEE"
+      },
+      {
+        "date": "2023-01-17",
+        "amount": 5,
+        "desc": "NON-WELLS FARGO ATM TRANSACTION FEE"
+      },
+      {
+        "date": "2023-01-24",
+        "amount": 5,
+        "desc": "NON-WELLS FARGO ATM TRANSACTION FEE"
+      },
+      {
+        "date": "2023-02-24",
+        "amount": 2.5,
+        "desc": "NON-WELLS FARGO ATM TRANSACTION FEE"
+      },
+      {
+        "date": "2023-09-22",
+        "amount": 2.5,
+        "desc": "NON-WELLS FARGO ATM TRANSACTION FEE"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710750",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Vons",
+    "purchase_count": 1,
+    "total_spend": 57.67,
+    "avg_purchase": 57.67,
+    "price_tier": "small",
+    "cadence_days_avg": null,
+    "first_purchase": "2022-10-18",
+    "last_purchase": "2022-10-18",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Supplies",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-10-18",
+        "amount": 57.67,
+        "desc": "PURCHASE AUTHORIZED ON 10/18 VONS #2615 HENDERSON NV P462292025733904 CARD 8759"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710731",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Big Ts Cantina",
+    "purchase_count": 1,
+    "total_spend": 57.26,
+    "avg_purchase": 57.26,
+    "price_tier": "small",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-05-09",
+    "last_purchase": "2023-05-09",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-05-09",
+        "amount": 57.26,
+        "desc": "PURCHASE                                AUTHORIZED ON   05/07 WPY*BIG TS CANTINA        BOULDER CITY  NV  S4631278547992"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710813",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Doctor",
+    "purchase_count": 4,
+    "total_spend": 54.38,
+    "avg_purchase": 13.6,
+    "price_tier": "micro",
+    "cadence_days_avg": 3.3,
+    "first_purchase": "2022-05-25",
+    "last_purchase": "2022-06-04",
+    "span_days": 10,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 4
+    },
+    "primary_account": "Personal healthcare",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-05-25",
+        "amount": 26.87,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2022-05-25",
+        "amount": 0.27,
+        "desc": "PayPal fees"
+      },
+      {
+        "date": "2022-06-04",
+        "amount": 26.97,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2022-06-04",
+        "amount": 0.27,
+        "desc": "PayPal fees"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710624",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Intl Lagerbaren",
+    "purchase_count": 2,
+    "total_spend": 50.25,
+    "avg_purchase": 25.12,
+    "price_tier": "small",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-03-14",
+    "last_purchase": "2023-03-14",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 2
+    },
+    "primary_account": "Meals:Travel meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-03-14",
+        "amount": 45.25,
+        "desc": "PURCHASE INTL                           AUTHORIZED ON   03/13 LAGERBAREN                STOCKHOLM     SWE S5830724634772"
+      },
+      {
+        "date": "2023-03-14",
+        "amount": 5,
+        "desc": "PURCHASE INTL                           AUTHORIZED ON   03/13 LAGERBAREN                STOCKHOLM     SWE S5830725131498"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710791",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "UPS",
+    "purchase_count": 5,
+    "total_spend": 49.38,
+    "avg_purchase": 9.88,
+    "price_tier": "micro",
+    "cadence_days_avg": 367.5,
+    "first_purchase": "2022-02-24",
+    "last_purchase": "2026-03-05",
+    "span_days": 1470,
+    "primary_category": "business",
+    "category_breakdown": {
+      "business": 5
+    },
+    "primary_account": "Office expenses:Shipping & postage",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-02-24",
+        "amount": 1.25,
+        "desc": "POS PURCH : THE UPS STORE 18 7399               NV 702-2862726     THE UPS STORE 1874 US"
+      },
+      {
+        "date": "2023-02-22",
+        "amount": 12.47,
+        "desc": "PURCHASE                                AUTHORIZED ON   02/21 THE UPS STORE 1874        702-2862726   NV  S5830526304468"
+      },
+      {
+        "date": "2023-03-01",
+        "amount": 24.39,
+        "desc": "PURCHASE                                AUTHORIZED ON   02/28 THE UPS STORE 1874        702-2862726   NV  S3830596484958"
+      },
+      {
+        "date": "2024-08-22",
+        "amount": 6.51,
+        "desc": "PURCHASE                                AUTHORIZED ON   08/21 THE UPS STORE 1874        702-2862726   NV  SXXXXXXXX33381"
+      },
+      {
+        "date": "2026-03-05",
+        "amount": 4.76,
+        "desc": "VISA - 03/03 THE UPS STORE 1874 702-2862726 NV 003885 VISA - 03/03 THE UPS STORE 1874"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710595",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "A&W",
+    "purchase_count": 1,
+    "total_spend": 49.06,
+    "avg_purchase": 49.06,
+    "price_tier": "small",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-03-21",
+    "last_purchase": "2023-03-21",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-03-21",
+        "amount": 49.06,
+        "desc": "PURCHASE                                AUTHORIZED ON   03/19 A & W                     Boulder City  NV  S3830787438609"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710807",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "SUPABASE",
+    "purchase_count": 1,
+    "total_spend": 35.21,
+    "avg_purchase": 35.21,
+    "price_tier": "small",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-12-03",
+    "last_purchase": "2025-12-03",
+    "span_days": 0,
+    "primary_category": "business_saas",
+    "category_breakdown": {
+      "business_saas": 1
+    },
+    "primary_account": "General business expenses:Memberships & subscriptions",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-12-03",
+        "amount": 35.21,
+        "desc": "VISA - 12/01 SUPABASE SINGAPORE SG 001856 VISA - 12/01 SUPABASE SINGAPORE"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710973",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Parkup Parking App",
+    "purchase_count": 2,
+    "total_spend": 35.0,
+    "avg_purchase": 17.5,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-02-21",
+    "last_purchase": "2023-02-21",
+    "span_days": 0,
+    "primary_category": "vehicle_part",
+    "category_breakdown": {
+      "vehicle_part": 2
+    },
+    "primary_account": "Vehicle expenses:Parking & tolls",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-02-21",
+        "amount": 25,
+        "desc": "RECURRING PAYMENT                       AUTHORIZED ON   02/17 PARKUP PARKING APP        HTTPSPARKUP.A CA  S5830491252882"
+      },
+      {
+        "date": "2023-02-21",
+        "amount": 10,
+        "desc": "RECURRING PAYMENT                       AUTHORIZED ON   02/18 PARKUP PARKING APP        HTTPSPARKUP.A CA  S4630496737437"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710767",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Uber",
+    "purchase_count": 3,
+    "total_spend": 34.98,
+    "avg_purchase": 11.66,
+    "price_tier": "micro",
+    "cadence_days_avg": 25.5,
+    "first_purchase": "2024-12-10",
+    "last_purchase": "2025-01-30",
+    "span_days": 51,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 3
+    },
+    "primary_account": "Travel:Taxis or shared rides",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2024-12-10",
+        "amount": 15,
+        "desc": "PURCHASE                                AUTHORIZED ON   12/09 UBER   *TRIP              XXXXXX8996    CA  SXXXXXXXX30536"
+      },
+      {
+        "date": "2024-12-26",
+        "amount": 9.99,
+        "desc": "RECURRING PAYMENT                       AUTHORIZED ON   12/25 UBER   *ONE               HELP.UBER.COM CA  SXXXXXXXX74259"
+      },
+      {
+        "date": "2025-01-30",
+        "amount": 9.99,
+        "desc": "RECURRING PAYMENT                       AUTHORIZED ON   01/29 UBER   *ONE               HELP.UBER.COM CA  SXXXXXXXX67109"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710898",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Marshalls",
+    "purchase_count": 1,
+    "total_spend": 34.68,
+    "avg_purchase": 34.68,
+    "price_tier": "small",
+    "cadence_days_avg": null,
+    "first_purchase": "2024-01-03",
+    "last_purchase": "2024-01-03",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Personal expenses",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2024-01-03",
+        "amount": 34.68,
+        "desc": "POS PURCH : MARSHALLS #1071  531 POS PURCH : MARSHALLS #1071  5310               NV HENDERSON       290 W LAKE MEAD PKWU"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710874",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "regal cinema",
+    "purchase_count": 1,
+    "total_spend": 31.94,
+    "avg_purchase": 31.94,
+    "price_tier": "small",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-02-28",
+    "last_purchase": "2023-02-28",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Entertainment with clients",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-02-28",
+        "amount": 31.94,
+        "desc": "PURCHASE                                AUTHORIZED ON   02/26 REG GREEN VALLEY          HENDERSON     NV  S5830581936791"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710773",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Prime Video",
+    "purchase_count": 5,
+    "total_spend": 28.57,
+    "avg_purchase": 5.71,
+    "price_tier": "micro",
+    "cadence_days_avg": 23.8,
+    "first_purchase": "2025-10-27",
+    "last_purchase": "2026-01-30",
+    "span_days": 95,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 5
+    },
+    "primary_account": "General business expenses",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-10-27",
+        "amount": 14.01,
+        "desc": "VISA - 10/25 PRIME VIDEO *N48L19AU1 888-802-3080 WA 02550 VISA - 10/25 PRIME VIDEO *N48L19"
+      },
+      {
+        "date": "2025-10-27",
+        "amount": 2.99,
+        "desc": "VISA - 10/25 PRIME VIDEO *N451Y1040 888-802-3080 WA 02592 VISA - 10/25 PRIME VIDEO *N451Y1"
+      },
+      {
+        "date": "2025-11-12",
+        "amount": 3.79,
+        "desc": "VISA - 11/09 PRIME VIDEO *BT3HZ2KO1 888-802-3080 WA 00988 VISA - 11/09 PRIME VIDEO *BT3HZ2"
+      },
+      {
+        "date": "2025-11-17",
+        "amount": 3.79,
+        "desc": "VISA - 11/15 PRIME VIDEO *B83FZ5SI1 888-802-3080 WA 01506 VISA - 11/15 PRIME VIDEO *B83FZ5"
+      },
+      {
+        "date": "2026-01-30",
+        "amount": 3.99,
+        "desc": "VISA - 01/28 PRIME VIDEO *IN08R5CL3 888-802-3080 WA 02887 VISA - 01/28 PRIME VIDEO *IN08R5"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710934",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Etsy",
+    "purchase_count": 1,
+    "total_spend": 25.94,
+    "avg_purchase": 25.94,
+    "price_tier": "small",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-12-05",
+    "last_purchase": "2023-12-05",
+    "span_days": 0,
+    "primary_category": "unknown",
+    "category_breakdown": {
+      "unknown": 1
+    },
+    "primary_account": "Uncategorized Expense",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-12-05",
+        "amount": 25.94,
+        "desc": "VISA - 12/04 ETSY, INC. BROOKLYN NY 003181 VISA - 12/04 ETSY, INC. BROOKLYN"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710861",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Uber Eats",
+    "purchase_count": 1,
+    "total_spend": 24.46,
+    "avg_purchase": 24.46,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-10-14",
+    "last_purchase": "2025-10-14",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-10-14",
+        "amount": 24.46,
+        "desc": "POINT OF SALE PURCHASE USA CA UBEREATS.COM, UBER 405 HOWARD ST - XXXXXXXX6668 POINT OF SALE PURCHASE USA CA UB"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710901",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Intl Galina",
+    "purchase_count": 1,
+    "total_spend": 23.99,
+    "avg_purchase": 23.99,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-03-17",
+    "last_purchase": "2023-03-17",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Meals:Travel meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-03-17",
+        "amount": 23.99,
+        "desc": "PURCHASE INTL                           AUTHORIZED ON   03/10 GALINA S AB               STOCKHOLM     SWE S3030694027796"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710803",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "AutoZone",
+    "purchase_count": 1,
+    "total_spend": 23.98,
+    "avg_purchase": 23.98,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2024-08-24",
+    "last_purchase": "2024-08-24",
+    "span_days": 0,
+    "primary_category": "parts",
+    "category_breakdown": {
+      "parts": 1
+    },
+    "primary_account": "Vehicle Parts & Materials",
+    "primary_payment_type": null,
+    "samples": [
+      {
+        "date": "2024-08-24",
+        "amount": 23.98,
+        "desc": "Engine mount ($23.99) + part ($25.99)"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710880",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Dairy Queen",
+    "purchase_count": 2,
+    "total_spend": 19.99,
+    "avg_purchase": 10.0,
+    "price_tier": "micro",
+    "cadence_days_avg": 234.0,
+    "first_purchase": "2022-09-11",
+    "last_purchase": "2023-05-03",
+    "span_days": 234,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 2
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-09-11",
+        "amount": 2.21,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2023-05-03",
+        "amount": 17.78,
+        "desc": "PURCHASE                                AUTHORIZED ON   05/02 DAIRY QUEEN #19374        BOULDER CITY  NV  S4631228290826"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710694",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "DHL",
+    "purchase_count": 1,
+    "total_spend": 19.99,
+    "avg_purchase": 19.99,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-12-26",
+    "last_purchase": "2025-12-26",
+    "span_days": 0,
+    "primary_category": "business",
+    "category_breakdown": {
+      "business": 1
+    },
+    "primary_account": "Office expenses:Shipping & postage",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-12-26",
+        "amount": 19.99,
+        "desc": "VISA - 12/24 ANTELOPE DHL SBH ST BARTHELEMY GP 024864 VISA - 12/24 ANTELOPE DHL SBH ST"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710986",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Raising Cane's",
+    "purchase_count": 1,
+    "total_spend": 15.96,
+    "avg_purchase": 15.96,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-02-21",
+    "last_purchase": "2023-02-21",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-02-21",
+        "amount": 15.96,
+        "desc": "PURCHASE                                AUTHORIZED ON   02/18 RAISING CANE'S 584        BARSTOW       CA  S5830501980106"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710761",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Kmart",
+    "purchase_count": 1,
+    "total_spend": 15.84,
+    "avg_purchase": 15.84,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-03-14",
+    "last_purchase": "2023-03-14",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Meals:Travel meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-03-14",
+        "amount": 15.84,
+        "desc": "PURCHASE INTL                           AUTHORIZED ON   03/13 KMARKT TEATERN            STOCKHOLM     SWE S5830725182842"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710794",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Carambole",
+    "purchase_count": 2,
+    "total_spend": 15.08,
+    "avg_purchase": 7.54,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2022-08-30",
+    "last_purchase": "2022-08-30",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 2
+    },
+    "primary_account": "Travel",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-08-30",
+        "amount": 14.93,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2022-08-30",
+        "amount": 0.15,
+        "desc": "PayPal fees"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710684",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Intl Pressbyran",
+    "purchase_count": 1,
+    "total_spend": 14.52,
+    "avg_purchase": 14.52,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-03-13",
+    "last_purchase": "2023-03-13",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Meals:Travel meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-03-13",
+        "amount": 14.52,
+        "desc": "PURCHASE INTL                           AUTHORIZED ON   03/11 4108183 Pressbyran        Stockholm     SWE S5830706467465"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710783",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Lufthansa",
+    "purchase_count": 4,
+    "total_spend": 14.33,
+    "avg_purchase": 3.58,
+    "price_tier": "micro",
+    "cadence_days_avg": 0.7,
+    "first_purchase": "2022-10-11",
+    "last_purchase": "2022-10-13",
+    "span_days": 2,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 4
+    },
+    "primary_account": "Travel:Airfare",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2022-10-11",
+        "amount": 6.38,
+        "desc": "PayPal Here transaction"
+      },
+      {
+        "date": "2022-10-11",
+        "amount": 0.06,
+        "desc": "PayPal fees"
+      },
+      {
+        "date": "2022-10-13",
+        "amount": 0.08,
+        "desc": "PayPal fees"
+      },
+      {
+        "date": "2022-10-13",
+        "amount": 7.81,
+        "desc": "PayPal Here transaction"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710724",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Intl Lilla",
+    "purchase_count": 1,
+    "total_spend": 13.2,
+    "avg_purchase": 13.2,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-03-13",
+    "last_purchase": "2023-03-13",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Meals:Travel meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-03-13",
+        "amount": 13.2,
+        "desc": "PURCHASE INTL                           AUTHORIZED ON   03/11 LILLA ITALIA              STOCKHOLM     SWE S5830706509466"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710786",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Selecta",
+    "purchase_count": 4,
+    "total_spend": 11.06,
+    "avg_purchase": 2.77,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-03-15",
+    "last_purchase": "2023-03-15",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 4
+    },
+    "primary_account": "Meals:Travel meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-03-15",
+        "amount": 2.08,
+        "desc": "PURCHASE INTL                           AUTHORIZED ON   03/14 SELECTA AB                STOCKHOLM     SWE S3030733530255"
+      },
+      {
+        "date": "2023-03-15",
+        "amount": 2.55,
+        "desc": "PURCHASE INTL                           AUTHORIZED ON   03/14 SELECTA AB                STOCKHOLM     SWE S3030733526851"
+      },
+      {
+        "date": "2023-03-15",
+        "amount": 3.12,
+        "desc": "PURCHASE INTL                           AUTHORIZED ON   03/14 SELECTA AB                STOCKHOLM     SWE S3030733517171"
+      },
+      {
+        "date": "2023-03-15",
+        "amount": 3.31,
+        "desc": "PURCHASE INTL                           AUTHORIZED ON   03/14 SELECTA AB                STOCKHOLM     SWE S3030733523106"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710797",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Circle K",
+    "purchase_count": 2,
+    "total_spend": 11.02,
+    "avg_purchase": 5.51,
+    "price_tier": "micro",
+    "cadence_days_avg": 94.0,
+    "first_purchase": "2023-09-19",
+    "last_purchase": "2023-12-22",
+    "span_days": 94,
+    "primary_category": "vehicle_fuel",
+    "category_breakdown": {
+      "vehicle_fuel": 2
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-09-19",
+        "amount": 1.28,
+        "desc": "POINT OF SALE PURCHASE US NV HENDERSON, CIRCLE K 03360 POINT OF SALE PURCHASE US NV HEN"
+      },
+      {
+        "date": "2023-12-22",
+        "amount": 9.74,
+        "desc": "VISA - 12/20 CIRCLE K 05394 HENDERSON NV 019305 VISA - 12/20 CIRCLE K 05394 HEND"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710831",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Tropical Smoothie",
+    "purchase_count": 1,
+    "total_spend": 9.58,
+    "avg_purchase": 9.58,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-05-08",
+    "last_purchase": "2023-05-08",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-05-08",
+        "amount": 9.58,
+        "desc": "PURCHASE                                AUTHORIZED ON   05/04 TROPICAL SMOOTHIE         HENDERSON     NV  S3031247157347"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710810",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Jasons deli",
+    "purchase_count": 1,
+    "total_spend": 9.27,
+    "avg_purchase": 9.27,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-02-21",
+    "last_purchase": "2023-02-21",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-02-21",
+        "amount": 9.27,
+        "desc": "PURCHASE                                AUTHORIZED ON   02/18 SQ *JASONS                Los Angeles   CA  S5830498052153"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710764",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Jfk Camden Rj",
+    "purchase_count": 1,
+    "total_spend": 9.24,
+    "avg_purchase": 9.24,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-03-15",
+    "last_purchase": "2023-03-15",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Meals:Travel meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-03-15",
+        "amount": 9.24,
+        "desc": "PURCHASE                                AUTHORIZED ON   03/14 JFK CAMDEN RJ 6352        888-3100583   NY  S3030738206237"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710800",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Arby's",
+    "purchase_count": 1,
+    "total_spend": 8.3,
+    "avg_purchase": 8.3,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-10-21",
+    "last_purchase": "2025-10-21",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Meals:Travel meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-10-21",
+        "amount": 8.3,
+        "desc": "VISA - 10/19 ATL ARBYS ATLANTA GA 019782 VISA - 10/19 ATL ARBYS ATLANTA G"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710924",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Odicho Livs Post",
+    "purchase_count": 1,
+    "total_spend": 7.5,
+    "avg_purchase": 7.5,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-03-13",
+    "last_purchase": "2023-03-13",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-03-13",
+        "amount": 7.5,
+        "desc": "PURCHASE                                AUTHORIZED ON   03/11 ODICHO LIVS & POST        STOCKHOLM     SWE S3030703842188"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710788",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Popeye's",
+    "purchase_count": 1,
+    "total_spend": 7.35,
+    "avg_purchase": 7.35,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-11-06",
+    "last_purchase": "2023-11-06",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Meals:Travel meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-11-06",
+        "amount": 7.35,
+        "desc": "VISA - 11/03 POPEYES 4625 ATLANTA GA 003040 VISA - 11/03 POPEYES 4625 ATLANT"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710840",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Whsmith T Stockholm",
+    "purchase_count": 1,
+    "total_spend": 6.06,
+    "avg_purchase": 6.06,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-01-20",
+    "last_purchase": "2023-01-20",
+    "span_days": 0,
+    "primary_category": "personal",
+    "category_breakdown": {
+      "personal": 1
+    },
+    "primary_account": "Meals:Travel meals",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-01-20",
+        "amount": 6.06,
+        "desc": "PURCHASE                                AUTHORIZED ON   01/18 WHSMITH T2 2546           STOCKHOLM-ARL SWE S5830184491394"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710752",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Nuke ltd",
+    "purchase_count": 2,
+    "total_spend": 6.0,
+    "avg_purchase": 3.0,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-10-23",
+    "last_purchase": "2025-10-23",
+    "span_days": 0,
+    "primary_category": "unknown",
+    "category_breakdown": {
+      "unknown": 2
+    },
+    "primary_account": "Office expenses",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2025-10-23",
+        "amount": 3,
+        "desc": "VISA - 10/21 NUKE LTD N-ZERO.DEV NV 021677 VISA - 10/21 NUKE LTD N-ZERO.DEV"
+      },
+      {
+        "date": "2025-10-23",
+        "amount": 3,
+        "desc": "VISA - 10/21 NUKE LTD N-ZERO.DEV NV 021270 VISA - 10/21 NUKE LTD N-ZERO.DEV"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710930",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Fiverr",
+    "purchase_count": 1,
+    "total_spend": 4.13,
+    "avg_purchase": 4.13,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2023-11-29",
+    "last_purchase": "2023-11-29",
+    "span_days": 0,
+    "primary_category": "business",
+    "category_breakdown": {
+      "business": 1
+    },
+    "primary_account": "Advertising & marketing",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2023-11-29",
+        "amount": 4.13,
+        "desc": "FIVERR INTERNATI IAT PAYPAL 231129 1030944272008   SKYLAR WILLIAMS"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710851",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "FedEx",
+    "purchase_count": 4,
+    "total_spend": 3.58,
+    "avg_purchase": 0.9,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2026-03-06",
+    "last_purchase": "2026-03-06",
+    "span_days": 0,
+    "primary_category": "business",
+    "category_breakdown": {
+      "business": 4
+    },
+    "primary_account": "Office expenses:Shipping & postage",
+    "primary_payment_type": "Cash",
+    "samples": [
+      {
+        "date": "2026-03-06",
+        "amount": 0.77,
+        "desc": "VISA - 03/04 FEDEX OFFICE 4197 LASKK HENDERSON NV 004397 VISA - 03/04 FEDEX OFFICE 4197 L"
+      },
+      {
+        "date": "2026-03-06",
+        "amount": 0.77,
+        "desc": "VISA - 03/04 FEDEX OFFICE 4197 LASKK HENDERSON NV 004203 VISA - 03/04 FEDEX OFFICE 4197 L"
+      },
+      {
+        "date": "2026-03-06",
+        "amount": 1.54,
+        "desc": "VISA - 03/04 FEDEX OFFICE 4197 LASKK HENDERSON NV 004019 VISA - 03/04 FEDEX OFFICE 4197 L"
+      },
+      {
+        "date": "2026-03-06",
+        "amount": 0.5,
+        "desc": "VISA - 03/04 FEDEX OFFICE 4197 LASKK HENDERSON NV 004833 VISA - 03/04 FEDEX OFFICE 4197 L"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710997",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Classic Parts of America",
+    "purchase_count": 1,
+    "total_spend": 0.0,
+    "avg_purchase": 0.0,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2024-09-22",
+    "last_purchase": "2024-09-22",
+    "span_days": 0,
+    "primary_category": "parts",
+    "category_breakdown": {
+      "parts": 1
+    },
+    "primary_account": "Vehicle Parts & Materials",
+    "primary_payment_type": null,
+    "samples": [
+      {
+        "date": "2024-09-22",
+        "amount": 0,
+        "desc": "Classic Parts order (items TBD)"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710886",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Quantum Fuel Systems",
+    "purchase_count": 1,
+    "total_spend": 0.0,
+    "avg_purchase": 0.0,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2024-09-25",
+    "last_purchase": "2024-09-25",
+    "span_days": 0,
+    "primary_category": "parts",
+    "category_breakdown": {
+      "parts": 1
+    },
+    "primary_account": "Vehicle Parts & Materials",
+    "primary_payment_type": null,
+    "samples": [
+      {
+        "date": "2024-09-25",
+        "amount": 0,
+        "desc": "QFS-H882-367 high-flow fuel pump assembly (BUILD P367 + OET.PX 15.3 QTY 2)"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710892",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "Tom's Offroad",
+    "purchase_count": 2,
+    "total_spend": 0.0,
+    "avg_purchase": 0.0,
+    "price_tier": "micro",
+    "cadence_days_avg": 17.0,
+    "first_purchase": "2025-10-17",
+    "last_purchase": "2025-11-03",
+    "span_days": 17,
+    "primary_category": "parts",
+    "category_breakdown": {
+      "parts": 2
+    },
+    "primary_account": "Vehicle Parts & Materials",
+    "primary_payment_type": null,
+    "samples": [
+      {
+        "date": "2025-10-17",
+        "amount": 0,
+        "desc": "Locking Security (from order summary snippet)"
+      },
+      {
+        "date": "2025-11-03",
+        "amount": 0,
+        "desc": "Front Amber Side Marker (from order summary snippet)"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710919",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  },
+  {
+    "kind": "vendor_preference",
+    "user_id": "0b9f107a-d124-49de-9ded-94698f63c1c4",
+    "vendor": "RockAuto",
+    "purchase_count": 1,
+    "total_spend": 0.0,
+    "avg_purchase": 0.0,
+    "price_tier": "micro",
+    "cadence_days_avg": null,
+    "first_purchase": "2025-10-17",
+    "last_purchase": "2025-10-17",
+    "span_days": 0,
+    "primary_category": "parts",
+    "category_breakdown": {
+      "parts": 1
+    },
+    "primary_account": "Vehicle Parts & Materials",
+    "primary_payment_type": null,
+    "samples": [
+      {
+        "date": "2025-10-17",
+        "amount": 0,
+        "desc": "Dorman 47099"
+      }
+    ],
+    "source": "qb_transactions",
+    "observed_at": "2026-05-23T20:46:51.710921",
+    "method": "sql_aggregate",
+    "trust": "T2"
+  }
+]

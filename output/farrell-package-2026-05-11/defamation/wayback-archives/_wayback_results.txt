@@ -1,0 +1,58 @@
+=== https://www.instagram.com/nukeltd_scam_warning/ ===
+HTTP/2 523 
+FINAL: https://web.archive.org/save/https://www.instagram.com/nukeltd_scam_warning/
+523
+
+=== https://www.instagram.com/p/DUYGTAEDiWp/ ===
+HTTP/2 523 
+FINAL: https://web.archive.org/save/https://www.instagram.com/p/DUYGTAEDiWp/
+523
+
+=== https://www.instagram.com/kickassclassics/ ===
+HTTP/2 523 
+FINAL: https://web.archive.org/save/https://www.instagram.com/kickassclassics/
+523
+
+=== https://www.instagram.com/p/DQhDuOlkYDX/ ===
+HTTP/2 523 
+FINAL: https://web.archive.org/save/https://www.instagram.com/p/DQhDuOlkYDX/
+523
+
+=== https://www.instagram.com/p/DQtn7-pjr5q/ ===
+HTTP/2 523 
+FINAL: https://web.archive.org/save/https://www.instagram.com/p/DQtn7-pjr5q/
+523
+
+=== https://www.instagram.com/p/DUjWb1xD2TA/ ===
+HTTP/2 523 
+FINAL: https://web.archive.org/save/https://www.instagram.com/p/DUjWb1xD2TA/
+523
+
+=== https://www.instagram.com/p/DORNvnADaP9/ ===
+HTTP/2 523 
+FINAL: https://web.archive.org/save/https://www.instagram.com/p/DORNvnADaP9/
+523
+
+=== https://lasvegas.craigslist.org/cto/d/boulder-city-1971-ford-bronco-velocity/7928736832.html ===
+HTTP/2 302 
+location: https://web.archive.org/web/20260511224230/https://lasvegas.craigslist.org/cto/d/boulder-city-1971-ford-bronco-velocity/7928736832.html
+HTTP/2 200 
+x-archive-orig-set-cookie: cl_b=4|b2b6afb59fb9f130ccd6b4f1bec945ea9799f095|17785393506idsI;path=/;domain=.craigslist.org;secure;expires=Fri, 01-Jan-2038 00:00:00 GMT
+x-archive-orig-cache-control: private, no-cache, no-store, must-revalidate
+x-archive-orig-content-length: 8375
+x-archive-orig-content-security-policy: base-uri 'self' https://hcaptcha.com https://*.hcaptcha.com; child-src https://*.craigslist.org; connect-src https://*.craigslist.org https://hcaptcha.com https://*.hcaptcha.com; font-src data:; form-action https://*.craigslist.org; frame-ancestors https://*.craigslist.org; frame-src https://*.craigslist.org https://craigslist.org https://hcaptcha.com https://*.hcaptcha.com; media-src data:; object-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https://*.craigslist.org https://hcaptcha.com https://*.hcaptcha.com; style-src 'unsafe-inline' https://*.craigslist.org https://hcaptcha.com https://*.hcaptcha.com
+x-archive-orig-date: Mon, 11 May 2026 22:42:28 GMT
+x-archive-orig-expires: Thu, 01 Jan 1970 00:00:00 GMT
+x-archive-orig-last-modified: Mon, 11 May 2026 22:42:28 GMT
+FINAL: https://web.archive.org/save/https://lasvegas.craigslist.org/cto/d/boulder-city-1971-ford-bronco-velocity/7928736832.html
+302
+
+
+=== Craigslist successfully archived: ===
+https://web.archive.org/web/20260511224230/https://lasvegas.craigslist.org/cto/d/boulder-city-1971-ford-bronco-velocity/7928736832.html
+
+=== Instagram URLs: Wayback returned HTTP 523 (IG blocks archiving). Trying archive.today: ===
+HTTP/2 302 
+location: https://web.archive.org/web/20260511225231/https://losangeles.craigslist.org/lac/cto/d/los-angeles-1971-ford-bronco-velocity/7928736379.html
+HTTP/2 200 
+

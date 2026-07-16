@@ -1,0 +1,148 @@
+[
+  {
+    "uuid": "41FD7FB9-2661-4079-989F-18A395681652",
+    "burst_id": "41FD7FB9",
+    "observed_at": "2023-05-14T00:33:48Z",
+    "kind": "work_record",
+    "summary": "Video still inside the shop; engine bay area with yellow/green tools and red shop equipment visible; subject vehicle obscured by motion blur. Pre-sale timeframe (4 days before known distributor diagnostic and 11 days before sale).",
+    "extracted_data": {
+      "work_type": "diagnostic_or_inspection",
+      "vendor": null,
+      "part_number": null,
+      "amount_usd": null,
+      "color_observed": null
+    },
+    "confidence": "low",
+    "note": "Burst is 7 video stills, all severely motion-blurred. Cannot positively ID as D-150 from imagery alone, but timing (May 14 2023 = 11 days pre-sale) and burst clustering with the 5/18 distributor diagnostic strongly suggest same vehicle work session."
+  },
+  {
+    "uuid": "4DFCDA62-5464-4D25-B299-330C89244822",
+    "burst_id": "41FD7FB9",
+    "observed_at": "2023-05-14T00:33:01Z",
+    "kind": "work_record",
+    "summary": "Sibling video still from same 5/14/2023 shop session; engine bay activity, motion-blurred.",
+    "extracted_data": {
+      "work_type": "diagnostic_or_inspection",
+      "vendor": null,
+      "part_number": null,
+      "amount_usd": null,
+      "color_observed": null
+    },
+    "confidence": "low",
+    "note": "Same caveat as 41FD7FB9."
+  },
+  {
+    "uuid": "F0FA4582-469F-4BBB-A4D1-AFA8E55A2822",
+    "burst_id": "41FD7FB9",
+    "observed_at": "2023-05-14T00:33:13Z",
+    "kind": "work_record",
+    "summary": "Sibling video still from 5/14/2023 shop burst.",
+    "extracted_data": { "work_type": "diagnostic_or_inspection" },
+    "confidence": "low"
+  },
+  {
+    "uuid": "4507B9A0-64A9-485C-8AD8-998E8C4D8042",
+    "burst_id": "41FD7FB9",
+    "observed_at": "2023-05-14T00:33:58Z",
+    "kind": "work_record",
+    "summary": "Sibling video still from 5/14/2023 shop burst.",
+    "extracted_data": { "work_type": "diagnostic_or_inspection" },
+    "confidence": "low"
+  },
+  {
+    "uuid": "BD211F41-2258-48CB-9B72-B32F2F2DC8FC",
+    "burst_id": "41FD7FB9",
+    "observed_at": "2023-05-14T00:34:34Z",
+    "kind": "work_record",
+    "summary": "Sibling video still from 5/14/2023 shop burst.",
+    "extracted_data": { "work_type": "diagnostic_or_inspection" },
+    "confidence": "low"
+  },
+  {
+    "uuid": "23731E3D-B68D-4CEB-8720-3C8F3BAD2BE7",
+    "burst_id": "41FD7FB9",
+    "observed_at": "2023-05-14T00:34:44Z",
+    "kind": "work_record",
+    "summary": "Sibling video still from 5/14/2023 shop burst.",
+    "extracted_data": { "work_type": "diagnostic_or_inspection" },
+    "confidence": "low"
+  },
+  {
+    "uuid": "D5D77233-C65A-40E2-98C3-8668ABFA26A5",
+    "burst_id": "41FD7FB9",
+    "observed_at": "2023-05-14T00:35:01Z",
+    "kind": "work_record",
+    "summary": "Sibling video still from 5/14/2023 shop burst.",
+    "extracted_data": { "work_type": "diagnostic_or_inspection" },
+    "confidence": "low"
+  },
+  {
+    "uuid": "26EC9DA6-0501-4998-9369-06CD9B6DF1FF",
+    "burst_id": "26EC9DA6",
+    "observed_at": "2023-05-18T18:39:18Z",
+    "kind": "work_record",
+    "summary": "Snap-On EEDM504F Digital Multimeter Basic reading 000.5 ohms across an MSD/Mopar-style red HEI distributor cap; cap is held in hand with brass terminals exposed. Diagnostic of distributor cap resistance two days before sale of D-150.",
+    "extracted_data": {
+      "work_type": "diagnostic",
+      "tool_used": "Snap-On EEDM504F Digital Multimeter Basic",
+      "part_tested": "distributor cap (red, aftermarket — visually consistent with Mopar V8 HEI-style cap for Dodge 318/360)",
+      "reading_value": "000.5 ohms",
+      "color_observed": null
+    },
+    "confidence": "high",
+    "note": "Photo is sharp and unambiguous; cap color matches typical aftermarket Mopar distributor cap. Pre-sale electrical diagnostic — likely the 'cap and rotor / spark issue' Skylar referenced when describing repairs."
+  },
+  {
+    "uuid": "C96A8C06-781C-4E72-BC8D-6D9918E7C8FF",
+    "burst_id": "26EC9DA6",
+    "observed_at": "2023-05-18T18:39:45Z",
+    "kind": "work_record",
+    "summary": "Video frame of the same distributor cap diagnostic session — blurry but red cap and Snap-On meter consistent with primary still.",
+    "extracted_data": { "work_type": "diagnostic", "tool_used": "Snap-On DMM" },
+    "confidence": "medium"
+  },
+  {
+    "uuid": "CEFD956C-D2BD-40E7-A120-2922C0EC914C",
+    "burst_id": "26EC9DA6",
+    "observed_at": "2023-05-18T19:19:21Z",
+    "kind": "specification",
+    "summary": "Annotated screenshot/PNG of a Mopar V8 engine bay (carbureted, single air cleaner, alternator, blue valve cover faintly visible) overlaid with the firing-order text '1-8-4-3-6-5-7-2'. This is the standard Chrysler/Mopar small-block V8 (318/360) firing order — reference for re-wiring the distributor cap. Taken 40 minutes after the 000.5 ohm reading.",
+    "extracted_data": {
+      "work_type": "diagnostic",
+      "spec_documented": "Mopar V8 firing order 1-8-4-3-6-5-7-2",
+      "engine_family": "Mopar LA-series small-block V8 (318/360, consistent with 1990 D-150 S)",
+      "color_observed": "blue valve covers (engine), tan/yellow firewall"
+    },
+    "confidence": "high",
+    "note": "Strong corroborating evidence that 5/18 burst is the D-150's distributor work. 318 LA V8 was the standard 1990 D-150 engine; firing-order reference saved 40 min after diagnostic suggests re-installation/timing work in progress."
+  },
+  {
+    "uuid": "8B4E99DC-A552-492F-8579-96D98B0D0AD1",
+    "burst_id": "8B4E99DC",
+    "observed_at": "2023-05-25T01:51:41Z",
+    "kind": "work_record",
+    "summary": "Close-up of a fresh-painted bright-blue casting (engine or accessory) with yellow date-code stamp '07311E81 11:47 PRODUCT OF USA'. Surface shows blue paint over machined cast iron with metallic flake/grit (sandblast or media-residue) visible. Date taken is the day before sale (May 25 = sale was reportedly May 2023).",
+    "extracted_data": {
+      "work_type": "engine_rebuild_or_repaint",
+      "part_marking": "07311E81  11:47  PRODUCT OF USA",
+      "color_observed": "Mopar/Chrysler 'Corporate Blue' engine paint (consistent with factory 318/360 LA-block color)",
+      "vendor": null
+    },
+    "confidence": "high",
+    "note": "Mopar engine paint blue + USA-cast date code + day-before-sale timing = direct evidence of the engine refresh Skylar mentioned. Date code format '07311E81' parses as: 07 = July, 31 = day, 1E = shift/line, 81 = year. Suggests a 1981-cast Chrysler component (could be intake manifold or block) repainted during recent refresh."
+  },
+  {
+    "uuid": "458E3258-E9F3-4B8D-BF6E-761B20E9C084",
+    "burst_id": "458E3258",
+    "observed_at": "2023-06-02T22:52:29Z",
+    "kind": "sighting",
+    "summary": "Yellow long-bed pickup, side profile, in desert / open road, blue sky. Body lines are slab-sided fleetside truck but the color is bright school-bus yellow. D-150 was Silver per the title and was sold May 2023 (this photo is 6/2/2023, ~10 days post-sale). NOT the D-150.",
+    "extracted_data": {
+      "work_type": null,
+      "color_observed": "bright yellow",
+      "body_style": "regular cab long bed fleetside pickup"
+    },
+    "confidence": "high",
+    "note": "Mis-flagged by prior agent. This is a different vehicle — likely a different truck in Skylar's inventory or a sighting. The D-150 was Silver and had already been sold by this date."
+  }
+]

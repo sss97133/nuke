@@ -120,7 +120,7 @@
   " class="trunk" marker-end="url(#arrow)"/>
 
   <text x="900" y="260" class="lbl" fill="#C00" font-size="12">MAIN ENGINE HARNESS TRUNK</text>
-  <text x="900" y="275" class="lbl-wire" fill="#C00">28 WIRES — TXL 18-22AWG</text>
+  <text x="900" y="275" class="lbl-wire" fill="#C00">28 WIRES — TEFZEL 18-22AWG</text>
 </g>
 
 <!-- ═══════════════════════════════════════════════════ -->
@@ -365,7 +365,7 @@
   <line x1="1700" y1="115" x2="2440" y2="115" stroke="black" stroke-width="0.5"/>
   <text x="2070" y="75" text-anchor="middle" class="title" font-size="16">NUKE LTD — ENGINE BAY WIRING</text>
   <text x="2070" y="105" text-anchor="middle" class="lbl" font-size="13">1977 K5 BLAZER — LS3 6.2L / MOTEC M130</text>
-  <text x="2070" y="130" text-anchor="middle" class="lbl-sm" fill="#666">VIN CCL187Z210370 | 28 ENGINE WIRES | TXL TIER</text>
+  <text x="2070" y="130" text-anchor="middle" class="lbl-sm" fill="#666">VIN CCL187Z210370 | 28 ENGINE WIRES | TEFZEL TIER</text>
   <text x="2070" y="155" text-anchor="middle" class="lbl-wire" fill="#999">OVERLAY ON GM FIG 6D-16D ENGINE COMPARTMENT</text>
 </g>
 

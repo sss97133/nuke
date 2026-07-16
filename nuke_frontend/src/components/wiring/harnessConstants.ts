@@ -235,6 +235,29 @@ export const LOCATION_ZONES = [
   { value: 'roof', label: 'Roof' },
 ];
 
+// Canonical zone color palette. Re-exported via wiringTheme.ts.
+// Previously duplicated inline in WiringPlan.tsx and FormboardView.tsx.
+export const ZONE_COLORS: Record<string, string> = {
+  engine_bay: '#cc2222',
+  firewall:   '#cc6600',
+  dash:       '#2266cc',
+  doors:      '#8822cc',
+  rear:       '#22aa44',
+  underbody:  '#666666',
+  roof:       '#778899',
+  interior:   '#44bbcc',
+};
+
+export const ZONE_LABELS: Record<string, string> = Object.fromEntries(
+  LOCATION_ZONES.map(z => [z.value, z.label]),
+);
+
+// Canonical segment-key helper for harness graph edges.
+// Stable, order-independent key for an unordered pair of node ids.
+export function segmentKey(a: string, b: string): string {
+  return a < b ? `${a}::${b}` : `${b}::${a}`;
+}
+
 // Section type colors (defaults)
 export const SECTION_COLORS: Record<string, string> = {
   engine: '#d13438',

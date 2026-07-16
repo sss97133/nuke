@@ -60,8 +60,12 @@ async function fetchVehicleImages(vehicleId: string): Promise<VehicleImage[]> {
     .not('is_document', 'is', true)
     // Quarantine/duplicate rows should never appear in standard galleries
     .or('is_duplicate.is.null,is_duplicate.eq.false')
+    // Superseded rows are prior versions of reattributed images — never display
+    .not('is_superseded', 'is', true)
     // Hide AI-detected mismatched/unrelated images
     .or('image_vehicle_match_status.is.null,image_vehicle_match_status.not.in.("mismatch","unrelated")')
+    // Hide gate-rejected (wrong-vehicle / personal) images
+    .or('vision_gate_status.is.null,vision_gate_status.not.in.("rejected_personal","rejected_misattributed")')
     .order('is_primary', { ascending: false })
     .order('created_at', { ascending: false });
     // NO LIMIT - show ALL images from all sources
@@ -136,8 +140,10 @@ export const useVehiclesWithImages = () => {
     setError(null);
 
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      const userId = auth?.user?.id || null;
+      // Use getSession() instead of getUser() to avoid Web Locks API contention
+      // on sb-*-auth-token (cause of 2026-05-24 garage hang). See lib/supabase.ts.
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id || null;
       if (!userId) {
         setVehicles([]);
         return;

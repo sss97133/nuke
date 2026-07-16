@@ -1,0 +1,425 @@
+[
+  {
+    "order": 0,
+    "image_id": "f27bdeed-2446-45d7-bee0-7ddfff54fe33",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/000_f27bdeed.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Paperwork: California DMV Application for Transfer by New Owner (REG 227). Title transfer/release form. Acquisition-context evidence for 06d4 C10.",
+    "paperwork": "ca_dmv_transfer_application_reg227"
+  },
+  {
+    "order": 1,
+    "image_id": "dee4784f-1467-41aa-a530-5b1413e7292b",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/001_dee4784f.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Paperwork: California Certificate of Title (commercial). Year 1980, make CHEV, body 0238/PK, partial VIN visible (CCZ14AZ11W751-style sequence), title number CA217895371. Issued 03/20/23. Owner CLAYTON GEORGE, SAUGUS CA. Authentic acquisition document for 1980 C10.",
+    "paperwork": "ca_certificate_of_title_1980_chev"
+  },
+  {
+    "order": 2,
+    "image_id": "87b2fa84-dc1b-4603-8f19-317d106063a7",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/002_87b2fa84.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Door-jamb GVWR/tire pressure decal (GM Federal Motor Vehicle Safety Standards sticker) visible on copper/cream C10 with desert backdrop. Authentic 06d4 vehicle.",
+    "paperwork": "door_jamb_gvwr_tire_decal"
+  },
+  {
+    "order": 3,
+    "image_id": "37df488d-a0fc-4374-8ea0-44736de643bc",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/003_37df488d.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Bed shot of copper-painted square-body C10 fleetside box, clean black bedliner/spray-on, wheel well intrusion. Matches 06d4 paint/trim.",
+    "paperwork": null
+  },
+  {
+    "order": 4,
+    "image_id": "ba6834ec-ab67-47e0-b0db-7dc2f2240805",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/004_ba6834ec.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Second bed/box shot from over tailgate, copper paint with chrome bed rails. Same 06d4 1980 C10.",
+    "paperwork": null
+  },
+  {
+    "order": 5,
+    "image_id": "0cd226fe-03d4-4add-bb9b-c9b195ad98ba",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/005_0cd226fe.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Glovebox open showing original owner's manual paperwork including 'IMPORTANT INFORMATION ON VEHICLE LOADING' tire-loading label-page. Copper interior matches 06d4. Owner documentation context.",
+    "paperwork": "original_owners_manual_loading_info"
+  },
+  {
+    "order": 6,
+    "image_id": "e60ca68b-1dc2-4437-9065-b747109894e6",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/006_e60ca68b.jpg",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Interior shot rotated 180 degrees showing copper exterior, tan cloth, square-body dash and spare tire on bedside. Authentic 06d4 C10 — image is upside down but content matches.",
+    "paperwork": null
+  },
+  {
+    "order": 10,
+    "image_id": "1e8eb4ed-bba1-4912-9ded-14c4f40696ed",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/010_1e8eb4ed.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Interior dash shot (rotated 180) — square-body GM dash with auxiliary gauge pod, copper trim, tan vinyl. Matches 06d4.",
+    "paperwork": null
+  },
+  {
+    "order": 11,
+    "image_id": "64195a63-7ff9-498e-bf80-75698a930bde",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/011_64195a63.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Driver door open (rotated 180) showing copper exterior, tan interior, Silverado door panel, square-body dash. Matches 06d4.",
+    "paperwork": null
+  },
+  {
+    "order": 12,
+    "image_id": "f68603b1-9f2c-4f54-be91-824d5b8bc62d",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/012_f68603b1.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Hero front 3/4 of 1980 C10 Silverado: copper/cream two-tone, stacked rectangular dual headlights with 1980-only crosshatch grille, 2WD stance, chrome bumper, California plate 1T68144. Canonical 06d4 vehicle.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 13,
+    "image_id": "95579660-ecb9-4393-886b-dbfd3450cb92",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/013_95579660.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 driver-side of 1980 C10 with CB whip antenna, CA plate 1T68144. 2WD square-body. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 14,
+    "image_id": "e232c78f-4bda-4bb6-acb9-fdedd6f03de9",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/014_e232c78f.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 of 1980 C10, CA plate 1T68144 visible. Canonical 06d4 vehicle.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 15,
+    "image_id": "17ccb87c-066b-4c9e-9ad9-3548c47b530a",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/015_17ccb87c.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 of 1980 C10 with mountain backdrop, CA plate 1T68144. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 16,
+    "image_id": "e5440c5c-a0b3-472e-99a9-114f9aef73a2",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/016_e5440c5c.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 passenger-side of 1980 C10, CA plate 1T68144. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 17,
+    "image_id": "a851ad68-a2fa-4fb0-98b1-9dac82470302",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/017_a851ad68.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 passenger-side of 1980 C10. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 18,
+    "image_id": "02f020f4-de08-409f-a827-98344bbeb311",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/018_02f020f4.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Passenger-side profile, tail of 1980 C10 Silverado long-bed fleetside, two-tone copper/cream.",
+    "paperwork": null
+  },
+  {
+    "order": 19,
+    "image_id": "d3bea9ea-29ec-4cf0-8e34-4bd897009c56",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/019_d3bea9ea.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Rear 3/4 of 1980 C10 showing CHEVROLET tailgate badge, CA plate 1T68144, two-tone paint. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 20,
+    "image_id": "654b8402-8e36-49c4-96e6-ee91c5ab3928",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/020_654b8402.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Driver-side profile of 1980 C10 with CB antenna mast, CA plate visible on front bumper. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 21,
+    "image_id": "76712b16-5cf5-4080-af8c-b360a63dd021",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/021_76712b16.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 of 1980 C10, CA plate 1T68144 visible. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 22,
+    "image_id": "312363d8-0c8f-4509-a9ca-c66ce6e28937",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/022_312363d8.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Passenger-side bedside close-up showing two-tone trim and fender flare; copper/cream paint matches 06d4.",
+    "paperwork": null
+  },
+  {
+    "order": 23,
+    "image_id": "049627b3-9ccb-454c-a9e1-e00e8555af2e",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/023_049627b3.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Passenger door close-up showing 'Silverado' badge on fender. Confirms Silverado trim on 06d4 C10.",
+    "paperwork": "silverado_fender_badge"
+  },
+  {
+    "order": 24,
+    "image_id": "4d4b82ad-4d00-4bcc-9462-a900504bac64",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/024_4d4b82ad.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Passenger fender close-up showing 'Silverado 10' badge with marker-light below — confirms C10 Silverado trim. Same 06d4.",
+    "paperwork": "silverado_10_fender_badge"
+  },
+  {
+    "order": 25,
+    "image_id": "353c67f4-f38e-4e57-98f3-52d94e517ef8",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/025_353c67f4.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Grille/headlight/front-bumper close-up of 1980 C10 with red bowtie and CA plate 1T68144. Crosshatch grille pattern unique to 1980.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 26,
+    "image_id": "4a8dd165-7f6e-4dfe-aa89-c5bbb1f4d850",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/026_4a8dd165.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 driver-side of 1980 C10, CA plate 1T68144. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 27,
+    "image_id": "a5e685a3-ccc3-45f0-a371-ab54b0ac24f3",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/027_a5e685a3.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Dead-front of 1980 C10 head-on, CA plate 1T68144 centered on bumper. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 28,
+    "image_id": "a88fd7dd-505b-467c-b6e2-9c00f92e4f3a",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/028_a88fd7dd.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Front 3/4 of 1980 C10 in rocky desert lot. Same 06d4.",
+    "paperwork": null
+  },
+  {
+    "order": 29,
+    "image_id": "ccf3fa92-59a1-44b9-876b-804cbbe26ad7",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/029_ccf3fa92.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Driver-side full profile of 1980 C10 long-bed Silverado. Same 06d4.",
+    "paperwork": null
+  },
+  {
+    "order": 30,
+    "image_id": "fd4c8020-797b-44de-8ef0-834f9f4e08f0",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/030_fd4c8020.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Rear 3/4 driver-side of 1980 C10, CHEVROLET tailgate badge, CA plate 1T68144 with January 2026 tag. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144_jan_2026_tag"
+  },
+  {
+    "order": 31,
+    "image_id": "7d39d34a-c5d3-4f64-bef9-26dc2b88b342",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/031_7d39d34a.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Dead-rear of 1980 C10, CA plate 1T68144 with January 2026 reg sticker. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144_jan_2026_tag"
+  },
+  {
+    "order": 32,
+    "image_id": "5f0cbc60-b838-4aed-a239-205fe07d6d8f",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/032_5f0cbc60.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Rear 3/4 passenger-side of 1980 C10 long-bed. Same 06d4.",
+    "paperwork": null
+  },
+  {
+    "order": 33,
+    "image_id": "9bf77f50-50bb-4fea-bb2e-99b3f11caa95",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/033_9bf77f50.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Passenger-side profile of 1980 C10 long-bed Silverado. Same 06d4.",
+    "paperwork": null
+  },
+  {
+    "order": 34,
+    "image_id": "22f50723-5f46-4be6-90da-522fc0db4beb",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/034_22f50723.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 driver-side, CA plate 1T68144 visible. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 35,
+    "image_id": "4e061334-a644-4901-810f-3aba444170d5",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/035_4e061334.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 driver-side of 1980 C10, CA plate 1T68144. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 36,
+    "image_id": "9ec0f723-d4b2-42b0-93b5-50fc89a0b0ce",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/036_9ec0f723.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Close-up of driver-side headlight, grille and red bowtie; CA plate 1T68144 partially visible. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 37,
+    "image_id": "4d94786c-8f2b-4d50-9b7f-d793e867a9c4",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/037_4d94786c.jpg",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Close-up of passenger-side grille corner and headlight assembly with partial CA plate. Same 06d4.",
+    "paperwork": "license_plate_ca_partial"
+  },
+  {
+    "order": 38,
+    "image_id": "7dd2bf75-2f32-4580-93b7-9cf1d2b72b91",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/038_7dd2bf75.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front grille close-up of 1980 C10, red bowtie, CA plate 1T68144 centered. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 39,
+    "image_id": "52600dc5-d67a-4e30-a46d-aab058c542f1",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/039_52600dc5.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Passenger front fender close-up showing 'Silverado 10' badge with diesel/badge insert and marker-light. Confirms C10 Silverado trim, same 06d4.",
+    "paperwork": "silverado_10_fender_badge"
+  },
+  {
+    "order": 40,
+    "image_id": "ee9fd3bf-0b7a-4ca6-a52d-68ceac37543e",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/040_ee9fd3bf.jpg",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Driver-side door/fender close-up showing 'Silverado 10' badge with diesel-style insert. Confirms 06d4 trim.",
+    "paperwork": "silverado_10_fender_badge"
+  },
+  {
+    "order": 41,
+    "image_id": "fcd790ce-1c3b-484b-b206-5d28c59ef8bd",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/041_fcd790ce.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Passenger-side rear bed close-up of two-tone copper/cream long-bed fleetside. Same 06d4.",
+    "paperwork": null
+  },
+  {
+    "order": 42,
+    "image_id": "c203df8c-c37c-47d4-9f0d-70a1b3d5a27d",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/042_c203df8c.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Rear 3/4 driver-side of 1980 C10, CA plate 1T68144 (partial). Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144_partial"
+  },
+  {
+    "order": 43,
+    "image_id": "26840835-48ae-4384-8e49-a4edf3c86cee",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/043_26840835.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Dead-rear of 1980 C10, CHEVROLET tailgate badge, CA plate 1T68144 with January 2026 reg tag. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144_jan_2026_tag"
+  },
+  {
+    "order": 44,
+    "image_id": "f08c51c9-d859-4d06-a555-87d1f240d86a",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/044_f08c51c9.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Rear 3/4 driver-side of 1980 C10 with mountain backdrop, CA plate 1T68144. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 45,
+    "image_id": "13f03f52-a972-4733-8e48-a188d46bd710",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/045_13f03f52.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 passenger-side of 1980 C10, CA plate 1T68144. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 46,
+    "image_id": "86b23ccb-2b8b-4930-a83d-47631ba8a562",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/046_86b23ccb.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Dead-front of 1980 C10, CA plate 1T68144. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 47,
+    "image_id": "49a4238e-a11c-4956-84e2-39b004fd551a",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/047_49a4238e.jpg",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Front 3/4 driver-side of 1980 C10, CA plate visible. Same 06d4.",
+    "paperwork": "license_plate_ca_1T68144"
+  },
+  {
+    "order": 48,
+    "image_id": "d6e2c3a1-c23a-4357-9ee2-ed4f0855fa21",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/048_d6e2c3a1.jpg",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Behind-seat storage area of square-body cab with seat tipped forward showing socket set and parts box on cab floor; copper paint visible on inner door. Authentic 06d4 truck-bed/cab detail. Receipt/barcode tag visible on parts but small.",
+    "paperwork": "parts_box_with_receipt_tag"
+  },
+  {
+    "order": 49,
+    "image_id": "1585b2c8-8857-49b1-95a0-97b2642780f9",
+    "path": "/Users/skylar/nuke/.context/06d4_01_vision_gate/049_1585b2c8.jpg",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Interior headliner shot of square-body C10 with tan headliner, visor pad, dome light. Copper paint visible on door frame. Same 06d4.",
+    "paperwork": null
+  }
+]
