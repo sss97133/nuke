@@ -1,0 +1,344 @@
+/* DailyWorkOrder — screen preview + print rules */
+
+.dwo-page {
+  background: #e8e8e8;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 0;
+}
+
+.dwo-paper {
+  width: 816px;   /* 8.5in at 96dpi */
+  min-height: 1056px; /* 11in at 96dpi */
+  background: #fff;
+  color: #111;
+  padding: 60px;
+  box-sizing: border-box;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* ── Action bar ── */
+
+.dwo-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  justify-content: center;
+}
+
+.dwo-actions button {
+  font-family: Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 6px 16px;
+  border: 2px solid #111;
+  background: #fff;
+  color: #111;
+  cursor: pointer;
+}
+
+.dwo-actions button:hover {
+  background: #111;
+  color: #fff;
+}
+
+.dwo-actions a {
+  font-family: Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 6px 16px;
+  border: 2px solid #888;
+  background: #fff;
+  color: #888;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+}
+
+.dwo-actions a:hover {
+  border-color: #111;
+  color: #111;
+}
+
+/* ── Section labels ── */
+
+.dwo-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+  margin: 0 0 4px 0;
+}
+
+/* ── Borders ── */
+
+.dwo-divider {
+  border: none;
+  border-top: 2px solid #111;
+  margin: 12px 0;
+}
+
+.dwo-divider-light {
+  border: none;
+  border-top: 1px solid #ccc;
+  margin: 8px 0;
+}
+
+/* ── Header ── */
+
+.dwo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+
+.dwo-title {
+  font-size: 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0;
+}
+
+.dwo-date {
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  text-align: right;
+}
+
+.dwo-shop {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dwo-shop-name {
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* ── Info grid (vehicle + customer) ── */
+
+.dwo-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+}
+
+.dwo-info-col h3 {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+  margin: 0 0 4px 0;
+}
+
+.dwo-info-col p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.dwo-vin {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+/* ── Work description ── */
+
+.dwo-work-desc {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Photo grid ── */
+
+.dwo-photos {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.dwo-photos img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+/* ── Tables ── */
+
+.dwo-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.dwo-table th {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+  text-align: left;
+  padding: 0 0 4px 0;
+  border-bottom: 1px solid #ccc;
+}
+
+.dwo-table th:last-child,
+.dwo-table td.dwo-num {
+  text-align: right;
+}
+
+.dwo-table td {
+  padding: 4px 0;
+  vertical-align: top;
+  border-bottom: 1px solid #eee;
+}
+
+.dwo-table td.dwo-num {
+  font-family: 'Courier New', monospace;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.dwo-table tr.dwo-comped {
+  opacity: 0.5;
+}
+
+.dwo-comped-badge {
+  display: inline-block;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  border: 1px solid #888;
+  color: #888;
+  padding: 0 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.dwo-table-subtotal {
+  font-weight: 700;
+  text-align: right;
+  padding-top: 6px;
+  font-size: 12px;
+}
+
+/* ── Totals block ── */
+
+.dwo-totals {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+}
+
+.dwo-totals-row {
+  display: flex;
+  gap: 24px;
+  justify-content: flex-end;
+  min-width: 200px;
+}
+
+.dwo-totals-row span:first-child {
+  font-family: Arial, sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+  text-align: left;
+  flex: 1;
+}
+
+.dwo-totals-row span:last-child {
+  text-align: right;
+  font-weight: 700;
+}
+
+.dwo-total-grand {
+  border-top: 2px solid #111;
+  padding-top: 4px;
+  margin-top: 4px;
+}
+
+/* ── Footer ── */
+
+.dwo-footer {
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  color: #888;
+  text-align: center;
+  margin-top: 12px;
+}
+
+/* ── Loading ── */
+
+.dwo-loading {
+  text-align: center;
+  padding: 80px 0;
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+}
+
+/* ══════════════════════════════════════════════════════
+   PRINT
+   ══════════════════════════════════════════════════════ */
+
+@media print {
+  @page {
+    size: letter portrait;
+    margin: 20mm;
+  }
+
+  html, body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .dwo-page {
+    background: white;
+    padding: 0;
+    min-height: auto;
+  }
+
+  .dwo-paper {
+    width: auto;
+    min-height: auto;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .dwo-photos img {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
