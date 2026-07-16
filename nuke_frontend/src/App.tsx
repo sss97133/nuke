@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -35,6 +35,10 @@ const LazyFallback = <div style={{ height: '100vh', background: 'var(--bg)' }} /
  */
 function HomeGate() {
   const { user, loading } = useAuth();
+  // Legacy links use /?tab=map, but no such tab exists — the org map is /map
+  if (new URLSearchParams(window.location.search).get('tab') === 'map') {
+    return <Navigate to="/map" replace />;
+  }
   if (loading) return LazyFallback;
   if (!user) return <Suspense fallback={LazyFallback}><LandingPage /></Suspense>;
   return (
