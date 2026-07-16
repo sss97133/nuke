@@ -20,7 +20,9 @@ export default function Editable({
     if (!canEdit) return;
     e.stopPropagation();
     e.preventDefault();
-    const plainText = html ? value.replace(/<[^>]*>/g, '') : value;
+    const plainText = html
+      ? (new DOMParser().parseFromString(value, 'text/html').body.textContent ?? '')
+      : value;
     const newVal = window.prompt('Edit:', plainText);
     if (newVal !== null && newVal !== plainText) {
       onSave(newVal);
