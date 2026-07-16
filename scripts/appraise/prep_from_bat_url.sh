@@ -15,11 +15,12 @@ OUT_BASE="${2:-/tmp/eye_reads}"
 [[ "$URL" == *"bringatrailer.com/listing/"* ]] || { echo "not a BaT listing URL"; exit 1; }
 
 echo "== import: $URL"
-RESP=$(dotenvx run -- bash -c "curl -sS --max-time 200 -X POST \
-  \"\$VITE_SUPABASE_URL/functions/v1/complete-bat-import\" \
-  -H \"Authorization: Bearer \$SUPABASE_SERVICE_ROLE_KEY\" \
-  -H 'Content-Type: application/json' -d '{\"bat_url\":\"$URL\"}'")
-VID=$(echo "$RESP" | python3 -c "import sys,json;print(json.load(sys.stdin).get('vehicle_id',''))")
+# URL is exported into the child env so the single-quoted body expands
+# $VITE_SUPABASE_URL / $SUPABASE_SERVICE_ROLE_KEY / $URL all INSIDE dotenvx.
+# Body is one line: backslash-newline is literal inside single quotes.
+RESP=$(URL="$URL" dotenvx run -- bash -c 'curl -sS --max-time 200 -X POST "$VITE_SUPABASE_URL/functions/v1/complete-bat-import" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"bat_url\":\"$URL\"}"' 2>/dev/null)
+# strip any dotenvx banner: pull the JSON object out of RESP before parsing
+VID=$(echo "$RESP" | python3 -c "import sys,json,re;s=sys.stdin.read();m=re.search(r'\{.*\}',s,re.S);print(json.loads(m.group(0)).get('vehicle_id','') if m else '')")
 [[ -n "$VID" ]] || { echo "import failed: $RESP"; exit 1; }
 echo "== vehicle_id: $VID"
 
