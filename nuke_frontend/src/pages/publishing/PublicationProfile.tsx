@@ -104,16 +104,20 @@ export default function PublicationProfile() {
     async function load() {
       setLoading(true);
 
-      const [pubRes, credRes] = await Promise.all([
-        supabase
-          .from('publications')
-          .select('*')
-          .eq('publisher_slug', slug)
-          .order('publication_date', { ascending: false }),
-        supabase
-          .from('nuke_production_credits')
-          .select('person_name, role, confidence'),
-      ]);
+      const pubRes = await supabase
+        .from('publications')
+        .select('*')
+        .eq('publisher_slug', slug)
+        .order('publication_date', { ascending: false });
+
+      // Scope credits to this publication's rows (credits carry publication_id)
+      const pubIds = (pubRes.data ?? []).map((p: { id: string }) => p.id);
+      const credRes = pubIds.length > 0
+        ? await supabase
+            .from('nuke_production_credits')
+            .select('person_name, role, confidence')
+            .in('publication_id', pubIds)
+        : { data: [] };
 
       if (cancelled) return;
       setIssues((pubRes.data ?? []) as PubRow[]);

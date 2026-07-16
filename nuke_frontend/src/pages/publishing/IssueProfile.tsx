@@ -66,12 +66,32 @@ export default function IssueProfile() {
     setPublication(pub as Publication);
 
     // Step 2: get the issue
-    const { data: issueData } = await supabase
+    let { data: issueData } = await supabase
       .from('publication_issues')
       .select('*')
       .eq('publication_id', pub.id)
       .eq('issue_number', issueNumber)
       .single();
+
+    // Fallback: issues are keyed to ONE canonical publications row per
+    // publisher_slug, but navigation may arrive via any sibling row's slug.
+    if (!issueData && pub.publisher_slug) {
+      const { data: siblings } = await supabase
+        .from('publications')
+        .select('id')
+        .eq('publisher_slug', pub.publisher_slug);
+      const siblingIds = (siblings || []).map((s: { id: string }) => s.id);
+      if (siblingIds.length > 0) {
+        const { data: fallbackIssue } = await supabase
+          .from('publication_issues')
+          .select('*')
+          .in('publication_id', siblingIds)
+          .eq('issue_number', issueNumber)
+          .limit(1)
+          .maybeSingle();
+        issueData = fallbackIssue;
+      }
+    }
 
     if (!issueData) {
       setLoading(false);
