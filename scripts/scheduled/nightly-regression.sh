@@ -71,24 +71,28 @@ echo ""
 # 3. Pipeline Flow (7 days)
 echo "### Pipeline Flow (last 7 days)"
 NEW_VEHICLES=$(run_sql "SELECT count(*) FROM vehicles WHERE created_at > now() - interval '7 days';")
-COMPLETED_EXTRACTIONS=$(run_sql "SELECT count(*) FROM import_queue WHERE status = 'complete' AND updated_at > now() - interval '7 days';")
+# Extraction completions come from bat_extraction_queue (the LIVE artery), NOT import_queue.
+# import_queue is the retired path — its worker cron (bat-import-queue-worker) is disabled, so it
+# completes ~0/7d and made this line a permanent false alarm (2026-07-15). The active BaT pipeline
+# (bat-extraction-queue-slow + sync-live-auctions) works bat_extraction_queue directly.
+COMPLETED_EXTRACTIONS=$(run_sql "SELECT count(*) FROM bat_extraction_queue WHERE status = 'complete' AND updated_at > now() - interval '7 days';")
 
 echo "- New vehicles: ${NEW_VEHICLES:-N/A}"
-echo "- Completed extractions: ${COMPLETED_EXTRACTIONS:-N/A}"
+echo "- Completed extractions (bat_extraction_queue): ${COMPLETED_EXTRACTIONS:-N/A}"
 if [ "${NEW_VEHICLES:-0}" = "0" ] 2>/dev/null; then
   echo "- **WARNING**: No new vehicles in 7 days!"
   ISSUES=$((ISSUES+1))
 fi
 echo ""
 
-# 4. Recent Error Rate
-echo "### Import Queue (last 7d)"
+# 4. Recent Error Rate — the LIVE extraction artery (bat_extraction_queue), not the retired import_queue
+echo "### Extraction Queue (bat_extraction_queue, last 7d)"
 QUEUE_7D=$(psql $PGARGS -c "
 SELECT json_build_object(
   'complete', count(*) FILTER (WHERE status = 'complete'),
   'failed', count(*) FILTER (WHERE status = 'failed'),
   'skipped', count(*) FILTER (WHERE status = 'skipped')
-) FROM import_queue WHERE updated_at > now() - interval '7 days';
+) FROM bat_extraction_queue WHERE updated_at > now() - interval '7 days';
 " 2>/dev/null | tr -d ' ')
 
 if [ -n "$QUEUE_7D" ] && echo "$QUEUE_7D" | jq . >/dev/null 2>&1; then
