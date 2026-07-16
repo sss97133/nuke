@@ -17,6 +17,7 @@ import React, { useState } from 'react';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
 import { freshnessOf, agoLabel } from './valueFreshness';
 import { useEyeLedger, type CanonCheck } from './hooks/useEyeLedger';
+import { normalizePoints, normalizeStrings, normalizeIiv, normalizeFlipPlan } from './hooks/eyeShape';
 
 interface EyeReadHeader {
   band: [number, number] | null;
@@ -175,10 +176,11 @@ const EyeLedgerPopup: React.FC<EyeLedgerPopupProps> = ({ vehicleId, eyeRead, pri
   const band = eyeRead.band;
   const readFresh = freshnessOf(eyeRead.computedAt);
   const bandUsd = payload?.band_usd;
-  const iiv = payload?.if_it_verifies;
-  const wwctn: string[] = Array.isArray(payload?.what_would_change_the_number) ? payload.what_would_change_the_number : [];
-  const drivers: string[] = Array.isArray(payload?.top_value_drivers) ? payload.top_value_drivers : [];
-  const risks: string[] = Array.isArray(payload?.top_value_risks) ? payload.top_value_risks : [];
+  const iiv = normalizeIiv(payload?.if_it_verifies);
+  const wwctn = normalizeStrings(payload?.what_would_change_the_number);
+  const drivers = normalizePoints(payload?.top_value_drivers, 'driver');
+  const risks = normalizePoints(payload?.top_value_risks, 'risk');
+  const flipPlan = normalizeFlipPlan(payload?.flip_plan);
   const grades = payload?.system_grades || null;
 
   if (!loaded) {
@@ -275,13 +277,13 @@ const EyeLedgerPopup: React.FC<EyeLedgerPopupProps> = ({ vehicleId, eyeRead, pri
           <div style={{ ...LABEL, color: 'var(--text, #000)', marginBottom: '3px' }}>
             If it verifies — separate scenario, never blended
           </div>
-          {iiv.band_usd?.low != null && (
+          {iiv.low != null && (
             <div style={{ ...MONO, fontWeight: 700, marginBottom: '3px' }}>
-              {fmtUsd(Number(iiv.band_usd.low))}–{fmtUsd(Number(iiv.band_usd.high))}
+              {fmtUsd(iiv.low)}–{fmtUsd(iiv.high ?? iiv.low)}
             </div>
           )}
           {iiv.note && <div style={{ ...BODY, marginBottom: '3px' }}>{iiv.note}</div>}
-          {Array.isArray(iiv.condition_precedent) && iiv.condition_precedent.map((p: string, i: number) => (
+          {iiv.precedents.map((p, i) => (
             <div key={i} style={{ ...MONO, fontSize: '8px', color: 'var(--text-secondary, #555)' }}>{i + 1}. {p}</div>
           ))}
         </div>
@@ -294,7 +296,7 @@ const EyeLedgerPopup: React.FC<EyeLedgerPopupProps> = ({ vehicleId, eyeRead, pri
             <div>
               <div style={{ ...LABEL, color: 'var(--text, #000)', marginBottom: '4px' }}>Value drivers</div>
               {drivers.map((d, i) => (
-                <div key={i} style={{ ...BODY, padding: '2px 0', borderBottom: '1px solid var(--border, #f0f0f0)' }}>{d}</div>
+                <div key={i} style={{ ...BODY, padding: '2px 0', borderBottom: '1px solid var(--border, #f0f0f0)' }}>{d.text}</div>
               ))}
             </div>
           )}
@@ -302,7 +304,7 @@ const EyeLedgerPopup: React.FC<EyeLedgerPopupProps> = ({ vehicleId, eyeRead, pri
             <div>
               <div style={{ ...LABEL, color: 'var(--text, #000)', marginBottom: '4px' }}>Value risks</div>
               {risks.map((r, i) => (
-                <div key={i} style={{ ...BODY, padding: '2px 0', borderBottom: '1px solid var(--border, #f0f0f0)' }}>{r}</div>
+                <div key={i} style={{ ...BODY, padding: '2px 0', borderBottom: '1px solid var(--border, #f0f0f0)' }}>{r.text}</div>
               ))}
             </div>
           )}
@@ -310,9 +312,13 @@ const EyeLedgerPopup: React.FC<EyeLedgerPopupProps> = ({ vehicleId, eyeRead, pri
       )}
 
       {/* FLIP PLAN */}
-      {typeof payload?.flip_plan === 'string' && payload.flip_plan && (
+      {flipPlan.length > 0 && (
         <Section label="Flip plan">
-          <div style={BODY}>{payload.flip_plan}</div>
+          {flipPlan.map((f, i) => (
+            <div key={i} style={BODY}>
+              {f.label && <span style={{ ...LABEL, color: 'var(--text-secondary, #666)', marginRight: '6px' }}>{f.label}</span>}{f.value}
+            </div>
+          ))}
         </Section>
       )}
 

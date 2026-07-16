@@ -21,6 +21,7 @@ import { supabase } from '../../lib/supabase';
 import { useEyeRead } from './hooks/useEyeRead';
 import { useEyeLedger, type CanonCheck } from './hooks/useEyeLedger';
 import { freshnessOf, agoLabel } from './valueFreshness';
+import { normalizePoints, normalizeStrings, normalizeIiv, normalizeFlipPlan } from './hooks/eyeShape';
 
 const SANS = 'Arial, sans-serif';
 const MONO = '"Courier New", monospace';
@@ -150,10 +151,11 @@ const EyeDossierPage: React.FC = () => {
   const readFresh = eyeRead ? freshnessOf(eyeRead.computedAt) : null;
   const price = vehicle && vehicle !== 'missing' ? vehicle.price : null;
   const bandUsd = payload?.band_usd;
-  const iiv = payload?.if_it_verifies;
-  const wwctn: string[] = Array.isArray(payload?.what_would_change_the_number) ? payload.what_would_change_the_number : [];
-  const drivers: string[] = Array.isArray(payload?.top_value_drivers) ? payload.top_value_drivers : [];
-  const risks: string[] = Array.isArray(payload?.top_value_risks) ? payload.top_value_risks : [];
+  const iiv = normalizeIiv(payload?.if_it_verifies);
+  const wwctn = normalizeStrings(payload?.what_would_change_the_number);
+  const drivers = normalizePoints(payload?.top_value_drivers, 'driver');
+  const risks = normalizePoints(payload?.top_value_risks, 'risk');
+  const flipPlan = normalizeFlipPlan(payload?.flip_plan);
   const grades = payload?.system_grades || null;
 
   const notReady = loaded && !eyeRead && totalChecks === 0;
@@ -261,13 +263,13 @@ const EyeDossierPage: React.FC = () => {
 
             {iiv && (
               <Section label="If it verifies — separate scenario, never blended">
-                {iiv.band_usd?.low != null && (
+                {iiv.low != null && (
                   <div style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
-                    {fmtUsd(Number(iiv.band_usd.low))}–{fmtUsd(Number(iiv.band_usd.high))}
+                    {fmtUsd(iiv.low)}–{fmtUsd(iiv.high ?? iiv.low)}
                   </div>
                 )}
                 {iiv.note && <div style={{ ...BODY, marginBottom: 4 }}>{iiv.note}</div>}
-                {Array.isArray(iiv.condition_precedent) && iiv.condition_precedent.map((p: string, i: number) => (
+                {iiv.precedents.map((p, i) => (
                   <div key={i} style={{ fontFamily: MONO, fontSize: 9, color: '#555' }}>{i + 1}. {p}</div>
                 ))}
               </Section>
@@ -278,21 +280,25 @@ const EyeDossierPage: React.FC = () => {
                 {drivers.length > 0 && (
                   <div>
                     <div style={{ ...LABEL, color: '#111', marginBottom: 5 }}>Value drivers</div>
-                    {drivers.map((d, i) => <div key={i} style={{ ...BODY, fontSize: 10, padding: '3px 0', borderBottom: '1px solid #f0f0f0' }}>{d}</div>)}
+                    {drivers.map((d, i) => <div key={i} style={{ ...BODY, fontSize: 10, padding: '3px 0', borderBottom: '1px solid #f0f0f0' }}>{d.text}</div>)}
                   </div>
                 )}
                 {risks.length > 0 && (
                   <div>
                     <div style={{ ...LABEL, color: '#111', marginBottom: 5 }}>Value risks</div>
-                    {risks.map((r, i) => <div key={i} style={{ ...BODY, fontSize: 10, padding: '3px 0', borderBottom: '1px solid #f0f0f0' }}>{r}</div>)}
+                    {risks.map((r, i) => <div key={i} style={{ ...BODY, fontSize: 10, padding: '3px 0', borderBottom: '1px solid #f0f0f0' }}>{r.text}</div>)}
                   </div>
                 )}
               </div>
             )}
 
-            {typeof payload?.flip_plan === 'string' && payload.flip_plan && (
+            {flipPlan.length > 0 && (
               <Section label="Flip plan">
-                <div style={BODY}>{payload.flip_plan}</div>
+                {flipPlan.map((f, i) => (
+                  <div key={i} style={{ ...BODY, padding: '2px 0' }}>
+                    {f.label && <span style={{ ...LABEL, color: '#666', marginRight: 6 }}>{f.label}</span>}{f.value}
+                  </div>
+                ))}
               </Section>
             )}
 
