@@ -253,7 +253,9 @@
     "day:synthesize": "dotenvx run -- node scripts/daily-receipt/synthesize-day.mjs",
     "day:classify": "dotenvx run -- node scripts/daily-receipt/classify-unfiled-day.mjs",
     "ops:schema-census": "dotenvx run -- node scripts/schema-pressure-census.mjs",
-    "ledger:facts": "node scripts/ledger/refresh-facts.mjs"
+    "ledger:facts": "node scripts/ledger/refresh-facts.mjs",
+    "appraise:prep": "bash scripts/appraise/prep_from_bat_url.sh",
+    "appraise:land": "dotenvx run -- node scripts/appraise/land_read.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.62",
