@@ -27,6 +27,14 @@ interface BrandDesignLanguage {
   logos?: { svg?: string; primary_dark?: string; primary_light?: string };
 }
 
+interface PubFeature {
+  org_name_printed: string | null;
+  printed_page: number | null;
+  page: number | null;
+  category: string | null;
+  feature_kind: string | null;
+}
+
 interface OrgData {
   id: string;
   name: string | null;
@@ -44,6 +52,7 @@ interface OrgData {
 
 export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
   const [org, setOrg] = useState<OrgData | null>(null);
+  const [features, setFeatures] = useState<PubFeature[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -72,8 +81,20 @@ export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
         if (!cancelled && vehs) vehicles = vehs as OrgVehicle[];
       }
 
+      // Guest Book advertiser graph — the view may not exist yet; treat errors as empty
+      let feats: PubFeature[] = [];
+      if (o) {
+        const { data: featData, error: featErr } = await supabase
+          .from('publication_features_public')
+          .select('org_name_printed, printed_page, page, category, feature_kind')
+          .eq('org_id', o.id)
+          .order('page', { ascending: true });
+        if (!featErr && featData) feats = featData as PubFeature[];
+      }
+
       if (!cancelled && o) {
         setOrg({ ...o, vehicles } as OrgData);
+        setFeatures(feats);
       }
       setLoading(false);
     }
@@ -286,6 +307,49 @@ export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
               })}
             </div>
           </>
+        )}
+
+        {/* Guest Book advertiser graph — only render when rows exist (no empty shells) */}
+        {features.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase' as const, color: 'var(--text-secondary)', letterSpacing: '1px', marginBottom: 6 }}>
+              FEATURED IN — SAINT BARTH GUEST BOOK 2024
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {features.map((f, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
+                    padding: '4px 6px', border: '1px solid var(--border)',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
+                      {f.org_name_printed || org.name}
+                    </div>
+                    {f.category && (
+                      <div style={{ fontSize: 7, textTransform: 'uppercase' as const, color: 'var(--text-disabled)', letterSpacing: '0.3px' }}>
+                        {f.category}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                    {f.feature_kind && (
+                      <span style={{ fontSize: 7, textTransform: 'uppercase' as const, border: '1px solid var(--border)', padding: '1px 4px', color: 'var(--text-secondary)', letterSpacing: '0.3px' }}>
+                        {f.feature_kind}
+                      </span>
+                    )}
+                    {(f.printed_page ?? f.page) != null && (
+                      <span style={{ fontSize: 9, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)' }}>
+                        p.{f.printed_page ?? f.page}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
