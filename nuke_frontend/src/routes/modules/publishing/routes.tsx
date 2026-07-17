@@ -8,12 +8,14 @@ const PublicationProfile = React.lazy(() => import('../../../pages/publishing/Pu
 const IssueProfile = React.lazy(() => import('../../../pages/publishing/IssueProfile'));
 const PersonProfile = React.lazy(() => import('../../../pages/publishing/PersonProfile'));
 const PeopleDirectory = React.lazy(() => import('../../../pages/publishing/PeopleDirectory'));
+const FinanceDashboard = React.lazy(() => import('../../../pages/publishing/FinanceDashboard'));
 
 const PublishingModuleRoutes = () => {
   return (
     <Suspense fallback={<div style={{ height: '100vh', background: 'var(--bg)' }} />}>
       <Routes>
         <Route path="/" element={<PublishingDashboard />} />
+        <Route path="/finance" element={<FinanceDashboard />} />
         <Route path="/:slug" element={<PublicationProfile />} />
         <Route path="/:slug/issue/:issueNumber" element={<IssueProfile />} />
         <Route path="/people" element={<PeopleDirectory />} />
