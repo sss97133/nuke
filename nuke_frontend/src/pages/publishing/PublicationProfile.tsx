@@ -10,6 +10,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import guestbookSnapshot from '../../data/guestbook2024-snapshot.json';
 
 interface PubRow {
   id: string;
@@ -32,6 +33,7 @@ interface CreditRow {
 }
 
 interface FeatureRow {
+  publication_id: string;
   org_id: string | null;
   org_name_printed: string | null;
   printed_page: number | null;
@@ -109,8 +111,6 @@ export default function PublicationProfile() {
   const navigate = useNavigate();
   const [issues, setIssues] = useState<PubRow[]>([]);
   const [credits, setCredits] = useState<CreditRow[]>([]);
-  const [features, setFeatures] = useState<FeatureRow[]>([]);
-  const [featureOrgs, setFeatureOrgs] = useState<Record<string, FeatureOrg>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -135,35 +135,9 @@ export default function PublicationProfile() {
             .in('publication_id', pubIds)
         : { data: [] };
 
-      // Advertiser graph (Guest Book) — the view may not exist yet; treat errors as empty
-      let featRows: FeatureRow[] = [];
-      const orgMap: Record<string, FeatureOrg> = {};
-      if (pubIds.length > 0) {
-        const featRes = await supabase
-          .from('publication_features_public')
-          .select('org_id, org_name_printed, printed_page, page, category, feature_kind')
-          .in('publication_id', pubIds)
-          .order('page', { ascending: true });
-        if (!featRes.error && featRes.data) {
-          featRows = featRes.data as FeatureRow[];
-          const orgIds = Array.from(new Set(featRows.map(f => f.org_id).filter((x): x is string => !!x)));
-          if (orgIds.length > 0) {
-            const orgRes = await supabase
-              .from('organizations')
-              .select('id, name, slug')
-              .in('id', orgIds);
-            for (const o of (orgRes.data ?? []) as { id: string; name: string | null; slug: string | null }[]) {
-              orgMap[o.id] = { name: o.name, slug: o.slug };
-            }
-          }
-        }
-      }
-
       if (cancelled) return;
       setIssues((pubRes.data ?? []) as PubRow[]);
       setCredits((credRes.data ?? []) as CreditRow[]);
-      setFeatures(featRows);
-      setFeatureOrgs(orgMap);
       setLoading(false);
     }
 
@@ -208,8 +182,13 @@ export default function PublicationProfile() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 20);
 
-  // Advertiser graph rows (paid placements only — editorial/menu/listing kinds excluded)
-  const adRows = features.filter(f => f.feature_kind === 'ad');
+  // Advertiser graph — bundled snapshot (fixed annual publication; paid placements only,
+  // editorial/menu/listing kinds excluded). Org names/slugs come from snapshot.orgs.
+  const issueIds = new Set(issues.map(i => i.id));
+  const adRows = (guestbookSnapshot.features as FeatureRow[])
+    .filter(f => issueIds.has(f.publication_id) && f.feature_kind === 'ad')
+    .sort((a, b) => (a.page ?? 0) - (b.page ?? 0));
+  const featureOrgs = guestbookSnapshot.orgs as Record<string, FeatureOrg>;
 
   return (
     <div style={S.container}>

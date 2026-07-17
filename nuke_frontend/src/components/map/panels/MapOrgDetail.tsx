@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import MiniLineChart from '../../charts/MiniLineChart';
 import { optimizeImageUrl } from '../../../lib/imageOptimizer';
+import guestbookSnapshot from '../../../data/guestbook2024-snapshot.json';
 
 const MAP_FONT = 'Arial, Helvetica, sans-serif';
 
@@ -28,6 +29,7 @@ interface BrandDesignLanguage {
 }
 
 interface PubFeature {
+  org_id: string | null;
   org_name_printed: string | null;
   printed_page: number | null;
   page: number | null;
@@ -52,7 +54,6 @@ interface OrgData {
 
 export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
   const [org, setOrg] = useState<OrgData | null>(null);
-  const [features, setFeatures] = useState<PubFeature[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -81,20 +82,8 @@ export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
         if (!cancelled && vehs) vehicles = vehs as OrgVehicle[];
       }
 
-      // Guest Book advertiser graph — the view may not exist yet; treat errors as empty
-      let feats: PubFeature[] = [];
-      if (o) {
-        const { data: featData, error: featErr } = await supabase
-          .from('publication_features_public')
-          .select('org_name_printed, printed_page, page, category, feature_kind')
-          .eq('org_id', o.id)
-          .order('page', { ascending: true });
-        if (!featErr && featData) feats = featData as PubFeature[];
-      }
-
       if (!cancelled && o) {
         setOrg({ ...o, vehicles } as OrgData);
-        setFeatures(feats);
       }
       setLoading(false);
     }
@@ -119,6 +108,11 @@ export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
       </div>
     );
   }
+
+  // Guest Book advertiser graph — bundled snapshot (fixed annual publication; no live view)
+  const features = (guestbookSnapshot.features as PubFeature[])
+    .filter(f => f.org_id === org.id)
+    .sort((a, b) => (a.page ?? 0) - (b.page ?? 0));
 
   const location = [org.city, org.state, org.country].filter(Boolean).join(', ');
   const soldCount = org.vehicles.filter(v => v.status === 'sold').length;

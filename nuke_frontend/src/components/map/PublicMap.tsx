@@ -39,6 +39,15 @@ function hexToRgbStr(hex: string | null): string {
   return `rgb(${parseInt(m[0], 16)},${parseInt(m[1], 16)},${parseInt(m[2], 16)})`;
 }
 
+// Category fallback colors (annuaire super_category + business_type) — used only
+// when the org has no brand color of its own.
+function categoryColor(businessType: string | null, superCategory: string | null): string | null {
+  if (superCategory === 'boutiques') return '#111';
+  if (superCategory === 'tourisme' || businessType === 'hotel') return '#c00';
+  if (superCategory === 'restaurants-soiree') return '#06c';
+  return null;
+}
+
 // ── Detail Panel ─────────────────────────────────────────────
 
 function OrgDetailPanel({ orgId, slug, onClose }: { orgId: string; slug: string; onClose: () => void }) {
@@ -272,7 +281,7 @@ export default function PublicMap() {
         for (let from = 0; ; from += PAGE) {
           const { data: page, error } = await supabase
             .from('organizations')
-            .select('id, name, slug, latitude, longitude, business_type, brand_design_language')
+            .select('id, name, slug, latitude, longitude, business_type, brand_design_language, super_category:metadata->super_category')
             .not('latitude', 'is', null)
             .order('id')
             .range(from, from + PAGE - 1);
@@ -295,7 +304,9 @@ export default function PublicMap() {
             lat: b.latitude,
             lng: b.longitude,
             type: b.business_type,
-            color: hexToRgbStr(bdl?.colors?.primary),
+            color: bdl?.colors?.primary
+              ? hexToRgbStr(bdl.colors.primary)
+              : (categoryColor(b.business_type, b.super_category ?? null) || '#999'),
             logoUrl: bdl?.logos?.svg || bdl?.logos?.primary_dark || bdl?.logos?.primary_light || null,
           };
         }));
