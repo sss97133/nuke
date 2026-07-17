@@ -31,6 +31,20 @@ interface CreditRow {
   confidence: number;
 }
 
+interface FeatureRow {
+  org_id: string | null;
+  org_name_printed: string | null;
+  printed_page: number | null;
+  page: number | null;
+  category: string | null;
+  feature_kind: string | null;
+}
+
+interface FeatureOrg {
+  name: string | null;
+  slug: string | null;
+}
+
 const S: Record<string, React.CSSProperties> = {
   container: { padding: '0 12px', maxWidth: '960px', margin: '0 auto' },
   header: {
@@ -95,6 +109,8 @@ export default function PublicationProfile() {
   const navigate = useNavigate();
   const [issues, setIssues] = useState<PubRow[]>([]);
   const [credits, setCredits] = useState<CreditRow[]>([]);
+  const [features, setFeatures] = useState<FeatureRow[]>([]);
+  const [featureOrgs, setFeatureOrgs] = useState<Record<string, FeatureOrg>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -119,9 +135,35 @@ export default function PublicationProfile() {
             .in('publication_id', pubIds)
         : { data: [] };
 
+      // Advertiser graph (Guest Book) — the view may not exist yet; treat errors as empty
+      let featRows: FeatureRow[] = [];
+      const orgMap: Record<string, FeatureOrg> = {};
+      if (pubIds.length > 0) {
+        const featRes = await supabase
+          .from('publication_features_public')
+          .select('org_id, org_name_printed, printed_page, page, category, feature_kind')
+          .in('publication_id', pubIds)
+          .order('page', { ascending: true });
+        if (!featRes.error && featRes.data) {
+          featRows = featRes.data as FeatureRow[];
+          const orgIds = Array.from(new Set(featRows.map(f => f.org_id).filter((x): x is string => !!x)));
+          if (orgIds.length > 0) {
+            const orgRes = await supabase
+              .from('organizations')
+              .select('id, name, slug')
+              .in('id', orgIds);
+            for (const o of (orgRes.data ?? []) as { id: string; name: string | null; slug: string | null }[]) {
+              orgMap[o.id] = { name: o.name, slug: o.slug };
+            }
+          }
+        }
+      }
+
       if (cancelled) return;
       setIssues((pubRes.data ?? []) as PubRow[]);
       setCredits((credRes.data ?? []) as CreditRow[]);
+      setFeatures(featRows);
+      setFeatureOrgs(orgMap);
       setLoading(false);
     }
 
@@ -165,6 +207,9 @@ export default function PublicationProfile() {
   const topContribs = Array.from(contribMap.values())
     .sort((a, b) => b.count - a.count)
     .slice(0, 20);
+
+  // Advertiser graph rows (paid placements only — editorial/menu/listing kinds excluded)
+  const adRows = features.filter(f => f.feature_kind === 'ad');
 
   return (
     <div style={S.container}>
@@ -240,6 +285,39 @@ export default function PublicationProfile() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Advertisers (Guest Book advertiser graph) — only render when rows exist */}
+          {adRows.length > 0 && (
+            <div style={S.widget}>
+              <div style={S.widgetHeader}>
+                <span style={S.widgetLabel}>ADVERTISERS</span>
+                <span style={S.widgetCount}>{adRows.length}</span>
+              </div>
+              <div style={S.widgetBody}>
+                {adRows.map((f, i) => {
+                  const linked = f.org_id ? featureOrgs[f.org_id] : undefined;
+                  const clickable = !!f.org_id;
+                  return (
+                    <div
+                      key={`${f.org_id ?? f.org_name_printed ?? 'row'}-${i}`}
+                      style={{ ...S.row, cursor: clickable ? 'pointer' : 'default' }}
+                      onClick={clickable ? () => navigate(`/org/${featureOrgs[f.org_id!]?.slug || f.org_id}`) : undefined}
+                      onMouseEnter={clickable ? e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'; } : undefined}
+                      onMouseLeave={clickable ? e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; } : undefined}
+                    >
+                      <span style={S.rowLabel}>{linked?.name || f.org_name_printed || 'Unknown'}</span>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {f.category && <span style={S.badge}>{f.category}</span>}
+                        {(f.printed_page ?? f.page) != null && (
+                          <span style={S.rowMono}>p.{f.printed_page ?? f.page}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
