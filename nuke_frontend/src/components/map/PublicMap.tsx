@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import MapGL, { Source, Layer, NavigationControl } from 'react-map-gl/maplibre';
+import MapGL, { Source, Layer, NavigationControl, Marker } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { supabase } from '../../lib/supabase';
 import { CARTO_DARK } from './constants';
@@ -260,6 +260,7 @@ export default function PublicMap() {
   const initLat = parseFloat(params.get('lat') || '17.9');
   const initLng = parseFloat(params.get('lng') || '-62.833');
   const initZoom = parseFloat(params.get('zoom') || '14');
+  const [zoom, setZoom] = useState(initZoom);
 
   useEffect(() => {
     async function load() {
@@ -330,6 +331,7 @@ export default function PublicMap() {
         mapStyle={CARTO_DARK}
         interactiveLayerIds={['org-circles']}
         onClick={handleClick}
+        onMove={(e: any) => setZoom(e.viewState.zoom)}
       >
         <NavigationControl position="top-right" />
 
@@ -365,6 +367,17 @@ export default function PublicMap() {
             />
           </Source>
         )}
+
+        {/* Brand logo chips replace dots for orgs with enriched logos */}
+        {zoom >= 13 && orgs.filter(o => o.logoUrl).map(o => (
+          <Marker key={o.id} longitude={o.lng} latitude={o.lat} anchor="center"
+            onClick={(e: any) => { e.originalEvent?.stopPropagation?.(); setSelected(o); }}>
+            <div title={o.name} style={{ width: 26, height: 26, background: '#fff', border: '2px solid #111', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden' }}>
+              <img src={o.logoUrl} alt={o.name} loading="lazy" style={{ maxWidth: 22, maxHeight: 22, objectFit: 'contain' }}
+                onError={(e: any) => { const p = e.currentTarget.parentElement; if (p) p.style.display = 'none'; }} />
+            </div>
+          </Marker>
+        ))}
       </MapGL>
 
       {/* Detail panel */}
