@@ -52,12 +52,25 @@ export default function IssueProfile() {
     if (!slug || !issueNumber) return;
     setLoading(true);
 
-    // Step 1: get publication by slug
-    const { data: pub } = await supabase
+    // Step 1: get publication by slug, falling back to publisher_slug —
+    // dashboard/profile pages navigate with publisher_slug, and some series
+    // (e.g. lofficiel_stbarth) have no publications row whose slug matches it.
+    let { data: pub } = await supabase
       .from('publications')
       .select('*')
       .eq('slug', slug)
-      .single();
+      .maybeSingle();
+
+    if (!pub) {
+      const { data: bySeries } = await supabase
+        .from('publications')
+        .select('*')
+        .eq('publisher_slug', slug)
+        .order('publication_date', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      pub = bySeries;
+    }
 
     if (!pub) {
       setLoading(false);
@@ -125,7 +138,10 @@ export default function IssueProfile() {
     ]);
 
     if (storyRes.data) setStories(storyRes.data as EditorialStory[]);
-    if (adRes.data) setAds(adRes.data as AdPlacement[]);
+    if (adRes.data) {
+      // structural front-of-book rows drained without a brand — not real ads
+      setAds((adRes.data as AdPlacement[]).filter(a => a.brand_name !== '(unspecified)'));
+    }
     if (flatRes.data) setFlatplan(flatRes.data as FlatplanPage[]);
     if (creditRes.data) setCredits(creditRes.data as ProductionCredit[]);
 
