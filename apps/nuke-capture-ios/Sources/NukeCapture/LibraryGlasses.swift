@@ -1,0 +1,183 @@
+// LibraryGlasses.swift — DB/analysis intelligence laid over the raw library as
+// async, non-blocking decoration. Keyed by PHAsset.localIdentifier (the same id the
+// app stamps into exif_data.uuid on upload). A cell is always there at full speed
+// whether or not the glasses have anything to say about it yet — NEVER blocks a cell.
+//
+// The cheap on-device classifier (Apple tags via VisionEngine) runs OFF the scroll
+// path, caches verdicts in LocalStore (the ledger), marks personal photos (for
+// blur/hide), and badges vehicle photos. (LocalStore/VisionEngine are same-module.)
+//
+// Operating table: source → LibraryStore.swift · grid → LibraryView.swift ·
+// fullscreen → LibraryDetail.swift.
+
+import Photos
+import SwiftUI
+
+struct LibraryDecoration {
+    let known: Bool          // the DB has an observation/upload for this content
+    let glyph: String        // SF Symbol, e.g. "car.fill" (attributed) / "sparkles" (analyzed)
+}
+
+/// How personal photos are presented in the grid — toggled from the count control.
+enum PersonalMode: Int { case show = 0, blur = 1, black = 2 }
+
+@MainActor
+final class LibraryOverlayStore: ObservableObject {
+    static let shared = LibraryOverlayStore()
+    /// Per-cell badges (vehicle/analyzed). Filled off the scroll path.
+    @Published private(set) var decorations: [String: LibraryDecoration] = [:]
+    /// localIdentifiers the on-device pass classified PERSONAL (face + non-vehicle → blur/hide).
+    @Published private(set) var personal: Set<String> = []
+    /// Vehicle/work photos that ALSO contain a person — shown (work), but flagged
+    /// borderline so the Select tool can let the owner approve/reject them.
+    @Published private(set) var withPerson: Set<String> = []
+    /// localIdentifiers the on-device pass classified UNNECESSARY (screenshots, docs,
+    /// shopping/web captures) — clutter gated out of the way by default. Owner-approve
+    /// (Select tool) overrides. Derived from POSITIVE junk signals, never "not a vehicle".
+    @Published private(set) var junk: Set<String> = []
+    /// Per-photo TOP on-device vision label (humanized) — makes tag propagation VISIBLE:
+    /// a chip appears on each cell the instant the live classifier reads it. This is the
+    /// proof surface (Blur has it; Nuke didn't) — you watch the tags land, or see nothing.
+    @Published private(set) var topLabel: [String: String] = [:]
+    /// Owner's explicit verdicts (the Select tool) — these OVERRIDE the auto verdict.
+    @Published private(set) var approved: Set<String> = []
+    @Published private(set) var rejected: Set<String> = []
+
+    private var seen = Set<String>()        // resolved or in flight (dedup)
+    private var queue: [String] = []
+    private var running = false
+
+    // Coalesced publish: classifications land fast during scroll, and mutating the
+    // @Published sets per-photo fired objectWillChange per-photo — re-rendering EVERY
+    // visible cell each time (the scroll-path jank). Stage results here and flush to the
+    // @Published sets in bounded bursts (~6x/sec) so the grid updates calmly.
+    private var pendingPersonal = Set<String>()
+    private var pendingJunk = Set<String>()
+    private var pendingTopLabel: [String: String] = [:]
+    private var pendingWithPerson = Set<String>()
+    private var pendingApproved = Set<String>()
+    private var pendingRejected = Set<String>()
+    private var pendingDecorations: [String: LibraryDecoration] = [:]
+    private var flushScheduled = false
+
+    /// A cell appeared — classify it cheap, on-device, cached, OFF the scroll path.
+    func note(_ localIdentifier: String) {
+        guard !seen.contains(localIdentifier) else { return }
+        seen.insert(localIdentifier)
+        queue.append(localIdentifier)
+        if !running { running = true; Task { await run() } }
+    }
+
+    func decoration(for localIdentifier: String) -> LibraryDecoration? { decorations[localIdentifier] }
+    func isPersonal(_ localIdentifier: String) -> Bool { personal.contains(localIdentifier) }
+
+    /// Whether a cell should be hidden/blurred — the owner verdict WINS, else the auto verdict.
+    func shouldHide(_ lid: String) -> Bool {
+        if rejected.contains(lid) { return true }
+        if approved.contains(lid) { return false }
+        return personal.contains(lid)
+    }
+
+    /// Whether a cell is UNNECESSARY clutter (screenshot/doc/shopping) gated out by
+    /// default — the essential Vision gate. Owner-approve (Select) un-gates it.
+    func isGatedJunk(_ lid: String) -> Bool {
+        if approved.contains(lid) { return false }
+        return junk.contains(lid)
+    }
+
+    /// The top on-device vision label for a cell (humanized), once classified — the
+    /// visible proof that local vision ran on THIS photo. nil = not yet read.
+    func label(for lid: String) -> String? { topLabel[lid] }
+
+    /// Owner approves (work) or rejects (hide) a batch — overrides the auto verdict, persisted.
+    func setVerdict(_ lids: [String], approved isApproved: Bool) {
+        for lid in lids {
+            if isApproved { approved.insert(lid); rejected.remove(lid) }
+            else { rejected.insert(lid); approved.remove(lid) }
+        }
+        let verdict = isApproved ? "approved" : "rejected"
+        Task.detached { LocalStore.shared.setOwnerVerdict(lids, verdict: verdict) }
+    }
+
+    /// Drain the classify queue across a few CONCURRENT lanes — serial was too slow,
+    /// so blur/hide lagged behind the scroll. Each lane pulls an id on the main actor,
+    /// classifies OFF the main actor, applies back on main.
+    private func run() async {
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<4 {
+                group.addTask { [weak self] in
+                    while let lid = await self?.nextLID() {
+                        let info = await Self.resolve(lid)
+                        await self?.apply(lid, info)
+                    }
+                }
+            }
+        }
+        running = false
+        if !queue.isEmpty { running = true; Task { await run() } }   // ids that arrived mid-drain
+    }
+
+    private func nextLID() -> String? { queue.isEmpty ? nil : queue.removeFirst() }
+
+    private func apply(_ lid: String, _ info: (isPersonal: Bool, isJunk: Bool, hasPerson: Bool, label: String?, ownerApproved: Bool?, glyph: String?)?) {
+        guard let info else { return }
+        if info.isPersonal { pendingPersonal.insert(lid) }
+        if info.isJunk { pendingJunk.insert(lid) }
+        if let l = info.label { pendingTopLabel[lid] = l }
+        if info.hasPerson { pendingWithPerson.insert(lid) }
+        if let o = info.ownerApproved { if o { pendingApproved.insert(lid) } else { pendingRejected.insert(lid) } }
+        if let g = info.glyph { pendingDecorations[lid] = LibraryDecoration(known: true, glyph: g) }
+        scheduleFlush()
+    }
+
+    /// Push the staged results into the @Published sets at most ~6x/sec. SwiftUI
+    /// coalesces the several property mutations in one flush into a single grid update,
+    /// so a burst of classifications costs one re-render, not one per photo.
+    private func scheduleFlush() {
+        guard !flushScheduled else { return }
+        flushScheduled = true
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(160))
+            self?.flush()
+        }
+    }
+
+    private func flush() {
+        flushScheduled = false
+        if !pendingPersonal.isEmpty { personal.formUnion(pendingPersonal); pendingPersonal.removeAll() }
+        if !pendingJunk.isEmpty { junk.formUnion(pendingJunk); pendingJunk.removeAll() }
+        if !pendingTopLabel.isEmpty { topLabel.merge(pendingTopLabel) { _, new in new }; pendingTopLabel.removeAll() }
+        if !pendingWithPerson.isEmpty { withPerson.formUnion(pendingWithPerson); pendingWithPerson.removeAll() }
+        if !pendingApproved.isEmpty { approved.formUnion(pendingApproved); pendingApproved.removeAll() }
+        if !pendingRejected.isEmpty { rejected.formUnion(pendingRejected); pendingRejected.removeAll() }
+        if !pendingDecorations.isEmpty {
+            decorations.merge(pendingDecorations) { _, new in new }
+            pendingDecorations.removeAll()
+        }
+    }
+
+    /// Heavy work, OFF the main actor: read the owner verdict + cached classification,
+    /// else classify the photo on-device (Apple tags) and write it to the local store.
+    nonisolated private static func resolve(_ lid: String) async -> (isPersonal: Bool, isJunk: Bool, hasPerson: Bool, label: String?, ownerApproved: Bool?, glyph: String?)? {
+        let owner = LocalStore.shared.ownerVerdicts(for: [lid])[lid]
+        if let c = LocalStore.shared.classification(for: [lid])[lid] {
+            // Junk is DERIVED (not a stored column) from the cached T0 labels + the free
+            // screenshot flag — so it needs no migration and re-tunes as the label set evolves.
+            let junk = VisionEngine.isUnnecessary(labels: c.labels, isScreenshot: VisionEngine.isScreenshot(localIdentifier: lid))
+            return (c.isPersonal, junk, c.hasPerson, humanize(c.labels.first), owner, c.isVehicle ? "car.fill" : nil)
+        }
+        guard let v = await VisionEngine.classifyAsset(localIdentifier: lid) else {
+            // iCloud-only / unclassifiable, but it may still carry an owner verdict.
+            return owner == nil ? nil : (false, false, false, nil, owner, nil)
+        }
+        LocalStore.shared.classify(localIdentifier: lid, isVehicle: v.isVehicle, isPersonal: v.isPersonal,
+                                   hasPerson: v.hasPerson, labels: v.labels)
+        let junk = VisionEngine.isUnnecessary(labels: v.labels, isScreenshot: VisionEngine.isScreenshot(localIdentifier: lid))
+        return (v.isPersonal, junk, v.hasPerson, humanize(v.labels.first), owner, v.isVehicle ? "car.fill" : nil)
+    }
+
+    /// "sports_car" → "Sports Car" — the on-device label, made human for the chip.
+    nonisolated private static func humanize(_ raw: String?) -> String? {
+        raw.map { $0.replacingOccurrences(of: "_", with: " ").capitalized }
+    }
+}
