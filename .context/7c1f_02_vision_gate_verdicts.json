@@ -1,0 +1,74 @@
+[
+  {
+    "image_id": "d541368b-caac-4111-a2fe-64989a835a0d",
+    "verdict": "default",
+    "confidence": 0.92,
+    "reasoning": "Underside of truck on two-post lift showing frame rails, solid rear axle with leaf springs, driveshaft, transfer case area, and fuel tank. Consistent with squarebody GM C/K chassis."
+  },
+  {
+    "image_id": "3ec5c973-b040-4e88-9697-ee95b663248f",
+    "verdict": "default",
+    "confidence": 0.98,
+    "reasoning": "Front 3/4 view of a two-tone green squarebody Chevy pickup, eggcrate grille with Chevy bowtie, dual round headlights, chrome bumper. Matches 1976 Chev C20 Silverado (lime/light green)."
+  },
+  {
+    "image_id": "a3647159-b36e-4a2b-9d14-0b760917a37c",
+    "verdict": "default",
+    "confidence": 0.85,
+    "reasoning": "Macro of Holley carburetor body showing List number stamp (L1ST-_02-1 1106, 5071, 7832, 70021). Engine component on the 454ci build — paperwork-grade evidence of carb identity."
+  },
+  {
+    "image_id": "7819b9f1-dfa1-4d48-adc4-360fb57e04cf",
+    "verdict": "default",
+    "confidence": 0.85,
+    "reasoning": "Closeup of Holley carb throttle shaft/linkage area with HOLLEY casting visible. Engine component on the 454ci build."
+  },
+  {
+    "image_id": "47baad2c-291d-46ed-8f28-ff9ccc79b946",
+    "verdict": "default",
+    "confidence": 0.8,
+    "reasoning": "Closeup of Holley carb throttle linkage/shaft. Engine component on the 454ci build."
+  },
+  {
+    "image_id": "eb15d845-9b6e-450b-98f9-afbc94a421b5",
+    "verdict": "default",
+    "confidence": 0.9,
+    "reasoning": "Holley carburetor with metering block and patent text on red Chevy big-block. Consistent with the 454ci engine in this C20."
+  },
+  {
+    "image_id": "e77f326b-7707-4404-b49a-c1c12dcb3b04",
+    "verdict": "default",
+    "confidence": 0.92,
+    "reasoning": "Holley 4-barrel carburetor top view, gold throttle plates and brass-zinc finish, mounted on red engine intake. Consistent with 454ci build."
+  },
+  {
+    "image_id": "83b729ff-a8e6-4ef6-a186-89dfd697b9b4",
+    "verdict": "default",
+    "confidence": 0.85,
+    "reasoning": "Throttle bracket and return spring detail on red painted big-block engine. Engine component on the 454ci build."
+  },
+  {
+    "image_id": "095504df-1511-410d-aa15-87cca932e116",
+    "verdict": "default",
+    "confidence": 0.97,
+    "reasoning": "Engine bay shot: red-painted Chevy big-block 454 with Holley 4-barrel, distributor, ignition coil, green firewall and inner fenders matching the C20 lime green. Hood up."
+  },
+  {
+    "image_id": "a9c56186-6507-43a9-ba55-b050c9930acc",
+    "verdict": "default",
+    "confidence": 0.9,
+    "reasoning": "Underside view showing frame rails, fuel tank, leaf-spring rear suspension, driveshaft and transfer-case area. Consistent with squarebody GM C/K chassis on a lift."
+  },
+  {
+    "image_id": "77555b03-92bd-42f8-8634-25bb79a8bdf7",
+    "verdict": "default",
+    "confidence": 0.96,
+    "reasoning": "Green squarebody Chevy pickup with white camper shell on a two-post lift in a shop. Background shows other vehicles (red C10s, white van, side-by-side). Subject vehicle matches 1976 C20."
+  },
+  {
+    "image_id": "57607eec-a722-474a-b53e-067722b50a64",
+    "verdict": "review_needed",
+    "confidence": 0.1,
+    "reasoning": "Image is largely corrupted/gray with only a narrow vertical sliver visible on the right edge showing what appears to be red painted surfaces and possibly an engine component. Insufficient information to classify with confidence."
+  }
+]

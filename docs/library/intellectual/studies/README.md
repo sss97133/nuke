@@ -21,3 +21,28 @@ Analysis of how the project's technical vocabulary evolved across five months an
 ---
 
 *These studies are based on the analytical work produced in `/docs/writing/` during March 2026. They formalize and extend that work into citation-ready documents with methodology sections, finding discussions, and reproducibility notes.*
+
+---
+
+## Methodological Foundations
+
+The quantitative methods used across these studies are the standard primitives of information retrieval, statistics, and representation learning — not ad hoc. Each citation below is web-verified.
+
+- **Document-frequency / term-specificity (IDF)** — `vocabulary-evolution.md` counts terms by distinct prompts containing them and treats rarer terms as higher-signal: inverse document frequency. [sparckjones1972idf], applied to query scoring by [ramos2003tfidf]
+- **Herfindahl-Hirschman Index as a focus/concentration metric** — `13758-prompts-analysis.md` computes per-session focus as HHI of the category distribution (1.0 = single category; <0.4 flagged "thrashing"). [hirschman1964paternity]
+- **Chance-corrected agreement (Cohen's κ)** — classifier-vs-human validation (87% on 200 labeled prompts) and multi-model agreement should report against chance-corrected agreement, since raw percent overstates reliability under skewed priors. [cohen1960kappa]
+- **Precision / recall / F-measure** — `description-extraction-quality.md` frames correct vs. malformed extractions in retrieval-evaluation terms. [vanrijsbergen1979ir]
+- **CLIP image-text joint embeddings** — matching a photo to a listing description is the contrastive image-text alignment task. [radford2021clip]
+- **Perceptual / DCT-based image hashing (pHash)** — near-duplicate detection over the 1M+ image corpus. [zauner2010phash]
+
+### Bibliography
+
+1. **[sparckjones1972idf]** Karen Spärck Jones (1972). *A Statistical Interpretation of Term Specificity and Its Application in Retrieval*. Journal of Documentation 28(1), 11-21. https://doi.org/10.1108/eb026526
+2. **[hirschman1964paternity]** Albert O. Hirschman (1964). *The Paternity of an Index*. American Economic Review 54(5), 761-762. https://www.jstor.org/stable/1818582
+3. **[cohen1960kappa]** Jacob Cohen (1960). *A Coefficient of Agreement for Nominal Scales*. Educational and Psychological Measurement 20(1), 37-46. https://doi.org/10.1177/001316446002000104
+4. **[vanrijsbergen1979ir]** C. J. van Rijsbergen (1979). *Information Retrieval (2nd ed.)*. Butterworths, London.
+5. **[radford2021clip]** Radford, Kim, Hallacy, Ramesh, Goh, et al. (2021). *Learning Transferable Visual Models From Natural Language Supervision*. ICML (PMLR 139), arXiv:2103.00020. https://arxiv.org/abs/2103.00020
+6. **[zauner2010phash]** Christoph Zauner (2010). *Implementation and Benchmarking of Perceptual Image Hash Functions*. MSc thesis, Hagenberg. https://www.phash.org/docs/pubs/thesis_zauner.pdf
+7. **[ramos2003tfidf]** Juan Ramos (2003). *Using TF-IDF to Determine Word Relevance in Document Queries*. First **Instructional** Conf. on Machine Learning (iCML — a Rutgers tutorial venue, **not** ICML).
+
+*Verification note: all seven confirmed real. ⚠️ [ramos2003tfidf] is the* Instructional *Conference (iCML), NOT the International Conference on Machine Learning (ICML) — do not conflate.*

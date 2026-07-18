@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Fill remaining text fields using Y/M/M spec lookup.
 Uses 50-combo batches with robust error handling.
@@ -13,7 +14,7 @@ except ImportError:
     import psycopg2
     from psycopg2.extras import execute_values
 
-DB = "postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
+DB = f"postgresql://postgres.qkgaybvrernstplzjaam:{os.environ['SUPABASE_DB_PASSWORD']}@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
 COMBO_BATCH = 50
 
 

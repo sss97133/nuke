@@ -95,38 +95,21 @@ export class AuctionService {
   /**
    * Get all bids for an auction
    */
-  static async getBids(listingId: string): Promise<AuctionBid[]> {
-    const { data, error } = await supabase
-      .from('auction_bids')
-      .select('*')
-      .eq('listing_id', listingId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching bids:', error);
-      return [];
-    }
-
-    return data as AuctionBid[];
+  static async getBids(_listingId: string): Promise<AuctionBid[]> {
+    // TODO(ghost-ref 2026-07-12): auction_bids does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+    // Native-auction bids (vehicle_listings + place-auction-bid, cents/bidder_id) have no backing table.
+    // bat_bids / external_auction_bids model scraped external auctions and do not fit this shape.
+    return [];
   }
 
   /**
    * Get user's bids on an auction
    */
-  static async getUserBids(listingId: string, userId: string): Promise<AuctionBid[]> {
-    const { data, error } = await supabase
-      .from('auction_bids')
-      .select('*')
-      .eq('listing_id', listingId)
-      .eq('bidder_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching user bids:', error);
-      return [];
-    }
-
-    return data as AuctionBid[];
+  static async getUserBids(_listingId: string, _userId: string): Promise<AuctionBid[]> {
+    // TODO(ghost-ref 2026-07-12): auction_bids does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+    // Native-auction bids (vehicle_listings + place-auction-bid, cents/bidder_id) have no backing table.
+    // bat_bids / external_auction_bids model scraped external auctions and do not fit this shape.
+    return [];
   }
 
   /**

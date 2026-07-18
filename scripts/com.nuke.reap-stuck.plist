@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nuke.reap-stuck</string>
+
+    <!-- TEMPORARY self-finishing drainer for the Phase-1.3 stuck-'processing' tail (~233K abandoned
+         scraped rows). The one-shot reap got 82% (1.32M->233K) but the last tail can't drain in one
+         run (~100 rows/sec on 28 indexes vs the 10s pooler cap, on a continuously-busy DB). This
+         grinds bounded chunks per fire during quieter windows until processing=0, then no-ops.
+         REMOVE once logs/reap-stuck.log shows 'drain-DRAINED': launchctl unload + rm both plist
+         copies. Pipeline-flag write only (ALLOW_RAW_TESTIMONY_WRITE) — no testimony touched.
+         Login-shell (not Claude's Bash sandbox) so it reaches Supabase. Repo copy is source of
+         truth; keep identical to ~/Library/LaunchAgents/com.nuke.reap-stuck.plist. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/skylar/nuke/scripts/daily-receipt/reap-stuck-drain.sh</string>
+    </array>
+
+    <!-- every 10 min; bounded 60-batch fires keep each run short and the lock prevents overlap. -->
+    <key>StartInterval</key>
+    <integer>600</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/skylar/nuke/logs/reap-stuck.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/skylar/nuke/logs/reap-stuck.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/skylar/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>Nice</key>
+    <integer>15</integer>
+</dict>
+</plist>

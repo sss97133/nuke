@@ -1,0 +1,77 @@
+# Sessions Needing Manual Review (confidence < 0.6)
+
+**71 sessions** could not be confidently classified by keyword. Reasons typically: very short session, no recognized topic keywords, or no source text available (main JSONL cleaned + subagent traces sparse).
+
+| date | conf | primary | first prompt | session |
+|---|---|---|---|---|
+| 2026-03-15 | 0.2 | other |  | `b0ade5df` |
+| 2026-03-15 | 0.45 | vehicles:other |  | `8bad05ef` |
+| 2026-03-15 | 0.45 | vehicles:other |  | `92460d7e` |
+| 2026-03-15 | 0.3 | other |  | `5ba3ea5b` |
+| 2026-03-15 | 0.3 | other |  | `16195e64` |
+| 2026-03-15 | 0.3 | other |  | `624f8a0b` |
+| 2026-03-15 | 0.3 | other |  | `e05594ef` |
+| 2026-03-15 | 0.3 | other |  | `26649395` |
+| 2026-03-14 | 0.3 | other |  | `7c51f4b0` |
+| 2026-03-14 | 0.3 | other |  | `7bdd334a` |
+| 2026-03-14 | 0.3 | other |  | `9412f4a5` |
+| 2026-03-14 | 0.3 | other |  | `abbf2835` |
+| 2026-03-14 | 0.3 | other |  | `4b47346d` |
+| 2026-03-13 | 0.45 | platform:nuke_engineering |  | `895c870f` |
+| 2026-03-10 | 0.3 | other |  | `c6eb7017` |
+| 2026-03-10 | 0.3 | other |  | `cdaf3f4b` |
+| 2026-03-10 | 0.3 | other |  | `99bff299` |
+| 2026-03-10 | 0.3 | other |  | `30d4812b` |
+| 2026-03-10 | 0.3 | other |  | `e8ee5fc7` |
+| 2026-03-09 | 0.45 | platform:nuke_engineering |  | `ff4525ad` |
+| 2026-03-08 | 0.45 | platform:architecture_design |  | `a534587e` |
+| 2026-03-07 | 0.45 | vehicles:other |  | `d4845faf` |
+| 2026-03-07 | 0.45 | vehicles:other |  | `bf7eb16f` |
+| 2026-03-01 | 0.3 | other |  | `b8393d68` |
+| 2026-02-28 | 0.45 | personal:scheduling_and_admin |  | `e791fa5c` |
+| 2026-02-28 | 0.3 | other |  | `6b36859d` |
+| 2026-02-28 | 0.45 | platform:nuke_engineering |  | `7c727915` |
+| 2026-02-28 | 0.3 | other |  | `148f723c` |
+| 2026-02-28 | 0.3 | other |  | `58f12474` |
+| 2026-02-28 | 0.45 | platform:architecture_design |  | `d6997ab3` |
+| 2026-02-27 | 0.45 | vehicle:k2500_1983 |  | `29e2ed8f` |
+| 2026-02-27 | 0.3 | other |  | `26b424e1` |
+| 2026-02-27 | 0.45 | platform:nuke_engineering |  | `de2952d4` |
+| 2026-02-27 | 0.45 | platform:nuke_engineering |  | `b6f4991b` |
+| 2026-02-27 | 0.45 | personal:scheduling_and_admin |  | `8aeec8a0` |
+| 2026-02-27 | 0.3 | other |  | `1b5c049a` |
+| 2026-02-27 | 0.3 | other |  | `96b4a81a` |
+| 2026-02-25 | 0.2 | other |  | `24c7c21e` |
+| 2026-02-23 | 0.45 | platform:nuke_engineering |  | `a5439a7e` |
+| 2026-02-18 | 0.45 | platform:nuke_engineering |  | `c604863c` |
+| 2026-02-17 | 0.45 | vehicles:other |  | `96d16cb3` |
+| 2026-02-17 | 0.3 | other |  | `bac8dc5d` |
+| 2026-02-15 | 0.45 | platform:nuke_engineering |  | `785e4b91` |
+| 2026-02-13 | 0.45 | platform:nuke_engineering |  | `535d739a` |
+| 2026-02-13 | 0.45 | platform:nuke_engineering |  | `9d9fa0c9` |
+| 2026-02-08 | 0.3 | other |  | `5714bb7c` |
+| 2026-02-08 | 0.3 | other |  | `cd165c1e` |
+| 2026-02-08 | 0.45 | vehicles:other |  | `e1ad2be1` |
+| 2026-02-08 | 0.3 | other |  | `a15193b6` |
+| 2026-02-07 | 0.3 | other |  | `01b8e640` |
+| 2026-02-06 | 0.45 | platform:nuke_engineering |  | `b1016b6f` |
+| 2026-02-06 | 0.3 | other |  | `9a1cb0e1` |
+| 2026-02-04 | 0.3 | other |  | `e970b3ed` |
+| 2026-02-03 | 0.45 | vehicles:other |  | `b0f4f5a4` |
+| 2026-02-03 | 0.3 | other |  | `36568181` |
+| 2026-02-03 | 0.3 | other |  | `848e73c9` |
+| 2026-02-03 | 0.3 | other |  | `ca9619cc` |
+| 2026-02-02 | 0.3 | other |  | `a7d3398f` |
+| 2026-02-02 | 0.3 | other |  | `3b7b22cd` |
+| 2026-02-02 | 0.45 | platform:data_pipelines |  | `36b06efd` |
+| 2026-02-01 | 0.45 | vehicles:other |  | `56143278` |
+| 2026-02-01 | 0.3 | other |  | `604dca6b` |
+| 2026-02-01 | 0.3 | other |  | `bcebd8bc` |
+| 2026-02-01 | 0.45 | vehicles:other |  | `bf57c166` |
+| 2026-01-30 | 0.3 | other |  | `6addbe4a` |
+| 2026-01-30 | 0.45 | platform:data_pipelines |  | `0053f89d` |
+| 2026-01-30 | 0.3 | other |  | `e2f42345` |
+| 2026-01-30 | 0.3 | other |  | `12a909cd` |
+| 2026-01-30 | 0.45 | platform:architecture_design |  | `476528bc` |
+| 2026-01-30 | 0.45 | vehicles:other |  | `ed058623` |
+| 2026-01-27 | 0.3 | other |  | `5c0f765a` |

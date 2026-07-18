@@ -1,0 +1,266 @@
+[
+  {
+    "order": 0,
+    "image_id": "2dbeea30-e695-495b-875f-c0357b8bdb4f",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Rough Country 8002R leaf spring pack (labeled), staged on shop floor. Aftermarket suspension part likely for the d5ec K20 build. Square-body / K-truck content by extension.",
+    "paperwork": ["Rough Country 8002R leaf spring labels with barcodes"]
+  },
+  {
+    "order": 1,
+    "image_id": "40e3bf1a-b7be-4b1c-839e-702b2902343e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Freshly painted white 8-lug steel wheel mounted to BFGoodrich tire. 8-lug pattern consistent with K20 3/4-ton. Likely a refurbished d5ec wheel.",
+    "paperwork": []
+  },
+  {
+    "order": 2,
+    "image_id": "cc6e873d-f323-47b8-8dd1-08bb56e722c7",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "BFGoodrich Mud-Terrain T/A KM3 mounted to white 8-lug wheel. 8-lug = K20/K30 fitment. GM part box visible (GM21049D / EF-6059B).",
+    "paperwork": ["GM part number box: GM21049D, EF-6059B"]
+  },
+  {
+    "order": 3,
+    "image_id": "cc88ab87-ff39-4a95-b194-ae096139b6cd",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Four 8-lug steel wheels hanging in paint booth, mid-prep. Consistent with d5ec wheel refurb. Square-body wheel set.",
+    "paperwork": []
+  },
+  {
+    "order": 4,
+    "image_id": "65c213b9-6775-4bea-b664-a47718731d61",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same four 8-lug steel wheels in paint booth in white primer. d5ec wheel refurb set.",
+    "paperwork": []
+  },
+  {
+    "order": 5,
+    "image_id": "79eb501c-468d-4634-ba0b-6c688a224e49",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same four 8-lug steel wheels in paint booth, primer coat. d5ec wheel refurb set.",
+    "paperwork": []
+  },
+  {
+    "order": 6,
+    "image_id": "258b7bf3-cf8c-4b90-9dc2-8bb9151c820a",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Square-body GM truck on a lift, front 4WD axle / brake hub / leaf spring visible, blue PRW power steering pump or coolant reservoir. Front-end disassembly of K-truck.",
+    "paperwork": []
+  },
+  {
+    "order": 7,
+    "image_id": "47fcd3f4-566e-4f3e-b78e-169c24fa1217",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Square-body GM truck (1977-1980 front nose) with brown over cream two-tone, LWB pickup bed, on 2-post lift with rear axle removed. Color/body matches d5ec restoration in progress. Other classic trucks visible in background (shop yard).",
+    "paperwork": []
+  },
+  {
+    "order": 8,
+    "image_id": "b041120c-38ab-433f-bd40-cae3966ebae3",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Engine bay of square-body GM truck with hood up. SBC 350 V8 visible. Brown firewall/cowl. Consistent with d5ec disassembly stage.",
+    "paperwork": []
+  },
+  {
+    "order": 9,
+    "image_id": "7ae10454-c608-4afd-a75f-f2dbd524e630",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "POSITIVE ID: front of d5ec K20 — UT plate T27 0CV clearly readable. 1977-80 square-body grille with '350' emblem (matches d5ec's 350 V8). Single round headlights, chrome bumper, hood open.",
+    "paperwork": ["UT plate T27 0CV (matches d5ec)", "Grille '350' V8 emblem"]
+  },
+  {
+    "order": 10,
+    "image_id": "d8ff7788-1403-44f8-b847-c83a2233c72b",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Engine bay shot from front of same square-body GM truck (continuation of front-end shot). Hood open showing SBC 350 with single barrel intake, brown fender wells.",
+    "paperwork": []
+  },
+  {
+    "order": 11,
+    "image_id": "ece44e78-f529-4e2f-ae04-3fa9fc1fcae2",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Underside view of square-body GM K-truck showing GM transfer case (NP203 or NP205) mated to transmission, exhaust manifold, exhaust pipe, front driveshaft yoke. Brown floor pan above. Consistent with d5ec lifted shot.",
+    "paperwork": []
+  },
+  {
+    "order": 12,
+    "image_id": "3cd16438-5183-4f09-9293-dbf023369707",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "POSITIVE ID: full undercarriage view from above of d5ec — UT plate T27 0CV visible at the cab end. Dana solid front axle (K-truck 4WD), leaf springs front and rear, transfer case, dual exhaust, fuel tank. Full underbody documentation.",
+    "paperwork": ["UT plate T27 0CV"]
+  },
+  {
+    "order": 13,
+    "image_id": "b5b26384-5ff6-486f-a379-b34ca23a104b",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Underside continuation — rear of same K-truck on lift, dual saddle tanks visible, leaf-sprung rear, Dana 60 / 14-bolt rear axle, transfer case. Kaeser air compressor in background (shop).",
+    "paperwork": []
+  },
+  {
+    "order": 14,
+    "image_id": "696180c9-3fdb-4f1f-b4ea-e3dc88f91b17",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Underside of same K20 on lift, mid-chassis view of frame, driveshaft, transfer case, dual saddle tanks, leaf springs. Same vehicle as #12-13.",
+    "paperwork": []
+  },
+  {
+    "order": 15,
+    "image_id": "028523d0-f29b-4745-9940-20df5669fdf7",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Underside front view of same K-truck — Dana 44 or Dana 60 front axle, leaf springs, lower control arms, steering linkage, sway bar. Continuation series.",
+    "paperwork": []
+  },
+  {
+    "order": 16,
+    "image_id": "83d5711a-f852-45dd-9ce2-d834cef9c064",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Rear undercarriage view of same K-truck on lift. RV/motorhome and Kaeser compressor in background = same shop. Rear axle, exhaust, leaf springs.",
+    "paperwork": []
+  },
+  {
+    "order": 17,
+    "image_id": "e074348d-d476-4d30-b5f6-87e7380b885f",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "POSITIVE ID: d5ec hero shot, front three-quarter — UT plate T27 0CV clearly readable. 1977-80 square-body Scottsdale, brown over saddle two-tone, single round headlights, '350' grille badge, K20 (4WD lifted stance, 8-lug white steel wheels with MT tires, brush guard/grille guard bumper).",
+    "paperwork": ["UT plate T27 0CV (matches d5ec)", "Grille '350' V8 emblem"]
+  },
+  {
+    "order": 18,
+    "image_id": "3875294d-d915-4acb-b40d-d5c7c8e96c25",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "POSITIVE ID: d5ec — same hero session as #17, slightly different angle. UT plate T27 0CV partially visible.",
+    "paperwork": ["UT plate T27 0CV"]
+  },
+  {
+    "order": 19,
+    "image_id": "7ec00e01-2b0c-477e-88e5-1298e1f70955",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "POSITIVE ID: d5ec — same hero session, front three-quarter from opposite side. UT plate T27 0CV visible.",
+    "paperwork": ["UT plate T27 0CV"]
+  },
+  {
+    "order": 20,
+    "image_id": "52703a70-b38c-491a-8472-f066ed6958ff",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "POSITIVE ID: d5ec close-up of grille and front bumper — UT plate T27 0CV readable, '350' V8 grille emblem.",
+    "paperwork": ["UT plate T27 0CV", "Grille '350' V8 emblem"]
+  },
+  {
+    "order": 21,
+    "image_id": "7cc11145-9daf-4305-8a7f-9ea500d543b6",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Lineup of multiple square-body GM C/K trucks at the shop yard (red Silverado, yellow C10, others). Inventory documentation. Per attribution rule, square-body GM content defaults to approved in d5ec bucket.",
+    "paperwork": []
+  },
+  {
+    "order": 22,
+    "image_id": "b9df14c8-e6c6-43d6-9dec-49e0c7b7aec2",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Interior steering-wheel/dash POV of a square-body GM truck (Chevy bowtie horn pad, square-body gauge cluster). Out the rainy windshield: lineup of more square-body trucks at shop. Possible d5ec interior or a stablemate.",
+    "paperwork": []
+  },
+  {
+    "order": 23,
+    "image_id": "b773569c-e28e-4b86-8567-99ce7ac5a3e1",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Same interior POV as #22, second frame. Square-body GM dash/steering wheel with view of square-body lineup outside.",
+    "paperwork": []
+  },
+  {
+    "order": 24,
+    "image_id": "8ea034bd-8562-4233-bcef-97ac72970c19",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Blue square-body Chevy truck (rough patina) parked at the shop, tailgate-down view. CHEVROLET tailgate stamping visible. Not d5ec (color mismatch — d5ec is brown/cream) but valid square-body shop inventory content. Approved per attribution rule.",
+    "paperwork": ["CHEVROLET tailgate stamping"]
+  },
+  {
+    "order": 25,
+    "image_id": "38ad56d3-f289-446a-a2f9-ce30952a56de",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Square-body interior, passenger side — Scottsdale door panel emblem visible on lower left, tan/saddle bench seat, brown/cream two-tone door. Albertsons grocery store sign visible through window. Consistent with d5ec Scottsdale interior on an errand.",
+    "paperwork": ["Scottsdale door panel emblem"]
+  },
+  {
+    "order": 26,
+    "image_id": "571b8a75-466d-4168-9043-41c85819f5e5",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "POSITIVE ID: d5ec finished hero shot at sunset — UT plate T27 0CV readable. Brown over saddle two-tone Scottsdale K20, single round headlights, '350' grille, 4WD stance on 8-lug steel wheels with MT tires. Lifted, headlights on, parking lights amber.",
+    "paperwork": ["UT plate T27 0CV"]
+  },
+  {
+    "order": 27,
+    "image_id": "9adbb33d-a2e2-47aa-8697-f8c85af077b6",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "POSITIVE ID: d5ec in middle of group photo — UT plate T27 0CV (orange UT graphic plate) under sunset thunderhead. Flanked by white Chevy Task Force (left) and yellow early-1970s C/K (right). Brown/saddle Scottsdale clearly d5ec.",
+    "paperwork": ["UT plate T27 0CV"]
+  },
+  {
+    "order": 28,
+    "image_id": "fb1c107e-68d1-4762-83f6-722bb2302b58",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "POSITIVE ID: same scene as #27, alternate frame. d5ec in middle with T27 0CV visible.",
+    "paperwork": ["UT plate T27 0CV"]
+  },
+  {
+    "order": 29,
+    "image_id": "3039528e-9744-41e8-af38-ee83de73824a",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "POSITIVE ID: d5ec on left, UT plate T27 0CV fully readable. Brown over saddle Scottsdale K20, '350' grille badge. Group lineup with yellow C10 stepside and tan Chevy Suburban.",
+    "paperwork": ["UT plate T27 0CV (full read)", "Grille '350' V8 emblem"]
+  },
+  {
+    "order": 30,
+    "image_id": "5ef6113f-93a6-4b56-af7c-bf8f6b0d83bb",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rotated/sideways shot of a lineup of square-body GM trucks parked in a desert lot with mountain backdrop. Yellow, brown, and other square-bodies visible. Brown one in lineup is possibly d5ec — too small to confirm plate. Approved as square-body inventory content.",
+    "paperwork": []
+  },
+  {
+    "order": 31,
+    "image_id": "b2ef604d-6abf-450f-966f-a9e353a3dabb",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Brown over saddle (cream) two-tone square-body Scottsdale, single round headlights, K20 fitment (8-lug white steel wheels, MT tires). UT plate visible but small/unreadable. Matches d5ec color scheme and stance exactly. Likely d5ec, but plate not confirmed at this resolution.",
+    "paperwork": ["UT plate visible (unreadable at this resolution)"]
+  },
+  {
+    "order": 32,
+    "image_id": "959986ed-6610-43fd-ae50-19dc89619656",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Rotated side-angle close-up of brown over saddle square-body GM truck — 'Scottsdale' fender badge clearly visible on rear fender, chrome bumper, 8-lug steel wheel. Matches d5ec color scheme and trim. Strong d5ec ID even without plate visible.",
+    "paperwork": ["'Scottsdale' fender badge"]
+  }
+]

@@ -1,0 +1,394 @@
+[
+  {
+    "order": 0,
+    "image_id": "4fd85b5a-1046-4b27-94e2-06201d4cde64",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Front view of square-body GM C/K truck (1981-1987 facelift grille with quad rectangular headlamps and Chevy bowtie). White paint, lifted, faded hood with surface rust. Five cab-roof clearance lamps visible (DRW/dually indicator). Matches subject V3500.",
+    "notes": "Front bumper license plate area empty. Five cab roof clearance lights confirm DRW. Faded/peeling roof paint."
+  },
+  {
+    "order": 1,
+    "image_id": "e63617cc-d18d-4886-b5bb-4583c52928e8",
+    "verdict": "rejected_personal",
+    "confidence": 0.85,
+    "reasoning": "Dusk shot dominated by a person in safety vest standing next to the truck. Truck side visible but person is the subject. White square-body truck visible on left, palm tree, orange streetlamp.",
+    "notes": "Person in reflective safety vest is central subject."
+  },
+  {
+    "order": 2,
+    "image_id": "f9ada6e8-2513-49b0-87fa-798193b1a2b0",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Two-pane composite of a red 1989+ square-body C/K dually (single cab, 4WD, DRW). Quad rectangular headlamps and 1989-style billet grille. Clear DRW fender flares with 6 lug visible. Square-body GM C/K = default approved per rule.",
+    "notes": "License plate '59 KMNZ' visible both front and rear (Kentucky plate). Likely a Facebook/social inspiration photo of another truck, not the subject V3500, but rule says default approved for square-body GM C/K content."
+  },
+  {
+    "order": 3,
+    "image_id": "16ba7d03-0774-414c-835a-ce0eba27379d",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Blue 4-door square-body crew cab dually, rear 3/4 view. Square-body GM C/K (1973-1987). DRW visible. Tailgate Chevrolet script. Per rule, square-body GM content is default approved.",
+    "notes": "Connecticut license plate '680 ZFS' visible. 'ANTI-RACIST' bumper sticker. Likely an inspiration/reference photo of a different blue crew cab dually, not the white subject V3500."
+  },
+  {
+    "order": 4,
+    "image_id": "bf631b43-e0e9-49e1-b984-c03e5903ab2e",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Side view of blue square-body crew cab dually, lifted, on road. Quad rectangular headlamp grille (1981-87). DRW fender flares. Default approved per square-body GM rule.",
+    "notes": "Same blue crew cab dually as 003 - clearly a reference/inspiration build photo."
+  },
+  {
+    "order": 5,
+    "image_id": "11785a31-b9b8-4e25-9537-dbb3ab90380a",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Gray/charcoal square-body crew cab dually, heavily lifted with blue coilovers, blacked out grille and lights. Square-body C/K body (1981-87 facelift grille frame). Default approved.",
+    "notes": "'View Products' overlay = Facebook/Instagram social media screenshot. Reference build photo. Black painted grille."
+  },
+  {
+    "order": 6,
+    "image_id": "4ff8ba1d-4ae0-4160-86d2-3f8075b3c3c7",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Side 3/4 of blue square-body crew cab dually with raised camper shell, lifted, 5 cab roof clearance lamps. Square-body GM C/K. Default approved.",
+    "notes": "Connecticut plate '680 ZFS' visible (same blue truck as 003, 004). Reference photo of a CT-based blue crew cab dually."
+  },
+  {
+    "order": 7,
+    "image_id": "2cd78079-54a6-405e-890d-29ac80159ec7",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Close-up of wheel and Cooper Discoverer A/TR tire on truck. 8-lug pattern visible (heavy-duty 1-ton spec). White vehicle body just visible. Consistent with V3500 1-ton.",
+    "notes": "Cooper Discoverer A/TR tire. 8-lug aluminum wheel. Likely on-truck wheel photo for the V3500."
+  },
+  {
+    "order": 8,
+    "image_id": "eb9b2a60-bfea-44ed-9bbd-8334f4c537f6",
+    "verdict": "rejected_misattributed",
+    "confidence": 0.95,
+    "reasoning": "Two-pane composite of modern (2017+) Ford F-450 Super Duty dually trucks with gooseneck trailers hauling other lifted modern dually trucks. 'Tweety's Tire & Welding' shop sign. NOT square-body GM - these are modern Ford Super Duties.",
+    "notes": "Modern Ford F-series dually content, social media composite (4:56 video timestamp overlay). Tweety's Tire & Welding signage."
+  },
+  {
+    "order": 9,
+    "image_id": "c58a848b-0ad2-498b-a28e-73bf4be2b1d4",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "White square-body crew cab being loaded on flatbed trailer at night, palm trees, Vegas-style shop. Door open. Clearly the subject V3500 in restoration transport.",
+    "notes": "Acquisition/transport photo. Truck loaded on flatbed trailer at shop yard at night."
+  },
+  {
+    "order": 10,
+    "image_id": "6c8dd40e-386f-4cf0-b031-2fa867bbf3d5",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Rear 3/4 of white square-body crew cab dually with stack of 4 tires strapped in the bed. Clearly the subject V3500. Single cab roof not visible but body shape and DRW fender flares match.",
+    "notes": "Bed loaded with 4 stacked tires (likely the Cooper A/TRs from photo 017). Shop/desert setting."
+  },
+  {
+    "order": 11,
+    "image_id": "1a93273a-309a-45f0-a735-47b9a65c64ba",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Same white square-body crew cab dually with tire stack in bed, different angle. Subject V3500.",
+    "notes": "Same scene as 010, different angle. Dusk lighting."
+  },
+  {
+    "order": 12,
+    "image_id": "11bbf22f-66ba-401b-bc60-8759593a3e8a",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Same white V3500 with tires in bed, sunset/dusk. Subject vehicle.",
+    "notes": "Same scene as 010, 011."
+  },
+  {
+    "order": 13,
+    "image_id": "df8926d4-4cc2-4eff-b3b4-d4c7c7c5e5d2",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Same white V3500 with tire stack in bed, image rotated 90 degrees. Subject vehicle.",
+    "notes": "Sideways/rotated photo of same scene as 010-012."
+  },
+  {
+    "order": 14,
+    "image_id": "57a36e16-e01d-4367-8a72-f381577aea72",
+    "verdict": "review_needed",
+    "confidence": 0.9,
+    "reasoning": "Service invoice from J&S Diesel Service LLC, Las Vegas NV, dated 08/12/21. Billed to Skylar Williams (sehylar@gmail.com). Invoice #071809. Customer vehicle line reads '1993 Cummins 5.9' - this names a DIFFERENT vehicle, not the 1987 V3500. Per rule, paperwork naming different vehicle = review_needed.",
+    "notes": "PAPERWORK: J&S Diesel Service invoice 071809 dated 08/12/2021. Las Vegas NV. Skylar Williams customer. Vehicle: 1993 Cummins 5.9 (Dodge Ram). Labor items reference oil pan leak, vacuum pump, fuel injection pump, transmission shifting issues. Grand Total $617.50. Diesel shop receipt - belongs to a 1993 5.9 Cummins vehicle, possibly the W250/W350/Ram dually."
+  },
+  {
+    "order": 15,
+    "image_id": "435f8202-d81f-4d63-a284-31320295ae78",
+    "verdict": "review_needed",
+    "confidence": 0.9,
+    "reasoning": "Same J&S Diesel invoice 071809 dated 08/12/21 for 1993 Cummins 5.9, rotated/different angle with credit card slip overlay. Names DIFFERENT vehicle (1993 Cummins) than subject V3500.",
+    "notes": "PAPERWORK: Same J&S Diesel invoice 071809 as photo 014, with credit card slip showing transaction amount $517.50 (sic - invoice shows $617.50). Receipt for a 1993 Cummins 5.9 diesel."
+  },
+  {
+    "order": 16,
+    "image_id": "58a11194-2e90-409b-87df-9fe42797a4dd",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Rear view of subject white V3500 crew cab dually with tires in bed, daytime, parked next to industrial building with fire hydrant. Clear DRW fender flares.",
+    "notes": "Same Vegas-area industrial yard. DRW rear visible."
+  },
+  {
+    "order": 17,
+    "image_id": "92385516-1b85-47c7-9e95-65f8bbeb513f",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Top-down view of 4 stacked Cooper Discoverer A/TR tires on 8-lug aluminum wheels (same wheels as photo 007), strapped to a pallet/trailer. Parts/wheels for the V3500.",
+    "notes": "Stack of 4 Cooper Discoverer A/TR tires on 8-lug wheels with green ratchet strap. Likely the dually tire set."
+  },
+  {
+    "order": 18,
+    "image_id": "ce74a4c2-e31c-4194-88c8-b18d5f00dbfc",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Close-up of dually rear wheels, exhaust tip, leaf springs on white truck. Chrome dually hubcap visible with twin tires. Subject V3500 detail.",
+    "notes": "Rear DRW close-up. Chrome dually center cap. Leaf spring suspension. Exhaust tip exits side."
+  },
+  {
+    "order": 19,
+    "image_id": "866f7968-b6d5-4265-9ea6-de30eccaa5f8",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Close-up of single 8-lug aluminum wheel with ROADONE brand tire labeled 'GAVALRY M/T LT315/75R16' (Roadone Cavalry M/T). Heavy-duty 8-lug = 1-ton spec, consistent with V3500. Could be on a different vehicle but parts content for the build.",
+    "notes": "TIRE: Roadone Cavalry M/T LT315/75R16. 8-lug aluminum (polished/chrome). Possibly a different wheel set than the Cooper Discoverers in 017 - could be the new dually wheels."
+  },
+  {
+    "order": 20,
+    "image_id": "02e7b01c-5017-47ea-849c-1afc7eedb0b4",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Undercarriage shot showing transmission/transfer case and aftermarket transmission cooler/filter pan (gold/brass colored). Blue vehicle visible in background. This is a shop/lift undercarriage shot, likely of the V3500 (a blue car is parked next to/under it).",
+    "notes": "Transmission pan with aftermarket filter housing. Driveshaft visible. Undercarriage maintenance/inspection shot."
+  },
+  {
+    "order": 21,
+    "image_id": "a5784da4-b472-46d6-b3bb-37bda3bfffc5",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Undercarriage shot showing crossmember, transmission mount, frame rails, exhaust. Blue car visible below. Square-body frame rail geometry. Likely V3500 undercarriage.",
+    "notes": "Transmission crossmember and bracket visible."
+  },
+  {
+    "order": 22,
+    "image_id": "9f8f2088-b5be-418c-9001-bf56c12b5608",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Undercarriage shot showing transfer case output yoke and rear driveshaft slip yoke. 4WD drivetrain consistent with V3500 4x4.",
+    "notes": "Transfer case output and slip yoke. 4WD drivetrain detail."
+  },
+  {
+    "order": 23,
+    "image_id": "595463cd-9cf7-404e-bfc7-9a626bfd5167",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Undercarriage shot of New Process / NP205 (or NP241/NP243) transfer case with characteristic 8-bolt round cover - GM truck transfer case. Consistent with V3500 4x4 (likely NP205 since 1-ton 4WD).",
+    "notes": "Transfer case - looks like NP205 with characteristic round 8-bolt cover. GM 4x4 1-ton spec."
+  },
+  {
+    "order": 24,
+    "image_id": "557ffb10-1564-40c3-8e32-80941d967093",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Close-up of same transfer case round 8-bolt cover, showing casting marks. NP205-style cover. GM 4x4 truck part.",
+    "notes": "Transfer case cover close-up. Casting numbers visible but blurry."
+  },
+  {
+    "order": 25,
+    "image_id": "f20dcbba-c194-43af-b7de-0906075c755f",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Transfer case + transmission tail housing area, mounted on a stand or chassis with red feature visible. Shows NP205-style 8-bolt round cover. Component from V3500 drivetrain rebuild.",
+    "notes": "Transfer case on bench/stand. Drivetrain rebuild context."
+  },
+  {
+    "order": 26,
+    "image_id": "5105b68f-6372-40a2-9988-9b18311454ae",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "FACTORY DIFFERENTIAL/AXLE TAG with build date stamped '3 17 87 205' (March 17, 1987 build, plant/line code 205). GM logo visible. This is the date code tag from a GM rear axle (Dana 70 or 14-bolt for a 1-ton dually). Confirms 1987 build year matching the V3500.",
+    "notes": "FACTORY AXLE TAG / DATE STAMP: '3 17 87 205' = March 17, 1987 build date. GM logo. Critical provenance datum for the 1987 V3500. Tag is on what appears to be the differential housing."
+  },
+  {
+    "order": 27,
+    "image_id": "b4d303ef-4102-4632-bd03-9a2c6c36312c",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Detail shot of front axle with locking hub, NP205-style transfer case cover, and the axle date tag (same as 026) visible. GM 4x4 front axle assembly. Consistent with V3500.",
+    "notes": "Front axle with manual locking hub (or actuator). Axle date tag visible on rear of housing (same '3 17 87' tag from 026)."
+  },
+  {
+    "order": 28,
+    "image_id": "7cbd8640-7338-4c4b-8458-d3d1b89cdff7",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Rear axle/differential housing detail showing 14-bolt-style cover (or Dana 70 with similar profile), drum brakes/cable, leaf spring, axle tube. Roadone tire visible at left. Subject V3500 rear end.",
+    "notes": "Rear axle housing differential. Drum brake parking cable. Leaf spring suspension. Likely GM 14-bolt full-floater or Dana 70 (1-ton spec)."
+  },
+  {
+    "order": 29,
+    "image_id": "d1e17a67-aa96-4d74-b1a6-922c2dda6352",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rotated/inverted shot of white V3500 front (grille, bowtie, quad rectangular headlamps) and windshield with 5 cab clearance lights visible. Subject V3500.",
+    "notes": "Inverted (upside-down framed) shot. 5 cab roof clearance lamps confirm DRW."
+  },
+  {
+    "order": 30,
+    "image_id": "8dd6bace-e20f-487b-939f-82fb758a4087",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Rotated shot of subject white V3500 in front of shop/desert mountain backdrop. Full body visible - crew cab, 4dr, lifted, DRW. Subject vehicle.",
+    "notes": "Photo rotated 90 deg. Industrial yard/desert. Cab clearance lamps visible. UniGroup truck and red sedan in background."
+  },
+  {
+    "order": 31,
+    "image_id": "c72d35bc-af1e-4e24-bd65-d0cab444672b",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Same rotated shot of white V3500 crew cab front 3/4. Subject vehicle.",
+    "notes": "Same scene as 030, slightly different framing."
+  },
+  {
+    "order": 32,
+    "image_id": "de58f176-65a3-43d0-ab04-5302f86a9c6a",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Rotated/sideways shot of white V3500 front, 5 cab roof clearance lamps visible. Subject vehicle outside shop.",
+    "notes": "Side-rotated photo. Red sedan in background."
+  },
+  {
+    "order": 33,
+    "image_id": "7c18d483-749a-4d9c-88d6-df086ce717af",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Painted body panel/hood in workshop, freshly painted white/light gray with double crease line down the center - characteristic of a square-body GM hood (1981-87 style with twin power-dome creases). Body work for the V3500.",
+    "notes": "Freshly painted hood on stands. Looks like a square-body GM truck hood with twin character lines. Restoration paintwork."
+  },
+  {
+    "order": 34,
+    "image_id": "c8785487-ae7b-4bc5-a310-4eaf8e8300b2",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Engine bay shot of a diesel engine (visible valve covers with multiple cylinder injector tubes - looks like a 6.2L/6.5L Detroit Diesel V8 in a square-body engine bay). Wiring harness exposed. Engine bay matches square-body GM C/K. Subject V3500 (the V3500 used 6.2L/7.4L gas as factory options).",
+    "notes": "DIESEL ENGINE in square-body engine bay. Six valve covers on right bank visible - this is the GM 6.2L/6.5L Detroit Diesel V8 (each cylinder has individual valve cover). Brake booster + master cylinder. Battery visible. Likely the V3500's diesel."
+  },
+  {
+    "order": 35,
+    "image_id": "4f597cd2-aa6d-4fc2-9665-ed6e51165d02",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Same engine bay, other side, showing battery, air intake, and the diesel injection pump/turbo area. 6.2L/6.5L Detroit Diesel architecture. Subject V3500 engine bay.",
+    "notes": "Other side of 034 engine bay. Battery with date sticker visible. Air intake snorkel. Diesel intake/IP area."
+  },
+  {
+    "order": 36,
+    "image_id": "ab4f9ade-3262-4aca-b3bd-9337c3eacddb",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Engine bay - top down close view of the GM Detroit Diesel 6.2/6.5L V8 with both banks of individual cylinder valve covers and intake/injection manifolds visible. Subject V3500 engine.",
+    "notes": "Top-down of 6.2/6.5L Detroit Diesel V8. Both banks visible. Glow plug wiring/injection lines."
+  },
+  {
+    "order": 37,
+    "image_id": "c194e93e-d906-4a2e-9d71-55600368cd3a",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Rotated photo of white V3500 in indoor shop bay (tile floor, plaster wall, fluorescent shop light). Front 3/4 view, hood open, exposed engine bay, dually wheel visible at right. Subject vehicle in shop.",
+    "notes": "Shop interior - tiled floor, plaster wall (looks like Mexican/Latin American shop). Hood up for service. Spare tire stored upright behind cab."
+  },
+  {
+    "order": 38,
+    "image_id": "3cfc8e69-6241-4c08-8281-84f8107d6577",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Same indoor shop scene as 037, different angle. White V3500 with hood up, in shop bay.",
+    "notes": "Same shop, different angle from 037."
+  },
+  {
+    "order": 39,
+    "image_id": "9f0dcc1b-6642-4f6b-8a69-9635a211c312",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Front view of white V3500 with hood removed showing radiator support / core support area. Square-body C/K grille with bowtie. Restoration/teardown photo.",
+    "notes": "Hood removed, core support exposed. Front clip restoration work. Grille and headlamps still installed."
+  },
+  {
+    "order": 40,
+    "image_id": "dc90186b-888f-4845-88fa-d0008c48632a",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Rotated photo of white V3500 in shop bay, hood up, front 3/4 view. Subject vehicle.",
+    "notes": "Same shop as 037, 038. Rotated framing."
+  },
+  {
+    "order": 42,
+    "image_id": "b078dee2-56ed-4ce7-a329-fc8a62a471e0",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Iconic location shot: white V3500 crew cab dually parked in front of Las Vegas Strip skyline (Excalibur and other casinos visible). Front 3/4 view, lifted, DRW visible. Subject vehicle in Vegas.",
+    "notes": "LOCATION: Las Vegas Strip in background - Excalibur Hotel visible. 'BLUE M[...]' billboard. 'CARS MUSEUM' / 'HOLLYWOOD CARS MUSEUM' sign at 5115 (address). Vegas iconic photo location."
+  },
+  {
+    "order": 43,
+    "image_id": "57e10083-0387-44c0-9114-5a2162f2b3d0",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rotated/inverted shot of white V3500 in Vegas-area parking lot, in front of a sign that reads (when inverted) 'Diesel Service' at 5155 - same area as J&S Diesel Service. Subject vehicle.",
+    "notes": "Inverted photo. Sign reads '5155 Diesel Service' (likely the J&S Diesel Service shop at 5155 - the invoice was billed from J&S Diesel)."
+  },
+  {
+    "order": 44,
+    "image_id": "164e8b26-7334-4b77-9b58-ca9a2236b6bb",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rotated shot of white V3500 at parking lot with BetMGM billboard (sports betting partner) - Las Vegas. Front 3/4. Subject vehicle.",
+    "notes": "BetMGM billboard visible. Las Vegas Strip area."
+  },
+  {
+    "order": 45,
+    "image_id": "772c8225-dfca-4c50-8204-9921caff91b9",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rotated shot of white V3500 - same Vegas parking lot scene as 044 with BetMGM signage. Subject vehicle.",
+    "notes": "Same scene as 044, different framing."
+  },
+  {
+    "order": 46,
+    "image_id": "3179eb8d-b417-41dd-a2bc-b86e6f506866",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rotated shot of white V3500 in front of 'BOSCH' / 'Diesel Service' building (Bosch authorized diesel shop) - confirms shop context for the V3500. Subject vehicle.",
+    "notes": "BOSCH Diesel Service signage at 5155 - this is the same shop that issued the J&S Diesel Service invoice (Bosch authorized diesel service center)."
+  },
+  {
+    "order": 47,
+    "image_id": "948700b0-2159-4df9-873b-a0a53976e634",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rotated photo of white V3500 at the same Bosch/J&S Diesel Service shop at 5155. Subject vehicle.",
+    "notes": "Same Bosch Diesel Service location at 5155 as photo 046."
+  },
+  {
+    "order": 48,
+    "image_id": "1591c729-b359-40ef-809d-035e06fe0373",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Full undercarriage shot from underneath truck looking up - shows front axle, leaf springs, frame rails, transfer case crossmember, and front of bed. Roadone tire visible at right. Subject V3500 on lift.",
+    "notes": "Full undercarriage on lift. Solid front axle, leaf springs, factory frame rails."
+  },
+  {
+    "order": 49,
+    "image_id": "a93b778e-19b0-4efc-b84b-1b630b9802c3",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Rotated undercarriage view from beneath truck looking back - shows transfer case, driveshaft, exhaust pipe, frame rails, leaf springs. Subject V3500 chassis.",
+    "notes": "Undercarriage looking rearward. Transfer case round cover visible. Exhaust system. Rotated framing."
+  }
+]

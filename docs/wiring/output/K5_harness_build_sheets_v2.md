@@ -103,7 +103,7 @@ All 8 ignition coil IC signal wires route as a single bundle from the firewall g
 
 **Wire count at branch entry:** 8
 **Wire length each:** 2.5 ft (measured from firewall grommet to DEL-Stributor bracket)
-**Bundle diameter:** ~0.27" (8x 20AWG TXL, OD 0.070" each)
+**Bundle diameter:** ~0.27" (8x 20AWG TEFZEL, OD 0.070" each)
 **Protection:** Raychem DR-25 heat shrink (3/8") over the full 2.5ft run. No need for ladder sub-branches — all 8 wires terminate at the same bracket.
 **Build note:** This is the simplest coil branch possible. All 8 wires run as a tight bundle straight from the firewall to the bracket. At the bracket end, fan out to 8 individual pigtails (6" each) terminating in the D510C coil connector (Pin A — IC signal). Each coil also needs B+ power (Pin C, bussed 16 AWG) and grounds (Pin B sensor ground, Pin D chassis ground) — those are local bus wires on the bracket, NOT part of this harness. See coil mapping document for D510C pinout.
 
@@ -758,7 +758,7 @@ No changes from v1.
 
 | Parameter | Value |
 |-----------|-------|
-| Cable | 22 AWG twisted pair, TXL rated |
+| Cable | 22 AWG twisted pair, TEFZEL rated |
 | Colors | WHT/GRN + GRN/WHT |
 | Termination | 120 ohm resistor at each end |
 | Twist rate | Minimum 1 twist per inch (25 twists/ft) |
@@ -1041,7 +1041,7 @@ The complete harness system should be built in this order. Each phase should be 
 
 ## 11. WIRE DIAMETER REFERENCE
 
-Approximate outer diameter (OD) for TXL automotive wire with insulation:
+Approximate outer diameter (OD) for TEFZEL automotive wire with insulation:
 
 | Gauge | Single Wire OD | Notes |
 |-------|---------------|-------|

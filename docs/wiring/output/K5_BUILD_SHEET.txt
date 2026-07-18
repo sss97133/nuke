@@ -1,0 +1,237 @@
+
+=========================================================================================================
+  K5 BUILD SHEET — 162 wires
+=========================================================================================================
+
+  >> ANALOG_5V COMPANION GROUND + 5V REF
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #102g OPS Sensor Ground             M130:B16      22  BLK         55.2in  3-1447221-5         
+  #102r OPS 5V Reference              M130:A02      22  GRY         55.2in  3-1447221-5         
+  #108g MAP Sensor Ground             M130:B15      22  BLK         55.2in  3-1447221-5         
+  #108r MAP 5V Reference              M130:A09      22  GRY         55.2in  3-1447221-5         
+  #112g Fuel Pressure Ground          M130:B16      22  BLK         55.2in  3-1447221-5         
+  #112r Fuel Pressure 5V Reference    M130:A02      22  GRY         55.2in  3-1447221-5         
+
+  >> ANALOG_TEMP COMPANION GROUND RETURNS
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #109g IAT Sensor Ground             M130:B15      22  BLK         55.2in  3-1447221-5         
+  #110g CLT Sensor Ground             M130:B16      22  BLK         55.2in  3-1447221-5         
+  #113g OTS Sensor Ground             M130:B15      22  BLK         55.2in  3-1447221-5         
+
+  >> AUDIO
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #26a  Speaker Front Left (+)        AMP CH1+      18  ORN/YEL     82.8in  ?                   
+  #26b  Speaker Front Left (-)        AMP CH1-      18  ORN/YEL/BLK 82.8in  ?                   
+  #27a  Speaker Front Right (+)       AMP CH2+      18  ORN/VIO     82.8in  ?                   
+  #27b  Speaker Front Right (-)       AMP CH2-      18  ORN/VIO/BLK 82.8in  ?                   
+  #28a  Speaker Rear Left (+)         AMP CH3+      18  ORN/ORG     220.8in ?                   
+  #28b  Speaker Rear Left (-)         AMP CH3-      18  ORN/ORG/BLK 220.8in ?                   
+  #29a  Speaker Rear Right (+)        AMP CH4+      18  ORN         220.8in ?                   
+  #29b  Speaker Rear Right (-)        AMP CH4-      18  ORN/BLK     220.8in ?                   
+  #30a  Subwoofer (+)                 AMP SUB+      14  ORN/WHT     220.8in ?                   
+  #30b  Subwoofer (-)                 AMP SUB-      14  ORN/WHT/BLK 220.8in ?                   
+  #31   Radio/Head Unit               PDM30:OUT20   18  ORN/BLK     42.0in  3-1447221-3         
+  #32   Amplifier                     ECU           8   ORN/RED     220.8in ?                   
+  #96   Amplifier Relay               ECU           22  ORN/BLK     220.8in ?                   
+
+  >> CHASSIS / UNDERBODY
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #1    AMP Research Step Left        PDM30:OUT9    14  ORN/BLK     138.0in ?                   
+  #2    AMP Research Step Right       PDM30:OUT10   14  ORN/BLK/WHT 138.0in ?                   
+  #3    AMP Research Controller       PDM30:OUT11   14  ORN/BLK/BLK 138.0in ?                   
+  #21   Radiator Fan 1                PDM30:OUT1    12  ORN/WHT     55.2in  ?                   
+  #22   Radiator Fan 2                PDM30:OUT2    12  ORN/BLK     55.2in  ?                   
+  #25   Electric Water Pump           PDM30:OUT5    14  ORN/BLU     55.2in  ?                   
+  #64   Wideband Lambda Controller    PDM30:OUT24   20  ORN/BLK     55.2in  3-1447221-4         
+  #66   Fuel Pump                     ECU           10  ORN/BLU     220.8in ?                   
+  #94   Fuel Pump Relay               PDM30         22  ORN         55.2in  ?                   
+  #100  Vehicle Speed Sensor          ECU           22  ORN/BLU     138.0in ?                   
+  #106  Wideband O2 Sensor 1          ECU           22  VIO/BLU     138.0in ?                   
+  #107  Wideband O2 Sensor 2          ECU           22  VIO/BLU/WHT 138.0in ?                   
+
+  >> DAKOTA DIGITAL DUAL-SENDER
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #114  Dakota CTS Sender             FACTORY GM C..22  TAN/WHT     96.0in  ?                   
+  #115  Dakota Oil Pressure Sender    FACTORY GM O..22  VIO/WHT     96.0in  ?                   
+  #116  Dakota Tach Signal            M130:A31      22  WHT/BLK     96.0in  3-1447221-5         
+  #117  Dakota Fuel Level Sender      FACTORY GM F..22  ORN/RED     220.8in ?                   
+  #118  Dakota VSS Speedometer        M130:A32      22  WHT/YEL     138.0in 3-1447221-5         
+  #119  Dakota Turn Signal L          tap #80 at d..22  LT BLU      18.0in  ?                   
+  #120  Dakota Turn Signal R          tap #82 at d..22  DK BLU      18.0in  ?                   
+  #121  Dakota High Beam              TBD           22  LT GRN      24.0in  ?                   
+  #122  Dakota Brake Indicator        tap #53 at d..22  ORN/WHT     18.0in  ?                   
+  #123  Dakota Ground                 STAR GND DAS..22  BLK         36.0in  ?                   
+  #124  Dakota Switched +12V Backup   PDM30:OUT29 ..22  ORN/RED     36.0in  3-1447221-5         
+
+  >> ECU_CRANK_CAM SHIELDED COMPANIONS
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #99g  CKP Sensor Ground (conductor..22 AWG    BL..?   ?           ?       ?                   
+  #99r  CKP 5V Reference              M130:A02      22  GRY         55.2in  3-1447221-5         
+  #99s  CKP Shield Drain              M130:B15    ..?   ?           ?       ?                   
+  #101g CMP Sensor Ground (conductor..M130:B16      22  BLK         55.2in  3-1447221-5         
+  #101r CMP 5V Reference              M130:A09      22  GRY         55.2in  3-1447221-5         
+  #101s CMP Shield Drain              M130:B16    ..?   ?           ?       ?                   
+
+  >> ENGINE LOOM
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #4a   ETB TAC Motor 2               M130:A01      18  BRN         55.2in  3-1447221-3         
+  #4b   ETB TAC Motor 1               M130:A18      18  YEL         55.2in  3-1447221-3         
+  #4c   ETB TPS1 Signal               M130:A14      22  DK GRN      55.2in  3-1447221-5         
+  #4d   ETB TPS2 Signal               M130:A17      22  PPL         55.2in  3-1447221-5         
+  #4e   ETB 5V Reference              M130:A02      22  GRY         55.2in  3-1447221-5         
+  #4f   ETB Signal Ground             M130:B15      22  BLK         55.2in  3-1447221-5         
+  #5    Ignition Coil 3               M130:A03      20  WHT         30.0in  3-1447221-4         
+  #7    Ignition Coil 5               M130:A04      20  WHT/WHT     30.0in  3-1447221-4         
+  #8    Ignition Coil 7               M130:A05      20  WHT/BLK     30.0in  3-1447221-4         
+  #9    Ignition Coil 2               M130:A06      20  WHT/RED     30.0in  3-1447221-4         
+  #10   Ignition Coil 4               M130:A07      20  WHT/BLU     30.0in  3-1447221-4         
+  #11   Ignition Coil 6               M130:A08      20  WHT/YEL     30.0in  3-1447221-4         
+  #12   Ignition Coil 8               M130:A12      20  WHT/VIO     30.0in  3-1447221-4         
+  #13   Fuel Injector 1               M130:A19      18  GRN         55.2in  Pre-terminated by   
+  #14   Fuel Injector 2               M130:A20      18  GRN/WHT     55.2in  3-1447221-3         
+  #15   Fuel Injector 3               M130:A21      18  GRN/BLK     55.2in  3-1447221-3         
+  #16   Fuel Injector 4               M130:A22      18  GRN/RED     55.2in  3-1447221-3         
+  #17   Fuel Injector 5               M130:A27      18  GRN/BLU     55.2in  3-1447221-3         
+  #18   Fuel Injector 6               M130:A28      18  GRN/YEL     55.2in  3-1447221-3         
+  #19   Fuel Injector 7               M130:A29      18  GRN/VIO     55.2in  3-1447221-3         
+  #20   Fuel Injector 8               M130:A30      18  GRN/ORG     55.2in  3-1447221-3         
+  #24   Ignition Coil 1               M130:A13      20  WHT/ORG     30.0in  3-1447221-4         
+  #97   Rear Backup Camera            PDM30:OUT15   20  BLU/WHT     220.8in 3-1447221-4         
+  #99   Crank Position Sensor         M130:B01    ..?   ?           ?       ?                   
+  #101  Cam Position Sensor           M130:B02    ..?   ?           ?       ?                   
+  #102  Oil Pressure Sensor (ECU)     M130:A14      22  VIO         55.2in  3-1447221-5         
+  #103  Knock Sensor Bank 1           M130:B07    ..?   ?           ?       ?                   
+  #104  Knock Sensor Bank 2           M130:B13    ..?   ?           ?       ?                   
+  #108  MAP Sensor                    M130:A15      22  VIO/WHT     55.2in  3-1447221-5         
+  #109  Intake Air Temp Sensor        M130:B03      22  TAN         55.2in  3-1447221-5         
+  #110  Coolant Temp Sensor (ECU)     M130:B04      22  TAN/WHT     55.2in  Pre-terminated by   
+  #112  Fuel Pressure Sensor          M130:A16      22  VIO/BLK     55.2in  3-1447221-5         
+  #113  Oil Temperature Sensor        M130:B05      22  TAN/BLK     55.2in  3-1447221-5         
+
+  >> E-STOPP ESK001 — DASH BUTTON TRIGGER
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #126  E-Stopp Trigger               DASH BUTTON   22  ORN/WHT     120.0in ?                   
+
+  >> EXTERIOR / BODY
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #33   Turn Signal Switch            ECU           18  ORN/BLU     42.0in  ?                   
+  #39   Headlight Switch              ECU           14  ORN/ORG     42.0in  ?                   
+  #46   Wiper/Washer Switch           ECU           18  ORN/VIO     42.0in  ?                   
+  #48   Horn                          PDM30:OUT14   14  ORN/ORG     55.2in  ?                   
+  #49   Windshield Wiper Motor        PDM30:OUT12   14  PPL         55.2in  ?                   
+  #50   Washer Pump                   PDM30:OUT26   18  ORN/BLK/RED 55.2in  3-1447221-3         
+  #53   Brake Light Switch            ECU           22  ORN/WHT     42.0in  ?                   
+  #54   Electric Parking Brake        PDM30:OUT7    14  ORN/BLK/YEL 220.8in ?                   
+  #75   Tail Light Right              PDM30:OUT13   18  BRN/YEL     220.8in 3-1447221-3         
+  #76   Backup Light Right            PDM30:OUT15   18  BRN/VIO     220.8in 3-1447221-3         
+  #77   Side Marker Rear Left         PDM30:OUT19   18  BRN/ORG     220.8in 3-1447221-3         
+  #78   Side Marker Rear Right        PDM30:OUT19   18  BRN         220.8in 3-1447221-3         
+  #79   Cab Clearance Light Left      PDM30:OUT19   18  BRN/WHT     42.0in  3-1447221-3         
+  #80   Turn Signal Left Front        PDM30:OUT27   18  LT BLU      55.2in  3-1447221-3         
+  #81   Tail Light Left               PDM30:OUT13   18  BRN/BLK     220.8in 3-1447221-3         
+  #82   Turn Signal Right Front       PDM30:OUT28   18  DK BLU      55.2in  3-1447221-3         
+  #83   Parking Light Left Front      PDM30:OUT13   18  BRN/RED     55.2in  3-1447221-3         
+  #84   Parking Light Right Front     PDM30:OUT13   18  BRN/BLU     55.2in  3-1447221-3         
+  #85   LED Headlight Left            PDM30:OUT17   16  LT GRN      55.2in  3-1447221-3         
+  #86   LED Headlight Right           PDM30:OUT18   16  LT GRN/WHT  55.2in  3-1447221-3         
+  #87   Side Marker Front Left        PDM30:OUT19   18  BRN/YEL     55.2in  3-1447221-3         
+  #88   Side Marker Front Right       PDM30:OUT19   18  BRN/VIO     55.2in  3-1447221-3         
+  #89   Backup Light Left             PDM30:OUT15   18  BRN/ORG     220.8in 3-1447221-3         
+  #90   Cab Clearance Light Center    PDM30:OUT19   18  BRN         42.0in  3-1447221-3         
+  #91   Cab Clearance Light Right     PDM30:OUT19   18  BRN/WHT     42.0in  3-1447221-3         
+  #92   License Plate Light           PDM30:OUT19   18  BRN/BLK     220.8in 3-1447221-3         
+  #93   Third Brake Light             PDM30:OUT15   18  BRN/RED     220.8in 3-1447221-3         
+
+  >> HIGH-BEAM CIRCUIT
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #85a  LED Headlight Left LOW        FLOOR DIMMER..?   ?           ?       ?                   
+  #85b  LED Headlight Left HIGH       FLOOR DIMMER..?   ?           ?       ?                   
+  #86a  LED Headlight Right LOW       FLOOR DIMMER..?   ?           ?       ?                   
+  #86b  LED Headlight Right HIGH      FLOOR DIMMER..?   ?           ?       ?                   
+
+  >> HOLLEY 558-499 T43 TCU — CAN BUS EXTENSION
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #125  TCU CAN Bus Tap               splice on #6..?   ?           ?       ?                   
+
+  >> INTERIOR / DASH
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #34   Power Window Motor Left       PDM30:OUT3    12  DK BLU      82.8in  ?                   
+  #35   Power Window Motor Right      PDM30:OUT4    12  DK BLU/WHT  82.8in  ?                   
+  #36   Window Switch Master (Driver..ECU           14  ORN/YEL     82.8in  ?                   
+  #37   Window Switch Passenger       ECU           14  ORN/VIO     82.8in  ?                   
+  #38   Power Lock Actuator Left      PDM30:OUT21   18  BLK         82.8in  3-1447221-3         
+  #42   Door Switch Left              ECU           18  ORN/BLK     82.8in  ?                   
+  #43   Door Switch Right             ECU           18  ORN/RED     82.8in  ?                   
+  #44   Lock Switch                   ECU           18  ORN/BLU     82.8in  ?                   
+  #45   Blower Speed Switch/Control   ECU           14  ORN/YEL     42.0in  ?                   
+  #47   Power Lock Actuator Right     PDM30:OUT22   18  BLK/WHT     82.8in  3-1447221-3         
+  #51   Heater Blower Motor           PDM30:OUT6    12  ORN/BLK/BLU 55.2in  ?                   
+  #65   Display/Dash                  PDM30:OUT29   22  ORN/RED     42.0in  3-1447221-5         
+  #67   Dome Light                    PDM30:OUT25   20  BRN         42.0in  3-1447221-4         
+  #68   Under-Dash LED Lights         PDM30:OUT25   20  BRN/WHT     42.0in  3-1447221-4         
+  #69   Footwell Lights               PDM30:OUT25   20  BRN/BLK     42.0in  3-1447221-4         
+  #70   USB Charging Port             PDM30:OUT30   18  ORN/YEL     42.0in  3-1447221-3         
+  #71   Dakota Digital Gauge Cluster  PDM30         18  ORN/VIO     42.0in  ?                   
+  #72   Cigarette Lighter / 12V Outl..PDM30:OUT8    14  ORN/ORG     42.0in  ?                   
+
+  >> LOGIC_COIL_DRIVE
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #COIL_GNDCoil Ground Rail              ENGINE BLOCK  14  BLK         36.0in  ?                   
+  #COIL_PWRCoil +12V Rail                PDM30:OUT?    14  RED         36.0in  ?                   
+
+  >> LOW_SIDE_DRIVE
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #INJ_PWRInjector +12V Rail            PDM30:OUT?    16  RED         60.0in  3-1447221-3         
+
+  >> MISC
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #23   A/C Compressor Clutch         PDM30:OUT16   18  ORN/RED     55.2in  3-1447221-3         
+  #40   Ignition Switch               ECU           14  ORN         42.0in  ?                   
+  #41   Hazard Flasher                ECU           18  ORN/WHT     42.0in  ?                   
+  #52   Bosch V4 Electric Brake Boos..ECU           10  ORN         55.2in  ?                   
+  #55   Transfer Case Indicator       PDM30         16  ORN/BLK     138.0in ?                   
+  #56   Neutral Safety Switch         PDM30         14  ORN/RED     138.0in ?                   
+  #57   Reverse Light Switch          PDM30         18  ORN/BLU     138.0in ?                   
+  #58   Transmission Controller       PDM30:OUT23   20  ORN/YEL     42.0in  3-1447221-4         
+  #60   ECU                           ECU           20  ORN/ORG     55.2in  ?                   
+  #61   Power Distribution Module     ECU           22  ORN         42.0in  ?                   
+  #73   Underhood Light               PDM30:OUT25   20  BRN/RED     55.2in  3-1447221-4         
+  #74   Cargo/Bed Light               PDM30:OUT25   20  BRN/BLU     220.8in 3-1447221-4         
+  #95   Bosch iBooster Relay          PDM30         22  ORN/WHT     27.6in  ?                   
+  #98   Fuel Level Sender             ECU           20  ORN/RED     220.8in ?                   
+  #105  A/C Pressure Switch Low       ECU           22  ORN/YEL     55.2in  ?                   
+  #111  A/C Pressure Switch High      ECU           22  ORN/VIO     55.2in  ?                   
+
+  >> PIEZOELECTRIC KNOCK COMPANIONS
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #103g Knock B1 Sensor Ground (cond..M130:B15      22  BLK         55.2in  3-1447221-5         
+  #103s Knock B1 Shield Drain         M130:B15    ..?   ?           ?       ?                   
+  #104g Knock B2 Sensor Ground (cond..M130:B16      22  BLK         55.2in  3-1447221-5         
+  #104s Knock B2 Shield Drain         M130:B16    ..?   ?           ?       ?                   
+
+  >> POWER / COMM
+  #     LABEL                         ECU PIN       GA  COLOR       LEN     TERM-B              
+  ──────────────────────────────────────────────────────────────────────────────────────────────
+  #6    Starter Motor                 ECU           4   ORN         55.2in  ?                   
+  #59   Alternator                    ECU           8   ORN/VIO     55.2in  ?                   
+  #62   CAN Bus Network               ECU         ..?   ?           ?       ?                   
+  #63   Battery Disconnect            ECU           4   ORN/WHT     55.2in  ?                   
+
+  Total: 162 wires
+

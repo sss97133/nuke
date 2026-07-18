@@ -55,6 +55,25 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
+// ─── DISABLED 2026-05-30 — privacy incident ────────────────────────────────
+// This script dumped ENTIRE iMessage threads (private texts + every attached
+// photo) into PUBLIC vehicle records: work_sessions.work_description and
+// vehicle_images. It had no relevance/personal-content gate and a broken
+// attributedBody parser that leaked raw NSKeyedArchiver keys
+// (__kIMFileTransferGUIDAttributeName) into published text. Result: private
+// family photos and personal conversations (contacts Tommy Taylor, Ernie
+// Wilder, Dave Granholm) were readable on public, is_public=true vehicles.
+// 729 work_sessions + 699 vehicle_images + 699 public storage files purged.
+//
+// DO NOT re-enable without: (1) opt-in per-message, photos-only by default,
+// (2) a real typedstream attributedBody decoder, (3) vision_gate_status gating
+// at the PUBLISH boundary. See the 2026-05-30 audit.
+if (process.env.NUKE_IMESSAGE_SYNC_REENABLED !== '1') {
+  console.error('imessage-vehicle-sync is DISABLED (privacy incident 2026-05-30). Refusing to run.');
+  console.error('It published private texts/photos to public vehicle records. See header comment.');
+  process.exit(78); // EX_CONFIG
+}
+
 const CHAT_DB_PATH = join(os.homedir(), 'Library/Messages/chat.db');
 const CONFIG_FILE = join(os.homedir(), '.nuke-imessage-vehicles.json');
 const CURSOR_FILE = join(os.homedir(), '.nuke-imessage-vehicle-sync.json');

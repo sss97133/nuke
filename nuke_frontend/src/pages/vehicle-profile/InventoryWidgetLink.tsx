@@ -116,6 +116,19 @@ const InventoryWidgetLink: React.FC<Props> = ({ vehicleId }) => {
         >
           LIVE ANALYSIS STREAM →
         </Link>
+        <Link
+          to="/intake/live"
+          className="button-win95"
+          style={{
+            display: 'inline-block',
+            textAlign: 'center',
+            fontWeight: 700,
+            textDecoration: 'none',
+            color: 'inherit',
+          }}
+        >
+          LIVE INTAKE (FLEET BURN) →
+        </Link>
       </div>
     </CollapsibleWidget>
   );

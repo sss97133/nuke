@@ -1118,6 +1118,27 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
               {fmtNum(totalCount)} vehicles / {fmtMoney((activeData || []).reduce((s, n) => s + n.value, 0))} total value
             </span>
           )}
+          {currentLevel.year && currentLevel.make && currentLevel.model && (
+            <Link
+              to={`/cohort/${encodeURIComponent(currentLevel.make.toLowerCase())}/${encodeURIComponent(currentLevel.model.toLowerCase())}/${currentLevel.year}`}
+              style={{
+                fontSize: 8,
+                fontWeight: 700,
+                letterSpacing: '0.10em',
+                textTransform: 'uppercase',
+                fontFamily: 'Arial, sans-serif',
+                border: '2px solid var(--text)',
+                background: 'var(--text)',
+                color: 'var(--bg)',
+                cursor: 'pointer',
+                padding: '4px 12px',
+                whiteSpace: 'nowrap',
+                textDecoration: 'none',
+              }}
+            >
+              COHORT TERMINAL →
+            </Link>
+          )}
           {currentLevel.make && (
             <button
               onClick={() => {

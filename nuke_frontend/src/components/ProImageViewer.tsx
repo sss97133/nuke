@@ -202,7 +202,9 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
         .not('is_superseded', 'is', true)
         .or('vision_gate_status.is.null,vision_gate_status.not.in.("rejected_personal","rejected_misattributed")');
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data, error } = await query
+        .order('taken_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('ProImageViewer: Database error:', error);

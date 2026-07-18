@@ -1,0 +1,152 @@
+[
+  {
+    "image_id": "82617941-1ff1-4b5b-9d63-0e90dbce08b2",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "RM Auto Sales stock card / sale paperwork dated Aug 8 2024 with embedded photo of the yellow K10. Stock# RM 0699, VIN partial CKE142Z1622??, Model K10, Series Custom, Year 1972, Make Chevrolet, Color Ochre. Acquisition-context paperwork for THIS vehicle."
+  },
+  {
+    "image_id": "c413e5fe-db2b-4db6-ba79-ffecc94a7875",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Underside view of yellow LWB pickup on a two-post lift — exhaust, frame rails, fuel tank, drivetrain visible. Consistent with the K10 in other shots."
+  },
+  {
+    "image_id": "35610a4c-560e-4a7b-a936-e443a6b95c5b",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Underside / drivetrain shot showing transfer case, driveshaft, transmission crossmember, dual exhaust — 4WD layout consistent with K10. Same yellow rocker visible above frame."
+  },
+  {
+    "image_id": "cd85e19a-b344-4ec9-b3d5-a91de5f26b5b",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Front axle / steering / brake rotor closeup on lift, yellow front fender lip visible. Solid front axle = 4WD K-prefix consistent with K10."
+  },
+  {
+    "image_id": "ebce3539-241d-4806-a549-b2a7aa8e9aa8",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Yellow 1967-72 Chevrolet pickup on two-post lift, wheels off, CHEVROLET tailgate lettering visible, LWB bed. Subject vehicle."
+  },
+  {
+    "image_id": "c56002a5-fdcf-48f4-927b-13961de74492",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Same yellow K10 on lift from rear quarter — CHEVROLET tailgate, taillight housing, bed sides. Same session as 004."
+  },
+  {
+    "image_id": "c41e3fc8-e43b-4eb7-9408-d67c6f3e73fe",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Action Line dash cluster closeup — speedo (83056 mi), tach, fuel, battery + temperature gauges, LIGHTS knob, tan dash pad. Classic 1971-72 GM C/K interior."
+  },
+  {
+    "image_id": "043342aa-eb1f-4194-9f33-d9399122c10f",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Steering wheel + full dash view, brown 1971-72 GM C/K steering wheel with Chevy bowtie horn pad, yellow dash, full instrument cluster, AC vents — Action Line interior."
+  },
+  {
+    "image_id": "0a42f271-4f18-4d57-a0b0-9e3cf58da6ac",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Cream bench seat, brown steering wheel, yellow door, Action Line dash visible. Interior of subject K10."
+  },
+  {
+    "image_id": "74cb1a57-b43a-45f3-a90d-3640ea944bf1",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Driver-side interior — cream bench seat, AC vent, brown wheel, gauge cluster, yellow door panel insert. Action Line cab."
+  },
+  {
+    "image_id": "7f7f8e58-425b-4fb0-8839-d316c41e49ad",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Yellow door panel with cream insert, chrome interior handle, gauge cluster visible through doorway. 1971-72 GM C/K door panel."
+  },
+  {
+    "image_id": "fbdd5a5e-6302-4b8d-93fb-f5487016eb5e",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Passenger-side interior, door open, cream bench, Action Line dash. Same vehicle."
+  },
+  {
+    "image_id": "78e25ce7-cdde-495a-97f8-649d3d425684",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rear passenger 3/4 of yellow LWB pickup, slider window, painted bed with chrome trim strip, lifted, LED taillights, M/T wheel center cap. Subject K10."
+  },
+  {
+    "image_id": "45d243c5-9cb5-4c00-b782-d03619e788c2",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rear quarter of yellow LWB pickup, fuel filler door behind cab, LED taillight retrofit, Wild Country tires. Same K10."
+  },
+  {
+    "image_id": "02db5389-5b2d-4bc7-86aa-a156a376ca36",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Front-end closeup — chrome headlight bezel, yellow fender, marker light, grille edge. 1971-72 GM C/K front end. Background shows another vehicle (GMC squarebody) but subject is the K10."
+  },
+  {
+    "image_id": "392bbcd4-2c0e-46c7-8b3e-9dabcd0a1c64",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Front grille of 1971-72 Chevy C/K — egg-crate grille with center bowtie, dual round headlights, chrome bumper with amber marker lights. Yellow hood. Classic Action Line styling."
+  },
+  {
+    "image_id": "3bead567-c310-4ae9-9470-bd844ec7f3d0",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Passenger headlight + marker closeup, 1971-72 GM C/K trim, yellow paint. Subject K10."
+  },
+  {
+    "image_id": "5c1baa57-b3bf-4f82-b693-08c9cf0e97ed",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Front grille + bumper view from passenger side, 1971-72 Action Line styling, lifted stance, M/T wheels."
+  },
+  {
+    "image_id": "2957b6e3-a575-4743-8ef3-3eb301f8ae2c",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Passenger front fender with 'Custom/10' badge and 'C-10' badge below marker light. 1971-72 Chevrolet C/K (this is a /10 series). Note: badge says C-10 but lifted stance and rest of context (acquisition paperwork is K10) suggests possibly badge swap; still falls inside approved 1967-72 GM C/K window."
+  },
+  {
+    "image_id": "b191e6fa-73f9-45f1-bdec-303e5a89f048",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Driver door + passenger door with 'Custom/10' badge, chrome mirror, slider window. 1971-72 GM C/K LWB."
+  },
+  {
+    "image_id": "d61ab199-c372-48d0-b567-ca5c32c3b5bf",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Rear passenger quarter — LWB fleetside bed, LED taillight, chrome trim, M/T wheel. Same yellow K10."
+  },
+  {
+    "image_id": "884ef77e-9e6b-4efc-a576-557afe9b83eb",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Full passenger 3/4 view of yellow 1971-72 Chev LWB pickup, lifted 4WD, Custom/10 badge, Action Line front, chrome bumpers. Hero shot of subject vehicle."
+  },
+  {
+    "image_id": "4ab674de-6e62-4840-b493-8d5ad5f748fb",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Passenger 3/4 hero shot, 1971-72 Chev C/K LWB, lifted, M/T Wild Country tires. Subject K10."
+  },
+  {
+    "image_id": "b86b1920-5769-4bec-a0d3-e416207865b8",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Passenger front 3/4 hero shot of yellow 1971-72 Chev C/K LWB pickup, lifted 4WD. Subject vehicle."
+  },
+  {
+    "image_id": "027409c3-e6fb-40bd-bd7a-4ebb6ffde390",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Driver 3/4 hero shot, yellow 1971-72 Chev C/K LWB pickup, lifted 4WD, Action Line styling. Subject K10."
+  }
+]

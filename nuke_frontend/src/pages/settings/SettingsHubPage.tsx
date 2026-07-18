@@ -22,6 +22,11 @@ interface SettingsSurface {
 
 const SURFACES: SettingsSurface[] = [
   {
+    path: '/settings/analysis',
+    label: 'Analysis Compute',
+    description: 'Choose how your vehicles get analyzed: NUKE-hosted, your API key, or your Claude subscription.',
+  },
+  {
     path: '/settings/connected-agents',
     label: 'Connected Agents',
     description: 'Issue, scope, and revoke per-vehicle API keys for external agents.',

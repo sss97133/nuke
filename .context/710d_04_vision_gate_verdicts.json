@@ -1,0 +1,378 @@
+[
+  {
+    "order": 0,
+    "image_id": "e6c016a7-703c-4989-a393-64eabf90d3a6",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Interior shot — tan diamond-stitch leather seats, white body panels, roll cage with harness. Matches 710d signature (white paint + tan diamond-stitch + cage).",
+    "notes": "Diamond-stitch upholstery; roll cage with safety harness mount visible; tan door card with diamond-stitch insert."
+  },
+  {
+    "order": 1,
+    "image_id": "9d54c258-da71-414e-8d92-9ccfcbbcdb8c",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Underbody measurement — black-painted chassis, leaf spring, mud tire. Tape measure on axle/spring measurement — restoration documentation work consistent with this build.",
+    "notes": "Tape measure measurement; chassis/leaf-spring documentation."
+  },
+  {
+    "order": 3,
+    "image_id": "8b64a703-a4bd-4d20-9583-93731b17cf5b",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Blue powdercoated coil spring (Wild Horses) with tape measure, mud-terrain tire — matches 710d Wild Horses springs + blue powdercoat.",
+    "notes": "Tape measure on blue coil spring; spring labeled 'STUFF 5103' (Wild Horses 5103-series)."
+  },
+  {
+    "order": 4,
+    "image_id": "6868b7db-6c1a-4ff5-941d-0ef1c848e375",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Close-up of blue powdercoated coil + tape measure on Wild Horses spring (STUFF 5103 visible).",
+    "notes": "Tape measure; 'STUFF 5103' spring marking visible."
+  },
+  {
+    "order": 5,
+    "image_id": "19fd4aa6-698a-4211-8314-ec3f4fc114f0",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "White body lower edge + tan undercoat/inner-fender + mud tire — measurement of body-to-tire clearance. Consistent with 710d (white paint).",
+    "notes": "Tape measure measurement; tan inner-fender + white outer body visible."
+  },
+  {
+    "order": 6,
+    "image_id": "a61d325b-d107-4e69-b352-aaccfed0f007",
+    "verdict": "approved",
+    "confidence": 0.94,
+    "reasoning": "Body-to-blue-spring measurement — white body lower edge + blue powdercoat coil. Matches 710d palette.",
+    "notes": "Tape measure measurement of body to spring."
+  },
+  {
+    "order": 7,
+    "image_id": "0eea552d-bbda-4864-93d6-f282a0956e5a",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Tape measure on blue powdercoated coil spring (STUFF 5103 — Wild Horses).",
+    "notes": "Tape measure measurement of spring height; 'STUFF 5103' marking visible (Wild Horses)."
+  },
+  {
+    "order": 8,
+    "image_id": "7b6c474e-9166-4fea-832b-6c443d1d383c",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Front suspension w/ blue coil + braided line + steering knuckle/tire. Consistent with 710d front end (blue powdercoat).",
+    "notes": "Tape measure measurement of coil spring."
+  },
+  {
+    "order": 9,
+    "image_id": "78feaf22-96a9-40c6-8624-271502d643c3",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Bare aluminum oil pan (TCI/aftermarket transmission/oil pan) with Ranchos shock packaging visible. Generic restoration part — sitting in this build's parts collection.",
+    "notes": "Aluminum pan with raised lettering 'TCI' or similar mfg; Rancho RS5000 shock visible in background."
+  },
+  {
+    "order": 10,
+    "image_id": "55f9d5f3-afff-4d7f-83d0-bf853e53ff51",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Automatic transmission valve body (C4/C6-style — Ford) on underside of vehicle, with yellow dipstick. Ford auto-trans valve body fits early Bronco doctrine.",
+    "notes": "Ford automatic transmission valve body exposed; yellow trans dipstick visible."
+  },
+  {
+    "order": 11,
+    "image_id": "26cdc791-f945-429c-b5c5-3da6a8636fc0",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Front suspension — blue powdercoated coil + radius arm + steering knuckle + tire. Pure 710d front end (blue powdercoat, Wild Horses, mud-terrain).",
+    "notes": ""
+  },
+  {
+    "order": 12,
+    "image_id": "677e0fea-cadf-4b7c-8c68-fc81b1ba6da7",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Blue powdercoated chassis/frame component with braided steel line — blue powdercoat is 710d signature.",
+    "notes": ""
+  },
+  {
+    "order": 13,
+    "image_id": "be2f0b9d-c5d0-464d-b831-cca4cc01655a",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Blue powdercoated steering knuckle/coil bucket on front axle — matches 710d front-end build.",
+    "notes": ""
+  },
+  {
+    "order": 14,
+    "image_id": "5e68903e-85f0-4d32-9eb8-e3e8ad4362f5",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Pair of new Bilstein B8 5100 shocks in factory boxes on jack stand — parts staging for this build.",
+    "notes": "Bilstein B8 5100 boxes visible; product images on box; shocks new in package."
+  },
+  {
+    "order": 16,
+    "image_id": "78dc772d-7c39-4b03-8117-bdd7a2820be6",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Bilstein shock box label close-up — P/N 24-185493, BIL88117, B8 5100 Shock for Stud/Eye Mount. Direct parts receipt for this build.",
+    "notes": "Bilstein P/N 24-185493 / BIL88117 / B8 5100 Stud/Eye Mount; UPC 65186 0453583; QR code; CA Prop 65 warning."
+  },
+  {
+    "order": 17,
+    "image_id": "2bd210be-9912-4b5d-9640-1c85daf30255",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Bilstein shock box label with sticker dated 02/12/25 — purchase/shipping receipt detail.",
+    "notes": "Date 02/12/25 visible; P/N BIL24-185493; SF code; sticker is dated paperwork."
+  },
+  {
+    "order": 18,
+    "image_id": "d0377658-d848-498f-af52-d4fa034fa04d",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Pair of Bilstein shocks on top of their factory boxes — parts staging.",
+    "notes": "Bilstein boxes with multilingual labeling; SF SKU sticker visible."
+  },
+  {
+    "order": 19,
+    "image_id": "2ca39209-f236-4fce-aa0b-c4e5a948d28c",
+    "verdict": "approved",
+    "confidence": 0.5,
+    "reasoning": "Close-up of an unidentified mechanical component (looks like transmission/transfer-case shifter detent or governor). In this bucket so likely a 710d build part — but ambiguous in isolation.",
+    "notes": ""
+  },
+  {
+    "order": 20,
+    "image_id": "e63e50dd-3a3f-4508-9728-c28bed37ba0a",
+    "verdict": "approved",
+    "confidence": 0.55,
+    "reasoning": "Close-up of mechanical assembly (looks like transmission internals or transfer case shift detent area). In 710d bucket — treat as build content.",
+    "notes": ""
+  },
+  {
+    "order": 21,
+    "image_id": "61e0c677-85a2-4a10-aac8-a90ccf0d88f7",
+    "verdict": "approved",
+    "confidence": 0.5,
+    "reasoning": "Close-up of mechanical component — appears to be transfer case or transmission internal detail. In bucket so treated as build content.",
+    "notes": ""
+  },
+  {
+    "order": 23,
+    "image_id": "aaeadc7d-4b01-4700-8ced-d51f834d1020",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Amazon screenshot — Flashpower 18\" Dual Pass Aluminum Finned Transmission Cooler. Parts research / shopping for this build.",
+    "notes": "Amazon mobile screenshot; product: 'Flashpower 18\" Dual Pass Aluminum Finned Transmission Coolers'; review rating 4.6 (265); 'Purchased another variation 2 times — Last purchased Feb 6, 2020 — 15\" Dual Pass'; dated purchase history."
+  },
+  {
+    "order": 24,
+    "image_id": "2b9fcbcc-61f6-433a-8545-0f5597790c7c",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Engine bay close-up — distributor cap + fuel filter (silver canister) + blue Ford engine block (351W) + chromed valve cover + braided plug wire boot. Matches 710d (Ford 351W on blue paint).",
+    "notes": "Distributor; inline fuel filter; chrome valve cover; alternator pulley w/ '20101L1' marking on belt; blue Ford block (351W color)."
+  },
+  {
+    "order": 25,
+    "image_id": "3a82da63-330a-44b0-b217-485480caa949",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front of engine bay — radiator, electric fan, alternator (P/N 7749A visible on label), red Granatelli plug wires. Build-progress content.",
+    "notes": "Alternator label '7749A' partially visible; red Granatelli wires; electric cooling fan; welder ('Vulcan') and battery jumper in shop background."
+  },
+  {
+    "order": 26,
+    "image_id": "3bc38aa1-3ebf-4d9c-8e2d-212fae14dd65",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Undercarriage — twin chromed Flowmaster-style mufflers + bedliner-coated body + transfer case (red — likely Atlas or Klune). Custom undercarriage of this build.",
+    "notes": "Twin polished mufflers; red transfer case (Atlas-style); bedliner-coated underbody."
+  },
+  {
+    "order": 27,
+    "image_id": "a3d1c403-06bb-4f85-8331-50987ed9a730",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Blue Ford C4/C6 bellhousing with Ford blue oval visible, shift linkage attached, braided lines — classic Ford auto-trans on 351W. Pure 710d.",
+    "notes": "Ford blue oval logo visible on bellhousing; shift linkage rod; braided steel lines."
+  },
+  {
+    "order": 28,
+    "image_id": "07b3ac54-6eaa-4ae1-a7d2-13c54acf7d72",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Blue Ford engine block side w/ braided lines, stainless header tube, plug wire/boot. 351W on blue paint = 710d.",
+    "notes": "Blue Ford 351W block; stainless header collector; braided AN line."
+  },
+  {
+    "order": 29,
+    "image_id": "bcc70998-2fc9-434c-9e8c-504d9b32c722",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Blue Ford engine block + braided steel line + stainless header — same engine bay context as 028.",
+    "notes": ""
+  },
+  {
+    "order": 30,
+    "image_id": "289b3ed3-7099-47ef-9709-5c6b5191ff35",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Mud-terrain tire (Truxus/similar) on disc-brake hub — wheel/tire fitment work consistent with 710d build.",
+    "notes": "DOT date code partially visible on tire sidewall; disc brake rotor + caliper-less hub; spindle/lug studs visible."
+  },
+  {
+    "order": 31,
+    "image_id": "583b4e5a-ceba-4491-a2c6-80cae70302e5",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Vehicle on red Harbor Freight jack stand — mud-terrain tire + leaf spring + battery jumper. Build/shop work shot.",
+    "notes": "Red HF-style jack stand; battery in red box; leaf spring + drum brake backing plate."
+  },
+  {
+    "order": 32,
+    "image_id": "179a8e28-f0ea-4551-9e0a-d6eafb3325d4",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Vision-brand wheel center cap close-up with lock + lug nuts. Matches 710d Vision wheel application (also seen at 040).",
+    "notes": "Vision-brand wheel; locking lug pattern; wheel lock key in yellow."
+  },
+  {
+    "order": 33,
+    "image_id": "e70a0b05-2a25-4679-88f8-313c3a7e6f40",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Close-up of bolts on a steel cup (likely drum brake or transmission inspection cover) against blue powdercoated chassis member. Build detail shot.",
+    "notes": ""
+  },
+  {
+    "order": 34,
+    "image_id": "ff9bc94b-7fba-4729-afdf-4922c57e884e",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Front suspension — blue Wild Horses coil + blue powdercoated radius arm/coil bucket + steel brake dust shield + mud tire. Marking '1210 10P.R.' on tire sidewall.",
+    "notes": "Tire sidewall '1210 10P.R.' (Q load / 10-ply); blue powdercoat suspension; brake dust shield."
+  },
+  {
+    "order": 35,
+    "image_id": "00977627-fdd7-4f53-b589-fdfb61cb2d69",
+    "verdict": "approved",
+    "confidence": 0.65,
+    "reasoning": "Stainless fuel tank with fuel-cell-style filler neck + brass fitting (vent). Build fuel tank detail.",
+    "notes": "Polished aluminum/stainless tank; flush filler neck mount with brass vent; tank could be aluminum fuel cell."
+  },
+  {
+    "order": 36,
+    "image_id": "f0a01355-f000-4df2-a6d4-a5f29ce3213d",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Bilstein shock installed on blue radius arm/coil-bucket + blue coil spring + mud tire. Direct 710d front suspension shot.",
+    "notes": "Bilstein silver+blue shock body visible; '5100' sticker; blue Wild Horses coil."
+  },
+  {
+    "order": 37,
+    "image_id": "2b7a12f5-e3be-4a1b-ad68-256d3987aa58",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Bilstein shock close-up installed on the chassis — frame rail + shock + blue coil + bumper bracket area.",
+    "notes": "Bilstein blue/silver shock; brand label visible."
+  },
+  {
+    "order": 38,
+    "image_id": "f1845fea-b19a-4a5e-acc0-338b3c27ee8f",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rear suspension — disc brake caliper + e-brake actuator + Bilstein shock + frame + tire. Rear disc conversion is common Bronco upgrade.",
+    "notes": "Rear caliper w/ integrated parking brake lever; Bilstein shock body; mud tire."
+  },
+  {
+    "order": 39,
+    "image_id": "732300cb-7fd4-4800-85e3-5bda20939257",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Bilstein 24-185493 (visible on shock body label) being installed — same P/N as box label in image 16. Tan undercoat body visible above + mud tire.",
+    "notes": "Bilstein shock body label visible (24-185 prefix matches 24-185493 from box); tan-painted underbody."
+  },
+  {
+    "order": 40,
+    "image_id": "209665e8-9a1d-4af3-9443-7effb589e166",
+    "verdict": "approved",
+    "confidence": 0.97,
+    "reasoning": "Rear of Bronco with tailgate-mounted spare tire — Atturo Trail Blade XT 35x12.50R17 on Vision wheel + tan/cream body color visible + 'Bronco' script badge. THIS IS THE 710d — definitive hero shot.",
+    "notes": "ATTURO Trail Blade XT tire (35x12.50R17 visible); Vision wheel (matches images 032/041); 'Bronco' script badge on tailgate; tan/cream paint (likely the 'tan' interior color is also the body — note: this body color may indicate paint is actually tan-ish, not pure white)."
+  },
+  {
+    "order": 41,
+    "image_id": "39a145cf-7d3f-405a-8c66-ba133bc91dd3",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Steering gearbox close-up (black painted) — early Bronco-style steering box with sector shaft. Build detail.",
+    "notes": "Bolts with Ford-style 'F' head markings visible."
+  },
+  {
+    "order": 42,
+    "image_id": "e391ead0-628c-4aff-a355-0c10811df644",
+    "verdict": "approved",
+    "confidence": 0.92,
+    "reasoning": "Stainless exhaust tip terminating near frame rail next to blue painted component + brass fitting. Custom exhaust on 710d.",
+    "notes": "Polished stainless exhaust tip; blue powdercoated frame component; brass union fitting."
+  },
+  {
+    "order": 43,
+    "image_id": "ff8b53b4-1ebf-4deb-9291-96a55d105ee6",
+    "verdict": "approved",
+    "confidence": 0.96,
+    "reasoning": "Front axle inner — blue powdercoated radius arm + steering knuckle + blue coil + caliper + mud tire. Tire sidewall DOT marking partially visible.",
+    "notes": "Tire DOT side: 'DOT [...]45 LKFR3L'; blue powdercoat radius arm; caliper visible."
+  },
+  {
+    "order": 44,
+    "image_id": "993ecc75-7355-4eee-a0ef-3586a44794cc",
+    "verdict": "approved",
+    "confidence": 0.93,
+    "reasoning": "Frame-rail shock mount + sway bar end-link + blue coil spring + leaf spring shackle. Build chassis detail.",
+    "notes": ""
+  },
+  {
+    "order": 45,
+    "image_id": "88ade9e6-f55a-4d39-ab38-6ff98c615d6e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Stainless exhaust tip + braided AN line + blue painted engine — header/exhaust + fuel line detail.",
+    "notes": ""
+  },
+  {
+    "order": 46,
+    "image_id": "0c1fb68a-d082-4910-88ce-bc1523cc0aae",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Browser screenshot of tomsoffroad.com '66-77 Ford Bro[nco]' product — power running boards for early Bronco. Direct parts shopping for THIS vehicle's year range.",
+    "notes": "URL 'tomsoffroad.com'; page title '66-77 Ford Bro[nco]'; product = power running boards kit; phone screenshot 4:54 PM; date code visible on phone; Tom's Offroad is an early-Bronco specialist."
+  },
+  {
+    "order": 47,
+    "image_id": "c2054085-f656-4d1e-bb2c-d78b67380141",
+    "verdict": "approved",
+    "confidence": 0.99,
+    "reasoning": "Same tomsoffroad.com '66-77 Ford Bro[nco]' page — power running board motors and step detail. Parts shopping for early Bronco.",
+    "notes": "URL 'tomsoffroad.com'; '66-77 Ford Bro[nco]' page title; AMP Research-style power step motors; matches AMP Research module installed in image 049."
+  },
+  {
+    "order": 48,
+    "image_id": "58da8e4a-bf1e-4bb5-91b1-697531b9fcab",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Coiled wiring harness loom hanging under the vehicle — restoration/build wiring work. Some blue painted chassis member visible in background.",
+    "notes": "Convoluted (split-loom) tubing with vehicle harness; blue chassis member visible."
+  },
+  {
+    "order": 49,
+    "image_id": "32d9d1fe-feb3-499d-b20a-5b9f93c8c119",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "AMP Research power-step controller module + MSD Street Fire CDI multi-spark ignition box (P/N 5520) — both early-Bronco-compatible aftermarket modules installed in interior console.",
+    "notes": "AMP RESEARCH module (matches running boards in 046/047); MSD Street Fire CDI 'PN 5520' visible; wiring harness with butt-connector splices; mounted in white-painted interior compartment."
+  }
+]

@@ -4,8 +4,14 @@ import {
   getAttribute,
   getChecklist,
   validateSubmission,
+  validateEvidenceClass,
+  admissibleEvidence,
   type SubjectKind,
 } from "../_shared/cockpit/attribute-registry.ts";
+import {
+  scopeAllowsWriteTier,
+  type WriteTier,
+} from "../_shared/scopeGrammar.ts";
 
 // =============================================================================
 // NUKE MCP CONNECTOR — Full-Resolution Vehicle Digital Twin Access
@@ -120,23 +126,52 @@ function oauthServerMetadata(): Response {
   }), { headers: { ...CORS, "Content-Type": "application/json" } });
 }
 
+// Allowed scope universe for OAuth-issued tokens. read is implicit (read tools are public),
+// but we carry it for transparency. write:observations = autonomous governed claims.
+// write:canonical = direct canonical mutation, owner-login only.
+const ALLOWED_SCOPES = ["read", "write:observations", "write:canonical"];
+
+/**
+ * Compute the scope string to grant. Requested scopes are intersected with the allowed universe;
+ * a non-owner (external/walk-in) leg is clamped to strip write:canonical so it can never escalate.
+ * With nothing requested, owner login defaults to full power, external defaults to read + observations.
+ */
+function grantedScope(requested: string | null | undefined, ownerLogin: boolean): string {
+  const universe = ownerLogin ? ALLOWED_SCOPES : ALLOWED_SCOPES.filter((s) => s !== "write:canonical");
+  let grants: string[];
+  if (requested && requested.trim()) {
+    const want = requested.trim().split(/\s+/);
+    grants = universe.filter((s) => want.includes(s));
+    if (grants.length === 0) grants = ["read"]; // requested only unknown scopes → minimal
+  } else {
+    grants = ownerLogin ? universe.slice() : ["read", "write:observations"];
+  }
+  if (!grants.includes("read")) grants.unshift("read");
+  return grants.join(" ");
+}
+
 async function oauthAuthorize(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const redirectUri = url.searchParams.get("redirect_uri");
   const state = url.searchParams.get("state");
   const codeChallenge = url.searchParams.get("code_challenge");
   const clientId = url.searchParams.get("client_id");
+  const requestedScope = url.searchParams.get("scope");
 
   if (!redirectUri) {
     return new Response("Missing redirect_uri", { status: 400, headers: CORS });
   }
 
-  // Generate auth code as signed JWT (stateless, 5-min expiry)
+  // This /authorize is the owner-login (single-owner, auto-approved) leg. Completing it IS the
+  // human gate, so the owner may be granted write:canonical. An external agent that wants an
+  // autonomous token requests a narrower scope (e.g. "read write:observations") and is clamped to
+  // it by grantedScope() below — it can never escalate to canonical.
   const code = await signJwt({
     type: "auth_code",
     client_id: clientId,
     redirect_uri: redirectUri,
     code_challenge: codeChallenge,
+    scope: grantedScope(requestedScope, /* ownerLogin */ true),
   }, 300);
 
   // Auto-approve (single-owner system) — redirect back with code
@@ -185,17 +220,22 @@ async function oauthToken(req: Request): Promise<Response> {
       }
     }
 
-    // Issue access token (90-day JWT)
+    // Issue access token (90-day JWT). Carry the scope minted at /authorize so the write-tier
+    // gate can enforce it. Fall back to read+observations for legacy auth codes lacking a scope.
+    const tokenScope = typeof payload.scope === "string" && payload.scope.trim()
+      ? payload.scope
+      : "read write:observations";
     const accessToken = await signJwt({
       type: "access_token",
       sub: payload.client_id || "claude-ai",
-      scope: "mcp:tools",
+      scope: tokenScope,
     }, 90 * 24 * 3600);
 
     return new Response(JSON.stringify({
       access_token: accessToken,
       token_type: "Bearer",
       expires_in: 90 * 24 * 3600,
+      scope: tokenScope,
     }), { headers: { ...CORS, "Content-Type": "application/json" } });
   }
 
@@ -237,6 +277,7 @@ async function hashApiKey(key: string): Promise<string> {
 interface AuthResult {
   ok: boolean;
   userId?: string;
+  scopes?: string[];
   error?: string;
   status?: number;
 }
@@ -249,17 +290,23 @@ async function authenticate(req: Request): Promise<AuthResult> {
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7);
     if (token === SERVICE_ROLE_KEY) {
-      return { ok: true, userId: "service-role" };
+      return { ok: true, userId: "service-role", scopes: ["admin"] };
     }
     const alt = Deno.env.get("SERVICE_ROLE_KEY");
     if (alt && token === alt) {
-      return { ok: true, userId: "service-role" };
+      return { ok: true, userId: "service-role", scopes: ["admin"] };
     }
 
-    // 1b. OAuth JWT access token
+    // 1b. OAuth JWT access token — carry its minted scope through to the write-tier gate.
     const jwt = await verifyJwt(token);
     if (jwt && jwt.type === "access_token") {
-      return { ok: true, userId: String(jwt.sub || "oauth-user") };
+      const scope = typeof jwt.scope === "string" ? jwt.scope : "";
+      // Legacy "mcp:tools" tokens predate the tier grammar; treat as read + observations
+      // (NOT canonical — tightening is intentional; canonical now needs an explicit grant).
+      const scopes = scope && scope !== "mcp:tools"
+        ? scope.split(/\s+/).filter(Boolean)
+        : ["read", "write:observations"];
+      return { ok: true, userId: String(jwt.sub || "oauth-user"), scopes };
     }
   }
 
@@ -282,7 +329,12 @@ async function authenticate(req: Request): Promise<AuthResult> {
           : "Invalid API key";
       return { ok: false, error: msg, status: data?.error === "rate_limit_exceeded" ? 429 : 401 };
     }
-    return { ok: true, userId: data.user_id || `agent:${data.agent_registration_id || "anon"}` };
+    // API-key scopes: honor a `scopes` array from the rate-limit RPC if present, else default to
+    // autonomous-observations (read + write:observations). Canonical needs an explicit grant.
+    const keyScopes = Array.isArray(data.scopes) && data.scopes.length
+      ? data.scopes.map((s: unknown) => String(s))
+      : ["read", "write:observations"];
+    return { ok: true, userId: data.user_id || `agent:${data.agent_registration_id || "anon"}`, scopes: keyScopes };
   }
 
   // 3. No auth — reject
@@ -623,6 +675,21 @@ const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "get_make_model_terminal",
+    description:
+      "Return the cohort terminal for a year-make-model: the full market-intelligence envelope for a model line, not a single VIN. Includes population count, price distribution (min/median/max, percentiles), market flow (listing/sale velocity over time), sentiment, dealer flow, comparable sales, production/survival estimates, and the cited consensus fields that summarize the cohort. Backed by the get_make_model_terminal RPC. Pass grain='generation' to widen the cohort to a full generation; default 'year'.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        make: { type: "string" },
+        model: { type: "string" },
+        year: { type: "number" },
+        grain: { type: "string", description: "year|generation, default year" },
+      },
+      required: ["make", "model"],
+    },
+  },
+  {
     name: "query_market_history",
     description:
       "Get all auction and listing events for a vehicle or model cohort. Returns chronological event history including final prices, bid counts, platforms, and outcomes.",
@@ -723,6 +790,18 @@ const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "get_vehicle_wiki",
+    description:
+      "The finite-asset wiki for one VIN: a readable, fully-sourced page where every field is the weighted consensus of evidence-cited claims (evidence_class × contributor reputation × confidence × recency). Each cited field carries its value, citation, confidence, contributors, and any conflict (surfaced inline, never silently resolved). The canonical header is the denormalized cache; cited_fields are the live projection — the truth. This is the read-side product surface of the agent-write loop: a Wikipedia for one physical object, every line cited.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vehicle_id: { type: "string", description: "Vehicle UUID" },
+      },
+      required: ["vehicle_id"],
+    },
+  },
+  {
     name: "get_attribute_checklist",
     description:
       "Return the checklist of attributes a caller agent can answer about a subject (image, vehicle, person, cluster). Each entry includes the prompt to run, the expected_shape of the answer, the L1–L5 layer, modality hints, and depends_on so callers can iterate in dependency order. " +
@@ -733,8 +812,8 @@ const TOOLS: ToolDef[] = [
       properties: {
         subject_kind: {
           type: "string",
-          enum: ["image", "vehicle", "person", "cluster"],
-          description: "What kind of subject the caller is observing",
+          enum: ["image", "vehicle", "person", "cluster", "user", "make_model"],
+          description: "What kind of subject the caller is observing. 'user' added 2026-05-24 — exposes user.has_profile / display_identity / contact_surface / role_set / possession_set / vendor_preference_signal / daily_activity_density / relationship_map.",
         },
         layers: {
           type: "array",
@@ -759,9 +838,18 @@ const TOOLS: ToolDef[] = [
       type: "object",
       properties: {
         attribute: { type: "string", description: "Canonical attribute name from get_attribute_checklist (e.g. 'image.has_vehicle', 'vehicle.exterior_color')" },
-        subject_id: { type: "string", description: "UUID of the subject (vehicle_id, image_id, person_id, cluster_id) the answer applies to" },
-        subject_kind: { type: "string", enum: ["image", "vehicle", "person", "cluster"] },
+        subject_id: { type: "string", description: "UUID of the subject (vehicle_id, image_id, person_id, cluster_id, user_id, make_model subject_id) the answer applies to" },
+        subject_kind: { type: "string", enum: ["image", "vehicle", "person", "cluster", "user", "make_model"] },
         value: { description: "The caller's answer. Shape must match the registry's expected_shape; enums must match enum_values; will be validated before insert." },
+        evidence: {
+          type: "object",
+          description: "REQUIRED. The citation backing this claim. {class, ref}. class must be one of the attribute's admissible_evidence (see get_attribute_checklist) — image | vin_decode | document | owner_claim | context_atoms. A photo cannot cite a VIN-decode fact (hp/torque/displacement); such a claim is rejected. ref points at the evidence: {image_ids:[...]} for image, {rule, vin} for vin_decode, {document_id|url, page} for document, {statement} for owner_claim.",
+          properties: {
+            class: { type: "string", enum: ["image", "vin_decode", "document", "owner_claim", "context_atoms"] },
+            ref: { description: "Structured reference to the cited evidence (object or non-empty string)." },
+          },
+          required: ["class", "ref"],
+        },
         model_slug: { type: "string", description: "Identifier for the caller's model (e.g. 'claude-opus-4-7-via-byok', 'gpt-4o-mini', 'custom-yolo-v8'). Used to attribute the projection." },
         model_version: { type: "string", description: "Optional version string for the caller's model" },
         confidence: { type: "number", description: "Caller's confidence in their answer, 0..1" },
@@ -770,7 +858,29 @@ const TOOLS: ToolDef[] = [
         basis_signals: { type: "array", description: "Optional list of signals the caller's reasoning fired on" },
         declared_observed_at: { type: "string", description: "Optional ISO-8601 timestamp when the caller's model produced the answer (defaults to now)" },
       },
-      required: ["attribute", "subject_id", "subject_kind", "value", "model_slug", "confidence"],
+      required: ["attribute", "subject_id", "subject_kind", "value", "evidence", "model_slug", "confidence"],
+    },
+  },
+  {
+    name: "confirm_work_session",
+    description:
+      "Owner-confirmation gate for the labor ledger. Turns an inferred work_session (status auto_inferred/completed — produced by the photo→labor pipeline or the dT cluster.work_transition operator, base_trust ~0.30) into an owner-confirmed FACT. Per the value-accrual rule, labor value reaches the ledger ONLY on confirm/amend, never from inference alone. " +
+      "decision='confirm' accepts the existing inferred numbers; 'amend' applies owner-supplied labor_hours/labor_rate/parts (recomputes total_job_cost); 'reject' records that no billable labor happened (no value; the row is NOT deleted). Sets work_sessions.status + finalized_at + metadata.owner_confirmation, and logs the decision as a high-trust projection_event atom (attribute cluster.work_transition_confirmed) for the audit trail.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        work_session_id: { type: "string", description: "UUID of the work_sessions row to confirm" },
+        decision: { type: "string", enum: ["confirm", "amend", "reject"], description: "confirm = accept inferred values; amend = override with owner numbers; reject = no billable labor (default: confirm)" },
+        confirmed_by: { type: "string", description: "Who confirmed (default 'skylar')" },
+        labor_hours: { type: "number", description: "Owner-supplied labor hours (amend)" },
+        labor_rate: { type: "number", description: "Owner-supplied $/hr (amend)" },
+        total_labor_cost: { type: "number", description: "Override labor cost directly (else hours*rate or existing)" },
+        total_parts_cost: { type: "number", description: "Override parts cost (amend)" },
+        zones_confirmed: { type: "array", items: { type: "string" }, description: "Zones the owner confirms work touched" },
+        source_projection_event_id: { type: "string", description: "The dT cluster.work_transition atom this confirms, if any (lineage)" },
+        note: { type: "string", description: "Optional owner note" },
+      },
+      required: ["work_session_id"],
     },
   },
   {
@@ -849,12 +959,12 @@ const TOOLS: ToolDef[] = [
   {
     name: "find_subjects_needing_atoms",
     description:
-      "Discovery surface for walk-in callers: given a subject_kind (image / vehicle), return subjects with thin atom coverage (fewer than min_atoms in projection_event). Activates the laser-tag harness at scale — any caller can hit this, get a worklist, run get_attribute_checklist for each subject, submit answers via submit_attribute_value. " +
-      "Without this, callers don't know where to start. With it, the entire third-party-LLM compute base can attack thin substrate spots in priority order. Defaults: subject_kind=image, min_atoms=3, limit=20, recent_only=true (last 90 days).",
+      "Discovery surface for walk-in callers: given a subject_kind (image / vehicle / user), return subjects with thin atom coverage (fewer than min_atoms in projection_event). Activates the laser-tag harness at scale — any caller can hit this, get a worklist, run get_attribute_checklist for each subject, submit answers via submit_attribute_value. " +
+      "Without this, callers don't know where to start. With it, the entire third-party-LLM compute base can attack thin substrate spots in priority order. Defaults: subject_kind=image, min_atoms=3, limit=20, recent_only=true (last 90 days). 'user' was added 2026-05-24 per Skylar directive — surfaces auth.users rows whose user-profile attributes (display_identity / contact_surface / role_set / possession_set / etc.) need filling.",
     inputSchema: {
       type: "object",
       properties: {
-        subject_kind: { type: "string", enum: ["image", "vehicle"], description: "What kind of subject to surface (default image)" },
+        subject_kind: { type: "string", enum: ["image", "vehicle", "user", "make_model"], description: "What kind of subject to surface (default image)" },
         vehicle_id: { type: "string", description: "Optional vehicle UUID — for image discovery, scopes to a single build (uses composite index, fast). Without it, samples by primary key (no date sort)." },
         min_atoms: { type: "number", description: "Subjects with fewer than this many atoms qualify (default 3)" },
         limit: { type: "number", description: "Max subjects to return (default 20, max 200)" },
@@ -879,6 +989,46 @@ const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "project_attribute",
+    description:
+      "Canonical weighted-consensus projection. Calls the SQL function project_attribute(p_subject_id, p_attribute) — the SAME engine that powers vehicle_wiki_view — so the answer you get here is byte-for-byte the answer the vehicle profile renders. " +
+      "Prefer this over synthesize_attribute when you want the system's authoritative single value for a (subject, attribute): synthesize_attribute is a separate TS reimplementation of the same idea and can drift from the SQL truth. This tool has no drift — it IS the canonical engine. " +
+      "Returns whatever shape project_attribute emits (typically the consensus value plus its supporting weight/provenance).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        subject_id: { type: "string", description: "Subject UUID (p_subject_id)" },
+        attribute: { type: "string", description: "Attribute name from the registry (p_attribute), e.g. 'vehicle.make'" },
+      },
+      required: ["subject_id", "attribute"],
+    },
+  },
+  {
+    name: "propose_attribute",
+    description:
+      "Propose a NOVEL attribute the registry LACKS (e.g. 'image.weld_pattern_type', 'image.media_blast_profile', 'image.period_correct_finish') so a real discovery isn't lost when get_attribute_checklist has no slot for it. " +
+      "This is the ONLY tool that can grow the attribute vocabulary — without it, anything the checklist doesn't already name is dropped. Records a schema_proposals row (proposal_type='add_image_attribute', status='open') with full source DNA. A human curator reviews and promotes accepted proposals into attribute-registry.ts; promotion stays HUMAN by design (laser-tag doctrine — the agent grows the vocabulary, the human signs it). " +
+      "Use only when you can clearly OBSERVE and CITE something the registry can't capture. Don't propose duplicates of existing attributes (call get_attribute_checklist first).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        attribute: { type: "string", description: "Proposed canonical name, namespaced (e.g. 'image.weld_pattern_type')" },
+        subject_kind: { type: "string", enum: ["image", "vehicle", "person", "cluster", "user", "make_model"] },
+        prompt: { type: "string", description: "The instruction a caller agent would run to answer this attribute" },
+        expected_shape: { type: "string", enum: ["string", "number", "boolean", "enum", "ratio_0_1", "bbox", "uuid", "iso_date", "iso_timestamp", "structured"] },
+        admissible_evidence: { type: "array", items: { type: "string", enum: ["image", "vin_decode", "document", "owner_claim", "context_atoms"] }, description: "Which evidence classes may legitimately cite this attribute (anti-laundering rule). Defaults to ['image']." },
+        result_kind: { type: "string", enum: ["substrate", "projection"], description: "substrate = direct measurement on the artifact; projection = inference about the world. Defaults to substrate." },
+        layer: { type: "number", description: "L1-L5 per the image-to-atom taxonomy (lower answered before higher)" },
+        enum_values: { type: "array", items: { type: "string" }, description: "REQUIRED when expected_shape=enum: the candidate values" },
+        motivation: { type: "string", description: "Why the existing checklist can't capture this — what you observed that has no slot" },
+        sample_evidence: { type: "object", description: "{class, ref} citing the observation that motivated this (e.g. {class:'image', ref:{image_ids:[...]}})" },
+        observed_by: { type: "string", description: "Caller identity (model slug / agent key) for source DNA" },
+        confidence: { type: "number", description: "0-1 confidence that this attribute is real and worth adding" },
+      },
+      required: ["attribute", "subject_kind", "prompt", "expected_shape", "motivation", "observed_by", "confidence"],
+    },
+  },
+  {
     name: "submit_attribute_values",
     description:
       "Batch version of submit_attribute_value. Caller submits an array of {attribute, value, confidence, basis_signals?, candidates?} for the same subject + model_slug in a single call. Returns array of projection_event_ids in submission order, with per-row error if validation/insert failed. " +
@@ -887,7 +1037,7 @@ const TOOLS: ToolDef[] = [
       type: "object",
       properties: {
         subject_id: { type: "string" },
-        subject_kind: { type: "string", enum: ["image", "vehicle", "person", "cluster"] },
+        subject_kind: { type: "string", enum: ["image", "vehicle", "person", "cluster", "user", "make_model"] },
         model_slug: { type: "string" },
         model_version: { type: "string" },
         declared_observed_at: { type: "string" },
@@ -899,12 +1049,21 @@ const TOOLS: ToolDef[] = [
               attribute: { type: "string" },
               value: {},
               confidence: { type: "number" },
+              evidence: {
+                type: "object",
+                description: "REQUIRED per atom. {class, ref} — class must be admissible for the attribute (see get_attribute_checklist). Same anti-laundering rule as submit_attribute_value.",
+                properties: {
+                  class: { type: "string", enum: ["image", "vin_decode", "document", "owner_claim", "context_atoms"] },
+                  ref: {},
+                },
+                required: ["class", "ref"],
+              },
               candidates: { type: "array" },
               basis_signals: { type: "array" },
             },
-            required: ["attribute", "value", "confidence"],
+            required: ["attribute", "value", "confidence", "evidence"],
           },
-          description: "Array of atoms to submit. Each atom shares the subject + caller from the top-level params.",
+          description: "Array of atoms to submit. Each atom shares the subject + caller from the top-level params, and each carries its own evidence citation.",
         },
       },
       required: ["subject_id", "subject_kind", "model_slug", "atoms"],
@@ -2135,6 +2294,18 @@ async function handleGetComps(args: Record<string, unknown>): Promise<ToolResult
   return toolOk(data);
 }
 
+async function handleGetMakeModelTerminal(args: Record<string, unknown>): Promise<ToolResult> {
+  const supabase = sb();
+  const { data, error } = await supabase.rpc("get_make_model_terminal", {
+    p_make: args.make,
+    p_model: args.model,
+    p_year: args.year ?? null,
+    p_grain: args.grain ?? "year",
+  });
+  if (error) return toolErr(error.message);
+  return toolOk(data);
+}
+
 async function handleQueryMarketHistory(args: Record<string, unknown>): Promise<ToolResult> {
   const supabase = sb();
   const limit = Number(args.limit) || 50;
@@ -2235,12 +2406,74 @@ async function handleSearchServiceManuals(args: Record<string, unknown>): Promis
 
 // ── Vision ──────────────────────────────────────────────────────────────────
 
+// Best-effort: flag a known image for re-analysis when vision is down. Pipeline-state only, never
+// a testimony-value overwrite. No-op if the URL isn't one of ours.
+// IMPORTANT: process-all-images-cron re-appraises images where ai_scan_metadata->appraiser->
+// primary_label IS NULL — NOT off ai_processing_status. So we must clear that gate (null out
+// ai_scan_metadata) for re-analysis to actually fire; the cron repopulates it on re-appraisal.
+async function queueImageForReanalysis(image_url: string): Promise<boolean> {
+  try {
+    const { data, error } = await sb()
+      .from("vehicle_images")
+      .update({ ai_scan_metadata: null, ai_processing_status: "pending" })
+      .eq("image_url", image_url)
+      .select("id");
+    return !error && (data?.length ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
 async function handleAnalyzeImage(args: Record<string, unknown>): Promise<ToolResult> {
-  const data = await callEdgeApi("vision", "/analyze", "POST", {
-    image_url: args.image_url,
-    include_comps: args.include_comps ?? false,
+  const image_url = String(args.image_url ?? "");
+  if (!image_url) return toolErr("image_url is required");
+
+  // Retry with backoff on transient vision outages (YONO sidecar 503 / network). A vision outage
+  // must NOT block the rest of the agent loop — on persistent failure we degrade gracefully:
+  // queue the image and tell the caller to mark vision-dependent claims evidence_pending.
+  const delays = [0, 300, 900];
+  let lastErr = "";
+  for (let i = 0; i < delays.length; i++) {
+    if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/api-v1-vision/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE_KEY}` },
+        body: JSON.stringify({ image_url, include_comps: args.include_comps ?? false }),
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => null) as Record<string, unknown> | null;
+        // The API can return 200 while the sidecar is down (source:"unavailable"). Treat as degraded.
+        if (data && data.source !== "unavailable" && data.status !== 503) {
+          return toolOk(data);
+        }
+        lastErr = "vision sidecar reported unavailable";
+      } else if (res.status < 500 && res.status !== 429) {
+        // Genuine client error (bad URL etc.) — not transient, don't retry.
+        const txt = await res.text();
+        return toolErr(`analyze_image failed (${res.status}): ${txt.slice(0, 300)}`);
+      } else {
+        lastErr = `vision returned ${res.status}`;
+      }
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  const queued = await queueImageForReanalysis(image_url);
+  return toolOk({
+    source: "unavailable",
+    status: "vision_degraded",
+    evidence_status: "evidence_pending",
+    queued,
+    image_url,
+    error: lastErr,
+    guidance:
+      "Vision (YONO) is temporarily unavailable; this is not a hard failure. The image was " +
+      (queued ? "re-queued for analysis (ai_processing_status=pending)" : "not found in our store (pass a Nuke image_url to queue it)") +
+      ". Continue with non-vision work. Any image-class claim submitted now should carry low confidence " +
+      "and evidence_status=evidence_pending; it will be re-scored when vision recovers.",
   });
-  return toolOk(data);
 }
 
 async function handleIdentifyVehicleImage(args: Record<string, unknown>): Promise<ToolResult> {
@@ -2256,9 +2489,19 @@ async function handleQueryVehicleImages(args: Record<string, unknown>): Promise<
   const vid = String(args.vehicle_id);
   const limit = Math.min(Number(args.limit) || 20, 100);
 
+  // NOTE: vehicle_images has NO `url` column. Real columns are image_url / large_url /
+  // medium_url / thumbnail_url / safe_preview_url / source_url / storage_path. Selecting a
+  // non-existent column is the recurring bug class (cf. organizations.type→business_type).
+  // The connector-schema-regression test asserts every column below exists in information_schema.
+  //
+  // Context-rich by design: an external agent must "weigh in with the context of the profile
+  // wherein the image exists and the EXIF data" — so we ship EXIF + capture metadata (taken_at,
+  // GPS, camera_pose, caption) alongside the URLs. Authoritative EXIF still requires exiftool on
+  // the storage object (DB columns can lie — see feedback_exhaust_evidence_before_owner_eyes);
+  // exif_data here is the stored best-effort and is labeled as such in the response.
   let query = supabase
     .from("vehicle_images")
-    .select("id, url, angle, condition_score, photo_quality_score, ai_processing_status, damage_flags, modification_flags, fabrication_stage, vision_analyzed_at, created_at")
+    .select("id, image_url, thumbnail_url, medium_url, large_url, storage_path, angle, condition_score, photo_quality_score, ai_processing_status, damage_flags, modification_flags, fabrication_stage, vision_analyzed_at, created_at, exif_data, taken_at, latitude, longitude, camera_pose, caption")
     .eq("vehicle_id", vid)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -2269,7 +2512,49 @@ async function handleQueryVehicleImages(args: Record<string, unknown>): Promise<
 
   const { data, error } = await query;
   if (error) return toolErr(error.message);
-  return toolOk({ vehicle_id: vid, count: data?.length ?? 0, images: data || [] });
+
+  // Expose a stable `url` alias (= image_url) for callers/wiki while preserving the real columns,
+  // and split out a labeled exif block so the caller knows it's stored best-effort, not exiftool ground-truth.
+  const images = (data || []).map((r) => {
+    const row = r as Record<string, unknown>;
+    return {
+      ...row,
+      url: (row.image_url as string) ?? null,
+      exif: {
+        source: "stored_best_effort",
+        note: "Authoritative EXIF requires exiftool on the storage object; treat GPS/taken_at as priors, not proof.",
+        exif_data: row.exif_data ?? null,
+        taken_at: row.taken_at ?? null,
+        latitude: row.latitude ?? null,
+        longitude: row.longitude ?? null,
+        camera_pose: row.camera_pose ?? null,
+      },
+    };
+  });
+
+  // The agent must weigh in WITH the context of the profile the image lives in. Ship the parent
+  // profile alongside the images so analysis is grounded, never cross-associated to another vehicle.
+  const { data: veh } = await supabase
+    .from("vehicles")
+    .select("id, year, make, model, vin, body_style, color, color_primary, displacement, engine_displacement, horsepower, torque, seats, canonical_outcome, is_for_sale, status")
+    .eq("id", vid)
+    .maybeSingle();
+
+  return toolOk({
+    vehicle_id: vid,
+    profile_context: veh ?? null,
+    count: images.length,
+    images,
+    analysis_contract: "Submit findings via submit_attribute_value with an evidence citation. Image-class claims must cite image id(s); never cross-associate to another VIN.",
+  });
+}
+
+async function handleGetVehicleWiki(args: Record<string, unknown>): Promise<ToolResult> {
+  const vid = String(args.vehicle_id ?? "");
+  if (!vid) return toolErr("vehicle_id is required");
+  const { data, error } = await sb().rpc("vehicle_wiki", { p_vehicle_id: vid });
+  if (error) return toolErr(`vehicle_wiki failed: ${error.message}`);
+  return toolOk(data);
 }
 
 async function sha256Hex(input: string): Promise<string> {
@@ -2296,12 +2581,56 @@ async function handleSubmitAttributeValue(args: Record<string, unknown>): Promis
   }
 
   const def = getAttribute(attribute);
-  if (!def) return toolErr(`unknown attribute: ${attribute} (call get_attribute_checklist to see valid names)`);
+  if (!def) {
+    // Don't drop the attempted claim — a rejected value is still testimony. Capture
+    // the value + evidence + source DNA into pending_claims so it's routable to a
+    // propose_attribute proposal instead of evaporating. Best-effort: a capture
+    // failure must NOT change the rejection the caller sees.
+    try {
+      await sb()
+        .from("pending_claims")
+        .insert({
+          attempted_property_key: attribute,
+          attempted_value: value === undefined ? null : value,
+          attempted_structured_data: (args.evidence && typeof args.evidence === "object")
+            ? args.evidence
+            : null,
+          agent_key: model_slug || null,
+          rejection_reason: "unknown_attribute",
+          status: "captured",
+        });
+    } catch (_e) { /* best-effort — capture must never block the rejection */ }
+    return toolErr(
+      `unknown attribute: ${attribute} (call get_attribute_checklist to see valid names; ` +
+      `if this is a real, novel observation the registry lacks, call propose_attribute to route it)`,
+    );
+  }
   if (def.subject_kind !== subject_kind) {
     return toolErr(`attribute ${attribute} expects subject_kind='${def.subject_kind}', caller passed '${subject_kind}'`);
   }
   const validation = validateSubmission(attribute, value);
   if (validation) return toolErr(`invalid value for ${attribute}: ${validation}`);
+
+  // ── Evidence-class binding (anti-laundering) ───────────────────────────────
+  // Every claim must cite evidence whose class is admissible for the attribute.
+  // A photo-cited horsepower claim dies here: "image" ∉ admissible(vehicle.horsepower).
+  const evidence = args.evidence as { class?: unknown; ref?: unknown } | undefined;
+  if (!evidence || typeof evidence !== "object") {
+    return toolErr(
+      `evidence is required: pass evidence={class, ref}. Admissible classes for ${attribute}: [${admissibleEvidence(attribute).join(", ")}]`,
+    );
+  }
+  const evidenceClassErr = validateEvidenceClass(attribute, evidence.class);
+  if (evidenceClassErr) return toolErr(evidenceClassErr);
+  const evidence_class = String(evidence.class);
+  const evidence_ref = evidence.ref;
+  if (evidence_ref === undefined || evidence_ref === null ||
+      (typeof evidence_ref === "object" && Object.keys(evidence_ref as object).length === 0) ||
+      (typeof evidence_ref === "string" && evidence_ref.trim() === "")) {
+    return toolErr(
+      `evidence.ref is required and must point at the citation (e.g. {image_ids:[...]} for image, {rule, vin} for vin_decode, {document_id|url} for document, {statement} for owner_claim).`,
+    );
+  }
 
   const supabase = sb();
 
@@ -2409,6 +2738,8 @@ async function handleSubmitAttributeValue(args: Record<string, unknown>): Promis
       prompt_sha256,
       observation_ids,
       observed_at,
+      evidence_class,
+      evidence_ref,
     })
     .select("id, recorded_at")
     .single();
@@ -2425,10 +2756,144 @@ async function handleSubmitAttributeValue(args: Record<string, unknown>): Promis
     subject_id,
     subject_kind,
     result_kind: def.result_kind,
+    evidence_class,
+    evidence_ref,
     prompt_sha256,
     note: existingModel
       ? "Walk-in model previously registered. Reputation accumulates by survival rate of your projections."
       : "First submission from this model_slug. Auto-registered at base_trust=0.30. Future projections accumulate reputation.",
+  });
+}
+
+// Owner-confirmation gate: turn an inferred work_session (status auto_inferred/completed,
+// base_trust ~0.30) into an owner-confirmed FACT. Per the $410-for-a-text-to-dad rule,
+// value accrues to the ledger ONLY on owner confirm/amend — never from inference alone.
+// confirm = owner accepts the existing inferred numbers; amend = owner supplies corrected
+// hours/rate/parts (recomputes cost); reject = owner says no labor happened (no value, not
+// deleted). The decision is logged as a high-trust projection_event atom for the audit trail.
+async function handleConfirmWorkSession(args: Record<string, unknown>): Promise<ToolResult> {
+  const work_session_id = String(args.work_session_id ?? "");
+  const decision = String(args.decision ?? "confirm");
+  const confirmed_by = typeof args.confirmed_by === "string" ? args.confirmed_by : "skylar";
+  if (!work_session_id) return toolErr("work_session_id is required");
+  if (!["confirm", "amend", "reject"].includes(decision)) {
+    return toolErr(`decision must be confirm | amend | reject, got '${decision}'`);
+  }
+
+  const supabase = sb();
+
+  const { data: ws, error: wsErr } = await supabase
+    .from("work_sessions")
+    .select("id, vehicle_id, status, total_labor_cost, total_parts_cost, total_job_cost, labor_rate_per_hour, metadata, session_date")
+    .eq("id", work_session_id)
+    .maybeSingle();
+  if (wsErr) return toolErr(`work_sessions lookup failed: ${wsErr.message}`);
+  if (!ws) return toolErr(`work_session not found: ${work_session_id}`);
+
+  const now = new Date().toISOString();
+  const num = (v: unknown, fallback: number | null): number | null =>
+    v === undefined || v === null || v === "" || Number.isNaN(Number(v)) ? fallback : Number(v);
+
+  const amend = decision === "amend";
+  const labor_hours = num(args.labor_hours, null);
+  const labor_rate = num(args.labor_rate, (ws.labor_rate_per_hour as number | null) ?? null);
+  let total_labor_cost = num(args.total_labor_cost, (ws.total_labor_cost as number | null) ?? null);
+  if (amend && labor_hours != null && labor_rate != null) total_labor_cost = labor_hours * labor_rate;
+  const total_parts_cost = num(args.total_parts_cost, (ws.total_parts_cost as number | null) ?? null);
+  const total_job_cost = amend
+    ? (total_labor_cost ?? 0) + (total_parts_cost ?? 0)
+    : num(args.total_job_cost, (ws.total_job_cost as number | null) ?? null);
+
+  const zones_confirmed = Array.isArray(args.zones_confirmed) ? args.zones_confirmed : null;
+  const source_projection_event_id = typeof args.source_projection_event_id === "string" ? args.source_projection_event_id : null;
+  const note = typeof args.note === "string" ? args.note : null;
+
+  const newStatus = decision === "reject" ? "rejected" : "confirmed";
+  const prior = (ws.metadata && typeof ws.metadata === "object") ? ws.metadata as Record<string, unknown> : {};
+  const metadata = {
+    ...prior,
+    owner_confirmation: {
+      decision, confirmed_by, confirmed_at: now,
+      prior_status: ws.status, source_projection_event_id,
+      labor_hours, labor_rate, zones_confirmed, note,
+    },
+  };
+
+  const update: Record<string, unknown> = { status: newStatus, metadata };
+  if (decision !== "reject") {
+    update.finalized_at = now;
+    if (amend) {
+      update.total_labor_cost = total_labor_cost;
+      update.total_parts_cost = total_parts_cost;
+      update.total_job_cost = total_job_cost;
+      if (labor_rate != null) update.labor_rate_per_hour = labor_rate;
+    }
+  }
+  const { error: updErr } = await supabase.from("work_sessions").update(update).eq("id", work_session_id);
+  if (updErr) return toolErr(`work_sessions update failed: ${updErr.message}`);
+
+  // Owner decision is authoritative testimony — log it as a high-trust projection_event atom.
+  let confirmation_event_id: string | null = null;
+  let atomNote = "confirmation written to work_sessions";
+  try {
+    const ownerSlug = "owner-confirmation";
+    let model_id: string;
+    const { data: existing } = await supabase.from("model_registry").select("id").eq("slug", ownerSlug).maybeSingle();
+    if (existing) {
+      model_id = existing.id;
+      await supabase.from("model_registry").update({ last_seen: now }).eq("id", model_id);
+    } else {
+      const { data: ins, error: insErr } = await supabase.from("model_registry")
+        .insert({ slug: ownerSlug, provider: "owner", caller_kind: "platform", base_trust: 0.95, notes: "Owner-authoritative work-session confirmations (confirm_work_session)" })
+        .select("id").single();
+      if (insErr || !ins) throw new Error(insErr?.message ?? "model_registry insert failed");
+      model_id = ins.id;
+    }
+
+    const prompt_input = "cluster.work_transition_confirmed:v1:owner work-session confirmation";
+    const prompt_sha256 = "sha256:" + (await sha256Hex(prompt_input));
+    await supabase.from("prompt_template_registry").upsert({
+      prompt_sha256,
+      template_name: "cluster.work_transition_confirmed",
+      template_body: "Owner confirms / amends / rejects an inferred work session. Value accrues to the ledger only on confirm or amend.",
+      schema_hint: { expected_shape: "structured" },
+      last_used_at: now,
+    }, { onConflict: "prompt_sha256", ignoreDuplicates: false });
+
+    const token = await sha256Hex(`${ownerSlug}:${work_session_id}:${now}`);
+    const { data: ev, error: evErr } = await supabase.from("projection_event").insert({
+      request_envelope: { audience: "owner", subject_id: work_session_id, subject_kind: "cluster", attribute: "cluster.work_transition_confirmed", as_of: now },
+      result_envelope: {
+        label: { decision, total_labor_cost, total_parts_cost, total_job_cost, labor_hours, labor_rate, zones_confirmed, source_projection_event_id, vehicle_id: ws.vehicle_id, session_date: ws.session_date, confirmed_by },
+        confidence: decision === "reject" ? 0 : 1,
+        basis: { signals: ["owner_confirmation"], agent_version: `owner:${confirmed_by}`, applied_priors: ["owner_authoritative"] },
+        envelope: { model_id, model_caller: { kind: "platform", token }, observed_at: now, submitted_at: now },
+      },
+      result_kind: "substrate",
+      model_id,
+      model_caller: `owner:${confirmed_by}`,
+      prompt_sha256,
+      observation_ids: source_projection_event_id ? [source_projection_event_id] : [],
+      observed_at: now,
+    }).select("id").single();
+    if (evErr || !ev) throw new Error(evErr?.message ?? "no row");
+    confirmation_event_id = ev.id;
+    atomNote = "confirmation written to work_sessions + logged as projection_event atom";
+  } catch (e) {
+    atomNote = `work_sessions updated; confirmation atom skipped (${e instanceof Error ? e.message : String(e)})`;
+  }
+
+  return toolOk({
+    work_session_id,
+    vehicle_id: ws.vehicle_id,
+    decision,
+    new_status: newStatus,
+    prior_status: ws.status,
+    finalized_at: decision !== "reject" ? now : null,
+    total_job_cost: decision !== "reject" ? total_job_cost : null,
+    confirmation_event_id,
+    confirmed_by,
+    note: atomNote,
   });
 }
 
@@ -3149,143 +3614,85 @@ async function handleProjectMoneyFlow(args: Record<string, unknown>): Promise<To
   });
 }
 
+// synthesize_attribute — ONE consensus engine (P7.3, image-ecosystem mandate §7.3).
+// The old TS reimplementation here weighted only base_trust*confidence*recency and
+// could drift from the SQL truth the vehicle profile renders. It is RETIRED. This
+// tool now CALLS the canonical SQL project_attribute(p_subject_id, p_attribute) — the
+// same engine behind vehicle_wiki_view, weight = evidence_weight*actor_trust*confidence*recency.
+// Tool name + {subject_id, attribute} signature stay stable; the answer is now the
+// authoritative one with no second math to drift. (handleProjectAttribute is the
+// explicit alias of the same engine.)
 async function handleSynthesizeAttribute(args: Record<string, unknown>): Promise<ToolResult> {
   const subject_id = String(args.subject_id ?? "");
   const attribute = String(args.attribute ?? "");
   if (!subject_id || !attribute) return toolErr("subject_id and attribute are required");
 
-  const def = getAttribute(attribute);
   const supabase = sb();
-
-  const { data: rows, error } = await supabase
-    .from("projection_event")
-    .select(`
-      id, result_kind, observed_at, recorded_at, retracted_by,
-      request_envelope, result_envelope,
-      model_registry!inner ( slug, caller_kind, base_trust )
-    `)
-    .filter("request_envelope->>subject_id", "eq", subject_id)
-    .filter("request_envelope->>attribute", "eq", attribute)
-    .is("retracted_by", null)
-    .order("recorded_at", { ascending: false })
-    .limit(500);
-
-  if (error) return toolErr(`projection_event query: ${error.message}`);
-  const atoms = (rows ?? []) as Array<Record<string, any>>;
-
-  if (atoms.length === 0) {
-    return toolOk({
-      subject_id,
-      attribute,
-      consensus: null,
-      contributing_atoms: [],
-      note: "No non-retracted atoms recorded for this (subject, attribute). Submit some via submit_attribute_value.",
-    });
-  }
-
-  type Weighted = { atom: Record<string, any>; weight: number; label: unknown; caller: string; base_trust: number; confidence: number };
-  const weighted: Weighted[] = atoms.map((a) => {
-    const caller = a.model_registry;
-    const base_trust = Number(caller?.base_trust ?? 0.3);
-    const confidence = Number(a.result_envelope?.confidence ?? 0.5);
-    return {
-      atom: a,
-      weight: base_trust * confidence,
-      label: a.result_envelope?.label,
-      caller: caller?.slug ?? "unknown",
-      base_trust,
-      confidence,
-    };
+  const { data, error } = await supabase.rpc("project_attribute", {
+    p_subject_id: subject_id,
+    p_attribute: attribute,
   });
+  if (error) return toolErr(`project_attribute rpc: ${error.message}`);
 
-  const total_weight = weighted.reduce((s, w) => s + w.weight, 0);
-  const distinct_callers = new Set(weighted.map((w) => w.caller)).size;
-  const expected_shape = def?.expected_shape ?? "string";
+  const p = (data ?? {}) as Record<string, any>;
+  const hasAtoms = Number(p.observation_count ?? 0) > 0;
 
-  let consensus_label: unknown = null;
-  let consensus_weight = 0;
-  let contradiction_score = 0;
-  let synthesis_method: string;
+  // Re-shape the canonical SQL projection into the stable synthesize_attribute
+  // response contract (consensus + contributing-atom-style summary), so existing
+  // callers keep working while the value itself comes from the single SQL engine.
+  return toolOk({
+    subject_id,
+    attribute,
+    engine: "sql:project_attribute",
+    consensus: hasAtoms
+      ? {
+          label: p.consensus ?? null,
+          weighted_confidence: p.consensus_support != null
+            ? Math.min(0.99, Number(p.consensus_support))
+            : 0,
+          support: p.consensus_support ?? null,
+          total_weight: p.total_support ?? null,
+          contradiction_score: p.conflict ? 1 - Number(p.corroboration ?? 0) : 0,
+          distinct_callers: p.distinct_values ?? null,
+          observation_count: p.observation_count ?? 0,
+          synthesis_method: "sql_weighted_consensus",
+          conflict: !!p.conflict,
+          corroboration: p.corroboration ?? null,
+        }
+      : null,
+    candidates: p.candidates ?? null,
+    projection: data ?? null,
+    note: !hasAtoms
+      ? "No non-retracted atoms recorded for this (subject, attribute). Submit some via submit_attribute_value."
+      : p.conflict
+        ? "Conflict detected — competing values; surface to human review."
+        : "Consensus from the canonical SQL engine (matches vehicle_wiki_view).",
+  });
+}
 
-  if (["enum", "string", "boolean"].includes(expected_shape)) {
-    synthesis_method = "weighted_vote";
-    const tally = new Map<string, number>();
-    for (const w of weighted) {
-      const key = JSON.stringify(w.label);
-      tally.set(key, (tally.get(key) ?? 0) + w.weight);
-    }
-    let winnerKey = "";
-    let winnerWeight = 0;
-    for (const [k, v] of tally.entries()) {
-      if (v > winnerWeight) { winnerKey = k; winnerWeight = v; }
-    }
-    consensus_label = winnerKey ? JSON.parse(winnerKey) : null;
-    consensus_weight = winnerWeight;
-    contradiction_score = total_weight > 0 ? (total_weight - winnerWeight) / total_weight : 0;
-  } else if (expected_shape === "number" || expected_shape === "ratio_0_1") {
-    synthesis_method = "weighted_mean";
-    let sum = 0;
-    let sum_w = 0;
-    for (const w of weighted) {
-      const v = Number(w.label);
-      if (!Number.isNaN(v)) { sum += v * w.weight; sum_w += w.weight; }
-    }
-    consensus_label = sum_w > 0 ? sum / sum_w : null;
-    consensus_weight = sum_w;
-    let variance_w = 0;
-    for (const w of weighted) {
-      const v = Number(w.label);
-      if (!Number.isNaN(v) && consensus_label !== null) variance_w += w.weight * (v - (consensus_label as number)) ** 2;
-    }
-    contradiction_score = sum_w > 0 ? Math.min(1, Math.sqrt(variance_w / sum_w) / Math.max(1, Math.abs((consensus_label as number) || 1))) : 0;
-  } else {
-    synthesis_method = "best_shape_grouping";
-    const tally = new Map<string, number>();
-    for (const w of weighted) {
-      const key = JSON.stringify(w.label);
-      tally.set(key, (tally.get(key) ?? 0) + w.weight);
-    }
-    let winnerKey = "";
-    let winnerWeight = 0;
-    for (const [k, v] of tally.entries()) {
-      if (v > winnerWeight) { winnerKey = k; winnerWeight = v; }
-    }
-    consensus_label = winnerKey ? JSON.parse(winnerKey) : null;
-    consensus_weight = winnerWeight;
-    contradiction_score = total_weight > 0 ? (total_weight - winnerWeight) / total_weight : 0;
-  }
+// project_attribute — thin MCP exposure of the CANONICAL SQL consensus engine.
+// project_attribute(p_subject_id, p_attribute) is the same function vehicle_wiki_view
+// is built on; calling it directly here guarantees the MCP answer matches what the
+// vehicle profile renders (no TS-reimplementation drift like synthesize_attribute).
+async function handleProjectAttribute(args: Record<string, unknown>): Promise<ToolResult> {
+  const subject_id = String(args.subject_id ?? "");
+  const attribute = String(args.attribute ?? "");
+  if (!subject_id || !attribute) return toolErr("subject_id and attribute are required");
 
-  const weighted_confidence = total_weight > 0 ? Math.min(0.99, consensus_weight) : 0;
+  const supabase = sb();
+  const { data, error } = await supabase.rpc("project_attribute", {
+    p_subject_id: subject_id,
+    p_attribute: attribute,
+  });
+  if (error) return toolErr(`project_attribute rpc: ${error.message}`);
 
   return toolOk({
     subject_id,
     attribute,
-    expected_shape,
-    consensus: {
-      label: consensus_label,
-      weighted_confidence,
-      support: consensus_weight,
-      total_weight,
-      contradiction_score,
-      distinct_callers,
-      observation_count: atoms.length,
-      synthesis_method,
-    },
-    contributing_atoms: weighted.map((w) => ({
-      projection_event_id: w.atom.id,
-      label: w.label,
-      caller_slug: w.caller,
-      base_trust: w.base_trust,
-      confidence: w.confidence,
-      weight: w.weight,
-      result_kind: w.atom.result_kind,
-      recorded_at: w.atom.recorded_at,
-    })),
-    note: contradiction_score < 0.1
-      ? "Strong consensus."
-      : contradiction_score < 0.4
-        ? "Moderate dialectic — consider gathering more callers."
-        : "High contradiction — surface to human review.",
+    projection: data ?? null,
+    engine: "sql:project_attribute",
+    note: "Canonical weighted-consensus value from the SQL engine behind vehicle_wiki_view. " +
+      (data == null ? "No projection — no non-retracted atoms for this (subject, attribute)." : "This is the authoritative single value."),
   });
 }
 
@@ -3311,6 +3718,7 @@ async function handleSubmitAttributeValues(args: Record<string, unknown>): Promi
       confidence: a.confidence,
       basis_signals: a.basis_signals,
       candidates: a.candidates,
+      evidence: a.evidence,
       declared_observed_at: args.declared_observed_at,
     });
     const text = single.content?.[0]?.type === "text" ? single.content[0].text : null;
@@ -3335,14 +3743,14 @@ async function handleSubmitAttributeValues(args: Record<string, unknown>): Promi
 }
 
 async function handleFindSubjectsNeedingAtoms(args: Record<string, unknown>): Promise<ToolResult> {
-  const subject_kind = (typeof args.subject_kind === "string" ? args.subject_kind : "image") as "image" | "vehicle";
+  const subject_kind = (typeof args.subject_kind === "string" ? args.subject_kind : "image") as "image" | "vehicle" | "user" | "make_model";
   const min_atoms = Math.max(0, Number(args.min_atoms) || 3);
   const limit = Math.min(Number(args.limit) || 20, 200);
   const recent_only = args.recent_only !== false;
   const attribute_filter = typeof args.attribute === "string" ? args.attribute : null;
 
-  if (!["image", "vehicle"].includes(subject_kind)) {
-    return toolErr(`subject_kind must be image or vehicle, got '${subject_kind}'`);
+  if (!["image", "vehicle", "user", "make_model"].includes(subject_kind)) {
+    return toolErr(`subject_kind must be image, vehicle, user, or make_model, got '${subject_kind}'`);
   }
 
   const supabase = sb();
@@ -3363,19 +3771,38 @@ async function handleFindSubjectsNeedingAtoms(args: Record<string, unknown>): Pr
       candidatesQ = candidatesQ.eq("vehicle_id", vehicle_id_param).order("taken_at", { ascending: false });
       if (recent_only) candidatesQ = candidatesQ.gte("taken_at", ninetyDaysAgo);
     }
-  } else {
+  } else if (subject_kind === "vehicle") {
     candidatesQ = supabase
       .from("vehicles")
       .select("id, year, make, model")
       .order("created_at", { ascending: false })
       .limit(Math.min(limit * 5, 500));
     if (recent_only) candidatesQ = candidatesQ.gte("created_at", ninetyDaysAgo);
+  } else if (subject_kind === "make_model") {
+    // subject_kind === "make_model" — surface year-make-model cohort profiles with thin
+    // atom coverage. make_model_profiles is keyed by subject_id (uuid); carry the cohort
+    // labels (canonical_make/canonical_model/year/grain) through so the caller has a worklist.
+    candidatesQ = supabase
+      .from("make_model_profiles")
+      .select("subject_id, canonical_make, canonical_model, year, grain")
+      .limit(Math.min(limit * 5, 500));
+  } else {
+    // subject_kind === "user" — surface auth.users that have minimal profile coverage.
+    // We query user_profiles (1:1 with auth.users post-2026-05-24 migration) so we get
+    // both the user_id and the existing display_name in one shot.
+    candidatesQ = supabase
+      .from("user_profiles")
+      .select("user_id, display_name, preferred_username, locale, timezone, created_at")
+      .order("updated_at", { ascending: false })
+      .limit(Math.min(limit * 5, 500));
   }
 
   const { data: candidates, error: candErr } = await candidatesQ;
   if (candErr) return toolErr(`candidate query: ${candErr.message}`);
 
-  const candIds = (candidates ?? []).map((c) => c.id);
+  // user_profiles uses user_id as PK; make_model_profiles uses subject_id; vehicles/vehicle_images use id.
+  const idField = subject_kind === "user" ? "user_id" : subject_kind === "make_model" ? "subject_id" : "id";
+  const candIds = (candidates ?? []).map((c: Record<string, any>) => c[idField]);
   if (candIds.length === 0) {
     return toolOk({ subject_kind, count: 0, subjects: [], note: "No candidate subjects matched the filters." });
   }
@@ -3385,6 +3812,8 @@ async function handleFindSubjectsNeedingAtoms(args: Record<string, unknown>): Pr
     .select("request_envelope")
     .in("request_envelope->>subject_id", candIds)
     .is("retracted_by", null);
+  // make_model subject_ids (uuid) can collide with other kinds' ids — scope by kind.
+  if (subject_kind === "make_model") atomQ = atomQ.filter("request_envelope->>subject_kind", "eq", "make_model");
   if (attribute_filter) atomQ = atomQ.filter("request_envelope->>attribute", "eq", attribute_filter);
 
   const { data: atomRows, error: atomErr } = await atomQ;
@@ -3397,7 +3826,7 @@ async function handleFindSubjectsNeedingAtoms(args: Record<string, unknown>): Pr
   }
 
   const needs = (candidates ?? [])
-    .map((c) => ({ ...c, atom_count: counts.get(c.id) ?? 0 }))
+    .map((c: Record<string, any>) => ({ ...c, atom_count: counts.get(c[idField]) ?? 0 }))
     .filter((c) => c.atom_count < min_atoms)
     .sort((a, b) => a.atom_count - b.atom_count)
     .slice(0, limit);
@@ -3492,8 +3921,8 @@ async function handleQuerySubjectAtoms(args: Record<string, unknown>): Promise<T
 
 async function handleGetAttributeChecklist(args: Record<string, unknown>): Promise<ToolResult> {
   const subject_kind = String(args.subject_kind ?? "") as SubjectKind;
-  if (!["image", "vehicle", "person", "cluster"].includes(subject_kind)) {
-    return toolErr(`subject_kind must be one of image | vehicle | person | cluster, got '${subject_kind}'`);
+  if (!["image", "vehicle", "person", "cluster", "user", "make_model"].includes(subject_kind)) {
+    return toolErr(`subject_kind must be one of image | vehicle | person | cluster | user | make_model, got '${subject_kind}'`);
   }
   const layers = Array.isArray(args.layers)
     ? (args.layers as Array<unknown>)
@@ -3510,12 +3939,14 @@ async function handleGetAttributeChecklist(args: Record<string, unknown>): Promi
   return toolOk({
     subject_kind,
     count: checklist.length,
-    submission_endpoint: "submit_attribute_value (pending: Phase 1 §1.1 cockpit migration)",
+    submission_endpoint: "submit_attribute_value (LIVE — requires write:observations scope; each claim must carry an evidence citation whose class is admissible for the attribute)",
+    evidence_contract: "Each submit_attribute_value must carry evidence={class, ref}; class must be one of the attribute's admissible_evidence. A photo cannot cite a VIN-decode fact (hp/torque/displacement) — it will be rejected.",
     checklist: checklist.map((d) => ({
       attribute: d.attribute,
       layer: d.layer,
       result_kind: d.result_kind,
       modalities: d.modalities,
+      admissible_evidence: admissibleEvidence(d.attribute),
       depends_on: d.depends_on ?? [],
       prompt: d.prompt,
       expected_shape: d.expected_shape,
@@ -4518,12 +4949,15 @@ async function handlePrepareListing(
     ars = res.data;
   }
 
+  // Tier vocabulary single-sourced from compute_auction_readiness(): TIER_1_EXCEPTIONAL,
+  // TIER_2_COMPETITIVE, TIER_3_VIABLE, TIER_4_INCOMPLETE, DISCOVERY_ONLY.
+  const arsTier = (ars?.tier as string) || null;
   const tierWarning =
-    ars?.tier === "AUCTION_READY"
+    arsTier === "TIER_1_EXCEPTIONAL" || arsTier === "TIER_2_COMPETITIVE"
       ? null
-      : ars?.tier === "NEARLY_READY"
-        ? "Vehicle is NEARLY_READY — listing may have gaps. Review coaching plan."
-        : `Vehicle is ${ars?.tier || "UNKNOWN"} — not recommended for submission yet. Run get_coaching_plan first.`;
+      : arsTier === "TIER_3_VIABLE"
+        ? "Vehicle is TIER_3_VIABLE — listing-ready with minor gaps. Review coaching plan."
+        : `Vehicle is ${arsTier || "UNKNOWN"} — not recommended for submission yet. Run get_coaching_plan first.`;
 
   const { data: v, error: vErr } = await supabase
     .from("vehicles")
@@ -5546,6 +5980,95 @@ async function handleGetAuctionBriefing(args: Record<string, unknown>): Promise<
   };
 }
 
+// propose_attribute — the ONLY tool that can grow the attribute vocabulary. Records a
+// novel proposed attribute into schema_proposals (proposal_type='add_image_attribute',
+// status='pending') with full source DNA. Promotion into attribute-registry.ts stays
+// human (laser-tag doctrine): the agent grows the vocabulary, the human signs it.
+async function handleProposeAttribute(args: Record<string, unknown>): Promise<ToolResult> {
+  const attribute = String(args.attribute ?? "").trim();
+  const subject_kind = String(args.subject_kind ?? "").trim();
+  const prompt = String(args.prompt ?? "").trim();
+  const expected_shape = String(args.expected_shape ?? "").trim();
+  const motivation = String(args.motivation ?? "").trim();
+  const observed_by = String(args.observed_by ?? "").trim();
+  const confidence = Number(args.confidence);
+
+  if (!attribute || !subject_kind || !prompt || !expected_shape || !motivation || !observed_by || Number.isNaN(confidence)) {
+    return toolErr("attribute, subject_kind, prompt, expected_shape, motivation, observed_by, and confidence are required");
+  }
+  if (confidence < 0 || confidence > 1) return toolErr(`confidence must be in [0,1], got ${confidence}`);
+
+  const SUBJECT_KINDS = ["image", "vehicle", "person", "cluster", "user", "make_model"];
+  if (!SUBJECT_KINDS.includes(subject_kind)) return toolErr(`subject_kind must be one of ${SUBJECT_KINDS.join("|")}`);
+  const SHAPES = ["string", "number", "boolean", "enum", "ratio_0_1", "bbox", "uuid", "iso_date", "iso_timestamp", "structured"];
+  if (!SHAPES.includes(expected_shape)) return toolErr(`expected_shape must be one of ${SHAPES.join("|")}`);
+  if (expected_shape === "enum" && (!Array.isArray(args.enum_values) || (args.enum_values as unknown[]).length === 0)) {
+    return toolErr("expected_shape=enum requires a non-empty enum_values array");
+  }
+
+  // Not novel if it already exists — point the caller at submit_attribute_value instead.
+  if (getAttribute(attribute)) {
+    return toolErr(`attribute '${attribute}' already exists in the registry — use submit_attribute_value to record a value, not propose_attribute`);
+  }
+
+  const supabase = sb();
+
+  // Idempotent: an identical pending proposal is returned, not duplicated.
+  const { data: existing } = await supabase
+    .from("schema_proposals")
+    .select("id, status, proposed_at")
+    .eq("proposal_type", "add_image_attribute")
+    .eq("payload->>attribute", attribute)
+    .eq("status", "open")
+    .maybeSingle();
+  if (existing) {
+    return toolOk({ proposal_id: existing.id, status: existing.status, attribute, proposed_at: existing.proposed_at, note: "an identical pending proposal already exists; not duplicated" });
+  }
+
+  const admissible = Array.isArray(args.admissible_evidence)
+    ? (args.admissible_evidence as unknown[]).filter((c) => typeof c === "string")
+    : ["image"];
+  const sample_evidence = (args.sample_evidence && typeof args.sample_evidence === "object") ? args.sample_evidence as Record<string, unknown> : null;
+  const ref = sample_evidence && typeof sample_evidence.ref === "object" ? sample_evidence.ref as Record<string, unknown> : null;
+  const motivating_observation_ids = ref && Array.isArray(ref.image_ids)
+    ? (ref.image_ids as unknown[]).filter((s) => typeof s === "string")
+    : [];
+
+  const payload = {
+    attribute,
+    subject_kind,
+    prompt,
+    expected_shape,
+    enum_values: Array.isArray(args.enum_values) ? args.enum_values : undefined,
+    admissible_evidence: admissible.length ? admissible : ["image"],
+    result_kind: (args.result_kind === "substrate" || args.result_kind === "projection") ? args.result_kind : "substrate",
+    layer: typeof args.layer === "number" ? args.layer : null,
+    motivation,
+  };
+
+  const { data: inserted, error } = await supabase
+    .from("schema_proposals")
+    .insert({
+      proposal_type: "add_image_attribute",
+      proposed_by_agent_key: observed_by,
+      payload,
+      evidence: { sample_evidence, confidence, observed_by, proposed_via: "mcp:propose_attribute" },
+      motivating_observation_ids,
+      status: "open",
+    })
+    .select("id, proposed_at")
+    .single();
+  if (error || !inserted) return toolErr(`schema_proposals insert failed: ${error?.message ?? "no row"}`);
+
+  return toolOk({
+    proposal_id: inserted.id,
+    status: "open",
+    attribute,
+    proposed_at: inserted.proposed_at,
+    note: "Proposal recorded in schema_proposals (proposal_type='add_image_attribute'). A human curator reviews and promotes accepted proposals into attribute-registry.ts — promotion stays human by design.",
+  });
+}
+
 // =============================================================================
 // TOOL DISPATCH
 // =============================================================================
@@ -5566,18 +6089,23 @@ const TOOL_HANDLERS: Record<string, (args: Record<string, unknown>) => Promise<T
   get_valuation: handleGetValuation,
   compute_valuation: handleComputeValuation,
   get_comps: handleGetComps,
+  get_make_model_terminal: handleGetMakeModelTerminal,
   query_market_history: handleQueryMarketHistory,
   query_library: handleQueryLibrary,
   search_service_manuals: handleSearchServiceManuals,
   analyze_image: handleAnalyzeImage,
   identify_vehicle_image: handleIdentifyVehicleImage,
   query_vehicle_images: handleQueryVehicleImages,
+  get_vehicle_wiki: handleGetVehicleWiki,
   get_attribute_checklist: handleGetAttributeChecklist,
   submit_attribute_value: handleSubmitAttributeValue,
   submit_attribute_values: handleSubmitAttributeValues,
+  confirm_work_session: handleConfirmWorkSession,
   query_subject_atoms: handleQuerySubjectAtoms,
   find_subjects_needing_atoms: handleFindSubjectsNeedingAtoms,
   synthesize_attribute: handleSynthesizeAttribute,
+  project_attribute: handleProjectAttribute,
+  propose_attribute: handleProposeAttribute,
   project_invoice: handleProjectInvoice,
   project_work_log: handleProjectWorkLog,
   project_money_flow: handleProjectMoneyFlow,
@@ -5760,21 +6288,25 @@ Deno.serve(async (req: Request) => {
   // pointing at the OAuth resource metadata. Claude.ai sees this and triggers the
   // OAuth flow at https://nuke.ag/oauth/authorize. After the user logs in via
   // magic link, Claude.ai gets a Bearer token that it includes on every retry.
-  const WRITE_TOOLS = new Set([
-    "submit_observation",
-    "submit_attribute_value",
-    "submit_attribute_values",
-    "submit_vehicle_event",
-    "create_profile",
-    "link_account",
-    "verify_account_link",
-    "ingest_photos",
-  ]);
+  // Write tools are tiered. Governed append-only claims need write:observations (autonomous for
+  // external agents). Canonical-record mutations (identity) need write:canonical, which is only
+  // grantable via owner login — an autonomous walk-in token can never reach them.
+  const WRITE_TIERS: Record<string, WriteTier> = {
+    submit_observation: "observations",
+    submit_attribute_value: "observations",
+    submit_attribute_values: "observations",
+    submit_vehicle_event: "observations",
+    ingest_photos: "observations",
+    create_profile: "canonical",
+    link_account: "canonical",
+    verify_account_link: "canonical",
+  };
   if (body.method === "tools/call") {
     const toolName = body?.params?.name as string | undefined;
     const authHeader = req.headers.get("Authorization");
     const apiKey = req.headers.get("X-API-Key");
-    const isWrite = toolName && WRITE_TOOLS.has(toolName);
+    const requiredTier: WriteTier | undefined = toolName ? WRITE_TIERS[toolName] : undefined;
+    const isWrite = Boolean(requiredTier);
 
     // If auth is provided, always validate it (so a bad key fails fast even on read tools).
     if (authHeader || apiKey) {
@@ -5790,6 +6322,16 @@ Deno.serve(async (req: Request) => {
               "WWW-Authenticate": `Bearer realm="nuke", resource_metadata="https://nuke.ag/.well-known/oauth-protected-resource"`,
             },
           },
+        );
+      }
+      // Authenticated, but does the token carry the required write tier?
+      if (requiredTier && !scopeAllowsWriteTier(auth.scopes, requiredTier)) {
+        const msg = requiredTier === "canonical"
+          ? `Tool '${toolName}' mutates a canonical record and requires the human-gated 'write:canonical' scope. Your token holds [${(auth.scopes ?? []).join(", ") || "none"}]. Submit your finding as a governed claim via submit_attribute_value / submit_observation (write:observations) instead — canonical fields are projected from claims, not written directly.`
+          : `Tool '${toolName}' requires the 'write:observations' scope. Your token holds [${(auth.scopes ?? []).join(", ") || "none"}]. Re-authorize requesting scope=write:observations.`;
+        return new Response(
+          JSON.stringify(rpcError(body.id, -32003, msg)),
+          { status: 403, headers: { ...CORS, "Content-Type": "application/json" } },
         );
       }
     } else if (isWrite) {

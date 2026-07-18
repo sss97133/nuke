@@ -1,0 +1,461 @@
+# K5 EXTERIOR / BODY — generated from K5_cut_list_v2.txt
+# 27 wires, sources: ECU, PDM30
+
+metadata:
+  title: "K5 EXTERIOR / BODY"
+  pn: "K5-EXTERIOR-BODY"
+  description: "1977 Chevrolet K5 Blazer · VIN CCL187Z210370 · LS3 6.2L · MoTeC M130 + PDM30. 27 wires from K5_cut_list_v2.txt. Wire spec: M22759/32 Tefzel (Pro tier). Generated 2026-05-14. Builder: NUKE LTD. Wiring: Desert Performance."
+  revision: "wireviz-2026-05-14"
+
+options:
+  fontname: "Roboto"
+  bgcolor: "WH"
+  color_mode: full
+
+connectors:
+  ECU:
+    type: "ECU"
+    subtype: female  # mating side that plugs into the device
+    pincount: 4
+    pinlabels: ["P33", "P39", "P46", "P53"]
+
+  PDM30:
+    type: "MoTeC Superseal A (34-pin) — MoTeC #65044"
+    subtype: female  # mating side that plugs into the device
+    pincount: 34
+    pinlabels: ["OUT12", "OUT13", "OUT14", "OUT15", "OUT17", "OUT18", "OUT19", "OUT26", "OUT27", "OUT28", "OUT7"]
+
+  Backup_Light_Left:
+    type: "Backup Light Left (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Backup_Light_Right:
+    type: "Backup Light Right (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Brake_Light_Switch:
+    type: "Brake Light Switch (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Cab_Clearance_Light_Center:
+    type: "Cab Clearance Light Center (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Cab_Clearance_Light_Left:
+    type: "Cab Clearance Light Left (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Cab_Clearance_Light_Right:
+    type: "Cab Clearance Light Right (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Electric_Parking_Brake:
+    type: "Electric Parking Brake (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Headlight_Switch:
+    type: "Headlight Switch (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Horn:
+    type: "Horn (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  LED_Headlight_Left:
+    type: "LED Headlight Left (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  LED_Headlight_Right:
+    type: "LED Headlight Right (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  License_Plate_Light:
+    type: "License Plate Light (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Parking_Light_Left_Front:
+    type: "Parking Light Left Front (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Parking_Light_Right_Front:
+    type: "Parking Light Right Front (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Side_Marker_Front_Left:
+    type: "Side Marker Front Left (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Side_Marker_Front_Right:
+    type: "Side Marker Front Right (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Side_Marker_Rear_Left:
+    type: "Side Marker Rear Left (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Side_Marker_Rear_Right:
+    type: "Side Marker Rear Right (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Tail_Light_Left:
+    type: "Tail Light Left (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Tail_Light_Right:
+    type: "Tail Light Right (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Third_Brake_Light:
+    type: "Third Brake Light (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Turn_Signal_Left_Front:
+    type: "Turn Signal Left Front (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Turn_Signal_Right_Front:
+    type: "Turn Signal Right Front (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Turn_Signal_Switch:
+    type: "Turn Signal Switch (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Washer_Pump:
+    type: "Washer Pump (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Windshield_Wiper_Motor:
+    type: "Windshield Wiper Motor (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Wiper_Washer_Switch:
+    type: "Wiper/Washer Switch (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+cables:
+  W33:
+    gauge: 18 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [OGBU]
+    notes: "#33 Turn Signal Switch (ORN/BLU)"
+
+  W39:
+    gauge: 14 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [OGOG]
+    notes: "#39 Headlight Switch (ORN/ORG)"
+
+  W46:
+    gauge: 18 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [OGVT]
+    notes: "#46 Wiper/Washer Switch (ORN/VIO)"
+
+  W48:
+    gauge: 14 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OGOG]
+    notes: "#48 Horn (ORN/ORG)"
+
+  W49:
+    gauge: 14 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [VT]
+    notes: "#49 Windshield Wiper Motor (PPL)"
+
+  W50:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OGBKRD]
+    notes: "#50 Washer Pump (ORN/BLK/RED)"
+
+  W53:
+    gauge: 22 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [OGWH]
+    notes: "#53 Brake Light Switch (ORN/WHT)"
+
+  W54:
+    gauge: 14 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [OGBKYE]
+    notes: "#54 Electric Parking Brake (ORN/BLK/YEL)"
+
+  W75:
+    gauge: 18 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [BNYE]
+    notes: "#75 Tail Light Right (BRN/YEL)"
+
+  W76:
+    gauge: 18 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [BNVT]
+    notes: "#76 Backup Light Right (BRN/VIO)"
+
+  W77:
+    gauge: 18 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [BNOG]
+    notes: "#77 Side Marker Rear Left (BRN/ORG)"
+
+  W78:
+    gauge: 18 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [BN]
+    notes: "#78 Side Marker Rear Right (BRN)"
+
+  W79:
+    gauge: 18 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [BNWH]
+    notes: "#79 Cab Clearance Light Left (BRN/WHT)"
+
+  W80:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BU]
+    notes: "#80 Turn Signal Left Front (LT BLU)"
+
+  W81:
+    gauge: 18 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [BNBK]
+    notes: "#81 Tail Light Left (BRN/BLK)"
+
+  W82:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BU]
+    notes: "#82 Turn Signal Right Front (DK BLU)"
+
+  W83:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BNRD]
+    notes: "#83 Parking Light Left Front (BRN/RED)"
+
+  W84:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BNBU]
+    notes: "#84 Parking Light Right Front (BRN/BLU)"
+
+  W85:
+    gauge: 16 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GN]
+    notes: "#85 LED Headlight Left (LT GRN)"
+
+  W86:
+    gauge: 16 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GNWH]
+    notes: "#86 LED Headlight Right (LT GRN/WHT)"
+
+  W87:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BNYE]
+    notes: "#87 Side Marker Front Left (BRN/YEL)"
+
+  W88:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BNVT]
+    notes: "#88 Side Marker Front Right (BRN/VIO)"
+
+  W89:
+    gauge: 18 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [BNOG]
+    notes: "#89 Backup Light Left (BRN/ORG)"
+
+  W90:
+    gauge: 18 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [BN]
+    notes: "#90 Cab Clearance Light Center (BRN)"
+
+  W91:
+    gauge: 18 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [BNWH]
+    notes: "#91 Cab Clearance Light Right (BRN/WHT)"
+
+  W92:
+    gauge: 18 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [BNBK]
+    notes: "#92 License Plate Light (BRN/BLK)"
+
+  W93:
+    gauge: 18 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [BNRD]
+    notes: "#93 Third Brake Light (BRN/RED)"
+
+connections:
+  -
+    - ECU: ["P33"]
+    - W33: [1]
+    - Turn_Signal_Switch: ["P1"]
+  -
+    - ECU: ["P39"]
+    - W39: [1]
+    - Headlight_Switch: ["P1"]
+  -
+    - ECU: ["P46"]
+    - W46: [1]
+    - Wiper_Washer_Switch: ["P1"]
+  -
+    - PDM30: ["OUT14"]
+    - W48: [1]
+    - Horn: ["P1"]
+  -
+    - PDM30: ["OUT12"]
+    - W49: [1]
+    - Windshield_Wiper_Motor: ["P1"]
+  -
+    - PDM30: ["OUT26"]
+    - W50: [1]
+    - Washer_Pump: ["P1"]
+  -
+    - ECU: ["P53"]
+    - W53: [1]
+    - Brake_Light_Switch: ["P1"]
+  -
+    - PDM30: ["OUT7"]
+    - W54: [1]
+    - Electric_Parking_Brake: ["P1"]
+  -
+    - PDM30: ["OUT13"]
+    - W75: [1]
+    - Tail_Light_Right: ["P1"]
+  -
+    - PDM30: ["OUT15"]
+    - W76: [1]
+    - Backup_Light_Right: ["P1"]
+  -
+    - PDM30: ["OUT19"]
+    - W77: [1]
+    - Side_Marker_Rear_Left: ["P1"]
+  -
+    - PDM30: ["OUT19"]
+    - W78: [1]
+    - Side_Marker_Rear_Right: ["P1"]
+  -
+    - PDM30: ["OUT19"]
+    - W79: [1]
+    - Cab_Clearance_Light_Left: ["P1"]
+  -
+    - PDM30: ["OUT27"]
+    - W80: [1]
+    - Turn_Signal_Left_Front: ["P1"]
+  -
+    - PDM30: ["OUT13"]
+    - W81: [1]
+    - Tail_Light_Left: ["P1"]
+  -
+    - PDM30: ["OUT28"]
+    - W82: [1]
+    - Turn_Signal_Right_Front: ["P1"]
+  -
+    - PDM30: ["OUT13"]
+    - W83: [1]
+    - Parking_Light_Left_Front: ["P1"]
+  -
+    - PDM30: ["OUT13"]
+    - W84: [1]
+    - Parking_Light_Right_Front: ["P1"]
+  -
+    - PDM30: ["OUT17"]
+    - W85: [1]
+    - LED_Headlight_Left: ["P1"]
+  -
+    - PDM30: ["OUT18"]
+    - W86: [1]
+    - LED_Headlight_Right: ["P1"]
+  -
+    - PDM30: ["OUT19"]
+    - W87: [1]
+    - Side_Marker_Front_Left: ["P1"]
+  -
+    - PDM30: ["OUT19"]
+    - W88: [1]
+    - Side_Marker_Front_Right: ["P1"]
+  -
+    - PDM30: ["OUT15"]
+    - W89: [1]
+    - Backup_Light_Left: ["P1"]
+  -
+    - PDM30: ["OUT19"]
+    - W90: [1]
+    - Cab_Clearance_Light_Center: ["P1"]
+  -
+    - PDM30: ["OUT19"]
+    - W91: [1]
+    - Cab_Clearance_Light_Right: ["P1"]
+  -
+    - PDM30: ["OUT19"]
+    - W92: [1]
+    - License_Plate_Light: ["P1"]
+  -
+    - PDM30: ["OUT15"]
+    - W93: [1]
+    - Third_Brake_Light: ["P1"]

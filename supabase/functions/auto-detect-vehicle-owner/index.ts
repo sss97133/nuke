@@ -65,12 +65,11 @@ Deno.serve(async (req) => {
     }
 
     // 2. Title documents (highest confidence for external ownership)
-    const { data: titleDocs } = await supabase
-      .from('vehicle_title_documents')
-      .select('owner_name, state, issue_date, extraction_confidence')
-      .eq('vehicle_id', vehicle_id)
-      .order('issue_date', { ascending: false })
-      .limit(1);
+    // TODO(ghost-ref 2026-07-12): vehicle_title_documents does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+    // deal_documents is the closest table but has no owner_name/state/extraction_confidence
+    // columns (they'd live inside ocr_data jsonb), so a clean repoint isn't possible.
+    // Returning no title docs keeps the ownership-signal flow intact without crashing.
+    const titleDocs: { owner_name: string; state: string; issue_date: string; extraction_confidence: number }[] = [];
 
     if (titleDocs && titleDocs.length > 0) {
       const titleDoc = titleDocs[0];

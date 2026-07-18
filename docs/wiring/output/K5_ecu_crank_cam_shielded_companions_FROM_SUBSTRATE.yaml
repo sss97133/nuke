@@ -1,0 +1,54 @@
+# Generated from vehicle_canonical — substrate-driven, not file-driven.
+# Vehicle: e08bf694-970f-4cbe-8a74-8715158a0f2e
+# Loom: ECU_CRANK_CAM SHIELDED COMPANIONS
+# Wires projected: 6
+
+metadata:
+  title: K5 ECU_CRANK_CAM SHIELDED COMPANIONS
+  description: |
+    Projection of 6 wires from public.vehicle_canonical for
+    vehicle_id=e08bf694-970f-4cbe-8a74-8715158a0f2e. Source of truth is the DB; this YAML
+    is regenerated on demand. Cite-by-cell provenance retained in
+    structured_data on each underlying observation row.
+
+connectors:
+  M130_A:  {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  M130_B:  {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+  PDM30_A: {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  PDM30_B: {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+
+cables:
+  W99g:
+    # gauge: substrate gap
+    notes: "CKP Sensor Ground (conductor 2 of #99 shielded 2C cable) M130:B15 | from 22 AWG    BLK         4.6ft   In the M27500-style shielded cable | sources=k5_cut_list_v2"
+  W99r:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GY]
+    type: M22759/32
+    notes: "CKP 5V Reference | from M130:A02 | sources=k5_cut_list_v2"
+  W99s:
+    # gauge: substrate gap
+    notes: "CKP Shield Drain | from M130:B15      22 AWG bare/BLK       BARE        4.6ft   Drain to SEN_0V at ECU end only (no sensor-end ground per K5_connector_schedule.txt:38) | sources=k5_cut_list_v2"
+  W101g:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BK]
+    notes: "CMP Sensor Ground (conductor 2 of #101 shielded 2C) | from M130:B16 | sources=k5_cut_list_v2"
+  W101r:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GY]
+    type: M22759/32
+    notes: "CMP 5V Reference | from M130:A09 | sources=k5_cut_list_v2"
+  W101s:
+    # gauge: substrate gap
+    notes: "CMP Shield Drain | from M130:B16      22 AWG bare/BLK       BARE        4.6ft | sources=k5_cut_list_v2"
+
+# Connection list intentionally omitted in this MVP — needs the
+# from_pin → connector pin mapping logic that lives in
+# docs/wiring/output/generate_wireviz_yaml.py. Next pass: refactor
+# that generator to consume the per-wire dicts produced above.

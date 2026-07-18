@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { callTool } from "../../lib/mcp";
 
 interface Atom {
   attribute: string;
@@ -115,11 +116,7 @@ export default function JournalPage() {
     if (!date) return;
     setLoading(true);
     setError(null);
-    fetch(`/api/journal/${date}`)
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`fetch failed: ${r.status}`);
-        return (await r.json()) as Response;
-      })
+    callTool<Response>("project_work_log", { date })
       .then(setData)
       .catch((e) => setError(String(e?.message || e)))
       .finally(() => setLoading(false));
@@ -170,7 +167,7 @@ export default function JournalPage() {
                     <div style={styles.photoCaption}>
                       {p.angle ?? "—"} ·{" "}
                       {p.vehicle_id ? (
-                        <Link to={`/vehicles/${p.vehicle_id}`} style={styles.link}>
+                        <Link to={`/vehicle/${p.vehicle_id}`} style={styles.link}>
                           {p.vehicle_id.slice(0, 8)}
                         </Link>
                       ) : (

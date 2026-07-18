@@ -718,6 +718,7 @@ export interface IngestResult {
   source?: string;
   external_id?: string;
   error?: string;
+  reason?: string;
   quality_score?: number;
   issues?: string[];
 }

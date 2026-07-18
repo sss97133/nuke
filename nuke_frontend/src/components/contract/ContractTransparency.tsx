@@ -140,15 +140,9 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
     }
 
     if (byType.bond?.length) {
-      fetches.push(
-        supabase
-          .from('vehicle_bonds')
-          .select('id, principal_amount_cents, interest_rate_pct, term_months, status, maturity_date, issuer_name, issuer_type, collateral_description, coupon_rate_pct, payments_on_time')
-          .in('id', byType.bond)
-          .then(({ data }) => {
-            (data || []).forEach((b: any) => { detailsMap[b.id] = b; });
-          })
-      );
+      // TODO(ghost-ref 2026-07-12): vehicle_bonds does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+      // No replacement table exists for bond details. Skip the fetch so the query cannot fail
+      // against a nonexistent table; downstream `detailsMap[asset.asset_id] || null` renders bonds without detail.
     }
 
     if (byType.stake?.length) {

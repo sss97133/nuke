@@ -1,0 +1,707 @@
+[
+  {
+    "vendor": "ksl",
+    "total_msgs": 37662,
+    "distinct_addrs": 6,
+    "first_msg": 1371327682,
+    "last_msg": 1777731225,
+    "addresses": [
+      {
+        "address": "cars@ksl.com",
+        "n": 37500,
+        "first": 1732566537,
+        "last": 1777731225
+      },
+      {
+        "address": "support@ksl.com",
+        "n": 14,
+        "first": 1616792347,
+        "last": 1774927917
+      },
+      {
+        "address": "classifieds@ksl.com",
+        "n": 107,
+        "first": 1663515993,
+        "last": 1777552265
+      },
+      {
+        "address": "classifieds@ksl.com",
+        "n": 38,
+        "first": 1611889385,
+        "last": 1622477276
+      },
+      {
+        "address": "support@ksl.com",
+        "n": 2,
+        "first": 1371327682,
+        "last": 1371327909
+      }
+    ]
+  },
+  {
+    "vendor": "ebay",
+    "total_msgs": 3409,
+    "distinct_addrs": 263,
+    "first_msg": 1268883354,
+    "last_msg": 1775255681,
+    "addresses": [
+      {
+        "address": "ebay@info.ebay.com",
+        "n": 9,
+        "first": 1719490826,
+        "last": 1769027962
+      },
+      {
+        "address": "ebay@ebay.com",
+        "n": 2208,
+        "first": 1452907414,
+        "last": 1775255681
+      },
+      {
+        "address": "ebay@reply.ebay.com",
+        "n": 260,
+        "first": 1658934386,
+        "last": 1771185508
+      },
+      {
+        "address": "raucyc_fviy6146nij@members.ebay.com",
+        "n": 1,
+        "first": 1735937827,
+        "last": 1735937827
+      },
+      {
+        "address": "sunilw_huw3809rjtc@members.ebay.com",
+        "n": 12,
+        "first": 1734030331,
+        "last": 1734031182
+      }
+    ]
+  },
+  {
+    "vendor": "bringatrailer",
+    "total_msgs": 1655,
+    "distinct_addrs": 18,
+    "first_msg": 1397043228,
+    "last_msg": 1777725054,
+    "addresses": [
+      {
+        "address": "updates@bringatrailer.com",
+        "n": 1481,
+        "first": 1692005878,
+        "last": 1777725054
+      },
+      {
+        "address": "updates@bringatrailer.com",
+        "n": 12,
+        "first": 1697569017,
+        "last": 1772352219
+      },
+      {
+        "address": "auctionmanager+86894488@bringatrailer.com",
+        "n": 22,
+        "first": 1734042966,
+        "last": 1745853297
+      },
+      {
+        "address": "auctionmanager+74545671@bringatrailer.com",
+        "n": 3,
+        "first": 1713822037,
+        "last": 1713893964
+      },
+      {
+        "address": "mail@bringatrailer.com",
+        "n": 1,
+        "first": 1709593329,
+        "last": 1709593329
+      }
+    ]
+  },
+  {
+    "vendor": "paypal",
+    "total_msgs": 1524,
+    "distinct_addrs": 10,
+    "first_msg": 1341042524,
+    "last_msg": 1777674741,
+    "addresses": [
+      {
+        "address": "service@paypal.com",
+        "n": 1113,
+        "first": 1341129017,
+        "last": 1777434343
+      },
+      {
+        "address": "service@paypal.com",
+        "n": 401,
+        "first": 1730962899,
+        "last": 1777674741
+      },
+      {
+        "address": "service@paypal.com",
+        "n": 1,
+        "first": 1716324087,
+        "last": 1716324087
+      },
+      {
+        "address": "service@paypal.com",
+        "n": 2,
+        "first": 1708568295,
+        "last": 1708701104
+      },
+      {
+        "address": "service@paypal.com",
+        "n": 1,
+        "first": 1620177883,
+        "last": 1620177883
+      }
+    ]
+  },
+  {
+    "vendor": "amazon",
+    "total_msgs": 1399,
+    "distinct_addrs": 53,
+    "first_msg": 1255598983,
+    "last_msg": 1777671182,
+    "addresses": [
+      {
+        "address": "store-news@amazon.com",
+        "n": 342,
+        "first": 1255598983,
+        "last": 1777671182
+      },
+      {
+        "address": "donotreply@amazon.com",
+        "n": 31,
+        "first": 1658108181,
+        "last": 1746734187
+      },
+      {
+        "address": "marketplace-messages@amazon.com",
+        "n": 56,
+        "first": 1536546203,
+        "last": 1777073483
+      },
+      {
+        "address": "order-update@amazon.com",
+        "n": 236,
+        "first": 1608838818,
+        "last": 1777061199
+      },
+      {
+        "address": "shipment-tracking@amazon.com",
+        "n": 252,
+        "first": 1531342145,
+        "last": 1777055009
+      }
+    ]
+  },
+  {
+    "vendor": "jegs",
+    "total_msgs": 820,
+    "distinct_addrs": 7,
+    "first_msg": 1540966973,
+    "last_msg": 1777680101,
+    "addresses": [
+      {
+        "address": "jegs@e.jegs.com",
+        "n": 799,
+        "first": 1583589999,
+        "last": 1777680101
+      },
+      {
+        "address": "jegs@e.jegs.com",
+        "n": 12,
+        "first": 1724759355,
+        "last": 1725457472
+      },
+      {
+        "address": "jegs@e.jegs.com",
+        "n": 1,
+        "first": 1724780994,
+        "last": 1724780994
+      },
+      {
+        "address": "JEGS_Customer_Care@JEGS.COM",
+        "n": 3,
+        "first": 1596468334,
+        "last": 1613953370
+      },
+      {
+        "address": "ROBIN.WHITE@JEGS.com",
+        "n": 1,
+        "first": 1597676252,
+        "last": 1597676252
+      }
+    ]
+  },
+  {
+    "vendor": "harbor_freight",
+    "total_msgs": 818,
+    "distinct_addrs": 14,
+    "first_msg": 1676335848,
+    "last_msg": 1777696730,
+    "addresses": [
+      {
+        "address": "hft@em.harborfreight.com",
+        "n": 199,
+        "first": 1725656289,
+        "last": 1755966320
+      },
+      {
+        "address": "hft@em.harborfreight.com",
+        "n": 115,
+        "first": 1702319496,
+        "last": 1755178087
+      },
+      {
+        "address": "hft@em.harborfreight.com",
+        "n": 2,
+        "first": 1752698018,
+        "last": 1753114350
+      },
+      {
+        "address": "hft@em.harborfreight.com",
+        "n": 1,
+        "first": 1731351168,
+        "last": 1731351168
+      },
+      {
+        "address": "hft@em.harborfreight.com",
+        "n": 126,
+        "first": 1677020026,
+        "last": 1755799230
+      }
+    ]
+  },
+  {
+    "vendor": "cj_pony",
+    "total_msgs": 807,
+    "distinct_addrs": 18,
+    "first_msg": 1461083352,
+    "last_msg": 1777587977,
+    "addresses": [
+      {
+        "address": "cjautomotive@mktg.cjponyparts.com",
+        "n": 657,
+        "first": 1726322544,
+        "last": 1777587977
+      },
+      {
+        "address": "no-reply@cjponyparts.com",
+        "n": 8,
+        "first": 1721874500,
+        "last": 1773087873
+      },
+      {
+        "address": "Ship-Confirmation@cjponyparts.com",
+        "n": 29,
+        "first": 1720653026,
+        "last": 1774040624
+      },
+      {
+        "address": "cjautomotive@cjponyparts.com",
+        "n": 56,
+        "first": 1650777615,
+        "last": 1734104751
+      },
+      {
+        "address": "Order-Confirmation@cjponyparts.com",
+        "n": 20,
+        "first": 1720647406,
+        "last": 1772746480
+      }
+    ]
+  },
+  {
+    "vendor": "discount_tire",
+    "total_msgs": 152,
+    "distinct_addrs": 2,
+    "first_msg": 1728565046,
+    "last_msg": 1777729476,
+    "addresses": [
+      {
+        "address": "dtc-email@discounttire-email.com",
+        "n": 151,
+        "first": 1728565046,
+        "last": 1777729476
+      },
+      {
+        "address": "NVL_23MGR@discounttire.com",
+        "n": 1,
+        "first": 1745452011,
+        "last": 1745452011
+      }
+    ]
+  },
+  {
+    "vendor": "summit_racing",
+    "total_msgs": 112,
+    "distinct_addrs": 7,
+    "first_msg": 1574108743,
+    "last_msg": 1776964013,
+    "addresses": [
+      {
+        "address": "summitracing@summitracing.narvar.com",
+        "n": 60,
+        "first": 1694478877,
+        "last": 1776964013
+      },
+      {
+        "address": "CustomerService@SummitRacing.com",
+        "n": 42,
+        "first": 1584985648,
+        "last": 1776918245
+      },
+      {
+        "address": "support@summitracing.com",
+        "n": 3,
+        "first": 1727273455,
+        "last": 1757368144
+      },
+      {
+        "address": "sre-verifications@summitracing.com",
+        "n": 2,
+        "first": 1727273440,
+        "last": 1727273445
+      },
+      {
+        "address": "noreply@summitracing.com",
+        "n": 1,
+        "first": 1651261246,
+        "last": 1651261246
+      }
+    ]
+  },
+  {
+    "vendor": "holley",
+    "total_msgs": 80,
+    "distinct_addrs": 6,
+    "first_msg": 1648138754,
+    "last_msg": 1767214883,
+    "addresses": [
+      {
+        "address": "motorlife@holley.com",
+        "n": 64,
+        "first": 1662443327,
+        "last": 1767214883
+      },
+      {
+        "address": "noreply@holley.com",
+        "n": 1,
+        "first": 1725049577,
+        "last": 1725049577
+      },
+      {
+        "address": "motorlife@holley.com",
+        "n": 6,
+        "first": 1665587976,
+        "last": 1697726759
+      },
+      {
+        "address": "noreply@holley.com",
+        "n": 6,
+        "first": 1648138754,
+        "last": 1662813950
+      },
+      {
+        "address": "HolleyOrders@holley.com",
+        "n": 1,
+        "first": 1662351902,
+        "last": 1662351902
+      }
+    ]
+  },
+  {
+    "vendor": "eckler",
+    "total_msgs": 46,
+    "distinct_addrs": 4,
+    "first_msg": 1772664763,
+    "last_msg": 1777659121,
+    "addresses": [
+      {
+        "address": "Ecklers@email.ecklers.com",
+        "n": 9,
+        "first": 1772751071,
+        "last": 1777032091
+      },
+      {
+        "address": "Ecklers@email.ecklers.com",
+        "n": 2,
+        "first": 1772842759,
+        "last": 1773357540
+      },
+      {
+        "address": "Ecklers@email.ecklers.com",
+        "n": 2,
+        "first": 1772664763,
+        "last": 1772743009
+      },
+      {
+        "address": "Ecklers@email.ecklers.com",
+        "n": 33,
+        "first": 1773054931,
+        "last": 1777659121
+      }
+    ]
+  },
+  {
+    "vendor": "craigslist",
+    "total_msgs": 37,
+    "distinct_addrs": 4,
+    "first_msg": 1252083547,
+    "last_msg": 1771520621,
+    "addresses": [
+      {
+        "address": "robot@craigslist.org",
+        "n": 29,
+        "first": 1372805851,
+        "last": 1771520621
+      },
+      {
+        "address": "noreply@craigslist.org",
+        "n": 5,
+        "first": 1260414221,
+        "last": 1268674777
+      },
+      {
+        "address": "help@craigslist.org",
+        "n": 2,
+        "first": 1260413991,
+        "last": 1267487607
+      },
+      {
+        "address": "remailer_daemon@craigslist.org",
+        "n": 1,
+        "first": 1252083547,
+        "last": 1252083547
+      }
+    ]
+  },
+  {
+    "vendor": "classic_industries",
+    "total_msgs": 37,
+    "distinct_addrs": 7,
+    "first_msg": 1539496101,
+    "last_msg": 1656595051,
+    "addresses": [
+      {
+        "address": "promotions@classicindustries.com",
+        "n": 27,
+        "first": 1633266838,
+        "last": 1656595051
+      },
+      {
+        "address": "no-reply-notifications@classicindustries.com",
+        "n": 4,
+        "first": 1647505573,
+        "last": 1652986933
+      },
+      {
+        "address": "info-desk@classicindustries.com",
+        "n": 2,
+        "first": 1647505250,
+        "last": 1652939537
+      },
+      {
+        "address": "info-desk@classicindustries.com",
+        "n": 1,
+        "first": 1631920817,
+        "last": 1631920817
+      },
+      {
+        "address": "noreply@classicindustries.com",
+        "n": 1,
+        "first": 1541919702,
+        "last": 1541919702
+      }
+    ]
+  },
+  {
+    "vendor": "home_depot",
+    "total_msgs": 30,
+    "distinct_addrs": 14,
+    "first_msg": 1543273166,
+    "last_msg": 1745266335,
+    "addresses": [
+      {
+        "address": "HomeDepot@order.homedepot.com",
+        "n": 12,
+        "first": 1629825438,
+        "last": 1745266335
+      },
+      {
+        "address": "HomeDepotPro@order.homedepot.com",
+        "n": 3,
+        "first": 1629845264,
+        "last": 1647823152
+      },
+      {
+        "address": "homedepotpro@mg.homedepot.com",
+        "n": 1,
+        "first": 1623254930,
+        "last": 1623254930
+      },
+      {
+        "address": "home_services_no_reply@homedepot.com",
+        "n": 1,
+        "first": 1619474389,
+        "last": 1619474389
+      },
+      {
+        "address": "Flooring_Decor_3302@homedepot.com",
+        "n": 2,
+        "first": 1613862539,
+        "last": 1614374202
+      }
+    ]
+  },
+  {
+    "vendor": "advance_auto",
+    "total_msgs": 25,
+    "distinct_addrs": 3,
+    "first_msg": 1559244759,
+    "last_msg": 1665796237,
+    "addresses": [
+      {
+        "address": "reply@email-advanceautoparts.com",
+        "n": 11,
+        "first": 1575742225,
+        "last": 1665796237
+      },
+      {
+        "address": "advanceauto@E-speedperks.com",
+        "n": 8,
+        "first": 1575922550,
+        "last": 1655876921
+      },
+      {
+        "address": "advanceauto@email-advanceautoparts.com",
+        "n": 6,
+        "first": 1559244759,
+        "last": 1630151480
+      }
+    ]
+  },
+  {
+    "vendor": "rockauto",
+    "total_msgs": 18,
+    "distinct_addrs": 2,
+    "first_msg": 1760727976,
+    "last_msg": 1776871146,
+    "addresses": [
+      {
+        "address": "newsletter@list.rockauto.com",
+        "n": 13,
+        "first": 1761240835,
+        "last": 1776363478
+      },
+      {
+        "address": "noreply@rockauto.com",
+        "n": 5,
+        "first": 1760727976,
+        "last": 1776871146
+      }
+    ]
+  },
+  {
+    "vendor": "autozone",
+    "total_msgs": 16,
+    "distinct_addrs": 2,
+    "first_msg": 1699308101,
+    "last_msg": 1773994607,
+    "addresses": [
+      {
+        "address": "reviews@autozone.com",
+        "n": 13,
+        "first": 1700239441,
+        "last": 1773994607
+      },
+      {
+        "address": "orders@autozone.narvar.com",
+        "n": 3,
+        "first": 1699308101,
+        "last": 1699483889
+      }
+    ]
+  },
+  {
+    "vendor": "oreilly",
+    "total_msgs": 5,
+    "distinct_addrs": 2,
+    "first_msg": 1760625917,
+    "last_msg": 1762570597,
+    "addresses": [
+      {
+        "address": "noreply-oreillyauto@bazaarvoice-cgc.com",
+        "n": 2,
+        "first": 1761274705,
+        "last": 1762570597
+      },
+      {
+        "address": "messages@email.oreillyauto.com",
+        "n": 3,
+        "first": 1760625917,
+        "last": 1761242167
+      }
+    ]
+  },
+  {
+    "vendor": "lmc_truck",
+    "total_msgs": 4,
+    "distinct_addrs": 1,
+    "first_msg": 1669365265,
+    "last_msg": 1762180785,
+    "addresses": [
+      {
+        "address": "marketing@lmctruck.com",
+        "n": 4,
+        "first": 1669365265,
+        "last": 1762180785
+      }
+    ]
+  },
+  {
+    "vendor": "speedway",
+    "total_msgs": 1,
+    "distinct_addrs": 1,
+    "first_msg": 1738101199,
+    "last_msg": 1738101199,
+    "addresses": [
+      {
+        "address": "email@pr.speedwaymotors.emailpowerreviews.com",
+        "n": 1,
+        "first": 1738101199,
+        "last": 1738101199
+      }
+    ]
+  },
+  {
+    "vendor": "ridetech",
+    "total_msgs": 1,
+    "distinct_addrs": 1,
+    "first_msg": 1738872651,
+    "last_msg": 1738872651,
+    "addresses": [
+      {
+        "address": "rmorgan@ridetech.com",
+        "n": 1,
+        "first": 1738872651,
+        "last": 1738872651
+      }
+    ]
+  },
+  {
+    "vendor": "fast_efi",
+    "total_msgs": 1,
+    "distinct_addrs": 1,
+    "first_msg": 1761351571,
+    "last_msg": 1761351571,
+    "addresses": [
+      {
+        "address": "vaughn.hilll@fastandease.com",
+        "n": 1,
+        "first": 1761351571,
+        "last": 1761351571
+      }
+    ]
+  }
+]

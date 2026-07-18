@@ -17,7 +17,22 @@ export default defineConfig({
   },
   assetsInclude: ['**/*.md'],
   build: {
+    // TODO(mcmaster-speed): inline critical (above-the-fold) CSS into the HTML payload.
+    // Per docs/library/intellectual/studies/2026-05-24_mcmaster-carr-speed-benchmark-study.md,
+    // McMaster inlines critical CSS to eliminate the render-blocking stylesheet request,
+    // contributing to their <300ms FCP. Doctrine §2b cites this. Speed targets in
+    // .claude/rules/frontend.md require FCP <500ms — inlining is the cheapest path.
+    // Implementation: add `critters` plugin (~20 LOC). NOT done in this session because
+    // it changes the build pipeline — requires Skylar's explicit go-ahead.
     chunkSizeWarningLimit: 1000,
+    // Strip the maps chunk (1.2 MB / ~333 KB gzip) from entry-page preload.
+    // Maps are only used on /map; preloading them on / and every other route
+    // wastes bandwidth and slows perceived load. Lazy import handles fetching
+    // on actual route entry. Other chunks keep their default preload behavior.
+    modulePreload: {
+      resolveDependencies: (_filename, deps) =>
+        deps.filter((d) => !/\/maps-[^/]+\.(js|css)$/.test(d)),
+    },
     rollupOptions: {
       output: {
         manualChunks(id) {

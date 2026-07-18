@@ -1,0 +1,88 @@
+# K5 POWER / COMM — generated from K5_cut_list_v2.txt
+# 4 wires, sources: ECU
+
+metadata:
+  title: "K5 POWER / COMM"
+  pn: "K5-POWER-COMM"
+  description: "1977 Chevrolet K5 Blazer · VIN CKR187F127263 · LS3 6.2L · MoTeC M130 + PDM30. 4 wires from K5_cut_list_v2.txt. Wire spec: M22759/32 Tefzel (Pro tier). Generated 2026-05-17. Builder: NUKE LTD. Wiring: Desert Performance."
+  revision: "wireviz-2026-05-17"
+
+options:
+  fontname: "Roboto"
+  bgcolor: "WH"
+  color_mode: full
+
+connectors:
+  ECU:
+    type: "ECU"
+    subtype: female  # mating side that plugs into the device
+    pincount: 4
+    pinlabels: ["P59", "P6", "P62", "P63"]
+
+  Alternator:
+    type: "Alternator (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Battery_Disconnect:
+    type: "Battery Disconnect (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  CAN_Bus_Network:
+    type: "CAN Bus Network (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Starter_Motor:
+    type: "Starter Motor (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+cables:
+  W6:
+    gauge: 4 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OG]
+    notes: "#6 Starter Motor (ORN)"
+
+  W59:
+    gauge: 8 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OGVT]
+    notes: "#59 Alternator (ORN/VIO)"
+
+  W62:
+    gauge: 22 AWG
+    length: 3.5
+    wirecount: 2
+    shield: false
+    colors: [WH, GN]   # CAN-H / CAN-L per ISO 11898
+    notes: "#62 CAN Bus Network — twisted pair, 120Ω terminated each end"
+
+  W63:
+    gauge: 4 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OGWH]
+    notes: "#63 Battery Disconnect (ORN/WHT)"
+
+connections:
+  -
+    - ECU: ["P6"]
+    - W6: [1]
+    - Starter_Motor: ["P1"]
+  -
+    - ECU: ["P59"]
+    - W59: [1]
+    - Alternator: ["P1"]
+  -
+    - ECU: ["P62"]
+    - W62: [1]
+    - CAN_Bus_Network: ["P1"]
+  -
+    - ECU: ["P63"]
+    - W63: [1]
+    - Battery_Disconnect: ["P1"]

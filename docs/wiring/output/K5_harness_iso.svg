@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="1050" viewBox="0 0 1700 1050" font-family="ui-sans-serif, system-ui, sans-serif">
+<defs><style><![CDATA[
+  .frame  { stroke: #94a3b8; stroke-width: 1.4; fill: none; }
+  .wire   { fill: none; stroke-linecap: round; stroke-linejoin: round; opacity: 0.5; }
+  .wire:hover { opacity: 1; stroke-width: 5; }
+  .lm     { fill: #1f2937; stroke: white; stroke-width: 1.2; }
+  .lm-label { font-size: 11px; fill: #1f2937; }
+  .comp   { font-size: 11px; fill: #111827; font-weight: 600; }
+  .title  { font-size: 18px; fill: #111827; font-weight: 700; }
+  .sub    { font-size: 11px; fill: #6b7280; }
+  .disc   { font-size: 11px; fill: #b45309; }
+  .legend { font-size: 11px; fill: #374151; }
+]]></style></defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<polyline class="frame" points="1185.4,130.9 530.7,508.9"/>
+<polyline class="frame" points="1418.2,265.3 763.5,643.3"/>
+<polyline class="frame" points="1185.4,130.9 1418.2,265.3"/>
+<polyline class="frame" points="530.7,508.9 763.5,643.3"/>
+<polyline class="frame" points="1185.4,46.9 949.0,183.4"/>
+<polyline class="frame" points="1418.2,181.3 1181.8,317.8"/>
+<polyline class="frame" points="1185.4,46.9 1418.2,181.3"/>
+<polyline class="frame" points="949.0,183.4 1181.8,317.8"/>
+<polyline class="frame" points="949.0,183.4 949.0,86.8"/>
+<polyline class="frame" points="1181.8,317.8 1181.8,221.2"/>
+<polyline class="frame" points="949.0,86.8 767.1,191.8"/>
+<polyline class="frame" points="1181.8,221.2 999.9,326.2"/>
+<polyline class="frame" points="767.1,191.8 999.9,326.2"/>
+<polyline class="frame" points="949.0,86.8 1181.8,221.2"/>
+<polyline class="frame" points="767.1,191.8 767.1,288.4"/>
+<polyline class="frame" points="999.9,326.2 999.9,422.8"/>
+<polyline class="frame" points="767.1,347.2 530.7,483.7"/>
+<polyline class="frame" points="999.9,481.6 763.5,618.1"/>
+<polyline class="frame" points="530.7,483.7 763.5,618.1"/>
+<polyline class="frame" points="767.1,288.4 530.7,424.9"/>
+<polyline class="frame" points="999.9,422.8 763.5,559.3"/>
+<polyline class="frame" points="530.7,424.9 763.5,559.3"/>
+<polyline class="frame" points="1167.2,208.6 1240.0,250.6 1130.9,313.6 1058.1,271.6 1167.2,208.6"/>
+<polyline class="frame" points="1167.2,158.2 1240.0,200.2 1130.9,263.2 1058.1,221.2 1167.2,158.2"/>
+<polyline class="frame" points="1167.2,208.6 1167.2,158.2"/>
+<polyline class="frame" points="1240.0,250.6 1240.0,200.2"/>
+<polyline class="frame" points="1058.1,271.6 1058.1,221.2"/>
+<polyline class="frame" points="1130.9,313.6 1130.9,263.2"/>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1138.1,200.2" stroke="#c2410c" stroke-width="1.16"><title>#24 Ignition Coil 1 · 20 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1138.1,200.2 1122.1,209.4" stroke="#c2410c" stroke-width="1.16"><title>#5 Ignition Coil 3 · 20 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1138.1,200.2 1122.1,209.4 1106.1,218.7" stroke="#c2410c" stroke-width="1.16"><title>#10 Ignition Coil 5 · 20 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1138.1,200.2 1122.1,209.4 1106.1,218.7 1090.1,227.9" stroke="#c2410c" stroke-width="1.16"><title>#7 Ignition Coil 7 · 20 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1196.3,233.8" stroke="#c2410c" stroke-width="1.16"><title>#9 Ignition Coil 2 · 20 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1196.3,233.8 1180.3,243.0" stroke="#c2410c" stroke-width="1.16"><title>#8 Ignition Coil 4 · 20 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1196.3,233.8 1180.3,243.0 1164.3,252.3" stroke="#c2410c" stroke-width="1.16"><title>#11 Ignition Coil 6 · 20 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1196.3,233.8 1180.3,243.0 1164.3,252.3 1148.3,261.5" stroke="#c2410c" stroke-width="1.16"><title>#12 Ignition Coil 8 · 20 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1138.1,200.2 1138.1,217.0" stroke="#c2410c" stroke-width="1.52"><title>#13 Fuel Injector 1 · 18 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1138.1,200.2 1122.1,209.4 1122.1,226.2" stroke="#c2410c" stroke-width="1.52"><title>#15 Fuel Injector 3 · 18 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1138.1,200.2 1122.1,209.4 1106.1,218.7 1106.1,235.5" stroke="#c2410c" stroke-width="1.52"><title>#17 Fuel Injector 5 · 18 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1138.1,200.2 1122.1,209.4 1106.1,218.7 1090.1,227.9 1090.1,244.7" stroke="#c2410c" stroke-width="1.52"><title>#19 Fuel Injector 7 · 18 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1196.3,233.8 1196.3,250.6" stroke="#c2410c" stroke-width="1.52"><title>#14 Fuel Injector 2 · 18 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1196.3,233.8 1180.3,243.0 1180.3,259.8" stroke="#c2410c" stroke-width="1.52"><title>#16 Fuel Injector 4 · 18 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1196.3,233.8 1180.3,243.0 1164.3,252.3 1164.3,269.1" stroke="#c2410c" stroke-width="1.52"><title>#18 Fuel Injector 6 · 18 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1196.3,233.8 1180.3,243.0 1164.3,252.3 1148.3,261.5 1148.3,278.3" stroke="#c2410c" stroke-width="1.52"><title>#20 Fuel Injector 8 · 18 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1192.7,202.3" stroke="#c2410c" stroke-width="1.52"><title>#4 Electronic Throttle Body · 18 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1138.1,229.6" stroke="#c2410c" stroke-width="0.80"><title>#108 MAP Sensor · 22 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1138.1,229.6" stroke="#c2410c" stroke-width="0.80"><title>#109 Intake Air Temp Sensor · 22 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1138.1,200.2" stroke="#c2410c" stroke-width="0.80"><title>#110 Coolant Temp Sensor (ECU) · 22 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1138.1,200.2 1138.1,217.0" stroke="#c2410c" stroke-width="0.80"><title>#112 Fuel Pressure Sensor · 22 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1058.1,338.8" stroke="#c2410c" stroke-width="0.80"><title>#113 Oil Temperature Sensor · 22 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1058.1,338.8" stroke="#c2410c" stroke-width="0.80"><title>#102 Oil Pressure Sensor (ECU) · 22 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1058.1,338.8" stroke="#c2410c" stroke-width="0.80" stroke-dasharray="4 3"><title>#99 Crank Position Sensor · 22 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1210.9,217.0" stroke="#c2410c" stroke-width="0.80" stroke-dasharray="4 3"><title>#101 Cam Position Sensor · 22 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1072.7,296.8" stroke="#c2410c" stroke-width="0.80" stroke-dasharray="4 3"><title>#103 Knock Sensor Bank 1 · 22 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1145.4,338.8" stroke="#c2410c" stroke-width="0.80" stroke-dasharray="4 3"><title>#104 Knock Sensor Bank 2 · 22 AWG · ENGINE LOOM</title></polyline>
+<polyline class="wire" points="970.8,305.2 970.8,296.8" stroke="#4b5563" stroke-width="1.52"><title>#33 Turn Signal Switch · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1007.2,309.4 1007.2,301.0" stroke="#4b5563" stroke-width="2.24"><title>#39 Headlight Switch · 14 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="970.8,305.2 970.8,296.8" stroke="#4b5563" stroke-width="1.52"><title>#46 Wiper/Washer Switch · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="999.9,330.4 999.9,322.0" stroke="#4b5563" stroke-width="0.80"><title>#53 Brake Light Switch · 22 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1" stroke="#4b5563" stroke-width="2.24"><title>#54 Electric Parking Brake · 14 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1192.7,202.3" stroke="#4b5563" stroke-width="2.24"><title>#48 Horn · 14 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 992.6,225.4" stroke="#4b5563" stroke-width="2.24"><title>#49 Windshield Wiper Motor · 14 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1192.7,202.3" stroke="#4b5563" stroke-width="1.52"><title>#50 Washer Pump · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1138.1,191.8" stroke="#4b5563" stroke-width="1.52"><title>#80 Turn Signal Left Front · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1196.3,233.8 1138.1,191.8" stroke="#4b5563" stroke-width="1.52"><title>#82 Turn Signal Right Front · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1138.1,191.8" stroke="#4b5563" stroke-width="1.52"><title>#83 Parking Light Left Front · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1196.3,233.8 1138.1,191.8" stroke="#4b5563" stroke-width="1.52"><title>#84 Parking Light Right Front · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1138.1,191.8" stroke="#4b5563" stroke-width="1.88"><title>#85 LED Headlight Left · 16 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1196.3,233.8 1138.1,191.8" stroke="#4b5563" stroke-width="1.88"><title>#86 LED Headlight Right · 16 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 992.6,225.4" stroke="#4b5563" stroke-width="1.52"><title>#87 Cab Clearance Light Left · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 992.6,225.4" stroke="#4b5563" stroke-width="1.52"><title>#88 Cab Clearance Light Right · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 647.1,550.9" stroke="#4b5563" stroke-width="1.52"><title>#75 Tail Light Right · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 647.1,550.9" stroke="#4b5563" stroke-width="1.52"><title>#76 Backup Light Right · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1" stroke="#4b5563" stroke-width="1.52"><title>#77 Side Marker Right Front · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 647.1,550.9" stroke="#4b5563" stroke-width="1.52"><title>#78 Side Marker Right Rear · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 647.1,550.9" stroke="#4b5563" stroke-width="1.52"><title>#79 License Plate Lamp · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 647.1,550.9" stroke="#4b5563" stroke-width="1.52"><title>#81 Tail Light Left · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 647.1,550.9" stroke="#4b5563" stroke-width="1.52"><title>#89 Backup Light Left · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1" stroke="#4b5563" stroke-width="1.52"><title>#90 Side Marker Left Front · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 647.1,550.9" stroke="#4b5563" stroke-width="1.52"><title>#91 Side Marker Left Rear · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1" stroke="#4b5563" stroke-width="1.52"><title>#92 Side Marker Right Center · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 647.1,550.9" stroke="#4b5563" stroke-width="1.52"><title>#93 Third Brake Light · 18 AWG · EXTERIOR / BODY LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 890.8,259.0 861.7,267.4" stroke="#4b5563" stroke-width="2.60"><title>#34 Power Window Motor Left · 12 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1109.0,385.0 861.7,267.4" stroke="#4b5563" stroke-width="2.60"><title>#35 Power Window Motor Right · 12 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="1007.2,309.4 1007.2,301.0" stroke="#4b5563" stroke-width="1.52"><title>#36 Window Switch Left · 18 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="1007.2,309.4 1007.2,301.0" stroke="#4b5563" stroke-width="1.52"><title>#37 Window Switch Right · 18 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 890.8,259.0 861.7,267.4" stroke="#4b5563" stroke-width="1.52"><title>#38 Power Lock Actuator Left · 18 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1109.0,385.0 861.7,267.4" stroke="#4b5563" stroke-width="1.52"><title>#47 Power Lock Actuator Right · 18 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="1007.2,309.4 1007.2,301.0" stroke="#4b5563" stroke-width="1.52"><title>#42 Lock Switch Left · 18 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="1007.2,309.4 1007.2,301.0" stroke="#4b5563" stroke-width="1.52"><title>#43 Lock Switch Right · 18 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="890.8,259.0 861.7,267.4" stroke="#4b5563" stroke-width="0.80"><title>#44 Door Ajar Switch Left · 22 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="1109.0,385.0 861.7,267.4" stroke="#4b5563" stroke-width="0.80"><title>#45 Door Ajar Switch Right · 22 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1192.7,202.3" stroke="#4b5563" stroke-width="2.60"><title>#51 Heater Blower Motor · 12 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="1007.2,309.4 1007.2,301.0" stroke="#4b5563" stroke-width="0.80"><title>#65 Display / Dash (Motec C125) · 22 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="992.6,225.4 992.6,217.0" stroke="#4b5563" stroke-width="1.16"><title>#67 Dome Light · 20 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="1007.2,309.4 1007.2,301.0" stroke="#4b5563" stroke-width="1.16"><title>#68 Under-dash Light · 20 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="999.9,330.4 999.9,322.0" stroke="#4b5563" stroke-width="1.16"><title>#69 Footwell Light · 20 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="1007.2,309.4 1007.2,301.0" stroke="#4b5563" stroke-width="1.52"><title>#70 USB Charging Port · 18 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="1007.2,309.4 1007.2,301.0" stroke="#4b5563" stroke-width="1.52"><title>#71 Console 12V Outlet · 18 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="1007.2,309.4 1007.2,301.0" stroke="#4b5563" stroke-width="2.24"><title>#72 Cigarette Lighter / 12V Outlet · 14 AWG · INTERIOR / DASH LOOM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1138.1,191.8" stroke="#4b5563" stroke-width="2.60"><title>#21 Radiator Fan 1 · 12 AWG · CHASSIS / UNDERBODY</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1196.3,233.8 1138.1,191.8" stroke="#4b5563" stroke-width="2.60"><title>#22 Radiator Fan 2 · 12 AWG · CHASSIS / UNDERBODY</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1138.1,200.2" stroke="#4b5563" stroke-width="2.24"><title>#25 Electric Water Pump · 14 AWG · CHASSIS / UNDERBODY</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1192.7,202.3" stroke="#4b5563" stroke-width="1.16"><title>#64 Wideband Lambda Controller · 20 AWG · CHASSIS / UNDERBODY</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1" stroke="#4b5563" stroke-width="2.24"><title>#1 AMP Research Step Left · 14 AWG · CHASSIS / UNDERBODY</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1" stroke="#4b5563" stroke-width="2.24"><title>#2 AMP Research Step Right · 14 AWG · CHASSIS / UNDERBODY</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0" stroke="#4b5563" stroke-width="2.24"><title>#3 AMP Research Controller · 14 AWG · CHASSIS / UNDERBODY</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 919.9,452.2" stroke="#4b5563" stroke-width="0.80"><title>#100 Vehicle Speed Sensor · 22 AWG · CHASSIS / UNDERBODY</title></polyline>
+<polyline class="wire" points="1101.8,296.8 985.4,355.6" stroke="#4b5563" stroke-width="0.80" stroke-dasharray="4 3"><title>#106 Wideband O2 Sensor 1 · 22 AWG · CHASSIS / UNDERBODY</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1087.2,414.4" stroke="#4b5563" stroke-width="0.80" stroke-dasharray="4 3"><title>#107 Wideband O2 Sensor 2 · 22 AWG · CHASSIS / UNDERBODY</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 810.8,515.2" stroke="#4b5563" stroke-width="2.96"><title>#66 Fuel Pump · 10 AWG · CHASSIS / UNDERBODY</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1192.7,202.3" stroke="#4b5563" stroke-width="0.80"><title>#94 Fuel Pump Relay · 22 AWG · CHASSIS / UNDERBODY</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 890.8,259.0 861.7,267.4" stroke="#7c3aed" stroke-width="1.52"><title>#26 Speaker Front Left · 18 AWG · AUDIO</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1109.0,385.0 861.7,267.4" stroke="#7c3aed" stroke-width="1.52"><title>#27 Speaker Front Right · 18 AWG · AUDIO</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 647.1,550.9" stroke="#7c3aed" stroke-width="1.52"><title>#28 Speaker Rear Left · 18 AWG · AUDIO</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 647.1,550.9" stroke="#7c3aed" stroke-width="1.52"><title>#29 Speaker Rear Right · 18 AWG · AUDIO</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 647.1,550.9" stroke="#7c3aed" stroke-width="2.24"><title>#30 Subwoofer · 14 AWG · AUDIO</title></polyline>
+<polyline class="wire" points="1007.2,309.4 1007.2,301.0" stroke="#7c3aed" stroke-width="1.52"><title>#31 Radio / Head Unit · 18 AWG · AUDIO</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 647.1,550.9" stroke="#7c3aed" stroke-width="3.32"><title>#32 Amplifier · 8 AWG · AUDIO</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 647.1,550.9" stroke="#7c3aed" stroke-width="0.80"><title>#96 Amplifier Relay · 22 AWG · AUDIO</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1043.6,338.8" stroke="#4b5563" stroke-width="4.04"><title>#6 Starter Motor · 4 AWG · POWER / COMM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1138.1,191.8" stroke="#4b5563" stroke-width="3.32"><title>#59 Alternator · 8 AWG · POWER / COMM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7" stroke="#4b5563" stroke-width="0.80"><title>#62 CAN Bus Network · 22 AWG · POWER / COMM</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1043.6,338.8" stroke="#4b5563" stroke-width="4.04"><title>#63 Battery Disconnect · 4 AWG · POWER / COMM</title></polyline>
+<polyline class="wire" points="970.8,305.2 970.8,296.8" stroke="#4b5563" stroke-width="2.24"><title>#40 Ignition Switch · 14 AWG · MISC</title></polyline>
+<polyline class="wire" points="1007.2,309.4 1007.2,301.0" stroke="#4b5563" stroke-width="1.52"><title>#41 Hazard Flasher · 18 AWG · MISC</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7" stroke="#4b5563" stroke-width="0.80"><title>#61 PDM Power Feed · 22 AWG · MISC</title></polyline>
+<polyline class="wire" points="1007.2,309.4 1007.2,301.0" stroke="#4b5563" stroke-width="1.16"><title>#58 Transmission Controller · 20 AWG · MISC</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1138.1,191.8" stroke="#4b5563" stroke-width="1.16"><title>#60 ECU Power · 20 AWG · MISC</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1101.8,288.4" stroke="#4b5563" stroke-width="0.80"><title>#95 Bosch iBooster Relay · 22 AWG · MISC</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1138.1,191.8" stroke="#4b5563" stroke-width="2.96"><title>#52 Bosch iBooster · 10 AWG · MISC</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1192.7,202.3" stroke="#4b5563" stroke-width="1.52"><title>#23 A/C Compressor Clutch · 18 AWG · MISC</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1192.7,202.3" stroke="#4b5563" stroke-width="0.80"><title>#105 A/C Pressure Switch Low · 22 AWG · MISC</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1109.0,250.6 1192.7,202.3" stroke="#4b5563" stroke-width="0.80"><title>#111 A/C Pressure Switch High · 22 AWG · MISC</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 1192.7,202.3" stroke="#4b5563" stroke-width="1.16"><title>#73 Underhood Light · 20 AWG · MISC</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 647.1,550.9" stroke="#4b5563" stroke-width="1.16"><title>#74 Cargo/Bed Light · 20 AWG · MISC</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 810.8,515.2" stroke="#4b5563" stroke-width="1.16"><title>#98 Fuel Level Sender · 20 AWG · MISC</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 919.9,452.2" stroke="#4b5563" stroke-width="1.88"><title>#55 Transfer Case Indicator · 16 AWG · MISC</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 919.9,452.2" stroke="#4b5563" stroke-width="2.24"><title>#56 Neutral Safety Switch · 14 AWG · MISC</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 919.9,452.2" stroke="#4b5563" stroke-width="1.52"><title>#57 Reverse Light Switch · 18 AWG · MISC</title></polyline>
+<polyline class="wire" points="1101.8,296.8 1076.3,357.7 869.0,490.0 719.8,534.1 647.1,550.9" stroke="#4b5563" stroke-width="1.16"><title>#97 Rear Backup Camera · 20 AWG · REAR LOOM EXTRA</title></polyline>
+<circle class="lm" cx="1101.8" cy="296.8" r="3.2"/>
+<text class="lm-label" x="1106.8" y="291.8">L01</text>
+<circle class="lm" cx="1109.0" cy="250.6" r="3.2"/>
+<text class="lm-label" x="1114.0" y="245.6">L02</text>
+<circle class="lm" cx="1138.1" cy="200.2" r="3.2"/>
+<text class="lm-label" x="1143.1" y="195.2">L03</text>
+<circle class="lm" cx="1196.3" cy="233.8" r="3.2"/>
+<text class="lm-label" x="1201.3" y="228.8">L05</text>
+<circle class="lm" cx="1192.7" cy="202.3" r="3.2"/>
+<text class="lm-label" x="1197.7" y="197.3">L08</text>
+<circle class="lm" cx="1138.1" cy="229.6" r="3.2"/>
+<text class="lm-label" x="1143.1" y="224.6">L09</text>
+<circle class="lm" cx="1058.1" cy="338.8" r="3.2"/>
+<text class="lm-label" x="1063.1" y="333.8">L10</text>
+<circle class="lm" cx="1210.9" cy="217.0" r="3.2"/>
+<text class="lm-label" x="1215.9" y="212.0">L11</text>
+<circle class="lm" cx="1072.7" cy="296.8" r="3.2"/>
+<text class="lm-label" x="1077.7" y="291.8">L12</text>
+<circle class="lm" cx="1145.4" cy="338.8" r="3.2"/>
+<text class="lm-label" x="1150.4" y="333.8">L13</text>
+<circle class="lm" cx="1138.1" cy="191.8" r="3.2"/>
+<text class="lm-label" x="1143.1" y="186.8">L14</text>
+<circle class="lm" cx="1043.6" cy="338.8" r="3.2"/>
+<text class="lm-label" x="1048.6" y="333.8">L15</text>
+<circle class="lm" cx="1076.3" cy="357.7" r="3.2"/>
+<text class="lm-label" x="1081.3" y="352.7">L16</text>
+<circle class="lm" cx="970.8" cy="305.2" r="3.2"/>
+<text class="lm-label" x="975.8" y="300.2">L17</text>
+<circle class="lm" cx="1007.2" cy="309.4" r="3.2"/>
+<text class="lm-label" x="1012.2" y="304.4">L18</text>
+<circle class="lm" cx="999.9" cy="330.4" r="3.2"/>
+<text class="lm-label" x="1004.9" y="325.4">L19</text>
+<circle class="lm" cx="890.8" cy="259.0" r="3.2"/>
+<text class="lm-label" x="895.8" y="254.0">L20</text>
+<circle class="lm" cx="861.7" cy="267.4" r="3.2"/>
+<text class="lm-label" x="866.7" y="262.4">L21</text>
+<circle class="lm" cx="1109.0" cy="385.0" r="3.2"/>
+<text class="lm-label" x="1114.0" y="380.0">L22</text>
+<circle class="lm" cx="992.6" cy="225.4" r="3.2"/>
+<text class="lm-label" x="997.6" y="220.4">L23</text>
+<circle class="lm" cx="869.0" cy="490.0" r="3.2"/>
+<text class="lm-label" x="874.0" y="485.0">L24</text>
+<circle class="lm" cx="719.8" cy="534.1" r="3.2"/>
+<text class="lm-label" x="724.8" y="529.1">L25</text>
+<circle class="lm" cx="647.1" cy="550.9" r="3.2"/>
+<text class="lm-label" x="652.1" y="545.9">L26</text>
+<circle class="lm" cx="810.8" cy="515.2" r="3.2"/>
+<text class="lm-label" x="815.8" y="510.2">L27</text>
+<circle class="lm" cx="919.9" cy="452.2" r="3.2"/>
+<text class="lm-label" x="924.9" y="447.2">L28</text>
+<circle class="lm" cx="985.4" cy="355.6" r="3.2"/>
+<text class="lm-label" x="990.4" y="350.6">L29</text>
+<circle class="lm" cx="1087.2" cy="414.4" r="3.2"/>
+<text class="lm-label" x="1092.2" y="409.4">L30</text>
+<text class="comp" x="1109.8" y="308.8">M130 ECU</text>
+<text class="comp" x="1084.3" y="369.7">PDM30</text>
+<text class="comp" x="1066.1" y="350.8">CKP</text>
+<text class="comp" x="1200.7" y="214.3">Throttle Body</text>
+<text class="comp" x="1146.1" y="203.8">ALT / BAT+</text>
+<text class="comp" x="1051.6" y="350.8">Starter</text>
+<text class="comp" x="727.8" y="546.1">Rear junction</text>
+<text class="comp" x="818.8" y="527.2">Fuel pump</text>
+<text class="comp" x="1000.6" y="237.4">Cowl / cab top</text>
+<defs><marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#374151"/></marker></defs>
+<line x1="1570" y1="940" x2="1613" y2="916" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="1626" y="913" font-size="11" fill="#374151">front</text>
+<line x1="1570" y1="940" x2="1527" y2="916" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="1514" y="913" font-size="11" fill="#374151">driver</text>
+<line x1="1570" y1="940" x2="1570" y2="890" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="1570" y="879" font-size="11" fill="#374151">up</text>
+<text class="title" x="40" y="40">1977 K5 Blazer — harness isometric · per-wire</text>
+<text class="sub" x="40" y="60">113 wires drawn · projection: 30°/30°/vertical · topology from K5_wire_paths.yaml</text>
+<text class="disc" x="40" y="78">Landmark 3D positions are illustrative, not measured. Real lengths require K5_landmarks.yaml values (currently null).</text>
+<text class="legend" x="40" y="100" font-weight="700">Loom</text>
+<line x1="40" y1="116" x2="66" y2="116" stroke="#c2410c" stroke-width="3" stroke-linecap="round"/>
+<text class="legend" x="72" y="119">Engine Loom</text>
+<line x1="40" y1="132" x2="66" y2="132" stroke="#ca8a04" stroke-width="3" stroke-linecap="round"/>
+<text class="legend" x="72" y="135">Exterior/Body Loom</text>
+<line x1="40" y1="148" x2="66" y2="148" stroke="#15803d" stroke-width="3" stroke-linecap="round"/>
+<text class="legend" x="72" y="151">Interior/Dash Loom</text>
+<line x1="40" y1="164" x2="66" y2="164" stroke="#1d4ed8" stroke-width="3" stroke-linecap="round"/>
+<text class="legend" x="72" y="167">Chassis/Underbody</text>
+<line x1="40" y1="180" x2="66" y2="180" stroke="#7c3aed" stroke-width="3" stroke-linecap="round"/>
+<text class="legend" x="72" y="183">Audio</text>
+<line x1="40" y1="196" x2="66" y2="196" stroke="#b91c1c" stroke-width="3" stroke-linecap="round"/>
+<text class="legend" x="72" y="199">Power/Comm</text>
+<line x1="40" y1="212" x2="66" y2="212" stroke="#4b5563" stroke-width="3" stroke-linecap="round"/>
+<text class="legend" x="72" y="215">Misc</text>
+<line x1="40" y1="228" x2="66" y2="228" stroke="#4b5563" stroke-width="3" stroke-linecap="round"/>
+<text class="legend" x="72" y="231">Rear Loom Extra</text>
+<line x1="40" y1="250" x2="66" y2="250" stroke="#374151" stroke-width="2" stroke-dasharray="4 3"/>
+<text class="legend" x="72" y="253">dashed = shielded</text>
+</svg>

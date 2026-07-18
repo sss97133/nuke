@@ -1,0 +1,29 @@
+{
+  "summary": {
+    "ranAt": "2026-07-07T22:44:11.400Z",
+    "local": {
+      "fingerprints": 79606,
+      "exactHashable": 198
+    },
+    "nuke": {
+      "identities": 24300,
+      "shaBearing": 11701,
+      "v2SpaceRows": 0,
+      "foreignSpaceRows": 11681
+    },
+    "tier1_exact": 0,
+    "tier2_hamming": {
+      "0-2_nearCertain": 0,
+      "3-4_strong": 0,
+      "5-10_needsConfirm": 0
+    },
+    "reRootable": 0,
+    "orphans_noLibraryMatch": 0
+  },
+  "tier1": [],
+  "bands": {
+    "0-2": [],
+    "3-4": [],
+    "5-10": []
+  }
+}

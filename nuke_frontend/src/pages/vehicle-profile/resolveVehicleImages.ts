@@ -27,10 +27,13 @@ export async function resolveVehicleImages(vehicleId: string): Promise<ResolvedI
   if (!vehicleId) return empty;
 
   try {
+    // Hero/lead resolution only needs the best image; the query orders is_primary first,
+    // so one page is plenty. Capping avoids paginating all 3,000+ photos on every profile
+    // open just to pick a single lead. Consumers only use the returned urls as `.length > 0`.
     const rows = await fetchVehicleImages<any>(
       vehicleId,
       'id, image_url, thumbnail_url, medium_url, storage_path, is_primary, is_document, is_duplicate, image_vehicle_match_status, position, created_at, taken_at, source',
-      { includeMismatchFilter: true },
+      { includeMismatchFilter: true, maxRows: 500 },
     );
     if (!rows || rows.length === 0) return empty;
 

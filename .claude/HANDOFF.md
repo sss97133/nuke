@@ -1,643 +1,97 @@
-# Handoff — Assembled 2026-04-05 21:54:19
+# Handoff — Assembled 2026-07-02 19:38:02
 
 *Auto-assembled from per-agent handoff files. Most recent first.*
 
 ---
-# Session Handoff — 2026-04-05_21-54-19 (agent 44281)
+# Session Handoff — 2026-07-02_19-38-02 (agent 97186)
 
 ## What Was Happening
-Product rollout session. Built landing page + product pages, ran 3 rounds of audits (17 agents), then executed fixes in parallel (5 agents). What's done: 19 dead files deleted (-8K lines), search z-index fixed, feed defaults changed (3-col, NEWEST, follow enabled, live/sold badges), price history chart on profiles, AuctionTrendsDashboard unlocked at /market/trends, button variants fixed, landing CSS tokenized, PWA manifest fixed. What's NOT done: landing page still shows 6 products (should show 1 - Search), feed changes not visually verified, nothing deployed to production, no 'show me all the Camaros' make-level pages, no persistent nav in header. Three planning docs produced: docs/PRODUCT_AUDIT.md, docs/DESIGN_REVIEW.md, docs/DESIGN_REVIEW_DEEP_DIVE.md plus 16 individual reports in docs/audit/ and docs/design-review/. Next session should: (1) simplify landing to lead with Search, (2) verify feed changes visually while logged in, (3) deploy to production, (4) start on make-level browse pages (the real product vision - understand a vehicle market, not just find a car).
+IMAGE-ANALYSIS OWNER (Fable 5) — SESSION CLOSE 2026-07-02. Operating mode set by Skylar mid-session: FABLE COORDINATES, NEVER GRINDS (grind = token-free scripts/SQL or cheap models; accelerated claude-CLI drain OFF, launchd cron trickles). FOUNDATION-FIRST ordering ruled: identity → attribution → context → deep reading. SHIPPED (all committed feat/cohort-terminal, NOT pushed): (1) Phone→cloud tag seam wired end-to-end (iOS 5983650fe → TestFlight; RPC v2/v2.1/v2.2 set-based+heartbeat+source-param). (2) Entity layer: 27K component_identifications, 57 receipt-confirmed; tap-target RPC get_image_component_targets live-proven. (3) xyz spatial-anchor substrate implemented from May-24 design (vehicle_coordinate_frames + 6 anchor cols; K5 frame registered, origin UNVERIFIED). (4) Crystallization organ v1 (ops:schema-census) + first executed expansion (idx_vobs_structured_image_id, 7.5M-seq-scan → 0.21ms). (5) DNA paper (docs/library/working/working-papers/2026-07-02_the-dna-derived.md) + sealed-capture rule + Blur lesson + Skylar's corrected organic-growth definition (agent expands schema WITHOUT humans; halt=self-sufficiency). (6) ai_scan_metadata CLOBBER killed (process-all-images-cron merges now, DEPLOYED); orchestrator Strategy-3 evidence-free auto-stamp killed (DEPLOYED); doubt-gate in ingest + attribution_doubt events (152 backfilled) + get_analysis_stream v2 honest labels. (7) agent-chat DEPLOYED (was never deployed!) + find_photos query verb — the rhizome's conversational surface. (8) Corrupt relay days RECOVERED: June 13/18/19 (69 rows landed, evidence-earned attribution, 2 old mis-routes caught) + 2019-misdate cohort closed (422 corrected via citation chokepoint; root cause = filename recycling). (9) FOUNDATION NIGHT: Blur's full-library subject-index (79,506 entries) pulled off the paired iPhone via devicectl → landed via chokepoint (5,428 rows tagged, labels 9.4K→13.5K); content identity rooted from storage etags via new root_identity_by_content RPC — 20,104/26,777 rooted (39%→75%), 3,056 exact dupes collapse by image_identity_id. (10) Fix-fleet all-SOUND: extract-vehicle-data-ai 3 DNA violations fixed (v171 deployed), photo-sync-daemon sealed-capture converged, receipt-context bridge (day_context status, proven on real K5 day incl. pixel re-read of LMC 38-7840), 1,817 orphan attribution proposals (zero writes), 3 canon docs landed. Seam-2 verdict: bit-exact dHash parity REFUTED (Apple resampler unspecifiable) → sha256=equality key, dHash=opaque+tagged, hamming~10+confirm. OPEN: task #3 tag heartbeat (phone must open Library→calendar Days or charge; analysis_events stage=tag_sync_batch, baseline 2 bulk calls); task #5 dimensional (pin-drop verify glb origin, photogrammetry $ = owner call); task #7 remainder (thumbnail dhash_js_v1 backfill); verifier minors (day-context >400-frame page split, receipt self-lift edge, dangling wiki-links, quote labeled in-full is lightly edited); GH hourly workflow calls dead batch-analyze-all-images (main-branch fix); money-DNA design; PR debt (#278/#286-289/#293). OWNER DECISIONS PENDING: doppelganger 1977 K5 21501c21 (VIN CRK178P122739, 114 imgs) — second truck or dup profile; sold-77-K10 sale date+buyer (custody event + ship-out day recovery from Mac library — June 12 candidates: red/white first-gen Blazer at staging vs yellow squarebody bed-swap); Scout II Rallye entity; then 43 pool photos re-home + 1,817 proposals start converting via agent-chat/confirm queue.
 
 ## Branch
-main
+feat/cohort-terminal
 
 ## Recent Commits (last 3h)
-none
+4cfd8f550 db: root_identity_by_content — content identity from storage etags (75% of library rooted)
+789fe6faa entity landing: receipt-context bridge (day-context pass)
+0b309dec7 db: sync_local_vision_tags v2.2 — source param + Blur full-library T0 landing
+bdb8dc4aa photo-sync-daemon: seal capture — sha256 at the source, ingest via identity chokepoint
+2d0ead7ee fix(extract-vehicle-data-ai): three source-DNA violations from the 2026-07-02 write-path audit (§IV)
+7ecfb3b86 Add orphan attribution proposal engine (propose, never land)
+e561c5115 library: land the three missing canon contemplations the rules cite
 
 ## Uncommitted Changes
-.claude/ACTIVE_AGENTS.md
 .claude/HANDOFF.md
 DONE.md
-TOOLS.md
-docs/library/technical/design-book/README.md
-mcp-servers/nuke-context/resolve.mjs
-nuke_frontend/public/manifest.json
-nuke_frontend/src/App.tsx
-nuke_frontend/src/components/DiscoveryFeed.tsx
-nuke_frontend/src/components/GlobalUploadStatus.tsx
-nuke_frontend/src/components/ProxyBidModal.tsx
-nuke_frontend/src/components/VehicleComments.tsx
-nuke_frontend/src/components/VehicleContributors.tsx
-nuke_frontend/src/components/VehicleMailbox/VehicleExpertChat.tsx
-nuke_frontend/src/components/VehicleTimeline.tsx
-nuke_frontend/src/components/auth/AuthErrorBoundary.tsx
-nuke_frontend/src/components/compliance/RiskDisclosureModal.tsx
-nuke_frontend/src/components/compliance/index.ts
-nuke_frontend/src/components/image/ImageLightbox.tsx
-nuke_frontend/src/components/layout/AppHeader.css
-nuke_frontend/src/components/map/DeckGLMap.tsx
-nuke_frontend/src/components/map/NukeMap.tsx
-nuke_frontend/src/components/map/layers/businessLayer.ts
-nuke_frontend/src/components/map/panels/MapOrgDetail.tsx
-nuke_frontend/src/components/map/types.ts
-nuke_frontend/src/components/organization/OrganizationCard.tsx
-nuke_frontend/src/components/organization/ServiceVehicleCard.tsx
-nuke_frontend/src/components/organization/SoldInventoryBrowser.tsx
-nuke_frontend/src/components/parts/PartCheckoutModal.tsx
-nuke_frontend/src/components/parts/PartEnrichmentModal.tsx
-nuke_frontend/src/components/popups/VehiclePopup.tsx
-nuke_frontend/src/components/profile/OrganizationAffiliations.tsx
-nuke_frontend/src/components/profile/VehicleCollection.tsx
-nuke_frontend/src/components/vehicle/EditHistoryViewer.tsx
-nuke_frontend/src/components/vehicle/LinkedOrganizations.tsx
-nuke_frontend/src/components/vehicle/NukeEstimatePanel.tsx
-nuke_frontend/src/components/vehicle/SimilarSalesSection.tsx
-nuke_frontend/src/components/vehicle/VehicleCommentsCard.tsx
-nuke_frontend/src/components/vehicle/VehicleVideoSection.tsx
-nuke_frontend/src/components/wiring/HarnessBuilder.tsx
-nuke_frontend/src/components/wiring/HarnessCanvas.tsx
-nuke_frontend/src/components/wiring/HarnessCanvasEdge.tsx
-nuke_frontend/src/components/wiring/HarnessCanvasNode.tsx
-nuke_frontend/src/components/wiring/HarnessCanvasSectionGroup.tsx
-nuke_frontend/src/components/wiring/HarnessCompletenessPanel.tsx
-nuke_frontend/src/components/wiring/HarnessLoadSummary.tsx
-nuke_frontend/src/components/wiring/HarnessSidebar.tsx
-nuke_frontend/src/components/wiring/HarnessSystemsPalette.tsx
-nuke_frontend/src/components/wiring/HarnessToolbar.tsx
-nuke_frontend/src/components/wiring/ModelHarnessAnnotator.tsx
-nuke_frontend/src/components/wiring/WiringDetailPanel.tsx
-nuke_frontend/src/components/wiring/WiringDeviceNode.tsx
-nuke_frontend/src/components/wiring/WiringOverlaySandbox.tsx
-nuke_frontend/src/components/wiring/WiringQueryContextBar.tsx
-nuke_frontend/src/components/wiring/WiringWirePath.tsx
-nuke_frontend/src/components/wiring/WiringWorkspace.tsx
-nuke_frontend/src/components/wiring/harnessConstants.ts
-nuke_frontend/src/components/wiring/vehicleSilhouettes.ts
-nuke_frontend/src/feed/components/FeedPage.tsx
-nuke_frontend/src/feed/components/FeedSkeleton.tsx
-nuke_frontend/src/feed/components/VehicleCard.tsx
-nuke_frontend/src/feed/hooks/useFeedSearchParams.ts
-nuke_frontend/src/feed/types/feed.ts
-nuke_frontend/src/feed/utils/feedUrlCodec.ts
-nuke_frontend/src/pages/AdminAnalytics.tsx
-nuke_frontend/src/pages/AdminDashboard.tsx
-nuke_frontend/src/pages/AuctionListing.tsx
-nuke_frontend/src/pages/AuctionMarketplace.tsx
-nuke_frontend/src/pages/BuilderDashboard.tsx
-nuke_frontend/src/pages/Capture.tsx
-nuke_frontend/src/pages/ContractStation.tsx
-nuke_frontend/src/pages/CreateOrganization.tsx
-nuke_frontend/src/pages/CreditsSuccess.tsx
-nuke_frontend/src/pages/CurationQueue.tsx
-nuke_frontend/src/pages/Dashboard.tsx
-nuke_frontend/src/pages/DealerAIAssistant.tsx
-nuke_frontend/src/pages/DealerBulkEditor.tsx
-nuke_frontend/src/pages/DeveloperSignup.tsx
-nuke_frontend/src/pages/EditVehicle.tsx
-nuke_frontend/src/pages/HomePage.tsx
-nuke_frontend/src/pages/MarketDashboard.tsx
-nuke_frontend/src/pages/MarketFundDetail.tsx
-nuke_frontend/src/pages/MarketSegmentDetail.tsx
-nuke_frontend/src/pages/MarketSegments.tsx
-nuke_frontend/src/pages/MergeProposalsDashboard.tsx
-nuke_frontend/src/pages/MyAuctions.tsx
-nuke_frontend/src/pages/MyOrganizations.tsx
-nuke_frontend/src/pages/OrganizationProfile.tsx
-nuke_frontend/src/pages/Organizations.tsx
-nuke_frontend/src/pages/Portfolio.tsx
-nuke_frontend/src/pages/Profile.tsx
-nuke_frontend/src/pages/RestorationIntake.tsx
-nuke_frontend/src/pages/Search.tsx
-nuke_frontend/src/pages/StripeConnect.tsx
-nuke_frontend/src/pages/StripeConnectStore.tsx
-nuke_frontend/src/pages/UnlinkedReceipts.tsx
-nuke_frontend/src/pages/VehicleProfile.tsx
-nuke_frontend/src/pages/Vehicles.tsx
-nuke_frontend/src/pages/WiringPlan.tsx
-nuke_frontend/src/pages/WiringSandbox.tsx
-nuke_frontend/src/pages/WorkOrderStatement.tsx
-nuke_frontend/src/pages/admin/HoverCardDemo.tsx
-nuke_frontend/src/pages/admin/ProxyBidOperations.tsx
-nuke_frontend/src/pages/admin/ShippingSettings.tsx
-nuke_frontend/src/pages/admin/X402Settings.tsx
-nuke_frontend/src/pages/vehicle-profile/AnalysisSignalsSection.tsx
-nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
-nuke_frontend/src/pages/vehicle-profile/BuildTimelineChart.tsx
-nuke_frontend/src/pages/vehicle-profile/DayCard.tsx
-nuke_frontend/src/pages/vehicle-profile/FieldEvidencePopup.tsx
-nuke_frontend/src/pages/vehicle-profile/FieldProvenanceDrawer.tsx
-nuke_frontend/src/pages/vehicle-profile/GenerateBill.tsx
-nuke_frontend/src/pages/vehicle-profile/ObservationTimeline.tsx
-nuke_frontend/src/pages/vehicle-profile/VehicleHeader.tsx
-nuke_frontend/src/pages/vehicle-profile/VehicleHeroImage.tsx
-nuke_frontend/src/pages/vehicle-profile/VehicleSubHeader.tsx
-nuke_frontend/src/pages/vehicle-profile/WorkOrderProgress.tsx
-nuke_frontend/src/pages/vehicle-profile/WorkspaceContent.tsx
-nuke_frontend/src/pages/vehicle-profile/loadVehicleData.ts
-nuke_frontend/src/routes/DomainRoutes.tsx
-nuke_frontend/src/routes/modules/admin/routes.tsx
-nuke_frontend/src/routes/modules/marketplace/routes.tsx
-nuke_frontend/src/routes/modules/organization/routes.tsx
-nuke_frontend/src/routes/modules/vehicle/routes.tsx
-nuke_frontend/src/styles/unified-design-system.css
-nuke_frontend/src/styles/vehicle-profile.css
-package-lock.json
-package.json
-scripts/fb-marketplace-local-scraper.mjs
-scripts/fb-scrape-saved.ts
-scripts/package.json
-supabase/functions/backfill-cl-asking-price/index.ts
-supabase/functions/backfill-cl-descriptions/index.ts
-supabase/functions/backfill-gooding-descriptions/index.ts
-supabase/functions/backfill-image-angles/index.ts
-supabase/functions/backfill-mecum-descriptions/index.ts
-supabase/functions/backfill-rmsothebys-descriptions/index.ts
-supabase/functions/backfill-vin-from-snapshots/index.ts
-supabase/functions/barn-finds-discovery/index.ts
-supabase/functions/bid-curve-analysis/index.ts
-supabase/functions/compute-wiring-overlay/index.ts
-supabase/functions/consolidate_photo_events.sql
-supabase/functions/discover-build-threads/index.ts
-supabase/functions/feed-query/index.ts
-supabase/functions/index-classic-com-dealer/index.ts
-supabase/functions/intelligent-crawler/index.ts
-supabase/functions/mcp-connector/index.ts
-supabase/functions/migrate-snapshots-to-storage/index.ts
-supabase/functions/patient-zero/index.ts
-supabase/functions/predict-hammer-price/index.ts
-supabase/functions/scrape-multi-source/index.ts
-supabase/functions/widget-broker-exposure/index.ts
-supabase/functions/widget-buyer-qualification/index.ts
-supabase/functions/widget-commission-optimizer/index.ts
-supabase/functions/widget-completion-discount/index.ts
-supabase/functions/widget-deal-readiness/index.ts
-supabase/functions/widget-geographic-arbitrage/index.ts
-supabase/functions/widget-presentation-roi/index.ts
-supabase/functions/widget-rerun-decay/index.ts
-supabase/functions/widget-sell-through-cliff/index.ts
-supabase/functions/widget-time-kills-deals/index.ts
-supabase/functions/x-media-upload/index.ts
-supabase/functions/x-post/index.ts
+nuke_frontend/src/pages/CohortTerminal.tsx
+scripts/fb-saved-sync.sh
+supabase/functions/extract-bat-core/index.ts
+supabase/functions/ingest/index.ts
+supabase/functions/poll-listing-feeds/index.ts
 
 ## Staged
 none
 
 ---
-# Ghost Handoff — Agent 23476 (auto-captured)
+# Session Handoff — 2026-07-02_18-59-44 (agent 87832)
+
+## What Was Happening
+Pipeline relight + investigator session (2026-07-01→02). COMPLETE: CL-Vegas + BaT arteries live (hourly, ledgered, gated), pipeline_heartbeat dead-man cron, P2 price heal to 0/0 (~32.5K junk projections nulled), editorial slop gate in extract-vehicle-data-ai, ingest front door fixed (share-URLs, enrichment unwrap, min-viability gate, user_id→discovery), BaT delegate→extract-bat-core (+listing_url resolver, model-pollution check), fb-saved-sync re-armed w/ politeness patch (fires on next Chrome window), Gullwing case ran end-to-end (vehicle 1ca8aa43, discovery a65df91a, broker John Hallenborg in pipeline_sellers, chassis-matched 198.040-7500061 unverified), INVESTIGATOR_CHAIN.md written incl sandbox-agent architecture. IN PROGRESS: nothing mid-flight; crons hold the night. NEXT: (1) Chrome window → saved-sync first fire + Ferrari-VIN grab → John's associative profile; (2) call-receipt loop on iOS vehicle profile (first UI brick); (3) sandbox agent loop + share-sheet (top of iOS track); (4) Caprice vehicle-dup merge proposal; (5) WORKING TREE UNCOMMITTED: poll-listing-feeds, ingest, extract-bat-core, extract-vehicle-data-ai + 3 migrations — deployed to prod but not committed, commit on Skylar's word. Read .claude/ISSUES.md pipeline section + docs/products/INVESTIGATOR_CHAIN.md before touching any of this.
+
+## Branch
+feat/cohort-terminal
+
+## Recent Commits (last 3h)
+2d0ead7ee fix(extract-vehicle-data-ai): three source-DNA violations from the 2026-07-02 write-path audit (§IV)
+7ecfb3b86 Add orphan attribution proposal engine (propose, never land)
+e561c5115 library: land the three missing canon contemplations the rules cite
+
+## Uncommitted Changes
+.claude/HANDOFF.md
+DONE.md
+nuke_frontend/src/pages/CohortTerminal.tsx
+scripts/deep-image-analysis-byok.mjs
+scripts/fb-saved-sync.sh
+scripts/photo-sync-daemon.mjs
+supabase/functions/extract-bat-core/index.ts
+supabase/functions/ingest/index.ts
+supabase/functions/poll-listing-feeds/index.ts
+
+## Staged
+none
+
+---
+# Ghost Handoff — Agent 82862 (auto-captured)
 *(Agent died without explicit handoff. Narrative from registration + commits.)*
 
-10:26 | invoice-finalize | shipping final Granholm receipt | WorkOrderStatement
-10:34 | COMMIT: f2c8c78f6 fix(invoice): pull in labor/parts/courtesy sections with side margins
-13:05 | COMMIT: 364f18685 fix(invoice): clean print output — strip grey bg, border, site chrome
+18:18:47 | ORPHAN-PROPOSALS | orphan attribution proposal script | scripts/orphan-attribution-proposals.mjs, package.json
 
 ## Git State at Death
 ### Recent Commits
 
 ---
-# Session Handoff — 2026-04-05_14-23-51 (agent 82143)
+# Ghost Handoff — Agent 82824 (auto-captured)
+*(Agent died without explicit handoff. Narrative from registration + commits.)*
 
-## What Was Happening
-FB Pipeline Remaining Items — COMPLETED. Created 197 vehicle records from orphaned marketplace_listings (all with year+make). 49,441 of 49,658 listings now linked (99.6%). Downloaded 1,622 images from FB CDN to Supabase storage for 164 vehicles. Cleaned unicode \u00b7 dots from vehicle models (was literal escape sequence, not unicode char). Fixed enricher filter to use scraped_at instead of seller_name. Moved pycookiecheat to ~/.local/venvs/fbcookies (persistent). Deleted dead scripts (debug-chrome-cookies, fb-enrich-from-chrome). Added npm scripts. REMAINING: 217 listings with no year/make (can't auto-create vehicles). 18 duplicate K10 vehicles (same seller relisting — entity resolution needed). ~12K FB vehicles still need YONO vision pass for body_style.
+18:47 | FIX-EXTRACT-DNA | fix 3 source-DNA violations in extract-vehicle-data-ai | supabase/functions/extract-vehicle-data-ai
 
-## Branch
-main
-
-## Recent Commits (last 3h)
-364f18685 fix(invoice): clean print output — strip grey bg, border, site chrome
-
-## Uncommitted Changes
-.claude/ACTIVE_AGENTS.md
-.claude/HANDOFF.md
-DONE.md
-docs/library/technical/design-book/README.md
-mcp-servers/nuke-context/resolve.mjs
-nuke_frontend/public/manifest.json
-nuke_frontend/src/App.tsx
-nuke_frontend/src/components/DiscoveryFeed.tsx
-nuke_frontend/src/components/GlobalUploadStatus.tsx
-nuke_frontend/src/components/ProxyBidModal.tsx
-nuke_frontend/src/components/VehicleComments.tsx
-nuke_frontend/src/components/VehicleContributors.tsx
-nuke_frontend/src/components/VehicleTimeline.tsx
-nuke_frontend/src/components/auth/AuthErrorBoundary.tsx
-nuke_frontend/src/components/compliance/RiskDisclosureModal.tsx
-nuke_frontend/src/components/compliance/index.ts
-nuke_frontend/src/components/image/ImageLightbox.tsx
-nuke_frontend/src/components/layout/AppHeader.css
-nuke_frontend/src/components/organization/OrganizationCard.tsx
-nuke_frontend/src/components/organization/ServiceVehicleCard.tsx
-nuke_frontend/src/components/organization/SoldInventoryBrowser.tsx
-nuke_frontend/src/components/parts/PartCheckoutModal.tsx
-nuke_frontend/src/components/parts/PartEnrichmentModal.tsx
-nuke_frontend/src/components/popups/VehiclePopup.tsx
-nuke_frontend/src/components/profile/OrganizationAffiliations.tsx
-nuke_frontend/src/components/profile/VehicleCollection.tsx
-nuke_frontend/src/components/vehicle/EditHistoryViewer.tsx
-nuke_frontend/src/components/vehicle/LinkedOrganizations.tsx
-nuke_frontend/src/components/vehicle/NukeEstimatePanel.tsx
-nuke_frontend/src/components/vehicle/SimilarSalesSection.tsx
-nuke_frontend/src/components/vehicle/VehicleCommentsCard.tsx
-nuke_frontend/src/components/vehicle/VehicleVideoSection.tsx
-nuke_frontend/src/components/wiring/WiringDetailPanel.tsx
-nuke_frontend/src/components/wiring/WiringDeviceNode.tsx
-nuke_frontend/src/components/wiring/WiringOverlaySandbox.tsx
-nuke_frontend/src/components/wiring/WiringWirePath.tsx
-nuke_frontend/src/components/wiring/WiringWorkspace.tsx
-nuke_frontend/src/components/wiring/harnessConstants.ts
-nuke_frontend/src/components/wiring/vehicleSilhouettes.ts
-nuke_frontend/src/feed/components/FeedPage.tsx
-nuke_frontend/src/feed/components/FeedSkeleton.tsx
-nuke_frontend/src/feed/components/VehicleCard.tsx
-nuke_frontend/src/feed/hooks/useFeedSearchParams.ts
-nuke_frontend/src/feed/types/feed.ts
-nuke_frontend/src/feed/utils/feedUrlCodec.ts
-nuke_frontend/src/pages/AdminAnalytics.tsx
-nuke_frontend/src/pages/AdminDashboard.tsx
-nuke_frontend/src/pages/AuctionListing.tsx
-nuke_frontend/src/pages/AuctionMarketplace.tsx
-nuke_frontend/src/pages/BuilderDashboard.tsx
-nuke_frontend/src/pages/Capture.tsx
-nuke_frontend/src/pages/ContractStation.tsx
-nuke_frontend/src/pages/CreateOrganization.tsx
-nuke_frontend/src/pages/CreditsSuccess.tsx
-nuke_frontend/src/pages/CurationQueue.tsx
-nuke_frontend/src/pages/Dashboard.tsx
-nuke_frontend/src/pages/DealerAIAssistant.tsx
-nuke_frontend/src/pages/DealerBulkEditor.tsx
-nuke_frontend/src/pages/DeveloperSignup.tsx
-nuke_frontend/src/pages/EditVehicle.tsx
-nuke_frontend/src/pages/HomePage.tsx
-nuke_frontend/src/pages/MarketDashboard.tsx
-nuke_frontend/src/pages/MarketFundDetail.tsx
-nuke_frontend/src/pages/MarketSegmentDetail.tsx
-nuke_frontend/src/pages/MarketSegments.tsx
-nuke_frontend/src/pages/MergeProposalsDashboard.tsx
-nuke_frontend/src/pages/MyAuctions.tsx
-nuke_frontend/src/pages/MyOrganizations.tsx
-nuke_frontend/src/pages/OrganizationProfile.tsx
-nuke_frontend/src/pages/Organizations.tsx
-nuke_frontend/src/pages/Portfolio.tsx
-nuke_frontend/src/pages/Profile.tsx
-nuke_frontend/src/pages/RestorationIntake.tsx
-nuke_frontend/src/pages/Search.tsx
-nuke_frontend/src/pages/StripeConnect.tsx
-nuke_frontend/src/pages/StripeConnectStore.tsx
-nuke_frontend/src/pages/UnlinkedReceipts.tsx
-nuke_frontend/src/pages/VehicleProfile.tsx
-nuke_frontend/src/pages/Vehicles.tsx
-nuke_frontend/src/pages/WiringPlan.tsx
-nuke_frontend/src/pages/WiringSandbox.tsx
-nuke_frontend/src/pages/WorkOrderStatement.tsx
-nuke_frontend/src/pages/admin/HoverCardDemo.tsx
-nuke_frontend/src/pages/admin/ProxyBidOperations.tsx
-nuke_frontend/src/pages/admin/ShippingSettings.tsx
-nuke_frontend/src/pages/admin/X402Settings.tsx
-nuke_frontend/src/pages/vehicle-profile/AnalysisSignalsSection.tsx
-nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
-nuke_frontend/src/pages/vehicle-profile/BuildTimelineChart.tsx
-nuke_frontend/src/pages/vehicle-profile/DayCard.tsx
-nuke_frontend/src/pages/vehicle-profile/FieldEvidencePopup.tsx
-nuke_frontend/src/pages/vehicle-profile/FieldProvenanceDrawer.tsx
-nuke_frontend/src/pages/vehicle-profile/GenerateBill.tsx
-nuke_frontend/src/pages/vehicle-profile/ObservationTimeline.tsx
-nuke_frontend/src/pages/vehicle-profile/VehicleHeader.tsx
-nuke_frontend/src/pages/vehicle-profile/VehicleHeroImage.tsx
-nuke_frontend/src/pages/vehicle-profile/VehicleSubHeader.tsx
-nuke_frontend/src/pages/vehicle-profile/WorkOrderProgress.tsx
-nuke_frontend/src/pages/vehicle-profile/WorkspaceContent.tsx
-nuke_frontend/src/pages/vehicle-profile/loadVehicleData.ts
-nuke_frontend/src/routes/DomainRoutes.tsx
-nuke_frontend/src/routes/modules/admin/routes.tsx
-nuke_frontend/src/routes/modules/marketplace/routes.tsx
-nuke_frontend/src/routes/modules/organization/routes.tsx
-nuke_frontend/src/routes/modules/vehicle/routes.tsx
-nuke_frontend/src/styles/unified-design-system.css
-nuke_frontend/src/styles/vehicle-profile.css
-package-lock.json
-package.json
-scripts/fb-marketplace-local-scraper.mjs
-scripts/fb-scrape-saved.ts
-scripts/package.json
-supabase/functions/backfill-cl-asking-price/index.ts
-supabase/functions/backfill-cl-descriptions/index.ts
-supabase/functions/backfill-gooding-descriptions/index.ts
-supabase/functions/backfill-image-angles/index.ts
-supabase/functions/backfill-mecum-descriptions/index.ts
-supabase/functions/backfill-rmsothebys-descriptions/index.ts
-supabase/functions/backfill-vin-from-snapshots/index.ts
-supabase/functions/barn-finds-discovery/index.ts
-supabase/functions/bid-curve-analysis/index.ts
-supabase/functions/consolidate_photo_events.sql
-supabase/functions/discover-build-threads/index.ts
-supabase/functions/feed-query/index.ts
-supabase/functions/index-classic-com-dealer/index.ts
-supabase/functions/intelligent-crawler/index.ts
-supabase/functions/mcp-connector/index.ts
-supabase/functions/migrate-snapshots-to-storage/index.ts
-supabase/functions/patient-zero/index.ts
-supabase/functions/predict-hammer-price/index.ts
-supabase/functions/scrape-multi-source/index.ts
-supabase/functions/widget-broker-exposure/index.ts
-supabase/functions/widget-buyer-qualification/index.ts
-supabase/functions/widget-commission-optimizer/index.ts
-supabase/functions/widget-completion-discount/index.ts
-supabase/functions/widget-deal-readiness/index.ts
-supabase/functions/widget-geographic-arbitrage/index.ts
-supabase/functions/widget-presentation-roi/index.ts
-supabase/functions/widget-rerun-decay/index.ts
-supabase/functions/widget-sell-through-cliff/index.ts
-supabase/functions/widget-time-kills-deals/index.ts
-supabase/functions/x-media-upload/index.ts
-supabase/functions/x-post/index.ts
-
-## Staged
-none
+## Git State at Death
+### Recent Commits
 
 ---
-# Session Handoff — 2026-04-05_13-43-23 (agent 62254)
+# Ghost Handoff — Agent 82797 (auto-captured)
+*(Agent died without explicit handoff. Narrative from registration + commits.)*
 
-## What Was Happening
-FB Saved Items Pipeline Fix — end-to-end session
+18:47 | photo-sync-daemon-sealed-capture | converge daemon on ingest_image_identity_first RPC | scripts/photo-sync-daemon.mjs
 
-COMPLETED:
-1. Built fb-enrich-with-cookies.mjs v3 — Chrome cookie extraction via pycookiecheat + plain HTTP enrichment. No Playwright/browser automation needed. 445 listings enriched in first run.
-2. Body_style classification — 19,128 FB vehicles classified, ~150 variant labels normalized to 8 canonical types + NOT_AUTO. 0 non-canonical values remain.
-3. Junk image cleanup — 87 polluted images deleted from 3 vehicles (Blazer/Porsche/C10), real photos re-uploaded via Nuke MCP ingest_photos.
-4. Scraper pipeline fixes in fb-marketplace-local-scraper.mjs: parseTitle returns fullTitle for body_style, classifyVehicle handles split makes (Sea+Ray), deriveBodyStyle expanded patterns, emoji/comma stripping.
-5. Audit by 3-agent expert team, all CRITICAL/HIGH fixes applied: safe rate limiting (3-7s), circuit breaker, retry, session invalidation detection, price sanity, fetch timeout.
-6. DB cleanup: garbage sale_prices nulled, 165 non-canonical body_styles normalized.
-7. Daily cron: 0 6 * * * with v3 enricher, limit 50.
-
-REMAINING:
-- 423 listings still show seller_name=NULL (many FB listings genuinely lack visible seller names — the enricher ran but FB didn't expose seller). Need alternate enrichment signal.
-- 355 marketplace_listings with no vehicle_id — need vehicle record creation pipeline.
-- ~12K FB vehicles with NULL body_style need YONO vision pass.
-- Playwright fb-scrape-saved.ts still uses Chrome for Testing — could be updated to use cookie approach instead, but the enricher makes it redundant for now.
-- pycookiecheat venv at /tmp/fbcookies/ — lost on reboot, needs persistent install or setup script.
-
-FILES CHANGED:
-- scripts/fb-enrich-with-cookies.mjs (new, v3)
-- scripts/export-chrome-cookies.py (new)
-- scripts/fb-scrape-saved.ts (user_saved flag)
-- scripts/fb-marketplace-local-scraper.mjs (3 bug fixes + audit fixes)
-- scripts/debug-chrome-cookies.mjs (debug, can delete)
-- scripts/fb-enrich-from-chrome.mjs (dead, superseded by cookies version, can delete)
-
-## Branch
-main
-
-## Recent Commits (last 3h)
-364f18685 fix(invoice): clean print output — strip grey bg, border, site chrome
-
-## Uncommitted Changes
-.claude/ACTIVE_AGENTS.md
-.claude/HANDOFF.md
-DONE.md
-docs/library/technical/design-book/README.md
-mcp-servers/nuke-context/resolve.mjs
-nuke_frontend/src/App.tsx
-nuke_frontend/src/components/DiscoveryFeed.tsx
-nuke_frontend/src/components/GlobalUploadStatus.tsx
-nuke_frontend/src/components/VehicleComments.tsx
-nuke_frontend/src/components/VehicleContributors.tsx
-nuke_frontend/src/components/VehicleTimeline.tsx
-nuke_frontend/src/components/auth/AuthErrorBoundary.tsx
-nuke_frontend/src/components/organization/OrganizationCard.tsx
-nuke_frontend/src/components/organization/ServiceVehicleCard.tsx
-nuke_frontend/src/components/organization/SoldInventoryBrowser.tsx
-nuke_frontend/src/components/profile/OrganizationAffiliations.tsx
-nuke_frontend/src/components/profile/VehicleCollection.tsx
-nuke_frontend/src/components/vehicle/EditHistoryViewer.tsx
-nuke_frontend/src/components/vehicle/LinkedOrganizations.tsx
-nuke_frontend/src/components/vehicle/NukeEstimatePanel.tsx
-nuke_frontend/src/components/vehicle/SimilarSalesSection.tsx
-nuke_frontend/src/components/vehicle/VehicleCommentsCard.tsx
-nuke_frontend/src/components/vehicle/VehicleVideoSection.tsx
-nuke_frontend/src/components/wiring/WiringDetailPanel.tsx
-nuke_frontend/src/components/wiring/WiringDeviceNode.tsx
-nuke_frontend/src/components/wiring/WiringOverlaySandbox.tsx
-nuke_frontend/src/components/wiring/WiringWirePath.tsx
-nuke_frontend/src/components/wiring/WiringWorkspace.tsx
-nuke_frontend/src/components/wiring/harnessConstants.ts
-nuke_frontend/src/components/wiring/vehicleSilhouettes.ts
-nuke_frontend/src/pages/AuctionListing.tsx
-nuke_frontend/src/pages/AuctionMarketplace.tsx
-nuke_frontend/src/pages/BuilderDashboard.tsx
-nuke_frontend/src/pages/Capture.tsx
-nuke_frontend/src/pages/CreateOrganization.tsx
-nuke_frontend/src/pages/CreditsSuccess.tsx
-nuke_frontend/src/pages/CurationQueue.tsx
-nuke_frontend/src/pages/Dashboard.tsx
-nuke_frontend/src/pages/DealerAIAssistant.tsx
-nuke_frontend/src/pages/DealerBulkEditor.tsx
-nuke_frontend/src/pages/DeveloperSignup.tsx
-nuke_frontend/src/pages/EditVehicle.tsx
-nuke_frontend/src/pages/HomePage.tsx
-nuke_frontend/src/pages/MarketDashboard.tsx
-nuke_frontend/src/pages/MarketFundDetail.tsx
-nuke_frontend/src/pages/MarketSegmentDetail.tsx
-nuke_frontend/src/pages/MarketSegments.tsx
-nuke_frontend/src/pages/MergeProposalsDashboard.tsx
-nuke_frontend/src/pages/MyAuctions.tsx
-nuke_frontend/src/pages/MyOrganizations.tsx
-nuke_frontend/src/pages/OrganizationProfile.tsx
-nuke_frontend/src/pages/Organizations.tsx
-nuke_frontend/src/pages/Portfolio.tsx
-nuke_frontend/src/pages/Profile.tsx
-nuke_frontend/src/pages/RestorationIntake.tsx
-nuke_frontend/src/pages/UnlinkedReceipts.tsx
-nuke_frontend/src/pages/VehicleProfile.tsx
-nuke_frontend/src/pages/Vehicles.tsx
-nuke_frontend/src/pages/WiringPlan.tsx
-nuke_frontend/src/pages/vehicle-profile/AnalysisSignalsSection.tsx
-nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
-nuke_frontend/src/pages/vehicle-profile/BuildTimelineChart.tsx
-nuke_frontend/src/pages/vehicle-profile/DayCard.tsx
-nuke_frontend/src/pages/vehicle-profile/FieldEvidencePopup.tsx
-nuke_frontend/src/pages/vehicle-profile/FieldProvenanceDrawer.tsx
-nuke_frontend/src/pages/vehicle-profile/GenerateBill.tsx
-nuke_frontend/src/pages/vehicle-profile/ObservationTimeline.tsx
-nuke_frontend/src/pages/vehicle-profile/VehicleHeader.tsx
-nuke_frontend/src/pages/vehicle-profile/VehicleHeroImage.tsx
-nuke_frontend/src/pages/vehicle-profile/VehicleSubHeader.tsx
-nuke_frontend/src/pages/vehicle-profile/WorkOrderProgress.tsx
-nuke_frontend/src/pages/vehicle-profile/loadVehicleData.ts
-nuke_frontend/src/routes/modules/organization/routes.tsx
-nuke_frontend/src/routes/modules/vehicle/routes.tsx
-nuke_frontend/src/styles/vehicle-profile.css
-package-lock.json
-package.json
-scripts/fb-marketplace-local-scraper.mjs
-scripts/fb-scrape-saved.ts
-scripts/package.json
-supabase/functions/backfill-cl-asking-price/index.ts
-supabase/functions/backfill-cl-descriptions/index.ts
-supabase/functions/backfill-gooding-descriptions/index.ts
-supabase/functions/backfill-image-angles/index.ts
-supabase/functions/backfill-mecum-descriptions/index.ts
-supabase/functions/backfill-rmsothebys-descriptions/index.ts
-supabase/functions/backfill-vin-from-snapshots/index.ts
-supabase/functions/barn-finds-discovery/index.ts
-supabase/functions/bid-curve-analysis/index.ts
-supabase/functions/consolidate_photo_events.sql
-supabase/functions/discover-build-threads/index.ts
-supabase/functions/feed-query/index.ts
-supabase/functions/index-classic-com-dealer/index.ts
-supabase/functions/intelligent-crawler/index.ts
-supabase/functions/mcp-connector/index.ts
-supabase/functions/migrate-snapshots-to-storage/index.ts
-supabase/functions/patient-zero/index.ts
-supabase/functions/predict-hammer-price/index.ts
-supabase/functions/scrape-multi-source/index.ts
-supabase/functions/widget-broker-exposure/index.ts
-supabase/functions/widget-buyer-qualification/index.ts
-supabase/functions/widget-commission-optimizer/index.ts
-supabase/functions/widget-completion-discount/index.ts
-supabase/functions/widget-deal-readiness/index.ts
-supabase/functions/widget-geographic-arbitrage/index.ts
-supabase/functions/widget-presentation-roi/index.ts
-supabase/functions/widget-rerun-decay/index.ts
-supabase/functions/widget-sell-through-cliff/index.ts
-supabase/functions/widget-time-kills-deals/index.ts
-supabase/functions/x-media-upload/index.ts
-supabase/functions/x-post/index.ts
-
-## Staged
-none
-
----
-# Session Handoff — 2026-04-05_13-40-16 (agent 60690)
-
-## What Was Happening
-LONG SESSION — save everything. SOLID WORK: commercial structure doc (complete thesis, contact chain Hauthils→Bendet→Materazzo→Gelardi, heritage paradox, data presentation framework), research (GT350-H, Porsche 80%, Hertz-Tesla), Chapter 14 deck system architecture (782 lines), DB enrichment (355/390 SBH orgs = 91% with brand data, logo quality fixes), deck v2 content is strong. VISUAL EXECUTION FAILING: map has been rebuilt 3+ times, still has coordinate issues and logo rendering problems. Root cause: agents can't see the map tiles so every coordinate is a guess. The prompt harness for map-building agents is not producing correct output — more rules in longer prompts makes it worse not better. DECK v2 at luxe-fleet-ford-v2.html has correct logos and research integrated but needs visual review. MAP at stbarth-map-v2.html is latest rebuild from OSM data — needs human verification of pin positions. KEY USER FEEDBACK: stop patching, the factory system should produce correct output. SiBarth vs SiBarth Real Estate are two different companies (fixed in DB). Eden Rock is Eden Rock not Oetker (fixed). Never use prompt/alert/confirm in browser code. FBM logo has dark+light variants now. User has real Bronco-on-SBH photos (4 images shared in chat) that need ingesting. Ashley/SiBarth testimonial documented. NEXT SESSION: 1) visually verify map coordinates with human help 2) integrate research into deck properly 3) get Eden Rock assets from oetkerhotels.com (needs browser, JS-rendered) 4) ingest user's Bronco photos 5) apply colorways
-
-## Branch
-main
-
-## Recent Commits (last 3h)
-364f18685 fix(invoice): clean print output — strip grey bg, border, site chrome
-
-## Uncommitted Changes
-.claude/ACTIVE_AGENTS.md
-.claude/HANDOFF.md
-DONE.md
-docs/library/technical/design-book/README.md
-mcp-servers/nuke-context/resolve.mjs
-nuke_frontend/src/App.tsx
-nuke_frontend/src/components/DiscoveryFeed.tsx
-nuke_frontend/src/components/GlobalUploadStatus.tsx
-nuke_frontend/src/components/VehicleComments.tsx
-nuke_frontend/src/components/VehicleContributors.tsx
-nuke_frontend/src/components/VehicleTimeline.tsx
-nuke_frontend/src/components/auth/AuthErrorBoundary.tsx
-nuke_frontend/src/components/organization/OrganizationCard.tsx
-nuke_frontend/src/components/organization/ServiceVehicleCard.tsx
-nuke_frontend/src/components/organization/SoldInventoryBrowser.tsx
-nuke_frontend/src/components/profile/OrganizationAffiliations.tsx
-nuke_frontend/src/components/profile/VehicleCollection.tsx
-nuke_frontend/src/components/vehicle/EditHistoryViewer.tsx
-nuke_frontend/src/components/vehicle/LinkedOrganizations.tsx
-nuke_frontend/src/components/vehicle/NukeEstimatePanel.tsx
-nuke_frontend/src/components/vehicle/SimilarSalesSection.tsx
-nuke_frontend/src/components/vehicle/VehicleCommentsCard.tsx
-nuke_frontend/src/components/vehicle/VehicleVideoSection.tsx
-nuke_frontend/src/components/wiring/WiringDetailPanel.tsx
-nuke_frontend/src/components/wiring/WiringDeviceNode.tsx
-nuke_frontend/src/components/wiring/WiringOverlaySandbox.tsx
-nuke_frontend/src/components/wiring/WiringWirePath.tsx
-nuke_frontend/src/components/wiring/WiringWorkspace.tsx
-nuke_frontend/src/components/wiring/harnessConstants.ts
-nuke_frontend/src/components/wiring/vehicleSilhouettes.ts
-nuke_frontend/src/pages/AuctionListing.tsx
-nuke_frontend/src/pages/AuctionMarketplace.tsx
-nuke_frontend/src/pages/BuilderDashboard.tsx
-nuke_frontend/src/pages/Capture.tsx
-nuke_frontend/src/pages/CreateOrganization.tsx
-nuke_frontend/src/pages/CreditsSuccess.tsx
-nuke_frontend/src/pages/CurationQueue.tsx
-nuke_frontend/src/pages/Dashboard.tsx
-nuke_frontend/src/pages/DealerAIAssistant.tsx
-nuke_frontend/src/pages/DealerBulkEditor.tsx
-nuke_frontend/src/pages/DeveloperSignup.tsx
-nuke_frontend/src/pages/EditVehicle.tsx
-nuke_frontend/src/pages/HomePage.tsx
-nuke_frontend/src/pages/MarketDashboard.tsx
-nuke_frontend/src/pages/MarketFundDetail.tsx
-nuke_frontend/src/pages/MarketSegmentDetail.tsx
-nuke_frontend/src/pages/MarketSegments.tsx
-nuke_frontend/src/pages/MergeProposalsDashboard.tsx
-nuke_frontend/src/pages/MyAuctions.tsx
-nuke_frontend/src/pages/MyOrganizations.tsx
-nuke_frontend/src/pages/OrganizationProfile.tsx
-nuke_frontend/src/pages/Organizations.tsx
-nuke_frontend/src/pages/Portfolio.tsx
-nuke_frontend/src/pages/Profile.tsx
-nuke_frontend/src/pages/RestorationIntake.tsx
-nuke_frontend/src/pages/UnlinkedReceipts.tsx
-nuke_frontend/src/pages/VehicleProfile.tsx
-nuke_frontend/src/pages/Vehicles.tsx
-nuke_frontend/src/pages/WiringPlan.tsx
-nuke_frontend/src/pages/vehicle-profile/AnalysisSignalsSection.tsx
-nuke_frontend/src/pages/vehicle-profile/BarcodeTimeline.tsx
-nuke_frontend/src/pages/vehicle-profile/BuildTimelineChart.tsx
-nuke_frontend/src/pages/vehicle-profile/DayCard.tsx
-nuke_frontend/src/pages/vehicle-profile/FieldEvidencePopup.tsx
-nuke_frontend/src/pages/vehicle-profile/FieldProvenanceDrawer.tsx
-nuke_frontend/src/pages/vehicle-profile/GenerateBill.tsx
-nuke_frontend/src/pages/vehicle-profile/ObservationTimeline.tsx
-nuke_frontend/src/pages/vehicle-profile/VehicleHeader.tsx
-nuke_frontend/src/pages/vehicle-profile/VehicleHeroImage.tsx
-nuke_frontend/src/pages/vehicle-profile/VehicleSubHeader.tsx
-nuke_frontend/src/pages/vehicle-profile/WorkOrderProgress.tsx
-nuke_frontend/src/pages/vehicle-profile/loadVehicleData.ts
-nuke_frontend/src/routes/modules/organization/routes.tsx
-nuke_frontend/src/routes/modules/vehicle/routes.tsx
-nuke_frontend/src/styles/vehicle-profile.css
-package-lock.json
-package.json
-scripts/fb-marketplace-local-scraper.mjs
-scripts/fb-scrape-saved.ts
-scripts/package.json
-supabase/functions/backfill-cl-asking-price/index.ts
-supabase/functions/backfill-cl-descriptions/index.ts
-supabase/functions/backfill-gooding-descriptions/index.ts
-supabase/functions/backfill-image-angles/index.ts
-supabase/functions/backfill-mecum-descriptions/index.ts
-supabase/functions/backfill-rmsothebys-descriptions/index.ts
-supabase/functions/backfill-vin-from-snapshots/index.ts
-supabase/functions/barn-finds-discovery/index.ts
-supabase/functions/bid-curve-analysis/index.ts
-supabase/functions/consolidate_photo_events.sql
-supabase/functions/discover-build-threads/index.ts
-supabase/functions/feed-query/index.ts
-supabase/functions/index-classic-com-dealer/index.ts
-supabase/functions/intelligent-crawler/index.ts
-supabase/functions/mcp-connector/index.ts
-supabase/functions/migrate-snapshots-to-storage/index.ts
-supabase/functions/patient-zero/index.ts
-supabase/functions/predict-hammer-price/index.ts
-supabase/functions/scrape-multi-source/index.ts
-supabase/functions/widget-broker-exposure/index.ts
-supabase/functions/widget-buyer-qualification/index.ts
-supabase/functions/widget-commission-optimizer/index.ts
-supabase/functions/widget-completion-discount/index.ts
-supabase/functions/widget-deal-readiness/index.ts
-supabase/functions/widget-geographic-arbitrage/index.ts
-supabase/functions/widget-presentation-roi/index.ts
-supabase/functions/widget-rerun-decay/index.ts
-supabase/functions/widget-sell-through-cliff/index.ts
-supabase/functions/widget-time-kills-deals/index.ts
-supabase/functions/x-media-upload/index.ts
-supabase/functions/x-post/index.ts
-
-## Staged
-none
+## Git State at Death
+### Recent Commits
 
 ---
 ## Recent Checkpoints
-2026-04-05_21-50-52.md
-2026-04-05_21-48-47.md
-2026-04-05_21-45-30.md
+2026-07-02_19-31-52.md
+2026-07-02_19-14-58.md
+2026-07-02_19-11-13.md
 *(See .claude/checkpoints/ for full details)*
 
 ## Pickup Instructions

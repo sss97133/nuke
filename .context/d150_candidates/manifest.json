@@ -1,0 +1,324 @@
+[
+ {
+  "uuid": "C61DE361-61C9-4D90-8058-6ADCA68BCDC1",
+  "burst_start": "2023-05-20 15:19:34",
+  "burst_count": 72,
+  "delta_days": 0.3,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/C61DE361_2023-05-20_15-19-34.jpg"
+ },
+ {
+  "uuid": "26EC9DA6-0501-4998-9369-06CD9B6DF1FF",
+  "burst_start": "2023-05-18 18:39:18",
+  "burst_count": 36,
+  "delta_days": -1.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/26EC9DA6_2023-05-18_18-39-18.jpg"
+ },
+ {
+  "uuid": "56108CA1-60B9-460A-8046-5E644779E38F",
+  "burst_start": "2023-05-21 22:51:15",
+  "burst_count": 6,
+  "delta_days": 1.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/56108CA1_2023-05-21_22-51-15.jpg"
+ },
+ {
+  "uuid": "A1B160B1-2B29-47C8-ACAE-5771B5ED7740",
+  "burst_start": "2023-05-22 22:25:13",
+  "burst_count": 9,
+  "delta_days": 2.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/A1B160B1_2023-05-22_22-25-13.jpg"
+ },
+ {
+  "uuid": "ABB1A6C6-09AC-4FD6-BBA0-AFCB7E6ADFD0",
+  "burst_start": "2023-05-16 23:50:08",
+  "burst_count": 9,
+  "delta_days": -3.4,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/ABB1A6C6_2023-05-16_23-50-08.jpg"
+ },
+ {
+  "uuid": "31206FB5-AFB9-4639-A2C7-4EB7428B06D9",
+  "burst_start": "2023-05-16 17:14:37",
+  "burst_count": 18,
+  "delta_days": -3.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/31206FB5_2023-05-16_17-14-37.jpg"
+ },
+ {
+  "uuid": "8B4E99DC-A552-492F-8579-96D98B0D0AD1",
+  "burst_start": "2023-05-25 01:51:09",
+  "burst_count": 5,
+  "delta_days": 4.7,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/8B4E99DC_2023-05-25_01-51-09.jpg"
+ },
+ {
+  "uuid": "3FA0406A-AB9D-46FE-995D-8400B11F1C51",
+  "burst_start": "2023-05-15 03:18:52",
+  "burst_count": 6,
+  "delta_days": -5.2,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/3FA0406A_2023-05-15_03-18-52.jpg"
+ },
+ {
+  "uuid": "41FD7FB9-2661-4079-989F-18A395681652",
+  "burst_start": "2023-05-14 00:20:19",
+  "burst_count": 25,
+  "delta_days": -6.3,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/41FD7FB9_2023-05-14_00-20-19.jpg"
+ },
+ {
+  "uuid": "14FD3B16-3891-4E3F-A600-7D7DE916B233",
+  "burst_start": "2023-05-27 17:22:59",
+  "burst_count": 13,
+  "delta_days": 7.4,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/14FD3B16_2023-05-27_17-22-59.jpg"
+ },
+ {
+  "uuid": "591D5987-FDC0-43D0-B8DD-D1C33197559C",
+  "burst_start": "2023-05-28 18:53:14",
+  "burst_count": 6,
+  "delta_days": 8.4,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/591D5987_2023-05-28_18-53-14.jpg"
+ },
+ {
+  "uuid": "0F0070FE-5114-4C69-AE09-7C6AF344A849",
+  "burst_start": "2023-05-11 18:01:33",
+  "burst_count": 8,
+  "delta_days": -8.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/0F0070FE_2023-05-11_18-01-33.jpg"
+ },
+ {
+  "uuid": "0D82B7D7-FE00-4A39-AB23-F0ECFDCC670D",
+  "burst_start": "2023-05-30 22:09:52",
+  "burst_count": 7,
+  "delta_days": 10.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/0D82B7D7_2023-05-30_22-09-52.jpg"
+ },
+ {
+  "uuid": "6967FE4A-D1B1-460A-B2F5-5326FF91F3AD",
+  "burst_start": "2023-05-09 15:30:04",
+  "burst_count": 6,
+  "delta_days": -10.7,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/6967FE4A_2023-05-09_15-30-04.jpg"
+ },
+ {
+  "uuid": "188C837D-5B14-400A-9E28-2FAF8DB51B80",
+  "burst_start": "2023-05-08 18:31:14",
+  "burst_count": 8,
+  "delta_days": -11.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/188C837D_2023-05-08_18-31-14.jpg"
+ },
+ {
+  "uuid": "BE69B964-27F2-47BE-BF50-0B10ADE748B5",
+  "burst_start": "2023-06-01 23:36:00",
+  "burst_count": 14,
+  "delta_days": 12.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/BE69B964_2023-06-01_23-36-00.jpg"
+ },
+ {
+  "uuid": "458E3258-E9F3-4B8D-BF6E-761B20E9C084",
+  "burst_start": "2023-06-02 22:52:29",
+  "burst_count": 13,
+  "delta_days": 13.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/458E3258_2023-06-02_22-52-29.jpg"
+ },
+ {
+  "uuid": "B68CD3F1-0F2B-4418-A065-0D878E8A0389",
+  "burst_start": "2023-05-05 16:45:28",
+  "burst_count": 44,
+  "delta_days": -14.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/B68CD3F1_2023-05-05_16-45-28.jpg"
+ },
+ {
+  "uuid": "3F87E981-95FB-49CB-B503-357335000E03",
+  "burst_start": "2023-06-04 04:08:32",
+  "burst_count": 15,
+  "delta_days": 14.8,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/3F87E981_2023-06-04_04-08-32.jpg"
+ },
+ {
+  "uuid": "EEC323D4-361E-4A9D-B8AF-812DA9247525",
+  "burst_start": "2023-05-02 01:05:23",
+  "burst_count": 7,
+  "delta_days": -18.3,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/EEC323D4_2023-05-02_01-05-23.jpg"
+ },
+ {
+  "uuid": "C1A4D877-2253-43FF-97E2-1CCE32829321",
+  "burst_start": "2023-04-29 17:54:41",
+  "burst_count": 55,
+  "delta_days": -20.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/C1A4D877_2023-04-29_17-54-41.jpg"
+ },
+ {
+  "uuid": "1582CEBD-AFCB-4B34-96BF-93FEF7C6A381",
+  "burst_start": "2023-04-28 15:44:52",
+  "burst_count": 27,
+  "delta_days": -21.7,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/1582CEBD_2023-04-28_15-44-52.jpg"
+ },
+ {
+  "uuid": "C1A2B8F3-FC0C-4A64-9289-1B225DA7FDA2",
+  "burst_start": "2023-06-11 16:13:49",
+  "burst_count": 13,
+  "delta_days": 22.3,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/C1A2B8F3_2023-06-11_16-13-49.jpg"
+ },
+ {
+  "uuid": "5461D9B9-FFF8-4AB3-9EAA-5833B7FA64BF",
+  "burst_start": "2023-04-27 15:44:49",
+  "burst_count": 5,
+  "delta_days": -22.7,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/5461D9B9_2023-04-27_15-44-49.jpg"
+ },
+ {
+  "uuid": "B76B6B55-90C8-4058-99D2-C5211DB5F47B",
+  "burst_start": "2023-06-15 16:04:33",
+  "burst_count": 59,
+  "delta_days": 26.3,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/B76B6B55_2023-06-15_16-04-33.jpg"
+ },
+ {
+  "uuid": "3BEE1AD0-058B-487C-9B52-84DD08E6814D",
+  "burst_start": "2023-04-21 14:48:13",
+  "burst_count": 15,
+  "delta_days": -28.7,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/3BEE1AD0_2023-04-21_14-48-13.jpg"
+ },
+ {
+  "uuid": "3131D260-4C78-4674-BDCF-39BCBB7D36BE",
+  "burst_start": "2023-04-20 16:02:09",
+  "burst_count": 149,
+  "delta_days": -29.7,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/3131D260_2023-04-20_16-02-09.jpg"
+ },
+ {
+  "uuid": "6DAE69D7-2252-4B19-AB97-8AFBBEA3C3D2",
+  "burst_start": "2023-06-20 01:36:04",
+  "burst_count": 6,
+  "delta_days": 30.7,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/6DAE69D7_2023-06-20_01-36-04.jpg"
+ },
+ {
+  "uuid": "7C01B1E3-7F6A-4D31-9B86-AAA3D334D715",
+  "burst_start": "2023-06-21 20:14:43",
+  "burst_count": 26,
+  "delta_days": 32.5,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/7C01B1E3_2023-06-21_20-14-43.jpg"
+ },
+ {
+  "uuid": "C5DD3D82-226C-4A2D-BEF2-A4DB016C52A6",
+  "burst_start": "2023-04-17 16:24:57",
+  "burst_count": 51,
+  "delta_days": -32.7,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/C5DD3D82_2023-04-17_16-24-57.jpg"
+ },
+ {
+  "uuid": "BAF64B37-32AC-4D59-91FF-CA21DB2C53C8",
+  "burst_start": "2023-04-16 03:02:08",
+  "burst_count": 12,
+  "delta_days": -34.2,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/BAF64B37_2023-04-16_03-02-08.jpg"
+ },
+ {
+  "uuid": "E3C584A9-B2D8-4420-B93C-D82A93A6FB3A",
+  "burst_start": "2023-04-14 16:29:06",
+  "burst_count": 22,
+  "delta_days": -35.7,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/E3C584A9_2023-04-14_16-29-06.jpg"
+ },
+ {
+  "uuid": "90752A97-6A63-494A-8A7D-8A314FE99FD2",
+  "burst_start": "2023-04-13 17:36:28",
+  "burst_count": 87,
+  "delta_days": -36.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/90752A97_2023-04-13_17-36-28.jpg"
+ },
+ {
+  "uuid": "304BC235-1196-46C8-A647-37346BFFFA0D",
+  "burst_start": "2023-04-11 18:54:08",
+  "burst_count": 50,
+  "delta_days": -38.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/304BC235_2023-04-11_18-54-08.jpg"
+ },
+ {
+  "uuid": "C68557D6-BB33-4619-90AF-255761A4C29D",
+  "burst_start": "2023-04-10 23:25:36",
+  "burst_count": 33,
+  "delta_days": -39.4,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/C68557D6_2023-04-10_23-25-36.jpg"
+ },
+ {
+  "uuid": "977408AA-5C10-4249-AC74-A5E2A007A642",
+  "burst_start": "2023-04-10 16:35:23",
+  "burst_count": 5,
+  "delta_days": -39.7,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/977408AA_2023-04-10_16-35-23.jpg"
+ },
+ {
+  "uuid": "13581A7E-2ABD-48CD-8FC9-34B4D7287635",
+  "burst_start": "2023-07-01 20:36:25",
+  "burst_count": 148,
+  "delta_days": 42.5,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/13581A7E_2023-07-01_20-36-25.jpg"
+ },
+ {
+  "uuid": "29D8AB4B-5B80-42FD-AEFC-C1450F2B2B41",
+  "burst_start": "2023-04-06 17:30:36",
+  "burst_count": 17,
+  "delta_days": -43.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/29D8AB4B_2023-04-06_17-30-36.jpg"
+ },
+ {
+  "uuid": "E101CCE1-CB78-4788-AB63-9D791DB1C102",
+  "burst_start": "2023-07-02 23:36:28",
+  "burst_count": 7,
+  "delta_days": 43.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/E101CCE1_2023-07-02_23-36-28.jpg"
+ },
+ {
+  "uuid": "B5586619-E711-430E-8C84-B1049D851409",
+  "burst_start": "2023-04-04 16:14:35",
+  "burst_count": 20,
+  "delta_days": -45.7,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/B5586619_2023-04-04_16-14-35.jpg"
+ },
+ {
+  "uuid": "EB81671B-269B-41F5-A7A5-71DF1AD170EF",
+  "burst_start": "2023-07-05 16:24:09",
+  "burst_count": 5,
+  "delta_days": 46.3,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/EB81671B_2023-07-05_16-24-09.jpg"
+ },
+ {
+  "uuid": "7B45A547-FC5E-4545-972B-401DAEB9054C",
+  "burst_start": "2023-04-01 01:10:31",
+  "burst_count": 19,
+  "delta_days": -49.3,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/7B45A547_2023-04-01_01-10-31.jpg"
+ },
+ {
+  "uuid": "13E8C3F6-0E11-4FE1-8D1C-F76605EE58AA",
+  "burst_start": "2023-07-10 19:35:01",
+  "burst_count": 86,
+  "delta_days": 51.5,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/13E8C3F6_2023-07-10_19-35-01.jpg"
+ },
+ {
+  "uuid": "44857C61-3A23-4634-812E-CD70ED0639C4",
+  "burst_start": "2023-03-29 16:47:01",
+  "burst_count": 46,
+  "delta_days": -51.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/44857C61_2023-03-29_16-47-01.jpg"
+ },
+ {
+  "uuid": "DC2366F4-4816-4030-A17A-DCBDE3B61F01",
+  "burst_start": "2023-03-28 17:35:46",
+  "burst_count": 19,
+  "delta_days": -52.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/DC2366F4_2023-03-28_17-35-46.jpg"
+ },
+ {
+  "uuid": "8F9B59D3-1F0F-47B9-B83E-EDDBB648F959",
+  "burst_start": "2023-07-11 23:33:56",
+  "burst_count": 76,
+  "delta_days": 52.6,
+  "path": "/Users/skylar/nuke/.context/d150_candidates/8F9B59D3_2023-07-11_23-33-56.jpg"
+ }
+]

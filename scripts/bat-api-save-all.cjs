@@ -22,7 +22,7 @@ const DATA_DIR = path.join(__dirname, 'data', 'bat-api-pages');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const client = new pg.Client({
-  connectionString: 'postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres',
+  connectionString: `postgresql://postgres.qkgaybvrernstplzjaam:${process.env.SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres`,
   statement_timeout: 55000,
 });
 

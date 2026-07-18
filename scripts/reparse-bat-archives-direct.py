@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 BaT Archive Re-Parser — Direct database approach.
 
@@ -27,7 +28,7 @@ except ImportError:
     import psycopg2
     import psycopg2.extras
 
-DB_URL = "postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
+DB_URL = f"postgresql://postgres.qkgaybvrernstplzjaam:{os.environ['SUPABASE_DB_PASSWORD']}@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
 
 def strip_tags(s):
     if not s: return ''

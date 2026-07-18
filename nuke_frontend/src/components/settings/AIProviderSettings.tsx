@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../hooks/useToast';
+import ClaudeSubscriptionSettings from './ClaudeSubscriptionSettings';
 
 interface AIProvider {
   id?: string;
@@ -74,44 +75,53 @@ const AIProviderSettings: React.FC = () => {
     }
 
     try {
-      // Store API key as base64 encoded (simple obfuscation)
-      // In production, use proper encryption
-      let encryptedKey = provider.api_key_encrypted || '';
-      if (apiKey && apiKey.trim()) {
-        // Only update key if a new one was provided
-        encryptedKey = btoa(apiKey.trim());
-      } else if (!encryptedKey) {
+      const hasNewKey = !!(apiKey && apiKey.trim());
+      if (hasNewKey) {
+        // New key → encrypt at rest via set-ai-provider (AES-GCM, server key). The client
+        // never base64s the key into the DB anymore. The security-critical copy for the
+        // analysis drain is additionally written to Vault below via set_analysis_credential.
+        const { data, error } = await supabase.functions.invoke('set-ai-provider', {
+          body: { provider: provider.provider, api_key: apiKey.trim(), model_name: provider.model_name.trim() },
+        });
+        if (error || (data && data.error)) throw new Error(data?.error_description || error?.message || 'Failed to save key');
+      } else if (!provider.api_key_encrypted) {
         showToast('API key is required', 'warning');
         return;
-      }
-
-      // If setting as default, unset other defaults first
-      if (provider.is_default) {
-        await supabase
+      } else {
+        // Editing metadata only (no new key) — update non-secret fields, never touch the key.
+        const { error: metaErr } = await supabase
           .from('user_ai_providers')
-          .update({ is_default: false })
+          .update({ model_name: provider.model_name.trim(), cost_per_request_cents: provider.cost_per_request_cents || 0, updated_at: new Date().toISOString() })
           .eq('user_id', session.user.id)
-          .neq('id', provider.id || '');
+          .eq('provider', provider.provider);
+        if (metaErr) throw metaErr;
       }
 
-      // Upsert provider
-      const { error: upsertError } = await supabase
-        .from('user_ai_providers')
-        .upsert({
-          id: provider.id,
-          user_id: session.user.id,
-          provider: provider.provider,
-          api_key_encrypted: encryptedKey,
-          model_name: provider.model_name.trim(),
-          is_default: provider.is_default,
-          is_active: true,
-          cost_per_request_cents: provider.cost_per_request_cents || 0,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'id'
-        });
+      // Default toggle (non-secret): unset others, set this provider.
+      if (provider.is_default) {
+        await supabase.from('user_ai_providers').update({ is_default: false }).eq('user_id', session.user.id).neq('provider', provider.provider);
+        await supabase.from('user_ai_providers').update({ is_default: true }).eq('user_id', session.user.id).eq('provider', provider.provider);
+      }
 
-      if (upsertError) throw upsertError;
+      // Persist the analysis credential to Vault (encrypted) via the broker RPC so the deep-
+      // analysis drain reads a properly-encrypted secret, not the base64 value above. Only for a
+      // freshly-entered Anthropic key (the provider the drain uses); method is detected from the
+      // token prefix — setup-token subscription (sk-ant-oat) vs pay-per-token API key (sk-ant-api).
+      // Best-effort: a failure here must not block the provider save.
+      if (apiKey && apiKey.trim() && provider.provider === 'anthropic') {
+        const raw = apiKey.trim();
+        const method = raw.startsWith('sk-ant-oat') ? 'byo_subscription'
+                     : raw.startsWith('sk-ant-api') ? 'byo_api_key' : null;
+        if (method) {
+          const { error: credErr } = await supabase.rpc('set_analysis_credential', {
+            p_method: method,
+            p_provider: 'anthropic',
+            p_secret: raw,
+            p_model: provider.model_name.trim(),
+          });
+          if (credErr) console.warn('analysis credential (Vault) not stored:', credErr.message);
+        }
+      }
 
       showToast('AI provider saved successfully', 'success');
       setEditingProvider(null);
@@ -158,6 +168,9 @@ const AIProviderSettings: React.FC = () => {
 
   return (
     <div className="card">
+      <div style={{ marginBottom: '16px' }}>
+        <ClaudeSubscriptionSettings />
+      </div>
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h3 className="heading-3">AI Provider API Keys</h3>
@@ -228,16 +241,7 @@ const AIProviderSettings: React.FC = () => {
                     {provider.is_default && ' (PRIMARY)'}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: "'Courier New', monospace" }}>
-                    {(() => {
-                      if (!provider.api_key_encrypted) return '••••••••';
-                      try {
-                        const decoded = atob(provider.api_key_encrypted);
-                        return decoded.length >= 8 ? `${decoded.substring(0,4)}••••${decoded.slice(-4)}` : '••••••••';
-                      } catch {
-                        const raw = provider.api_key_encrypted;
-                        return raw.length >= 8 ? `${raw.substring(0,4)}••••${raw.slice(-4)}` : '••••••••';
-                      }
-                    })()}
+                    {provider.api_key_encrypted ? '•••••••• encrypted' : 'not set'}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '4px' }}>

@@ -339,3 +339,30 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 **YONO (You Only Nuke Once)** — Local AI model for image classification. EfficientNet-based, ONNX exported. Eliminates cloud inference costs at scale ($0 vs $34K for 34M images). Sidecar live on Modal (2 warm containers). Consumer API deployed via `api-v1-vision`. Hierarchical classification: tier-1 family, tier-2 make (58 makes). Zone classifier (41 zones, 72.8% accuracy). Condition analysis via Florence-2 vision. Pipeline globally PAUSED via `NUKE_ANALYSIS_PAUSED` flag.
 
 **Yule's K** — A vocabulary richness measure that is approximately independent of text length (Yule 1944). K = 10^4 * (M2 - N) / N^2. Lower K = richer vocabulary. Typical ranges: literary prose 80-120, academic writing 100-150, forum comments 120-200+, formulaic writing 200+. The primary cross-user vocabulary comparison metric because unlike Type-Token Ratio, it is length-normalized. Computed per user in stylometric profiles.
+
+---
+
+## Scholarly Foundations
+
+The vocabulary is Nuke-specific, but every underlying concept descends from a well-established result in data management, knowledge representation, or statistics. Each citation below is web-verified (real DOI/publisher record).
+
+- **Observation as subject-predicate-object testimony** → mirrors the RDF data model, where every assertion is a discrete, attributable triple rather than a mutable cell. The `(value, source, method, observed_at, trust)` shape is exactly this self-describing immutable statement. [rdf11-concepts]
+- **Knowledge graph = "everything that can be true about an entity"** → instantiates the modern knowledge-graph paradigm. [hogan-2021-knowledge-graphs]
+- **"The Postgres tables ARE the graph"** → the relational model itself: entities and relationships as n-ary relations over which queries compose. [codd-1970-relational-model], [hogan-2021-knowledge-graphs]
+- **Entity Resolution / "never auto-match below 0.80"** → the classic record-linkage match / possible-match / non-match decision rule. [fellegi-sunter-1969], survey: [getoor-machanavajjhala-2012-er]
+- **Provenance / chain of custody** → the *why* and *where* formalization of data provenance. [buneman-2001-why-where-provenance]
+- **Source Trust / Trust Weight** → reliability-weighted evidence combination at the heart of record linkage. [fellegi-sunter-1969]
+- **Half-Life / trust decay** → the accuracy/currency dimension of provenance: a datum's value depends on how and when it was derived. [buneman-2001-why-where-provenance]
+- **Dimensional Shadow / Digital Twin (five fixed perspectives)** → separation of facts (measures) from dimensions, i.e. Kimball star-schema dimensional modeling. [kimball-2013-dw-toolkit]
+
+### Bibliography
+
+1. **[rdf11-concepts]** Cyganiak, Wood, Lanthaler (eds.) (2014). *RDF 1.1 Concepts and Abstract Syntax (W3C Recommendation)*. W3C. https://www.w3.org/TR/rdf11-concepts/
+2. **[hogan-2021-knowledge-graphs]** Hogan, Blomqvist, Cochez, d'Amato, de Melo, et al. (2021). *Knowledge Graphs*. ACM Computing Surveys 54(4), Art. 71. https://doi.org/10.1145/3447772
+3. **[codd-1970-relational-model]** E. F. Codd (1970). *A Relational Model of Data for Large Shared Data Banks*. CACM 13(6), 377-387. https://doi.org/10.1145/362384.362685
+4. **[fellegi-sunter-1969]** Fellegi & Sunter (1969). *A Theory for Record Linkage*. JASA 64(328), 1183-1210. https://doi.org/10.1080/01621459.1969.10501049
+5. **[getoor-machanavajjhala-2012-er]** Getoor & Machanavajjhala (2012). *Entity Resolution: Theory, Practice & Open Challenges*. PVLDB 5(12), 2018-2019. https://doi.org/10.14778/2367502.2367564
+6. **[buneman-2001-why-where-provenance]** Buneman, Khanna, Tan (2001). *Why and Where: A Characterization of Data Provenance*. ICDT 2001, LNCS 1973, 316-330. https://doi.org/10.1007/3-540-44503-X_20
+7. **[kimball-2013-dw-toolkit]** Kimball & Ross (2013). *The Data Warehouse Toolkit (3rd ed.)*. Wiley.
+
+*Verification note: all seven confirmed real against primary sources. Do not add a citation here without the same verification.*

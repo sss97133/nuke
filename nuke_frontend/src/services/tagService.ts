@@ -87,8 +87,8 @@ export class TagService {
    */
   static async getTagsForImage(imageId: string): Promise<Tag[]> {
     const { data, error } = await supabase
-      .from('vehicle_image_tags')
-      .select('*, vehicle_images(vehicle_id)')
+      .from('image_tags')
+      .select('*')
       .eq('image_id', imageId)
       .order('created_at', { ascending: false });
 
@@ -115,8 +115,8 @@ export class TagService {
     const imageIds = images.map(img => img.id);
 
     const { data, error } = await supabase
-      .from('vehicle_image_tags')
-      .select('*, vehicle_images(vehicle_id)')
+      .from('image_tags')
+      .select('*')
       .in('image_id', imageIds)
       .order('created_at', { ascending: false });
 
@@ -133,7 +133,7 @@ export class TagService {
    */
   static async verifyTag(tagId: string, userId: string): Promise<boolean> {
     const { error } = await supabase
-      .from('vehicle_image_tags')
+      .from('image_tags')
       .update({
         updated_at: new Date().toISOString()
       })
@@ -152,7 +152,7 @@ export class TagService {
    */
   static async rejectTag(tagId: string): Promise<boolean> {
     const { error } = await supabase
-      .from('vehicle_image_tags')
+      .from('image_tags')
       .delete()
       .eq('id', tagId);
 
@@ -185,16 +185,17 @@ export class TagService {
     const yPos = tagData.y_position ? Math.round(tagData.y_position * 100) : null;
 
     const { data, error } = await supabase
-      .from('vehicle_image_tags')
+      .from('image_tags')
       .insert({
         image_id: imageId,
-        tag_text: tagData.tag_name,
+        vehicle_id: vehicleId,
+        tag_name: tagData.tag_name,
         tag_type: tagData.tag_type,
         x_position: xPos,
         y_position: yPos,
         created_by: userId
       })
-      .select('*, vehicle_images(vehicle_id)')
+      .select('*')
       .single();
 
     if (error) {
@@ -209,8 +210,8 @@ export class TagService {
    * Normalize database tag to frontend Tag interface
    */
   private static normalizeTagFromDB(dbTag: any): Tag {
-    // Get vehicle_id from joined vehicle_images if available
-    const vehicleId = dbTag.vehicle_images?.vehicle_id || null;
+    // image_tags carries vehicle_id directly (repointed from ghost vehicle_image_tags)
+    const vehicleId = dbTag.vehicle_id || null;
     
     // Convert integer positions back to percentages (0-10000 -> 0-100)
     const xPos = dbTag.x_position != null ? dbTag.x_position / 100 : undefined;

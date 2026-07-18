@@ -1,0 +1,214 @@
+# Generated from vehicle_canonical — substrate-driven, not file-driven.
+# Vehicle: e08bf694-970f-4cbe-8a74-8715158a0f2e
+# Loom: EXTERIOR / BODY
+# Wires projected: 27
+
+metadata:
+  title: K5 EXTERIOR / BODY
+  description: |
+    Projection of 27 wires from public.vehicle_canonical for
+    vehicle_id=e08bf694-970f-4cbe-8a74-8715158a0f2e. Source of truth is the DB; this YAML
+    is regenerated on demand. Cite-by-cell provenance retained in
+    structured_data on each underlying observation row.
+
+connectors:
+  M130_A:  {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  M130_B:  {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+  PDM30_A: {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  PDM30_B: {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+
+cables:
+  W33:
+    gauge: 18 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [OGBU]
+    type: M22759/32
+    notes: "Turn Signal Switch | from ECU | sources=k5_cut_list_v2"
+  W39:
+    gauge: 14 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [OGOG]
+    type: M22759/32
+    notes: "Headlight Switch | from ECU | sources=k5_cut_list_v2"
+  W46:
+    gauge: 18 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [OGVT]
+    type: M22759/32
+    notes: "Wiper/Washer Switch | from ECU | sources=k5_cut_list_v2"
+  W48:
+    gauge: 14 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [OGOG]
+    type: M22759/32
+    notes: "Horn | from PDM30:OUT14 | sources=k5_cut_list_v2"
+  W49:
+    gauge: 14 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [VT]
+    type: M22759/32
+    notes: "Windshield Wiper Motor | from PDM30:OUT12 | sources=k5_cut_list_v2"
+  W50:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [OGBKRD]
+    type: M22759/32
+    notes: "Washer Pump | from PDM30:OUT26 | sources=k5_cut_list_v2"
+  W53:
+    gauge: 22 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [OGWH]
+    type: M22759/32
+    notes: "Brake Light Switch | from ECU | sources=k5_cut_list_v2"
+  W54:
+    gauge: 14 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [OGBKYE]
+    type: M22759/32
+    notes: "Electric Parking Brake | from PDM30:OUT7 | sources=k5_cut_list_v2"
+  W75:
+    gauge: 18 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [BNYE]
+    type: M22759/32
+    notes: "Tail Light Right | from PDM30:OUT13 | sources=k5_cut_list_v2"
+  W76:
+    gauge: 18 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [BNVT]
+    type: M22759/32
+    notes: "Backup Light Right | from PDM30:OUT15 | sources=k5_cut_list_v2"
+  W77:
+    gauge: 18 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [BNOG]
+    type: M22759/32
+    notes: "Side Marker Rear Left | from PDM30:OUT19 | sources=k5_cut_list_v2"
+  W78:
+    gauge: 18 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [BN]
+    type: M22759/32
+    notes: "Side Marker Rear Right | from PDM30:OUT19 | sources=k5_cut_list_v2"
+  W79:
+    gauge: 18 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [BNWH]
+    type: M22759/32
+    notes: "Cab Clearance Light Left | from PDM30:OUT19 | sources=k5_cut_list_v2"
+  W80:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BU]
+    type: M22759/32
+    notes: "Turn Signal Left Front | from PDM30:OUT27 | sources=k5_cut_list_v2"
+  W81:
+    gauge: 18 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [BNBK]
+    type: M22759/32
+    notes: "Tail Light Left | from PDM30:OUT13 | sources=k5_cut_list_v2"
+  W82:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BU]
+    type: M22759/32
+    notes: "Turn Signal Right Front | from PDM30:OUT28 | sources=k5_cut_list_v2"
+  W83:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BNRD]
+    type: M22759/32
+    notes: "Parking Light Left Front | from PDM30:OUT13 | sources=k5_cut_list_v2"
+  W84:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BNBU]
+    type: M22759/32
+    notes: "Parking Light Right Front | from PDM30:OUT13 | sources=k5_cut_list_v2"
+  W85:
+    gauge: 16 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GN]
+    type: M22759/32
+    notes: "LED Headlight Left | from PDM30:OUT17 | sources=k5_cut_list_v2"
+  W86:
+    gauge: 16 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [GNWH]
+    type: M22759/32
+    notes: "LED Headlight Right | from PDM30:OUT18 | sources=k5_cut_list_v2"
+  W87:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BNYE]
+    type: M22759/32
+    notes: "Side Marker Front Left | from PDM30:OUT19 | sources=k5_cut_list_v2"
+  W88:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BNVT]
+    type: M22759/32
+    notes: "Side Marker Front Right | from PDM30:OUT19 | sources=k5_cut_list_v2"
+  W89:
+    gauge: 18 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [BNOG]
+    type: M22759/32
+    notes: "Backup Light Left | from PDM30:OUT15 | sources=k5_cut_list_v2"
+  W90:
+    gauge: 18 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [BN]
+    type: M22759/32
+    notes: "Cab Clearance Light Center | from PDM30:OUT19 | sources=k5_cut_list_v2"
+  W91:
+    gauge: 18 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [BNWH]
+    type: M22759/32
+    notes: "Cab Clearance Light Right | from PDM30:OUT19 | sources=k5_cut_list_v2"
+  W92:
+    gauge: 18 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [BNBK]
+    type: M22759/32
+    notes: "License Plate Light | from PDM30:OUT19 | sources=k5_cut_list_v2"
+  W93:
+    gauge: 18 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [BNRD]
+    type: M22759/32
+    notes: "Third Brake Light | from PDM30:OUT15 | sources=k5_cut_list_v2"
+
+# Connection list intentionally omitted in this MVP — needs the
+# from_pin → connector pin mapping logic that lives in
+# docs/wiring/output/generate_wireviz_yaml.py. Next pass: refactor
+# that generator to consume the per-wire dicts produced above.

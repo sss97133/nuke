@@ -1,7 +1,9 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { BrandingProvider } from './branding/BrandingContext';
+import ModeAutoController from './branding/ModeAutoController';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './components/ui/Toast';
 import { ToastProvider as OldToastProvider } from './hooks/useToast';
@@ -19,11 +21,13 @@ import { track } from './lib/track';
 import { useAuth } from './hooks/useAuth';
 const HomePage = React.lazy(() => import('./pages/HomePage'));
 const LandingPage = React.lazy(() => import('./pages/landing/LandingPage'));
+const IntakePage = React.lazy(() => import('./pages/intake/IntakePage'));
 const ProductPage = React.lazy(() => import('./pages/landing/ProductPage'));
 const PublicMap = React.lazy(() => import('./components/map/PublicMap'));
 const NukeMap = React.lazy(() => import('./components/map/NukeMap'));
 const VehicleShowcase = React.lazy(() => import('./pages/showcase/VehicleShowcase'));
 const DeckPage = React.lazy(() => import('./pages/DeckPage'));
+const ShareWiring = React.lazy(() => import('./pages/ShareWiring'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,12 +38,41 @@ const queryClient = new QueryClient({
 const LazyFallback = <div style={{ height: '100vh', background: 'var(--bg)' }} />;
 
 /**
- * Home route gate — Landing (standalone) for visitors, HomePage (in AppLayout) for logged-in users.
+ * Home route gate — IntakePage (Janitor drain, F6) for logged-out visitors,
+ * HomePage (in AppLayout) for logged-in users.
+ *
+ * Pre-F6 this rendered LandingPage; the canon (the-three-users-and-the-finder.md)
+ * says the front door is the dump prompt, not a hero/search splash. LandingPage
+ * is preserved (still imported below) as a fallback for ?legacy_landing=1 if we
+ * need to A/B compare; otherwise unused.
  */
 function HomeGate() {
   const { user, loading } = useAuth();
+  // Legacy links use /?tab=map, but no such tab exists — the org map is /map
+  if (new URLSearchParams(window.location.search).get('tab') === 'map') {
+    return <Navigate to="/map" replace />;
+  }
   if (loading) return LazyFallback;
-  if (!user) return <Suspense fallback={LazyFallback}><LandingPage /></Suspense>;
+  if (!user) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('legacy_landing') === '1') {
+      return <Suspense fallback={LazyFallback}><LandingPage /></Suspense>;
+    }
+    // /explore (or any treemap deep-link) routes here with ?force_treemap=1.
+    // Hand off to HomePage so it can render TreemapHomePage.
+    if (params.get('force_treemap') === '1') {
+      return (
+        <AppLayout>
+          <Suspense fallback={LazyFallback}><HomePage /></Suspense>
+        </AppLayout>
+      );
+    }
+    return (
+      <AppLayout>
+        <Suspense fallback={LazyFallback}><IntakePage variant="homepage" /></Suspense>
+      </AppLayout>
+    );
+  }
   return (
     <AppLayout>
       <Suspense fallback={LazyFallback}><HomePage /></Suspense>
@@ -76,6 +109,8 @@ function RoutedApp() {
           <Route path="/showcase" element={<Suspense fallback={LazyFallback}><VehicleShowcase /></Suspense>} />
           <Route path="/showcase/:vehicleId" element={<Suspense fallback={LazyFallback}><VehicleShowcase /></Suspense>} />
           <Route path="/deck/:deckId" element={<Suspense fallback={LazyFallback}><DeckPage /></Suspense>} />
+          {/* Builder share view — zero-chrome public print package (receipt 2026-06-11_builder-share-view.md) */}
+          <Route path="/share/wiring/:vehicleId" element={<Suspense fallback={LazyFallback}><ShareWiring /></Suspense>} />
 
           {/* ── App shell routes (with AppLayout) ── */}
           <Route path="/*" element={
@@ -100,6 +135,8 @@ export default function App() {
         single cached session — no per-component getSession() calls needed. */}
     <AuthProvider>
     <ThemeProvider>
+      <BrandingProvider>
+      <ModeAutoController />
       <ToastProvider>
         <OldToastProvider>
           <UploadStatusProvider>
@@ -112,6 +149,7 @@ export default function App() {
           <SpeedInsights />
         </OldToastProvider>
       </ToastProvider>
+      </BrandingProvider>
     </ThemeProvider>
     </AuthProvider>
     </QueryClientProvider>

@@ -17,7 +17,27 @@ Canonical CSS: `src/styles/unified-design-system.css` (legacy `design-system.css
 - Racing accents (Gulf, Martini, JPS, BRG, Papaya) as easter eggs only.
 
 ## Animation
-- 180ms `cubic-bezier(0.16, 1, 0.3, 1)`
+- 180ms `cubic-bezier(0.16, 1, 0.3, 1)` — for interactions (hover, expand, drawer), not for hiding navigation latency.
+- For navigation between pages: no fade transitions, no loading spinners. Use hover-prefetch + instant transition (McMaster-Carr pattern). See benchmark study.
+
+## Performance Targets (McMaster-Carr benchmark)
+
+Speed is a first-class doctrine concern. Targets (verified against `docs/library/intellectual/studies/2026-05-24_mcmaster-carr-speed-benchmark-study.md`):
+
+| Metric | Target | Why |
+|---|---|---|
+| Time to First Byte | <200ms | Edge-cached HTML via Vercel |
+| First Contentful Paint | <500ms | SSR or inlined critical CSS |
+| Largest Contentful Paint | <1.5s | Fixed-dim images, no JS-blocking |
+| Cumulative Layout Shift | <0.05 | Reserved space for all media |
+| JS bundle per route | <150kb | Code-split per route |
+| Hover → prefetch | required | react-router prefetch on hover |
+
+Binding rules:
+- Every `<img>` has explicit width/height (no CLS).
+- Every internal `<Link>` prefetches on hover.
+- No marketing copy on canonical pages — the data IS the page.
+- Resist hero rotators, newsletter modals, promotional banners. McMaster has none. Neither do we.
 
 ## Sticky Stack (CRITICAL — read before touching any `position: sticky`)
 

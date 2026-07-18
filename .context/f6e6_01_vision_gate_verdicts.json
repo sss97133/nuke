@@ -1,0 +1,356 @@
+[
+  {
+    "order": 0,
+    "image_id": "81184bca-0d2f-432b-8086-24dcde8ecea7",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Paperwork - sale/consignment document for 1980 Chevrolet Silverado VIN CKM3A4AF129952 (Series 3+3 4x4 dsrp) and 1971 Chevrolet C10 Cheyenne Super trade-in VIN CE141186472123. Sale to Hughes Brothers Equipment LLC / ACL Clovis NM. Stock #ACL-24, Acquired Jan 24 2025 from Richard Stevensen. Names: Doug, Richard Stevensen, Laura Inv 26000. Phone (575) 309-6371, email hughesbros@yucca.net, ISA 1099 form noted. Sale Price $75,000.00, Gross Profit $18,642.82, Total Cost $56,357.18.",
+    "is_paperwork": true,
+    "paperwork_details": "Consignment/sale document. VIN CKM3A4AF129952 (1980 Chev Silverado 4x4 d.s.r.p. K30), Stock #ACL-24, Color Gold & Tan, Odometer 15,574, Acquired Jan 24 2025 from Richard Stevensen, Sold Feb 4 2025 to Hughes Brothers Equipment LLC, Clovis NM, ISA-NM, phone (575) 309-6371. Sale Price $75,000. Trade-in: 1971 Chevrolet C10 Cheyenne Super VIN CE141186472123, color Ochre & White, odometer 18,574."
+  },
+  {
+    "order": 1,
+    "image_id": "cc2e1138-b477-4dd2-b1a6-2dcad1ed668c",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Squarebody Chevy Silverado 30 badge clearly visible, brown/tan two-tone paint, side mirror and roof trim. Diagnostic K30."
+  },
+  {
+    "order": 2,
+    "image_id": "0b12fe49-eca6-46a0-8dd6-b18bf7dabd09",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Tan interior trim parts (armrests/door pulls) on cloth seat upholstery. Consistent with squarebody Chevy interior parts."
+  },
+  {
+    "order": 3,
+    "image_id": "3acb02b5-090a-4cec-8a1c-993b8db8a598",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Squarebody Chevy dashboard gauge cluster - 85 MPH speedometer (federal post-1979), round gauges, tan/saddle dash interior. Diagnostic K30 dash."
+  },
+  {
+    "order": 4,
+    "image_id": "80ad6837-69a4-440e-8abd-9eaa24ff87da",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Squarebody Chevy HVAC controls panel (DEF/HOT/HEATER/VENT/BI-LEVEL/NORM/MAX/AIR COND/ECONOMY) and Motorola AM/FM radio. Classic 1973-1980 squarebody dash layout."
+  },
+  {
+    "order": 5,
+    "image_id": "8adad3bb-5449-426c-8abe-0764c951ad43",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Squarebody Chevy interior - CHEVROLET steering wheel, full gauge cluster, tan/saddle vinyl, manual transmission shifter and 4WD transfer case shifter visible. Diagnostic K-series 4WD."
+  },
+  {
+    "order": 6,
+    "image_id": "eb066ae6-6452-4ec5-a652-f3002013e071",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Vehicle in paint booth, masked with green tape and paper, lower body painted brown - consistent with K30 paint work in progress."
+  },
+  {
+    "order": 7,
+    "image_id": "6545d879-652a-4f3a-af92-1c641f3273bd",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Chrome CHEVROLET tailgate with raised stamped lettering - classic squarebody tailgate, brown paint backing visible."
+  },
+  {
+    "order": 8,
+    "image_id": "c3fb2f9e-c60e-459a-94f0-5672c93e33ab",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Chevy steel wheel with Power King tire and Chevy bowtie hubcap. 1-ton dually-style rear wheel matches K30 configuration."
+  },
+  {
+    "order": 9,
+    "image_id": "8829717c-c4d7-4504-b31e-7ee037fee5c0",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Polished steel wheel with Chevy hubcap, dually configuration, brown squarebody body visible above - K30 dually wheel."
+  },
+  {
+    "order": 10,
+    "image_id": "028037b9-7663-469c-b592-d4aae142edcf",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Diagnostic K30 - front fender with 'Silverado 30' badge clearly visible, brown/tan two-tone squarebody, chrome bumper, raised 4WD stance. Solid evidence of subject vehicle."
+  },
+  {
+    "order": 11,
+    "image_id": "f1173f4f-83e5-45f9-b9bd-850df53bc818",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Full side view of brown crew-cab squarebody K30 dually with single round headlight, in shop with 76 gas sign. Diagnostic K30 crew cab."
+  },
+  {
+    "order": 12,
+    "image_id": "08640318-8d20-4fa1-8441-2671e962962f",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Front 3/4 view of brown K30 squarebody crew cab with single round headlights (1980 last single-headlight year), with person posing beside it - vehicle is prominent subject."
+  },
+  {
+    "order": 13,
+    "image_id": "c0edf337-92eb-44e5-b010-40351a1db288",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Person posing with brown K30 squarebody in foreground; vehicle hood and side visible behind. Vehicle is in frame but person is dominant; squarebody context confirmed."
+  },
+  {
+    "order": 14,
+    "image_id": "31ede75c-079d-4402-a458-5533a30ae05a",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Brown K30 crew cab squarebody front 3/4 with person posing, single round headlight and chrome grille visible. Vehicle prominent in frame."
+  },
+  {
+    "order": 15,
+    "image_id": "ff3ab23e-793f-4c78-ac6b-6c916db80f4e",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Brown K30 squarebody crew cab with person posing, chrome bumper and grille visible. Vehicle prominent."
+  },
+  {
+    "order": 16,
+    "image_id": "3d4c462b-7af4-479d-976a-ec322a2ed253",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Person posing with brown K30 squarebody behind; vehicle ~50% of frame, side mirror and hood visible."
+  },
+  {
+    "order": 17,
+    "image_id": "f2d4756f-f25d-4dfb-a87c-ba70110cdfdf",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Person posing with brown K30 squarebody, single round headlight and side mirror visible."
+  },
+  {
+    "order": 18,
+    "image_id": "d98348c8-6c89-4bbf-ab57-c5f3c6a90e1d",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Person posing with brown K30 squarebody, hood and headlight visible."
+  },
+  {
+    "order": 19,
+    "image_id": "31f7a802-a2ca-49f1-a54f-94d3f3108034",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Person hugging the brown K30 hood; hood, fender, headlight clearly visible. Vehicle is the affectionate subject."
+  },
+  {
+    "order": 20,
+    "image_id": "e7d02fe8-4e70-4161-8f10-424fe09dd64f",
+    "verdict": "approved",
+    "confidence": 0.8,
+    "reasoning": "Person leaning on hood of brown K30 squarebody, hood/fender prominent."
+  },
+  {
+    "order": 21,
+    "image_id": "2bf895ce-179d-4908-9c1d-35c73d2ef484",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Person hugging brown K30 squarebody hood, single round headlight and crew cab side glass visible."
+  },
+  {
+    "order": 22,
+    "image_id": "030a15fc-6225-444b-a486-a328c73f9096",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Brown K30 squarebody crew cab in shop with person leaning on hood - front grille with bowtie, chrome bumper, single round headlights visible. Diagnostic K30."
+  },
+  {
+    "order": 23,
+    "image_id": "d1d4a37f-107b-42c6-b0ee-b027908d2cde",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Brown K30 squarebody front view with person leaning on hood, chrome grille and bumper, single round headlight visible. Shop with 76 sign."
+  },
+  {
+    "order": 24,
+    "image_id": "61298cf6-2fcf-4fac-ab01-648304fa73f5",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Direct front view of brown K30 squarebody with chrome grille (bowtie center), single round headlights, dually rear wheels visible. Diagnostic 1980 K30."
+  },
+  {
+    "order": 25,
+    "image_id": "3b5f7d48-8280-4247-adf5-8ffa9da9647d",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Hero shot - brown/tan crew-cab 4WD squarebody K30 with single round headlights and long bed at golden hour. Diagnostic 1980 K30 crew cab, lifted, on damp pavement at shop with row of other vintage trucks (squarebody, F-series) in background."
+  },
+  {
+    "order": 26,
+    "image_id": "0d8420f9-a3b7-47f5-8f6d-6f69c30b595c",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Hero shot of brown K30 crew cab 4WD with single round headlights, chrome grille and bumper, mud-terrain tires, raised stance. Diagnostic K30."
+  },
+  {
+    "order": 27,
+    "image_id": "e79726cc-337a-47b1-bd28-06f277c83462",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Hero front 3/4 of brown K30 crew cab 4WD with long bed, single round headlights, chrome grille with bowtie. Diagnostic K30."
+  },
+  {
+    "order": 28,
+    "image_id": "7ff30f62-a137-4fdc-9ede-bc16c0905171",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Brown K30 crew cab squarebody front 3/4 at shop, partial view including hood/grille/side."
+  },
+  {
+    "order": 29,
+    "image_id": "e1b7256e-f58b-4ad5-a818-27ff6a478fe1",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Hero night shot of brown K30 crew cab dually 4WD - cab/chassis with bed removed showing dual rear wheels and frame, chrome grille with bowtie, single round headlights. Diagnostic K30."
+  },
+  {
+    "order": 30,
+    "image_id": "cb006c85-91d2-49d8-894e-e388030e7a0d",
+    "verdict": "approved",
+    "confidence": 0.95,
+    "reasoning": "Brown K30 crew cab night shot, cab/chassis with dual rear wheels visible, with vintage Studebaker/early Ford pickup and other vehicles visible in background of shop yard. Diagnostic K30."
+  },
+  {
+    "order": 31,
+    "image_id": "a679f9bc-c983-48d6-9024-fc05d87d8e46",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Front fender shot with 'Silverado 30' badge clearly visible - definitively the K30 Silverado trim. White wagon-wheel style rim with mud tire. Diagnostic K30."
+  },
+  {
+    "order": 32,
+    "image_id": "c4f96e00-5a37-431e-9d2d-50ff4b4c0f39",
+    "verdict": "approved",
+    "confidence": 0.98,
+    "reasoning": "Hero front 3/4 of brown K30 crew cab 4WD long bed with single round headlights, chrome grille (bowtie), oversized mud tires, in shop yard. Diagnostic K30."
+  },
+  {
+    "order": 33,
+    "image_id": "a57ebaa7-cdfe-4a10-9cb4-bdf1932d3adc",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Brown K30 squarebody front 3/4 on lift, chrome grille with bowtie visible, dually wheel beside the lift post."
+  },
+  {
+    "order": 34,
+    "image_id": "bc0b953b-3fa6-46a6-a5bc-4fe9211a909b",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Through-window shot showing brown squarebody Chevy crew-cab visible in shop with engine work in progress. Vehicle context confirmed."
+  },
+  {
+    "order": 35,
+    "image_id": "a71ced6c-6d9f-47f2-b4dd-296e6b1fef54",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underside view - solid front axle (Dana 60-style), leaf springs, transfer case, engine in teal/turquoise paint. Classic 4WD K30 squarebody undercarriage."
+  },
+  {
+    "order": 36,
+    "image_id": "97e74ef2-079a-4666-b685-0f047ba98ebb",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Underside view of K30 chassis on lift - front axle, drivetrain, engine pan visible. Approved as K30 chassis work."
+  },
+  {
+    "order": 37,
+    "image_id": "e9451335-78e6-46cc-a88f-ec19b3378d41",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Front of brown K30 squarebody on lift with engine bay exposed, chrome grille visible. Restoration in progress."
+  },
+  {
+    "order": 38,
+    "image_id": "e80141eb-a4ec-4516-a222-4b1eb41b6298",
+    "verdict": "review_needed",
+    "confidence": 0.6,
+    "reasoning": "Front of squarebody Chevy with a 'C10 - America's Truck Event' sticker on the grille (possibly an event sticker on the K30, or this could be a different C10). Solid front axle visible underneath suggests 4WD (K-series), but the C10 sticker is ambiguous. Recommend review to determine if this is the K30 with an event sticker or a different vehicle.",
+    "is_paperwork": true,
+    "paperwork_details": "C10 'America's Truck Event' sticker on the chrome grille. No VIN visible."
+  },
+  {
+    "order": 39,
+    "image_id": "dafd908e-314a-4b53-a70c-046e1bd19907",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Brown squarebody on lift with engine bay open/engine removed, leaf-spring front axle visible. K30 restoration in progress."
+  },
+  {
+    "order": 40,
+    "image_id": "7e10e9ca-6380-42d1-8b96-6390ded16794",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Cab/body lifted from frame, exposing K30 4WD chassis with front axle, drivetrain, fuel tank, leaf springs. Restoration in progress."
+  },
+  {
+    "order": 41,
+    "image_id": "bdc0a7a3-5a63-48d1-8702-7f619a36daa3",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Bare K30 frame on lift showing rear 14-bolt axle, dual fuel tanks, leaf springs, exhaust. K30 chassis."
+  },
+  {
+    "order": 42,
+    "image_id": "df4d0f8b-160b-4aa2-af97-dfb724543761",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rear axle (14-bolt) of K30 viewed from below with leaf springs and brake drums. K30 chassis work."
+  },
+  {
+    "order": 43,
+    "image_id": "8ae4790b-361e-443b-b4e3-56ad9de61aea",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "Rear axle, dual exhaust, dual fuel tanks, leaf springs viewed from below. K30 chassis from underneath."
+  },
+  {
+    "order": 44,
+    "image_id": "8c3e0967-7773-4527-941b-45792a7d7882",
+    "verdict": "approved",
+    "confidence": 0.75,
+    "reasoning": "Interior cab floor (rear seat / footwell area) with seam sealer, gas pedal visible. Brown body sill outside. Squarebody Chevy cab floor restoration in progress."
+  },
+  {
+    "order": 45,
+    "image_id": "8855e0a7-6535-4fdd-b835-f8f6edf6494d",
+    "verdict": "approved",
+    "confidence": 0.85,
+    "reasoning": "View of K30 frame, driveshaft, and underside of cab floor with leaf springs and frame rails. Chassis from below."
+  },
+  {
+    "order": 46,
+    "image_id": "ff96bf27-e3db-44cd-8462-b7d985c54230",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Transmission/transfer case visible from underneath, K30 4WD drivetrain with frame rails and skid plate."
+  },
+  {
+    "order": 47,
+    "image_id": "25bedd08-6f78-4957-9ac9-b5d560ef5d46",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Front Dana 60 axle, drivetrain, leaf springs, frame from below. K30 4WD chassis."
+  },
+  {
+    "order": 48,
+    "image_id": "ed88976d-b8d0-4364-bb3b-9e606a20fba0",
+    "verdict": "approved",
+    "confidence": 0.9,
+    "reasoning": "Underside K30 chassis on lift with row of other squarebody trucks visible in background of shop yard (consistent with Skylar's squarebody fleet)."
+  },
+  {
+    "order": 49,
+    "image_id": "cafcec85-3838-4985-b0a8-4238e6986529",
+    "verdict": "approved",
+    "confidence": 0.7,
+    "reasoning": "Brake rotor/hub with grooves (in need of resurfacing) and lug studs visible, with chalk mark 'C'. Truck brake work in progress."
+  }
+]

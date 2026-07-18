@@ -196,6 +196,7 @@ function SearchPageInput({ initialQuery }: { initialQuery: string }) {
 export default function Search() {
   const {
     query,
+    cohortTarget,
     displayResults,
     loading,
     searchSummary,
@@ -232,6 +233,39 @@ export default function Search() {
       {/* Active search: filters + results */}
       {query && !urlExtraction && (
         <>
+          {/* Cohort terminal link — only when the query is a clean year-make-model */}
+          {cohortTarget && (
+            <Link
+              to={cohortTarget.path}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                border: '2px solid var(--text)',
+                background: 'var(--surface)',
+                padding: '10px 14px',
+                marginBottom: '12px',
+                textDecoration: 'none',
+                transition: 'opacity 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+            >
+              <div>
+                <div style={{ fontSize: '8px', fontWeight: 800, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                  Cohort Terminal
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text)' }}>
+                  {cohortTarget.label}
+                </div>
+              </div>
+              <div style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text)' }}>
+                View terminal &rarr;
+              </div>
+            </Link>
+          )}
+
           {/* Filter panel — above results, collapsed by default */}
           {vehicleCount > 0 && (
             <SearchFilterPanel

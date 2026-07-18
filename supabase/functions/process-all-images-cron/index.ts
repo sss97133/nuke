@@ -107,9 +107,15 @@ Deno.serve(async (req) => {
                 analysis_tier: analysisTier,
               }
             }
+            // MERGE, never replace: ai_scan_metadata is a shared multi-writer namespace
+            // (byok_deep_analysis, identity_first, on_device_vision, provenance_corrections
+            // all co-tenant here). Whole-column replacement destroyed sibling namespaces.
             await supabase
               .from('vehicle_images')
-              .update({ ai_scan_metadata: skipped, ai_processing_status: 'completed' })
+              .update({
+                ai_scan_metadata: { ...(image.ai_scan_metadata || {}), ...skipped },
+                ai_processing_status: 'completed'
+              })
               .eq('id', image.id)
             continue
           }
@@ -279,10 +285,11 @@ Return ONLY valid JSON:
             }
           }
 
+          // MERGE, never replace (same shared-namespace rule as the skip path above).
           const { error: updateError } = await supabase
             .from('vehicle_images')
             .update({
-              ai_scan_metadata: aiScanMetadata,
+              ai_scan_metadata: { ...(image.ai_scan_metadata || {}), ...aiScanMetadata },
               ai_processing_status: 'completed'
             })
             .eq('id', image.id)
