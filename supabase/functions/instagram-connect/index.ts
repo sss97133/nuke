@@ -88,6 +88,19 @@ async function vaultDelete(id: string): Promise<void> {
   await svc().rpc('ig_vault_delete', { p_id: id });
 }
 
+/** Runtime SUPABASE_SERVICE_ROLE_KEY can differ in format from callers' valid service keys
+ * (legacy JWT vs sb_secret_ rotation) — verify capability, not string equality. */
+async function isServiceCaller(jwt: string): Promise<boolean> {
+  if (!jwt) return false;
+  if (jwt === SERVICE_ROLE_KEY) return true;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1`, {
+      headers: { apikey: jwt, Authorization: `Bearer ${jwt}` },
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
 // ---------- IG API ----------
 async function igJson(url: string, init?: RequestInit): Promise<Record<string, unknown>> {
   const res = await fetch(url, init);
@@ -116,7 +129,7 @@ Deno.serve(async (req) => {
       const anon = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY') ?? '');
       const { data: userData } = await anon.auth.getUser(jwt);
       const userId = userData?.user?.id ?? null;
-      if (!userId && jwt !== SERVICE_ROLE_KEY) return json({ error: 'auth required' }, 401);
+      if (!userId && !(await isServiceCaller(jwt))) return json({ error: 'auth required' }, 401);
 
       const state = await signState({ org_id: orgId, return_to: returnTo, user_id: userId, ts: Date.now() });
       const authorize = 'https://www.instagram.com/oauth/authorize?' + new URLSearchParams({
@@ -216,7 +229,7 @@ Deno.serve(async (req) => {
     // ---- POST /sync ---- (cron or service role)
     if (route === '/sync' && req.method === 'POST') {
       const jwt = (req.headers.get('authorization') ?? '').replace(/^Bearer /i, '');
-      if (jwt !== SERVICE_ROLE_KEY) return json({ error: 'service only' }, 401);
+      if (!(await isServiceCaller(jwt))) return json({ error: 'service only' }, 401);
       const body = await req.json().catch(() => ({}));
 
       let q = db.from('concierge_partner_connections')
