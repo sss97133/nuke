@@ -600,3 +600,9 @@ Confidence ratings reflect how thoroughly the audit could rule out callers. Prom
 
 **Functions kept despite rare invocation:** `live-admin`, `nlq-sql`, `onboard-source` — admin-only or registry-growth paths. Low frequency is by design, not orphan status.
 - **Always use `archiveFetch()`** for fetching external URLs — never raw `fetch()`.
+
+## Social Connect (orgs)
+
+| Intent | Tool | Notes |
+|---|---|---|
+| Org connects their Instagram (OAuth), feed cached + mirrored for org profiles | `instagram-connect` edge fn | Path-routed: `/start` `/callback` `/deauth` `/data-deletion` `/sync`. Meta app "Nuke Connect" (1025281197031266), scope `instagram_business_basic` only. Tokens in Vault via `ig_vault_*` RPCs; connections in `concierge_partner_connections` (channel `instagram`); feed cache `org_instagram_media`; binaries mirrored to `concierge-media/instagram/<org>/` (never hotlink IG CDN). Cron `instagram-feed-sync` */30min. Spec: lofficiel-concierge `docs/INSTAGRAM_CONNECT.md`. |
