@@ -226,6 +226,18 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    // ---- POST /revoke ---- (operator disconnect from our side; service only)
+    if (route === '/revoke' && req.method === 'POST') {
+      const jwt = (req.headers.get('authorization') ?? '').replace(/^Bearer /i, '');
+      if (!(await isServiceCaller(jwt))) return json({ error: 'service only' }, 401);
+      const { connection_id } = await req.json().catch(() => ({}));
+      const { data: conn } = await db.from('concierge_partner_connections')
+        .select('id, org_id, credential_secret_id').eq('id', connection_id).eq('channel', 'instagram').maybeSingle();
+      if (!conn) return json({ error: 'connection not found' }, 404);
+      await revokeConnection(db, conn);
+      return json({ ok: true, revoked: conn.id });
+    }
+
     // ---- POST /sync ---- (cron or service role)
     if (route === '/sync' && req.method === 'POST') {
       const jwt = (req.headers.get('authorization') ?? '').replace(/^Bearer /i, '');
