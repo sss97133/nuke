@@ -169,6 +169,72 @@ function trustWeight(sourceType: string): number {
 /*  Hook                                                               */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/*  Agent-write claims (projection_event consensus) as evidence sources */
+/*  Converges the agent-correction engine into the SAME provenance UI    */
+/*  instead of a parallel display. Each cited field's consensus becomes  */
+/*  one evidence row tagged by its evidence_class.                       */
+/* ------------------------------------------------------------------ */
+
+// attribute name -> the frontend field_name the dossier renders
+const ATTR_TO_FIELD: Record<string, string> = {
+  'vehicle.current_color': 'color',
+  'vehicle.exterior_color': 'color',
+  'vehicle.horsepower': 'horsepower',
+  'vehicle.torque': 'torque',
+  'vehicle.displacement': 'displacement',
+  'vehicle.seat_count': 'seats',
+};
+// attributes that aren't simple scalar fields — don't surface as a dossier field row
+const AGENT_SKIP = new Set(['vehicle.refinish_event']);
+
+function agentValueToString(consensus: unknown): string {
+  if (consensus == null) return '';
+  if (typeof consensus === 'object') {
+    const o = consensus as Record<string, unknown>;
+    const v = o.color ?? o.value ?? o.label ?? o.to_color;
+    return v != null ? String(v) : JSON.stringify(consensus);
+  }
+  return String(consensus);
+}
+
+async function fetchAgentConsensus(vehicleId: string): Promise<FieldEvidenceRow[]> {
+  try {
+    const { data, error } = await supabase.rpc('vehicle_wiki', { p_vehicle_id: vehicleId });
+    if (error || !data) return [];
+    const cited = (data as any).cited_fields;
+    if (!Array.isArray(cited)) return [];
+    const rows: FieldEvidenceRow[] = [];
+    for (const f of cited) {
+      const attr: string = f?.attribute ?? '';
+      if (!attr || AGENT_SKIP.has(attr)) continue;
+      const value = agentValueToString(f?.consensus);
+      if (!value) continue;
+      const fieldName = ATTR_TO_FIELD[attr] ?? attr.replace(/^(vehicle|image)\./, '');
+      const total = Number(f?.total_support) || 0;
+      const winner = Number(f?.consensus_support) || 0;
+      const confidence = total > 0 ? Math.min(1, winner / total) : 0.5;
+      const evidenceClass = f?.candidates?.[0]?.contributors?.[0]?.evidence_class ?? 'agent';
+      rows.push({
+        id: `agent-${attr}`,
+        vehicle_id: vehicleId,
+        field_name: fieldName,
+        field_value: value,
+        source_type: `agent_${evidenceClass}`,
+        confidence,
+        extraction_context: `Agent consensus · ${f?.corroboration ?? 1} contributor(s)${f?.conflict ? ' · CONFLICT' : ''}`,
+        extracted_at: null,
+        status: null,
+        created_at: new Date().toISOString(),
+      });
+    }
+    return rows;
+  } catch (e) {
+    console.warn('[useFieldEvidence] agent consensus fetch failed (non-fatal):', e);
+    return [];
+  }
+}
+
 async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidenceMap> {
   const { data, error: queryError } = await supabase
     .from('field_evidence')
@@ -204,9 +270,8 @@ async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidence
         console.warn('[useFieldEvidence] backfill error (non-fatal):', backfillErr);
       }
     }
-    if (rows.length === 0) {
-      return {};
-    }
+    // NOTE: do not early-return on empty field_evidence — a vehicle may have agent-write
+    // claims (projection_event) even with no field_evidence rows; those are merged below.
   }
 
   // Map DB columns to UI interface
@@ -226,9 +291,15 @@ async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidence
   // Filter out rejected evidence — don't include in conflict analysis or display
   const active = mapped.filter(r => r.status !== 'rejected');
 
+  // Merge agent-write consensus (projection_event) as additional evidence sources — the
+  // corrections engine converges into the SAME provenance UI, not a parallel display.
+  const agentRows = await fetchAgentConsensus(vehicleId);
+  const combined = [...active, ...agentRows];
+  if (combined.length === 0) return {};
+
   // Group by field_name
   const grouped: Record<string, FieldEvidenceRow[]> = {};
-  for (const row of active) {
+  for (const row of combined) {
     if (!grouped[row.field_name]) grouped[row.field_name] = [];
     grouped[row.field_name].push(row);
   }

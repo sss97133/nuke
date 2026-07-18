@@ -268,6 +268,30 @@ export function normalizeVin(vin: string | null | undefined): string | null {
 }
 
 /**
+ * Extract Craigslist canonical (city-form) listing URLs from arbitrary text
+ * (fetched page HTML/markdown). Returns one entry per unique numeric listing
+ * id (first occurrence wins) — Craigslist has no platform-specific case in
+ * normalizeListingUrl() above because the id in a share-link URL
+ * (craigslist.org/view/d/...) is an opaque token unrelated to the real post
+ * id and can only be resolved by fetching the page, not by string
+ * normalization alone; this extracts the id FROM already-fetched page
+ * content instead. Union of two independently-authored regexes previously
+ * hand-duplicated in ingest/index.ts (single-match, resolving one share-link
+ * redirect page) and poll-listing-feeds/index.ts (exhaustive match over a
+ * search-results page) — tolerant of both http/https and both hyphenated
+ * and non-hyphenated region subdomains, the union of what each needed.
+ */
+export function extractCraigslistCanonicalUrls(text: string): Array<{ id: string; url: string }> {
+  const re = /https?:\/\/[a-z0-9-]+\.craigslist\.org\/[a-z]{2,4}\/d\/[^\/\s"'<>)\]]+\/(\d{6,})\.html/gi;
+  const byId = new Map<string, string>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (!byId.has(m[1])) byId.set(m[1], m[0]);
+  }
+  return [...byId.entries()].map(([id, url]) => ({ id, url }));
+}
+
+/**
  * Check if two URLs point to the same listing.
  * Uses canonical listing IDs when available, falls back to normalized URL comparison.
  */

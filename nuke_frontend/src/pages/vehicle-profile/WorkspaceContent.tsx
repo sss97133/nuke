@@ -10,6 +10,8 @@ const VehicleLedgerDocumentsCard = React.lazy(() => import('../../components/veh
 // WiringQueryContextBar removed — wiring canvas replaced with data view
 const PartsQuoteGenerator = React.lazy(() => import('../../components/PartsQuoteGenerator').then(m => ({ default: m.PartsQuoteGenerator })));
 const InvestmentLedger = React.lazy(() => import('./InvestmentLedger'));
+const BuildLedger = React.lazy(() => import('./BuildLedger'));
+const AgentChat = React.lazy(() => import('../../components/agent/AgentChat'));
 const WorthEngineCard = React.lazy(() => import('./WorthEngineCard'));
 const PhotoAuthenticationCard = React.lazy(() => import('./PhotoAuthenticationCard'));
 const VehicleFindingsCard = React.lazy(() => import('./VehicleFindingsCard'));
@@ -25,12 +27,15 @@ const AnalysisSignalsSection = React.lazy(() => import('./AnalysisSignalsSection
 const VehicleIntelligencePanel = React.lazy(() => import('./VehicleIntelligencePanel'));
 const VehicleScoresWidget = React.lazy(() => import('./VehicleScoresWidget'));
 const AuctionReadinessPanel = React.lazy(() => import('./AuctionReadinessPanel'));
+const ChannelSwitchboardCard = React.lazy(() => import('./ChannelSwitchboardCard'));
+const VenueSkinPreviewCard = React.lazy(() => import('./VenueSkinPreviewCard'));
 const ColumnDivider = React.lazy(() => import('./ColumnDivider'));
 const BuildManifestPanel = React.lazy(() => import('./BuildManifestPanel'));
 const VehicleListingDetailsCard = React.lazy(() => import('../../components/vehicle/VehicleListingDetailsCard'));
 const SimilarSalesSection = React.lazy(() => import('../../components/vehicle/SimilarSalesSection').then(m => ({ default: m.SimilarSalesSection })));
 const PriceHistoryChart = React.lazy(() => import('../../components/vehicle/PriceHistoryChart'));
 const ObservationTimeline = React.lazy(() => import('./ObservationTimeline'));
+const VehicleAgentChat = React.lazy(() => import('./VehicleAgentChat'));
 const InventoryWidgetLink = React.lazy(() => import('./InventoryWidgetLink'));
 // BuildLog removed — work sessions now surface via BarcodeTimeline Day Card popups
 
@@ -174,6 +179,14 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
             </React.Suspense>
           )}
 
+          {/* Vehicle Agent — interactive Claude over this vehicle's data; can record
+              observations on the owner's behalf (provenance-stamped, reversible). */}
+          {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
+            <React.Suspense fallback={null}>
+              <VehicleAgentChat vehicleId={vehicle.id} />
+            </React.Suspense>
+          )}
+
           {/* Vehicle Dossier — provenance-rich field panel */}
           <React.Suspense fallback={null}>
             <VehicleDossierPanel />
@@ -211,6 +224,21 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
             <React.Suspense fallback={null}>
               <InvestmentLedger vehicleId={vehicle.id} vehicle={vehicle} isOwnerView />
+            </React.Suspense>
+          )}
+
+          {/* Build Ledger — evidence-tiered financial audit draft (owner-scoped via get_vehicle_build_ledger RPC) */}
+          {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
+            <React.Suspense fallback={null}>
+              <BuildLedger vehicleId={vehicle.id} />
+            </React.Suspense>
+          )}
+
+          {/* Ask — the in-app agent. Answers the ledger's pending owner questions and
+              signs them off through ingest-observation. Same owner gate as the ledger. */}
+          {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
+            <React.Suspense fallback={null}>
+              <AgentChat vehicleId={vehicle.id} />
             </React.Suspense>
           )}
 
@@ -505,6 +533,16 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           {/* Auction Readiness */}
           <React.Suspense fallback={null}>
             <AuctionReadinessPanel />
+          </React.Suspense>
+
+          {/* Sales Channels — readiness gate + one-toggle submission per outlet */}
+          <React.Suspense fallback={null}>
+            <ChannelSwitchboardCard />
+          </React.Suspense>
+
+          {/* Preview as Venue — render the profile in a venue's real design language */}
+          <React.Suspense fallback={null}>
+            <VenueSkinPreviewCard />
           </React.Suspense>
 
           {/* Videos — VehicleVideoSection self-guards: returns null when no videos */}

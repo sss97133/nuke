@@ -29,7 +29,7 @@ DIR="/tmp/dia/$RUN"
 WORK="$DIR/work.jsonl"
 SINK="$DIR/verdicts.jsonl"
 IMG="$DIR/img"
-LOG_DIR="/Users/skylar/nuke/logs"
+LOG_DIR="${NUKE_LOG_DIR:-/Users/skylar/nuke/logs}"
 LOG="$LOG_DIR/byok-image-batch.log"
 LOCK="/tmp/byok-image-batch-${SHARD_COUNT}-${SHARD_INDEX}.lock"
 mkdir -p "$DIR" "$IMG" "$LOG_DIR"
@@ -47,8 +47,15 @@ log "=== batch start vehicle=$VEHICLE_ID size=$BATCH run=$RUN ==="
 
 # 1) PREPARE (network) — pull the next DAY's pending frames for this vehicle.
 # --by-day: the day is the unit of analysis; workers shard by day, never split one.
+# Resolution-pass env knobs (additive; steady-drain callers unaffected):
+#   BYOK_REHASH=1          → re-open unsaturated already-verdicted frames (closure pass)
+#   BYOK_DATE=YYYY-MM-DD   → target ONE specific day instead of the earliest pending
+#   BYOK_EXTRA_CONTEXT=<f> → extra briefing (e.g. a resolution dossier) appended to the prompt
+PREP_EXTRA=""
+[ "${BYOK_REHASH:-0}" = "1" ] && PREP_EXTRA="$PREP_EXTRA --rehash"
+[ -n "${BYOK_DATE:-}" ] && PREP_EXTRA="$PREP_EXTRA --date $BYOK_DATE"
 dotenvx run -- node scripts/deep-image-analysis-byok.mjs prepare \
-  --vehicle-id "$VEHICLE_ID" --limit "$BATCH" --worklist "$WORK" --by-day \
+  --vehicle-id "$VEHICLE_ID" --limit "$BATCH" --worklist "$WORK" --by-day $PREP_EXTRA \
   --shard-count "$SHARD_COUNT" --shard-index "$SHARD_INDEX" >>"$LOG" 2>&1
 PREP_RC=$?
 N=$( [ -f "$WORK" ] && wc -l < "$WORK" | tr -d ' ' || echo 0 )
@@ -118,6 +125,9 @@ PROMPT_FILE="$DIR/prompt.txt"
   echo "together with the new DuraStop brakes' — not 'a metal disc on a floor.'"
   echo
   if [ -f "$CTX" ]; then cat "$CTX"; echo; fi
+  # Resolution dossier seam: a closure pass hands the detective the day's researched
+  # answers (entity resolutions, receipt citations, arc placement) as extra briefing.
+  if [ -n "${BYOK_EXTRA_CONTEXT:-}" ] && [ -f "${BYOK_EXTRA_CONTEXT}" ]; then cat "${BYOK_EXTRA_CONTEXT}"; echo; fi
   cat scripts/daily-receipt/byok-vision-prompt.md
   echo
   echo "## THIS IS ONE WORK DAY: ${DAY:-unknown}"
@@ -154,11 +164,22 @@ log "invoking claude for vision on $N images"
 # MODEL is hoisted so provenance (stamped in sanitize below) can never drift from
 # the model that actually ran — numbers carry source DNA.
 MODEL="${BYOK_MODEL:-claude-opus-4-8}"
+RESULT_JSON="$DIR/claude_result.json"
 T_VISION_START=$(date +%s)
 env -u CLAUDE_EFFORT timeout $(( N * 150 + 60 )) \
-  claude --print --model "$MODEL" --permission-mode bypassPermissions --add-dir "$DIR" \
-  < "$PROMPT_FILE" >>"$LOG" 2>&1 || log "claude --print returned non-zero/timeout (ingesting whatever landed)"
+  claude --print --output-format json --model "$MODEL" --permission-mode bypassPermissions --add-dir "$DIR" \
+  < "$PROMPT_FILE" >"$RESULT_JSON" 2>>"$LOG" || log "claude --print returned non-zero/timeout (ingesting whatever landed)"
 BATCH_MS=$(( ( $(date +%s) - T_VISION_START ) * 1000 ))
+
+# Capture REAL token usage + cost for the batch. --output-format json makes the CLI emit
+# total_cost_usd + usage even on the subscription (it computes the API-equivalent cost
+# from actual tokens), so every run finally records what an image costs — the per-image
+# unit-economics signal the pipeline never had (provenance was hard-coded $0 before).
+read COST_USD IN_TOK OUT_TOK CACHE_TOK < <(node -e '
+  try{const j=require(process.argv[1]); const u=j.usage||{};
+    process.stdout.write([j.total_cost_usd||0, u.input_tokens||0, u.output_tokens||0, (u.cache_creation_input_tokens||0)+(u.cache_read_input_tokens||0)].join(" "));
+  }catch(e){process.stdout.write("0 0 0 0");}' "$RESULT_JSON" 2>/dev/null || echo "0 0 0 0")
+log "vision cost: \$$COST_USD for $N imgs | tokens in=$IN_TOK out=$OUT_TOK cache=$CACHE_TOK | model=$MODEL"
 
 V=$( [ -f "$SINK" ] && wc -l < "$SINK" | tr -d ' ' || echo 0 )
 log "claude wrote $V verdict lines"
@@ -170,10 +191,14 @@ if [ "$V" -eq 0 ]; then log "no verdicts produced — abort ingest"; exit 1; fi
 #      or mislabels). Match by position when the echoed image_id isn't a worklist id.
 #  (2) Drop localized elements missing a valid bbox (the validator rejects the whole
 #      verdict otherwise) — keep the rest so the image still lands.
-python3 - "$SINK" "$WORK" "$VEHICLE_ID" "$MODEL" "$BATCH_MS" "$RUN" "$N" >>"$LOG" 2>&1 <<'PY'
+python3 - "$SINK" "$WORK" "$VEHICLE_ID" "$MODEL" "$BATCH_MS" "$RUN" "$N" "$COST_USD" "$IN_TOK" "$OUT_TOK" "$CACHE_TOK" >>"$LOG" 2>&1 <<'PY'
 import json,sys
 sink,work,vehicle_id=sys.argv[1],sys.argv[2],sys.argv[3]
 model,batch_ms,run_id,n_imgs=sys.argv[4],int(sys.argv[5]),sys.argv[6],max(1,int(sys.argv[7]))
+cost_usd=float(sys.argv[8]) if len(sys.argv)>8 else 0.0
+in_tok =int(sys.argv[9])  if len(sys.argv)>9  else 0
+out_tok=int(sys.argv[10]) if len(sys.argv)>10 else 0
+cache_tok=int(sys.argv[11]) if len(sys.argv)>11 else 0
 wl=[json.loads(l) for l in open(work) if l.strip()]
 ids=[w["image_id"] for w in wl]; idset=set(ids)
 by_id={w["image_id"]:w for w in wl}
@@ -219,8 +244,14 @@ for i,l in enumerate(raw):
         "batch_duration_ms":batch_ms,
         "agent_duration_ms":batch_ms//n_imgs,
         "images_in_batch":n_imgs,
-        "agent_cost_cents":0,
-        "cost_basis":"byok_subscription_flat",
+        # REAL per-image economics, amortized from the batch's measured usage/cost.
+        # cost is the API-equivalent the CLI reports (true even on subscription).
+        "agent_cost_cents":round(cost_usd*100/n_imgs,4),
+        "batch_cost_usd":cost_usd,
+        "input_tokens_per_image":in_tok//n_imgs,
+        "output_tokens_per_image":out_tok//n_imgs,
+        "cache_tokens_per_image":cache_tok//n_imgs,
+        "cost_basis":"metered_from_usage" if cost_usd>0 else "byok_subscription_flat",
     }
     out.append(json.dumps(v))
 open(sink,"w").write("\n".join(out)+"\n")
@@ -239,5 +270,69 @@ if [ -n "$DAY" ]; then
     --vehicle-id "$VEHICLE_ID" --date "$DAY" >>"$LOG" 2>&1 \
     && log "rolled up work_session for $DAY" \
     || log "build-day rollup for $DAY returned non-zero (non-fatal)"
+
+  # 5b) WORTH CASCADE — feed the BUILT technician_worth_proof. One evidence row per labor
+  # day (burst-clustered minutes, Skylar/Ernie via place_hint), so technician_work_evidence
+  # stays current as the fleet analyzes — NOT a one-shot like the 9fcdd38f backfill that
+  # ran once and starved the engine. Idempotent, per-vehicle.
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_technician_evidence" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 \
+    && log "worth-cascade: refreshed technician evidence for ${VEHICLE_ID:0:8}" \
+    || log "worth-cascade returned non-zero (non-fatal)"
+  # equipment usage testimony (actor-event: tool used on this vehicle/day) → depreciation computes
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_equipment_evidence" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 || true
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/refresh_equipment_hours" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{}"' >>"$LOG" 2>&1 || true
+  # consumable presence testimony (present-in-frame; never a fabricated consumed quantity)
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_consumable_evidence" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 || true
+  # ARM6 parts-presence testimony (resolves components to parts_catalog SKUs or surfaces catalog gap)
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_parts_evidence" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 || true
+  # micro-atom lane: promote workshop_signals/presence/scene_type/build_phase JSONB into queryable rows
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_micro_atoms" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 \
+    && log "worth-cascade: refreshed parts + micro-atoms for ${VEHICLE_ID:0:8}" || true
+  # recompute the documented-investment floor (v3 labor + photo-parts ledger) and store it on the
+  # coverage counter, so the fleet worth-proof stays current as this vehicle's analysis deepens
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/refresh_vehicle_documented_floor" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 \
+    && log "worth-cascade: refreshed documented-investment floor for ${VEHICLE_ID:0:8}" || true
 fi
+# 6) PERCEPTUAL HASH (no AI, no extra download) — hash the already-local frames so the
+# dedup organ has input (phash was 0% filled; see engineering-manual Ch.19). Guarded:
+# if the image libs aren't installed it skips cleanly rather than failing the batch.
+dotenvx run -- python3 - "$WORK" "$IMG" >>"$LOG" 2>&1 <<'PY'
+import json,sys,os
+try:
+    import imagehash; from PIL import Image; import pillow_heif; pillow_heif.register_heif_opener(); import requests
+except Exception as e:
+    print("phash: deps missing, skipping (", str(e)[:60], ")"); sys.exit(0)
+work,imgdir=sys.argv[1],sys.argv[2]
+URL=os.environ.get("SUPABASE_URL") or os.environ.get("VITE_SUPABASE_URL"); KEY=os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+if not URL or not KEY: print("phash: no creds, skipping"); sys.exit(0)
+H={"apikey":KEY,"authorization":f"Bearer {KEY}","content-type":"application/json","prefer":"return=minimal"}
+n=0
+for l in open(work):
+    r=json.loads(l); p=os.path.join(imgdir, r.get("file_name",""))
+    if not p or not os.path.exists(p): continue
+    try:
+        im=Image.open(p).convert("RGB"); ph=str(imagehash.phash(im)); dh=str(imagehash.dhash(im))
+        requests.patch(f"{URL}/rest/v1/vehicle_images?id=eq.{r['image_id']}&phash=is.null",
+                       headers=H, json={"phash":ph,"dhash":dh}, timeout=30)
+        n+=1
+    except Exception as e: print("phash err", r.get("file_name"), str(e)[:60])
+print("phash: hashed", n, "local frames")
+PY
+
+# 7) DEDUP + SESSION (no AI) — collapse bursts and fill work_session_id for this vehicle.
+# Both functions are vehicle-scoped, idempotent, and reversible (see Ch.19); safe per batch.
+dotenvx run -- node -e '
+const { createClient } = require("@supabase/supabase-js");
+const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const sb = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY);
+(async () => {
+  // promote_image_depth_to_columns lifts this batch verdicts (camera_pose, components_seen)
+  // out of ai_scan_metadata JSONB into the first-class columns so the depth is queryable (Ch.19).
+  for (const fn of ["flag_image_burst_duplicates", "derive_work_sessions", "promote_image_depth_to_columns"]) {
+    const { data, error } = await sb.rpc(fn, { p_vehicle_id: process.argv[1] });
+    console.log(fn, error ? ("ERR " + error.message) : JSON.stringify(data));
+  }
+})();
+' "$VEHICLE_ID" >>"$LOG" 2>&1 || log "dedup/session/promote rpc returned non-zero (non-fatal)"
+
 log "=== batch done: day ${DAY:-unknown}, ingest $WROTE / $N ==="

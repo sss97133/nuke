@@ -1,5 +1,10 @@
 name: iOS TestFlight
 
+# CodeQL: scope the GITHUB_TOKEN — this workflow only reads the repo; signing
+# and upload use ASC secrets, never the token.
+permissions:
+  contents: read
+
 # Builds apps/nuke-capture-ios and uploads it to TestFlight from a GitHub
 # runner — the GitHub Actions equivalent of the Xcode Cloud setup in
 # apps/nuke-capture-ios/ci_scripts/. Consumes six repo secrets:

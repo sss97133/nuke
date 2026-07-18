@@ -185,9 +185,11 @@ export default function VehicleAuctionQuickStartCard(props: {
     setSubmitError(null);
     setReadinessIssues(null);
     try {
-      const { data: userResp, error: userErr } = await supabase.auth.getUser();
+      // Use getSession() instead of getUser() to avoid Web Locks API contention
+      // on sb-*-auth-token (cause of 2026-05-24 garage hang). See lib/supabase.ts.
+      const { data: { session }, error: userErr } = await supabase.auth.getSession();
       if (userErr) throw userErr;
-      const userId = userResp?.user?.id;
+      const userId = session?.user?.id;
       if (!userId) throw new Error('Not signed in');
 
       const startingBid = Number(startingBidUsd);

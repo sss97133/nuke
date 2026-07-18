@@ -42,37 +42,21 @@ fi
 EXTRACTED_JSON=$(osascript 2>>"$LOG_FILE" <<'APPLESCRIPT'
 on run
   tell application "Google Chrome"
-    -- Find facebook.com/saved tab
-    set foundTab to missing value
-    repeat with w in windows
-      repeat with t in tabs of w
-        if URL of t contains "facebook.com/saved" then
-          set foundTab to t
-          exit repeat
-        end if
-      end repeat
-      if foundTab is not missing value then exit repeat
-    end repeat
-
-    -- If no saved tab, find any FB tab and navigate
-    if foundTab is missing value then
-      repeat with w in windows
-        repeat with t in tabs of w
-          if URL of t contains "facebook.com" then
-            set foundTab to t
-            set URL of t to "https://www.facebook.com/saved"
-            delay 6
-            exit repeat
-          end if
-        end repeat
-        if foundTab is not missing value then exit repeat
-      end repeat
-    end if
-
-    -- No FB tabs at all — skip silently
-    if foundTab is missing value then
+    -- Polite mode (2026-07-02): never hijack a tab the user is looking at.
+    -- Old behavior navigated the user's existing FB tab to /saved mid-browse
+    -- (the "annoying popup"), and silently skipped when no FB tab was open
+    -- (why syncs felt unreliable). New behavior: open a NEW tab in the back
+    -- window, do the work, close it, restore the previously active tab.
+    if (count of windows) is 0 then
       return "{\"vehicles\":[]}"
     end if
+
+    set w to window 1
+    set savedTabIndex to active tab index of w
+    set foundTab to make new tab at end of tabs of w with properties {URL:"https://www.facebook.com/saved"}
+    -- Immediately give the user their tab back while the page loads
+    set active tab index of w to savedTabIndex
+    delay 8
 
     -- Auto-scroll to load all saved items
     execute foundTab javascript "
@@ -160,6 +144,11 @@ on run
         return JSON.stringify({vehicles:vs,total:vs.length});
       })();
     "
+    -- Clean up: close the worker tab, restore the user's active tab
+    try
+      close foundTab
+      set active tab index of w to savedTabIndex
+    end try
     return jsResult
   end tell
 end run

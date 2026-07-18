@@ -1,0 +1,285 @@
+# K5 MISC — generated from K5_cut_list_v2.txt
+# 16 wires, sources: ECU, PDM30
+
+metadata:
+  title: "K5 MISC"
+  pn: "K5-MISC"
+  description: "1977 Chevrolet K5 Blazer · VIN CCL187Z210370 · LS3 6.2L · MoTeC M130 + PDM30. 16 wires from K5_cut_list_v2.txt. Wire spec: M22759/32 Tefzel (Pro tier). Generated 2026-05-14. Builder: NUKE LTD. Wiring: Desert Performance."
+  revision: "wireviz-2026-05-14"
+
+options:
+  fontname: "Roboto"
+  bgcolor: "WH"
+  color_mode: full
+
+connectors:
+  ECU:
+    type: "ECU"
+    subtype: female  # mating side that plugs into the device
+    pincount: 8
+    pinlabels: ["P105", "P111", "P40", "P41", "P52", "P60", "P61", "P98"]
+
+  PDM30:
+    type: "MoTeC Superseal A (34-pin) — MoTeC #65044"
+    subtype: female  # mating side that plugs into the device
+    pincount: 34
+    pinlabels: ["OUT16", "OUT23", "OUT25", "P55", "P56", "P57", "P95"]
+
+  A_C_Compressor_Clutch:
+    type: "A/C Compressor Clutch (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  A_C_Pressure_Switch_High:
+    type: "A/C Pressure Switch High (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  A_C_Pressure_Switch_Low:
+    type: "A/C Pressure Switch Low (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Bosch_V4_Electric_Brake_Booste:
+    type: "Bosch V4 Electric Brake Booste (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Bosch_iBooster_Relay:
+    type: "Bosch iBooster Relay (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Cargo_Bed_Light:
+    type: "Cargo/Bed Light (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  ECU_TARGET:
+    type: "ECU (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Fuel_Level_Sender:
+    type: "Fuel Level Sender (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Hazard_Flasher:
+    type: "Hazard Flasher (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Ignition_Switch:
+    type: "Ignition Switch (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Neutral_Safety_Switch:
+    type: "Neutral Safety Switch (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Power_Distribution_Module:
+    type: "Power Distribution Module (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Reverse_Light_Switch:
+    type: "Reverse Light Switch (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Transfer_Case_Indicator:
+    type: "Transfer Case Indicator (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Transmission_Controller:
+    type: "Transmission Controller (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Underhood_Light:
+    type: "Underhood Light (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+cables:
+  W23:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OGRD]
+    notes: "#23 A/C Compressor Clutch (ORN/RED)"
+
+  W40:
+    gauge: 14 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [OG]
+    notes: "#40 Ignition Switch (ORN)"
+
+  W41:
+    gauge: 18 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [OGWH]
+    notes: "#41 Hazard Flasher (ORN/WHT)"
+
+  W52:
+    gauge: 10 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OG]
+    notes: "#52 Bosch V4 Electric Brake Booste (ORN)"
+
+  W55:
+    gauge: 16 AWG
+    length: 11.5
+    wirecount: 1
+    colors: [OGBK]
+    notes: "#55 Transfer Case Indicator (ORN/BLK)"
+
+  W56:
+    gauge: 14 AWG
+    length: 11.5
+    wirecount: 1
+    colors: [OGRD]
+    notes: "#56 Neutral Safety Switch (ORN/RED)"
+
+  W57:
+    gauge: 18 AWG
+    length: 11.5
+    wirecount: 1
+    colors: [OGBU]
+    notes: "#57 Reverse Light Switch (ORN/BLU)"
+
+  W58:
+    gauge: 20 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [OGYE]
+    notes: "#58 Transmission Controller (ORN/YEL)"
+
+  W60:
+    gauge: 20 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OGOG]
+    notes: "#60 ECU (ORN/ORG)"
+
+  W61:
+    gauge: 22 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [OG]
+    notes: "#61 Power Distribution Module (ORN)"
+
+  W73:
+    gauge: 20 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BNRD]
+    notes: "#73 Underhood Light (BRN/RED)"
+
+  W74:
+    gauge: 20 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [BNBU]
+    notes: "#74 Cargo/Bed Light (BRN/BLU)"
+
+  W95:
+    gauge: 22 AWG
+    length: 2.3
+    wirecount: 1
+    colors: [OGWH]
+    notes: "#95 Bosch iBooster Relay (ORN/WHT)"
+
+  W98:
+    gauge: 20 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [OGRD]
+    notes: "#98 Fuel Level Sender (ORN/RED)"
+
+  W105:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OGYE]
+    notes: "#105 A/C Pressure Switch Low (ORN/YEL)"
+
+  W111:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OGVT]
+    notes: "#111 A/C Pressure Switch High (ORN/VIO)"
+
+connections:
+  -
+    - PDM30: ["OUT16"]
+    - W23: [1]
+    - A_C_Compressor_Clutch: ["P1"]
+  -
+    - ECU: ["P40"]
+    - W40: [1]
+    - Ignition_Switch: ["P1"]
+  -
+    - ECU: ["P41"]
+    - W41: [1]
+    - Hazard_Flasher: ["P1"]
+  -
+    - ECU: ["P52"]
+    - W52: [1]
+    - Bosch_V4_Electric_Brake_Booste: ["P1"]
+  -
+    - PDM30: ["P55"]
+    - W55: [1]
+    - Transfer_Case_Indicator: ["P1"]
+  -
+    - PDM30: ["P56"]
+    - W56: [1]
+    - Neutral_Safety_Switch: ["P1"]
+  -
+    - PDM30: ["P57"]
+    - W57: [1]
+    - Reverse_Light_Switch: ["P1"]
+  -
+    - PDM30: ["OUT23"]
+    - W58: [1]
+    - Transmission_Controller: ["P1"]
+  -
+    - ECU: ["P60"]
+    - W60: [1]
+    - ECU_TARGET: ["P1"]
+  -
+    - ECU: ["P61"]
+    - W61: [1]
+    - Power_Distribution_Module: ["P1"]
+  -
+    - PDM30: ["OUT25"]
+    - W73: [1]
+    - Underhood_Light: ["P1"]
+  -
+    - PDM30: ["OUT25"]
+    - W74: [1]
+    - Cargo_Bed_Light: ["P1"]
+  -
+    - PDM30: ["P95"]
+    - W95: [1]
+    - Bosch_iBooster_Relay: ["P1"]
+  -
+    - ECU: ["P98"]
+    - W98: [1]
+    - Fuel_Level_Sender: ["P1"]
+  -
+    - ECU: ["P105"]
+    - W105: [1]
+    - A_C_Pressure_Switch_Low: ["P1"]
+  -
+    - ECU: ["P111"]
+    - W111: [1]
+    - A_C_Pressure_Switch_High: ["P1"]

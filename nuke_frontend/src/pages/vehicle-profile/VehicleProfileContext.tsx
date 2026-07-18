@@ -16,6 +16,7 @@ import { useViewHistory } from '../../hooks/useViewHistory';
 import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
 import { loadVehicleImpl, selectBestHeroImage, type RpcLoadResult } from './loadVehicleData';
 import { resolveVehicleImages } from './resolveVehicleImages';
+import { withTimeout } from '../../lib/withTimeout';
 import { resolveCurrencyCode } from '../../utils/currency';
 import { useVehicleIntel } from './hooks/useVehicleIntel';
 import type { VehicleIntel } from './hooks/useVehicleIntel';
@@ -260,7 +261,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         .select('id, name, session_start, session_end, session_duration_minutes, metadata, event_date')
         .eq('vehicle_id', vehicleId)
         .order('session_start', { ascending: false });
-      const [tlResult, wsResult] = await Promise.all([
+      const [tlResult, wsResult] = await withTimeout(Promise.all([
         supabase
           .from('timeline_events')
           .select('*')
@@ -269,10 +270,14 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
           .limit(200),
         supabase
           .from('work_sessions')
-          .select('id, session_date, title, work_type, image_count, duration_minutes, total_parts_cost, work_description, status, total_labor_cost, total_job_cost')
+          .select('id, session_date, title, work_type, image_count, duration_minutes, total_parts_cost, work_description, status, total_labor_cost, total_job_cost, session_type')
+          // Communication-derived sessions (imessage threads, optimistic backfill) are
+          // context, not build labor — exclude them so the timeline shows real work only
+          // and build-hours stop inflating (e.g. K2500 5,009h was 4,860h of texting).
           .eq('vehicle_id', vehicleId)
+          .or('session_type.is.null,session_type.not.in.(imessage_sync,baseline_backfill)')
           .order('session_date', { ascending: false }),
-      ]);
+      ]), 10000, 'loadTimelineEvents');
 
       const events: any[] = [];
       if (!tlResult.error && tlResult.data) events.push(...tlResult.data);

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Fix garbage make fields from BaT title parsing.
 
@@ -25,7 +26,7 @@ except ImportError:
     from psycopg2.extras import execute_batch
 
 # Use port 5432 (session pooler) - port 6543 (transaction pooler) is often saturated
-DB_URL = "postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
+DB_URL = f"postgresql://postgres.qkgaybvrernstplzjaam:{os.environ['SUPABASE_DB_PASSWORD']}@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
 
 # Two-word makes that get split
 TWO_WORD_MAKES = {

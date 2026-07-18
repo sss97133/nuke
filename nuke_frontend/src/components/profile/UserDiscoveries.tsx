@@ -208,6 +208,8 @@ const UserDiscoveries: React.FC<UserDiscoveriesProps> = ({ userId, isOwnProfile 
       const result = await resp.json();
       if (result.status === 'error') {
         setIngestResult(`Error: ${result.error}`);
+      } else if (result.status === 'rejected') {
+        setIngestResult(`Not tracked: ${result.reason || 'submission rejected'}`);
       } else {
         setIngestResult(
           result.status === 'duplicate'

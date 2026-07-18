@@ -105,7 +105,10 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function PlatformBadge({ platform }: { platform: string }) {
+function PlatformBadge({ platform, label }: { platform: string; label?: string | null }) {
+  // Prefer the channel label (set by the switchboard) so outlets collapsed into
+  // the 'other' platform enum still read by name (Cars & Bids, RM Sotheby's, …).
+  const text = label || PLATFORM_LABELS[platform] || platform.toUpperCase();
   return (
     <span style={{
       ...LABEL,
@@ -113,7 +116,7 @@ function PlatformBadge({ platform }: { platform: string }) {
       border: '2px solid var(--border, #bdbdbd)',
       display: 'inline-block',
     }}>
-      {PLATFORM_LABELS[platform] || platform.toUpperCase()}
+      {text}
     </span>
   );
 }
@@ -213,7 +216,7 @@ function ExportRow({ exp, onStatusChange }: {
       </Link>
 
       {/* Platform */}
-      <PlatformBadge platform={exp.platform} />
+      <PlatformBadge platform={exp.platform} label={(exp.metadata as any)?.channel_label} />
 
       {/* Status */}
       <StatusBadge status={exp.status} />

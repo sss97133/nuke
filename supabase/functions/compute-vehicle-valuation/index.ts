@@ -128,6 +128,45 @@ function extractCoreModel(normalizedModel: string): string {
 // ============================================================================
 // STEP 1: BASE PRICE FROM COMPARABLES (multi-tier matching)
 // ============================================================================
+// Build class from the subject's OWN evidence (vehicle_condition_scores.descriptor_summary).
+// A frame-off resto-mod must not be priced on the stock-comp median — it belongs to the
+// upper tail of its make/model/year distribution (where built examples actually sell).
+async function getBuildClass(supabase: any, vehicleId: string): Promise<string> {
+  const { data } = await supabase
+    .from("vehicle_condition_scores")
+    .select("descriptor_summary, condition_tier, observation_count")
+    .eq("vehicle_id", vehicleId)
+    .limit(1);
+  if (!data || data.length === 0) return "unknown";
+  const r = data[0];
+  const ds = r.descriptor_summary || {};
+  const obs = r.observation_count || 1;
+  const mods = Object.keys(ds)
+    .filter((k) => /aftermarket|non_original|forced_induction|lifted|restored|swap|modification/.test(k))
+    .reduce((s, k) => s + ((ds[k] && ds[k].count) || 0), 0);
+  const modDensity = mods / Math.max(obs, 1);
+  if (modDensity >= 0.15) return "restomod";       // heavy documented modification
+  if (r.condition_tier === "project") return "project";
+  if (["concours", "show", "excellent", "survivor"].includes(r.condition_tier)) return "survivor";
+  return "unknown";
+}
+
+// Class-aware anchor: pick the percentile of the comp pool that matches the subject's
+// build class, instead of always taking the stock-dominated median. Unknown class →
+// the prior recency-weighted median (no behavior change).
+function classAwareAnchor(rows: any[], buildClass: string, subjectYear: number | null = null): number {
+  if (buildClass === "unknown") return recencyWeightedMedian(rows, subjectYear);
+  const prices = rows.map((r) => r.best_price).filter((p) => p > 0).sort((a, b) => a - b);
+  if (prices.length === 0) return 0;
+  const pct = (p: number) => prices[Math.min(prices.length - 1, Math.max(0, Math.round((p / 100) * (prices.length - 1))))];
+  switch (buildClass) {
+    case "restomod": return pct(82);   // documented high-end build → upper tail
+    case "survivor": return pct(55);
+    case "project":  return pct(30);
+    default:         return recencyWeightedMedian(rows, subjectYear);
+  }
+}
+
 async function getBasePrice(supabase: any, vehicle: any): Promise<{
   basePrice: number;
   compCount: number;
@@ -140,6 +179,16 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
   if (!make || !year) {
     return { basePrice: 0, compCount: 0, method: "none" };
   }
+
+  // Subject build class → which percentile of the comp pool anchors the estimate.
+  const buildClass = await getBuildClass(supabase, vehicle.id);
+  // Subject body class → hard mismatch filter on the comp pool (Stage-2-lite).
+  const bodyClass = subjectBodyClass(vehicle);
+  const anchor = (rows: any[]) => classAwareAnchor(rows, buildClass, year);
+  const label = (tier: string, stratified = false) => {
+    const base = buildClass !== "unknown" ? "class_stratified" : tier;
+    return stratified ? `${base}_bodied` : base;
+  };
 
   // ---- Tier 1: Canonical model aliases (best quality match) ----
   if (model) {
@@ -207,7 +256,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
     if (bestCanonical) {
       const { data: canonComps } = await supabase
         .from("clean_vehicle_prices")
-        .select("best_price, is_sold, updated_at")
+        .select("vehicle_id, year, model, best_price, is_sold, updated_at, price_source")
         .ilike("make", make)
         .ilike("model", `%${bestCanonical}%`)
         .gte("year", year - 5)
@@ -217,8 +266,8 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
         .limit(300);
 
       if (canonComps && canonComps.length >= 3) {
-        const median = recencyWeightedMedian(canonComps);
-        return { basePrice: median, compCount: canonComps.length, method: "canonical" };
+        const s = await stratifyByBody(supabase, canonComps, bodyClass);
+        return { basePrice: anchor(s.rows), compCount: s.rows.length, method: label("canonical", s.stratified) };
       }
     }
   }
@@ -227,7 +276,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
   if (model) {
     const { data: compRows } = await supabase
       .from("clean_vehicle_prices")
-      .select("best_price, is_sold, updated_at")
+      .select("vehicle_id, year, model, best_price, is_sold, updated_at, price_source")
       .ilike("make", make)
       .ilike("model", `%${model}%`)
       .gte("year", year - 5)
@@ -237,8 +286,8 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
       .limit(300);
 
     if (compRows && compRows.length >= 3) {
-      const median = recencyWeightedMedian(compRows);
-      return { basePrice: median, compCount: compRows.length, method: "exact" };
+      const s = await stratifyByBody(supabase, compRows, bodyClass);
+      return { basePrice: anchor(s.rows), compCount: s.rows.length, method: label("exact", s.stratified) };
     }
   }
 
@@ -248,7 +297,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
     if (normalizedModel && normalizedModel !== model.toLowerCase()) {
       const { data: normComps } = await supabase
         .from("clean_vehicle_prices")
-        .select("best_price, is_sold, updated_at")
+        .select("vehicle_id, year, model, best_price, is_sold, updated_at, price_source")
         .ilike("make", make)
         .ilike("model", `%${normalizedModel}%`)
         .gte("year", year - 5)
@@ -258,8 +307,8 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
         .limit(300);
 
       if (normComps && normComps.length >= 3) {
-        const median = recencyWeightedMedian(normComps);
-        return { basePrice: median, compCount: normComps.length, method: "normalized" };
+        const s = await stratifyByBody(supabase, normComps, bodyClass);
+        return { basePrice: anchor(s.rows), compCount: s.rows.length, method: label("normalized", s.stratified) };
       }
     }
   }
@@ -270,7 +319,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
     if (coreModel && coreModel.length >= 2) {
       const { data: coreComps } = await supabase
         .from("clean_vehicle_prices")
-        .select("best_price, is_sold, updated_at")
+        .select("vehicle_id, year, model, best_price, is_sold, updated_at, price_source")
         .ilike("make", make)
         .ilike("model", `%${coreModel}%`)
         .gte("year", year - 5)
@@ -280,8 +329,8 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
         .limit(300);
 
       if (coreComps && coreComps.length >= 3) {
-        const median = recencyWeightedMedian(coreComps);
-        return { basePrice: median, compCount: coreComps.length, method: "core_model" };
+        const s = await stratifyByBody(supabase, coreComps, bodyClass);
+        return { basePrice: anchor(s.rows), compCount: s.rows.length, method: label("core_model", s.stratified) };
       }
     }
   }
@@ -289,7 +338,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
   // ---- Tier 5: Make-only fallback with wider year range ----
   const { data: makeComps } = await supabase
     .from("clean_vehicle_prices")
-    .select("best_price, is_sold, updated_at")
+    .select("year, best_price, is_sold, updated_at, price_source")
     .ilike("make", make)
     .gte("year", year - 10)
     .lte("year", year + 10)
@@ -298,20 +347,102 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
     .limit(200);
 
   if (makeComps && makeComps.length > 0) {
-    const median = recencyWeightedMedian(makeComps);
-    return { basePrice: median, compCount: makeComps.length, method: "make_fallback" };
+    // Make-only is too coarse to trust a class anchor → keep the median even when classed.
+    return { basePrice: recencyWeightedMedian(makeComps, year), compCount: makeComps.length, method: "make_fallback" };
   }
 
   return { basePrice: 0, compCount: 0, method: "none" };
 }
 
-function recencyWeightedMedian(rows: any[]): number {
+// ============================================================================
+// STAGE-2-LITE SIMILARITY — body-style stratification + year proximity
+// (valuation-methodology.md Part II §2.2). Without this, a C-code coupe gets
+// priced against fastback/convertible/Shelby money: the raw first-gen Mustang
+// pool medians ~$42K while the coupe-only slice medians ~$24K (2026-07-07).
+// Body style is a hard mismatch filter (mismatched comps dropped), unknown
+// bodies stay at half weight; year distance becomes a weight per the paper.
+// ============================================================================
+const BODY_TOKEN_CLASSES: [RegExp, string][] = [
+  [/fastback|sportsroof|liftback/i, "FASTBACK"],
+  [/convertible|cabriolet|drophead|roadster|spyder|spider/i, "CONVERTIBLE"],
+  [/coupe|hardtop|notchback/i, "COUPE"],
+  [/wagon|estate/i, "WAGON"],
+  [/pickup|stepside|fleetside/i, "PICKUP"],
+];
+
+function bodyClassFromStrings(...parts: (string | null | undefined)[]): string | null {
+  const hay = parts.filter(Boolean).join(" ");
+  for (const [re, cls] of BODY_TOKEN_CLASSES) if (re.test(hay)) return cls;
+  return null;
+}
+
+function subjectBodyClass(vehicle: any): string | null {
+  if (vehicle.canonical_body_style) return String(vehicle.canonical_body_style).toUpperCase();
+  return bodyClassFromStrings(vehicle.body_style, vehicle.model, vehicle.trim, vehicle.series);
+}
+
+// Comps come from clean_vehicle_prices, which has no body columns — enrich from
+// vehicles in batched .in() queries, fall back to body tokens in the model string.
+async function stratifyByBody(supabase: any, rows: any[], subjectBody: string | null): Promise<{ rows: any[]; stratified: boolean }> {
+  if (!subjectBody || !rows?.length) return { rows: rows || [], stratified: false };
+  const ids = rows.map((r) => r.vehicle_id).filter(Boolean);
+  const bodyById = new Map<string, string | null>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await supabase
+      .from("vehicles")
+      .select("id, canonical_body_style, body_style, model, trim")
+      .in("id", ids.slice(i, i + 200));
+    if (error) console.error("[valuation] body enrich error:", error.message);
+    for (const v of data || []) {
+      const body = v.canonical_body_style
+        ? String(v.canonical_body_style).toUpperCase()
+        : bodyClassFromStrings(v.body_style, v.model, v.trim);
+      bodyById.set(v.id, body);
+    }
+  }
+  const kept = rows
+    .map((r) => {
+      const body = bodyById.get(r.vehicle_id) ?? bodyClassFromStrings(r.model);
+      if (!body) return { ...r, sim_weight: 0.5 }; // unknown body — half weight (§3.5 asymmetry spirit)
+      return body === subjectBody ? { ...r, sim_weight: 1.0 } : null; // hard mismatch → dropped
+    })
+    .filter(Boolean);
+  // Thin-market guard (§2.5): if stratification starves the pool, fall back unstratified.
+  if (kept.length < 3) return { rows: rows.map((r) => ({ ...r, sim_weight: 0.5 })), stratified: false };
+  return { rows: kept, stratified: true };
+}
+
+// Year proximity weight per the paper's similarity table (±1 → 0.8, ±2 → 0.5, ±5 → 0.2).
+function yearProximityWeight(subjectYear: number | null, compYear: number | null): number {
+  if (!subjectYear || !compYear) return 0.5;
+  const d = Math.abs(subjectYear - compYear);
+  if (d === 0) return 1.0;
+  if (d <= 1) return 0.8;
+  if (d <= 2) return 0.5;
+  if (d <= 5) return 0.2;
+  return 0.05;
+}
+
+// Consecration of a price by its TYPE — the field's authority to confer worth.
+// Doctrine: docs/library/intellectual/contemplations/habitus-and-the-exchange.md (Law 2).
+// A consummated sale is the supreme consecratory act; an asking price is an ASK,
+// not a sale, and should not anchor a valuation the way a hammer price does.
+const PRICE_CONSECRATION: Record<string, number> = {
+  sale_price: 1.0, // consummated sale — money moved
+  bat_sold_price: 1.0, // consummated BaT sale
+  winning_bid: 0.9, // auction close
+  high_bid: 0.6, // auction high — not necessarily sold
+  asking_price: 0.35, // a listing is an ask, not a consecration
+  current_value: 0.25, // owner/derived estimate
+};
+
+function recencyWeightedMedian(rows: any[], subjectYear: number | null = null): number {
   const now = Date.now();
   const sixMonths = 180 * 24 * 60 * 60 * 1000;
   const oneYear = 365 * 24 * 60 * 60 * 1000;
   const twoYears = 730 * 24 * 60 * 60 * 1000;
 
-  // Apply recency weights
+  // Apply recency + consecration + similarity weights
   const weighted: { price: number; weight: number }[] = rows.map((r: any) => {
     const age = now - new Date(r.updated_at).getTime();
     let weight = 0.3;
@@ -320,6 +451,11 @@ function recencyWeightedMedian(rows: any[]): number {
     else if (age < twoYears) weight = 0.4;
     // Sold vehicles get a boost
     if (r.is_sold) weight *= 1.2;
+    // Consecration: weight by how much the price TYPE confers worth (sale >> ask)
+    weight *= PRICE_CONSECRATION[r.price_source as string] ?? 0.5;
+    // Stage-2-lite similarity: body match (set upstream) and year proximity
+    weight *= r.sim_weight ?? 1.0;
+    weight *= yearProximityWeight(subjectYear, r.year ?? null);
     return { price: Number(r.best_price), weight };
   });
 
@@ -345,24 +481,28 @@ async function getConditionMultiplier(supabase: any, vehicleId: string): Promise
   multiplier: number;
   sourceCount: number;
 }> {
-  // Check condition_assessments for severity data
-  const { data: assessments } = await supabase
-    .from("condition_assessments")
-    .select("severity, value_impact")
-    .eq("vehicle_id", vehicleId);
+  // Real source: vehicle_condition_scores. (`condition_assessments` was a PHANTOM
+  // table — the query silently returned null, so this signal read as "no data" for
+  // every vehicle.) KEYSTONE: check {error} loudly so a missing relation can never
+  // again masquerade as missing data.
+  //
+  // CRITICAL: condition_score is teardown-INCLUSIVE — built from the as-found/build
+  // photos (rust, oxidation, paint-fading) — so it must NOT penalize a FINISHED
+  // resto-mod. Until build-class-aware scoring lands, record that condition data is
+  // PRESENT (sourceCount) but keep the multiplier NEUTRAL — never a condition-blind cut.
+  const { data: scores, error } = await supabase
+    .from("vehicle_condition_scores")
+    .select("condition_score, observation_count, zone_coverage")
+    .eq("vehicle_id", vehicleId)
+    .limit(1);
 
-  if (!assessments || assessments.length === 0) {
+  if (error) console.error("[valuation] condition query error (vehicle_condition_scores):", error.message);
+  if (!scores || scores.length === 0) {
     return { multiplier: 1.0, sourceCount: 0 };
   }
-
-  // Average severity: 1=minor, 5=critical
-  // More issues and higher severity = lower multiplier
-  const avgSeverity = assessments.reduce((s: number, a: any) => s + (a.severity || 3), 0) / assessments.length;
-  const issueCount = assessments.length;
-
-  // Scale: 0 issues = 1.15x (excellent), many severe = 0.75x
-  let multiplier = 1.15 - (avgSeverity / 5) * 0.4 - Math.min(issueCount, 10) * 0.01;
-  return { multiplier: clamp(multiplier, 0.75, 1.15), sourceCount: assessments.length };
+  // Neutral multiplier on purpose (class-aware scoring TODO); sourceCount proves the
+  // signal is now firing on real data instead of a phantom table.
+  return { multiplier: 1.0, sourceCount: scores[0].observation_count || 0 };
 }
 
 async function getRarityMultiplier(supabase: any, vehicle: any): Promise<{
@@ -555,23 +695,29 @@ async function getOriginalityMultiplier(supabase: any, vehicleId: string): Promi
   multiplier: number;
   sourceCount: number;
 }> {
-  // Check vehicle_condition_profiles or condition assessments for originality signals
-  const { data: profile } = await supabase
-    .from("vehicle_condition_profiles")
-    .select("overall_score")
+  // Real source: vehicle_condition_scores.descriptor_summary. (`vehicle_condition_profiles`
+  // was a PHANTOM table.) KEYSTONE: check {error} loudly.
+  //
+  // CRITICAL: for a RESTO-MOD, modifications are VALUE, not a penalty. The old logic
+  // (less original → lower multiplier) would punish a documented build. Until build-
+  // class-aware scoring lands, record the build-evidence is PRESENT (sourceCount of
+  // mod atoms) but keep the multiplier NEUTRAL — never penalize documented mods.
+  const { data: scores, error } = await supabase
+    .from("vehicle_condition_scores")
+    .select("descriptor_summary")
     .eq("vehicle_id", vehicleId)
     .limit(1);
 
-  if (!profile || profile.length === 0) {
+  if (error) console.error("[valuation] originality query error (vehicle_condition_scores):", error.message);
+  if (!scores || scores.length === 0) {
     return { multiplier: 1.0, sourceCount: 0 };
   }
-
-  const p = profile[0];
-  const score = p.overall_score || 50;
-  // Score 0-100: 100 = perfect original, 0 = heavily modified/damaged
-  // Map to multiplier range 0.90 - 1.12
-  const multiplier = 0.90 + (score / 100) * 0.22;
-  return { multiplier: clamp(multiplier, 0.90, 1.12), sourceCount: 1 };
+  const ds = scores[0].descriptor_summary || {};
+  // Build-evidence atoms: aftermarket / non-original / forced-induction / lifted / restored.
+  const modCount = Object.keys(ds)
+    .filter((k) => /aftermarket|non_original|forced_induction|lifted|restored|modification/.test(k))
+    .reduce((s, k) => s + ((ds[k] && ds[k].count) || 0), 0);
+  return { multiplier: 1.0, sourceCount: modCount };
 }
 
 // ============================================================================
@@ -688,7 +834,7 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
   // Fetch vehicle data
   const { data: vehicle, error: vErr } = await supabase
     .from("vehicles")
-    .select("id, year, make, model, series, trim, vin, mileage, sale_price, asking_price, current_value, sale_status, sale_date, created_at, updated_at, discovery_url, profile_origin")
+    .select("id, year, make, model, series, trim, vin, mileage, body_style, canonical_body_style, sale_price, asking_price, current_value, sale_status, sale_date, created_at, updated_at, discovery_url, profile_origin")
     .eq("id", vehicleId)
     .maybeSingle();
 
@@ -707,13 +853,12 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
     if (vehicle.sale_price && vehicle.sale_price > 0) {
       return { error: "no_independent_comps", vehicleId };
     }
-    // If asking_price exists but no sale_price, allow as low-confidence base
-    const fallbackPrice = vehicle.asking_price || vehicle.current_value;
-    if (fallbackPrice && fallbackPrice > 0) {
-      basePrice = fallbackPrice;
-      compCount = 0;
-      compMethod = "self_price_fallback";
-    }
+    // No independent comps AND no sale price. Do NOT fall back to the vehicle's own
+    // asking_price / current_value: deriving the estimate from the ask is circular — it
+    // produces a fixed asking×~1.8 "estimate" and a meaningless (constant) deal score, which
+    // is exactly the contamination that made the deal output untrustworthy. Leave
+    // nuke_estimate NULL. "Not enough comps to value this" is a truthful, meaningful state.
+    return { error: "no_independent_comps", vehicleId };
   }
 
   if (basePrice <= 0) {

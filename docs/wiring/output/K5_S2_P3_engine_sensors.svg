@@ -171,7 +171,7 @@
 <circle cx="454" cy="220" r="2.5" class="dot"/>
 <circle cx="3437" cy="220" r="2.5" class="dot"/>
 <text x="1727" y="214" class="lbl">CKP  22AWG  BLU/WHT</text>
-<text x="1727" y="236" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="236" class="lbl-sm">4.6 FT  TEFZEL</text>
 <circle cx="3602" cy="220" r="14" class="comp"/>
 <path d="M3594,220 Q3598,214 3602,220 Q3606,226 3610,220" fill="none" stroke="black" stroke-width="1"/>
 <text x="3624" y="218" class="hdr" font-size="11">CRANK POSITION SENSOR</text>
@@ -184,7 +184,7 @@
 <circle cx="454" cy="292" r="2.5" class="dot"/>
 <circle cx="3437" cy="292" r="2.5" class="dot"/>
 <text x="1727" y="286" class="lbl">CMP  22AWG  BLU/BLK</text>
-<text x="1727" y="308" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="308" class="lbl-sm">4.6 FT  TEFZEL</text>
 <circle cx="3602" cy="292" r="14" class="comp"/>
 <path d="M3594,292 Q3598,286 3602,292 Q3606,298 3610,292" fill="none" stroke="black" stroke-width="1"/>
 <text x="3624" y="290" class="hdr" font-size="11">CAM POSITION SENSOR</text>
@@ -197,7 +197,7 @@
 <circle cx="454" cy="364" r="2.5" class="dot"/>
 <circle cx="3437" cy="364" r="2.5" class="dot"/>
 <text x="1727" y="358" class="lbl">KS1  22AWG  GRY</text>
-<text x="1727" y="380" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="380" class="lbl-sm">4.6 FT  TEFZEL</text>
 <circle cx="3602" cy="364" r="14" class="comp"/>
 <text x="3602" y="368" text-anchor="middle" class="hdr" font-size="10">KS</text>
 <text x="3624" y="362" class="hdr" font-size="11">KNOCK SENSOR BANK 1</text>
@@ -210,7 +210,7 @@
 <circle cx="454" cy="436" r="2.5" class="dot"/>
 <circle cx="3437" cy="436" r="2.5" class="dot"/>
 <text x="1727" y="430" class="lbl">KS2  22AWG  GRY/WHT</text>
-<text x="1727" y="452" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="452" class="lbl-sm">4.6 FT  TEFZEL</text>
 <circle cx="3602" cy="436" r="14" class="comp"/>
 <text x="3602" y="440" text-anchor="middle" class="hdr" font-size="10">KS</text>
 <text x="3624" y="434" class="hdr" font-size="11">KNOCK SENSOR BANK 2</text>
@@ -223,7 +223,7 @@
 <circle cx="454" cy="508" r="2.5" class="dot"/>
 <circle cx="3437" cy="508" r="2.5" class="dot"/>
 <text x="1727" y="502" class="lbl">MAP  22AWG  VIO/WHT</text>
-<text x="1727" y="524" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="524" class="lbl-sm">4.6 FT  TEFZEL</text>
 <polygon points="3602,494 3616,508 3602,522 3588,508" class="comp"/>
 <text x="3624" y="506" class="hdr" font-size="11">MAP SENSOR</text>
 <text x="3624" y="520" class="lbl-sm">3-wire  5V/SIG/GND</text>
@@ -235,7 +235,7 @@
 <circle cx="454" cy="580" r="2.5" class="dot"/>
 <circle cx="3437" cy="580" r="2.5" class="dot"/>
 <text x="1727" y="574" class="lbl">IAT  22AWG  TAN</text>
-<text x="1727" y="596" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="596" class="lbl-sm">4.6 FT  TEFZEL</text>
 <polygon points="3602,566 3616,580 3602,594 3588,580" class="comp"/>
 <text x="3624" y="578" class="hdr" font-size="11">INTAKE AIR TEMP</text>
 <text x="3624" y="592" class="lbl-sm">2-wire  SIG/GND</text>
@@ -247,7 +247,7 @@
 <circle cx="454" cy="652" r="2.5" class="dot"/>
 <circle cx="3437" cy="652" r="2.5" class="dot"/>
 <text x="1727" y="646" class="lbl">CLT  22AWG  TAN/WHT</text>
-<text x="1727" y="668" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="668" class="lbl-sm">4.6 FT  TEFZEL</text>
 <polygon points="3602,638 3616,652 3602,666 3588,652" class="comp"/>
 <text x="3624" y="650" class="hdr" font-size="11">COOLANT TEMP SENSOR</text>
 <text x="3624" y="664" class="lbl-sm">2-wire  SIG/GND</text>
@@ -259,7 +259,7 @@
 <circle cx="454" cy="724" r="2.5" class="dot"/>
 <circle cx="3437" cy="724" r="2.5" class="dot"/>
 <text x="1727" y="718" class="lbl">TPS  22AWG  VIO</text>
-<text x="1727" y="740" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="740" class="lbl-sm">4.6 FT  TEFZEL</text>
 <polygon points="3602,710 3616,724 3602,738 3588,724" class="comp"/>
 <text x="3624" y="722" class="hdr" font-size="11">THROTTLE POSITION</text>
 <text x="3624" y="736" class="lbl-sm">INTEGRAL TO ETB</text>
@@ -271,7 +271,7 @@
 <circle cx="454" cy="796" r="2.5" class="dot"/>
 <circle cx="3437" cy="796" r="2.5" class="dot"/>
 <text x="1727" y="790" class="lbl">FPS  22AWG  VIO/BLK</text>
-<text x="1727" y="812" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="812" class="lbl-sm">4.6 FT  TEFZEL</text>
 <polygon points="3602,782 3616,796 3602,810 3588,796" class="comp"/>
 <text x="3624" y="794" class="hdr" font-size="11">FUEL PRESSURE SENSOR</text>
 <text x="3624" y="808" class="lbl-sm">3-wire  5V/SIG/GND</text>
@@ -283,7 +283,7 @@
 <circle cx="454" cy="868" r="2.5" class="dot"/>
 <circle cx="3437" cy="868" r="2.5" class="dot"/>
 <text x="1727" y="862" class="lbl">OPS  22AWG  VIO/RED</text>
-<text x="1727" y="884" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="884" class="lbl-sm">4.6 FT  TEFZEL</text>
 <polygon points="3602,854 3616,868 3602,882 3588,868" class="comp"/>
 <text x="3624" y="866" class="hdr" font-size="11">OIL PRESSURE SENSOR</text>
 <text x="3624" y="880" class="lbl-sm">3-wire  12674513</text>
@@ -295,7 +295,7 @@
 <circle cx="454" cy="940" r="2.5" class="dot"/>
 <circle cx="3437" cy="940" r="2.5" class="dot"/>
 <text x="1727" y="934" class="lbl">OTS  22AWG  TAN/BLK</text>
-<text x="1727" y="956" class="lbl-sm">4.6 FT  TXL</text>
+<text x="1727" y="956" class="lbl-sm">4.6 FT  TEFZEL</text>
 <polygon points="3602,926 3616,940 3602,954 3588,940" class="comp"/>
 <text x="3624" y="938" class="hdr" font-size="11">OIL TEMP SENSOR</text>
 <text x="3624" y="952" class="lbl-sm">2-wire  SIG/GND</text>

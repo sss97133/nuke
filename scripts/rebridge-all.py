@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """Re-bridge all vehicles from vehicle_condition_scores that haven't been bridged yet."""
 
 import sys, os, socket, time
@@ -21,7 +22,7 @@ socket.setdefaulttimeout(None)
 DB_PARAMS = dict(
     host=HOST, port=6543, dbname='postgres',
     user='postgres.qkgaybvrernstplzjaam',
-    password='${SUPABASE_DB_PASSWORD}',
+    password=f"{os.environ['SUPABASE_DB_PASSWORD']}",
     connect_timeout=10,
 )
 
