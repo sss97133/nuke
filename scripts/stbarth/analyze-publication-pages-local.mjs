@@ -217,9 +217,25 @@ async function analyzePage(page) {
       );
     }
 
+    // spatial_tags holds the model's VERBATIM output, including its own
+    // page_type claim — that is vision testimony and is never overwritten.
+    // But it is a second copy of a field the column also carries, and a stale
+    // copy silently misleads anyone who queries the blob (it read 1,122
+    // "cover" while the adjudicated column read 63). Carry the adjudication
+    // alongside the raw claim so the blob can't be mistaken for the verdict.
+    // The verdict for page_type is the COLUMN; no consumer reads
+    // spatial_tags.page_type for classification (verified 2026-07-19 across
+    // the mag analysis/pages routes and the enrich/crop scripts).
+    const spatialTags = {
+      ...parsed,
+      page_type_adjudicated: pageType,
+      page_type_raw_vision_claim: visionType,
+      page_type_decided_by: 'publication_pages.page_type column (printed spine outranks vision)',
+    };
+
     // Write results
     await supabase.from('publication_pages').update({
-      spatial_tags: parsed,
+      spatial_tags: spatialTags,
       ai_scan_metadata: {
         model: MODEL, duration_ms: duration, cost_usd: 0, local: !IS_CLOUD, cloud_gpu: IS_CLOUD,
         page_type_source: page.spine_page_type ? 'printed_spine' : 'vision',
