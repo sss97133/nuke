@@ -1,7 +1,7 @@
 # Privacy Policy — NUKE Platform
 
 **Effective Date:** January 25, 2026
-**Last Updated:** January 25, 2026
+**Last Updated:** July 19, 2026
 
 ---
 
@@ -197,6 +197,17 @@ United States
 
 **Data Protection Inquiries:** privacy@nuke.ag
 **Response Time:** Within 30 days of verified request
+
+---
+
+## 14. Connected Social Accounts (Instagram)
+
+Organizations featured on the Platform may connect their own Instagram professional account through Meta's Instagram API so their profile can display their feed.
+
+- **What we receive:** With the account owner's authorization (scope: instagram_business_basic), we receive the account's basic profile (username, account id, account type) and its media (images, video thumbnails, captions, permalinks, timestamps).
+- **How we store it:** Access tokens are stored encrypted in a secrets vault, never in application tables. Media metadata and copies of media files are cached on our infrastructure so the connected profile loads reliably; every displayed post links back to its original Instagram permalink.
+- **Deletion:** Posts deleted on Instagram are detected on sync, and the cached media file and caption are permanently purged. Disconnecting the account — from our side, or by removing the app in Instagram settings (Meta's deauthorize callback) — revokes the stored token and permanently deletes all cached media and metadata for that account. Meta data-deletion requests receive a confirmation code and a status URL; visiting that URL (this page with your confirmation code) shows the current status of your request.
+- **No third-party sharing:** Connected-account data is displayed only on the connected organization's own profile and is never sold or shared with third parties.
 
 ---
 
