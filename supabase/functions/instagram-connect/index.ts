@@ -6,6 +6,7 @@
  *   GET  /callback                 Meta redirect: code -> long-lived token -> Vault -> connection row
  *   POST /deauth                   Meta deauthorize webhook (signed_request) -> revoke + purge
  *   POST /data-deletion            Meta data-deletion webhook -> revoke + purge + confirmation code
+ *   GET  /deletion-status?code=    public: human-readable status for nuke.ag/privacy#ig-deletion-<code>
  *   POST /sync                     cron/service: refresh due feeds into org_instagram_media + mirror binaries
  *
  * Substrate: concierge_partner_connections (channel='instagram', token in Vault via credential_secret_id),
@@ -220,10 +221,28 @@ Deno.serve(async (req) => {
         .eq('consent->>ig_user_id', igUserId);
       for (const c of conns ?? []) await revokeConnection(db, c);
 
+      // receipt so the status URL has something to look up; revoke+purge already completed above
+      const { error: receiptErr } = await db.from('instagram_deletion_requests').insert({
+        confirmation_code: confirmation, ig_user_id: igUserId, route: route.slice(1),
+        connections_revoked: (conns ?? []).length,
+      });
+      if (receiptErr) console.error('deletion receipt insert', receiptErr);
+
       if (route === '/data-deletion') {
         return json({ url: `https://nuke.ag/privacy#ig-deletion-${confirmation}`, confirmation_code: confirmation });
       }
       return json({ ok: true });
+    }
+
+    // ---- GET /deletion-status?code= ---- (public; Meta requires the returned URL to show request status)
+    if (route === '/deletion-status' && req.method === 'GET') {
+      const code = url.searchParams.get('code') ?? '';
+      if (!/^[0-9a-f]{4,36}$/i.test(code)) return json({ found: false });
+      const { data: receipt } = await db.from('instagram_deletion_requests')
+        .select('confirmation_code, connections_revoked, requested_at')
+        .eq('confirmation_code', code).maybeSingle();
+      if (!receipt) return json({ found: false });
+      return json({ found: true, status: 'completed', ...receipt });
     }
 
     // ---- POST /revoke ---- (operator disconnect from our side; service only)
