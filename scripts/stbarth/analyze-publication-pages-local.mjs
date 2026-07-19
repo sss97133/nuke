@@ -72,9 +72,20 @@ const VISION_PROMPT = `Analyze this magazine/publication page image. Return ONLY
   "businesses": [{"name": "str", "business_type": "hotel|restaurant|boutique|gallery|spa|real_estate|yacht_charter|other", "phone": "str or null", "website": "str or null"}],
   "properties": [{"name": "str", "type": "villa|hotel|estate|condo|land|restaurant", "features": ["str"]}],
   "artworks": [{"title": "str or null", "artist": "str or null", "medium": "str or null"}],
-  "raw_text": "ALL visible text on the page, verbatim",
+  "raw_text": "<transcribe here>",
   "confidence": 0.0-1.0
 }
+
+RULES:
+- "raw_text": transcribe every word you can actually SEE on the page, verbatim. Never
+  copy this instruction or the placeholder text into the value. If the page carries no
+  legible text at all, use "".
+- "page_type": "cover" means the FRONT COVER of the magazine — the outermost page
+  carrying the masthead and cover lines. It is almost never any page past the first
+  few. A full-bleed photograph with a logo or wordmark on it is NOT a cover: if it
+  sells a product it is "advertisement", if it belongs to a feature it is
+  "editorial" or "photo_spread". Do not use "cover" as a fallback for a page you
+  find hard to read — use "other".
 
 Use empty arrays [] when no entities of that type are found. Return ONLY the JSON object.`;
 
@@ -148,6 +159,31 @@ function parseJson(text) {
 }
 
 // ---------------------------------------------------------------------------
+// Placeholder guard — the 7B VLM echoes the prompt's own schema wording back
+// ("ALL visible text on the page, verbatim", "str", "str or null") instead of
+// reading the page. Landing those as extracted_text fabricates content: 638
+// L'Officiel pages carried the literal placeholder string as their "text"
+// before this guard existed (measured 2026-07-19). Treat an echo as a failed
+// read, not as content.
+// ---------------------------------------------------------------------------
+const TEXT_PLACEHOLDERS = new Set([
+  'all visible text on the page, verbatim',
+  'str', 'str or null', 'string', 'null', 'none', 'n/a', 'na',
+]);
+// The echo also shows up appended to genuine text (measured: stbarth-22 p3
+// returned real cover text with the placeholder line glued on the end), so
+// strip it line-wise rather than only rejecting whole-string matches.
+function cleanRawText(v) {
+  if (typeof v !== 'string') return null;
+  const kept = v
+    .split('\n')
+    .filter(line => !TEXT_PLACEHOLDERS.has(line.trim().toLowerCase()))
+    .join('\n')
+    .trim();
+  return kept || null;
+}
+
+// ---------------------------------------------------------------------------
 // Analyze one page
 // ---------------------------------------------------------------------------
 async function analyzePage(page) {
@@ -164,12 +200,34 @@ async function analyzePage(page) {
       throw new Error('JSON parse failed');
     }
 
+    // A read that yielded neither text nor a classification is a FAILED read,
+    // not a completed one. Reporting it 'completed' is what made ~10% of the
+    // L'Officiel corpus silently empty AND invisible to this worker forever
+    // (the queue only selects ai_processing_status='pending'). Route it down
+    // the failure path so it stays retryable and legible.
+    const rawText = cleanRawText(parsed.raw_text);
+    const visionType = cleanRawText(parsed.page_type);
+    // Printed spine outranks vision where it speaks.
+    const pageType = page.spine_page_type || visionType;
+    if (!rawText && !pageType) {
+      throw new Error(
+        cleanRawText(parsed.raw_text) === null && typeof parsed.raw_text === 'string' && parsed.raw_text.trim()
+          ? 'Empty read: model echoed prompt placeholder instead of page text'
+          : 'Empty read: model returned no raw_text and no page_type'
+      );
+    }
+
     // Write results
     await supabase.from('publication_pages').update({
       spatial_tags: parsed,
-      ai_scan_metadata: { model: MODEL, duration_ms: duration, cost_usd: 0, local: !IS_CLOUD, cloud_gpu: IS_CLOUD },
-      extracted_text: parsed.raw_text || null,
-      page_type: parsed.page_type || null,
+      ai_scan_metadata: {
+        model: MODEL, duration_ms: duration, cost_usd: 0, local: !IS_CLOUD, cloud_gpu: IS_CLOUD,
+        page_type_source: page.spine_page_type ? 'printed_spine' : 'vision',
+        ...(page.spine_page_type && visionType && page.spine_page_type !== visionType
+          ? { vision_page_type_overridden: visionType } : {}),
+      },
+      extracted_text: rawText,
+      page_type: pageType,
       extraction_confidence: parsed.confidence || null,
       analysis_model: IS_CLOUD ? `modal/${MODEL}` : `ollama/${MODEL}`,
       analysis_cost: 0,
@@ -223,6 +281,41 @@ async function processPool(pages, concurrency) {
 }
 
 // ---------------------------------------------------------------------------
+// Printed-spine page kinds (mag_spine_page_kinds, phash-keyed) → page_type.
+// Sets page.spine_page_type; silent spine leaves it undefined so vision applies.
+// ---------------------------------------------------------------------------
+const SPINE_KIND_TO_PAGE_TYPE = {
+  ad: 'advertisement',
+  story: 'editorial',
+  edito: 'editorial',
+  toc: 'table_of_contents',
+  cover: 'cover',
+};
+
+async function attachSpineKinds(pages) {
+  const byHash = new Map();
+  for (const p of pages) {
+    if (!p.phash) continue;
+    if (!byHash.has(p.phash)) byHash.set(p.phash, []);
+    byHash.get(p.phash).push(p);
+  }
+  const hashes = [...byHash.keys()];
+  for (let i = 0; i < hashes.length; i += 200) {
+    const { data, error } = await supabase
+      .from('mag_spine_page_kinds').select('vphash, kind').in('vphash', hashes.slice(i, i + 200));
+    if (error) {
+      console.log(`  [warn] spine lookup failed (${error.message}) — vision page_type applies`);
+      return;
+    }
+    for (const row of (data || [])) {
+      const mapped = SPINE_KIND_TO_PAGE_TYPE[row.kind];
+      if (!mapped) continue;
+      for (const p of (byHash.get(row.vphash) || [])) p.spine_page_type = mapped;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
@@ -260,7 +353,7 @@ async function main() {
   // Query pending pages
   let q = supabase
     .from('publication_pages')
-    .select('id, page_number, image_url, attempts, publications!inner(title, publisher_slug, page_count)')
+    .select('id, page_number, image_url, attempts, phash, publications!inner(title, publisher_slug, page_count)')
     .eq('ai_processing_status', 'pending')
     .is('locked_by', null)
     .lt('attempts', 3)
@@ -274,12 +367,21 @@ async function main() {
 
   const pages = (data || []).map(r => ({
     id: r.id, page_number: r.page_number, image_url: r.image_url, attempts: r.attempts,
+    phash: r.phash,
     pub_title: r.publications.title, publisher_slug: r.publications.publisher_slug,
     page_count: r.publications.page_count,
   }));
 
   if (!pages.length) { console.log('No pending pages.'); return; }
   console.log(`Found ${pages.length} pending pages.\n`);
+
+  // Attach the printed story spine's page kind. The spine is a HIGHER trust tier
+  // than vision (printed > vision, docs/ANALYSIS_SPEC.md), and vision is measurably
+  // bad at this field: it labelled 1,071 L'Officiel pages "cover" (~26/issue) where
+  // the spine said 826 story / 184 ad / 39 cover. Where the spine speaks, it wins.
+  await attachSpineKinds(pages);
+  const spined = pages.filter(p => p.spine_page_type).length;
+  console.log(`Spine kinds attached to ${spined}/${pages.length} pages (spine outranks vision page_type).\n`);
 
   // Lock pages
   const workerName = `ollama-worker-${process.pid}`;
