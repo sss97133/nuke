@@ -137,7 +137,11 @@ import {
 import { observe } from './observe.mjs';
 
 let _db = null;
-const db = () => (_db ??= createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY));
+// X-Nuke-Writer: every write this gate makes leaves a write_receipts row naming
+// this path (migration 20260721000000). Undeclared writes stand out on v_write_pulse.
+const db = () => (_db ??= createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+  global: { headers: { 'X-Nuke-Writer': 'scripts/entity/write.mjs' } },
+}));
 
 // ════════════════════════════════════════════════════════════════════════════
 // WHERE A REFUSED-BUT-PRESERVED VALUE LANDS
