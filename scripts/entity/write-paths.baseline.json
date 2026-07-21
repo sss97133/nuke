@@ -1,0 +1,1263 @@
+{
+  "generated_at": "2026-07-20T18:12:52.600Z",
+  "note": "Doors that existed when the census was taken. audit-write-paths.mjs fails on any door NOT listed here. Edit `status` and `note` by hand; regenerate with --update-baseline.",
+  "served_columns": {
+    "organizations": [
+      "address",
+      "asking_price",
+      "banner_url",
+      "business_name",
+      "business_type",
+      "city",
+      "country",
+      "description",
+      "email",
+      "entity_type",
+      "hourly_rate_max",
+      "hourly_rate_min",
+      "hours_of_operation",
+      "latitude",
+      "logo_url",
+      "longitude",
+      "name",
+      "org_type",
+      "phone",
+      "services_offered",
+      "slug",
+      "social_links",
+      "specializations",
+      "state",
+      "verification_level",
+      "website",
+      "zip_code"
+    ],
+    "properties": [
+      "amenities",
+      "base_price",
+      "bathrooms",
+      "bedrooms",
+      "city",
+      "country",
+      "description",
+      "images",
+      "latitude",
+      "longitude",
+      "max_guests",
+      "name",
+      "price_currency",
+      "price_period",
+      "primary_image_url",
+      "region",
+      "sale_price",
+      "sale_price_currency",
+      "slug",
+      "status"
+    ],
+    "concierge_products": [
+      "availability",
+      "brand",
+      "category",
+      "currency",
+      "description",
+      "image_url",
+      "images",
+      "name",
+      "price",
+      "price_unit",
+      "slug",
+      "url"
+    ]
+  },
+  "entries": {
+    "database/migrations/20260217_seed_gw_ecosystem.sql|organizations|sql-insert|business_name,business_type,city,country,description,email,enrichment_sources,enrichment_status,entity_type,last_enriched_at,metadata,phone,slug,social_links,state,website": {
+      "file": "database/migrations/20260217_seed_gw_ecosystem.sql",
+      "line": 12,
+      "table": "organizations",
+      "kind": "sql-insert",
+      "columns": [
+        "business_name",
+        "business_type",
+        "city",
+        "country",
+        "description",
+        "email",
+        "enrichment_sources",
+        "enrichment_status",
+        "entity_type",
+        "last_enriched_at",
+        "metadata",
+        "phone",
+        "slug",
+        "social_links",
+        "state",
+        "website"
+      ],
+      "served_columns": [
+        "business_name",
+        "business_type",
+        "city",
+        "country",
+        "description",
+        "email",
+        "entity_type",
+        "phone",
+        "slug",
+        "social_links",
+        "state",
+        "website"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": "historical migration, already applied; kept for the record. Not a door a new write can use."
+    },
+    "database/migrations/20260217_seed_gw_ecosystem.sql|organizations|sql-insert|address,business_name,business_type,city,country,description,email,enrichment_sources,enrichment_status,entity_type,last_enriched_at,metadata,phone,slug,social_links,state,website": {
+      "file": "database/migrations/20260217_seed_gw_ecosystem.sql",
+      "line": 112,
+      "table": "organizations",
+      "kind": "sql-insert",
+      "columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "country",
+        "description",
+        "email",
+        "enrichment_sources",
+        "enrichment_status",
+        "entity_type",
+        "last_enriched_at",
+        "metadata",
+        "phone",
+        "slug",
+        "social_links",
+        "state",
+        "website"
+      ],
+      "served_columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "country",
+        "description",
+        "email",
+        "entity_type",
+        "phone",
+        "slug",
+        "social_links",
+        "state",
+        "website"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": "historical migration, already applied; kept for the record. Not a door a new write can use."
+    },
+    "database/migrations/20260217_seed_gw_ecosystem.sql|organizations|sql-insert|business_name,business_type,city,country,description,enrichment_status,entity_type,slug,state,website": {
+      "file": "database/migrations/20260217_seed_gw_ecosystem.sql",
+      "line": 244,
+      "table": "organizations",
+      "kind": "sql-insert",
+      "columns": [
+        "business_name",
+        "business_type",
+        "city",
+        "country",
+        "description",
+        "enrichment_status",
+        "entity_type",
+        "slug",
+        "state",
+        "website"
+      ],
+      "served_columns": [
+        "business_name",
+        "business_type",
+        "city",
+        "country",
+        "description",
+        "entity_type",
+        "slug",
+        "state",
+        "website"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": "historical migration, already applied; kept for the record. Not a door a new write can use."
+    },
+    "lofficiel-concierge:scripts/ingest_field_survey.py|organizations|rest-patch|latitude,longitude": {
+      "file": "lofficiel-concierge:scripts/ingest_field_survey.py",
+      "line": 506,
+      "table": "organizations",
+      "kind": "rest-patch",
+      "columns": [
+        "latitude",
+        "longitude"
+      ],
+      "served_columns": [
+        "latitude",
+        "longitude"
+      ],
+      "live": [
+        "referenced by a package.json script or shell runner"
+      ],
+      "status": "live-ungated",
+      "note": "LIVE via scripts/field_walk_watch.sh. PATCHes latitude/longitude from a field survey — the highest-trust coordinate source there is, and still unchecked: nothing asserts the point lands on St Barth. This is the Dordogne defect class with a human hand on it."
+    },
+    "lofficiel-concierge:scripts/mirror_org_marks.mjs|organizations|rest-patch|logo_url": {
+      "file": "lofficiel-concierge:scripts/mirror_org_marks.mjs",
+      "line": 419,
+      "table": "organizations",
+      "kind": "rest-patch",
+      "columns": [
+        "logo_url"
+      ],
+      "served_columns": [
+        "logo_url"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "lofficiel-concierge:src/app/api/studio/place/route.ts|organizations|update|latitude,longitude": {
+      "file": "lofficiel-concierge:src/app/api/studio/place/route.ts",
+      "line": 60,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "latitude",
+        "longitude"
+      ],
+      "served_columns": [
+        "latitude",
+        "longitude"
+      ],
+      "live": [
+        "application code (served on request)"
+      ],
+      "status": "live-ungated",
+      "note": "LIVE Next.js API route — an owner manual reposition writes latitude/longitude on request. Highest-trust source, zero validation. Same exposure as the field survey, but reachable from a browser."
+    },
+    "scripts/concierge/audit-discovered-socials.mjs|organizations|update|links,metadata,social_links": {
+      "file": "scripts/concierge/audit-discovered-socials.mjs",
+      "line": 140,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "links",
+        "metadata",
+        "social_links"
+      ],
+      "served_columns": [
+        "social_links"
+      ],
+      "live": [],
+      "status": "quarantine",
+      "note": "repair/quarantine script — HOLDS a value back from the surface or records a defect. The write is the remedy, not the assertion."
+    },
+    "scripts/concierge/audit-discovered-websites.mjs|organizations|update|metadata,website": {
+      "file": "scripts/concierge/audit-discovered-websites.mjs",
+      "line": 96,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "metadata",
+        "website"
+      ],
+      "served_columns": [
+        "website"
+      ],
+      "live": [],
+      "status": "quarantine",
+      "note": "repair/quarantine script — HOLDS a value back from the surface or records a defect. The write is the remedy, not the assertion."
+    },
+    "scripts/concierge/audit-discovered-websites.mjs|organizations|update|keep,metadata,social_links": {
+      "file": "scripts/concierge/audit-discovered-websites.mjs",
+      "line": 123,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "keep",
+        "metadata",
+        "social_links"
+      ],
+      "served_columns": [
+        "social_links"
+      ],
+      "live": [],
+      "status": "quarantine",
+      "note": "repair/quarantine script — HOLDS a value back from the surface or records a defect. The write is the remedy, not the assertion."
+    },
+    "scripts/concierge/clean-org-defects.mjs|organizations|update|<unresolved>": {
+      "file": "scripts/concierge/clean-org-defects.mjs",
+      "line": 119,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "<unresolved>"
+      ],
+      "served_columns": [],
+      "live": [],
+      "status": "quarantine",
+      "note": "repair/quarantine script — HOLDS a value back from the surface or records a defect. The write is the remedy, not the assertion."
+    },
+    "scripts/concierge/discover-org-websites.mjs|organizations|update|enrichment_sources,enrichment_status,last_enriched_at,metadata,social_links,website": {
+      "file": "scripts/concierge/discover-org-websites.mjs",
+      "line": 420,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "enrichment_sources",
+        "enrichment_status",
+        "last_enriched_at",
+        "metadata",
+        "social_links",
+        "website"
+      ],
+      "served_columns": [
+        "social_links",
+        "website"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "scripts/concierge/fix-eden-rock-geo.mjs|organizations|update|latitude,longitude": {
+      "file": "scripts/concierge/fix-eden-rock-geo.mjs",
+      "line": 40,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "latitude",
+        "longitude"
+      ],
+      "served_columns": [
+        "latitude",
+        "longitude"
+      ],
+      "live": [],
+      "status": "quarantine",
+      "note": "repair/quarantine script — HOLDS a value back from the surface or records a defect. The write is the remedy, not the assertion."
+    },
+    "scripts/concierge/migrate-villas-to-properties.ts|properties|update|base_price,city,country,description,discovered_via,external_id,latitude,listing_type,longitude,metadata,name,owner_org_id,price_currency,price_period,property_type,property_type_id,region,sale,sale_price,search_keywords,slug,source_url,specs,tagline": {
+      "file": "scripts/concierge/migrate-villas-to-properties.ts",
+      "line": 145,
+      "table": "properties",
+      "kind": "update",
+      "columns": [
+        "base_price",
+        "city",
+        "country",
+        "description",
+        "discovered_via",
+        "external_id",
+        "latitude",
+        "listing_type",
+        "longitude",
+        "metadata",
+        "name",
+        "owner_org_id",
+        "price_currency",
+        "price_period",
+        "property_type",
+        "property_type_id",
+        "region",
+        "sale",
+        "sale_price",
+        "search_keywords",
+        "slug",
+        "source_url",
+        "specs",
+        "tagline"
+      ],
+      "served_columns": [
+        "base_price",
+        "city",
+        "country",
+        "description",
+        "latitude",
+        "longitude",
+        "name",
+        "price_currency",
+        "price_period",
+        "region",
+        "sale_price",
+        "slug"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "scripts/concierge/migrate-villas-to-properties.ts|properties|insert|base_price,city,country,description,discovered_via,external_id,latitude,listing_type,longitude,metadata,name,owner_org_id,price_currency,price_period,property_type,property_type_id,region,sale,sale_price,search_keywords,slug,source_url,specs,tagline": {
+      "file": "scripts/concierge/migrate-villas-to-properties.ts",
+      "line": 156,
+      "table": "properties",
+      "kind": "insert",
+      "columns": [
+        "base_price",
+        "city",
+        "country",
+        "description",
+        "discovered_via",
+        "external_id",
+        "latitude",
+        "listing_type",
+        "longitude",
+        "metadata",
+        "name",
+        "owner_org_id",
+        "price_currency",
+        "price_period",
+        "property_type",
+        "property_type_id",
+        "region",
+        "sale",
+        "sale_price",
+        "search_keywords",
+        "slug",
+        "source_url",
+        "specs",
+        "tagline"
+      ],
+      "served_columns": [
+        "base_price",
+        "city",
+        "country",
+        "description",
+        "latitude",
+        "longitude",
+        "name",
+        "price_currency",
+        "price_period",
+        "region",
+        "sale_price",
+        "slug"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "scripts/concierge/migrate-villas-to-properties.ts|properties|upsert|base_price,city,country,description,discovered_via,external_id,latitude,listing_type,longitude,metadata,name,owner_org_id,price_currency,price_period,property_type,property_type_id,region,sale,sale_price,search_keywords,slug,source_url,specs,tagline": {
+      "file": "scripts/concierge/migrate-villas-to-properties.ts",
+      "line": 169,
+      "table": "properties",
+      "kind": "upsert",
+      "columns": [
+        "base_price",
+        "city",
+        "country",
+        "description",
+        "discovered_via",
+        "external_id",
+        "latitude",
+        "listing_type",
+        "longitude",
+        "metadata",
+        "name",
+        "owner_org_id",
+        "price_currency",
+        "price_period",
+        "property_type",
+        "property_type_id",
+        "region",
+        "sale",
+        "sale_price",
+        "search_keywords",
+        "slug",
+        "source_url",
+        "specs",
+        "tagline"
+      ],
+      "served_columns": [
+        "base_price",
+        "city",
+        "country",
+        "description",
+        "latitude",
+        "longitude",
+        "name",
+        "price_currency",
+        "price_period",
+        "region",
+        "sale_price",
+        "slug"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "scripts/concierge/probe-org-catalogs.mjs|concierge_products|insert|<unresolved>": {
+      "file": "scripts/concierge/probe-org-catalogs.mjs",
+      "line": 414,
+      "table": "concierge_products",
+      "kind": "insert",
+      "columns": [
+        "<unresolved>"
+      ],
+      "served_columns": [],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "scripts/concierge/promote-villa-listings.mjs|organizations|update|description,metadata": {
+      "file": "scripts/concierge/promote-villa-listings.mjs",
+      "line": 56,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "description",
+        "metadata"
+      ],
+      "served_columns": [
+        "description"
+      ],
+      "live": [
+        "referenced by a package.json script or shell runner"
+      ],
+      "status": "live-ungated",
+      "note": "LIVE (npm concierge:promote-villa-listings). Writes organizations.description from villa-listing metadata, first-write-only (guarded by !o.description). A generated tagline landing in a served prose column with no gate."
+    },
+    "scripts/concierge/quarantine-elan-prices.mjs|properties|update|base_price": {
+      "file": "scripts/concierge/quarantine-elan-prices.mjs",
+      "line": 37,
+      "table": "properties",
+      "kind": "update",
+      "columns": [
+        "base_price"
+      ],
+      "served_columns": [
+        "base_price"
+      ],
+      "live": [],
+      "status": "quarantine",
+      "note": "repair/quarantine script — HOLDS a value back from the surface or records a defect. The write is the remedy, not the assertion."
+    },
+    "scripts/concierge/regeocode-centroid-pins.mjs|organizations|update|latitude,longitude": {
+      "file": "scripts/concierge/regeocode-centroid-pins.mjs",
+      "line": 123,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "latitude",
+        "longitude"
+      ],
+      "served_columns": [
+        "latitude",
+        "longitude"
+      ],
+      "live": [],
+      "status": "quarantine",
+      "note": "repair/quarantine script — HOLDS a value back from the surface or records a defect. The write is the remedy, not the assertion."
+    },
+    "scripts/concierge/regeocode-centroid-pins.mjs|organizations|update|<unresolved>": {
+      "file": "scripts/concierge/regeocode-centroid-pins.mjs",
+      "line": 136,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "<unresolved>"
+      ],
+      "served_columns": [],
+      "live": [],
+      "status": "quarantine",
+      "note": "repair/quarantine script — HOLDS a value back from the surface or records a defect. The write is the remedy, not the assertion."
+    },
+    "scripts/concierge/repair-blank-marks.mjs|organizations|update|logo_url": {
+      "file": "scripts/concierge/repair-blank-marks.mjs",
+      "line": 78,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "logo_url"
+      ],
+      "served_columns": [
+        "logo_url"
+      ],
+      "live": [],
+      "status": "quarantine",
+      "note": "repair/quarantine script — HOLDS a value back from the surface or records a defect. The write is the remedy, not the assertion."
+    },
+    "scripts/concierge/repair-blank-marks.mjs|organizations|update|<unresolved>": {
+      "file": "scripts/concierge/repair-blank-marks.mjs",
+      "line": 102,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "<unresolved>"
+      ],
+      "served_columns": [],
+      "live": [],
+      "status": "quarantine",
+      "note": "repair/quarantine script — HOLDS a value back from the surface or records a defect. The write is the remedy, not the assertion."
+    },
+    "scripts/create-forum-orgs.js|organizations|insert|description,discovered_via,is_active,name,slug,source_url,specialties,type,website": {
+      "file": "scripts/create-forum-orgs.js",
+      "line": 40,
+      "table": "organizations",
+      "kind": "insert",
+      "columns": [
+        "description",
+        "discovered_via",
+        "is_active",
+        "name",
+        "slug",
+        "source_url",
+        "specialties",
+        "type",
+        "website"
+      ],
+      "served_columns": [
+        "description",
+        "name",
+        "slug",
+        "website"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "scripts/import-ksl-single.js|organizations|insert|address,is_public,metadata,name,slug,type": {
+      "file": "scripts/import-ksl-single.js",
+      "line": 124,
+      "table": "organizations",
+      "kind": "insert",
+      "columns": [
+        "address",
+        "is_public",
+        "metadata",
+        "name",
+        "slug",
+        "type"
+      ],
+      "served_columns": [
+        "address",
+        "name",
+        "slug"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "scripts/load-perplexity-orgs.ts|organizations|insert|<unresolved>": {
+      "file": "scripts/load-perplexity-orgs.ts",
+      "line": 91,
+      "table": "organizations",
+      "kind": "insert",
+      "columns": [
+        "<unresolved>"
+      ],
+      "served_columns": [],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "scripts/load-perplexity-orgs.ts|organizations|update|business_type,enrichment_status,entity_type": {
+      "file": "scripts/load-perplexity-orgs.ts",
+      "line": 121,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "business_type",
+        "enrichment_status",
+        "entity_type"
+      ],
+      "served_columns": [
+        "business_type",
+        "entity_type"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "scripts/load-perplexity-orgs.ts|organizations|update|city,country,description,enrichment_sources,enrichment_status,entity_type,last_enriched_at,metadata,sl,social_links,state,website": {
+      "file": "scripts/load-perplexity-orgs.ts",
+      "line": 280,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "city",
+        "country",
+        "description",
+        "enrichment_sources",
+        "enrichment_status",
+        "entity_type",
+        "last_enriched_at",
+        "metadata",
+        "sl",
+        "social_links",
+        "state",
+        "website"
+      ],
+      "served_columns": [
+        "city",
+        "country",
+        "description",
+        "entity_type",
+        "social_links",
+        "state",
+        "website"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "scripts/seed-more-forums-and-orgs.js|organizations|insert|description,metadata,name,org_type,slug,website_url": {
+      "file": "scripts/seed-more-forums-and-orgs.js",
+      "line": 127,
+      "table": "organizations",
+      "kind": "insert",
+      "columns": [
+        "description",
+        "metadata",
+        "name",
+        "org_type",
+        "slug",
+        "website_url"
+      ],
+      "served_columns": [
+        "description",
+        "name",
+        "org_type",
+        "slug"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "scripts/sonar-enrich-batch.mjs|organizations|update|<unresolved>": {
+      "file": "scripts/sonar-enrich-batch.mjs",
+      "line": 110,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "<unresolved>"
+      ],
+      "served_columns": [],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "scripts/sonar-enrich-org.mjs|organizations|update|<spread>": {
+      "file": "scripts/sonar-enrich-org.mjs",
+      "line": 204,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "<spread>"
+      ],
+      "served_columns": [],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "scripts/sonar-enrich-org.mjs|organizations|insert|is_active,is_public,status": {
+      "file": "scripts/sonar-enrich-org.mjs",
+      "line": 210,
+      "table": "organizations",
+      "kind": "insert",
+      "columns": [
+        "is_active",
+        "is_public",
+        "status"
+      ],
+      "served_columns": [],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "scripts/stbarth/seed-publishers.mjs|organizations|upsert|<unresolved>": {
+      "file": "scripts/stbarth/seed-publishers.mjs",
+      "line": 74,
+      "table": "organizations",
+      "kind": "upsert",
+      "columns": [
+        "<unresolved>"
+      ],
+      "served_columns": [],
+      "live": [],
+      "status": "one-off",
+      "note": ""
+    },
+    "supabase/functions/classify-organization-type/index.ts|organizations|update|entity_type": {
+      "file": "supabase/functions/classify-organization-type/index.ts",
+      "line": 276,
+      "table": "organizations",
+      "kind": "update",
+      "columns": [
+        "entity_type"
+      ],
+      "served_columns": [
+        "entity_type"
+      ],
+      "live": [
+        "deployed edge function"
+      ],
+      "status": "live-ungated",
+      "note": "DEPLOYED edge function. Writes organizations.entity_type from a model classification. Wrong entity_type is how MEDIFLIGHT (St Barth) ends up filed next to Mediflight Of Oklahoma."
+    },
+    "supabase/functions/extract-gaa-classics/index.ts|organizations|insert|location,metadata,name,org_type,slug,website_url": {
+      "file": "supabase/functions/extract-gaa-classics/index.ts",
+      "line": 417,
+      "table": "organizations",
+      "kind": "insert",
+      "columns": [
+        "location",
+        "metadata",
+        "name",
+        "org_type",
+        "slug",
+        "website_url"
+      ],
+      "served_columns": [
+        "name",
+        "org_type",
+        "slug"
+      ],
+      "live": [
+        "deployed edge function"
+      ],
+      "status": "live-ungated",
+      "note": "DEPLOYED edge function. INSERTs organizations (name, org_type, slug) from extraction. Creating an org is the identity decision resolve.mjs exists to adjudicate; this bypasses it."
+    },
+    "supabase/functions/link-document-entities/index.ts|organizations|insert|entity_type,metadata,name,source": {
+      "file": "supabase/functions/link-document-entities/index.ts",
+      "line": 160,
+      "table": "organizations",
+      "kind": "insert",
+      "columns": [
+        "entity_type",
+        "metadata",
+        "name",
+        "source"
+      ],
+      "served_columns": [
+        "entity_type",
+        "name"
+      ],
+      "live": [
+        "deployed edge function"
+      ],
+      "status": "live-ungated",
+      "note": "DEPLOYED edge function. INSERTs organizations (name, entity_type) when linking a document to an entity. Same bypass: a new org minted from a document mention."
+    },
+    "supabase/migrations/20260215200000_rename_businesses_to_organizations.sql|organizations|sql-update|entity_type": {
+      "file": "supabase/migrations/20260215200000_rename_businesses_to_organizations.sql",
+      "line": 40,
+      "table": "organizations",
+      "kind": "sql-update",
+      "columns": [
+        "entity_type"
+      ],
+      "served_columns": [
+        "entity_type"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": "historical migration, already applied; kept for the record. Not a door a new write can use."
+    },
+    "supabase/migrations/20260215200000_rename_businesses_to_organizations.sql|organizations|sql-update|entity_type,legal_structure": {
+      "file": "supabase/migrations/20260215200000_rename_businesses_to_organizations.sql",
+      "line": 36,
+      "table": "organizations",
+      "kind": "sql-update",
+      "columns": [
+        "entity_type",
+        "legal_structure"
+      ],
+      "served_columns": [
+        "entity_type"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": "historical migration, already applied; kept for the record. Not a door a new write can use."
+    },
+    "supabase/migrations/20260523080500_boulder_city_shops_seed.sql|organizations|sql-insert|address,business_name,business_type,city,enrichment_status,has_fabrication,has_lift,has_paint_booth,metadata,name,org_type,primary_focus,service_description,slug,source,source_url,specializations,specialty_eras,specialty_makes,state,verification_level,zip_code": {
+      "file": "supabase/migrations/20260523080500_boulder_city_shops_seed.sql",
+      "line": 19,
+      "table": "organizations",
+      "kind": "sql-insert",
+      "columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "enrichment_status",
+        "has_fabrication",
+        "has_lift",
+        "has_paint_booth",
+        "metadata",
+        "name",
+        "org_type",
+        "primary_focus",
+        "service_description",
+        "slug",
+        "source",
+        "source_url",
+        "specializations",
+        "specialty_eras",
+        "specialty_makes",
+        "state",
+        "verification_level",
+        "zip_code"
+      ],
+      "served_columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "name",
+        "org_type",
+        "slug",
+        "specializations",
+        "state",
+        "verification_level",
+        "zip_code"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": "historical migration, already applied; kept for the record. Not a door a new write can use."
+    },
+    "supabase/migrations/20260523080500_boulder_city_shops_seed.sql|organizations|sql-insert|address,business_name,business_type,city,hours_of_operation,metadata,name,org_type,services_offered,slug,source,source_url,specializations,state,verification_level,years_in_business,zip_code": {
+      "file": "supabase/migrations/20260523080500_boulder_city_shops_seed.sql",
+      "line": 71,
+      "table": "organizations",
+      "kind": "sql-insert",
+      "columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "hours_of_operation",
+        "metadata",
+        "name",
+        "org_type",
+        "services_offered",
+        "slug",
+        "source",
+        "source_url",
+        "specializations",
+        "state",
+        "verification_level",
+        "years_in_business",
+        "zip_code"
+      ],
+      "served_columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "hours_of_operation",
+        "name",
+        "org_type",
+        "services_offered",
+        "slug",
+        "specializations",
+        "state",
+        "verification_level",
+        "zip_code"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": "historical migration, already applied; kept for the record. Not a door a new write can use."
+    },
+    "supabase/migrations/20260523080500_boulder_city_shops_seed.sql|organizations|sql-insert|address,business_type,city,hours_of_operation,metadata,name,org_type,phone,services_offered,slug,source,source_url,state,verification_level,zip_code": {
+      "file": "supabase/migrations/20260523080500_boulder_city_shops_seed.sql",
+      "line": 122,
+      "table": "organizations",
+      "kind": "sql-insert",
+      "columns": [
+        "address",
+        "business_type",
+        "city",
+        "hours_of_operation",
+        "metadata",
+        "name",
+        "org_type",
+        "phone",
+        "services_offered",
+        "slug",
+        "source",
+        "source_url",
+        "state",
+        "verification_level",
+        "zip_code"
+      ],
+      "served_columns": [
+        "address",
+        "business_type",
+        "city",
+        "hours_of_operation",
+        "name",
+        "org_type",
+        "phone",
+        "services_offered",
+        "slug",
+        "state",
+        "verification_level",
+        "zip_code"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": "historical migration, already applied; kept for the record. Not a door a new write can use."
+    },
+    "supabase/migrations/20260523080500_boulder_city_shops_seed.sql|organizations|sql-insert|address,business_name,business_type,city,founded_year,hours_of_operation,metadata,name,org_type,phone,services_offered,slug,source,source_url,state,verification_level,years_in_business,zip_code": {
+      "file": "supabase/migrations/20260523080500_boulder_city_shops_seed.sql",
+      "line": 139,
+      "table": "organizations",
+      "kind": "sql-insert",
+      "columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "founded_year",
+        "hours_of_operation",
+        "metadata",
+        "name",
+        "org_type",
+        "phone",
+        "services_offered",
+        "slug",
+        "source",
+        "source_url",
+        "state",
+        "verification_level",
+        "years_in_business",
+        "zip_code"
+      ],
+      "served_columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "hours_of_operation",
+        "name",
+        "org_type",
+        "phone",
+        "services_offered",
+        "slug",
+        "state",
+        "verification_level",
+        "zip_code"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": "historical migration, already applied; kept for the record. Not a door a new write can use."
+    },
+    "supabase/migrations/20260523080500_boulder_city_shops_seed.sql|organizations|sql-insert|address,business_name,business_type,city,hours_of_operation,metadata,name,org_type,phone,services_offered,slug,source,source_url,state,verification_level,zip_code": {
+      "file": "supabase/migrations/20260523080500_boulder_city_shops_seed.sql",
+      "line": 166,
+      "table": "organizations",
+      "kind": "sql-insert",
+      "columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "hours_of_operation",
+        "metadata",
+        "name",
+        "org_type",
+        "phone",
+        "services_offered",
+        "slug",
+        "source",
+        "source_url",
+        "state",
+        "verification_level",
+        "zip_code"
+      ],
+      "served_columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "hours_of_operation",
+        "name",
+        "org_type",
+        "phone",
+        "services_offered",
+        "slug",
+        "state",
+        "verification_level",
+        "zip_code"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": "historical migration, already applied; kept for the record. Not a door a new write can use."
+    },
+    "supabase/migrations/20260523080900_seeds_fixed.sql|organizations|sql-insert|address,business_name,business_type,city,enrichment_status,has_fabrication,has_lift,metadata,name,org_type,primary_focus,service_description,slug,source,specializations,specialty_eras,specialty_makes,state,verification_level,zip_code": {
+      "file": "supabase/migrations/20260523080900_seeds_fixed.sql",
+      "line": 10,
+      "table": "organizations",
+      "kind": "sql-insert",
+      "columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "enrichment_status",
+        "has_fabrication",
+        "has_lift",
+        "metadata",
+        "name",
+        "org_type",
+        "primary_focus",
+        "service_description",
+        "slug",
+        "source",
+        "specializations",
+        "specialty_eras",
+        "specialty_makes",
+        "state",
+        "verification_level",
+        "zip_code"
+      ],
+      "served_columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "name",
+        "org_type",
+        "slug",
+        "specializations",
+        "state",
+        "verification_level",
+        "zip_code"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": "historical migration, already applied; kept for the record. Not a door a new write can use."
+    },
+    "supabase/migrations/20260523080900_seeds_fixed.sql|organizations|sql-insert|address,business_name,business_type,city,hours_of_operation,metadata,name,org_type,services_offered,slug,source,source_url,specializations,state,verification_level,years_in_business,zip_code": {
+      "file": "supabase/migrations/20260523080900_seeds_fixed.sql",
+      "line": 40,
+      "table": "organizations",
+      "kind": "sql-insert",
+      "columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "hours_of_operation",
+        "metadata",
+        "name",
+        "org_type",
+        "services_offered",
+        "slug",
+        "source",
+        "source_url",
+        "specializations",
+        "state",
+        "verification_level",
+        "years_in_business",
+        "zip_code"
+      ],
+      "served_columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "hours_of_operation",
+        "name",
+        "org_type",
+        "services_offered",
+        "slug",
+        "specializations",
+        "state",
+        "verification_level",
+        "zip_code"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": "historical migration, already applied; kept for the record. Not a door a new write can use."
+    },
+    "supabase/migrations/20260523080900_seeds_fixed.sql|organizations|sql-insert|address,business_name,business_type,city,hours_of_operation,metadata,name,org_type,phone,services_offered,slug,source,source_url,state,verification_level,zip_code": {
+      "file": "supabase/migrations/20260523080900_seeds_fixed.sql",
+      "line": 84,
+      "table": "organizations",
+      "kind": "sql-insert",
+      "columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "hours_of_operation",
+        "metadata",
+        "name",
+        "org_type",
+        "phone",
+        "services_offered",
+        "slug",
+        "source",
+        "source_url",
+        "state",
+        "verification_level",
+        "zip_code"
+      ],
+      "served_columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "hours_of_operation",
+        "name",
+        "org_type",
+        "phone",
+        "services_offered",
+        "slug",
+        "state",
+        "verification_level",
+        "zip_code"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": "historical migration, already applied; kept for the record. Not a door a new write can use."
+    },
+    "supabase/migrations/20260523080900_seeds_fixed.sql|organizations|sql-insert|address,business_name,business_type,city,founded_year,hours_of_operation,metadata,name,org_type,phone,services_offered,slug,source,source_url,state,verification_level,years_in_business,zip_code": {
+      "file": "supabase/migrations/20260523080900_seeds_fixed.sql",
+      "line": 74,
+      "table": "organizations",
+      "kind": "sql-insert",
+      "columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "founded_year",
+        "hours_of_operation",
+        "metadata",
+        "name",
+        "org_type",
+        "phone",
+        "services_offered",
+        "slug",
+        "source",
+        "source_url",
+        "state",
+        "verification_level",
+        "years_in_business",
+        "zip_code"
+      ],
+      "served_columns": [
+        "address",
+        "business_name",
+        "business_type",
+        "city",
+        "hours_of_operation",
+        "name",
+        "org_type",
+        "phone",
+        "services_offered",
+        "slug",
+        "state",
+        "verification_level",
+        "zip_code"
+      ],
+      "live": [],
+      "status": "one-off",
+      "note": "historical migration, already applied; kept for the record. Not a door a new write can use."
+    }
+  }
+}
