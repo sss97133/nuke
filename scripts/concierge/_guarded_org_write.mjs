@@ -52,7 +52,9 @@ import { writeFields } from '../entity/write.mjs';
 import { fitRegion, STBARTH_REGION_TEXT } from '../entity/validate.mjs';
 
 let _db = null;
-const db = () => (_db ??= createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY));
+const db = () => (_db ??= createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+  global: { headers: { 'X-Nuke-Writer': 'scripts/concierge/_guarded_org_write.mjs' } },
+}));
 
 // ════════════════════════════════════════════════════════════════════════════
 // THE REGION — fitted from the live population, ONCE per process.
