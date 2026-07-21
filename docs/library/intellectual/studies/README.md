@@ -18,6 +18,9 @@ The March 2026 triage as a reproducible methodology for platform audits. 171 GB 
 ### [Vocabulary Evolution: How the Project's Language Changed Over 141 Days](vocabulary-evolution.md)
 Analysis of how the project's technical vocabulary evolved across five months and 13,758 prompts. Replacement chains (scrape to extract to ingest to observe), formality arcs (7.1% profanity in October to 5.6% in March), the rise of structured prompting (0.9% to 39%), and the relationship between vocabulary sophistication and implementation quality.
 
+### [L'Officiel Corpus Foundation: What Is Now Executable, and What Is Still Prose](2026-07-20_lofficiel-corpus-foundation.md)
+The 2026-07-20 snapshot of the L'Officiel magazine corpus (47,792 pages, 432-row story spine, 40/41 publications joined, 0 orphans inside spined issues), turned into executable checks. Records the honest split between findings now guarded by `npm run foundation:check` (spine join, status lie, placeholder echo, presence-axis) and findings still prose-only (folio has no column, spine `page_start` drift, Polo scope). The anti-rehash discipline made measurable.
+
 ---
 
 *These studies are based on the analytical work produced in `/docs/writing/` during March 2026. They formalize and extend that work into citation-ready documents with methodology sections, finding discussions, and reproducibility notes.*
