@@ -301,3 +301,6 @@ docs/library/_extracted/
 # User substrate — never in a public repo. Receipts, bank slips, titles, names.
 # These belong in the Nuke DB as observations with provenance.
 output/vision-receipt-recovery-*/
+
+# Tax working papers — PII. nuke is a PUBLIC repo. Never commit.
+output/turbotax/
