@@ -989,7 +989,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(JSON.stringify({
       apply: !!a.apply, n: decisions.length, admitted: decisions.length - held, held, decisions,
     }));
-    process.exit(held ? 3 : 0);
+    // exitCode, not process.exit(): exit() kills the process before stdout drains,
+    // truncating envelopes >64KB (pipe buffer) — every large-batch caller then
+    // crashes parsing half a JSON line. Nothing runs after this branch, so letting
+    // the loop drain is safe. Measured: 166-item batch = 131KB envelope, truncated
+    // at 65,362 bytes before this fix; parses whole after.
+    process.exitCode = held ? 3 : 0;
   } else {
     console.log('commands: selftest | set <subject_type> <subject_id> <field> <value> [--source=] [--observed-at=] [--apply] [--supersede] | plan  (JSON array on stdin -> JSON decisions on stdout, exit 3 if any held)');
   }
