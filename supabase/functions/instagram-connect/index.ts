@@ -33,7 +33,10 @@ const RETURN_TO_ALLOWLIST = [
   'http://localhost:5173',
 ];
 
-const svc = () => createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+const svc = () =>
+  createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    global: { headers: { 'X-Nuke-Writer': 'instagram-connect' } },
+  });
 
 // ---------- crypto helpers ----------
 const enc = new TextEncoder();
