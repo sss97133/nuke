@@ -954,13 +954,33 @@ Deno.serve(async (req) => {
     // strictly better — and this codebase has already paid for this exact
     // failure mode once (docs/library/technical/extraction-playbook.md
     // FAILURE 14: edge-function batch size too large -> 504).
-    const FEED_LOOP_TIME_BUDGET_MS = 240_000;
+    // Must stay UNDER the platform's real ceiling, which is a 150s idle timeout —
+    // measured 2026-07-26, not theorized: a single-feed poll returned
+    // "Request idle timeout limit (150s) reached". The previous 240_000 budget
+    // was above that ceiling, so it could never fire: the platform always killed
+    // the invocation first.
+    const FEED_LOOP_TIME_BUDGET_MS = 110_000;
 
     for (const feed of dueFeeds) {
       if (Date.now() - startTime > FEED_LOOP_TIME_BUDGET_MS) {
         console.log(`[poll-feeds] Time budget exceeded (${Date.now() - startTime}ms) — stopping early, ${dueFeeds.length - results.length} feed(s) deferred to next cron tick`);
         break;
       }
+
+      // CLAIM BEFORE WORK. Stamp last_polled_at up front so a mid-feed kill
+      // cannot wedge the queue. Feeds are selected `ORDER BY last_polled_at ASC
+      // NULLS FIRST`, so a feed that always outlives the invocation would, under
+      // write-at-clean-end, stay at the head of that ordering forever and block
+      // every feed behind it. That is not hypothetical: the 2026-07-13 widening
+      // (2 -> 441 feeds) put five never-polled feeds at the head, the first of
+      // them exceeded the 150s ceiling on its own, and the whole artery — all
+      // 416 Craigslist metros included — polled nothing for 13 days. The CL
+      // Lake Havasu 928 was missed inside that window.
+      // A crashed feed now simply waits out its own poll_interval_minutes.
+      await supabase
+        .from("listing_feeds")
+        .update({ last_polled_at: new Date().toISOString() })
+        .eq("id", feed.id);
       // Curated direct-ingest strategies (Craigslist HTML via Firecrawl, BaT
       // RSS). Both bypass the legacy import_queue path entirely and route
       // through `ingest` with the share-URL ledger.
