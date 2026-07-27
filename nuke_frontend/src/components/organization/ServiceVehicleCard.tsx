@@ -12,12 +12,16 @@ import { optimizeImageUrl } from '../../lib/imageOptimizer';
 interface Receipt {
   id: string;
   date: string;
-  total: number;
-  status: string;
-  labor_hours: number;
-  parts_cost: number;
-  labor_cost: number;
+  // Everything below is optional: the rows come from get_service_vehicles_for_org,
+  // which builds them from timeline_events, not from the `receipts` table. Only
+  // work_description / labor_hours / image_count are actually populated today.
+  total?: number | null;
+  status?: string;
+  labor_hours?: number | null;
+  parts_cost?: number | null;
+  labor_cost?: number | null;
   work_description?: string;
+  hours_are_estimated?: boolean;
 }
 
 interface ServiceVehicleCardProps {
@@ -29,7 +33,7 @@ interface ServiceVehicleCardProps {
     vin?: string | null;
   };
   receipts: Receipt[];
-  totalInvestment: number;
+  totalInvestment: number | null;
   totalDays: number;
   totalLaborHours: number;
   jobCount: number;
@@ -62,13 +66,23 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
     pending: 'Pending'
   };
 
-  const formatCurrency = (amount: number) => {
+  // There is no per-job money on file — get_service_vehicles_for_org emits
+  // title/hours/image_count, no `total` — so this was rendering literal "$NaN"
+  // on every receipt row (Intl.format(undefined)). And total_investment is now
+  // NULL rather than a hard-coded 0, because the `receipts` rows that do exist
+  // for these vehicles mix sale proceeds ("Bring a Trailer (sold to Dave
+  // Granholm, NJ)" $31,000) with parts spend (AutoZone, 41 receipts, $813.10);
+  // summing them under the label "Investment" would be a fabricated number.
+  // Unknown money renders as "—", never as $0 and never as $NaN.
+  // (memory: feedback_valuation_block_when_not_defensible)
+  const formatCurrency = (amount: number | null | undefined) => {
+    if (amount === null || amount === undefined || !Number.isFinite(Number(amount))) return '—';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(amount);
+    }).format(Number(amount));
   };
 
   return (
@@ -244,9 +258,9 @@ export const ServiceVehicleCard: React.FC<ServiceVehicleCardProps> = ({
                     <span style={{ fontWeight: 600 }}>
                       {receipt.work_description || `Job ${index + 1}`}
                     </span>
-                    {receipt.labor_hours > 0 && (
+                    {(receipt.labor_hours ?? 0) > 0 && (
                       <span style={{ color: 'var(--grey-600)', marginLeft: '8px' }}>
-                        • {receipt.labor_hours.toFixed(1)} hours
+                        • {Number(receipt.labor_hours).toFixed(1)}h est.
                       </span>
                     )}
                   </div>
