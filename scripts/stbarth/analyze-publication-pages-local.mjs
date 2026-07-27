@@ -315,8 +315,9 @@ async function analyzePage(page) {
     // lost all of it. (Same defect class fixed in analyze_pages_v2 on
     // 2026-07-26, where a stale snapshot reverted owner decisions.)
     const { data: liveRow } = await supabase
-      .from('publication_pages').select('spatial_tags').eq('id', id).single();
+      .from('publication_pages').select('spatial_tags, ai_scan_metadata').eq('id', id).single();
     const live = (liveRow?.spatial_tags && typeof liveRow.spatial_tags === 'object') ? liveRow.spatial_tags : {};
+    const liveMeta = (liveRow?.ai_scan_metadata && typeof liveRow.ai_scan_metadata === 'object') ? liveRow.ai_scan_metadata : {};
 
     // Arrays this pass produces are unioned with what is already there, and the
     // EXISTING entry always wins on a name collision so demotions survive.
@@ -351,11 +352,20 @@ async function analyzePage(page) {
     // Write results
     await supabase.from('publication_pages').update({
       spatial_tags: spatialTags,
+      // Same defect as the spatial_tags one fixed above, one column over: this
+      // used to REPLACE ai_scan_metadata, so OCR'ing a page erased every other
+      // pass's provenance — v2's `v2_people_garments` marker most of all, which
+      // is the only record that the people/garments pass ever landed there.
+      // (Measured 2026-07-26: every page this run touched came out marker-less.)
+      // Provenance is the one thing a pass must never take from another pass.
       ai_scan_metadata: {
+        ...liveMeta,
         model: MODEL, duration_ms: duration, cost_usd: 0, local: !IS_CLOUD, cloud_gpu: IS_CLOUD,
         page_type_source: page.spine_page_type ? 'printed_spine' : 'vision',
-        ...(page.spine_page_type && visionType && page.spine_page_type !== visionType
-          ? { vision_page_type_overridden: visionType } : {}),
+        // written, or explicitly cleared — never inherited from an older run,
+        // which would leave a stale override claim standing over a fresh read
+        vision_page_type_overridden:
+          (page.spine_page_type && visionType && page.spine_page_type !== visionType) ? visionType : null,
       },
       extracted_text: rawText,
       page_type: pageType,
