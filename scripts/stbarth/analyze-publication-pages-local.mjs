@@ -314,8 +314,14 @@ async function analyzePage(page) {
     // suspect:true demotions the owner has signed. A page that was OCR'd second
     // lost all of it. (Same defect class fixed in analyze_pages_v2 on
     // 2026-07-26, where a stale snapshot reverted owner decisions.)
-    const { data: liveRow } = await supabase
+    // Check the error. Without this, a transient read failure leaves liveRow
+    // undefined, live and liveMeta silently fall back to {}, and the update
+    // below writes a wholesale spatial_tags AND ai_scan_metadata — the exact
+    // pre-fix destruction, with no log line and no failure count. The merge is
+    // only as safe as the read it merges onto.
+    const { data: liveRow, error: liveErr } = await supabase
       .from('publication_pages').select('spatial_tags, ai_scan_metadata').eq('id', id).single();
+    if (liveErr) throw new Error(`pre-write re-read failed: ${liveErr.message}`);
     const live = (liveRow?.spatial_tags && typeof liveRow.spatial_tags === 'object') ? liveRow.spatial_tags : {};
     const liveMeta = (liveRow?.ai_scan_metadata && typeof liveRow.ai_scan_metadata === 'object') ? liveRow.ai_scan_metadata : {};
 
