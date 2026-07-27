@@ -110,8 +110,15 @@ async function fetchImageBase64(imageUrl) {
 // ---------------------------------------------------------------------------
 // Call Ollama vision model
 // ---------------------------------------------------------------------------
-async function callOllama(base64Data, prompt) {
+// attempts scales the output budget. A dense page (a French art magazine's
+// body-text spread) overruns the 2048 output budget, the JSON is cut mid-object,
+// and the parse fails — the SAME pages fail every time, so a flat retry burns
+// three attempts and marks a readable page permanently 'failed'. Measured on
+// blast-01 2026-07-26: pp.50/56/62/63/69 failed here and in analyze_pages_v2,
+// which carries the same fix as V2_NUM_PREDICT. Give each retry more room.
+async function callOllama(base64Data, prompt, attempt = 0) {
   const t0 = Date.now();
+  const numPredict = parseInt(process.env.OCR_NUM_PREDICT || '2048', 10) * (attempt + 1);
   const headers = { 'Content-Type': 'application/json' };
   if (AUTH_TOKEN) headers['Authorization'] = `Bearer ${AUTH_TOKEN}`;
 
@@ -123,7 +130,7 @@ async function callOllama(base64Data, prompt) {
       prompt,
       images: [base64Data],
       stream: false,
-      options: { temperature: 0.1, num_predict: 2048 },
+      options: { temperature: 0.1, num_predict: numPredict },
     }),
   });
 
@@ -193,7 +200,7 @@ async function analyzePage(page) {
     const base64Data = await fetchImageBase64(image_url);
     const prompt = `${VISION_PROMPT}\n\nThis is page ${page_number} of ${page_count} from "${pub_title}" by ${publisher_slug}.`;
 
-    const { text, duration } = await callOllama(base64Data, prompt);
+    const { text, duration } = await callOllama(base64Data, prompt, attempts || 0);
     const parsed = parseJson(text);
 
     if (!parsed) {
