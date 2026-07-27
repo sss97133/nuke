@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useState, type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
 interface RankedOffer {
@@ -135,12 +136,18 @@ export function LiveOffersTable() {
                       {ageLabel(r.hours_old)}
                     </td>
                     <td style={td}>
-                      {r.listing_url ? (
-                        <a href={r.listing_url} target="_blank" rel="noopener noreferrer"
-                           style={{ color: 'var(--text)', textDecoration: 'underline' }}>
-                          {title}
-                        </a>
-                      ) : title}
+                      {/* Into the vehicle profile — never out to the source.
+                          The profile is the convergence point
+                          (nuke_frontend/CLAUDE.md); a row that links to
+                          craigslist.org hands the visitor to Craigslist and
+                          throws away every piece of evidence Nuke holds on
+                          that car. Clicking shows you more, it does not take
+                          you away. The raw listing is reachable from the
+                          profile, which is where provenance belongs. */}
+                      <Link to={`/vehicle/${r.vehicle_id}`}
+                            style={{ color: 'var(--text)', textDecoration: 'underline' }}>
+                        {title}
+                      </Link>
                     </td>
                     <td style={{ ...mono, textAlign: 'right' }}>
                       {r.price != null
