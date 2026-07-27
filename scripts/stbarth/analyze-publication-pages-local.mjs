@@ -150,6 +150,39 @@ async function callOllama(base64Data, prompt, attempt = 0) {
 // ---------------------------------------------------------------------------
 // Parse JSON (robust — handles markdown fences, trailing commas)
 // ---------------------------------------------------------------------------
+// The model transcribes a page's own punctuation verbatim into raw_text, and a
+// page that quotes people ships literal " characters — which it does not escape.
+// The parse then dies on the FIRST inner quote, deterministically, at any output
+// budget, so retries can never help and the page is marked failed forever.
+//
+// Measured on blast-01 p89 (a page of quoted forum posts) 2026-07-26: the model
+// emitted  pas au "vrai Mario" et au "vrai JP"  inside raw_text; the parser hit
+// `"vrai` and demanded a comma. Three attempts, three identical deaths.
+//
+// Walk the string tracking whether we are inside a value. A quote that is not
+// followed by a structural character (, } ] :) cannot be a closing quote, so it
+// belongs to the text and gets escaped.
+function escapeInnerQuotes(s) {
+  let out = '';
+  let inStr = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (!inStr) {
+      out += c;
+      if (c === '"') inStr = true;
+      continue;
+    }
+    if (c === '\\') { out += c + (s[i + 1] ?? ''); i++; continue; }
+    if (c === '"') {
+      if (/^\s*[,}\]:]/.test(s.slice(i + 1))) { out += c; inStr = false; }
+      else out += '\\"';
+      continue;
+    }
+    out += c;
+  }
+  return out;
+}
+
 function parseJson(text) {
   let cleaned = text.trim();
   // Strip markdown fences
@@ -160,6 +193,9 @@ function parseJson(text) {
   try { return JSON.parse(cleaned); } catch {}
   // Fix trailing commas
   try { return JSON.parse(cleaned.replace(/,\s*([}\]])/g, '$1')); } catch {}
+  // Escape quotes the model left loose inside transcribed text
+  try { return JSON.parse(escapeInnerQuotes(cleaned)); } catch {}
+  try { return JSON.parse(escapeInnerQuotes(cleaned).replace(/,\s*([}\]])/g, '$1')); } catch {}
   // Extract largest {...}
   const match = cleaned.match(/\{[\s\S]*\}/);
   if (match) {
