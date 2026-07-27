@@ -285,6 +285,32 @@ const MAKES = [
   "AM General",
 ];
 
+/**
+ * MAKES matched longest-first, with hyphen and space treated as equivalent.
+ *
+ * Two bugs this closes, both measured in live rows on 2026-07-26:
+ *  - URL slugs arrive with hyphens already turned into spaces
+ *    ("mercedes benz 350slc"), so a literal startsWith("Mercedes-Benz") misses
+ *    and the shorter alias "Mercedes" matches instead — consuming half the make
+ *    and leaving the rest at the head of the model. Result: make
+ *    "Mercedes-Benz" + model "benz sl500". 20 distinct corrupted model strings
+ *    in 24h.
+ *  - Array order decided which make won, so "International" shadowed
+ *    "International Harvester" the same way.
+ * Sorting by length makes the more specific make always win regardless of where
+ * anyone adds an entry, and `[-\s]*` also catches the run-together spelling
+ * ("rollsroyce") that RM Sotheby's slugs use.
+ */
+const MAKE_MATCHERS: Array<{ make: string; re: RegExp }> = [...MAKES]
+  .sort((a, b) => b.length - a.length)
+  .map((make) => ({
+    make,
+    re: new RegExp(
+      "^" + make.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/[-\s]+/g, "[-\\s]*") + "\\b",
+      "i",
+    ),
+  }));
+
 interface ParsedVehicle {
   year: number | null;
   make: string | null;
@@ -330,6 +356,33 @@ const MODEL_IMPLIES_MAKE: Record<string, string> = {
   "moke": "MINI",
 };
 
+/**
+ * Take the first few words after the make as the model.
+ *
+ * The old filter dropped EVERY purely-numeric word, which deleted real model
+ * designations: Austin-Healey 3000 lost its model entirely and was then refused
+ * by the minimum-viability gate; Land Rover Defender 90 became "defender";
+ * Chevrolet 210, Ferrari 250, Datsun 510, BMW 2002 all the same. The filter was
+ * aimed at listing ids and prices, so aim it there instead: ids are long (5+
+ * digits — `cleanSlugTail` already trims the trailing one) and a repeat of the
+ * year is noise, but a short number is part of the car's name.
+ */
+function modelFromWords(text: string, year: number | null): string | null {
+  return text
+    .split(/[\s·•|—,\-$]+/)
+    .filter((w) =>
+      w &&
+      !/^\$/.test(w) &&
+      // keep 1-4 digit designations, drop long opaque ids
+      !(/^\d+$/.test(w) && w.length > 4) &&
+      // drop a restated year ("1969 chevrolet 1969 camaro")
+      !(year !== null && w === String(year))
+    )
+    .slice(0, 3)
+    .join(" ")
+    .trim() || null;
+}
+
 function parseVehicleTitle(text: string): ParsedVehicle {
   if (!text) return { year: null, make: null, model: null };
 
@@ -347,16 +400,14 @@ function parseVehicleTitle(text: string): ParsedVehicle {
   const afterYear = cleaned.slice(cleaned.indexOf(yearMatch[0]) + yearMatch[0].length).trim();
   const lower = afterYear.toLowerCase();
 
-  for (const make of MAKES) {
-    if (lower.startsWith(make.toLowerCase())) {
-      const afterMake = afterYear.slice(make.length).trim();
-      const model = afterMake
-        .split(/[\s·•|—,\-$]+/)
-        .filter(w => w && !/^\d+$/.test(w) && !/^\$/.test(w))
-        .slice(0, 3)
-        .join(" ")
-        .trim() || null;
-      return { year, make: normalizeMake(make) || make, model };
+  for (const { make, re } of MAKE_MATCHERS) {
+    const hit = afterYear.match(re);
+    if (hit) {
+      // Slice by what actually matched, not by the length of the MAKES entry —
+      // the two differ whenever the separator differs ("mercedes benz" is 13
+      // chars, "Mercedes-Benz" is 13 but "mercedesbenz" is 12).
+      const afterMake = afterYear.slice(hit[0].length).trim();
+      return { year, make: normalizeMake(make) || make, model: modelFromWords(afterMake, year) };
     }
   }
 
@@ -366,11 +417,7 @@ function parseVehicleTitle(text: string): ParsedVehicle {
     if (re.test(lower)) {
       // Extract model as the text starting from the keyword
       const modelStart = lower.indexOf(keyword.toLowerCase());
-      const modelText = afterYear.slice(modelStart).split(/[\s·•|—,\-$]+/)
-        .filter(w => w && !/^\d+$/.test(w) && !/^\$/.test(w))
-        .slice(0, 3)
-        .join(" ")
-        .trim() || keyword;
+      const modelText = modelFromWords(afterYear.slice(modelStart), year) || keyword;
       return { year, make: impliedMake, model: modelText };
     }
   }
