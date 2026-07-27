@@ -66,10 +66,10 @@ export function ServiceVehicleCardRich({
 
       if (eventsError) throw eventsError;
 
-      // Get recent images
-      const { data: images, error: imagesError } = await supabase
+      // Get recent images + the true total (count, not a page of 6)
+      const { data: images, error: imagesError, count: imageCount } = await supabase
         .from('vehicle_images')
-        .select('id, image_url, thumbnail_url, taken_at')
+        .select('id, image_url, thumbnail_url, taken_at', { count: 'exact' })
         .eq('vehicle_id', vehicleId)
         .not('taken_at', 'is', null)
         .order('taken_at', { ascending: false })
@@ -77,15 +77,26 @@ export function ServiceVehicleCardRich({
 
       if (imagesError) throw imagesError;
 
+      // Oldest documented frame, so a vehicle with photos but no timeline
+      // events still shows a real date span instead of "No dates".
+      const { data: oldestImage } = await supabase
+        .from('vehicle_images')
+        .select('taken_at')
+        .eq('vehicle_id', vehicleId)
+        .not('taken_at', 'is', null)
+        .order('taken_at', { ascending: true })
+        .limit(1);
+
       // Calculate stats
       const totalSessions = events?.length || 0;
-      let totalImages = 0;
+      // Count the frames we actually hold, not timeline_events.metadata.image_count
+      // (never populated — it printed "0 photos documented" under six rendered photos).
+      const totalImages = imageCount ?? images?.length ?? 0;
       let totalHours = 0;
       const workTypes = new Set<string>();
 
       events?.forEach(event => {
         const meta = event.metadata || {};
-        totalImages += meta.image_count || 0;
         totalHours += meta.duration_hours || event.duration_hours || 0;
         
         // Extract work type from title
@@ -103,8 +114,13 @@ export function ServiceVehicleCardRich({
         totalImages,
         totalHours: Math.round(totalHours * 10) / 10,
         estimatedCost,
-        firstSession: events?.length ? events[events.length - 1]?.event_date : null,
-        lastSession: events?.length ? events[0]?.event_date : null,
+        // Prefer logged sessions; fall back to the documented photo span.
+        firstSession: events?.length
+          ? events[events.length - 1]?.event_date
+          : (oldestImage?.[0]?.taken_at ?? null),
+        lastSession: events?.length
+          ? events[0]?.event_date
+          : (images?.[0]?.taken_at ?? null),
         recentImages: images?.map(img => img.thumbnail_url || img.image_url) || [],
         workTypes: Array.from(workTypes)
       });
@@ -253,11 +269,13 @@ export function ServiceVehicleCardRich({
           color: 'var(--text-secondary)',
           display: 'flex',
           justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '4px 10px',
           borderTop: '1px solid var(--border-light)',
           paddingTop: '8px'
         }}>
-          <span>{stats?.totalImages || 0} photos documented</span>
-          <span>
+          <span style={{ whiteSpace: 'nowrap' }}>{stats?.totalImages || 0} photos</span>
+          <span style={{ whiteSpace: 'nowrap' }}>
             {stats?.firstSession && stats?.lastSession 
               ? `${formatDate(stats.firstSession)} - ${formatDate(stats.lastSession)}`
               : 'No dates'
