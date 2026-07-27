@@ -94,7 +94,91 @@ const SOURCE_PATTERNS: Array<{
     pattern: /instagram\.com\/p\/([\w-]+)/,
     extractId: (m) => m[1],
   },
+  // ── Venues polled by listing_feeds whose URL carries {year}-{make}-{model}
+  // in the last path segment. Registering them is what lets the
+  // minimum-viability gate below trust their slug WITHOUT a live fetch —
+  // exactly the trust Craigslist already gets. Every pattern here was
+  // written against a real URL observed in import_queue (2026-07-26), not
+  // guessed; venues whose slug does NOT carry identity are deliberately
+  // absent (see notes at the bottom of this list).
+  {
+    platform: "mecum",
+    // https://www.mecum.com/lots/1177355/2005-hummer-h2
+    pattern: /mecum\.com\/lots\/(\d+)\//,
+    extractId: (m) => m[1],
+  },
+  {
+    platform: "classiccars",
+    // https://classiccars.com/listings/view/2089229/1993-chevrolet-corvette-for-sale-in-cleveland-ohio-44128
+    pattern: /classiccars\.com\/listings\/view\/(\d+)\//,
+    extractId: (m) => m[1],
+  },
+  {
+    platform: "barrett_jackson",
+    // https://www.barrett-jackson.com/2026-columbus/docket/vehicle/1951-plymouth-cranbrook-300183
+    pattern: /barrett-jackson\.com\/[\w-]+\/docket\/vehicle\/([\w-]+)/,
+    extractId: (m) => m[1],
+  },
+  {
+    platform: "pcarmarket",
+    // https://www.pcarmarket.com/auction/2003-bmw-z4-25i-roadster
+    pattern: /pcarmarket\.com\/auction\/([\w-]+)/,
+    extractId: (m) => m[1],
+  },
+  {
+    platform: "autohunter",
+    // https://autohunter.com/Listing/Details/90844982/1966-PLYMOUTH-SATELLITE-CUSTOM-HARDTOP
+    pattern: /autohunter\.com\/Listing\/Details\/(\d+)\//i,
+    extractId: (m) => m[1],
+  },
+  {
+    platform: "allcollectorcars",
+    // https://www.allcollectorcars.com/classic-car-auctions/vehicles/1949-chevrolet-styleline-sport-coupe
+    pattern: /allcollectorcars\.com\/[\w-]+\/vehicles\/([\w-]+)/,
+    extractId: (m) => m[1],
+  },
+  {
+    platform: "vanguard_motors",
+    // https://www.vanguardmotorsales.com/inventory/5686/1970-plymouth-gtx
+    pattern: /vanguardmotorsales\.com\/inventory\/(\d+)\//,
+    extractId: (m) => m[1],
+  },
+  {
+    platform: "carandclassic",
+    // https://www.carandclassic.com/auctions/1972-mercedes-benz-350slc-c107-n7kb3n
+    pattern: /carandclassic\.com\/auctions\/([\w-]+)/,
+    extractId: (m) => m[1],
+  },
+  // NOT registered on purpose — their URLs do not carry identity, so trusting
+  // them would mint stubs from guesswork (the failure this gate exists to stop):
+  //   cars.ksl.com/listing/10662354        — numeric only, no slug (needs a fetch)
+  //   barnfinds.com/testarvette-ferrari-…  — editorial slug, no year
+  //   themarket.co.uk/listings/jaguar/…    — make/model but no year
+  //   rmsothebys.com/…/lots/s0005-1914-…   — lot-code prefix + mangled make ("rollsroyce")
 ];
+
+/**
+ * Strip marketplace boilerplate and opaque ids off the tail of a listing slug,
+ * so only the vehicle description survives into year/make/model.
+ *
+ * Without this the model field silently absorbs junk — exactly the make/model
+ * corruption class that took a gate to fix on 2026-07-08 (see ISSUES.md):
+ *   1993-chevrolet-corvette-for-sale-in-cleveland-ohio-44128
+ *     -> model "corvette for sale in cleveland ohio 44128"
+ *   1951-plymouth-cranbrook-300183   -> model "cranbrook 300183"
+ *   1972-mercedes-benz-350slc-c107-n7kb3n -> model "…c107 n7kb3n"
+ * Only the TAIL is trimmed; nothing before the boilerplate marker is touched,
+ * so real model names keep their digits (z4-25i, 350slc, k5-blazer, f-100).
+ */
+function cleanSlugTail(seg: string): string {
+  let out = seg;
+  // "…-for-sale-in-cleveland-ohio-44128" / "…-for-sale-by-owner" and friends
+  out = out.replace(/-for-sale(-(in|by|near)-.*)?$/i, "");
+  // trailing opaque listing/lot id: 5+ digits, or a mixed alphanumeric hash
+  out = out.replace(/-\d{5,}$/, "");
+  out = out.replace(/-(?=[a-z0-9]{6,}$)(?=[a-z]*\d)(?=[0-9]*[a-z])[a-z0-9]{6,}$/i, "");
+  return out || seg;
+}
 
 /**
  * Extract a human-readable title from a URL slug.
@@ -122,7 +206,7 @@ function extractTitleFromUrlSlug(url: string): string | null {
       if (/^\d+$/.test(seg) || /\.\w{2,4}$/.test(seg)) continue;
       // Must have dashes (slugified) and contain a 4-digit year
       if (seg.includes("-") && /\b(19|20)\d{2}\b/.test(seg)) {
-        return seg.replace(/-/g, " ");
+        return cleanSlugTail(seg).replace(/-/g, " ");
       }
     }
     return null;
