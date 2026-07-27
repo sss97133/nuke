@@ -14,7 +14,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
-import { firecrawlScrape } from '../_shared/firecrawl.ts';
+import { archiveFetch } from '../_shared/archiveFetch.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 import { writeObservation } from '../_shared/observationWriter.ts';
@@ -662,56 +662,36 @@ const BROWSER_HEADERS = {
 };
 
 async function fetchHagertyPage(url: string): Promise<{ html: string; source: string }> {
-  // Try direct fetch first (FREE) - Hagerty SSRs their pages, no JS needed
-  console.log(`[hagerty] Trying direct fetch: ${url}`);
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-    const response = await fetch(url, {
-      headers: BROWSER_HEADERS,
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (response.ok) {
-      const html = await response.text();
-      // Verify we got the __NEXT_DATA__
-      if (html.includes('__NEXT_DATA__')) {
-        console.log(`[hagerty] Direct fetch SUCCESS (${html.length} bytes)`);
-        return { html, source: 'direct' };
-      }
-      console.log(`[hagerty] Direct fetch missing __NEXT_DATA__, trying Firecrawl...`);
-    } else if (response.status === 403 || response.status === 429) {
-      console.log(`[hagerty] Rate limited (HTTP ${response.status}), trying Firecrawl...`);
-    } else {
-      throw new Error(`HTTP ${response.status}`);
-    }
-  } catch (err: any) {
-    if (err.name === 'AbortError') {
-      console.log(`[hagerty] Direct fetch timeout, trying Firecrawl...`);
-    } else {
-      console.log(`[hagerty] Direct fetch failed: ${err instanceof Error ? err.message : String(err)}, trying Firecrawl...`);
-    }
-  }
-
-  // Fallback to Firecrawl
-  console.log(`[hagerty] Fetching via Firecrawl: ${url}`);
-
-  const result = await firecrawlScrape({
-    url,
-    formats: ['html'],
-    onlyMainContent: false,
-    waitFor: 3000,
+  // archiveFetch, not raw fetch: it keeps the direct-first-then-Firecrawl ladder
+  // this function used to hand-roll (Hagerty SSRs its pages, so direct usually
+  // wins and is free), but it also archives every page to
+  // listing_page_snapshots and serves repeats from that archive.
+  //
+  // That cache is the point, not a side benefit. A whole-feed hagerty poll blew
+  // the platform's 150s ceiling on 2026-07-26 — ~20 listings each paying a live
+  // page fetch — so the feed could never reach the clean-end stamp that clears
+  // its last_error. Re-polls now read the archive instead of the network.
+  // "Fetch once, extract forever" (.claude/rules/extraction.md).
+  const result = await archiveFetch(url, {
+    platform: 'hagerty',
+    callerName: 'extract-hagerty-listing',
+    // A live auction's bid/price moves; a day-old snapshot would report a stale
+    // number as current. One hour keeps the re-poll cheap without going stale.
+    maxAgeSec: 3600,
+    waitForJs: 3000,
   });
 
-  if (!result.data.html) {
-    throw new Error(`Firecrawl failed: ${result.error || 'No HTML returned'}`);
+  if (!result.html) {
+    throw new Error(`Fetch failed: ${result.error || 'No HTML returned'}`);
+  }
+  // The parser needs __NEXT_DATA__; a page without it is a soft failure worth
+  // naming, because it means the shape changed rather than the fetch failing.
+  if (!result.html.includes('__NEXT_DATA__')) {
+    throw new Error(`Page fetched (${result.source}) but no __NEXT_DATA__ present`);
   }
 
-  return { html: result.data.html, source: 'firecrawl' };
+  console.log(`[hagerty] ${result.source}${result.cached ? ' (cached)' : ''} — ${result.html.length} bytes`);
+  return { html: result.html, source: result.source };
 }
 
 // ============================================================================
