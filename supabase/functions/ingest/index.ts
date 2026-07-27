@@ -81,7 +81,14 @@ const SOURCE_PATTERNS: Array<{
   },
   {
     platform: "hagerty",
-    pattern: /hagerty\.com\/marketplace\/([\w-]+)/,
+    // https://www.hagerty.com/marketplace/auction/1965-Ford-Mustang/ce62f601-14d5-4090-9489-2287744182ee
+    // The old pattern stopped at the first path segment, so extractId returned
+    // the literal "auction" (or "classified") for EVERY hagerty listing — one
+    // external_id shared by the whole venue. Identity lives in the second-to-
+    // last segment; the id is the tail (uuid, or a 22-char shortid).
+    // `auction` read off the live search page 2026-07-26; `classified` is the
+    // feed's own listing_url_regex (listing_feeds 2cc4741f) — same shape.
+    pattern: /hagerty\.com\/marketplace\/(?:auction|classified)\/[\w-]+\/([\w-]+)/,
     extractId: (m) => m[1],
   },
   {
@@ -204,6 +211,13 @@ function extractTitleFromUrlSlug(url: string): string | null {
       const seg = segments[i];
       // Skip numeric-only segments (IDs) and file extensions
       if (/^\d+$/.test(seg) || /\.\w{2,4}$/.test(seg)) continue;
+      // Skip UUID tails. A uuid has dashes, and 0.871% of them contain a
+      // hex group that reads as a year (…-1993-4e13-…) — measured over
+      // 200k random uuids — so without this guard the id itself wins the
+      // loop below and becomes the title: year 1993, make "4e13".
+      // Hagerty puts identity in the second-to-last segment behind exactly
+      // such an id (/marketplace/auction/1965-Ford-Mustang/{uuid}).
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg)) continue;
       // Must have dashes (slugified) and contain a 4-digit year
       if (seg.includes("-") && /\b(19|20)\d{2}\b/.test(seg)) {
         return cleanSlugTail(seg).replace(/-/g, " ");
@@ -1108,11 +1122,39 @@ interface IngestResult {
   location?: string | null;
 }
 
+/**
+ * Coerce a location of unknown shape to the string the rest of ingest assumes.
+ *
+ * `location` is typed `string` everywhere downstream and used unguarded
+ * (`.toLowerCase()` in the Tier-3 confidence scorer, `parseLocation()` on the
+ * write path). A TypeScript annotation is not a runtime check: on 2026-07-26
+ * extract-hagerty-listing returned Hagerty's GraphQL location OBJECT and every
+ * ingest call in the poll died with "parsed.location.toLowerCase is not a
+ * function" — 20/20. This is the single door extractor output comes through,
+ * so one coercion here protects every consumer from every extractor.
+ */
+function normalizeLocation(loc: unknown): string | null {
+  if (typeof loc === "string") return loc.trim() || null;
+  if (loc && typeof loc === "object") {
+    const o = loc as Record<string, unknown>;
+    const parts = [o.city, o.state, o.country]
+      .filter((p): p is string => typeof p === "string" && p.trim().length > 0);
+    if (parts.length) return parts.join(", ");
+    // Unknown object shape — drop it rather than stringify "[object Object]"
+    // into a field that gets displayed and geocoded.
+    return null;
+  }
+  return null;
+}
+
 async function ingestOne(input: IngestInput, userId: string | null): Promise<IngestResult> {
   try {
     // Strict boolean: a JSON string "false" must not silently turn a real ingest
     // into a preview (refuter finding, 2026-07-12).
     const isPreview = input.preview === true;
+
+    // Callers post arbitrary JSON — normalize before anything reads it.
+    input.location = normalizeLocation(input.location) ?? undefined;
 
     // Determine source
     let platform = "manual";
@@ -1265,7 +1307,9 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         if (!input.body_style && enriched.body_style) input.body_style = enriched.body_style;
         if (!input.title_status && enriched.title_status) input.title_status = enriched.title_status;
         if (!input.condition && enriched.condition) input.condition = enriched.condition;
-        if (!input.location && enriched.location) input.location = enriched.location;
+        if (!input.location && enriched.location) {
+          input.location = normalizeLocation(enriched.location) ?? undefined;
+        }
         if (!input.seller_name && enriched.seller_name) input.seller_name = enriched.seller_name;
         // Extracted identity beats slug-derived guesses (caller-explicit fields
         // were already merged into input above, so they still win)
