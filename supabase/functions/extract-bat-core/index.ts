@@ -169,7 +169,14 @@ function parseBatIdentityFromUrl(listingUrl: string): {
 
     const firstPart = parts[0].toLowerCase();
     if (multiWordMakes[firstPart] && parts.length > 1) {
-      const makeParts = multiWordMakes[firstPart].split(" ");
+      // Split on hyphen OR space. "Mercedes-Benz" is the only entry joined by a
+      // hyphen, so `.split(" ")` returned a ONE-element array, makeParts[1] was
+      // undefined, the second-token check could never match, and every Benz fell
+      // through to the single-word branch: make "Mercedes" (canonicalised back
+      // to "Mercedes-Benz" downstream) with "Benz ..." left at the head of the
+      // model. 2,343 rows carried a "-Benz ..." model, 44 of them in the 24h
+      // before this fix — it was still producing them.
+      const makeParts = multiWordMakes[firstPart].split(/[\s-]+/);
       const secondPart = parts[1].toLowerCase();
       if (secondPart === makeParts[1]?.toLowerCase()) {
         make = multiWordMakes[firstPart];

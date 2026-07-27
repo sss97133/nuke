@@ -23,7 +23,6 @@ import { SignalCard, useSignalCards } from './SignalCard';
 import { InterestsBar } from './InterestsBar';
 import { RecentlyViewed } from './RecentlyViewed';
 import { ReturnVisitBanner } from './ReturnVisitBanner';
-import { FreshFindsStrip } from './FreshFindsStrip';
 import { HeroPanel, type HeroDimension, type HeroFilter } from './HeroPanel';
 import { DEFAULT_FILTERS } from '../../lib/filterPersistence';
 import { useInterests } from '../../hooks/useInterests';
@@ -382,13 +381,6 @@ export default function FeedPage() {
           topMakes={topMakes}
           vehicles={vehicles}
           viewedWithPrices={viewedWithPrices}
-        />
-
-        {/* Ranked offers strip — get_ranked_offers (desire prior x freshness) */}
-        <FreshFindsStrip
-          previousVisit={previousVisit}
-          hasInterests={hasInterests}
-          topMakes={topMakes}
         />
 
         {/* Interest chips — shown when user has interests and no active filters */}
