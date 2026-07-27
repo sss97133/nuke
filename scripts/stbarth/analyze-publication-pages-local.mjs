@@ -183,6 +183,33 @@ function escapeInnerQuotes(s) {
   return out;
 }
 
+// Mixed escaping defeats any lookahead. Measured on blast-01 p50, the model
+// emitted  \\"en une semaine",  — it escaped the OPENING quote of a French
+// quotation and left the closing one bare, and that bare quote is followed by a
+// comma in the prose, which is exactly the shape a real end-of-string has.
+// No character-walk can tell those apart.
+//
+// So repair structurally instead of lexically: raw_text is the only free-prose
+// field in the schema and `confidence` always follows it. Lift the value between
+// those two fixed landmarks, escape it properly, and splice it back.
+function repairRawText(s) {
+  const startM = /"raw_text"\s*:\s*"/.exec(s);
+  if (!startM) return null;
+  const valStart = startM.index + startM[0].length;
+  const endM = /"\s*,\s*"confidence"/.exec(s.slice(valStart));
+  if (!endM) return null;
+  const valEnd = valStart + endM.index;
+  const value = s.slice(valStart, valEnd);
+  // Unescape what the model did escape, then escape the whole thing uniformly,
+  // so mixed input converges on one correct encoding.
+  const normalized = value
+    .replace(/\\"/g, '"')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t');
+  return s.slice(0, valStart) + JSON.stringify(normalized).slice(1, -1) + s.slice(valEnd);
+}
+
 function parseJson(text) {
   let cleaned = text.trim();
   // Strip markdown fences
@@ -196,6 +223,13 @@ function parseJson(text) {
   // Escape quotes the model left loose inside transcribed text
   try { return JSON.parse(escapeInnerQuotes(cleaned)); } catch {}
   try { return JSON.parse(escapeInnerQuotes(cleaned).replace(/,\s*([}\]])/g, '$1')); } catch {}
+  // Structural repair of the free-prose field (handles mixed escaping)
+  const repaired = repairRawText(cleaned);
+  if (repaired) {
+    try { return JSON.parse(repaired); } catch {}
+    try { return JSON.parse(escapeInnerQuotes(repaired)); } catch {}
+    try { return JSON.parse(repaired.replace(/,\s*([}\]])/g, '$1')); } catch {}
+  }
   // Extract largest {...}
   const match = cleaned.match(/\{[\s\S]*\}/);
   if (match) {
