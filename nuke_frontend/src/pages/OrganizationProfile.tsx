@@ -1347,12 +1347,25 @@ export default function OrganizationProfile() {
             runChunked(ids => supabase.from('vehicles').select('id, year, make, model, vin, current_value, asking_price, purchase_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score, auction_outcome').in('id', ids)),
             runChunked(ids => supabase.from('vehicle_images').select('vehicle_id, thumbnail_url, medium_url, image_url, variants, is_primary, created_at').in('vehicle_id', ids).order('is_primary', { ascending: false }).order('created_at', { ascending: true })),
             runChunked(ids => supabase.from('vehicle_listings').select('vehicle_id, id, status, sale_type, auction_end_time, current_high_bid_cents, bid_count, reserve_price_cents').in('vehicle_id', ids).eq('status', 'active').in('sale_type', ['auction', 'live_auction']).gt('auction_end_time', now)),
-            runChunked(ids => supabase.from('external_listings').select('vehicle_id, id, organization_id, listing_status, end_date, current_bid, bid_count, reserve_price, platform, listing_url, view_count, watcher_count, metadata').in('vehicle_id', ids).gt('end_date', now)),
+            // external_listings -> vehicle_events. external_listings is granted to
+            // service_role ONLY and carries ZERO RLS policies, so from a browser
+            // it answered 401 "permission denied" every single time — three
+            // queries x2 StrictMode = 6 failing requests per load — and
+            // runChunked swallows the error as `r.data || []`, so the page
+            // rendered as though these vehicles had no auction state at all.
+            // vehicle_events is the declared successor (see
+            // services/unifiedAuctionStateService.ts: "formerly external_listings"),
+            // is anon-readable with 2 RLS policies, and every one of its 414,143
+            // rows is a listing event (event_type: auction 388,282 / listing
+            // 25,860 / classified 1). Column aliases keep the consumer shape
+            // byte-identical. organization_id -> source_organization_id; the old
+            // column was populated on 1,751 of 139,760 rows.
+            runChunked(ids => supabase.from('vehicle_events').select('vehicle_id, id, organization_id:source_organization_id, listing_status:event_status, end_date:ended_at, current_bid:current_price, bid_count, reserve_price, platform:source_platform, listing_url:source_url, view_count, watcher_count, metadata').in('vehicle_id', ids).gt('ended_at', now)),
             runChunked(ids => supabase.from('bat_listings').select('vehicle_id, id, organization_id, seller_username, listing_status, auction_end_date, final_bid, bid_count, comment_count, view_count, reserve_price, bat_listing_url, bat_listing_title').in('vehicle_id', ids).gt('auction_end_date', nowDate)),
-            runChunked(ids => supabase.from('external_listings').select('vehicle_id, id, organization_id, listing_status, end_date, current_bid, final_price, sold_at, platform').in('vehicle_id', ids).eq('listing_status', 'sold')),
+            runChunked(ids => supabase.from('vehicle_events').select('vehicle_id, id, organization_id:source_organization_id, listing_status:event_status, end_date:ended_at, current_bid:current_price, final_price, sold_at, platform:source_platform').in('vehicle_id', ids).eq('event_status', 'sold')),
             runChunked(ids => supabase.from('bat_listings').select('vehicle_id, id, organization_id, listing_status, auction_end_date, final_bid, bat_listing_title').in('vehicle_id', ids).in('listing_status', ['sold', 'ended'])),
             runChunked(ids => supabase.from('vehicle_listings').select('vehicle_id, id, status, auction_end_time').in('vehicle_id', ids).lte('auction_end_time', now)),
-            runChunked(ids => supabase.from('external_listings').select('vehicle_id, id, listing_status, end_date').in('vehicle_id', ids)),
+            runChunked(ids => supabase.from('vehicle_events').select('vehicle_id, id, listing_status:event_status, end_date:ended_at').in('vehicle_id', ids).order('ended_at', { ascending: false, nullsFirst: false }).limit(1000)),
           ]);
 
           const allVehicles = { data: allVehiclesData };
