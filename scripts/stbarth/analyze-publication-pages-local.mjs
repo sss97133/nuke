@@ -116,9 +116,13 @@ async function fetchImageBase64(imageUrl) {
 // three attempts and marks a readable page permanently 'failed'. Measured on
 // blast-01 2026-07-26: pp.50/56/62/63/69 failed here and in analyze_pages_v2,
 // which carries the same fix as V2_NUM_PREDICT. Give each retry more room.
+// Base is 8192, measured not guessed: blast-01 p24 replied 6,213 chars cut
+// mid-word at 2048 and 6,621 chars closing cleanly at 8192. The ceiling costs
+// nothing on pages that finish early — generation stops at the stop sequence,
+// so a high ceiling only buys headroom for the dense ones.
 async function callOllama(base64Data, prompt, attempt = 0) {
   const t0 = Date.now();
-  const numPredict = parseInt(process.env.OCR_NUM_PREDICT || '2048', 10) * (attempt + 1);
+  const numPredict = parseInt(process.env.OCR_NUM_PREDICT || '8192', 10) * (attempt + 1);
   const headers = { 'Content-Type': 'application/json' };
   if (AUTH_TOKEN) headers['Authorization'] = `Bearer ${AUTH_TOKEN}`;
 
