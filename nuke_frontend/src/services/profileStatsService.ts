@@ -417,7 +417,22 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
           *,
           listing:auction_events(*, vehicle:vehicles(*))
         `)
-        .in('external_identity_id', identityIds)
+        // Filter the AUTHOR column, which is what "this contributor's comments"
+        // actually means — and it is the one that is indexed.
+        // auction_comments is 14.6M rows / 13 GB. external_identity_id has NO
+        // index, so this seq-scanned and died on the statement timeout: measured
+        // 2026-07-26, HTTP 500 after 16.1s on EVERY org profile load, and
+        // getOrganizationProfileData awaits it, so listings/bids/stories/services
+        // all queued behind a query that could never succeed.
+        // idx_auction_comments_author_external_identity_id serves this in 0.22s.
+        // The two columns hold the same value wherever both are set (200,000 of
+        // 200,000 sampled agree); author_external_identity_id is NULL on ~21% of
+        // rows that external_identity_id has, so the un-backfilled tail is not
+        // returned yet. Backfilling that column, or adding
+        //   CREATE INDEX CONCURRENTLY idx_auction_comments_external_identity_id
+        //     ON auction_comments(external_identity_id) WHERE external_identity_id IS NOT NULL;
+        // (a 13 GB build — owner's call) closes it.
+        .in('author_external_identity_id', identityIds)
         .eq('platform', 'bat')
         .order('posted_at', { ascending: false })
         .limit(100);
