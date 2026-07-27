@@ -327,8 +327,11 @@ export function ServiceVehicleCardRich({
                       <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)' }}>
                         {photos.toLocaleString()}
                       </span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '4px' }}>
-                        {photos === 1 ? 'photo' : 'photos'}
+                      {/* A real space, not just the 4px margin — margin is
+                          invisible to copy-paste and to a screen reader, which
+                          read this as "314photos". */}
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        {' '}{photos === 1 ? 'photo' : 'photos'}
                       </span>
                     </span>
                   )}
