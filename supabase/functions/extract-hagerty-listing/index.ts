@@ -541,8 +541,19 @@ function extractFromNextData(nextData: any, url: string): HagertyExtracted {
     }
   }
 
-  // Location
-  const location = item?.location || auction.location || null;
+  // Location. Hagerty's GraphQL returns an object
+  // ({__typename:"AuctionVehicleLocation", city:"Savannah", state:"Georgia"}),
+  // not the string this function's ExtractedListing type declares. Passing the
+  // object straight through crashed every ingest call on 2026-07-26
+  // ("parsed.location.toLowerCase is not a function") — 20/20 of a poll.
+  const rawLocation = item?.location || auction.location || null;
+  const location = typeof rawLocation === "string"
+    ? rawLocation
+    : rawLocation && typeof rawLocation === "object"
+    ? [rawLocation.city, rawLocation.state, rawLocation.country]
+      .filter((p) => typeof p === "string" && p.trim())
+      .join(", ") || null
+    : null;
 
   // Origin & classification
   const origin = Array.isArray(item?.origin) ? item.origin[0] : (item?.origin || null);
