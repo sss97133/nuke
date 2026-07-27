@@ -876,6 +876,59 @@ export default function OrganizationProfile() {
     return hasIdentity;
   }), [vehicles]);
 
+  const isServiceOrg = intelligence?.effectivePrimaryFocus === 'service';
+
+  /**
+   * Batch the whole In Service grid's stats into ONE call — but ONLY for orgs
+   * that actually draw that grid, and only when the set is small enough for the
+   * function to answer.
+   *
+   * `relationship_type='service_provider'` is not the shop relationship it reads
+   * as: a backfill applied it to every discovered vehicle's source venue, so
+   * Facebook Marketplace carries 10,578 of these links, Bring a Trailer 3,431,
+   * Craigslist 2,651, and the auction houses over a thousand each. Calling the
+   * RPC unconditionally put a 15.2s HTTP 500 on Bring a Trailer's page
+   * (measured 2026-07-26) — the function does 3 LATERALs per vehicle over
+   * vehicle_images and dies on the statement timeout well before 3,431.
+   *
+   * So: gate on the grid rendering at all, and cap at a size the function is
+   * measured to survive. Over the cap the cards self-fetch as before — slower,
+   * still correct, never a timeout.
+   */
+  const SERVICE_STATS_BATCH_MAX = 250;
+  const wantsServiceStats =
+    isServiceOrg &&
+    serviceVehicles.length > 0 &&
+    serviceVehicles.length <= SERVICE_STATS_BATCH_MAX;
+
+  useEffect(() => {
+    if (!organizationId) return;
+    if (!isServiceOrg || serviceVehicles.length === 0) return;
+
+    if (!wantsServiceStats) {
+      // Too big to batch — let the cards fetch their own and stop holding them.
+      setServiceStats({ byId: new Map(), settled: true });
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await OrganizationIntelligenceService.getServiceVehicles(organizationId);
+        if (cancelled) return;
+        const byId = new Map<string, ServiceVehicleStatsRow>();
+        for (const r of (rows || []) as ServiceVehicleStatsRow[]) {
+          if (r?.vehicle_id) byId.set(String(r.vehicle_id), r);
+        }
+        setServiceStats({ byId, settled: true });
+      } catch {
+        // Degrades to per-card fetching, never to wrong numbers.
+        if (!cancelled) setServiceStats({ byId: new Map(), settled: true });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [organizationId, isServiceOrg, wantsServiceStats, serviceVehicles.length]);
+
   // Helper function to parse year/make/model from BaT listing title
   const parseBatTitle = (title: string | null | undefined): { year?: number; make?: string; model?: string } => {
     if (!title) return {};
@@ -1591,25 +1644,6 @@ export default function OrganizationProfile() {
           setVehicles(withSeller);
         } catch {
           setVehicles([]);
-        }
-      })();
-
-      // Service card stats — ONE call for the whole In Service grid.
-      // Each ServiceVehicleCardRich used to fetch its own timeline_events +
-      // two vehicle_images queries; at 46 cards that was 138 round trips and
-      // 4.5-5.0s to settle. get_service_vehicles_for_org returns all of it.
-      // Cards fall back to self-fetching if this fails, so a failure here
-      // degrades speed, never correctness.
-      (async () => {
-        try {
-          const rows = await OrganizationIntelligenceService.getServiceVehicles(organizationId);
-          const byId = new Map<string, ServiceVehicleStatsRow>();
-          for (const r of (rows || []) as ServiceVehicleStatsRow[]) {
-            if (r?.vehicle_id) byId.set(String(r.vehicle_id), r);
-          }
-          setServiceStats({ byId, settled: true });
-        } catch {
-          setServiceStats({ byId: new Map(), settled: true });
         }
       })();
 
@@ -2800,8 +2834,8 @@ export default function OrganizationProfile() {
                 {(() => {
                   // For service orgs: show service vehicles
                   // For inventory orgs: show vehicles for sale
-                  const isServiceOrg = intelligence?.effectivePrimaryFocus === 'service';
-                  
+                  // isServiceOrg is hoisted above — the stats batch keys off the
+                  // same flag, so the fetch and the render can't disagree.
                   if (isServiceOrg) {
                     // serviceVehicles is the shared memo above — the same list
                     // the "In Service N" header counts.
