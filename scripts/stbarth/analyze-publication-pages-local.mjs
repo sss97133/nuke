@@ -226,8 +226,42 @@ async function analyzePage(page) {
     // The verdict for page_type is the COLUMN; no consumer reads
     // spatial_tags.page_type for classification (verified 2026-07-19 across
     // the mag analysis/pages routes and the enrich/crop scripts).
+    // Re-read and MERGE rather than replace. This pass used to assign
+    // spatial_tags wholesale, which silently destroyed anything another pass had
+    // put on the page: analyze_pages_v2 lands people_in_image/garments_visible,
+    // classify_image_class lands image_class, and the audit loop lands
+    // suspect:true demotions the owner has signed. A page that was OCR'd second
+    // lost all of it. (Same defect class fixed in analyze_pages_v2 on
+    // 2026-07-26, where a stale snapshot reverted owner decisions.)
+    const { data: liveRow } = await supabase
+      .from('publication_pages').select('spatial_tags').eq('id', id).single();
+    const live = (liveRow?.spatial_tags && typeof liveRow.spatial_tags === 'object') ? liveRow.spatial_tags : {};
+
+    // Arrays this pass produces are unioned with what is already there, and the
+    // EXISTING entry always wins on a name collision so demotions survive.
+    const mergeArr = (a, b, keyFn) => {
+      const out = Array.isArray(a) ? [...a] : [];
+      const seen = new Set(out.map(keyFn).filter(Boolean));
+      for (const it of (Array.isArray(b) ? b : [])) {
+        const k = keyFn(it);
+        if (k && !seen.has(k)) { seen.add(k); out.push(it); }
+      }
+      return out;
+    };
+    const nm = x => (typeof x?.name === 'string' ? x.name.trim().toLowerCase() : '');
     const spatialTags = {
-      ...parsed,
+      ...live,          // keys this pass does not produce (people_in_image,
+      ...parsed,        // garments_visible, image_class) survive untouched
+      brands:           mergeArr(live.brands, parsed.brands, nm),
+      people_mentioned: mergeArr(live.people_mentioned, parsed.people_mentioned, nm),
+      creative_credits: mergeArr(live.creative_credits, parsed.creative_credits,
+                                 x => nm(x) + '|' + (x?.role ?? '')),
+      locations:        mergeArr(live.locations, parsed.locations, nm),
+      ...(Array.isArray(live.people_in_image) && live.people_in_image.length
+          ? { people_in_image: live.people_in_image } : {}),
+      ...(Array.isArray(live.garments_visible) && live.garments_visible.length
+          ? { garments_visible: live.garments_visible } : {}),
+      ...(live.image_class ? { image_class: live.image_class, image_class_detail: live.image_class_detail } : {}),
       page_type_adjudicated: pageType,
       page_type_raw_vision_claim: visionType,
       page_type_decided_by: 'publication_pages.page_type column (printed spine outranks vision)',
