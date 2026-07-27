@@ -121,7 +121,7 @@ export function LiveOffersTable() {
               <tr>
                 <th style={th}>Age</th>
                 <th style={th}>Vehicle</th>
-                <th style={{ ...th, textAlign: 'right' }}>Ask</th>
+                <th style={{ ...th, textAlign: 'right' }}>Price</th>
                 <th style={th}>Era</th>
                 <th style={th}>Where</th>
                 <th style={th}>Source</th>
@@ -150,9 +150,20 @@ export function LiveOffersTable() {
                       </Link>
                     </td>
                     <td style={{ ...mono, textAlign: 'right' }}>
-                      {r.price != null
-                        ? '$' + Math.round(r.price).toLocaleString()
-                        : <span style={{ color: 'var(--text-muted)' }}>not priced yet</span>}
+                      {/* An ASK and a BID are opposite species (ask-nuke
+                          THEORY.md). A classified's number is what the seller
+                          wants; a live auction's number is what someone has
+                          already committed. Calling both "ask" misreads the
+                          auction ones by the full remaining run of the auction,
+                          so each row says which it is. */}
+                      {r.price != null ? (
+                        <>
+                          {'$' + Math.round(r.price).toLocaleString()}
+                          <span style={{ marginLeft: 5, fontSize: '8px', color: 'var(--text-muted)' }}>
+                            {r.price_source === 'listing' ? 'ASK' : 'BID'}
+                          </span>
+                        </>
+                      ) : <span style={{ color: 'var(--text-muted)' }}>not priced yet</span>}
                     </td>
                     <td style={{ ...td, fontSize: '9px', color: 'var(--text-muted)' }}>
                       {r.segment_slug?.replace(/^era-/, '') || '—'}
