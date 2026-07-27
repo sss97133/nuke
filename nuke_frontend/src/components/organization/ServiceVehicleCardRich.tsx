@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import { ServiceReportModal } from './ServiceReportModal';
 
 interface ServiceStats {
@@ -205,7 +206,17 @@ export function ServiceVehicleCardRich({
       onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--accent)'}
       onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
     >
-      {/* Image Grid - Top */}
+      {/* Image Grid - Top.
+          These thumbs render at ~37px in a 6-per-row grid, and every frame was
+          being fetched as the full-resolution original: measured 2026-07-26 on
+          this org, 140 storage requests, 224.8 MB, ZERO through the render API,
+          and after 25 seconds only 43 of 259 thumbnails had painted — which is
+          why the grid read as a wall of grey boxes. thumbnail_url and
+          medium_url are NULL on all 365 strip frames and `variants` is `{}`
+          with optimization_status='pending', so there is no pre-made small
+          version to reach for. optimizeImageUrl already solves this (it is what
+          ServiceVehicleCard uses) by routing through Supabase's render API with
+          resize=contain. No new machinery. */}
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(6, 1fr)', 
@@ -214,12 +225,16 @@ export function ServiceVehicleCardRich({
       }}>
         {stats?.recentImages.slice(0, 6).map((url, idx) => (
           <div key={idx} style={{ aspectRatio: '1', overflow: 'hidden' }}>
-            <img 
-              src={url} 
+            <img
+              src={optimizeImageUrl(url, 'thumbnail') || url}
               alt=""
-              style={{ 
-                width: '100%', 
-                height: '100%', 
+              loading="lazy"
+              decoding="async"
+              width={150}
+              height={150}
+              style={{
+                width: '100%',
+                height: '100%',
                 objectFit: 'cover'
               }}
             />
