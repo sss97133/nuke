@@ -309,25 +309,57 @@ NULL) — a filename search returns zero and makes the archive look empty when i
 
 ---
 
-## Where it goes
+## Where it goes — SWEPT LIVE 2026-07-27 (authenticated, all 6 groups read)
 Marketplace listing is the primary surface; the groups are cross-posts of it — that's
 natively how these groups work, every sale post in them is a shared Marketplace item.
 
-| Venue | Members | Posts/day | Reach ÷ noise | Status |
-|---|---|---|---|---|
-| Classic Mustangs for Sale | 87.8K | ~10 | **8,780** | JOINED |
-| All Mustangs For Sale 1965-73 CARS ONLY | 42.8K | 8 | 5,350 | JOINED |
-| MUSTANG BUY SELL TRADE | 252K | 50+ | 5,042 | PENDING |
-| Mustangs & parts 1964½-66 | 30.4K | 11 | 2,764 | PENDING |
-| Classic mustangs cars/parts for sale | 33.8K | 48 | 704 | JOINED |
-| Las Vegas Cars For Sale | 62.5K | 192 | 326 | JOINED |
+I got into all six groups (including the private ones) by driving a headless browser with
+your own Facebook session and read the feeds and searches directly. Here's what the three
+ranking factors actually resolved to:
 
-⚠️ **Reach ÷ noise is only one of three ranking factors, and it's the weakest.** It measures
-how long your post stays visible, not whether cars actually *sell* there. Factors 2 and 3 —
-SOLD-marked comparables per month, and what share of the feed is your exact segment —
-require the live browser sweep (procedure: `~/.claude/skills/fb-scraper` Mode 3, extractor
-at `scripts/extract-group-feed.js`). **Not yet measured.** Nuke's DB cannot substitute:
-it holds 115,712 Facebook rows and **zero** are group posts — all are `/marketplace/item/`.
+**Factor A — reach ÷ noise (measured):**
+
+| Venue | Members | Reach ÷ noise | Status |
+|---|---|---|---|
+| Classic Mustangs for Sale | 87.8K | **8,780** | JOINED |
+| All Mustangs For Sale 1965-73 CARS ONLY | 42.8K | 5,350 | JOINED |
+| MUSTANG BUY SELL TRADE | 252K | 5,042 | JOINED (was pending — now in) |
+| Mustangs & parts 1964½-66 | 30.4K | 2,764 | JOINED (was pending — now in) |
+| Classic mustangs cars/parts for sale | 33.8K | 704 | JOINED |
+| Las Vegas Cars For Sale | 62.5K | 326 | JOINED |
+
+**Factor B — do cars actually SELL here, and for what? → Facebook cannot tell you.**
+This factor is unmeasurable *from Facebook*, and that's a finding, not a gap. FB group search
+does not expose historical sold posts — sellers delete the post or mark the Marketplace item
+sold, neither of which surfaces in search. A live sweep of all six groups' "sold 1966 mustang"
+search returned exactly **one** SOLD text post (a $4,000 project coupe, Long Beach MS). So do
+NOT try to price against FB group history. **The authority for factor B is the Nuke comp DB**,
+already measured: '65-66 coupes median $19,000 sold, documented restoration +44%. Use that.
+
+**Factor C — geography + segment fit (measured, and it's the decisive one):**
+The live feeds split the venues cleanly, and geography is what matters for a cash-and-carry sale:
+- **National Mustang groups = right car, wrong buyer for cash.** Live '66-coupe asks pulled
+  this pass: $35,000 St Augustine FL · $26,000 Belfair WA · $25,000 Mt Morris MI · $12,000
+  (A-code) Bellefontaine OH · $9,000 La Crosse WI. All out of driving range of Boulder City.
+  These groups reach enthusiasts nationwide but nobody in them hands you cash locally.
+- **Las Vegas Cars For Sale = right geography, wrong crowd.** Its live feed was a Nissan Leaf,
+  a Chrysler 200, a Dodge Journey, a Microsoft Surface tablet. Zero classic buyers. A
+  documented $25K coupe is a violin at a swap meet there.
+- **Classic mustangs cars/parts is a PARTS counter** — radiators, dash pads, quarter-panel
+  glass. Right marque, $80 buyers, not whole-car buyers.
+- **Your only real local competitor is already visible**: the **$39,650 "1966 Cobra Coupe"
+  in Las Vegas** shows up in the national groups AND your local Marketplace field. It's a
+  Cobra tribute (dressed up beyond a plain coupe), so it sets the local *ceiling*, not your comp.
+
+**Live buyer-intent leads found this pass** (real people, worth more than the ranking):
+- Classic Mustangs for Sale: buyer in **NY looking for a '65-67, "willing to travel a little"** —
+  the closest thing to a live lead, though NY is far.
+- Also: someone seeking "a Mustang for my wife"; two others chasing specific '69s.
+
+**The decision this points to:** it is NOT "pick the best group." It's **Marketplace listed
+in Las Vegas as the primary cash-buyer surface, cross-posted to Classic Mustangs for Sale
+(reach) + Mustangs & parts 1964½-66 (your exact-year specialists) for national reach and to
+flush out a travel-willing buyer like the NY one.** Price off the Nuke DB, never off FB.
 
 Rules common to all: price + location + contact required in the post; no auctions, no
 "make offer"; don't disable comments (reads as scam); Mustang content only.
