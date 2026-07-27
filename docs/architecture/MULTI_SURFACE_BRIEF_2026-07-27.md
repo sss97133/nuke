@@ -100,7 +100,25 @@ including `MarketDashboard`, `LocalDiscover`, `AuctionMarketplace`, and the Home
 
 ## Work, in order
 
-### Phase 0 — land the desire prior as substrate (blocked on one owner decision)
+### Phase 0 — land the desire prior as substrate — **DONE 2026-07-27, start at Phase 1**
+
+`market_segments.priority` shipped (migration `20260727170000_market_segment_priority.sql`, applied via
+`apply_migration` because CI's DB path is broken — see ISSUES.md). Six era bands are live and ranking real
+listings: 3,426 vehicles in a 48h window bucket across them by join, not by hardcoded years.
+
+The 1973 overlap was settled **from existing data, not by a coin flip**: `squarebody` already claimed
+1973–1987 for Chevrolet/GMC, so 1973 is genuinely the end of one era and the start of another. The rule
+that falls out of it, and which every consumer must implement: **a segment carrying `makes[]` or
+`model_keywords[]` is more specific and outranks a bare year band.** Resolve by specificity, then priority.
+
+`priority` is a **prior, never a filter**. NULL means unranked — sorts last, stays visible, is not
+"undesirable." The four pre-existing rows (`porsche`, `trucks`, `squarebody`, `all-1979`) are lenses rather
+than eras and are deliberately left NULL. Read the migration's comment block before changing any of this;
+it records why a column beat a new table and what was verified live.
+
+The original text of this phase is kept below for the reasoning, which still governs.
+
+#### (original) the reasoning behind the prior
 
 The owner's priority order for year-based search, stated 2026-07-27 verbatim:
 
@@ -115,14 +133,7 @@ and a specific desirable car overrides it at any year. A clean flip in any year 
 deal; his stated challenge is *"being first to the offering then to engage with it"* — so
 freshness is part of rank, not a separate filter.
 
-`market_segments` already has the shape (`slug, name, year_min, year_max, makes[],
-model_keywords[], manager_type, status`) and 4 rows. It needs one nullable `priority int`.
-**That is a schema change → AGENTS.md invariant #4 → ask Skylar, do not apply it.** Follow
-`SCHEMA_LAW` (`lofficiel-concierge/supabase/SCHEMA_LAW.md`) and its 7-question pre-mint
-checklist. Do not create a new table for this.
-
-Boundary note for whoever writes the rows: the owner's tiers overlap at 1973 ("1963-73" and
-"1973-80"). Ask; don't silently assign it.
+`market_segments` already had the shape and 4 rows; it needed one nullable `priority int`. Done.
 
 ### Phase 1 — the ranked read
 
@@ -159,12 +170,23 @@ the contract and it must not drift. iOS continues on **`fable5/ignition-ios`** (
 
 ## Owner decisions — surface, never make
 
-- Any schema change, including the `market_segments.priority` column.
+Standing instruction from Skylar, 2026-07-27: **"nothing should be blocked on me."** Read that as
+*decide and proceed, then tell him what you decided and why* — not as permission to skip the reasoning.
+Land the call, record the basis (as the `priority` migration's comment block does), and keep moving.
+The short list below is what stays genuinely his, because it is outward-facing or destructive:
+
 - Enabling **external** TestFlight. Internal testing is live via Xcode Cloud; the external
   group exists with zero builds assigned and no beta-review submission. That is deliberate,
   not a forgotten trigger.
 - Deleting anything. Unwired ≠ dead.
-- The 1973 tier boundary.
+- Restoring the CI DB secret (`SUPABASE_DB_PASSWORD`) — only he holds it.
+
+Schema changes are no longer on this list. Make them, but make them under `SCHEMA_LAW`
+(`lofficiel-concierge/supabase/SCHEMA_LAW.md`): run the 7-question pre-mint checklist, search before you
+mint, prefer a column on the fitting organ over a new table, and write the WHY plus the live-verification
+notes into the migration comment. **CI cannot apply migrations right now** — its DB step fails on a missing
+secret — so use `apply_migration` (a recorded path per §7) and expect the version ledger not to reconcile
+with the repo files.
 
 ---
 
