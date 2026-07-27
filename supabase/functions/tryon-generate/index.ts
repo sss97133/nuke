@@ -49,7 +49,7 @@ async function klingToken(): Promise<string> {
 
 async function klingJson(path: string, init?: RequestInit): Promise<Record<string, any>> {
   const token = await klingToken();
-  const res = await fetch(`${KLING_BASE}${path}`, {
+  const res = await fetch(`${KLING_BASE}${path}`, { // guardrail-allow: raw-fetch — api.klingai.com JSON API, not a page fetch
     ...init,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
   });
@@ -185,7 +185,7 @@ async function pollJob(db: ReturnType<typeof svc>, j: Record<string, any>) {
     // mirror binary into concierge-media (same primitive as instagram-connect)
     let storagePath: string | null = null;
     try {
-      const bin = await fetch(imgUrl);
+      const bin = await fetch(imgUrl); // guardrail-allow: raw-fetch — same binary-mirror primitive as instagram-connect
       if (bin.ok) {
         const bytes = new Uint8Array(await bin.arrayBuffer());
         storagePath = `tryon/${j.id}/0.png`;

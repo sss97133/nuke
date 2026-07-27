@@ -106,7 +106,7 @@ async function isServiceCaller(jwt: string): Promise<boolean> {
 
 // ---------- IG API ----------
 async function igJson(url: string, init?: RequestInit): Promise<Record<string, unknown>> {
-  const res = await fetch(url, init);
+  const res = await fetch(url, init); // guardrail-allow: raw-fetch — graph.instagram.com JSON API, not a page fetch
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`IG ${res.status}: ${JSON.stringify(body).slice(0, 300)}`);
   return body as Record<string, unknown>;
@@ -348,7 +348,7 @@ async function syncConnection(db: ReturnType<typeof svc>, connectionId: string, 
         const src = (m.media_type === 'VIDEO' ? (m.thumbnail_url ?? m.media_url) : m.media_url) as string | undefined;
         if (src) {
           try {
-            const bin = await fetch(src);
+            const bin = await fetch(src); // guardrail-allow: raw-fetch — mirrors the IG CDN binary into concierge-media (never-hotlink rule)
             if (bin.ok) {
               const bytes = new Uint8Array(await bin.arrayBuffer());
               const ext = (m.media_type === 'VIDEO' ? 'jpg' : (src.split('?')[0].split('.').pop() ?? 'jpg')).slice(0, 4);
