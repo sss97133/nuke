@@ -384,7 +384,7 @@ export default function FeedPage() {
           viewedWithPrices={viewedWithPrices}
         />
 
-        {/* Fresh finds strip — top new vehicles matching interests since last visit */}
+        {/* Ranked offers strip — get_ranked_offers (desire prior x freshness) */}
         <FreshFindsStrip
           previousVisit={previousVisit}
           hasInterests={hasInterests}
