@@ -16,6 +16,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -417,10 +418,19 @@ function parseTitle(title: string): {
     shelby: "Shelby", ac: "AC", cobra: "AC Cobra",
   };
 
-  const rawMake = words[0].toLowerCase();
-  const make =
-    makeMap[rawMake] ||
-    words[0].charAt(0).toUpperCase() + words[0].slice(1).toLowerCase();
+  // Skip leading dimension/engine/spec tokens ("5x8", "22r", "500cc", "115",
+  // a doubled year) that FB titles lead with before the real make. (Gate 5.)
+  let mi = 0;
+  while (mi < words.length && !makeMap[words[mi].toLowerCase()] && isGarbageMake(words[mi])) mi++;
+  const makeToken = words[mi] ?? "";
+  const rawMake = makeToken.toLowerCase();
+  // Reject a still-garbage token outright: unknown make = null, never a
+  // number/single-char/year on a live listing.
+  const make = makeMap[rawMake]
+    ? makeMap[rawMake]
+    : (!makeToken || isGarbageMake(makeToken))
+    ? null
+    : makeToken.charAt(0).toUpperCase() + makeToken.slice(1).toLowerCase();
 
   const stopWords = [
     "pickup", "truck", "sedan", "coupe", "wagon", "van", "suv",
@@ -428,7 +438,7 @@ function parseTitle(title: string): {
     "runs", "drives", "project", "restored", "original", "clean", "rare",
   ];
   const modelParts: string[] = [];
-  for (let i = 1; i < Math.min(words.length, 5); i++) {
+  for (let i = mi + 1; i < Math.min(words.length, mi + 5); i++) {
     const lower = words[i].toLowerCase();
     if (stopWords.includes(lower)) break;
     if (/^[A-Z][a-z]+,$/.test(words[i])) break;

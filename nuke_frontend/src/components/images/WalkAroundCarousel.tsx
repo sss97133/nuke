@@ -67,7 +67,8 @@ function toRenderUrl(publicUrl: string, width: number, height: number, quality =
     const base = url.slice(0, idx);
     const path = url.slice(idx + marker.length).split('?')[0];
     if (!path) return null;
-    return `${base}/storage/v1/render/image/public/${path}?width=${width}&height=${height}&quality=${quality}&resize=cover`;
+    // resize=contain over cover — preserves portrait iPhone aspect ratios.
+    return `${base}/storage/v1/render/image/public/${path}?width=${width}&height=${height}&quality=${quality}&resize=contain`;
   } catch {
     return null;
   }

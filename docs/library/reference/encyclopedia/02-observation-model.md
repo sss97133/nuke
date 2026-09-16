@@ -1022,3 +1022,148 @@ The observation model transforms the platform from a vehicle listing database in
 The write layer (Tetris + observationWriter) ensures that truth materialization is safe: gap-fills never regress, conflicts are quarantined, and every write is auditable. The batch ingest pipeline scales observation intake to hundreds per request. The retroactive adoption pattern allows extractors to join the observation system incrementally without breaking their existing functionality.
 
 At 5.7 million observations across 449,747 vehicles from 160 sources, the observation model is the largest vehicle evidence database in the collector car space. Its value compounds: each new observation makes existing observations more valuable through corroboration, contradiction detection, and temporal sequencing.
+
+---
+
+## Per-Kind structured_data Shape
+
+For five years, the shape of `structured_data` was inherited from the source — a BaT listing has its own fields, an auction comment has its own fields, a sale result has its own fields. Each extractor decided what to put in the JSONB column.
+
+That changes when the source is an agent reading a photo. Vision agents without a published form will hallucinate structure — `paint_condition` on one submission, `exterior_paint` on the next, neither composable. The form-shape is the contract that turns Claude's natural-language interpretation into structured testimony.
+
+Each `kind` now has a canonical shape, published as a JSON Schema at `docs/api/schemas/v1/` and consumed by both the REST surface (`POST /v1/events`) and the MCP surface (`submit_vehicle_event`). The schema is enforced at submission time. A second contract — the **event checklist** returned by the `get_event_checklist` MCP tool — is enforced at suggestion time, telling Claude where each field's answer comes from.
+
+> See `docs/library/intellectual/contemplations/the-form-is-the-thing.md` for why this matters.
+
+### The Three Annotations
+
+Every field in every form-shape carries a triplet that tells the agent how to fill it:
+
+| Annotation | Meaning | Example field |
+|---|---|---|
+| `vision_fillable` | Agent can populate from a photo alone. | `zones_touched`, `condition_observations[].severity`, `body.paint_condition` |
+| `context_fillable` | Agent can populate from what the user just said. | `labor_minutes`, `shop_ref`, `narrative` |
+| `tool_fillable` | Agent must call another tool to populate. | `vehicle_ref.vin` (lookup), `correction_of` (history query) |
+
+A field can carry multiple annotations. `narrative` is both vision_fillable (describe what you see) and context_fillable (echo what the user said). The annotations are guidance, not gates — the schema validates the result, not the path.
+
+### Per-Kind Canonical Fields
+
+#### `work_record` — service, modification
+
+Routes from `event_type` `service` (a wrench-time session) and `modification` (an aftermarket change). Source slug `shop` for owner-trust submissions.
+
+| Field | Type | Vision | Context | Tool | Notes |
+|---|---|---|---|---|---|
+| `summary` | string (1–500) | yes | yes | — | Required. 1–2 sentence headline. |
+| `narrative` | string (≤32K) | yes | yes | — | Long-form description. |
+| `zones_touched` | enum array | yes | yes | — | `engine_bay`, `undercarriage`, `interior`, `wheels`, `drivetrain`, `cooling`, `electrical`, `fuel`, `ignition`, `suspension`, `brakes`, `body`, `other`. |
+| `work_performed` | string array | — | yes | — | Discrete actions completed. |
+| `work_planned` | string array | — | yes | — | Actions queued for next session. |
+| `parts[]` | object array | yes | yes | yes | `name`, `manufacturer`, `part_number`, `quantity`, `status` (`needed`/`ordered`/`installed`/`considered_rejected`). |
+| `decisions[]` | object array | — | yes | — | `question`, `outcome`, `reasoning`. |
+| `condition_observations[]` | object array | yes | yes | — | `system` enum, `finding`, `severity` (`info`/`monitor`/`concern`/`critical`). |
+| `labor_minutes` | number | — | yes | — | Wrench time. |
+| `shop_ref` | string | — | yes | — | "NUKE LTD bay 2", "home garage". |
+
+Schema: `docs/api/schemas/v1/service.json`. Modification reuses the service shape with `modification_type` added.
+
+#### `condition` — inspection, condition_assessment
+
+Routes from `event_type` `inspection` (deliberate examination — PPI, walk-around, photo audit) and `condition_assessment` (rolled-up state report). Source slug `agent-submission`. **Closed schema** — `additionalProperties: false` because inspections are checklists.
+
+| Field | Type | Vision | Context | Tool | Notes |
+|---|---|---|---|---|---|
+| `summary` | string (1–500) | yes | yes | — | Required. |
+| `inspection_type` | enum | — | yes | — | `pre_purchase`, `walk_around`, `photo_audit`, `post_work_qc`, `annual_check`, `incident_report`, `other`. |
+| `inspector_role` | enum | — | yes | — | `agent_vision`, `owner_self`, `shop`, `third_party_expert`. |
+| `zones_inspected` | enum array | yes | yes | — | Closed enum aligned with `zones_touched`. |
+| `findings[]` | object array | yes | yes | — | Required, ≥1. Each finding: `system` enum, `finding`, `severity` enum, optional `evidence_photo_ref`. |
+| `overall_condition` | enum | yes | yes | — | `excellent`/`good`/`fair`/`rough`/`project`/`parts_only`. |
+| `deferred_maintenance_minutes` | number | yes | yes | — | Estimated wrench-time backlog. |
+| `photos_referenced` | string array | — | yes | — | Caller-side photo identifiers. |
+
+Schema: `docs/api/schemas/v1/inspection.json`. The closed schema is intentional — checklists do not accept "additional properties" because the checklist IS the contract.
+
+#### `media` — photo, video, document attachment
+
+Not yet a top-level `event_type` in v1; media flows through the envelope's `media[]` array. The substrate shape on `vehicle_observations` for media:
+
+| Field | Type | Vision | Context | Tool | Notes |
+|---|---|---|---|---|---|
+| `media_type` | enum | — | yes | — | `image`, `video`, `audio`, `document`. |
+| `url` | URI | — | yes | — | Publicly addressable resource. |
+| `sha256` | hex string | — | — | yes | Lowercase hex SHA-256, integrity check. |
+| `caption` | string (≤1024) | yes | yes | — | What the agent sees. |
+| `zones_visible` | enum array | yes | — | — | Same enum as `zones_inspected`. |
+
+When v1.1 routes `event_type=media`, the schema lands at `docs/api/schemas/v1/media.json`.
+
+#### `comment` — note
+
+Routes from `event_type` `note`. Source slug `agent-submission`. Minimal by design — notes are the escape hatch when nothing more structured fits.
+
+| Field | Type | Vision | Context | Tool | Notes |
+|---|---|---|---|---|---|
+| `summary` | string (1–280) | yes | yes | — | Required. Short headline. |
+| `narrative` | string (≤32K) | yes | yes | — | Optional longer body. |
+
+Schema: `docs/api/schemas/v1/note.json`.
+
+#### `expense` — receipt, parts purchase
+
+Not yet a top-level `event_type` in v1 (deferred to receipt-bridge work). The substrate shape on `vehicle_observations` for expense:
+
+| Field | Type | Vision | Context | Tool | Notes |
+|---|---|---|---|---|---|
+| `merchant` | string | yes | yes | — | Vendor name (Summit Racing, NAPA, etc.). |
+| `total` | number | yes | yes | — | Total amount, currency assumed USD. |
+| `currency` | ISO-4217 | — | yes | — | Default USD. |
+| `purchased_at` | date-time | yes | yes | — | When the transaction happened. |
+| `line_items[]` | object array | yes | yes | — | `name`, `quantity`, `unit_price`, `total`. |
+| `parts_referenced[]` | string array | yes | yes | — | Parts mentioned, normalized for join with `parts_catalog`. |
+| `payment_method` | enum | yes | yes | — | `cash`, `card`, `check`, `wire`, `other`. |
+| `receipt_image_ref` | string | — | yes | — | Caller-side photo identifier. |
+
+Will be schematized as `docs/api/schemas/v1/expense.json` when receipt → observation bridge ships.
+
+### The get_event_checklist Contract
+
+The `get_event_checklist(event_type)` MCP tool returns a Claude-actionable per-field guide for any event type:
+
+```typescript
+{
+  event_type: "service",
+  fields: [
+    {
+      name: "zones_touched",
+      type: "string[]",
+      required: false,
+      description: "Vehicle subsystems involved in this session.",
+      why_it_matters: "Drives timeline rendering and downstream gap-fill — a session that touched 'cooling' tells the system to weight subsequent cooling-related observations higher.",
+      enum: ["engine_bay", "undercarriage", "interior", "wheels", "drivetrain", "cooling", "electrical", "fuel", "ignition", "suspension", "brakes", "body", "other"],
+      vision_fillable: true,
+      context_fillable: true,
+      tool_fillable: false,
+      example: ["engine_bay", "drivetrain"]
+    },
+    // ... one entry per field in the JSON Schema
+  ]
+}
+```
+
+The data is inlined in the MCP connector — no DB lookup. The checklist is the form-shape's instruction manual: the JSON Schema validates structure, the checklist tells the agent how to produce structure that validates.
+
+### Why Per-Kind Shape, Not Universal Shape
+
+Earlier drafts proposed a single `vehicle_event` JSON Schema with optional fields for everything. That was rejected. A universal shape forces the agent to figure out which fields are relevant; a per-kind shape tells the agent which fields ARE the event. The agent's job is to fill the form, not to design it.
+
+The cost: more schemas to maintain. The benefit: every submission of a given kind has a known shape, and the timeline can render structured details for every event without "see narrative" fallbacks.
+
+### Cross-references
+
+- **Form-shape framing**: `docs/library/intellectual/contemplations/the-form-is-the-thing.md`
+- **External Agent Write API**: Chapter 7 — how the form gets delivered to Claude over REST and MCP.
+- **JSON Schemas**: `docs/api/schemas/v1/{envelope,service,inspection,note}.json`. Future: `modification.json`, `condition_assessment.json`, `media.json`, `expense.json`.
+- **Dictionary entries**: `docs/library/reference/dictionary/{service,inspection,modification,note,condition_assessment,form-shape,vision-fillable}.md`.
+- **MCP tool**: `get_event_checklist` in `supabase/functions/mcp-connector/index.ts`.

@@ -12,9 +12,57 @@
  * Design: see docs/library/technical/design-book/11-intelligence-surface.md
  * Philosophy: see docs/library/intellectual/discourses/the-knowing-system.md
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
+import { supabase } from '../../lib/supabase';
 import type { VehicleIntel, CommentIntel, Apparition, CompSale } from './hooks/useVehicleIntel';
+
+// ---------------------------------------------------------------------------
+// Eye read — the evidence-graded appraisal (vehicle_condition_scores).
+// When present it OWNS the value story; the model estimate is demoted.
+// A price we can't defend is never the headline (valuation-block doctrine).
+// ---------------------------------------------------------------------------
+
+interface EyeRead {
+  band: [number, number] | null;
+  conditionClass: string | null;
+  tier: string;
+  score: number;
+  frames: number | null;
+  method: string;
+  computedAt: string;
+}
+
+function useEyeRead(vehicleId: string | undefined): EyeRead | null {
+  const [read, setRead] = useState<EyeRead | null>(null);
+  useEffect(() => {
+    if (!vehicleId) return;
+    let alive = true;
+    supabase
+      .from('vehicle_condition_scores')
+      .select('condition_score, condition_tier, descriptor_summary, observation_count, computed_at, computation_version')
+      .eq('vehicle_id', vehicleId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!alive || !data) return;
+        const ds: any = data.descriptor_summary || {};
+        const band = Array.isArray(ds.as_is_band_usd) && ds.as_is_band_usd[0] != null
+          ? [Number(ds.as_is_band_usd[0]), Number(ds.as_is_band_usd[1])] as [number, number]
+          : null;
+        setRead({
+          band,
+          conditionClass: typeof ds.condition_class === 'string' ? ds.condition_class.split('(')[0].trim() : null,
+          tier: data.condition_tier,
+          score: Number(data.condition_score),
+          frames: data.observation_count,
+          method: data.computation_version || 'appraisal',
+          computedAt: data.computed_at,
+        });
+      });
+    return () => { alive = false; };
+  }, [vehicleId]);
+  return read;
+}
 
 // ---------------------------------------------------------------------------
 // Design tokens — matches vehicle-profile.css system
@@ -47,7 +95,26 @@ function generateHeadline(
   vehicle: any,
   intel: VehicleIntel | null,
   observationCount: number,
+  eyeRead: EyeRead | null = null,
 ): HeadlineResult | null {
+  // Priority 0: the Eye's evidence-graded read. When it exists, THE value story
+  // is the band vs the real price — never the undefended model estimate.
+  if (eyeRead?.band) {
+    const [lo, hi] = eyeRead.band;
+    const fmt = (n: number) => '$' + Math.round(n / 100) / 10 + 'k';
+    const price = vehicle?.sale_price || vehicle?.sold_price || vehicle?.asking_price || vehicle?.price;
+    const cls = eyeRead.conditionClass ? ` · ${eyeRead.conditionClass}` : '';
+    if (price && price > 0) {
+      const pos = price < lo ? `${fmt(price)} is BELOW the band`
+        : price <= hi ? `${fmt(price)} is IN BAND`
+        : `${fmt(price)} is ${fmt(price - hi)} above what the evidence proves`;
+      return {
+        text: `Evidence read: ${fmt(lo)}–${fmt(hi)} as-is${cls} — ${pos}`,
+        severity: price <= hi ? 'ok' : 'warning',
+      };
+    }
+    return { text: `Evidence read: ${fmt(lo)}–${fmt(hi)} as-is${cls}`, severity: 'info' };
+  }
   // Priority 1: HIGH-severity red flags only (real warnings, not trivia)
   const flags = intel?.description_intel?.red_flags;
   const highFlags = flags?.filter(f => f.sev?.toLowerCase() === 'high');
@@ -73,13 +140,14 @@ function generateHeadline(
   if (estimate && asking && estimate > 0 && asking > 0) {
     const ratio = Math.max(estimate, asking) / Math.min(estimate, asking);
     if (ratio < 5) {
-      const diff = ((estimate - asking) / asking) * 100;
+      // Percent is of the ESTIMATE (a price can never be >100% below a value).
+      const diff = ((estimate - asking) / estimate) * 100;
       const fmt = (n: number) => '$' + Math.round(n).toLocaleString();
       if (diff > 15) {
-        return { text: `Priced ${Math.round(diff)}% below estimated value (${fmt(estimate)})`, severity: 'ok' };
+        return { text: `Priced ${Math.round(diff)}% below model estimate (${fmt(estimate)})`, severity: 'ok' };
       }
       if (diff < -15) {
-        return { text: `Priced ${Math.round(Math.abs(diff))}% above estimated value (${fmt(estimate)})`, severity: 'info' };
+        return { text: `Priced ${Math.round(Math.abs(diff))}% above model estimate (${fmt(estimate)})`, severity: 'info' };
       }
     }
   }
@@ -206,10 +274,11 @@ const CompRow: React.FC<{ comp: CompSale }> = ({ comp }) => {
 const VehicleBriefing: React.FC = () => {
   const { vehicle, vehicleIntel, vehicleIntelLoading, observationCount } = useVehicleProfile();
   const [showComps, setShowComps] = useState(false);
+  const eyeRead = useEyeRead(vehicle?.id);
 
   if (!vehicle || vehicleIntelLoading) return null;
 
-  const headline = generateHeadline(vehicle, vehicleIntel, observationCount);
+  const headline = generateHeadline(vehicle, vehicleIntel, observationCount, eyeRead);
   const estimate = vehicle.nuke_estimate;
   const scores = vehicleIntel?.scores;
   const comps = vehicleIntel?.recent_comps;
@@ -219,9 +288,24 @@ const VehicleBriefing: React.FC = () => {
   // Compute stat pills
   const pills: StatPillProps[] = [];
 
-  if (estimate && estimate > 0) {
+  if (eyeRead?.band) {
+    // The Eye leads; carry the date so freshness is never a mystery.
+    const [lo, hi] = eyeRead.band;
     pills.push({
-      label: 'ESTIMATE',
+      label: 'EYE READ',
+      value: `$${Math.round(lo / 100) / 10}k–$${Math.round(hi / 100) / 10}k`,
+    });
+    pills.push({
+      label: 'READ ON',
+      value: new Date(eyeRead.computedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    });
+    if (eyeRead.frames) {
+      pills.push({ label: 'FRAMES', value: String(eyeRead.frames) });
+    }
+  } else if (estimate && estimate > 0) {
+    // Legacy model estimate only when no evidence read exists — and labeled as such.
+    pills.push({
+      label: 'MODEL EST',
       value: '$' + Math.round(estimate).toLocaleString(),
     });
   }

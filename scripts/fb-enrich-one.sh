@@ -43,7 +43,7 @@ while IFS= read -r URL; do
       [ "$COUNT" = "0" ] && IS_PRIMARY="true" && PRIMARY="$PUBLIC_URL"
 
       # Insert vehicle_image record + media observation
-      PGPASSWORD="RbzKq32A0uhqvJMQ" psql -q -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
+      PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -q -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
         -U postgres.qkgaybvrernstplzjaam -d postgres <<EOSQL
 INSERT INTO vehicle_images (vehicle_id, image_url, is_primary, source)
 VALUES ('${VEHICLE_ID}', '${PUBLIC_URL}', ${IS_PRIMARY}, 'facebook-saved')
@@ -66,7 +66,7 @@ done <<< "$URLS"
 
 # Set primary image on vehicle
 if [ -n "$PRIMARY" ]; then
-  PGPASSWORD="RbzKq32A0uhqvJMQ" psql -q -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
+  PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -q -h aws-0-us-west-1.pooler.supabase.com -p 6543 \
     -U postgres.qkgaybvrernstplzjaam -d postgres \
     -c "UPDATE vehicles SET primary_image_url = '${PRIMARY}' WHERE id = '${VEHICLE_ID}';"
 fi

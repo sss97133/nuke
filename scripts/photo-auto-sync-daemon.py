@@ -35,7 +35,7 @@ from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass, field
 
 import requests
-from PIL import Image
+from PIL import Image, ExifTags
 import pillow_heif
 
 # Register HEIF support
@@ -817,6 +817,43 @@ def get_photo_albums(photo) -> List[str]:
         return []
 
 
+def _read_exif_capture_date(img: "Image.Image") -> Optional[datetime]:
+    """The TRUE capture instant, read from the file's embedded EXIF
+    DateTimeOriginal (+ OffsetTimeOriginal when present).
+
+    Mirrors CameraEXIF.captureDate(from:) in the iOS/mac capture apps
+    (Sources/NukeCapture/CameraEXIF.swift): this is the raw source of
+    truth — it survives intact even when the Photos-library asset date
+    (ZASSET.ZDATECREATED, i.e. `photo.date`) is the date the photo was
+    *re-added* to the library (iCloud restore/migration/library merge).
+    Always prefer this over `photo.date`. Returns None only when the file
+    carries no DateTimeOriginal (stripped EXIF, screenshot, non-JPEG/HEIC
+    container, or a read error) — caller falls back to `photo.date`.
+    """
+    try:
+        exif = img.getexif()
+        exif_ifd = exif.get_ifd(ExifTags.IFD.Exif)
+        original = exif_ifd.get(36867)  # DateTimeOriginal
+        if not original:
+            return None
+        # DateTimeOriginal is local wall-clock ("YYYY:MM:DD HH:MM:SS").
+        dt = datetime.strptime(original, "%Y:%m:%d %H:%M:%S")
+        offset = exif_ifd.get(36881)  # OffsetTimeOriginal, e.g. "-07:00"
+        if offset:
+            try:
+                sign = -1 if offset.startswith('-') else 1
+                hh, mm = offset.lstrip('+-').split(':')
+                dt = dt.replace(tzinfo=timezone(sign * timedelta(hours=int(hh), minutes=int(mm))))
+                return dt
+            except Exception:
+                pass
+        # No embedded offset: interpret the wall-clock in this machine's
+        # current zone. Still the file's own date — never the re-add date.
+        return dt.astimezone()
+    except Exception:
+        return None
+
+
 def export_and_convert(photo, export_dir: Path) -> Optional[Tuple[Path, Dict]]:
     """Read photo directly from Photos library and convert to JPEG if needed."""
     try:
@@ -831,8 +868,12 @@ def export_and_convert(photo, export_dir: Path) -> Optional[Tuple[Path, Dict]]:
         jpeg_name = f"{photo.uuid}.jpg"
         jpeg_path = export_dir / jpeg_name
 
+        exif_capture_date = None
         try:
             img = Image.open(file_path)
+            # Read the TRUE EXIF capture date before any mode conversion —
+            # photo.date (ZASSET.ZDATECREATED) is Apple's MUTABLE re-add date.
+            exif_capture_date = _read_exif_capture_date(img)
             if img.mode in ('RGBA', 'P'):
                 img = img.convert('RGB')
 
@@ -854,10 +895,13 @@ def export_and_convert(photo, export_dir: Path) -> Optional[Tuple[Path, Dict]]:
             else:
                 return None
 
+        # Prefer the true EXIF capture date; fall back to the Photos asset
+        # date only when the file carries no DateTimeOriginal.
+        taken_at = exif_capture_date or photo.date
         metadata = {
             'uuid': photo.uuid,
             'original_filename': photo.original_filename or photo.filename,
-            'date_taken': photo.date.isoformat() if photo.date else None,
+            'date_taken': taken_at.isoformat() if taken_at else None,
             'date_added': photo.date_added.isoformat() if photo.date_added else None,
             'width': photo.width,
             'height': photo.height,
@@ -1032,7 +1076,7 @@ def create_vehicle_image_record(
     )
 
     try:
-        db_password = os.getenv('SUPABASE_DB_PASSWORD', 'RbzKq32A0uhqvJMQ')
+        db_password = os.getenv('SUPABASE_DB_PASSWORD', f"{os.environ['SUPABASE_DB_PASSWORD']}")
         result = subprocess.run(
             ['psql', '-h', 'aws-0-us-west-1.pooler.supabase.com', '-p', '6543',
              '-U', 'postgres.qkgaybvrernstplzjaam', '-d', 'postgres',

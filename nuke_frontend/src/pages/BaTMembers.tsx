@@ -59,9 +59,10 @@ export default function BaTMembers() {
           if (commentsCount === 0 || listingsCount === 0) {
             // Get comment count
             const { count: commentCount } = await supabase
-              .from('bat_comments')
+              .from('auction_comments')
               .select('*', { count: 'exact', head: true })
-              .eq('external_identity_id', member.id);
+              .eq('external_identity_id', member.id)
+              .eq('platform', 'bat');
 
             // Get listing count (as seller)
             const { count: listingCount } = await supabase

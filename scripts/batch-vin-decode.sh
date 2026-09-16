@@ -3,7 +3,7 @@
 # ~35K records in ~30 minutes
 set -uo pipefail
 
-DB="postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
+DB="postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
 LOG="/tmp/nuke-overnight/main.log"
 BATCH_SIZE=50
 TOTAL=0

@@ -165,19 +165,11 @@ export class FlexibleAuctionService {
 
       // Submit bid
       const now = new Date();
-      const { data: bidData, error: bidError } = await supabase
-        .from('auction_bids')
-        .insert({
-          auction_id: auctionId,
-          bidder_id: bidderId,
-          amount: bidAmount,
-          bid_timestamp: now,
-          extended_auction: shouldExtend
-        })
-        .select()
-        .single();
-
-      if (bidError) throw bidError;
+      // TODO(ghost-ref 2026-07-12): auction_bids does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+      // No target table maps the (auction_id, bidder_id, amount) native-bid columns —
+      // bat_bids / external_auction_bids are keyed to scraped external listings, not native bids.
+      // Skip the insert so the bid flow does not crash; the auctions row still updates below.
+      const bidData: Bid | undefined = undefined;
 
       // Update auction with new bid
       const { data: updatedData, error: updateError } = await supabase
@@ -307,16 +299,12 @@ export class FlexibleAuctionService {
   /**
    * Get all bids for an auction
    */
-  static async getAuctionBids(auctionId: string): Promise<Bid[]> {
+  static async getAuctionBids(_auctionId: string): Promise<Bid[]> {
     try {
-      const { data, error } = await supabase
-        .from('auction_bids')
-        .select('*')
-        .eq('auction_id', auctionId)
-        .order('bid_timestamp', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
+      // TODO(ghost-ref 2026-07-12): auction_bids does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+      // No native-bid table exists (bat_bids / external_auction_bids key to scraped external
+      // listings, not native auction_id bids). Return empty so callers render an empty bid list.
+      return [];
     } catch (error) {
       console.error('Failed to get auction bids:', error);
       return [];

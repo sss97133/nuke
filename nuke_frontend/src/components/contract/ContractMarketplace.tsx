@@ -95,7 +95,7 @@ export default function ContractMarketplace({ curatorId, onSelectContract }: Con
         if (v.primary_image_url) {
           // Use render transform for smaller thumbnails
           imageMap[v.id] = v.primary_image_url.includes('/storage/v1/object/public/')
-            ? v.primary_image_url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=300&quality=70'
+            ? v.primary_image_url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=300&quality=70&resize=contain'
             : v.primary_image_url;
         }
       }

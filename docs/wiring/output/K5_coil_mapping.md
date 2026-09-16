@@ -90,7 +90,7 @@ All 8 coils share a common B+ power feed (Pin C) and chassis ground (Pin D). The
 
 - **B+ source:** PDM30 dedicated output or ignition relay, 12 AWG minimum feed wire to coil bus
 - **Ground:** Dedicated ground stud on DEL-Stributor bracket or engine block, 12 AWG minimum
-- **Bus wire:** 16 AWG TXL daisy-chain or bus bar on the DEL-Stributor bracket
+- **Bus wire:** 16 AWG M22759/32 daisy-chain or bus bar on the DEL-Stributor bracket
 
 ### Per-Coil Wiring Summary
 
@@ -152,14 +152,14 @@ The following wire labels in the cut list must be updated to match this authorit
 
 | Wire # | Label | M130 Pin | Gauge | Color | Length | Notes |
 |--------|-------|----------|-------|-------|--------|-------|
-| #24 | Ignition Coil — Cyl 1 | M130:A03 | 20 AWG TXL | WHT/ORG | 4.6ft | Driver front. DEL-Stributor slot 1. |
-| #9 | Ignition Coil — Cyl 2 | M130:A04 | 20 AWG TXL | WHT/RED | 4.6ft | Passenger front. DEL-Stributor slot 2. |
-| #5 | Ignition Coil — Cyl 3 | M130:A05 | 20 AWG TXL | WHT | 4.6ft | Driver mid-front. DEL-Stributor slot 3. |
-| #10 | Ignition Coil — Cyl 4 | M130:A06 | 20 AWG TXL | WHT/BLU | 4.6ft | Passenger mid-front. DEL-Stributor slot 4. |
-| #7 | Ignition Coil — Cyl 5 | M130:A07 | 20 AWG TXL | WHT/WHT | 4.6ft | Driver mid-rear. DEL-Stributor slot 5. |
-| #11 | Ignition Coil — Cyl 6 | M130:A08 | 20 AWG TXL | WHT/YEL | 4.6ft | Passenger mid-rear. DEL-Stributor slot 6. |
-| #8 | Ignition Coil — Cyl 7 | M130:A12 | 20 AWG TXL | WHT/BLK | 4.6ft | Driver rear. DEL-Stributor slot 7. |
-| #12 | Ignition Coil — Cyl 8 | M130:A13 | 20 AWG TXL | WHT/VIO | 4.6ft | Passenger rear. DEL-Stributor slot 8. |
+| #24 | Ignition Coil — Cyl 1 | M130:A03 | 20 AWG M22759/32 | WHT/ORG | 4.6ft | Driver front. DEL-Stributor slot 1. |
+| #9 | Ignition Coil — Cyl 2 | M130:A04 | 20 AWG M22759/32 | WHT/RED | 4.6ft | Passenger front. DEL-Stributor slot 2. |
+| #5 | Ignition Coil — Cyl 3 | M130:A05 | 20 AWG M22759/32 | WHT | 4.6ft | Driver mid-front. DEL-Stributor slot 3. |
+| #10 | Ignition Coil — Cyl 4 | M130:A06 | 20 AWG M22759/32 | WHT/BLU | 4.6ft | Passenger mid-front. DEL-Stributor slot 4. |
+| #7 | Ignition Coil — Cyl 5 | M130:A07 | 20 AWG M22759/32 | WHT/WHT | 4.6ft | Driver mid-rear. DEL-Stributor slot 5. |
+| #11 | Ignition Coil — Cyl 6 | M130:A08 | 20 AWG M22759/32 | WHT/YEL | 4.6ft | Passenger mid-rear. DEL-Stributor slot 6. |
+| #8 | Ignition Coil — Cyl 7 | M130:A12 | 20 AWG M22759/32 | WHT/BLK | 4.6ft | Driver rear. DEL-Stributor slot 7. |
+| #12 | Ignition Coil — Cyl 8 | M130:A13 | 20 AWG M22759/32 | WHT/VIO | 4.6ft | Passenger rear. DEL-Stributor slot 8. |
 
 ### What Changed
 

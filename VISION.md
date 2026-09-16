@@ -359,7 +359,7 @@ The architecture exists because of the constraint. One founder. Zero outside eng
 > "You're not in a WeWork. You're in a garage in Boulder City building data infrastructure between oil changes. That's the whole story."
 > — YC_VIDEO_STORYBOARD.md
 
-**The physical business is real:** K5 Blazer build: $124K invested, 6,580 labor minutes, $150-250K target. Highboy consignment: $90-150K relaunch, 17 months managed, $11,927 broker-absorbed costs. 6 active restomod builds. 200+ legacy auto industry contacts from Viva Las Vegas Autos. Server at 707 Yucca running YONO.
+**The physical business is real:** active restomod builds and decades of dealer relationships feed the platform directly.
 
 ---
 

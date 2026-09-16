@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
-import { usePopup } from '../../components/popups/usePopup';
+import { supabase } from '../../lib/supabase';
+import { VEHICLE_DAY_OPEN_EVENT } from './VehiclePhotoLightbox';
 
 interface BarcodeTimelineProps {}
 
@@ -171,6 +172,13 @@ function formatEventLabel(ev: any): string {
     return 'Photo Session';
   }
 
+  // Pending analysis that's actually been analyzed — render as completed photo session
+  if (eventType === 'pending_analysis' && ev.metadata?.analysis_complete === true) {
+    const count = ev.metadata?.image_count || 0;
+    if (count > 0) return `Analyzed (${count} photos)`;
+    return 'Analyzed';
+  }
+
   if (eventType === 'vehicle_added') {
     if (platform) return `Added via ${platform}`;
     if (ev.user_id) return 'Added by User';
@@ -234,8 +242,16 @@ function extractAreas(description: string): string[] {
   return areas;
 }
 
-// Lazy-load DayCard for popup rendering
-const DayCardPopupContent = React.lazy(() => import('./DayCard'));
+// Day drawer — the complete day document (C10); lazy since it renders on click
+const VehicleDayDrawer = React.lazy(() => import('./VehicleDayDrawer'));
+
+/** Sync ?day=YYYY-MM-DD without touching scroll or history depth. */
+function setDayParam(date: string | null): void {
+  const url = new URL(window.location.href);
+  if (date) url.searchParams.set('day', date);
+  else url.searchParams.delete('day');
+  window.history.replaceState(window.history.state, '', url.toString());
+}
 
 // ---------------------------------------------------------------------------
 // Timeline filter definitions — client-side only, no new queries
@@ -263,32 +279,92 @@ const TIMELINE_FILTERS: { key: string; label: string; match: (ev: any) => boolea
 
 const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
   const { vehicle, vehicleId, timelineEvents, setGalleryFilter } = useVehicleProfile();
-  const { openPopup } = usePopup();
+
+  // Per-day image-analysis depth (Tier 0-4) → illuminates the timeline as deep analysis
+  // fills in. A day with raw photos and no verdicts stays dim; as T1/T2 land it warms,
+  // an owner-confirmed T4 day glows brightest. One RPC per vehicle (get_vehicle_day_depth).
+  const [depthByDay, setDepthByDay] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!vehicleId) return;
+    let cancelled = false;
+    supabase.rpc('get_vehicle_day_depth', { p_vehicle_id: vehicleId }).then(({ data }) => {
+      if (cancelled || !data) return;
+      const m: Record<string, number> = {};
+      for (const r of data as any[]) {
+        const dp = Number(r.depth) || 0;
+        m[r.day] = dp >= 0.5 ? 4 : dp >= 0.35 ? 3 : dp >= 0.18 ? 2 : dp > 0 ? 1 : 0;
+      }
+      if (!cancelled) setDepthByDay(m);
+    }).catch(() => { /* coverage is best-effort; timeline still renders from events */ });
+    return () => { cancelled = true; };
+  }, [vehicleId]);
   const [expanded, setExpanded] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
   const [receiptDate, setReceiptDate] = useState<string | null>(null);
-  const [receiptPos, setReceiptPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [tooltipContent, setTooltipContent] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [highlightGroup, setHighlightGroup] = useState<string | null>(null);
   const heatmapRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
 
+  // Per-day photo/work densities from the substrate. timelineEvents alone
+  // starved the heatmap: an owner-import truck with 861 photos rendered
+  // "ALL (3) / PHOTOS (1)" (C10 quality check, 2026-06-10). The photos ARE
+  // the activity record — get_vehicle_contribution_days returns
+  // (day, kind photo|work|event, n); 'event' kind is skipped here because
+  // timelineEvents already carries the real events.
+  const [dayRows, setDayRows] = useState<{ day: string; kind: string; n: number }[]>([]);
+  useEffect(() => {
+    if (!vehicleId) return;
+    let cancelled = false;
+    supabase
+      .rpc('get_vehicle_contribution_days', { p_vehicle_id: vehicleId })
+      .then(({ data, error }) => {
+        if (error) console.warn('[BarcodeTimeline] contribution days:', error.message);
+        if (!cancelled && data) setDayRows(data as any[]);
+      });
+    return () => { cancelled = true; };
+  }, [vehicleId]);
+
+  // Synthesize photo/work day events for days the event feed doesn't cover.
+  const enrichedEvents = useMemo(() => {
+    if (dayRows.length === 0) return timelineEvents;
+    const coveredPhotoDays = new Set(
+      timelineEvents
+        .filter((ev: any) => (ev.metadata?.image_count > 0) || String(ev.event_type || '').toLowerCase() === 'photo_session')
+        .map((ev: any) => String(ev.event_date || '').slice(0, 10)),
+    );
+    const coveredWorkDays = new Set(
+      timelineEvents
+        .filter((ev: any) => ['work_session', 'repair', 'modification', 'maintenance', 'service'].includes(String(ev.event_type || '').toLowerCase()))
+        .map((ev: any) => String(ev.event_date || '').slice(0, 10)),
+    );
+    const synthetic: any[] = [];
+    for (const r of dayRows) {
+      if (r.kind === 'photo' && !coveredPhotoDays.has(r.day)) {
+        synthetic.push({ event_date: r.day, event_type: 'photo_session', title: `${r.n} photos`, metadata: { image_count: r.n, synthetic_day: true } });
+      } else if (r.kind === 'work' && !coveredWorkDays.has(r.day)) {
+        synthetic.push({ event_date: r.day, event_type: 'work_session', title: 'work session', metadata: { synthetic_day: true } });
+      }
+    }
+    return synthetic.length ? [...timelineEvents, ...synthetic] : timelineEvents;
+  }, [timelineEvents, dayRows]);
+
   // Filter counts — always computed from the full set so pills show totals before clicking
   const filterCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const f of TIMELINE_FILTERS) {
-      counts[f.key] = f.key === 'all' ? timelineEvents.length : timelineEvents.filter(f.match).length;
+      counts[f.key] = f.key === 'all' ? enrichedEvents.length : enrichedEvents.filter(f.match).length;
     }
     return counts;
-  }, [timelineEvents]);
+  }, [enrichedEvents]);
 
   // Filtered events for heatmap — client-side only
   const filteredEvents = useMemo(() => {
     const filter = TIMELINE_FILTERS.find(f => f.key === activeFilter);
-    if (!filter || activeFilter === 'all') return timelineEvents;
-    return timelineEvents.filter(filter.match);
-  }, [timelineEvents, activeFilter]);
+    if (!filter || activeFilter === 'all') return enrichedEvents;
+    return enrichedEvents.filter(filter.match);
+  }, [enrichedEvents, activeFilter]);
 
   // Helper: build an EventDay map from a list of events
   const buildEventMap = useCallback((events: any[]) => {
@@ -353,18 +429,31 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
   // eventMap from FILTERED events (heatmap); weeks from ALL events (barcode strip always shows everything)
   const { eventMap, startDate, endDate, weeks, sortedDates } = useMemo(() => {
     const currentYear = new Date().getFullYear();
-    const vehicleYear = (vehicle as any).year || currentYear;
 
     // Build map from ALL events first for barcode weeks + date range
-    const allMap = buildEventMap(timelineEvents);
+    const allMap = buildEventMap(enrichedEvents);
 
     // Build the filtered map for heatmap rendering
     const map = activeFilter === 'all' ? allMap : buildEventMap(filteredEvents);
 
-    // Date range uses ALL events so the heatmap grid stays stable across filters
-    const allYears = Object.keys(allMap).map((d) => new Date(d + 'T00:00:00').getFullYear());
-    const minYear = Math.min(vehicleYear, ...allYears, currentYear - 3);
-    const maxYear = Math.max(currentYear, ...allYears);
+    // Illuminate by analysis depth: raise each day's heat to at least its analysis-depth
+    // level (Tier 0-4) so the timeline visibly fills in as the deep pipeline drains.
+    const applyDepth = (mp: Record<string, EventDay>) => {
+      for (const ds in mp) {
+        const dl = depthByDay[ds];
+        if (dl && dl > mp[ds].level) mp[ds].level = dl;
+      }
+    };
+    applyDepth(allMap);
+    if (map !== allMap) applyDepth(map);
+
+    // Range = the DATA's range, never the model year. Anchoring at the model
+    // year rendered a '79 truck as a 48-year grid that was 96% void (C10
+    // quality check, 2026-06-10) — empty decades aren't honesty, they're
+    // noise. Floor at 2000 (bogus-EXIF guard); ceiling always reaches today.
+    const allYears = Object.keys(allMap).map((d) => new Date(d + 'T00:00:00').getFullYear()).filter((y) => y >= 2000);
+    const minYear = allYears.length ? Math.min(...allYears) : currentYear - 1;
+    const maxYear = Math.max(currentYear, ...(allYears.length ? allYears : [currentYear]));
 
     const start = new Date(minYear, 0, 1);
     start.setDate(start.getDate() - start.getDay()); // align to Sunday
@@ -397,7 +486,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       weeks: wks,
       sortedDates: sorted,
     };
-  }, [vehicle, timelineEvents, filteredEvents, activeFilter, buildEventMap]);
+  }, [enrichedEvents, filteredEvents, activeFilter, buildEventMap, depthByDay]);
 
   // Heatmap weeks for expanded view
   const heatmapWeeks = useMemo(() => {
@@ -444,11 +533,63 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     return s === e ? String(s) : `${s}—${e}`;
   }, [startDate, endDate]);
 
+  // Open the day document for a date (any day — with or without events).
+  const openDay = useCallback(
+    (ds: string) => {
+      const ev = eventMap[ds];
+      // Area highlight for multi-day project linking
+      if (ev?.areas && ev.areas.length > 0) setHighlightGroup(`area:${ev.areas[0]}`);
+      else if (ev?.group) setHighlightGroup(ev.group);
+      else setHighlightGroup(null);
+      // Emit gallery filter for this day's photos
+      setGalleryFilter({ dateRange: [ds, ds] });
+      setExpanded(true);
+      setReceiptDate(ds);
+      setDayParam(ds);
+    },
+    [eventMap, setGalleryFilter]
+  );
+
+  const closeDay = useCallback(() => {
+    setReceiptDate(null);
+    setDayParam(null);
+    setHighlightGroup(null);
+    setGalleryFilter(null);
+  }, [setGalleryFilter]);
+
+  // Heatmap cell click → the day document, in place
+  const onCellClick = useCallback(
+    (ds: string) => {
+      if (receiptDate === ds) closeDay();
+      else openDay(ds);
+    },
+    [receiptDate, openDay, closeDay]
+  );
+
+  // URL-addressable: ?day=YYYY-MM-DD opens the drawer on load; external
+  // surfaces (e.g. the photo lightbox's PART OF link) open it via event.
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('day');
+    if (param && /^\d{4}-\d{2}-\d{2}$/.test(param)) {
+      setExpanded(true);
+      setReceiptDate(param);
+    }
+    const onOpenDay = (e: Event) => {
+      const date = (e as CustomEvent).detail?.date;
+      if (date) openDay(String(date));
+    };
+    window.addEventListener(VEHICLE_DAY_OPEN_EVENT, onOpenDay);
+    return () => window.removeEventListener(VEHICLE_DAY_OPEN_EVENT, onOpenDay);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
   // Toggle expand
   const toggleExpand = useCallback(() => {
     setExpanded((prev) => {
       if (prev) {
         setReceiptDate(null);
+        setDayParam(null);
         setHighlightGroup(null);
         setGalleryFilter(null);
       }
@@ -456,25 +597,96 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     });
   }, [setGalleryFilter]);
 
-  // Auto-scroll heatmap to right (most recent events) when expanded
+  // Anchor the heatmap's initial window to the DATA, not the calendar:
+  // land with the latest day that has activity at the right edge. Plain
+  // scrollLeft=scrollWidth parked the window at "today" — for vehicles
+  // whose dense history ended earlier, that opened on the emptiest years
+  // with the build history scrolled off-screen left (C10 audit,
+  // 2026-06-11: K5 opened on Jan 2025–Dec 2026 while 2021-2024 held the
+  // build). Re-fires when the week grid grows (events load async).
+  const heatmapUserScrolledRef = useRef(false);
   useEffect(() => {
-    if (expanded && heatmapRef.current) {
-      const scrollContainer = heatmapRef.current.querySelector('.timeline-heatmap') as HTMLElement;
-      if (scrollContainer) {
-        requestAnimationFrame(() => {
-          scrollContainer.scrollLeft = scrollContainer.scrollWidth;
-        });
-      }
-    }
-  }, [expanded]);
+    if (!expanded || !heatmapRef.current) return;
+    const scrollContainer = heatmapRef.current.querySelector('.timeline-heatmap') as HTMLElement;
+    if (!scrollContainer) return;
 
-  // Collapse on scroll down, re-expand when scrolled back to top
+    const anchor = () => {
+      if (heatmapUserScrolledRef.current) return;
+      // Fit-all: nothing to scroll.
+      if (scrollContainer.scrollWidth <= scrollContainer.clientWidth + 4) return;
+      const totalWeeks = heatmapWeeks.length;
+      if (totalWeeks === 0) {
+        scrollContainer.scrollLeft = scrollContainer.scrollWidth;
+        return;
+      }
+      // Per-week activity from the event map (sum of day levels + 1 per active day).
+      const density = heatmapWeeks.map((week) =>
+        week.reduce((sum, day) => {
+          const ev = day.inRange ? eventMap[day.s] : undefined;
+          return sum + (ev ? 1 + (ev.level || 0) : 0);
+        }, 0),
+      );
+      const colWidth = scrollContainer.scrollWidth / totalWeeks;
+      const visibleWeeks = Math.max(4, Math.floor(scrollContainer.clientWidth / colWidth));
+      // Slide a viewport-sized window; pick the densest (ties -> most recent).
+      let windowSum = 0;
+      for (let i = 0; i < Math.min(visibleWeeks, totalWeeks); i++) windowSum += density[i];
+      let bestStart = 0;
+      let bestSum = windowSum;
+      for (let s = 1; s + visibleWeeks <= totalWeeks; s++) {
+        windowSum += density[s + visibleWeeks - 1] - density[s - 1];
+        if (windowSum >= bestSum) { bestSum = windowSum; bestStart = s; }
+      }
+      scrollContainer.scrollLeft = bestSum > 0
+        ? Math.min(bestStart * colWidth, scrollContainer.scrollWidth - scrollContainer.clientWidth)
+        : scrollContainer.scrollWidth;
+    };
+
+    // A wheel/touch/keyboard scroll from the user ends auto-anchoring; the
+    // settle re-anchor below must never fight a human hand.
+    const markUserScroll = () => { heatmapUserScrolledRef.current = true; };
+    scrollContainer.addEventListener('wheel', markUserScroll, { passive: true });
+    scrollContainer.addEventListener('touchmove', markUserScroll, { passive: true });
+    scrollContainer.addEventListener('pointerdown', markUserScroll, { passive: true });
+
+    // Anchor now and once after the async event flood settles — the grid DOM
+    // can be replaced between data loads, which silently resets scrollLeft.
+    const raf = requestAnimationFrame(anchor);
+    const settle = window.setTimeout(anchor, 700);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(settle);
+      scrollContainer.removeEventListener('wheel', markUserScroll);
+      scrollContainer.removeEventListener('touchmove', markUserScroll);
+      scrollContainer.removeEventListener('pointerdown', markUserScroll);
+    };
+  }, [expanded, weeks.length, heatmapWeeks, eventMap]);
+
+  // Auto-scroll the COLLAPSED barcode strip to today's edge on first paint
+  // and whenever the underlying week count changes. Lands the user on the
+  // newest activity; scrolling left walks back through the vehicle's history.
   useEffect(() => {
+    if (!stripRef.current) return;
+    const el = stripRef.current;
+    requestAnimationFrame(() => {
+      el.scrollLeft = el.scrollWidth;
+    });
+  }, [weeks.length]);
+
+  // Collapse on scroll past the hero area, re-expand when scrolled back near top.
+  // Hysteresis: expand threshold (40) is lower than collapse threshold (320) so the
+  // timeline doesn't strobe open/closed during normal page interaction. Prior threshold
+  // of 10 caused the timeline to slam shut on the slightest scroll.
+  useEffect(() => {
+    const COLLAPSE_AT = 320;
+    const EXPAND_AT = 40;
     const onScroll = () => {
-      const atTop = window.scrollY <= 10;
-      if (atTop && !expanded) {
+      // Never auto-collapse while the user is reading a day document.
+      if (receiptDate) return;
+      const y = window.scrollY;
+      if (y <= EXPAND_AT && !expanded) {
         setExpanded(true);
-      } else if (!atTop && expanded) {
+      } else if (y > COLLAPSE_AT && expanded) {
         setExpanded(false);
         setReceiptDate(null);
         setHighlightGroup(null);
@@ -489,21 +701,26 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('scroll', onScroll);
     };
-  }, [expanded]);
+  }, [expanded, receiptDate, setGalleryFilter]);
 
-  // Escape to close
+  // Escape: close the day drawer first, then the strip (mirrors the
+  // user-profile drawer contract — reversible, layer by layer).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && expanded) {
+      if (e.key !== 'Escape') return;
+      if (receiptDate) {
+        closeDay();
+        return;
+      }
+      if (expanded) {
         setExpanded(false);
-        setReceiptDate(null);
         setHighlightGroup(null);
         setGalleryFilter(null);
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [expanded]);
+  }, [expanded, receiptDate, closeDay, setGalleryFilter]);
 
   // Barcode stripe hover
   const onStripeMouseMove = useCallback(
@@ -523,80 +740,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     setTooltipContent(null);
   }, []);
 
-  // Open full Day Card detail in a popup
-  const openDayCardPopup = useCallback(
-    (date: string) => {
-      const ev = eventMap[date];
-      if (!ev) return;
-      const dateLabel = formatDate(date);
-      openPopup(
-        <React.Suspense fallback={null}>
-          <DayCardPopupContent
-            session={{
-              date,
-              title: ev.label,
-              work_type: ev.workMeta?.work_type || 'work',
-              image_count: ev.workMeta?.image_count || 0,
-              duration_minutes: ev.workMeta?.duration_minutes || 0,
-              total_parts_cost: ev.workMeta?.total_parts_cost || 0,
-              has_receipts: (ev.workMeta?.total_parts_cost || 0) > 0,
-              work_description: ev.workMeta?.work_description || '',
-              status: 'complete',
-            }}
-            detail={null}
-            isLoading={false}
-            onExpand={() => {}}
-            vehicleId={vehicleId}
-            isPopup={true}
-          />
-        </React.Suspense>,
-        `DAY CARD — ${dateLabel}`,
-        520,
-        false,
-      );
-      // Close the inline receipt when opening popup
-      setReceiptDate(null);
-    },
-    [eventMap, vehicleId, openPopup]
-  );
-
-  // Heatmap cell click
-  const onCellClick = useCallback(
-    (ds: string, e: React.MouseEvent) => {
-      const ev = eventMap[ds];
-      if (!ev) return;
-
-      // Set area highlight for multi-day project linking (Fix 3)
-      if (ev.areas && ev.areas.length > 0) {
-        setHighlightGroup(`area:${ev.areas[0]}`);
-      } else if (ev.group) {
-        setHighlightGroup(ev.group);
-      } else {
-        setHighlightGroup(null);
-      }
-
-      // Emit gallery filter for this day's photos
-      setGalleryFilter({ dateRange: [ds, ds] });
-
-      // Work session days → open DayCard popup directly (Fix 2)
-      if (ev.hasWorkSession) {
-        openDayCardPopup(ds);
-        return;
-      }
-
-      // Non-work days → show inline receipt
-      setReceiptDate(ds);
-      const rect = (e.target as HTMLElement).getBoundingClientRect();
-      const POPUP_WIDTH = 290;
-      setReceiptPos({
-        x: Math.min(rect.left + rect.width + 4, window.innerWidth - POPUP_WIDTH - 8),
-        y: rect.top,
-      });
-    },
-    [eventMap, setGalleryFilter, openDayCardPopup]
-  );
-
-  // Receipt navigation
+  // Day navigation across days-with-activity
   const navigateReceipt = useCallback(
     (dir: -1 | 1) => {
       if (!receiptDate) return;
@@ -606,6 +750,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       if (nextIdx >= 0 && nextIdx < sortedDates.length) {
         const nextDate = sortedDates[nextIdx];
         setReceiptDate(nextDate);
+        setDayParam(nextDate);
         const nextEv = eventMap[nextDate];
         if (nextEv?.group) setHighlightGroup(nextEv.group);
         else setHighlightGroup(null);
@@ -614,8 +759,6 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     },
     [receiptDate, sortedDates, eventMap, setGalleryFilter]
   );
-
-  const receiptEvent = receiptDate ? eventMap[receiptDate] : null;
 
   // If no timeline events at all, hide the section entirely
   if (timelineEvents.length === 0) {
@@ -708,7 +851,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
                             className={`hm-c ${level > 0 ? `l${level}` : ''} ${isHighlighted ? 'hl' : ''}`}
                             data-date={ev ? day.s : undefined}
                             title={ev ? `${day.s}: ${ev.label}` : undefined}
-                            onClick={ev ? (e) => onCellClick(day.s, e) : undefined}
+                            onClick={ev ? () => onCellClick(day.s) : undefined}
                           />
                         );
                       })}
@@ -723,65 +866,17 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
             {/* Month labels are now rendered inline inside each .hm-week column */}
           </div>
 
-          {/* Receipt popup */}
-          {receiptEvent && receiptDate && (
-            <div
-              className="receipt receipt--visible"
-              style={{ left: receiptPos.x, top: receiptPos.y }}
-            >
-              <div className="receipt__header">{formatDate(receiptDate)}</div>
-              <div className="receipt__header" style={{ fontSize: '8px', fontWeight: 400, marginTop: '-2px' }}>
-                {receiptEvent.label}
-              </div>
-              <hr className="receipt__divider" />
-              {receiptEvent.items.map((item, i) => (
-                <div className="receipt__line" key={i}>
-                  <span className="receipt__line-label">{item.k}</span>
-                  <span className="receipt__line-value">{item.v}</span>
-                </div>
-              ))}
-              {/* Work session summary — duration, photos, parts */}
-              {receiptEvent.hasWorkSession && receiptEvent.workMeta && (
-                <>
-                  <hr className="receipt__divider" />
-                  <div style={{ fontSize: '7px', fontFamily: 'var(--vp-font-mono, Courier New, monospace)', color: 'var(--text-disabled)', lineHeight: 1.6 }}>
-                    {receiptEvent.workMeta.duration_minutes > 0 && (
-                      <div>{Math.floor(receiptEvent.workMeta.duration_minutes / 60)}h {receiptEvent.workMeta.duration_minutes % 60}m session</div>
-                    )}
-                    {receiptEvent.workMeta.image_count > 0 && (
-                      <div>{receiptEvent.workMeta.image_count} photos</div>
-                    )}
-                    {receiptEvent.workMeta.work_description && (
-                      <div style={{ color: 'var(--text-disabled)', fontFamily: 'Arial, sans-serif', marginTop: '2px' }}>
-                        {receiptEvent.workMeta.work_description.length > 100
-                          ? receiptEvent.workMeta.work_description.slice(0, 100) + '...'
-                          : receiptEvent.workMeta.work_description}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-              <hr className="receipt__divider" />
-              <div className="receipt__total">
-                <span>TOTAL</span>
-                <span>{receiptEvent.total}</span>
-              </div>
-              {receiptEvent.group && receiptEvent.groupDay && (
-                <div style={{ fontSize: '8px', color: 'var(--text-disabled)', fontFamily: "var(--vp-font-mono)", marginTop: '2px' }}>
-                  Day {receiptEvent.groupDay} · Group total: {receiptEvent.groupTotal || '—'}
-                </div>
-              )}
-              <div className="receipt__nav">
-                <a onClick={() => navigateReceipt(-1)}>{'\u2190'} PREV</a>
-                <a
-                  onClick={() => openDayCardPopup(receiptDate)}
-                  style={{ fontWeight: 700, color: 'var(--surface-elevated)' }}
-                >
-                  +
-                </a>
-                <a onClick={() => navigateReceipt(1)}>NEXT {'\u2192'}</a>
-              </div>
-            </div>
+          {/* Day document — inline drawer below the grid (C10: a day click
+              answers "what happened that day" completely, in place) */}
+          {receiptDate && (
+            <React.Suspense fallback={null}>
+              <VehicleDayDrawer
+                date={receiptDate}
+                onClose={closeDay}
+                onPrev={() => navigateReceipt(-1)}
+                onNext={() => navigateReceipt(1)}
+              />
+            </React.Suspense>
           )}
         </div>
       </div>

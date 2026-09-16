@@ -24,7 +24,7 @@ const ENRICH_ONLY = args.includes('--enrich-only');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 const client = new pg.Client({
-  connectionString: 'postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres',
+  connectionString: `postgresql://postgres.qkgaybvrernstplzjaam:${process.env.SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres`,
   statement_timeout: 55000,
 });
 

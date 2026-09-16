@@ -1,7 +1,7 @@
 #!/bin/bash
 cd /Users/skylar/nuke
 dotenvx run -- bash -c '
-  PGPASSWORD="RbzKq32A0uhqvJMQ" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c "
+  PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres -c "
   SELECT 
     (SELECT COUNT(*) FROM marketplace_listings) as total_listings,
     (SELECT COUNT(*) FROM marketplace_listings WHERE scraped_at > NOW() - INTERVAL '"'"'24 hours'"'"') as last_24h,

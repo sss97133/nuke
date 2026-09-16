@@ -16,6 +16,12 @@
  */
 
 import { checkRateLimit, getClientIp, rateLimitResponse, rateLimitHeaders } from './rateLimit.ts';
+import { parseScope, scopeMatches, vinFromScope, type ScopeRequest } from './scopeGrammar.ts';
+
+// Re-export scope grammar primitives so callers can `import { ... } from '_shared/apiKeyAuth.ts'`
+// without needing to know about the parser file.
+export { parseScope, scopeMatches, vinFromScope };
+export type { ScopeRequest };
 
 export interface AuthResult {
   userId: string | null;
@@ -208,6 +214,62 @@ export async function authenticateRequest(
     error: 'Invalid or missing authentication',
     status: 401,
     headers: rateLimitHeaders(rl, anonMaxRequests),
+  };
+}
+
+/**
+ * Per-vehicle scope check for the /v1/events write surface.
+ *
+ * This is the additive auth primitive used by `api-v1-events` (WS-B) and any
+ * other endpoint that needs to validate per-VIN access for an external agent.
+ *
+ * It is intentionally a thin wrapper over `scopeMatches()` so the grammar
+ * lives in one place (`scopeGrammar.ts`) and can be unit-tested without a
+ * Deno or Supabase runtime.
+ *
+ * Service-role callers (internal tools, MCP cockpit) bypass the scope check —
+ * they're already trusted by virtue of holding `SUPABASE_SERVICE_ROLE_KEY`.
+ *
+ * Usage in an edge function:
+ *   const auth = await authenticateRequest(req, supabase, { endpoint: 'events' });
+ *   if (auth.error) return errResponse(auth);
+ *   const gate = requireVehicleScope(auth, 'write', vinFromBody);
+ *   if (!gate.ok) return jsonError(403, gate.reason);
+ */
+export function requireVehicleScope(
+  authResult: AuthResult,
+  action: 'read' | 'write',
+  vin: string,
+): { ok: true } | { ok: false; reason: string } {
+  if (!vin || typeof vin !== 'string' || vin.trim().length === 0) {
+    return { ok: false, reason: 'Missing VIN for scope check' };
+  }
+
+  // Service role bypasses scope grammar — it's the platform itself.
+  if (authResult.isServiceRole) {
+    return { ok: true };
+  }
+
+  // Anonymous / failed auth never passes scope check.
+  if (!authResult.userId) {
+    return { ok: false, reason: 'Unauthenticated' };
+  }
+
+  const granted = authResult.scopes ?? [];
+  const request: ScopeRequest = {
+    resource: 'events',
+    action,
+    target: 'vehicle',
+    targetId: vin,
+  };
+
+  if (scopeMatches(granted, request)) {
+    return { ok: true };
+  }
+
+  return {
+    ok: false,
+    reason: `Scope insufficient for events:${action}:vehicle:${vin}. Granted: [${granted.join(', ') || 'none'}]`,
   };
 }
 

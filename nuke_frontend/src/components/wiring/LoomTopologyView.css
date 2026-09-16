@@ -1,0 +1,245 @@
+/* LoomTopologyView.css — Topology schematic styles using design system variables */
+
+.topo-root {
+  display: flex;
+  height: 100%;
+  background: var(--bg);
+}
+
+/* SVG canvas container */
+.topo-canvas {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.topo-svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Zone legend — top-left overlay */
+.topo-legend {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  z-index: 2;
+}
+
+.topo-legend-item {
+  font-family: Arial, sans-serif;
+  font-size: var(--fs-8);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border: 1px solid;
+}
+
+/* Layer toggles — top-right overlay */
+.topo-layers {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  z-index: 2;
+}
+
+.topo-layer-btn {
+  font-family: Arial, sans-serif;
+  font-size: var(--fs-8);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.topo-layer-btn[data-active="true"] {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+.topo-layer-btn[data-active="false"] {
+  opacity: 0.5;
+}
+
+/* Stats bar — bottom overlay */
+.topo-stats {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-top: 2px solid var(--border);
+  padding: 4px 12px;
+  display: flex;
+  gap: 16px;
+  font-family: 'Courier New', monospace;
+  font-size: var(--fs-9);
+  color: var(--text);
+  opacity: 0.8;
+  z-index: 2;
+}
+
+.topo-stats-hint {
+  margin-left: auto;
+  opacity: 0.5;
+}
+
+/* Detail panel — right side */
+.topo-detail {
+  width: 320px;
+  border-left: 2px solid var(--border);
+  background: var(--surface);
+  overflow: auto;
+  padding: 12px;
+  flex-shrink: 0;
+}
+
+.topo-detail-zone {
+  font-family: Arial, sans-serif;
+  font-size: var(--fs-9);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.topo-detail-id {
+  font-family: 'Courier New', monospace;
+  font-size: var(--fs-11);
+  color: var(--text);
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.topo-detail-label {
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  opacity: 0.7;
+  margin-bottom: 12px;
+}
+
+.topo-section-header {
+  font-family: Arial, sans-serif;
+  font-size: 11px;
+  color: var(--text);
+  opacity: 0.7;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.topo-section-header-mt {
+  font-family: Arial, sans-serif;
+  font-size: 11px;
+  color: var(--text);
+  opacity: 0.7;
+  text-transform: uppercase;
+  margin-top: 12px;
+  margin-bottom: 4px;
+}
+
+.topo-segment-row {
+  font-family: 'Courier New', monospace;
+  font-size: var(--fs-10);
+  color: var(--text);
+  padding: 2px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.topo-segment-row:hover {
+  background: var(--bg);
+}
+
+.topo-wire-list {
+  max-height: 400px;
+  overflow: auto;
+}
+
+.topo-wire-row {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--text);
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+  opacity: 0.8;
+}
+
+.topo-wire-code {
+  color: var(--text);
+  font-weight: bold;
+}
+
+.topo-wire-detail {
+  opacity: 0.7;
+}
+
+/* Empty state */
+.topo-empty {
+  font-family: Arial, sans-serif;
+  font-size: var(--fs-10);
+  color: var(--text);
+  opacity: 0.4;
+  margin-top: 20px;
+  line-height: 1.6;
+}
+
+/* Loading state */
+.topo-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-family: 'Courier New', monospace;
+  font-size: var(--fs-10);
+  color: var(--text);
+  opacity: 0.5;
+}
+
+/* Error state */
+.topo-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  font-family: Arial, sans-serif;
+  font-size: var(--fs-10);
+  color: var(--text);
+}
+
+.topo-error-msg {
+  opacity: 0.6;
+}
+
+.topo-retry-btn {
+  font-family: Arial, sans-serif;
+  font-size: var(--fs-9);
+  font-weight: bold;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.topo-retry-btn:hover {
+  background: var(--text);
+  color: var(--bg);
+}

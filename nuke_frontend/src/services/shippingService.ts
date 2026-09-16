@@ -33,31 +33,11 @@ export async function getShippingEvents(transactionId: string): Promise<Shipping
 /**
  * Get shipping status for a transaction
  */
-export async function getShippingStatus(transactionId: string) {
-  const { data, error } = await supabase
-    .from('vehicle_transactions')
-    .select(`
-      shipping_listing_id,
-      shipping_status,
-      shipping_carrier_name,
-      shipping_carrier_phone,
-      shipping_carrier_email,
-      shipping_pickup_date,
-      shipping_delivery_date,
-      shipping_estimated_cost,
-      shipping_actual_cost,
-      shipping_tracking_url,
-      pickup_address,
-      delivery_address
-    `)
-    .eq('id', transactionId)
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
+export async function getShippingStatus(_transactionId: string) {
+  // TODO(ghost-ref 2026-07-12): vehicle_transactions does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+  // The shipping_* columns were never migrated onto any live table. Return null so
+  // callers render an empty/absent shipping-status state instead of crashing.
+  return null;
 }
 
 /**

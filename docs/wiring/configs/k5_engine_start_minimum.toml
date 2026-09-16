@@ -1,0 +1,28 @@
+# K5 ENGINE-START MINIMUM — crank + run the LS3 + show gauges, nothing else.
+# Owner's stated goal 2026-06-10: "battery, ECU, PDM and the essential pinout
+# so we can turn on the engine."
+# ON (by toggle or non-toggleable): CORE_ENGINE, FUEL, COOLING,
+# CHARGING_STARTING, DASH_CLUSTER_DAKOTA, HARNESS_INFRA.
+# NOTE: the calc registry does not include the v4.1 ECU/PDM lifelines
+# (#ECU_PWR/#ECU_GND1/#ECU_GND2, #PDM_BPOS/#PDM_GND1/#PDM_GND2) — they are
+# mandatory on top of every config. See K5_ENGINE_START_MINIMUM.md.
+[toggles]
+BRAKES_IBOOSTER = false
+EPARKING_BRAKE = false
+TRANS_6L80E = false
+LIGHTING_EXTERIOR = false
+LIGHTING_INTERIOR = false
+DOME_COURTESY = false
+POWER_WINDOWS = false
+POWER_LOCKS = false
+AUDIO = false
+HVAC_AC = false
+WIPERS_WASHER = false
+AMP_STEPS = false
+CAMERA_REAR = false
+ACCESSORY_12V = false
+EXHAUST_CUTOUTS_QTP = false
+# kept ON: FUEL, COOLING, DASH_CLUSTER_DAKOTA (defaults are ON; listed for clarity)
+FUEL = true
+COOLING = true
+DASH_CLUSTER_DAKOTA = true

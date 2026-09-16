@@ -162,7 +162,7 @@ async function rescrapeVehicle(vehicle) {
             .from('vehicle_images')
             .insert({
               vehicle_id: vehicle.id,
-              user_id: '13450c45-3e8b-4124-9f5b-5c512094ff04', // owner-account@example.com
+              user_id: '13450c45-3e8b-4124-9f5b-5c512094ff04', // owner account
               image_url: publicUrl,
               storage_path: storagePath,
               source: 'rescrape',

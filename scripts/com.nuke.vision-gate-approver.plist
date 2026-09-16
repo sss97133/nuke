@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nuke.vision-gate-approver</string>
+
+    <!-- FLEET-WIDE vision-gate promoter. Closes the audit's highest-throughput gap:
+         new owner photos land at vision_gate_status='pending' (column default) and
+         never advance, so the live BYOK deep-analysis fleet (com.nuke.byok-image-analysis,
+         which only drains gate-APPROVED frames) starves on new inflow.
+
+         vision-gate-drain-fleet.sh loops vehicles with a real gate deficit (from the
+         bounded image_coverage_by_vehicle counter — NOT the 38.9M-row vehicle_images
+         table) and runs vision-gate-classify.mjs per vehicle.
+
+         SAFETY (cardinal no-mixed-data rule): CHEAP LAYERS ONLY. The wrapper never
+         passes --call-vision. The gate is evidence-based — it approves clear-evidence
+         frames (L0 text / L1 source / L2 apple_ml / L3 flags / L0.5 sender-affinity,
+         all already in the DB) and HOLDS ambiguous frames as review_needed for L4
+         (agent-driven, human-in-loop). Holding is correct; nothing is force-approved.
+
+         Runs in the login shell (NOT Claude Code's Bash sandbox) so the network steps
+         reach Supabase normally. This repo copy is the source of truth; keep it
+         identical to ~/Library/LaunchAgents/com.nuke.vision-gate-approver.plist. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/skylar/nuke/scripts/daily-receipt/vision-gate-drain-fleet.sh</string>
+        <!-- per-vehicle classify limit -->
+        <string>80</string>
+        <!-- max vehicles touched per fire -->
+        <string>40</string>
+    </array>
+
+    <!-- 15 min between fires: gate classification is cheap (DB-only, no vision spend),
+         but 900s respects the >=15min cadence and keeps the counter/log churn modest. -->
+    <key>StartInterval</key>
+    <integer>900</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/skylar/nuke/logs/vision-gate-drain-fleet.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/skylar/nuke/logs/vision-gate-drain-fleet.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/skylar/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>Nice</key>
+    <integer>10</integer>
+</dict>
+</plist>

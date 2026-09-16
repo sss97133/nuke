@@ -1,0 +1,14 @@
+-- get_ranked_offers: read location from city/state as well as vehicles.location.
+-- The board showed "—" for every BaT row while the data sat in city/state: of
+-- 507 BaT rows in 24h, location was NULL on ALL of them, city set on 362.
+-- Coverage over 72h: 2,351 -> 3,461 of 4,338 rows (54% -> 80%).
+--
+-- Applied via apply_migration. Function body identical to 20260727180000 except
+-- the location expression; see that file for the design notes.
+--
+-- KNOWN LIMIT, measured 2026-07-27 — do not "fix" this in the read layer:
+-- BaT discovery writes a STUB and enrichment lands 6-24h later. Location
+-- coverage by row age: 0-2h 36.8% | 2-6h 48.7% | 6-24h 86.7%. vehicles.price is
+-- 0% for BaT in every bucket. A newest-first board therefore shows the
+-- least-complete rows first, by construction. The fix belongs upstream: write
+-- location and current bid at first sight.

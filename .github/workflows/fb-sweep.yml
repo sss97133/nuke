@@ -58,9 +58,17 @@ jobs:
         run: npm ci
 
       - name: Validate Secrets
+        # NOTE: this step previously had TWO env: keys (one above run:, one
+        # below). Duplicate mapping keys make the workflow file invalid to
+        # GitHub's parser — which then creates a startup-failure run on EVERY
+        # push (10/10 recent runs, zero jobs). Merged into one env block.
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           MISSING=0
           if [ -z "${SUPABASE_URL:-}" ]; then
@@ -81,11 +89,6 @@ jobs:
           [ -n "${GROQ_API_KEY:-}" ]         && echo "  ✅ groq (GROQ_API_KEY)"            || echo "  ⚪ groq — no key"
           [ -n "${PERPLEXITY_API_KEY:-}" ]   && echo "  ✅ perplexity (PERPLEXITY_API_KEY)" || echo "  ⚪ perplexity — no key"
           [ -n "${OPENAI_API_KEY:-}" ]       && echo "  ✅ openai (OPENAI_API_KEY)"        || echo "  ⚪ openai — no key"
-        env:
-          GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Build pipeline flags
         id: flags

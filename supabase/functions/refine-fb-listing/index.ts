@@ -11,6 +11,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
 
 // Googlebot works for FB Marketplace individual listings (bingbot blocked as of 2026-03)
 const GOOGLEBOT_UA =
@@ -214,17 +215,26 @@ function parseTitle(title: string): {
   const words = afterYear.split(/\s+/).filter((w) => w.length > 0);
   if (words.length === 0) return { year, make: null, model: null, cleanPrice };
 
-  const rawMake = words[0].toLowerCase();
-  const make =
-    MAKE_MAP[rawMake] ||
-    words[0].charAt(0).toUpperCase() + words[0].slice(1).toLowerCase();
+  // Skip leading dimension/engine/spec tokens ("5x8", "22r", "500cc", "115",
+  // a doubled year) before the real make. Reject a still-garbage token: an
+  // unknown make is null (unknown), never a number/single-char/year on a live
+  // listing. (Gate 5, 2026-07-08.)
+  let mi = 0;
+  while (mi < words.length && !MAKE_MAP[words[mi].toLowerCase()] && isGarbageMake(words[mi])) mi++;
+  const makeToken = words[mi] ?? "";
+  const rawMake = makeToken.toLowerCase();
+  const make = MAKE_MAP[rawMake]
+    ? MAKE_MAP[rawMake]
+    : (!makeToken || isGarbageMake(makeToken))
+    ? null
+    : makeToken.charAt(0).toUpperCase() + makeToken.slice(1).toLowerCase();
 
   const stopWords = [
     "pickup", "truck", "sedan", "coupe", "wagon", "van",
     "suv", "convertible", "hatchback", "cab", "door", "bed",
   ];
   const modelParts: string[] = [];
-  for (let i = 1; i < Math.min(words.length, 5); i++) {
+  for (let i = mi + 1; i < Math.min(words.length, mi + 5); i++) {
     const lower = words[i].toLowerCase();
     if (stopWords.includes(lower) || /^[A-Z][a-z]+$/.test(words[i])) break;
     modelParts.push(words[i]);
@@ -837,18 +847,22 @@ Deno.serve(async (req) => {
                 }
               }
 
+              // Reject financing/down-payment artifacts: sub-$1k, or a 2015+ vehicle under $3k.
+              const plausibleAsk = (a: number | null | undefined): boolean =>
+                !!a && a >= 1000 && a <= 500000 && !((vehicle.year as number) >= 2015 && a < 3000);
+
               // Price from raw_scrape_data
               if (!vehicle.asking_price && raw) {
                 const price = raw.price as Record<string, unknown> | null;
                 const amount = price?.amount ? parseFloat(price.amount as string) : null;
-                if (amount && amount > 0) {
+                if (plausibleAsk(amount)) {
                   vehicleUpdates.asking_price = amount;
                   fields++;
                 }
               }
 
               // Price from title
-              if (!vehicle.asking_price && !vehicleUpdates.asking_price && parsed.cleanPrice) {
+              if (!vehicle.asking_price && !vehicleUpdates.asking_price && plausibleAsk(parsed.cleanPrice)) {
                 vehicleUpdates.asking_price = parsed.cleanPrice;
                 fields++;
               }

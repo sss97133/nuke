@@ -1,0 +1,729 @@
+/**
+ * User Profile — Two-Column Workspace Architecture
+ * Mirrors vehicle-profile.css design language.
+ *
+ * RULES: Arial only. Courier New for mono. Zero border-radius. Zero shadows. Zero gradients.
+ * Widgets stack with border-bottom, NOT individual borders.
+ * Transitions: 180ms cubic-bezier(0.16, 1, 0.3, 1) only.
+ */
+
+/* ─── Tokens ─── */
+.user-profile-page {
+  --up-bg: #f5f5f5;
+  --up-surface: #ffffff;
+  --up-ink: #1a1a1a;
+  --up-pencil: #888888;
+  --up-data-dim: #666666; /* de-emphasized but DATA-carrying (values/dates/counts) — >=4.5:1 on light surface */
+  --up-ghost: #dddddd;
+  --up-text-faint: #bbbbbb;
+  --up-row-alt: #f9f9f9;
+
+  --up-font-sans: Arial, Helvetica, sans-serif;
+  --up-font-mono: 'Courier New', Courier, monospace;
+
+  --up-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --up-speed: 180ms;
+
+  /* Racing Accents — HOVER ONLY */
+  --up-gulf-blue: #6AADE4;
+  --up-gulf-orange: #EE7623;
+  --up-martini-red: #C8102E;
+  --up-jps-gold: #C8A951;
+
+  /* Semantic */
+  --up-danger: #8a0020;
+  --up-sold: #16825d;
+  --up-brg: #004225;
+
+  /* Heatmap */
+  --heat-0: #d4d4d4;
+  --heat-2: #6ee7b7;
+
+  /* ─── Sticky Stack ───
+     Each layer's height, then cumulative anchors.
+     To add a new sticky layer: add its height, insert a new anchor,
+     and bump all anchors below it. Never use raw px for sticky top. */
+  --up-h-site: var(--header-height, 42px);    /* global header (NUKE + search) */
+  --up-h-header: 44px;                         /* user header bar */
+  --up-h-sub: 28px;                            /* sub-header (badge bar) */
+  --up-h-barcode: 10px;                        /* barcode timeline strip */
+
+  --up-stick-header:  var(--up-h-site);
+  --up-stick-sub:     calc(var(--up-h-site) + var(--up-h-header));
+  --up-stick-barcode: calc(var(--up-h-site) + var(--up-h-header) + var(--up-h-sub));
+  --up-sticky-top:    calc(var(--up-h-site) + var(--up-h-header) + var(--up-h-sub) + var(--up-h-barcode));
+
+  font-family: var(--up-font-sans);
+  background: var(--up-bg);
+  min-height: 100vh;
+
+  /* ─── One coherent surface treatment ───
+     The profile is drawn on the light --up-* palette, but a few embedded
+     components (UserDiscoveries, VehicleCollection) read the GLOBAL app tokens
+     (--bg / --surface / --text / --border), which resolve dark in the app's
+     dark theme — producing random dark slabs amid the light record. Remap the
+     global tokens to the profile's own light palette for the subtree so every
+     surface is the same light treatment. No new colors: aliases of --up-*. */
+  --bg: var(--up-bg);
+  --surface: var(--up-surface);
+  --surface-hover: var(--up-row-alt);
+  --surface-elevated: var(--up-surface);
+  --text: var(--up-ink);
+  --text-muted: var(--up-data-dim);
+  --border: var(--up-ghost);
+  color-scheme: light;
+}
+
+/* ─── User Header ─── */
+.up-header {
+  position: sticky;
+  top: var(--up-stick-header);
+  z-index: 900;
+  background: var(--up-surface);
+  border-bottom: 2px solid var(--border, #ddd);
+  height: var(--up-h-header);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  gap: 12px;
+}
+
+.up-header__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.up-header__avatar {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--up-ink);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.up-header__name {
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-12);
+  font-weight: 700;
+  color: var(--up-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.up-header__username {
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-9);
+  color: var(--up-data-dim);
+  white-space: nowrap;
+}
+
+.up-header__meta {
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-8);
+  color: var(--up-data-dim);
+  white-space: nowrap;
+}
+
+.up-header__center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.up-header__right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Stat pills */
+.up-stat-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-9);
+  color: var(--up-ink);
+  white-space: nowrap;
+}
+
+.up-stat-pill__label {
+  font-family: var(--up-font-sans);
+  font-size: calc(7px * var(--font-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--up-pencil);
+}
+
+/* Stat DOOR — pill-as-button (founder law: every stat is a button that
+   expands). Structure only: a clickable pill with a 2px-border-bottom
+   underline cue; colors inherit from .up-stat-pill (no new color here). */
+.up-stat-pill--door {
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  margin: 0;
+  border-bottom: 2px solid transparent;
+}
+.up-stat-pill--door:hover {
+  border-bottom-color: var(--up-pencil);
+}
+.up-stat-pill--door.up-stat-pill--open {
+  border-bottom-color: var(--up-ink);
+}
+
+/* Inline door detail panel — opens under the header bar, full width. */
+.up-stat-door {
+  flex-basis: 100%;
+  width: 100%;
+  border-top: 1px solid var(--up-ghost);
+  margin-top: 6px;
+  padding-top: 6px;
+}
+.up-stat-door__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px 4px;
+}
+.up-stat-door__title {
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-9);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--up-ink);
+}
+.up-stat-door__close {
+  font-size: var(--fs-8);
+}
+.up-stat-door__body {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.up-stat-door__row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 12px;
+  border-top: 1px solid var(--up-ghost);
+  text-decoration: none;
+  color: inherit;
+}
+.up-stat-door__row:hover {
+  background: var(--up-surface);
+}
+.up-stat-door__row-main {
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-10);
+  color: var(--up-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.up-stat-door__row-meta {
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-8);
+  color: var(--up-pencil);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.up-stat-door__cta {
+  display: block;
+  padding: 6px 12px;
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-10);
+  font-weight: 700;
+  color: var(--up-ink);
+  text-decoration: none;
+}
+.up-stat-door__cta:hover {
+  text-decoration: underline;
+}
+.up-stat-door__empty {
+  padding: 8px 12px;
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-9);
+  color: var(--up-pencil);
+}
+
+/* ─── Sub-Header ─── */
+.up-sub-header {
+  position: sticky;
+  top: var(--up-stick-sub);
+  z-index: 899;
+  background: var(--up-surface);
+  border-bottom: 1px solid var(--up-ghost);
+  height: var(--up-h-sub);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.up-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-8);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--up-ghost);
+  color: var(--up-data-dim);
+  white-space: nowrap;
+}
+
+.up-badge--verified {
+  border-color: var(--up-brg);
+  color: var(--up-brg);
+}
+
+.up-badge--professional {
+  border-color: var(--up-gulf-blue);
+  color: var(--up-gulf-blue);
+}
+
+.up-badge--dealer {
+  border-color: var(--up-jps-gold);
+  color: var(--up-jps-gold);
+}
+
+/* ─── Two-Column Layout ─── */
+.up-columns {
+  display: flex;
+  position: sticky;
+  top: var(--up-sticky-top);
+  height: calc(100vh - var(--up-sticky-top));
+}
+
+.up-col-left {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--up-ghost) transparent;
+}
+
+.up-col-right {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--up-ghost) transparent;
+}
+
+/* Reuse vehicle-profile column divider */
+.up-col-divider {
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  transition: background var(--up-speed) var(--up-ease);
+  position: relative;
+}
+
+.up-col-divider:hover,
+.up-col-divider--active {
+  background: var(--up-gulf-blue);
+}
+
+/* ─── Buttons ─── */
+.up-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-8);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--up-ink);
+  background: transparent;
+  color: var(--up-ink);
+  cursor: pointer;
+  transition: background var(--up-speed) var(--up-ease), color var(--up-speed) var(--up-ease);
+  white-space: nowrap;
+}
+
+.up-btn:hover {
+  background: var(--up-ink);
+  color: var(--up-surface);
+}
+
+.up-btn--primary {
+  background: var(--up-ink);
+  color: var(--up-surface);
+}
+
+.up-btn--primary:hover {
+  background: var(--up-gulf-blue);
+  border-color: var(--up-gulf-blue);
+}
+
+/* ─── Text Scale Control (A− A A+) ─── */
+.up-textscale {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.up-textscale__label {
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-8);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--up-pencil);
+}
+
+.up-textscale__seg {
+  display: inline-flex;
+  border: 1px solid var(--up-ink);
+}
+
+.up-textscale__btn {
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-8);
+  font-weight: 700;
+  padding: 2px 6px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--up-ink);
+  color: var(--up-ink);
+  cursor: pointer;
+  line-height: 1;
+  transition: background var(--up-speed) var(--up-ease), color var(--up-speed) var(--up-ease);
+}
+
+.up-textscale__btn:last-child {
+  border-right: none;
+}
+
+.up-textscale__btn:hover:not(:disabled) {
+  background: var(--up-ink);
+  color: var(--up-surface);
+}
+
+.up-textscale__btn:disabled {
+  color: var(--up-text-faint);
+  cursor: default;
+}
+
+.up-textscale__btn--active {
+  background: var(--up-ink);
+  color: var(--up-surface);
+}
+
+.up-textscale__value {
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-8);
+  color: var(--up-data-dim);
+  min-width: 28px;
+}
+
+/* Compact variant pushes to the right end of the sub-header */
+.up-textscale--compact {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ─── Settings Drawer ─── */
+.up-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity var(--up-speed) var(--up-ease);
+  pointer-events: none;
+}
+
+.up-drawer-backdrop--open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.up-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 560px;
+  max-width: 100vw;
+  background: var(--up-surface);
+  z-index: 1001;
+  transform: translateX(100%);
+  transition: transform var(--up-speed) var(--up-ease);
+  overflow-y: auto;
+  border-left: 2px solid var(--up-ink);
+}
+
+.up-drawer--open {
+  transform: translateX(0);
+}
+
+.up-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border-bottom: 2px solid var(--border, #ddd);
+}
+
+.up-drawer__title {
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-11);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.up-drawer__close {
+  background: none;
+  border: none;
+  font-size: calc(16px * var(--font-scale, 1));
+  cursor: pointer;
+  color: var(--up-pencil);
+  padding: 4px;
+}
+
+.up-drawer__body {
+  padding: 12px;
+}
+
+/* ─── Activity Feed ─── */
+.up-activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--up-ghost);
+  font-size: var(--fs-9);
+}
+
+.up-activity-item:last-child {
+  border-bottom: none;
+}
+
+.up-activity-item__date {
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-8);
+  color: var(--up-data-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 60px;
+}
+
+.up-activity-item__badge {
+  display: inline-flex;
+  padding: 1px 4px;
+  font-family: var(--up-font-mono);
+  font-size: calc(7px * var(--font-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--up-ghost);
+  color: var(--up-pencil);
+  flex-shrink: 0;
+}
+
+.up-activity-item__text {
+  font-family: var(--up-font-sans);
+  color: var(--up-ink);
+  line-height: 1.4;
+}
+
+.up-activity-item__thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border: 1px solid var(--up-ghost);
+  flex-shrink: 0;
+}
+
+/* ─── Dossier Panel ─── */
+.up-dossier-group {
+  margin-bottom: 8px;
+  /* Canonical 12px horizontal gutter (frontend.md): the CollapsibleWidget
+     content this sits in has 0 padding, so without this the GITHUB / WEBSITE
+     value ran flush to the viewport edge and clipped at 375px. */
+  padding: 0 12px;
+}
+
+.up-dossier-group__label {
+  font-family: var(--up-font-sans);
+  font-size: calc(7px * var(--font-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--up-pencil);
+  margin-bottom: 4px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--up-ghost);
+}
+
+.up-dossier-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 2px 0;
+  font-size: var(--fs-9);
+}
+
+.up-dossier-row__label {
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-8);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--up-pencil);
+}
+
+.up-dossier-row__value {
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-9);
+  color: var(--up-ink);
+  text-align: right;
+}
+
+.up-dossier-row__value a {
+  color: var(--up-ink);
+  text-decoration: underline;
+}
+
+/* ─── Briefing ─── */
+.up-briefing {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--up-ghost);
+}
+
+.up-briefing__headline {
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-10);
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--up-ink);
+}
+
+.up-briefing__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* ─── Reputation Widget ─── */
+.up-reputation .score-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.up-reputation .score-row__label {
+  font-family: var(--up-font-sans);
+  font-size: var(--fs-8);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--up-pencil);
+  min-width: 100px;
+}
+
+.up-reputation .score-row__bar {
+  flex: 1;
+  height: 4px;
+  background: var(--up-ghost);
+  position: relative;
+}
+
+.up-reputation .score-row__bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: var(--up-ink);
+  transition: width var(--up-speed) var(--up-ease);
+}
+
+.up-reputation .score-row__value {
+  font-family: var(--up-font-mono);
+  font-size: var(--fs-9);
+  min-width: 32px;
+  text-align: right;
+}
+
+.up-reputation .score-row__value--null {
+  color: var(--up-text-faint);
+}
+
+/* ─── Mobile ─── */
+@media (max-width: 767px) {
+  .up-columns {
+    flex-direction: column;
+    position: static;
+    height: auto;
+  }
+
+  .up-col-left,
+  .up-col-right {
+    width: 100% !important;
+    overflow: visible;
+  }
+
+  .up-col-divider,
+  .vp-col-divider {
+    display: none;
+  }
+
+  .up-header {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 6px 12px;
+    gap: 4px;
+  }
+
+  .up-header__center {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    column-gap: 12px;
+  }
+
+  /* Dossier rows: let the label hold its width and the value wrap/shrink
+     instead of clipping off the right edge at 375px. */
+  .up-dossier-row {
+    gap: 8px;
+  }
+  .up-dossier-row__label {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .up-dossier-row__value {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .up-drawer {
+    width: 100vw;
+  }
+}

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """Bulk fix garbage make fields — triggers disabled via session_replication_role."""
 import sys
 try:
@@ -8,7 +9,7 @@ except ImportError:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'psycopg2-binary', '-q'])
     import psycopg2
 
-DB = "postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
+DB = f"postgresql://postgres.qkgaybvrernstplzjaam:{os.environ['SUPABASE_DB_PASSWORD']}@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
 BATCH = 3000
 
 conn = psycopg2.connect(DB)

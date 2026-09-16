@@ -13,7 +13,7 @@ DB_HOST="aws-0-us-west-1.pooler.supabase.com"
 DB_PORT="6543"
 DB_USER="postgres.qkgaybvrernstplzjaam"
 DB_NAME="postgres"
-DB_PASS="RbzKq32A0uhqvJMQ"
+DB_PASS="${SUPABASE_DB_PASSWORD}"
 
 PSQL_CMD="PGPASSWORD=$DB_PASS psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -q"
 UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

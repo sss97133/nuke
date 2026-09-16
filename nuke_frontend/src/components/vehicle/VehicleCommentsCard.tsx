@@ -322,17 +322,23 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
     return date.toLocaleDateString();
   };
 
-  const renderCommentText = (text: string) => {
+  const renderCommentText = (text: string | null | undefined) => {
+    // Defensive: accept null/undefined/non-string (prod crashed here 2026-05-24 with
+    // "Cannot read properties of null (reading 'length')" inside an Array.map at
+    // VehicleCommentsCard. Some comment rows arrive with null/non-string comment_text.
+    if (text == null) return null;
+    const safeText = typeof text === 'string' ? text : String(text ?? '');
+    if (!safeText) return null;
     // Parse markdown-style meme references: [meme:Title](url)
     const memeRegex = /\[meme:([^\]]+)\]\(([^)]+)\)/g;
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match;
 
-    while ((match = memeRegex.exec(text)) !== null) {
+    while ((match = memeRegex.exec(safeText)) !== null) {
       // Add text before the meme
       if (match.index > lastIndex) {
-        parts.push(text.substring(lastIndex, match.index));
+        parts.push(safeText.substring(lastIndex, match.index));
       }
       
       // Add the meme image
@@ -359,11 +365,11 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
     }
     
     // Add remaining text
-    if (lastIndex < text.length) {
-      parts.push(text.substring(lastIndex));
+    if (lastIndex < safeText.length) {
+      parts.push(safeText.substring(lastIndex));
     }
-    
-    return parts.length > 0 ? parts : text;
+
+    return parts.length > 0 ? parts : safeText;
   };
 
   const handleUsernameClick = async (comment: Comment) => {
@@ -491,6 +497,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {visibleComments.map((comment) => {
+              if (!comment) return null;
               const displayDate = comment.posted_at || comment.created_at;
               // Check if this is a bid - either comment_type is 'bid' OR bid_amount is set
               const type = String(comment.comment_type || '').toLowerCase();
@@ -672,9 +679,10 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                           </div>
                         ) : (
                           <>
-                            {renderCommentText(comment.comment_text)}
-                            {/* Show media URLs for Instagram/Facebook comments */}
-                            {comment.media_urls && comment.media_urls.length > 0 && (
+                            {renderCommentText(comment.comment_text ?? '')}
+                            {/* Show media URLs for Instagram/Facebook comments — guard against
+                                non-array media_urls (some rows have string/null instead of array). */}
+                            {Array.isArray(comment.media_urls) && comment.media_urls.length > 0 && (
                               <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                 {comment.media_urls.slice(0, 3).map((url, idx) => (
                                   <img

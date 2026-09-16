@@ -4,7 +4,7 @@
 # Designed to run for hours — processes ~84K vehicles at ~150 VINs/sec
 set -uo pipefail
 
-DB="postgresql://postgres.qkgaybvrernstplzjaam:RbzKq32A0uhqvJMQ@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
+DB="postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
 WORK_DIR="/tmp/nuke-vin-gaps"
 VIN_FILE="$WORK_DIR/vins-to-decode.txt"
 LOG="$WORK_DIR/progress.log"

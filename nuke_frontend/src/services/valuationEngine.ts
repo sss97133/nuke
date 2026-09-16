@@ -300,17 +300,36 @@ export class ValuationEngine {
         warnings.push('⚠️ Less than half of investments have photo evidence');
       }
 
-      // Check for damage tags
-      const { data: damageTags } = await supabase
-        .from('image_tags')
-        .select('id')
+      // Check for damage signal. The live source of image-level damage testimony
+      // is vehicle_images (byok-derived damage_flags[] / damage_type), NOT image_tags
+      // — image_tags only ever carries manual part/custom/issue annotations, so the
+      // old 'damage'/'rust'/'crack'/'dent' tag_type read returned 0 for every vehicle.
+      // Match only rows with real damage content. damage_flags is text[] whose
+      // empty value is `{}` (not NULL), so a plain not-is-null check would match
+      // every analyzed image and crowd the real hits out of any LIMIT window —
+      // use a non-empty-array filter (cs.{} is true for any array, gt length via
+      // neq) plus a JS guard for defense-in-depth.
+      const { data: damageImages } = await supabase
+        .from('vehicle_images')
+        .select('id, damage_type, damage_flags')
         .eq('vehicle_id', vehicleId)
-        .in('tag_type', ['damage', 'rust', 'crack', 'dent'])
-        .limit(1);
+        .or('damage_type.not.is.null,damage_flags.neq.{}')
+        .limit(50);
 
-      if (damageTags && damageTags.length > 0) {
+      const damagedImages = (damageImages || []).filter(
+        img => img.damage_type || (Array.isArray(img.damage_flags) && img.damage_flags.length > 0)
+      );
+
+      if (damagedImages.length > 0) {
         flags.valueAtRisk = true;
-        warnings.push('⚠️ Damage detected in photos - may affect value');
+        const damageTerms = Array.from(new Set(
+          damagedImages.flatMap(img => [
+            ...(Array.isArray(img.damage_flags) ? img.damage_flags : []),
+            ...(img.damage_type ? [img.damage_type] : []),
+          ])
+        ));
+        const detail = damageTerms.length > 0 ? ` (${damageTerms.join(', ')})` : '';
+        warnings.push(`⚠️ Damage detected in ${damagedImages.length} photo(s)${detail} - may affect value`);
       }
 
       return {

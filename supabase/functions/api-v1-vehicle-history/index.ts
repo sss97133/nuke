@@ -7,6 +7,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { authenticateRequest, logApiUsage } from "../_shared/apiKeyAuth.ts";
+import { buildDossier, resolveVehicle } from "../_shared/dossier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,6 +49,19 @@ Deno.serve(async (req) => {
 
     if (!vin || vin === 'api-v1-vehicle-history' || vin.length < 5) {
       return jsonResponse({ error: "VIN is required. Use GET /api-v1-vehicle-history/{vin}" }, 400);
+    }
+
+    // Dossier view — full Build-History + Proof-of-Ownership artifact (nuke.dossier/v1).
+    // Accepts VIN or vehicle UUID as the path identifier.
+    if (url.searchParams.get("view") === "dossier") {
+      const vehicleRow = await resolveVehicle(supabase, vin);
+      if (!vehicleRow) {
+        return jsonResponse({ error: "Vehicle not found", identifier: vin }, 404);
+      }
+      const laborRate = parseFloat(url.searchParams.get("labor_rate") || "85");
+      const dossier = await buildDossier(supabase, vehicleRow, { laborRate });
+      await logApiUsage(supabase, userId, "vehicle-history", "dossier", vehicleRow.id);
+      return jsonResponse(dossier);
     }
 
     // Pagination

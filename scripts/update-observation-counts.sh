@@ -3,7 +3,7 @@
 set -euo pipefail
 
 BATCH_SIZE="${1:-500}"
-export PGPASSWORD="RbzKq32A0uhqvJMQ"
+export PGPASSWORD="${SUPABASE_DB_PASSWORD}"
 PG="psql -h aws-0-us-west-1.pooler.supabase.com -p 6543 -U postgres.qkgaybvrernstplzjaam -d postgres"
 
 echo "[$(date)] Fetching vehicle IDs needing observation_count update..."

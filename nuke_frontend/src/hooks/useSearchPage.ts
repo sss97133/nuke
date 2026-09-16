@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { track } from '../lib/track';
 import { ingestVehicle } from '../services/aiDataIngestion';
 import type { SearchResult, SearchResultType } from '../types/search';
 
@@ -91,6 +92,39 @@ const TYPE_MAP: Record<string, string> = {
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export interface CohortTarget {
+  year: number;
+  make: string;
+  model: string;
+  label: string;
+  path: string;
+}
+
+/**
+ * Parse a query into a year-make-model cohort target ("1966 Ford Mustang").
+ * Requires a leading 4-digit year (1885–current+1), a make token, and at
+ * least one model token. Returns null when the query isn't a clean YMM —
+ * we never guess a cohort from a partial query.
+ */
+function parseCohort(q: string): CohortTarget | null {
+  const t = q.trim();
+  const m = t.match(/^(1[89]\d{2}|20\d{2})\s+([A-Za-z][A-Za-z-]*)\s+(.+?)\s*$/);
+  if (!m) return null;
+  const year = parseInt(m[1], 10);
+  if (year < 1885 || year > new Date().getFullYear() + 1) return null;
+  const make = m[2];
+  const model = m[3].trim();
+  if (!model) return null;
+  const slug = (s: string) => encodeURIComponent(s.toLowerCase());
+  return {
+    year,
+    make,
+    model,
+    label: `${year} ${make} ${model}`,
+    path: `/cohort/${slug(make)}/${slug(model)}/${year}`,
+  };
+}
 
 function mapRawResult(r: any): SearchResult {
   return {
@@ -217,6 +251,7 @@ export function useSearchPage() {
 
           // Got a vehicle — go straight to profile, no lingering
           if (result.vehicle_id) {
+            track('url_ingest', { url, ok: true });
             navigate(`/vehicle/${result.vehicle_id}`, { replace: true });
             return;
           }
@@ -241,17 +276,23 @@ export function useSearchPage() {
     setLoading(true);
     setResultFilter('all');
 
-    // Fire search + browse_stats in parallel
+    // Fire search + browse_stats in parallel — but NEVER gate results on stats.
+    // browse_stats was measured live at 15s + statement-timeout 500
+    // (2026-06-10); awaiting it in Promise.all held the entire results page
+    // hostage on every make query. Stats now fill in whenever they arrive.
     const searchPromise = supabase.functions.invoke('universal-search', {
       body: { query: q, limit: 100 },
     });
 
-    // Fetch browse stats if we detected a make
-    const statsPromise = detectedMake
-      ? supabase.rpc('browse_stats', { p_make: detectedMake }).then(({ data }) => data)
-      : Promise.resolve(null);
+    setBrowseStats(null);
+    if (detectedMake) {
+      supabase.rpc('browse_stats', { p_make: detectedMake })
+        .then(({ data }: { data: unknown }) => {
+          if (data) setBrowseStats(data as BrowseStats);
+        }, () => { /* stats are decoration — never surface their failures */ });
+    }
 
-    Promise.all([searchPromise, statsPromise]).then(([searchRes, stats]) => {
+    searchPromise.then((searchRes) => {
       const { data, error } = searchRes;
 
       if (error || !data) {
@@ -269,9 +310,8 @@ export function useSearchPage() {
       const total = data.meta?.total_count ?? mapped.length;
       setSearchSummary(`Found ${total.toLocaleString()} results for "${q}".`);
       setSearchMeta(data.meta || null);
-
-      if (stats) setBrowseStats(stats as BrowseStats);
-      else setBrowseStats(null);
+      // Funnel: the first-query moment. Zero-result queries are the gap list.
+      track('search_results', { q, total });
 
       setLoading(false);
     });
@@ -337,8 +377,12 @@ export function useSearchPage() {
   const vehicleCount = results.filter(r => r.type === 'vehicle').length;
   const displayVehicleCount = displayResults.filter(r => r.type === 'vehicle').length;
 
+  // Cohort terminal target — only when the query is a clean year-make-model.
+  const cohortTarget = useMemo(() => parseCohort(query), [query]);
+
   return {
     query,
+    cohortTarget,
     results,
     displayResults,
     loading,

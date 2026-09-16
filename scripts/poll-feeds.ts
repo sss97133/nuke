@@ -460,6 +460,10 @@ async function pollFeeds() {
   let totalQueued = 0;
   let totalFound = 0;
   let errors = 0;
+  // DB-error backoff state (mirrors byok-image-batch.sh): a struggling DB must NOT
+  // be retry-stormed — that's what turns "slow" into "down" and burns egress.
+  let consecutiveDbErrors = 0;
+  const MAX_CONSECUTIVE_DB_ERRORS = 5;
 
   for (const feed of feeds) {
     try {
@@ -557,9 +561,44 @@ async function pollFeeds() {
           updated_at: new Date().toISOString(),
         })
         .eq("id", feed.id);
+
+      // A successful round-trip means the DB is alive — clear the backoff streak.
+      consecutiveDbErrors = 0;
     } catch (err: any) {
       console.log(`❌ ${err.message}`);
       errors++;
+
+      // Distinguish a DB-down error from a per-feed fetch failure. A struggling
+      // database must NOT be retry-stormed (522/ECONNREFUSED/ENOTFOUND/5xx/timeout) —
+      // back off with a staggered/exponential sleep (cap 60s), and bail the whole run
+      // after N consecutive DB errors so we don't loop hot and burn egress.
+      const msg = String(err?.message || err);
+      const isDbError =
+        /\b522\b|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|connection timeout|fetch failed|\b50[0-9]\b|\b52[0-9]\b/i.test(
+          msg
+        );
+
+      if (isDbError) {
+        consecutiveDbErrors++;
+        const backoffMs = Math.min(60000, 2000 * 2 ** (consecutiveDbErrors - 1));
+        console.log(
+          `    ⏳ DB error (${consecutiveDbErrors}/${MAX_CONSECUTIVE_DB_ERRORS}) — backing off ${Math.round(
+            backoffMs / 1000
+          )}s, NOT hammering`
+        );
+        await new Promise((r) => setTimeout(r, backoffMs));
+        if (consecutiveDbErrors >= MAX_CONSECUTIVE_DB_ERRORS) {
+          console.log(
+            `    🛑 ${MAX_CONSECUTIVE_DB_ERRORS} consecutive DB errors — DB looks down, stopping run cleanly.`
+          );
+          break;
+        }
+        // Skip the metadata write below — it would just hit the same dead DB.
+        continue;
+      }
+
+      // Per-feed (non-DB) error: reset the DB-error streak and record it on the feed.
+      consecutiveDbErrors = 0;
 
       await supabase
         .from("listing_feeds")

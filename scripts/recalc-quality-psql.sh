@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-PGPASSWORD="RbzKq32A0uhqvJMQ"
+PGPASSWORD="${SUPABASE_DB_PASSWORD}"
 PGHOST="aws-0-us-west-1.pooler.supabase.com"
 PGPORT="6543"
 PGUSER="postgres.qkgaybvrernstplzjaam"

@@ -30,24 +30,31 @@ A29   INJ_PH7                     Fuel Injector 7             18ga  12576341 EV6
 A30   INJ_PH8                     Fuel Injector 8             18ga  12576341 EV6/USCAR connector
   UNUSED (11): A01, A14, A15, A16, A17, A18, A25, A31, A32, A33, A34
 
->> M130 Connector_B (Superseal 26-pin)
+>> M130 Connector_B (Tyco Superseal 26 Position Keying 1 — MoTeC #65045)
+   Amended 2026-05-14: B03-B06 corrected from UNUSED to AT1-AT4 assignments per
+   motec_m1_hardware_techspec.pdf p17 and K5_cut_list_v2.txt. Mating connector PN
+   added (MoTeC #65045) from PDF p17. See receipts/2026-05-14_substrate-m130-b03-b06-correction.md
 ------------------------------------------------------------------------------------------
 PIN   FUNCTION                    ASSIGNED TO                 GAUGE NOTES
 B01   UDIG1                       Crank Position Sensor       22ga  SHIELDED SHIELDED. 12615626 Firmware-locked to crank position.
 B02   UDIG2                       Cam Position Sensor         22ga  SHIELDED SHIELDED. 12591720
+B03   AT1                         Intake Air Temp Sensor      22ga  1k pull-up to SEN_5V_A. Wire #109.
+B04   AT2                         Coolant Temp Sensor (ECU)   22ga  1k pull-up to SEN_5V_B. Wire #110.
+B05   AT3                         Oil Temperature Sensor      22ga  1k pull-up to SEN_5V_A. Wire #113.
+B06   AT4                         —                           22ga  1k pull-up to SEN_5V_B. Spare AT input.
 B07   KNOCK1                      Knock Sensor Bank 1         22ga  SHIELDED SHIELDED. Drain to sensor ground.
-B12   BAT_BAK                     —                           22ga  
+B12   BAT_BAK                     —                           22ga
 B13   KNOCK2                      Knock Sensor Bank 2         22ga  SHIELDED SHIELDED. Drain to sensor ground.
-B15   SEN_0V_A                    —                           22ga  Star ground point
-B16   SEN_0V_B                    —                           22ga  Star ground point
+B15   SEN_0V_A                    —                           22ga  Star ground point. Companion to AT1/AT3 + SEN_5V_A sensors.
+B16   SEN_0V_B                    —                           22ga  Star ground point. Companion to AT2/AT4 + SEN_5V_B sensors.
 B17   CAN_HI                      —                           22ga  120 ohm termination required
 B18   CAN_LO                      —                           22ga  120 ohm termination required
-B19   SEN_6V3                     —                           22ga  
-B23   ETH_TX+                     —                           24ga  
-B24   ETH_TX-                     —                           24ga  
-B25   ETH_RX+                     —                           24ga  
-B26   ETH_RX-                     —                           24ga  
-  UNUSED (12): B03, B04, B05, B06, B08, B09, B10, B11, B14, B20, B21, B22
+B19   SEN_6V3                     —                           22ga
+B23   ETH_TX+                     —                           24ga
+B24   ETH_TX-                     —                           24ga
+B25   ETH_RX+                     —                           24ga
+B26   ETH_RX-                     —                           24ga
+  UNUSED (8): B06, B08, B09, B10, B11, B14, B20, B21, B22  (B06=AT4 is spare-but-functional)
 
 >> PDM30 (Superseal 34+26+M6 (61 pins))
 ------------------------------------------------------------------------------------------
