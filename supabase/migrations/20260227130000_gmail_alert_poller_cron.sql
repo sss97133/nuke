@@ -1,7 +1,7 @@
 -- Gmail Alert Poller — pg_cron job
 --
 -- Calls the gmail-alert-poller edge function every 5 minutes.
--- Polls alerts-inbox@example.com for vehicle listing alert emails,
+-- Polls the alerts inbox (ALERTS_EMAIL) for vehicle listing alert emails,
 -- extracts listing URLs, and queues them into import_queue.
 --
 -- PREREQUISITES (must be done before this cron will actually work):

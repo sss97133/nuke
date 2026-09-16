@@ -1,0 +1,207 @@
+# K5 AUDIO — generated from K5_cut_list_v2.txt
+# 13 wires, sources: AMP, ECU, PDM30
+
+connectors:
+  AMP:
+    type: "AMP"
+    subtype: female  # mating side that plugs into the device
+    pincount: 10
+    pinlabels: ["CH1n", "CH1p", "CH2n", "CH2p", "CH3n", "CH3p", "CH4n", "CH4p", "SUBn", "SUBp"]
+
+  ECU:
+    type: "ECU"
+    subtype: female  # mating side that plugs into the device
+    pincount: 2
+    pinlabels: ["P32", "P96"]
+
+  PDM30:
+    type: "MoTeC Superseal A (34-pin) — MoTeC #65044"
+    subtype: female  # mating side that plugs into the device
+    pincount: 34
+    pinlabels: ["OUT20"]
+
+  Amplifier:
+    type: "Amplifier (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Amplifier_Relay:
+    type: "Amplifier Relay (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Radio_Head_Unit:
+    type: "Radio/Head Unit (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Speaker_Front_Left:
+    type: "Speaker Front Left (connector PN unknown)"
+    pincount: 2
+    pinlabels: [P1, P2]
+
+  Speaker_Front_Right:
+    type: "Speaker Front Right (connector PN unknown)"
+    pincount: 2
+    pinlabels: [P1, P2]
+
+  Speaker_Rear_Left:
+    type: "Speaker Rear Left (connector PN unknown)"
+    pincount: 2
+    pinlabels: [P1, P2]
+
+  Speaker_Rear_Right:
+    type: "Speaker Rear Right (connector PN unknown)"
+    pincount: 2
+    pinlabels: [P1, P2]
+
+  Subwoofer:
+    type: "Subwoofer (connector PN unknown)"
+    pincount: 2
+    pinlabels: [P1, P2]
+
+cables:
+  W26a:
+    gauge: 18 AWG
+    length: 6.9
+    wirecount: 1
+    colors: [OGYE]
+    notes: "#26a Speaker Front Left (+) (ORN/YEL)"
+
+  W26b:
+    gauge: 18 AWG
+    length: 6.9
+    wirecount: 1
+    colors: [OGYEBK]
+    notes: "#26b Speaker Front Left (-) (ORN/YEL/BLK)"
+
+  W27a:
+    gauge: 18 AWG
+    length: 6.9
+    wirecount: 1
+    colors: [OGVT]
+    notes: "#27a Speaker Front Right (+) (ORN/VIO)"
+
+  W27b:
+    gauge: 18 AWG
+    length: 6.9
+    wirecount: 1
+    colors: [OGVTBK]
+    notes: "#27b Speaker Front Right (-) (ORN/VIO/BLK)"
+
+  W28a:
+    gauge: 18 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [OGOG]
+    notes: "#28a Speaker Rear Left (+) (ORN/ORG)"
+
+  W28b:
+    gauge: 18 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [OGOGBK]
+    notes: "#28b Speaker Rear Left (-) (ORN/ORG/BLK)"
+
+  W29a:
+    gauge: 18 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [OG]
+    notes: "#29a Speaker Rear Right (+) (ORN)"
+
+  W29b:
+    gauge: 18 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [OGBK]
+    notes: "#29b Speaker Rear Right (-) (ORN/BLK)"
+
+  W30a:
+    gauge: 14 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [OGWH]
+    notes: "#30a Subwoofer (+) (ORN/WHT)"
+
+  W30b:
+    gauge: 14 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [OGWHBK]
+    notes: "#30b Subwoofer (-) (ORN/WHT/BLK)"
+
+  W31:
+    gauge: 18 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [OGBK]
+    notes: "#31 Radio/Head Unit (ORN/BLK)"
+
+  W32:
+    gauge: 8 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [OGRD]
+    notes: "#32 Amplifier (ORN/RED)"
+
+  W96:
+    gauge: 22 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [OGBK]
+    notes: "#96 Amplifier Relay (ORN/BLK)"
+
+connections:
+  -
+    - AMP: ["CH1p"]
+    - W26a: [1]
+    - Speaker_Front_Left: ["P1"]
+  -
+    - AMP: ["CH1n"]
+    - W26b: [1]
+    - Speaker_Front_Left: ["P2"]
+  -
+    - AMP: ["CH2p"]
+    - W27a: [1]
+    - Speaker_Front_Right: ["P1"]
+  -
+    - AMP: ["CH2n"]
+    - W27b: [1]
+    - Speaker_Front_Right: ["P2"]
+  -
+    - AMP: ["CH3p"]
+    - W28a: [1]
+    - Speaker_Rear_Left: ["P1"]
+  -
+    - AMP: ["CH3n"]
+    - W28b: [1]
+    - Speaker_Rear_Left: ["P2"]
+  -
+    - AMP: ["CH4p"]
+    - W29a: [1]
+    - Speaker_Rear_Right: ["P1"]
+  -
+    - AMP: ["CH4n"]
+    - W29b: [1]
+    - Speaker_Rear_Right: ["P2"]
+  -
+    - AMP: ["SUBp"]
+    - W30a: [1]
+    - Subwoofer: ["P1"]
+  -
+    - AMP: ["SUBn"]
+    - W30b: [1]
+    - Subwoofer: ["P2"]
+  -
+    - PDM30: ["OUT20"]
+    - W31: [1]
+    - Radio_Head_Unit: ["P1"]
+  -
+    - ECU: ["P32"]
+    - W32: [1]
+    - Amplifier: ["P1"]
+  -
+    - ECU: ["P96"]
+    - W96: [1]
+    - Amplifier_Relay: ["P1"]

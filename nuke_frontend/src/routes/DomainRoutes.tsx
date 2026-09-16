@@ -14,7 +14,13 @@ const Extension = React.lazy(() => import('../pages/Extension'));
 // Search: lazy-loaded (chunk retry logic in main.tsx handles failures)
 const Search = React.lazy(() => import('../pages/Search'));
 const BrowseVehicles = React.lazy(() => import('../pages/BrowseVehicles'));
+const LiveFloor = React.lazy(() => import('../live/LiveFloor'));
+// Cohort terminal — Bloomberg-for-a-cohort (year-make-model landing)
+const CohortTerminal = React.lazy(() => import('../pages/CohortTerminal'));
+// R&D: white-label / "make this my app" showroom
+const BrandStudio = React.lazy(() => import('../pages/BrandStudio'));
 const PublicMap = React.lazy(() => import('../components/map/PublicMap'));
+const Valuation = React.lazy(() => import('../pages/Valuation'));
 
 // Public map page — no auth, no DeckGL
 function MapPage() {
@@ -34,6 +40,7 @@ const OrganizationRoutes = React.lazy(() => import('./modules/organization/route
 const DealerRoutes = React.lazy(() => import('./modules/dealer/routes'));
 const AdminRoutes = React.lazy(() => import('./modules/admin/routes'));
 const MarketplaceRoutes = React.lazy(() => import('./modules/marketplace/routes'));
+const PublishingRoutes = React.lazy(() => import('./modules/publishing/routes'));
 
 // Auth / callbacks (still referenced by many pages/components)
 const Login = React.lazy(() => import('../components/auth/Login'));
@@ -92,8 +99,12 @@ const PersonalPhotoLibrary = React.lazy(() => import('../pages/PersonalPhotoLibr
 
 const SettingsHubPage = React.lazy(() => import('../pages/settings/SettingsHubPage'));
 const ApiKeysPage = React.lazy(() => import('../pages/settings/ApiKeysPage'));
+const AIAccessPage = React.lazy(() => import('../pages/settings/AIAccessPage'));
 const ConnectedAgentsPage = React.lazy(() => import('../pages/settings/ConnectedAgentsPage'));
-const WebhooksPage = React.lazy(() => import('../pages/settings/WebhooksPage'));
+const AnalysisSettingsPage = React.lazy(() => import('../pages/settings/AnalysisSettingsPage'));
+const PipelineVisualizer = React.lazy(() => import('../pages/PipelineVisualizer'));
+// WebhooksPage removed 2026-07-12 (8e90e7ba5): feature 404'd at the DB layer
+// (webhook_endpoints/deliveries never migrated); page + edge fn deleted.
 const UsageDashboardPage = React.lazy(() => import('../pages/settings/UsageDashboardPage'));
 const DevelopersPage = React.lazy(() => import('../pages/developers'));
 const ApiLanding = React.lazy(() => import('../pages/ApiLanding'));
@@ -112,6 +123,8 @@ const JournalPage = React.lazy(() => import('../pages/journal/JournalPage'));
 
 // Public intake — Janitor drain (first ship: note event type only)
 const IntakePage = React.lazy(() => import('../pages/intake/IntakePage'));
+// Live intake — owner watches the BYOK fleet burn fill the timeline
+const LiveIntakeScreen = React.lazy(() => import('../pages/intake/LiveIntakeScreen'));
 
 export const DomainRoutes = () => {
   return (
@@ -134,6 +147,9 @@ export const DomainRoutes = () => {
         <Route path="/extension" element={<Extension />} />
         <Route path="/data-deletion" element={<DataDeletion />} />
 
+        {/* ── R&D: white-label "make this my app" showroom ──────────────── */}
+        <Route path="/brand-studio" element={<BrandStudio />} />
+
         {/* Local-first user views — no Supabase, works offline */}
         <Route path="/my/discover" element={<LocalDiscover />} />
         <Route path="/my/:slug" element={<LocalVehicle />} />
@@ -148,6 +164,8 @@ export const DomainRoutes = () => {
         <Route path="/admin/*" element={<AdminRoutes />} />
         {/* Marketplace: mix of public + protected (handled inside the module) */}
         <Route path="/market/*" element={<MarketplaceRoutes />} />
+        {/* Publishing: editorial production, publications, credits — separate from vehicles */}
+        <Route path="/publishing/*" element={<PublishingRoutes />} />
 
         {/* ── Legacy Route Compatibility Shims ─────────────────────────── */}
         <Route path="/vehicles" element={<Navigate to="/vehicle/list" replace />} />
@@ -167,8 +185,11 @@ export const DomainRoutes = () => {
 
         {/* Search + Browse + Map: public */}
         <Route path="/search" element={<Search />} />
+        <Route path="/cohort/:make/:model/:year" element={<CohortTerminal />} />
         <Route path="/browse" element={<BrowseVehicles />} />
+        <Route path="/live" element={<LiveFloor />} />
         <Route path="/map" element={<MapPage />} />
+        <Route path="/valuation" element={<Valuation />} />
         {/* Public auction listings */}
         <Route path="/auctions" element={<AuctionMarketplace />} />
         <Route path="/auction/:listingId" element={<AuctionListing />} />
@@ -197,6 +218,9 @@ export const DomainRoutes = () => {
         <Route path="/journal/:date" element={<JournalPage />} />
         {/* Public intake — Janitor drain (first ship: note event type only) */}
         <Route path="/intake" element={<IntakePage />} />
+        {/* Live intake — fleet burn watch (kept off /intake: that route is the
+            Janitor-drain note form and login returnUrl target) */}
+        <Route path="/intake/live" element={<LiveIntakeScreen />} />
         {/* Treemap browse experience — preserved at /explore after F6 moved */}
         {/* the homepage to the Janitor-drain intake variant. */}
         <Route path="/explore" element={<Navigate to="/?force_treemap=1" replace />} />
@@ -204,7 +228,11 @@ export const DomainRoutes = () => {
 
         {/* ── Hub convenience redirects → homepage tabs ─────────────────── */}
         <Route path="/garage" element={<Navigate to="/?tab=garage" replace />} />
-        <Route path="/map" element={<Navigate to="/?tab=map" replace />} />
+        {/* /map is NOT redirected here — it's served by the real MapPage route
+            declared above (line ~181). A duplicate redirect route used to live
+            here; it was dead code (React Router resolves same-path ties to the
+            earlier-declared route, so this one could never fire). Removed
+            2026-07-06 QA pass — see nuke.ag QA findings. */}
         <Route path="/feed" element={<Navigate to="/?tab=feed" replace />} />
 
         {/* ── Protected routes (require sign-in) ───────────────────────── */}
@@ -259,8 +287,11 @@ export const DomainRoutes = () => {
           <Route element={<ProtectedRoute />}>
             <Route path="/settings" element={<SettingsHubPage />} />
             <Route path="/settings/api-keys" element={<ApiKeysPage />} />
+            {/* Where the user brings their own compute for the in-app agent. */}
+            <Route path="/settings/ai" element={<AIAccessPage />} />
             <Route path="/settings/connected-agents" element={<ConnectedAgentsPage />} />
-            <Route path="/settings/webhooks" element={<WebhooksPage />} />
+            <Route path="/settings/analysis" element={<AnalysisSettingsPage />} />
+            <Route path="/pipeline/analysis" element={<PipelineVisualizer />} />
             <Route path="/settings/usage" element={<UsageDashboardPage />} />
             <Route path="/developers/dashboard" element={<DeveloperDashboard />} />
             <Route path="/business/settings" element={<BusinessSettings />} />

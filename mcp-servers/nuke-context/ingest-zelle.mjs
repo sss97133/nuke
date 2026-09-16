@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * ingest-zelle.mjs — Parse AFCU Zelle SMS notifications from iMessage chat.db
+ * ingest-zelle.mjs — Parse bank Zelle SMS notifications from iMessage chat.db
  *
  * Reads short code 767666 messages, extracts sender/amount/memo from both
  * outbound (confirmation requests) and inbound (deposit notifications),

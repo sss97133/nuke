@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import MiniLineChart from '../../charts/MiniLineChart';
 import { optimizeImageUrl } from '../../../lib/imageOptimizer';
+import guestbookSnapshot from '../../../data/guestbook2024-snapshot.json';
 
 const MAP_FONT = 'Arial, Helvetica, sans-serif';
 
@@ -25,6 +26,15 @@ interface OrgVehicle {
 interface BrandDesignLanguage {
   colors?: { primary?: string; secondary?: string };
   logos?: { svg?: string; primary_dark?: string; primary_light?: string };
+}
+
+interface PubFeature {
+  org_id: string | null;
+  org_name_printed: string | null;
+  printed_page: number | null;
+  page: number | null;
+  category: string | null;
+  feature_kind: string | null;
 }
 
 interface OrgData {
@@ -98,6 +108,11 @@ export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
       </div>
     );
   }
+
+  // Guest Book advertiser graph — bundled snapshot (fixed annual publication; no live view)
+  const features = (guestbookSnapshot.features as PubFeature[])
+    .filter(f => f.org_id === org.id)
+    .sort((a, b) => (a.page ?? 0) - (b.page ?? 0));
 
   const location = [org.city, org.state, org.country].filter(Boolean).join(', ');
   const soldCount = org.vehicles.filter(v => v.status === 'sold').length;
@@ -286,6 +301,49 @@ export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
               })}
             </div>
           </>
+        )}
+
+        {/* Guest Book advertiser graph — only render when rows exist (no empty shells) */}
+        {features.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase' as const, color: 'var(--text-secondary)', letterSpacing: '1px', marginBottom: 6 }}>
+              FEATURED IN — SAINT BARTH GUEST BOOK 2024
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {features.map((f, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
+                    padding: '4px 6px', border: '1px solid var(--border)',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
+                      {f.org_name_printed || org.name}
+                    </div>
+                    {f.category && (
+                      <div style={{ fontSize: 7, textTransform: 'uppercase' as const, color: 'var(--text-disabled)', letterSpacing: '0.3px' }}>
+                        {f.category}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                    {f.feature_kind && (
+                      <span style={{ fontSize: 7, textTransform: 'uppercase' as const, border: '1px solid var(--border)', padding: '1px 4px', color: 'var(--text-secondary)', letterSpacing: '0.3px' }}>
+                        {f.feature_kind}
+                      </span>
+                    )}
+                    {(f.printed_page ?? f.page) != null && (
+                      <span style={{ fontSize: 9, fontFamily: 'Courier New, monospace', color: 'var(--text-secondary)' }}>
+                        p.{f.printed_page ?? f.page}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>

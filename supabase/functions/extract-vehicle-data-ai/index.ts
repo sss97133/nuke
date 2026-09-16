@@ -16,6 +16,57 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// === LISTING-VS-EDITORIAL GATE ===
+// Editorial / news domains publish articles ABOUT vehicles, never listings OF vehicles.
+// On 2026-07-01 the import-queue drainer fed article URLs here and this function minted
+// vehicles from sneaker roundups (hiconsumption), a Lamborghini TRACTOR (silodrome), and
+// 2027 press-car reviews (thedrive). Never save a vehicle from these domains.
+const EDITORIAL_DOMAINS = [
+  'thedrive.com',
+  'silodrome.com',
+  'hiconsumption.com',
+  'jalopnik.com',
+  'motortrend.com',
+  'roadandtrack.com',
+  'caranddriver.com',
+  'autoblog.com',
+  'carscoops.com',
+  'autoevolution.com',
+  'hotcars.com',
+  'topspeed.com',
+  'motor1.com',
+  'thetruthaboutcars.com',
+  'uncrate.com',
+  'gearpatrol.com',
+  'petrolicious.com',
+  'theautopian.com',
+]
+
+// Consumer brands the LLM sometimes returns as "make" from lifestyle articles
+// (Nike sneakers, Rolex watches). Never vehicle manufacturers.
+const NON_VEHICLE_MAKES = new Set([
+  'nike', 'adidas', 'rolex', 'apple', 'samsung', 'sony', 'omega', 'seiko',
+])
+
+// First automobile: Benz Patent-Motorwagen, 1885. Anything older isn't a vehicle year;
+// anything past next model year is a press-preview article, not a listing.
+const MIN_VEHICLE_YEAR = 1885
+
+// Hostname-derived slugs whose registered observation_sources.slug differs.
+// (sourceSlugFromUrl('bringatrailer.com') → 'bringatrailer', but the registered
+// source slug is 'bat'.) Only map domains this function plausibly receives.
+const OBSERVATION_SLUG_ALIASES: Record<string, string> = {
+  bringatrailer: 'bat',
+  carsandbids: 'cars-and-bids',
+  collectingcars: 'collecting-cars',
+  classiccars: 'classiccars-com',
+  rmsothebys: 'rm-sothebys',
+}
+
+// Registered generic source for AI extraction from unregistered domains
+// (observation_sources: base_trust_score 0.65, supports 'listing').
+const GENERIC_AI_SOURCE = 'ai-description-extraction'
+
 interface ExtractionRequest {
   url: string
   html?: string
@@ -38,6 +89,32 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'URL is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
+    }
+
+    // Source slug from hostname (e.g. 'craigslist', 'hemmings') — used for provenance columns
+    const sourceSlug = sourceSlugFromUrl(url)
+
+    // Skip response for the save_to_db gates below. The `error` text intentionally matches
+    // process-import-queue's non-vehicle detection ("No vehicle data found") so gated URLs
+    // are marked skipped in the queue instead of retried.
+    const skipResponse = (reason: string, extra: Record<string, unknown> = {}) =>
+      new Response(JSON.stringify({
+        success: false,
+        skipped: true,
+        reason,
+        error: `No vehicle data found: ${reason}`,
+        url,
+        ...extra,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+
+    // === EDITORIAL GATE (pre-fetch) ===
+    // Article domains never produce listings — skip before spending fetch/LLM calls.
+    if (save_to_db) {
+      const editorialDomain = matchEditorialDomain(url)
+      if (editorialDomain) {
+        console.log(`[extract-vehicle-data-ai] Editorial domain blocked: ${editorialDomain}`)
+        return skipResponse('editorial_source', { domain: editorialDomain })
+      }
     }
 
     // Route to dedicated extractor if one exists for this domain
@@ -333,7 +410,7 @@ Deno.serve(async (req) => {
     // === FIELD-LEVEL EXTRACTION HEALTH LOGGING ===
     const overallConfidence = extractedJson.confidence || 0.8
     const healthLogger = new ExtractionLogger(supabase, {
-      source: source || 'unknown',
+      source: source || sourceSlug || 'unknown',
       extractorName: 'extract-vehicle-data-ai',
       extractorVersion: '1.0',
       sourceUrl: url,
@@ -371,6 +448,34 @@ Deno.serve(async (req) => {
     // Flush logs in background
     healthLogger.flush().catch(err => console.error('Health log flush error:', err))
 
+    // === LISTING-SIGNALS GATES (save_to_db only) ===
+    // A real listing carries structural signals editorial prose never does.
+    // These gates run before ANY vehicles write.
+    if (save_to_db) {
+      // Obvious non-auto brand extracted as "make" (Nike sneakers, Rolex watches)
+      if (normalized.make && NON_VEHICLE_MAKES.has(String(normalized.make).trim().toLowerCase())) {
+        console.log(`[extract-vehicle-data-ai] Non-vehicle make blocked: ${normalized.make}`)
+        return skipResponse('not_a_vehicle', { make: normalized.make })
+      }
+
+      // Implausible model year — kills future press cars (e.g. 2027 review articles)
+      const maxPlausibleYear = new Date().getFullYear() + 1
+      if (normalized.year && (normalized.year < MIN_VEHICLE_YEAR || normalized.year > maxPlausibleYear)) {
+        console.log(`[extract-vehicle-data-ai] Implausible year blocked: ${normalized.year}`)
+        return skipResponse('implausible_year', { year: normalized.year })
+      }
+
+      // A listing has at least one of price / mileage / VIN / location. None → article.
+      const hasListingSignals = Boolean(
+        normalized.price || normalized.asking_price || normalized.sold_price ||
+        normalized.mileage || normalized.vin || normalized.location
+      )
+      if (!hasListingSignals) {
+        console.log(`[extract-vehicle-data-ai] No listing signals (price/mileage/VIN/location) — skipping save`)
+        return skipResponse('no_listing_signals')
+      }
+    }
+
     // === PERSIST TO DATABASE when save_to_db is true ===
     let vehicleId: string | null = null
     let imagesInserted = 0
@@ -407,10 +512,6 @@ Deno.serve(async (req) => {
           existing = data
         }
 
-        // Derive domain slug for discovery_source (e.g. "barrett-jackson" from "www.barrett-jackson.com")
-        let domainSlug = 'ai_extraction'
-        try { domainSlug = new URL(url).hostname.replace(/^www\./, '').replace(/\.com$|\.org$|\.net$|\.co\.uk$/,''); } catch {}
-
         // Normalize make/model/transmission/drivetrain/VIN via shared canonical layer
         normalizeVehicleFields(normalized);
 
@@ -432,25 +533,48 @@ Deno.serve(async (req) => {
           asking_price: normalized.price || null,
           description: normalized.description?.slice(0, 5000) || null,
           discovery_url: url,
-          discovery_source: source || domainSlug,
+          listing_url: url,
+          // Provenance: hostname-derived slug (e.g. 'craigslist', 'hemmings') — never 'unknown'
+          source: sourceSlug || source || 'ai_extraction',
+          discovery_source: source || sourceSlug || 'ai_extraction',
           profile_origin: source || 'ai_extraction',
-          extractor_version: 'extract-vehicle-data-ai:1.1',
+          // Scraped page = third-party testimony, not an owner claim
+          // (matches scripts/import-fb-saved.mjs; vehicles_entry_type_check allows:
+          //  owner_claim | contributor_data | title_verified | disputed)
+          entry_type: 'contributor_data',
+          // 1.3 (2026-07-02): gap-fill-only updates, domain-derived observation
+          // platform, no-DELETE image dedupe (DNA audit §IV)
+          extractor_version: 'extract-vehicle-data-ai:1.3',
           status: 'active',
         }
 
         if (existing) {
           vehicleId = existing.id
-          // Update with new data (don't overwrite existing non-null fields)
+          // GAP-FILL ONLY (Tetris discipline — _shared/batUpsertWithProvenance.ts):
+          // fetch the existing row and fill only columns that are currently NULL.
+          // Re-extractions never overwrite existing values. (2026-07-02 DNA audit:
+          // the old loop checked only the NEW value for null, so it clobbered
+          // existing columns despite its own comment.)
+          // entry_type is set at record creation only — never downgrade an existing
+          // owner_claim/title_verified vehicle to contributor_data on re-extraction
+          const { data: existingRow } = await supabase
+            .from('vehicles')
+            .select('*')
+            .eq('id', vehicleId)
+            .maybeSingle()
           const updates: Record<string, any> = {}
-          for (const [key, val] of Object.entries(vehiclePayload)) {
-            if (val !== null && key !== 'discovery_url' && key !== 'status') {
-              updates[key] = val
+          if (existingRow) {
+            for (const [key, val] of Object.entries(vehiclePayload)) {
+              if (val === null || key === 'discovery_url' || key === 'status' || key === 'entry_type') continue
+              if (existingRow[key] === null || existingRow[key] === undefined) {
+                updates[key] = val
+              }
             }
           }
           if (Object.keys(updates).length > 0) {
             await supabase.from('vehicles').update(updates).eq('id', vehicleId)
           }
-          console.log(`[extract-vehicle-data-ai] Updated existing vehicle: ${vehicleId}`)
+          console.log(`[extract-vehicle-data-ai] Gap-filled ${Object.keys(updates).length} NULL fields on existing vehicle: ${vehicleId}`)
         } else {
           const { data: inserted, error: insertErr } = await supabase
             .from('vehicles')
@@ -472,9 +596,30 @@ Deno.serve(async (req) => {
           for (const [k, v] of Object.entries(normalized)) {
             if (v != null && !obsSkip.has(k)) obsFields[k] = v;
           }
+          // Platform derives from the ACTUAL source domain (2026-07-02 DNA audit:
+          // this previously stamped EVERY domain as platform 'bat' / trust 0.65 —
+          // falsified source DNA). Registered domain slug → that source and its
+          // base_trust_score; unregistered domain → the generic AI-extraction
+          // source with its conservative base trust. Never label non-BaT as bat.
+          let obsPlatform = GENERIC_AI_SOURCE;
+          let obsTrust: number | undefined;
+          try {
+            const slugCandidate = sourceSlug ? (OBSERVATION_SLUG_ALIASES[sourceSlug] ?? sourceSlug) : null;
+            const lookup = slugCandidate ? [slugCandidate, GENERIC_AI_SOURCE] : [GENERIC_AI_SOURCE];
+            const { data: srcRows } = await supabase
+              .from('observation_sources')
+              .select('slug, base_trust_score')
+              .in('slug', lookup);
+            const match = (srcRows || []).find((r: any) => r.slug === slugCandidate)
+              || (srcRows || []).find((r: any) => r.slug === GENERIC_AI_SOURCE);
+            if (match) {
+              obsPlatform = match.slug;
+              obsTrust = Number(match.base_trust_score) || undefined;
+            }
+          } catch (_) { /* fall through to generic source, writer default trust */ }
           writeObservation(supabase, {
             vehicleId,
-            source: { platform: "bat", url, trustScore: 0.65 },
+            source: { platform: obsPlatform, url, ...(obsTrust ? { trustScore: obsTrust } : {}) },
             fields: obsFields,
             observationKind: "listing",
             extractionMethod: "ai_extraction",
@@ -500,43 +645,59 @@ Deno.serve(async (req) => {
           const cleanedUrls = normalized.image_urls.filter((u: string) =>
             !JUNK_IMAGE_PATTERNS.some((p) => p.test(u))
           );
-          const imageRows = cleanedUrls.slice(0, 50).map((imgUrl: string, idx: number) => ({
-            vehicle_id: vehicleId,
-            image_url: imgUrl,
-            source: 'external_import',
-            source_url: imgUrl,
-            is_external: true,
-            approval_status: 'auto_approved',
-            is_approved: true,
-            redaction_level: 'none',
-            position: idx,
-            display_order: idx,
-            is_primary: idx === 0,
-            exif_data: {
-              source_url: url,
-              discovery_url: url,
-              imported_from: source || 'ai_extraction',
-            },
-          }))
+          const candidateUrls: string[] = cleanedUrls.slice(0, 50)
 
-          // Delete existing external_import images to avoid duplicates
-          const { error: deleteError } = await supabase
+          // NEVER DELETE vehicle_images — testimony, trust-invariant rule 1.
+          // (2026-07-02 DNA audit: the old delete+reinsert here destroyed accrued
+          // ai_scan_metadata on every re-extraction.) Dedupe by image_url instead:
+          // insert only URLs not already present for this vehicle, leave existing
+          // rows intact.
+          const { data: existingImgs } = await supabase
             .from('vehicle_images')
-            .delete()
+            .select('image_url')
             .eq('vehicle_id', vehicleId)
-            .eq('source', 'external_import')
-          if (deleteError) console.error('Failed to delete from vehicle_images:', deleteError.message)
+            .limit(1000)
+          const existingUrls = new Set((existingImgs || []).map((r: any) => r.image_url))
+          const vehicleHasImages = existingUrls.size > 0
 
-          const { data: insertedImgs, error: imgErr } = await supabase
-            .from('vehicle_images')
-            .insert(imageRows)
-            .select('id')
+          const imageRows = candidateUrls
+            .map((imgUrl: string, idx: number) => ({ imgUrl, idx }))
+            .filter(({ imgUrl }: { imgUrl: string }) => !existingUrls.has(imgUrl))
+            .map(({ imgUrl, idx }: { imgUrl: string; idx: number }) => ({
+              vehicle_id: vehicleId,
+              image_url: imgUrl,
+              source: 'external_import',
+              source_url: imgUrl,
+              is_external: true,
+              approval_status: 'auto_approved',
+              is_approved: true,
+              redaction_level: 'none',
+              position: idx,
+              display_order: idx,
+              // Claim primary only when the vehicle has no images at all —
+              // never displace an existing primary on re-extraction
+              is_primary: !vehicleHasImages && idx === 0,
+              exif_data: {
+                source_url: url,
+                discovery_url: url,
+                imported_from: source || 'ai_extraction',
+              },
+            }))
 
-          if (imgErr) {
-            console.error(`[extract-vehicle-data-ai] Image insert failed: ${imgErr.message}`)
+          if (imageRows.length === 0) {
+            console.log(`[extract-vehicle-data-ai] All ${candidateUrls.length} image URLs already present — nothing to insert`)
           } else {
-            imagesInserted = insertedImgs?.length || imageRows.length
-            console.log(`[extract-vehicle-data-ai] Saved ${imagesInserted} images`)
+            const { data: insertedImgs, error: imgErr } = await supabase
+              .from('vehicle_images')
+              .insert(imageRows)
+              .select('id')
+
+            if (imgErr) {
+              console.error(`[extract-vehicle-data-ai] Image insert failed: ${imgErr.message}`)
+            } else {
+              imagesInserted = insertedImgs?.length || imageRows.length
+              console.log(`[extract-vehicle-data-ai] Saved ${imagesInserted} new images (${candidateUrls.length - imageRows.length} already present)`)
+            }
           }
         }
       } catch (dbErr: any) {
@@ -567,7 +728,7 @@ Deno.serve(async (req) => {
         vehicle_id: vehicleId,
         images_saved: imagesInserted,
         confidence: extractedJson.confidence || 0.8,
-        source: source || 'unknown',
+        source: source || sourceSlug || 'unknown',
         extractionMethod: 'ai'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -713,6 +874,40 @@ function getDedicatedExtractor(url: string): string | null {
       }
     }
     return null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Match a URL against the editorial-domain blocklist (subdomains included).
+ * Returns the matched domain or null.
+ */
+function matchEditorialDomain(url: string): string | null {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '')
+    for (const domain of EDITORIAL_DOMAINS) {
+      if (hostname === domain || hostname.endsWith('.' + domain)) {
+        return domain
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Derive a source slug from the URL hostname.
+ * e.g. "sfbay.craigslist.org" → "craigslist", "www.hemmings.com" → "hemmings"
+ */
+function sourceSlugFromUrl(url: string): string | null {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '')
+    // Strip TLD (multi-part TLDs first), then take the registrable label
+    const base = hostname.replace(/\.(co\.uk|com\.au|com|org|net|io|us|ca|de|uk|au)$/, '')
+    const parts = base.split('.')
+    return parts[parts.length - 1] || null
   } catch {
     return null
   }

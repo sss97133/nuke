@@ -17,7 +17,7 @@ def promote():
         host="aws-0-us-west-1.pooler.supabase.com",
         port=6543,
         user="postgres.qkgaybvrernstplzjaam",
-        password=os.environ.get('SUPABASE_DB_PASSWORD', '${SUPABASE_DB_PASSWORD}'),
+        password=os.environ.get('SUPABASE_DB_PASSWORD', f"{os.environ['SUPABASE_DB_PASSWORD']}"),
         database="postgres"
     )
     cur = conn.cursor()

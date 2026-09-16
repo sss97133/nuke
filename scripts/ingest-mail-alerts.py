@@ -3,7 +3,7 @@
 Ingest KSL (and other) listing alert emails from Apple Mail into Nuke import_queue.
 
 Reads the local Apple Mail SQLite database, finds alert emails sent to
-alerts-inbox@example.com, decodes Mailgun tracking redirects to extract
+the alerts inbox (ALERTS_EMAIL), decodes Mailgun tracking redirects to extract
 actual listing URLs, and inserts them into import_queue via Supabase.
 
 Usage:
@@ -35,7 +35,7 @@ from pathlib import Path
 
 MAIL_DB = Path.home() / "Library/Mail/V10/MailData/Envelope Index"
 MAIL_DIR = Path.home() / "Library/Mail/V10"
-TARGET_EMAIL = "alerts-inbox@example.com"
+TARGET_EMAIL = os.environ.get("ALERTS_EMAIL", "")
 
 # Alert subjects/senders we care about
 ALERT_FILTERS = [

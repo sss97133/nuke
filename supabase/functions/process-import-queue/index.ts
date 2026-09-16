@@ -57,8 +57,15 @@ Deno.serve(async (req) => {
         let extractorUrl = null;
 
         // Use normalized URL for domain routing (handles www, mixed case, trailing slashes)
-        if (normalizedUrl.includes('bringatrailer.com')) {
-          extractorUrl = supabaseUrl + '/functions/v1/complete-bat-import';
+        const isBat = normalizedUrl.includes('bringatrailer.com');
+        if (isBat) {
+          // complete-bat-import (the old single entry point, which also
+          // chained extract-auction-comments) was deleted from deployment
+          // in the March 2026 triage and 404s live — confirmed 2026-07-07.
+          // extract-bat-core is the standalone replacement; see
+          // _shared/approved-extractors.ts. It does NOT auto-chain
+          // comments, so that's triggered explicitly below on success.
+          extractorUrl = supabaseUrl + '/functions/v1/extract-bat-core';
         } else if (normalizedUrl.includes('carsandbids.com')) {
           extractorUrl = supabaseUrl + '/functions/v1/extract-cars-and-bids-core';
         } else if (normalizedUrl.includes('pcarmarket.com')) {
@@ -119,10 +126,31 @@ Deno.serve(async (req) => {
 
         if (extractData.success) {
           const extractedVehicle = extractData.extracted || extractData;
-          let vehicleId = extractedVehicle.vehicle_id || extractedVehicle.vehicleId || extractData.vehicle_id || extractData.vehicleId || null;
+          // extract-bat-core returns created_vehicle_ids/updated_vehicle_ids
+          // arrays, not a flat vehicle_id — without this fallback, every
+          // successful BaT extraction through this path would silently
+          // write vehicle_id: null to the queue row.
+          let vehicleId = extractedVehicle.vehicle_id || extractedVehicle.vehicleId || extractData.vehicle_id || extractData.vehicleId
+            || extractData.created_vehicle_ids?.[0] || extractData.updated_vehicle_ids?.[0] || null;
           const qualityScore = extractData.quality_score ?? extractedVehicle.quality_score ?? null;
           // If extractor returned a quality score, use it to flag low-quality extractions
           const queueStatus = (qualityScore !== null && qualityScore < 0.3) ? 'pending_review' : 'complete';
+
+          // extract-bat-core does not chain comment extraction itself
+          // (see the comment at the isBat routing branch above) — trigger
+          // it here, fire-and-forget, mirroring continuous-queue-processor's
+          // established pattern for the same gap.
+          if (isBat && vehicleId) {
+            fetch(supabaseUrl + '/functions/v1/extract-auction-comments', {
+              method: 'POST',
+              headers: {
+                'Authorization': 'Bearer ' + Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ auction_url: url, vehicle_id: vehicleId }),
+              signal: AbortSignal.timeout(120_000),
+            }).catch((e: any) => console.warn(`[process-import-queue] Comment extraction trigger failed for ${item.id}:`, e instanceof Error ? e.message : String(e)));
+          }
 
           await supabase.from('import_queue').update({
             status: queueStatus,

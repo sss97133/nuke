@@ -2,7 +2,7 @@
 /**
  * gmail-poller.mjs — Gmail Alert Email Poller for Nuke
  *
- * Polls alerts-inbox@example.com for vehicle listing alert emails and pipes
+ * Polls the alerts inbox (ALERTS_EMAIL) for vehicle listing alert emails and pipes
  * them into the process-alert-email edge function, which extracts listing
  * URLs and queues them into the Nuke pipeline.
  *
@@ -20,7 +20,7 @@
  *
  * 3. Run the interactive OAuth setup:
  *    dotenvx run -- node scripts/gmail-poller.mjs --setup
- *    → Opens browser, you log in as alerts-inbox@example.com, paste the code
+ *    → Opens browser, you log in as the alerts inbox (ALERTS_EMAIL), paste the code
  *    → Saves GOOGLE_REFRESH_TOKEN to .env automatically
  *
  * 4. Start the daemon (polls every 5 minutes):
@@ -401,11 +401,11 @@ async function runSetup() {
   authUrl.searchParams.set('scope', scopes);
   authUrl.searchParams.set('access_type', 'offline');
   authUrl.searchParams.set('prompt', 'consent'); // force to get refresh_token
-  authUrl.searchParams.set('login_hint', 'alerts-inbox@example.com');
+  authUrl.searchParams.set('login_hint', process.env.ALERTS_EMAIL || '');
 
   console.log('Steps:');
   console.log('  1. A browser window will open (or copy the URL below)');
-  console.log('  2. Log in as alerts-inbox@example.com if not already');
+  console.log(`  2. Log in as ${process.env.ALERTS_EMAIL || 'the alerts inbox'} if not already`);
   console.log('  3. Grant Gmail read/modify access');
   console.log('  4. The setup completes automatically\n');
 

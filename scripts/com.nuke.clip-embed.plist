@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nuke.clip-embed</string>
+
+    <!-- CLIP embedding drainer for the Tier-2 (PLACED) search engine. Closes the Phase-4(c)
+         gap: image_observations rows exist but ~94% lacked embedding_clip_vitb32, so visual
+         search/convergence was dark. clip-embed-drain.sh runs the local CLIP ViT-B/32 embedder
+         (MPS, ZERO API cost) with --all to drain every null-embedding active row, then exits;
+         this StartInterval re-fires it so rows newly PLACED by the BYOK deep writer get embedded
+         as fleet coverage deepens. mkdir-lock prevents overlapping GPU runs.
+
+         Runs in the login shell (NOT Claude Code's Bash sandbox) so it reaches Supabase + MPS.
+         This repo copy is the source of truth; keep it identical to
+         ~/Library/LaunchAgents/com.nuke.clip-embed.plist. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/skylar/nuke/scripts/daily-receipt/clip-embed-drain.sh</string>
+    </array>
+
+    <!-- 30 min between fires. A full backfill takes hours the first time; the lock makes
+         re-fires no-op while one runs, and once drained each fire only embeds new PLACED rows. -->
+    <key>StartInterval</key>
+    <integer>1800</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/skylar/nuke/logs/clip-embed.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/skylar/nuke/logs/clip-embed.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/skylar/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>Nice</key>
+    <integer>10</integer>
+</dict>
+</plist>

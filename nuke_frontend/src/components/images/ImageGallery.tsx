@@ -72,6 +72,10 @@ const TAG_TYPES = [
 const GALLERY_IMAGE_SELECT =
   'id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_last_scanned, angle, category, storage_path, file_hash, vehicle_zone, photo_quality_score, condition_score, damage_flags, image_medium, ' +
   'ai_tier1:ai_scan_metadata->tier_1_analysis, ai_classification:ai_scan_metadata->classification, ai_deep_condition_score:ai_scan_metadata->deep_analysis->condition_detail->overall_score, ai_fabrication_stage:ai_scan_metadata->deep_analysis->>fabrication_stage, ' +
+  // byok_deep_analysis is where the deep-analysis drain actually writes (the deep_analysis
+  // key above is legacy and unfed). Project its scalars + the small components_seen array so
+  // analyzed tiles can show scene/phase/what's-in-it. See engineering-manual Ch.19.
+  'ai_byok_scene:ai_scan_metadata->byok_deep_analysis->>scene_type, ai_byok_phase:ai_scan_metadata->byok_deep_analysis->>build_phase_guess, ai_byok_narrative:ai_scan_metadata->byok_deep_analysis->>narrative_one_line, ai_byok_components:ai_scan_metadata->byok_deep_analysis->components_seen, ' +
   'exif_source_url:exif_data->>source_url, exif_discovery_url:exif_data->>discovery_url, exif_original_url:exif_data->>original_url, exif_listing_urls:exif_data->listing_urls, exif_listing_positions:exif_data->listing_positions, exif_auction_start_date:exif_data->>auction_start_date, exif_listed_date:exif_data->>listed_date, exif_start_date:exif_data->>start_date, exif_auction_end_date:exif_data->>auction_end_date, exif_end_date:exif_data->>end_date, exif_camera:exif_data->camera, exif_location:exif_data->location';
 
 const compactObject = (obj: Record<string, any>): Record<string, any> | null => {
@@ -89,6 +93,7 @@ const rehydrateGalleryRows = (rows: any[]): any[] =>
     if (!r || typeof r !== 'object') return r;
     const {
       ai_tier1, ai_classification, ai_deep_condition_score, ai_fabrication_stage,
+      ai_byok_scene, ai_byok_phase, ai_byok_narrative, ai_byok_components,
       exif_source_url, exif_discovery_url, exif_original_url, exif_listing_urls,
       exif_listing_positions, exif_auction_start_date, exif_listed_date,
       exif_start_date, exif_auction_end_date, exif_end_date, exif_camera, exif_location,
@@ -102,6 +107,12 @@ const rehydrateGalleryRows = (rows: any[]): any[] =>
         deep_analysis: compactObject({
           condition_detail: ai_deep_condition_score != null ? { overall_score: ai_deep_condition_score } : null,
           fabrication_stage: ai_fabrication_stage,
+        }),
+        byok_deep_analysis: compactObject({
+          scene_type: ai_byok_scene,
+          build_phase_guess: ai_byok_phase,
+          narrative_one_line: ai_byok_narrative,
+          components_seen: ai_byok_components,
         }),
       }),
       exif_data: compactObject({
@@ -531,6 +542,11 @@ const ImageGallery = ({
   // vehicle) and race setAllImages against the real loader — it never actually loaded
   // vehicle meta (its setVehicleMeta was a self-assignment) and was removed.
   const [vehicleMeta, setVehicleMeta] = useState<any | null>(null);
+  // NOTE: a second, redundant `vehicle_images` SELECT * loader used to live here. It
+  // double-loaded the gallery on every profile open (unprojected SELECT *, no row cap)
+  // and never resolved `loading`, contributing to the connection-pool storm that hung
+  // the gallery for 30s+. The canonical `fetchImages` effect below is the single loader
+  // (projected columns via fetchVehicleImages + dedup + BaT overlay + finally→setLoading(false)).
 
   // Default BaT-only view for BaT-origin vehicles, with a user-toggle to show all sources
   const isBatVehicle = useMemo(() => {
@@ -1236,8 +1252,8 @@ const ImageGallery = ({
         const posB = (typeof b?.position === 'number' && Number.isFinite(b.position)) ? b.position : Number.POSITIVE_INFINITY;
         if (posA !== posB) return posA - posB;
 
-        const ca = typeof a?.created_at === 'string' ? new Date(a.created_at).getTime() : 0;
-        const cb = typeof b?.created_at === 'string' ? new Date(b.created_at).getTime() : 0;
+        const ca = new Date(a?.taken_at || a?.created_at || 0).getTime();
+        const cb = new Date(b?.taken_at || b?.created_at || 0).getTime();
         if (ca !== cb) return ca - cb;
 
         return String(a?.id || '').localeCompare(String(b?.id || ''));

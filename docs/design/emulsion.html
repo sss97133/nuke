@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EMULSION — YEARS / MONTHS / DAY</title>
+<style>
+  :root{
+    --paper:#f5f5f5; --surface:#fff; --ink:#1a1a1a; --pencil:#666; --ghost:#ddd; --border:#bdbdbd;
+    --sans:-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,"Courier New",monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);padding:22px 24px 40px}
+  .masthead{border-bottom:2px solid var(--ink);padding-bottom:8px;
+    display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+  .masthead h1{font-size:18px;font-weight:800;letter-spacing:-0.5px}
+  .masthead .m{font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  #portrait{font-family:var(--mono);font-size:11px;margin:10px 0 12px}
+  #portrait b{font-weight:700}
+
+  /* navigation: one visible path, always */
+  .crumbs{display:flex;align-items:center;gap:10px;margin-bottom:10px;min-height:34px}
+  .crumbs button{font-family:var(--mono);font-size:12px;font-weight:700;border:2px solid var(--ink);
+    background:var(--surface);color:var(--ink);padding:7px 14px;cursor:pointer}
+  .crumbs button:hover{background:var(--ink);color:#fff}
+  .crumbs .here{font-family:var(--mono);font-size:12px;font-weight:700;padding:7px 0}
+  .crumbs .sep{color:var(--pencil);font-family:var(--mono)}
+
+  .level{border:2px solid var(--ink);background:var(--surface);padding:14px}
+  .grid{display:grid;gap:10px}
+  .grid.years{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+  .grid.months{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .cell{border:1px solid var(--border);background:var(--surface);cursor:pointer;padding:10px;
+    transition:border-color .12s}
+  .cell:hover{border-color:var(--ink);border-width:1px;outline:1px solid var(--ink)}
+  .cell .t{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+  .cell .nm{font-family:var(--mono);font-size:12px;font-weight:700}
+  .cell .n{font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .cell canvas{display:block;width:100%;height:54px}
+  .cell.empty{opacity:.38;cursor:default}
+  .cell.empty:hover{outline:none;border-color:var(--border)}
+
+  /* day level: the receipt, photos as the surface */
+  .dayhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+  .dayhead .date{font-family:var(--mono);font-size:14px;font-weight:700}
+  .dayhead .span{font-family:var(--mono);font-size:11px;color:var(--pencil)}
+  .photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:3px}
+  .photos img{aspect-ratio:1/1;width:100%;object-fit:cover;display:block;background:#eee}
+  .daylink{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ink);
+    border:2px solid var(--ink);padding:9px 16px;margin-top:12px;text-decoration:none}
+  .daylink:hover{background:var(--ink);color:#fff}
+  .hint{font-family:var(--mono);font-size:9px;color:var(--pencil);margin-top:8px}
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <h1>EMULSION</h1>
+  <span class="m">2,618 REAL EXPOSURES · 1977 K5 BLAZER · TAP IN, TAP BACK — NOTHING ELSE TO LEARN</span>
+</div>
+<div id="portrait">DEVELOPING&hellip;</div>
+
+<div class="crumbs" id="crumbs"></div>
+<div class="level" id="level"></div>
+<div class="hint" id="hint">EVERY CELL IS REAL RECORDS · CLICK A YEAR</div>
+
+<script>
+(async () => {
+  const [ts, photos] = await Promise.all([
+    fetch('k5_timestamps.json').then(r => r.json()),
+    fetch('k5_photos.json').then(r => r.json()),
+  ]);
+
+  // ---- index the substrate ----
+  const byDay = new Map(), byMonth = new Map(), byYear = new Map();
+  ts.forEach(t => {
+    const d = t.slice(0, 10), m = t.slice(0, 7), y = t.slice(0, 4), hm = t.slice(11, 16);
+    let o = byDay.get(d); if (!o) { o = { n: 0, first: hm, last: hm, times: [] }; byDay.set(d, o); }
+    o.n++; if (hm < o.first) o.first = hm; if (hm > o.last) o.last = hm; o.times.push(t);
+    byMonth.set(m, (byMonth.get(m) || 0) + 1);
+    byYear.set(y, (byYear.get(y) || 0) + 1);
+  });
+  const photosByDay = new Map();
+  photos.forEach(p => {
+    const d = p.t.slice(0, 10);
+    if (!photosByDay.has(d)) photosByDay.set(d, []);
+    photosByDay.get(d).push(p.u);
+  });
+
+  // the caption the data paints
+  (() => {
+    const ds = [...byDay.entries()].sort();
+    const biggest = ds.reduce((m, e) => e[1].n > m[1].n ? e : m);
+    let streak = 1, best = 1;
+    for (let i = 1; i < ds.length; i++) {
+      const gap = (new Date(ds[i][0]) - new Date(ds[i-1][0])) / 86400e3;
+      streak = gap <= 1 ? streak + 1 : 1; if (streak > best) best = streak;
+    }
+    const years = ((new Date(ds[ds.length-1][0]) - new Date(ds[0][0])) / 31557600e3).toFixed(1);
+    document.getElementById('portrait').innerHTML =
+      `<b>${ts.length.toLocaleString()}</b> EXPOSURES &middot; <b>${byDay.size}</b> DAYS &middot; <b>${years}</b> YEARS &middot; ` +
+      `BIGGEST DAY <b>${biggest[0]} (${biggest[1].n})</b> &middot; LONGEST RUN <b>${best} DAYS STRAIGHT</b>`;
+  })();
+
+  // ---- grain mini-field renderer (the material) ----
+  function hash(i) { let x = (i + 1) * 2654435761 % 4294967296; x = (x ^ (x >> 13)) * 1274126177 % 4294967296; return (x ^ (x >> 16)) / 4294967296; }
+  function grainField(cv, times, t0, t1, developMs) {
+    const DPR = window.devicePixelRatio || 1;
+    const w = cv.clientWidth || 170, h = cv.clientHeight || 54;
+    cv.width = w * DPR; cv.height = h * DPR;
+    const ctx = cv.getContext('2d'); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const pts = times.map((t, i) => ({
+      x: (new Date(t) - t0) / (t1 - t0) * (w - 4) + 2,
+      y: 4 + hash(i * 7 + times.length) * (h - 8),
+      r: 1.2 + hash(i + 7919) * 1.6,
+      a: 0.65 + hash(i + 104729) * 0.35,
+      o: hash(i + 31337),
+    })).sort((a, b) => a.o - b.o);
+    const start = performance.now();
+    (function dev(now) {
+      const p = developMs ? Math.min(1, (now - start) / developMs) : 1;
+      const k = Math.floor((1 - Math.pow(1 - p, 2.4)) * pts.length);
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#1a1a1a';
+      for (let i = 0; i < k; i++) { const g = pts[i]; ctx.globalAlpha = g.a; ctx.fillRect(g.x, g.y, g.r, g.r); }
+      ctx.globalAlpha = 1;
+      if (p < 1) requestAnimationFrame(dev);
+    })(start);
+  }
+
+  // ---- navigation: a tiny stack, rendered as crumbs + level ----
+  const crumbsEl = document.getElementById('crumbs'), levelEl = document.getElementById('level'), hintEl = document.getElementById('hint');
+  const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  let state = { level: 'years' }; // {level:'years'} | {level:'months', y} | {level:'day', y, m, d}
+
+  function crumbs(parts) {
+    crumbsEl.innerHTML = '';
+    parts.forEach((p, i) => {
+      if (i) { const s = document.createElement('span'); s.className = 'sep'; s.textContent = '/'; crumbsEl.appendChild(s); }
+      if (p.go) {
+        const b = document.createElement('button'); b.textContent = p.label; b.onclick = p.go; crumbsEl.appendChild(b);
+      } else {
+        const h = document.createElement('span'); h.className = 'here'; h.textContent = p.label; crumbsEl.appendChild(h);
+      }
+    });
+  }
+
+  function showYears() {
+    state = { level: 'years' };
+    crumbs([{ label: 'ALL YEARS' }]);
+    hintEl.textContent = 'EVERY CELL IS REAL RECORDS · CLICK A YEAR';
+    levelEl.innerHTML = '<div class="grid years"></div>';
+    const g = levelEl.firstChild;
+    [...byYear.keys()].sort().forEach(y => {
+      const cell = document.createElement('div'); cell.className = 'cell';
+      cell.innerHTML = `<div class="t"><span class="nm">${y}</span><span class="n">${byYear.get(y)} PHOTOS</span></div><canvas></canvas>`;
+      cell.onclick = () => showMonths(y);
+      g.appendChild(cell);
+      const times = ts.filter(t => t.startsWith(y));
+      requestAnimationFrame(() => grainField(cell.querySelector('canvas'), times,
+        new Date(y + '-01-01'), new Date((+y + 1) + '-01-01'), 700));
+    });
+  }
+
+  function showMonths(y) {
+    state = { level: 'months', y };
+    crumbs([{ label: 'ALL YEARS', go: showYears }, { label: y }]);
+    hintEl.textContent = 'CLICK A MONTH WITH GRAIN · ESC OR THE CRUMB GOES BACK UP';
+    levelEl.innerHTML = '<div class="grid months"></div>';
+    const g = levelEl.firstChild;
+    for (let m = 1; m <= 12; m++) {
+      const key = y + '-' + String(m).padStart(2, '0');
+      const n = byMonth.get(key) || 0;
+      const days = [...byDay.keys()].filter(d => d.startsWith(key)).sort();
+      const cell = document.createElement('div');
+      cell.className = 'cell' + (n ? '' : ' empty');
+      cell.innerHTML = `<div class="t"><span class="nm">${MONTHS[m-1]}</span><span class="n">${n ? n + ' · ' + days.length + 'D' : '—'}</span></div><canvas></canvas>`;
+      if (n) {
+        cell.onclick = () => days.length === 1 ? showDay(days[0]) : showDays(y, key, days);
+        const times = ts.filter(t => t.startsWith(key));
+        requestAnimationFrame(() => grainField(cell.querySelector('canvas'), times,
+          new Date(key + '-01'), new Date(m === 12 ? (+y + 1) + '-01-01' : y + '-' + String(m + 1).padStart(2, '0') + '-01'), 500));
+      }
+      g.appendChild(cell);
+    }
+  }
+
+  function showDays(y, key, days) {
+    state = { level: 'days', y, key };
+    const mName = MONTHS[+key.slice(5) - 1];
+    crumbs([{ label: 'ALL YEARS', go: showYears }, { label: y, go: () => showMonths(y) }, { label: mName }]);
+    hintEl.textContent = 'CLICK A DAY — IT OPENS AS THE FULL RECEIPT';
+    levelEl.innerHTML = '<div class="grid months"></div>';
+    const g = levelEl.firstChild;
+    days.forEach(d => {
+      const o = byDay.get(d);
+      const cell = document.createElement('div'); cell.className = 'cell';
+      cell.innerHTML = `<div class="t"><span class="nm">${d.slice(8)} ${mName}</span><span class="n">${o.n} · ${o.first}–${o.last}</span></div><canvas></canvas>`;
+      cell.onclick = () => showDay(d);
+      g.appendChild(cell);
+      requestAnimationFrame(() => grainField(cell.querySelector('canvas'), o.times,
+        new Date(d + 'T00:00:00'), new Date(d + 'T23:59:59'), 400));
+    });
+  }
+
+  function showDay(d) {
+    const y = d.slice(0, 4), key = d.slice(0, 7), mName = MONTHS[+d.slice(5, 7) - 1];
+    const o = byDay.get(d);
+    state = { level: 'day', d };
+    const thumb = u => u.replace('/object/public/', '/render/image/public/') + '?width=420&resize=contain';
+    crumbs([
+      { label: 'ALL YEARS', go: showYears },
+      { label: y, go: () => showMonths(y) },
+      { label: mName, go: () => showDays(y, key, [...byDay.keys()].filter(x => x.startsWith(key)).sort()) },
+      { label: d.slice(8) },
+    ]);
+    hintEl.textContent = 'THE DATA END: THE DAY’S TESTIMONY · CRUMBS GO BACK UP';
+    const urls = photosByDay.get(d) || [];
+    levelEl.innerHTML = `
+      <div class="dayhead">
+        <span class="date">${d}</span>
+        <span class="span">${o.n} PHOTOS · FIRST ${o.first} · LAST ${o.last}</span>
+      </div>
+      <div class="photos">${urls.map(u => `<a href="${u}" target="_blank"><img decoding="async" src="${thumb(u)}"></a>`).join('')}</div>
+      ${urls.length < o.n ? `<div class="hint" style="margin-top:8px">SHOWING ${urls.length} OF ${o.n} — FULL DAY ON THE JOURNAL</div>` : ''}
+      <a class="daylink" href="https://nuke.ag/journal/${d}" target="_blank">VIEW DAY ON NUKE.AG &rarr;</a>`;
+  }
+
+  window.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (state.level === 'day') { const y = state.d.slice(0,4); showMonths(y); }
+    else if (state.level === 'days') showMonths(state.y);
+    else if (state.level === 'months') showYears();
+  });
+
+  showYears();
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nuke.fb-fast-lane</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/skylar/nuke/scripts/fb-fast-lane.sh</string>
+    </array>
+    <!-- Every 10 minutes: a fresh local deal pass. Catches a hot listing within minutes. -->
+    <key>StartInterval</key>
+    <integer>600</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/skylar/nuke/logs/fb-fast-lane.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/skylar/nuke/logs/fb-fast-lane.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/skylar/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+    <key>Nice</key>
+    <integer>10</integer>
+</dict>
+</plist>
