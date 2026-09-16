@@ -301,3 +301,18 @@ docs/library/_extracted/
 # User substrate — never in a public repo. Receipts, bank slips, titles, names.
 # These belong in the Nuke DB as observations with provenance.
 output/vision-receipt-recovery-*/
+
+# Personal data and local state — never commit
+output/
+.context/
+reference_documents/
+fb-session/
+IMG_*.jpg
+IMG_*.JPG
+IMG_*.PNG
+*.db
+*.sqlite
+DONE.md
+.claude/HANDOFF.md
+.claude/ACTIVE_AGENTS.md
+tools/nuke-desktop/src-tauri/target/
