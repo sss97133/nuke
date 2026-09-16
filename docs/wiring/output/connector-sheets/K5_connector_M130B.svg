@@ -1,0 +1,317 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1700" viewBox="0 0 2200 1700">
+<rect x="0" y="0" width="2200" height="1700" fill="#FFFFFF"/>
+<rect x="24.0" y="24.0" width="2152.0" height="1652.0" fill="none" stroke="#1A1A1A" stroke-width="3"/>
+<rect x="32.0" y="32.0" width="2136.0" height="1636.0" fill="none" stroke="#1A1A1A" stroke-width="1"/>
+<text x="1100.0" y="74.0" font-family="Courier New, Courier, monospace" font-size="28" font-weight="bold" fill="#1A1A1A" text-anchor="middle">M130 ECU — CONNECTOR B (26-WAY TYCO SUPERSEAL 1.0)</text>
+<text x="1100.0" y="102.0" font-family="Courier New, Courier, monospace" font-size="13" fill="#1A1A1A" text-anchor="middle">PLUG TE 3-1437290-7 (MoTeC #65045) — KEY 1 — 11/26 PINS WIRED, 15 SPARE</text>
+<rect x="54.0" y="194.0" width="476.0" height="290.0" fill="none" stroke="#1A1A1A" stroke-width="2.5"/>
+<rect x="258.0" y="176.0" width="68.0" height="16.0" fill="#EEEEEE" stroke="#1A1A1A" stroke-width="1.5"/>
+<text x="292.0" y="188.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="middle">KEY 1</text>
+<circle cx="106.0" cy="246.0" r="26.0" fill="#BBD3EE" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="106.0" y="250.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="middle">1</text>
+<circle cx="168.0" cy="246.0" r="26.0" fill="#BBD3EE" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="168.0" y="250.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="middle">2</text>
+<circle cx="230.0" cy="246.0" r="26.0" fill="#BBD3EE" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="230.0" y="250.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="middle">3</text>
+<circle cx="292.0" cy="246.0" r="26.0" fill="#BBD3EE" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="292.0" y="250.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="middle">4</text>
+<circle cx="354.0" cy="246.0" r="26.0" fill="#BBD3EE" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="354.0" y="250.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="middle">5</text>
+<circle cx="416.0" cy="246.0" r="26.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="416.0" y="250.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">6</text>
+<circle cx="478.0" cy="246.0" r="26.0" fill="#BBD3EE" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="478.0" y="250.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="middle">7</text>
+<circle cx="137.0" cy="308.0" r="26.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="137.0" y="312.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">8</text>
+<circle cx="199.0" cy="308.0" r="26.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="199.0" y="312.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">9</text>
+<circle cx="261.0" cy="308.0" r="26.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="261.0" y="312.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">10</text>
+<circle cx="323.0" cy="308.0" r="26.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="323.0" y="312.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">11</text>
+<circle cx="385.0" cy="308.0" r="26.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="385.0" y="312.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">12</text>
+<circle cx="447.0" cy="308.0" r="26.0" fill="#BBD3EE" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="447.0" y="312.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="middle">13</text>
+<circle cx="137.0" cy="370.0" r="26.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="137.0" y="374.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">14</text>
+<circle cx="199.0" cy="370.0" r="26.0" fill="#BBD3EE" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="199.0" y="374.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="middle">15</text>
+<circle cx="261.0" cy="370.0" r="26.0" fill="#BBD3EE" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="261.0" y="374.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="middle">16</text>
+<circle cx="323.0" cy="370.0" r="26.0" fill="#BFEAEF" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="323.0" y="374.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="middle">17</text>
+<circle cx="385.0" cy="370.0" r="26.0" fill="#BFEAEF" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="385.0" y="374.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="middle">18</text>
+<circle cx="447.0" cy="370.0" r="26.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="447.0" y="374.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">19</text>
+<circle cx="106.0" cy="432.0" r="26.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="106.0" y="436.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">20</text>
+<circle cx="168.0" cy="432.0" r="26.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="168.0" y="436.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">21</text>
+<circle cx="230.0" cy="432.0" r="26.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="230.0" y="436.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">22</text>
+<circle cx="292.0" cy="432.0" r="26.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="292.0" y="436.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">23</text>
+<circle cx="354.0" cy="432.0" r="26.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="354.0" y="436.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">24</text>
+<circle cx="416.0" cy="432.0" r="26.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="416.0" y="436.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">25</text>
+<circle cx="478.0" cy="432.0" r="26.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1.4"/>
+<text x="478.0" y="436.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="middle">26</text>
+<text x="292.0" y="494.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="middle">CONNECTOR B — MATING FACE (HARNESS PLUG, WIRE-SIDE REAR)</text>
+<text x="80.0" y="516.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">Row split 9/8/8/9 (34-pos) / 7/6/6/7 (26-pos) per TE Superseal 1.0</text>
+<text x="80.0" y="532.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">catalog config drawing (Dalroad mirror p.81). Pin numbers sequential per</text>
+<text x="80.0" y="548.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">MoTeC M130 datasheet (Part 13130) p.4-5 tables — VERIFY MOLDED CAVITY</text>
+<text x="80.0" y="564.0" font-family="Courier New, Courier, monospace" font-size="10" font-weight="bold" fill="#8A8A8A" text-anchor="start">NUMBERS ON HOUSING BEFORE PINNING.</text>
+<rect x="80.0" y="581.0" width="14.0" height="14.0" fill="#BBD3EE" stroke="#1A1A1A" stroke-width="1"/>
+<text x="100.0" y="592.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">SENSOR/AV/AT</text>
+<rect x="216.4" y="581.0" width="14.0" height="14.0" fill="#F2BBBB" stroke="#1A1A1A" stroke-width="1"/>
+<text x="236.4" y="592.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">INJ/IGN/HB</text>
+<rect x="338.4" y="581.0" width="14.0" height="14.0" fill="#F8D9A8" stroke="#1A1A1A" stroke-width="1"/>
+<text x="358.4" y="592.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">BAT</text>
+<rect x="410.0" y="581.0" width="14.0" height="14.0" fill="#BFEAEF" stroke="#1A1A1A" stroke-width="1"/>
+<text x="430.0" y="592.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">CAN/ETH</text>
+<rect x="510.4" y="581.0" width="14.0" height="14.0" fill="#EBEBEB" stroke="#1A1A1A" stroke-width="1"/>
+<text x="530.4" y="592.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">NO WIRE</text>
+<rect x="60.0" y="612.0" width="580.0" height="96.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.5"/>
+<text x="72.0" y="629.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">CONTACTS (CONNECTOR_DATA_REPORT 2.3):</text>
+<text x="72.0" y="644.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">  20-24 AWG signal: TE 3-1447221-4 (gold, small barrel)</text>
+<text x="72.0" y="659.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">  16-18 AWG power:  TE 3-1447221-3 (gold, normal barrel)</text>
+<text x="72.0" y="674.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">  solid alt: ProWireUSA SSC-N (16-24 AWG). Crimp HDT-48-00.</text>
+<text x="72.0" y="689.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">  Sealed cavity plugs in all spare positions (IP67).</text>
+<rect x="700.0" y="152.0" width="1254.0" height="32.0" fill="#D8D8D8" stroke="#1A1A1A" stroke-width="1.5"/>
+<text x="707.0" y="174.0" font-family="Courier New, Courier, monospace" font-size="12.0" font-weight="bold" fill="#1A1A1A" text-anchor="start">PIN</text>
+<text x="771.0" y="174.0" font-family="Courier New, Courier, monospace" font-size="12.0" font-weight="bold" fill="#1A1A1A" text-anchor="start">FUNCTION</text>
+<text x="891.0" y="174.0" font-family="Courier New, Courier, monospace" font-size="12.0" font-weight="bold" fill="#1A1A1A" text-anchor="start">WIRE #</text>
+<text x="1139.0" y="174.0" font-family="Courier New, Courier, monospace" font-size="12.0" font-weight="bold" fill="#1A1A1A" text-anchor="start">CIRCUIT</text>
+<text x="1389.0" y="174.0" font-family="Courier New, Courier, monospace" font-size="12.0" font-weight="bold" fill="#1A1A1A" text-anchor="start">COLOR</text>
+<text x="1501.0" y="174.0" font-family="Courier New, Courier, monospace" font-size="12.0" font-weight="bold" fill="#1A1A1A" text-anchor="start">AWG</text>
+<text x="1553.0" y="174.0" font-family="Courier New, Courier, monospace" font-size="12.0" font-weight="bold" fill="#1A1A1A" text-anchor="start">DESTINATION / NOTE</text>
+<rect x="700.0" y="184.0" width="1254.0" height="46.0" fill="#FFFFFF" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="224.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">B01</text>
+<text x="771.0" y="224.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">UDIG1</text>
+<text x="891.0" y="224.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">#99</text>
+<text x="1139.0" y="224.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">Crank Position Sensor</text>
+<text x="1389.0" y="224.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">BLU/WHT/WHT</text>
+<text x="1501.0" y="224.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">22</text>
+<text x="1553.0" y="224.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">SHLD 2C; drain -&gt; B15 (#99s)</text>
+<rect x="700.0" y="230.0" width="1254.0" height="46.0" fill="#F2F2F2" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="270.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">B02</text>
+<text x="771.0" y="270.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">UDIG2</text>
+<text x="891.0" y="270.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">#101</text>
+<text x="1139.0" y="270.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">Cam Position Sensor</text>
+<text x="1389.0" y="270.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">BLU/WHT/BLK</text>
+<text x="1501.0" y="270.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">22</text>
+<text x="1553.0" y="270.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">SHLD 2C; drain -&gt; B16 (#101s) | 2026-04-13 'camera on B0</text>
+<rect x="700.0" y="276.0" width="1254.0" height="46.0" fill="#FFFFFF" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="316.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">B03</text>
+<text x="771.0" y="316.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">AT1</text>
+<text x="891.0" y="316.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">#109</text>
+<text x="1139.0" y="316.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">Intake Air Temp Sensor</text>
+<text x="1389.0" y="316.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">TAN</text>
+<text x="1501.0" y="316.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">22</text>
+<text x="1553.0" y="316.0" font-family="Courier New, Courier, monospace" font-size="11.5" font-weight="bold" fill="#E67300" text-anchor="start">IAT; gnd #109g -&gt; B15 | CONFLICT: pdm_power_budget swaps</text>
+<rect x="700.0" y="322.0" width="1254.0" height="46.0" fill="#F2F2F2" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="362.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">B04</text>
+<text x="771.0" y="362.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">AT2</text>
+<text x="891.0" y="362.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">#110</text>
+<text x="1139.0" y="362.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">Coolant Temp Sensor (ECU)</text>
+<text x="1389.0" y="362.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">TAN/WHT</text>
+<text x="1501.0" y="362.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">22</text>
+<text x="1553.0" y="362.0" font-family="Courier New, Courier, monospace" font-size="11.5" font-weight="bold" fill="#E67300" text-anchor="start">CLT; gnd #110g -&gt; B16 | CONFLICT: see B03</text>
+<rect x="700.0" y="368.0" width="1254.0" height="46.0" fill="#FFFFFF" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="408.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">B05</text>
+<text x="771.0" y="408.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">AT3</text>
+<text x="891.0" y="408.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">#113</text>
+<text x="1139.0" y="408.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">Oil Temperature Sensor</text>
+<text x="1389.0" y="408.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">TAN/BLK</text>
+<text x="1501.0" y="408.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">22</text>
+<text x="1553.0" y="408.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">OTS; gnd #113g -&gt; B15</text>
+<rect x="700.0" y="414.0" width="1254.0" height="46.0" fill="#F2F2F2" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="454.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">B06</text>
+<text x="771.0" y="454.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">AT4</text>
+<text x="891.0" y="454.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">—</text>
+<text x="1139.0" y="454.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">(reserved — no wire)</text>
+<text x="1389.0" y="454.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">—</text>
+<text x="1501.0" y="454.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">—</text>
+<text x="1553.0" y="454.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">spare AT4 — needs companion gnd when assigned (v4 KNOWN </text>
+<rect x="700.0" y="460.0" width="1254.0" height="46.0" fill="#FFFFFF" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="500.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">B07</text>
+<text x="771.0" y="500.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">KNOCK1</text>
+<text x="891.0" y="500.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">#103</text>
+<text x="1139.0" y="500.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">Knock Sensor Bank 1</text>
+<text x="1389.0" y="500.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">GRY</text>
+<text x="1501.0" y="500.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">22</text>
+<text x="1553.0" y="500.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">SHLD 2C; drain -&gt; B15</text>
+<rect x="700.0" y="506.0" width="1254.0" height="46.0" fill="#F2F2F2" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="546.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">B08</text>
+<text x="771.0" y="546.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">UDIG3</text>
+<text x="891.0" y="546.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">—</text>
+<text x="1139.0" y="546.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">(no wire)</text>
+<text x="1389.0" y="546.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">—</text>
+<text x="1501.0" y="546.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">—</text>
+<text x="1553.0" y="546.0" font-family="Courier New, Courier, monospace" font-size="11.5" font-weight="bold" fill="#E67300" text-anchor="start">candidate for #105/#111 A/C switches (FROM='ECU', pin TB</text>
+<rect x="700.0" y="552.0" width="1254.0" height="46.0" fill="#FFFFFF" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="592.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">B09</text>
+<text x="771.0" y="592.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">UDIG4</text>
+<text x="891.0" y="592.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1139.0" y="592.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">(no wire)</text>
+<text x="1389.0" y="592.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1501.0" y="592.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1553.0" y="592.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<rect x="700.0" y="598.0" width="1254.0" height="46.0" fill="#F2F2F2" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="638.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">B10</text>
+<text x="771.0" y="638.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">UDIG5</text>
+<text x="891.0" y="638.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1139.0" y="638.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">(no wire)</text>
+<text x="1389.0" y="638.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1501.0" y="638.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1553.0" y="638.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<rect x="700.0" y="644.0" width="1254.0" height="46.0" fill="#FFFFFF" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="684.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">B11</text>
+<text x="771.0" y="684.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">UDIG6</text>
+<text x="891.0" y="684.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1139.0" y="684.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">(no wire)</text>
+<text x="1389.0" y="684.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1501.0" y="684.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1553.0" y="684.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<rect x="700.0" y="690.0" width="1254.0" height="46.0" fill="#F2F2F2" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="730.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">B12</text>
+<text x="771.0" y="730.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">BAT_BAK</text>
+<text x="891.0" y="730.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1139.0" y="730.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">(no wire)</text>
+<text x="1389.0" y="730.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1501.0" y="730.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1553.0" y="730.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<rect x="700.0" y="736.0" width="1254.0" height="46.0" fill="#FFFFFF" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="776.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">B13</text>
+<text x="771.0" y="776.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">KNOCK2</text>
+<text x="891.0" y="776.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">#104</text>
+<text x="1139.0" y="776.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">Knock Sensor Bank 2</text>
+<text x="1389.0" y="776.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">GRY/WHT</text>
+<text x="1501.0" y="776.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">22</text>
+<text x="1553.0" y="776.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">SHLD 2C; drain -&gt; B16</text>
+<rect x="700.0" y="782.0" width="1254.0" height="46.0" fill="#F2F2F2" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="822.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">B14</text>
+<text x="771.0" y="822.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">UDIG7</text>
+<text x="891.0" y="822.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1139.0" y="822.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">(no wire)</text>
+<text x="1389.0" y="822.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1501.0" y="822.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1553.0" y="822.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<rect x="700.0" y="828.0" width="1254.0" height="46.0" fill="#FFFFFF" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="868.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">B15</text>
+<text x="771.0" y="868.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">SEN_0V_A</text>
+<text x="891.0" y="868.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">#4f,99g/s,103g/s,108g,109g,113g</text>
+<text x="1139.0" y="868.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">Sensor 0V star A</text>
+<text x="1389.0" y="868.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">BLK/BARE</text>
+<text x="1501.0" y="868.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">22</text>
+<text x="1553.0" y="868.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">ETB+CKP+K1 gnd/drains, MAP+IAT+OTS gnd</text>
+<rect x="700.0" y="874.0" width="1254.0" height="46.0" fill="#F2F2F2" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="914.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">B16</text>
+<text x="771.0" y="914.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">SEN_0V_B</text>
+<text x="891.0" y="914.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">#101g/s,102g,104g/s,110g,112g</text>
+<text x="1139.0" y="914.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">Sensor 0V star B</text>
+<text x="1389.0" y="914.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">BLK/BARE</text>
+<text x="1501.0" y="914.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">22</text>
+<text x="1553.0" y="914.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">CMP+K2 gnd/drains, OPS+CLT+FPS gnd</text>
+<rect x="700.0" y="920.0" width="1254.0" height="46.0" fill="#FFFFFF" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="960.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">B17</text>
+<text x="771.0" y="960.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">CAN_HI</text>
+<text x="891.0" y="960.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">#62</text>
+<text x="1139.0" y="960.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">CAN Bus 1 High</text>
+<text x="1389.0" y="960.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">WHT/GRN</text>
+<text x="1501.0" y="960.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">24</text>
+<text x="1553.0" y="960.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">PDM30 B26 + C125/Dakota | #125 T43 stub 22 vs 24 AWG tru</text>
+<rect x="700.0" y="966.0" width="1254.0" height="46.0" fill="#F2F2F2" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="1006.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">B18</text>
+<text x="771.0" y="1006.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">CAN_LO</text>
+<text x="891.0" y="1006.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">#62</text>
+<text x="1139.0" y="1006.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">CAN Bus 1 Low</text>
+<text x="1389.0" y="1006.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">WHT/GRN</text>
+<text x="1501.0" y="1006.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">24</text>
+<text x="1553.0" y="1006.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">PDM30 B25 + C125/Dakota; 120R each end</text>
+<rect x="700.0" y="1012.0" width="1254.0" height="46.0" fill="#FFFFFF" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="1052.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">B19</text>
+<text x="771.0" y="1052.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">SEN_6V3</text>
+<text x="891.0" y="1052.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1139.0" y="1052.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">(no wire)</text>
+<text x="1389.0" y="1052.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1501.0" y="1052.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1553.0" y="1052.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<rect x="700.0" y="1058.0" width="1254.0" height="46.0" fill="#F2F2F2" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="1098.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">B20</text>
+<text x="771.0" y="1098.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">AV6</text>
+<text x="891.0" y="1098.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">—</text>
+<text x="1139.0" y="1098.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">(no wire)</text>
+<text x="1389.0" y="1098.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">—</text>
+<text x="1501.0" y="1098.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#1A1A1A" text-anchor="start">—</text>
+<text x="1553.0" y="1098.0" font-family="Courier New, Courier, monospace" font-size="11.5" font-weight="bold" fill="#E67300" text-anchor="start">candidate for #98 fuel level AV pin (v4 open item)</text>
+<rect x="700.0" y="1104.0" width="1254.0" height="46.0" fill="#FFFFFF" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="1144.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">B21</text>
+<text x="771.0" y="1144.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">AV7</text>
+<text x="891.0" y="1144.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1139.0" y="1144.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">(no wire)</text>
+<text x="1389.0" y="1144.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1501.0" y="1144.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1553.0" y="1144.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<rect x="700.0" y="1150.0" width="1254.0" height="46.0" fill="#F2F2F2" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="1190.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">B22</text>
+<text x="771.0" y="1190.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">AV8</text>
+<text x="891.0" y="1190.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1139.0" y="1190.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">(no wire)</text>
+<text x="1389.0" y="1190.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1501.0" y="1190.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1553.0" y="1190.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<rect x="700.0" y="1196.0" width="1254.0" height="46.0" fill="#FFFFFF" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="1236.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">B23</text>
+<text x="771.0" y="1236.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">ETH_TX+</text>
+<text x="891.0" y="1236.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1139.0" y="1236.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">(no wire — tune via UTC)</text>
+<text x="1389.0" y="1236.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1501.0" y="1236.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1553.0" y="1236.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<rect x="700.0" y="1242.0" width="1254.0" height="46.0" fill="#F2F2F2" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="1282.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">B24</text>
+<text x="771.0" y="1282.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">ETH_TX-</text>
+<text x="891.0" y="1282.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1139.0" y="1282.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">(no wire)</text>
+<text x="1389.0" y="1282.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1501.0" y="1282.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1553.0" y="1282.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<rect x="700.0" y="1288.0" width="1254.0" height="46.0" fill="#FFFFFF" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="1328.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">B25</text>
+<text x="771.0" y="1328.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">ETH_RX+</text>
+<text x="891.0" y="1328.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1139.0" y="1328.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">(no wire)</text>
+<text x="1389.0" y="1328.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1501.0" y="1328.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1553.0" y="1328.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<rect x="700.0" y="1334.0" width="1254.0" height="46.0" fill="#F2F2F2" stroke="#777777" stroke-width="0.6"/>
+<text x="707.0" y="1374.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">B26</text>
+<text x="771.0" y="1374.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">ETH_RX-</text>
+<text x="891.0" y="1374.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1139.0" y="1374.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">(no wire)</text>
+<text x="1389.0" y="1374.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1501.0" y="1374.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<text x="1553.0" y="1374.0" font-family="Courier New, Courier, monospace" font-size="11.5" fill="#8A8A8A" text-anchor="start">—</text>
+<line x1="764.0" y1="152.0" x2="764.0" y2="1380.0" stroke="#777777" stroke-width="0.6"/>
+<line x1="884.0" y1="152.0" x2="884.0" y2="1380.0" stroke="#777777" stroke-width="0.6"/>
+<line x1="1132.0" y1="152.0" x2="1132.0" y2="1380.0" stroke="#777777" stroke-width="0.6"/>
+<line x1="1382.0" y1="152.0" x2="1382.0" y2="1380.0" stroke="#777777" stroke-width="0.6"/>
+<line x1="1494.0" y1="152.0" x2="1494.0" y2="1380.0" stroke="#777777" stroke-width="0.6"/>
+<line x1="1546.0" y1="152.0" x2="1546.0" y2="1380.0" stroke="#777777" stroke-width="0.6"/>
+<rect x="700.0" y="152.0" width="1254.0" height="1228.0" fill="none" stroke="#1A1A1A" stroke-width="1.5"/>
+<rect x="1536.0" y="1506.0" width="620.0" height="150.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="2"/>
+<line x1="1536.0" y1="1534.0" x2="2156.0" y2="1534.0" stroke="#1A1A1A" stroke-width="1"/>
+<line x1="1536.0" y1="1560.0" x2="2156.0" y2="1560.0" stroke="#1A1A1A" stroke-width="1"/>
+<line x1="1536.0" y1="1586.0" x2="2156.0" y2="1586.0" stroke="#1A1A1A" stroke-width="1"/>
+<line x1="1536.0" y1="1612.0" x2="2156.0" y2="1612.0" stroke="#1A1A1A" stroke-width="1"/>
+<text x="1548.0" y="1526.0" font-family="Courier New, Courier, monospace" font-size="14" font-weight="bold" fill="#1A1A1A" text-anchor="start">NUKE LTD / DESERT PERFORMANCE</text>
+<text x="1548.0" y="1552.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">1977 CHEVROLET K5 BLAZER — VIN CKR187F127263</text>
+<text x="1548.0" y="1578.0" font-family="Courier New, Courier, monospace" font-size="12" fill="#1A1A1A" text-anchor="start">LS3 6.2L / MoTeC M130 + PDM30 — CONNECTOR BUILD SHEETS</text>
+<text x="1548.0" y="1604.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="start">SHEET 3 OF 4   —   2026-06-10   —   REV A</text>
+<text x="1548.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="9.5" fill="#1A1A1A" text-anchor="start">PIN FUNCTIONS: MoTeC M130 datasheet p.4-5. WIRES: K5_cut_list_v4 join (FROM co</text>
+<text x="1548.0" y="1646.0" font-family="Courier New, Courier, monospace" font-size="9.5" fill="#1A1A1A" text-anchor="start">lumn) + companion addendum.</text>
+</svg>

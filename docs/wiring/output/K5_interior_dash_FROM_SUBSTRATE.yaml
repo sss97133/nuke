@@ -1,0 +1,151 @@
+# Generated from vehicle_canonical — substrate-driven, not file-driven.
+# Vehicle: e08bf694-970f-4cbe-8a74-8715158a0f2e
+# Loom: INTERIOR / DASH
+# Wires projected: 18
+
+metadata:
+  title: K5 INTERIOR / DASH
+  description: |
+    Projection of 18 wires from public.vehicle_canonical for
+    vehicle_id=e08bf694-970f-4cbe-8a74-8715158a0f2e. Source of truth is the DB; this YAML
+    is regenerated on demand. Cite-by-cell provenance retained in
+    structured_data on each underlying observation row.
+
+connectors:
+  M130_A:  {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  M130_B:  {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+  PDM30_A: {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  PDM30_B: {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+
+cables:
+  W34:
+    gauge: 12 AWG
+    length: 6.9
+    length_unit: ft
+    colors: [BU]
+    type: M22759/32
+    notes: "Power Window Motor Left | from PDM30:OUT3 | sources=k5_cut_list_v2"
+  W35:
+    gauge: 12 AWG
+    length: 6.9
+    length_unit: ft
+    colors: [BUWH]
+    type: M22759/32
+    notes: "Power Window Motor Right | from PDM30:OUT4 | sources=k5_cut_list_v2"
+  W36:
+    gauge: 14 AWG
+    length: 6.9
+    length_unit: ft
+    colors: [OGYE]
+    type: M22759/32
+    notes: "Window Switch Master (Driver) | from ECU | sources=k5_cut_list_v2"
+  W37:
+    gauge: 14 AWG
+    length: 6.9
+    length_unit: ft
+    colors: [OGVT]
+    type: M22759/32
+    notes: "Window Switch Passenger | from ECU | sources=k5_cut_list_v2"
+  W38:
+    gauge: 18 AWG
+    length: 6.9
+    length_unit: ft
+    colors: [BK]
+    type: M22759/32
+    notes: "Power Lock Actuator Left | from PDM30:OUT21 | sources=k5_cut_list_v2"
+  W42:
+    gauge: 18 AWG
+    length: 6.9
+    length_unit: ft
+    colors: [OGBK]
+    type: M22759/32
+    notes: "Door Switch Left | from ECU | sources=k5_cut_list_v2"
+  W43:
+    gauge: 18 AWG
+    length: 6.9
+    length_unit: ft
+    colors: [OGRD]
+    type: M22759/32
+    notes: "Door Switch Right | from ECU | sources=k5_cut_list_v2"
+  W44:
+    gauge: 18 AWG
+    length: 6.9
+    length_unit: ft
+    colors: [OGBU]
+    type: M22759/32
+    notes: "Lock Switch | from ECU | sources=k5_cut_list_v2"
+  W45:
+    gauge: 14 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [OGYE]
+    type: M22759/32
+    notes: "Blower Speed Switch/Control | from ECU | sources=k5_cut_list_v2"
+  W47:
+    gauge: 18 AWG
+    length: 6.9
+    length_unit: ft
+    colors: [BKWH]
+    type: M22759/32
+    notes: "Power Lock Actuator Right | from PDM30:OUT22 | sources=k5_cut_list_v2"
+  W51:
+    gauge: 12 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [OGBKBU]
+    type: M22759/32
+    notes: "Heater Blower Motor | from PDM30:OUT6 | sources=k5_cut_list_v2"
+  W65:
+    gauge: 22 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [OGRD]
+    type: M22759/32
+    notes: "Display/Dash | from PDM30:OUT29 | sources=k5_cut_list_v2"
+  W67:
+    gauge: 20 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [BN]
+    type: M22759/32
+    notes: "Dome Light | from PDM30:OUT25 | sources=k5_cut_list_v2"
+  W68:
+    gauge: 20 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [BNWH]
+    type: M22759/32
+    notes: "Under-Dash LED Lights | from PDM30:OUT25 | sources=k5_cut_list_v2"
+  W69:
+    gauge: 20 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [BNBK]
+    type: M22759/32
+    notes: "Footwell Lights | from PDM30:OUT25 | sources=k5_cut_list_v2"
+  W70:
+    gauge: 18 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [OGYE]
+    type: M22759/32
+    notes: "USB Charging Port | from PDM30:OUT30 | sources=k5_cut_list_v2"
+  W71:
+    gauge: 18 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [OGVT]
+    type: M22759/32
+    notes: "Dakota Digital Gauge Cluster | from PDM30 | sources=k5_cut_list_v2"
+  W72:
+    gauge: 14 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [OGOG]
+    type: M22759/32
+    notes: "Cigarette Lighter / 12V Outlet | from PDM30:OUT8 | sources=k5_cut_list_v2"
+
+# Connection list intentionally omitted in this MVP — needs the
+# from_pin → connector pin mapping logic that lives in
+# docs/wiring/output/generate_wireviz_yaml.py. Next pass: refactor
+# that generator to consume the per-wire dicts produced above.

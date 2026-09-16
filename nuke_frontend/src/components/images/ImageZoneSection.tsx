@@ -299,6 +299,13 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
               ? image.damage_flags
               : [];
             const hasDamage = damageFlags.length > 0;
+            // byok_deep_analysis is the deep-analysis drain's actual output (Ch.19); the
+            // legacy deep_analysis.fabrication_stage is unfed, so fall back to byok.
+            const byok = image.ai_scan_metadata?.byok_deep_analysis;
+            const buildPhase: string | null =
+              image.ai_scan_metadata?.deep_analysis?.fabrication_stage || byok?.build_phase_guess || null;
+            const sceneType: string | null =
+              byok?.scene_type && byok.scene_type !== 'unknown' ? byok.scene_type : null;
 
             return (
               <div
@@ -407,8 +414,33 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
                   />
                 )}
 
-                {/* Fabrication Stage Badge (bottom-right) */}
-                {image.ai_scan_metadata?.deep_analysis?.fabrication_stage && (
+                {/* Scene Type Badge (top-left) — the clearest "this frame is analyzed and
+                    here's what it is" signal from byok_deep_analysis. */}
+                {sceneType && !selectMode && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '4px',
+                      left: '4px',
+                      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                      color: 'rgba(255, 255, 255, 0.9)',
+                      padding: '1px 5px',
+                      fontSize: '8px',
+                      fontWeight: 700,
+                      fontFamily: 'Arial, Helvetica, sans-serif',
+                      textTransform: 'uppercase' as const,
+                      letterSpacing: '0.03em',
+                      zIndex: 10,
+                      lineHeight: '12px',
+                    }}
+                    title={byok?.narrative_one_line || `Scene: ${sceneType.replace(/_/g, ' ')}`}
+                  >
+                    {sceneType.replace(/_/g, ' ')}
+                  </div>
+                )}
+
+                {/* Build Phase Badge (bottom-right) */}
+                {buildPhase && (
                   <div
                     style={{
                       position: 'absolute',
@@ -425,9 +457,9 @@ const ImageZoneSection: React.FC<ImageZoneSectionProps> = ({
                       zIndex: 10,
                       lineHeight: '12px',
                     }}
-                    title={`Stage: ${image.ai_scan_metadata.deep_analysis.fabrication_stage.replace(/_/g, ' ')}`}
+                    title={`Stage: ${buildPhase.replace(/_/g, ' ')}`}
                   >
-                    {image.ai_scan_metadata.deep_analysis.fabrication_stage.replace(/_/g, ' ')}
+                    {buildPhase.replace(/_/g, ' ')}
                   </div>
                 )}
 

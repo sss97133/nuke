@@ -1,0 +1,45 @@
+{
+  "schema_version": "day-synth-1",
+  "vehicle_id": "uuid",
+  "session_date": "YYYY-MM-DD",
+  "frame_count": 0,
+
+  "title": "string",
+  "day_narrative": "string",
+  "day_verdict": "string",
+  "work_type": "labor|inspection|documentation|parts_sourcing|acquisition|mixed",
+  "primary_intent": "labor|inspection|documentation|parts_sourcing|acquisition|unknown",
+  "build_arc_placement": "string",
+  "progression_notes": "string",
+
+  "work_items": [{
+    "task": "string",
+    "component": "string",
+    "build_phase": "string",
+    "evidence_frame_ids": ["uuid"],
+    "frame_span": ["HH:MM", "HH:MM"],
+    "completeness": { "before": "string", "after": "string" },
+    "state_change": "string|null",
+    "parts_installed": [{
+      "part": "string",
+      "source": "text_region|part_number_guess",
+      "source_frame_id": "uuid",
+      "confidence": 0.0
+    }],
+    "intent": "labor|inspection|documentation|parts_sourcing|acquisition|unknown",
+    "labor_signal": "observed|documentation_only|ambiguous",
+    "value_status": "unconfirmed",
+    "confirm_prompt": "string|null"
+  }],
+
+  "value": {
+    "labor_minutes_estimate": 0,
+    "needs_owner_confirmation": true,
+    "value_reasoning": "string",
+    "total_job_cost": null,
+    "owner_confirmed": false
+  },
+
+  "confidence": 0.0,
+  "open_questions": ["string"]
+}

@@ -117,16 +117,20 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
             .order('ended_at', { ascending: false })
             .limit(100)
         : EMPTY,
-      // Comments — EXCLUDE bids
-      identityIds.length > 0
-        ? supabase
-            .from('auction_comments')
-            .select(`*, auction:auction_events(*, ${VEHICLE_EMBED})`)
-            .in('author_external_identity_id', identityIds)
-            .is('bid_amount', null)
-            .order('posted_at', { ascending: false })
-            .limit(100)
-        : EMPTY,
+      // Comments — the user's PLATFORM comments (their own comments on Nuke
+      // vehicles/images/timeline), NOT BaT auction comments. The header
+      // "COMMENTS" headline was previously fed by auction_comments (BaT only,
+      // via external identity) — that number is already surfaced, correctly
+      // scoped, inside UserBatTrackRecord's "COMMENTS (n)" door, so reusing it
+      // here both double-counted and mislabeled it as platform activity. The
+      // canonical platform-comment table is user_comments (superset of the
+      // legacy vehicle_comments). vehicle embed populates the door's link.
+      supabase
+        .from('user_comments')
+        .select(`*, ${VEHICLE_EMBED}`)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(100),
       // Auction wins
       identityIds.length > 0
         ? supabase
@@ -148,7 +152,15 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
 
   const listings = listingsRes.data;
   const batBids = batBidsRes.data;
-  const auctionComments = auctionCommentsRes.data;
+  // Platform comments from user_comments. Normalize the shape so the existing
+  // header COMMENTS door (reads c.comment_text, c.posted_at, c.auction?.vehicle)
+  // renders unchanged: alias created_at→posted_at and lift the embedded vehicle
+  // under `auction.vehicle`.
+  const platformComments = (auctionCommentsRes.data || []).map((c: any) => ({
+    ...c,
+    posted_at: c.created_at,
+    auction: { vehicle: c.vehicle },
+  }));
   const auctionWins = auctionWinsRes.data;
   const profileStatsRow = (profileStatsRes as any)?.data ?? null;
 
@@ -159,7 +171,7 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
   const stats: ProfileStats = {
     total_listings: listings?.length ?? 0,
     total_bids: batBids?.length ?? 0,
-    total_comments: auctionComments?.length ?? 0,
+    total_comments: platformComments.length,
     total_auction_wins: auctionWins?.length ?? 0,
     total_success_stories: 0, // success_stories table does not exist in prod
     member_since: profile.member_since || profile.created_at,
@@ -174,7 +186,7 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     stats,
     listings: listings || [],
     bids: batBids || [],
-    comments: auctionComments || [],
+    comments: platformComments,
     auction_wins: auctionWins || [],
     success_stories: [],
     comments_of_note: [],
@@ -238,16 +250,17 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     .limit(100);
 
   // Get comments - EXCLUDE bids
-  // NOTE: bat_comments still joins to bat_listings via FK (bat_listing_id) — keep until bat_comments migrated
+  // ghost-ref 2026-07-12: bat_comments does not exist — repointed to unified auction_comments (platform='bat'); see docs/ledger/FINISH_ROADMAP.md
   const { data: batComments } = await supabase
-    .from('bat_comments')
+    .from('auction_comments')
     .select(`
       *,
-      listing:bat_listings(*, vehicle:vehicles(*))
+      listing:auction_events(*, vehicle:vehicles(*))
     `)
     .eq('external_identity_id', externalIdentity.id)
-    .or('contains_bid.is.null,contains_bid.eq.false')
-    .order('comment_timestamp', { ascending: false })
+    .eq('platform', 'bat')
+    .is('bid_amount', null)
+    .order('posted_at', { ascending: false })
     .limit(100);
 
   const { data: auctionComments } = await supabase
@@ -380,16 +393,10 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
 
   const contributorIds = orgContributors?.map(oc => oc.user_id) || [];
 
-  const { data: bids } = contributorIds.length > 0 ? await supabase
-    .from('auction_bids')
-    .select(`
-      *,
-      auction:auction_listings(*, vehicle:vehicles(*)),
-      bidder:profiles(*)
-    `)
-    .in('bidder_id', contributorIds)
-    .order('created_at', { ascending: false })
-    .limit(100) : { data: [] };
+  // TODO(ghost-ref 2026-07-12): auction_bids does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+  // Was native-auction bids by profiles.id (bidder_id), joined to the also-missing auction_listings.
+  // No repoint target: bat_bids/external_auction_bids key on platform usernames, not Nuke user ids.
+  const bids: any[] = [];
 
   // Get comments (from organization members)
   let comments: any[] = [];
@@ -403,15 +410,31 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     const identityIds = externalIdentities?.map(ei => ei.id) || [];
     
     if (identityIds.length > 0) {
-      // NOTE: bat_comments still joins to bat_listings via FK (bat_listing_id) — keep until bat_comments migrated
+      // ghost-ref 2026-07-12: bat_comments does not exist — repointed to unified auction_comments (platform='bat'); see docs/ledger/FINISH_ROADMAP.md
       const { data: batComments } = await supabase
-        .from('bat_comments')
+        .from('auction_comments')
         .select(`
           *,
-          listing:bat_listings(*, vehicle:vehicles(*))
+          listing:auction_events(*, vehicle:vehicles(*))
         `)
-        .in('external_identity_id', identityIds)
-        .order('comment_timestamp', { ascending: false })
+        // Filter the AUTHOR column, which is what "this contributor's comments"
+        // actually means — and it is the one that is indexed.
+        // auction_comments is 14.6M rows / 13 GB. external_identity_id has NO
+        // index, so this seq-scanned and died on the statement timeout: measured
+        // 2026-07-26, HTTP 500 after 16.1s on EVERY org profile load, and
+        // getOrganizationProfileData awaits it, so listings/bids/stories/services
+        // all queued behind a query that could never succeed.
+        // idx_auction_comments_author_external_identity_id serves this in 0.22s.
+        // The two columns hold the same value wherever both are set (200,000 of
+        // 200,000 sampled agree); author_external_identity_id is NULL on ~21% of
+        // rows that external_identity_id has, so the un-backfilled tail is not
+        // returned yet. Backfilling that column, or adding
+        //   CREATE INDEX CONCURRENTLY idx_auction_comments_external_identity_id
+        //     ON auction_comments(external_identity_id) WHERE external_identity_id IS NOT NULL;
+        // (a 13 GB build — owner's call) closes it.
+        .in('author_external_identity_id', identityIds)
+        .eq('platform', 'bat')
+        .order('posted_at', { ascending: false })
         .limit(100);
 
       comments = batComments || [];
@@ -431,31 +454,17 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     .order('ended_at', { ascending: false })
     .limit(50);
 
-  // Get success stories
-  const { data: successStories } = await supabase
-    .from('success_stories')
-    .select(`
-      *,
-      vehicle:vehicles(*)
-    `)
-    .eq('organization_id', orgId)
-    .order('story_date', { ascending: false })
-    .limit(20);
-
-  // Get services
-  const { data: services } = await supabase
-    .from('organization_services')
-    .select('*')
-    .eq('organization_id', orgId)
-    .eq('is_active', true)
-    .order('service_name', { ascending: true });
-
-  // Get website mapping (use maybeSingle to handle missing rows gracefully)
-  const { data: websiteMapping } = await supabase
-    .from('organization_website_mappings')
-    .select('*')
-    .eq('organization_id', orgId)
-    .maybeSingle();
+  // ghost-ref 2026-07-26: public.success_stories, public.organization_services and
+  // public.organization_website_mappings do NOT exist — to_regclass returns NULL
+  // for all three, verified against the live DB. Each read 404'd on every
+  // organization profile load, the result was destructured without an error
+  // check, and the Stories and Services tabs rendered empty with no explanation.
+  // Same class as the auction_bids / bat_comments ghost-refs above; see
+  // docs/ledger/FINISH_ROADMAP.md. Not deleting the feature — there is nothing
+  // to delete yet. When a table lands, restore the read here.
+  const successStories: never[] = [];
+  const services: never[] = [];
+  const websiteMapping = null;
 
   // Seller track record — per-vehicle breakdown from organization_vehicles
   // Query directly (not from vehicleIds which caps at 1000) with seller-relevant types

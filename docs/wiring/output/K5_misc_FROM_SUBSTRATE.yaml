@@ -1,0 +1,137 @@
+# Generated from vehicle_canonical — substrate-driven, not file-driven.
+# Vehicle: e08bf694-970f-4cbe-8a74-8715158a0f2e
+# Loom: MISC
+# Wires projected: 16
+
+metadata:
+  title: K5 MISC
+  description: |
+    Projection of 16 wires from public.vehicle_canonical for
+    vehicle_id=e08bf694-970f-4cbe-8a74-8715158a0f2e. Source of truth is the DB; this YAML
+    is regenerated on demand. Cite-by-cell provenance retained in
+    structured_data on each underlying observation row.
+
+connectors:
+  M130_A:  {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  M130_B:  {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+  PDM30_A: {type: MoTeC Superseal Connector A (34-pin), pincount: 34}
+  PDM30_B: {type: MoTeC Superseal Connector B (26-pin), pincount: 26}
+
+cables:
+  W23:
+    gauge: 18 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [OGRD]
+    type: M22759/32
+    notes: "A/C Compressor Clutch | from PDM30:OUT16 | sources=k5_cut_list_v2"
+  W40:
+    gauge: 14 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [OG]
+    type: M22759/32
+    notes: "Ignition Switch | from ECU | sources=k5_cut_list_v2"
+  W41:
+    gauge: 18 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [OGWH]
+    type: M22759/32
+    notes: "Hazard Flasher | from ECU | sources=k5_cut_list_v2"
+  W52:
+    gauge: 10 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [OG]
+    type: M22759/16
+    notes: "Bosch V4 Electric Brake Booste | from ECU | sources=k5_cut_list_v2"
+  W55:
+    gauge: 16 AWG
+    length: 11.5
+    length_unit: ft
+    colors: [OGBK]
+    type: M22759/32
+    notes: "Transfer Case Indicator | from PDM30 | sources=k5_cut_list_v2"
+  W56:
+    gauge: 14 AWG
+    length: 11.5
+    length_unit: ft
+    colors: [OGRD]
+    type: M22759/32
+    notes: "Neutral Safety Switch | from PDM30 | sources=k5_cut_list_v2"
+  W57:
+    gauge: 18 AWG
+    length: 11.5
+    length_unit: ft
+    colors: [OGBU]
+    type: M22759/32
+    notes: "Reverse Light Switch | from PDM30 | sources=k5_cut_list_v2"
+  W58:
+    gauge: 20 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [OGYE]
+    type: M22759/32
+    notes: "Transmission Controller | from PDM30:OUT23 | sources=k5_cut_list_v2"
+  W60:
+    gauge: 20 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [OGOG]
+    type: M22759/32
+    notes: "ECU | from ECU | sources=k5_cut_list_v2"
+  W61:
+    gauge: 22 AWG
+    length: 3.5
+    length_unit: ft
+    colors: [OG]
+    type: M22759/32
+    notes: "Power Distribution Module | from ECU | sources=k5_cut_list_v2"
+  W73:
+    gauge: 20 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [BNRD]
+    type: M22759/32
+    notes: "Underhood Light | from PDM30:OUT25 | sources=k5_cut_list_v2"
+  W74:
+    gauge: 20 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [BNBU]
+    type: M22759/32
+    notes: "Cargo/Bed Light | from PDM30:OUT25 | sources=k5_cut_list_v2"
+  W95:
+    gauge: 22 AWG
+    length: 2.3
+    length_unit: ft
+    colors: [OGWH]
+    type: M22759/32
+    notes: "Bosch iBooster Relay | from PDM30 | sources=k5_cut_list_v2"
+  W98:
+    gauge: 20 AWG
+    length: 18.4
+    length_unit: ft
+    colors: [OGRD]
+    type: M22759/32
+    notes: "Fuel Level Sender | from ECU | sources=k5_cut_list_v2"
+  W105:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [OGYE]
+    type: M22759/32
+    notes: "A/C Pressure Switch Low | from ECU | sources=k5_cut_list_v2"
+  W111:
+    gauge: 22 AWG
+    length: 4.6
+    length_unit: ft
+    colors: [OGVT]
+    type: M22759/32
+    notes: "A/C Pressure Switch High | from ECU | sources=k5_cut_list_v2"
+
+# Connection list intentionally omitted in this MVP — needs the
+# from_pin → connector pin mapping logic that lives in
+# docs/wiring/output/generate_wireviz_yaml.py. Next pass: refactor
+# that generator to consume the per-wire dicts produced above.

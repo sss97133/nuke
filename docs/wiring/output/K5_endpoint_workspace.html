@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>K5 Engine Bay — Formboard Workspace</title>
+<style>
+  body { margin: 0; font-family: -apple-system, sans-serif; background: #1a1a1a; color: #eee; overflow: hidden; }
+  #toolbar { padding: 10px 16px; background: #222; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #333; flex-wrap: wrap; }
+  #toolbar button { background: #444; color: #eee; border: 0; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; }
+  #toolbar button:hover { background: #555; }
+  #toolbar button.active { background: #0066cc; }
+  .sep { width: 1px; height: 20px; background: #444; margin: 0 4px; }
+  #scale-info { color: #888; font-size: 11px; margin-left: auto; font-family: monospace; }
+  #stage { display: flex; height: calc(100vh - 50px); }
+  #sidebar { width: 200px; background: #222; padding: 10px; overflow-y: auto; border-right: 1px solid #333; flex-shrink: 0; }
+  #sidebar h3 { margin: 4px 0 6px; font-size: 10px; text-transform: uppercase; color: #888; letter-spacing: 1px; }
+  .chip { background: #333; padding: 5px 9px; margin-bottom: 3px; border-radius: 3px; cursor: grab; font-size: 11px; user-select: none; border: 1px solid #444; }
+  .chip:hover { background: #3a3a3a; }
+  .chip.placed { opacity: 0.4; }
+  #addChip { background: #2a4a2a; border: 1px dashed #4a8a4a; padding: 5px 9px; margin: 6px 0; border-radius: 3px; cursor: pointer; font-size: 11px; text-align: center; }
+  #addChip:hover { background: #355a35; }
+  #canvas-wrap { flex: 1; overflow: auto; background: #111; padding: 20px; position: relative; }
+  #canvas { background: #fff; position: relative; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+  #wires-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+  #wires-svg line { pointer-events: stroke; cursor: pointer; }
+  #engine-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+  .placed-chip { position: absolute; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; cursor: move; user-select: none; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 1px solid #cc8c00; white-space: nowrap; background: #ffb800; color: #000; z-index: 3; }
+  .placed-chip::before { content: ''; position: absolute; left: -3px; top: 50%; width: 8px; height: 8px; background: #ff0000; border-radius: 50%; transform: translateY(-50%); border: 1px solid #000; }
+  .placed-chip.gnd { background: #444; color: #fff; border-color: #222; }
+  .placed-chip.power { background: #cc0000; color: #fff; border-color: #800; }
+  .placed-chip.sensor { background: #aa00cc; color: #fff; border-color: #6a0080; }
+  .placed-chip.ecu { background: #0066cc; color: #fff; border-color: #003d80; }
+  .placed-chip.selected { outline: 3px solid #00ffaa; outline-offset: 2px; }
+  .placed-chip.wire-source { outline: 3px dashed #00aaff; outline-offset: 2px; }
+  #readout { position: fixed; bottom: 10px; right: 10px; background: #000; padding: 8px 12px; border-radius: 4px; font-size: 11px; font-family: monospace; z-index: 10; }
+  #inspector { position: fixed; top: 60px; right: 10px; background: #222; border: 1px solid #444; border-radius: 4px; padding: 12px; font-size: 12px; width: 240px; max-height: 70vh; overflow-y: auto; display: none; z-index: 10; }
+  #inspector.visible { display: block; }
+  #inspector h4 { margin: 0 0 8px; font-size: 13px; color: #ffb800; }
+  #inspector .wire-row { padding: 4px 0; border-bottom: 1px solid #333; font-family: monospace; font-size: 11px; }
+  #inspector .wire-row:last-child { border-bottom: 0; }
+  .wire-label { fill: #000; font-family: monospace; font-size: 10px; pointer-events: none; }
+  .wire-label-bg { fill: #fff; opacity: 0.85; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <button id="mode-place" class="active" onclick="setMode('place')">place</button>
+  <button id="mode-wire" onclick="setMode('wire')">wire</button>
+  <button id="mode-inspect" onclick="setMode('inspect')">inspect</button>
+  <span class="sep"></span>
+  <button onclick="saveLayout()">save</button>
+  <button onclick="loadLayout()">load</button>
+  <button onclick="exportJSON()">export</button>
+  <button onclick="importJSON()">import</button>
+  <button onclick="clearAll()">clear</button>
+  <span class="sep"></span>
+  <button onclick="toggleScale()">zoom: <span id="zoom">×1</span></button>
+  <button id="engine-toggle" class="active" onclick="toggleEngine()">engine overlay</button>
+  <span id="scale-info">place: drag chips · wire: click endpoint → click waypoints around obstacles → click destination · inspect: click endpoint · right-click anything to remove</span>
+</div>
+<div id="stage">
+  <div id="sidebar">
+    <h3>ECU / PDM</h3>
+    <div class="chip" data-cls="ecu" draggable="true">M130 ECU</div>
+    <div class="chip" data-cls="ecu" draggable="true">PDM30</div>
+    <h3>Power</h3>
+    <div class="chip" data-cls="power" draggable="true">Battery</div>
+    <div class="chip" data-cls="power" draggable="true">Alternator</div>
+    <div class="chip" data-cls="power" draggable="true">Starter</div>
+    <h3>Engine</h3>
+    <div class="chip" draggable="true">ETB (throttle)</div>
+    <div class="chip" draggable="true">Coil 1</div>
+    <div class="chip" draggable="true">Coil 2</div>
+    <div class="chip" draggable="true">Coil 3</div>
+    <div class="chip" draggable="true">Coil 4</div>
+    <div class="chip" draggable="true">Coil 5</div>
+    <div class="chip" draggable="true">Coil 6</div>
+    <div class="chip" draggable="true">Coil 7</div>
+    <div class="chip" draggable="true">Coil 8</div>
+    <div class="chip" draggable="true">Injector 1</div>
+    <div class="chip" draggable="true">Injector 2</div>
+    <div class="chip" draggable="true">Injector 3</div>
+    <div class="chip" draggable="true">Injector 4</div>
+    <div class="chip" draggable="true">Injector 5</div>
+    <div class="chip" draggable="true">Injector 6</div>
+    <div class="chip" draggable="true">Injector 7</div>
+    <div class="chip" draggable="true">Injector 8</div>
+    <h3>Sensors</h3>
+    <div class="chip" data-cls="sensor" draggable="true">Crank</div>
+    <div class="chip" data-cls="sensor" draggable="true">Cam</div>
+    <div class="chip" data-cls="sensor" draggable="true">MAP</div>
+    <div class="chip" data-cls="sensor" draggable="true">IAT</div>
+    <div class="chip" data-cls="sensor" draggable="true">CTS (coolant)</div>
+    <div class="chip" data-cls="sensor" draggable="true">Oil pressure</div>
+    <div class="chip" data-cls="sensor" draggable="true">Oil temp</div>
+    <div class="chip" data-cls="sensor" draggable="true">Fuel pressure</div>
+    <div class="chip" data-cls="sensor" draggable="true">Knock B1</div>
+    <div class="chip" data-cls="sensor" draggable="true">Knock B2</div>
+    <h3>Grounds / pass-thru</h3>
+    <div class="chip" data-cls="gnd" draggable="true">Engine block GND</div>
+    <div class="chip" data-cls="gnd" draggable="true">Frame GND</div>
+    <div class="chip" data-cls="gnd" draggable="true">Body GND</div>
+    <div class="chip" draggable="true">Firewall grommet</div>
+    <div id="addChip" onclick="addCustomEndpoint()">+ add custom endpoint</div>
+  </div>
+  <div id="canvas-wrap">
+    <div id="canvas">
+      <svg id="engine-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+      <svg id="wires-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div id="inspector"><h4>inspector</h4><div id="inspector-body"></div></div>
+  </div>
+</div>
+<div id="readout">cursor: <span id="pos">—</span></div>
+
+<script>
+// ── CONSTANTS ─────────────────────────────────────────────────────────────
+// K5 engine bay extents from docs/wiring/output/K5_DIMENSIONAL_SUBSTRATE.md:
+// Front box 60" × 67¾" → 1524mm × 1721mm. Bay length firewall→front 1523mm.
+// Canvas 2486×1720mm gives 38% pad on the right for cabin/dash space.
+const MM_W = 2486, MM_H = 1720;
+const BAY_FRONT_X = 18;       // left edge of bay outline (mm)
+const BAY_FW_X    = 1541;     // firewall x position (mm)
+const BAY_TOP_Y   = 2.5;      // top edge of bay (mm)
+const BAY_BOT_Y   = 1717.5;   // bottom edge
+
+let scaleIdx = 1;
+const scales = [0.5, 1, 1.5, 2];
+let mode = 'place';
+let wireSrc = null;
+let wires = [];        // [{from: endpointId, to: endpointId, waypoints: [{x_mm, y_mm}]}]
+let pendingWaypoints = [];  // accumulated while wireSrc is set, before destination chosen
+let nextChipId = 1;
+let engineVisible = true;
+
+const canvas       = document.getElementById('canvas');
+const wiresSvg     = document.getElementById('wires-svg');
+const engineSvg    = document.getElementById('engine-svg');
+const zoomSpan     = document.getElementById('zoom');
+const inspector    = document.getElementById('inspector');
+const inspectorBody = document.getElementById('inspector-body');
+
+// ── ENGINE OUTLINE — sourced from K5_DIMENSIONAL_SUBSTRATE.md ─────────────
+// Bay coords: x = front (18) → firewall (1541). y = driver (2.5) → passenger (1717.5)
+// All values cited to source docs. 1" = 25.4mm.
+//
+// Anchors:
+//   Engine setback (block rear to firewall): 200mm typical LS swap in classic truck
+//   Engine centered laterally in bay: cy = (BAY_TOP_Y + BAY_BOT_Y)/2 = 860mm
+const IN = 25.4;
+const BAY_CY = (BAY_TOP_Y + BAY_BOT_Y) / 2;
+const ENGINE_SETBACK = 200;  // mm, block rear to firewall
+const BLOCK_L = 22 * IN;     // 559mm (GM LS3 service manual, FormboardCanvas note line 135)
+const BLOCK_W = 20 * IN;     // 508mm
+const BLOCK_X1 = BAY_FW_X - ENGINE_SETBACK - BLOCK_L;
+const BLOCK_X2 = BAY_FW_X - ENGINE_SETBACK;
+
+const ENGINE_SHAPES = [
+  // ── RADIATOR — K5 28" wide × 3" core thickness (top-down) ──
+  // Source: K5 Blazer radiator dims (FormboardCanvas line 247: "~28" wide × 18" tall").
+  // The 18" is front-view height (vertical in vehicle); top-down core thickness ~3".
+  // The 28" "width" is lateral span (y-axis in this view). FormboardCanvas's 3×44 was
+  // a stylized full-board strip, NOT the real shape — that's what produced the
+  // earlier "huge slab" mistake.
+  { type: 'rect', x: BAY_FRONT_X + 30, y: BAY_CY - 14*IN, w: 3*IN, h: 28*IN,
+    fill: '#55AAAA', stroke: '#338888', opacity: 0.20,
+    label: 'RADIATOR', labelX: BAY_FRONT_X + 30 + 1.5*IN, labelY: BAY_CY },
+
+  // ── LS3 BLOCK — bare block footprint 22"×20" (no heads/manifold) ──
+  // Source: GM LS3 service manual via FormboardCanvas comment line 135.
+  // LS3 long-block dims (716×705×710mm) per Marine_LS3_6.2L_Specs.pdf are heads+intake.
+  { type: 'rect', x: BLOCK_X1, y: BAY_CY - BLOCK_W/2, w: BLOCK_L, h: BLOCK_W,
+    fill: '#aaa', stroke: '#777', opacity: 0.18,
+    label: 'LS3 BLOCK', labelX: BLOCK_X1 + BLOCK_L/2, labelY: BAY_CY + BLOCK_W/2 - 8 },
+
+  // ── VALVE COVERS — 20" × 4.5" each, sit on heads on top of block sides ──
+  // Source: GM LS valve cover dims (FormboardCanvas line 149).
+  // In top-down view, VCs appear at the outer (driver/passenger) edges of the block plan.
+  { type: 'rect', x: BLOCK_X1 + 1*IN, y: BAY_CY - BLOCK_W/2 - 4.5*IN,
+    w: 20*IN, h: 4.5*IN, fill: '#bbb', stroke: '#888', opacity: 0.25,
+    label: 'VALVE COVER (DRIVER)', labelX: BLOCK_X1 + 11*IN, labelY: BAY_CY - BLOCK_W/2 - 2.5*IN + 4 },
+  { type: 'rect', x: BLOCK_X1 + 1*IN, y: BAY_CY + BLOCK_W/2,
+    w: 20*IN, h: 4.5*IN, fill: '#bbb', stroke: '#888', opacity: 0.25,
+    label: 'VALVE COVER (PASSENGER)', labelX: BLOCK_X1 + 11*IN, labelY: BAY_CY + BLOCK_W/2 + 2.25*IN + 4 },
+
+  // ── HOLLEY 300-131 INTAKE — 18"×14" centered on block (top-down plan) ──
+  // Source: Holley 300-131 install doc IMG_9324 via FormboardCanvas line 168.
+  { type: 'rect', x: BLOCK_X1 + 2*IN, y: BAY_CY - 7*IN, w: 18*IN, h: 14*IN,
+    fill: '#C0A060', stroke: '#8B7040', opacity: 0.22,
+    label: 'HOLLEY 300-131', labelX: BLOCK_X1 + 11*IN, labelY: BAY_CY + 4 },
+
+  // ── THROTTLE BODY — 90mm DBW, 3.8"×4" at rear of intake (toward firewall) ──
+  // Source: Holley doc + GM 12605109 dims via FormboardCanvas line 186.
+  { type: 'rect', x: BLOCK_X1 + 20*IN, y: BAY_CY - 2*IN, w: 3.8*IN, h: 4*IN,
+    fill: '#888', stroke: '#555', opacity: 0.35,
+    label: 'ETB 90mm', labelX: BLOCK_X1 + 21.9*IN, labelY: BAY_CY + 4 },
+
+  // ── COIL RELOCATION BRACKET — 4"×12", in setback space between block rear and firewall ──
+  // Source: D510C 4.287×2.248 × 8, HEI-style relocation per FormboardCanvas line 219.
+  // Positioned 30mm aft of ETB rear, with 50mm clearance to firewall.
+  { type: 'rect', x: BLOCK_X2 + 40, y: BAY_CY - 6*IN, w: 4*IN, h: 12*IN,
+    fill: '#333', stroke: '#222', opacity: 0.28,
+    label: 'COIL BRACKET (×8)', labelX: BLOCK_X2 + 40 + 2*IN, labelY: BAY_CY + 6*IN + 14 },
+
+  // ── FUEL RAILS — 18"×1.2", along inside edges of each head ──
+  // Source: Holley 534-219 fuel rail kit (FormboardCanvas line 199).
+  { type: 'rect', x: BLOCK_X1 + 2*IN, y: BAY_CY - BLOCK_W/2 - 1.2*IN,
+    w: 18*IN, h: 1.2*IN, fill: '#3366AA', stroke: '#224488', opacity: 0.30 },
+  { type: 'rect', x: BLOCK_X1 + 2*IN, y: BAY_CY + BLOCK_W/2,
+    w: 18*IN, h: 1.2*IN, fill: '#3366AA', stroke: '#224488', opacity: 0.30 },
+];
+
+function renderEngine() {
+  engineSvg.innerHTML = '';
+  if (!engineVisible) return;
+  const s = scales[scaleIdx];
+  engineSvg.setAttribute('viewBox', `0 0 ${MM_W} ${MM_H}`);
+  engineSvg.setAttribute('width', MM_W * s);
+  engineSvg.setAttribute('height', MM_H * s);
+  for (const shape of ENGINE_SHAPES) {
+    if (shape.type === 'rect') {
+      const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      r.setAttribute('x', shape.x); r.setAttribute('y', shape.y);
+      r.setAttribute('width', shape.w); r.setAttribute('height', shape.h);
+      r.setAttribute('fill', shape.fill); r.setAttribute('stroke', shape.stroke);
+      r.setAttribute('stroke-width', '1.5'); r.setAttribute('opacity', shape.opacity);
+      engineSvg.appendChild(r);
+    } else if (shape.type === 'circle') {
+      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      c.setAttribute('cx', shape.cx); c.setAttribute('cy', shape.cy); c.setAttribute('r', shape.r);
+      c.setAttribute('fill', shape.fill); c.setAttribute('stroke', shape.stroke);
+      c.setAttribute('stroke-width', '1.5'); c.setAttribute('opacity', shape.opacity);
+      engineSvg.appendChild(c);
+    }
+    if (shape.label) {
+      const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      t.setAttribute('x', shape.labelX); t.setAttribute('y', shape.labelY);
+      t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-family', 'monospace');
+      t.setAttribute('font-size', '24'); t.setAttribute('fill', '#444'); t.setAttribute('opacity', '0.6');
+      t.textContent = shape.label;
+      engineSvg.appendChild(t);
+    }
+  }
+}
+
+// ── CANVAS BACKGROUND (bay outline, firewall, scale bar) ─────────────────
+function drawBackground() {
+  const s = scales[scaleIdx];
+  canvas.querySelectorAll('.bg-el').forEach(g => g.remove());
+  const bay = document.createElement('div');
+  bay.className = 'bg-el';
+  bay.style.cssText = `position:absolute; left:${BAY_FRONT_X*s}px; top:${BAY_TOP_Y*s}px; width:${(BAY_FW_X-BAY_FRONT_X)*s}px; height:${(BAY_BOT_Y-BAY_TOP_Y)*s}px; border:2px dashed #aaa; pointer-events:none; z-index:0;`;
+  canvas.appendChild(bay);
+  const labels = [
+    { x: BAY_FW_X * s + 6, y: BAY_TOP_Y * s,   txt: 'FIREWALL →' },
+    { x: BAY_FRONT_X * s - 60, y: BAY_TOP_Y * s, txt: '← FRONT' },
+    { x: BAY_FW_X * s - 110, y: BAY_TOP_Y * s - 18, txt: 'DRIVER ↑' },
+    { x: BAY_FW_X * s - 110, y: BAY_BOT_Y * s + 4, txt: 'PASSENGER ↓' },
+  ];
+  for (const l of labels) {
+    const el = document.createElement('div');
+    el.className = 'bg-el';
+    el.style.cssText = `position:absolute; left:${l.x}px; top:${l.y}px; color:#888; font-size:10px; font-family:monospace; pointer-events:none; z-index:0;`;
+    el.textContent = l.txt;
+    canvas.appendChild(el);
+  }
+  // 100mm scale bar
+  const bar = document.createElement('div');
+  bar.className = 'bg-el';
+  bar.style.cssText = `position:absolute; left:20px; bottom:20px; width:${100*s}px; height:8px; background:#000; pointer-events:none; z-index:4;`;
+  canvas.appendChild(bar);
+  const barLbl = document.createElement('div');
+  barLbl.className = 'bg-el';
+  barLbl.style.cssText = `position:absolute; left:20px; bottom:32px; color:#000; font-size:10px; font-family:monospace; pointer-events:none; z-index:4;`;
+  barLbl.textContent = '100mm (1:1 reference)';
+  canvas.appendChild(barLbl);
+}
+
+// ── SCALE ────────────────────────────────────────────────────────────────
+function applyScale() {
+  const s = scales[scaleIdx];
+  canvas.style.width = (MM_W * s) + 'px';
+  canvas.style.height = (MM_H * s) + 'px';
+  zoomSpan.textContent = '×' + s;
+  drawBackground();
+  renderEngine();
+  repositionAllChips();
+  redrawWires();
+}
+function toggleScale() { scaleIdx = (scaleIdx + 1) % scales.length; applyScale(); }
+function toggleEngine() {
+  engineVisible = !engineVisible;
+  document.getElementById('engine-toggle').classList.toggle('active', engineVisible);
+  renderEngine();
+}
+
+// ── MODE ─────────────────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  ['place','wire','inspect'].forEach(x => {
+    document.getElementById('mode-'+x).classList.toggle('active', x === m);
+  });
+  wireSrc = null;
+  document.querySelectorAll('.placed-chip').forEach(c => {
+    c.classList.remove('wire-source', 'selected');
+  });
+  inspector.classList.remove('visible');
+}
+
+// ── CHIP PLACEMENT (mm storage) ──────────────────────────────────────────
+function placeChip(name, cls, mmX, mmY, chipId) {
+  const c = document.createElement('div');
+  c.className = 'placed-chip' + (cls ? ' ' + cls : '');
+  c.textContent = name;
+  c.dataset.xMm = mmX;
+  c.dataset.yMm = mmY;
+  c.dataset.id = chipId || ('chip-' + nextChipId++);
+  positionChipPx(c);
+  canvas.appendChild(c);
+  attachChipHandlers(c);
+  markPlaced(name);
+  return c;
+}
+function positionChipPx(c) {
+  const s = scales[scaleIdx];
+  c.style.left = (parseFloat(c.dataset.xMm) * s) + 'px';
+  c.style.top  = (parseFloat(c.dataset.yMm) * s) + 'px';
+}
+function repositionAllChips() {
+  document.querySelectorAll('.placed-chip').forEach(positionChipPx);
+}
+
+function attachChipHandlers(c) {
+  // Drag-to-move (place mode only)
+  let dx, dy, dragging = false, downX, downY;
+  c.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    downX = e.clientX; downY = e.clientY;
+    if (mode === 'place') {
+      dragging = true;
+      dx = e.clientX - c.offsetLeft;
+      dy = e.clientY - c.offsetTop;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const s = scales[scaleIdx];
+    const newPx_x = e.clientX - dx;
+    const newPx_y = e.clientY - dy;
+    c.style.left = newPx_x + 'px';
+    c.style.top  = newPx_y + 'px';
+    c.dataset.xMm = newPx_x / s;
+    c.dataset.yMm = newPx_y / s;
+    redrawWires();
+  });
+  document.addEventListener('mouseup', () => { dragging = false; });
+  // Click — varies by mode
+  c.addEventListener('click', e => {
+    // suppress click if it was actually a drag (moved > 4px)
+    if (Math.abs(e.clientX - downX) > 4 || Math.abs(e.clientY - downY) > 4) return;
+    if (mode === 'wire')   handleWireClick(c);
+    if (mode === 'inspect') handleInspectClick(c);
+    e.stopPropagation();
+  });
+  c.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    removeChip(c);
+  });
+}
+function removeChip(c) {
+  const id = c.dataset.id;
+  // remove wires touching this chip
+  wires = wires.filter(w => w.from !== id && w.to !== id);
+  const name = c.textContent;
+  c.remove();
+  markUnplaced(name);
+  redrawWires();
+}
+
+// ── DRAG FROM SIDEBAR ───────────────────────────────────────────────────
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', chip.textContent);
+    e.dataTransfer.setData('cls', chip.dataset.cls || '');
+  });
+});
+canvas.addEventListener('dragover', e => e.preventDefault());
+canvas.addEventListener('drop', e => {
+  e.preventDefault();
+  const name = e.dataTransfer.getData('text/plain');
+  const cls = e.dataTransfer.getData('cls');
+  const rect = canvas.getBoundingClientRect();
+  const s = scales[scaleIdx];
+  placeChip(name, cls, (e.clientX - rect.left) / s, (e.clientY - rect.top) / s);
+});
+
+// ── SIDEBAR PLACED/UNPLACED ─────────────────────────────────────────────
+function markPlaced(name) {
+  document.querySelectorAll('.chip').forEach(c => {
+    if (c.textContent === name) c.classList.add('placed');
+  });
+}
+function markUnplaced(name) {
+  const stillPlaced = [...canvas.querySelectorAll('.placed-chip')].some(p => p.textContent === name);
+  if (!stillPlaced) {
+    document.querySelectorAll('.chip').forEach(c => {
+      if (c.textContent === name) c.classList.remove('placed');
+    });
+  }
+}
+
+// ── CUSTOM ENDPOINT ─────────────────────────────────────────────────────
+function addCustomEndpoint() {
+  const name = prompt('Endpoint name (e.g. "Fuel pump", "Headlight L", "Tail L"):');
+  if (!name || !name.trim()) return;
+  const cls = prompt('Category (blank / gnd / power / sensor / ecu):', '') || '';
+  const newChip = document.createElement('div');
+  newChip.className = 'chip';
+  if (cls) newChip.dataset.cls = cls;
+  newChip.draggable = true;
+  newChip.textContent = name.trim();
+  newChip.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', newChip.textContent);
+    e.dataTransfer.setData('cls', newChip.dataset.cls || '');
+  });
+  document.getElementById('addChip').before(newChip);
+}
+
+// ── WIRE MODE ───────────────────────────────────────────────────────────
+function handleWireClick(c) {
+  if (!wireSrc) {
+    wireSrc = c;
+    pendingWaypoints = [];
+    c.classList.add('wire-source');
+    redrawWires();
+  } else if (wireSrc === c) {
+    wireSrc.classList.remove('wire-source');
+    wireSrc = null;
+    pendingWaypoints = [];
+    redrawWires();
+  } else {
+    wires.push({ from: wireSrc.dataset.id, to: c.dataset.id, waypoints: pendingWaypoints });
+    wireSrc.classList.remove('wire-source');
+    wireSrc = null;
+    pendingWaypoints = [];
+    redrawWires();
+  }
+}
+// Click on empty canvas in wire mode = add waypoint
+canvas.addEventListener('click', e => {
+  if (mode !== 'wire' || !wireSrc) return;
+  // ignore if click was on a chip (handled by chip handler with stopPropagation)
+  if (e.target.classList.contains('placed-chip')) return;
+  const rect = canvas.getBoundingClientRect();
+  const s = scales[scaleIdx];
+  pendingWaypoints.push({
+    x_mm: (e.clientX - rect.left) / s,
+    y_mm: (e.clientY - rect.top) / s,
+  });
+  redrawWires();
+});
+function chipById(id) { return canvas.querySelector(`.placed-chip[data-id="${id}"]`); }
+function chipCenterMm(c) {
+  return {
+    x: parseFloat(c.dataset.xMm) + c.offsetWidth / 2 / scales[scaleIdx],
+    y: parseFloat(c.dataset.yMm) + c.offsetHeight / 2 / scales[scaleIdx],
+  };
+}
+function pathPoints(w) {
+  // Returns [{x,y}] full polyline including endpoints
+  const a = chipById(w.from); const b = chipById(w.to);
+  if (!a || !b) return [];
+  const A = chipCenterMm(a); const B = chipCenterMm(b);
+  const pts = [A];
+  for (const wp of (w.waypoints || [])) pts.push({ x: wp.x_mm, y: wp.y_mm });
+  pts.push(B);
+  return pts;
+}
+function pathLengthMm(pts) {
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const dx = pts[i].x - pts[i-1].x; const dy = pts[i].y - pts[i-1].y;
+    total += Math.sqrt(dx*dx + dy*dy);
+  }
+  return total;
+}
+function drawWirePath(w, opts) {
+  const pts = pathPoints(w);
+  if (pts.length < 2) return;
+  const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  poly.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
+  poly.setAttribute('fill', 'none');
+  poly.setAttribute('stroke', opts.stroke || '#0066cc');
+  poly.setAttribute('stroke-width', opts.width || '4');
+  poly.setAttribute('stroke-opacity', opts.opacity || '0.7');
+  if (opts.dash) poly.setAttribute('stroke-dasharray', opts.dash);
+  poly.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    wires = wires.filter(x => x !== w);
+    redrawWires();
+  });
+  wiresSvg.appendChild(poly);
+  // waypoint markers (with right-click to remove)
+  for (let i = 0; i < (w.waypoints || []).length; i++) {
+    const wp = w.waypoints[i];
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('cx', wp.x_mm); dot.setAttribute('cy', wp.y_mm); dot.setAttribute('r', '10');
+    dot.setAttribute('fill', opts.stroke || '#0066cc'); dot.setAttribute('fill-opacity', '0.6');
+    dot.setAttribute('stroke', '#fff'); dot.setAttribute('stroke-width', '2');
+    dot.style.cursor = 'pointer';
+    dot.style.pointerEvents = 'all';
+    dot.addEventListener('contextmenu', e => {
+      e.preventDefault(); e.stopPropagation();
+      w.waypoints.splice(i, 1);
+      redrawWires();
+    });
+    wiresSvg.appendChild(dot);
+  }
+  // length label
+  const len_mm = pathLengthMm(pts);
+  const mid = pts[Math.floor(pts.length / 2)];
+  const lbl_text = `${len_mm.toFixed(0)}mm / ${(len_mm/25.4).toFixed(1)}"`;
+  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  bg.setAttribute('class', 'wire-label-bg');
+  bg.setAttribute('x', mid.x - lbl_text.length * 5); bg.setAttribute('y', mid.y - 11);
+  bg.setAttribute('width', lbl_text.length * 10); bg.setAttribute('height', 18);
+  wiresSvg.appendChild(bg);
+  const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  t.setAttribute('class', 'wire-label');
+  t.setAttribute('x', mid.x); t.setAttribute('y', mid.y + 4);
+  t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', '14');
+  t.textContent = lbl_text;
+  wiresSvg.appendChild(t);
+}
+function redrawWires() {
+  wiresSvg.innerHTML = '';
+  const s = scales[scaleIdx];
+  wiresSvg.setAttribute('viewBox', `0 0 ${MM_W} ${MM_H}`);
+  wiresSvg.setAttribute('width', MM_W * s);
+  wiresSvg.setAttribute('height', MM_H * s);
+  for (const w of wires) drawWirePath(w, { stroke: '#0066cc', width: 4, opacity: 0.7 });
+  // Pending wire preview (dashed, while source set + pending waypoints)
+  if (mode === 'wire' && wireSrc) {
+    const src = chipCenterMm(wireSrc);
+    const previewPts = [src, ...pendingWaypoints.map(p => ({ x: p.x_mm, y: p.y_mm }))];
+    if (previewPts.length >= 2) {
+      const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+      poly.setAttribute('points', previewPts.map(p => `${p.x},${p.y}`).join(' '));
+      poly.setAttribute('fill', 'none');
+      poly.setAttribute('stroke', '#00aaff'); poly.setAttribute('stroke-width', '3');
+      poly.setAttribute('stroke-dasharray', '20,12'); poly.setAttribute('stroke-opacity', '0.85');
+      wiresSvg.appendChild(poly);
+    }
+    for (const wp of pendingWaypoints) {
+      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('cx', wp.x_mm); dot.setAttribute('cy', wp.y_mm); dot.setAttribute('r', '8');
+      dot.setAttribute('fill', '#00aaff'); dot.setAttribute('stroke', '#fff'); dot.setAttribute('stroke-width', '2');
+      wiresSvg.appendChild(dot);
+    }
+  }
+}
+
+// ── INSPECT MODE ────────────────────────────────────────────────────────
+function handleInspectClick(c) {
+  document.querySelectorAll('.placed-chip').forEach(p => p.classList.remove('selected'));
+  c.classList.add('selected');
+  const myId = c.dataset.id;
+  const connected = wires.filter(w => w.from === myId || w.to === myId);
+  inspector.classList.add('visible');
+  document.getElementById('inspector').firstElementChild.textContent = c.textContent;
+  let html = `<div style="color:#888;font-size:11px;margin-bottom:8px;">${c.dataset.xMm | 0} × ${c.dataset.yMm | 0} mm</div>`;
+  html += `<div style="color:#888;font-size:11px;margin-bottom:8px;">${connected.length} wire${connected.length === 1 ? '' : 's'} terminating here</div>`;
+  for (const w of connected) {
+    const other = w.from === myId ? chipById(w.to) : chipById(w.from);
+    if (!other) continue;
+    const len = pathLengthMm(pathPoints(w));
+    const wpN = (w.waypoints || []).length;
+    html += `<div class="wire-row"><strong>↔ ${other.textContent}</strong><br><span style="color:#888;">${len.toFixed(0)}mm / ${(len/25.4).toFixed(1)}" · ${wpN} waypoint${wpN===1?'':'s'}</span></div>`;
+  }
+  if (connected.length === 0) {
+    html += `<div style="color:#666;font-style:italic;">No wires yet. Switch to wire mode to connect.</div>`;
+  }
+  inspectorBody.innerHTML = html;
+}
+
+// ── CURSOR READOUT ──────────────────────────────────────────────────────
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const s = scales[scaleIdx];
+  const mmX = ((e.clientX - rect.left) / s);
+  const mmY = ((e.clientY - rect.top) / s);
+  document.getElementById('pos').textContent = `${mmX.toFixed(0)} × ${mmY.toFixed(0)} mm  (${(mmX/25.4).toFixed(1)} × ${(mmY/25.4).toFixed(1)} in)`;
+});
+
+// ── SAVE / LOAD ─────────────────────────────────────────────────────────
+function getLayout() {
+  const endpoints = [...canvas.querySelectorAll('.placed-chip')].map(p => ({
+    id: p.dataset.id,
+    name: p.textContent,
+    cls: [...p.classList].filter(c => c !== 'placed-chip' && c !== 'selected' && c !== 'wire-source').join(' '),
+    x_mm: Math.round(parseFloat(p.dataset.xMm)),
+    y_mm: Math.round(parseFloat(p.dataset.yMm)),
+  }));
+  return { version: 2, endpoints, wires };
+}
+function saveLayout() {
+  localStorage.setItem('k5_endpoints_v2', JSON.stringify(getLayout()));
+  alert(`Saved ${getLayout().endpoints.length} endpoints, ${wires.length} wires.`);
+}
+function loadLayout() {
+  // try v2 first, fall back to v1 (old format)
+  let raw = localStorage.getItem('k5_endpoints_v2');
+  let v1 = false;
+  if (!raw) { raw = localStorage.getItem('k5_endpoints'); v1 = !!raw; }
+  if (!raw) return;
+  const data = v1 ? { endpoints: JSON.parse(raw), wires: [] } : JSON.parse(raw);
+  canvas.querySelectorAll('.placed-chip').forEach(p => p.remove());
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('placed'));
+  wires = data.wires || [];
+  for (const d of (data.endpoints || [])) {
+    placeChip(d.name, d.cls, d.x_mm, d.y_mm, d.id);
+    if (d.id) {
+      const n = parseInt((d.id || '').replace('chip-', ''));
+      if (!isNaN(n) && n >= nextChipId) nextChipId = n + 1;
+    }
+  }
+  redrawWires();
+}
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(getLayout(), null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'K5_formboard_layout.json'; a.click();
+}
+function importJSON() {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json';
+  inp.onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      const data = JSON.parse(ev.target.result);
+      canvas.querySelectorAll('.placed-chip').forEach(p => p.remove());
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('placed'));
+      wires = data.wires || [];
+      for (const d of (data.endpoints || [])) placeChip(d.name, d.cls, d.x_mm, d.y_mm, d.id);
+      redrawWires();
+    };
+    r.readAsText(f);
+  };
+  inp.click();
+}
+function clearAll() {
+  if (!confirm('Clear all placed endpoints and wires?')) return;
+  canvas.querySelectorAll('.placed-chip').forEach(p => p.remove());
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('placed'));
+  wires = [];
+  redrawWires();
+}
+
+// ── BOOT ────────────────────────────────────────────────────────────────
+applyScale();
+loadLayout();
+</script>
+</body>
+</html>

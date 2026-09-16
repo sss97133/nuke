@@ -81,19 +81,11 @@ const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({ vehicleId, isOpen
         setRows(historyRows);
 
         // Load pinned baselines for 30d (optional; safe if table missing / RLS blocks)
+        // TODO(ghost-ref 2026-07-12): vehicle_price_baselines does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+        // Table was never created, so the query always failed silently. Short-circuit to an
+        // empty baseline map so the UI renders without an unpinnable-baseline round-trip.
         try {
-          const { data: bases } = await supabase
-            .from('vehicle_price_baselines')
-            .select('price_type, period, baseline_price_history_id')
-            .eq('vehicle_id', vehicleId)
-            .eq('period', '30d');
-          const m: Record<string, string> = {};
-          for (const b of (bases as any[]) || []) {
-            const pt = String(b?.price_type || '');
-            const id = String(b?.baseline_price_history_id || '');
-            if (pt && id) m[pt] = id;
-          }
-          setBaselineByType(m);
+          setBaselineByType({});
         } catch {
           setBaselineByType({});
         }

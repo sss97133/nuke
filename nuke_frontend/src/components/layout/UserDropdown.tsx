@@ -50,6 +50,7 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({
         <div className="user-dropdown-section">
           <div className="user-dropdown-section-label">ACCOUNT</div>
           <button onClick={() => go(`/profile/${session?.user?.id || ''}`)}>Profile</button>
+          <button onClick={() => go('/brand-studio')}>Modes</button>
           <button onClick={() => go('/inbox')}>
             Inbox
           </button>
@@ -89,6 +90,7 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({
           <div className="user-dropdown-section-label">SETTINGS</div>
           <button onClick={() => go('/capsule')}>Appearance</button>
           <button onClick={() => go('/capsule?tab=settings')}>Settings</button>
+          <button onClick={() => go('/settings')}>All Settings</button>
           {isAdmin && <button onClick={() => go('/admin')}>Admin</button>}
         </div>
 

@@ -34,6 +34,11 @@ if you want it, don't copy it blind.
 
 ```json
 {
+  "git": {
+    "deploymentEnabled": {
+      "main": false
+    }
+  },
   "buildCommand": "cd nuke_frontend && CI=false npm run build",
   "outputDirectory": "nuke_frontend/dist",
   "installCommand": "cd nuke_frontend && npm install",

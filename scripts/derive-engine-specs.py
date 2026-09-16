@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Engine Spec Derivation — Direct database approach.
 
@@ -28,7 +29,7 @@ except ImportError:
     import psycopg2
     from psycopg2.extras import execute_batch
 
-DB_URL = "postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
+DB_URL = f"postgresql://postgres.qkgaybvrernstplzjaam:{os.environ['SUPABASE_DB_PASSWORD']}@aws-0-us-west-1.pooler.supabase.com:6543/postgres"
 
 # Cubic inches to liters conversion
 CI_TO_LITERS = 0.016387064

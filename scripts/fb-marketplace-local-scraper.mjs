@@ -205,6 +205,17 @@ async function downloadAndStoreImage(sourceUrl, vehicleId, index = 0) {
 let consecutiveRateLimits = 0;
 const MAX_CONSECUTIVE_RATE_LIMITS = 3;
 
+// DB-down tracking — a struggling database must NOT be retry-stormed (522/ECONNREFUSED
+// turns "slow" into "down" and burns egress). On a DB error: exponential backoff then
+// one retry; after MAX consecutive DB errors, flip dbIsDown so the run aborts cleanly.
+let consecutiveDbErrors = 0;
+const MAX_CONSECUTIVE_DB_ERRORS = 5;
+let dbIsDown = false;
+const isDbDownError = (msg) =>
+  /\b522\b|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|connection timeout|fetch failed|ECONNRESET|\b50[0-9]\b|\b52[0-9]\b/i.test(
+    String(msg || "")
+  );
+
 // US metros: slug -> {lat, lng, label}
 const METRO_AREAS = {
   austin: { lat: 30.2672, lng: -97.7431, label: "Austin, TX" },
@@ -1167,6 +1178,12 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
     return { found: 0, vintage: 0, inserted: 0, updated: 0, errors: 1, sellers: 0, vehicles: 0, images: 0 };
   }
 
+  // Abort if the DB looks down — don't keep hammering a struggling database.
+  if (dbIsDown) {
+    console.log(`  Skipping ${label} — DB is down, aborting remaining cities`);
+    return { found: 0, vintage: 0, inserted: 0, updated: 0, errors: 1, sellers: 0, vehicles: 0, images: 0 };
+  }
+
   console.log(`\n[${label}] Starting scrape...`);
 
   let cursor = null;
@@ -1352,17 +1369,56 @@ async function scrapeLocation(slug, { lat, lng, label }, maxPages, sweepId) {
     if (error) {
       console.error(`  Batch upsert error: ${error.message}`);
       stats.errors++;
-      for (const row of rows) {
-        const { error: singleErr } = await supabase
+
+      // If this is a DB-down error (522/ECONNREFUSED/5xx), do NOT fall through to the
+      // per-row retry storm — that's exactly what hammers a struggling database into
+      // the ground. Back off exponentially (cap 60s), retry the batch ONCE, and if the
+      // DB is clearly down, flip dbIsDown and abort the rest of the run.
+      if (isDbDownError(error.message)) {
+        consecutiveDbErrors++;
+        const backoffMs = Math.min(60000, 2000 * 2 ** (consecutiveDbErrors - 1));
+        console.error(
+          `  DB error (${consecutiveDbErrors}/${MAX_CONSECUTIVE_DB_ERRORS}) — backing off ${Math.round(backoffMs / 1000)}s before retry, NOT hammering`
+        );
+        await sleep(backoffMs);
+
+        if (consecutiveDbErrors >= MAX_CONSECUTIVE_DB_ERRORS) {
+          console.error(`\n  *** ${MAX_CONSECUTIVE_DB_ERRORS} CONSECUTIVE DB ERRORS — DB is down, aborting run ***`);
+          dbIsDown = true;
+          break;
+        }
+
+        const { error: retryErr } = await supabase
           .from("marketplace_listings")
-          .upsert(row, { onConflict: "facebook_id" });
-        if (singleErr) {
-          console.error(`    Single upsert error for ${row.facebook_id}: ${singleErr.message}`);
+          .upsert(rows, { onConflict: "facebook_id", ignoreDuplicates: false });
+        if (retryErr) {
+          console.error(`  Batch retry still failing: ${retryErr.message}`);
+          if (isDbDownError(retryErr.message)) {
+            dbIsDown = true;
+            console.error(`\n  *** DB still down after backoff — aborting run ***`);
+            break;
+          }
         } else {
-          stats.inserted++;
+          consecutiveDbErrors = 0;
+          stats.inserted += rows.length;
+        }
+      } else {
+        // Non-DB error (constraint, bad row, etc.) — DB is alive, so the per-row
+        // fallback is safe. Reset the DB-error streak.
+        consecutiveDbErrors = 0;
+        for (const row of rows) {
+          const { error: singleErr } = await supabase
+            .from("marketplace_listings")
+            .upsert(row, { onConflict: "facebook_id" });
+          if (singleErr) {
+            console.error(`    Single upsert error for ${row.facebook_id}: ${singleErr.message}`);
+          } else {
+            stats.inserted++;
+          }
         }
       }
     } else {
+      consecutiveDbErrors = 0;
       stats.inserted += rows.length;
     }
 

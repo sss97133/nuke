@@ -1,0 +1,14 @@
+-- get_ranked_offers: add p_order, and drop the 5-arg signature it supersedes
+-- (an overload made the name ambiguous to both PostgREST and GRANT).
+--
+-- WHY p_order EXISTS: ordering purely by score made the AGE column
+-- non-monotonic on the Live Offers board — 6m, 12h, 16h, 6m, 36m, 1h — because
+-- a 12h Craigslist truck with the 'specific' bonus outranks a 6-minute-old BaT
+-- car. True to the score, unreadable to a human scanning for what just landed,
+-- and landing first is the entire point of the board.
+--   'newest' = strict recency. The default for a live board.
+--   'rank'   = desire prior x freshness. For surfaces that want the score.
+--
+-- Applied via apply_migration (CI's DB path is broken — see .claude/ISSUES.md).
+-- Final state of the function lives here; see 20260727173000 for the original.
+drop function if exists public.get_ranked_offers(integer, integer, numeric, numeric, integer);

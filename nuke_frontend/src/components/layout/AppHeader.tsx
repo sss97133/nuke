@@ -8,6 +8,7 @@ import { useAdminAccess } from '../../hooks/useAdminAccess';
 import AIDataIngestionSearch from '../search/AIDataIngestionSearch';
 import { UserArea } from './UserArea';
 import { UserDropdown } from './UserDropdown';
+import { useBranding } from '../../branding/BrandingContext';
 import GlobalUploadIndicator from '../GlobalUploadIndicator';
 import './AppHeader.css';
 
@@ -38,6 +39,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const userId = session?.user?.id;
   const unreadCount = useNotificationBadge(userId);
   const { isAdmin } = useAdminAccess();
+  const { brand } = useBranding();
   const location = useLocation();
 
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -66,9 +68,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   return (
     <div className="header-wrapper" ref={headerRef}>
       <div className="header">
-        {/* Zone 1: Identity */}
-        <Link to="/" className="header-wordmark" aria-label="Nuke — home">
-          NUKE
+        {/* Zone 1: Identity — wears the active brand if one is projected onto
+            the shell, otherwise the Nuke wordmark. */}
+        <Link
+          to="/"
+          className="header-wordmark"
+          aria-label={brand ? `${brand.name} — home` : 'Nuke — home'}
+          title={brand ? 'Powered by Nuke' : undefined}
+        >
+          {brand ? brand.name : 'NUKE'}
         </Link>
 
         {/* Zone 2: Navigation — hover-prefetch per McMaster benchmark */}

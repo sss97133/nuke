@@ -5,6 +5,7 @@
  * Extracted from VehicleProfile.tsx to reduce file size.
  * This function has side effects (state setters, supabase calls, navigation) but no React hooks.
  */
+import type React from 'react';
 import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
 import { isMismatchedVehicleImage, scoreMoneyShot } from './imageFilterUtils';
 
@@ -86,6 +87,9 @@ function scoreHeroCandidate(row: any, options: { frontExterior?: boolean } = {})
 // pure concurrent-request coalescing, not a cache.
 const inflightHeroCandidates = new Map<string, Promise<any[] | null>>();
 
+// In-flight dedupe for the main profile RPC (same coalescing pattern).
+const inflightProfileRpc = new Map<string, Promise<any>>();
+
 /**
  * Select the best hero image for a vehicle based on zone, quality, confidence,
  * and banner fit.
@@ -120,7 +124,7 @@ export async function selectBestHeroImage(
         const query: Promise<any[] | null> = supabase
           .from('vehicle_images')
           .select(
-            'image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at'
+            'image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at, category, image_type'
           )
           .eq('vehicle_id', vehicleId)
           // Order by recency first — latest owner photo wins per restoration_lead_image_must_be_latest.
@@ -176,11 +180,42 @@ export async function selectBestHeroImage(
         || src === 'tech_capture'
         || src.startsWith('direct_pull');
     };
+
+    // A hero must be a presentable EXTERIOR of the whole vehicle — never a detail
+    // closeup, engine bay, undercarriage, interior, document, or transport/delivery
+    // shot. Skylar 2026-05-30: "engine bay isn't a primary, post-delivery isn't a
+    // primary — there should be flags that inhibit that image from being the hero."
+    const NON_HERO_ZONE = /^(detail_|int_|eng|under|trunk|doc|receipt|data_plate|transport|delivery|ship)/i;
+    const EXT_ZONE = /(^ext_)|profile|three.?quarter|(^3q)/i;
+    const NON_HERO_CAT = new Set([
+      'engine_bay', 'engine', 'undercarriage', 'interior', 'vehicle_interior',
+      'documentation', 'receipt_document', 'data_plate', 'trunk_storage', 'transport', 'delivery',
+    ]);
+    const isHeroEligible = (img: any): boolean => {
+      if (img?.is_document === true) return false;
+      const z = (img?.vehicle_zone || '').toLowerCase();
+      const c = (img?.category || '').toLowerCase();
+      const t = (img?.image_type || '').toLowerCase();
+      if (NON_HERO_ZONE.test(z)) return false;
+      if (NON_HERO_CAT.has(c) || NON_HERO_CAT.has(t)) return false;
+      return true;
+    };
+    const isExterior = (img: any): boolean => {
+      const z = (img?.vehicle_zone || '').toLowerCase();
+      const c = (img?.category || '').toLowerCase();
+      return EXT_ZONE.test(z) || c === 'exterior' || c === 'exterior_body' || c === 'vehicle_exterior';
+    };
+
     const ownerOwned = usable.filter((img: any) => isOwnerTrustSource(img?.source));
     if (ownerOwned.length > 0) {
-      // Already ordered by taken_at DESC, created_at DESC from the query.
-      // Take the newest. buildHeroResult handles medium/large URL preference.
-      return buildHeroResult(ownerOwned[0]);
+      // Candidates are ordered taken_at DESC. Latest owner EXTERIOR shot wins;
+      // else latest owner hero-eligible shot (not a detail/engine/interior/transport).
+      // Only if NEITHER exists do we fall through to the exterior/quality priorities below
+      // — better to fall through than pin a closeup or shipping photo as the face of the truck.
+      const ownerExt = ownerOwned.filter(isExterior);
+      if (ownerExt.length > 0) return buildHeroResult(ownerExt[0]);
+      const ownerOk = ownerOwned.filter(isHeroEligible);
+      if (ownerOk.length > 0) return buildHeroResult(ownerOk[0]);
     }
 
     // Priority 1: explicit is_primary (fallback for vehicles with no owner-trust uploads, e.g. BaT-only imports).
@@ -284,7 +319,7 @@ export interface LoadVehicleParams {
   setIsPublic: (v: boolean) => void;
   setLeadImageUrl: (url: string) => void;
   setVehicleImages: (images: string[]) => void;
-  setTimelineEvents: (events: any[]) => void;
+  setTimelineEvents: React.Dispatch<React.SetStateAction<any[]>>;
   setAuctionPulse: (pulse: any) => void;
 }
 
@@ -333,8 +368,16 @@ export async function loadVehicleImpl({
       const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
         setTimeout(() => resolve({ data: null, error: new Error('get_vehicle_profile_data timed out') }), rpcTimeoutMs)
       );
+      // Coalesce concurrent identical RPC calls (StrictMode double-mount was
+      // observed firing this 3.7s query twice in parallel).
+      let rpcPending = inflightProfileRpc.get(vehicleId);
+      if (!rpcPending) {
+        rpcPending = Promise.resolve(supabase.rpc('get_vehicle_profile_data', { p_vehicle_id: vehicleId }))
+          .finally(() => inflightProfileRpc.delete(vehicleId));
+        inflightProfileRpc.set(vehicleId, rpcPending);
+      }
       const rpcResult = await Promise.race([
-        supabase.rpc('get_vehicle_profile_data', { p_vehicle_id: vehicleId }),
+        rpcPending,
         timeoutPromise,
       ]);
       rpcData = rpcResult.data;
@@ -429,39 +472,49 @@ export async function loadVehicleImpl({
             });
           }
         }
-        // RPC doesn't include image_sets — supplement with a parallel query
-        try {
-          const { data: imageSets } = await supabase
-            .from('image_sets')
-            .select('id, name, session_start, session_end, session_duration_minutes, metadata, event_date')
-            .eq('vehicle_id', vehicleId)
-            .order('session_start', { ascending: false });
-          if (Array.isArray(imageSets)) {
-            for (const s of imageSets) {
-              events.push({
-                id: s.id,
-                vehicle_id: vehicleId,
-                event_date: s.event_date || (s.session_start ? String(s.session_start).slice(0, 10) : null),
-                event_type: 'photo_session',
-                title: s.name || 'Photo session',
-                metadata: {
-                  ...(s.metadata || {}),
-                  session_start: s.session_start,
-                  session_end: s.session_end,
-                  session_duration_minutes: s.session_duration_minutes,
-                  source: 'context_stitcher',
-                },
-              });
-            }
-          }
-        } catch { /* ignore — image_sets is supplementary */ }
-        events.sort((a: any, b: any) => {
+        const sortByDateDesc = (arr: any[]) => arr.sort((a: any, b: any) => {
           const da = a.event_date || '';
           const db = b.event_date || '';
           return db.localeCompare(da);
         });
+        // Paint the timeline NOW — do not gate first paint on image_sets.
+        sortByDateDesc(events);
         setTimelineEvents(events);
         rpcLoaded.timeline = true;
+        // RPC doesn't include image_sets — supplement asynchronously and merge
+        // when (if) it lands. This query was measured at 15s/HTTP 500 for anon
+        // (RLS policy timeout) and was the single biggest stall in signed-out
+        // first paint: awaiting it held the timeline (and everything sequenced
+        // after) to t+19s. Photo sessions are supplementary — never blocking.
+        void (async () => {
+          try {
+            const { data: imageSets } = await supabase
+              .from('image_sets')
+              .select('id, name, session_start, session_end, session_duration_minutes, metadata, event_date')
+              .eq('vehicle_id', vehicleId)
+              .order('session_start', { ascending: false });
+            if (!Array.isArray(imageSets) || imageSets.length === 0) return;
+            const sessionEvents = imageSets.map((s: any) => ({
+              id: s.id,
+              vehicle_id: vehicleId,
+              event_date: s.event_date || (s.session_start ? String(s.session_start).slice(0, 10) : null),
+              event_type: 'photo_session',
+              title: s.name || 'Photo session',
+              metadata: {
+                ...(s.metadata || {}),
+                session_start: s.session_start,
+                session_end: s.session_end,
+                session_duration_minutes: s.session_duration_minutes,
+                source: 'context_stitcher',
+              },
+            }));
+            setTimelineEvents((prev: any[]) => {
+              const have = new Set((prev || []).map((e: any) => e.id));
+              const merged = [...(prev || []), ...sessionEvents.filter((e: any) => !have.has(e.id))];
+              return sortByDateDesc(merged);
+            });
+          } catch { /* ignore — image_sets is supplementary */ }
+        })();
       }
       // Extract counts from RPC stats to avoid separate count queries
       if (rpcData.stats) {

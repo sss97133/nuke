@@ -238,6 +238,11 @@ const DiscoveryFeed = ({ viewMode: propViewMode = 'gallery', denseMode = false, 
               avatar_url
             )
           `)
+          // Never surface documents, duplicates, superseded, or gate-rejected (wrong-vehicle / personal) images in the public feed
+          .not('is_document', 'is', true)
+          .not('is_superseded', 'is', true)
+          .or('is_duplicate.is.null,is_duplicate.eq.false')
+          .or('vision_gate_status.is.null,vision_gate_status.not.in.("rejected_personal","rejected_misattributed")')
           .order('created_at', { ascending: false })
           .range(Math.floor(offset/3), Math.floor(offset/3) + Math.floor(limit/3) - 1);
 

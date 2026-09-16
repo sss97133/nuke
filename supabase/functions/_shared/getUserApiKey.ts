@@ -2,6 +2,8 @@
  * Shared utility to get user API key with fallback to system key
  */
 
+import { decryptSecret } from "./secretBox.ts";
+
 interface ApiKeyResult {
   apiKey: string | null;
   source: 'user' | 'system';
@@ -51,18 +53,10 @@ export async function getUserApiKey(
     .maybeSingle();
 
   if (!keyError && userKeyInfo && userKeyInfo.api_key_encrypted) {
-    // User has their own key - use it (even without subscription, they can use their own key)
-    // Keys are stored as base64 encoded (simple obfuscation)
-    // In production, use proper encryption/decryption
-    let decryptedKey: string;
-    try {
-      // Try to decode as base64
-      decryptedKey = atob(userKeyInfo.api_key_encrypted);
-    } catch {
-      // If not base64, assume it's plain text (for backwards compatibility)
-      decryptedKey = userKeyInfo.api_key_encrypted;
-    }
-    
+    // User has their own key — decrypt at rest (AES-GCM, env key) with transparent
+    // fallback to legacy base64 values. See _shared/secretBox.ts.
+    const decryptedKey: string = await decryptSecret(userKeyInfo.api_key_encrypted);
+
     return {
       apiKey: decryptedKey,
       source: 'user',

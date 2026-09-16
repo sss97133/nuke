@@ -33,7 +33,7 @@ const pool = new Pool({
   host: 'aws-0-us-west-1.pooler.supabase.com',
   port: 6543,
   user: 'postgres.qkgaybvrernstplzjaam',
-  password: '${SUPABASE_DB_PASSWORD}',
+  password: `${process.env.SUPABASE_DB_PASSWORD}`,
   database: 'postgres',
   ssl: { rejectUnauthorized: false },
   max: 3,
