@@ -151,3 +151,54 @@ export function scopeMatches(
 
   return false;
 }
+
+// ============================================================================
+// Write-tier scopes — the governed agent-write pipeline (v2, 2026-06)
+//
+// Grammar:
+//   write:observations  → append-only governed claims (projection_event / observations).
+//                         Autonomous: an external agent token carrying this can submit
+//                         evidence-cited claims with no human in the loop.
+//   write:canonical     → mutate a canonical field directly. HUMAN-GATED: only granted to a
+//                         token that passed owner login (or service-role). External / walk-in
+//                         tokens are clamped below this and can never escalate to it.
+//
+// Tier ladder: admin ⊃ write:canonical ⊃ write:observations.
+// Legacy "write" maps to write:observations ONLY (it must not silently confer canonical power).
+// ============================================================================
+
+export type WriteTier = 'observations' | 'canonical';
+
+const WRITE_TIER_SCOPES: ReadonlySet<string> = new Set([
+  'write:observations',
+  'write:canonical',
+]);
+
+/** True if `s` is a recognized write-tier scope string. */
+export function isWriteTierScope(s: string | null | undefined): boolean {
+  return typeof s === 'string' && WRITE_TIER_SCOPES.has(s.trim());
+}
+
+/**
+ * Does the granted scope set authorize writes at the requested tier?
+ *
+ *   admin              → any tier
+ *   write:canonical    → canonical AND observations (higher tier subsumes lower)
+ *   write:observations → observations only
+ *   legacy "write"     → observations only (never canonical)
+ *   read / events:*     → never authorize a write tier
+ */
+export function scopeAllowsWriteTier(
+  granted: readonly string[] | null | undefined,
+  tier: WriteTier,
+): boolean {
+  if (!granted || granted.length === 0) return false;
+  for (const raw of granted) {
+    const s = typeof raw === 'string' ? raw.trim() : '';
+    if (s === 'admin') return true;
+    if (s === 'write:canonical') return true; // subsumes observations
+    if (s === 'write:observations' && tier === 'observations') return true;
+    if (s === 'write' && tier === 'observations') return true; // legacy → observations only
+  }
+  return false;
+}

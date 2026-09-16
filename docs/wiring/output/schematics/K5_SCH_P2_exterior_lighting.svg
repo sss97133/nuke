@@ -1,0 +1,222 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1700" viewBox="0 0 2200 1700">
+<rect x="0" y="0" width="2200" height="1700" fill="#FFFFFF"/>
+<rect x="30.0" y="30.0" width="2140.0" height="1640.0" fill="none" stroke="#1A1A1A" stroke-width="3"/>
+<rect x="38.0" y="38.0" width="2124.0" height="1624.0" fill="none" stroke="#1A1A1A" stroke-width="1"/>
+<text x="1100.0" y="88.0" font-family="Courier New, Courier, monospace" font-size="28" font-weight="bold" fill="#1A1A1A" text-anchor="middle">SECTION 4 — EXTERIOR LIGHTING</text>
+<text x="1100.0" y="116.0" font-family="Courier New, Courier, monospace" font-size="13" fill="#1A1A1A" text-anchor="middle">PDM30 OUT13/15/17/18/19/27/28 → FRONT FIXTURES + FLOOR-DIMMER HIGH-BEAM TOPOLOGY (REAR FIXTURES ON SHEET 6)</text>
+<rect x="1530.0" y="170.0" width="600.0" height="134.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="188.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">FLOOR DIMMER SWITCH (SPDT)</text>
+<text x="1540.0" y="264.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">COMMON fed by OUT17/OUT18 paralleled; LO/HI legs below</text>
+<text x="1540.0" y="280.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#E67300" text-anchor="start">dimmer position UNMEASURED — L19 is nearest landmark (estimate)</text>
+<text x="1540.0" y="296.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#E67300" text-anchor="start">dimmer switch itself has NO cut-list wire id — gap (subsystems.json)</text>
+<rect x="1530.0" y="314.0" width="600.0" height="60.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="332.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">TURN SIGNAL LF</text>
+<rect x="1530.0" y="384.0" width="600.0" height="60.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="402.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">TURN SIGNAL RF</text>
+<rect x="1530.0" y="454.0" width="600.0" height="86.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="472.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">PARKING LIGHTS FRONT</text>
+<rect x="1530.0" y="550.0" width="600.0" height="86.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="568.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">SIDE MARKERS FRONT</text>
+<rect x="1530.0" y="646.0" width="600.0" height="112.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="664.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">CAB CLEARANCE LIGHTS (ROOF)</text>
+<rect x="1530.0" y="768.0" width="600.0" height="128.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="786.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">REAR FIXTURES — SEE SHEET 6</text>
+<text x="1540.0" y="888.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">runs continue via FLOOR-RR grommet + frame rail (rear loom)</text>
+<rect x="1530.0" y="906.0" width="600.0" height="102.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="924.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">LED HEADLIGHT LEFT</text>
+<text x="1540.0" y="1000.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">Truck-Lite 27270C — dual-input LOW/HIGH pins</text>
+<rect x="1530.0" y="1018.0" width="600.0" height="102.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="1036.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">LED HEADLIGHT RIGHT</text>
+<text x="1540.0" y="1112.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">Truck-Lite 27270C — dual-input LOW/HIGH pins</text>
+<rect x="1530.0" y="1130.0" width="600.0" height="86.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="1148.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">COLUMN SWITCHES — SEE SHEET 1</text>
+<rect x="70.0" y="170.0" width="310.0" height="596.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.8"/>
+<rect x="70.0" y="170.0" width="310.0" height="24.0" fill="#D8D8D8" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="78.0" y="187.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="start">PDM30 — LIGHTING OUTPUTS</text>
+<text x="372.0" y="220.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT17</text>
+<polyline points="380.0,216.0 1140.0,216.0 1140.0,209.0 1530.0,209.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="216.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="213.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#85 COMMON FEED L (3.6A)</text>
+<rect x="398.0" y="206.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="220.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#85</text>
+<text x="444.2" y="210.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">LT GRN · 20 AWG · 4.6ft</text>
+<text x="444.2" y="231.0" font-family="Courier New, Courier, monospace" font-size="9.5" fill="#8A8A8A" text-anchor="start">terminates at dimmer COMMON, not the lamp — 2026-05-14 high-beam decision</text>
+<text x="372.0" y="260.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT18</text>
+<polyline points="380.0,256.0 1140.0,256.0 1140.0,235.0 1530.0,235.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="256.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="239.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#86 COMMON FEED R (3.6A)</text>
+<rect x="398.0" y="246.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="260.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#86</text>
+<text x="444.2" y="250.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">LT GRN/WHT · 20 AWG · 4.6ft</text>
+<text x="372.0" y="300.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT27</text>
+<polyline points="380.0,296.0 1164.0,296.0 1164.0,353.0 1530.0,353.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="296.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="357.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#80 TURN SIGNAL LF</text>
+<rect x="398.0" y="286.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="300.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#80</text>
+<text x="444.2" y="290.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">LT BLU · 22 AWG · 4.6ft</text>
+<text x="444.2" y="311.0" font-family="Courier New, Courier, monospace" font-size="9.5" fill="#8A8A8A" text-anchor="start">#119 Dakota indicator splices dash-side (SHEET 1)</text>
+<circle cx="1060.0" cy="296.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="340.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT28</text>
+<polyline points="380.0,336.0 1188.0,336.0 1188.0,423.0 1530.0,423.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="336.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="427.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#82 TURN SIGNAL RF</text>
+<rect x="398.0" y="326.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="340.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#82</text>
+<text x="444.2" y="330.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">DK BLU · 22 AWG · 4.6ft</text>
+<text x="444.2" y="351.0" font-family="Courier New, Courier, monospace" font-size="9.5" fill="#8A8A8A" text-anchor="start">#120 Dakota indicator splices dash-side (SHEET 1)</text>
+<circle cx="1060.0" cy="336.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="380.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT13</text>
+<polyline points="380.0,376.0 1212.0,376.0 1212.0,493.0 1530.0,493.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="376.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="497.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#83 PARKING LIGHT LF</text>
+<rect x="398.0" y="366.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="380.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#83</text>
+<text x="444.2" y="370.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">BRN/RED · 22 AWG · 4.6ft</text>
+<circle cx="1060.0" cy="376.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="420.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT13</text>
+<polyline points="380.0,416.0 1212.0,416.0 1212.0,519.0 1530.0,519.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="416.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="523.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#84 PARKING LIGHT RF</text>
+<rect x="398.0" y="406.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="420.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#84</text>
+<text x="444.2" y="410.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">BRN/BLU · 22 AWG · 4.6ft</text>
+<circle cx="1060.0" cy="416.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="460.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT19</text>
+<polyline points="380.0,456.0 1236.0,456.0 1236.0,589.0 1530.0,589.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="456.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="593.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#87 SIDE MARKER FRONT L</text>
+<rect x="398.0" y="446.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="460.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#87</text>
+<text x="444.2" y="450.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">BRN/YEL · 22 AWG · 4.6ft</text>
+<circle cx="1060.0" cy="456.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="500.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT19</text>
+<polyline points="380.0,496.0 1236.0,496.0 1236.0,615.0 1530.0,615.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="496.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="619.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#88 SIDE MARKER FRONT R</text>
+<rect x="398.0" y="486.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="500.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#88</text>
+<text x="444.2" y="490.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">BRN/VIO · 22 AWG · 4.6ft</text>
+<circle cx="1060.0" cy="496.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="540.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT19</text>
+<polyline points="380.0,536.0 1260.0,536.0 1260.0,685.0 1530.0,685.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="536.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="689.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#79 CAB CLEARANCE L</text>
+<rect x="398.0" y="526.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="540.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#79</text>
+<text x="444.2" y="530.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">BRN/WHT · 22 AWG · 3.5ft</text>
+<text x="372.0" y="580.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT19</text>
+<polyline points="380.0,576.0 1260.0,576.0 1260.0,711.0 1530.0,711.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="576.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="715.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#90 CAB CLEARANCE CENTER</text>
+<rect x="398.0" y="566.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="580.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#90</text>
+<text x="444.2" y="570.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">BRN · 22 AWG · 3.5ft</text>
+<text x="372.0" y="620.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT19</text>
+<polyline points="380.0,616.0 1260.0,616.0 1260.0,737.0 1530.0,737.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="616.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="741.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#91 CAB CLEARANCE R</text>
+<rect x="398.0" y="606.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="620.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#91</text>
+<text x="444.2" y="610.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">BRN/WHT · 22 AWG · 3.5ft</text>
+<text x="372.0" y="660.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT13</text>
+<polyline points="380.0,656.0 1284.0,656.0 1284.0,807.0 1530.0,807.0" fill="none" stroke="#8A8A8A" stroke-width="1.3"/>
+<circle cx="380.0" cy="656.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="811.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#8A8A8A" text-anchor="start">#75 #81 TAIL LIGHTS L+R</text>
+<rect x="398.0" y="646.0" width="65.8" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="430.9" y="660.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#75 #81</text>
+<text x="473.8" y="650.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">tails — BRN/YEL + BRN/BLK · 22 AWG · 18.4ft</text>
+<text x="372.0" y="700.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT15</text>
+<polyline points="380.0,696.0 1284.0,696.0 1284.0,833.0 1530.0,833.0" fill="none" stroke="#8A8A8A" stroke-width="1.3"/>
+<circle cx="380.0" cy="696.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="837.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#8A8A8A" text-anchor="start">#76 #89 #93 BACKUP L/R + 3RD BRAKE</text>
+<rect x="398.0" y="686.0" width="95.4" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="445.7" y="700.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#76 #89 #93</text>
+<text x="503.4" y="690.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">backup L/R + 3rd brake · 22 AWG · 18.4ft</text>
+<text x="372.0" y="740.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT19</text>
+<polyline points="380.0,736.0 1284.0,736.0 1284.0,859.0 1530.0,859.0" fill="none" stroke="#8A8A8A" stroke-width="1.3"/>
+<circle cx="380.0" cy="736.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="863.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#8A8A8A" text-anchor="start">#77 #78 #92 MARKERS RL/RR + PLATE</text>
+<rect x="398.0" y="726.0" width="95.4" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="445.7" y="740.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#77 #78 #92</text>
+<text x="503.4" y="730.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">rear markers + plate · 22 AWG · 18.4ft</text>
+<rect x="70.0" y="776.0" width="310.0" height="196.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.8"/>
+<rect x="70.0" y="776.0" width="310.0" height="24.0" fill="#D8D8D8" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="78.0" y="793.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="start">FLOOR DIMMER — SPDT OUTPUTS</text>
+<text x="372.0" y="826.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">LO-OUT</text>
+<polyline points="380.0,822.0 1308.0,822.0 1308.0,945.0 1530.0,945.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="822.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="949.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#85a LOW BEAM PIN</text>
+<rect x="398.0" y="812.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="826.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#85a</text>
+<text x="451.6" y="816.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">LT GRN · 16 AWG · 4.0ft</text>
+<circle cx="1060.0" cy="822.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="866.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">HI-OUT</text>
+<polyline points="380.0,862.0 1308.0,862.0 1308.0,971.0 1530.0,971.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="862.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="975.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#85b HIGH BEAM PIN</text>
+<rect x="398.0" y="852.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="866.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#85b</text>
+<text x="451.6" y="856.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">LT GRN/BLK · 16 AWG · 4.0ft</text>
+<text x="451.6" y="877.0" font-family="Courier New, Courier, monospace" font-size="9.5" fill="#8A8A8A" text-anchor="start">#121 Dakota high-beam indicator taps at dimmer HI-OUT</text>
+<circle cx="1060.0" cy="862.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="906.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">LO-OUT</text>
+<polyline points="380.0,902.0 1332.0,902.0 1332.0,1057.0 1530.0,1057.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="902.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="1061.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#86a LOW BEAM PIN</text>
+<rect x="398.0" y="892.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="906.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#86a</text>
+<text x="451.6" y="896.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">LT GRN/WHT · 16 AWG · 4.0ft</text>
+<circle cx="1060.0" cy="902.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="946.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">HI-OUT</text>
+<polyline points="380.0,942.0 1332.0,942.0 1332.0,1083.0 1530.0,1083.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="942.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="1087.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#86b HIGH BEAM PIN</text>
+<rect x="398.0" y="932.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="946.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#86b</text>
+<text x="451.6" y="936.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">LT GRN/WHT/BLK · 16 AWG · 4.0ft</text>
+<text x="451.6" y="957.0" font-family="Courier New, Courier, monospace" font-size="9.5" fill="#E67300" text-anchor="start">3-stripe code remaps to 2-color at purchase — locked decision 2026-05-11</text>
+<circle cx="1060.0" cy="942.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<rect x="70.0" y="982.0" width="310.0" height="116.0" fill="#FFFFFF" stroke="#E67300" stroke-width="1.8"/>
+<rect x="70.0" y="982.0" width="310.0" height="24.0" fill="#D8D8D8" stroke="#E67300" stroke-width="1.2"/>
+<text x="78.0" y="999.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#E67300" text-anchor="start">M130 INPUTS — PIN TBD</text>
+<text x="372.0" y="1032.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#E67300" text-anchor="end">PIN TBD</text>
+<polyline points="380.0,1028.0 1356.0,1028.0 1356.0,1169.0 1530.0,1169.0" fill="none" stroke="#8A8A8A" stroke-width="1.3"/>
+<circle cx="380.0" cy="1028.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="1173.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#8A8A8A" text-anchor="start">#33 TURN SIGNAL SWITCH</text>
+<rect x="398.0" y="1018.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="1032.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#33</text>
+<text x="444.2" y="1022.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/BLU · 22 AWG (logic input)</text>
+<text x="372.0" y="1072.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#E67300" text-anchor="end">PIN TBD</text>
+<polyline points="380.0,1068.0 1356.0,1068.0 1356.0,1195.0 1530.0,1195.0" fill="none" stroke="#8A8A8A" stroke-width="1.3"/>
+<circle cx="380.0" cy="1068.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="1199.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#8A8A8A" text-anchor="start">#41 HAZARD FLASHER</text>
+<rect x="398.0" y="1058.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="1072.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#41</text>
+<text x="444.2" y="1062.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/WHT · 22 AWG (logic input)</text>
+<text x="1060.0" y="158.0" font-family="Courier New, Courier, monospace" font-size="10" font-weight="bold" fill="#1E7D32" text-anchor="middle">FWG-MAIN</text>
+<text x="70.0" y="1244.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="start">NOTES:</text>
+<text x="80.0" y="1262.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">HIGH-BEAM TOPOLOGY: OUT17/18 → #85/#86 → dimmer COMMON → SPDT LO/HI → #85a/b #86a/b → lamp LOW/HIGH pins (receipt 2026-05-14_decision-high-beam-floor-dimmer.md).</text>
+<text x="80.0" y="1278.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#E67300" text-anchor="start">Label drift: wire_paths.yaml swaps front/rear marker naming on #77/#78/#87/#88/#90-92 — CUT LIST v4 names shown (canonical per wire-closure protocol).</text>
+<text x="80.0" y="1294.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">Marker/clearance group OUT19 = 8 fixtures, 1.25-1.3A total. Tail/park group OUT13. Backup group OUT15 (shared w/ camera).</text>
+<text x="70.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="start">LEGEND:</text>
+<line x1="150.0" y1="1626.0" x2="200.0" y2="1626.0" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="206.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">wire run (id in box, COLOR · AWG · LEN on run)</text>
+<circle cx="610.0" cy="1626.0" r="7.0" fill="none" stroke="#1E7D32" stroke-width="2"/>
+<text x="624.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">grommet / boot pass-through</text>
+<rect x="860.0" y="1618.0" width="40.0" height="15.0" fill="none" stroke="#1A1A1A" stroke-width="1" stroke-dasharray="5,3"/>
+<text x="908.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">physical boundary</text>
+<text x="1060.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="10" font-weight="bold" fill="#E67300" text-anchor="start">ORANGE = CONFLICT / TBD</text>
+<text x="1280.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">GRAY = cross-ref other sheet</text>
+<rect x="1494.0" y="1486.0" width="660.0" height="168.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="2"/>
+<line x1="1494.0" y1="1516.0" x2="2154.0" y2="1516.0" stroke="#1A1A1A" stroke-width="1"/>
+<line x1="1494.0" y1="1544.0" x2="2154.0" y2="1544.0" stroke="#1A1A1A" stroke-width="1"/>
+<line x1="1494.0" y1="1572.0" x2="2154.0" y2="1572.0" stroke="#1A1A1A" stroke-width="1"/>
+<line x1="1494.0" y1="1600.0" x2="2154.0" y2="1600.0" stroke="#1A1A1A" stroke-width="1"/>
+<text x="1506.0" y="1507.0" font-family="Courier New, Courier, monospace" font-size="15" font-weight="bold" fill="#1A1A1A" text-anchor="start">NUKE LTD / DESERT PERFORMANCE</text>
+<text x="1506.0" y="1535.0" font-family="Courier New, Courier, monospace" font-size="13" fill="#1A1A1A" text-anchor="start">1977 CHEVROLET K5 BLAZER — VIN CKR187F127263</text>
+<text x="1506.0" y="1563.0" font-family="Courier New, Courier, monospace" font-size="13" fill="#1A1A1A" text-anchor="start">SYSTEM SCHEMATICS — SECTION 4 — EXTERIOR LIGHTING</text>
+<text x="1506.0" y="1591.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">SHEET 2 OF 6   —   2026-06-09   —   REV A</text>
+<text x="1506.0" y="1617.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">DERIVED FROM K5_cut_list_v4 + pdm30 channel plan (2026-04-05 AUTH) + wire_</text>
+<text x="1506.0" y="1638.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">paths + subsystems.json + objectTraits grounds</text>
+</svg>

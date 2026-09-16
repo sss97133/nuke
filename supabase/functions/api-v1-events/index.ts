@@ -254,6 +254,162 @@ function stripEnvelope(structured: Record<string, unknown>): Record<string, unkn
   return rest;
 }
 
+// Payload keys that are structural/free-text, NOT candidate observation properties.
+// Everything else in payload is a claim about a property the registry may not know.
+const NON_PROPERTY_PAYLOAD_KEYS = new Set([
+  "summary", "notes", "note", "description", "text", "comment",
+  "title", "labels", "tags", "media", "attachments",
+]);
+
+/**
+ * P7.2 — close the unknown-attribute rejection-to-growth loop.
+ *
+ * The registry (`observation_properties`) is the set of property keys the system
+ * knows how to project. When an incoming event's payload carries a property key
+ * the registry does NOT have, the claim used to be silently swallowed into the
+ * observation's structured_data and never became a queryable, projectable atom.
+ *
+ * Front half (this function): park each unknown key in `pending_claims` and
+ * create/cite an OPEN `schema_proposal` (proposal_type='add_property'). The
+ * already-existing approve-side trigger + `fn_schema_proposal_apply` are the back
+ * half — a human/curator ratifies the proposal into `observation_properties`,
+ * which migrates the parked claim. We only implement capture here.
+ *
+ * Non-blocking: never fails the event write. pending_claims/schema_proposals are
+ * the PROPOSAL layer (not testimony) — direct inserts here are explicitly allowed.
+ */
+async function captureUnknownProperties(
+  supabase: any,
+  args: {
+    vehicleId: string;
+    observationId: string;
+    kind: string;
+    payload: Record<string, unknown>;
+    userId: string | null;
+    isServiceRole: boolean;
+    agentKey: string | null;
+    agentSessionId: string | null;
+  },
+): Promise<{ unknown_properties: string[]; proposals: string[] }> {
+  const result = { unknown_properties: [] as string[], proposals: [] as string[] };
+  try {
+    const candidateKeys = Object.keys(args.payload).filter(
+      (k) =>
+        !NON_PROPERTY_PAYLOAD_KEYS.has(k) &&
+        !k.startsWith("_") &&
+        args.payload[k] !== undefined &&
+        args.payload[k] !== null,
+    );
+    if (candidateKeys.length === 0) return result;
+
+    // Known registry keys (38-ish, small — fetch once).
+    const { data: known } = await supabase
+      .from("observation_properties")
+      .select("property_key")
+      .is("deprecated_at", null);
+    const knownSet = new Set((known ?? []).map((r: any) => r.property_key as string));
+
+    const unknownKeys = candidateKeys.filter((k) => !knownSet.has(k));
+    if (unknownKeys.length === 0) return result;
+    result.unknown_properties = unknownKeys;
+
+    const isUuidUser =
+      args.userId && !args.isServiceRole &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(args.userId);
+    const proposerUserId = isUuidUser ? args.userId : null;
+    const proposerAgentKey = args.agentKey ?? "api-v1-events";
+
+    for (const key of unknownKeys) {
+      const value = args.payload[key];
+
+      // Idempotency: reuse an existing OPEN add_property proposal for this key
+      // rather than spawning a duplicate on every repeated submission.
+      const { data: existing } = await supabase
+        .from("schema_proposals")
+        .select("id, motivating_observation_ids")
+        .eq("proposal_type", "add_property")
+        .eq("status", "open")
+        .filter("payload->>property_key", "eq", key)
+        .limit(1)
+        .maybeSingle();
+
+      let proposalId: string | null = existing?.id ?? null;
+
+      const evidenceItem = {
+        observation_id: args.observationId,
+        vehicle_id: args.vehicleId,
+        sample_value: value,
+        observed_via: "api-v1-events",
+        observed_at: new Date().toISOString(),
+      };
+
+      if (proposalId) {
+        // Cite this new observation on the existing proposal (append, dedup).
+        const ids = new Set([
+          ...((existing!.motivating_observation_ids as string[]) ?? []),
+          args.observationId,
+        ]);
+        await supabase
+          .from("schema_proposals")
+          .update({ motivating_observation_ids: [...ids] })
+          .eq("id", proposalId);
+      } else {
+        const inferredType =
+          typeof value === "number" ? "number"
+          : typeof value === "boolean" ? "boolean"
+          : "text";
+        const { data: created, error: propErr } = await supabase
+          .from("schema_proposals")
+          .insert({
+            proposal_type: "add_property",
+            status: "open",
+            proposed_by_user_id: proposerUserId,
+            proposed_by_agent_key: proposerAgentKey,
+            payload: {
+              property_key: key,
+              label: key.replace(/_/g, " "),
+              data_type: inferredType,
+              namespace: "pending",
+              applies_to_kinds: [args.kind],
+              description:
+                `Auto-proposed from an unknown property key submitted via /v1/events. ` +
+                `Curator to review label/data_type/namespace before ratifying.`,
+            },
+            evidence: [evidenceItem],
+            motivating_observation_ids: [args.observationId],
+          })
+          .select("id")
+          .maybeSingle();
+        if (propErr) {
+          console.warn(`[api-v1-events] schema_proposal insert failed for '${key}': ${propErr.message}`);
+          continue;
+        }
+        proposalId = created?.id ?? null;
+      }
+      if (proposalId) result.proposals.push(proposalId);
+
+      // Park the claim. Attribution satisfies pending_claim_attribution
+      // (agent_key is always set as a fallback).
+      await supabase.from("pending_claims").insert({
+        vehicle_id: args.vehicleId,
+        attempted_property_key: key,
+        attempted_kind: args.kind,
+        attempted_value: { value },
+        attempted_structured_data: args.payload,
+        submitted_by_user_id: proposerUserId,
+        agent_key: proposerAgentKey,
+        agent_session_id: args.agentSessionId,
+        rejection_reason: "unknown_property",
+        proposal_id: proposalId,
+        status: "awaiting_proposal",
+      });
+    }
+  } catch (e: any) {
+    console.warn(`[api-v1-events] captureUnknownProperties error: ${e.message}`);
+  }
+  return result;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: RESPONSE_HEADERS });
@@ -502,6 +658,19 @@ Deno.serve(async (req) => {
     }
   }
 
+  // 9b. P7.2 — capture any unknown property keys in the payload as pending_claims +
+  //     open schema_proposals (rejection-to-growth loop). Non-blocking.
+  const unknownCapture = await captureUnknownProperties(supabase, {
+    vehicleId,
+    observationId,
+    kind: mapping.kind,
+    payload: envelope.payload ?? {},
+    userId: auth.userId,
+    isServiceRole: !!auth.isServiceRole,
+    agentKey: envelope.agent?.id ?? auth.agentId ?? null,
+    agentSessionId: envelope.agent?.session_id ?? null,
+  });
+
   // 10. Log API usage
   await logApiUsage(supabase, auth.userId, "events", "create", observationId);
 
@@ -513,6 +682,12 @@ Deno.serve(async (req) => {
       duplicate: !!ingestResult.duplicate,
       correction_applied: correctionApplied,
       scopes_matched: scopeCheck.matched,
+      ...(unknownCapture.unknown_properties.length > 0
+        ? {
+            unknown_properties_parked: unknownCapture.unknown_properties,
+            schema_proposals: unknownCapture.proposals,
+          }
+        : {}),
     },
     201,
     auth.headers || {},

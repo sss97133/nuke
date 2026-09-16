@@ -124,7 +124,8 @@ export default function VehicleShowcase() {
 
         const [{ count: imageCount }, { count: eventCount }] = await Promise.all([
           supabase.from('vehicle_images').select('id', { count: 'exact', head: true })
-            .eq('vehicle_id', vehicleId).eq('is_duplicate', false).eq('is_document', false),
+            .eq('vehicle_id', vehicleId).eq('is_duplicate', false).eq('is_document', false)
+            .not('is_superseded', 'is', true),
           supabase.from('vehicle_events').select('id', { count: 'exact', head: true })
             .eq('vehicle_id', vehicleId),
         ]);

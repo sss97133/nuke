@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nuke.content-miner</string>
+
+    <!-- Runs in the login shell (NOT Claude Code's Bash sandbox), so BYOK + citation-verify
+         HTTP calls reach the network. One bounded run per fire. Builds the private X bank. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/skylar/nuke/scripts/content-miner-batch.sh</string>
+    </array>
+
+    <!-- Nightly at 03:00 local. Mines the day's new sessions/library. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/skylar/nuke/logs/content-miner.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/skylar/nuke/logs/content-miner.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/skylar/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <!-- No RunAtLoad: don't fire on every login, only on the nightly schedule. -->
+    <key>Nice</key>
+    <integer>10</integer>
+</dict>
+</plist>

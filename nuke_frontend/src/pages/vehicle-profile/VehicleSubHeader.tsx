@@ -3,7 +3,6 @@ import { useVehicleProfile } from './VehicleProfileContext';
 import { BadgePortal } from '../../components/badges/BadgePortal';
 import { OdometerBadge } from '../../components/vehicle/OdometerBadge';
 
-/** Capitalize first letter of each word for display (e.g. "K5 JIMMY" -> "K5 Jimmy") */
 function toTitleCase(s: string): string {
   return String(s || '')
     .trim()
@@ -56,16 +55,8 @@ const VehicleSubHeader: React.FC = () => {
   const { vehicle } = useVehicleProfile();
   if (!vehicle) return null;
 
-  const year      = vehicle.year   ?? vehicle.model_year   ?? '';
-  const make      = vehicle.make   ?? vehicle.make_name    ?? '';
-  const model     = vehicle.model  ?? vehicle.model_name   ?? '';
-  const rawTrim   = vehicle.trim   ?? vehicle.trim_name    ?? '';
-  // Suppress trim badge when it's already contained in the model string (e.g. "K2500 Sierra Classic" already includes "Sierra Classic")
-  const trim      = rawTrim && model && String(model).toLowerCase().includes(String(rawTrim).toLowerCase()) ? '' : rawTrim;
-  const titleParts = [year, make, model, rawTrim].filter(Boolean);
-  const titleStr  = titleParts.map((p) => (typeof p === 'number' ? String(p) : toTitleCase(String(p)))).join(' ');
-
-  const mileage      = vehicle.mileage    ?? vehicle.odometer   ?? vehicle.miles;
+  const year         = vehicle.year ?? vehicle.model_year ?? '';
+  const mileage      = vehicle.mileage ?? vehicle.odometer ?? vehicle.miles;
   const bodyStyle    = (vehicle as any).body_style ?? (vehicle as any).bodyStyle ?? '';
   const transmission = (vehicle as any).transmission ?? '';
   const drivetrain   = (vehicle as any).drivetrain ?? (vehicle as any).drive_type ?? '';
@@ -93,19 +84,6 @@ const VehicleSubHeader: React.FC = () => {
     minWidth:   0,
   };
 
-  const titleStyle: React.CSSProperties = {
-    fontFamily:     TOKEN.fontBody,
-    fontSize:       11,
-    fontWeight:     700,
-    textTransform:  'uppercase',
-    letterSpacing:  '0.04em',
-    color:          TOKEN.ink,
-    whiteSpace:     'nowrap',
-    overflow:       'hidden',
-    textOverflow:   'ellipsis',
-    maxWidth:       280,
-  };
-
   const dividerStyle: React.CSSProperties = {
     width:       1,
     height:      16,
@@ -127,47 +105,10 @@ const VehicleSubHeader: React.FC = () => {
 
   return (
     <div className="vp-sub-header" style={containerStyle}>
-      {/* Left: YMM (+ trim) as BadgePortal -- click expands cluster inline */}
+      {/* Left: mileage only. Year/Make/Model/Trim are already shown as the
+          page-title chips in VehicleHeader -- showing them here again was
+          one of five restatements of the same identity. */}
       <div className="vp-sub-header__left" style={leftStyle}>
-        {titleStr ? (
-          <>
-            {year && (
-              <BadgePortal
-                dimension="year"
-                value={year}
-                label={String(year)}
-                variant="source"
-              />
-            )}
-            {make && (
-              <BadgePortal
-                dimension="make"
-                value={make}
-                label={toTitleCase(String(make))}
-                variant="source"
-              />
-            )}
-            {model && (
-              <BadgePortal
-                dimension="model"
-                value={model}
-                label={toTitleCase(String(model))}
-                variant="source"
-              />
-            )}
-            {trim && (
-              <BadgePortal
-                dimension="model"
-                value={trim}
-                label={toTitleCase(String(trim))}
-                variant="source"
-              />
-            )}
-          </>
-        ) : (
-          <span className="vp-sub-header__title" style={titleStyle}>VEHICLE</span>
-        )}
-
         {mileage != null && mileage !== '' && (
           <OdometerBadge
             mileage={typeof mileage === 'number' ? mileage : parseFloat(String(mileage).replace(/[^0-9.]/g, ''))}
@@ -176,8 +117,8 @@ const VehicleSubHeader: React.FC = () => {
         )}
       </div>
 
-      {/* Divider */}
-      <div style={dividerStyle} />
+      {/* Divider (only if there's something to the left of it) */}
+      {mileage != null && mileage !== '' && <div style={dividerStyle} />}
 
       {/* Dimension badges — every badge is clickable per design spec */}
       <div className="vp-sub-header__badges" style={badgesWrapStyle}>

@@ -1,0 +1,788 @@
+{
+ "meta": {
+  "sources": {
+   "devices": "/Users/skylar/k5-harness-pull/devices.json (141 devices)",
+   "cut_list": "/Users/skylar/nuke/docs/wiring/output/K5_cut_list_v3.txt (123 wires + 22 companion = 145)",
+   "paths": "/Users/skylar/nuke/docs/wiring/output/K5_wire_paths.yaml"
+  },
+  "conventions": {
+   "wire_ids": "Cut-list v3 IDs. Suffixes: g=ground return, r=5V ref, s=shield drain. INJ_PWR/COIL_PWR/COIL_GND are addendum bus rails.",
+   "total_amps": "Sum of device nameplate amps (worst-case simultaneous peak). Coils/injectors are peak not continuous. Pass-through devices (controllers feeding actuators) noted to avoid double-count.",
+   "pdm_channels": "PDM30:OUTn from cut list FROM column. 'PDM30:unspecified' = cut list says PDM30 with no channel."
+  },
+  "wire_accounting": "All 123 original + 22 companion wire IDs assigned exactly once. All 141 devices assigned exactly once (2 non-electrical excluded into NON_ELECTRICAL)."
+ },
+ "subsystems": {
+  "CORE_ENGINE": {
+   "toggleable": false,
+   "swap_axis": "engine_type (LS3 V8 today; swapping engine swaps coil/injector count, sensor pinouts, ETB connector \u2014 structure stays)",
+   "devices": [
+    "ECU",
+    "Power Distribution Module",
+    "CAN Bus Network",
+    "MoTeC 8-Button Keypad",
+    "Display/Dash",
+    "Accelerator Pedal Sensor (APS)",
+    "Electronic Throttle Body",
+    "Throttle Position Sensor 1",
+    "Throttle Position Sensor 2",
+    "Ignition Coil 1",
+    "Ignition Coil 2",
+    "Ignition Coil 3",
+    "Ignition Coil 4",
+    "Ignition Coil 5",
+    "Ignition Coil 6",
+    "Ignition Coil 7",
+    "Ignition Coil 8",
+    "Fuel Injector 1",
+    "Fuel Injector 2",
+    "Fuel Injector 3",
+    "Fuel Injector 4",
+    "Fuel Injector 5",
+    "Fuel Injector 6",
+    "Fuel Injector 7",
+    "Fuel Injector 8",
+    "Crank Position Sensor",
+    "Cam Position Sensor",
+    "MAP Sensor",
+    "Intake Air Temp Sensor",
+    "Coolant Temp Sensor (ECU)",
+    "Oil Pressure Sensor (ECU)",
+    "Oil Temperature Sensor",
+    "Knock Sensor Bank 1",
+    "Knock Sensor Bank 2",
+    "Fuel Pressure Sensor",
+    "Wideband Lambda Controller",
+    "Wideband O2 Sensor 1",
+    "Wideband O2 Sensor 2",
+    "Vehicle Speed Sensor"
+   ],
+   "wire_ids": [
+    "4a",
+    "4b",
+    "4c",
+    "4d",
+    "4e",
+    "4f",
+    "5",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "24",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "60",
+    "61",
+    "62",
+    "64",
+    "65",
+    "99",
+    "100",
+    "101",
+    "102",
+    "103",
+    "104",
+    "106",
+    "107",
+    "108",
+    "109",
+    "110",
+    "112",
+    "113",
+    "99g",
+    "99r",
+    "99s",
+    "101g",
+    "101r",
+    "101s",
+    "102g",
+    "102r",
+    "103g",
+    "103s",
+    "104g",
+    "104s",
+    "108g",
+    "108r",
+    "109g",
+    "110g",
+    "112g",
+    "112r",
+    "113g",
+    "INJ_PWR",
+    "COIL_PWR",
+    "COIL_GND"
+   ],
+   "wire_count": 62,
+   "total_amps": 76.9,
+   "amps_note": "Peak; coils 32A + injectors 32A are pulsed, continuous draw far lower. ETB 5A, WB controller 3A, ECU 2A.",
+   "pdm_channels": [
+    "OUT24 (WB controller)",
+    "OUT29 (Display/Dash)",
+    "OUT_TBD (INJ_PWR \u2014 see K5_pdm30_channel_plan.md)",
+    "OUT_TBD (COIL_PWR)"
+   ],
+   "zones": [
+    "dash",
+    "engine_bay",
+    "underbody",
+    "firewall"
+   ]
+  },
+  "FUEL": {
+   "toggleable": true,
+   "devices": [
+    "Fuel Pump Relay",
+    "Fuel Pressure Regulator",
+    "Fuel Level Sender"
+   ],
+   "wire_ids": [
+    "66",
+    "94",
+    "98"
+   ],
+   "wire_count": 3,
+   "total_amps": 35.2,
+   "amps_note": "35A is the Fuel Pressure Regulator (PWM pump controller) feed \u2014 the pump draws through it. Relay coil 0.2A, level sender 0.01A.",
+   "pdm_channels": [
+    "PDM30:unspecified (#94 fuel pump relay)"
+   ],
+   "zones": [
+    "rear",
+    "engine_bay"
+   ],
+   "gaps": [
+    "Fuel Pump itself is in the cut list (#66, 8 AWG) but has NO device entry in devices.json",
+    "Fuel Pressure Regulator has no cut-list wire ID"
+   ]
+  },
+  "COOLING": {
+   "toggleable": true,
+   "devices": [
+    "Radiator Fan 1",
+    "Radiator Fan 2",
+    "Electric Water Pump"
+   ],
+   "wire_ids": [
+    "21",
+    "22",
+    "25"
+   ],
+   "wire_count": 3,
+   "total_amps": 46.0,
+   "pdm_channels": [
+    "OUT1",
+    "OUT2",
+    "OUT5"
+   ],
+   "zones": [
+    "engine_bay"
+   ]
+  },
+  "CHARGING_STARTING": {
+   "toggleable": false,
+   "devices": [
+    "Alternator",
+    "Battery",
+    "Battery Disconnect",
+    "Starter Motor",
+    "Ignition Switch"
+   ],
+   "wire_ids": [
+    "6",
+    "40",
+    "59",
+    "63"
+   ],
+   "wire_count": 4,
+   "total_amps": 200.0,
+   "amps_note": "200A = starter cranking peak. Alternator is 220A SOURCE (output), not load. All 0 AWG M22759/16 direct battery runs \u2014 no PDM channels.",
+   "pdm_channels": [],
+   "zones": [
+    "engine_bay",
+    "dash"
+   ]
+  },
+  "BRAKES_IBOOSTER": {
+   "toggleable": true,
+   "toggle_note": "Toggling off implies vacuum/hydroboost alternative \u2014 iBooster feed (#52, 8 AWG) and relay (#95) drop.",
+   "devices": [
+    "Bosch V4 Electric Brake Booster",
+    "Bosch iBooster Relay",
+    "Brake Light Switch"
+   ],
+   "wire_ids": [
+    "52",
+    "53",
+    "95"
+   ],
+   "wire_count": 3,
+   "total_amps": 40.2,
+   "pdm_channels": [
+    "PDM30:unspecified (#95 iBooster relay)"
+   ],
+   "zones": [
+    "engine_bay",
+    "firewall",
+    "dash"
+   ],
+   "cross_dependency": "Brake Light Switch (#53, ECU digital input) also feeds LIGHTING_EXTERIOR brake lamps and TRANS_6L80E torque-converter unlock \u2014 keep #53 if either of those is on, even with iBooster off."
+  },
+  "EPARKING_BRAKE": {
+   "toggleable": true,
+   "devices": [
+    "E-Stopp Dash Switch",
+    "E-Stopp Controller Box",
+    "E-Stopp Actuator"
+   ],
+   "wire_ids": [
+    "54"
+   ],
+   "wire_count": 1,
+   "total_amps": 10.1,
+   "amps_note": "Actuator (10A) draws through controller \u2014 not double-counted. #54 = 16 AWG PDM feed to controller.",
+   "pdm_channels": [
+    "OUT7"
+   ],
+   "zones": [
+    "dash",
+    "rear",
+    "underbody"
+   ],
+   "gaps": [
+    "E-Stopp Dash Switch and Actuator legs have no own cut-list IDs \u2014 only the #54 controller feed exists"
+   ]
+  },
+  "TRANS_6L80E": {
+   "toggleable": true,
+   "swap_axis": "trans_type (manual swap drops controller #58 + NSS; reverse switch + t-case indicator survive any swap)",
+   "devices": [
+    "Transmission Controller",
+    "Neutral Safety Switch",
+    "Reverse Light Switch",
+    "Transfer Case Indicator"
+   ],
+   "wire_ids": [
+    "55",
+    "56",
+    "57",
+    "58"
+   ],
+   "wire_count": 4,
+   "total_amps": 3.0,
+   "pdm_channels": [
+    "OUT23 (controller)",
+    "PDM30:unspecified (#55, #56, #57 inputs)"
+   ],
+   "zones": [
+    "dash",
+    "underbody"
+   ],
+   "cross_dependency": "Reverse Light Switch (#57) feeds LIGHTING_EXTERIOR backup lights and CAMERA_REAR trigger."
+  },
+  "LIGHTING_EXTERIOR": {
+   "toggleable": true,
+   "devices": [
+    "Headlight Switch",
+    "Turn Signal Switch",
+    "Hazard Flasher",
+    "Floor Dimmer Switch (Beam Selector)",
+    "LED Headlight Left",
+    "LED Headlight Right",
+    "Parking Light Left Front",
+    "Parking Light Right Front",
+    "Turn Signal Left Front",
+    "Turn Signal Right Front",
+    "Side Marker Front Left",
+    "Side Marker Front Right",
+    "Side Marker Rear Left",
+    "Side Marker Rear Right",
+    "Tail Light Left",
+    "Tail Light Right",
+    "Backup Light Left",
+    "Backup Light Right",
+    "License Plate Light",
+    "Third Brake Light",
+    "Cab Clearance Light Center",
+    "Cab Clearance Light Left",
+    "Cab Clearance Light Right"
+   ],
+   "wire_ids": [
+    "33",
+    "39",
+    "41",
+    "75",
+    "76",
+    "77",
+    "78",
+    "79",
+    "80",
+    "81",
+    "82",
+    "83",
+    "84",
+    "85",
+    "86",
+    "87",
+    "88",
+    "89",
+    "90",
+    "91",
+    "92",
+    "93"
+   ],
+   "wire_count": 22,
+   "total_amps": 24.9,
+   "pdm_channels": [
+    "OUT13 (tail/parking)",
+    "OUT15 (backup/3rd brake \u2014 shared with rear camera)",
+    "OUT17 (headlight L)",
+    "OUT18 (headlight R)",
+    "OUT19 (markers/clearance/plate)",
+    "OUT27 (turn L)",
+    "OUT28 (turn R)"
+   ],
+   "zones": [
+    "dash",
+    "engine_bay",
+    "rear",
+    "underbody"
+   ],
+   "gaps": [
+    "Floor Dimmer Switch has no cut-list wire ID"
+   ]
+  },
+  "LIGHTING_INTERIOR": {
+   "toggleable": true,
+   "devices": [
+    "Footwell Lights",
+    "Under-Dash LED Lights",
+    "Underhood Light",
+    "Cargo/Bed Light"
+   ],
+   "wire_ids": [
+    "68",
+    "69",
+    "73",
+    "74"
+   ],
+   "wire_count": 4,
+   "total_amps": 2.0,
+   "pdm_channels": [
+    "OUT25 (shared with DOME_COURTESY)"
+   ],
+   "zones": [
+    "dash",
+    "engine_bay",
+    "rear"
+   ]
+  },
+  "DOME_COURTESY": {
+   "toggleable": true,
+   "devices": [
+    "Dome Light",
+    "Door Switch Left",
+    "Door Switch Right",
+    "Door Puddle Light Left",
+    "Door Puddle Light Right"
+   ],
+   "wire_ids": [
+    "42",
+    "43",
+    "67"
+   ],
+   "wire_count": 3,
+   "total_amps": 1.1,
+   "pdm_channels": [
+    "OUT25 (shared with LIGHTING_INTERIOR)"
+   ],
+   "zones": [
+    "dash",
+    "doors"
+   ],
+   "gaps": [
+    "Door Puddle Lights have no cut-list wire IDs"
+   ]
+  },
+  "POWER_WINDOWS": {
+   "toggleable": true,
+   "devices": [
+    "Power Window Motor Left",
+    "Power Window Motor Right",
+    "Window Switch Master (Driver)",
+    "Window Switch Passenger"
+   ],
+   "wire_ids": [
+    "34",
+    "35",
+    "36",
+    "37"
+   ],
+   "wire_count": 4,
+   "total_amps": 30.0,
+   "pdm_channels": [
+    "OUT3",
+    "OUT4"
+   ],
+   "zones": [
+    "doors",
+    "dash"
+   ],
+   "routing_note": "Wires 34/35 carry door_crossing flag (+6in boot flex) \u2014 depends on Door Jamb Boots (HARNESS_INFRA)."
+  },
+  "POWER_LOCKS": {
+   "toggleable": true,
+   "devices": [
+    "Power Lock Actuator Left",
+    "Power Lock Actuator Right",
+    "Lock Switch"
+   ],
+   "wire_ids": [
+    "38",
+    "44",
+    "47"
+   ],
+   "wire_count": 3,
+   "total_amps": 6.0,
+   "pdm_channels": [
+    "OUT21",
+    "OUT22"
+   ],
+   "zones": [
+    "doors"
+   ]
+  },
+  "AUDIO": {
+   "toggleable": true,
+   "devices": [
+    "AM/FM Antenna",
+    "Radio/Head Unit",
+    "Amplifier",
+    "Amplifier Relay",
+    "Speaker Front Left",
+    "Speaker Front Right",
+    "Speaker Rear Left",
+    "Speaker Rear Right",
+    "Subwoofer"
+   ],
+   "wire_ids": [
+    "26a",
+    "26b",
+    "27a",
+    "27b",
+    "28a",
+    "28b",
+    "29a",
+    "29b",
+    "30a",
+    "30b",
+    "31",
+    "32",
+    "96"
+   ],
+   "wire_count": 13,
+   "total_amps": 33.3,
+   "amps_note": "Amp 30A (8 AWG feed #32), head unit 3A, relay coil 0.2A. Speaker wires carry no battery amps.",
+   "pdm_channels": [
+    "OUT20 (head unit)"
+   ],
+   "zones": [
+    "dash",
+    "doors",
+    "rear"
+   ]
+  },
+  "HVAC_AC": {
+   "toggleable": true,
+   "devices": [
+    "Blower Speed Switch/Control",
+    "Heater Blower Motor",
+    "A/C Compressor Clutch",
+    "A/C Pressure Switch High",
+    "A/C Pressure Switch Low"
+   ],
+   "wire_ids": [
+    "23",
+    "45",
+    "51",
+    "105",
+    "111"
+   ],
+   "wire_count": 5,
+   "total_amps": 16.0,
+   "pdm_channels": [
+    "OUT6 (blower, 10 AWG)",
+    "OUT16 (A/C clutch)"
+   ],
+   "zones": [
+    "dash",
+    "engine_bay"
+   ]
+  },
+  "WIPERS_WASHER": {
+   "toggleable": true,
+   "devices": [
+    "Wiper/Washer Switch",
+    "Windshield Wiper Motor",
+    "Washer Pump"
+   ],
+   "wire_ids": [
+    "46",
+    "49",
+    "50"
+   ],
+   "wire_count": 3,
+   "total_amps": 10.0,
+   "pdm_channels": [
+    "OUT12 (wiper motor)",
+    "OUT26 (washer pump)"
+   ],
+   "zones": [
+    "dash",
+    "engine_bay"
+   ]
+  },
+  "AMP_STEPS": {
+   "toggleable": true,
+   "devices": [
+    "AMP Research Controller",
+    "AMP Research Step Left",
+    "AMP Research Step Right"
+   ],
+   "wire_ids": [
+    "1",
+    "2",
+    "3"
+   ],
+   "wire_count": 3,
+   "total_amps": 24.0,
+   "amps_note": "8A x 3 nameplate; steps typically run sequentially through controller \u2014 realistic peak ~16A.",
+   "pdm_channels": [
+    "OUT9",
+    "OUT10",
+    "OUT11"
+   ],
+   "zones": [
+    "underbody"
+   ]
+  },
+  "CAMERA_REAR": {
+   "toggleable": true,
+   "devices": [
+    "Rear Backup Camera"
+   ],
+   "wire_ids": [
+    "97"
+   ],
+   "wire_count": 1,
+   "total_amps": 0.2,
+   "pdm_channels": [
+    "OUT15 (SHARED with backup lights \u2014 camera powers up with reverse; intentional coupling, but means CAMERA_REAR off does not free OUT15 if LIGHTING_EXTERIOR is on)"
+   ],
+   "zones": [
+    "rear",
+    "dash"
+   ],
+   "cross_dependency": "Video display lands on Radio/Head Unit (AUDIO) or Display/Dash \u2014 camera without a screen is dead weight."
+  },
+  "DASH_CLUSTER_DAKOTA": {
+   "toggleable": true,
+   "devices": [
+    "Dakota Digital Gauge Cluster",
+    "SGI-100BT Signal Bridge",
+    "GPS Antenna"
+   ],
+   "wire_ids": [
+    "71"
+   ],
+   "wire_count": 1,
+   "total_amps": 2.6,
+   "pdm_channels": [
+    "PDM30:unspecified (#71)"
+   ],
+   "zones": [
+    "dash"
+   ],
+   "gaps": [
+    "SGI-100BT and GPS Antenna have no cut-list wire IDs \u2014 SGI needs CAN tap (#62 backbone) + power/ground; flag for cut-list v4"
+   ],
+   "data_note": "Cluster data arrives over CAN via SGI-100BT bridge from MoTeC \u2014 no analog sender wires in this configuration."
+  },
+  "ACCESSORY_12V": {
+   "toggleable": true,
+   "devices": [
+    "Cigarette Lighter / 12V Outlet",
+    "USB Charging Port",
+    "Horn"
+   ],
+   "wire_ids": [
+    "48",
+    "70",
+    "72"
+   ],
+   "wire_count": 3,
+   "total_amps": 16.0,
+   "pdm_channels": [
+    "OUT8 (12V outlet)",
+    "OUT14 (horn)",
+    "OUT30 (USB)"
+   ],
+   "zones": [
+    "dash",
+    "engine_bay"
+   ],
+   "note": "Horn parked here \u2014 no HORN subsystem was defined and it is a discretionary accessory load."
+  },
+  "EXHAUST_CUTOUTS_QTP": {
+   "toggleable": true,
+   "added_beyond_spec": true,
+   "reason": "QTP cutouts + polarity relays exist in devices.json but fit no requested subsystem.",
+   "devices": [
+    "QTP Electric Exhaust Cutout Left",
+    "QTP Electric Exhaust Cutout Right",
+    "Polarity Reversing Relay 1",
+    "Polarity Reversing Relay 2",
+    "Polarity Reversing Relay 3",
+    "Polarity Reversing Relay 4"
+   ],
+   "wire_ids": [],
+   "wire_count": 0,
+   "total_amps": 16.4,
+   "pdm_channels": [],
+   "zones": [
+    "underbody",
+    "engine_bay"
+   ],
+   "gaps": [
+    "ZERO cut-list wires for this entire subsystem \u2014 cut-list v4 work item",
+    "Relay-to-cutout assignment unconfirmed (assumed 2 polarity relays per cutout for open/close reversal)"
+   ]
+  },
+  "HARNESS_INFRA": {
+   "toggleable": false,
+   "note": "Always built; scales with whatever subsystems are selected. Not a toggle \u2014 a substrate.",
+   "devices": [
+    "Body Ground Point",
+    "Star Ground Point",
+    "Firewall Bulkhead Connector",
+    "Door Jamb Boot Left",
+    "Door Jamb Boot Right",
+    "Rear Harness Junction",
+    "Power Distribution Module (Secondary)"
+   ],
+   "wire_ids": [],
+   "wire_count": 0,
+   "total_amps": 0,
+   "pdm_channels": [],
+   "zones": [
+    "dash",
+    "engine_bay",
+    "firewall",
+    "doors",
+    "rear"
+   ],
+   "dependency_rules": [
+    "Door Jamb Boots required if any of POWER_WINDOWS, POWER_LOCKS, AUDIO (front speakers), DOME_COURTESY (door switches/puddles) is on",
+    "Rear Harness Junction required if any of FUEL, AUDIO (rear), LIGHTING_EXTERIOR (rear), CAMERA_REAR, EPARKING_BRAKE, AMP_STEPS is on",
+    "Firewall Bulkhead (61-pin D38999) sized by count of engine-bay-crossing circuits \u2014 recompute on toggle change"
+   ]
+  },
+  "NON_ELECTRICAL": {
+   "devices": [
+    "Intake Manifold",
+    "Intake Manifold Adapter"
+   ],
+   "note": "0 pins, no signal \u2014 present in devices.json but not harness items. Excluded from all electrical totals."
+  }
+ },
+ "MECHANICAL_GAUGES_ALTERNATE": {
+  "description": "If mechanical gauges are chosen alongside OR instead of Dakota cluster. ECU-side sensors NEVER come out \u2014 they are engine-protection inputs to the M130. Mechanical gauges need their OWN senders/ports.",
+  "doubled_senders": [
+   {
+    "parameter": "oil_pressure",
+    "ecu_sensor_keeps": {
+     "device": "Oil Pressure Sensor (ECU)",
+     "wires": [
+      "102",
+      "102g",
+      "102r"
+     ],
+     "ecu_pin": "M130:A14",
+     "signal": "analog_5v"
+    },
+    "second_sender_adds": {
+     "device": "Oil Pressure Sender (gauge) \u2014 NOT in devices.json, add it",
+     "mechanical_option": "capillary tube to gauge \u2014 ZERO new wires, needs oil galley tee or second port",
+     "electric_gauge_option": "1x 22 AWG signal wire dash-to-block (~4.6ft engine loom run) + gauge lighting feed",
+     "physical_requirement": "tee fitting or second galley port \u2014 two senders cannot share one port"
+    }
+   },
+   {
+    "parameter": "water_temp",
+    "ecu_sensor_keeps": {
+     "device": "Coolant Temp Sensor (ECU)",
+     "wires": [
+      "110",
+      "110g"
+     ],
+     "ecu_pin": "M130:B04",
+     "signal": "analog_temp"
+    },
+    "second_sender_adds": {
+     "device": "Water Temp Sender (gauge) \u2014 NOT in devices.json, add it",
+     "mechanical_option": "capillary bulb to gauge \u2014 ZERO new wires, needs second port in head/manifold/water pump housing",
+     "electric_gauge_option": "1x 22 AWG signal wire dash-to-engine (~4.6ft) + gauge lighting feed",
+     "physical_requirement": "second coolant port \u2014 capillary bulb and ECU CLT cannot share"
+    }
+   }
+  ],
+  "if_instead_of_dakota": {
+   "drop": {
+    "devices": [
+     "Dakota Digital Gauge Cluster",
+     "SGI-100BT Signal Bridge",
+     "GPS Antenna"
+    ],
+    "wires": [
+     "71"
+    ]
+   },
+   "rewire": [
+    "Fuel Level Sender #98 currently runs to ECU \u2014 analog fuel gauge needs the sender wired direct to gauge, with ohm-range match (GM 0-90 ohm vs gauge spec)",
+    "Speedometer: mechanical cable from transfer case OR keep VSS #100 (ECU still wants it regardless)"
+   ],
+   "delta_amps": -2.6
+  },
+  "if_alongside_dakota": {
+   "drop": [],
+   "add_note": "Only the two doubled senders above + their ports. Net new wires: 0 (capillary) to 2 (electric senders)."
+  }
+ },
+ "shared_pdm_channel_warnings": [
+  "OUT15: Backup Lights + Third Brake Light (LIGHTING_EXTERIOR) + Rear Camera (CAMERA_REAR) \u2014 three loads, two subsystems",
+  "OUT25: Dome (DOME_COURTESY) + Footwell/Under-Dash/Underhood/Cargo (LIGHTING_INTERIOR) \u2014 channel frees only when BOTH subsystems are off",
+  "OUT13: Tail Lights + both front Parking Lights",
+  "OUT19: all 5 markers + 3 clearance + license plate",
+  "Unspecified PDM30 channels needing assignment: #71 Dakota, #94 Fuel Pump Relay, #95 iBooster Relay, #55/#56/#57 trans inputs, INJ_PWR, COIL_PWR"
+ ],
+ "known_gaps": [
+  "Fuel Pump: wire #66 exists, device entry missing from devices.json",
+  "No cut-list wires at all for: QTP cutouts (x2), Polarity Reversing Relays (x4), Door Puddle Lights (x2), Floor Dimmer Switch, E-Stopp Dash Switch + Actuator legs, SGI-100BT, GPS Antenna, AM/FM Antenna, MoTeC Keypad (CAN tap), APS (CRITICAL \u2014 drive-by-wire pedal has no wire IDs), Battery cables, PDM Secondary feed, Fuel Pressure Regulator",
+  "INJ_PWR and COIL_PWR PDM channels TBD per cut-list addendum \u2014 check K5_pdm30_channel_plan.md",
+  "Cut list label drift vs wire_paths.yaml on #77/#78/#87/#88/#90-92 (front/rear marker naming swapped) \u2014 cut list is canonical per wire-closure protocol"
+ ],
+ "totals_check": {
+  "devices_assigned": 141,
+  "original_wires_assigned": 123,
+  "companion_wires_assigned": 22,
+  "wires_total": 145
+ }
+}

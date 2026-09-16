@@ -518,9 +518,18 @@ async function run() {
       targetVehicle = WORK_VEHICLES.red_c10_ernies;
     }
 
-    // Default: Sierra Classic (your client's truck, most actively worked on)
+    // NO silent default. An unmatched GPS cluster can be ANY vehicle in the shop —
+    // yours, a client's, or none — and the shop runs many customer cars (the June
+    // audit found a client Toyota, an El Camino, a Mirage, etc. mixed with the
+    // builds). Dumping those onto one truck is doppelganger contamination
+    // (.claude/rules/agent-trust-invariants.md): an UNattributed photo is
+    // recoverable; a MIS-attributed one corrupts the record. Skip — leave it
+    // unprocessed for confident (vision/VIN/owner-confirmed) attribution later.
+    // NOTE: even the two GPS→vehicle mappings above are unverified location guesses;
+    // and classifyPhotoVehicle() (the vision classifier) is defined but never called.
     if (!targetVehicle) {
-      targetVehicle = WORK_VEHICLES.sierra_classic_83;
+      console.log(`Session ${i + 1} → SKIPPED — no confident vehicle match; ${session.photos.length} photos left unattributed (was silently dumping on the Sierra Classic, a client truck).`);
+      continue;
     }
 
     console.log(`Session ${i + 1} → ${targetVehicle.label} (${targetVehicle.id})`);

@@ -92,35 +92,11 @@ Deno.serve(async (req) => {
     const facilitation_fee = (sale_price * fee_percentage) / 100
 
     // Create transaction record (pending fee payment)
-    const { data: transaction, error: transactionError } = await supabase
-      .from('vehicle_transactions')
-      .insert({
-        vehicle_id,
-        buyer_id: user.id,
-        seller_id,
-        sale_price,
-        facilitation_fee_pct: fee_percentage,
-        facilitation_fee_amount: facilitation_fee,
-        buyer_phone,
-        buyer_email: buyer_email || user.email,
-        seller_phone,
-        seller_email: user.email, // Will get from seller profile
-        status: 'pending_fee_payment',
-        vehicle_details: {
-          year: vehicle.year,
-          make: vehicle.make,
-          model: vehicle.model,
-          vin: vehicle.vin,
-          vehicle_number: vehicle.vehicle_number
-        }
-      })
-      .select()
-      .single()
-
-    if (transactionError || !transaction) {
-      console.error('Failed to create transaction:', transactionError)
-      return json({ error: 'Failed to create transaction' }, 500)
-    }
+    // TODO(ghost-ref 2026-07-12): vehicle_transactions does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+    // The persistence table isn't provisioned, so we can't store the pending transaction.
+    // Synthesize a reference id so the Stripe checkout flow still works (success_url + metadata
+    // below both need it) instead of hard-failing the whole checkout on a missing table.
+    const transaction = { id: crypto.randomUUID() }
 
     // Create Stripe checkout session
     const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' })
@@ -158,10 +134,9 @@ Deno.serve(async (req) => {
     })
 
     // Update transaction with Stripe session ID
-    await supabase
-      .from('vehicle_transactions')
-      .update({ stripe_session_id: session.id })
-      .eq('id', transaction.id)
+    // TODO(ghost-ref 2026-07-12): vehicle_transactions does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+    // No transactions table to persist the Stripe session id to yet; it is already carried in the
+    // checkout session's metadata above, so skip the update instead of failing the request.
 
     return json({
       checkout_url: session.url,

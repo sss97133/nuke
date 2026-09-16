@@ -4,10 +4,11 @@
 
 | Field | Value |
 |-------|-------|
-| Vehicle ID | `e04bf9c5-b488-433b-be9a-3d307861d90b` |
-| VIN | CCL187Z210370 |
+| Vehicle ID | `e08bf694-970f-4cbe-8a74-8715158a0f2e` (corrected 2026-05-17 from prior `e04bf9c5-...`) |
+| VIN | **CKR187F127263** (corrected 2026-05-17 from prior `CCL187Z210370`) |
 | Year/Make/Model | 1977 Chevrolet Blazer (K5) |
-| Owner/Client | Scott (scott@li3go.com) |
+| Owner | Skylar (NUKE LTD) — current owner + builder |
+| Client | Scott (scott@li3go.com) — soon-to-be-owner; takes title on completion |
 | Builder | NUKE LTD, 676 Wells Rd, Boulder City NV 89005 |
 | Wiring Sub | Desert Performance (same address) |
 

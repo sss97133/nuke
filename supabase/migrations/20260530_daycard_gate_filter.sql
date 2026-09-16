@@ -1,6 +1,6 @@
 -- Day-card / build-log RPCs were rendering gate-rejected, personal, duplicate,
 -- and superseded images. The main gallery (loadVehicleData.ts:143) already filters
--- vision_gate_status IN ('rejected_personal','rejected_misattributed'),
+-- vision_gate_status IN ('rejected_personal','rejected_misattributed','rejected'),
 -- but get_daily_work_receipt and get_vehicle_work_dates did not — so misattributed
 -- photos (e.g. a maroon Cheyenne K10, a K5 Blazer, an airplane) and personal shots
 -- (deposit slips, Telegram screenshots) leaked onto the K2500 day cards.
@@ -88,7 +88,7 @@ BEGIN
   FROM vehicle_images vi
   WHERE vi.vehicle_id = p_vehicle_id
   AND vi.taken_at::date = p_date
-  AND (vi.vision_gate_status IS NULL OR vi.vision_gate_status::text NOT IN ('rejected_personal', 'rejected_misattributed'))
+  AND (vi.vision_gate_status IS NULL OR vi.vision_gate_status::text NOT IN ('rejected_personal', 'rejected_misattributed', 'rejected'))
   AND vi.is_duplicate IS NOT TRUE
   AND vi.is_superseded IS NOT TRUE;
 
@@ -224,7 +224,7 @@ BEGIN
       SELECT count(*) FROM vehicle_images
       WHERE vehicle_id = p_vehicle_id
       AND taken_at::date BETWEEN p_start_date AND p_end_date
-      AND (vision_gate_status IS NULL OR vision_gate_status::text NOT IN ('rejected_personal', 'rejected_misattributed'))
+      AND (vision_gate_status IS NULL OR vision_gate_status::text NOT IN ('rejected_personal', 'rejected_misattributed', 'rejected'))
       AND is_duplicate IS NOT TRUE
       AND is_superseded IS NOT TRUE
     ),

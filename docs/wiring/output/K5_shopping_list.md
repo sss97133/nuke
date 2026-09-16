@@ -3,6 +3,8 @@
 **Generated:** 4/5/2026
 **Source data:** component_connectors DB, K5_cut_list.txt, K5_bom.txt, Ch.08 LS3 Sensors
 
+> ⚠️ **SUPERSEDED for wire section (2026-05-11):** Build decision is **Tefzel only** (M22759/32 for 12-22 AWG, M22759/16 for 4-10 AWG). The wire pricing/SKUs in §3 of this doc reflect the old TXL plan and are NOT the current spec. See `K5_wire_spec_and_costs.md` Job 3 for canonical Tefzel pricing (~$2,017 wire total) and the cut list v2 amendment receipt (`receipts/2026-05-11_k5-cut-list-tefzel-amendment.md`). Connector/terminal sections of this doc are still valid.
+
 ---
 
 ## 1. M130 / PDM30 Mating Connectors

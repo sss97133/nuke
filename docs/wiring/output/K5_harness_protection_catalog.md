@@ -625,6 +625,7 @@ Every crimp joint follows this sequence:
 2. Slide correct-size dual-wall adhesive heat shrink over the wire BEFORE crimping
 3. Crimp terminal with correct tool (Daniels indent or quality ratchet)
 4. Pull-test the crimp (10 lb minimum for 22 AWG, 20 lb for 18 AWG, 30 lb for 14 AWG)
+> SUPERSEDED — see chapters/appendix-b-corrections.md (was: 22 AWG = 10 lbf; correct per IPC/WHMA-A-620 = 8 lbf)
 5. Slide the dual-wall heat shrink over the crimp barrel, covering the barrel and 1/4" of insulation
 6. Heat with calibrated heat gun (start at the adhesive end, work outward)
 7. Verify adhesive squeeze-out at both ends of the heat shrink

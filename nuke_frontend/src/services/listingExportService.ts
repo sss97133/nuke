@@ -4,6 +4,8 @@
  */
 
 import { supabase } from '../lib/supabase';
+import type { ChannelDef } from './channelRegistry';
+import { dispatchChannel } from './channelAdapters';
 
 export interface ListingExport {
   id: string;
@@ -128,6 +130,121 @@ export class ListingExportService {
         error: error instanceof Error ? error.message : 'Failed to update export'
       };
     }
+  }
+
+  /**
+   * Flip a channel ON: prepare the listing package for this outlet, then record
+   * an export row whose status reflects what the channel's mechanism can actually
+   * do today. The toggle is the user-facing surface; the mechanism is hidden here.
+   *
+   *   native          → 'active'   (lives on Nuke immediately)
+   *   instant_api     → 'submitted' once the adapter lands; 'prepared' until then
+   *   dealer_feed     → 'prepared' + queued for the next feed push
+   *   agent_pilot     → 'prepared' + queued for the browser agent to drive the form
+   *   concierge_human → 'prepared' + queued for human consignment handoff
+   *
+   * We never claim 'submitted'/'active' for a channel we haven't actually pushed to —
+   * status is honest. metadata.dispatch carries the next concrete action.
+   */
+  static async submitToChannel(params: {
+    vehicle_id: string;
+    channel: ChannelDef;
+    asking_price_cents?: number;
+    reserve_price_cents?: number;
+  }): Promise<{ success: boolean; export_id?: string; status?: ListingExport['status']; error?: string }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { success: false, error: 'Not authenticated' };
+
+      const { channel } = params;
+
+      // 1. Prepare the package from the digital twin (existing edge function).
+      let pkg: any = null;
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-listing-package', {
+          body: { vehicle_id: params.vehicle_id, platform: channel.platform },
+        });
+        if (error) throw error;
+        pkg = data;
+      } catch (e) {
+        // Package assembly is best-effort; we still arm the channel with what we have.
+        console.warn(`generate-listing-package failed for ${channel.id}:`, e);
+      }
+
+      const content = (pkg?.listing_content ?? {}) as Record<string, any>;
+      const photos = (pkg?.photos?.ordered ?? []) as Array<{ url: string }>;
+      const title = (content.title as string) ||
+        `${pkg?.identity?.year ?? ''} ${pkg?.identity?.make ?? ''} ${pkg?.identity?.model ?? ''}`.trim() ||
+        'Vehicle';
+
+      // 2. Resolve the channel's mechanism to a normalized dispatch result.
+      const result = dispatchChannel(channel, {
+        vehicleId: params.vehicle_id,
+        pkg,
+        askingPriceCents: params.asking_price_cents,
+        reserveCents: params.reserve_price_cents,
+      });
+
+      // 'blocked' is an adapter concept (needs a credential before it can fire);
+      // the export row stores it as 'prepared' + metadata.needs so the DB enum stays valid.
+      const dbStatus: ListingExport['status'] =
+        result.status === 'blocked' ? 'prepared' : (result.status as ListingExport['status']);
+      const nowIso = new Date().toISOString();
+
+      // 3. Record the export. metadata.channel_id lets the switchboard match this
+      //    row back to its toggle even when platform collapses to 'other'.
+      const { data, error } = await supabase
+        .from('listing_exports')
+        .insert({
+          vehicle_id: params.vehicle_id,
+          user_id: user.id,
+          platform: channel.platform,
+          export_format: 'json',
+          title,
+          description: (content.description as string) || '',
+          asking_price_cents: params.asking_price_cents ?? null,
+          reserve_price_cents: params.reserve_price_cents ?? null,
+          exported_images: photos.map((p) => p.url),
+          image_count: photos.length,
+          status: dbStatus,
+          external_listing_url: result.externalRef?.url ?? null,
+          external_listing_id: result.externalRef?.id ?? null,
+          submitted_at: dbStatus === 'submitted' || dbStatus === 'active' ? nowIso : null,
+          activated_at: dbStatus === 'active' ? nowIso : null,
+          metadata: {
+            channel_id: channel.id,
+            channel_label: channel.label,
+            mechanism: channel.mechanism,
+            dispatch: result.note,
+            needs: result.needs ?? null,
+            blocked: result.status === 'blocked',
+            job: result.job ?? null,
+            payload: result.payload ?? null,
+            payload_ready: !!result.payload,
+            live: channel.liveStatus === 'live',
+            ars_tier: pkg?.tier ?? null,
+            ars_score: pkg?.ars_score ?? null,
+          },
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { success: true, export_id: data.id, status: dbStatus };
+    } catch (error) {
+      console.error('Error submitting to channel:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to submit to channel' };
+    }
+  }
+
+  /**
+   * Flip a channel OFF: cancel the export. Testimony-safe — we set status to
+   * 'cancelled' rather than deleting, so the listing history is preserved.
+   */
+  static async withdrawFromChannel(export_id: string): Promise<{ success: boolean; error?: string }> {
+    return ListingExportService.updateExportStatus(export_id, 'cancelled', {
+      ended_at: new Date().toISOString(),
+    });
   }
 
   /**
