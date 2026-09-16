@@ -17,7 +17,7 @@ while true; do
   echo "";
   
   # Get current scan progress
-  psql "postgresql://postgres.qkgaybvrernstplzjaam:5bDBY\!iAnZtvpwx@aws-0-us-west-1.pooler.supabase.com:5432/postgres" \
+  psql "postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:5432/postgres" \
     -c "SELECT 
           scan_type,
           status,
@@ -33,7 +33,7 @@ while true; do
   
   echo "";
   echo "Overall Stats:";
-  psql "postgresql://postgres.qkgaybvrernstplzjaam:5bDBY\!iAnZtvpwx@aws-0-us-west-1.pooler.supabase.com:5432/postgres" \
+  psql "postgresql://postgres.qkgaybvrernstplzjaam:${SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:5432/postgres" \
     -c "SELECT * FROM get_image_scan_stats();" \
     2>/dev/null | head -10
   

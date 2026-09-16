@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NUKE — PRODUCT STORYBOARD V3 — HIT THE GROUND RUNNING</title>
+<style>
+  /* Board chrome = Nuke print. Phone interiors = Apple's material. The color on this board
+     comes from exactly one source: the user's own photographs. */
+  :root{
+    --paper:#f5f5f5; --surface:#ffffff; --ink:#1a1a1a; --pencil:#666666;
+    --ghost:#dddddd; --border:#bdbdbd;
+    --heat-lo:#d9f99d; --heat-hi:#065f46;
+    --sans:-apple-system, "Helvetica Neue", Arial, sans-serif;
+    --mono:ui-monospace, "SF Mono", Menlo, "Courier New", monospace;
+    --ios-bg:#f2f2f7; --ios-cell:#ffffff; --ios-sep:#c6c6c8; --ios-grey:#8e8e93;
+    --ios-blue:#007aff;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);padding:28px 24px 48px}
+
+  .masthead{border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:6px;
+    display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .masthead h1{font-size:22px;font-weight:800;letter-spacing:-0.5px}
+  .masthead .mlabel{font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .lawline{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--pencil);margin:8px 0 26px}
+
+  .board{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+  .unit{width:302px}
+
+  .cap{margin-top:10px;border-top:2px solid var(--ink);padding-top:8px}
+  .cap .num{font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .cap h2{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:2px 0 4px}
+  .cap p{font-size:9px;line-height:1.5;color:var(--pencil)}
+  .cap .organ{font-family:var(--mono);font-size:8px;color:var(--ink);margin-top:5px;line-height:1.6}
+  .cap .organ b{font-weight:700}
+
+  .phone{width:302px;height:648px;border:2px solid var(--ink);background:var(--ios-bg);
+    display:flex;flex-direction:column;overflow:hidden;position:relative}
+  .statusbar{display:flex;justify-content:space-between;align-items:center;
+    padding:8px 16px 4px;font-size:12px;font-weight:600;color:#000}
+  .screen{flex:1;display:flex;flex-direction:column;min-height:0;padding:0 16px 16px}
+
+  .cell{background:var(--ios-cell);border-radius:10px;padding:12px 14px}
+  .cellgroup .cell{border-radius:0}
+  .cellgroup .cell:first-child{border-radius:10px 10px 0 0}
+  .cellgroup .cell:last-child{border-radius:0 0 10px 10px}
+  .cellgroup .cell + .cell{border-top:0.5px solid var(--ios-sep)}
+  .ios-title{font-size:28px;font-weight:700;color:#000}
+  .ios-foot{font-size:12px;color:var(--ios-grey);line-height:1.4}
+  .btn{background:#000;color:#fff;border:0;border-radius:8px;width:100%;padding:14px 0;
+    font-size:16px;font-weight:500;text-align:center}
+  .btn.ghostbtn{background:#fff;color:var(--ios-blue);border:0.5px solid #d8d8dc}
+  .sysdialog{width:250px;background:rgba(248,248,248,.98);border-radius:14px;overflow:hidden;
+    text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+  .sysdialog .t{font-size:13px;font-weight:600;padding:14px 14px 4px;color:#000}
+  .sysdialog .b{font-size:11px;color:#5b5b5e;padding:0 14px 12px;line-height:1.4}
+  .sysdialog .opt{border-top:0.5px solid #c9c9cc;padding:10px;font-size:14px;color:var(--ios-blue)}
+  .sysdialog .opt.bold{font-weight:600}
+  .scrim{position:absolute;inset:0;background:rgba(0,0,0,.30);display:flex;
+    align-items:flex-end;justify-content:center;padding-bottom:90px}
+
+  .data{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .nlab{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ios-grey)}
+  .receipt{border:2px solid #1a1a1a;background:#fff;padding:12px}
+  .receipt .date{font-family:var(--mono);font-size:12px;font-weight:700}
+  .receipt .fig{font-family:var(--mono);font-size:44px;font-weight:700;line-height:1.05;letter-spacing:-1px;margin-top:6px}
+  .receipt .span{font-family:var(--mono);font-size:10px;margin-top:6px;color:#1a1a1a}
+  .thumbs{display:grid;grid-template-columns:repeat(5,1fr);gap:2px;margin-top:10px}
+  .thumbs img{aspect-ratio:1/1;width:100%;object-fit:cover;display:block}
+  .thumbs .more{aspect-ratio:1/1;background:#fff;border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .hero{margin:20px 2px 4px}
+  .hero .fig{font-family:var(--mono);font-size:56px;font-weight:700;line-height:1;letter-spacing:-2px;color:#000}
+  .hero .nlab{margin-top:6px;display:block}
+  .scanrule{height:2px;background:#1a1a1a;margin-top:8px}
+
+  /* day grid — the month, GitHub grammar, heat = photo count */
+  .daygrid{display:grid;grid-template-columns:repeat(16,1fr);gap:2px;margin-top:10px}
+  .daygrid i{display:block;aspect-ratio:1/1}
+  .d0{background:#ececf0}.d1{background:var(--heat-lo)}.d2{background:#86efac}
+  .d3{background:#15803d}.d4{background:var(--heat-hi)}
+
+  .legend{margin-top:34px;border-top:2px solid var(--ink);padding-top:10px;max-width:980px}
+  .legend .lab{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:6px}
+  .legend p{font-size:9px;color:var(--pencil);line-height:1.55;margin-bottom:6px}
+  .legend .q{font-family:var(--mono);font-size:9px;color:var(--ink);line-height:1.7}
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <h1>NUKE — HIT THE GROUND RUNNING</h1>
+  <span class="mlabel">PRODUCT STORYBOARD V3 · 7 FRAMES · JUN 10 2026 · REAL SUBSTRATE ONLY (1977 K5 BLAZER, PROD DB)</span>
+</div>
+<div class="lawline">The marketing deck is a separate document · every photo on this board is real · ignition is the product · no frame without an organ</div>
+
+<div class="board">
+
+  <!-- ============ P1 — FIRST OPEN ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:41</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen" style="justify-content:space-between">
+        <div style="margin-top:190px">
+          <div style="font-size:40px;font-weight:800;letter-spacing:-1px;color:#000">NUKE</div>
+          <p style="font-size:15px;line-height:1.45;margin-top:12px;max-width:230px;color:#000">
+            Your shop photos become a work record.</p>
+        </div>
+        <button class="btn">&#63743; Sign in with Apple</button>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">P1 / 07</span>
+      <h2>First open</h2>
+      <p>One sentence, one button. The privacy promise moves to P2 where it earns the
+      permission at cell size — this screen only has one job: get out of the way. The
+      mirror the user wants to see of themselves is not possible yet (no access granted);
+      the fastest path to the mirror IS the tap.</p>
+      <div class="organ">RUNS ON: <b>BUILT</b> — SIWA native (merged, PR #270) &middot; portal config = Skylar, 5 clicks</div>
+    </div>
+  </div>
+
+  <!-- ============ P2 — THE DEAL ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:41</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="height:56px"></div>
+        <div class="cellgroup">
+          <div class="cell">
+            <span class="nlab">Uploads</span>
+            <div style="font-size:14px;color:#000;margin-top:2px">Photos you take at your shop</div>
+          </div>
+          <div class="cell">
+            <span class="nlab">Stays on your phone</span>
+            <div style="font-size:14px;color:#000;margin-top:2px">Everything else</div>
+          </div>
+          <div class="cell">
+            <span class="nlab">Public</span>
+            <div style="font-size:14px;color:#000;margin-top:2px">Nothing, until you publish it</div>
+          </div>
+        </div>
+        <p class="ios-foot" style="margin-top:10px">The filter reads each photo&rsquo;s own location
+        info, on your phone. Location permission is never requested.</p>
+        <div style="margin-top:auto"><button class="btn ghostbtn">Continue</button></div>
+      </div>
+      <div class="scrim">
+        <div class="sysdialog">
+          <div class="t">Allow &ldquo;Nuke&rdquo; to Access Your Photos?</div>
+          <div class="b">Nuke finds photos taken at your shop and adds them to your work record. Off-site photos never leave your phone.</div>
+          <div class="opt">Limit Access&hellip;</div>
+          <div class="opt bold">Allow Full Access</div>
+          <div class="opt">Don&rsquo;t Allow</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">P2 / 07</span>
+      <h2>The deal &rarr; the system ask</h2>
+      <p>The dialog says <b>Nuke</b> — home screen and system chrome carry the bare name
+      (CFBundleDisplayName); only the store listing carries the qualifier. Plain words,
+      no jargon. Limit Access degrades honestly: the ledger simply shows the narrower
+      scope as a fact, never a nag.</p>
+      <div class="organ">RUNS ON: <b>BUILT</b> — PhotoKit + on-device EXIF gate, zero CoreLocation (merged, PR #269) &middot; display-name change = 1-line build item</div>
+    </div>
+  </div>
+
+  <!-- ============ P3 — IGNITION I: THE SCAN ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:42</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="height:36px"></div>
+        <div class="hero">
+          <div class="fig">11,408</div>
+          <span class="nlab">photos read &middot; counting</span>
+        </div>
+        <div class="data" style="font-size:11px;color:#000;margin-top:14px">SCANNING YOUR LIBRARY &middot; ON THIS PHONE</div>
+        <div class="scanrule" style="width:28%"></div>
+        <p class="ios-foot" style="margin-top:12px">Nothing has uploaded. Found so far:</p>
+        <div class="cellgroup" style="margin-top:8px">
+          <div class="cell" style="display:flex;justify-content:space-between;align-items:baseline">
+            <span class="nlab">Shop photos</span><span class="data" style="font-size:15px;color:#000">512</span>
+          </div>
+          <div class="cell" style="display:flex;justify-content:space-between;align-items:baseline">
+            <span class="nlab">Work days</span><span class="data" style="font-size:15px;color:#000">17</span>
+          </div>
+        </div>
+        <div class="thumbs">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0118.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1119.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0120.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1123.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0161.jpg" loading="lazy">
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">P3 / 07</span>
+      <h2>Ignition I — the scan (t &asymp; 40s)</h2>
+      <p>The moment after Allow: numbers visibly counting up, real thumbnails landing,
+      happening-happening-happening. Everything on this screen is still local — stated
+      plainly, because that is what makes watching it safe. No spinner; the count IS the
+      progress.</p>
+      <div class="organ">RUNS ON: <b>TO BUILD (48h)</b> — current code looks back 24h only (Config.firstRunLookback); full-library scan + live ticker is the build item. Backend untouched — this is all on-device.</div>
+    </div>
+  </div>
+
+  <!-- ============ P4 — IGNITION II: THE SHOP QUESTION ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:44</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="height:36px"></div>
+        <span class="ios-title" style="font-size:22px">Your photos cluster in one place.</span>
+        <p class="ios-foot" style="margin-top:8px">2,686 photos over five years, within 150 ft of one spot. Is this where you work?</p>
+        <div class="cell" style="margin-top:14px;padding:0;overflow:hidden">
+          <div style="height:150px;background:#e8e8ec;display:flex;align-items:center;justify-content:center;position:relative">
+            <span class="ios-foot">[ map tile &middot; one pin &middot; 150 ft radius ]</span>
+            <span style="position:absolute;width:10px;height:10px;border-radius:50%;background:var(--ios-blue)"></span>
+            <span style="position:absolute;width:84px;height:84px;border-radius:50%;border:1.5px solid var(--ios-blue);opacity:.45"></span>
+          </div>
+          <div style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center">
+            <input value="ERNIE'S SHOP" style="border:0;outline:0;font-family:var(--mono);font-size:14px;font-weight:700;width:60%" readonly>
+            <span class="nlab" style="color:var(--ios-blue)">name it</span>
+          </div>
+        </div>
+        <p class="ios-foot" style="margin-top:10px">Only photos taken here will upload. You can add
+        places or change this anytime.</p>
+        <div style="margin-top:auto;display:flex;gap:8px">
+          <button class="btn ghostbtn" style="flex:1">Not my shop</button>
+          <button class="btn" style="flex:1">That&rsquo;s my shop</button>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">P4 / 07</span>
+      <h2>Ignition II — the shop question</h2>
+      <p>The frame the whole panel demanded independently. The system shows its evidence
+      and asks; the user names the place. This converts inference into consent — the
+      difference between the machine that watched you and the apprentice that did its
+      homework. The kid with a driveway types MY DRIVEWAY and gets the same dignity.</p>
+      <div class="organ">RUNS ON: <b>TO BUILD (48h)</b> — on-device GPS cluster + confirm UI replaces the hardcoded single-shop Config.swift. Matches App Review notes&rsquo; &ldquo;self-declared workplace radius&rdquo; verbatim.</div>
+    </div>
+  </div>
+
+  <!-- ============ P5 — IGNITION III: THE CRYSTALLIZATION ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>2:45</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="height:36px"></div>
+        <div class="hero">
+          <div class="fig">2,686</div>
+          <span class="nlab">shop photos &middot; 51 work days &middot; 2021&ndash;2026</span>
+        </div>
+        <p class="ios-foot" style="margin-top:10px">Your record already exists. Nothing has uploaded yet.</p>
+        <div class="daygrid">
+          <i class="d0"></i><i class="d1"></i><i class="d0"></i><i class="d2"></i><i class="d3"></i><i class="d0"></i><i class="d0"></i><i class="d1"></i><i class="d0"></i><i class="d4"></i><i class="d2"></i><i class="d0"></i><i class="d1"></i><i class="d0"></i><i class="d3"></i><i class="d0"></i>
+          <i class="d2"></i><i class="d0"></i><i class="d0"></i><i class="d1"></i><i class="d4"></i><i class="d3"></i><i class="d0"></i><i class="d0"></i><i class="d2"></i><i class="d1"></i><i class="d0"></i><i class="d3"></i><i class="d0"></i><i class="d0"></i><i class="d2"></i><i class="d4"></i>
+          <i class="d0"></i><i class="d3"></i><i class="d1"></i><i class="d0"></i><i class="d2"></i><i class="d0"></i><i class="d4"></i><i class="d0"></i><i class="d1"></i><i class="d0"></i><i class="d3"></i><i class="d2"></i><i class="d0"></i><i class="d1"></i><i class="d0"></i><i class="d0"></i>
+        </div>
+        <p class="ios-foot" style="margin-top:6px">Five years of work days. Darker = bigger day.</p>
+        <div class="thumbs">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0122.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0125.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1120.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0163.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0166.jpg" loading="lazy">
+        </div>
+        <div style="margin-top:auto"><button class="btn">Upload 2,686 shop photos</button></div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">P5 / 07</span>
+      <h2>Ignition III — their own life, organized</h2>
+      <p>The world-change frame. The numbers are this vehicle&rsquo;s real prod substrate
+      (2,686 frames, 51 days). The button says the blunt verb — upload — with the real
+      count, because the observer who trusts blunt verbs is the one we want. Cold-start
+      variant: hero shows the honest small count and &ldquo;your record starts today.&rdquo;</p>
+      <div class="organ">RUNS ON: <b>SPLIT</b> — day rollup + contribution RPC <b>LIVE</b> in prod (51 K5 days) &middot; in-app day grouping + batched upload <b>TO BUILD (48h)</b></div>
+    </div>
+  </div>
+
+  <!-- ============ P6 — TODAY ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>5:14</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="padding-top:10px;display:flex;justify-content:space-between;align-items:baseline">
+          <span class="ios-title">Today</span>
+          <span class="data" style="font-size:10px;color:var(--ios-grey)">SYNCED 5:14 PM</span>
+        </div>
+        <div class="hero">
+          <div class="fig">42</div>
+          <span class="nlab">photos on the record</span>
+          <div class="data" style="font-size:8px;color:var(--ios-grey);margin-top:4px">TUE OCT 01 &middot; 1977 CHEVROLET K5 BLAZER &middot; ERNIE&rsquo;S SHOP</div>
+        </div>
+        <div class="cellgroup" style="margin-top:14px">
+          <div class="cell" style="display:flex;justify-content:space-between;align-items:baseline">
+            <span class="nlab">Held back &middot; off-shop</span><span class="data" style="font-size:15px;color:#000">9</span>
+          </div>
+          <div class="cell" style="display:flex;justify-content:space-between;align-items:baseline">
+            <span class="nlab">On the record &middot; all time</span><span class="data" style="font-size:15px;color:#000">2,728</span>
+          </div>
+        </div>
+        <div class="thumbs">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1119.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1121.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1122.jpg" loading="lazy">
+          <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_1124.jpg" loading="lazy">
+          <div class="more">+37</div>
+        </div>
+        <div style="margin-top:auto">
+          <div class="receipt" style="padding:10px;display:flex;justify-content:space-between;align-items:center">
+            <span class="data" style="font-size:11px;font-weight:700">VIEW DAY ON NUKE.AG</span>
+            <span class="data" style="font-size:11px">&rarr;</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">P6 / 07</span>
+      <h2>Today — glance, then pocket</h2>
+      <p>The daily instrument. Real day: Oct 1, 42 photos, 10:12a&ndash;5:14p, from prod.
+      All-time count reconciles with P5&rsquo;s import (2,686 + 42 = 2,728) — one coherent
+      demo user; the numbers survive an audit because they are real.</p>
+      <div class="organ">RUNS ON: <b>BUILT</b> — TodayView local store, &lt;100ms cold paint (merged) &middot; <b>SMOKE NEEDED</b>: zero photos have traveled phone&rarr;prod yet; first end-to-end witness is a launch gate.</div>
+    </div>
+  </div>
+
+  <!-- ============ P7 — THE RECEIPT / THE PAPER ============ -->
+  <div class="unit">
+    <div class="phone">
+      <div class="statusbar"><span>7:05</span><span>&#9646;&#9646;&#9646;&#9647;</span></div>
+      <div class="screen">
+        <div style="height:40px"></div>
+        <div class="receipt">
+          <div class="date">SAT AUG 24 2024</div>
+          <div class="fig">60</div>
+          <span class="nlab" style="color:#1a1a1a">photos</span>
+          <div class="span">FIRST 10:17A &middot; LAST 8:10P &middot; SPAN 9.9H</div>
+          <div class="span" style="margin-top:4px">1977 CHEVROLET K5 BLAZER &middot; ERNIE&rsquo;S SHOP</div>
+          <div class="thumbs" style="grid-template-columns:repeat(4,1fr)">
+            <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0118.jpg" loading="lazy">
+            <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0123.jpg" loading="lazy">
+            <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0127.jpg" loading="lazy">
+            <img src="https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/vehicle-photos/e08bf694-970f-4cbe-8a74-8715158a0f2e/iphoto/IMG_0168.jpg" loading="lazy">
+          </div>
+        </div>
+        <p class="ios-foot" style="margin-top:12px">You logged nothing. The day built its own record.</p>
+        <div style="margin-top:auto;display:flex;gap:8px">
+          <button class="btn ghostbtn" style="flex:1">PDF</button>
+          <button class="btn" style="flex:1">View on nuke.ag</button>
+        </div>
+      </div>
+    </div>
+    <div class="cap">
+      <span class="num">P7 / 07</span>
+      <h2>The receipt — and the paper</h2>
+      <p>Real day from prod: Aug 24 2024, 60 photos, 10:17a&ndash;8:10p, real thumbnails.
+      The PDF button is the olive branch from old-world tech — a document you can print,
+      email a customer, staple to an invoice. SPAN, never HRS: a 9.9-hour photo span is
+      a fact; billable hours are a claim the EXIF cannot back.</p>
+      <div class="organ">RUNS ON: <b>SPLIT</b> — get_user_day_receipt RPC <b>LIVE</b> &middot; /journal/:date <b>BROKEN IN PROD (404 — fix is a launch gate)</b> &middot; PDF render <b>TO BUILD</b> (project_invoice projection exists; renderer is the gap)</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="legend">
+  <span class="lab">What changed from v2 — and what the board now admits</span>
+  <p>Frame zero (the three doors) moved to its own marketing deck — influence-before-interaction
+  is a campaign, not an app screen. Every photograph on this board is a real frame of the
+  1977 K5 Blazer pulled from the production database; the color on the board is the work
+  itself, which is the doctrine working as written. The bars are gone from inside the app —
+  the month reads as a day grid (heat = size of day), a grammar borrowed from the one
+  contribution graph the world already trusts.</p>
+  <p class="q">THE 48-HOUR ORGAN LIST (what must be true before these frames are honest):
+  1. full-library first-run scan + live ticker (replaces 24h lookback) &middot;
+  2. on-device shop clustering + the shop question (replaces hardcoded single shop) &middot;
+  3. day grouping + batched backfill upload &middot;
+  4. one photo witnessed end-to-end phone&rarr;vehicle_images in prod &middot;
+  5. /journal/:date 404 fix &middot;
+  6. CFBundleDisplayName = "Nuke" &middot;
+  7. PDF render of the day receipt (the olive branch).</p>
+</div>
+
+</body>
+</html>

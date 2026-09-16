@@ -116,35 +116,19 @@ Deno.serve(async (req) => {
             }
           }
         } catch (e) {
-          // Non-fatal; doc should still be protected and extracted into vehicle_title_documents.
+          // Non-fatal; doc is still protected (marked sensitive) even if this attach fails.
           console.warn('Failed to attach title to ownership_verifications (non-fatal):', (e as any)?.message || e);
         }
       }
 
       // Store extracted document data
+      // TODO(ghost-ref 2026-07-12): vehicle_title_documents does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
+      // The structured OCR fields (title_number, previous_owner_name, lienholder_name, odometer_*, brand, etc.)
+      // have no home table yet. deal_documents is not a fit (requires deal_id, drops these columns, and this
+      // path fires for any non-'other' doc type, not just titles). Skip the write so detection still succeeds;
+      // the image is already marked sensitive and attached to ownership_verifications above.
       if (analysisResult.document_type && analysisResult.document_type !== 'other') {
-        await supabase
-          .from('vehicle_title_documents')
-          .insert({
-            vehicle_id,
-            image_id,
-            document_type: analysisResult.document_type,
-            title_number: analysisResult.extracted_data.title_number,
-            vin: analysisResult.extracted_data.vin,
-            state: analysisResult.extracted_data.state,
-            issue_date: analysisResult.extracted_data.issue_date,
-            owner_name: analysisResult.extracted_data.owner_name,
-            previous_owner_name: analysisResult.extracted_data.previous_owner_name,
-            lienholder_name: analysisResult.extracted_data.lienholder_name,
-            odometer_reading: analysisResult.extracted_data.odometer_reading,
-            odometer_date: analysisResult.extracted_data.odometer_date,
-            brand: analysisResult.extracted_data.brand,
-            raw_ocr_text: analysisResult.raw_text,
-            extracted_data: analysisResult.extracted_data,
-            extraction_confidence: analysisResult.confidence
-          });
-
-        console.log(`✅ Extracted data from ${analysisResult.document_type}`);
+        console.log(`✅ Extracted data from ${analysisResult.document_type} (persistence skipped — vehicle_title_documents not yet built)`);
       }
     } else {
       console.log(`✅ Image is not sensitive`);

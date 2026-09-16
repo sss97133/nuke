@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import type { WorkSession, DailyReceipt, DayPhoto } from './hooks/useBuildLog';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 
@@ -284,9 +285,11 @@ interface Props {
   /** When rendered inside a popup, auto-expand and auto-load detail */
   vehicleId?: string;
   isPopup?: boolean;
+  /** Hide the "OPEN FULL DAY" link (e.g. when already rendered on the day route) */
+  hideOpenFullLink?: boolean;
 }
 
-const DayCard: React.FC<Props> = ({ session, detail, isLoading, onExpand, vehicleId, isPopup }) => {
+const DayCard: React.FC<Props> = ({ session, detail, isLoading, onExpand, vehicleId, isPopup, hideOpenFullLink }) => {
   const [expanded, setExpanded] = useState(!!isPopup);
   const [popupDetail, setPopupDetail] = useState<DailyReceipt | null>(detail);
   const [popupLoading, setPopupLoading] = useState(false);
@@ -507,6 +510,26 @@ const DayCard: React.FC<Props> = ({ session, detail, isLoading, onExpand, vehicl
                   <div style={{ fontFamily: 'var(--vp-font-mono)', fontSize: '9px', fontWeight: 700, color: 'var(--vp-ink)' }}>
                     {fmt(session.total_parts_cost)}
                   </div>
+                )}
+                {vehicleId && !hideOpenFullLink && (
+                  <Link
+                    to={`/vehicle/${vehicleId}/day/${session.date}`}
+                    style={{
+                      display: 'inline-block',
+                      marginTop: 4,
+                      fontFamily: 'var(--vp-font-sans)',
+                      fontSize: 7,
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      color: 'var(--vp-ink, #1a1a1a)',
+                      textDecoration: 'none',
+                      border: '2px solid var(--vp-ink, #1a1a1a)',
+                      padding: '2px 6px',
+                    }}
+                  >
+                    OPEN FULL DAY →
+                  </Link>
                 )}
               </div>
             </div>

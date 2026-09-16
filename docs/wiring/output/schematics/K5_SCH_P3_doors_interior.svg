@@ -1,0 +1,194 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1700" viewBox="0 0 2200 1700">
+<rect x="0" y="0" width="2200" height="1700" fill="#FFFFFF"/>
+<rect x="30.0" y="30.0" width="2140.0" height="1640.0" fill="none" stroke="#1A1A1A" stroke-width="3"/>
+<rect x="38.0" y="38.0" width="2124.0" height="1624.0" fill="none" stroke="#1A1A1A" stroke-width="1"/>
+<text x="1100.0" y="88.0" font-family="Courier New, Courier, monospace" font-size="28" font-weight="bold" fill="#1A1A1A" text-anchor="middle">SECTION 5 — DOORS &amp; INTERIOR</text>
+<text x="1100.0" y="116.0" font-family="Courier New, Courier, monospace" font-size="13" fill="#1A1A1A" text-anchor="middle">PDM30 OUT3/4/21/22/25 + AMP CH1/CH2 + M130 INPUTS → DOOR LOOMS (BOOTS) + DOME/COURTESY</text>
+<rect x="1516.0" y="160.0" width="628.0" height="200.0" fill="none" stroke="#1A1A1A" stroke-width="1.2" stroke-dasharray="7,4"/>
+<text x="1524.0" y="154.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">DOOR SHELL L — JAMB BOOT (+6in flex)</text>
+<rect x="1530.0" y="170.0" width="600.0" height="180.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="188.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">DRIVER DOOR LOOM</text>
+<text x="1540.0" y="342.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">window 15A · lock 3A · speaker 6.5x9 · ajar sw → courtesy logic</text>
+<rect x="1516.0" y="350.0" width="628.0" height="200.0" fill="none" stroke="#1A1A1A" stroke-width="1.2" stroke-dasharray="7,4"/>
+<text x="1524.0" y="344.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">DOOR SHELL R — JAMB BOOT (+6in flex)</text>
+<rect x="1530.0" y="360.0" width="600.0" height="180.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="378.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">PASSENGER DOOR LOOM</text>
+<text x="1540.0" y="532.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">window 15A · lock 3A · speaker 6.5x9 · ajar sw → courtesy logic</text>
+<rect x="1530.0" y="550.0" width="600.0" height="212.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="568.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">INTERIOR / COURTESY GROUP (OUT25)</text>
+<text x="1540.0" y="722.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">5 loads share OUT25 (1.9-2.5A) — channel frees only if BOTH</text>
+<text x="1540.0" y="738.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">DOME_COURTESY and LIGHTING_INTERIOR toggle off (subsystems.json)</text>
+<text x="1540.0" y="754.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#E67300" text-anchor="start">door puddle lights: devices exist, NO cut-list wire ids — gap</text>
+<rect x="1530.0" y="772.0" width="600.0" height="128.0" fill="#F7F7F7" stroke="#1A1A1A" stroke-width="1.6"/>
+<text x="1540.0" y="790.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">DOOR CONTROL SWITCH PANEL</text>
+<text x="1540.0" y="892.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#E67300" text-anchor="start">window/lock switches — dash or console mount TBD</text>
+<rect x="70.0" y="170.0" width="310.0" height="396.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.8"/>
+<rect x="70.0" y="170.0" width="310.0" height="24.0" fill="#D8D8D8" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="78.0" y="187.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="start">PDM30 — DOOR / INTERIOR</text>
+<text x="372.0" y="220.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT3</text>
+<polyline points="380.0,216.0 1140.0,216.0 1140.0,209.0 1530.0,209.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="216.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="213.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#34 WINDOW MOTOR</text>
+<rect x="398.0" y="206.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="220.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#34</text>
+<text x="444.2" y="210.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">DK BLU · 16 AWG · 6.9ft (15A)</text>
+<circle cx="1060.0" cy="216.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="260.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT21</text>
+<polyline points="380.0,256.0 1140.0,256.0 1140.0,235.0 1530.0,235.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="256.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="239.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#38 LOCK ACTUATOR</text>
+<rect x="398.0" y="246.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="260.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#38</text>
+<text x="444.2" y="250.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">BLK · 20 AWG · 6.9ft</text>
+<circle cx="1060.0" cy="256.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="300.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT4</text>
+<polyline points="380.0,296.0 1164.0,296.0 1164.0,399.0 1530.0,399.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="296.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="403.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#35 WINDOW MOTOR</text>
+<rect x="398.0" y="286.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="300.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#35</text>
+<text x="444.2" y="290.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">DK BLU/WHT · 16 AWG · 6.9ft (15A)</text>
+<circle cx="1060.0" cy="296.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="340.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT22</text>
+<polyline points="380.0,336.0 1164.0,336.0 1164.0,425.0 1530.0,425.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="336.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="429.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#47 LOCK ACTUATOR</text>
+<rect x="398.0" y="326.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="340.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#47</text>
+<text x="444.2" y="330.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">BLK/WHT · 20 AWG · 6.9ft</text>
+<circle cx="1060.0" cy="336.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="380.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT25</text>
+<polyline points="380.0,376.0 1188.0,376.0 1188.0,589.0 1530.0,589.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="376.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="593.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#67 DOME LIGHT</text>
+<rect x="398.0" y="366.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="380.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#67</text>
+<text x="444.2" y="370.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">BRN · 22 AWG · 3.5ft</text>
+<text x="372.0" y="420.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT25</text>
+<polyline points="380.0,416.0 1188.0,416.0 1188.0,615.0 1530.0,615.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="416.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="619.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#68 UNDER-DASH LED</text>
+<rect x="398.0" y="406.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="420.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#68</text>
+<text x="444.2" y="410.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">BRN/WHT · 22 AWG · 3.5ft</text>
+<text x="372.0" y="460.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT25</text>
+<polyline points="380.0,456.0 1188.0,456.0 1188.0,641.0 1530.0,641.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="456.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="645.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#69 FOOTWELL LIGHTS</text>
+<rect x="398.0" y="446.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="460.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#69</text>
+<text x="444.2" y="450.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">BRN/BLK · 22 AWG · 3.5ft</text>
+<text x="372.0" y="500.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT25</text>
+<polyline points="380.0,496.0 1188.0,496.0 1188.0,667.0 1530.0,667.0" fill="none" stroke="#8A8A8A" stroke-width="1.3"/>
+<circle cx="380.0" cy="496.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="671.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#8A8A8A" text-anchor="start">#73 UNDERHOOD LIGHT (→ bay)</text>
+<rect x="398.0" y="486.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="500.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#73</text>
+<text x="444.2" y="490.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">BRN/RED · 22 AWG · 4.6ft</text>
+<text x="372.0" y="540.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">OUT25</text>
+<polyline points="380.0,536.0 1188.0,536.0 1188.0,693.0 1530.0,693.0" fill="none" stroke="#8A8A8A" stroke-width="1.3"/>
+<circle cx="380.0" cy="536.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="697.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#8A8A8A" text-anchor="start">#74 CARGO/BED LIGHT (SHEET 6)</text>
+<rect x="398.0" y="526.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="540.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#74</text>
+<text x="444.2" y="530.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">BRN/BLU · 22 AWG · 18.4ft</text>
+<rect x="70.0" y="576.0" width="310.0" height="196.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.8"/>
+<rect x="70.0" y="576.0" width="310.0" height="24.0" fill="#D8D8D8" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="78.0" y="593.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#1A1A1A" text-anchor="start">AMPLIFIER — SEE SHEET 4</text>
+<text x="372.0" y="626.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">AMP CH1+</text>
+<polyline points="380.0,622.0 1140.0,622.0 1140.0,261.0 1530.0,261.0" fill="none" stroke="#8A8A8A" stroke-width="1.3"/>
+<circle cx="380.0" cy="622.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="265.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#8A8A8A" text-anchor="start">#26a SPEAKER (+)</text>
+<rect x="398.0" y="612.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="626.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#26a</text>
+<text x="451.6" y="616.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/YEL · 18 AWG · 6.9ft</text>
+<circle cx="1060.0" cy="622.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="666.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">AMP CH1-</text>
+<polyline points="380.0,662.0 1140.0,662.0 1140.0,287.0 1530.0,287.0" fill="none" stroke="#8A8A8A" stroke-width="1.3"/>
+<circle cx="380.0" cy="662.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="291.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#8A8A8A" text-anchor="start">#26b SPEAKER (-)</text>
+<rect x="398.0" y="652.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="666.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#26b</text>
+<text x="451.6" y="656.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/YEL/BLK · 18 AWG · 6.9ft</text>
+<circle cx="1060.0" cy="662.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="706.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">AMP CH2+</text>
+<polyline points="380.0,702.0 1164.0,702.0 1164.0,451.0 1530.0,451.0" fill="none" stroke="#8A8A8A" stroke-width="1.3"/>
+<circle cx="380.0" cy="702.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="455.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#8A8A8A" text-anchor="start">#27a SPEAKER (+)</text>
+<rect x="398.0" y="692.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="706.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#27a</text>
+<text x="451.6" y="696.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/VIO · 18 AWG · 6.9ft</text>
+<circle cx="1060.0" cy="702.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="746.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="end">AMP CH2-</text>
+<polyline points="380.0,742.0 1164.0,742.0 1164.0,477.0 1530.0,477.0" fill="none" stroke="#8A8A8A" stroke-width="1.3"/>
+<circle cx="380.0" cy="742.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="481.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#8A8A8A" text-anchor="start">#27b SPEAKER (-)</text>
+<rect x="398.0" y="732.0" width="43.6" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="419.8" y="746.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#27b</text>
+<text x="451.6" y="736.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/VIO/BLK · 18 AWG · 6.9ft</text>
+<circle cx="1060.0" cy="742.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<rect x="70.0" y="782.0" width="310.0" height="236.0" fill="#FFFFFF" stroke="#E67300" stroke-width="1.8"/>
+<rect x="70.0" y="782.0" width="310.0" height="24.0" fill="#D8D8D8" stroke="#E67300" stroke-width="1.2"/>
+<text x="78.0" y="799.0" font-family="Courier New, Courier, monospace" font-size="12" font-weight="bold" fill="#E67300" text-anchor="start">M130 INPUTS — PIN TBD</text>
+<text x="372.0" y="832.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#E67300" text-anchor="end">PIN TBD</text>
+<polyline points="380.0,828.0 1140.0,828.0 1140.0,313.0 1530.0,313.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="828.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="317.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#42 DOOR AJAR SWITCH</text>
+<rect x="398.0" y="818.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="832.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#42</text>
+<text x="444.2" y="822.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/BLK · 22 AWG · 6.9ft</text>
+<circle cx="1060.0" cy="828.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="872.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#E67300" text-anchor="end">PIN TBD</text>
+<polyline points="380.0,868.0 1164.0,868.0 1164.0,503.0 1530.0,503.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="868.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="507.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#43 DOOR AJAR SWITCH</text>
+<rect x="398.0" y="858.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="872.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#43</text>
+<text x="444.2" y="862.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/RED · 22 AWG · 6.9ft</text>
+<circle cx="1060.0" cy="868.0" r="8.0" fill="#FFFFFF" stroke="#1E7D32" stroke-width="2.2"/>
+<text x="372.0" y="912.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#E67300" text-anchor="end">PIN TBD</text>
+<polyline points="380.0,908.0 1212.0,908.0 1212.0,811.0 1530.0,811.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="908.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="815.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#36 WINDOW SW MASTER (DRV)</text>
+<rect x="398.0" y="898.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="912.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#36</text>
+<text x="444.2" y="902.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/YEL · 22 AWG · 6.9ft</text>
+<text x="372.0" y="952.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#E67300" text-anchor="end">PIN TBD</text>
+<polyline points="380.0,948.0 1212.0,948.0 1212.0,837.0 1530.0,837.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="948.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="841.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#37 WINDOW SW PASSENGER</text>
+<rect x="398.0" y="938.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="952.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#37</text>
+<text x="444.2" y="942.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/VIO · 22 AWG · 6.9ft</text>
+<text x="372.0" y="992.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#E67300" text-anchor="end">PIN TBD</text>
+<polyline points="380.0,988.0 1212.0,988.0 1212.0,863.0 1530.0,863.0" fill="none" stroke="#1A1A1A" stroke-width="1.3"/>
+<circle cx="380.0" cy="988.0" r="2.4" fill="#1A1A1A" stroke="#1A1A1A" stroke-width="0.5"/>
+<text x="1544.0" y="867.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">#44 LOCK SWITCH</text>
+<rect x="398.0" y="978.0" width="36.2" height="20.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="416.1" y="992.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="middle">#44</text>
+<text x="444.2" y="982.0" font-family="Courier New, Courier, monospace" font-size="10.5" fill="#1A1A1A" text-anchor="start">ORN/BLU · 22 AWG · 6.9ft</text>
+<text x="1060.0" y="158.0" font-family="Courier New, Courier, monospace" font-size="10" font-weight="bold" fill="#1E7D32" text-anchor="middle">DOOR BOOTS</text>
+<text x="70.0" y="1046.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="start">NOTES:</text>
+<text x="80.0" y="1064.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">Door crossings (#34 #35 #38 #47 #26x #27x #42 #43) carry door_crossing flag: +6in boot flex allowance (wire_paths.yaml).</text>
+<text x="80.0" y="1080.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">Door jamb boots required by POWER_WINDOWS / POWER_LOCKS / AUDIO front / DOME_COURTESY — HARNESS_INFRA dependency rule.</text>
+<text x="70.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="11" font-weight="bold" fill="#1A1A1A" text-anchor="start">LEGEND:</text>
+<line x1="150.0" y1="1626.0" x2="200.0" y2="1626.0" stroke="#1A1A1A" stroke-width="1.2"/>
+<text x="206.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">wire run (id in box, COLOR · AWG · LEN on run)</text>
+<circle cx="610.0" cy="1626.0" r="7.0" fill="none" stroke="#1E7D32" stroke-width="2"/>
+<text x="624.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">grommet / boot pass-through</text>
+<rect x="860.0" y="1618.0" width="40.0" height="15.0" fill="none" stroke="#1A1A1A" stroke-width="1" stroke-dasharray="5,3"/>
+<text x="908.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">physical boundary</text>
+<text x="1060.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="10" font-weight="bold" fill="#E67300" text-anchor="start">ORANGE = CONFLICT / TBD</text>
+<text x="1280.0" y="1630.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#8A8A8A" text-anchor="start">GRAY = cross-ref other sheet</text>
+<rect x="1494.0" y="1486.0" width="660.0" height="168.0" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="2"/>
+<line x1="1494.0" y1="1516.0" x2="2154.0" y2="1516.0" stroke="#1A1A1A" stroke-width="1"/>
+<line x1="1494.0" y1="1544.0" x2="2154.0" y2="1544.0" stroke="#1A1A1A" stroke-width="1"/>
+<line x1="1494.0" y1="1572.0" x2="2154.0" y2="1572.0" stroke="#1A1A1A" stroke-width="1"/>
+<line x1="1494.0" y1="1600.0" x2="2154.0" y2="1600.0" stroke="#1A1A1A" stroke-width="1"/>
+<text x="1506.0" y="1507.0" font-family="Courier New, Courier, monospace" font-size="15" font-weight="bold" fill="#1A1A1A" text-anchor="start">NUKE LTD / DESERT PERFORMANCE</text>
+<text x="1506.0" y="1535.0" font-family="Courier New, Courier, monospace" font-size="13" fill="#1A1A1A" text-anchor="start">1977 CHEVROLET K5 BLAZER — VIN CKR187F127263</text>
+<text x="1506.0" y="1563.0" font-family="Courier New, Courier, monospace" font-size="13" fill="#1A1A1A" text-anchor="start">SYSTEM SCHEMATICS — SECTION 5 — DOORS &amp; INTERIOR</text>
+<text x="1506.0" y="1591.0" font-family="Courier New, Courier, monospace" font-size="13" font-weight="bold" fill="#1A1A1A" text-anchor="start">SHEET 3 OF 6   —   2026-06-09   —   REV A</text>
+<text x="1506.0" y="1617.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">DERIVED FROM K5_cut_list_v4 + pdm30 channel plan (2026-04-05 AUTH) + wire_</text>
+<text x="1506.0" y="1638.0" font-family="Courier New, Courier, monospace" font-size="10" fill="#1A1A1A" text-anchor="start">paths + subsystems.json + objectTraits grounds</text>
+</svg>

@@ -42,7 +42,7 @@ const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABAS
   global: { fetch: nodeFetch }
 });
 const BUCKET = 'vehicle-photos';
-const BATCH_SIZE = 10;
+const BATCH_SIZE = 1;
 const USER_ID = '0b9f107a-d124-49de-9ded-94698f63c1c4'; // skylar's user_id
 
 // ─── CLI args ────────────────────────────────────────────────────────────────
@@ -124,44 +124,44 @@ async function loadVehicleCache(albums = null) {
   if (vehicleCache) return;
   console.log('Loading vehicle cache...');
 
-  // STRATEGY: Load vehicles that already have iphoto records (from --map-only run).
-  // These are the user's actual vehicles — much more accurate than searching 1.2M vehicles.
-  const iphotoVehicleIds = new Set();
+  // Scope by owner — bootstraps cleanly even before any iphoto ingestion exists.
+  // Previous strategy (filter by vehicle_images.source='iphoto') had a chicken-and-egg
+  // failure: on first run the cache was empty and every album was skipped as unmatched.
+  vehicleCache = [];
   let offset = 0;
   while (true) {
     const { data } = await withRetry(async () => {
-      const r = await supabase.from('vehicle_images')
-        .select('vehicle_id')
-        .eq('source', 'iphoto')
+      const r = await supabase.from('vehicles')
+        .select('id, year, make, model, vin, discovery_source')
+        .eq('owner_id', USER_ID)
+        // Never match into merged/soft-deleted records. The K5 doppelganger
+        // (e04bf9c5, GAA scrape) absorbed 1,196 of Skylar's photos because the
+        // fuzzy matcher saw it as "Skylar's 1977 Blazer". Receipt:
+        // docs/wiring/receipts/2026-06-11_k5-doppelganger-reattribution.md
+        .neq('status', 'merged')
+        .is('deleted_at', null)
         .range(offset, offset + 999);
       if (r.error) throw new Error(r.error.message);
       return r;
-    }, 'iphoto-vehicles');
+    }, 'owned-vehicles');
     if (!data || data.length === 0) break;
-    for (const d of data) iphotoVehicleIds.add(d.vehicle_id);
+    vehicleCache.push(...data);
     if (data.length < 1000) break;
     offset += 1000;
   }
 
-  // Fetch full details for those vehicles
-  vehicleCache = [];
-  const ids = [...iphotoVehicleIds];
-  for (let i = 0; i < ids.length; i += 50) {
-    const batch = ids.slice(i, i + 50);
-    const { data } = await withRetry(async () => {
-      const r = await supabase.from('vehicles')
-        .select('id, year, make, model, vin')
-        .in('id', batch);
-      if (r.error) throw new Error(r.error.message);
-      return r;
-    }, 'vehicle-details');
-    if (data) vehicleCache.push(...data);
-  }
-
-  console.log(`  Cached ${vehicleCache.length} vehicles (user's iphoto-linked vehicles)`);
+  console.log(`  Cached ${vehicleCache.length} vehicles (owner_id=${USER_ID})`);
 }
 
-function findVehicleCached(year, make, model) {
+function findVehicleCached(year, make, model, albumName = null) {
+  // Tier 1: exact discovery_source match (vehicle created from this album).
+  if (albumName) {
+    const sourceTag = `iphoto_album:${albumName}`;
+    const exact = vehicleCache.filter(v => v.discovery_source === sourceTag);
+    if (exact.length === 1) return exact[0];
+  }
+
+  // Tier 2: fuzzy year + make + model_first_word.
   const modelFirst = model.split(' ')[0].toLowerCase();
   const makeLower = make.toLowerCase();
   const matches = vehicleCache.filter(v =>
@@ -181,14 +181,17 @@ function findVehicleCached(year, make, model) {
   return null;
 }
 
-async function findVehicle(year, make, model) {
-  // Use cache if loaded (preferred — avoids DNS issues during long runs)
-  if (vehicleCache) return findVehicleCached(year, make, model);
+async function findVehicle(year, make, model, albumName = null) {
+  // Use cache if populated (preferred — avoids DNS issues during long runs)
+  if (vehicleCache && vehicleCache.length > 0) return findVehicleCached(year, make, model, albumName);
 
-  // Fallback to live query
+  // Fallback to live query (scoped to owner)
   const { data: exact } = await supabase
     .from('vehicles')
     .select('id, year, make, model, vin')
+    .eq('owner_id', USER_ID)
+    .neq('status', 'merged')      // see loadVehicleCache: no merged/soft-deleted targets
+    .is('deleted_at', null)
     .eq('year', year)
     .ilike('make', `%${make}%`)
     .ilike('model', `%${model.split(' ')[0]}%`)
@@ -287,10 +290,17 @@ function extractPhotoMeta(p) {
   if (p.score) exifData.score = p.score;
   if (p.labels) exifData.labels = p.labels;
 
+  // True capture instant: prefer osxphotos' `date_original` (never-rewritten
+  // EXIF DateTimeOriginal), then exif_info.date (same value, nested), and
+  // only fall back to `p.date` — Apple's MUTABLE internal date, which gets
+  // reset on iCloud restore/migration/library merge and does not represent
+  // when the photo was actually taken.
+  const takenAt = p.date_original || exif.date || p.date || null;
+
   return {
     latitude: p.latitude || null,
     longitude: p.longitude || null,
-    taken_at: p.date || null,
+    taken_at: takenAt,
     location_name: locationName,
     exif_data: Object.keys(exifData).length > 0 ? exifData : null,
   };
@@ -364,20 +374,40 @@ async function uploadPhotos(vehicleId, jpegDir, metaMap = new Map()) {
   console.log(`  Skipping ${files.length - toUpload.length} already uploaded`);
 
   let uploaded = 0, errors = 0, gpsCount = 0;
-  for (let i = 0; i < toUpload.length; i += BATCH_SIZE) {
+  let consecutiveErrors = 0;
+  const CONSECUTIVE_ERR_ABORT = 30; // bail if 30 in a row — network/storage is down
+  let aborted = false;
+  for (let i = 0; i < toUpload.length && !aborted; i += BATCH_SIZE) {
     const batch = toUpload.slice(i, i + BATCH_SIZE);
     await Promise.all(batch.map(async (filename) => {
+      if (aborted) return;
       const filePath = join(jpegDir, filename);
       const fileData = readFileSync(filePath);
       const fileSize = statSync(filePath).size;
       const storagePath = `${vehicleId}/iphoto/${filename}`;
       const mimeType = /\.png$/i.test(filename) ? 'image/png' : 'image/jpeg';
 
-      const { error: uploadError } = await supabase.storage
-        .from(BUCKET)
-        .upload(storagePath, fileData, { contentType: mimeType, upsert: true });
-
-      if (uploadError) { errors++; if (errors <= 3) console.error(`  Upload error [${filename}]: ${uploadError.message || JSON.stringify(uploadError)}`); return; }
+      // Upload with retry — three attempts with exponential backoff to ride out transient network/DNS blips
+      let uploadError = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const r = await supabase.storage
+          .from(BUCKET)
+          .upload(storagePath, fileData, { contentType: mimeType, upsert: true });
+        uploadError = r.error;
+        if (!uploadError) break;
+        if (attempt < 3) await new Promise(res => setTimeout(res, attempt * 2000));
+      }
+      if (uploadError) {
+        errors++;
+        consecutiveErrors++;
+        if (errors <= 10 || errors % 25 === 0) console.error(`  Upload error [${filename}] (${errors} total, ${consecutiveErrors} consec): ${uploadError.message || JSON.stringify(uploadError)}`);
+        if (consecutiveErrors >= CONSECUTIVE_ERR_ABORT && !aborted) {
+          aborted = true;
+          console.error(`\n  ⛔ ABORT — ${consecutiveErrors} consecutive upload failures. Network/storage appears down. ${uploaded} uploaded so far; remaining ${toUpload.length - (i + batch.length)} skipped. Re-run after network recovers; already-uploaded files will be skipped via dedup.`);
+        }
+        return;
+      }
+      consecutiveErrors = 0;
 
       const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
 
@@ -395,6 +425,7 @@ async function uploadPhotos(vehicleId, jpegDir, metaMap = new Map()) {
         file_size: fileSize,
         is_external: false,
         ai_processing_status: 'pending',
+        user_id: USER_ID,
         documented_by_user_id: USER_ID,
         // GPS fields
         ...(meta.latitude != null && { latitude: meta.latitude }),
@@ -406,11 +437,43 @@ async function uploadPhotos(vehicleId, jpegDir, metaMap = new Map()) {
         ...(meta.exif_data && { exif_data: meta.exif_data }),
       };
 
-      const { error: insertError } = await supabase.from('vehicle_images').insert(row);
-      if (insertError && !insertError.message.includes('duplicate') && !insertError.message.includes('unique')) {
-        errors++;
+      const { data: inserted, error: insertError } = await supabase
+        .from('vehicle_images').insert(row).select('id').single();
+      if (insertError) {
+        const isDup = /duplicate|unique|already exists/i.test(insertError.message || '');
+        if (isDup) {
+          // benign — row already exists from a prior run
+        } else {
+          errors++;
+          if (errors <= 10 || errors % 25 === 0) console.error(`  Insert error [${filename}] (${errors} total): ${insertError.message || JSON.stringify(insertError)}`);
+        }
       } else {
         uploaded++;
+        // Chain-of-custody: write device_attributions row if EXIF identity present
+        const ex = meta.exif_data || {};
+        if (inserted?.id && ex.camera_make) {
+          const fingerprint = `camera:${String(ex.camera_make).toLowerCase().replace(/\s+/g,'-')}:${String(ex.camera_model||'unknown').toLowerCase().replace(/\s+/g,'-')}`;
+          const attrib = {
+            image_id: inserted.id,
+            camera_make: ex.camera_make,
+            camera_model: ex.camera_model || null,
+            device_fingerprint: fingerprint,
+            software: ex.software || null,
+            attribution_source: 'photos_library_iphoto_intake',
+            extraction_method: 'osxphotos_exif_passthrough',
+            confidence_score: 100,
+            actual_contributor_id: USER_ID,
+            uploaded_by_user_id: USER_ID,
+            datetime_original: meta.taken_at || null,
+            latitude: meta.latitude ?? null,
+            longitude: meta.longitude ?? null,
+            raw_exif: ex,
+          };
+          const { error: attribErr } = await supabase.from('device_attributions').insert(attrib);
+          if (attribErr && !/duplicate|unique/i.test(attribErr.message || '')) {
+            console.error(`  device_attribution error [${filename}]: ${attribErr.message}`);
+          }
+        }
       }
     }));
     process.stdout.write(`\r  ${i + batch.length}/${toUpload.length} (${uploaded} new, ${gpsCount} GPS, ${errors} err)  `);
@@ -494,7 +557,7 @@ async function processAlbum(albumName, vehicleId = null) {
       return null;
     }
     console.log(`  Parsed: ${parsed.year} ${parsed.make} ${parsed.model}`);
-    const match = await findVehicle(parsed.year, parsed.make, parsed.model);
+    const match = await findVehicle(parsed.year, parsed.make, parsed.model, albumName);
     if (!match) {
       console.log(`  No vehicle match found in DB — skipping (add vehicle first or pass --vehicle-id)`);
       return null;
@@ -513,7 +576,7 @@ async function processAlbum(albumName, vehicleId = null) {
     // Query GPS + EXIF metadata from osxphotos BEFORE export
     const metaMap = queryAlbumMetadata(albumName);
 
-    const ok = exportAlbum(albumName, tmpExport);
+    const ok = exportAlbum(albumName, tmpExport, flag('--download-missing'));
     if (!ok) return null;
 
     const count = convertHeicToJpeg(tmpExport, tmpJpeg);
@@ -913,6 +976,7 @@ if (flag('--backfill-gps')) {
 
 } else if (flag('--all')) {
   const albums = listAlbums();
+  await loadVehicleCache(albums);
   console.log(`Processing ${albums.length} vehicle albums...`);
   let matched = 0, skipped = 0;
   for (const a of albums) {

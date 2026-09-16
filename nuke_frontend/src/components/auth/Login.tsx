@@ -163,6 +163,30 @@ const Login = () => {
     }
   };
   
+  const handleAppleLogin = async () => {
+    try {
+      setError(null);
+      setLoading(true);
+      try {
+        sessionStorage.setItem('login_return_url', getReturnUrl());
+      } catch {
+        // ignore
+      }
+      // Apple OAuth rides Supabase's hosted flow; the Services ID + secret
+      // live in the Supabase dashboard (see apps/SIGN_IN_WITH_APPLE_SETUP.md).
+      // redirectTo lands on /auth/callback (OAuthCallback.tsx), which picks
+      // up login_return_url from sessionStorage like Google/GitHub do.
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: { redirectTo: window.location.origin + '/auth/callback' },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      setError(err.message || 'Failed to login with Apple');
+      setLoading(false);
+    }
+  };
+
   const handleGitHubLogin = async () => {
     try {
       setError(null);
@@ -281,6 +305,15 @@ const Login = () => {
             )}
 
             {/* OAuth buttons */}
+            <button
+              onClick={handleAppleLogin}
+              className="button button-secondary w-full"
+              disabled={loading}
+              style={{ marginBottom: '8px' }}
+            >
+              {loading ? 'Connecting...' : 'Continue with Apple'}
+            </button>
+
             <button
               onClick={handleGoogleLogin}
               className="button button-secondary w-full"

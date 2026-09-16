@@ -144,6 +144,8 @@ const PublicImageGallery: React.FC<PublicImageGalleryProps> = ({ userId, isOwnPr
         .from('vehicle_images')
         .select(IMAGE_SELECT)
         .eq('user_id', userId)
+        // Capture time, not ingestion time — backfilled photos get created_at=now.
+        .order('taken_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
         .limit(200);
 

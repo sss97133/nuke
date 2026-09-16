@@ -202,6 +202,8 @@ Tables are grouped by domain and sorted by row count within each group.
 |--------|------|------|---------|-------------|
 | `id` | uuid | NO | uuid() |  |
 | `vehicle_id` | uuid | YES |  |  |
+| `subject_type` | text | NO | 'vehicle' | Polymorphic subject kind: vehicle\|organization\|user\|asset. Added 2026-06-17 (migration 20260617000000). Lets any entity accumulate observations, not just vehicles. See engineering-manual/20-polymorphic-subject-build-guide.md. |
+| `subject_id` | uuid | YES |  | Polymorphic subject id. NULL for legacy vehicle rows; effective subject = COALESCE(subject_id, vehicle_id). Non-vehicle subjects set this explicitly. See engineering-manual/20. |
 | `vehicle_match_confidence` | numeric | YES |  |  |
 | `vehicle_match_signals` | jsonb | YES |  |  |
 | `observed_at` | timestamp with time zone | NO |  |  |

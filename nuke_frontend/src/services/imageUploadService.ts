@@ -390,12 +390,16 @@ export class ImageUploadService {
           ? `vehicles/${vehicleId}/${storageFolder}/${safeCategory}/${fileName}`
           : `users/${user.id}/unorganized/${fileName}`; // Personal library
 
-      // Use photo date if available, otherwise use current time or file modified date
-      const photoDate = listingCapturedAt 
-        || metadata.dateTaken 
-        || (file.lastModified ? new Date(file.lastModified) : new Date());
-      console.log('File date:', photoDate);
-      console.log('Using date for timeline:', photoDate.toISOString());
+      // Capture date is real testimony — only assert it from a real capture signal.
+      // EXIF DateTimeOriginal / a source listing's capture time / the file's own
+      // mtime are all genuine. Upload-now is NOT a capture date: stamping it makes
+      // an old photo bucket onto the day it was uploaded/analyzed (the "wrong day"
+      // bug). When no capture signal exists, leave taken_at NULL — absence held
+      // open beats a fabricated timestamp.
+      const photoDate: Date | null = listingCapturedAt
+        || metadata.dateTaken
+        || (file.lastModified ? new Date(file.lastModified) : null);
+      console.log('Using date for timeline:', photoDate ? photoDate.toISOString() : '(none — taken_at left null)');
 
       // Upload original to storage (use compressed version if available)
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -555,7 +559,7 @@ export class ImageUploadService {
           is_duplicate: Boolean(duplicateOf),
           is_primary: count === 0 && !isDocument, // First image becomes primary (not documents)
           is_sensitive: false, // Required field
-          taken_at: photoDate.toISOString(), // Use actual photo date for timeline
+          taken_at: photoDate ? photoDate.toISOString() : null, // Real capture signal only; null when unknown
           latitude: latitude || null, // Store at top level for easier querying
           longitude: longitude || null, // Store at top level for easier querying
           variants: variants, // Store all variant URLs
@@ -752,46 +756,55 @@ export class ImageUploadService {
   }
 
   /**
-   * Auto-match an unorganized image to vehicles using GPS, date, and filename
-   * This runs in the background after upload if vehicleId was not provided
+   * Auto-match an unorganized image to vehicles using GPS proximity.
+   * Runs in the background after upload if vehicleId was not provided.
+   *
+   * Calls the 5-arg GPS overload of auto_match_image_to_vehicles (the
+   * ambiguity-guard version, migration 20260610011000). The legacy 4-arg
+   * overload (filename-LIKE scorer) was dropped in migration
+   * 20260611040000_close_destructive_paths.sql.
    */
   private static async autoMatchImage(imageId: string, userId: string): Promise<void> {
     try {
-      // Use the database function for efficient matching
-      const { data: matches, error } = await supabase
-        .rpc('auto_match_image_to_vehicles', {
-          p_image_id: imageId,
-          p_max_gps_distance_meters: 50,
-          p_max_date_difference_days: 30,
-          p_min_confidence: 0.5
-        });
+      // The GPS overload needs the image's coordinates — fetch them first.
+      const { data: img } = await supabase
+        .from('vehicle_images')
+        .select('latitude, longitude, taken_at')
+        .eq('id', imageId)
+        .maybeSingle();
 
-      if (error) {
-        console.warn('Auto-match RPC failed, falling back to client-side matching:', error);
-        // Fallback to client-side matching
+      let bestMatch: { vehicle_id: string; confidence: number } | null = null;
+      let matchReason = 'gps_proximity';
+
+      if (img?.latitude != null && img?.longitude != null) {
+        const { data: matches, error } = await supabase.rpc('auto_match_image_to_vehicles', {
+          p_image_id: imageId,
+          p_latitude: img.latitude,
+          p_longitude: img.longitude,
+          p_taken_at: img.taken_at,
+          p_user_id: userId
+        });
+        if (error) {
+          console.warn('Auto-match RPC failed, falling back to client-side matching:', error);
+        } else if (matches && matches.length > 0) {
+          bestMatch = matches[0];
+        }
+      }
+
+      // Fallback: client-side matcher for no-GPS images or RPC failure.
+      if (!bestMatch) {
         const { ImageVehicleMatcher } = await import('./imageVehicleMatcher');
         const match = await ImageVehicleMatcher.matchImage(imageId, { userId });
         if (match && match.vehicleId) {
-          // SAFETY: do not auto-apply; only store suggestion.
-          await supabase
-            .from('vehicle_images')
-            .update({
-              suggested_vehicle_id: match.vehicleId,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', imageId);
-          console.log(`✅ Suggested match for image ${imageId}: vehicle ${match.vehicleId} (confidence: ${(match.confidence * 100).toFixed(0)}%)`);
+          bestMatch = { vehicle_id: match.vehicleId, confidence: match.confidence };
+          matchReason = 'client_side_matcher';
         }
-        return;
       }
 
-      if (!matches || matches.length === 0) {
+      if (!bestMatch) {
         console.log(`No auto-match found for image ${imageId}`);
         return;
       }
-
-      // Get the best match (highest confidence)
-      const bestMatch = matches[0];
 
       // SAFETY: never auto-assign vehicle_id based on heuristic matching.
       // This prevents cross-vehicle contamination; we only store a suggestion for review.
@@ -808,8 +821,7 @@ export class ImageUploadService {
         return;
       }
 
-      console.log(`✅ Suggested match for image ${imageId}: vehicle ${bestMatch.vehicle_id} (confidence: ${(bestMatch.confidence * 100).toFixed(0)}%)`);
-      console.log('Match reasons:', bestMatch.match_reasons);
+      console.log(`✅ Suggested match for image ${imageId}: vehicle ${bestMatch.vehicle_id} (confidence: ${(bestMatch.confidence * 100).toFixed(0)}%, via ${matchReason})`);
 
       // Notify UI that image was matched
       if (typeof window !== 'undefined') {
@@ -818,7 +830,7 @@ export class ImageUploadService {
             imageId,
             vehicleId: bestMatch.vehicle_id,
             confidence: bestMatch.confidence,
-            reasons: bestMatch.match_reasons
+            reasons: [matchReason]
           }
         }));
       }

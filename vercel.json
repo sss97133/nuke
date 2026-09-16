@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "main": false
+    }
+  },
   "buildCommand": "cd nuke_frontend && CI=false npm run build",
   "outputDirectory": "nuke_frontend/dist",
   "installCommand": "cd nuke_frontend && npm install",

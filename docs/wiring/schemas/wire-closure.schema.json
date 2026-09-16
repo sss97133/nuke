@@ -1,0 +1,240 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://nuke.ag/schemas/wire-closure.schema.json",
+  "title": "K5 Wire Closure",
+  "description": "Structured wire closure record. Every value is either cited to a source OR explicitly unknown with a specific action needed. No third option.",
+  "type": "object",
+  "required": [
+    "wire_id", "label", "loom", "bundle",
+    "from", "to",
+    "wire_spec", "routing", "termination",
+    "companion_wires", "fuse", "heat_shrink",
+    "open_unknowns", "closure"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string", "description": "Schema URI hint for editors; not validated." },
+    "wire_id":  { "type": "string", "pattern": "^[0-9]+[a-z]?$", "description": "Cut list ID, e.g. \"110\" or \"4a\"" },
+    "label":    { "type": "string" },
+    "loom":     { "enum": ["ENGINE LOOM", "EXTERIOR / BODY", "INTERIOR / DASH", "CHASSIS / UNDERBODY", "AUDIO", "POWER / COMM", "MISC"] },
+    "bundle":   { "type": "string", "description": "e.g. B3-Front" },
+
+    "from": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["device", "connector", "pin", "pin_function", "signal_type", "expected_wire_count"],
+      "properties": {
+        "device":              { "$ref": "#/definitions/cited" },
+        "connector":           { "$ref": "#/definitions/cited" },
+        "pin":                 { "$ref": "#/definitions/cited" },
+        "pin_function":        { "$ref": "#/definitions/cited" },
+        "signal_type":         { "$ref": "#/definitions/cited_enum_signal" },
+        "expected_wire_count": { "type": "integer", "minimum": 1, "maximum": 8, "description": "Per chapter 05 signal type table" }
+      }
+    },
+
+    "to": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["device", "device_pn", "connector_type", "physical_location", "pigtail_pn"],
+      "properties": {
+        "device":            { "$ref": "#/definitions/cited" },
+        "device_pn":         { "$ref": "#/definitions/cited" },
+        "connector_type":    { "$ref": "#/definitions/cited" },
+        "physical_location": { "$ref": "#/definitions/cited", "description": "Specific boss/mount, cited to service manual page OR measurement. \"Front of engine\" is not valid." },
+        "pigtail_pn":        { "$ref": "#/definitions/cited" }
+      }
+    },
+
+    "wire_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gauge_awg", "spec", "color", "shielding"],
+      "properties": {
+        "gauge_awg": { "type": "integer", "minimum": 0, "maximum": 28 },
+        "spec":      { "enum": ["M22759/32", "M22759/16", "M27500-2C-shielded", "M27500-TP-twisted", "Welding-cable", "TXL", "GXL"] },
+        "color":     { "type": "string", "description": "From cut list, post-3-stripe remap" },
+        "shielding": { "type": "boolean" }
+      }
+    },
+
+    "routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["landmark_path", "total_length_in"],
+      "properties": {
+        "landmark_path": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^L[0-9]{2}$" },
+          "description": "Landmark IDs from K5_landmarks.yaml"
+        },
+        "total_length_in": { "$ref": "#/definitions/cited_or_estimated_number" }
+      }
+    },
+
+    "termination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from_terminal_pn", "from_seal_pn", "to_terminal_pn", "to_seal_pn"],
+      "properties": {
+        "from_terminal_pn": { "$ref": "#/definitions/cited" },
+        "from_seal_pn":     { "$ref": "#/definitions/cited" },
+        "to_terminal_pn":   { "$ref": "#/definitions/cited" },
+        "to_seal_pn":       { "$ref": "#/definitions/cited" }
+      }
+    },
+
+    "companion_wires": {
+      "type": "array",
+      "description": "Sibling wires required by signal_type (ground return, 5V ref, shield drain, etc.). Empty array if signal type requires only 1 wire.",
+      "items": {
+        "type": "object",
+        "required": ["role", "wire_id_or_status", "target_pin"],
+        "properties": {
+          "role":              { "enum": ["sensor_ground", "5V_reference", "shield_drain", "high_side_pwr", "secondary_signal"] },
+          "wire_id_or_status": { "$ref": "#/definitions/cited" },
+          "target_pin":        { "$ref": "#/definitions/cited" }
+        }
+      }
+    },
+
+    "fuse": {
+      "oneOf": [
+        { "type": "object", "required": ["rating_a", "source"], "properties": { "rating_a": {"type": "number"}, "source": {"type": "string"} } },
+        { "type": "object", "required": ["not_applicable", "reason"], "properties": { "not_applicable": {"const": true}, "reason": {"type": "string"} } }
+      ]
+    },
+
+    "heat_shrink": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Per-end labels + layered shrink stack. Aligned 2026-05-22 with observation_properties registry (wire_label_a/b_text, wire_termination_a/b_inner_seal_pn, wire_termination_a/b_outer_cover_pn). The previous flat 'label_text' string collapsed per-end multi-cardinality and was retired.",
+      "required": [
+        "label_end_a", "label_end_b",
+        "termination_end_a_inner_seal_pn", "termination_end_a_outer_cover_pn",
+        "termination_end_b_inner_seal_pn", "termination_end_b_outer_cover_pn",
+        "boot_at_terminals"
+      ],
+      "properties": {
+        "label_end_a":                       { "$ref": "#/definitions/cited", "description": "Printed text on white M23053/5 label sleeve at end A (the non-ECU / device end). Maps to observation_properties.wire_label_a_text." },
+        "label_end_b":                       { "$ref": "#/definitions/cited", "description": "Printed text on white M23053/5 label sleeve at end B (the ECU end). Maps to wire_label_b_text." },
+        "termination_end_a_inner_seal_pn":   { "$ref": "#/definitions/cited", "description": "Inner adhesive-lined heat shrink PN at end A (typically Raychem SCL, M23053/4). Maps to wire_termination_a_inner_seal_pn." },
+        "termination_end_a_outer_cover_pn":  { "$ref": "#/definitions/cited", "description": "Outer abrasion-resistant cover PN at end A (typically DR-25, M23053/16). Maps to wire_termination_a_outer_cover_pn." },
+        "termination_end_b_inner_seal_pn":   { "$ref": "#/definitions/cited", "description": "Same as A, end B." },
+        "termination_end_b_outer_cover_pn":  { "$ref": "#/definitions/cited", "description": "Same as A, end B." },
+        "boot_at_terminals":                 { "$ref": "#/definitions/cited", "description": "Pre-molded AS85049 backshell boot when applicable (D38999 side). Often {unknown:true, needs:'N/A for Superseal — built-up boot from SCL+DR-25 layers'} on the MoTeC side." }
+      }
+    },
+
+    "open_unknowns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["field", "needs"],
+        "properties": {
+          "field":  { "type": "string", "description": "Dotted path, e.g. \"to.physical_location\"" },
+          "needs":  { "type": "string", "description": "Specific action, e.g. \"LS3 service manual §3 page citation\"" },
+          "blocks": { "type": "array", "items": { "type": "string" }, "description": "What downstream work this gap blocks" }
+        }
+      }
+    },
+
+    "substrate_inconsistencies": {
+      "type": "array",
+      "description": "Disagreements between source files surfaced during closure. Do NOT fix inline — separate substrate_correction receipt.",
+      "items": {
+        "type": "object",
+        "required": ["doc_a", "doc_b", "field", "doc_a_says", "doc_b_says", "preferred"],
+        "properties": {
+          "doc_a":       { "type": "string" },
+          "doc_b":       { "type": "string" },
+          "field":       { "type": "string" },
+          "doc_a_says":  { "type": "string" },
+          "doc_b_says":  { "type": "string" },
+          "preferred":   { "type": "string", "description": "Which doc to trust + why" }
+        }
+      }
+    },
+
+    "closure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "fields_cited", "fields_gapped", "total_fields", "ratio"],
+      "properties": {
+        "status":        { "enum": ["COMPLETE", "PARTIAL", "BLOCKED"] },
+        "fields_cited":  { "type": "integer", "minimum": 0 },
+        "fields_gapped": { "type": "integer", "minimum": 0 },
+        "total_fields":  { "type": "integer", "minimum": 1, "description": "Atomic cell count for this receipt. Computed = fields_cited + fields_gapped. Each leaf {value,source} or {unknown,needs} is one cell. The hardcoded 14/18 has been dropped — cells per wire vary by schema evolution, and the build's KPI is sum(fields_cited)/sum(total_fields) across all receipts." },
+        "ratio":         { "type": "string", "pattern": "^[0-9]+/[0-9]+$" }
+      }
+    }
+  },
+
+  "definitions": {
+    "cited": {
+      "description": "Either a value with a source citation, OR explicitly unknown with a specific close path. No third option.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value", "source"],
+          "properties": {
+            "value":  { "type": "string" },
+            "source": { "type": "string", "description": "file:line | doc§section | measurement record | manufacturer datasheet page" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["unknown", "needs"],
+          "properties": {
+            "unknown": { "const": true },
+            "needs":   { "type": "string", "description": "Specific action to close this gap, e.g. \"read motec_m1_hardware_techspec.pdf p16\"" }
+          }
+        }
+      ]
+    },
+
+    "cited_enum_signal": {
+      "description": "Signal type from chapters/05-build-manifest.md, with citation",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value", "source"],
+          "properties": {
+            "value":  { "enum": ["analog_5v", "analog_temp", "ecu_digital_input", "ecu_crank_cam", "piezoelectric", "wideband_lambda", "h_bridge_motor", "low_side_drive", "logic_coil_drive", "led_lighting", "motor", "audio", "controller", "can_display", "power_outlet", "pdm_input", "standalone_switch", "standalone_module", "ground", "power_source", "can_bus", "relay", "alternator"] },
+            "source": { "type": "string" }
+          }
+        },
+        { "type": "object", "required": ["unknown", "needs"], "properties": { "unknown": {"const": true}, "needs": {"type": "string"} } }
+      ]
+    },
+
+    "cited_or_estimated_number": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value", "method", "source"],
+          "properties": {
+            "value":  { "type": "number" },
+            "method": { "enum": ["measured_on_vehicle", "computed_from_landmarks", "datasheet_lookup"] },
+            "source": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value", "method", "estimate_basis"],
+          "properties": {
+            "value":          { "type": "number" },
+            "method":         { "const": "zone_distance_estimate" },
+            "estimate_basis": { "type": "string", "description": "e.g. harnessConstants.ts zone distance + 20% engine bay pad" }
+          }
+        },
+        { "type": "object", "required": ["unknown", "needs"], "properties": { "unknown": {"const": true}, "needs": {"type": "string"} } }
+      ]
+    }
+  }
+}

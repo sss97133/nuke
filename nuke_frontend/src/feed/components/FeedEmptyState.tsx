@@ -9,9 +9,12 @@ import { Link } from 'react-router-dom';
 export interface FeedEmptyStateProps {
   hasFilters: boolean;
   onResetFilters?: () => void;
+  /** True when the feed failed/timed out (vs genuinely zero results). Honest failed-vs-empty. */
+  error?: boolean;
+  onRetry?: () => void;
 }
 
-export function FeedEmptyState({ hasFilters, onResetFilters }: FeedEmptyStateProps) {
+export function FeedEmptyState({ hasFilters, onResetFilters, error, onRetry }: FeedEmptyStateProps) {
   return (
     <div
       style={{
@@ -34,10 +37,44 @@ export function FeedEmptyState({ hasFilters, onResetFilters }: FeedEmptyStatePro
           color: 'var(--text-secondary)',
         }}
       >
-        NO VEHICLES MATCH
+        {error ? "COULDN'T LOAD THE FEED" : 'NO VEHICLES MATCH'}
       </div>
 
-      {hasFilters && (
+      {error && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+          <div
+            style={{
+              fontFamily: 'Arial, sans-serif',
+              fontSize: '10px',
+              color: 'var(--text-disabled)',
+            }}
+          >
+            The feed took too long or the server is busy. Your filters are fine.
+          </div>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              style={{
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '9px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.3px',
+                padding: '4px 12px',
+                border: '2px solid var(--text)',
+                background: 'transparent',
+                color: 'var(--text)',
+                cursor: 'pointer',
+              }}
+            >
+              RETRY
+            </button>
+          )}
+        </div>
+      )}
+
+      {!error && hasFilters && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
           <div
             style={{

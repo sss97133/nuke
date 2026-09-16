@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IGNITION HARNESS — LIVE DATA, NOT A MOCKUP</title>
+<style>
+  :root{
+    --paper:#f5f5f5; --surface:#fff; --ink:#1a1a1a; --pencil:#666; --ghost:#ddd;
+    --heat:#065f46;
+    --sans:-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,"Courier New",monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);padding:24px}
+  .masthead{border-bottom:2px solid var(--ink);padding-bottom:8px;margin-bottom:4px;
+    display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+  .masthead h1{font-size:18px;font-weight:800;letter-spacing:-0.5px}
+  .masthead .m{font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .law{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--pencil);margin:6px 0 18px}
+
+  .controls{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:18px;
+    border:2px solid var(--ink);background:var(--surface);padding:10px 12px}
+  .controls button{font-family:var(--mono);font-size:12px;font-weight:700;border:2px solid var(--ink);
+    background:var(--ink);color:#fff;padding:8px 18px;cursor:pointer}
+  .controls button.alt{background:var(--surface);color:var(--ink)}
+  .controls label{font-family:var(--mono);font-size:10px;color:var(--pencil)}
+  .controls input[type=range]{width:160px}
+  .controls .val{font-family:var(--mono);font-size:11px;font-weight:700;min-width:90px}
+
+  .bench{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:1100px}
+  .win{border:2px solid var(--ink);background:var(--surface);padding:12px;min-height:120px}
+  .win.full{grid-column:1 / -1}
+  .fn{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.04em}
+  .io{font-family:var(--mono);font-size:9px;color:var(--pencil);margin-top:2px}
+  .hr{border-top:1px solid var(--ghost);margin:8px 0}
+  .big{font-family:var(--mono);font-size:52px;font-weight:700;letter-spacing:-2px;line-height:1}
+  .lab{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--pencil)}
+  .row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;border-bottom:1px solid var(--ghost)}
+  .row .data{font-family:var(--mono);font-size:12px}
+  canvas{display:block;width:100%;height:140px;background:var(--surface)}
+  #ledger{max-height:200px;overflow:auto}
+  #ledger .row{font-family:var(--mono);font-size:10px}
+  .assemble{font-family:var(--mono);font-size:11px;margin-top:6px;line-height:1.7}
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <h1>IGNITION HARNESS</h1>
+  <span class="m">LIVE REPLAY · 2,618 REAL ASSETS · 1977 K5 BLAZER · PROD SUBSTRATE · NOT A MOCKUP</span>
+</div>
+<div class="law">These are functions, not animations — the same group-by-day / accumulate / render path the app runs. The data is real; only the clock is compressed.</div>
+
+<div class="controls">
+  <button id="btnRun">RUN</button>
+  <button id="btnPause" class="alt">PAUSE</button>
+  <button id="btnReset" class="alt">RESET</button>
+  <label>RATE <input type="range" id="rate" min="1" max="400" value="60"> <span class="val" id="rateVal">60 /s</span></label>
+  <label><input type="checkbox" id="shuffle" checked> LIBRARY ORDER (SHUFFLED — how PhotoKit actually finds them)</label>
+</div>
+
+<div class="bench">
+
+  <div class="win">
+    <div class="fn">fn scan(library) &rarr; stream&lt;asset&gt;</div>
+    <div class="io">in: PHAsset enumeration &middot; out: timestamped events &middot; uploads: none</div>
+    <div class="hr"></div>
+    <div class="big" id="readCount">0</div>
+    <span class="lab">assets read</span>
+    <div class="row"><span class="lab">rate</span><span class="data" id="liveRate">0 /s</span></div>
+    <div class="row"><span class="lab">uploaded</span><span class="data">0</span></div>
+  </div>
+
+  <div class="win">
+    <div class="fn">fn crystallize(stream) &rarr; days</div>
+    <div class="io">in: asset events &middot; out: day buckets (local calendar) &middot; this is the unit of the timeline</div>
+    <div class="hr"></div>
+    <div class="big" id="dayCount">0</div>
+    <span class="lab">days on record</span>
+    <div class="assemble" id="assembling">&mdash;</div>
+  </div>
+
+  <div class="win full">
+    <div class="fn">fn timeline(days) &rarr; barcode</div>
+    <div class="io">in: day buckets &middot; out: one bar per real day, weight = photos &middot; x = 2016&rarr;2026 &middot; grows the moment data exists</div>
+    <div class="hr"></div>
+    <canvas id="barcode" width="1060" height="140"></canvas>
+    <div class="row" style="border:0;margin-top:4px">
+      <span class="lab" id="spanLab">&mdash;</span>
+      <span class="data" id="totalLab">0 PHOTOS · 0 DAYS</span>
+    </div>
+  </div>
+
+  <div class="win full">
+    <div class="fn">fn ledger(days) &rarr; rows</div>
+    <div class="io">in: closed day buckets &middot; out: the receipt queue — every row here is a shareable document</div>
+    <div class="hr"></div>
+    <div id="ledger"></div>
+  </div>
+
+</div>
+
+<script>
+(async () => {
+  const ts = await (await fetch('k5_timestamps.json')).json();
+  const cvs = document.getElementById('barcode'), ctx = cvs.getContext('2d');
+  const T0 = new Date('2016-01-01').getTime(), T1 = new Date('2026-06-11').getTime();
+
+  let order = [], idx = 0, days = new Map(), running = false, lastTick = 0, readSinceTick = 0, liveRate = 0;
+
+  function reset() {
+    order = [...ts];
+    if (document.getElementById('shuffle').checked)
+      for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    idx = 0; days = new Map(); running = false;
+    document.getElementById('readCount').textContent = '0';
+    document.getElementById('dayCount').textContent = '0';
+    document.getElementById('assembling').innerHTML = '&mdash;';
+    document.getElementById('ledger').innerHTML = '';
+    document.getElementById('totalLab').textContent = '0 PHOTOS · 0 DAYS';
+    document.getElementById('spanLab').textContent = '—';
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+  }
+
+  function drawBar(day, n) {
+    const x = ( (new Date(day + 'T12:00:00').getTime() - T0) / (T1 - T0) ) * cvs.width;
+    const h = Math.min(130, 8 + Math.sqrt(n) * 14);
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(Math.floor(x), cvs.height - h, 2.5, h);
+  }
+
+  function ingest(t) {
+    const day = t.slice(0, 10), hm = t.slice(11, 16);
+    let d = days.get(day);
+    if (!d) { d = { n: 0, first: hm, last: hm }; days.set(day, d); }
+    d.n++; if (hm < d.first) d.first = hm; if (hm > d.last) d.last = hm;
+    drawBar(day, d.n);
+    return { day, d };
+  }
+
+  function closeLedgerRow(day, d) {
+    const el = document.createElement('div');
+    el.className = 'row';
+    el.innerHTML = `<span>${day}</span><span>${String(d.n).padStart(3,' ')} PHOTOS · ${d.first}–${d.last}</span>`;
+    const lg = document.getElementById('ledger');
+    lg.prepend(el); while (lg.children.length > 60) lg.lastChild.remove();
+  }
+
+  function refreshLedger() {
+    // live view: biggest days so far, newest evidence first
+    const all = [...days.entries()].sort((a,b) => b[1].n - a[1].n).slice(0, 14);
+    const lg = document.getElementById('ledger');
+    lg.innerHTML = '';
+    for (const [day, d] of all) {
+      const el = document.createElement('div');
+      el.className = 'row';
+      el.innerHTML = `<span>${day}</span><span>${String(d.n).padStart(3,' ')} PHOTOS · ${d.first}–${d.last}</span>`;
+      lg.appendChild(el);
+    }
+  }
+
+  const TICK_MS = 33;
+  let timer = null, lastLedger = 0, lastNow = 0;
+  function tick() {
+    if (!running) return;
+    const now = performance.now();
+    const rate = +document.getElementById('rate').value;
+    const elapsed = lastNow ? (now - lastNow) : TICK_MS; lastNow = now;
+    const perTick = Math.max(1, Math.round(rate * elapsed / 1000));
+    let last = null;
+    for (let k = 0; k < perTick && idx < order.length; k++, idx++) {
+      last = ingest(order[idx]); readSinceTick++;
+    }
+    document.getElementById('readCount').textContent = idx.toLocaleString();
+    document.getElementById('dayCount').textContent = days.size;
+    if (last) document.getElementById('assembling').innerHTML =
+      `<b>${last.day}</b> · ${last.d.n} PHOTOS · ${last.d.first}–${last.d.last} <span style="color:#666">assembling…</span>`;
+    document.getElementById('totalLab').textContent = `${idx.toLocaleString()} PHOTOS · ${days.size} DAYS`;
+    if (days.size) {
+      const ks = [...days.keys()].sort();
+      document.getElementById('spanLab').textContent = `${ks[0]} → ${ks[ks.length-1]}`;
+    }
+    if (now - lastTick > 500) { liveRate = Math.round(readSinceTick * 1000 / (now - lastTick)); readSinceTick = 0; lastTick = now;
+      document.getElementById('liveRate').textContent = liveRate + ' /s'; }
+    if (now - lastLedger > 400) { refreshLedger(); lastLedger = now; }
+    if (idx >= order.length) {
+      running = false; clearInterval(timer); timer = null;
+      refreshLedger();
+      document.getElementById('assembling').innerHTML += ' <b>· COMPLETE</b>';
+    }
+  }
+
+  document.getElementById('btnRun').onclick = () => {
+    if (running) return;
+    if (idx >= order.length) reset();
+    running = true; lastTick = performance.now(); lastNow = 0;
+    if (timer) clearInterval(timer);
+    timer = setInterval(tick, TICK_MS);
+  };
+  document.getElementById('btnPause').onclick = () => running = false;
+  document.getElementById('btnReset').onclick = reset;
+  document.getElementById('rate').oninput = e => document.getElementById('rateVal').textContent = e.target.value + ' /s';
+  document.getElementById('shuffle').onchange = reset;
+  reset();
+})();
+</script>
+
+</body>
+</html>
