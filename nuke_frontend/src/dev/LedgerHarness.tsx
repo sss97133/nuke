@@ -172,7 +172,7 @@ export const FIXTURE_ROWS: HarnessRawRow[] = [
   {
     observation_id: 'fx-010',
     observed_at: '2024-05-20T00:00:00Z',
-    content_text: 'Paint balance — stated amount, no bank match found in AFCU or Viva exports',
+    content_text: 'Paint balance — stated amount, no bank match found in bank exports',
     structured_data: {
       amount_usd: 3500.0, direction: 'out', event_type: 'labor_payment',
       counterparty: 'Painter (unresolved)', entity_paid: 'skylar',

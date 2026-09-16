@@ -122,7 +122,7 @@ Per-image micro facts the system *could* capture from the same photo:
 - tools visible (lift visible in frame, wire crimpers on bench, multimeter in hand, gloves on hands)
 - PPE compliance signals (gloves, safety glasses, hearing protection)
 - environmental signals (shop interior vs outdoor, lighting type, time-of-day inference)
-- person(s) visible (Skylar, Charles, Keoni, customer present) — links to contacts
+- person(s) visible (owner, technicians, customer present) — links to contacts
 - substances visible (oil leak, coolant, fluids on floor, brake fluid spill)
 - text visible (labels on parts, signs, plate numbers, gauge readings)
 - weather/season cues (sky, foliage, snow, dust)

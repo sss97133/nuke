@@ -417,7 +417,22 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
           *,
           listing:auction_events(*, vehicle:vehicles(*))
         `)
-        .in('external_identity_id', identityIds)
+        // Filter the AUTHOR column, which is what "this contributor's comments"
+        // actually means — and it is the one that is indexed.
+        // auction_comments is 14.6M rows / 13 GB. external_identity_id has NO
+        // index, so this seq-scanned and died on the statement timeout: measured
+        // 2026-07-26, HTTP 500 after 16.1s on EVERY org profile load, and
+        // getOrganizationProfileData awaits it, so listings/bids/stories/services
+        // all queued behind a query that could never succeed.
+        // idx_auction_comments_author_external_identity_id serves this in 0.22s.
+        // The two columns hold the same value wherever both are set (200,000 of
+        // 200,000 sampled agree); author_external_identity_id is NULL on ~21% of
+        // rows that external_identity_id has, so the un-backfilled tail is not
+        // returned yet. Backfilling that column, or adding
+        //   CREATE INDEX CONCURRENTLY idx_auction_comments_external_identity_id
+        //     ON auction_comments(external_identity_id) WHERE external_identity_id IS NOT NULL;
+        // (a 13 GB build — owner's call) closes it.
+        .in('author_external_identity_id', identityIds)
         .eq('platform', 'bat')
         .order('posted_at', { ascending: false })
         .limit(100);
@@ -439,31 +454,17 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     .order('ended_at', { ascending: false })
     .limit(50);
 
-  // Get success stories
-  const { data: successStories } = await supabase
-    .from('success_stories')
-    .select(`
-      *,
-      vehicle:vehicles(*)
-    `)
-    .eq('organization_id', orgId)
-    .order('story_date', { ascending: false })
-    .limit(20);
-
-  // Get services
-  const { data: services } = await supabase
-    .from('organization_services')
-    .select('*')
-    .eq('organization_id', orgId)
-    .eq('is_active', true)
-    .order('service_name', { ascending: true });
-
-  // Get website mapping (use maybeSingle to handle missing rows gracefully)
-  const { data: websiteMapping } = await supabase
-    .from('organization_website_mappings')
-    .select('*')
-    .eq('organization_id', orgId)
-    .maybeSingle();
+  // ghost-ref 2026-07-26: public.success_stories, public.organization_services and
+  // public.organization_website_mappings do NOT exist — to_regclass returns NULL
+  // for all three, verified against the live DB. Each read 404'd on every
+  // organization profile load, the result was destructured without an error
+  // check, and the Stories and Services tabs rendered empty with no explanation.
+  // Same class as the auction_bids / bat_comments ghost-refs above; see
+  // docs/ledger/FINISH_ROADMAP.md. Not deleting the feature — there is nothing
+  // to delete yet. When a table lands, restore the read here.
+  const successStories: never[] = [];
+  const services: never[] = [];
+  const websiteMapping = null;
 
   // Seller track record — per-vehicle breakdown from organization_vehicles
   // Query directly (not from vehicleIds which caps at 1000) with seller-relevant types

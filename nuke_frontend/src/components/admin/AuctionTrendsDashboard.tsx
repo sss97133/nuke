@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { LiveOffersTable } from '../market/LiveOffersTable';
 import { supabase } from '../../lib/supabase';
 
 // Platform display names and colors
@@ -572,8 +573,15 @@ export default function AuctionTrendsDashboard() {
 
       {error && <div style={{ marginTop: 'var(--space-3)', fontSize: '11px', color: 'var(--error)' }}>{error}</div>}
 
+      {/* Live offers first: this page opened on zeros because every panel below
+          is auction-platform-only, while the priced supply is mostly
+          Craigslist. Ranked offers render regardless of `data` loading. */}
+      <div style={{ marginTop: 'var(--space-4)' }}>
+        <LiveOffersTable />
+      </div>
+
       {data && (
-        <div style={{ marginTop: 'var(--space-4)' }}>
+        <div>
           {/* Data Quality Badge (Library: epistemic honesty) */}
           <MarketQualityBadge />
 

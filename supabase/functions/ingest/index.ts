@@ -81,7 +81,14 @@ const SOURCE_PATTERNS: Array<{
   },
   {
     platform: "hagerty",
-    pattern: /hagerty\.com\/marketplace\/([\w-]+)/,
+    // https://www.hagerty.com/marketplace/auction/1965-Ford-Mustang/ce62f601-14d5-4090-9489-2287744182ee
+    // The old pattern stopped at the first path segment, so extractId returned
+    // the literal "auction" (or "classified") for EVERY hagerty listing — one
+    // external_id shared by the whole venue. Identity lives in the second-to-
+    // last segment; the id is the tail (uuid, or a 22-char shortid).
+    // `auction` read off the live search page 2026-07-26; `classified` is the
+    // feed's own listing_url_regex (listing_feeds 2cc4741f) — same shape.
+    pattern: /hagerty\.com\/marketplace\/(?:auction|classified)\/[\w-]+\/([\w-]+)/,
     extractId: (m) => m[1],
   },
   {
@@ -94,7 +101,91 @@ const SOURCE_PATTERNS: Array<{
     pattern: /instagram\.com\/p\/([\w-]+)/,
     extractId: (m) => m[1],
   },
+  // ── Venues polled by listing_feeds whose URL carries {year}-{make}-{model}
+  // in the last path segment. Registering them is what lets the
+  // minimum-viability gate below trust their slug WITHOUT a live fetch —
+  // exactly the trust Craigslist already gets. Every pattern here was
+  // written against a real URL observed in import_queue (2026-07-26), not
+  // guessed; venues whose slug does NOT carry identity are deliberately
+  // absent (see notes at the bottom of this list).
+  {
+    platform: "mecum",
+    // https://www.mecum.com/lots/1177355/2005-hummer-h2
+    pattern: /mecum\.com\/lots\/(\d+)\//,
+    extractId: (m) => m[1],
+  },
+  {
+    platform: "classiccars",
+    // https://classiccars.com/listings/view/2089229/1993-chevrolet-corvette-for-sale-in-cleveland-ohio-44128
+    pattern: /classiccars\.com\/listings\/view\/(\d+)\//,
+    extractId: (m) => m[1],
+  },
+  {
+    platform: "barrett_jackson",
+    // https://www.barrett-jackson.com/2026-columbus/docket/vehicle/1951-plymouth-cranbrook-300183
+    pattern: /barrett-jackson\.com\/[\w-]+\/docket\/vehicle\/([\w-]+)/,
+    extractId: (m) => m[1],
+  },
+  {
+    platform: "pcarmarket",
+    // https://www.pcarmarket.com/auction/2003-bmw-z4-25i-roadster
+    pattern: /pcarmarket\.com\/auction\/([\w-]+)/,
+    extractId: (m) => m[1],
+  },
+  {
+    platform: "autohunter",
+    // https://autohunter.com/Listing/Details/90844982/1966-PLYMOUTH-SATELLITE-CUSTOM-HARDTOP
+    pattern: /autohunter\.com\/Listing\/Details\/(\d+)\//i,
+    extractId: (m) => m[1],
+  },
+  {
+    platform: "allcollectorcars",
+    // https://www.allcollectorcars.com/classic-car-auctions/vehicles/1949-chevrolet-styleline-sport-coupe
+    pattern: /allcollectorcars\.com\/[\w-]+\/vehicles\/([\w-]+)/,
+    extractId: (m) => m[1],
+  },
+  {
+    platform: "vanguard_motors",
+    // https://www.vanguardmotorsales.com/inventory/5686/1970-plymouth-gtx
+    pattern: /vanguardmotorsales\.com\/inventory\/(\d+)\//,
+    extractId: (m) => m[1],
+  },
+  {
+    platform: "carandclassic",
+    // https://www.carandclassic.com/auctions/1972-mercedes-benz-350slc-c107-n7kb3n
+    pattern: /carandclassic\.com\/auctions\/([\w-]+)/,
+    extractId: (m) => m[1],
+  },
+  // NOT registered on purpose — their URLs do not carry identity, so trusting
+  // them would mint stubs from guesswork (the failure this gate exists to stop):
+  //   cars.ksl.com/listing/10662354        — numeric only, no slug (needs a fetch)
+  //   barnfinds.com/testarvette-ferrari-…  — editorial slug, no year
+  //   themarket.co.uk/listings/jaguar/…    — make/model but no year
+  //   rmsothebys.com/…/lots/s0005-1914-…   — lot-code prefix + mangled make ("rollsroyce")
 ];
+
+/**
+ * Strip marketplace boilerplate and opaque ids off the tail of a listing slug,
+ * so only the vehicle description survives into year/make/model.
+ *
+ * Without this the model field silently absorbs junk — exactly the make/model
+ * corruption class that took a gate to fix on 2026-07-08 (see ISSUES.md):
+ *   1993-chevrolet-corvette-for-sale-in-cleveland-ohio-44128
+ *     -> model "corvette for sale in cleveland ohio 44128"
+ *   1951-plymouth-cranbrook-300183   -> model "cranbrook 300183"
+ *   1972-mercedes-benz-350slc-c107-n7kb3n -> model "…c107 n7kb3n"
+ * Only the TAIL is trimmed; nothing before the boilerplate marker is touched,
+ * so real model names keep their digits (z4-25i, 350slc, k5-blazer, f-100).
+ */
+function cleanSlugTail(seg: string): string {
+  let out = seg;
+  // "…-for-sale-in-cleveland-ohio-44128" / "…-for-sale-by-owner" and friends
+  out = out.replace(/-for-sale(-(in|by|near)-.*)?$/i, "");
+  // trailing opaque listing/lot id: 5+ digits, or a mixed alphanumeric hash
+  out = out.replace(/-\d{5,}$/, "");
+  out = out.replace(/-(?=[a-z0-9]{6,}$)(?=[a-z]*\d)(?=[0-9]*[a-z])[a-z0-9]{6,}$/i, "");
+  return out || seg;
+}
 
 /**
  * Extract a human-readable title from a URL slug.
@@ -120,9 +211,16 @@ function extractTitleFromUrlSlug(url: string): string | null {
       const seg = segments[i];
       // Skip numeric-only segments (IDs) and file extensions
       if (/^\d+$/.test(seg) || /\.\w{2,4}$/.test(seg)) continue;
+      // Skip UUID tails. A uuid has dashes, and 0.871% of them contain a
+      // hex group that reads as a year (…-1993-4e13-…) — measured over
+      // 200k random uuids — so without this guard the id itself wins the
+      // loop below and becomes the title: year 1993, make "4e13".
+      // Hagerty puts identity in the second-to-last segment behind exactly
+      // such an id (/marketplace/auction/1965-Ford-Mustang/{uuid}).
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg)) continue;
       // Must have dashes (slugified) and contain a 4-digit year
       if (seg.includes("-") && /\b(19|20)\d{2}\b/.test(seg)) {
-        return seg.replace(/-/g, " ");
+        return cleanSlugTail(seg).replace(/-/g, " ");
       }
     }
     return null;
@@ -187,6 +285,32 @@ const MAKES = [
   "AM General",
 ];
 
+/**
+ * MAKES matched longest-first, with hyphen and space treated as equivalent.
+ *
+ * Two bugs this closes, both measured in live rows on 2026-07-26:
+ *  - URL slugs arrive with hyphens already turned into spaces
+ *    ("mercedes benz 350slc"), so a literal startsWith("Mercedes-Benz") misses
+ *    and the shorter alias "Mercedes" matches instead — consuming half the make
+ *    and leaving the rest at the head of the model. Result: make
+ *    "Mercedes-Benz" + model "benz sl500". 20 distinct corrupted model strings
+ *    in 24h.
+ *  - Array order decided which make won, so "International" shadowed
+ *    "International Harvester" the same way.
+ * Sorting by length makes the more specific make always win regardless of where
+ * anyone adds an entry, and `[-\s]*` also catches the run-together spelling
+ * ("rollsroyce") that RM Sotheby's slugs use.
+ */
+const MAKE_MATCHERS: Array<{ make: string; re: RegExp }> = [...MAKES]
+  .sort((a, b) => b.length - a.length)
+  .map((make) => ({
+    make,
+    re: new RegExp(
+      "^" + make.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/[-\s]+/g, "[-\\s]*") + "\\b",
+      "i",
+    ),
+  }));
+
 interface ParsedVehicle {
   year: number | null;
   make: string | null;
@@ -232,6 +356,33 @@ const MODEL_IMPLIES_MAKE: Record<string, string> = {
   "moke": "MINI",
 };
 
+/**
+ * Take the first few words after the make as the model.
+ *
+ * The old filter dropped EVERY purely-numeric word, which deleted real model
+ * designations: Austin-Healey 3000 lost its model entirely and was then refused
+ * by the minimum-viability gate; Land Rover Defender 90 became "defender";
+ * Chevrolet 210, Ferrari 250, Datsun 510, BMW 2002 all the same. The filter was
+ * aimed at listing ids and prices, so aim it there instead: ids are long (5+
+ * digits — `cleanSlugTail` already trims the trailing one) and a repeat of the
+ * year is noise, but a short number is part of the car's name.
+ */
+function modelFromWords(text: string, year: number | null): string | null {
+  return text
+    .split(/[\s·•|—,\-$]+/)
+    .filter((w) =>
+      w &&
+      !/^\$/.test(w) &&
+      // keep 1-4 digit designations, drop long opaque ids
+      !(/^\d+$/.test(w) && w.length > 4) &&
+      // drop a restated year ("1969 chevrolet 1969 camaro")
+      !(year !== null && w === String(year))
+    )
+    .slice(0, 3)
+    .join(" ")
+    .trim() || null;
+}
+
 function parseVehicleTitle(text: string): ParsedVehicle {
   if (!text) return { year: null, make: null, model: null };
 
@@ -249,16 +400,14 @@ function parseVehicleTitle(text: string): ParsedVehicle {
   const afterYear = cleaned.slice(cleaned.indexOf(yearMatch[0]) + yearMatch[0].length).trim();
   const lower = afterYear.toLowerCase();
 
-  for (const make of MAKES) {
-    if (lower.startsWith(make.toLowerCase())) {
-      const afterMake = afterYear.slice(make.length).trim();
-      const model = afterMake
-        .split(/[\s·•|—,\-$]+/)
-        .filter(w => w && !/^\d+$/.test(w) && !/^\$/.test(w))
-        .slice(0, 3)
-        .join(" ")
-        .trim() || null;
-      return { year, make: normalizeMake(make) || make, model };
+  for (const { make, re } of MAKE_MATCHERS) {
+    const hit = afterYear.match(re);
+    if (hit) {
+      // Slice by what actually matched, not by the length of the MAKES entry —
+      // the two differ whenever the separator differs ("mercedes benz" is 13
+      // chars, "Mercedes-Benz" is 13 but "mercedesbenz" is 12).
+      const afterMake = afterYear.slice(hit[0].length).trim();
+      return { year, make: normalizeMake(make) || make, model: modelFromWords(afterMake, year) };
     }
   }
 
@@ -268,11 +417,7 @@ function parseVehicleTitle(text: string): ParsedVehicle {
     if (re.test(lower)) {
       // Extract model as the text starting from the keyword
       const modelStart = lower.indexOf(keyword.toLowerCase());
-      const modelText = afterYear.slice(modelStart).split(/[\s·•|—,\-$]+/)
-        .filter(w => w && !/^\d+$/.test(w) && !/^\$/.test(w))
-        .slice(0, 3)
-        .join(" ")
-        .trim() || keyword;
+      const modelText = modelFromWords(afterYear.slice(modelStart), year) || keyword;
       return { year, make: impliedMake, model: modelText };
     }
   }
@@ -1024,11 +1169,39 @@ interface IngestResult {
   location?: string | null;
 }
 
+/**
+ * Coerce a location of unknown shape to the string the rest of ingest assumes.
+ *
+ * `location` is typed `string` everywhere downstream and used unguarded
+ * (`.toLowerCase()` in the Tier-3 confidence scorer, `parseLocation()` on the
+ * write path). A TypeScript annotation is not a runtime check: on 2026-07-26
+ * extract-hagerty-listing returned Hagerty's GraphQL location OBJECT and every
+ * ingest call in the poll died with "parsed.location.toLowerCase is not a
+ * function" — 20/20. This is the single door extractor output comes through,
+ * so one coercion here protects every consumer from every extractor.
+ */
+function normalizeLocation(loc: unknown): string | null {
+  if (typeof loc === "string") return loc.trim() || null;
+  if (loc && typeof loc === "object") {
+    const o = loc as Record<string, unknown>;
+    const parts = [o.city, o.state, o.country]
+      .filter((p): p is string => typeof p === "string" && p.trim().length > 0);
+    if (parts.length) return parts.join(", ");
+    // Unknown object shape — drop it rather than stringify "[object Object]"
+    // into a field that gets displayed and geocoded.
+    return null;
+  }
+  return null;
+}
+
 async function ingestOne(input: IngestInput, userId: string | null): Promise<IngestResult> {
   try {
     // Strict boolean: a JSON string "false" must not silently turn a real ingest
     // into a preview (refuter finding, 2026-07-12).
     const isPreview = input.preview === true;
+
+    // Callers post arbitrary JSON — normalize before anything reads it.
+    input.location = normalizeLocation(input.location) ?? undefined;
 
     // Determine source
     let platform = "manual";
@@ -1181,7 +1354,9 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         if (!input.body_style && enriched.body_style) input.body_style = enriched.body_style;
         if (!input.title_status && enriched.title_status) input.title_status = enriched.title_status;
         if (!input.condition && enriched.condition) input.condition = enriched.condition;
-        if (!input.location && enriched.location) input.location = enriched.location;
+        if (!input.location && enriched.location) {
+          input.location = normalizeLocation(enriched.location) ?? undefined;
+        }
         if (!input.seller_name && enriched.seller_name) input.seller_name = enriched.seller_name;
         // Extracted identity beats slug-derived guesses (caller-explicit fields
         // were already merged into input above, so they still win)

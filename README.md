@@ -11,7 +11,7 @@ output: 10,000+ sourced observations — every claim traced to origin,
         confidence-scored, time-ordered. Nothing overwrites. Everything compounds.
 ```
 
-| What | Scale |
+| What | Scale (mid-2026) |
 |------|-------|
 | Vehicles | 645,725 entities (292K active) |
 | Images | 32.8M classified by 41-zone taxonomy |
@@ -26,7 +26,7 @@ output: 10,000+ sourced observations — every claim traced to origin,
 
 The system's knowledge lives in [`docs/library/`](docs/library/README.md). If the code disappeared tomorrow, the library rebuilds it.
 
-| Shelf | What | Scale |
+| Shelf | What | Scale (mid-2026) |
 |-------|------|-------|
 | [**Dictionary**](docs/library/reference/dictionary/) | Every table, column, term, enum | 20,749 lines |
 | [**Encyclopedia**](docs/library/reference/encyclopedia/) | 23 sections — what the system IS | 1,250 lines |
@@ -120,8 +120,6 @@ Vercel (React SPA) ──→ Supabase Edge Functions (Deno) ──→ PostgreSQL
 | [**Library**](docs/library/README.md) | The system in written form — dictionary, schematics, engineering manual |
 | [**VISION.md**](VISION.md) | Why Nuke exists, the $1T gap, product stack |
 | [**TOOLS.md**](TOOLS.md) | Intent → function map. Read before building anything. |
-| [**CLAUDE.md**](CLAUDE.md) | Hard rules — 15 laws that prevent the platform from bloating |
-| [**PROJECT_STATE.md**](PROJECT_STATE.md) | Current sprint focus, what's active, what's paused |
 | [**Design Bible**](docs/DESIGN_BIBLE.md) | Three design laws, visual identity, component patterns |
 | [**Build Prompt**](docs/library/BUILD_PROMPT.md) | Phase 0-1 implementation guide for new agents |
 

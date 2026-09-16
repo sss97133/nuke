@@ -8,7 +8,7 @@
  * Design: 2px borders, zero radius, 8px labels, Courier New for prices.
  */
 
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { supabase } from '../../lib/supabase';
 import { usePopup } from '../../components/popups/usePopup';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
@@ -19,6 +19,21 @@ import type { FeedVehicle } from '../types/feed';
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+/** One row of public.get_ranked_offers — the shared web/iOS/API read. */
+interface RankedOffer {
+  vehicle_id: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  image_url: string | null;
+  price: number | null;
+  price_source: 'listing' | 'event' | 'bat' | null;
+  source: string | null;
+  segment_slug: string | null;
+  priority: number | null;
+  rank_score: number | null;
+}
 
 interface FreshFindMini {
   id: string;
@@ -153,82 +168,56 @@ export function FreshFindsStrip({
   const { openPopup } = usePopup();
   const [vehicles, setVehicles] = useState<FreshFindMini[]>([]);
 
-  // Only show for return visitors with interests and at least 1 hour gap
+  // Ranked offers need no interest history — the desire prior lives in
+  // market_segments, so a first-time visitor gets the same ranking a returning
+  // one does. `previousVisit` / `hasInterests` / `topMakes` are kept on the
+  // props so the strip can re-personalise later without a signature change.
   const isReturnVisitor = previousVisit > 0 && (Date.now() - previousVisit) > 3_600_000;
-  const shouldFetch = isReturnVisitor && hasInterests && topMakes.length > 0;
-
-  // Get the top 3 makes to query for
-  const interestMakes = useMemo(
-    () => topMakes.slice(0, 3).map((m) => m.name),
-    [topMakes],
-  );
+  const shouldFetch = true;
+  void isReturnVisitor; void hasInterests; void topMakes;
 
   useEffect(() => {
     if (!shouldFetch) return;
     let cancelled = false;
 
     async function fetchFreshFinds() {
-      const sinceISO = new Date(previousVisit).toISOString();
+      // ONE shared read — get_ranked_offers is the same RPC web, iOS and API
+      // consume (MULTI_SURFACE_BRIEF_2026-07-27), so the ranking can never
+      // disagree between surfaces. It replaces two brittle `vehicles` queries
+      // that guessed at make capitalisation and retried on low yield.
+      //
+      // Rank = desire prior (market_segments.priority) decayed by age; price
+      // walks listing -> auction event -> bat_listings, and stays null rather
+      // than guessing when no rung hits.
+      const { data, error } = await supabase.rpc('get_ranked_offers', {
+        p_limit: 10,
+        p_max_hours: 168,
+      });
 
-      // Query vehicles matching interest makes, added since last visit
-      // Ordered by find_score (best finds first), fall back to created_at
-      const { data } = await supabase
-        .from('vehicles')
-        .select('id, year, make, model, primary_image_url, sale_price, asking_price, discovery_source, find_score')
-        .gt('created_at', sinceISO)
-        .is('deleted_at', null)
-        .in('make', interestMakes.map((m) => m.charAt(0) + m.slice(1).toLowerCase()))
-        .not('primary_image_url', 'is', null)
-        .order('find_score', { ascending: false, nullsFirst: false })
-        .limit(10);
+      if (cancelled || error || !data) return;
 
-      if (cancelled || !data) return;
-
-      // Also try uppercase makes if the first query returned few results
-      if (data.length < 5) {
-        const { data: data2 } = await supabase
-          .from('vehicles')
-          .select('id, year, make, model, primary_image_url, sale_price, asking_price, discovery_source, find_score')
-          .gt('created_at', sinceISO)
-          .is('deleted_at', null)
-          .in('make', interestMakes)
-          .not('primary_image_url', 'is', null)
-          .order('find_score', { ascending: false, nullsFirst: false })
-          .limit(10);
-
-        if (cancelled) return;
-
-        // Merge and dedupe
-        const seen = new Set(data.map((v) => v.id));
-        const merged = [...data];
-        for (const v of (data2 || [])) {
-          if (!seen.has(v.id)) {
-            merged.push(v);
-            seen.add(v.id);
-          }
-        }
-
-        const mapped = merged.slice(0, 10).map((v: any) => ({
-          ...v,
-          display_price: v.sale_price || v.asking_price || null,
-        }));
-        setVehicles(mapped);
-        return;
-      }
-
-      const mapped = data.map((v: any) => ({
-        ...v,
-        display_price: v.sale_price || v.asking_price || null,
+      const mapped = (data as RankedOffer[]).map((v) => ({
+        id: v.vehicle_id,
+        year: v.year,
+        make: v.make,
+        model: v.model,
+        primary_image_url: v.image_url,
+        sale_price: null,
+        asking_price: v.price,
+        discovery_source: v.source,
+        find_score: v.rank_score,
+        display_price: v.price ?? null,
       }));
       setVehicles(mapped);
     }
 
     fetchFreshFinds();
     return () => { cancelled = true; };
-  }, [shouldFetch, previousVisit, interestMakes]);
+  }, [shouldFetch]);
 
-  // Don't render if nothing to show
-  if (!shouldFetch || vehicles.length === 0) return null;
+  // No empty shells (.claude/rules/frontend.md) — render nothing, never a
+  // "no data" box.
+  if (vehicles.length === 0) return null;
 
   const formatPrice = (n: number | null) => {
     if (!n || n <= 0) return null;
