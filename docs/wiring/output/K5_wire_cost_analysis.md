@@ -2,6 +2,8 @@
 
 Generated: 2026-04-05 | Source: ProWire USA actual catalog prices (scraped)
 
+> **Build decision (2026-05-11):** Tefzel only. This doc preserves the TXL comparison as historical cost-rationale context — the K5 is being built with M22759/32 + M22759/16 exclusively. TXL references in tables below are NOT live spec.
+
 ## Summary
 
 | Tier | Insulation | Temp Rating | Total Wire Cost | Cost/ft avg |

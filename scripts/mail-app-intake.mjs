@@ -2,7 +2,7 @@
 /**
  * mail-app-intake.mjs — Scrape vehicle listing URLs from Mail.app emails
  *
- * Reads the macOS Mail.app SQLite database for alerts-inbox@example.com,
+ * Reads the macOS Mail.app SQLite database for the alerts inbox (ALERTS_EMAIL),
  * finds unread vehicle alert emails (BaT, KSL, etc.), extracts listing
  * URLs from the .emlx files on disk, and queues them to import_queue.
  *

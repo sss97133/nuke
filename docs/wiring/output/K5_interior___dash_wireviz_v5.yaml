@@ -1,0 +1,317 @@
+# K5 INTERIOR / DASH — generated from K5_cut_list_v2.txt
+# 18 wires, sources: ECU, PDM30
+
+metadata:
+  title: "K5 INTERIOR / DASH"
+  pn: "K5-INTERIOR-DASH"
+  description: "1977 Chevrolet K5 Blazer · VIN CCL187Z210370 · LS3 6.2L · MoTeC M130 + PDM30. 18 wires from K5_cut_list_v2.txt. Wire spec: M22759/32 Tefzel (Pro tier). Generated 2026-05-14. Builder: NUKE LTD. Wiring: Desert Performance."
+  revision: "wireviz-2026-05-14"
+
+options:
+  fontname: "Roboto"
+  bgcolor: "WH"
+  color_mode: full
+
+connectors:
+  ECU:
+    type: "ECU"
+    subtype: female  # mating side that plugs into the device
+    pincount: 6
+    pinlabels: ["P36", "P37", "P42", "P43", "P44", "P45"]
+
+  PDM30:
+    type: "MoTeC Superseal A (34-pin) — MoTeC #65044"
+    subtype: female  # mating side that plugs into the device
+    pincount: 34
+    pinlabels: ["OUT21", "OUT22", "OUT25", "OUT29", "OUT3", "OUT30", "OUT4", "OUT6", "OUT8", "P71"]
+
+  Blower_Speed_Switch_Control:
+    type: "Blower Speed Switch/Control (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Cigarette_Lighter_12V_Outlet:
+    type: "Cigarette Lighter / 12V Outlet (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Dakota_Digital_Gauge_Cluster:
+    type: "Dakota Digital Gauge Cluster (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Display_Dash:
+    type: "Display/Dash (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Dome_Light:
+    type: "Dome Light (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Door_Switch_Left:
+    type: "Door Switch Left (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Door_Switch_Right:
+    type: "Door Switch Right (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Footwell_Lights:
+    type: "Footwell Lights (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Heater_Blower_Motor:
+    type: "Heater Blower Motor (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Lock_Switch:
+    type: "Lock Switch (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Power_Lock_Actuator_Left:
+    type: "Power Lock Actuator Left (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Power_Lock_Actuator_Right:
+    type: "Power Lock Actuator Right (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Power_Window_Motor_Left:
+    type: "Power Window Motor Left (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Power_Window_Motor_Right:
+    type: "Power Window Motor Right (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  USB_Charging_Port:
+    type: "USB Charging Port (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Under_Dash_LED_Lights:
+    type: "Under-Dash LED Lights (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Window_Switch_Master_Driver:
+    type: "Window Switch Master (Driver) (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Window_Switch_Passenger:
+    type: "Window Switch Passenger (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+cables:
+  W34:
+    gauge: 12 AWG
+    length: 6.9
+    wirecount: 1
+    colors: [BU]
+    notes: "#34 Power Window Motor Left (DK BLU)"
+
+  W35:
+    gauge: 12 AWG
+    length: 6.9
+    wirecount: 1
+    colors: [BUWH]
+    notes: "#35 Power Window Motor Right (DK BLU/WHT)"
+
+  W36:
+    gauge: 14 AWG
+    length: 6.9
+    wirecount: 1
+    colors: [OGYE]
+    notes: "#36 Window Switch Master (Driver) (ORN/YEL)"
+
+  W37:
+    gauge: 14 AWG
+    length: 6.9
+    wirecount: 1
+    colors: [OGVT]
+    notes: "#37 Window Switch Passenger (ORN/VIO)"
+
+  W38:
+    gauge: 18 AWG
+    length: 6.9
+    wirecount: 1
+    colors: [BK]
+    notes: "#38 Power Lock Actuator Left (BLK)"
+
+  W42:
+    gauge: 18 AWG
+    length: 6.9
+    wirecount: 1
+    colors: [OGBK]
+    notes: "#42 Door Switch Left (ORN/BLK)"
+
+  W43:
+    gauge: 18 AWG
+    length: 6.9
+    wirecount: 1
+    colors: [OGRD]
+    notes: "#43 Door Switch Right (ORN/RED)"
+
+  W44:
+    gauge: 18 AWG
+    length: 6.9
+    wirecount: 1
+    colors: [OGBU]
+    notes: "#44 Lock Switch (ORN/BLU)"
+
+  W45:
+    gauge: 14 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [OGYE]
+    notes: "#45 Blower Speed Switch/Control (ORN/YEL)"
+
+  W47:
+    gauge: 18 AWG
+    length: 6.9
+    wirecount: 1
+    colors: [BKWH]
+    notes: "#47 Power Lock Actuator Right (BLK/WHT)"
+
+  W51:
+    gauge: 12 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OGBKBU]
+    notes: "#51 Heater Blower Motor (ORN/BLK/BLU)"
+
+  W65:
+    gauge: 22 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [OGRD]
+    notes: "#65 Display/Dash (ORN/RED)"
+
+  W67:
+    gauge: 20 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [BN]
+    notes: "#67 Dome Light (BRN)"
+
+  W68:
+    gauge: 20 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [BNWH]
+    notes: "#68 Under-Dash LED Lights (BRN/WHT)"
+
+  W69:
+    gauge: 20 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [BNBK]
+    notes: "#69 Footwell Lights (BRN/BLK)"
+
+  W70:
+    gauge: 18 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [OGYE]
+    notes: "#70 USB Charging Port (ORN/YEL)"
+
+  W71:
+    gauge: 18 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [OGVT]
+    notes: "#71 Dakota Digital Gauge Cluster (ORN/VIO)"
+
+  W72:
+    gauge: 14 AWG
+    length: 3.5
+    wirecount: 1
+    colors: [OGOG]
+    notes: "#72 Cigarette Lighter / 12V Outlet (ORN/ORG)"
+
+connections:
+  -
+    - PDM30: ["OUT3"]
+    - W34: [1]
+    - Power_Window_Motor_Left: ["P1"]
+  -
+    - PDM30: ["OUT4"]
+    - W35: [1]
+    - Power_Window_Motor_Right: ["P1"]
+  -
+    - ECU: ["P36"]
+    - W36: [1]
+    - Window_Switch_Master_Driver: ["P1"]
+  -
+    - ECU: ["P37"]
+    - W37: [1]
+    - Window_Switch_Passenger: ["P1"]
+  -
+    - PDM30: ["OUT21"]
+    - W38: [1]
+    - Power_Lock_Actuator_Left: ["P1"]
+  -
+    - ECU: ["P42"]
+    - W42: [1]
+    - Door_Switch_Left: ["P1"]
+  -
+    - ECU: ["P43"]
+    - W43: [1]
+    - Door_Switch_Right: ["P1"]
+  -
+    - ECU: ["P44"]
+    - W44: [1]
+    - Lock_Switch: ["P1"]
+  -
+    - ECU: ["P45"]
+    - W45: [1]
+    - Blower_Speed_Switch_Control: ["P1"]
+  -
+    - PDM30: ["OUT22"]
+    - W47: [1]
+    - Power_Lock_Actuator_Right: ["P1"]
+  -
+    - PDM30: ["OUT6"]
+    - W51: [1]
+    - Heater_Blower_Motor: ["P1"]
+  -
+    - PDM30: ["OUT29"]
+    - W65: [1]
+    - Display_Dash: ["P1"]
+  -
+    - PDM30: ["OUT25"]
+    - W67: [1]
+    - Dome_Light: ["P1"]
+  -
+    - PDM30: ["OUT25"]
+    - W68: [1]
+    - Under_Dash_LED_Lights: ["P1"]
+  -
+    - PDM30: ["OUT25"]
+    - W69: [1]
+    - Footwell_Lights: ["P1"]
+  -
+    - PDM30: ["OUT30"]
+    - W70: [1]
+    - USB_Charging_Port: ["P1"]
+  -
+    - PDM30: ["P71"]
+    - W71: [1]
+    - Dakota_Digital_Gauge_Cluster: ["P1"]
+  -
+    - PDM30: ["OUT8"]
+    - W72: [1]
+    - Cigarette_Lighter_12V_Outlet: ["P1"]

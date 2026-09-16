@@ -37,7 +37,11 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 const BUCKET = 'vehicle-photos';
-const BATCH_SIZE = 10;
+// Concurrent inserts to one vehicle contend on per-vehicle triggers (image_count,
+// timeline) and hit lock timeouts. Default 10 for multi-vehicle bulk; pass
+// --batch-size 1 for single-vehicle uploads to serialize and avoid contention.
+const _bsIdx = process.argv.indexOf('--batch-size');
+const BATCH_SIZE = _bsIdx !== -1 ? Math.max(1, parseInt(process.argv[_bsIdx + 1]) || 10) : 10;
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp', '.tiff', '.tif']);
 
 // ─── CLI Args ────────────────────────────────────────────────────────────────
@@ -165,9 +169,37 @@ async function resolveVehicle() {
 
 // ─── Upload ──────────────────────────────────────────────────────────────────
 
+// Optional sidecar manifest: { "<filename>": "<ISO taken_at>" }. Folder uploads
+// otherwise lose capture time, dropping photos off the build timeline. When present,
+// taken_at is set on insert so each photo lands on its true calendar date.
+let takenAtMap = {};
+try {
+  const _sc = join(folderPath, '_taken_at.json');
+  if (existsSync(_sc)) {
+    takenAtMap = JSON.parse(readFileSync(_sc, 'utf8'));
+    console.log(`  taken_at sidecar: ${Object.keys(takenAtMap).length} entries`);
+  }
+} catch { /* sidecar is optional */ }
+
 async function uploadPhotos(files, vId) {
   let uploaded = 0, skipped = 0, errors = 0;
   const vehicleDir = vId || 'unassigned';
+
+  // Dedup: the script header promised file-hash dedup but never implemented it, so
+  // re-runs created duplicate rows (no unique constraint on storage_path). Preload the
+  // storage_paths already on this vehicle and skip any that exist — makes re-runs idempotent.
+  const existingPaths = new Set();
+  if (vId) {
+    let off = 0;
+    while (true) {
+      const { data } = await supabase.from('vehicle_images')
+        .select('storage_path').eq('vehicle_id', vId).range(off, off + 999);
+      if (!data || data.length === 0) break;
+      data.forEach(r => r.storage_path && existingPaths.add(r.storage_path));
+      if (data.length < 1000) break;
+      off += 1000;
+    }
+  }
 
   for (let i = 0; i < files.length; i += BATCH_SIZE) {
     const batch = files.slice(i, i + BATCH_SIZE);
@@ -178,6 +210,9 @@ async function uploadPhotos(files, vId) {
       const ext = extname(filename).toLowerCase();
       const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
       const storagePath = `${vehicleDir}/${source}/${filename}`;
+
+      // Skip if this exact photo path is already on the vehicle (idempotent re-run)
+      if (existingPaths.has(storagePath)) { skipped++; return; }
 
       // Upload to storage
       const { error: uploadErr } = await supabase.storage
@@ -202,6 +237,7 @@ async function uploadPhotos(files, vId) {
         mime_type: mimeType,
         is_external: false,
         ai_processing_status: 'pending',
+        ...(takenAtMap[filename] && { taken_at: takenAtMap[filename] }),
         ...(vId && { vehicle_id: vId }),
         ...(userId && { documented_by_user_id: userId }),
       };

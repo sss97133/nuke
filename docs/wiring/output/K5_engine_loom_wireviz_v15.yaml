@@ -1,0 +1,773 @@
+# K5 ENGINE LOOM — generated from K5_cut_list_v2.txt
+# 52 wires, sources: M130, PDM30
+#
+# !! SUBSTRATE INCONSISTENCY — pin assignment conflicts detected !!
+#   M130:A14 assigned to 2 signal wires:
+#     - #4c ETB TPS1 Signal
+#     - #102 Oil Pressure Sensor (ECU)
+#   See K5_diagram_quality_report.md for resolution status.
+
+metadata:
+  title: "K5 ENGINE LOOM"
+  pn: "K5-ENGINE_LOOM"
+  description: "1977 Chevrolet K5 Blazer · VIN CKR187F127263 · LS3 6.2L · MoTeC M130 + PDM30. 52 wires from K5_cut_list_v2.txt. Wire spec: M22759/32 Tefzel (Pro tier). Generated 2026-05-17. Builder: NUKE LTD. Wiring: Desert Performance."
+  revision: "wireviz-2026-05-17"
+
+options:
+  fontname: "Roboto"
+  bgcolor: "WH"
+  color_mode: full
+
+connectors:
+  M130:
+    type: "MoTeC Superseal Cnctr A (34-pin) — MoTeC #65044"
+    subtype: female  # mating side that plugs into the device
+    pincount: 34
+    pinlabels: ["A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08", "A09", "A12", "A13", "A14", "A15", "A16", "A17", "A18", "A19", "A20", "A21", "A22", "A27", "A28", "A29", "A30", "B01", "B02", "B03", "B04", "B05", "B07", "B13", "B15", "B16"]
+
+  PDM30:
+    type: "MoTeC Superseal A (34-pin) — MoTeC #65044"
+    subtype: female  # mating side that plugs into the device
+    pincount: 34
+    pinlabels: ["OUT15"]
+
+  Cam_Position_Sensor:
+    type: "Metri-Pack 3-pin — WPCMP30 / GM 12591720"
+    pincount: 3
+    pinlabels: [+5V, SIG, GND]
+    notes: Pigtail WPCMP30
+
+  Coolant_Temp_Sensor:
+    type: "Metri-Pack 150.2 2-pin sealed — WPCTS30 / GM 19236568"
+    pincount: 2
+    pinlabels: [SIG, GND]
+    notes: Pigtail WPCTS30
+
+  Crank_Position_Sensor:
+    type: "Metri-Pack 3-pin gray — WPCKP40 / GM 12615626"
+    pincount: 3
+    pinlabels: [+5V, SIG, GND]
+    notes: Pigtail WPCKP40
+
+  ETB:
+    type: "6-pin sealed — GM 13580085 mates GM 12605109"
+    pincount: 6
+    pinlabels: [MotorA, MotorB, TPS1, TPS2, +5V, GND]
+
+  Fuel_Injector_1:
+    type: "EV6/USCAR — WPINJ40 / GM 13352241 (2-pin)"
+    pincount: 2
+    pinlabels: [+12V, CTRL]
+    notes: Pigtail WPINJ40
+
+  Fuel_Injector_2:
+    type: "EV6/USCAR — WPINJ40 / GM 13352241 (2-pin)"
+    pincount: 2
+    pinlabels: [+12V, CTRL]
+    notes: Pigtail WPINJ40
+
+  Fuel_Injector_3:
+    type: "EV6/USCAR — WPINJ40 / GM 13352241 (2-pin)"
+    pincount: 2
+    pinlabels: [+12V, CTRL]
+    notes: Pigtail WPINJ40
+
+  Fuel_Injector_4:
+    type: "EV6/USCAR — WPINJ40 / GM 13352241 (2-pin)"
+    pincount: 2
+    pinlabels: [+12V, CTRL]
+    notes: Pigtail WPINJ40
+
+  Fuel_Injector_5:
+    type: "EV6/USCAR — WPINJ40 / GM 13352241 (2-pin)"
+    pincount: 2
+    pinlabels: [+12V, CTRL]
+    notes: Pigtail WPINJ40
+
+  Fuel_Injector_6:
+    type: "EV6/USCAR — WPINJ40 / GM 13352241 (2-pin)"
+    pincount: 2
+    pinlabels: [+12V, CTRL]
+    notes: Pigtail WPINJ40
+
+  Fuel_Injector_7:
+    type: "EV6/USCAR — WPINJ40 / GM 13352241 (2-pin)"
+    pincount: 2
+    pinlabels: [+12V, CTRL]
+    notes: Pigtail WPINJ40
+
+  Fuel_Injector_8:
+    type: "EV6/USCAR — WPINJ40 / GM 13352241 (2-pin)"
+    pincount: 2
+    pinlabels: [+12V, CTRL]
+    notes: Pigtail WPINJ40
+
+  Fuel_Pressure_Sensor:
+    type: "3-pin (PN TBD)"
+    pincount: 3
+    pinlabels: [+5V, SIG, GND]
+
+  Ignition_Coil_1:
+    type: "D510C — WPCOL40 / GM 12162000 (4-pin)"
+    pincount: 4
+    pinlabels: [+12V, GND, SIG, GND2]
+    notes: Pigtail WPCOL40
+
+  Ignition_Coil_2:
+    type: "D510C — WPCOL40 / GM 12162000 (4-pin)"
+    pincount: 4
+    pinlabels: [+12V, GND, SIG, GND2]
+    notes: Pigtail WPCOL40
+
+  Ignition_Coil_3:
+    type: "D510C — WPCOL40 / GM 12162000 (4-pin)"
+    pincount: 4
+    pinlabels: [+12V, GND, SIG, GND2]
+    notes: Pigtail WPCOL40
+
+  Ignition_Coil_4:
+    type: "D510C — WPCOL40 / GM 12162000 (4-pin)"
+    pincount: 4
+    pinlabels: [+12V, GND, SIG, GND2]
+    notes: Pigtail WPCOL40
+
+  Ignition_Coil_5:
+    type: "D510C — WPCOL40 / GM 12162000 (4-pin)"
+    pincount: 4
+    pinlabels: [+12V, GND, SIG, GND2]
+    notes: Pigtail WPCOL40
+
+  Ignition_Coil_6:
+    type: "D510C — WPCOL40 / GM 12162000 (4-pin)"
+    pincount: 4
+    pinlabels: [+12V, GND, SIG, GND2]
+    notes: Pigtail WPCOL40
+
+  Ignition_Coil_7:
+    type: "D510C — WPCOL40 / GM 12162000 (4-pin)"
+    pincount: 4
+    pinlabels: [+12V, GND, SIG, GND2]
+    notes: Pigtail WPCOL40
+
+  Ignition_Coil_8:
+    type: "D510C — WPCOL40 / GM 12162000 (4-pin)"
+    pincount: 4
+    pinlabels: [+12V, GND, SIG, GND2]
+    notes: Pigtail WPCOL40
+
+  Intake_Air_Temp_Sensor:
+    type: "2-pin (LS3 IAT — GM PN TBD)"
+    pincount: 2
+    pinlabels: [SIG, GND]
+
+  Knock_Sensor_Bank_1:
+    type: "2-pin sealed metric — WPKNO40 / GM 12623730"
+    pincount: 2
+    pinlabels: [SIG, GND]
+    notes: Pigtail WPKNO40
+
+  Knock_Sensor_Bank_2:
+    type: "2-pin sealed metric — WPKNO40 / GM 12623730"
+    pincount: 2
+    pinlabels: [SIG, GND]
+    notes: Pigtail WPKNO40
+
+  MAP_Sensor:
+    type: "Bosch 3-pin sealed — GM 55573248 / ACDelco PT2293"
+    pincount: 3
+    pinlabels: [+5V, SIG, GND]
+
+  Oil_Pressure_Sensor:
+    type: "3-pin oval sealed — WP0IL40 / GM 12673134"
+    pincount: 3
+    pinlabels: [+5V, SIG, GND]
+    notes: Pigtail WP0IL40
+
+  Oil_Temperature_Sensor:
+    type: "2-pin (PN TBD)"
+    pincount: 2
+    pinlabels: [SIG, GND]
+
+  Rear_Backup_Camera:
+    type: "Camera connector (PN TBD)"
+    pincount: 4
+    pinlabels: [+12V, GND, VID+, VID-]
+
+cables:
+  W4a:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BN]
+    notes: "#4a ETB TAC Motor 2 (BRN)"
+
+  W4b:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [YE]
+    notes: "#4b ETB TAC Motor 1 (YEL)"
+
+  W4c:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GN]
+    notes: "#4c ETB TPS1 Signal (DK GRN)"
+
+  W4d:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [VT]
+    notes: "#4d ETB TPS2 Signal (PPL)"
+
+  W4e:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GY]
+    notes: "#4e ETB 5V Reference (GRY)"
+
+  W4f:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BK]
+    notes: "#4f ETB Signal Ground (BLK)"
+
+  W5:
+    gauge: 20 AWG
+    length: 2.5
+    wirecount: 1
+    colors: [WH]
+    notes: "#5 Ignition Coil 3 (WHT)"
+
+  W7:
+    gauge: 20 AWG
+    length: 2.5
+    wirecount: 1
+    colors: [WHWH]
+    notes: "#7 Ignition Coil 5 (WHT/WHT)"
+
+  W8:
+    gauge: 20 AWG
+    length: 2.5
+    wirecount: 1
+    colors: [WHBK]
+    notes: "#8 Ignition Coil 7 (WHT/BLK)"
+
+  W9:
+    gauge: 20 AWG
+    length: 2.5
+    wirecount: 1
+    colors: [WHRD]
+    notes: "#9 Ignition Coil 2 (WHT/RED)"
+
+  W10:
+    gauge: 20 AWG
+    length: 2.5
+    wirecount: 1
+    colors: [WHBU]
+    notes: "#10 Ignition Coil 4 (WHT/BLU)"
+
+  W11:
+    gauge: 20 AWG
+    length: 2.5
+    wirecount: 1
+    colors: [WHYE]
+    notes: "#11 Ignition Coil 6 (WHT/YEL)"
+
+  W12:
+    gauge: 20 AWG
+    length: 2.5
+    wirecount: 1
+    colors: [WHVT]
+    notes: "#12 Ignition Coil 8 (WHT/VIO)"
+
+  W13:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GN]
+    notes: "#13 Fuel Injector 1 (GRN)"
+
+  W14:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GNWH]
+    notes: "#14 Fuel Injector 2 (GRN/WHT)"
+
+  W15:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GNBK]
+    notes: "#15 Fuel Injector 3 (GRN/BLK)"
+
+  W16:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GNRD]
+    notes: "#16 Fuel Injector 4 (GRN/RED)"
+
+  W17:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GNBU]
+    notes: "#17 Fuel Injector 5 (GRN/BLU)"
+
+  W18:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GNYE]
+    notes: "#18 Fuel Injector 6 (GRN/YEL)"
+
+  W19:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GNVT]
+    notes: "#19 Fuel Injector 7 (GRN/VIO)"
+
+  W20:
+    gauge: 18 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GNOG]
+    notes: "#20 Fuel Injector 8 (GRN/ORG)"
+
+  W24:
+    gauge: 20 AWG
+    length: 2.5
+    wirecount: 1
+    colors: [WHOG]
+    notes: "#24 Ignition Coil 1 (WHT/ORG)"
+
+  W97:
+    gauge: 20 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [BUWH]
+    notes: "#97 Rear Backup Camera (BLU/WHT)"
+
+  W99:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 2
+    shield: true
+    colors: [WH, BK]   # signal + ground (cut list color "BLU/WHT/WHT" is bundle ID)
+    notes: "#99 Crank Position Sensor — 22 AWG M27500-style shielded 2C, drain to sensor ground"
+
+  W101:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 2
+    shield: true
+    colors: [WH, BK]   # signal + ground (cut list color "BLU/WHT/BLK" is bundle ID)
+    notes: "#101 Cam Position Sensor — 22 AWG M27500-style shielded 2C, drain to sensor ground"
+
+  W102:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [VT]
+    notes: "#102 Oil Pressure Sensor (ECU) (VIO)"
+
+  W103:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 2
+    shield: true
+    colors: [WH, BK]   # signal + ground (cut list color "GRY" is bundle ID)
+    notes: "#103 Knock Sensor Bank 1 — 22 AWG M27500-style shielded 2C, drain to sensor ground"
+
+  W104:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 2
+    shield: true
+    colors: [WH, BK]   # signal + ground (cut list color "GRY/WHT" is bundle ID)
+    notes: "#104 Knock Sensor Bank 2 — 22 AWG M27500-style shielded 2C, drain to sensor ground"
+
+  W108:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [VTWH]
+    notes: "#108 MAP Sensor (VIO/WHT)"
+
+  W109:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BN]
+    notes: "#109 Intake Air Temp Sensor (TAN)"
+
+  W110:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BNWH]
+    notes: "#110 Coolant Temp Sensor (ECU) (TAN/WHT)"
+
+  W112:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [VTBK]
+    notes: "#112 Fuel Pressure Sensor (VIO/BLK)"
+
+  W113:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BNBK]
+    notes: "#113 Oil Temperature Sensor (TAN/BLK)"
+
+  W109g:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BK]
+    notes: "#109g IAT Sensor Ground (BLK)"
+
+  W110g:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BK]
+    notes: "#110g CLT Sensor Ground (BLK)"
+
+  W113g:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BK]
+    notes: "#113g OTS Sensor Ground (BLK)"
+
+  W102g:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BK]
+    notes: "#102g OPS Sensor Ground (BLK)"
+
+  W102r:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GY]
+    notes: "#102r OPS 5V Reference (GRY)"
+
+  W108g:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BK]
+    notes: "#108g MAP Sensor Ground (BLK)"
+
+  W108r:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GY]
+    notes: "#108r MAP 5V Reference (GRY)"
+
+  W112g:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BK]
+    notes: "#112g Fuel Pressure Ground (BLK)"
+
+  W112r:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GY]
+    notes: "#112r Fuel Pressure 5V Reference (GRY)"
+
+  W99g:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BK]
+    notes: "#99g CKP Sensor Ground (conductor 2 of #99 shielded 2C cable) (BLK)"
+
+  W99r:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GY]
+    notes: "#99r CKP 5V Reference (GRY)"
+
+  W99s:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BA]
+    notes: "#99s CKP Shield Drain (BARE)"
+
+  W101g:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BK]
+    notes: "#101g CMP Sensor Ground (conductor 2 of #101 shielded 2C) (BLK)"
+
+  W101r:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [GY]
+    notes: "#101r CMP 5V Reference (GRY)"
+
+  W101s:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BA]
+    notes: "#101s CMP Shield Drain (BARE)"
+
+  W103g:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BK]
+    notes: "#103g Knock B1 Sensor Ground (conductor 2) (BLK)"
+
+  W103s:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BA]
+    notes: "#103s Knock B1 Shield Drain (BARE)"
+
+  W104g:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BK]
+    notes: "#104g Knock B2 Sensor Ground (conductor 2) (BLK)"
+
+  W104s:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [BA]
+    notes: "#104s Knock B2 Shield Drain (BARE)"
+
+connections:
+  -
+    - M130: ["A01"]
+    - W4a: [1]
+    - ETB: ["MotorB"]
+  -
+    - M130: ["A18"]
+    - W4b: [1]
+    - ETB: ["MotorA"]
+  -
+    - M130: ["A14"]
+    - W4c: [1]
+    - ETB: ["TPS1"]
+  -
+    - M130: ["A17"]
+    - W4d: [1]
+    - ETB: ["TPS2"]
+  -
+    - M130: ["A02"]
+    - W4e: [1]
+    - ETB: ["+5V"]
+  -
+    - M130: ["B15"]
+    - W4f: [1]
+    - ETB: ["GND"]
+  -
+    - M130: ["A03"]
+    - W5: [1]
+    - Ignition_Coil_3: ["SIG"]
+  -
+    - M130: ["A04"]
+    - W7: [1]
+    - Ignition_Coil_5: ["SIG"]
+  -
+    - M130: ["A05"]
+    - W8: [1]
+    - Ignition_Coil_7: ["SIG"]
+  -
+    - M130: ["A06"]
+    - W9: [1]
+    - Ignition_Coil_2: ["SIG"]
+  -
+    - M130: ["A07"]
+    - W10: [1]
+    - Ignition_Coil_4: ["SIG"]
+  -
+    - M130: ["A08"]
+    - W11: [1]
+    - Ignition_Coil_6: ["SIG"]
+  -
+    - M130: ["A12"]
+    - W12: [1]
+    - Ignition_Coil_8: ["SIG"]
+  -
+    - M130: ["A19"]
+    - W13: [1]
+    - Fuel_Injector_1: ["CTRL"]
+  -
+    - M130: ["A20"]
+    - W14: [1]
+    - Fuel_Injector_2: ["CTRL"]
+  -
+    - M130: ["A21"]
+    - W15: [1]
+    - Fuel_Injector_3: ["CTRL"]
+  -
+    - M130: ["A22"]
+    - W16: [1]
+    - Fuel_Injector_4: ["CTRL"]
+  -
+    - M130: ["A27"]
+    - W17: [1]
+    - Fuel_Injector_5: ["CTRL"]
+  -
+    - M130: ["A28"]
+    - W18: [1]
+    - Fuel_Injector_6: ["CTRL"]
+  -
+    - M130: ["A29"]
+    - W19: [1]
+    - Fuel_Injector_7: ["CTRL"]
+  -
+    - M130: ["A30"]
+    - W20: [1]
+    - Fuel_Injector_8: ["CTRL"]
+  -
+    - M130: ["A13"]
+    - W24: [1]
+    - Ignition_Coil_1: ["SIG"]
+  -
+    - PDM30: ["OUT15"]
+    - W97: [1]
+    - Rear_Backup_Camera: ["+12V"]
+  -
+    - M130: ["B01"]
+    - W99: [1]
+    - Crank_Position_Sensor: ["SIG"]
+  -
+    - M130: ["B02"]
+    - W101: [1]
+    - Cam_Position_Sensor: ["SIG"]
+  -
+    - M130: ["A14"]
+    - W102: [1]
+    - Oil_Pressure_Sensor: ["SIG"]
+  -
+    - M130: ["B07"]
+    - W103: [1]
+    - Knock_Sensor_Bank_1: ["SIG"]
+  -
+    - M130: ["B13"]
+    - W104: [1]
+    - Knock_Sensor_Bank_2: ["SIG"]
+  -
+    - M130: ["A15"]
+    - W108: [1]
+    - MAP_Sensor: ["SIG"]
+  -
+    - M130: ["B03"]
+    - W109: [1]
+    - Intake_Air_Temp_Sensor: ["SIG"]
+  -
+    - M130: ["B04"]
+    - W110: [1]
+    - Coolant_Temp_Sensor: ["SIG"]
+  -
+    - M130: ["A16"]
+    - W112: [1]
+    - Fuel_Pressure_Sensor: ["SIG"]
+  -
+    - M130: ["B05"]
+    - W113: [1]
+    - Oil_Temperature_Sensor: ["SIG"]
+  -
+    - M130: ["B15"]
+    - W109g: [1]
+    - Intake_Air_Temp_Sensor: ["GND"]
+  -
+    - M130: ["B16"]
+    - W110g: [1]
+    - Coolant_Temp_Sensor: ["GND"]
+  -
+    - M130: ["B15"]
+    - W113g: [1]
+    - Oil_Temperature_Sensor: ["GND"]
+  -
+    - M130: ["B16"]
+    - W102g: [1]
+    - Oil_Pressure_Sensor: ["GND"]
+  -
+    - M130: ["A02"]
+    - W102r: [1]
+    - Oil_Pressure_Sensor: ["+5V"]
+  -
+    - M130: ["B15"]
+    - W108g: [1]
+    - MAP_Sensor: ["GND"]
+  -
+    - M130: ["A09"]
+    - W108r: [1]
+    - MAP_Sensor: ["+5V"]
+  -
+    - M130: ["B16"]
+    - W112g: [1]
+    - Fuel_Pressure_Sensor: ["GND"]
+  -
+    - M130: ["A02"]
+    - W112r: [1]
+    - Fuel_Pressure_Sensor: ["+5V"]
+  -
+    - M130: ["B15"]
+    - W99g: [1]
+    - Crank_Position_Sensor: ["GND"]
+  -
+    - M130: ["A02"]
+    - W99r: [1]
+    - Crank_Position_Sensor: ["+5V"]
+  -
+    - M130: ["B15"]
+    - W99s: [1]
+    - Crank_Position_Sensor: ["GND"]
+  -
+    - M130: ["B16"]
+    - W101g: [1]
+    - Cam_Position_Sensor: ["GND"]
+  -
+    - M130: ["A09"]
+    - W101r: [1]
+    - Cam_Position_Sensor: ["+5V"]
+  -
+    - M130: ["B16"]
+    - W101s: [1]
+    - Cam_Position_Sensor: ["GND"]
+  -
+    - M130: ["B15"]
+    - W103g: [1]
+    - Knock_Sensor_Bank_1: ["GND"]
+  -
+    - M130: ["B15"]
+    - W103s: [1]
+    - Knock_Sensor_Bank_1: ["GND"]
+  -
+    - M130: ["B16"]
+    - W104g: [1]
+    - Knock_Sensor_Bank_2: ["GND"]
+  -
+    - M130: ["B16"]
+    - W104s: [1]
+    - Knock_Sensor_Bank_2: ["GND"]

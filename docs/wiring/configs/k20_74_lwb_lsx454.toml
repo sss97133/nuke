@@ -1,0 +1,53 @@
+# K20 FORK SCAFFOLD — '74 Chevrolet K20 LWB pickup · LSX454 + 6L90
+# ============================================================================
+# FORK SEMANTICS (read before trusting any number this config produces):
+#   template     = K5 v4.2 (1977 K5 Blazer, LS3 + 6L80E + MoTeC M130/PDM30,
+#                  174 wires / 1,143.5 ft, output/K5_cut_list_v4_2.txt)
+#   vehicle      = TBD-CONFIRM. Working candidate: Doug's K20
+#                  d7adb919-93d8-4fc3-af1b-afb4e027acb3 (1974 Cheyenne Super
+#                  K20, VIN CKY244Z103570). DB has NO row labeled "1974 K20
+#                  LWB" and NO LSX454/6L90 observation — Skylar confirms.
+#                  See output/K20_FORK_PLAN.md §0.
+#   geometry     = INVALID. Running this config recomputes the K5 TEMPLATE
+#                  under K20 toggles. EVERY LENGTH IS K5-TWIN-DERIVED
+#                  (K5_landmarks_blender_derived.yaml) and is
+#                  invalid-until-rederived on K20 geometry:
+#                  wheelbase 106.5" (K5) vs 131.5" (K20 LWB, Wikipedia C/K
+#                  third gen + It Still Runs 1984 K20 spec). Rear loom, fuel
+#                  tank (Blazer rear tank vs pickup side-saddle), dome run,
+#                  battery/alternator runs all re-derive from the K20 digital
+#                  twin (TurboSquid #1799009 — PAID Dec 2024 order #6425842,
+#                  never downloaded; see K20_FORK_PLAN.md §6).
+#   engine       = LSX454 (GMPM 19417357): Gen-IV architecture, 58X reluctor,
+#                  iron LSX block, LSX-LS7 heads, ships WITHOUT intake/coils/
+#                  injectors/accessories — coil/injector topology carries as
+#                  builder choice (8x DEL-Stributor + 8 inj pattern). Open:
+#                  knock bosses, cam 4X verify, intake for LS7-port heads,
+#                  accessory drive. K20_FORK_PLAN.md §4.
+#   trans        = 6L90 via Holley 558-499 (explicitly covers 2007+ 6L80/6L90,
+#                  CAN to internal T43 TCM). RISK: 558-499<->M130 pairing
+#                  unproven on the K5 — prove there first (§7 Risk 2).
+#   output label = TEMPLATE STRUCTURE ONLY, not K20 numbers.
+# ============================================================================
+# Baseline: work-truck-ish K20 (Skylar to adjust). Mirrors k5_work_truck.toml
+# precedent + K5-flavor accessories off + factory mechanical parking brake.
+# Omitted toggles default ON (CORE_ENGINE, FUEL, COOLING, CHARGING_STARTING,
+# TRANS_6L80E->6L90, LIGHTING_*, DOME_COURTESY, HVAC_AC, WIPERS_WASHER,
+# DASH_CLUSTER_DAKOTA, ACCESSORY_12V, HARNESS_INFRA).
+
+[fork]                       # metadata only — ignored by k5_harness_calc.py
+template = "K5 v4.2"
+vehicle_id = "TBD-confirm (candidate d7adb919-93d8-4fc3-af1b-afb4e027acb3)"
+lengths = "invalid-until-rederived (K5 geometry)"
+plan = "docs/wiring/output/K20_FORK_PLAN.md"
+
+[toggles]
+AUDIO = false                # work truck — no head unit/amp/speakers
+POWER_WINDOWS = false        # manual windows assumed (Skylar to flip)
+POWER_LOCKS = false          # manual locks assumed
+AMP_STEPS = false            # K5-specific accessory, not on the pickup
+CAMERA_REAR = false          # off baseline; if on, rear run re-derives (+~25-28")
+EXHAUST_CUTOUTS_QTP = false  # K5 flavor; had zero cut-list wires anyway
+EPARKING_BRAKE = false       # factory mechanical foot brake assumed (OD-12)
+BRAKES_IBOOSTER = true       # ON as available structure — K20 brake arch is OPEN (OD-11)
+HVAC_AC = true               # heater carries; A/C clutch gated on accessory drive (OD-9)

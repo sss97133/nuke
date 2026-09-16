@@ -1,0 +1,221 @@
+# K5 CHASSIS / UNDERBODY — generated from K5_cut_list_v2.txt
+# 12 wires, sources: ECU, PDM30
+
+metadata:
+  title: "K5 CHASSIS / UNDERBODY"
+  pn: "K5-CHASSIS-UNDERBODY"
+  description: "1977 Chevrolet K5 Blazer · VIN CKR187F127263 · LS3 6.2L · MoTeC M130 + PDM30. 12 wires from K5_cut_list_v2.txt. Wire spec: M22759/32 Tefzel (Pro tier). Generated 2026-05-17. Builder: NUKE LTD. Wiring: Desert Performance."
+  revision: "wireviz-2026-05-17"
+
+options:
+  fontname: "Roboto"
+  bgcolor: "WH"
+  color_mode: full
+
+connectors:
+  ECU:
+    type: "ECU"
+    subtype: female  # mating side that plugs into the device
+    pincount: 4
+    pinlabels: ["P100", "P106", "P107", "P66"]
+
+  PDM30:
+    type: "MoTeC Superseal A (34-pin) — MoTeC #65044"
+    subtype: female  # mating side that plugs into the device
+    pincount: 34
+    pinlabels: ["OUT1", "OUT10", "OUT11", "OUT2", "OUT24", "OUT5", "OUT9", "P94"]
+
+  AMP_Research_Controller:
+    type: "AMP Research Controller (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  AMP_Research_Step_Left:
+    type: "AMP Research Step Left (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  AMP_Research_Step_Right:
+    type: "AMP Research Step Right (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Electric_Water_Pump:
+    type: "Electric Water Pump (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Fuel_Pump:
+    type: "Fuel Pump (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Fuel_Pump_Relay:
+    type: "Fuel Pump Relay (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Radiator_Fan_1:
+    type: "Radiator Fan 1 (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Radiator_Fan_2:
+    type: "Radiator Fan 2 (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Vehicle_Speed_Sensor:
+    type: "Vehicle Speed Sensor (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Wideband_Lambda_Controller:
+    type: "Wideband Lambda Controller (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Wideband_O2_Sensor_1:
+    type: "Wideband O2 Sensor 1 (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+  Wideband_O2_Sensor_2:
+    type: "Wideband O2 Sensor 2 (connector PN unknown)"
+    pincount: 1
+    pinlabels: [P1]
+
+cables:
+  W1:
+    gauge: 14 AWG
+    length: 11.5
+    wirecount: 1
+    colors: [OGBK]
+    notes: "#1 AMP Research Step Left (ORN/BLK)"
+
+  W2:
+    gauge: 14 AWG
+    length: 11.5
+    wirecount: 1
+    colors: [OGBKWH]
+    notes: "#2 AMP Research Step Right (ORN/BLK/WHT)"
+
+  W3:
+    gauge: 14 AWG
+    length: 11.5
+    wirecount: 1
+    colors: [OGBKBK]
+    notes: "#3 AMP Research Controller (ORN/BLK/BLK)"
+
+  W21:
+    gauge: 12 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OGWH]
+    notes: "#21 Radiator Fan 1 (ORN/WHT)"
+
+  W22:
+    gauge: 12 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OGBK]
+    notes: "#22 Radiator Fan 2 (ORN/BLK)"
+
+  W25:
+    gauge: 14 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OGBU]
+    notes: "#25 Electric Water Pump (ORN/BLU)"
+
+  W64:
+    gauge: 20 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OGBK]
+    notes: "#64 Wideband Lambda Controller (ORN/BLK)"
+
+  W66:
+    gauge: 10 AWG
+    length: 18.4
+    wirecount: 1
+    colors: [OGBU]
+    notes: "#66 Fuel Pump (ORN/BLU)"
+
+  W94:
+    gauge: 22 AWG
+    length: 4.6
+    wirecount: 1
+    colors: [OG]
+    notes: "#94 Fuel Pump Relay (ORN)"
+
+  W100:
+    gauge: 22 AWG
+    length: 11.5
+    wirecount: 1
+    colors: [OGBU]
+    notes: "#100 Vehicle Speed Sensor (ORN/BLU)"
+
+  W106:
+    gauge: 22 AWG
+    length: 11.5
+    wirecount: 1
+    colors: [VTBU]
+    notes: "#106 Wideband O2 Sensor 1 (VIO/BLU)"
+
+  W107:
+    gauge: 22 AWG
+    length: 11.5
+    wirecount: 1
+    colors: [VTBUWH]
+    notes: "#107 Wideband O2 Sensor 2 (VIO/BLU/WHT)"
+
+connections:
+  -
+    - PDM30: ["OUT9"]
+    - W1: [1]
+    - AMP_Research_Step_Left: ["P1"]
+  -
+    - PDM30: ["OUT10"]
+    - W2: [1]
+    - AMP_Research_Step_Right: ["P1"]
+  -
+    - PDM30: ["OUT11"]
+    - W3: [1]
+    - AMP_Research_Controller: ["P1"]
+  -
+    - PDM30: ["OUT1"]
+    - W21: [1]
+    - Radiator_Fan_1: ["P1"]
+  -
+    - PDM30: ["OUT2"]
+    - W22: [1]
+    - Radiator_Fan_2: ["P1"]
+  -
+    - PDM30: ["OUT5"]
+    - W25: [1]
+    - Electric_Water_Pump: ["P1"]
+  -
+    - PDM30: ["OUT24"]
+    - W64: [1]
+    - Wideband_Lambda_Controller: ["P1"]
+  -
+    - ECU: ["P66"]
+    - W66: [1]
+    - Fuel_Pump: ["P1"]
+  -
+    - PDM30: ["P94"]
+    - W94: [1]
+    - Fuel_Pump_Relay: ["P1"]
+  -
+    - ECU: ["P100"]
+    - W100: [1]
+    - Vehicle_Speed_Sensor: ["P1"]
+  -
+    - ECU: ["P106"]
+    - W106: [1]
+    - Wideband_O2_Sensor_1: ["P1"]
+  -
+    - ECU: ["P107"]
+    - W107: [1]
+    - Wideband_O2_Sensor_2: ["P1"]

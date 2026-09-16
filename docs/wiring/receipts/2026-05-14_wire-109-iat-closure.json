@@ -1,0 +1,232 @@
+{
+  "$schema": "../schemas/wire-closure.schema.json",
+  "wire_id": "109",
+  "label": "Intake Air Temp Sensor",
+  "loom": "ENGINE LOOM",
+  "bundle": "B4-ETB/Intake",
+  "from": {
+    "device": {
+      "value": "MoTeC M130 ECU",
+      "source": "K5_WIRING_STATE.md \u00a71; chapters/appendix-d-k5-build.md"
+    },
+    "connector": {
+      "value": "Connector B (Superseal 26-pin)",
+      "source": "K5_connector_schedule.txt:33"
+    },
+    "pin": {
+      "value": "B03",
+      "source": "K5_cut_list_v2.txt:39"
+    },
+    "pin_function": {
+      "value": "AN_TEMP1 / AT1 (IAT)",
+      "source": "chapters/appendix-g-diagram-requirements-spec.md:889 (\"IAT B03\"); chapters/12-build-sheet.md:32 (\"IAT (AT1)\"); K5_wire_spec_and_costs.md Job 1 (M130 has 4 AT inputs on B03-B06)"
+    },
+    "signal_type": {
+      "value": "analog_temp",
+      "source": "chapters/05-build-manifest.md \u00a7ECU-Connected Signal Types; K5_wire_spec_and_costs.md Job 1"
+    },
+    "expected_wire_count": 2
+  },
+  "to": {
+    "device": {
+      "value": "GM LS3 IAT sensor (NTC thermistor)",
+      "source": "K5_wire_labels.md:79 (\"INTAKE TEMP IAT 22\"); K5_harness_build_sheets_v2.md:158"
+    },
+    "device_pn": {
+      "unknown": true,
+      "needs": "GM IAT sensor PN not in K5_shopping_list.md or K5_connector_shopping_list.txt. Common LS3 IAT PNs are GM 12568470 (older), GM 25036751 (factory air cleaner integrated), or aftermarket like Bosch 0280130039. Needs verification of which sensor is being used on this build."
+    },
+    "connector_type": {
+      "unknown": true,
+      "needs": "IAT mating connector type depends on sensor PN selected above; typically a 2-pin Metri-Pack 150.2 sealed (similar to CTS) but distinct PN. Needs vendor doc citation after sensor PN is locked."
+    },
+    "physical_location": {
+      "value": "In intake runner or MAF housing area on Holley 300-131 intake manifold",
+      "source": "K5_harness_build_sheets_v2.md:158"
+    },
+    "pigtail_pn": {
+      "unknown": true,
+      "needs": "No IAT pigtail listed in K5_connector_shopping_list.txt (only CTS / CKP / CMP / KS / OPS / Injector / Coil pigtails are enumerated). ICT Billet does sell IAT pigtails \u2014 needs PN lookup."
+    }
+  },
+  "wire_spec": {
+    "gauge_awg": 22,
+    "spec": "M22759/32",
+    "color": "TAN",
+    "shielding": false
+  },
+  "routing": {
+    "landmark_path": [
+      "L01",
+      "L02",
+      "L09"
+    ],
+    "total_length_in": {
+      "value": 66.2,
+      "method": "zone_distance_estimate",
+      "estimate_basis": "K5_cut_list_v2.txt:39 baseline 4.6 ft + 20% engine bay pad \u2192 5.52 ft = 66.2 in. Real path through L01-L02-L09 cannot be computed; K5_landmarks.yaml has all three values null."
+    }
+  },
+  "termination": {
+    "from_terminal_pn": {
+      "unknown": true,
+      "needs": "Read motec_m1_hardware_techspec.pdf p16 for Superseal 26-pin terminal PN (same source needed for #110)"
+    },
+    "from_seal_pn": {
+      "unknown": true,
+      "needs": "Same source as from_terminal_pn"
+    },
+    "to_terminal_pn": {
+      "unknown": true,
+      "needs": "Depends on IAT sensor PN selection (see to.device_pn)"
+    },
+    "to_seal_pn": {
+      "unknown": true,
+      "needs": "Same as to_terminal_pn"
+    }
+  },
+  "companion_wires": [
+    {
+      "role": "sensor_ground",
+      "wire_id_or_status": {
+        "value": "#109g (added 2026-05-14 per Option B amendment)",
+        "source": "K5_cut_list_v2.txt addendum; receipts/2026-05-14_amendment-cut-list-companion-wires.md"
+      },
+      "target_pin": {
+        "value": "M130:B15 (SEN_0V_A)",
+        "source": "motec_m1_hardware_techspec.pdf p17 (AT1 \u2192 SEN_5V_A pullup, paired ground to SEN_0V_A); K5_connector_schedule.txt:41 (post-correction)"
+      }
+    }
+  ],
+  "fuse": {
+    "not_applicable": true,
+    "reason": "AT input powered by M130 internal 1K\u03a9 pullup to 5V; sensor draws no current requiring overcurrent protection. Per K5_wire_spec_and_costs.md Job 1."
+  },
+  "heat_shrink": {
+    "label_end_a": {
+      "unknown": true,
+      "needs": "Per-end label text not yet split"
+    },
+    "label_end_b": {
+      "unknown": true,
+      "needs": "Per-end label text not yet split"
+    },
+    "termination_end_a_inner_seal_pn": {
+      "unknown": true,
+      "needs": "SCL PN (M23053/4 Class 2 or 3) at end A \u2014 not yet specified in build docs; pick from research \u00a73 sizing math"
+    },
+    "termination_end_a_outer_cover_pn": {
+      "unknown": true,
+      "needs": "DR-25 PN (M23053/16) at end A \u2014 not yet specified"
+    },
+    "termination_end_b_inner_seal_pn": {
+      "unknown": true,
+      "needs": "SCL PN at end B"
+    },
+    "termination_end_b_outer_cover_pn": {
+      "unknown": true,
+      "needs": "DR-25 PN at end B"
+    },
+    "boot_at_terminals": {
+      "unknown": true,
+      "needs": "DR-25 boot at M130 connector \u2014 spec not documented (same systemic gap as #110)"
+    }
+  },
+  "open_unknowns": [
+    {
+      "field": "to.device_pn",
+      "needs": "Select and cite IAT sensor PN (multiple options exist depending on intake setup)",
+      "blocks": [
+        "to.connector_type",
+        "to.pigtail_pn",
+        "termination.to_terminal_pn",
+        "termination.to_seal_pn"
+      ]
+    },
+    {
+      "field": "to.connector_type",
+      "needs": "Derive from sensor PN above",
+      "blocks": [
+        "termination.to_terminal_pn"
+      ]
+    },
+    {
+      "field": "to.pigtail_pn",
+      "needs": "ICT Billet IAT pigtail PN lookup (likely exists but not in current shopping list)",
+      "blocks": []
+    },
+    {
+      "field": "termination.from_terminal_pn",
+      "needs": "Read motec_m1_hardware_techspec.pdf p16 \u2014 covers ALL M130 Superseal terminations (systemic to every M130-connected wire)",
+      "blocks": [
+        "terminal/seal order placement for entire harness"
+      ]
+    },
+    {
+      "field": "termination.from_seal_pn",
+      "needs": "Same source as from_terminal_pn",
+      "blocks": [
+        "terminal/seal order placement"
+      ]
+    },
+    {
+      "field": "_companion_wires_resolved",
+      "needs": "RESOLVED 2026-05-14: Skylar accepted Option B. #109g enumerated as ground return wire per receipts/2026-05-14_amendment-cut-list-companion-wires.md",
+      "blocks": []
+    },
+    {
+      "field": "routing.total_length_in.value",
+      "needs": "Measure L01, L02, L09 on the actual truck; populate K5_landmarks.yaml",
+      "blocks": [
+        "accurate length for #109 and most engine loom wires"
+      ]
+    },
+    {
+      "field": "heat_shrink.label_locations",
+      "needs": "Document the build's labeling convention (systemic \u2014 applies to every wire)",
+      "blocks": [
+        "all wires"
+      ]
+    },
+    {
+      "field": "heat_shrink.boot_at_terminals",
+      "needs": "Document boot/heat-shrink spec at connector exits (systemic)",
+      "blocks": [
+        "all wires"
+      ]
+    }
+  ],
+  "substrate_inconsistencies": [
+    {
+      "doc_a": "K5_cut_list_v2.txt:39",
+      "doc_b": "K5_connector_schedule.txt:50 (pre-correction)",
+      "field": "M130 pin B03 assignment",
+      "doc_a_says": "B03 = IAT",
+      "doc_b_says": "B03 = UNUSED",
+      "preferred": "RESOLVED 2026-05-14 via receipts/2026-05-14_substrate-m130-b03-b06-correction.md. K5_connector_schedule.txt now lists B03 = AT1 / IAT."
+    },
+    {
+      "doc_a": "chapters/05-build-manifest.md",
+      "doc_b": "K5_cut_list_v2.txt",
+      "field": "Wire count for analog_temp signal type",
+      "doc_a_says": "analog_temp = 2 wires",
+      "doc_b_says": "(pre-2026-05-14) Only enumerates signal wire",
+      "preferred": "RESOLVED 2026-05-14 via receipts/2026-05-14_amendment-cut-list-companion-wires.md. Cut list now enumerates #109g."
+    },
+    {
+      "doc_a": "K5_wire_paths.yaml:49",
+      "doc_b": "K5_landmarks.yaml:24",
+      "field": "L09 destination",
+      "doc_a_says": "Wire #109 (IAT) path uses L09 as final landmark",
+      "doc_b_says": "L09 is defined as \"Intake valley junction \u2192 MAP sensor port\" \u2014 destination is MAP, not IAT",
+      "preferred": "Landmark definition is wrong-or-shared. Either L09 needs to cover both MAP and IAT (since they're both at the intake), or a new L## landmark is needed specifically for IAT. Cosmetic for now since both sensors are physically close on the Holley 300-131."
+    }
+  ],
+  "closure": {
+    "status": "PARTIAL",
+    "fields_cited": 11,
+    "fields_gapped": 14,
+    "total_fields": 25,
+    "ratio": "11/25"
+  }
+}

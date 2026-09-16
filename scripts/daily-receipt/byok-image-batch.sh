@@ -47,8 +47,15 @@ log "=== batch start vehicle=$VEHICLE_ID size=$BATCH run=$RUN ==="
 
 # 1) PREPARE (network) — pull the next DAY's pending frames for this vehicle.
 # --by-day: the day is the unit of analysis; workers shard by day, never split one.
+# Resolution-pass env knobs (additive; steady-drain callers unaffected):
+#   BYOK_REHASH=1          → re-open unsaturated already-verdicted frames (closure pass)
+#   BYOK_DATE=YYYY-MM-DD   → target ONE specific day instead of the earliest pending
+#   BYOK_EXTRA_CONTEXT=<f> → extra briefing (e.g. a resolution dossier) appended to the prompt
+PREP_EXTRA=""
+[ "${BYOK_REHASH:-0}" = "1" ] && PREP_EXTRA="$PREP_EXTRA --rehash"
+[ -n "${BYOK_DATE:-}" ] && PREP_EXTRA="$PREP_EXTRA --date $BYOK_DATE"
 dotenvx run -- node scripts/deep-image-analysis-byok.mjs prepare \
-  --vehicle-id "$VEHICLE_ID" --limit "$BATCH" --worklist "$WORK" --by-day \
+  --vehicle-id "$VEHICLE_ID" --limit "$BATCH" --worklist "$WORK" --by-day $PREP_EXTRA \
   --shard-count "$SHARD_COUNT" --shard-index "$SHARD_INDEX" >>"$LOG" 2>&1
 PREP_RC=$?
 N=$( [ -f "$WORK" ] && wc -l < "$WORK" | tr -d ' ' || echo 0 )
@@ -118,6 +125,9 @@ PROMPT_FILE="$DIR/prompt.txt"
   echo "together with the new DuraStop brakes' — not 'a metal disc on a floor.'"
   echo
   if [ -f "$CTX" ]; then cat "$CTX"; echo; fi
+  # Resolution dossier seam: a closure pass hands the detective the day's researched
+  # answers (entity resolutions, receipt citations, arc placement) as extra briefing.
+  if [ -n "${BYOK_EXTRA_CONTEXT:-}" ] && [ -f "${BYOK_EXTRA_CONTEXT}" ]; then cat "${BYOK_EXTRA_CONTEXT}"; echo; fi
   cat scripts/daily-receipt/byok-vision-prompt.md
   echo
   echo "## THIS IS ONE WORK DAY: ${DAY:-unknown}"
@@ -260,6 +270,28 @@ if [ -n "$DAY" ]; then
     --vehicle-id "$VEHICLE_ID" --date "$DAY" >>"$LOG" 2>&1 \
     && log "rolled up work_session for $DAY" \
     || log "build-day rollup for $DAY returned non-zero (non-fatal)"
+
+  # 5b) WORTH CASCADE — feed the BUILT technician_worth_proof. One evidence row per labor
+  # day (burst-clustered minutes, Skylar/Ernie via place_hint), so technician_work_evidence
+  # stays current as the fleet analyzes — NOT a one-shot like the 9fcdd38f backfill that
+  # ran once and starved the engine. Idempotent, per-vehicle.
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_technician_evidence" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 \
+    && log "worth-cascade: refreshed technician evidence for ${VEHICLE_ID:0:8}" \
+    || log "worth-cascade returned non-zero (non-fatal)"
+  # equipment usage testimony (actor-event: tool used on this vehicle/day) → depreciation computes
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_equipment_evidence" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 || true
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/refresh_equipment_hours" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{}"' >>"$LOG" 2>&1 || true
+  # consumable presence testimony (present-in-frame; never a fabricated consumed quantity)
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_consumable_evidence" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 || true
+  # ARM6 parts-presence testimony (resolves components to parts_catalog SKUs or surfaces catalog gap)
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_parts_evidence" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 || true
+  # micro-atom lane: promote workshop_signals/presence/scene_type/build_phase JSONB into queryable rows
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/cascade_micro_atoms" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 \
+    && log "worth-cascade: refreshed parts + micro-atoms for ${VEHICLE_ID:0:8}" || true
+  # recompute the documented-investment floor (v3 labor + photo-parts ledger) and store it on the
+  # coverage counter, so the fleet worth-proof stays current as this vehicle's analysis deepens
+  dotenvx run -- bash -c 'curl -s -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/refresh_vehicle_documented_floor" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Content-Type: application/json" -d "{\"p_vehicle_id\":\"'"$VEHICLE_ID"'\"}"' >>"$LOG" 2>&1 \
+    && log "worth-cascade: refreshed documented-investment floor for ${VEHICLE_ID:0:8}" || true
 fi
 # 6) PERCEPTUAL HASH (no AI, no extra download) — hash the already-local frames so the
 # dedup organ has input (phash was 0% filled; see engineering-manual Ch.19). Guarded:
@@ -294,7 +326,7 @@ const { createClient } = require("@supabase/supabase-js");
 const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const sb = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY);
 (async () => {
-  // promote_image_depth_to_columns lifts this batch's verdicts (camera_pose, components_seen)
+  // promote_image_depth_to_columns lifts this batch verdicts (camera_pose, components_seen)
   // out of ai_scan_metadata JSONB into the first-class columns so the depth is queryable (Ch.19).
   for (const fn of ["flag_image_burst_duplicates", "derive_work_sessions", "promote_image_depth_to_columns"]) {
     const { data, error } = await sb.rpc(fn, { p_vehicle_id: process.argv[1] });

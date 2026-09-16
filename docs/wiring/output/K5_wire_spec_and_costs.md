@@ -7,6 +7,8 @@
 **Wire Spec:** M22759/32 cross-linked ETFE (Tefzel), 150C rated
 **Supplier:** ProWire USA (primary), RaceSpec Online (reference pricing)
 
+> **Build decision (2026-05-11):** Tefzel only. All TXL references in this doc are historical cost-comparison context — NOT live spec. See `receipts/2026-05-11_k5-cut-list-tefzel-amendment.md`.
+
 ---
 
 ## JOB 1: Motec M130 Fuel Level Sender Analysis
@@ -97,9 +99,9 @@ Wire #98 (Fuel Level Sender) is already in the cut list as 20 AWG, 18.4ft, route
 
 ## JOB 2: AWG to mm2 Cross-Reference — M22759/32 Tefzel
 
-### Wire Specification Correction
+### Wire Specification (resolved 2026-05-11)
 
-The cut list v2 header says "TXL tier." **This is incorrect.** The K5 build is Professional tier per Chapter 03. The wire being purchased is **M22759/32 Tefzel** from ProWire USA, not TXL.
+The cut list v2 header originally said "TXL tier" — a placeholder. **Amended 2026-05-11** to correct per-gauge spec: M22759/32 Tefzel for 12-22 AWG, M22759/16 Tefzel for 4-10 AWG (Skylar confirmed Tefzel-only — no marine cable substitution for 4 AWG). See `receipts/2026-05-11_k5-cut-list-tefzel-amendment.md`.
 
 ### Critical Finding: M22759/32 Maxes Out at 12 AWG
 
@@ -134,6 +136,7 @@ The MIL-W-22759/32 specification covers **28 AWG through 12 AWG only.** It does 
 | 10 | M22759/16-10-* | Solid: -10-[0-9] | 150C | ETFE (Tefzel) | Fuel pump, iBooster |
 | 8 | M22759/16-8-* | Solid: -8-[0-9] | 150C | ETFE (Tefzel) | Alternator, amp power |
 | 4 | Welding cable or marine-grade | N/A | 105C+ | PVC/rubber | Starter, battery disconnect |
+> SUPERSEDED — see chapters/appendix-b-corrections.md (was: 4 AWG = welding/marine PVC; correct per locked Tefzel-only rule = M22759/16)
 
 ### M22759/32 Color Code System
 

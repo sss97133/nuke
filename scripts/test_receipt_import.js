@@ -20,7 +20,7 @@ const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_A
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// User ID for owner-account@example.com
+// User ID for owner account
 const USER_ID = '13450c45-3e8b-4124-9f5b-5c512094ff04';
 
 // Path to the PDF

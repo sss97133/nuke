@@ -289,9 +289,10 @@ export class UnifiedImageImportService {
       let ghostUserId: string | null = null;
 
       if (!photographerId) {
-        // Try to get authenticated user
-        const { data: { user } } = await supabase.auth.getUser();
-        photographerId = user?.id || undefined;
+        // Use getSession() instead of getUser() to avoid Web Locks API contention
+        // on sb-*-auth-token (cause of 2026-05-24 garage hang). See lib/supabase.ts.
+        const { data: { session } } = await supabase.auth.getSession();
+        photographerId = session?.user?.id || undefined;
       }
 
       // Step 3: Check if EXIF suggests different photographer (ghost user)

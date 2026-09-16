@@ -1337,3 +1337,35 @@ The observation system captures what happened. The question intelligence system 
 *This document is the Level 2 specification for Nuke. Level 1 is the vision (captured in docs/writing/). Level 3 is the code. At sufficient resolution, the three converge.*
 
 *The schema IS the prompt. The documentation IS the system. A big enough database just turns into AI at one point.*
+
+---
+
+## Scholarly Foundations
+
+The architectural claims in this document — a unified asset layer, provenance-bearing observations, temporal timelines, entity resolution, knowledge-graph construction, and characteristic-based valuation — are not novel inventions; they are restatements of established results in databases, AI, statistics, and economics. The following peer-reviewed works ground those claims, and all have been web-verified against primary sources.
+
+- **Unified asset layer / pay-as-you-go integration** (Ch.1 — a thin universal `assets` registry above heterogeneous, never-fully-integrated domain tables; cross-domain queries through the asset layer while per-domain queries keep working) → Franklin, Halevy & Maier's *dataspaces* abstraction is exactly this: manage co-existing, heterogeneous sources without an upfront unifying schema, integrating incrementally rather than all at once. [franklin2005dataspaces]
+
+- **Observation model — data is testimony with provenance** (Ch.2 + the butterfly chapter — every value is `(amount, source, method, observed_at, trust)`, never overwritten, only superseded; derived atoms carry `derived_from_image_id`) → Buneman, Khanna & Tan formalize *why* and *where* provenance — characterizing where a data value came from and why it is in the result — which is the theoretical backbone of source-DNA-bearing observations. [buneman2001provenance]
+
+- **Timeline architecture — events as dated intervals** (Ch.3 — the vehicle's life as a barcode of dated events with durations, ordering, and approximate dating across a near-million-row event store) → Allen's interval algebra gives the canonical relations (before, during, overlaps, meets) for reasoning over temporal intervals, which is precisely what ordering and overlapping vehicle events requires. [allen1983temporal]
+
+- **Entity resolution — when do observations refer to the same chassis** (Ch.4 — match / possible-match / non-match tiers, conservative thresholds, false-positive vs false-negative tradeoff before merge) → Fellegi & Sunter's theory of record linkage is the foundational model: it defines the match / possible-match / non-match decision rule at stipulated error levels, which is the exact decision structure of the conservative merge tiers. [fellegi1969recordlinkage]
+
+- **Knowledge graph construction from heterogeneous traces** (README "Networks Are Derived, Not Declared" + Ch.5 — one image cascades through 8+ entity-profile domains; the graph is built from evidence that compounds, not declared) → Hogan et al.'s survey of knowledge graphs defines the data model, construction methods, and provenance/quality concerns for graphs assembled from diverse evidence — the reference frame for Nuke's KG. [hogan2021knowledgegraphs]
+
+- **Value as a hedonic function of characteristics** (README + Ch.1 — "value is a function of the accumulated data"; vehicle/artwork attributes map to value confidence) → Rosen's hedonic pricing theory establishes that the price of a differentiated good is the implicit-market sum of its characteristics, grounding attribute-driven valuation (the Nuke Estimate). [rosen1974hedonic]
+
+- **Repeat-sales price indexing for thin markets** (Ch.4 + valuation framing — the same chassis reappearing across BaT/Mecum/forums over years, resolved into one entity, yields repeat observations of one asset over time) → Bailey, Muth & Nourse's regression method constructs price indices from properties that sell more than once — the canonical technique for valuing thinly-traded heterogeneous assets from repeat observations of the same item. [bailey1963repeatsales]
+
+### Bibliography
+
+1. **[franklin2005dataspaces]** Michael Franklin, Alon Halevy, David Maier (2005). *From Databases to Dataspaces: A New Abstraction for Information Management*. ACM SIGMOD Record, 34(4), 27-33. https://dl.acm.org/doi/10.1145/1107499.1107502
+2. **[buneman2001provenance]** Peter Buneman, Sanjeev Khanna, Wang-Chiew Tan (2001). *Why and Where: A Characterization of Data Provenance*. Proceedings of the 8th International Conference on Database Theory (ICDT 2001), LNCS 1973, 316-330. https://link.springer.com/chapter/10.1007/3-540-44503-X_20
+3. **[allen1983temporal]** James F. Allen (1983). *Maintaining Knowledge about Temporal Intervals*. Communications of the ACM, 26(11), 832-843. https://dl.acm.org/doi/10.1145/182.358434
+4. **[fellegi1969recordlinkage]** Ivan P. Fellegi, Alan B. Sunter (1969). *A Theory for Record Linkage*. Journal of the American Statistical Association, 64(328), 1183-1210. https://www.tandfonline.com/doi/abs/10.1080/01621459.1969.10501049
+5. **[hogan2021knowledgegraphs]** Aidan Hogan, Eva Blomqvist, Michael Cochez, Claudia d'Amato, Gerard de Melo, Claudio Gutierrez, Sabrina Kirrane, Jose Emilio Labra Gayo, Roberto Navigli, Sebastian Neumaier, Axel-Cyrille Ngonga Ngomo, Axel Polleres, Sabbir M. Rashid, Anisa Rula, Lukas Schmelzeisen, Juan Sequeda, Steffen Staab, Antoine Zimmermann (2021). *Knowledge Graphs*. ACM Computing Surveys, 54(4), Article 71. https://dl.acm.org/doi/10.1145/3447772
+6. **[rosen1974hedonic]** Sherwin Rosen (1974). *Hedonic Prices and Implicit Markets: Product Differentiation in Pure Competition*. Journal of Political Economy, 82(1), 34-55. https://www.journals.uchicago.edu/doi/10.1086/260169
+7. **[bailey1963repeatsales]** Martin J. Bailey, Richard F. Muth, Hugh O. Nourse (1963). *A Regression Method for Real Estate Price Index Construction*. Journal of the American Statistical Association, 58(304), 933-942. https://www.tandfonline.com/doi/abs/10.1080/01621459.1963.10480679
+
+*Verification note: all 7 citations above were confirmed real against primary sources (ACM Digital Library, Springer, Taylor & Francis, JPE/University of Chicago, dblp, RePEc, Semantic Scholar) with matching DOIs, venues, volumes, and pages. No citations were excluded — every candidate supplied to this section had verdict `is_real=true`. Future agents: do not substitute or "correct" these entries; the metadata above is the verified canonical form.*

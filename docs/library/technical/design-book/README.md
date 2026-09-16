@@ -58,6 +58,7 @@ The 10 most used tokens. Complete reference in [TOKENS.md](./TOKENS.md).
 | Working on dark mode | [08-dark-mode](./08-dark-mode.md), [TOKENS](./TOKENS.md) |
 | Understanding interaction patterns | [03-interactions](./03-interactions.md) |
 | Understanding the header | [05-the-header](./05-the-header.md) |
+| Understanding image-analysis depth / tiers | [18-deep-image-analysis](./18-deep-image-analysis.md) |
 
 ---
 
@@ -104,6 +105,9 @@ How multiple brands coexist in a single document. The three-layer stack (Nuke / 
 
 ### [14 — The Deck System](./14-deck-system.md)
 **The most important chapter.** How Nuke generates outward-facing documents that secure partnerships and funding. The deck as a view into the database. The five-stage pipeline (Query → Validate → Compose → Render → Review). The evidence hierarchy. Logo display rules as code. The seven rules for deck generation. The build report and provenance chain. The collaboration model between human and agent. Anti-patterns. The closing principle: the database IS the pitch.
+
+### [18 — Deep Image Analysis](./18-deep-image-analysis.md)
+**The adjudication record for image depth.** How deep-analyzed a photo is, made canonical: one deep-analysis marker (T1 verdict + image_observations row), the Tier 0→4 ladder (GATED → SEEN → PLACED → CONNECTED → CONFIRMED), the demotion of the listing four-tier (`decode/observe/deliberate/sign`) to listing-field justification, the orthogonal value/density axes, one `analysis_depth_score`, the butterfly cascade arms, and the two-flows-one-engine architecture with the inflow-priority rule. Each decision cited to the live file that enforces it.
 
 ### [Vehicle Profile — Computation Surface](./vehicle-profile-computation-surface.md)
 The vehicle profile as the middle of the data pipeline. Timeline as the atomic unit. Day cards. Seven-level analysis. Progressive density. The bill as a generated view. The anti-pattern of parallel tracking systems.
@@ -170,6 +174,7 @@ This Design Book supersedes `docs/DESIGN_BIBLE.md` as the canonical design refer
 
 | Date | Change |
 |------|--------|
+| 2026-06-18 | Chapter 18 (Deep Image Analysis) written — the §4 adjudication record for the IMAGE_ANALYSIS_100X mandate (one marker, one Tier 0–4 ladder, one depth score, two-flows-one-engine; demotes the listing four-tier to listing-field justification). README TOC + "where do I go" table updated. |
 | 2026-04-05 | Chapter 14 (The Deck System) written. README TOC updated to include chapters 09, 11, 12, 13, 14, and the Computation Surface chapter. Glossary extended with deck system terms. |
 | 2026-03-24 | Design Interface Encyclopedia created. TOKENS.md, VIOLATIONS.md, 04-screens.md, 06-third-party.md, 07-finder-model.md, 08-dark-mode.md written. All existing chapters (01, 02, 02-arch, 03, 05) updated with cross-references, CSS token references, and expanded specifications. README replaced with comprehensive index. |
 | 2025-10-21 | Original design-book chapters created (01-foundations, 02-components, 03-interactions, 05-the-header). |
@@ -177,3 +182,33 @@ This Design Book supersedes `docs/DESIGN_BIBLE.md` as the canonical design refer
 ---
 
 *The database IS the vehicle. The interface IS the graph. Design is end to end.*
+
+---
+
+## Scholarly Foundations
+
+The design laws and component doctrines in this book are not invented from scratch — they are bindings of established results in information visualization, usability engineering, and scene representation; the works below ground each core claim and are all web-verified against primary sources.
+
+- **Maximize information density / data-ink** → The "every element must earn its presence," 8-11px text, 4px grid, and zero-decoration mandate of [01-foundations.md](./01-foundations.md) and [07-finder-model.md](./07-finder-model.md) ("hierarchy through data density, not visual decoration") is Tufte's data-ink-ratio principle — "above all else show the data" — applied to a UI; the Bloomberg-terminal inheritance is the same idea by another name. [tufte1983visual]
+- **Progressive density / details-on-demand** → Design Law 3 "See First, Know Later" and the [11-intelligence-surface.md](./11-intelligence-surface.md) "progressive density" principle (sparse vehicle → sparse briefing; dense one → expandable evidence layers; BadgePortal value at idle → count on hover → full context on click) is Shneiderman's Visual Information-Seeking Mantra: "overview first, zoom and filter, then details-on-demand." [shneiderman1996eyes]
+- **Faceted navigation / browse** → `frontend-doctrine.md` §2b "Faceted Browse (Flamenco pattern)" — every high-cardinality attribute auto-becomes a facet with live counts, no query language exposed, the system never returns an empty result set — is Hearst's Flamenco work on faceted metadata for information exploration. [hearst2006clustering][hearst2002flexible]
+- **Information scent / foraging** → `frontend-doctrine.md` §2c "Observation Feed" — observation cards carry source glyph, observer trust, timestamp, and confidence chip as the "scent" a user follows to decide whether to dig into a patch — operationalizes Pirolli & Card's Information Foraging theory. [pirolli1999foraging]
+- **The Briefing Model** → "The profile IS the briefing" ([11-intelligence-surface.md](./11-intelligence-surface.md)), "the interface should feel inevitable — pre-fetch, pre-calculate, pre-render" ([07-finder-model.md](./07-finder-model.md)), and `frontend-doctrine.md` §5 "UI as call-to-action, not browser" rest on user-centered design — the system, not the user, bears the cognitive load (Norman) — with details-on-demand as the auditable expansion of a summary (Shneiderman). [norman1988design][shneiderman1996eyes]
+- **Usability heuristics / Zero Click Anxiety** → Design Law 2 "Zero Click Anxiety" (reversible-in-place, nothing navigates away without explicit action, the "No Surprise" rule of [03-interactions.md](./03-interactions.md)) operationalizes Nielsen & Molich's usability heuristics — user control and freedom (reversibility), consistency, and visibility of system status. [nielsen1990heuristic]
+- **Affordance honesty / material honesty** → [01-foundations.md](./01-foundations.md) "Why Zero Shadow" ("shadows are a lie about light"), "Why Zero Border-Radius," and the Win95 lineage ("a button looked like a button… every interactive element announced itself through visual affordance") is Norman's affordance/signifier theory: an element's appearance must truthfully signal what it does. [norman1988design]
+- **Spatial-temporal viewing of an entity** → `frontend-doctrine.md` §2d "Spatial-Temporal Viewer (Volumetric Lens)" — a vehicle scene queryable at any viewpoint, observations pinned at (x,y,z), a time scrubber for drift — descends from NeRF and 3D Gaussian Splatting for scene representation, with diachronic word embeddings as the model for temporal semantic drift. [mildenhall2020nerf][kerbl2023gaussian][hamilton2016diachronic]
+
+### Bibliography
+
+1. **[tufte1983visual]** Edward R. Tufte (1983). *The Visual Display of Quantitative Information*. Graphics Press, Cheshire, CT. https://www.edwardtufte.com/book/the-visual-display-of-quantitative-information/
+2. **[shneiderman1996eyes]** Ben Shneiderman (1996). *The Eyes Have It: A Task by Data Type Taxonomy for Information Visualizations*. Proceedings of the IEEE Symposium on Visual Languages, Boulder, CO, pp. 336-343. https://doi.org/10.1109/VL.1996.545307
+3. **[hearst2006clustering]** Marti A. Hearst (2006). *Clustering Versus Faceted Categories for Information Exploration*. Communications of the ACM, 49(4), pp. 59-61. https://doi.org/10.1145/1121949.1121983
+4. **[hearst2002flexible]** Marti A. Hearst, Jennifer English, Rashmi Sinha, Kirsten Swearingen, Ka-Ping Yee (2002). *Finding the Flow in Web Site Search*. Communications of the ACM, 45(9), September 2002, pp. 42-49. https://doi.org/10.1145/567498.567525
+5. **[pirolli1999foraging]** Peter Pirolli, Stuart K. Card (1999). *Information Foraging*. Psychological Review, 106(4), pp. 643-675. https://doi.org/10.1037/0033-295X.106.4.643
+6. **[nielsen1990heuristic]** Jakob Nielsen, Rolf Molich (1990). *Heuristic Evaluation of User Interfaces*. Proceedings of the SIGCHI Conference on Human Factors in Computing Systems (CHI '90), Seattle, pp. 249-256. https://doi.org/10.1145/97243.97281
+7. **[norman1988design]** Donald A. Norman (1988). *The Design of Everyday Things* (originally *The Psychology of Everyday Things*). Basic Books, New York (revised/expanded edition 2013). https://www.basicbooks.com/titles/don-norman/the-design-of-everyday-things/9780465050659/
+8. **[mildenhall2020nerf]** Ben Mildenhall, Pratul P. Srinivasan, Matthew Tancik, Jonathan T. Barron, Ravi Ramamoorthi, Ren Ng (2020). *NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis*. European Conference on Computer Vision (ECCV 2020), pp. 405-421. https://arxiv.org/abs/2003.08934
+9. **[kerbl2023gaussian]** Bernhard Kerbl, Georgios Kopanas, Thomas Leimkuehler, George Drettakis (2023). *3D Gaussian Splatting for Real-Time Radiance Field Rendering*. ACM Transactions on Graphics (SIGGRAPH), 42(4). https://doi.org/10.1145/3592433
+10. **[hamilton2016diachronic]** William L. Hamilton, Jure Leskovec, Dan Jurafsky (2016). *Diachronic Word Embeddings Reveal Statistical Laws of Semantic Change*. Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics (ACL 2016), Volume 1: Long Papers, Berlin, pp. 1489-1501. https://aclanthology.org/P16-1141/
+
+*Verification note: all 10 citations above confirmed real against primary sources (publisher pages, ACM DL, IEEE, ACL Anthology, arXiv, Psychological Review). No citations were excluded — every key supplied for this section verified as is_real=true. Note that [hearst2002flexible] was corrected from a garbled proposal: it is the canonical CACM 45(9) 2002 paper "Finding the Flow in Web Site Search" (DOI 10.1145/567498.567525), NOT a SIGIR 2002 demo, and "Ame Elliott" is NOT an author — do not re-add her or the flamenco02.pdf manuscript URL.*

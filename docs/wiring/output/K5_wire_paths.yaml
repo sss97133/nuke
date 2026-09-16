@@ -1,0 +1,240 @@
+# K5 wire-routing paths.
+# For each wire from K5_cut_list.txt, list the landmarks it traverses.
+# The compute script sums those landmarks + service loop + bend allowance.
+#
+# Path = ordered list of landmark IDs the wire follows.
+# Repeating a landmark is intentional (e.g., L04 used 3× for cyl 7 = 3 cyl pitches).
+#
+# flags:
+#   shielded       — adds 6" bypass for EMI/heat avoidance routing
+#   door_crossing  — adds 6" for door boot flex
+#
+# Source: K5_measurement_worksheet.md routing notes (2026-04-04 generation).
+
+wires:
+
+  # ============== ENGINE LOOM (28) ==============
+  # Pattern: M130 → FWG → intake valley → bank-side → cyl position
+  # Driver bank cyls 1,3,5,7 use L03 + n×L04 where n = 0,1,2,3
+  # Passenger bank cyls 2,4,6,8 use L05 + n×L06 where n = 0,1,2,3
+  # Injectors add L07 (coil-top to fuel-rail-side at same cyl)
+
+  # Driver bank coils
+  "24": {label: "Ignition Coil 1", gauge: 20, path: [L01, L02, L03]}
+  "5":  {label: "Ignition Coil 3", gauge: 20, path: [L01, L02, L03, L04]}
+  "10": {label: "Ignition Coil 5", gauge: 20, path: [L01, L02, L03, L04, L04]}
+  "7":  {label: "Ignition Coil 7", gauge: 20, path: [L01, L02, L03, L04, L04, L04]}
+
+  # Passenger bank coils
+  "9":  {label: "Ignition Coil 2", gauge: 20, path: [L01, L02, L05]}
+  "8":  {label: "Ignition Coil 4", gauge: 20, path: [L01, L02, L05, L06]}
+  "11": {label: "Ignition Coil 6", gauge: 20, path: [L01, L02, L05, L06, L06]}
+  "12": {label: "Ignition Coil 8", gauge: 20, path: [L01, L02, L05, L06, L06, L06]}
+
+  # Driver bank injectors
+  "13": {label: "Fuel Injector 1", gauge: 18, path: [L01, L02, L03, L07]}
+  "15": {label: "Fuel Injector 3", gauge: 18, path: [L01, L02, L03, L04, L07]}
+  "17": {label: "Fuel Injector 5", gauge: 18, path: [L01, L02, L03, L04, L04, L07]}
+  "19": {label: "Fuel Injector 7", gauge: 18, path: [L01, L02, L03, L04, L04, L04, L07]}
+
+  # Passenger bank injectors
+  "14": {label: "Fuel Injector 2", gauge: 18, path: [L01, L02, L05, L07]}
+  "16": {label: "Fuel Injector 4", gauge: 18, path: [L01, L02, L05, L06, L07]}
+  "18": {label: "Fuel Injector 6", gauge: 18, path: [L01, L02, L05, L06, L06, L07]}
+  "20": {label: "Fuel Injector 8", gauge: 18, path: [L01, L02, L05, L06, L06, L06, L07]}
+
+  # Engine accessories
+  "4":   {label: "Electronic Throttle Body", gauge: 18, path: [L01, L02, L08]}
+  "108": {label: "MAP Sensor", gauge: 22, path: [L01, L02, L09]}
+  "109": {label: "Intake Air Temp Sensor", gauge: 22, path: [L01, L02, L09]}
+  "110": {label: "Coolant Temp Sensor (ECU)", gauge: 22, path: [L01, L02, L03]}
+  "112": {label: "Fuel Pressure Sensor", gauge: 22, path: [L01, L02, L03, L07]}
+  "113": {label: "Oil Temperature Sensor", gauge: 22, path: [L01, L02, L10]}
+  "102": {label: "Oil Pressure Sensor (ECU)", gauge: 22, path: [L01, L02, L10]}
+
+  # Shielded sensors (CKP at bellhousing rear, CMP at front, KS1/2 below exhaust)
+  "99":  {label: "Crank Position Sensor", gauge: 22, path: [L01, L02, L10], flags: [shielded]}
+  "101": {label: "Cam Position Sensor", gauge: 22, path: [L01, L02, L11], flags: [shielded]}
+  "103": {label: "Knock Sensor Bank 1", gauge: 22, path: [L01, L02, L12], flags: [shielded]}
+  "104": {label: "Knock Sensor Bank 2", gauge: 22, path: [L01, L02, L13], flags: [shielded]}
+
+  # ============== EXTERIOR / BODY LOOM (27) ==============
+  # Switches inside cab — short runs from PDM30 to dash/column
+  "33": {label: "Turn Signal Switch", gauge: 18, path: [L17]}
+  "39": {label: "Headlight Switch", gauge: 14, path: [L18]}
+  "46": {label: "Wiper/Washer Switch", gauge: 18, path: [L17]}
+  "53": {label: "Brake Light Switch", gauge: 22, path: [L19]}
+  "54": {label: "Electric Parking Brake", gauge: 14, path: [L16, L24, L25]}
+
+  # Front lights — PDM30 → through firewall → engine bay/inner fender → light
+  "48": {label: "Horn", gauge: 14, path: [L16, L08]}                # FW → across radiator support to horn
+  "49": {label: "Windshield Wiper Motor", gauge: 14, path: [L16, L23]}  # to cowl area
+  "50": {label: "Washer Pump", gauge: 18, path: [L16, L08]}
+  "80": {label: "Turn Signal Left Front", gauge: 18, path: [L16, L14]}  # via inner fender to front turn
+  "82": {label: "Turn Signal Right Front", gauge: 18, path: [L16, L05, L14]}  # cross to passenger inner fender
+  "83": {label: "Parking Light Left Front", gauge: 18, path: [L16, L14]}
+  "84": {label: "Parking Light Right Front", gauge: 18, path: [L16, L05, L14]}
+  # v4 2026-06-09: #85/#86 now terminate at the floor dimmer COMMON, not the lamp
+  # (receipts/2026-05-14_decision-high-beam-floor-dimmer.md). L19 (pedal/floor area)
+  # is the nearest existing landmark to the floor dimmer — ESTIMATE until dimmer
+  # position is measured. Lamp legs are #85a/b, #86a/b below.
+  "85": {label: "LED Headlight Left (PDM → dimmer common)", gauge: 16, path: [L16, L19]}
+  "86": {label: "LED Headlight Right (PDM → dimmer common)", gauge: 16, path: [L16, L19]}
+  "87": {label: "Cab Clearance Light Left", gauge: 18, path: [L16, L23]}   # up A-pillar to cab top
+  "88": {label: "Cab Clearance Light Right", gauge: 18, path: [L16, L23]}
+
+  # Rear lights / exterior — PDM30 → floor → frame → rear junction → fixture
+  "75": {label: "Tail Light Right", gauge: 18, path: [L16, L24, L25, L26]}
+  "76": {label: "Backup Light Right", gauge: 18, path: [L16, L24, L25, L26]}
+  "77": {label: "Side Marker Right Front", gauge: 18, path: [L16, L24, L25]}
+  "78": {label: "Side Marker Right Rear", gauge: 18, path: [L16, L24, L25, L26]}
+  "79": {label: "License Plate Lamp", gauge: 18, path: [L16, L24, L25, L26]}
+  "81": {label: "Tail Light Left", gauge: 18, path: [L16, L24, L25, L26]}
+  "89": {label: "Backup Light Left", gauge: 18, path: [L16, L24, L25, L26]}
+  "90": {label: "Side Marker Left Front", gauge: 18, path: [L16, L24, L25]}
+  "91": {label: "Side Marker Left Rear", gauge: 18, path: [L16, L24, L25, L26]}
+  "92": {label: "Side Marker Right Center", gauge: 18, path: [L16, L24, L25]}
+  "93": {label: "Third Brake Light", gauge: 18, path: [L16, L24, L25, L26]}
+
+  # ============== INTERIOR / DASH LOOM (18) ==============
+  "34": {label: "Power Window Motor Left", gauge: 12, path: [L16, L20, L21], flags: [door_crossing]}
+  "35": {label: "Power Window Motor Right", gauge: 12, path: [L16, L22, L21], flags: [door_crossing]}
+  "36": {label: "Window Switch Left", gauge: 18, path: [L18]}
+  "37": {label: "Window Switch Right", gauge: 18, path: [L18]}
+  "38": {label: "Power Lock Actuator Left", gauge: 18, path: [L16, L20, L21], flags: [door_crossing]}
+  "47": {label: "Power Lock Actuator Right", gauge: 18, path: [L16, L22, L21], flags: [door_crossing]}
+  "42": {label: "Lock Switch Left", gauge: 18, path: [L18]}
+  "43": {label: "Lock Switch Right", gauge: 18, path: [L18]}
+  "44": {label: "Door Ajar Switch Left", gauge: 22, path: [L20, L21], flags: [door_crossing]}
+  "45": {label: "Door Ajar Switch Right", gauge: 22, path: [L22, L21], flags: [door_crossing]}
+  "51": {label: "Heater Blower Motor", gauge: 12, path: [L16, L08]}   # PDM → FW → engine bay heater core
+  "65": {label: "Display / Dash (Motec C125)", gauge: 22, path: [L18]}
+  "67": {label: "Dome Light", gauge: 20, path: [L23]}
+  "68": {label: "Under-dash Light", gauge: 20, path: [L18]}
+  "69": {label: "Footwell Light", gauge: 20, path: [L19]}
+  "70": {label: "USB Charging Port", gauge: 18, path: [L18]}
+  "71": {label: "Console 12V Outlet", gauge: 18, path: [L18]}
+  "72": {label: "Cigarette Lighter / 12V Outlet", gauge: 14, path: [L18]}
+
+  # ============== CHASSIS / UNDERBODY (12) ==============
+  "21": {label: "Radiator Fan 1", gauge: 12, path: [L16, L14]}
+  "22": {label: "Radiator Fan 2", gauge: 12, path: [L16, L05, L14]}
+  "25": {label: "Electric Water Pump", gauge: 14, path: [L01, L02, L03]}   # M130 routing along block
+  "64": {label: "Wideband Lambda Controller", gauge: 20, path: [L16, L08]}
+  "1":  {label: "AMP Research Step Left", gauge: 14, path: [L16, L24, L25]}
+  "2":  {label: "AMP Research Step Right", gauge: 14, path: [L16, L24, L25]}
+  "3":  {label: "AMP Research Controller", gauge: 14, path: [L16, L24]}
+  "100": {label: "Vehicle Speed Sensor", gauge: 22, path: [L01, L02, L28]}
+  "106": {label: "Wideband O2 Sensor 1", gauge: 22, path: [L01, L29], flags: [shielded]}
+  "107": {label: "Wideband O2 Sensor 2", gauge: 22, path: [L01, L30], flags: [shielded]}
+  "66": {label: "Fuel Pump", gauge: 10, path: [L16, L24, L25, L27]}
+  "94": {label: "Fuel Pump Relay", gauge: 22, path: [L16, L08]}
+
+  # ============== AUDIO (8) ==============
+  "26": {label: "Speaker Front Left", gauge: 18, path: [L16, L20, L21], flags: [door_crossing]}
+  "27": {label: "Speaker Front Right", gauge: 18, path: [L16, L22, L21], flags: [door_crossing]}
+  "28": {label: "Speaker Rear Left", gauge: 18, path: [L16, L24, L25, L26]}
+  "29": {label: "Speaker Rear Right", gauge: 18, path: [L16, L24, L25, L26]}
+  "30": {label: "Subwoofer", gauge: 14, path: [L16, L24, L25, L26]}
+  "31": {label: "Radio / Head Unit", gauge: 18, path: [L18]}
+  "32": {label: "Amplifier", gauge: 8, path: [L16, L24, L25, L26]}
+  "96": {label: "Amplifier Relay", gauge: 22, path: [L16, L24, L25, L26]}
+
+  # ============== POWER / COMM (4) ==============
+  "6":  {label: "Starter Motor", gauge: 4, path: [L15]}
+  "59": {label: "Alternator", gauge: 8, path: [L14]}
+  "62": {label: "CAN Bus Network", gauge: 22, path: [L01, L16]}   # M130→FW→PDM30
+  "63": {label: "Battery Disconnect", gauge: 4, path: [L15]}      # BAT to disconnect (assumes near starter)
+
+  # ============== MISC (16) ==============
+  "40": {label: "Ignition Switch", gauge: 14, path: [L17]}
+  "41": {label: "Hazard Flasher", gauge: 18, path: [L18]}
+  "61": {label: "PDM Power Feed", gauge: 22, path: [L01, L16]}    # M130→FW→PDM30
+  "58": {label: "Transmission Controller", gauge: 20, path: [L18]}
+  "60": {label: "ECU Power", gauge: 20, path: [L01, L14]}         # M130 → BAT
+  "95": {label: "Bosch iBooster Relay", gauge: 22, path: [L01]}   # short FW run
+  "52": {label: "Bosch iBooster", gauge: 10, path: [L01, L14]}    # BAT → iBooster on firewall
+  "23": {label: "A/C Compressor Clutch", gauge: 18, path: [L16, L08]}
+  "105": {label: "A/C Pressure Switch Low", gauge: 22, path: [L01, L02, L08]}
+  "111": {label: "A/C Pressure Switch High", gauge: 22, path: [L01, L02, L08]}
+  "73": {label: "Underhood Light", gauge: 20, path: [L16, L08]}
+  "74": {label: "Cargo/Bed Light", gauge: 20, path: [L16, L24, L25, L26]}
+  "98": {label: "Fuel Level Sender", gauge: 20, path: [L16, L24, L25, L27]}
+  "55": {label: "Transfer Case Indicator", gauge: 16, path: [L16, L28]}
+  "56": {label: "Neutral Safety Switch", gauge: 14, path: [L16, L28]}
+  "57": {label: "Reverse Light Switch", gauge: 18, path: [L16, L28]}
+
+  # ============== REAR LOOM EXTRA (1, was misfiled in engine loom) ==============
+  "97": {label: "Rear Backup Camera", gauge: 20, path: [L16, L24, L25, L26]}
+
+  # ============== V4 ADDENDUM (17 wires, 2026-06-09) ==============
+  # Source: K5_cut_list_v4.txt + receipts/2026-06-09_cut-list-v4.md.
+  # ALL paths in this block are ESTIMATES from existing landmarks — none measured.
+  # Dakota engine/tank sender wires reuse the parent-circuit segments (#110/#102/#98
+  # patterns) plus an L18 dash leg to the cluster. Dash-local taps are L18 only.
+
+  # Dakota Digital VHX dual-sender (#114-#124)
+  "114": {label: "Dakota CTS Sender (factory)", gauge: 22, path: [L18, L16, L02, L03]}   # cluster ← FW ← valley ← driver head boss; mirrors #110 engine route + dash leg (estimate)
+  "115": {label: "Dakota Oil Pressure Sender", gauge: 22, path: [L18, L16, L02, L10]}    # cluster ← FW ← valley ← oil galley; mirrors #102 route + dash leg (estimate)
+  "116": {label: "Dakota Tach Signal", gauge: 22, path: [L01, L16, L18]}                 # M130:A31 → FW → dash cluster; mirrors #62 M130→FW pattern + L18 (estimate)
+  "117": {label: "Dakota Fuel Level Sender", gauge: 22, path: [L18, L16, L24, L25, L27]} # cluster ← FW ← frame ← tank sender; parallels #98 route + dash leg (estimate)
+  "118": {label: "Dakota VSS / Speedo", gauge: 22, path: [L01, L16, L18]}                # M130:A32 → FW → dash cluster (estimate)
+  "119": {label: "Dakota Turn Signal Left Input", gauge: 22, path: [L18]}                # dash-local splice on #80
+  "120": {label: "Dakota Turn Signal Right Input", gauge: 22, path: [L18]}               # dash-local splice on #82
+  "121": {label: "Dakota High Beam Input", gauge: 22, path: [L19, L18]}                  # tap at dimmer high-out (floor, ~L19) → cluster (estimate)
+  "122": {label: "Dakota Brake Indicator", gauge: 22, path: [L18]}                       # dash-local splice on #53
+  "123": {label: "Dakota Ground", gauge: 22, path: [L18]}                                # dash star ground, dash-local
+  "124": {label: "Dakota Switched +12V Backup", gauge: 22, path: [L18]}                  # OUT29 splice, dash-local
+
+  # Holley 558-499 T43 TCU CAN stub (#125) — module in cab per acceptance receipt
+  "125": {label: "Holley T43 TCU CAN Stub", gauge: 22, path: [L18]}                      # short stub off #62 trunk at dash; T43 mount TBD (under-dash typical) — estimate
+
+  # E-Stopp ESK001 dash trigger (#126) — dash button → E-Stopp unit at rear
+  "126": {label: "E-Stopp Dash Button Trigger", gauge: 22, path: [L16, L24, L25]}        # mirrors #54 parking-brake route; dash end is dash-local (estimate)
+
+  # High-beam floor dimmer legs (#85a/b, #86a/b) — dimmer at floor (~L19) → front lamps
+  "85a": {label: "LED Headlight Left LOW", gauge: 16, path: [L19, L16, L14]}             # dimmer lo-out → FW → driver inner fender → lamp (estimate)
+  "85b": {label: "LED Headlight Left HIGH", gauge: 16, path: [L19, L16, L14]}            # dimmer hi-out → same route (estimate)
+  "86a": {label: "LED Headlight Right LOW", gauge: 16, path: [L19, L16, L05, L14]}       # adds L05 cross-engine-bay hop per #86 pattern (estimate)
+  "86b": {label: "LED Headlight Right HIGH", gauge: 16, path: [L19, L16, L05, L14]}      # same (estimate)
+
+  # ============== v4.1 ECU / PDM LIFELINES (2026-06-10) ==============
+  # BATTERY = PASSENGER FIREWALL CORNER — Skylar working statement 2026-06-10
+  # (resolves the A4 open question as an owner-stated WORKING position, not a
+  # measurement). L14/L15 were derived against the driver-side placeholder and
+  # MUST be mirror-flipped + re-derived in the Blender twin before any
+  # battery-relative length below is trusted. No landmark exists yet for
+  # "FWG → BAT+ passenger corner" — paths below reuse the stale L14 proxy
+  # (same convention as #60) and are flagged needs_rederivation.
+  "ECU_PWR":  {label: "M130 Battery Positive (A26)", gauge: 16, path: [L01, L14]}   # M130 → FWG → BAT+ star; L14 = STALE driver-side proxy, needs_rederivation
+  "ECU_GND1": {label: "M130 Battery Negative 1 (A10)", gauge: 16, path: [L01, L14]} # equal length with ECU_GND2; needs_rederivation
+  "ECU_GND2": {label: "M130 Battery Negative 2 (A11)", gauge: 16, path: [L01, L14]} # equal length with ECU_GND1; needs_rederivation
+  "PDM_BPOS": {label: "PDM30 Battery Feed B+ (stud)", gauge: 0, path: [L16, L14]}   # PDM30 → FWG (L16) → BAT+ corner; L14 leg = STALE proxy, needs_rederivation
+  "PDM_GND1": {label: "PDM30 Battery Negative 1 (A26)", gauge: 20, path: [L16, L14]} # equal length with PDM_GND2; needs_rederivation
+  "PDM_GND2": {label: "PDM30 Battery Negative 2 (B18)", gauge: 20, path: [L16, L14]} # equal length with PDM_GND1; needs_rederivation
+
+  # ============== v4.2 APS ACCELERATOR PEDAL (2026-06-10) ==============
+  # GM 10379038 DBW pedal (gm_aps_6pin), firewall under-dash, driver side.
+  # ALL SIX ARE ESTIMATES: no landmark exists for "M130 → pedal". L19
+  # (PDM30 → brake pedal switch, 34.7") is the nearest same-zone proxy —
+  # the M130 (A1, passenger firewall) and PDM30 (A2, under dash passenger)
+  # sit ~10" apart in the model, and the APS pedal hangs next to the brake
+  # pedal. needs_rederivation: add an M130→APS landmark in the Blender twin
+  # once the M130 mount (state file §4 OPEN) and the pedal mount land.
+  # All 6 route together as one bundle (same connector both ends).
+  "APS_T1_SIG": {label: "APS Track 1 Signal (B21/AV7)", gauge: 22, path: [L19]}   # estimate via L19 proxy; needs_rederivation
+  "APS_T1_5V":  {label: "APS Track 1 5V Ref (A02)", gauge: 22, path: [L19]}       # estimate; needs_rederivation
+  "APS_T1_GND": {label: "APS Track 1 Ground (B15)", gauge: 22, path: [L19]}       # estimate; needs_rederivation
+  "APS_T2_SIG": {label: "APS Track 2 Signal (B22/AV8)", gauge: 22, path: [L19]}   # estimate; needs_rederivation
+  "APS_T2_5V":  {label: "APS Track 2 5V Ref (A09)", gauge: 22, path: [L19]}       # estimate; needs_rederivation
+  "APS_T2_GND": {label: "APS Track 2 Ground (B16)", gauge: 22, path: [L19]}       # estimate; needs_rederivation
+
+# Total: 113 wires from K5_cut_list.txt base + 17 v4-addendum wires + 6 v4.1 lifelines + 6 v4.2 APS = 142 path entries.
+# (The 22 companion wires of the 2026-05-14 addendum inherit their parent wire's path
+#  per that addendum's convention and have no separate entries here.)
+# Open issues:
+#   - Some passenger-side fixtures (#82, #84, #86, #22) include an extra L05 hop
+#     that's an estimate of "across-engine-bay" distance — verify if the harness
+#     splits at the FWG-MAIN exit instead, in which case drop the L05.
+#   - L04 / L06 are SINGLE pitches; cyl 5 uses L04 twice, cyl 7 thrice.
+#   - #62 CAN and #61 PDM-power use both L01 and L16 because they cross the firewall.

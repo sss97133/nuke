@@ -10,6 +10,16 @@ const EditVehicle = React.lazy(() => import('../../../pages/EditVehicle'));
 const VehicleMailbox = React.lazy(() => import('../../../components/VehicleMailbox/VehicleMailbox'));
 const VehicleJobs = React.lazy(() => import('../../../pages/VehicleJobs'));
 const WiringPlan = React.lazy(() => import('../../../pages/WiringPlan'));
+const DayPage = React.lazy(() => import('../../../pages/vehicle-profile/DayPage'));
+const ObservationPage = React.lazy(() => import('../../../pages/vehicle-profile/ObservationPage'));
+const InventoryPage = React.lazy(() => import('../../../pages/vehicle-profile/InventoryPage'));
+const VendorPage = React.lazy(() => import('../../../pages/vehicle-profile/VendorPage'));
+const PartPage = React.lazy(() => import('../../../pages/vehicle-profile/PartPage'));
+const ImagePage = React.lazy(() => import('../../../pages/vehicle-profile/ImagePage'));
+const VendorsPage = React.lazy(() => import('../../../pages/vehicle-profile/VendorsPage'));
+const LifecyclePage = React.lazy(() => import('../../../pages/vehicle-profile/LifecyclePage'));
+const TablePage = React.lazy(() => import('../../../pages/vehicle-profile/TablePage'));
+const AnalysisStreamPage = React.lazy(() => import('../../../pages/vehicle-profile/AnalysisStreamPage'));
 
 const VehiclePortfolio = React.lazy(() => import('../../../pages/VehiclePortfolio'));
 const VehicleListFromPhotos = React.lazy(() => import('../../../pages/VehicleListFromPhotos'));
@@ -24,6 +34,16 @@ const VehicleModuleRoutes = () => {
         <Route path="/list/from-photos" element={<VehicleListFromPhotos />} />
         <Route path="/:vehicleId" element={<VehicleProfile />} />
         <Route path="/:vehicleId/wiring" element={<WiringPlan />} />
+        <Route path="/:vehicleId/day/:date" element={<DayPage />} />
+        <Route path="/:vehicleId/observation/:obsId" element={<ObservationPage />} />
+        <Route path="/:vehicleId/inventory" element={<InventoryPage />} />
+        <Route path="/:vehicleId/vendor/:vendorSlug" element={<VendorPage />} />
+        <Route path="/:vehicleId/part/:partNumber" element={<PartPage />} />
+        <Route path="/:vehicleId/image/:imageId" element={<ImagePage />} />
+        <Route path="/:vehicleId/vendors" element={<VendorsPage />} />
+        <Route path="/:vehicleId/lifecycle" element={<LifecyclePage />} />
+        <Route path="/:vehicleId/table" element={<TablePage />} />
+        <Route path="/:vehicleId/analysis-stream" element={<AnalysisStreamPage />} />
 
         {/* Protected: write / owner-only actions */}
         <Route element={<ProtectedRoute />}>

@@ -46,7 +46,12 @@ Deno.serve(async (req) => {
         amount: 3499, // $34.99
         credits: 1000,
         recurring: false
-      }
+      },
+      // AI wallet top-ups: dollars-in == cents credited to ai_credit_ledger.
+      // The stripe-webhook reads metadata.amount_cents and credits exactly that.
+      wallet_10:  { name: 'Claude Credits — $10',  description: 'Run analysis on your own Claude plan; overflow billed from this balance.', amount: 1000, wallet_cents: 1000, recurring: false },
+      wallet_25:  { name: 'Claude Credits — $25',  description: 'Run analysis on your own Claude plan; overflow billed from this balance.', amount: 2500, wallet_cents: 2500, recurring: false },
+      wallet_50:  { name: 'Claude Credits — $50',  description: 'Run analysis on your own Claude plan; overflow billed from this balance.', amount: 5000, wallet_cents: 5000, recurring: false }
     }
 
     const plan = plans[subscription_type as keyof typeof plans]
@@ -118,9 +123,10 @@ Deno.serve(async (req) => {
       client_reference_id: user.id,
       metadata: {
         user_id: user.id,
-        purchase_type: 'api_access_subscription',
+        purchase_type: (plan as any).wallet_cents ? 'ai_wallet_topup' : 'api_access_subscription',
         subscription_type: subscription_type,
-        ...(plan.credits ? { credits: plan.credits.toString() } : {})
+        ...(plan.credits ? { credits: plan.credits.toString() } : {}),
+        ...((plan as any).wallet_cents ? { amount_cents: (plan as any).wallet_cents.toString() } : {})
       },
     }
 

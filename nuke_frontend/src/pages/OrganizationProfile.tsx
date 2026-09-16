@@ -6,7 +6,7 @@ import { FaviconIcon } from '../components/common/FaviconIcon';
 // Always loaded — used in the overview tab or global page structure
 import OrganizationTimelineHeatmap from '../components/organization/OrganizationTimelineHeatmap';
 import SoldInventoryBrowser from '../components/organization/SoldInventoryBrowser';
-import { ServiceVehicleCardRich } from '../components/organization/ServiceVehicleCardRich';
+import { ServiceVehicleCardRich, type ServiceVehicleStatsRow } from '../components/organization/ServiceVehicleCardRich';
 import { extractImageMetadata } from '../utils/imageMetadata';
 import { DynamicTabBar } from '../components/organization/DynamicTabBar';
 import { OrganizationIntelligenceService, type OrganizationIntelligence, type TabConfig } from '../services/organizationIntelligenceService';
@@ -45,6 +45,33 @@ const CollectionIntelligenceTab = React.lazy(() => import('../components/organiz
 
 // Canonical Bring a Trailer org – we show extraction coverage (target 222k, queue) and turnover/metrics note
 const BAT_ORG_ID = 'd2bd6370-11d1-4af0-8dd2-3de2c3899166';
+
+interface ProfileLite {
+  id: string;
+  full_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+}
+
+/**
+ * Resolve a set of author/user ids to profiles in ONE query.
+ *
+ * Three places on this page used to enrich row-by-row inside a
+ * Promise.allSettled(rows.map(...)) — and the rows all shared a handful of
+ * authors, so the same profile row was fetched over and over. Measured
+ * 2026-07-26 on Ernies Upholstery: the 50-row timeline page has exactly ONE
+ * distinct created_by, and the page issued 102 `profiles` requests for that
+ * single row (51 per mount, doubled by StrictMode).
+ */
+async function fetchProfilesByIds(ids: Array<string | null | undefined>): Promise<Map<string, ProfileLite>> {
+  const unique = [...new Set(ids.filter((id): id is string => !!id))];
+  if (unique.length === 0) return new Map();
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, full_name, username, avatar_url')
+    .in('id', unique);
+  return new Map(((data ?? []) as ProfileLite[]).map((p) => [p.id, p]));
+}
 
 interface OrgExtractionCoverage {
   org_id: string;
@@ -300,6 +327,15 @@ export default function OrganizationProfile() {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [images, setImages] = useState<OrgImage[]>([]);
   const [vehicles, setVehicles] = useState<OrgVehicle[]>([]);
+  // One org-wide read of get_service_vehicles_for_org, keyed by vehicle_id, so
+  // the In Service grid stops firing 3 queries per card (138 for 46 cards).
+  // `settled` gates the cards: until the batch lands (or fails) they hold their
+  // skeleton instead of self-fetching, otherwise the race re-introduces the
+  // exact N+1 this replaces.
+  const [serviceStats, setServiceStats] = useState<{
+    byId: Map<string, ServiceVehicleStatsRow>;
+    settled: boolean;
+  }>({ byId: new Map(), settled: false });
   const [offering, setOffering] = useState<Offering | null>(null);
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -714,16 +750,11 @@ export default function OrganizationProfile() {
         console.error('Error reloading timeline events:', eventsError);
       } else if (eventsData) {
         console.log(`Reloaded ${eventsData.length} timeline events after upload`);
-        const enriched = await Promise.allSettled(
-          eventsData.map(async (e: any) => {
-            if (!e.created_by) {
-              return { ...e, profiles: null };
-            }
-            const { data: profile } = await supabase.from('profiles').select('full_name, username, avatar_url').eq('id', e.created_by).maybeSingle();
-            return { ...e, profiles: profile || null };
-          })
-        );
-        const validEvents = enriched.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled').map(r => r.value);
+        const profileById = await fetchProfilesByIds(eventsData.map((e) => e.created_by));
+        const validEvents = eventsData.map((e) => ({
+          ...e,
+          profiles: e.created_by ? (profileById.get(e.created_by) ?? null) : null
+        }));
         console.log(`Enriched ${validEvents.length} timeline events with profiles`);
         setTimelineEvents(validEvents);
       } else {
@@ -803,6 +834,100 @@ export default function OrganizationProfile() {
     const px = (w - gap * (cols - 1)) / cols;
     return Math.max(60, Math.floor(px));
   }, [gridWidth, cardsPerRow]);
+
+  /**
+   * The vehicles a service org actually has in the shop right now. Single
+   * source for BOTH the "In Service N" header and the card grid — they used to
+   * apply different filters, so the header could claim 46 while the grid drew
+   * a different number.
+   */
+  const serviceVehicles = useMemo(() => vehicles.filter((v) => {
+    if (v.status !== 'active') return false;
+
+    if (v.relationship_type !== 'service_provider' &&
+        v.relationship_type !== 'work_location') {
+      return false;
+    }
+
+    // Exclude sold/completed service vehicles — comprehensive sold detection
+    const linked = v.vehicles as Record<string, unknown> | null | undefined;
+    const isSold = (v as OrgVehicle & { is_sold?: boolean }).is_sold ||
+      v.sale_date ||
+      v.sale_price ||
+      v.vehicle_sale_status === 'sold' ||
+      v.listing_status === 'sold' ||
+      (linked && linked.sale_price) ||
+      (linked && linked.sale_date) ||
+      (linked && linked.auction_outcome === 'sold');
+    if (isSold) return false;
+
+    // A link whose vehicle we can't identify is not a service vehicle — it's an
+    // intake artifact, and it rendered as an "Unknown Vehicle · 0 photos · No
+    // dates" card on a public shop profile. Vehicle 14447ecd ("UNRESOLVED /
+    // Intake Quarantine (gate-rejected, awaiting re-homing)", 496 images) is
+    // linked work_location to four real orgs — Ernie's, Taylor Customs, Viva
+    // Las Vegas Autos and Nuke — and RLS hides the vehicles row from the
+    // public, so the grid was drawing a card for a vehicle it could not read.
+    // Nothing is deleted here; the link stays, it just stops being displayed as
+    // one of the shop's cars.
+    const hasIdentity =
+      !!(v.vehicle_year || v.vehicle_make || v.vehicle_model) &&
+      String(v.vehicle_make || '').toUpperCase() !== 'UNRESOLVED';
+    return hasIdentity;
+  }), [vehicles]);
+
+  const isServiceOrg = intelligence?.effectivePrimaryFocus === 'service';
+
+  /**
+   * Batch the whole In Service grid's stats into ONE call — but ONLY for orgs
+   * that actually draw that grid, and only when the set is small enough for the
+   * function to answer.
+   *
+   * `relationship_type='service_provider'` is not the shop relationship it reads
+   * as: a backfill applied it to every discovered vehicle's source venue, so
+   * Facebook Marketplace carries 10,578 of these links, Bring a Trailer 3,431,
+   * Craigslist 2,651, and the auction houses over a thousand each. Calling the
+   * RPC unconditionally put a 15.2s HTTP 500 on Bring a Trailer's page
+   * (measured 2026-07-26) — the function does 3 LATERALs per vehicle over
+   * vehicle_images and dies on the statement timeout well before 3,431.
+   *
+   * So: gate on the grid rendering at all, and cap at a size the function is
+   * measured to survive. Over the cap the cards self-fetch as before — slower,
+   * still correct, never a timeout.
+   */
+  const SERVICE_STATS_BATCH_MAX = 250;
+  const wantsServiceStats =
+    isServiceOrg &&
+    serviceVehicles.length > 0 &&
+    serviceVehicles.length <= SERVICE_STATS_BATCH_MAX;
+
+  useEffect(() => {
+    if (!organizationId) return;
+    if (!isServiceOrg || serviceVehicles.length === 0) return;
+
+    if (!wantsServiceStats) {
+      // Too big to batch — let the cards fetch their own and stop holding them.
+      setServiceStats({ byId: new Map(), settled: true });
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await OrganizationIntelligenceService.getServiceVehicles(organizationId);
+        if (cancelled) return;
+        const byId = new Map<string, ServiceVehicleStatsRow>();
+        for (const r of (rows || []) as ServiceVehicleStatsRow[]) {
+          if (r?.vehicle_id) byId.set(String(r.vehicle_id), r);
+        }
+        setServiceStats({ byId, settled: true });
+      } catch {
+        // Degrades to per-card fetching, never to wrong numbers.
+        if (!cancelled) setServiceStats({ byId: new Map(), settled: true });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [organizationId, isServiceOrg, wantsServiceStats, serviceVehicles.length]);
 
   // Helper function to parse year/make/model from BaT listing title
   const parseBatTitle = (title: string | null | undefined): { year?: number; make?: string; model?: string } => {
@@ -936,7 +1061,15 @@ export default function OrganizationProfile() {
     };
   }, [organizationId]);
 
+  // ghost-ref: public.organization_image_tags does not exist (to_regclass NULL,
+  // verified live 2026-07-26). This fired a 404 on every org profile load and
+  // the error was swallowed, so nothing ever surfaced. The reader and its
+  // render path are kept intact — the tags feature isn't being retired here,
+  // it has no table yet. Flip ORG_IMAGE_TAGS_TABLE_EXISTS when one lands.
+  const ORG_IMAGE_TAGS_TABLE_EXISTS = false;
+
   const loadImageTags = async (imageIds: string[]) => {
+    if (!ORG_IMAGE_TAGS_TABLE_EXISTS) return;
     try {
       const { data: tags } = await supabase
         .from('organization_image_tags')
@@ -1214,12 +1347,25 @@ export default function OrganizationProfile() {
             runChunked(ids => supabase.from('vehicles').select('id, year, make, model, vin, current_value, asking_price, purchase_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score, auction_outcome').in('id', ids)),
             runChunked(ids => supabase.from('vehicle_images').select('vehicle_id, thumbnail_url, medium_url, image_url, variants, is_primary, created_at').in('vehicle_id', ids).order('is_primary', { ascending: false }).order('created_at', { ascending: true })),
             runChunked(ids => supabase.from('vehicle_listings').select('vehicle_id, id, status, sale_type, auction_end_time, current_high_bid_cents, bid_count, reserve_price_cents').in('vehicle_id', ids).eq('status', 'active').in('sale_type', ['auction', 'live_auction']).gt('auction_end_time', now)),
-            runChunked(ids => supabase.from('external_listings').select('vehicle_id, id, organization_id, listing_status, end_date, current_bid, bid_count, reserve_price, platform, listing_url, view_count, watcher_count, metadata').in('vehicle_id', ids).gt('end_date', now)),
+            // external_listings -> vehicle_events. external_listings is granted to
+            // service_role ONLY and carries ZERO RLS policies, so from a browser
+            // it answered 401 "permission denied" every single time — three
+            // queries x2 StrictMode = 6 failing requests per load — and
+            // runChunked swallows the error as `r.data || []`, so the page
+            // rendered as though these vehicles had no auction state at all.
+            // vehicle_events is the declared successor (see
+            // services/unifiedAuctionStateService.ts: "formerly external_listings"),
+            // is anon-readable with 2 RLS policies, and every one of its 414,143
+            // rows is a listing event (event_type: auction 388,282 / listing
+            // 25,860 / classified 1). Column aliases keep the consumer shape
+            // byte-identical. organization_id -> source_organization_id; the old
+            // column was populated on 1,751 of 139,760 rows.
+            runChunked(ids => supabase.from('vehicle_events').select('vehicle_id, id, organization_id:source_organization_id, listing_status:event_status, end_date:ended_at, current_bid:current_price, bid_count, reserve_price, platform:source_platform, listing_url:source_url, view_count, watcher_count, metadata').in('vehicle_id', ids).gt('ended_at', now)),
             runChunked(ids => supabase.from('bat_listings').select('vehicle_id, id, organization_id, seller_username, listing_status, auction_end_date, final_bid, bid_count, comment_count, view_count, reserve_price, bat_listing_url, bat_listing_title').in('vehicle_id', ids).gt('auction_end_date', nowDate)),
-            runChunked(ids => supabase.from('external_listings').select('vehicle_id, id, organization_id, listing_status, end_date, current_bid, final_price, sold_at, platform').in('vehicle_id', ids).eq('listing_status', 'sold')),
+            runChunked(ids => supabase.from('vehicle_events').select('vehicle_id, id, organization_id:source_organization_id, listing_status:event_status, end_date:ended_at, current_bid:current_price, final_price, sold_at, platform:source_platform').in('vehicle_id', ids).eq('event_status', 'sold')),
             runChunked(ids => supabase.from('bat_listings').select('vehicle_id, id, organization_id, listing_status, auction_end_date, final_bid, bat_listing_title').in('vehicle_id', ids).in('listing_status', ['sold', 'ended'])),
             runChunked(ids => supabase.from('vehicle_listings').select('vehicle_id, id, status, auction_end_time').in('vehicle_id', ids).lte('auction_end_time', now)),
-            runChunked(ids => supabase.from('external_listings').select('vehicle_id, id, listing_status, end_date').in('vehicle_id', ids)),
+            runChunked(ids => supabase.from('vehicle_events').select('vehicle_id, id, listing_status:event_status, end_date:ended_at').in('vehicle_id', ids).order('ended_at', { ascending: false, nullsFirst: false }).limit(1000)),
           ]);
 
           const allVehicles = { data: allVehiclesData };
@@ -1546,25 +1692,22 @@ export default function OrganizationProfile() {
             return;
           }
           
-          const enriched = await Promise.allSettled(
-            contributorsData.map(async (c: any) => {
-              if (!c.user_id) {
-                return { ...c, profiles: null };
-              }
-              const { data: profile } = await supabase.from('profiles').select('id, full_name, username, avatar_url').eq('id', c.user_id).maybeSingle();
-              return { ...c, profiles: profile || null };
-            })
-          );
-          
-          setContributors(enriched.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled').map(r => r.value));
+          // Batch the profile lookup — same fan-out as the timeline block below.
+          const contributorProfileById = await fetchProfilesByIds(contributorsData.map((c) => c.user_id));
+          const enriched = contributorsData.map((c) => ({
+            ...c,
+            profiles: c.user_id ? (contributorProfileById.get(c.user_id) ?? null) : null
+          }));
+
+          setContributors(enriched);
           
           // Check user permissions in background
           (async () => {
             try {
               const { data: { user } } = await supabase.auth.getUser();
               if (user && org) {
-                const contributor = enriched.find((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value.user_id === user.id);
-                const userRole = contributor?.value?.role || null;
+                const contributor = enriched.find((c: any) => c.user_id === user.id);
+                const userRole = contributor?.role || null;
                 setCurrentUserRole(userRole);
                 
                 // Check if user has edit permissions via role OR admin status
@@ -1611,17 +1754,15 @@ export default function OrganizationProfile() {
             return;
           }
           
-          const enriched = await Promise.allSettled(
-            eventsData.map(async (e: any) => {
-              if (!e.created_by) {
-                return { ...e, profiles: null };
-              }
-              const { data: profile } = await supabase.from('profiles').select('full_name, username, avatar_url').eq('id', e.created_by).maybeSingle();
-              return { ...e, profiles: profile || null };
-            })
-          );
-          
-          const validEvents = enriched.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled').map(r => r.value);
+          // One query for the distinct authors, not one per row. This page's
+          // top-50 timeline page has exactly 1 distinct created_by on Ernie's
+          // org, so the old per-row map fetched the SAME profile row 50 times
+          // (x2 under StrictMode = 100 requests for one profile).
+          const profileById = await fetchProfilesByIds(eventsData.map((e) => e.created_by));
+          const validEvents = eventsData.map((e) => ({
+            ...e,
+            profiles: e.created_by ? (profileById.get(e.created_by) ?? null) : null
+          }));
           setTimelineEvents(validEvents);
         } catch (error) {
           // Exception loading timeline events - show empty
@@ -2654,7 +2795,9 @@ export default function OrganizationProfile() {
                   {intelligence?.effectivePrimaryFocus === 'service' ? 'In Service' : 'Inventory'}
                   {vehicles.length > 0 && (
                     <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: '6px' }}>
-                      {vehicles.filter((v: any) => !v.is_sold && v.status === 'active').length}
+                      {intelligence?.effectivePrimaryFocus === 'service'
+                        ? serviceVehicles.length
+                        : vehicles.filter((v: any) => !v.is_sold && v.status === 'active').length}
                     </span>
                   )}
                 </span>
@@ -2704,32 +2847,11 @@ export default function OrganizationProfile() {
                 {(() => {
                   // For service orgs: show service vehicles
                   // For inventory orgs: show vehicles for sale
-                  const isServiceOrg = intelligence?.effectivePrimaryFocus === 'service';
-                  
+                  // isServiceOrg is hoisted above — the stats batch keys off the
+                  // same flag, so the fetch and the render can't disagree.
                   if (isServiceOrg) {
-                    // Filter service vehicles (currently in service, not completed)
-                    const serviceVehicles = vehicles.filter(v => {
-                      // Must be active
-                      if (v.status !== 'active') return false;
-                      
-                      // Must be service-related
-                      if (v.relationship_type !== 'service_provider' && 
-                          v.relationship_type !== 'work_location') {
-                        return false;
-                      }
-                      
-                      // Exclude sold/completed service vehicles - use comprehensive sold detection
-                      const isSold = (v as any).is_sold || // Primary comprehensive flag
-                        v.sale_date || 
-                        v.sale_price || 
-                        v.vehicle_sale_status === 'sold' ||
-                        v.listing_status === 'sold' ||
-                        (v.vehicles && (v.vehicles as any).sale_price) ||
-                        (v.vehicles && (v.vehicles as any).sale_date) ||
-                        (v.vehicles && (v.vehicles as any).auction_outcome === 'sold');
-                      return !isSold;
-                    });
-                    
+                    // serviceVehicles is the shared memo above — the same list
+                    // the "In Service N" header counts.
                     if (serviceVehicles.length === 0) {
                       return (
                         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
@@ -2758,6 +2880,8 @@ export default function OrganizationProfile() {
                             organizationId={organizationId!}
                             organizationName={organization?.business_name}
                             laborRate={organization?.labor_rate || 125}
+                            statsRow={serviceStats.byId.get(String(vehicle.vehicle_id)) ?? null}
+                            statsPending={!serviceStats.settled}
                           />
                         ))}
                       </div>
