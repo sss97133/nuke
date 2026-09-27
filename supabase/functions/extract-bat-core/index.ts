@@ -1304,16 +1304,23 @@ Deno.serve(async (req) => {
         vehicleId = String(data.id);
       }
     }
-    // Also check by VIN to prevent duplicate key constraint violations
+    // Also check by VIN to prevent duplicate key constraint violations.
+    // v4: through find_vehicle_by_vin() — `vin = $1` matched none of the four VIN indexes (all partial or
+    // on upper(vin)) and cost a 920K-row seq scan per new lot (16–60 s measured 2026-09-27); the function
+    // reads idx_vehicles_vin_norm_trim. The column filter stays as a loud fallback only.
     if (!vehicleId && essentials.vin && essentials.vin.length >= 5) {
-      const { data } = await supabase
-        .from("vehicles")
-        .select("id")
-        .eq("vin", essentials.vin)
-        .limit(1)
-        .maybeSingle();
-      if (data?.id) {
-        vehicleId = String(data.id);
+      const { data: byVin, error: byVinErr } = await supabase.rpc("find_vehicle_by_vin", { p_vin: essentials.vin });
+      if (!byVinErr && byVin) {
+        vehicleId = String(byVin);
+      } else if (byVinErr) {
+        console.warn(`find_vehicle_by_vin unavailable (${byVinErr.message}); falling back to the column filter (slow)`);
+        const { data } = await supabase
+          .from("vehicles")
+          .select("id")
+          .eq("vin", essentials.vin)
+          .limit(1)
+          .maybeSingle();
+        if (data?.id) vehicleId = String(data.id);
       }
     }
 
