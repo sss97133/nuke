@@ -1132,6 +1132,11 @@ Deno.serve(async (req) => {
       ].filter(Boolean))
     );
 
+    // v4: phase timings (ms) in the response and the log — the per-lot cost has to be measurable
+    const phaseStart = Date.now();
+    let phaseLast = phaseStart;
+    const timings: Record<string, number> = {};
+    const mark = (k: string) => { const now = Date.now(); timings[k] = (timings[k] ?? 0) + (now - phaseLast); phaseLast = now; };
     let html = "";
     let httpStatus: number | null = null;
     let userAgent = "";
@@ -1196,6 +1201,7 @@ Deno.serve(async (req) => {
       });
     }
 
+    mark("fetch_or_snapshot");
     const identity = extractTitleIdentity(html, listingUrlCanonical);
     const essentials = extractEssentials(html);
 
@@ -1254,6 +1260,7 @@ Deno.serve(async (req) => {
     const bestListingLocation = essentials.location || null;
     const parsedLocation = parseLocation(essentials.location);
 
+    mark("parse");
     // Resolve existing vehicle
     let vehicleId: string | null = providedVehicleId;
     let existing: any | null = null;
@@ -1310,6 +1317,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    mark("resolve_vehicle");
     const createdIds: string[] = [];
     const updatedIds: string[] = [];
 
@@ -1896,6 +1904,7 @@ Deno.serve(async (req) => {
       updatedIds.push(vehicleId);
     }
 
+    mark("vehicle_write");
     // v4: a VIN that failed its check digit is kept as a receipt on the vehicle, never as the vehicle's VIN
     if (vehicleId && vinRejected) {
       await trySaveExtractionMetadata({
@@ -1976,6 +1985,7 @@ Deno.serve(async (req) => {
         cleanedImages.push(u);
       }
 
+      mark("observation_receipts");
       if (cleanedImages.length > 0) {
         try {
           const { data: existingRows, error: existingErr } = await supabase
@@ -2194,6 +2204,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    mark("images");
     // vehicle_events (platform tracking)
     if (vehicleId) {
       const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
@@ -2306,6 +2317,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    mark("vehicle_events");
     // Resolve seller_username → organization via bat_seller_monitors
     if (vehicleId && essentials.seller_username) {
       try {
@@ -2378,6 +2390,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    mark("org_link");
     // auction_events (multi-auction history per vehicle)
     if (vehicleId) {
       const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
@@ -2432,6 +2445,7 @@ Deno.serve(async (req) => {
     // NOTE: This is now handled by the vehicle_events upsert above with source_platform='bat'.
     // The bat_listings table has been consolidated into vehicle_events.
 
+    mark("auction_events");
     // Save raw listing description history (for Description Entries UI)
     if (vehicleId && descriptionRaw) {
       await trySaveExtractionMetadata({
@@ -2582,6 +2596,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    mark("description_timeline");
     // Non-blocking MSRP enrichment for newly created vehicles
     if (vehicleId && createdIds.length > 0) {
       try {
@@ -2596,6 +2611,7 @@ Deno.serve(async (req) => {
       } catch (_) { /* non-blocking */ }
     }
 
+    console.log(`extract-bat-core timings ${listingUrlCanonical}: ${JSON.stringify({ ...timings, total_ms: Date.now() - phaseStart })}`);
     return new Response(
       JSON.stringify({
         success: true,
@@ -2609,6 +2625,7 @@ Deno.serve(async (req) => {
         updated_vehicle_ids: updatedIds,
         issues: [],
         extraction_method: "direct_html_parsing_free_mode",
+        timings: { ...timings, total_ms: Date.now() - phaseStart },
         snapshot: "receipt_only",
         auction: {
           record_parsed: auction.parsed,
