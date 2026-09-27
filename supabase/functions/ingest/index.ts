@@ -23,6 +23,7 @@ import { validateVINChecksum } from "../_shared/intelligence-layer.ts";
 import { decodeVin } from "../_shared/vin-decoder.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { normalizeListingUrl, extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -1774,6 +1775,9 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
 // ── Serve ───────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

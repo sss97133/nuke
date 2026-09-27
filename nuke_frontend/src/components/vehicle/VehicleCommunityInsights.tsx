@@ -239,6 +239,8 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
+      // discover-from-observations writes; it refuses the anon key (writeGuard).
+      if (!token) throw new Error('Sign in to generate insights');
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/discover-from-observations`,
@@ -246,7 +248,7 @@ const VehicleCommunityInsights = ({ vehicleId }: VehicleCommunityInsightsProps) 
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({
             vehicle_id: vehicleId,

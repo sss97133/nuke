@@ -23,6 +23,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
 
 const WORKER = `derive-dispatch-${crypto.randomUUID().slice(0, 8)}`;
 
@@ -39,6 +40,9 @@ const EVIDENCE_ARG: Record<string, string> = {
 };
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {

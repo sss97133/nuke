@@ -22,6 +22,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { callTier } from "../_shared/llmRouter.ts";
 import type { AgentTier } from "../_shared/llmRouter.ts";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -735,6 +736,9 @@ async function handleNumberSelection(
 // ── Main Handler ─────────────────────────────────────────────
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

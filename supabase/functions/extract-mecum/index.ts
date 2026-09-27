@@ -25,6 +25,7 @@ import { archiveFetch, readArchivedPage } from "../_shared/archiveFetch.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { cleanVehicleFields } from "../_shared/pollutionDetector.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
 
 const EXTRACTOR_VERSION = "2.0.0";
 
@@ -804,6 +805,9 @@ async function saveVehicle(
 // ─── Main handler ───────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

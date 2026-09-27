@@ -70,6 +70,7 @@ Generated 2026-07-12 from the Canonical Ledger (`CANONICAL_LEDGER.md`, `ledger.j
 | Stripe payment-method setup | `setup-payment-method` | create-setup-session (undeployed; ProfileVerification broken) |
 | Stripe event handling | `stripe-webhook` | — |
 | API keys | `api-keys-manage` + `api_keys` table | — |
+| Caller check for a writing edge function | `_shared/writeGuard.ts` (`requireWriteAuth`: service key, signed-in user, optional nk_live_ key; refuses the anon key) — coverage enforced by `scripts/guardrails/check-write-guard.mjs` in supabase-deploy.yml | per-function `getUser`/service-key compares in ~30 functions: keep as a second layer, never as the only one; `apiKeyAuth.authenticateRequest` stays the api-v1-* front door |
 | Payment facts | `payment_events` table | vehicle_transactions / vehicle_financial_transactions / user_wallets (DROPPED) |
 | Deal jackets / doc forensics | `deal-jacket-pipeline` (dormant; reactivate cron if needed) | forensic-deal-jacket, decompose-deal-jacket, deal-brief, ds-* suite (deleted) |
 | Bidding / auto-buy / exchange / trading | CAPABILITY RETIRED 2026-03 | place-bid-with-deposit (auctionPaymentService still calls it — broken), execute-auto-buy, place-market-order, trading, paper-trade-autopilot, api-v1-exchange, update-exchange-prices (map's cron claim FALSE) |

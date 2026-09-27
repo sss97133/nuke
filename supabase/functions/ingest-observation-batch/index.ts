@@ -33,6 +33,7 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
 
 const MAX_BATCH_SIZE = 200;
 
@@ -87,6 +88,9 @@ interface ItemResult {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

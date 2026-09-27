@@ -17,6 +17,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { firecrawlScrape, firecrawlMap } from '../_shared/firecrawl.ts';
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
 
 const VERSION = '1.0.0';
 
@@ -183,6 +184,9 @@ function estimateFromBrowsePage(markdown: string): number | null {
 // ─── Main Handler ───────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

@@ -26,7 +26,7 @@ jobs:
           echo "Starting Mecum Kissimmee 2026 extraction..."
           curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/extract-premium-auction" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -d '{
               "url": "https://www.mecum.com/auctions/kissimmee-2026/lots/",
               "max_listings": ${{ github.event.inputs.limit || 50 }}
@@ -40,7 +40,7 @@ jobs:
           echo "Starting Las Vegas Motorcycles 2026 extraction..."
           curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/extract-premium-auction" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -d '{
               "url": "https://www.mecum.com/auctions/las-vegas-motorcycles-2026/lots/",
               "max_listings": ${{ github.event.inputs.limit || 50 }}

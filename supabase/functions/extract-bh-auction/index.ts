@@ -21,6 +21,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
 
 // Direct fetch - BH Auction has no Cloudflare/bot protection
 async function fetchPage(url: string): Promise<{ html: string; success: boolean; error?: string }> {
@@ -658,6 +659,9 @@ async function discoverLotUrls(lotsPageUrl: string): Promise<string[]> {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

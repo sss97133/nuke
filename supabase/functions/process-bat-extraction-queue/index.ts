@@ -6,6 +6,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,6 +14,9 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -86,9 +90,11 @@ async function processOneItem(
   results.processed++;
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-  const invokeJwt = Deno.env.get('INTERNAL_INVOKE_JWT') ??
-                   Deno.env.get('SUPABASE_ANON_KEY') ??
-                   Deno.env.get('ANON_KEY') ?? '';
+  // extract-bat-core and extract-auction-comments refuse anonymous callers (writeGuard), so
+  // the call must carry the service key. INTERNAL_INVOKE_JWT is the anon key — no longer enough.
+  const invokeJwt = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
+                   Deno.env.get('SERVICE_ROLE_KEY') ??
+                   Deno.env.get('INTERNAL_INVOKE_JWT') ?? '';
 
   try {
     if (!invokeJwt) {

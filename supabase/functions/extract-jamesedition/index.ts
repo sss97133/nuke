@@ -21,6 +21,7 @@ import { qualityGate } from '../_shared/extractionQualityGate.ts';
 import { archiveFetch } from '../_shared/archiveFetch.ts';
 import { normalizeListingUrl } from '../_shared/urlNormalization.ts';
 import { writeObservation } from '../_shared/observationWriter.ts';
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
 
 const VERSION = '1.1.0';
 const JAMESEDITION_SOURCE_ID = '77c149de-7866-4a7c-ad24-3423ee6c1f22';
@@ -199,6 +200,9 @@ function parseListingUrls(md: string): string[] {
 // ─── Main handler ───────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

@@ -43,7 +43,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
 
     steps:
       - name: Checkout (with previous commit for diff)
@@ -156,17 +156,34 @@ jobs:
           done
           echo "✅ migrations applied"
 
+      - name: Every writing function refuses anonymous callers
+        # A function that writes to the database must call requireWriteAuth
+        # (supabase/functions/_shared/writeGuard.ts) or be allowlisted there with
+        # its own auth. Fails the deploy otherwise — see the script for the rules.
+        run: node scripts/guardrails/check-write-guard.mjs
+
       - name: Deploy edge functions
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           if [ ! -s /tmp/functions.txt ]; then echo "no functions to deploy"; exit 0; fi
           npx -y supabase@latest --version
+          FNS=""
           while read -r fn; do
             [ -d "supabase/functions/$fn" ] || { echo "skip (no dir): $fn"; continue; }
-            echo "═══ deploying $fn"
-            npx -y supabase@latest functions deploy "$fn" --project-ref qkgaybvrernstplzjaam --no-verify-jwt
+            FNS="$FNS $fn"
           done < /tmp/functions.txt
+          [ -n "$FNS" ] || { echo "nothing to deploy"; exit 0; }
+          echo "═══ deploying:$FNS"
+          # One CLI call for the whole list: a per-function loop paid the CLI start-up and
+          # bundler image pull for every function and could not finish a wide change (the
+          # 155-function write-guard commit, 2026-09-27) inside the job timeout.
+          # --no-verify-jwt is deliberate (2026-09-27): the gateway check cannot tell the
+          # public anon JWT from a real caller and would break Stripe/API-key/webhook
+          # callers that carry no JWT at all. Caller identity is judged inside each
+          # function by _shared/writeGuard.ts (signature-verified), enforced by the
+          # guardrail step above.
+          npx -y supabase@latest functions deploy $FNS --project-ref qkgaybvrernstplzjaam --no-verify-jwt --jobs 4
           echo "✅ functions deployed"
 
       - name: Summary

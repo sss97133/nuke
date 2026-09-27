@@ -31,6 +31,7 @@ import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { batchUpsertWithProvenance, quarantineRecord, type ProvenanceMetadata } from "../_shared/batUpsertWithProvenance.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { summarizeAuction, vinCheckDigitOk } from "../_shared/batAuctionRecord.ts";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
 
 // Extractor versioning - update on each significant change
 const EXTRACTOR_VERSION = 'extract-bat-core:4.0.0';
@@ -1096,6 +1097,9 @@ async function tryUpsertMileageTimelineEvent(args: {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {

@@ -10,6 +10,7 @@ import { ExtractionLogger, validateVin } from '../_shared/extractionHealth.ts'
 import { getLLMConfig, callLLM, type LLMProvider } from '../_shared/llmProvider.ts'
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
 import { writeObservation } from "../_shared/observationWriter.ts"
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -77,6 +78,9 @@ interface ExtractionRequest {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }

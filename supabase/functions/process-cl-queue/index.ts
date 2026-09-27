@@ -5,6 +5,7 @@ import { parseLocation } from '../_shared/parseLocation.ts'
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts'
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
 import { archiveFetch } from '../_shared/archiveFetch.ts'
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +16,9 @@ const corsHeaders = {
 const STORAGE_BUCKET = 'vehicle-data'
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders, status: 200 })
   }

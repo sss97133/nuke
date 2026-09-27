@@ -24,7 +24,7 @@
  *   SUPABASE_URL           — Auto-set by Supabase runtime
  *   SUPABASE_SERVICE_ROLE_KEY — Auto-set by Supabase runtime
  */
-
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -195,6 +195,9 @@ function parseMessage(message: any): {
 // ─── Main handler ──────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

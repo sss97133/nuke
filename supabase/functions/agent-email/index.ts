@@ -11,6 +11,7 @@
  */
 
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
@@ -42,6 +43,9 @@ function getSql() {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 200,

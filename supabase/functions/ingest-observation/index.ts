@@ -26,6 +26,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrl, normalizeVin } from "../_shared/urlNormalization.ts";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -80,6 +82,33 @@ interface ObservationInput {
   rank?: "preferred" | "normal" | "deprecated";
 }
 
+/**
+ * The ONE anonymous write this function accepts (P0.2, 2026-09-27).
+ *
+ * The public builder share page (/share/wiring/:vehicleId, ShareWiring.tsx) lets a harness
+ * builder with no account answer YES/NO on a public vehicle. That verdict — and only that
+ * shape — may arrive on the anon key: source 'shop', kind 'comment', kind_detail
+ * 'professional_review', a public vehicle, at most SHARE_VERDICTS_PER_HOUR per IP.
+ * Every other write here needs the service key or a signed-in user (see _shared/writeGuard.ts).
+ */
+const SHARE_VERDICTS_PER_HOUR = 20;
+
+// deno-lint-ignore no-explicit-any
+async function allowShareVerdict(supabase: any, req: Request, input: ObservationInput): Promise<boolean> {
+  const detail = (input.structured_data as Record<string, unknown> | undefined)?.kind_detail;
+  const isVerdict = input.source_slug === "shop" && input.kind === "comment" &&
+    detail === "professional_review" && !input.subject &&
+    typeof input.vehicle_id === "string" && /^[0-9a-f-]{36}$/i.test(input.vehicle_id);
+  if (!isVerdict) return false;
+  const { data: vehicle } = await supabase
+    .from("vehicles").select("id, is_public").eq("id", input.vehicle_id).maybeSingle();
+  if (!vehicle?.is_public) return false;
+  const rl = await checkRateLimit(supabase, getClientIp(req), {
+    namespace: "ingest-observation-share-verdict", windowSeconds: 3600, maxRequests: SHARE_VERDICTS_PER_HOUR,
+  });
+  return rl.allowed;
+}
+
 async function hashContent(content: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(content);
@@ -107,6 +136,12 @@ Deno.serve(async (req) => {
         error: "Missing required fields: source_slug, kind, observed_at"
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+
+    // Writes are never anonymous — except the share-page verdict argued above.
+    const denied = await requireWriteAuth(req, {
+      allowAnonymous: () => allowShareVerdict(supabase, req, input),
+    });
+    if (denied) return denied;
 
     // Look up source
     const { data: source, error: sourceError } = await supabase
