@@ -42,7 +42,7 @@ const EXTRACTOR_VERSION = 'extract-bat-core:4.0.0';
 // source of truth means a future column addition can't silently drift and
 // produce inconsistent read-back data across the branches.
 const VEHICLE_MATCH_COLUMNS =
-  "id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, listing_kind, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid";
+  "id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, city, state, listing_kind, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1351,6 +1351,10 @@ Deno.serve(async (req) => {
         bat_buyer: essentials.buyer_username || null,
         bat_location: essentials.location || null,
         listing_location: parsedLocation.clean,
+        // city / state as their own columns: marketplace_metro_pulse and the EXPLORE metro map roll up
+        // by them (the July line persisted them; the public-history rewrite dropped it — drift audit 2026-09-27)
+        city: parsedLocation.city,
+        state: parsedLocation.state,
         listing_location_raw: parsedLocation.raw,
         listing_location_source: 'bat',
         listing_location_confidence: parsedLocation.confidence,
@@ -1565,6 +1569,8 @@ Deno.serve(async (req) => {
       if ((!existing?.bat_location || listingIsLatestOrEqual) && essentials.location) updatePayload.bat_location = essentials.location;
       if ((!existing?.listing_location || listingIsLatestOrEqual) && parsedLocation.clean) {
         updatePayload.listing_location = parsedLocation.clean;
+        if (parsedLocation.city) updatePayload.city = parsedLocation.city;
+        if (parsedLocation.state) updatePayload.state = parsedLocation.state;
         updatePayload.listing_location_raw = parsedLocation.raw;
         updatePayload.listing_location_source = 'bat';
         updatePayload.listing_location_confidence = parsedLocation.confidence;
