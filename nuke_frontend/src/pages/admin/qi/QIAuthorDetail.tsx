@@ -29,9 +29,6 @@ export default function QIAuthorDetail({ author }: Props) {
   const [categoryDist, setCategoryDist] = useState<CategoryDist[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Sanitize author for SQL — strip anything that could escape quotes
-  const authorSafe = author.replace(/[^a-zA-Z0-9_\-. ]/g, '');
-
   useEffect(() => {
     let cancelled = false;
 
@@ -52,15 +49,9 @@ export default function QIAuthorDetail({ author }: Props) {
         setTotalComments(count || 0);
       }
 
-      // Category distribution
-      const { data: distData } = await supabase.rpc('execute_sql', {
-        query: `SELECT question_primary_l1 as l1, question_primary_l2 as l2, count(*)::int as count
-          FROM auction_comments
-          WHERE author_username = '${authorSafe}'
-            AND has_question = true AND question_primary_l1 IS NOT NULL
-          GROUP BY question_primary_l1, question_primary_l2
-          ORDER BY count DESC LIMIT 20`
-      });
+      // Category distribution — admin-gated, parameterized RPC (migration 20260927170400);
+      // no SQL is built on the client since execute_sql was closed to user sessions.
+      const { data: distData } = await supabase.rpc('admin_qi_author_categories', { p_author: author });
 
       if (!cancelled && distData) {
         setCategoryDist(distData);
@@ -71,7 +62,7 @@ export default function QIAuthorDetail({ author }: Props) {
 
     load();
     return () => { cancelled = true; };
-  }, [author, authorSafe, page]);
+  }, [author, page]);
 
   const totalByAuthor = categoryDist.reduce((s, d) => s + d.count, 0);
 

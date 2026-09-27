@@ -9,18 +9,27 @@ interface ScriptStatus {
   purpose: string;
   status: 'running' | 'stopped' | 'error' | 'unknown';
   progress: {
-    current: number;
+    current: number | null; // null = not computed (the server says why)
     total: number;
-    percent: number;
+    percent: number | null;
   };
   metrics: {
     successRate: number;
-    cost: number;
+    cost: number | null;
     rate: number; // items per minute
     eta: string;
   };
   lastRun?: string;
   errors: string[];
+}
+
+// One row per script from admin_script_center_progress() (migration 20260927170400).
+interface ScriptProgressRow {
+  script_id: string;
+  source_table: string;
+  processed: number | string | null;
+  computed: boolean;
+  note: string | null;
 }
 
 const SCRIPTS = [
@@ -131,8 +140,15 @@ export default function ScriptControlCenter() {
     try {
       const statusList: ScriptStatus[] = [];
 
+      // One admin-gated RPC per load (migration 20260927170400) instead of raw SQL per script;
+      // execute_sql is closed to user sessions. computed=false rows carry the reason in `note`.
+      const { data: progressRows, error: progressErr } = await supabase.rpc('admin_script_center_progress');
+      if (progressErr) console.warn('admin_script_center_progress:', progressErr.message);
+      const progressById = new Map<string, ScriptProgressRow>();
+      for (const r of (progressRows || []) as ScriptProgressRow[]) progressById.set(r.script_id, r);
+
       for (const script of SCRIPTS) {
-        const status = await getScriptStatus(script);
+        const status = await getScriptStatus(script, progressById.get(script.id));
         statusList.push(status);
       }
 
@@ -144,37 +160,22 @@ export default function ScriptControlCenter() {
     }
   }
 
-  async function getScriptStatus(script: any): Promise<ScriptStatus> {
+  async function getScriptStatus(script: (typeof SCRIPTS)[number], progressRow?: ScriptProgressRow): Promise<ScriptStatus> {
     try {
       // Get total images
       const { count: total } = await supabase
         .from('vehicle_images')
         .select('*', { count: 'exact', head: true });
 
-      // Get processed count using the metric
-      let processed = 0;
-      try {
-        const { data, error } = await supabase.rpc('execute_sql', {
-          query: `SELECT ${script.metric} as processed FROM ${script.table}`
-        });
-        
-        if (error) {
-          // Function or table doesn't exist, return 0
-          if (error.code === 'PGRST301' || error.code === 'PGRST116' || error.code === '42P01' || error.code === '42883') {
-            processed = 0;
-          } else {
-            console.warn(`Error executing SQL for ${script.name}:`, error);
-            processed = 0;
-          }
-        } else {
-          processed = data?.processed || (Array.isArray(data) && data[0]?.processed) || 0;
-        }
-      } catch (err) {
-        console.warn(`Error in execute_sql for ${script.name}:`, err);
-        processed = 0;
+      // Processed count from the RPC. null = not computed (43M-row vehicle_images scans cannot run
+      // inside a request; the server says so in `note`) — shown as unknown, never as 0.
+      const processed: number | null =
+        progressRow && progressRow.computed && progressRow.processed != null ? Number(progressRow.processed) : null;
+      if (progressRow && !progressRow.computed && progressRow.note) {
+        console.info(`${script.name}: ${progressRow.note}`);
       }
 
-      const percent = total && total > 0 ? (processed / total) * 100 : 0;
+      const percent = processed != null && total && total > 0 ? (processed / total) * 100 : null;
 
       // Check if actively processing (updated in last 2 minutes)
       const { data: recentActivity } = await supabase
@@ -189,7 +190,7 @@ export default function ScriptControlCenter() {
         name: script.name,
         description: script.description,
         purpose: `Fills: ${script.table}.${script.field || 'rows'}`,
-        status: isRunning ? 'running' : processed > 0 ? 'stopped' : 'unknown',
+        status: isRunning ? 'running' : processed != null && processed > 0 ? 'stopped' : 'unknown',
         progress: {
           current: processed,
           total: total || 2742,
@@ -197,7 +198,7 @@ export default function ScriptControlCenter() {
         },
         metrics: {
           successRate: 100, // TODO: track failures
-          cost: processed * script.cost,
+          cost: processed != null ? processed * script.cost : null,
           rate: 0, // TODO: calculate
           eta: '0m'
         },
@@ -210,8 +211,8 @@ export default function ScriptControlCenter() {
         description: script.description,
         purpose: `Error loading status`,
         status: 'error',
-        progress: { current: 0, total: 0, percent: 0 },
-        metrics: { successRate: 0, cost: 0, rate: 0, eta: 'N/A' },
+        progress: { current: null, total: 0, percent: null },
+        metrics: { successRate: 0, cost: null, rate: 0, eta: 'N/A' },
         errors: [error.message]
       };
     }
@@ -301,7 +302,7 @@ export default function ScriptControlCenter() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
                     <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>PROGRESS</span>
                     <span style={{ fontFamily: "'Courier New', monospace" }}>
-                      {script.progress.current.toLocaleString()} / {script.progress.total.toLocaleString()}
+                      {script.progress.current == null ? '—' : script.progress.current.toLocaleString()} / {script.progress.total.toLocaleString()}
                     </span>
                   </div>
                   <div style={{ height: '6px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
@@ -309,13 +310,13 @@ export default function ScriptControlCenter() {
                       style={{ 
                         height: '100%', 
                         background: script.status === 'running' ? 'var(--success)' : 'var(--accent)',
-                        width: `${script.progress.percent}%`,
+                        width: `${script.progress.percent ?? 0}%`,
                         transition: 'width 0.3s ease'
                       }}
                     />
                   </div>
                   <div style={{ fontSize: '11px', textAlign: 'right', marginTop: '2px', color: 'var(--text-muted)' }}>
-                    {script.progress.percent.toFixed(1)}%
+                    {script.progress.percent == null ? 'not computed' : `${script.progress.percent.toFixed(1)}%`}
                   </div>
                 </div>
 
@@ -324,7 +325,7 @@ export default function ScriptControlCenter() {
                   <div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>COST</div>
                     <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--warning)' }}>
-                      ${script.metrics.cost.toFixed(4)}
+                      {script.metrics.cost == null ? '—' : `$${script.metrics.cost.toFixed(4)}`}
                     </div>
                   </div>
                   <div>
@@ -403,13 +404,15 @@ export default function ScriptControlCenter() {
             <div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>ANGLES SET</div>
               <div style={{ fontSize: '16px', fontWeight: 700 }}>
-                {scripts.find(s => s.name === 'Angle Detection')?.progress.current || 0}
+                {scripts.find(s => s.name === 'Angle Detection')?.progress.current ?? '—'}
               </div>
             </div>
             <div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL COST</div>
               <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--warning)' }}>
-                ${scripts.reduce((sum, s) => sum + s.metrics.cost, 0).toFixed(4)}
+                {scripts.some(s => s.metrics.cost == null)
+                  ? '—'
+                  : `$${scripts.reduce((sum, s) => sum + (s.metrics.cost ?? 0), 0).toFixed(4)}`}
               </div>
             </div>
             <div>
