@@ -680,26 +680,15 @@ async function syncToDatabase(
       }
     }
 
-    // Mirror live auction STATE into vehicle_listings — the realtime table the /live
-    // floor subscribes to (useLiveFloor.ts postgres_changes on INSERT). Same p_rows;
-    // upsert_live_auction_listings() resolves vehicle_id by listing_url (the vehicles
-    // upsert above ran first), keys on metadata->>'listing_url', and expires mirror
-    // rows whose auction_end_time has passed. Native seller listings are never touched.
-    for (let i = 0; i < upsertRows.length; i += UPSERT_BATCH) {
-      const chunk = upsertRows.slice(i, i + UPSERT_BATCH);
-      const { data, error } = await supabase.rpc("upsert_live_auction_listings", {
-        p_rows: chunk,
-      });
-      if (error) {
-        console.error(`[sync-live-auctions] upsert_live_auction_listings failed: ${error.message}`);
-      } else {
-        stats.updated_count += typeof data === "number" ? data : 0;
-        console.log(`[sync-live-auctions] Mirrored ${data ?? chunk.length} live rows into vehicle_listings`);
-      }
-    }
+    // No mirror into vehicle_listings (removed 2026-09-27; homepage owner's decision, approved by Skylar):
+    // vehicle_listings is Nuke's native-listing table — its readers (CreateAuctionListing, AuctionListing,
+    // AuctionMarketplace, myAuctionsService, OrganizationProfile, LiveAuctionBanner) treat rows as Nuke's own
+    // auctions, so mirrored BaT lots would read as Nuke auctions. The mirror had written nothing since 2026-07-12
+    // (search_path failures, then 60 s timeouts) and cost ~2 min of DB time per run. Live BaT state lives on
+    // vehicles (sale_status 'auction_live', high_bid), which market_pulse_live() and the vehicle page read.
 
-  // vehicle_events rows (bid snapshots + prediction reads) are ensured inside
-  // upsert_live_auction_listings() above. The old supabase-js upsert here used a bare
+  // vehicle_events rows for live lots were ensured inside upsert_live_auction_listings(), whose call is gone (see
+  // above; it had failed since 2026-07-12, so nothing that worked changes). The old supabase-js upsert here used a bare
   // ON CONFLICT (vehicle_id,source_platform,source_url) which can NEVER match the
   // PARTIAL unique index idx_vehicle_events_dedup_url (WHERE source_url IS NOT NULL
   // AND source_listing_id IS NULL) — it errored on every run. Removed 2026-07-11.
