@@ -30,7 +30,7 @@ import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { batchUpsertWithProvenance, quarantineRecord, type ProvenanceMetadata } from "../_shared/batUpsertWithProvenance.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
-import { summarizeAuction, vinCheckDigitOk } from "../_shared/batAuctionRecord.ts";
+import { readCommentsJson, summarizeAuction, vinCheckDigitOk } from "../_shared/batAuctionRecord.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 
 // Extractor versioning - update on each significant change
@@ -1243,6 +1243,9 @@ Deno.serve(async (req) => {
     const vinRejected = vinCheckDigitOk(essentials.vin) === false ? String(essentials.vin) : null;
     if (vinRejected) essentials.vin = null;
     let saleSupersession: any = null;
+    let auctionEventId: string | null = null;
+    let commentsWritten = 0;
+    let bidsWritten = 0;
 
     const batCategory = essentials.listing_category ? String(essentials.listing_category).trim() : null;
     const listingKind = batCategory && batCategory.toLowerCase() === "parts" ? "non_vehicle_item" : "vehicle";
@@ -2511,7 +2514,7 @@ Deno.serve(async (req) => {
       const endAt = essentials.auction_end_at ||
         (essentials.auction_end_date ? new Date(`${essentials.auction_end_date}T00:00:00Z`).toISOString() : null);
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("auction_events")
         .upsert({
           vehicle_id: vehicleId,
@@ -2545,9 +2548,113 @@ Deno.serve(async (req) => {
               body_style: inferredBodyStyle,
             },
           },
-        }, { onConflict: "vehicle_id,source_url" });
+        }, { onConflict: "vehicle_id,source_url" })
+        .select("id")
+        .maybeSingle();
 
       if (error) console.warn(`auction_events upsert failed (non-fatal): ${error?.message || error}`);
+      else auctionEventId = (data as any)?.id ? String((data as any).id) : null;
+    }
+
+    // v4.1 (2026-09-27): the auction's interactions, exactly timed — every comment and bid from the page's
+    // comments JSON, into auction_comments with the row shape and content_hash recipe extract-auction-comments
+    // uses (sha256 of 'bat'|url|sequence|posted_at|author|text), so the two writers dedupe on
+    // (vehicle_id, content_hash); bids also into bat_bids when the lot has a bat_listings row. Skylar's rule:
+    // a BaT auction's comments, bids, open and close belong on the vehicle's timeline at their precise moments.
+    if (vehicleId && auction.parsed) {
+      try {
+        const rawComments = readCommentsJson(html) ?? [];
+        const endAt = essentials.auction_end_at ? new Date(essentials.auction_end_at) : (auction.recordAt ? new Date(auction.recordAt) : null);
+        const rows: any[] = [];
+        for (let i = 0; i < rawComments.length; i++) {
+          const c: any = rawComments[i];
+          const authorRaw = String(c?.authorName || c?.author || "").trim();
+          const author = authorRaw.replace(/\s*\(The\s+Seller\)/i, "").trim() || "Unknown";
+          const isSeller = authorRaw.toLowerCase().includes("(the seller)");
+          const ts = typeof c?.timestamp === "number" && c.timestamp > 0 ? new Date(c.timestamp * 1000) : null;
+          const postedAt = ts ?? endAt ?? new Date();
+          const text = String(c?.content || c?.comment || c?.text || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+          if (!text || text.length < 3) continue;
+          const type = String(c?.type ?? "");
+          const voided = type === "bat-bid-canceled";                      // BaT voided it: never a bid on record
+          const isBid = !voided && (type === "bat-bid" || /bid\s+placed\s+by/i.test(text));
+          const bidAmount = isBid && Number(c?.bidAmount) > 0 ? Number(c.bidAmount) : null;
+          const isSaleRecord = (type === "bat-bid-reserve" && /^sold\b/i.test(text)) || type === "bat-rnm-accepted";
+          const comment_type = bidAmount ? "bid" : isSaleRecord ? "sold" : isSeller ? "seller_response" : text.includes("?") ? "question" : "observation";
+          const hoursUntilClose = endAt && ts ? (endAt.getTime() - postedAt.getTime()) / 3600000 : 0;
+          const content_hash = await sha256Hex(["bat", listingUrlNorm, String(i + 1), postedAt.toISOString(), author, text].join("|"));
+          rows.push({
+            auction_event_id: auctionEventId,
+            vehicle_id: vehicleId,
+            platform: "bat",
+            source_url: listingUrlNorm,
+            content_hash,
+            sequence_number: i + 1,
+            posted_at: postedAt.toISOString(),
+            hours_until_close: Math.max(0, hoursUntilClose),
+            author_username: author,
+            is_seller: isSeller,
+            author_total_likes: typeof c?.likes === "number" ? c.likes : 0,
+            comment_type,
+            comment_text: text,
+            word_count: text.split(/\s+/).length,
+            has_question: text.includes("?"),
+            has_media: Boolean(c?.hasImage || c?.hasVideo || (Array.isArray(c?.images) && c.images.length > 0) || (Array.isArray(c?.videos) && c.videos.length > 0)),
+            bid_amount: bidAmount,
+            comment_likes: typeof c?.commentLikes === "number" ? c.commentLikes : 0,
+            bat_author_id: typeof c?.authorId === "number" ? c.authorId : null,
+            bat_comment_id: typeof c?.id === "number" ? c.id : null,
+            bat_author_likes: typeof c?.authorLikes === "number" ? c.authorLikes : null,
+            likers_count: Array.isArray(c?.likers) ? c.likers.length : null,
+          });
+        }
+        let written = 0;
+        for (let i = 0; i < rows.length; i += 200) {
+          const { error: cErr } = await supabase
+            .from("auction_comments")
+            .upsert(rows.slice(i, i + 200), { onConflict: "vehicle_id,content_hash", ignoreDuplicates: true });
+          if (cErr) { console.warn(`auction_comments upsert failed (non-fatal): ${cErr.message}`); break; }
+          written += Math.min(200, rows.length - i);
+        }
+        commentsWritten = written;
+
+        // bids also into bat_bids (keyed by the lot's bat_listings row; absent for lots the catalog sync never saw)
+        const bidRows = rows.filter((r) => typeof r.bid_amount === "number" && r.bid_amount > 0);
+        if (bidRows.length > 0) {
+          const { data: bl } = await supabase
+            .from("bat_listings")
+            .select("id")
+            .in("bat_listing_url", urlCandidates)
+            .limit(1)
+            .maybeSingle();
+          const batListingId = (bl as any)?.id ? String((bl as any).id) : null;
+          if (batListingId) {
+            const nowIso2 = new Date().toISOString();
+            const { error: bErr } = await supabase.from("bat_bids").upsert(
+              bidRows.map((r) => ({
+                bat_listing_id: batListingId,
+                vehicle_id: vehicleId,
+                bat_user_id: null,
+                bat_username: r.author_username,
+                bid_amount: r.bid_amount,
+                bid_timestamp: r.posted_at,
+                is_winning_bid: false,
+                is_final_bid: false,
+                source: "comment",
+                auction_event_id: auctionEventId,
+                metadata: { source_url: listingUrlNorm, comment_content_hash: r.content_hash, sequence_number: r.sequence_number, extractor: EXTRACTOR_VERSION },
+                updated_at: nowIso2,
+              })),
+              { onConflict: "bat_listing_id,bat_username,bid_amount,bid_timestamp" },
+            );
+            if (bErr) console.warn(`bat_bids upsert failed (non-fatal): ${bErr.message}`);
+            else bidsWritten = bidRows.length;
+          }
+        }
+      } catch (e: any) {
+        console.warn(`comments/bids write failed (non-fatal): ${e?.message || String(e)}`);
+      }
+      mark("comments_bids");
     }
 
     // vehicle_events BaT-specific auction record (consolidated from bat_listings)
@@ -2659,6 +2766,8 @@ Deno.serve(async (req) => {
         },
         vin_rejected: vinRejected,
         sale_supersession: saleSupersession,
+        comments_written: commentsWritten,
+        bids_written: bidsWritten,
         timestamp: new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },

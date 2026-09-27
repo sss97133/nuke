@@ -6,7 +6,7 @@ set -u
 SLUGS=$1; OUT=$2; CHUNK=${3:-1000}
 Q=/Users/skylar/nuke/scripts/data/q.sh
 : > "$OUT"
-W=$(mktemp -d); split -l "$CHUNK" "$SLUGS" "$W/c_"
+W=$(mktemp -d); split -l "$CHUNK" -a 4 "$SLUGS" "$W/c_"
 n=0; rows=0
 for f in "$W"/c_*; do
   n=$((n+1))
