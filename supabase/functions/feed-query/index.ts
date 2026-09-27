@@ -68,6 +68,15 @@ async function getPortfolioStats(supabaseClient: any): Promise<any> {
       sales_count_today: 0, sales_volume_today: 0,
     };
   }
+  // LIVE: counted where the live sync keeps auctions (sale_status 'auction_live', end still ahead) on
+  // idx_vehicles_auction_live. The cached figure came from vehicle_listings, which the sync no longer
+  // mirrors into (it showed 3 while ~1,300 were live).
+  const { count: liveCount } = await supabaseClient
+    .from("vehicles")
+    .select("id", { count: "exact", head: true })
+    .eq("sale_status", "auction_live")
+    .gt("auction_end_date", new Date().toISOString());
+  if (typeof liveCount === "number") cachedPortfolioStats.active_auctions = liveCount;
   cachedPortfolioStatsAt = Date.now();
   return cachedPortfolioStats;
 }
@@ -424,9 +433,24 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Live auctions the sync keeps on the vehicle row itself (no vehicle_events row): the current bid is
+    // high_bid (sale_price on rows the sync has not rewritten since 20260927195000) and the listing URL.
+    const liveIds = items
+      .filter((r: any) => r.sale_status === "auction_live" && !auctionMap.has(r.vehicle_id))
+      .map((r: any) => r.vehicle_id);
+    const liveMap = new Map<string, any>();
+    if (liveIds.length > 0) {
+      const { data: liveRows } = await supabase
+        .from("vehicles")
+        .select("id, high_bid, sale_price, listing_url")
+        .in("id", liveIds);
+      for (const lr of liveRows ?? []) liveMap.set(lr.id, lr);
+    }
+
     // ----- Transform to response shape -----
     const feedItems = items.map((row: any) => {
       const auction = auctionMap.get(row.vehicle_id);
+      const live = liveMap.get(row.vehicle_id);
 
       // Thumbnail from MV (already resolved: thumbnail > medium > full > legacy primary_image_url)
       const thumbnail_url = row.primary_image_url ?? null;
@@ -486,10 +510,10 @@ Deno.serve(async (req) => {
         // Auction state: live from vehicle_events; an ended auction keeps its own end time from the MV
         auction_end_date: auction?.ended_at ?? row.auction_end_at ?? null,
         event_at: row.event_at ?? null,
-        current_bid: auction?.current_price ?? null,
+        current_bid: auction?.current_price ?? live?.high_bid ?? live?.sale_price ?? null,
         bid_count: auction?.bid_count ?? null,
-        listing_status: auction?.event_status ?? null,
-        listing_url: auction?.source_url ?? null,
+        listing_status: auction?.event_status ?? (live ? "active" : null),
+        listing_url: auction?.source_url ?? live?.listing_url ?? null,
 
         // Description from MV (pre-truncated to 300 chars)
         description: row.description_snippet ?? null,

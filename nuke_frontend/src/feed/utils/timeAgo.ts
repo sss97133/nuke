@@ -62,8 +62,8 @@ export function vehicleTimeLabel(vehicle: {
     }
   }
 
-  // Active auctions: show when ending
-  if (vehicle.auction_end_date && vehicle.listing_status === 'active') {
+  // Active auctions: show when ending (a future end date is a live auction, whatever the status field says)
+  if (vehicle.auction_end_date) {
     const end = new Date(vehicle.auction_end_date).getTime();
     if (Number.isFinite(end)) {
       const diff = end - Date.now();
