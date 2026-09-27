@@ -1258,6 +1258,9 @@
   .vp-col-divider { display: none; }
   .badge__tooltip { display: none !important; }
   .mileage__tooltip { display: none !important; }
+  /* the photo toolbar (ZONES … SOURCE + COLS) is 583px in one row; capped at the header's width it
+     wraps instead of pushing the whole page 200px sideways on a phone */
+  .gallery-header .widget__controls { flex-shrink: 1; min-width: 0; max-width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
