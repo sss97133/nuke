@@ -211,7 +211,28 @@ function timelineMatchesKey(t: TimelineEventLike, key: string, lotNumber: string
   return false;
 }
 
-export function buildAuctionSequences(input: SequenceInput): SequencesResult {
+/**
+ * One row per BaT comment. Re-reads of a lot wrote the same comment twice because the
+ * writer's content hash included the comment's position in the thread, which shifts as
+ * the thread grows (65 of 302 lots re-read on 2026-09-27 gained 1,924 repeats); the
+ * writer is fixed, the rows stay (testimony is never deleted). Keep the earliest
+ * posted_at per bat_comment_id, the lowest id on a tie; rows with no id pass through.
+ */
+export function dedupeComments(comments: AuctionCommentRow[]): AuctionCommentRow[] {
+  const kept = new Map<number, AuctionCommentRow>();
+  const out: AuctionCommentRow[] = [];
+  for (const c of comments) {
+    if (c.bat_comment_id == null) { out.push(c); continue; }
+    const prev = kept.get(c.bat_comment_id);
+    if (!prev) { kept.set(c.bat_comment_id, c); continue; }
+    const a = c.posted_at ?? '', b = prev.posted_at ?? '';
+    if (a < b || (a === b && c.id < prev.id)) kept.set(c.bat_comment_id, c);
+  }
+  return [...out, ...kept.values()];
+}
+
+export function buildAuctionSequences(rawInput: SequenceInput): SequencesResult {
+  const input: SequenceInput = { ...rawInput, comments: dedupeComments(rawInput.comments) };
   // every listing the rows know about
   const keys = new Set<string>();
   const hintKey = lotKey(input.lotUrlHint);

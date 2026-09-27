@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAuctionSequence, buildAuctionSequences, commentPermalink, lotKey, uploadMonth, type AuctionCommentRow } from './auctionSequence';
+import { buildAuctionSequence, buildAuctionSequences, commentPermalink, dedupeComments, lotKey, uploadMonth, type AuctionCommentRow } from './auctionSequence';
 
 const LOT = 'https://bringatrailer.com/listing/1985-pontiac-fiero-gt-3/';
 
@@ -74,13 +74,13 @@ describe('buildAuctionSequences — a car that ran three times (1951 Ford F-1)',
   const U18 = 'https://bringatrailer.com/listing/1951-ford-f-1-pickup-5/';
   const U26 = 'https://bringatrailer.com/listing/1951-ford-f-1-pickup-92/';
   const comments: AuctionCommentRow[] = [
-    comment({ id: 'a1', posted_at: '2017-06-12T18:17:40Z', comment_type: 'bid', bid_amount: 5000, source_url: U17 }),
-    comment({ id: 'a2', posted_at: '2017-06-23T13:58:52Z', comment_type: 'bid', bid_amount: 20750, source_url: U17 }),
-    comment({ id: 'b1', posted_at: '2018-07-25T16:04:12Z', comment_type: 'bid', bid_amount: 6000, source_url: U18 }),
-    comment({ id: 'b2', posted_at: '2018-08-01T20:52:55Z', comment_type: 'bid', bid_amount: 21750, source_url: U18 }),
-    comment({ id: 'c1', posted_at: '2026-01-17T19:22:20Z', comment_type: 'bid', bid_amount: 7000, source_url: U26 }),
-    comment({ id: 'c2', posted_at: '2026-01-24T18:49:16Z', comment_type: 'bid', bid_amount: 21250, source_url: U26 }),
-    comment({ id: 'c3', posted_at: '2026-01-25T10:00:00Z', comment_text: 'congrats', source_url: null }), // no URL → the car's own listing
+    comment({ id: 'a1', posted_at: '2017-06-12T18:17:40Z', comment_type: 'bid', bid_amount: 5000, source_url: U17, bat_comment_id: 101 }),
+    comment({ id: 'a2', posted_at: '2017-06-23T13:58:52Z', comment_type: 'bid', bid_amount: 20750, source_url: U17, bat_comment_id: 102 }),
+    comment({ id: 'b1', posted_at: '2018-07-25T16:04:12Z', comment_type: 'bid', bid_amount: 6000, source_url: U18, bat_comment_id: 103 }),
+    comment({ id: 'b2', posted_at: '2018-08-01T20:52:55Z', comment_type: 'bid', bid_amount: 21750, source_url: U18, bat_comment_id: 104 }),
+    comment({ id: 'c1', posted_at: '2026-01-17T19:22:20Z', comment_type: 'bid', bid_amount: 7000, source_url: U26, bat_comment_id: 105 }),
+    comment({ id: 'c2', posted_at: '2026-01-24T18:49:16Z', comment_type: 'bid', bid_amount: 21250, source_url: U26, bat_comment_id: 106 }),
+    comment({ id: 'c3', posted_at: '2026-01-25T10:00:00Z', comment_text: 'congrats', source_url: null, bat_comment_id: 107 }), // no URL → the car's own listing
   ];
   const auctionEvents = [
     { id: 'e26', source: 'bat', source_url: U26.replace(/\/$/, ''), lot_number: '227632', outcome: 'sold', winning_bid: 21250, total_bids: 15, winning_bidder: 'mohlster', seller_name: null, page_views: null, watchers: null, comments_count: 37 },
@@ -125,6 +125,25 @@ describe('buildAuctionSequences — a car that ran three times (1951 Ford F-1)',
     expect(s18.photos).toEqual({ publishedWithListing: 1, attributionUncertain: false });
     expect(s26.photos).toEqual({ publishedWithListing: 2, attributionUncertain: true });
     expect(importStampedDays).toEqual([new Date('2026-01-23T20:00:00Z').toLocaleDateString('en-CA')]);
+  });
+});
+
+describe('dedupeComments — a re-read wrote the same BaT comment twice', () => {
+  it('keeps one row per bat_comment_id (earliest posted_at, then lowest id) and passes null ids through', () => {
+    // 1981 Honda Civic 719d0e6d: 128 rows, 83 distinct bat_comment_id, 45 repeated pairs with identical posted_at
+    const rows: AuctionCommentRow[] = [
+      comment({ id: '350bb6ba', posted_at: '2025-08-28T16:12:33Z', bat_comment_id: 900001, comment_type: 'bid', bid_amount: 5000 }),
+      comment({ id: '16d4490e', posted_at: '2025-08-28T16:12:33Z', bat_comment_id: 900001, comment_type: 'bid', bid_amount: 5000 }), // the re-read's copy
+      comment({ id: 'zz-late', posted_at: '2025-08-28T18:00:00Z', bat_comment_id: 900002 }),
+      comment({ id: 'aa-early', posted_at: '2025-08-28T17:00:00Z', bat_comment_id: 900002 }),                                       // earlier posted_at wins
+      comment({ id: 'n1', posted_at: '2025-08-29T10:00:00Z', bat_comment_id: null }),
+      comment({ id: 'n2', posted_at: '2025-08-29T10:00:00Z', bat_comment_id: null }),
+    ];
+    const kept = dedupeComments(rows).map(c => c.id).sort();
+    expect(kept).toEqual(['16d4490e', 'aa-early', 'n1', 'n2']);
+    const { sequences } = buildAuctionSequences({ comments: rows, auctionEvents: [], vehicleEvents: [], timelineEvents: [], images: [], lotUrlHint: LOT });
+    expect(sequences[0].items.map(i => i.id)).toEqual(['16d4490e', 'aa-early', 'n1', 'n2']);
+    expect(sequences[0].items.filter(i => i.kind === 'bid')).toHaveLength(1);
   });
 });
 
