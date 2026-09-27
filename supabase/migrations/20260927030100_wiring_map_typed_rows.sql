@@ -168,6 +168,12 @@ create unique index wiring_decision_links_uniq
   on public.wiring_decision_links (decision_id, relation, coalesce(other_decision_id, endpoint_id));
 
 -- ---------------------------------------------------------------- read access: public for public vehicles, like circuits
+-- (a policy's lookup into another table is itself filtered by that table's RLS, so the design row must be
+--  readable too, or the endpoint policy below can never pass for a visitor)
+create policy "Public read for public vehicles" on public.harness_designs for select using (
+  exists (select 1 from public.vehicles v where v.id = harness_designs.vehicle_id
+            and (v.is_public = true or v.user_id = auth.uid() or v.owner_id = auth.uid())));
+
 create policy "Public read for public vehicles" on public.harness_endpoints for select using (
   exists (select 1 from public.harness_designs d join public.vehicles v on v.id = d.vehicle_id
           where d.id = harness_endpoints.design_id
