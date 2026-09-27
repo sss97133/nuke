@@ -17,6 +17,8 @@ const FollowAuctionCard = React.lazy(() => import('../../components/auction/Foll
 const OrganizationInvestmentCard = React.lazy(() => import('../../components/organization/OrganizationInvestmentCard'));
 import { CircularAvatar } from '../../components/common/CircularAvatar';
 import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
+import { factoryMsrp } from './factoryMsrp';
+
 import { PopupStackContext } from '../../components/popups/PopupStack';
 import { CommentsPopup } from '../../components/popups/CommentsPopup';
 import { BidsPopup } from '../../components/popups/BidsPopup';
@@ -368,7 +370,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       }
       return { amount: null, label: '' };
     }
-    if (mode === 'msrp') return { amount: typeof vehicle.msrp === 'number' ? vehicle.msrp : null, label: 'Original MSRP' };
+    if (mode === 'msrp') {
+      const sticker = factoryMsrp(vehicle);
+      return sticker == null ? { amount: null, label: '' } : { amount: sticker, label: 'Original MSRP' };
+    }
     return getAutoDisplay();
   };
 
@@ -904,7 +909,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     pushEntry({
       id: 'msrp',
       label: 'Original MSRP',
-      amount: vehicle.msrp,
+      amount: factoryMsrp(vehicle),
       date: vehicle.year ? `${vehicle.year}` : undefined,
       source: 'Factory data'
     });
@@ -4507,7 +4512,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     <option value="asking">Asking</option>
                     <option value="sale">Sale</option>
                     <option value="purchase">Purchase</option>
-                    <option value="msrp">MSRP</option>
+                    {factoryMsrp(vehicle) != null && <option value="msrp">MSRP</option>}
                   </select>
                   <div style={{ fontWeight: 600 }}>Responsible label</div>
                   <select
