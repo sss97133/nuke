@@ -183,7 +183,9 @@ jobs:
           # callers that carry no JWT at all. Caller identity is judged inside each
           # function by _shared/writeGuard.ts (signature-verified), enforced by the
           # guardrail step above.
-          npx -y supabase@latest functions deploy $FNS --project-ref qkgaybvrernstplzjaam --no-verify-jwt --jobs 4
+          # No --jobs: the CLI accepts it only with --use-api (server-side bundling), and every deploy so far
+          # bundled locally — keep the bundler that is known to work (run 36331008968 died on the flag).
+          npx -y supabase@latest functions deploy $FNS --project-ref qkgaybvrernstplzjaam --no-verify-jwt
           echo "✅ functions deployed"
 
       - name: Summary
