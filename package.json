@@ -252,7 +252,8 @@
     "day:synthesize": "dotenvx run -- node scripts/daily-receipt/synthesize-day.mjs",
     "day:classify": "dotenvx run -- node scripts/daily-receipt/classify-unfiled-day.mjs",
     "ops:schema-census": "dotenvx run -- node scripts/schema-pressure-census.mjs",
-    "ledger:facts": "node scripts/ledger/refresh-facts.mjs"
+    "ledger:facts": "node scripts/ledger/refresh-facts.mjs",
+    "market:live-bands": "dotenvx run -q -- node scripts/market/live-bands.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.62",
