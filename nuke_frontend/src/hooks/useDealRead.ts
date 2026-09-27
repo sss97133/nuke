@@ -18,6 +18,7 @@ import {
   buildCompSet, type BatListingRow, type CompSet, type VehicleCompRow,
 } from '../lib/dealRead/batComps';
 import { buildAsks, type Ask, type AskVehicleRow, type ListingObservationRow } from '../lib/dealRead/asks';
+import { pickWriteUps, type RawWriteUpRow, type WriteUp } from '../lib/dealRead/writeUps';
 
 export interface DealSubject {
   id: string;
@@ -229,18 +230,34 @@ async function fetchListingObservations(ids: string[]): Promise<ListingObservati
   return out;
 }
 
-async function fetchDescriptions(ids: string[]): Promise<Map<string, string | null>> {
-  const out = new Map<string, string | null>();
+// The text behind the claims, batched 100 vehicles a call: the BaT write-up
+// rows first (latest per vehicle), then vehicles.description only for the
+// vehicles that have no write-up row. Never one round trip per lot.
+async function fetchWriteUps(ids: string[]): Promise<Map<string, WriteUp>> {
+  const raw: RawWriteUpRow[] = [];
   for (let i = 0; i < ids.length; i += 100) {
-    const chunk = ids.slice(i, i + 100);
+    const { data, error } = await supabase
+      .from('extraction_metadata')
+      .select('vehicle_id,field_value,extracted_at,source_url')
+      .in('vehicle_id', ids.slice(i, i + 100))
+      .eq('field_name', 'raw_listing_description')
+      .order('extracted_at', { ascending: false })
+      .limit(1000);
+    if (error) throw error;
+    raw.push(...((data ?? []) as unknown as RawWriteUpRow[]));
+  }
+  const withRaw = new Set(raw.filter(r => r.field_value && r.field_value.trim()).map(r => r.vehicle_id));
+  const missing = ids.filter(id => !withRaw.has(id));
+  const summaries = new Map<string, string | null>();
+  for (let i = 0; i < missing.length; i += 100) {
     const { data, error } = await supabase
       .from('vehicles')
       .select('id,description')
-      .in('id', chunk);
+      .in('id', missing.slice(i, i + 100));
     if (error) throw error;
-    for (const row of (data ?? []) as Array<{ id: string; description: string | null }>) out.set(row.id, row.description);
+    for (const row of (data ?? []) as Array<{ id: string; description: string | null }>) summaries.set(row.id, row.description);
   }
-  return out;
+  return pickWriteUps(ids, raw, summaries);
 }
 
 export interface DealReadData {
@@ -252,7 +269,7 @@ export interface DealReadData {
   compSet: CompSet | null;
   /** the cohort's live asks (marketplace rows with an asking price and no sale), cheapest first */
   asks: Ask[] | undefined;
-  /** true once the descriptions behind the text claims have been merged in */
+  /** true once the write-ups behind the text claims have been merged in */
   textLoaded: boolean;
   isLoading: boolean;
   error: Error | null;
@@ -331,8 +348,8 @@ export function useDealRead(vehicleId: string | undefined, now: Date = new Date(
   );
 
   const descQ = useQuery({
-    queryKey: ['deal-read', 'descriptions', compIds],
-    queryFn: () => fetchDescriptions(compIds),
+    queryKey: ['deal-read', 'write-ups', compIds],
+    queryFn: () => fetchWriteUps(compIds),
     enabled: compIds.length > 0,
     staleTime: 10 * 60 * 1000,
   });
@@ -341,7 +358,10 @@ export function useDealRead(vehicleId: string | undefined, now: Date = new Date(
   const compSet = useMemo(() => {
     if (!firstPass || !bounds || !cohortQ.data || !batQ.data) return firstPass;
     if (!descQ.data) return firstPass;
-    const rows = cohortQ.data.map(v => (descQ.data.has(v.id) ? { ...v, description: descQ.data.get(v.id) ?? null } : v));
+    const rows = cohortQ.data.map(v => {
+      const w = descQ.data.get(v.id);
+      return w ? { ...v, description: w.text, description_source: w.source } : { ...v, description: null, description_source: null };
+    });
     return buildCompSet(rows, batQ.data, {
       modelToken, yearStart: bounds.year_start, yearEnd: bounds.year_end, now,
     });

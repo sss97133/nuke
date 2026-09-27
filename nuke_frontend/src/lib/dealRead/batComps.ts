@@ -41,8 +41,11 @@ export interface VehicleCompRow {
   bat_listing_title: string | null;
   title: string | null;
   primary_image_url: string | null;
-  // fetched in a second pass, only for rows that pass the sold rule
+  // fetched in a second pass, only for rows that pass the sold rule: the BaT
+  // write-up (extraction_metadata raw_listing_description) or, failing that,
+  // vehicles.description — a ~480-char summary by design
   description?: string | null;
+  description_source?: WriteUpSource | null;
 }
 
 export interface BatListingRow {
@@ -55,6 +58,8 @@ export interface BatListingRow {
   sale_date: string | null;
   auction_end_date: string | null;
 }
+
+import type { WriteUpSource } from './writeUps';
 
 export type EngineClass =
   | 'four_2_0'      // stock 2.0-litre flat-four (incl. replacement/rebuilt 2.0s, as the archive counts them)
@@ -97,6 +102,8 @@ export interface Comp {
   mileage: number | null;
   transmission: string | null;
   text: TextFeatures | null;
+  /** which text the claims were read from; null until write-ups are merged */
+  textSource: WriteUpSource | null;
   imageUrl: string | null;
 }
 
@@ -396,6 +403,7 @@ export function buildCompSet(vehicles: VehicleCompRow[], batListings: BatListing
       mileage: v?.mileage ?? null,
       transmission: v?.transmission ?? null,
       text: v && v.description !== undefined ? textFeatures(v.description, title) : null,
+      textSource: v && v.description !== undefined ? (v.description_source ?? null) : null,
       imageUrl: v?.primary_image_url ?? null,
     });
   }

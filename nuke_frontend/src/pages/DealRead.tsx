@@ -133,7 +133,11 @@ const REASON_LABEL: Record<ExclusionReason, string> = {
 
 function textFlags(c: Comp): string {
   if (!c.text) return '…';
-  if (!c.text.readable) return c.text.project ? `${/race ?car/i.test(c.title) ? 'race car' : 'project'} (title) · write-up truncated` : 'write-up truncated';
+  const fromSummary = c.textSource === 'vehicles.description';
+  if (!c.text.readable) {
+    const why = c.textSource == null ? 'no text held' : fromSummary ? 'summary only, no write-up row' : 'write-up too short';
+    return c.text.project ? `${/race ?car/i.test(c.title) ? 'race car' : 'project'} (title) · ${why}` : why;
+  }
   const f: string[] = [];
   if (c.text.rustMention) f.push('rust');
   if (c.text.project) f.push(/race ?car/i.test(c.title) ? 'race car' : 'project');
@@ -143,7 +147,8 @@ function textFlags(c: Comp): string {
   if (c.text.originalInterior) f.push('orig interior');
   if (c.text.ac) f.push('a/c');
   if (c.text.titleIssue) f.push('title issue');
-  return f.length ? f.join(' · ') : 'none read';
+  const read = f.length ? f.join(' · ') : 'none read';
+  return fromSummary ? `${read} (summary)` : read;
 }
 
 function CompRows({ rows, ask, mark }: { rows: Comp[]; ask?: number | null; mark?: (c: Comp) => boolean }) {
@@ -507,6 +512,8 @@ export default function DealRead() {
   const belowShare = ask != null ? shareBelow(win.map(c => c.price), ask) : null;
   const specs = claimSpecs(subject, sd, subjectEngine);
   const readableCount = win.filter(c => c.text?.readable).length;
+  const fromWriteUps = win.filter(c => c.textSource === 'raw_listing_description').length;
+  const fromSummaries = win.filter(c => c.textSource === 'vehicles.description').length;
   const exclusionsByReason = new Map<ExclusionReason, Exclusion[]>();
   for (const e of compSet?.excluded ?? []) exclusionsByReason.set(e.reason, [...(exclusionsByReason.get(e.reason) ?? []), e]);
   const older = tight.filter(c => !win.includes(c));
@@ -579,7 +586,7 @@ export default function DealRead() {
           />
           <StripPlot comps={win} ask={ask} quantiles={quantiles} asks={asks ?? []} subjectId={subject.id} />
           <div className="dr-mono dr-muted" style={{ fontSize: 'var(--fs-8)', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
-            <span>● no rust mention</span><span>○ mentions rust</span><span>◌ write-up unreadable</span><span>| this ask</span><span>▲ other live ask</span><span>each dot opens its BaT lot, each ▲ its deal read</span>
+            <span>● no rust mention</span><span>○ mentions rust</span><span>◌ no readable write-up</span><span>| this ask</span><span>▲ other live ask</span><span>each dot opens its BaT lot, each ▲ its deal read</span>
           </div>
           {figures ? (
             <div className="dr-mono" style={{ fontSize: 'var(--fs-9)', marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
@@ -666,7 +673,7 @@ export default function DealRead() {
         <div style={panelStyle}>
           <SectionHeader
             label="What the listing claims vs what sold"
-            meta={<>{tightLabel} · last {WINDOW_MONTHS} mo · write-ups readable {readableCount} of {win.length}{data.textLoaded ? '' : ' · reading…'}</>}
+            meta={<>{tightLabel} · last {WINDOW_MONTHS} mo · write-ups readable {readableCount} of {win.length}{data.textLoaded ? ` · ${fromWriteUps} from BaT write-ups · ${fromSummaries} from summaries` : ' · reading…'}</>}
           />
           {specs.length === 0 ? (
             <div className="dr-mono dr-muted" style={{ fontSize: 'var(--fs-9)' }}>the listing observation carries no claims to test</div>
@@ -708,7 +715,7 @@ export default function DealRead() {
             );
           })}
           <div className="dr-mono dr-muted" style={{ fontSize: 'var(--fs-8)', marginTop: '8px' }}>
-            claims are the seller's statements as recorded in the listing observation, not inspection findings · text features are read from BaT write-ups held in Nuke; a truncated write-up reads as nothing
+            claims are the seller's statements as recorded in the listing observation, not inspection findings · text is read from the BaT write-up (extraction_metadata raw_listing_description, latest per vehicle) where one exists, else from vehicles.description, a ~480-character summary by design — marked "(summary)"; text under 600 characters reads as nothing
           </div>
         </div>
       )}
