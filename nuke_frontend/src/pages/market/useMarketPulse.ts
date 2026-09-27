@@ -19,10 +19,31 @@ export interface LiveAuction {
   title: string | null; // the listing's own title as BaT publishes it
 }
 
+// The same board, read at an earlier moment (BAT-LIVE-BIDS index, migration 20260927210000).
+export interface BoardReading {
+  at: number; // epoch ms
+  bids: number;
+  n: number;
+  byMake: Record<string, [number, number]> | null; // make -> [bids, auctions with a bid]; live readings only
+  source: 'live' | 'archive' | string; // archive = rebuilt from BaT bid history (96% of auctions)
+}
+
+export interface SameHourRange {
+  hourUtc: string;
+  weekdayUtc: string;
+  low: number;
+  high: number;
+  weeks: number;
+  firstDay: string;
+  readings: { day: string; bids: number }[]; // the same weekday and hour in each earlier week
+}
+
 export interface MarketPulse {
   syncedAt: number | null;
   source: string;
   auctions: LiveAuction[];
+  weekAgo: BoardReading | null;
+  sameHour: SameHourRange | null;
 }
 
 // Lots BaT lists without a parsed make (wheel sets, replicas) are grouped under this label.
@@ -34,9 +55,20 @@ async function fetchPulse(): Promise<MarketPulse> {
   const { data, error } = await supabase.rpc('market_pulse_live');
   if (error) throw error;
   const rows = ((data?.auctions ?? []) as Row[]);
+  const wk = data?.baseline?.week_ago;
+  const sh = data?.baseline?.same_hour;
   return {
     syncedAt: data?.synced_at ? Date.parse(data.synced_at) : null,
     source: data?.source ?? '',
+    weekAgo: wk && wk.bids != null
+      ? { at: Date.parse(wk.at), bids: Number(wk.bids), n: Number(wk.n), byMake: wk.by_make ?? null, source: wk.source ?? 'live' }
+      : null,
+    sameHour: sh && sh.low != null && sh.high != null && Number(sh.weeks) > 0
+      ? {
+          hourUtc: sh.hour_utc, weekdayUtc: sh.weekday_utc, low: Number(sh.low), high: Number(sh.high), weeks: Number(sh.weeks), firstDay: sh.first_day,
+          readings: Array.isArray(sh.readings) ? sh.readings.map((r: [string, number]) => ({ day: r[0], bids: Number(r[1]) })) : [],
+        }
+      : null,
     auctions: rows.map((r) => ({
       id: r[0],
       year: r[1],

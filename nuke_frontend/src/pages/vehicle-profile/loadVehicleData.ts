@@ -708,9 +708,9 @@ export async function loadVehicleImpl({
           commentCount = typeof (commentCountResult as any)?.count === 'number' ? (commentCountResult as any).count : null;
           // A live-sync listing whose comments have not been extracted has no rows here: that is
           // "not read yet", not zero bids, so show unknown rather than 0.
-          if (vehicleAuctionLive && !best && bidCount === 0 && commentCount === 0) {
-            bidCount = null;
-            commentCount = null;
+          if (vehicleAuctionLive && !best) {
+            if (bidCount === 0) bidCount = null;
+            if (commentCount === 0) commentCount = null;
           }
           lastBidAt = (lastBid as any)?.data?.posted_at || null;
           lastCommentAt = (lastComment as any)?.data?.posted_at || null;

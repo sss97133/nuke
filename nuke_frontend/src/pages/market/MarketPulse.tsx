@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { squarify } from '../../lib/squarify';
-import { NO_MAKE, useMarketPulse, type LiveAuction } from './useMarketPulse';
+import { NO_MAKE, useMarketPulse, type BoardReading, type LiveAuction, type SameHourRange } from './useMarketPulse';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
 // Every figure is computed from the rows market_pulse_live() returns, and every
@@ -97,13 +97,87 @@ function useWidth<T extends HTMLElement>(): [React.RefObject<T>, number] {
   return [ref, w];
 }
 
+function pctChange(now: number, before: number): number | null {
+  return before > 0 ? ((now - before) / before) * 100 : null;
+}
+
+function signed(pct: number): string {
+  return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+}
+
+// Each earlier week at this weekday and hour is a tick; now is the block. The sentence ranks now among them.
+function RangeBar({ value, range }: { value: number; range: SameHourRange }) {
+  const lo = Math.min(range.low, value);
+  const hi = Math.max(range.high, value);
+  const span = hi - lo;
+  const x = (v: number) => (span > 0 ? (v - lo) / span : 0.5);
+  const beaten = range.readings.filter((r) => value > r.bids).length;
+  const n = range.readings.length;
+  const rank = n === 0 ? null : beaten === n ? `higher than all ${n}` : beaten === 0 ? `lower than all ${n}` : `higher than ${beaten} of ${n}`;
+  return (
+    <span
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}
+      title={`Current bids at this hour (${range.hourUtc}:00 UTC) on ${range.weekdayUtc}s, ${range.weeks} weeks since ${range.firstDay}. Readings before 27 Sep are rebuilt from BaT bid history (96% of auctions) and may run up to ~4% low.`}
+    >
+      <span style={label}>Same time on {range.weekdayUtc}s · last {range.weeks} weeks</span>
+      <span style={{ ...mono, fontSize: 11 }}>{usd(lo, true)}</span>
+      <span style={{ position: 'relative', width: 160, height: 12 }}>
+        <span style={{ position: 'absolute', top: 5, left: 0, right: 0, height: 2, background: 'var(--border)' }} />
+        {range.readings.map((r) => (
+          <span
+            key={r.day}
+            title={`${r.day}: ${usd(r.bids)}`}
+            style={{ position: 'absolute', top: 2, left: `calc(${x(r.bids) * 100}% - 1px)`, width: 2, height: 8, background: 'var(--text-secondary)' }}
+          />
+        ))}
+        <span title={`Now: ${usd(value)}`} style={{ position: 'absolute', top: 0, left: `calc(${x(value) * 100}% - 3px)`, width: 6, height: 12, background: 'var(--text)' }} />
+      </span>
+      <span style={{ ...mono, fontSize: 11 }}>{usd(hi, true)}</span>
+      {rank && <span style={{ ...label, color: 'var(--text)' }}>{rank} {range.weekdayUtc}s at this hour</span>}
+    </span>
+  );
+}
+
+// What the headline is relative to: the same board a week ago, and its range at this time of the week.
+function Relativity({ value, weekAgo, sameHour }: { value: number; weekAgo: BoardReading | null; sameHour: SameHourRange | null }) {
+  const pct = weekAgo ? pctChange(value, weekAgo.bids) : null;
+  const rebuilt = weekAgo?.source === 'archive';
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 18px', alignItems: 'center', padding: '6px 10px', border: '2px solid var(--border)', borderTop: 'none', marginTop: -12, marginBottom: 12 }}>
+      {weekAgo && pct != null ? (
+        <span title={`${usd(weekAgo.bids)} across ${weekAgo.n.toLocaleString('en-US')} auctions at ${clock(weekAgo.at)} a week ago${rebuilt ? ' (rebuilt from BaT bid history, 96% of auctions)' : ''}`}>
+          <span style={label}>vs same time last week </span>
+          <span style={{ ...mono, fontWeight: 700, color: pct >= 0 ? 'var(--success)' : 'var(--error)' }}>{rebuilt ? '≈' : ''}{signed(pct)}</span>
+          <span style={{ ...mono, fontSize: 11, color: 'var(--text-secondary)' }}> from {usd(weekAgo.bids, true)}</span>
+        </span>
+      ) : null}
+      {sameHour && <RangeBar value={value} range={sameHour} />}
+    </div>
+  );
+}
+
 interface MakeNode {
   make: string;
   count: number;
   bids: number;
 }
 
-function MarketMap({ auctions, selected, onSelect }: { auctions: LiveAuction[]; selected: string | null; onSelect: (make: string | null) => void }) {
+// Tile color is the make's change against the same time last week, only when that reading was
+// recorded live (rebuilt readings have no per-make split). No reading, no color.
+function changeTone(pct: number | null): { bg: string; fg: string } | null {
+  if (pct == null || Math.abs(pct) < 2) return null;
+  if (pct >= 10) return { bg: 'var(--success)', fg: 'var(--bg)' };
+  if (pct > 0) return { bg: 'var(--success-dim)', fg: 'var(--text)' };
+  if (pct <= -10) return { bg: 'var(--error)', fg: 'var(--bg)' };
+  return { bg: 'var(--error-dim)', fg: 'var(--text)' };
+}
+
+function MarketMap({ auctions, selected, onSelect, weekAgo }: { auctions: LiveAuction[]; selected: string | null; onSelect: (make: string | null) => void; weekAgo: BoardReading | null }) {
+  const byMakeBefore = weekAgo?.source === 'live' ? weekAgo.byMake : null;
+  const makeChange = (m: MakeNode) => {
+    const before = byMakeBefore?.[m.make]?.[0];
+    return before != null ? pctChange(m.bids, before) : null;
+  };
   const [ref, width] = useWidth<HTMLDivElement>();
   const height = width < 640 ? 240 : 380;
   const makes = useMemo(() => {
@@ -129,7 +203,7 @@ function MarketMap({ auctions, selected, onSelect }: { auctions: LiveAuction[]; 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4, minHeight: 12 }}>
         <span style={{ ...label, color: shown ? 'var(--text)' : 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {shown
-            ? `${shown.make} · ${shown.count} live · ${usd(shown.bids)} bid · ${((shown.bids / total) * 100).toFixed(1)}% of all bids`
+            ? `${shown.make} · ${shown.count} live · ${usd(shown.bids)} bid · ${((shown.bids / total) * 100).toFixed(1)}% of all bids${makeChange(shown) != null ? ` · ${signed(makeChange(shown) as number)} vs last week` : ''}`
             : 'Current bids by make · area = dollars bid · hover or tap a make'}
         </span>
         {selected && (
@@ -143,6 +217,7 @@ function MarketMap({ auctions, selected, onSelect }: { auctions: LiveAuction[]; 
         const active = selected === node.make;
         const dim = selected != null && !active;
         const roomy = w > 64 && h > 34;
+        const tone = changeTone(makeChange(node));
         return (
           <button
             key={node.make}
@@ -159,8 +234,8 @@ function MarketMap({ auctions, selected, onSelect }: { auctions: LiveAuction[]; 
               height: Math.max(0, h - 2),
               padding: roomy ? '5px 6px' : 0,
               border: 'none',
-              background: active ? 'var(--text)' : 'var(--surface)',
-              color: active ? 'var(--bg)' : 'var(--text)',
+              background: active ? 'var(--text)' : tone?.bg ?? 'var(--surface)',
+              color: active ? 'var(--bg)' : tone?.fg ?? 'var(--text)',
               opacity: dim ? 0.45 : 1,
               cursor: 'pointer',
               textAlign: 'left',
@@ -399,9 +474,13 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
         ))}
       </div>
 
+      {!isLoading && (data?.weekAgo || data?.sameHour) && (
+        <Relativity value={openBids} weekAgo={data?.weekAgo ?? null} sameHour={data?.sameHour ?? null} />
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'minmax(0, 3fr) minmax(260px, 1fr)', gap: 12, marginBottom: 12 }}>
         <section style={{ minWidth: 0 }}>
-          <MarketMap auctions={live} selected={make} onSelect={(m) => setParam('make', m)} />
+          <MarketMap auctions={live} selected={make} onSelect={(m) => setParam('make', m)} weekAgo={data?.weekAgo ?? null} />
         </section>
         <section style={{ border: '2px solid var(--border)', alignSelf: 'start', minWidth: 0 }}>
           <div style={{ ...label, padding: '6px 8px', borderBottom: '2px solid var(--border)' }}>Ending next</div>
