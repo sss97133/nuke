@@ -1224,6 +1224,11 @@ Deno.serve(async (req) => {
       }
       if (auction.bidCount) essentials.bid_count = auction.bidCount;
       if (auction.commentCount) essentials.comment_count = auction.commentCount;
+      // a closed page carries no data-ends; the sale / reserve-not-met record is stamped at the close
+      if (!essentials.auction_end_date && auction.recordAt) {
+        essentials.auction_end_at = auction.recordAt;
+        essentials.auction_end_date = auction.recordAt.slice(0, 10);
+      }
     }
     // buyer only on a sold lot
     const saleNow = Number(essentials.sale_price) > 0;
