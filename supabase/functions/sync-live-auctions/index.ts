@@ -23,6 +23,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { parseBatIdentityFromUrl } from "../_shared/batParser.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -148,6 +149,14 @@ async function syncBaT(): Promise<{ auctions: LiveAuction[]; error: string | nul
           const parts = cleanTitle.split(/\s+/);
           make = parts[0] || null;
           model = parts.slice(1).join(" ") || null;
+        }
+        // The lot URL is BaT's own identity: "2017-aston-martin-v12-vantage-s-7-speed" → Aston Martin /
+        // V12 Vantage S 7-Speed. Same parser as extract-bat-core (multi-word makes, title-cased tokens);
+        // the title split above only remains as the fallback for a URL that does not parse.
+        const ident = parseBatIdentityFromUrl(item.url);
+        if (ident.make) {
+          make = ident.make;
+          model = ident.model ?? model;
         }
 
         return {
@@ -694,6 +703,22 @@ async function syncToDatabase(
   // ON CONFLICT (vehicle_id,source_platform,source_url) which can NEVER match the
   // PARTIAL unique index idx_vehicle_events_dedup_url (WHERE source_url IS NOT NULL
   // AND source_listing_id IS NULL) — it errored on every run. Removed 2026-07-11.
+
+  // A lot that left the live list is no longer live (2026-09-27). BaT's /auctions/ page and Collecting
+  // Cars' feed are the complete live sets, so a row of this platform that is absent from them ends
+  // here — sale_status/auction_status 'ended', no sale claim; settlement records the result. The RPC
+  // ends nothing for a short (partial) list. Homepage-scraped platforms are not complete lists.
+  if (platform === "bringatrailer" || platform === "collecting-cars") {
+    const { data: ended, error: endErr } = await supabase.rpc("end_live_auctions_absent", {
+      p_platform: platform,
+      p_live_urls: auctions.map(a => a.url),
+    });
+    if (endErr) console.error(`[sync-live-auctions] end_live_auctions_absent failed: ${endErr.message}`);
+    else {
+      stats.ended_count = Number(ended) || 0;
+      if (stats.ended_count > 0) console.log(`[sync-live-auctions] ${platform}: ${stats.ended_count} live rows ended (absent from the live list)`);
+    }
+  }
 
   return stats;
 }
