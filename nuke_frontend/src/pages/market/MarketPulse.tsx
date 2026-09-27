@@ -429,24 +429,33 @@ function EndingNext({ auctions, risenIds, stale, heat }: { auctions: LiveAuction
 
 // Fixed row heights so the board can render only the rows on screen.
 const ROW_H = 52;
-const ROW_H_NARROW = 42;
+const ROW_H_NARROW = 50;
 
 function BoardRow({ a, risen, narrow, stale, heat }: { a: LiveAuction; risen: boolean; narrow: boolean; stale: boolean; heat: Heat | null | undefined }) {
+  const nr = a.noReserve && <span style={{ ...label, color: 'var(--text)', border: '2px solid var(--text)', padding: '0 3px', flexShrink: 0 }}>NR</span>;
+  const tagged = (heat != null && heat.state !== 'in line') || a.noReserve;
+  const name = <span style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title(a)}</span>;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px', height: narrow ? ROW_H_NARROW : ROW_H, boxSizing: 'border-box', borderBottom: '2px solid var(--border)', fontSize: 11 }}>
-      <div style={{ width: narrow ? 64 : 84, flexShrink: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: narrow ? 8 : 10, padding: '0 8px', height: narrow ? ROW_H_NARROW : ROW_H, boxSizing: 'border-box', borderBottom: '2px solid var(--border)', fontSize: 11 }}>
+      <div style={{ width: narrow ? 58 : 84, flexShrink: 0 }}>
         <Countdown endsAt={a.endsAt} />
       </div>
       <Link to={`/vehicle/${a.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, textDecoration: 'none', color: 'var(--text)' }}>
-        <Thumb src={a.imageUrl} size={narrow ? 44 : 60} />
-        <span style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title(a)}</span>
+        <Thumb src={a.imageUrl} size={narrow ? 40 : 60} />
+        {narrow ? (
+          // A phone has no room for tags beside the title: they go under it.
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+            {name}
+            {tagged && <span style={{ display: 'flex', gap: 4 }}><HeatTag a={a} heat={heat} />{nr}</span>}
+          </span>
+        ) : name}
       </Link>
-      <HeatTag a={a} heat={heat} />
-      {a.noReserve && <span style={{ ...label, color: 'var(--text)', border: '2px solid var(--text)', padding: '0 3px', flexShrink: 0 }}>NR</span>}
-      <div style={{ width: narrow ? 84 : 104, textAlign: 'right', flexShrink: 0 }}>
+      {!narrow && <HeatTag a={a} heat={heat} />}
+      {!narrow && nr}
+      <div style={{ width: narrow ? 76 : 104, textAlign: 'right', flexShrink: 0 }}>
         <BidCell auction={a} risen={risen} stale={stale} />
       </div>
-      {a.listingUrl && (
+      {!narrow && a.listingUrl && (
         <a
           href={a.listingUrl}
           target="_blank"
@@ -566,8 +575,8 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       </div>
 
       {/* Figures. Each one is a filter on the board below. */}
-      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(3, 1fr)' : 'repeat(8, 1fr)', border: '2px solid var(--border)', background: 'var(--border)', gap: 2, marginBottom: 12 }}>
-        <Figure caption="Current bids" value={isLoading ? '…' : usd(openBids, true)} active={false} onClick={() => setParam('live', null)} hint="Sum of the current high bid on every live auction" />
+      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(4, 1fr)' : 'repeat(8, 1fr)', border: '2px solid var(--border)', background: 'var(--border)', gap: 2, marginBottom: 12 }}>
+        <Figure caption="Current bids" value={isLoading ? '…' : usd(openBids, true)} active={false} onClick={() => setParam('live', null)} hint="Sum of the current high bid on every live auction" compact={narrow} />
         {WINDOWS.map((w) => (
           <Figure
             key={w.id}
@@ -579,6 +588,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
             value={isLoading ? '…' : figures[w.id].toLocaleString('en-US')}
             active={win === w.id && w.id !== 'all'}
             onClick={() => setParam('live', w.id === 'all' || win === w.id ? null : w.id)}
+            compact={narrow}
           />
         ))}
       </div>
@@ -604,7 +614,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
             {make ? ` · ${make}` : ''}
             {win !== 'all' ? ` · ${WINDOWS.find((w) => w.id === win)?.label}` : ''}
           </span>
-          <div style={{ display: 'flex', gap: 2 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
             {SORTS.map((s) => (
               <button
                 key={s.id}
@@ -636,7 +646,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   );
 }
 
-function Figure({ caption, value, active, onClick, hint }: { caption: string; value: string; active: boolean; onClick: () => void; hint?: string }) {
+function Figure({ caption, value, active, onClick, hint, compact }: { caption: string; value: string; active: boolean; onClick: () => void; hint?: string; compact?: boolean }) {
   return (
     <button
       onClick={onClick}
@@ -644,7 +654,7 @@ function Figure({ caption, value, active, onClick, hint }: { caption: string; va
       title={hint}
       style={{
         textAlign: 'left',
-        padding: '8px 10px',
+        padding: compact ? '6px 6px' : '8px 10px',
         border: 'none',
         background: active ? 'var(--text)' : 'var(--bg)',
         color: active ? 'var(--bg)' : 'var(--text)',
@@ -653,7 +663,7 @@ function Figure({ caption, value, active, onClick, hint }: { caption: string; va
       }}
     >
       <div style={{ ...label, color: 'inherit', opacity: 0.8 }}>{caption}</div>
-      <div style={{ ...mono, fontSize: 20, fontWeight: 700, marginTop: 2 }}>{value}</div>
+      <div style={{ ...mono, fontSize: compact ? 17 : 20, fontWeight: 700, marginTop: 2 }}>{value}</div>
     </button>
   );
 }
