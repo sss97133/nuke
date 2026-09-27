@@ -13,9 +13,12 @@
 -- 1. vehicle ↔ lot links: the three URL columns, plus catalog lots sharing a usable VIN
 CREATE OR REPLACE TABLE vlots AS
 SELECT vehicle_id, slug, string_agg(DISTINCT via, '+') AS via FROM (
-  SELECT p.id AS vehicle_id, t.slug, 'url' AS via
-  FROM pvrows p JOIN truth t ON t.slug <> '' AND t.slug IN (slug_of(p.bat_auction_url), slug_of(p.listing_url), slug_of(p.discovery_url))
-  WHERE p.merged_into IS NULL
+  -- one equijoin per URL column (an IN over three expressions is a nested loop over 264K x 188K rows)
+  SELECT u.id AS vehicle_id, t.slug, 'url' AS via
+  FROM (SELECT id, slug_of(bat_auction_url) AS s FROM pvrows WHERE merged_into IS NULL AND bat_auction_url IS NOT NULL
+        UNION ALL SELECT id, slug_of(listing_url) FROM pvrows WHERE merged_into IS NULL AND listing_url IS NOT NULL
+        UNION ALL SELECT id, slug_of(discovery_url) FROM pvrows WHERE merged_into IS NULL AND discovery_url IS NOT NULL) u
+  JOIN truth t ON t.slug = u.s AND t.slug <> ''
   UNION ALL
   -- VIN links only when the lot's model year agrees with the vehicle's (a mistyped VIN on a page must not
   -- pull a different truck's sale onto this vehicle)
@@ -44,15 +47,15 @@ WITH x AS (
          row_number() OVER (PARTITION BY v.vehicle_id ORDER BY t.sold DESC, t.end_ts DESC) AS rn_sold
   FROM vlots v JOIN truth t USING (slug)
 ), latest AS (SELECT * FROM x WHERE rn_latest = 1),
-   lsold  AS (SELECT * FROM x WHERE rn_sold = 1 AND sold)
+   lsold  AS (SELECT * FROM x WHERE rn_sold = 1 AND sold),
+   agg    AS (SELECT vehicle_id, count(*) AS n_lots, list(slug ORDER BY end_ts) AS lots FROM x GROUP BY vehicle_id)
 SELECT l.vehicle_id,
        l.slug AS latest_slug, l.canonical_url AS latest_url, l.end_ts AS latest_end_ts, l.end_day AS latest_end_day,
        l.final_bid AS latest_final_bid, l.auction_outcome AS latest_outcome, l.reserve_status AS latest_reserve_status,
        s.slug AS sold_slug, s.canonical_url AS sold_url, s.end_day AS sold_day, s.price_paid AS sold_price, s.buyer AS sold_buyer,
        s.has_detail AS sold_has_detail, s.price_method AS sold_price_method,
-       (SELECT count(*) FROM x WHERE x.vehicle_id = l.vehicle_id) AS n_lots,
-       (SELECT list(slug ORDER BY end_ts) FROM x WHERE x.vehicle_id = l.vehicle_id) AS lots
-FROM latest l LEFT JOIN lsold s USING (vehicle_id);
+       a.n_lots, a.lots
+FROM latest l LEFT JOIN lsold s USING (vehicle_id) JOIN agg a USING (vehicle_id);
 
 -- 3. proposed projection vs what we hold; a field is proposed only when it differs
 CREATE OR REPLACE TABLE corrections AS
