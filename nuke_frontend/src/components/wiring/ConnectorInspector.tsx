@@ -20,6 +20,7 @@ import { deriveHarness, SUBSYSTEMS, type DerivationInput } from './harnessDeriva
 import type { ConnectorId, SkinId } from './connector-inspector/types';
 import { buildConnectorModels } from './connector-inspector/buildConnectorModels';
 import { useBuildState } from './connector-inspector/useBuildState';
+import { useWiringFacts } from './connector-inspector/useWiringFacts';
 import {
   COLORWAYS, COLORWAY_LIST, COLORWAY_STORAGE_KEY, ColorwayContext,
   DEFAULT_COLORWAY, frame, isColorwayId, rule, textOn, type ColorwayId,
@@ -100,6 +101,8 @@ export function ConnectorInspector({ devices, vehicleId }: Props) {
 
   // ── build_state workflow map (BUILD skin writes; badges everywhere) ──
   const build = useBuildState(vehicleId);
+  // ── database facts with their paper (read-only; receipt 2026-09-26_facts-into-nuke-db.md) ──
+  const facts = useWiringFacts(vehicleId);
 
   // toast auto-dismiss
   useEffect(() => {
@@ -240,7 +243,7 @@ export function ConnectorInspector({ devices, vehicleId }: Props) {
       {/* ── active skin (instant swap — same model object, no refetch) ── */}
       <div style={{ flex: 1, minHeight: 0 }}>
         {skin === 'face' && (
-          <FaceSkin model={model} buildStates={build.states} selectedKey={selectedKey} onSelect={onSelect} />
+          <FaceSkin model={model} buildStates={build.states} selectedKey={selectedKey} onSelect={onSelect} facts={facts} />
         )}
         {skin === 'table' && (
           <TableSkin model={model} buildStates={build.states} selectedKey={selectedKey} onSelect={onSelect} />

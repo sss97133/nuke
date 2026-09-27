@@ -18,6 +18,8 @@ import {
   compositeOver, frame, rule, SPARE_FILL_OPACITY, textOn, useColorway, type Colorway,
 } from './colorways';
 import { BUILD_STATE_LABELS, type BuildState } from './useBuildState';
+import type { WiringFacts } from './useWiringFacts';
+import { WireEvidence } from './WireEvidence';
 
 interface ViewState { k: number; tx: number; ty: number }
 
@@ -26,9 +28,10 @@ interface Props {
   buildStates: Record<string, BuildState>;
   selectedKey: string | null;          // cavity key, or 'wire:<id>' for overflow
   onSelect: (key: string | null) => void;
+  facts?: WiringFacts;                 // database facts with their paper (useWiringFacts)
 }
 
-export function FaceSkin({ model, buildStates, selectedKey, onSelect }: Props) {
+export function FaceSkin({ model, buildStates, selectedKey, onSelect, facts }: Props) {
   const cw = useColorway();
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -302,19 +305,20 @@ export function FaceSkin({ model, buildStates, selectedKey, onSelect }: Props) {
       </div>
 
       {/* ── detail card ── */}
-      <DetailCard model={model} cavity={selCavity} wire={selWire} buildStates={buildStates} cw={cw} onClose={() => onSelect(null)} />
+      <DetailCard model={model} cavity={selCavity} wire={selWire} buildStates={buildStates} cw={cw} onClose={() => onSelect(null)} facts={facts} />
     </div>
   );
 }
 
 // ── right-side detail card ─────────────────────────────────────────────
-function DetailCard({ model, cavity, wire, buildStates, cw, onClose }: {
+function DetailCard({ model, cavity, wire, buildStates, cw, onClose, facts }: {
   model: ConnectorModel;
   cavity: InspectorCavity | null;
   wire: DerivedWire | null;
   buildStates: Record<string, BuildState>;
   cw: Colorway;
   onClose: () => void;
+  facts?: WiringFacts;
 }) {
   const wires = cavity ? cavity.wires : wire ? [wire] : [];
   const heading = cavity
@@ -354,15 +358,30 @@ function DetailCard({ model, cavity, wire, buildStates, cw, onClose }: {
               {cavity?.pdmState === 'live' ? 'BUS / SUPPLY PIN — NO HARNESS WIRE ROW.' : 'SPARE — SEAL PLUG.'}
             </div>
           )}
-          {wires.map(w => <WireCard key={w.id} w={w} state={buildStates[w.id] ?? 'uncut'} cw={cw} />)}
+          {wires.map(w => <WireCard key={w.id} w={w} state={buildStates[w.id] ?? 'uncut'} cw={cw} facts={facts} />)}
         </>
       )}
     </div>
   );
 }
 
-function WireCard({ w, state, cw }: { w: DerivedWire; state: BuildState; cw: Colorway }) {
+// The fields in this card come from the June derivation; where the database holds a sourced value for the
+// same wire (useWiringFacts), mark the June value and show the current one next to it -- each fact once.
+const GM_COLOR: Record<string, string> = { WHT: 'WHITE', BLK: 'BLACK', GRN: 'GREEN', BLU: 'BLUE', YEL: 'YELLOW', ORN: 'ORANGE',
+  BRN: 'BROWN', GRY: 'GRAY', VIO: 'VIOLET', PPL: 'PURPLE', PNK: 'PINK', TAN: 'TAN', RED: 'RED', 'DK GRN': 'GREEN', 'LT BLU': 'BLUE' };
+function dbWire(facts: WiringFacts | undefined, id: string) {
+  const f = facts?.byWire[id.toLowerCase()]?.find(x => x.property === 'wire');
+  const m = f?.value.match(/(\d+) AWG (\S+)\s*(.*)$/);
+  return m ? { gauge: m[1], spec: m[2], color: m[3].replace(/ cable$/, '').trim() } : null;
+}
+const normColor = (c: string) => c.toUpperCase().split(/[/\s]+/).map(t => GM_COLOR[t] ?? t).join('/');
+
+function WireCard({ w, state, cw, facts }: { w: DerivedWire; state: BuildState; cw: Colorway; facts?: WiringFacts }) {
   const parts = colorParts(w.color);
+  const db = dbWire(facts, w.id);
+  const june = (v: string) => <span style={{ color: cw.inkFaint, textDecoration: 'line-through' }}>{v}</span>;
+  const colorDiffers = !!db?.color && normColor(db.color) !== normColor(w.color);
+  const specDiffers = !!db && !w.spec.toUpperCase().includes(db.spec.toUpperCase()) && db.spec !== 'M27500';
   return (
     <div style={{ border: frame(cw), padding: '10px 12px', marginBottom: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -381,18 +400,19 @@ function WireCard({ w, state, cw }: { w: DerivedWire; state: BuildState; cw: Col
         <span style={{ display: 'inline-flex', width: 30, height: 16, border: `1px solid ${cw.swatchBorder}`, verticalAlign: 'middle', marginRight: 8 }}>
           {parts.map((p, i) => <span key={i} style={{ flex: 1, background: p }} />)}
         </span>
-        {w.color}
+        {colorDiffers ? <>{june(w.color)} → {db!.color.toUpperCase()} (DATABASE)</> : w.color}
       </Field>
       <Field cw={cw} label="GAUGE">
         {w.effectiveGauge} AWG{w.gaugeChangedFromSpec ? ` (SPEC ${w.gauge} — VDROP UPSIZE)` : ''}
       </Field>
-      <Field cw={cw} label="SPEC">{w.spec}</Field>
+      <Field cw={cw} label="SPEC">{specDiffers ? <>{june(w.spec)} → {db!.spec} (DATABASE)</> : w.spec}</Field>
       <Field cw={cw} label="LENGTH">{w.lengthFt} FT ({w.lengthMethod === 'cutlist_estimate' ? 'CUT-LIST EST' : 'LANDMARK DERIVED'})</Field>
       <Field cw={cw} label="FROM">{w.fromPin}</Field>
       <Field cw={cw} label="TO">{w.toDest}</Field>
       <Field cw={cw} label="SUBSYSTEM">{w.subsystem}</Field>
       <Field cw={cw} label="SIGNAL">{w.signalType}</Field>
       {w.companions.length > 0 && <Field cw={cw} label="COMPANIONS">{w.companions.map(c => `#${c}`).join(', ')}</Field>}
+      {facts && <WireEvidence wireId={w.id} facts={facts} cw={cw} />}
     </div>
   );
 }
