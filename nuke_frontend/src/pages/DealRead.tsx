@@ -19,7 +19,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useDealRead, type DealObservation, type DealSubject } from '../hooks/useDealRead';
 import { SectionHeader, DarkBlock } from '../components/terminal/primitives';
 import { panelStyle } from '../components/terminal/styles';
@@ -28,6 +28,8 @@ import {
   type Comp, type EngineClass, type Exclusion, type ExclusionReason,
 } from '../lib/dealRead/batComps';
 import { backtestFor, type BacktestRow } from '../lib/dealRead/registers';
+import { listingItemId, type Ask } from '../lib/dealRead/asks';
+import { ASK_WINDOW_DAYS } from '../hooks/useDealRead';
 import './DealRead.css';
 
 const WINDOW_MONTHS = 36;
@@ -260,16 +262,20 @@ const hash01 = (s: string): number => {
   return ((h >>> 0) % 10000) / 10000;
 };
 
-function StripPlot({ comps, ask, quantiles }: {
+function StripPlot({ comps, ask, quantiles, asks, subjectId }: {
   comps: Comp[]; ask: number | null;
   /** only passed when the corpus gate passes */
   quantiles: Array<{ label: string; value: number }> | null;
+  /** the cohort's other live asks — marks on the axis, each opening its own deal read */
+  asks: Ask[]; subjectId: string;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const width = useWidth(ref);
+  const navigate = useNavigate();
   const H = 152, padL = 28, padR = 28, axisY = 116, dotTop = 40, dotBottom = 100;
+  const otherAsks = asks.filter(a => a.vehicleId !== subjectId);
   const prices = comps.map(c => c.price);
-  const values = ask != null ? [...prices, ask] : prices;
+  const values = [...prices, ...otherAsks.map(a => a.price), ...(ask != null ? [ask] : [])];
   const lo = Math.floor(Math.min(...values) / 5000) * 5000;
   const hi = Math.ceil(Math.max(...values) / 5000) * 5000 || 5000;
   const span = Math.max(hi - lo, 5000);
@@ -313,6 +319,15 @@ function StripPlot({ comps, ask, quantiles }: {
               </a>
             );
           })}
+          {/* the cohort's other live asks — a mark on the axis each; the subject's ask is the rule */}
+          {otherAsks.map(a => (
+            <g key={a.vehicleId} style={{ cursor: 'pointer' }} role="link" tabIndex={0}
+               onClick={() => navigate(`/deal/${a.vehicleId}`)}
+               onKeyDown={e => { if (e.key === 'Enter') navigate(`/deal/${a.vehicleId}`); }}>
+              <path d={`M ${x(a.price)} ${axisY - 12} l -4 9 l 8 0 z`} fill="var(--text)" />
+              <title>{`ask ${fmtMoney(a.price)} · ${a.title} · ${a.location ?? ''} · first seen ${a.firstSeen ?? 'n/a'} · opens its deal read`}</title>
+            </g>
+          ))}
           {/* the ask */}
           {ask != null && (
             <g>
@@ -419,7 +434,7 @@ export default function DealRead() {
   const now = useMemo(() => new Date(), []);
   const data = useDealRead(vehicleId, now);
   const drills = useDrills();
-  const { subject, observations, bounds, compSet } = data;
+  const { subject, observations, bounds, compSet, asks } = data;
 
   const listingObs = useMemo(
     () => (observations ?? []).find(o => o.kind === 'listing') ?? null,
@@ -562,9 +577,9 @@ export default function DealRead() {
             label="Ask on the sales record"
             meta={<>{tightLabel} · BaT · {bounds.year_start}–{bounds.year_end} · last {WINDOW_MONTHS} mo · <Drill id="win" drills={drills}>n={win.length}</Drill></>}
           />
-          <StripPlot comps={win} ask={ask} quantiles={quantiles} />
+          <StripPlot comps={win} ask={ask} quantiles={quantiles} asks={asks ?? []} subjectId={subject.id} />
           <div className="dr-mono dr-muted" style={{ fontSize: 'var(--fs-8)', marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
-            <span>● no rust mention</span><span>○ mentions rust</span><span>◌ write-up unreadable</span><span>| ask</span><span>each dot opens its BaT lot</span>
+            <span>● no rust mention</span><span>○ mentions rust</span><span>◌ write-up unreadable</span><span>| this ask</span><span>▲ other live ask</span><span>each dot opens its BaT lot, each ▲ its deal read</span>
           </div>
           {figures ? (
             <div className="dr-mono" style={{ fontSize: 'var(--fs-9)', marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
@@ -599,6 +614,51 @@ export default function DealRead() {
           <Expansion id="q-below" drills={drills}><div className="dr-label">sold below the ask</div><CompRows rows={below} ask={ask} /></Expansion>
           <Expansion id="w12" drills={drills}><div className="dr-label">last 12 months</div><CompRows rows={win12} ask={ask} /></Expansion>
         </div>
+      )}
+
+      {/* ── Asks in this cohort: where sellers stand today, never averaged into the record ── */}
+      {compSet && asks && (
+        asks.length === 0 ? (
+          <DarkBlock label="Asks in this cohort" reason={`No marketplace ask for ${subject.make} ${bounds?.canonical_model ?? subject.model} landed in the last ${ASK_WINDOW_DAYS} days.`} />
+        ) : (
+          <div style={panelStyle}>
+            <SectionHeader
+              label="Asks in this cohort"
+              meta={<>{asks.length} asks · first seen in the last {ASK_WINDOW_DAYS} days · {fmtMoney(asks[0].price)}–{fmtMoney(asks[asks.length - 1].price)} · asks are not sales</>}
+            />
+            <div className="dr-scroll">
+              <table className="dr-table">
+                <thead>
+                  <tr><th className="num">ask</th><th className="num">was</th><th>vehicle</th><th>engine</th><th>runs</th><th>rust, per seller</th><th>where</th><th>listed</th><th>first seen</th><th>source</th><th>read</th></tr>
+                </thead>
+                <tbody>
+                  {asks.map(a => {
+                    const isSubject = a.vehicleId === subject.id;
+                    const sameSeller = a.sameSellerAsItem && a.sameSellerAsItem === listingItemId(subject.listing_url);
+                    return (
+                      <tr key={a.vehicleId} style={isSubject ? { fontWeight: 700 } : undefined}>
+                        <td className="num">{fmtMoney(a.price)}{a.firm ? ' firm' : ''}</td>
+                        <td className="num">{a.previousPrice != null ? fmtMoney(a.previousPrice) : ''}</td>
+                        <td className="wrap">{a.title}{isSubject ? ' · this listing' : sameSeller ? ' · same seller as this listing' : ''}</td>
+                        <td className="wrap">{a.engineText || ENGINE_LABEL[a.engine]}</td>
+                        <td className="wrap" style={{ maxWidth: '220px' }}>{a.roadReady === true ? (a.runs ?? 'runs') : a.roadReady === false ? `no · ${a.runs ?? 'not road-ready'}` : 'n/a'}</td>
+                        <td className="wrap" style={{ maxWidth: '260px' }}>{a.rust ?? 'not stated'}</td>
+                        <td className="wrap">{a.location ?? 'n/a'}</td>
+                        <td>{a.listedDays == null ? 'n/a' : a.listedDays < 1 ? '<1 d' : a.listedDays < 7 ? `${a.listedDays} d` : `~${Math.round(a.listedDays / 7)} wk`}</td>
+                        <td>{a.firstSeen ?? 'n/a'}</td>
+                        <td>{a.listingUrl ? <a className="dr-link" href={a.listingUrl} target="_blank" rel="noreferrer">{a.venue}↗</a> : a.venue}</td>
+                        <td>{isSubject ? 'here' : <Link className="dr-link" to={`/deal/${a.vehicleId}`}>deal read→</Link>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="dr-mono dr-muted" style={{ fontSize: 'var(--fs-8)', marginTop: '8px' }}>
+              read from vehicles.asking_price (sale_price null) + each row's latest listing observation · whether an ask is still up is not reconciled (listing lifecycle crons are off); first seen is the honest age · the cleared prices above are the record
+            </div>
+          </div>
+        )
       )}
 
       {/* ── Claims vs the record ── */}

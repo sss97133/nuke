@@ -17,6 +17,7 @@ import { supabase } from '../lib/supabase';
 import {
   buildCompSet, type BatListingRow, type CompSet, type VehicleCompRow,
 } from '../lib/dealRead/batComps';
+import { buildAsks, type Ask, type AskVehicleRow, type ListingObservationRow } from '../lib/dealRead/asks';
 
 export interface DealSubject {
   id: string;
@@ -87,6 +88,15 @@ const BAT_LISTING_COLUMNS = [
   'id', 'vehicle_id', 'bat_listing_url', 'bat_listing_title', 'listing_status', 'sale_price',
   'sale_date', 'auction_end_date',
 ].join(',');
+
+const ASK_COLUMNS = [
+  'id', 'year', 'make', 'model', 'trim', 'asking_price', 'price', 'sale_price', 'sale_status', 'listing_url',
+  'listing_source', 'source', 'location', 'city', 'state', 'mileage', 'transmission', 'engine_type', 'engine_size',
+  'color', 'created_at',
+].join(',');
+
+/** an ask older than this is rot, not a live market position */
+export const ASK_WINDOW_DAYS = 90;
 
 const PAGE = 1000;
 
@@ -179,6 +189,46 @@ async function fetchBatListings(make: string, model: string): Promise<BatListing
   );
 }
 
+// The cohort's live asks: rows that carry an asking price, no sale, and a
+// marketplace URL (anything but BaT), first seen inside the ask window.
+async function fetchCohortAsks(make: string, model: string, yearStart: number, yearEnd: number, now: Date): Promise<AskVehicleRow[]> {
+  const makes = Array.from(new Set([make, make.toUpperCase(), make.toLowerCase(), make[0].toUpperCase() + make.slice(1).toLowerCase()]));
+  const since = new Date(now.getTime() - ASK_WINDOW_DAYS * 86400000).toISOString();
+  const { data, error } = await supabase
+    .from('vehicles')
+    .select(ASK_COLUMNS)
+    .in('make', makes)
+    .ilike('model', `%${model}%`)
+    .gte('year', yearStart)
+    .lte('year', yearEnd)
+    .is('deleted_at', null)
+    .gt('asking_price', 0)
+    .is('sale_price', null)
+    .not('listing_url', 'is', null)
+    .not('listing_url', 'ilike', '%bringatrailer.com%')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error) throw error;
+  return (data ?? []) as unknown as AskVehicleRow[];
+}
+
+async function fetchListingObservations(ids: string[]): Promise<ListingObservationRow[]> {
+  const out: ListingObservationRow[] = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await supabase
+      .from('vehicle_observations')
+      .select('id,vehicle_id,observed_at,source_url,structured_data')
+      .in('vehicle_id', ids.slice(i, i + 100))
+      .eq('kind', 'listing')
+      .order('observed_at', { ascending: false })
+      .limit(500);
+    if (error) throw error;
+    out.push(...((data ?? []) as unknown as ListingObservationRow[]));
+  }
+  return out;
+}
+
 async function fetchDescriptions(ids: string[]): Promise<Map<string, string | null>> {
   const out = new Map<string, string | null>();
   for (let i = 0; i < ids.length; i += 100) {
@@ -200,6 +250,8 @@ export interface DealReadData {
   cohortVehicles: VehicleCompRow[] | undefined;
   batListings: BatListingRow[] | undefined;
   compSet: CompSet | null;
+  /** the cohort's live asks (marketplace rows with an asking price and no sale), cheapest first */
+  asks: Ask[] | undefined;
   /** true once the descriptions behind the text claims have been merged in */
   textLoaded: boolean;
   isLoading: boolean;
@@ -247,6 +299,24 @@ export function useDealRead(vehicleId: string | undefined, now: Date = new Date(
     staleTime: 10 * 60 * 1000,
   });
 
+  const asksQ = useQuery({
+    queryKey: ['deal-read', 'asks', make, modelToken, bounds?.year_start, bounds?.year_end],
+    queryFn: () => fetchCohortAsks(make, modelToken, bounds!.year_start, bounds!.year_end, now),
+    enabled: !!bounds,
+    staleTime: 5 * 60 * 1000,
+  });
+  const askIds = useMemo(() => (asksQ.data ?? []).map(r => r.id).sort(), [asksQ.data]);
+  const askObsQ = useQuery({
+    queryKey: ['deal-read', 'ask-observations', askIds],
+    queryFn: () => fetchListingObservations(askIds),
+    enabled: askIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+  const asks = useMemo(
+    () => (asksQ.data ? buildAsks(asksQ.data, askObsQ.data ?? []) : undefined),
+    [asksQ.data, askObsQ.data],
+  );
+
   // First pass: the sold rule without write-ups — decides which lots need text.
   const firstPass = useMemo(() => {
     if (!bounds || !cohortQ.data || !batQ.data) return null;
@@ -277,7 +347,7 @@ export function useDealRead(vehicleId: string | undefined, now: Date = new Date(
     });
   }, [firstPass, bounds, cohortQ.data, batQ.data, descQ.data, modelToken, now]);
 
-  const error = (subjectQ.error ?? observationsQ.error ?? boundsQ.error ?? cohortQ.error ?? batQ.error ?? descQ.error) as Error | null;
+  const error = (subjectQ.error ?? observationsQ.error ?? boundsQ.error ?? cohortQ.error ?? batQ.error ?? descQ.error ?? asksQ.error ?? askObsQ.error) as Error | null;
 
   return {
     subject,
@@ -286,6 +356,7 @@ export function useDealRead(vehicleId: string | undefined, now: Date = new Date(
     cohortVehicles: cohortQ.data,
     batListings: batQ.data,
     compSet,
+    asks,
     textLoaded: compIds.length === 0 ? !!firstPass : !!descQ.data,
     isLoading: subjectQ.isLoading || (!!subject && (boundsQ.isLoading || cohortQ.isLoading || batQ.isLoading)),
     error,
