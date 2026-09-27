@@ -42,6 +42,18 @@ const OUTCOME_LABEL: Record<AuctionSequence['outcome'], string> = {
 
 const mono: React.CSSProperties = { fontFamily: 'var(--vp-font-mono)' };
 
+const LABEL_FONT_PX = 8;
+const LABEL_GAP_PX = 6;
+
+/** Rendered width of a day label, measured in the band's own mono font (canvas), not assumed. */
+function makeLabelMeasurer(host: HTMLElement | null): (text: string) => number {
+  const family = (host ? getComputedStyle(host).getPropertyValue('--vp-font-mono') : '').trim() || "'Courier New', monospace";
+  const ctx = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
+  if (!ctx) return text => text.length * LABEL_FONT_PX * 0.6; // Courier New advances 0.6 em
+  ctx.font = `${LABEL_FONT_PX}px ${family}`;
+  return text => ctx.measureText(text).width;
+}
+
 function itemTitle(i: AuctionItem): string {
   const when = `${fmtDayShort(i.at)} ${fmtClock(i.at)}`;
   if (i.kind === 'bid') return `${fmtUsd(i.amount)} · ${i.author} · ${when}`;
@@ -95,7 +107,20 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay })
     }
   }
   if (stepPath && geom.closeT != null) stepPath += ` H ${x(geom.closeT).toFixed(1)}`;
-  const labelEvery = width > 0 && geom.days.length > 0 && (width / geom.days.length) < 44 ? 2 : 1;
+  // Day labels: a label is drawn only where its own day is wide enough to hold it and it
+  // clears the previous drawn label — measured from the rendered text, never a fixed width.
+  const measure = makeLabelMeasurer(ref.current);
+  const dayLabels = new Map<string, string>();
+  let lastLabelRight = -Infinity;
+  for (const d of geom.days) {
+    const x0 = Math.max(padL, x(d.start)), x1 = Math.min(width - padR, x(d.end));
+    const text = fmtDayShort(new Date(d.start + 12 * 3600e3).toISOString()).toUpperCase();
+    const w = measure(text);
+    if (x1 - x0 < w + LABEL_GAP_PX) continue;          // the day is too narrow for its own label
+    if (x0 + 3 < lastLabelRight + LABEL_GAP_PX) continue; // it would run into the previous label
+    dayLabels.set(d.date, text);
+    lastLabelRight = x0 + 3 + w;
+  }
   const closeX = geom.closeT != null ? x(geom.closeT) : null;
   const resultLabel = `${OUTCOME_LABEL[auction.outcome]}${auction.price != null ? ` ${fmtUsd(auction.price)}` : ''}`;
 
@@ -127,18 +152,19 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay })
         <svg className="auction-band__svg" width={width} height={H} viewBox={`0 0 ${width} ${H}`} role="img"
              aria-label={`auction sequence: ${bids.length} bids, ${items.length - bids.length} comments`}>
           {/* days: click targets, active highlight, boundaries, labels */}
-          {geom.days.map((d, i) => {
+          {geom.days.map(d => {
             const x0 = Math.max(padL, x(d.start)), x1 = Math.min(width - padR, x(d.end));
             if (x1 <= x0) return null;
+            const label = dayLabels.get(d.date);
             return (
               <g key={d.date}>
                 {activeDay === d.date && <rect x={x0} y={4} width={x1 - x0} height={axisY - 4} fill="var(--vp-row-alt, #f4f4f4)" />}
                 <rect x={x0} y={4} width={x1 - x0} height={axisY - 4} fill="transparent" style={{ cursor: 'pointer' }}
                       onClick={() => onOpenDay(d.date)}><title>{`open ${d.date}`}</title></rect>
                 <line x1={x0} y1={axisY} x2={x0} y2={axisY - 4} stroke="var(--vp-ghost, #ddd)" strokeWidth={1} />
-                {i % labelEvery === 0 && (
-                  <text x={x0 + 3} y={axisY + 12} fill="var(--vp-pencil, #888)" fontSize={8} fontFamily="var(--vp-font-mono)">
-                    {fmtDayShort(new Date(d.start + 12 * 3600e3).toISOString()).toUpperCase()}
+                {label && (
+                  <text x={x0 + 3} y={axisY + 12} fill="var(--vp-pencil, #888)" fontSize={LABEL_FONT_PX} fontFamily="var(--vp-font-mono)">
+                    {label}
                   </text>
                 )}
               </g>
