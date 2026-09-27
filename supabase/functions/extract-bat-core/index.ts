@@ -2084,6 +2084,10 @@ Deno.serve(async (req) => {
               source: "bat_import",
               source_url: imgUrl,
               is_external: true,
+              // v4: a BaT photo is a link, not a job. 'pending' fires trigger_photo_pipeline_on_image_insert →
+              // photo-pipeline-orchestrator → a Gemini call per image (78–140 per lot; 66K lots = ~7M calls).
+              // Vision on external links is a deliberate, paid pass (BYOK), never a side effect of indexing.
+              ai_processing_status: "skipped",
               approval_status: "auto_approved",
               is_approved: true,
               redaction_level: "none",
