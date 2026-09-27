@@ -30,7 +30,7 @@ import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { batchUpsertWithProvenance, quarantineRecord, type ProvenanceMetadata } from "../_shared/batUpsertWithProvenance.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
-import { readCommentsJson, summarizeAuction, vinCheckDigitOk } from "../_shared/batAuctionRecord.ts";
+import { readCommentsJson, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, sha256Hex } from "../_shared/batAuctionRecord.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 
 // Extractor versioning - update on each significant change
@@ -49,12 +49,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-async function sha256Hex(text: string): Promise<string> {
-  const data = new TextEncoder().encode(text);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  const bytes = Array.from(new Uint8Array(digest));
-  return bytes.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 function normalizeUrl(raw: string): string {
   try {
@@ -2572,55 +2566,15 @@ Deno.serve(async (req) => {
 
     // v4.1 (2026-09-27): the auction's interactions, exactly timed — every comment and bid from the page's
     // comments JSON, into auction_comments with the row shape and content_hash recipe extract-auction-comments
-    // uses (sha256 of 'bat'|url|sequence|posted_at|author|text), so the two writers dedupe on
+    // uses (sha256 of 'bat'|url|sequence|posted_at|author|text; rows built by the shared builder), so the two writers dedupe on
     // (vehicle_id, content_hash); bids also into bat_bids when the lot has a bat_listings row. Skylar's rule:
     // a BaT auction's comments, bids, open and close belong on the vehicle's timeline at their precise moments.
     if (vehicleId && auction.parsed) {
       try {
         const endAt = essentials.auction_end_at ? new Date(essentials.auction_end_at) : (auction.recordAt ? new Date(auction.recordAt) : null);
-        const rows: any[] = [];
-        for (let i = 0; i < rawComments.length; i++) {
-          const c: any = rawComments[i];
-          const authorRaw = String(c?.authorName || c?.author || "").trim();
-          const author = authorRaw.replace(/\s*\(The\s+Seller\)/i, "").trim() || "Unknown";
-          const isSeller = authorRaw.toLowerCase().includes("(the seller)");
-          const ts = typeof c?.timestamp === "number" && c.timestamp > 0 ? new Date(c.timestamp * 1000) : null;
-          const postedAt = ts ?? endAt ?? new Date();
-          const text = String(c?.content || c?.comment || c?.text || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-          if (!text || text.length < 3) continue;
-          const type = String(c?.type ?? "");
-          const voided = type === "bat-bid-canceled";                      // BaT voided it: never a bid on record
-          const isBid = !voided && (type === "bat-bid" || /bid\s+placed\s+by/i.test(text));
-          const bidAmount = isBid && Number(c?.bidAmount) > 0 ? Number(c.bidAmount) : null;
-          const isSaleRecord = (type === "bat-bid-reserve" && /^sold\b/i.test(text)) || type === "bat-rnm-accepted";
-          const comment_type = bidAmount ? "bid" : isSaleRecord ? "sold" : isSeller ? "seller_response" : text.includes("?") ? "question" : "observation";
-          const hoursUntilClose = endAt && ts ? (endAt.getTime() - postedAt.getTime()) / 3600000 : 0;
-          const content_hash = await sha256Hex(["bat", listingUrlNorm, String(i + 1), postedAt.toISOString(), author, text].join("|"));
-          rows.push({
-            auction_event_id: auctionEventId,
-            vehicle_id: vehicleId,
-            platform: "bat",
-            source_url: listingUrlNorm,
-            content_hash,
-            sequence_number: i + 1,
-            posted_at: postedAt.toISOString(),
-            hours_until_close: Math.max(0, hoursUntilClose),
-            author_username: author,
-            is_seller: isSeller,
-            author_total_likes: typeof c?.likes === "number" ? c.likes : 0,
-            comment_type,
-            comment_text: text,
-            word_count: text.split(/\s+/).length,
-            has_question: text.includes("?"),
-            has_media: Boolean(c?.hasImage || c?.hasVideo || (Array.isArray(c?.images) && c.images.length > 0) || (Array.isArray(c?.videos) && c.videos.length > 0)),
-            bid_amount: bidAmount,
-            comment_likes: typeof c?.commentLikes === "number" ? c.commentLikes : 0,
-            bat_author_id: typeof c?.authorId === "number" ? c.authorId : null,
-            bat_comment_id: typeof c?.id === "number" ? c.id : null,
-            bat_author_likes: typeof c?.authorLikes === "number" ? c.authorLikes : null,
-            likers_count: Array.isArray(c?.likers) ? c.likers.length : null,
-          });
-        }
+        // one builder for the reader and the archive loader (_shared/batAuctionRecord.ts); every comment lands,
+        // a text-less one too (v4.1, 2026-09-27) — the earlier "< 3 chars" skip dropped 443 of 30,805 comments on 400 pages
+        const rows = await buildAuctionCommentRows({ rawComments, listingUrlNorm, vehicleId, auctionEventId, endAt });
         let written = 0;
         for (let i = 0; i < rows.length; i += 200) {
           const { error: cErr } = await supabase

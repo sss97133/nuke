@@ -167,3 +167,111 @@ export function vinCheckDigitOk(vin: string | null | undefined): boolean | null 
   const r = sum % 11;
   return v[8] === (r === 10 ? "X" : String(r));
 }
+
+// ─── auction_comments rows ─────────────────────────────────────────
+// The ONE builder of auction_comments rows from a lot page's comments JSON (extract-bat-core v4.1 and the
+// archive loader use it, so a row built from a saved page is byte-identical to the row the reader writes).
+// Row identity is content_hash = sha256('bat' | normalized url | sequence | posted_at ISO | author | text);
+// the reader upserts on (vehicle_id, content_hash) with ignoreDuplicates, so a re-read never duplicates.
+// Every comment lands, including one with no text (an image-only or emoji comment is still an interaction
+// with an author and a moment — Skylar's rule, 2026-09-27: authentic data, no curation); its media travels in
+// has_media + media_urls. A voided bid (bat-bid-canceled) is never a bid on record.
+export async function sha256Hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export interface AuctionCommentRow {
+  auction_event_id: string | null;
+  vehicle_id: string;
+  platform: "bat";
+  source_url: string;
+  content_hash: string;
+  sequence_number: number;
+  posted_at: string;
+  hours_until_close: number;
+  author_username: string;
+  is_seller: boolean;
+  author_total_likes: number;
+  comment_type: "bid" | "sold" | "seller_response" | "question" | "observation";
+  comment_text: string;
+  word_count: number;
+  has_question: boolean;
+  has_media: boolean;
+  media_urls: string[] | null;
+  bid_amount: number | null;
+  comment_likes: number;
+  bat_author_id: number | null;
+  bat_comment_id: number | null;
+  bat_author_likes: number | null;
+  likers_count: number | null;
+}
+
+export function commentMediaUrls(c: any): string[] {
+  const out: string[] = [];
+  for (const img of Array.isArray(c?.images) ? c.images : []) {
+    const u = img?.large?.url || img?.url || img?.small?.url;
+    if (typeof u === "string" && u) out.push(u);
+  }
+  for (const v of Array.isArray(c?.videos) ? c.videos : []) {
+    const src = typeof v?.oembedHtml === "string" ? v.oembedHtml.match(/src="([^"]+)"/)?.[1] : null;
+    const u = src || v?.url;
+    if (typeof u === "string" && u) out.push(u);
+  }
+  return out;
+}
+
+export async function buildAuctionCommentRows(args: {
+  rawComments: any[];
+  listingUrlNorm: string;
+  vehicleId: string;
+  auctionEventId: string | null;
+  endAt: Date | null;
+}): Promise<AuctionCommentRow[]> {
+  const { rawComments, listingUrlNorm, vehicleId, auctionEventId, endAt } = args;
+  const rows: AuctionCommentRow[] = [];
+  for (let i = 0; i < rawComments.length; i++) {
+    const c: any = rawComments[i];
+    const authorRaw = String(c?.authorName || c?.author || "").trim();
+    const author = authorRaw.replace(/\s*\(The\s+Seller\)/i, "").trim() || "Unknown";
+    const isSeller = authorRaw.toLowerCase().includes("(the seller)");
+    const ts = typeof c?.timestamp === "number" && c.timestamp > 0 ? new Date(c.timestamp * 1000) : null;
+    const postedAt = ts ?? endAt ?? new Date();
+    const text = String(c?.content || c?.comment || c?.text || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const type = String(c?.type ?? "");
+    const voided = type === "bat-bid-canceled";                      // BaT voided it: never a bid on record
+    const isBid = !voided && (type === "bat-bid" || /bid\s+placed\s+by/i.test(text));
+    const bidAmount = isBid && Number(c?.bidAmount) > 0 ? Number(c.bidAmount) : null;
+    const isSaleRecord = (type === "bat-bid-reserve" && /^sold\b/i.test(text)) || type === "bat-rnm-accepted";
+    const comment_type = bidAmount ? "bid" : isSaleRecord ? "sold" : isSeller ? "seller_response" : text.includes("?") ? "question" : "observation";
+    const hoursUntilClose = endAt && ts ? (endAt.getTime() - postedAt.getTime()) / 3600000 : 0;
+    const content_hash = await sha256Hex(["bat", listingUrlNorm, String(i + 1), postedAt.toISOString(), author, text].join("|"));
+    const media = commentMediaUrls(c);
+    rows.push({
+      auction_event_id: auctionEventId,
+      vehicle_id: vehicleId,
+      platform: "bat",
+      source_url: listingUrlNorm,
+      content_hash,
+      sequence_number: i + 1,
+      posted_at: postedAt.toISOString(),
+      hours_until_close: Math.max(0, hoursUntilClose),
+      author_username: author,
+      is_seller: isSeller,
+      author_total_likes: typeof c?.likes === "number" ? c.likes : 0,
+      comment_type,
+      comment_text: text,
+      word_count: text ? text.split(/\s+/).length : 0,
+      has_question: text.includes("?"),
+      has_media: Boolean(c?.hasImage || c?.hasVideo || media.length > 0),
+      media_urls: media.length > 0 ? media : null,
+      bid_amount: bidAmount,
+      comment_likes: typeof c?.commentLikes === "number" ? c.commentLikes : 0,
+      bat_author_id: typeof c?.authorId === "number" ? c.authorId : null,
+      bat_comment_id: typeof c?.id === "number" ? c.id : null,
+      bat_author_likes: typeof c?.authorLikes === "number" ? c.authorLikes : null,
+      likers_count: Array.isArray(c?.likers) ? c.likers.length : null,
+    });
+  }
+  return rows;
+}
