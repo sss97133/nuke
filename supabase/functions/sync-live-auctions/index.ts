@@ -658,7 +658,7 @@ async function syncToDatabase(
     // (listing_url) can't match — it silently errored and dropped every live auction.
     // upsert_live_auction_vehicles() runs the ON CONFLICT ... WHERE <predicate> that
     // matches the partial index, and marks new live auctions is_public for the floor.
-    const UPSERT_BATCH = 500;
+    const UPSERT_BATCH = 100; // 500 hit the 60 s statement limit under the vehicles trigger chain (2026-09-27)
     for (let i = 0; i < upsertRows.length; i += UPSERT_BATCH) {
       const chunk = upsertRows.slice(i, i + UPSERT_BATCH);
       const { data, error } = await supabase.rpc("upsert_live_auction_vehicles", {
