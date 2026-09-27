@@ -1,5 +1,6 @@
 /**
- * useAuctionSequence — the rows behind a BaT lot's week, read once per vehicle.
+ * useAuctionSequence — the rows behind a BaT lot's week (one sequence per listing
+ * when the car ran more than once), read once per vehicle.
  *
  * Four indexed reads on vehicle_id (auction_comments, auction_events,
  * vehicle_events, vehicle_images with only id/taken_at/source), only for a
@@ -11,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
-  buildAuctionSequence, type AuctionCommentRow, type AuctionEventRow, type AuctionSequence,
+  buildAuctionSequences, type AuctionCommentRow, type AuctionEventRow, type AuctionSequence,
   type ImageStampRow, type TimelineEventLike, type VehicleEventRow,
 } from './auctionSequence';
 
@@ -56,7 +57,7 @@ async function fetchRows(vehicleId: string): Promise<RawRows> {
       .limit(10),
     supabase
       .from('vehicle_images')
-      .select('id,taken_at,source')
+      .select('id,taken_at,source,source_url')
       .eq('vehicle_id', vehicleId)
       .not('is_duplicate', 'is', true)
       .limit(2000),
@@ -74,7 +75,7 @@ export function useAuctionSequence(
   vehicleId: string | undefined,
   vehicle: Record<string, unknown> | null | undefined,
   timelineEvents: TimelineEventLike[],
-): { auction: AuctionSequence | null; loading: boolean } {
+): { auctions: AuctionSequence[]; importStampedDays: string[]; loading: boolean } {
   const lotHint = useMemo(() => looksLikeBatLot(vehicle, timelineEvents), [vehicle, timelineEvents]);
   const [rows, setRows] = useState<RawRows | null>(vehicleId ? cache.get(vehicleId) ?? null : null);
   const [loading, setLoading] = useState(false);
@@ -92,10 +93,10 @@ export function useAuctionSequence(
     return () => { cancelled = true; };
   }, [vehicleId, lotHint]);
 
-  const auction = useMemo(() => {
+  const built = useMemo(() => {
     if (!rows || lotHint === null) return null;
-    return buildAuctionSequence({ ...rows, timelineEvents, lotUrlHint: lotHint || null });
+    return buildAuctionSequences({ ...rows, timelineEvents, lotUrlHint: lotHint || null });
   }, [rows, lotHint, timelineEvents]);
 
-  return { auction, loading };
+  return { auctions: built?.sequences ?? [], importStampedDays: built?.importStampedDays ?? [], loading };
 }

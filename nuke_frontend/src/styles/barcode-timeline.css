@@ -372,7 +372,7 @@
 }
 .day-drawer__auction-row {
   display: grid;
-  grid-template-columns: 44px 72px 1fr;
+  grid-template-columns: 44px minmax(72px, max-content) 1fr;
   gap: 8px;
   font-size: var(--fs-9);
   line-height: 1.4;

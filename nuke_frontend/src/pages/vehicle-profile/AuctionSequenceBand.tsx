@@ -131,6 +131,9 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay })
         <a className="auction-band__lot" href={auction.lotUrl} target="_blank" rel="noreferrer">
           BAT{auction.lotNumber ? ` LOT ${auction.lotNumber}` : ''}↗
         </a>
+        {auction.listingCount > 1 && (
+          <span className="auction-band__basis">listing {auction.ordinal} of {auction.listingCount}{auction.ordinal === auction.listingCount ? ' (latest)' : ''}</span>
+        )}
         <span style={mono}>OPEN {fmtMoment(open)}</span>
         {open && <span className="auction-band__basis">({open.basis})</span>}
         <span style={mono}>CLOSE {fmtMoment(close)}</span>
@@ -144,7 +147,7 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay })
           <span className="auction-band__basis">bids and comments not extracted yet</span>
         )}
         {auction.photos.publishedWithListing > 0 && (
-          <span style={mono}>{auction.photos.publishedWithListing} photos published with the listing (no capture time)</span>
+          <span style={mono}>{auction.photos.publishedWithListing} photos published with the listing (no capture time{auction.photos.attributionUncertain ? '; some carry no listing path and sit on the latest listing' : ''})</span>
         )}
       </div>
 

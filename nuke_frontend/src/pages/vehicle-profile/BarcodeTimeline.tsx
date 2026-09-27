@@ -290,9 +290,10 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
   const { vehicle, vehicleId, timelineEvents, setGalleryFilter } = useVehicleProfile();
 
   // A BaT lot's real sequence — bids and comments at their times, the open and the
-  // close — from auction_comments / auction_events / vehicle_events. Null for any
-  // vehicle that was never a BaT lot (no query is made).
-  const { auction } = useAuctionSequence(vehicleId, vehicle as Record<string, unknown> | null, timelineEvents);
+  // close — from auction_comments / auction_events / vehicle_events, one per listing
+  // when the car ran more than once. Empty for any vehicle that was never a BaT lot
+  // (no query is made).
+  const { auctions, importStampedDays } = useAuctionSequence(vehicleId, vehicle as Record<string, unknown> | null, timelineEvents);
 
   // Per-day image-analysis depth (Tier 0-4) → illuminates the timeline as deep analysis
   // fills in. A day with raw photos and no verdicts stays dim; as T1/T2 land it warms,
@@ -342,28 +343,29 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
 
   // Synthesize photo/work day events for days the event feed doesn't cover.
   const enrichedEvents = useMemo(() => {
-    // Photo days whose stamps are import times, not capture times (a listing photo
-    // cannot have been taken after its auction closed): those days never render.
-    const importDays = new Set(auction?.photos.importStampedDays ?? []);
+    // Photo days whose stamps are import times, not capture times (a BaT-imported
+    // photo carries the importer's run time, never a capture time): those days never render.
+    const importDays = new Set(importStampedDays);
     const rows = importDays.size ? dayRows.filter(r => !(r.kind === 'photo' && importDays.has(r.day))) : dayRows;
 
-    // The auction's own days, timestamped to the moment — nothing here uses created_at.
+    // Each listing's own days, timestamped to the moment — nothing here uses created_at.
     const auctionDays: Array<Record<string, unknown>> = [];
-    if (auction) {
+    for (const auction of auctions) {
+      const lot = auctions.length > 1 ? `Lot ${auction.lotNumber ?? auction.ordinal} · ` : '';
       const openDay = auction.open ? toDateOnly(auction.open.at) : null;
       const closeDay = auction.close ? toDateOnly(auction.close.at) : null;
       if (openDay) {
-        auctionDays.push({ event_date: openDay, event_type: 'auction_started', title: 'Auction Opened', metadata: { auction: true, basis: auction.open!.basis } });
+        auctionDays.push({ event_date: openDay, event_type: 'auction_started', title: `${lot}Auction Opened`, metadata: { auction: true, basis: auction.open!.basis } });
         if (auction.photos.publishedWithListing > 0) {
-          auctionDays.push({ event_date: openDay, event_type: 'photo_session', title: `${auction.photos.publishedWithListing} photos published with the listing`, metadata: { image_count: auction.photos.publishedWithListing, published_with_listing: true, auction: true } });
+          auctionDays.push({ event_date: openDay, event_type: 'photo_session', title: `${lot}${auction.photos.publishedWithListing} photos published with the listing`, metadata: { image_count: auction.photos.publishedWithListing, published_with_listing: true, auction: true } });
         }
       }
       for (const d of auction.days) {
         const parts = [d.bids ? `${d.bids} bid${d.bids === 1 ? '' : 's'}` : null, d.comments ? `${d.comments} comment${d.comments === 1 ? '' : 's'}` : null].filter(Boolean);
-        auctionDays.push({ event_date: d.date, event_type: 'auction_day', title: `${parts.join(' · ')}${d.high != null ? ` · high bid $${Math.round(d.high).toLocaleString()}` : ''}${d.postClose ? ' · after the close' : ''}`, metadata: { auction: true, bids: d.bids, comments: d.comments } });
+        auctionDays.push({ event_date: d.date, event_type: 'auction_day', title: `${lot}${parts.join(' · ')}${d.high != null ? ` · high bid $${Math.round(d.high).toLocaleString()}` : ''}${d.postClose ? ' · after the close' : ''}`, metadata: { auction: true, bids: d.bids, comments: d.comments } });
       }
       if (closeDay) {
-        auctionDays.push({ event_date: closeDay, event_type: 'auction_ended', title: `Auction Closed · ${auction.outcome.replace(/_/g, ' ')}${auction.price != null ? ` $${Math.round(auction.price).toLocaleString()}` : ''}`, metadata: { auction: true, basis: auction.close!.basis } });
+        auctionDays.push({ event_date: closeDay, event_type: 'auction_ended', title: `${lot}Auction Closed · ${auction.outcome.replace(/_/g, ' ')}${auction.price != null ? ` $${Math.round(auction.price).toLocaleString()}` : ''}`, metadata: { auction: true, basis: auction.close!.basis } });
       }
     }
 
@@ -387,7 +389,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       }
     }
     return synthetic.length ? [...timelineEvents, ...synthetic] : timelineEvents;
-  }, [timelineEvents, dayRows, auction]);
+  }, [timelineEvents, dayRows, auctions, importStampedDays]);
 
   // Filter counts — always computed from the full set so pills show totals before clicking
   const filterCounts = useMemo(() => {
@@ -905,13 +907,13 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
             {/* Month labels are now rendered inline inside each .hm-week column */}
           </div>
 
-          {/* The auction's week, for a BaT lot: open, every bid and comment at its time,
-              the close and result, post-close comments. Each mark opens its source. */}
-          {auction && (auction.activityExtracted || auction.open || auction.close) && (
-            <React.Suspense fallback={null}>
-              <AuctionSequenceBand auction={auction} activeDay={receiptDate} onOpenDay={openDay} />
+          {/* Each BaT listing's week, newest first: open, every bid and comment at its
+              time, the close and result, post-close comments. Each mark opens its source. */}
+          {auctions.filter(a => a.activityExtracted || a.open || a.close).map(a => (
+            <React.Suspense key={a.key} fallback={null}>
+              <AuctionSequenceBand auction={a} activeDay={receiptDate} onOpenDay={openDay} />
             </React.Suspense>
-          )}
+          ))}
 
           {/* Day document — inline drawer below the grid (C10: a day click
               answers "what happened that day" completely, in place) */}
@@ -919,7 +921,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
             <React.Suspense fallback={null}>
               <VehicleDayDrawer
                 date={receiptDate}
-                auction={auction}
+                auctions={auctions}
                 onClose={closeDay}
                 onPrev={() => navigateReceipt(-1)}
                 onNext={() => navigateReceipt(1)}

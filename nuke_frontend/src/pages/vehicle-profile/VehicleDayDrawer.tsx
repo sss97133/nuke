@@ -18,12 +18,14 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
-import { fmtClock, fmtUsd, localDate, type AuctionSequence } from './auctionSequence';
+import { fmtClock, fmtUsd, listingForPhoto, localDate, type AuctionSequence } from './auctionSequence';
 
 interface DayPhoto {
   id: string;
   image_url: string;
   taken_at: string | null;
+  source?: string | null;
+  source_url?: string | null;
 }
 
 /** Minimal shape of context timeline events the drawer reads. */
@@ -43,8 +45,8 @@ interface DayEvent {
 
 interface VehicleDayDrawerProps {
   date: string; // YYYY-MM-DD
-  /** the BaT auction's sequence, when this vehicle was a lot — bids and comments land on their days */
-  auction?: AuctionSequence | null;
+  /** the BaT auction sequences, one per listing, when this vehicle was a lot — bids and comments land on their days */
+  auctions?: AuctionSequence[];
   onClose: () => void;
   onPrev?: () => void;
   onNext?: () => void;
@@ -94,19 +96,24 @@ const mono: React.CSSProperties = { fontFamily: "var(--vp-font-mono, 'Courier Ne
 // Session-scoped photo cache so re-opening a day never refetches.
 const dayPhotoCache = new Map<string, DayPhoto[]>();
 
-const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auction, onClose, onPrev, onNext }) => {
+const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = [], onClose, onPrev, onNext }) => {
   const { vehicleId, timelineEvents } = useVehicleProfile();
   const [photos, setPhotos] = useState<DayPhoto[] | null>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
 
-  // The auction's bids and comments that landed on this day, in time order.
+  // The bids and comments that landed on this day, across the car's listings, in time order.
   const auctionItems = useMemo(
-    () => (auction?.items ?? []).filter(i => localDate(i.at) === date),
-    [auction, date],
+    () => auctions.flatMap(a => a.items).filter(i => localDate(i.at) === date).sort((a, b) => (a.at < b.at ? -1 : 1)),
+    [auctions, date],
   );
+  const lotOf = useMemo(() => new Map(auctions.map(a => [a.key, a.lotNumber ?? String(a.ordinal)])), [auctions]);
   // Listing photos have no capture time (or an import stamp): they belong to the day
   // the listing opened, labelled as such — never to the day Nuke copied them.
-  const isListingDay = !!auction?.open && localDate(auction.open.at) === date && auction.photos.publishedWithListing > 0;
+  const listingOfDay = useMemo(
+    () => auctions.find(a => !!a.open && localDate(a.open.at) === date && a.photos.publishedWithListing > 0) ?? null,
+    [auctions, date],
+  );
+  const isListingDay = !!listingOfDay;
 
   // ── Photos of the day (one query, cached) ──
   useEffect(() => {
@@ -118,23 +125,25 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auction, onCl
     setPhotos(null);
     const base = supabase
       .from('vehicle_images')
-      .select('id, image_url, taken_at')
+      .select('id, image_url, taken_at, source, source_url')
       .eq('vehicle_id', vehicleId)
-      .not('is_duplicate', 'is', true)
-      .limit(120);
+      .not('is_duplicate', 'is', true);
     const query = isListingDay
-      // published with the listing: no capture time, or a stamp after the auction closed
-      ? (auction?.close
-          ? base.or(`taken_at.is.null,taken_at.gte.${auction.close.at}`)
-          : base.is('taken_at', null))
+      // published with the listing: BaT-hosted photos carry no capture time; each one's
+      // upload path names its listing (the same rule the timeline uses)
+      ? base.or('source.ilike.%bat%,source_url.ilike.%bringatrailer.com%,taken_at.is.null').limit(600)
       : base
           .gte('taken_at', `${date}T00:00:00Z`)
           .lt('taken_at', `${date}T23:59:59.999Z`)
-          .order('taken_at', { ascending: true });
+          .order('taken_at', { ascending: true })
+          .limit(120);
     query
       .then(({ data, error }) => {
         if (cancelled) return;
-        const rows = (!error && Array.isArray(data)) ? (data as DayPhoto[]).filter(p => p.image_url) : [];
+        let rows = (!error && Array.isArray(data)) ? (data as DayPhoto[]).filter(p => p.image_url) : [];
+        if (isListingDay && listingOfDay) {
+          rows = rows.filter(p => listingForPhoto({ id: p.id, taken_at: p.taken_at, source: p.source ?? null, source_url: p.source_url ?? null }, auctions)?.key === listingOfDay.key).slice(0, 120);
+        }
         dayPhotoCache.set(key, rows);
         setPhotos(rows);
       });
@@ -208,7 +217,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auction, onCl
       {/* Facet chips — only the facets this day touched */}
       {!loading && !isEmpty && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
-          {photos.length > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>{isListingDay ? `PHOTOS ${photos.length}${(auction?.photos.publishedWithListing ?? 0) > photos.length ? ` OF ${auction!.photos.publishedWithListing}` : ''} · PUBLISHED WITH THE LISTING` : `PHOTOS ${photos.length}`}</span>}
+          {photos.length > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>{isListingDay ? `PHOTOS ${photos.length}${(listingOfDay?.photos.publishedWithListing ?? 0) > photos.length ? ` OF ${listingOfDay!.photos.publishedWithListing}` : ''} · PUBLISHED WITH THE LISTING${auctions.length > 1 && listingOfDay?.lotNumber ? ` (LOT ${listingOfDay.lotNumber})` : ''}` : `PHOTOS ${photos.length}`}</span>}
           {dayBids > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>BIDS {dayBids}</span>}
           {dayComments > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>COMMENTS {dayComments}</span>}
           {workEvents.length > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>WORK {workEvents.length}</span>}
@@ -251,7 +260,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auction, onCl
           {auctionItems.map(i => (
             <div key={i.id} className={`day-drawer__auction-row${i.kind === 'seller' ? ' seller' : ''}`}>
               <span style={mono}>{fmtClock(i.at)}</span>
-              <span style={mono}>{i.kind === 'bid' ? `BID ${fmtUsd(i.amount)}` : i.kind === 'seller' ? 'SELLER' : 'COMMENT'}{i.postClose ? ' · after close' : ''}</span>
+              <span style={mono}>{auctions.length > 1 ? `LOT ${lotOf.get(i.listingKey) ?? ''} · ` : ''}{i.kind === 'bid' ? `BID ${fmtUsd(i.amount)}` : i.kind === 'seller' ? 'SELLER' : 'COMMENT'}{i.postClose ? ' · after close' : ''}</span>
               <span>
                 <a href={i.url} target="_blank" rel="noreferrer">{i.author}</a>
                 {i.kind !== 'bid' && i.text ? ` — ${i.text.length > 240 ? `${i.text.slice(0, 237)}…` : i.text}` : ''}
