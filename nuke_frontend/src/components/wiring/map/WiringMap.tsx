@@ -17,7 +17,7 @@ import {
   COLORWAYS, COLORWAY_LIST, COLORWAY_STORAGE_KEY, ColorwayContext, DEFAULT_COLORWAY,
   frame, isColorwayId, rule, textOn, type Colorway, type ColorwayId,
 } from '../connector-inspector/colorways';
-import { useWiringFacts, type WiringFact } from '../connector-inspector/useWiringFacts';
+import { useWiringFacts, type WiringFact, type PurchaseRecord } from '../connector-inspector/useWiringFacts';
 import { optimizeImageUrl } from '../../../lib/imageOptimizer';
 import { WireEvidence } from '../connector-inspector/WireEvidence';
 import {
@@ -28,13 +28,15 @@ const WORK_WORD: Record<WorkStatus, string> = {
   open: 'OPEN', in_progress: 'IN PROGRESS', needs_owner: 'NEEDS YOU', done: 'DONE', blocked: 'BLOCKED',
 };
 
-// Proof a part was lined up, bought, installed — or not (owner 2026-09-26). Each rung takes its own kind of evidence
+// Proof a part was lined up, acquired, installed — or not (owner 2026-09-26). Each rung takes its own kind of evidence
 // (owner 2026-09-27: "m130 in hand sure.. but any proof of purchase?", "throttle body likely never installed"):
-// lined up = a cart, quote or circled listing; bought = a purchase record; installed = fastened and connected.
+// lined up = a cart, quote or circled listing; acquired = a purchase record, shown whole — ordered, paid, delivered,
+// from whom, exactly what, and whether it is the part the design calls for (owner 2026-09-27: "bought? that word
+// doesnt encapsulate the full meaning"); installed = fastened and connected.
 // Possession and mock-up photos are evidence, never proof, and never counted.
 const RUNGS: { label: string; yes: string; no?: string }[] = [
   { label: 'LINED UP', yes: 'lined_up' },
-  { label: 'BOUGHT', yes: 'bought' },
+  { label: 'ACQUIRED', yes: 'bought' },
   { label: 'INSTALLED', yes: 'installed', no: 'not_installed' },
 ];
 // Owner 2026-09-27: "need to ensure all our wires are right". Each wire carries the registry's rule checks.
@@ -50,7 +52,7 @@ function verdictOf(w: MapWire): Verdict {
 }
 const ON_LADDER = new Set(['lined_up', 'bought', 'installed', 'not_installed']);
 const LEVEL_WORD: Record<string, string> = {
-  lined_up: 'LINED UP', bought: 'BOUGHT', installed: 'INSTALLED', not_installed: 'NOT INSTALLED',
+  lined_up: 'LINED UP', bought: 'ACQUIRED', installed: 'INSTALLED', not_installed: 'NOT INSTALLED',
   on_hand: 'IN HAND — NOT PROOF OF PURCHASE', in_hand: 'IN HAND — NOT PROOF OF PURCHASE',
   mounted: 'MOUNTED — NOT WIRED', placed: 'SET IN PLACE FOR A MOCK-UP — NOT INSTALLED',
   on_truck: 'ON THE TRUCK IN A PHOTO', not_on_truck: 'NOT ON THE TRUCK YET',
@@ -346,7 +348,7 @@ function NodeCard({ cw, n, map, byId, facts, onNode, onCall }: {
       {n.notes && <Field cw={cw} label="NOTE">{n.notes}</Field>}
       <Field cw={cw} label="SOURCE">{n.source ?? '—'}{n.trust ? ` (${n.trust})` : ''}</Field>
 
-      <Head cw={cw}>PROOF — LINED UP · BOUGHT · INSTALLED</Head>
+      <Head cw={cw}>PROOF — LINED UP · ACQUIRED · INSTALLED</Head>
       {RUNGS.map(r => {
         const yes = onFile.filter(f => f.level === r.yes);
         const no = r.no ? onFile.filter(f => f.level === r.no) : [];
@@ -505,12 +507,32 @@ function ProofRow({ cw, f }: { cw: Colorway; f: WiringFact }) {
           {LEVEL_WORD[f.level ?? ''] ?? (f.level ?? '').toUpperCase()}{f.eventDate ? ` ${f.eventDate}` : ''}
           {f.seenAt ? ` · PHOTO ${f.seenAt.slice(0, 10)}` : ''}
         </div>
-        <div>{f.value}</div>
+        {f.order ? <PurchaseLines cw={cw} o={f.order} /> : <div>{f.value}</div>}
         <div style={{ color: cw.inkFaint }}>
-          {f.ownerWords ? "THE OWNER'S WORDS" : f.level === 'question' ? 'RAISED BY A PHOTO ON THIS PROFILE'
+          {f.order ? `PURCHASE RECORD — THE OWNER'S ${(f.order.marketplace ?? 'ORDER').toUpperCase()} ORDER`
+            : f.ownerWords ? "THE OWNER'S WORDS" : f.level === 'question' ? 'RAISED BY A PHOTO ON THIS PROFILE'
             : "READ FROM THE VEHICLE'S OWN PHOTO · NOT YET CONFIRMED BY THE OWNER"}
         </div>
       </div>
+    </div>
+  );
+}
+
+// the whole purchase record, line by line: when, what it cost, from whom, exactly what, and does it fit the design
+function PurchaseLines({ cw, o }: { cw: Colorway; o: PurchaseRecord }) {
+  const money = typeof o.paid_usd === 'number' ? `$${o.paid_usd.toFixed(2)}` : null;
+  const when = [o.order_date && `ORDERED ${o.order_date}`, money && `PAID ${money}`,
+    o.delivered_date ? `DELIVERED ${o.delivered_date}` : 'DELIVERY NOT ON RECORD'].filter(Boolean).join(' · ');
+  const from = [o.seller ? `FROM ${o.seller.toUpperCase()}` : null,
+    o.order_number ? `${(o.marketplace ?? '').toUpperCase()} ORDER ${o.order_number}`.trim() : null].filter(Boolean).join(' · ');
+  const what = [(o.quantity ?? 1) > 1 ? `${o.quantity} ×` : null, (o.part_numbers ?? []).join(' / ') || null].filter(Boolean).join(' ');
+  const misfit = /^not\b/i.test(o.design_match ?? '');
+  return (
+    <div style={{ fontFamily: cw.fontMono, fontSize: 13, lineHeight: 1.55 }}>
+      <div>{when}</div>
+      {from && <div>{from}</div>}
+      {what && <div>{what}{o.condition ? ` · ${o.condition.toUpperCase()}` : ''}</div>}
+      {o.design_match && <div style={{ color: misfit ? cw.warn : cw.ok, fontWeight: 700 }}>DESIGN: {o.design_match.toUpperCase()}</div>}
     </div>
   );
 }
@@ -536,7 +558,7 @@ function Rollup({ cw, sec, rollup, calls }: {
               {r.done}/{r.nodes} NODES DONE · {r.placed} PLACED · {r.needs} NEED YOU
             </div>
             <div style={{ fontFamily: cw.fontMono }}>
-              BOUGHT {r.bought}/{r.nodes} · INSTALLED {r.installed}/{r.nodes} (PROOF ON FILE)
+              ACQUIRED {r.bought}/{r.nodes} · INSTALLED {r.installed}/{r.nodes} (PROOF ON FILE)
             </div>
             <div style={{ fontFamily: cw.fontMono }}>
               {r.decided} WIRES DECIDED · {r.concept} CONCEPT
