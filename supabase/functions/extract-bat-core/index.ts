@@ -2575,13 +2575,21 @@ Deno.serve(async (req) => {
         // one builder for the reader and the archive loader (_shared/batAuctionRecord.ts); every comment lands,
         // a text-less one too (v4.1, 2026-09-27) — the earlier "< 3 chars" skip dropped 443 of 30,805 comments on 400 pages
         const rows = await buildAuctionCommentRows({ rawComments, listingUrlNorm, vehicleId, auctionEventId, endAt });
+        // A BaT comment this vehicle already holds — by BaT's own comment id — is never written again, whatever
+        // its position in today's JSON. content_hash carries the sequence number, which shifts as a thread grows:
+        // a re-read of 1981-honda-civic-7 (71 rows from 2026-03-31) added 57 rows of which 45 were the same
+        // comments; 65 of the 302 lots re-read on 2026-09-27 gained 1,924 such rows. Older rows stay as they are.
+        const { data: have } = await supabase
+          .from("auction_comments").select("bat_comment_id").eq("vehicle_id", vehicleId).not("bat_comment_id", "is", null).limit(5000);
+        const haveIds = new Set((have ?? []).map((x: any) => Number(x.bat_comment_id)).filter(Number.isFinite));
+        const fresh = haveIds.size ? rows.filter((r) => r.bat_comment_id == null || !haveIds.has(r.bat_comment_id)) : rows;
         let written = 0;
-        for (let i = 0; i < rows.length; i += 200) {
+        for (let i = 0; i < fresh.length; i += 200) {
           const { error: cErr } = await supabase
             .from("auction_comments")
-            .upsert(rows.slice(i, i + 200), { onConflict: "vehicle_id,content_hash", ignoreDuplicates: true });
+            .upsert(fresh.slice(i, i + 200), { onConflict: "vehicle_id,content_hash", ignoreDuplicates: true });
           if (cErr) { console.warn(`auction_comments upsert failed (non-fatal): ${cErr.message}`); break; }
-          written += Math.min(200, rows.length - i);
+          written += Math.min(200, fresh.length - i);
         }
         commentsWritten = written;
 
