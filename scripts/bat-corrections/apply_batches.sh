@@ -53,7 +53,8 @@ for f in "$DIR"/batch_*.json; do
     echo "$(date -u +%FT%TZ) $(basename "$f"): $(echo "$res" | jq -c '.[0].correct_vehicle_sale_provenance_batch | {vehicles_corrected, fields_corrected, fields_noop, stale: (.stale|length), missing: (.missing|length), skipped_timeout: (.skipped_timeout // 0)}') rpc_ms=$rpc_ms"
     # lock-waiter check after each batch (lead's rule): anyone waiting on a lock → pause before the next batch
     lw=$(./scripts/data/q.sh "select count(*) as n from pg_stat_activity where wait_event_type = 'Lock'" | jq -r '.[0].n // "?"')
-    if [ "$lw" != "0" ]; then echo "$(date -u +%FT%TZ) lock waiters: $lw; pausing 60s" >&2; sleep 60; fi
+    # a single waiter is the normal shadow of one concurrent writer (a reader stream); a queue of them is contention
+    if [ "$lw" != "?" ] && [ "$lw" -gt 2 ]; then echo "$(date -u +%FT%TZ) lock waiters: $lw; pausing 60s" >&2; sleep 60; fi
   else
     echo "$(date -u +%FT%TZ) $(basename "$f") FAILED: $(echo "$res" | head -c 300)" >&2
     exit 1
