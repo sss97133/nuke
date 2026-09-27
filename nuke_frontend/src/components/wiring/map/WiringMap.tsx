@@ -28,14 +28,25 @@ const WORK_WORD: Record<WorkStatus, string> = {
   open: 'OPEN', in_progress: 'IN PROGRESS', needs_owner: 'NEEDS YOU', done: 'DONE', blocked: 'BLOCKED',
 };
 
-// device proof read from the vehicle's own photos (owner 2026-09-26: proof a part was lined up, bought, installed — or not)
+// Proof a part was lined up, bought, installed — or not (owner 2026-09-26). Each rung takes its own kind of evidence
+// (owner 2026-09-27: "m130 in hand sure.. but any proof of purchase?", "throttle body likely never installed"):
+// lined up = a cart, quote or circled listing; bought = a purchase record; installed = fastened and connected.
+// Possession and mock-up photos are evidence, never proof, and never counted.
+const RUNGS: { label: string; yes: string; no?: string }[] = [
+  { label: 'LINED UP', yes: 'lined_up' },
+  { label: 'BOUGHT', yes: 'bought' },
+  { label: 'INSTALLED', yes: 'installed', no: 'not_installed' },
+];
+const ON_LADDER = new Set(['lined_up', 'bought', 'installed', 'not_installed']);
 const LEVEL_WORD: Record<string, string> = {
-  lined_up: 'LINED UP', bought: 'BOUGHT', on_hand: 'ON HAND', on_truck: 'ON THE TRUCK',
-  not_on_truck: 'NOT ON THE TRUCK YET', question: 'QUESTION FOR THE OWNER',
+  lined_up: 'LINED UP', bought: 'BOUGHT', installed: 'INSTALLED', not_installed: 'NOT INSTALLED',
+  on_hand: 'IN HAND — NOT PROOF OF PURCHASE', in_hand: 'IN HAND — NOT PROOF OF PURCHASE',
+  mounted: 'MOUNTED — NOT WIRED', placed: 'SET IN PLACE FOR A MOCK-UP — NOT INSTALLED',
+  on_truck: 'ON THE TRUCK IN A PHOTO', not_on_truck: 'NOT ON THE TRUCK YET',
+  question: 'QUESTION FOR THE OWNER', answered: 'ANSWERED',
 };
-const PROVEN = new Set(['bought', 'on_hand', 'on_truck']);
 const deviceProof = (facts: ReturnType<typeof useWiringFacts>, code: string): WiringFact[] =>
-  (facts.byPlug[code] ?? []).filter(f => f.property === 'device proof');
+  (facts.byPlug[code] ?? []).filter(f => f.property === 'device proof' && f.level !== 'withdrawn');
 
 function statusColor(cw: Colorway, s: WorkStatus): string {
   return s === 'done' ? cw.ok : s === 'needs_owner' ? cw.warn : s === 'blocked' ? cw.danger : s === 'in_progress' ? cw.accent : cw.ink;
@@ -66,6 +77,8 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   };
 
   const byId = useMemo(() => new Map(map.nodes.map(n => [n.id, n])), [map.nodes]);
+  const openCalls = map.calls.filter(c => !c.decided);
+  const locked = map.calls.filter(c => c.decided);
   const node = nodeCode ? map.nodes.find(n => n.code === nodeCode) ?? null : null;
   const call = callSlug ? map.calls.find(c => c.slug === callSlug) ?? null : null;
 
@@ -75,12 +88,14 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   // rollups per section (the group-context layer)
   const rollup = useMemo(() => {
     const r: Record<string, SectionRollup> = {};
-    for (const s of SECTIONS) r[s.id] = { nodes: 0, placed: 0, done: 0, needs: 0, decided: 0, concept: 0, proven: 0 };
+    for (const s of SECTIONS) r[s.id] = { nodes: 0, placed: 0, done: 0, needs: 0, decided: 0, concept: 0, bought: 0, installed: 0 };
     for (const n of map.nodes) {
       const x = n.section && r[n.section];
       if (!x) continue;
       x.nodes += 1; if (n.x != null) x.placed += 1; if (n.workStatus === 'done') x.done += 1; if (n.workStatus === 'needs_owner') x.needs += 1;
-      if (deviceProof(facts, n.code).some(f => PROVEN.has(f.level ?? ''))) x.proven += 1;
+      const dp = deviceProof(facts, n.code);
+      if (dp.some(f => f.level === 'bought')) x.bought += 1;
+      if (dp.some(f => f.level === 'installed')) x.installed += 1;
     }
     for (const w of map.wires) {
       const x = w.section && r[w.section];
@@ -176,13 +191,13 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
                 </svg>
 
                 {/* open calls: targets too */}
-                {map.calls.length > 0 && (
+                {openCalls.length > 0 && (
                   <div style={{ marginTop: 10 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 1, color: cw.inkMuted, marginBottom: 4 }}>
-                      OPEN CALLS ({map.calls.filter(c => c.workStatus !== 'decided').length})
+                      OPEN CALLS ({openCalls.length})
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {map.calls.map(c => (
+                      {openCalls.map(c => (
                         <button key={c.id} onClick={() => set({ call: c.slug, node: null })} style={{
                           background: call?.id === c.id ? cw.warn : cw.surface, color: call?.id === c.id ? textOn(cw.warn) : cw.ink,
                           border: `2px solid ${cw.warn}`, fontFamily: cw.fontBody, fontSize: 14, padding: '3px 8px', cursor: 'pointer',
@@ -190,6 +205,28 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
                           {c.subject.toUpperCase()}{c.options.length ? ` · ${c.options.length} OPTIONS` : ''}
                         </button>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* locked decisions: enforced on the rows; each lists what it rules out */}
+                {locked.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 1, color: cw.inkMuted, marginBottom: 4 }}>
+                      LOCKED ({locked.length}) — DECIDED; ROWS THAT CONTRADICT THEM ARE RETIRED
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {locked.map(c => {
+                        const out = c.links.filter(l => l.relation === 'blocks').length;
+                        return (
+                          <button key={c.id} onClick={() => set({ call: c.slug, node: null })} style={{
+                            background: call?.id === c.id ? cw.ink : cw.surface, color: call?.id === c.id ? textOn(cw.ink) : cw.ink,
+                            border: `2px solid ${cw.ink}`, fontFamily: cw.fontBody, fontSize: 14, padding: '3px 8px', cursor: 'pointer',
+                          }}>
+                            {c.subject.toUpperCase()}{out ? ` · RULES OUT ${out}` : ''}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -275,8 +312,9 @@ function NodeCard({ cw, n, map, byId, facts, onNode, onCall }: {
     const rank = (c: string) => (/^(M130|PDM30)/.test(c) ? 0 : /^FIREWALL-CABIN/.test(c) ? 1 : /^FIREWALL/.test(c) ? 2 : 3);
     return [...new Set(all)].sort((a, b) => rank(a) - rank(b)).map(c => (c === n.code ? `[${c}]` : c)).join(' → ');
   };
-  const calls = map.calls.filter(c => c.links.some(l => l.endpointId === n.id));
+  const calls = map.calls.filter(c => !c.decided && c.links.some(l => l.endpointId === n.id));
   const onFile = deviceProof(facts, n.code).sort((a, b) => (a.seenAt ?? '').localeCompare(b.seenAt ?? ''));
+  const notes = onFile.filter(f => !ON_LADDER.has(f.level ?? ''));
   const [open, setOpen] = React.useState<string | null>(null);
   return (
     <div>
@@ -293,9 +331,25 @@ function NodeCard({ cw, n, map, byId, facts, onNode, onCall }: {
       {n.notes && <Field cw={cw} label="NOTE">{n.notes}</Field>}
       <Field cw={cw} label="SOURCE">{n.source ?? '—'}{n.trust ? ` (${n.trust})` : ''}</Field>
 
-      {onFile.length > 0 && <Head cw={cw}>ON FILE FOR THIS PART ({onFile.length})</Head>}
-      {onFile.map(f => <ProofRow key={f.id} cw={cw} f={f} />)}
-      {onFile.length === 0 && <Field cw={cw} label="PROOF">NO PHOTO OR RECEIPT ON FILE FOR THIS PART</Field>}
+      <Head cw={cw}>PROOF — LINED UP · BOUGHT · INSTALLED</Head>
+      {RUNGS.map(r => {
+        const yes = onFile.filter(f => f.level === r.yes);
+        const no = r.no ? onFile.filter(f => f.level === r.no) : [];
+        const implied = r.yes === 'lined_up' && !yes.length && onFile.some(f => f.level === 'bought' || f.level === 'installed');
+        return (
+          <div key={r.label}>
+            <Field cw={cw} label={r.label}>
+              {yes.length ? <span style={{ color: cw.ok, fontWeight: 700 }}>YES</span>
+                : no.length ? <span style={{ color: cw.warn, fontWeight: 700 }}>NO</span>
+                : implied ? 'IMPLIED BY THE PURCHASE'
+                : <span style={{ color: cw.inkMuted }}>NO PROOF ON FILE</span>}
+            </Field>
+            {[...yes, ...no].map(f => <ProofRow key={f.id} cw={cw} f={f} />)}
+          </div>
+        );
+      })}
+      {notes.length > 0 && <Head cw={cw}>OTHER EVIDENCE — NOT PROOF ({notes.length})</Head>}
+      {notes.map(f => <ProofRow key={f.id} cw={cw} f={f} />)}
 
       {wires.length > 0 && <Head cw={cw}>WIRES AT THIS NODE ({wires.length})</Head>}
       {wires.map(w => {
@@ -344,6 +398,27 @@ function CallCard({ cw, c, map, byId, onNode }: {
   cw: Colorway; c: MapCall; map: ReturnType<typeof useWiringMap>; byId: Map<string, MapNode>; onNode: (code: string) => void;
 }) {
   const callsById = new Map(map.calls.map(x => [x.id, x]));
+  if (c.decided) {
+    const out = c.links.filter(l => l.relation === 'blocks');
+    return (
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 1, color: cw.ink }}>LOCKED DECISION</div>
+        <div style={{ fontSize: 17, fontWeight: 700, margin: '4px 0 8px' }}>{c.subject}</div>
+        {c.chosen && <Field cw={cw} label="CHOSEN">{c.chosen}</Field>}
+        {c.decidedOn && <Field cw={cw} label="DECIDED">{c.decidedOn}</Field>}
+        {c.scope && <Field cw={cw} label="RULE">{c.scope}</Field>}
+        {c.source && <Field cw={cw} label="SOURCE">{c.source}</Field>}
+        <Head cw={cw}>RETIRED FROM THE MAP BY THIS DECISION ({out.length})</Head>
+        {out.map((l, i) => (
+          <div key={i} style={{ fontSize: 14, lineHeight: 1.5, borderBottom: rule(cw), padding: '4px 0' }}>
+            <span style={{ fontFamily: cw.fontMono, fontWeight: 700 }}>{l.endpointCode ?? '—'}</span>
+            {l.endpointName ? ` — ${l.endpointName}` : ''}
+            {l.note && <div style={{ color: cw.inkFaint }}>{l.note}</div>}
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
     <div>
       <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 1, color: cw.warn }}>OPEN CALL</div>
@@ -377,7 +452,8 @@ function CallCard({ cw, c, map, byId, onNode }: {
 
 // one photo (or receipt) and what it shows about this part; the photo opens full size
 function ProofRow({ cw, f }: { cw: Colorway; f: WiringFact }) {
-  const tone = f.level === 'question' ? cw.warn : f.level === 'not_on_truck' ? cw.inkMuted : cw.ok;
+  const tone = f.level === 'question' || f.level === 'not_installed' ? cw.warn
+    : f.level === 'lined_up' || f.level === 'bought' || f.level === 'installed' ? cw.ok : cw.inkMuted;
   const thumb = optimizeImageUrl(f.photoUrl, 'thumbnail');
   return (
     <div style={{ display: 'flex', gap: 10, borderBottom: rule(cw), padding: '6px 0' }}>
@@ -394,14 +470,15 @@ function ProofRow({ cw, f }: { cw: Colorway; f: WiringFact }) {
         </div>
         <div>{f.value}</div>
         <div style={{ color: cw.inkFaint }}>
-          {f.level === 'question' ? 'RAISED BY A PHOTO ON THIS PROFILE' : "READ FROM THE VEHICLE'S OWN PHOTO · NOT YET CONFIRMED BY THE OWNER"}
+          {f.ownerWords ? "THE OWNER'S WORDS" : f.level === 'question' ? 'RAISED BY A PHOTO ON THIS PROFILE'
+            : "READ FROM THE VEHICLE'S OWN PHOTO · NOT YET CONFIRMED BY THE OWNER"}
         </div>
       </div>
     </div>
   );
 }
 
-interface SectionRollup { nodes: number; placed: number; done: number; needs: number; decided: number; concept: number; proven: number }
+interface SectionRollup { nodes: number; placed: number; done: number; needs: number; decided: number; concept: number; bought: number; installed: number }
 
 function Rollup({ cw, sec, rollup, calls }: {
   cw: Colorway; sec: Section | null; rollup: Record<string, SectionRollup>;
@@ -422,7 +499,7 @@ function Rollup({ cw, sec, rollup, calls }: {
               {r.done}/{r.nodes} NODES DONE · {r.placed} PLACED · {r.needs} NEED YOU
             </div>
             <div style={{ fontFamily: cw.fontMono }}>
-              {r.proven}/{r.nodes} WITH PROOF ON FILE (PHOTO / RECEIPT)
+              BOUGHT {r.bought}/{r.nodes} · INSTALLED {r.installed}/{r.nodes} (PROOF ON FILE)
             </div>
             <div style={{ fontFamily: cw.fontMono }}>
               {r.decided} WIRES DECIDED · {r.concept} CONCEPT
@@ -431,7 +508,7 @@ function Rollup({ cw, sec, rollup, calls }: {
         );
       })}
       <div style={{ fontSize: 14, color: cw.inkFaint, marginTop: 8 }}>
-        {calls.filter(c => c.workStatus !== 'decided').length} OPEN CALLS · CLICK A NODE OR A CALL TO WORK IT.
+        {calls.filter(c => !c.decided).length} OPEN CALLS · {calls.filter(c => c.decided).length} LOCKED · CLICK A NODE OR A CALL TO WORK IT.
       </div>
     </div>
   );

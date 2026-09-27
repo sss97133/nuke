@@ -33,6 +33,7 @@ export interface WiringFact {
   photoUrl: string | null;   // the vehicle's own photo the proof was read from
   seenAt: string | null;     // when that photo was taken
   eventDate: string | null;  // when the thing it proves happened (e.g. the purchase), if the photo states it
+  ownerWords: boolean;       // the owner's own statement (structured_data.owner_confirmed), relayed from chat
 }
 
 export interface WiringFacts {
@@ -51,6 +52,7 @@ interface FactRow {
     plug?: string; plug_name?: string; wire_id?: string | null; property_key?: string; row_field?: string;
     value?: unknown; state?: string; check?: { status?: string }; proof?: PartProof;
     plugs?: string[]; proof_level?: string; photo?: { url?: string; taken_at?: string }; event_date?: string;
+    owner_confirmed?: boolean;
   } | null;
   source_url: string | null;
   citation_excerpt: string | null;
@@ -98,6 +100,7 @@ export function useWiringFacts(vehicleId: string | undefined): WiringFacts {
           photoUrl: sd.photo?.url ?? null,
           seenAt: sd.photo?.taken_at ?? null,
           eventDate: sd.event_date ?? null,
+          ownerWords: sd.owner_confirmed === true,
         };
         if (f.wireId) (byWire[f.wireId] ??= []).push(f);
         else for (const p of (Array.isArray(sd.plugs) && sd.plugs.length ? sd.plugs : [f.plug])) (byPlug[p] ??= []).push(f);

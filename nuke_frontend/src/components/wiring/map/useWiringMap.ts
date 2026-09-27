@@ -72,7 +72,11 @@ export interface MapEnd {
 }
 
 export interface MapOption { id: string; key: string; label: string; zone: string | null; source: string | null }
-export interface MapLink { relation: string; otherDecisionId: string | null; endpointId: string | null; note: string | null; source: string | null; trust: string | null }
+export interface MapLink {
+  relation: string; otherDecisionId: string | null; endpointId: string | null;
+  endpointCode: string | null; endpointName: string | null;   // named even when the node is retired (a 'blocks' link)
+  note: string | null; source: string | null; trust: string | null;
+}
 export interface MapCall {
   id: string;
   slug: string;
@@ -81,6 +85,11 @@ export interface MapCall {
   status: string | null;
   workStatus: string;
   assignee: string | null;
+  decided: boolean;           // a locked decision (status decided): shown under LOCKED, with what it rules out
+  chosen: string | null;
+  scope: string | null;
+  decidedOn: string | null;
+  source: string | null;
   options: MapOption[];
   links: MapLink[];
 }
@@ -111,7 +120,7 @@ export function useWiringMap(vehicleId: string | undefined): WiringMapData {
         supabase.from('harness_designs').select('id').eq('vehicle_id', vehicleId),
         supabase.from('vehicle_wiring_overlays').select('id').eq('vehicle_id', vehicleId),
         supabase.from('wiring_decisions')
-          .select('id, slug, subject, decision_kind, status, work_status, assignee')
+          .select('id, slug, subject, decision_kind, status, work_status, assignee, chosen, scope, decided_on, source')
           .eq('vehicle_id', vehicleId).eq('is_superseded', false).not('decision_kind', 'is', null),   // calls, not receipts
       ]);
       if (designs.error || overlays.error || calls.error) return fail((designs.error || overlays.error || calls.error)!.message);
@@ -137,7 +146,8 @@ export function useWiringMap(vehicleId: string | undefined): WiringMapData {
               .in('decision_id', callIds).eq('is_superseded', false)
           : Promise.resolve({ data: [], error: null }),
         callIds.length
-          ? supabase.from('wiring_decision_links').select('decision_id, relation, other_decision_id, endpoint_id, note, source, trust')
+          ? supabase.from('wiring_decision_links')
+              .select('decision_id, relation, other_decision_id, endpoint_id, note, source, trust, endpoint:harness_endpoints(code, name)')
               .in('decision_id', callIds)
           : Promise.resolve({ data: [], error: null }),
       ]);
@@ -171,11 +181,14 @@ export function useWiringMap(vehicleId: string | undefined): WiringMapData {
         calls: ((calls.data ?? []) as Row[]).map(r => ({
           id: r.id as string, slug: r.slug as string, subject: s(r.subject) ?? (r.slug as string), kind: s(r.decision_kind),
           status: s(r.status), workStatus: s(r.work_status) ?? 'open', assignee: s(r.assignee),
+          decided: r.status === 'decided' || r.work_status === 'decided',
+          chosen: s(r.chosen), scope: s(r.scope), decidedOn: s(r.decided_on), source: s(r.source),
           options: opts.filter(o => o.decision_id === r.id).map(o => ({
             id: o.id as string, key: o.key as string, label: s(o.label) ?? '', zone: s(o.zone), source: s(o.source),
           })),
           links: lks.filter(l => l.decision_id === r.id).map(l => ({
             relation: l.relation as string, otherDecisionId: s(l.other_decision_id), endpointId: s(l.endpoint_id),
+            endpointCode: s((l.endpoint as Row | null)?.code), endpointName: s((l.endpoint as Row | null)?.name),
             note: s(l.note), source: s(l.source), trust: s(l.trust),
           })),
         })),
