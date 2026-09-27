@@ -1209,6 +1209,14 @@ Deno.serve(async (req) => {
     // "Bid to $23,000 (Reserve Not Met)" on a lot whose record says "Sold on 04/11/2025 for
     // $24,000 to nocera76" (seller accepted after the close) — the record wins.
     const auction = summarizeAuction(html);
+    // the comments JSON, parsed once: the first comment or bid is the auction's public start, the sale /
+    // reserve-not-met record its close (Skylar: interactions on the timeline at their precise moments)
+    const rawComments: any[] = readCommentsJson(html) ?? [];
+    const firstActivityAt: string | null = (() => {
+      let min = Infinity;
+      for (const c of rawComments) { const t = Number(c?.timestamp); if (Number.isFinite(t) && t > 0 && t < min) min = t; }
+      return Number.isFinite(min) ? new Date(min * 1000).toISOString() : null;
+    })();
     if (auction.parsed) {
       if (auction.sold) {
         essentials.sale_price = auction.saleAmount ?? essentials.sale_price;
@@ -2004,7 +2012,7 @@ Deno.serve(async (req) => {
           supabase,
           vehicleId,
           eventType: "auction_listed",
-          eventDateYmd: listDateYmd,
+          eventDateYmd: firstActivityAt ? firstActivityAt.slice(0, 10) : listDateYmd,
           title: `Listed on Bring a Trailer${essentials.lot_number ? ` (Lot #${essentials.lot_number})` : ""}`,
           description: essentials.seller_username
             ? `Listed by @${essentials.seller_username}. ${essentials.reserve_status === "no_reserve" ? "No Reserve." : ""}`
@@ -2017,6 +2025,9 @@ Deno.serve(async (req) => {
             seller_username: essentials.seller_username,
             reserve_status: essentials.reserve_status,
             auction_end_date: endYmd,
+            // the exact moment: the first comment or bid on the page, else the 7-day convention
+            listed_at: firstActivityAt ?? `${listDateYmd}T12:00:00Z`,
+            listed_at_source: firstActivityAt ? "first_comment_or_bid" : "end_minus_7_days",
           },
         });
       }
@@ -2060,6 +2071,9 @@ Deno.serve(async (req) => {
           lot_number: essentials.lot_number,
           bid_count: essentials.bid_count,
           comment_count: essentials.comment_count,
+          // the exact close: the page's data-ends, else the sale / reserve-not-met record's timestamp
+          occurred_at: essentials.auction_end_at ?? auction.recordAt ?? null,
+          occurred_at_source: essentials.auction_end_at ? "data-ends" : (auction.recordAt ? "auction_record" : null),
         },
       });
 
@@ -2563,7 +2577,6 @@ Deno.serve(async (req) => {
     // a BaT auction's comments, bids, open and close belong on the vehicle's timeline at their precise moments.
     if (vehicleId && auction.parsed) {
       try {
-        const rawComments = readCommentsJson(html) ?? [];
         const endAt = essentials.auction_end_at ? new Date(essentials.auction_end_at) : (auction.recordAt ? new Date(auction.recordAt) : null);
         const rows: any[] = [];
         for (let i = 0; i < rawComments.length; i++) {
