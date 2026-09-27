@@ -8,6 +8,7 @@ import { useVehiclesDashboard } from '../hooks/useVehiclesDashboard';
 import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlideshow';
 import { useInterests } from '../hooks/useInterests';
 import { optimizeImageUrl } from '../lib/imageOptimizer';
+import { squarify } from '../lib/squarify';
 import IntakePage from './intake/IntakePage';
 
 // ────────────────────────────────────────────────────────────
@@ -45,116 +46,6 @@ interface DrillLevel {
   make?: string;
   model?: string;
   year?: number;
-}
-
-// ────────────────────────────────────────────────────────────
-// SQUARIFIED TREEMAP ALGORITHM (Bruls, Huizing, van Wijk 2000)
-// ────────────────────────────────────────────────────────────
-
-function worstAspectRatio(row: number[], w: number): number {
-  // w = length of the shorter side of the remaining rectangle
-  // row = array of areas
-  const s = row.reduce((a, b) => a + b, 0);
-  const rMax = Math.max(...row);
-  const rMin = Math.min(...row);
-  // worst = max(w^2 * rMax / s^2, s^2 / (w^2 * rMin))
-  const w2 = w * w;
-  const s2 = s * s;
-  return Math.max((w2 * rMax) / s2, s2 / (w2 * rMin));
-}
-
-function squarify(
-  items: { node: TreemapNode; area: number }[],
-  x: number,
-  y: number,
-  w: number,
-  h: number
-): TreemapRect[] {
-  if (items.length === 0) return [];
-  if (w <= 0 || h <= 0) return [];
-
-  // Sort descending by area
-  const sorted = [...items].sort((a, b) => b.area - a.area);
-  const totalArea = sorted.reduce((s, i) => s + i.area, 0);
-  if (totalArea <= 0) return [];
-
-  // Scale areas to fill the rectangle
-  const scale = (w * h) / totalArea;
-  const scaled = sorted.map(i => ({ ...i, scaledArea: i.area * scale }));
-
-  const result: TreemapRect[] = [];
-  layoutRow(scaled, x, y, w, h, result);
-  return result;
-}
-
-function layoutRow(
-  items: { node: TreemapNode; area: number; scaledArea: number }[],
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  result: TreemapRect[]
-): void {
-  if (items.length === 0) return;
-  if (items.length === 1) {
-    result.push({ node: items[0].node, x, y, w, h });
-    return;
-  }
-
-  // Determine the shorter side
-  const shorter = Math.min(w, h);
-  const horizontal = w >= h; // layout row along the shorter dimension
-
-  let row: typeof items = [items[0]];
-  let remaining = items.slice(1);
-  let currentWorst = worstAspectRatio(
-    row.map(i => i.scaledArea),
-    shorter
-  );
-
-  // Greedily add items to the row while aspect ratio improves
-  for (let k = 0; k < remaining.length; k++) {
-    const candidate = [...row, remaining[k]];
-    const candidateWorst = worstAspectRatio(
-      candidate.map(i => i.scaledArea),
-      shorter
-    );
-    if (candidateWorst <= currentWorst) {
-      row = candidate;
-      currentWorst = candidateWorst;
-    } else {
-      break;
-    }
-  }
-
-  remaining = items.slice(row.length);
-
-  // Lay out the row
-  const rowArea = row.reduce((s, i) => s + i.scaledArea, 0);
-
-  if (horizontal) {
-    // Row fills along the left side (fixed width = rowArea / h)
-    const rowW = rowArea / h;
-    let yOff = y;
-    for (const item of row) {
-      const itemH = item.scaledArea / rowW;
-      result.push({ node: item.node, x, y: yOff, w: rowW, h: itemH });
-      yOff += itemH;
-    }
-    // Recurse on the remaining rectangle
-    layoutRow(remaining, x + rowW, y, w - rowW, h, result);
-  } else {
-    // Row fills along the top (fixed height = rowArea / w)
-    const rowH = rowArea / w;
-    let xOff = x;
-    for (const item of row) {
-      const itemW = item.scaledArea / rowH;
-      result.push({ node: item.node, x: xOff, y, w: itemW, h: rowH });
-      xOff += itemW;
-    }
-    // Recurse on the remaining rectangle
-    layoutRow(remaining, x, y + rowH, w, h - rowH, result);
-  }
 }
 
 // ────────────────────────────────────────────────────────────
@@ -1343,16 +1234,19 @@ function TreemapHomePage({ onBrowse }: { onBrowse: () => void }) {
 // ────────────────────────────────────────────────────────────
 
 const FeedPage = lazy(() => import('../feed/components/FeedPage'));
+const MarketPulse = lazy(() => import('./market/MarketPulse'));
 const GarageTab = lazy(() => import('../components/garage/GarageTab'));
 
-type TabId = 'garage' | 'feed';
+type TabId = 'market' | 'garage' | 'feed';
 
 const TABS: { id: TabId; label: string }[] = [
+  { id: 'market', label: 'Market' },
   { id: 'feed', label: 'Feed' },
   { id: 'garage', label: 'Garage' },
 ];
 
-const LS_KEY = 'nuke_hub_tab';
+// v2 (2026-09-27): the market pulse became the homepage; a stored v1 choice is not carried over.
+const LS_KEY = 'nuke_hub_tab_v2';
 
 function TabSkeleton() {
   return (
@@ -1373,11 +1267,7 @@ export default function HomePage() {
     if (fromUrl && TABS.some((t) => t.id === fromUrl)) return fromUrl;
     const fromStorage = localStorage.getItem(LS_KEY) as TabId | null;
     if (fromStorage && TABS.some((t) => t.id === fromStorage)) return fromStorage;
-    // Logged-in users land on THEIR stuff, not the global feed. Sync check
-    // (supabase auth token in localStorage) because auth context is still
-    // loading when this memo runs.
-    const hasSession = Object.keys(localStorage).some((k) => k.startsWith('sb-') && k.endsWith('-auth-token'));
-    return hasSession ? 'garage' : 'feed';
+    return 'market';
   }, []);
 
   const [activeTab, setActiveTab] = useState<TabId>(defaultTab);
@@ -1389,7 +1279,7 @@ export default function HomePage() {
     const fromUrl = searchParams.get('tab') as TabId | null;
     const fromStorage = localStorage.getItem(LS_KEY) as TabId | null;
     if (!fromUrl && !fromStorage) {
-      setActiveTab('feed');
+      setActiveTab('market');
     }
     // Show feed for logged-out users when tab=feed is in URL
     // (includes treemap drill-through navigation with filters)
@@ -1416,7 +1306,8 @@ export default function HomePage() {
     localStorage.setItem('nuke_onboarding_seen', '1');
   };
 
-  // Logged-out users: by default see the Janitor-drain intake variant (F6).
+  // Logged-out users see the live market (the intake form stays at /intake and is
+  // the fallback if the market can't load).
   // Treemap is preserved at /explore (or ?force_treemap=1 on this route).
   // Onboarding slideshow only fires for signed-in users, so it's safe to
   // fork before the showOnboarding effect mounts.
@@ -1425,7 +1316,11 @@ export default function HomePage() {
     if (forceTreemap) {
       return <TreemapHomePage onBrowse={() => setShowFeed(true)} />;
     }
-    return <IntakePage variant="homepage" />;
+    return (
+      <Suspense fallback={<TabSkeleton />}>
+        <MarketPulse onUnavailable={<IntakePage variant="homepage" />} />
+      </Suspense>
+    );
   }
 
   return (
@@ -1477,6 +1372,7 @@ export default function HomePage() {
       )}
 
       <Suspense fallback={<TabSkeleton />}>
+        {activeTab === 'market' && <MarketPulse onUnavailable={<FeedPage />} />}
         {activeTab === 'garage' && <GarageTab dashboard={garage} />}
         {activeTab === 'feed' && <FeedPage />}
       </Suspense>
