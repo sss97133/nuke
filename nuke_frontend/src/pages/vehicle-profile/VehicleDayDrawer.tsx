@@ -18,6 +18,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
+import { fmtClock, fmtUsd, localDate, type AuctionSequence } from './auctionSequence';
 
 interface DayPhoto {
   id: string;
@@ -42,6 +43,8 @@ interface DayEvent {
 
 interface VehicleDayDrawerProps {
   date: string; // YYYY-MM-DD
+  /** the BaT auction's sequence, when this vehicle was a lot — bids and comments land on their days */
+  auction?: AuctionSequence | null;
   onClose: () => void;
   onPrev?: () => void;
   onNext?: () => void;
@@ -91,10 +94,19 @@ const mono: React.CSSProperties = { fontFamily: "var(--vp-font-mono, 'Courier Ne
 // Session-scoped photo cache so re-opening a day never refetches.
 const dayPhotoCache = new Map<string, DayPhoto[]>();
 
-const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, onClose, onPrev, onNext }) => {
+const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auction, onClose, onPrev, onNext }) => {
   const { vehicleId, timelineEvents } = useVehicleProfile();
   const [photos, setPhotos] = useState<DayPhoto[] | null>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+
+  // The auction's bids and comments that landed on this day, in time order.
+  const auctionItems = useMemo(
+    () => (auction?.items ?? []).filter(i => localDate(i.at) === date),
+    [auction, date],
+  );
+  // Listing photos have no capture time (or an import stamp): they belong to the day
+  // the listing opened, labelled as such — never to the day Nuke copied them.
+  const isListingDay = !!auction?.open && localDate(auction.open.at) === date && auction.photos.publishedWithListing > 0;
 
   // ── Photos of the day (one query, cached) ──
   useEffect(() => {
@@ -104,15 +116,22 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, onClose, onPr
     if (cached) { setPhotos(cached); return; }
     let cancelled = false;
     setPhotos(null);
-    supabase
+    const base = supabase
       .from('vehicle_images')
       .select('id, image_url, taken_at')
       .eq('vehicle_id', vehicleId)
-      .gte('taken_at', `${date}T00:00:00Z`)
-      .lt('taken_at', `${date}T23:59:59.999Z`)
       .not('is_duplicate', 'is', true)
-      .order('taken_at', { ascending: true })
-      .limit(120)
+      .limit(120);
+    const query = isListingDay
+      // published with the listing: no capture time, or a stamp after the auction closed
+      ? (auction?.close
+          ? base.or(`taken_at.is.null,taken_at.gte.${auction.close.at}`)
+          : base.is('taken_at', null))
+      : base
+          .gte('taken_at', `${date}T00:00:00Z`)
+          .lt('taken_at', `${date}T23:59:59.999Z`)
+          .order('taken_at', { ascending: true });
+    query
       .then(({ data, error }) => {
         if (cancelled) return;
         const rows = (!error && Array.isArray(data)) ? (data as DayPhoto[]).filter(p => p.image_url) : [];
@@ -120,7 +139,8 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, onClose, onPr
         setPhotos(rows);
       });
     return () => { cancelled = true; };
-  }, [vehicleId, date]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleId, date, isListingDay]);
 
   // ── Day events from the already-loaded timeline ──
   const dayEvents = useMemo(
@@ -136,13 +156,15 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, onClose, onPr
     [dayEvents],
   );
 
-  const first = photos && photos.length > 0 ? photos[0].taken_at : null;
-  const last = photos && photos.length > 0 ? photos[photos.length - 1].taken_at : null;
+  const first = photos && photos.length > 0 && !isListingDay ? photos[0].taken_at : null;
+  const last = photos && photos.length > 0 && !isListingDay ? photos[photos.length - 1].taken_at : null;
   const span = fmtSpan(first, last);
+  const dayBids = auctionItems.filter(i => i.kind === 'bid').length;
+  const dayComments = auctionItems.length - dayBids;
   const dayTotal = workEvents.reduce((sum, ev) => sum + (Number(ev.cost_amount) || 0), 0);
 
   const loading = photos === null;
-  const isEmpty = !loading && photos.length === 0 && workEvents.length === 0 && otherEvents.length === 0;
+  const isEmpty = !loading && photos.length === 0 && workEvents.length === 0 && otherEvents.length === 0 && auctionItems.length === 0;
 
   return (
     <div
@@ -186,7 +208,9 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, onClose, onPr
       {/* Facet chips — only the facets this day touched */}
       {!loading && !isEmpty && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
-          {photos.length > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>PHOTOS {photos.length}</span>}
+          {photos.length > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>{isListingDay ? `PHOTOS ${photos.length}${(auction?.photos.publishedWithListing ?? 0) > photos.length ? ` OF ${auction!.photos.publishedWithListing}` : ''} · PUBLISHED WITH THE LISTING` : `PHOTOS ${photos.length}`}</span>}
+          {dayBids > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>BIDS {dayBids}</span>}
+          {dayComments > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>COMMENTS {dayComments}</span>}
           {workEvents.length > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>WORK {workEvents.length}</span>}
           {dayTotal > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>{fmtMoney(dayTotal)}</span>}
         </div>
@@ -221,6 +245,22 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, onClose, onPr
         </div>
       ))}
 
+      {/* The auction's bids and comments of the day, each opening its comment on BaT */}
+      {auctionItems.length > 0 && (
+        <div className="day-drawer__auction-list">
+          {auctionItems.map(i => (
+            <div key={i.id} className={`day-drawer__auction-row${i.kind === 'seller' ? ' seller' : ''}`}>
+              <span style={mono}>{fmtClock(i.at)}</span>
+              <span style={mono}>{i.kind === 'bid' ? `BID ${fmtUsd(i.amount)}` : i.kind === 'seller' ? 'SELLER' : 'COMMENT'}{i.postClose ? ' · after close' : ''}</span>
+              <span>
+                <a href={i.url} target="_blank" rel="noreferrer">{i.author}</a>
+                {i.kind !== 'bid' && i.text ? ` — ${i.text.length > 240 ? `${i.text.slice(0, 237)}…` : i.text}` : ''}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Photo grid — square thumbs, lazy, render-endpoint sized */}
       {!loading && photos.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 3, marginTop: 4 }}>
@@ -228,7 +268,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, onClose, onPr
             <button
               key={p.id}
               onClick={() => openVehiclePhoto(p.id)}
-              title={fmtTime(p.taken_at)}
+              title={isListingDay ? 'published with the listing — no capture time' : fmtTime(p.taken_at)}
               style={{ display: 'block', padding: 0, border: '1px solid var(--vp-ghost, #ddd)', background: 'var(--vp-row-alt, #f9f9f9)', cursor: 'pointer', aspectRatio: '1 / 1', overflow: 'hidden' }}
             >
               <img

@@ -316,3 +316,72 @@
 @media (max-width: 768px) {
   .barcode-strip { position: relative; top: auto; }
 }
+
+/* ============ AUCTION SEQUENCE BAND (BaT lots) ============ */
+/* The auction's week inside the expanded timeline: facts line, the band, a legend.
+   Same tokens as the heatmap; Arial labels 8px, Courier data, no colour. */
+.auction-band {
+  margin-top: 10px;
+  border-top: 1px solid var(--vp-ghost);
+  padding-top: 8px;
+}
+.auction-band__facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-family: var(--vp-font-sans);
+  font-size: var(--fs-8);
+  color: var(--vp-ink);
+  margin-bottom: 4px;
+}
+.auction-band__lot {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--vp-ink);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+.auction-band__basis {
+  color: var(--vp-pencil);
+}
+.auction-band__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.auction-band__svg text {
+  font-family: var(--vp-font-sans);
+}
+.auction-band__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  font-family: var(--vp-font-mono);
+  font-size: var(--fs-8);
+  color: var(--vp-pencil);
+  margin-top: 4px;
+}
+.day-drawer__auction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 6px;
+}
+.day-drawer__auction-row {
+  display: grid;
+  grid-template-columns: 44px 72px 1fr;
+  gap: 8px;
+  font-size: var(--fs-9);
+  line-height: 1.4;
+  border-bottom: 1px solid var(--vp-ghost);
+  padding-bottom: 2px;
+}
+.day-drawer__auction-row a {
+  color: var(--vp-ink);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+.day-drawer__auction-row .seller { font-weight: 700; }

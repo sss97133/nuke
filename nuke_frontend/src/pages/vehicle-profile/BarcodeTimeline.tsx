@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
 import { VEHICLE_DAY_OPEN_EVENT } from './VehiclePhotoLightbox';
+import { useAuctionSequence } from './useAuctionSequence';
 
 interface BarcodeTimelineProps {}
 
@@ -102,6 +103,7 @@ const EVENT_LABELS: Record<string, string> = {
   auction_sold: 'Sold',
   auction_started: 'Auction Started',
   auction_ended: 'Auction Ended',
+  auction_day: 'Auction Day',
   vehicle_added: 'Profile Created',
   mileage_reading: 'Mileage Recorded',
   repair: 'Repair',
@@ -192,6 +194,11 @@ function formatEventLabel(ev: any): string {
 
   if (eventType === 'auction_sold' && platform) return `Sold on ${platform}`;
 
+  // A day of the auction: what landed (from auction_comments, timestamped to the moment)
+  if (eventType === 'auction_day') return ev.title || 'Auction Day';
+  if (eventType === 'auction_started' && ev.metadata?.basis) return `Auction Opened (${ev.metadata.basis})`;
+  if (eventType === 'auction_ended' && ev.title) return ev.title;
+
   const base = EVENT_LABELS[eventType];
   if (base) return base;
 
@@ -244,6 +251,8 @@ function extractAreas(description: string): string[] {
 
 // Day drawer — the complete day document (C10); lazy since it renders on click
 const VehicleDayDrawer = React.lazy(() => import('./VehicleDayDrawer'));
+// BaT lots only: the auction's week as it happened (open, bids, comments, close)
+const AuctionSequenceBand = React.lazy(() => import('./AuctionSequenceBand'));
 
 /** Sync ?day=YYYY-MM-DD without touching scroll or history depth. */
 function setDayParam(date: string | null): void {
@@ -279,6 +288,11 @@ const TIMELINE_FILTERS: { key: string; label: string; match: (ev: any) => boolea
 
 const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
   const { vehicle, vehicleId, timelineEvents, setGalleryFilter } = useVehicleProfile();
+
+  // A BaT lot's real sequence — bids and comments at their times, the open and the
+  // close — from auction_comments / auction_events / vehicle_events. Null for any
+  // vehicle that was never a BaT lot (no query is made).
+  const { auction } = useAuctionSequence(vehicleId, vehicle as Record<string, unknown> | null, timelineEvents);
 
   // Per-day image-analysis depth (Tier 0-4) → illuminates the timeline as deep analysis
   // fills in. A day with raw photos and no verdicts stays dim; as T1/T2 land it warms,
@@ -328,7 +342,32 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
 
   // Synthesize photo/work day events for days the event feed doesn't cover.
   const enrichedEvents = useMemo(() => {
-    if (dayRows.length === 0) return timelineEvents;
+    // Photo days whose stamps are import times, not capture times (a listing photo
+    // cannot have been taken after its auction closed): those days never render.
+    const importDays = new Set(auction?.photos.importStampedDays ?? []);
+    const rows = importDays.size ? dayRows.filter(r => !(r.kind === 'photo' && importDays.has(r.day))) : dayRows;
+
+    // The auction's own days, timestamped to the moment — nothing here uses created_at.
+    const auctionDays: Array<Record<string, unknown>> = [];
+    if (auction) {
+      const openDay = auction.open ? toDateOnly(auction.open.at) : null;
+      const closeDay = auction.close ? toDateOnly(auction.close.at) : null;
+      if (openDay) {
+        auctionDays.push({ event_date: openDay, event_type: 'auction_started', title: 'Auction Opened', metadata: { auction: true, basis: auction.open!.basis } });
+        if (auction.photos.publishedWithListing > 0) {
+          auctionDays.push({ event_date: openDay, event_type: 'photo_session', title: `${auction.photos.publishedWithListing} photos published with the listing`, metadata: { image_count: auction.photos.publishedWithListing, published_with_listing: true, auction: true } });
+        }
+      }
+      for (const d of auction.days) {
+        const parts = [d.bids ? `${d.bids} bid${d.bids === 1 ? '' : 's'}` : null, d.comments ? `${d.comments} comment${d.comments === 1 ? '' : 's'}` : null].filter(Boolean);
+        auctionDays.push({ event_date: d.date, event_type: 'auction_day', title: `${parts.join(' · ')}${d.high != null ? ` · high bid $${Math.round(d.high).toLocaleString()}` : ''}${d.postClose ? ' · after the close' : ''}`, metadata: { auction: true, bids: d.bids, comments: d.comments } });
+      }
+      if (closeDay) {
+        auctionDays.push({ event_date: closeDay, event_type: 'auction_ended', title: `Auction Closed · ${auction.outcome.replace(/_/g, ' ')}${auction.price != null ? ` $${Math.round(auction.price).toLocaleString()}` : ''}`, metadata: { auction: true, basis: auction.close!.basis } });
+      }
+    }
+
+    if (rows.length === 0 && auctionDays.length === 0) return timelineEvents;
     const coveredPhotoDays = new Set(
       timelineEvents
         .filter((ev: any) => (ev.metadata?.image_count > 0) || String(ev.event_type || '').toLowerCase() === 'photo_session')
@@ -339,8 +378,8 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
         .filter((ev: any) => ['work_session', 'repair', 'modification', 'maintenance', 'service'].includes(String(ev.event_type || '').toLowerCase()))
         .map((ev: any) => String(ev.event_date || '').slice(0, 10)),
     );
-    const synthetic: any[] = [];
-    for (const r of dayRows) {
+    const synthetic: any[] = [...auctionDays];
+    for (const r of rows) {
       if (r.kind === 'photo' && !coveredPhotoDays.has(r.day)) {
         synthetic.push({ event_date: r.day, event_type: 'photo_session', title: `${r.n} photos`, metadata: { image_count: r.n, synthetic_day: true } });
       } else if (r.kind === 'work' && !coveredWorkDays.has(r.day)) {
@@ -348,7 +387,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       }
     }
     return synthetic.length ? [...timelineEvents, ...synthetic] : timelineEvents;
-  }, [timelineEvents, dayRows]);
+  }, [timelineEvents, dayRows, auction]);
 
   // Filter counts — always computed from the full set so pills show totals before clicking
   const filterCounts = useMemo(() => {
@@ -866,12 +905,21 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
             {/* Month labels are now rendered inline inside each .hm-week column */}
           </div>
 
+          {/* The auction's week, for a BaT lot: open, every bid and comment at its time,
+              the close and result, post-close comments. Each mark opens its source. */}
+          {auction && (auction.activityExtracted || auction.open || auction.close) && (
+            <React.Suspense fallback={null}>
+              <AuctionSequenceBand auction={auction} activeDay={receiptDate} onOpenDay={openDay} />
+            </React.Suspense>
+          )}
+
           {/* Day document — inline drawer below the grid (C10: a day click
               answers "what happened that day" completely, in place) */}
           {receiptDate && (
             <React.Suspense fallback={null}>
               <VehicleDayDrawer
                 date={receiptDate}
+                auction={auction}
                 onClose={closeDay}
                 onPrev={() => navigateReceipt(-1)}
                 onNext={() => navigateReceipt(1)}
