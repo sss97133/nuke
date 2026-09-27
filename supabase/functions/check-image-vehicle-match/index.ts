@@ -756,12 +756,11 @@ Deno.serve(async (req: Request) => {
           await supabase.from("vehicle_images").update(update).eq("id", img.id);
         }
       } catch (err) {
+        // A failed vision call is no verdict: the image stays unchecked (status NULL) for a later
+        // pass. Writing 'ambiguous' here marked ~1.27M images (0.2% sample: 2,530 of 2,530 with no
+        // detection) while the system pool failed every call — 2026-09-27: gemini 404, anthropic
+        // 400, openai 429 "no credits", ~5,900 attempts each since 21:00Z.
         errors.push({ image_id: img.id, error: `Vision error: ${(err as Error).message}` });
-        if (!dryRun) {
-          await supabase.from("vehicle_images")
-            .update({ image_vehicle_match_status: "ambiguous" })
-            .eq("id", img.id);
-        }
       }
     }
 
