@@ -29,11 +29,11 @@ const corsHeaders = {
 
 const API = "https://bringatrailer.com/wp-json/bringatrailer/1.0/data/listings-filter";
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
-const SYNC_VERSION = "bat-closed-lots-sync:1.1.0";
-// import_queue.source_id for every row this sync queues. import_queue has no sources table; the value
-// is a fixed name-based UUID (uuid5 of "bat-closed-lots-sync" in the DNS namespace) so a drain can be
-// scoped to BaT rows alone with process-import-queue's existing source_id filter, without waking the
-// dormant extractors behind the 3,600+ failed non-BaT rows of 2026-03/04.
+const SYNC_VERSION = "bat-closed-lots-sync:1.2.0";
+// import_queue.source_id for every row this sync queues: the scrape_sources row created by migration
+// 20260927083100 (import_queue.source_id has an FK to scrape_sources — the first run without that row
+// failed every enqueue with 23503). A drain scoped to this id (bat-settlement-drain, job 504) claims BaT
+// rows alone, without waking the dormant extractors behind the 3,600+ failed non-BaT rows of 2026-03/04.
 const BAT_SETTLEMENT_SOURCE_ID = "4d3f0c9e-7a6b-5b21-9c0d-2f5e8a1b6c37";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
     if (body?.minimum_year) filter.minimum_year = Number(body.minimum_year);
     if (body?.maximum_year) filter.maximum_year = Number(body.maximum_year);
 
-    const stats = { pages: 0, items: 0, closed: 0, already_known: 0, listings_upserted: 0, queued: 0, queue_dupes: 0, errors: [] as string[] };
+    const stats = { pages: 0, items: 0, closed: 0, already_known: 0, listings_upserted: 0, queued: 0, queue_dupes: 0, requeued_known: 0, errors: [] as string[] };
     let cleanPages = 0;
 
     for (let page = 1; page <= maxPages; page++) {
@@ -142,7 +142,20 @@ Deno.serve(async (req) => {
       });
       stats.already_known += rows.length - fresh.length;
 
-      if (fresh.length === 0) {
+      // self-heal (1.2.0): a lot the catalog already knows but the queue never got (a failed enqueue, a
+      // run that died between the two writes) is queued now — the queue, not bat_listings, decides.
+      const { data: queuedAlready, error: qReadErr } = await supabase
+        .from("import_queue")
+        .select("listing_url")
+        .in("listing_url", urls);
+      if (qReadErr) stats.errors.push(`import_queue read p${page}: ${qReadErr.message}`);
+      const queuedSet = new Set<string>((queuedAlready || []).map((r: any) => String(r.listing_url)));
+      const freshUrls = new Set(fresh.map((r) => r.bat_listing_url));
+      const unqueuedKnown = rows.filter((r) => !freshUrls.has(r.bat_listing_url) && !queuedSet.has(r.bat_listing_url));
+      const toQueue = [...fresh, ...unqueuedKnown];
+      stats.requeued_known += unqueuedKnown.length;
+
+      if (toQueue.length === 0) {
         cleanPages++;
         if (cleanPages >= caughtUpPages) break;
         await sleep(750);
@@ -151,12 +164,14 @@ Deno.serve(async (req) => {
       cleanPages = 0;
 
       if (!dryRun) {
-        const { error: upErr } = await supabase.from("bat_listings").upsert(fresh, { onConflict: "bat_listing_url" });
-        if (upErr) { stats.errors.push(`bat_listings upsert p${page}: ${upErr.message}`); }
-        else stats.listings_upserted += fresh.length;
+        if (fresh.length > 0) {
+          const { error: upErr } = await supabase.from("bat_listings").upsert(fresh, { onConflict: "bat_listing_url" });
+          if (upErr) { stats.errors.push(`bat_listings upsert p${page}: ${upErr.message}`); }
+          else stats.listings_upserted += fresh.length;
+        }
 
         // queue the lot pages for the reader; import_queue.listing_url is unique → duplicates are no-ops
-        const queueRows = fresh.map((r) => ({
+        const queueRows = toQueue.map((r) => ({
           listing_url: r.bat_listing_url,
           source_id: BAT_SETTLEMENT_SOURCE_ID,
           listing_title: r.bat_listing_title,
@@ -176,18 +191,20 @@ Deno.serve(async (req) => {
         }
       } else {
         stats.listings_upserted += fresh.length;
-        stats.queued += fresh.length;
+        stats.queued += toQueue.length;
       }
 
       await sleep(750);
     }
 
+    // one log line per run, errors included — a silent failure is how 400 lots went unqueued on 2026-09-27
+    console.log(`bat-closed-lots-sync ${SYNC_VERSION} dry_run=${dryRun} ${JSON.stringify({ ms: Date.now() - startedAt, ...stats })}`);
     return new Response(JSON.stringify({ success: true, dry_run: dryRun, version: SYNC_VERSION, ms: Date.now() - startedAt, ...stats }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
     const msg = e?.message ? String(e.message) : String(e);
-    console.error("bat-closed-lots-sync error:", msg);
+    console.error(`bat-closed-lots-sync ${SYNC_VERSION} error: ${msg}`);
     return new Response(JSON.stringify({ success: false, error: msg, ms: Date.now() - startedAt }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
