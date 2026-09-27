@@ -1983,6 +1983,102 @@ Deno.serve(async (req) => {
     }
 
     // Save images (external URLs only)
+    // v4: the timeline events land BEFORE the gallery. The gallery statement is the one place the lot
+    // is graded (trg_regrade_on_image, statement-level; trg_regrade_on_timeline skips system rows since
+    // 20260927090100), and compute_vehicle_grade() reads timeline_events — so the auction result and the
+    // mileage reading must exist when that single grade runs.
+    // Persist auction timeline events so the 7-day BaT window is visible: listed (start) + sold/ended (end).
+    if (vehicleId && essentials.auction_end_date) {
+      const endYmd = String(essentials.auction_end_date).slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(endYmd)) {
+        // Standard BaT auctions run 7 days: list date = end - 7 days
+        const endDate = new Date(endYmd + "T12:00:00Z");
+        const listDate = new Date(endDate);
+        listDate.setUTCDate(listDate.getUTCDate() - 7);
+        const listDateYmd = listDate.toISOString().slice(0, 10);
+
+        await tryUpsertAuctionTimelineEvent({
+          supabase,
+          vehicleId,
+          eventType: "auction_listed",
+          eventDateYmd: listDateYmd,
+          title: `Listed on Bring a Trailer${essentials.lot_number ? ` (Lot #${essentials.lot_number})` : ""}`,
+          description: essentials.seller_username
+            ? `Listed by @${essentials.seller_username}. ${essentials.reserve_status === "no_reserve" ? "No Reserve." : ""}`
+            : "Auction started.",
+          source: "bat",
+          sourceUrl: listingUrlCanonical,
+          costAmount: null,
+          metadata: {
+            lot_number: essentials.lot_number,
+            seller_username: essentials.seller_username,
+            reserve_status: essentials.reserve_status,
+            auction_end_date: endYmd,
+          },
+        });
+      }
+      const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
+      const hasBid = Number.isFinite(essentials.high_bid) && (essentials.high_bid || 0) > 0;
+      const eventType =
+        hasSale ? "auction_sold" :
+        (essentials.reserve_status === "reserve_not_met" ? "auction_reserve_not_met" : "auction_ended");
+
+      const amount = hasSale ? (essentials.sale_price || null) : (hasBid ? (essentials.high_bid || null) : null);
+      const amountText = typeof amount === "number" && amount > 0 ? `$${Math.round(amount).toLocaleString()}` : "";
+      const title =
+        eventType === "auction_sold"
+          ? `BaT sold${amountText ? ` for ${amountText}` : ""}`
+          : eventType === "auction_reserve_not_met"
+            ? `BaT ended (RNM)${amountText ? ` • bid to ${amountText}` : ""}`
+            : `BaT ended${amountText ? ` • bid to ${amountText}` : ""}`;
+
+      const descParts: string[] = [];
+      if (essentials.lot_number) descParts.push(`Lot #${essentials.lot_number}`);
+      if (essentials.bid_count) descParts.push(`${essentials.bid_count} bids`);
+      if (essentials.comment_count) descParts.push(`${essentials.comment_count} comments`);
+      const desc = descParts.length ? descParts.join(" • ") : null;
+
+      await tryUpsertAuctionTimelineEvent({
+        supabase,
+        vehicleId,
+        eventType,
+        eventDateYmd: essentials.auction_end_date,
+        title,
+        description: desc,
+        source: "bat",
+        sourceUrl: listingUrlCanonical,
+        costAmount: typeof amount === "number" ? amount : null,
+        metadata: {
+          reserve_status: essentials.reserve_status,
+          high_bid: essentials.high_bid,
+          sale_price: essentials.sale_price,
+          buyer_username: essentials.buyer_username,
+          seller_username: essentials.seller_username,
+          lot_number: essentials.lot_number,
+          bid_count: essentials.bid_count,
+          comment_count: essentials.comment_count,
+        },
+      });
+
+      // Mileage reading timeline event (per auction)
+      if (typeof essentials.mileage === "number" && Number.isFinite(essentials.mileage) && essentials.mileage > 0) {
+        await tryUpsertMileageTimelineEvent({
+          supabase,
+          vehicleId,
+          eventDateYmd: essentials.auction_end_date,
+          mileage: essentials.mileage,
+          source: "bat",
+          sourceUrl: listingUrlCanonical,
+          metadata: {
+            lot_number: essentials.lot_number,
+            auction_event: true,
+          },
+        });
+      }
+    }
+
+    mark("timeline");
+
     if (vehicleId && images.length > 0) {
       const nowIso = new Date().toISOString();
 
@@ -2514,96 +2610,6 @@ Deno.serve(async (req) => {
             extractor: "extract-bat-core",
             listing_url: listingUrlCanonical,
             field: "drivetrain",
-          },
-        });
-      }
-    }
-
-    // Persist auction timeline events so the 7-day BaT window is visible: listed (start) + sold/ended (end).
-    if (vehicleId && essentials.auction_end_date) {
-      const endYmd = String(essentials.auction_end_date).slice(0, 10);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(endYmd)) {
-        // Standard BaT auctions run 7 days: list date = end - 7 days
-        const endDate = new Date(endYmd + "T12:00:00Z");
-        const listDate = new Date(endDate);
-        listDate.setUTCDate(listDate.getUTCDate() - 7);
-        const listDateYmd = listDate.toISOString().slice(0, 10);
-
-        await tryUpsertAuctionTimelineEvent({
-          supabase,
-          vehicleId,
-          eventType: "auction_listed",
-          eventDateYmd: listDateYmd,
-          title: `Listed on Bring a Trailer${essentials.lot_number ? ` (Lot #${essentials.lot_number})` : ""}`,
-          description: essentials.seller_username
-            ? `Listed by @${essentials.seller_username}. ${essentials.reserve_status === "no_reserve" ? "No Reserve." : ""}`
-            : "Auction started.",
-          source: "bat",
-          sourceUrl: listingUrlCanonical,
-          costAmount: null,
-          metadata: {
-            lot_number: essentials.lot_number,
-            seller_username: essentials.seller_username,
-            reserve_status: essentials.reserve_status,
-            auction_end_date: endYmd,
-          },
-        });
-      }
-      const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
-      const hasBid = Number.isFinite(essentials.high_bid) && (essentials.high_bid || 0) > 0;
-      const eventType =
-        hasSale ? "auction_sold" :
-        (essentials.reserve_status === "reserve_not_met" ? "auction_reserve_not_met" : "auction_ended");
-
-      const amount = hasSale ? (essentials.sale_price || null) : (hasBid ? (essentials.high_bid || null) : null);
-      const amountText = typeof amount === "number" && amount > 0 ? `$${Math.round(amount).toLocaleString()}` : "";
-      const title =
-        eventType === "auction_sold"
-          ? `BaT sold${amountText ? ` for ${amountText}` : ""}`
-          : eventType === "auction_reserve_not_met"
-            ? `BaT ended (RNM)${amountText ? ` • bid to ${amountText}` : ""}`
-            : `BaT ended${amountText ? ` • bid to ${amountText}` : ""}`;
-
-      const descParts: string[] = [];
-      if (essentials.lot_number) descParts.push(`Lot #${essentials.lot_number}`);
-      if (essentials.bid_count) descParts.push(`${essentials.bid_count} bids`);
-      if (essentials.comment_count) descParts.push(`${essentials.comment_count} comments`);
-      const desc = descParts.length ? descParts.join(" • ") : null;
-
-      await tryUpsertAuctionTimelineEvent({
-        supabase,
-        vehicleId,
-        eventType,
-        eventDateYmd: essentials.auction_end_date,
-        title,
-        description: desc,
-        source: "bat",
-        sourceUrl: listingUrlCanonical,
-        costAmount: typeof amount === "number" ? amount : null,
-        metadata: {
-          reserve_status: essentials.reserve_status,
-          high_bid: essentials.high_bid,
-          sale_price: essentials.sale_price,
-          buyer_username: essentials.buyer_username,
-          seller_username: essentials.seller_username,
-          lot_number: essentials.lot_number,
-          bid_count: essentials.bid_count,
-          comment_count: essentials.comment_count,
-        },
-      });
-
-      // Mileage reading timeline event (per auction)
-      if (typeof essentials.mileage === "number" && Number.isFinite(essentials.mileage) && essentials.mileage > 0) {
-        await tryUpsertMileageTimelineEvent({
-          supabase,
-          vehicleId,
-          eventDateYmd: essentials.auction_end_date,
-          mileage: essentials.mileage,
-          source: "bat",
-          sourceUrl: listingUrlCanonical,
-          metadata: {
-            lot_number: essentials.lot_number,
-            auction_event: true,
           },
         });
       }
