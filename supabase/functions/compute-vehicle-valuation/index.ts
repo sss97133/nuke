@@ -262,6 +262,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
         .gte("year", year - 5)
         .lte("year", year + 5)
         .gt("best_price", 0)
+        .eq("is_sold", true) // comps are consummated sales; bids and asks are not (2026-09-27)
         .order("updated_at", { ascending: false })
         .limit(300);
 
@@ -282,6 +283,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
       .gte("year", year - 5)
       .lte("year", year + 5)
       .gt("best_price", 0)
+      .eq("is_sold", true) // comps are consummated sales; bids and asks are not (2026-09-27)
       .order("updated_at", { ascending: false })
       .limit(300);
 
@@ -303,6 +305,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
         .gte("year", year - 5)
         .lte("year", year + 5)
         .gt("best_price", 0)
+        .eq("is_sold", true) // comps are consummated sales; bids and asks are not (2026-09-27)
         .order("updated_at", { ascending: false })
         .limit(300);
 
@@ -325,6 +328,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
         .gte("year", year - 5)
         .lte("year", year + 5)
         .gt("best_price", 0)
+        .eq("is_sold", true) // comps are consummated sales; bids and asks are not (2026-09-27)
         .order("updated_at", { ascending: false })
         .limit(300);
 
@@ -343,6 +347,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
     .gte("year", year - 10)
     .lte("year", year + 10)
     .gt("best_price", 0)
+    .eq("is_sold", true) // comps are consummated sales; bids and asks are not (2026-09-27)
     .order("updated_at", { ascending: false })
     .limit(200);
 

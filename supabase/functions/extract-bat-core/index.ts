@@ -1,10 +1,20 @@
 /**
  * extract-bat-core
  *
- * Version: 3.0.0
+ * Version: 4.0.0 — rows and links only (2026-09-27)
+ * - listing_page_snapshots gets a fetch RECEIPT (url, fetched_at, sha256, length, status), never the page.
+ *   The DB is an index of BaT's public data, not a copy of it (17 GB / 711K stored pages before this).
+ * - Price = the lot page's own auction record ("Sold on … for $X to buyer" in the comments JSON,
+ *   _shared/batAuctionRecord.ts). For "sold after reserve not met" lots the stats table and the
+ *   listings-filter catalog carry the HIGH BID; the record has the price paid (2,554 lots).
+ * - Buyer is written only on a sold lot. A 17-character VIN must pass its check digit or it is not written.
+ * - A sale field that already holds a DIFFERENT value is superseded through
+ *   correct_vehicle_sale_provenance_batch (original + this page kept as the citation), never overwritten.
+ * - Bid / comment counts are aggregates from the comments JSON; no comment text is stored here.
+ *
  * Free-mode BaT core extractor:
  * - Fetch HTML directly (no Firecrawl)
- * - Save HTML evidence to listing_page_snapshots
+ * - Save a fetch receipt to listing_page_snapshots (html column stays NULL)
  * - Extract clean title/year/make/model (avoid SEO chrome like "for sale on BaT Auctions")
  * - Extract BaT Essentials (seller/location/lot + key specs)
  * - Extract description + images
@@ -20,9 +30,10 @@ import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { batchUpsertWithProvenance, quarantineRecord, type ProvenanceMetadata } from "../_shared/batUpsertWithProvenance.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { summarizeAuction, vinCheckDigitOk } from "../_shared/batAuctionRecord.ts";
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:3.0.0';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.0.0';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -221,10 +232,11 @@ async function trySaveHtmlSnapshot(args: {
       http_status: httpStatus,
       success,
       error_message: errorMessage,
-      html: htmlText,
+      // v4: a receipt, not a copy. The hash + length prove what was read; the page lives at BaT.
+      html: null,
       html_sha256: htmlSha,
       content_length: contentLength,
-      metadata: metadata || {},
+      metadata: { ...(metadata || {}), rows_only: true, extractor_version: EXTRACTOR_VERSION },
     };
 
     const { error } = await supabase.from("listing_page_snapshots").insert(payload);
@@ -1182,6 +1194,41 @@ Deno.serve(async (req) => {
 
     const identity = extractTitleIdentity(html, listingUrlCanonical);
     const essentials = extractEssentials(html);
+
+    // v4: the page's own auction record is the price authority. The stats table / title say
+    // "Bid to $23,000 (Reserve Not Met)" on a lot whose record says "Sold on 04/11/2025 for
+    // $24,000 to nocera76" (seller accepted after the close) — the record wins.
+    const auction = summarizeAuction(html);
+    if (auction.parsed) {
+      if (auction.sold) {
+        essentials.sale_price = auction.saleAmount ?? essentials.sale_price;
+        essentials.buyer_username = auction.buyer ?? essentials.buyer_username;
+        essentials.high_bid = auction.highBid ?? essentials.high_bid ?? essentials.sale_price;
+        essentials.reserve_status = auction.soldAfterReserveNotMet
+          ? "reserve_not_met"
+          : (essentials.reserve_status === "reserve_not_met" ? "reserve_met" : essentials.reserve_status);
+      } else if (auction.reserveNotMet) {
+        essentials.sale_price = null;
+        essentials.buyer_username = null;
+        essentials.high_bid = auction.highBid ?? auction.reserveNotMetAmount ?? essentials.high_bid;
+        essentials.reserve_status = "reserve_not_met";
+      } else {
+        // no closing record (live auction, or a comments payload without one): never assert a sale
+        essentials.sale_price = null;
+        essentials.buyer_username = null;
+        if (auction.highBid) essentials.high_bid = auction.highBid;
+      }
+      if (auction.bidCount) essentials.bid_count = auction.bidCount;
+      if (auction.commentCount) essentials.comment_count = auction.commentCount;
+    }
+    // buyer only on a sold lot
+    const saleNow = Number(essentials.sale_price) > 0;
+    if (!saleNow) essentials.buyer_username = null;
+    // a 17-character VIN must pass its check digit; a failing one is kept as a receipt, never written
+    const vinRejected = vinCheckDigitOk(essentials.vin) === false ? String(essentials.vin) : null;
+    if (vinRejected) essentials.vin = null;
+    let saleSupersession: any = null;
+
     const batCategory = essentials.listing_category ? String(essentials.listing_category).trim() : null;
     const listingKind = batCategory && batCategory.toLowerCase() === "parts" ? "non_vehicle_item" : "vehicle";
     const descriptionRaw = extractDescription(html);
@@ -1300,6 +1347,10 @@ Deno.serve(async (req) => {
         auction_end_date: essentials.auction_end_date || null,
         sale_price: essentials.sale_price || null,
         high_bid: essentials.high_bid || null,
+        // v4: a consummated sale is a STATUS (clean_vehicle_prices.is_sold reads sale_status)
+        sale_status: saleNow ? "sold" : (essentials.reserve_status === "reserve_not_met" ? "not_sold" : null),
+        auction_outcome: saleNow ? "sold" : (essentials.reserve_status === "reserve_not_met" ? "reserve_not_met" : null),
+        sale_date: saleNow ? (essentials.auction_end_date || null) : null,
         mileage: essentials.mileage || null,
         color: bestExteriorColor || null,
         interior_color: bestInteriorColor || null,
@@ -1492,6 +1543,8 @@ Deno.serve(async (req) => {
 
       if ((!existing?.bat_seller || listingIsLatestOrEqual) && essentials.seller_username) updatePayload.bat_seller = essentials.seller_username;
       if ((!existing?.bat_buyer || listingIsLatestOrEqual) && essentials.buyer_username) updatePayload.bat_buyer = essentials.buyer_username;
+      // v4: buyer only on a sold lot — the latest listing did not sell, so no buyer stands
+      if (listingIsLatestOrEqual && !saleNow && existing?.bat_buyer && String(existing.sale_status || "").toLowerCase() !== "sold") updatePayload.bat_buyer = null;
       if ((!existing?.bat_location || listingIsLatestOrEqual) && essentials.location) updatePayload.bat_location = essentials.location;
       if ((!existing?.listing_location || listingIsLatestOrEqual) && parsedLocation.clean) {
         updatePayload.listing_location = parsedLocation.clean;
@@ -1597,9 +1650,11 @@ Deno.serve(async (req) => {
           updatePayload.sale_price = extractedSalePrice;
         }
 
-        // When sold, high_bid should equal the sold price.
-        if (!existingHighBid || existingHighBid !== extractedSalePrice) {
-          updatePayload.high_bid = extractedSalePrice;
+        // When sold, high_bid is the closing bid — equal to the price unless the seller accepted a
+        // post-auction offer (then the record's price beats the bid; v4).
+        const soldHighBid = hasExtractedBid ? extractedHighBid : extractedSalePrice;
+        if (!existingHighBid || existingHighBid !== soldHighBid) {
+          updatePayload.high_bid = soldHighBid;
         }
 
         // Make the vehicle row consistent (some UIs fall back to vehicles.* if vehicle_events is blocked by RLS).
@@ -1734,6 +1789,47 @@ Deno.serve(async (req) => {
         }
       }
 
+      // v4: a sale field that already holds a DIFFERENT value is superseded through the chokepoint
+      // (correct_vehicle_sale_provenance_batch keeps the original + this page as the citation and
+      // refuses a stale expectation). Gap-fills stay in the direct update with their Tetris receipts.
+      const SALE_FIELDS = ["sale_price", "sale_status", "auction_outcome", "reserve_status", "high_bid", "sale_date", "auction_end_date", "bat_buyer"];
+      const supersede: Record<string, { value: string | null; expected: string }> = {};
+      for (const f of SALE_FIELDS) {
+        if (!(f in updatePayload)) continue;
+        const cur = (existing as any)?.[f];
+        if (cur === null || cur === undefined || String(cur).trim() === "") continue; // gap-fill
+        const next = updatePayload[f];
+        if (String(cur) === String(next ?? "")) { delete updatePayload[f]; continue; } // no-op
+        supersede[f] = { value: next === null || next === undefined ? null : String(next), expected: String(cur) };
+        delete updatePayload[f];
+      }
+      if (Object.keys(supersede).length > 0) {
+        const { data: sup, error: supErr } = await supabase.rpc("correct_vehicle_sale_provenance_batch", {
+          p_rows: [{
+            vehicle_id: vehicleId,
+            source: {
+              type: "bat",
+              ref: listingUrlCanonical,
+              method: auction.parsed ? "lot page auction record (comments JSON) + essentials" : "lot page essentials",
+              observed_at: new Date().toISOString(),
+              extractor: EXTRACTOR_VERSION,
+              html_source: htmlSource,
+            },
+            corrections: supersede,
+          }],
+          p_asserted_by: EXTRACTOR_VERSION,
+          p_reason: "BaT lot page re-read",
+        });
+        if (supErr) {
+          // chokepoint missing (migration 20260927010100 not applied): keep v3 behaviour, loudly
+          console.warn(`[supersede] correct_vehicle_sale_provenance_batch unavailable (${supErr.message}); writing sale fields directly`);
+          for (const [f, s] of Object.entries(supersede)) updatePayload[f] = s.value;
+          saleSupersession = { error: supErr.message, fields: Object.keys(supersede), fallback: "direct" };
+        } else {
+          saleSupersession = sup;
+        }
+      }
+
       const { error } = await supabase.from("vehicles").update(updatePayload).eq("id", vehicleId);
       if (error) {
         const e: any = error;
@@ -1789,6 +1885,22 @@ Deno.serve(async (req) => {
         }
       }
       updatedIds.push(vehicleId);
+    }
+
+    // v4: a VIN that failed its check digit is kept as a receipt on the vehicle, never as the vehicle's VIN
+    if (vehicleId && vinRejected) {
+      await trySaveExtractionMetadata({
+        supabase,
+        vehicleId,
+        fieldName: "vin",
+        fieldValue: vinRejected,
+        sourceUrl: listingUrlCanonical,
+        extractionMethod: "essentials_block",
+        scraperVersion: EXTRACTOR_VERSION,
+        confidenceScore: 0.2,
+        validationStatus: "invalid",
+        rawExtractionData: { reason: "vin_check_digit_failed", extractor: "extract-bat-core" },
+      });
     }
 
     // Fire-and-forget observation write
@@ -2276,6 +2388,7 @@ Deno.serve(async (req) => {
           winning_bidder: hasSale ? (essentials.buyer_username || null) : null,
           seller_name: essentials.seller_username || null,
           total_bids: essentials.bid_count || null,
+          unique_bidders: auction.parsed ? auction.uniqueBidders : null,
           comments_count: essentials.comment_count || null,
           page_views: essentials.view_count || null,
           watchers: essentials.watcher_count || null,
@@ -2480,6 +2593,20 @@ Deno.serve(async (req) => {
         updated_vehicle_ids: updatedIds,
         issues: [],
         extraction_method: "direct_html_parsing_free_mode",
+        snapshot: "receipt_only",
+        auction: {
+          record_parsed: auction.parsed,
+          sold: saleNow,
+          sale_price: saleNow ? essentials.sale_price : null,
+          buyer: saleNow ? essentials.buyer_username : null,
+          high_bid: essentials.high_bid,
+          sold_after_reserve_not_met: auction.soldAfterReserveNotMet,
+          bids: essentials.bid_count,
+          unique_bidders: auction.parsed ? auction.uniqueBidders : null,
+          comments: essentials.comment_count,
+        },
+        vin_rejected: vinRejected,
+        sale_supersession: saleSupersession,
         timestamp: new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
