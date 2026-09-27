@@ -23,7 +23,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
-import { parseBatIdentityFromUrl } from "../_shared/batParser.ts";
+import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/batParser.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -130,34 +130,18 @@ async function syncBaT(): Promise<{ auctions: LiveAuction[]; error: string | nul
     const auctions: LiveAuction[] = data.items
       .filter(item => item.active)
       .map(item => {
-        // Parse year/make/model from BaT title
-        // Titles often have prefixes: "44k-Mile 2001 Chevrolet Suburban", "No Reserve: 2006 Porsche..."
-        // Strategy: find the 4-digit year anywhere in the title, then parse make/model after it
+        // Identity. BaT's feed carries the year as its own field; the lot slug is BaT's "year-make-model"
+        // (parseBatIdentityFromUrl — descriptors before the year skipped, multi-word makes joined); the title,
+        // once the make is known, gives the full model and covers a slug without a year
+        // ("coyote-powered-ford-mustang-gt-fastback-by-revology"). A title's first word is never the make: the
+        // old first-word split left 8 live rows reading "Coyote-Powered" / "LS3-Powered" / "Pair" (2026-09-27).
         const cleanTitle = item.title.replace(/&#\d+;/g, "'").replace(/&amp;/g, "&");
-        const yearMatch = cleanTitle.match(/\b(19\d{2}|20[0-2]\d)\s+/);
-        const year = yearMatch ? parseInt(yearMatch[1], 10) : (item.year ? parseInt(item.year, 10) : null);
-
-        // Everything after the year is "make model trim..."
-        let make: string | null = null;
-        let model: string | null = null;
-        if (yearMatch) {
-          const afterYear = cleanTitle.substring(yearMatch.index! + yearMatch[0].length).trim();
-          const parts = afterYear.split(/\s+/);
-          make = parts[0] || null;
-          model = parts.slice(1).join(" ") || null;
-        } else {
-          const parts = cleanTitle.split(/\s+/);
-          make = parts[0] || null;
-          model = parts.slice(1).join(" ") || null;
-        }
-        // The lot URL is BaT's own identity: "2017-aston-martin-v12-vantage-s-7-speed" → Aston Martin /
-        // V12 Vantage S 7-Speed. Same parser as extract-bat-core (multi-word makes, title-cased tokens);
-        // the title split above only remains as the fallback for a URL that does not parse.
         const ident = parseBatIdentityFromUrl(item.url);
-        if (ident.make) {
-          make = ident.make;
-          model = ident.model ?? model;
-        }
+        const fromTitle = parseBatIdentityFromTitle(cleanTitle, ident.make);
+        const feedYear = /^\d{4}$/.test(String(item.year || "")) ? parseInt(item.year, 10) : null;
+        const year = feedYear ?? ident.year ?? fromTitle.year;
+        const make = ident.make ?? fromTitle.make;
+        const model = (ident.make && fromTitle.model) ? fromTitle.model : (ident.model ?? fromTitle.model);
 
         return {
           url: item.url.replace(/\/$/, ""),
@@ -636,7 +620,17 @@ async function syncToDatabase(
 
   console.log(`[sync-live-auctions] ${platform}: Upserting ${auctions.length} auctions to vehicles table`);
 
-  const upsertRows = auctions.map(auction => ({
+  // No auction we sync runs longer than 14 days (BaT 7, Collecting Cars 7–14, Cars & Bids 7): a later end date
+  // is a feed or parse fault, not a live lot, and must not become an auction_live placeholder nothing ever ends
+  // (a Collecting Cars row read 2027-02-25 for six months, 2026-09-27). Such lots are skipped and named, not capped.
+  const horizon = Date.now() + 14 * 86_400_000;
+  const impossible = auctions.filter(a => { const t = Date.parse(a.auction_end_date); return !Number.isFinite(t) || t > horizon; });
+  if (impossible.length > 0) {
+    console.warn(`[sync-live-auctions] ${platform}: ${impossible.length} lots skipped, auction_end_date unparseable or more than 14 days out: ${impossible.slice(0, 3).map(a => `${a.url} ${a.auction_end_date}`).join(", ")}`);
+  }
+  const writable = impossible.length > 0 ? auctions.filter(a => !impossible.includes(a)) : auctions;
+
+  const upsertRows = writable.map(auction => ({
       listing_url: auction.url,
       title: auction.title,
       year: auction.year,

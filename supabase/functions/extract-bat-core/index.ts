@@ -31,6 +31,7 @@ import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { batchUpsertWithProvenance, quarantineRecord, type ProvenanceMetadata } from "../_shared/batUpsertWithProvenance.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { readCommentsJson, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, sha256Hex } from "../_shared/batAuctionRecord.ts";
+import { parseBatIdentityFromUrl, parseBatIdentityFromTitle, readBatTaxonomy } from "../_shared/batParser.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 
 // Extractor versioning - update on each significant change
@@ -135,74 +136,6 @@ function cleanBatTitle(raw: string): string {
     .replace(/\s*\(Lot #[\d,]+\).*$/i, "")
     .trim();
   return t;
-}
-
-function parseBatIdentityFromUrl(listingUrl: string): {
-  year: number | null;
-  make: string | null;
-  model: string | null;
-  title: string | null;
-} {
-  try {
-    const u = new URL(listingUrl);
-    // NOTE: u.pathname is percent-encoded; BaT slugs can include things like %C2%BC (¼) and %C2%BD (½).
-    // We capture the full slug (until next '/') then decode it.
-    const m = u.pathname.match(/\/listing\/(\d{4})-([^/]+)\/?$/i);
-    if (!m?.[1] || !m?.[2]) return { year: null, make: null, model: null, title: null };
-    const year = Number(m[1]);
-    if (!Number.isFinite(year) || year < 1885 || year > new Date().getFullYear() + 1) {
-      return { year: null, make: null, model: null, title: null };
-    }
-    let slug = String(m[2]);
-    try {
-      slug = decodeURIComponent(slug);
-    } catch {
-      // keep raw slug if decoding fails
-    }
-
-    const parts = slug.split("-").filter(Boolean);
-    if (parts.length < 2) return { year, make: null, model: null, title: null };
-
-    const multiWordMakes: Record<string, string> = {
-      alfa: "Alfa Romeo",
-      mercedes: "Mercedes-Benz",
-      land: "Land Rover",
-      aston: "Aston Martin",
-    };
-
-    let make: string | null = null;
-    let model: string | null = null;
-
-    const firstPart = parts[0].toLowerCase();
-    if (multiWordMakes[firstPart] && parts.length > 1) {
-      // Split on hyphen OR space. "Mercedes-Benz" is the only entry joined by a
-      // hyphen, so `.split(" ")` returned a ONE-element array, makeParts[1] was
-      // undefined, the second-token check could never match, and every Benz fell
-      // through to the single-word branch: make "Mercedes" (canonicalised back
-      // to "Mercedes-Benz" downstream) with "Benz ..." left at the head of the
-      // model. 2,343 rows carried a "-Benz ..." model, 44 of them in the 24h
-      // before this fix — it was still producing them.
-      const makeParts = multiWordMakes[firstPart].split(/[\s-]+/);
-      const secondPart = parts[1].toLowerCase();
-      if (secondPart === makeParts[1]?.toLowerCase()) {
-        make = multiWordMakes[firstPart];
-        model = parts.slice(2).map(titleCaseToken).join(" ").trim() || null;
-      } else {
-        make = titleCaseToken(parts[0]);
-        model = parts.slice(1).map(titleCaseToken).join(" ").trim() || null;
-      }
-    } else {
-      make = titleCaseToken(parts[0]);
-      model = parts.slice(1).map(titleCaseToken).join(" ").trim() || null;
-    }
-
-    if (model) model = model.replace(/\s+\d+$/, "").trim();
-
-    const title = [year, make, model].filter(Boolean).join(" ");
-    return { year, make, model, title: title || null };
-  } catch {
-    return { year: null, make: null, model: null, title: null };
-  }
 }
 
 async function trySaveHtmlSnapshot(args: {
@@ -318,16 +251,14 @@ function extractTitleIdentity(html: string, listingUrl: string): { title: string
   const yearMatch = cleanedTitle.match(/\b(19|20)\d{2}\b/);
   const year = yearMatch?.[0] ? parseInt(yearMatch[0], 10) : null;
 
-  let make = urlIdentity.make;
-  let model = urlIdentity.model;
-
-  if (yearMatch?.[0] && make) {
-    const afterYear = cleanedTitle.slice(cleanedTitle.indexOf(yearMatch[0]) + yearMatch[0].length).trim();
-    if (afterYear && afterYear.toLowerCase().startsWith(make.toLowerCase())) {
-      const afterMake = afterYear.slice(make.length).trim();
-      if (afterMake) model = afterMake;
-    }
-  }
+  // v4.1 (2026-09-27): BaT's own Make link on the page is the make (readBatTaxonomy), the slug's make the
+  // fallback; the title's decoration never is ("Coyote-Powered …", "38-Years-Owned, …", "Pair of …" stood as
+  // makes on 69 rows). The model is the title after the make — which also reads a year-less title once the make
+  // is known ("Coyote-Powered Ford Mustang GT Fastback by Revology" → Mustang GT Fastback by Revology).
+  const taxonomy = readBatTaxonomy(h);
+  const fromTitle = parseBatIdentityFromTitle(cleanedTitle, taxonomy.make ?? urlIdentity.make);
+  const make = taxonomy.make ?? urlIdentity.make ?? fromTitle.make;
+  let model = fromTitle.model ?? urlIdentity.model;
 
   // Guard against SEO chrome pollution
   const modelLower = String(model || "").toLowerCase();
@@ -1459,7 +1390,14 @@ Deno.serve(async (req) => {
         // reference vehicle, the K5 Blazer). A blanket <=2 would flag every
         // existing K5 as "polluted" and overwrite it on re-extraction.
         modelLower.trim().length <= 1 ||
-        /^(benz|rover|romeo|martin|davidson)\s/.test(modelLower.trim());
+        /^(benz|rover|romeo|martin|davidson|royce|healey|tomaso|general|camino)\s/.test(modelLower.trim());
+      // A title descriptor the old first-word split took for the make ("Coyote-Powered", "38-Years-Owned,",
+      // "Modified", "Pair"): the same shapes is_garbage_make() now rejects at the table (2026-09-27). A row that
+      // carries one loses to the page's own Make link on re-read.
+      const makeIsPolluted =
+        /-(powered|owned|mile|miles|kilometer|kilometers|swapped|built|driven|equipped)[,:]?$/.test(makeLower.trim()) ||
+        /^(modified|custom|supercharged|turbocharged|restored|backdated|lifted|euro|jdm|japanese-market|no-reserve|one-owner|original-owner|single-family-owned|fuel-injected|pair|set|lot|group)[,:]?$/.test(makeLower.trim()) ||
+        /^[0-9]/.test(makeLower.trim());
 
       const looksLikeBatBoilerplate = (t: string): boolean => {
         const s = String(t || "").toLowerCase();
@@ -1546,6 +1484,7 @@ Deno.serve(async (req) => {
         !existing?.year ||
         !existing?.make ||
         makeLower === "unknown" ||
+        makeIsPolluted ||
         !existing?.model ||
         modelLower === "unknown" ||
         modelIsPolluted

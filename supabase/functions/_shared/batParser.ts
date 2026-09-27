@@ -156,7 +156,11 @@ export interface BatIdentity {
 export function parseBatIdentityFromUrl(listingUrl: string): BatIdentity {
   try {
     const u = new URL(listingUrl);
-    const m = u.pathname.match(/\/listing\/(\d{4})-([^/]+)\/?$/i);
+    // The model year is the anchor; BaT puts descriptors before it in some slugs
+    // ("coyote-powered-1967-ford-mustang-gt-fastback", "no-reserve-11k-kilometer-1988-mercedes-benz-560sel",
+    // "30-years-owned-…"). Everything before the year is a descriptor, never the make (427 of 264,668
+    // archived lots, measured 2026-09-27; live rows had make "Coyote-Powered").
+    const m = u.pathname.match(/\/listing\/(?:[^/]*?-)?((?:18|19|20)\d{2})-([^/]+)\/?$/i);
     if (!m?.[1] || !m?.[2]) return { year: null, make: null, model: null, title: null };
     const year = Number(m[1]);
     if (!Number.isFinite(year) || year < 1885 || year > new Date().getFullYear() + 1) {
@@ -177,16 +181,16 @@ export function parseBatIdentityFromUrl(listingUrl: string): BatIdentity {
 
     const firstPart = parts[0].toLowerCase();
     if (multiWordMakes[firstPart] && parts.length > 1) {
-      const makeParts = multiWordMakes[firstPart].split(" ");
+      // The expansion splits on space OR hyphen. Split on " " alone, "Mercedes-Benz" / "Rolls-Royce" /
+      // "Austin-Healey" were one-element arrays, the second slug token was never consumed, and every Benz read
+      // make "Mercedes-Benz", model "Benz 560SEL" (the reader's private copy fixed this on 2026-07-02 — 2,343
+      // rows carried a "Benz …" model — this shared copy did not, and the live sync uses this one). And "austin"
+      // expands to Austin-Healey only when the next token IS "healey": "1959-austin-mini" is an Austin.
+      const makeParts = multiWordMakes[firstPart].split(/[\s-]+/);
       const secondPart = parts[1].toLowerCase();
-      // For hyphenated makes like "De Tomaso", also check single-word match
-      if (makeParts.length > 1 && secondPart === makeParts[1]?.toLowerCase()) {
+      if (secondPart === makeParts[1]?.toLowerCase()) {
         make = multiWordMakes[firstPart];
         model = parts.slice(2).map(titleCaseToken).join(" ").trim() || null;
-      } else if (makeParts.length === 1) {
-        // Single-word expansion (shouldn't happen in current map, but defensive)
-        make = multiWordMakes[firstPart];
-        model = parts.slice(1).map(titleCaseToken).join(" ").trim() || null;
       } else {
         make = titleCaseToken(parts[0]);
         model = parts.slice(1).map(titleCaseToken).join(" ").trim() || null;
@@ -203,6 +207,76 @@ export function parseBatIdentityFromUrl(listingUrl: string): BatIdentity {
   } catch {
     return { year: null, make: null, model: null, title: null };
   }
+}
+
+// ─── BaT's own taxonomy ─────────────────────────────────────────────
+// A lot page links its Make / Model / Era / Origin / Category pages:
+//   <a class="group-link" href="https://bringatrailer.com/ford/"><strong class="group-title-label">Make</strong> Ford</a>
+// The Make link is BaT's own statement of the make, whatever the title's decoration ("Coyote-Powered Ford Mustang
+// GT Fastback by Revology" links Make → Ford; "Pair of Ferrari 550 Barchetta Helmets" links Make → Ferrari under
+// parts-and-automobilia). The Model page is generation-scoped ("Ford Mustang 1967-1968"): BaT's cohort for the
+// lot, not the model string. Same reader as the archive builder (scripts/bat-lots-local.ts readGroups —
+// 110,273 archived lots carry these links, 2026-09-27).
+export interface BatTaxonomy {
+  make: string | null;
+  model: string | null;
+  model_path: string | null;
+  era: string | null;
+  origin: string | null;
+  categories: string[];
+}
+
+export function readBatTaxonomy(html: string): BatTaxonomy {
+  const groups: { label: string; value: string; path: string }[] = [];
+  const re = /<a class="group-link" href="https:\/\/bringatrailer\.com\/([^"]*)"><strong class="group-title-label">([^<]+)<\/strong>([^<]*)<\/a>/g;
+  for (const m of String(html || "").matchAll(re)) {
+    const value = stripTags(m[3]).replace(/&amp;/g, "&").replace(/&#8217;|&rsquo;/g, "'").trim();
+    groups.push({ label: m[2].trim(), value, path: m[1].replace(/\/$/, "") });
+  }
+  const first = (label: string) =>
+    groups.find((g) => g.label === label && !g.path.startsWith("parts-and-automobilia")) ?? groups.find((g) => g.label === label);
+  const model = first("Model");
+  return {
+    make: first("Make")?.value || null,
+    model: model?.value || null,
+    model_path: model?.path || null,
+    era: first("Era")?.value || null,
+    origin: first("Origin")?.value || null,
+    categories: groups.filter((g) => g.label === "Category").map((g) => g.value),
+  };
+}
+
+// BaT titles decorate the front: "Supercharged 355-Powered 1968 GMC C1500 Custom", "25-Years-Owned 1996 Ford
+// F-250 XL", "No Reserve: 44k-Mile 2001 …". The year is the anchor (249,398 of 264,669 archived titles carry
+// one); everything before it is a descriptor, the make and model follow it. A known make (BaT's Make link or the
+// slug's) is located in the title directly — which also reads a year-less title ("Coyote-Powered Ford Mustang GT
+// Fastback by Revology" → Ford / Mustang GT Fastback by Revology). Without a year or a known make there is no
+// honest make: null, never the first word (that is how "Coyote-Powered", "Pair", "Euro" became makes).
+export function parseBatIdentityFromTitle(rawTitle: string, knownMake?: string | null): BatIdentity {
+  const title = cleanBatTitle(String(rawTitle || ""));
+  if (!title) return { year: null, make: null, model: null, title: null };
+  const ym = title.match(/\b(18[89]\d|19\d{2}|20\d{2})\b/);
+  const yearRaw = ym ? Number(ym[1]) : null;
+  const year = yearRaw !== null && yearRaw >= 1885 && yearRaw <= new Date().getFullYear() + 1 ? yearRaw : null;
+  const km = String(knownMake || "").trim();
+  if (km) {
+    const i = title.toLowerCase().indexOf(km.toLowerCase());
+    if (i >= 0) {
+      const model = title.slice(i + km.length).trim().replace(/^[-–:,]\s*/, "") || null;
+      return { year, make: km, model, title };
+    }
+  }
+  if (!ym || year === null) return { year, make: km || null, model: null, title };
+  const after = title.slice(title.indexOf(ym[0]) + ym[0].length).trim();
+  const parts = after.split(/\s+/).filter(Boolean);
+  if (!parts.length) return { year, make: km || null, model: null, title };
+  // multi-word makes as titles spell them ("Alfa Romeo", "Land Rover", "Aston Martin", "De Tomaso", "AM General");
+  // hyphenated ones ("Mercedes-Benz", "Rolls-Royce", "Austin-Healey") are already one token
+  const exp = multiWordMakes[parts[0].toLowerCase()];
+  const two = !!exp && !!parts[1] && parts[1].toLowerCase() === exp.split(/[\s-]+/)[1]?.toLowerCase();
+  const make = two ? exp : parts[0].replace(/[,:]$/, "");
+  const model = parts.slice(two ? 2 : 1).join(" ").trim() || null;
+  return { year, make, model, title };
 }
 
 export function extractTitleIdentity(
