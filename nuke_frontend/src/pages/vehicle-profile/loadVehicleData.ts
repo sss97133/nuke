@@ -577,16 +577,27 @@ export async function loadVehicleImpl({
 
       // Fallback: if we can't access vehicle_events due to RLS, still treat BaT-discovered vehicles as "auction mode"
       // so we hide Claim/Set-price and show a link to the listing.
+      const vd = (vehicleData ?? {}) as Record<string, unknown>;
       const fallbackListingUrl =
         (vehicleData as any)?.bat_auction_url ||
         (String((vehicleData as any)?.discovery_url || '').includes('bringatrailer.com/listing/')
           ? String((vehicleData as any)?.discovery_url)
+          : null) ||
+        // sync-live-auctions writes the live listing's URL to listing_url only
+        (String(vd.listing_url || '').includes('bringatrailer.com/listing/')
+          ? String(vd.listing_url)
           : null);
+
+      // Live-sync rows carry the auction on the vehicle: sale_status 'auction_live' + a future end.
+      const vEnd = Date.parse(String(vd.auction_end_date || ''));
+      const vehicleAuctionLive = vSaleStatus === 'auction_live' && Number.isFinite(vEnd) && vEnd > Date.now();
+      const num = (x: unknown) => (x == null || x === '' || !Number.isFinite(Number(x)) ? null : Number(x));
 
       // Determine listing_status from vehicle data (fallback). DO NOT infer sold from sale_price alone.
       const inferredStatus = (() => {
         if (vOutcome === 'reserve_not_met' || vOutcome === 'no_sale') return vOutcome;
         if (vSaleStatus === 'sold' || vOutcome === 'sold') return 'sold';
+        if (vehicleAuctionLive) return 'active';
         return vOutcome || 'unknown';
       })();
 
@@ -599,8 +610,13 @@ export async function loadVehicleImpl({
                 listing_url: fallbackListingUrl,
                 listing_status: inferredStatus,
                 end_date: (vehicleData as any)?.auction_end_date || null,
-                current_bid: typeof (vehicleData as any)?.current_bid === 'number' ? (vehicleData as any).current_bid : null,
-                bid_count: typeof (vehicleData as any)?.bid_count === 'number' ? (vehicleData as any).bid_count : null,
+                // The live sync writes the bid to high_bid (since 20260927195000); rows it has not
+                // rewritten yet still hold it in sale_price, which on a live row is a bid, not a sale.
+                current_bid:
+                  num(vd.high_bid) ??
+                  num(vd.current_bid) ??
+                  (vehicleAuctionLive ? num(vd.sale_price) : null),
+                bid_count: num(vd.bid_count) ?? num((vd.origin_metadata as Record<string, unknown> | null)?.bid_count),
                 watcher_count: null,
                 view_count: null,
                 comment_count: null,
@@ -690,6 +706,12 @@ export async function loadVehicleImpl({
 
           if (bidCount === null) bidCount = typeof (bidCountResult as any)?.count === 'number' ? (bidCountResult as any).count : null;
           commentCount = typeof (commentCountResult as any)?.count === 'number' ? (commentCountResult as any).count : null;
+          // A live-sync listing whose comments have not been extracted has no rows here: that is
+          // "not read yet", not zero bids, so show unknown rather than 0.
+          if (vehicleAuctionLive && !best && bidCount === 0 && commentCount === 0) {
+            bidCount = null;
+            commentCount = null;
+          }
           lastBidAt = (lastBid as any)?.data?.posted_at || null;
           lastCommentAt = (lastComment as any)?.data?.posted_at || null;
           const winnerName = String((lastBid as any)?.data?.author_username || '').trim() || null;
