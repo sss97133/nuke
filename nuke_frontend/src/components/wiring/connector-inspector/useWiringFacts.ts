@@ -13,6 +13,15 @@ export interface PartProof {
   installed: unknown | null;
 }
 
+// A part's purchase record (owner 2026-09-27: "bought? that word doesnt encapsulate the full meaning"): who sold it,
+// exactly what, in what condition, what was paid, when it was ordered and delivered, and whether it is the part the
+// design calls for. The full record is the vehicle's parts_purchase provenance row; the map proof row carries this copy.
+export interface PurchaseRecord {
+  marketplace?: string; order_number?: string; order_date?: string; delivered_date?: string | null; paid_usd?: number;
+  seller?: string | null; item_id?: string; part_numbers?: string[]; quantity?: number; condition?: string | null;
+  design_match?: string; provenance_observation_id?: string | null;
+}
+
 export interface WiringFact {
   id: string;
   plug: string;
@@ -34,6 +43,7 @@ export interface WiringFact {
   seenAt: string | null;     // when that photo was taken
   eventDate: string | null;  // when the thing it proves happened (e.g. the purchase), if the photo states it
   ownerWords: boolean;       // the owner's own statement (structured_data.owner_confirmed), relayed from chat
+  order: PurchaseRecord | null; // the purchase record behind an ACQUIRED rung
 }
 
 export interface WiringFacts {
@@ -52,7 +62,7 @@ interface FactRow {
     plug?: string; plug_name?: string; wire_id?: string | null; property_key?: string; row_field?: string;
     value?: unknown; state?: string; check?: { status?: string }; proof?: PartProof;
     plugs?: string[]; proof_level?: string; photo?: { url?: string; taken_at?: string }; event_date?: string;
-    owner_confirmed?: boolean;
+    owner_confirmed?: boolean; order?: PurchaseRecord;
   } | null;
   source_url: string | null;
   citation_excerpt: string | null;
@@ -101,6 +111,7 @@ export function useWiringFacts(vehicleId: string | undefined): WiringFacts {
           seenAt: sd.photo?.taken_at ?? null,
           eventDate: sd.event_date ?? null,
           ownerWords: sd.owner_confirmed === true,
+          order: sd.order ?? null,
         };
         if (f.wireId) (byWire[f.wireId] ??= []).push(f);
         else for (const p of (Array.isArray(sd.plugs) && sd.plugs.length ? sd.plugs : [f.plug])) (byPlug[p] ??= []).push(f);
