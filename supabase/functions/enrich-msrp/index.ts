@@ -95,40 +95,8 @@ function tryDescriptionParse(description: string | null): number | null {
 }
 
 /**
- * Strategy 3: Use model market stats as AI estimate
- * Uses median sale price from get_model_market_stats RPC
- */
-async function tryMarketEstimate(
-  supabase: ReturnType<typeof createClient>,
-  make: string | null,
-  model: string | null,
-): Promise<number | null> {
-  if (!make || !model) return null;
-
-  const { data, error } = await supabase.rpc("get_model_market_stats", {
-    p_make: make,
-    p_model: model,
-  });
-
-  if (error || !data) return null;
-
-  const stats = data as { median_price?: number; avg_price?: number; total_listings?: number };
-
-  // Only use as estimate if we have enough data points
-  if ((stats.total_listings ?? 0) < 3) return null;
-
-  // Prefer median, fall back to average
-  const price = stats.median_price ?? stats.avg_price;
-  if (price && price > 0) {
-    return Math.round(price);
-  }
-
-  return null;
-}
-
-/**
  * Enrich a single vehicle's MSRP using cascading strategies.
- * skipMarketEstimate: skip the slow RPC-based market estimate (used in batch mode)
+ * skipMarketEstimate: kept for callers; there is no market estimate any more (see below)
  */
 async function enrichVehicleMsrp(
   supabase: ReturnType<typeof createClient>,
@@ -180,16 +148,10 @@ async function enrichVehicleMsrp(
     }
   }
 
-  // Strategy 3: Market estimate (lowest confidence — only if nothing better)
-  // Skipped in batch mode because the RPC is slow per-vehicle
-  if (!result.msrp && !skipMarketEstimate) {
-    const estimatedMsrp = await tryMarketEstimate(supabase, vehicle.make, vehicle.model);
-    if (estimatedMsrp) {
-      result.msrp = estimatedMsrp;
-      result.msrp_source = "ai_estimated";
-      result.strategy = "market_estimate";
-    }
-  }
+  // No third strategy. The model's median resale price is not a sticker price, so it is never written
+  // as msrp (2026-09-27: ~23,400 cars carried one as 'ai_estimated', and every car the BaT reader
+  // created paid a 25–60 s get_model_market_stats call for it). A car with neither an OEM row nor a
+  // parsed MSRP keeps msrp empty; the market median lives in get_model_market_stats itself.
 
   // Write to DB if we found something
   if (result.msrp) {
