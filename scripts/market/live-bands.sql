@@ -45,10 +45,10 @@ CREATE OR REPLACE TEMP MACRO title_trans(t) AS CASE
   WHEN regexp_matches(t, '\b[3-7]-Speed\b') AND NOT regexp_matches(lower(t), 'automatic|auto\b') THEN 'manual'
   WHEN regexp_matches(lower(t), 'automatic') THEN 'auto' END;
 
--- Live lots (written by live-bands.mjs to getvariable('live_tsv')) -> model page -> CompBase band as of now.
+-- Live lots (live-bands.mjs fills in __LIVE_TSV__ and __BANDS_CSV__) -> model page -> CompBase band as of now.
 CREATE OR REPLACE TEMP TABLE live AS
   SELECT vid AS key, title, try_cast(bid AS DOUBLE) AS bid, nr = 'true' AS no_reserve
-  FROM read_csv(getvariable('live_tsv'), delim = '\t', header = false, quote = '',
+  FROM read_csv('__LIVE_TSV__', delim = '\t', header = false, quote = '',
                 columns = {'vid': 'VARCHAR', 'bid': 'VARCHAR', 'nr': 'VARCHAR', 'title': 'VARCHAR'});
 CREATE OR REPLACE TEMP TABLE live_map AS SELECT * FROM map_cohorts('live');
 COPY (
@@ -70,4 +70,4 @@ COPY (
   SELECT b.key AS vehicle_id, m.cohort, m.share, b.n_comps, round(b.n_eff, 1) AS n_eff, b.p10, b.p25, b.p50, b.p75, b.p90, l.bid
   FROM band b JOIN live_map m USING (key) JOIN live l USING (key)
   WHERE b.n_eff >= 5          -- under 5 effective comps: "not priced yet", no band
-) TO getvariable('bands_csv') (HEADER);
+) TO '__BANDS_CSV__' (HEADER);

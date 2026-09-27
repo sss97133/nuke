@@ -11,17 +11,21 @@
 // page 96.4% of the time (97.7% when one page holds >= 60% of the matches, 89% of lots). Title-only bands
 // on 6,424 recent sales: 80% band caught 77.5%, 50% band 48.8%, median miss 27.1%.
 //
-// Run: npm run market:live-bands   (needs scripts/data/bat-archive.duckdb; writes to prod via the service key)
+// Run: npm run market:live-bands   (writes to prod via the service key)
+// The archive is local data (not in git): BAT_ARCHIVE=/path/to/bat-archive.duckdb, default scripts/data/bat-archive.duckdb.
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const URL = process.env.VITE_SUPABASE_URL;
 const ANON = process.env.VITE_SUPABASE_ANON_KEY;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!URL || !ANON || !SERVICE) throw new Error('VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are required (dotenvx run --)');
 const MODEL_VERSION = 30;
+const SQL_FILE = join(dirname(fileURLToPath(import.meta.url)), 'live-bands.sql');
+const ARCHIVE = resolve(process.env.BAT_ARCHIVE || 'scripts/data/bat-archive.duckdb');
 const dir = mkdtempSync(join(tmpdir(), 'live-bands-'));
 const liveTsv = join(dir, 'live.tsv');
 const bandsCsv = join(dir, 'bands.csv');
@@ -44,8 +48,8 @@ const clean = (s) => String(s).replace(/[\t\r\n]/g, ' ');
 writeFileSync(liveTsv, lots.map((l) => [l.id, l.bid ?? '', l.noReserve, clean(l.title)].join('\t')).join('\n') + '\n');
 
 // 2. bands from the archive (read-only)
-const sql = `SET VARIABLE live_tsv = '${liveTsv}';\nSET VARIABLE bands_csv = '${bandsCsv}';\n.read scripts/market/live-bands.sql\n`;
-execFileSync('duckdb', ['-readonly', 'scripts/data/bat-archive.duckdb'], { input: sql, stdio: ['pipe', 'inherit', 'inherit'] });
+const sql = readFileSync(SQL_FILE, 'utf8').replaceAll('__LIVE_TSV__', liveTsv).replaceAll('__BANDS_CSV__', bandsCsv);
+execFileSync('duckdb', ['-readonly', ARCHIVE], { input: sql, stdio: ['pipe', 'inherit', 'inherit'] });
 const [header, ...lines] = readFileSync(bandsCsv, 'utf8').trim().split('\n');
 const cols = header.split(',');
 const bands = lines.filter(Boolean).map((line) => Object.fromEntries(line.split(',').map((v, i) => [cols[i], v])));
