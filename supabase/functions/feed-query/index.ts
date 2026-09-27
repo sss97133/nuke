@@ -118,8 +118,10 @@ interface FeedRequest {
 
 // Valid sort fields mapped to MV columns
 const SORT_MAP: Record<string, { column: string; defaultDir: "asc" | "desc"; view?: string }> = {
-  newest:     { column: "created_at",  defaultDir: "desc" },
-  oldest:     { column: "created_at",  defaultDir: "asc" },
+  // event_at = COALESCE(sale_date, auction_end_at, created_at): the market event, not when the row reached
+  // Nuke (the BaT lot loader creates historical lots with created_at = now). Migration 20260927220000.
+  newest:     { column: "event_at",    defaultDir: "desc" },
+  oldest:     { column: "event_at",    defaultDir: "asc" },
   updated:    { column: "updated_at",  defaultDir: "desc" },
   deal_score: { column: "deal_score",  defaultDir: "desc" },
   heat_score: { column: "heat_score",  defaultDir: "desc" },
@@ -177,7 +179,7 @@ Deno.serve(async (req) => {
         transmission, drivetrain, body_style, canonical_body_style,
         mileage, vin,
         is_for_sale, sale_status, sale_date,
-        created_at, updated_at,
+        created_at, updated_at, auction_end_at, event_at,
         discovery_url, discovery_source, profile_origin, origin_organization_id,
         city, state, listing_location,
         canonical_vehicle_type, has_photos,
@@ -358,7 +360,7 @@ Deno.serve(async (req) => {
             vehicle_id, year, make, model, series, trim,
             transmission, drivetrain, body_style, canonical_body_style,
             mileage, vin, is_for_sale, sale_status, sale_date,
-            created_at, updated_at,
+            created_at, updated_at, auction_end_at, event_at,
             discovery_url, discovery_source, profile_origin, origin_organization_id,
             city, state, listing_location,
             canonical_vehicle_type, has_photos,
@@ -473,8 +475,9 @@ Deno.serve(async (req) => {
         city: row.city,
         state: row.state,
 
-        // Auction state (live from vehicle_events)
-        auction_end_date: auction?.ended_at ?? null,
+        // Auction state: live from vehicle_events; an ended auction keeps its own end time from the MV
+        auction_end_date: auction?.ended_at ?? row.auction_end_at ?? null,
+        event_at: row.event_at ?? null,
         current_bid: auction?.current_price ?? null,
         bid_count: auction?.bid_count ?? null,
         listing_status: auction?.event_status ?? null,

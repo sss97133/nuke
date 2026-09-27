@@ -52,6 +52,16 @@ export function vehicleTimeLabel(vehicle: {
     return ago ? `sold ${ago}` : null;
   }
 
+  // Ended auctions without a sale (reserve not met, no sale): the auction's own end date,
+  // never the date the row reached Nuke.
+  if (vehicle.auction_end_date) {
+    const end = new Date(vehicle.auction_end_date).getTime();
+    if (Number.isFinite(end) && end <= Date.now()) {
+      const ago = timeAgo(end);
+      return ago ? `ended ${ago}` : null;
+    }
+  }
+
   // Active auctions: show when ending
   if (vehicle.auction_end_date && vehicle.listing_status === 'active') {
     const end = new Date(vehicle.auction_end_date).getTime();
@@ -65,10 +75,10 @@ export function vehicleTimeLabel(vehicle: {
     }
   }
 
-  // For-sale listings: show when listed
+  // For-sale listings: created_at is when Nuke first saw the listing, labelled as such
   if (vehicle.is_for_sale && vehicle.created_at) {
     const ago = timeAgo(vehicle.created_at);
-    return ago ? `listed ${ago}` : null;
+    return ago ? `added to Nuke ${ago}` : null;
   }
 
   // If updated_at is significantly newer than created_at (>24h), show "updated"
@@ -81,10 +91,10 @@ export function vehicleTimeLabel(vehicle: {
     }
   }
 
-  // Default: show when added
+  // Default: when the row reached Nuke, labelled as such
   if (vehicle.created_at) {
     const ago = timeAgo(vehicle.created_at);
-    return ago ? `added ${ago}` : null;
+    return ago ? `added to Nuke ${ago}` : null;
   }
 
   return null;
