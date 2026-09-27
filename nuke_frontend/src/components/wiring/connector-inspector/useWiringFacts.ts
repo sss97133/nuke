@@ -1,7 +1,8 @@
 // connector-inspector/useWiringFacts.ts — the wiring facts landed in vehicle_observations
 // (docs/wiring/calc-data/load_observations.py, receipt 2026-09-26_facts-into-nuke-db.md), grouped by wire.
 // Each fact carries its paper: the source that backs it, the page excerpt, what the citation check found,
-// and — for parts — the proof on file that it was lined up, bought, installed. Read-only; skins never write.
+// and — for parts — the proof on file that it was lined up, bought, installed. Device proof read from the
+// vehicle's own photos is indexed under every plug it covers (structured_data.plugs). Read-only; skins never write.
 
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
@@ -28,6 +29,10 @@ export interface WiringFact {
   page: number | null;
   confidence: string | null;
   proof: PartProof | null;
+  level: string | null;      // device proof: bought | on_hand | on_truck | not_on_truck | question
+  photoUrl: string | null;   // the vehicle's own photo the proof was read from
+  seenAt: string | null;     // when that photo was taken
+  eventDate: string | null;  // when the thing it proves happened (e.g. the purchase), if the photo states it
 }
 
 export interface WiringFacts {
@@ -45,6 +50,7 @@ interface FactRow {
   structured_data: {
     plug?: string; plug_name?: string; wire_id?: string | null; property_key?: string; row_field?: string;
     value?: unknown; state?: string; check?: { status?: string }; proof?: PartProof;
+    plugs?: string[]; proof_level?: string; photo?: { url?: string; taken_at?: string }; event_date?: string;
   } | null;
   source_url: string | null;
   citation_excerpt: string | null;
@@ -88,9 +94,13 @@ export function useWiringFacts(vehicleId: string | undefined): WiringFacts {
           page: row.citation_page_number ?? null,
           confidence: row.confidence ?? null,
           proof: sd.proof ?? null,
+          level: sd.proof_level ?? null,
+          photoUrl: sd.photo?.url ?? null,
+          seenAt: sd.photo?.taken_at ?? null,
+          eventDate: sd.event_date ?? null,
         };
         if (f.wireId) (byWire[f.wireId] ??= []).push(f);
-        else (byPlug[f.plug] ??= []).push(f);
+        else for (const p of (Array.isArray(sd.plugs) && sd.plugs.length ? sd.plugs : [f.plug])) (byPlug[p] ??= []).push(f);
       }
       setFacts({ loaded: true, error: null, byWire, byPlug, total: data?.length ?? 0 });
     })();

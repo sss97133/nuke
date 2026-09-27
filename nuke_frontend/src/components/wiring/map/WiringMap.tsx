@@ -17,7 +17,8 @@ import {
   COLORWAYS, COLORWAY_LIST, COLORWAY_STORAGE_KEY, ColorwayContext, DEFAULT_COLORWAY,
   frame, isColorwayId, rule, textOn, type Colorway, type ColorwayId,
 } from '../connector-inspector/colorways';
-import { useWiringFacts } from '../connector-inspector/useWiringFacts';
+import { useWiringFacts, type WiringFact } from '../connector-inspector/useWiringFacts';
+import { optimizeImageUrl } from '../../../lib/imageOptimizer';
 import { WireEvidence } from '../connector-inspector/WireEvidence';
 import {
   SECTIONS, useWiringMap, type MapCall, type MapEnd, type MapNode, type MapWire, type Section, type WorkStatus,
@@ -26,6 +27,15 @@ import {
 const WORK_WORD: Record<WorkStatus, string> = {
   open: 'OPEN', in_progress: 'IN PROGRESS', needs_owner: 'NEEDS YOU', done: 'DONE', blocked: 'BLOCKED',
 };
+
+// device proof read from the vehicle's own photos (owner 2026-09-26: proof a part was lined up, bought, installed — or not)
+const LEVEL_WORD: Record<string, string> = {
+  lined_up: 'LINED UP', bought: 'BOUGHT', on_hand: 'ON HAND', on_truck: 'ON THE TRUCK',
+  not_on_truck: 'NOT ON THE TRUCK YET', question: 'QUESTION FOR THE OWNER',
+};
+const PROVEN = new Set(['bought', 'on_hand', 'on_truck']);
+const deviceProof = (facts: ReturnType<typeof useWiringFacts>, code: string): WiringFact[] =>
+  (facts.byPlug[code] ?? []).filter(f => f.property === 'device proof');
 
 function statusColor(cw: Colorway, s: WorkStatus): string {
   return s === 'done' ? cw.ok : s === 'needs_owner' ? cw.warn : s === 'blocked' ? cw.danger : s === 'in_progress' ? cw.accent : cw.ink;
@@ -64,12 +74,13 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
 
   // rollups per section (the group-context layer)
   const rollup = useMemo(() => {
-    const r: Record<string, { nodes: number; placed: number; done: number; needs: number; decided: number; concept: number }> = {};
-    for (const s of SECTIONS) r[s.id] = { nodes: 0, placed: 0, done: 0, needs: 0, decided: 0, concept: 0 };
+    const r: Record<string, SectionRollup> = {};
+    for (const s of SECTIONS) r[s.id] = { nodes: 0, placed: 0, done: 0, needs: 0, decided: 0, concept: 0, proven: 0 };
     for (const n of map.nodes) {
       const x = n.section && r[n.section];
       if (!x) continue;
       x.nodes += 1; if (n.x != null) x.placed += 1; if (n.workStatus === 'done') x.done += 1; if (n.workStatus === 'needs_owner') x.needs += 1;
+      if (deviceProof(facts, n.code).some(f => PROVEN.has(f.level ?? ''))) x.proven += 1;
     }
     for (const w of map.wires) {
       const x = w.section && r[w.section];
@@ -77,7 +88,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
       if (w.designStatus === 'decided') x.decided += 1; else x.concept += 1;
     }
     return r;
-  }, [map.nodes, map.wires]);
+  }, [map.nodes, map.wires, facts]);
 
   const visible = map.nodes.filter(n => !sec || n.section === sec);
   const placed = visible.filter(n => n.x != null && n.y != null);
@@ -265,6 +276,7 @@ function NodeCard({ cw, n, map, byId, facts, onNode, onCall }: {
     return [...new Set(all)].sort((a, b) => rank(a) - rank(b)).map(c => (c === n.code ? `[${c}]` : c)).join(' → ');
   };
   const calls = map.calls.filter(c => c.links.some(l => l.endpointId === n.id));
+  const onFile = deviceProof(facts, n.code).sort((a, b) => (a.seenAt ?? '').localeCompare(b.seenAt ?? ''));
   const [open, setOpen] = React.useState<string | null>(null);
   return (
     <div>
@@ -280,6 +292,10 @@ function NodeCard({ cw, n, map, byId, facts, onNode, onCall }: {
       {n.partNumber && <Field cw={cw} label="PLUG / KIT">{n.partNumber}</Field>}
       {n.notes && <Field cw={cw} label="NOTE">{n.notes}</Field>}
       <Field cw={cw} label="SOURCE">{n.source ?? '—'}{n.trust ? ` (${n.trust})` : ''}</Field>
+
+      {onFile.length > 0 && <Head cw={cw}>ON FILE FOR THIS PART ({onFile.length})</Head>}
+      {onFile.map(f => <ProofRow key={f.id} cw={cw} f={f} />)}
+      {onFile.length === 0 && <Field cw={cw} label="PROOF">NO PHOTO OR RECEIPT ON FILE FOR THIS PART</Field>}
 
       {wires.length > 0 && <Head cw={cw}>WIRES AT THIS NODE ({wires.length})</Head>}
       {wires.map(w => {
@@ -359,8 +375,36 @@ function CallCard({ cw, c, map, byId, onNode }: {
   );
 }
 
+// one photo (or receipt) and what it shows about this part; the photo opens full size
+function ProofRow({ cw, f }: { cw: Colorway; f: WiringFact }) {
+  const tone = f.level === 'question' ? cw.warn : f.level === 'not_on_truck' ? cw.inkMuted : cw.ok;
+  const thumb = optimizeImageUrl(f.photoUrl, 'thumbnail');
+  return (
+    <div style={{ display: 'flex', gap: 10, borderBottom: rule(cw), padding: '6px 0' }}>
+      {thumb && f.photoUrl && (
+        <a href={f.photoUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }} title="Open the photo">
+          <img src={thumb} alt="" width={76} height={76} loading="lazy"
+            style={{ display: 'block', objectFit: 'contain', border: rule(cw), background: cw.bg }} />
+        </a>
+      )}
+      <div style={{ fontSize: 14, lineHeight: 1.5 }}>
+        <div style={{ fontWeight: 700, color: tone }}>
+          {LEVEL_WORD[f.level ?? ''] ?? (f.level ?? '').toUpperCase()}{f.eventDate ? ` ${f.eventDate}` : ''}
+          {f.seenAt ? ` · PHOTO ${f.seenAt.slice(0, 10)}` : ''}
+        </div>
+        <div>{f.value}</div>
+        <div style={{ color: cw.inkFaint }}>
+          {f.level === 'question' ? 'RAISED BY A PHOTO ON THIS PROFILE' : "READ FROM THE VEHICLE'S OWN PHOTO · NOT YET CONFIRMED BY THE OWNER"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface SectionRollup { nodes: number; placed: number; done: number; needs: number; decided: number; concept: number; proven: number }
+
 function Rollup({ cw, sec, rollup, calls }: {
-  cw: Colorway; sec: Section | null; rollup: Record<string, { nodes: number; placed: number; done: number; needs: number; decided: number; concept: number }>;
+  cw: Colorway; sec: Section | null; rollup: Record<string, SectionRollup>;
   calls: MapCall[];
 }) {
   const rows = SECTIONS.filter(s => !sec || s.id === sec).filter(s => rollup[s.id] && rollup[s.id].nodes + rollup[s.id].decided + rollup[s.id].concept > 0);
@@ -376,6 +420,9 @@ function Rollup({ cw, sec, rollup, calls }: {
             <div style={{ fontWeight: 700 }}>{s.label}</div>
             <div style={{ fontFamily: cw.fontMono }}>
               {r.done}/{r.nodes} NODES DONE · {r.placed} PLACED · {r.needs} NEED YOU
+            </div>
+            <div style={{ fontFamily: cw.fontMono }}>
+              {r.proven}/{r.nodes} WITH PROOF ON FILE (PHOTO / RECEIPT)
             </div>
             <div style={{ fontFamily: cw.fontMono }}>
               {r.decided} WIRES DECIDED · {r.concept} CONCEPT
