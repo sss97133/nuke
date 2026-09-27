@@ -2094,7 +2094,10 @@ Deno.serve(async (req) => {
               position: idx,
               display_order: idx,
               is_primary: makePrimary,
-              taken_at: nowIso,
+              // v4: a BaT photo's capture time is unknown; stamping the import time made every link row
+              // look like a dated photo and sent it through auto_group_photos_into_events (a
+              // timeline_events read + write per image).
+              taken_at: null,
               exif_data: {
                 original_url: imgUrl,
                 source_url: listingUrlCanonical,
