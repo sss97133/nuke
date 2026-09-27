@@ -234,8 +234,11 @@ function transformLotItem(item: RMSLotItem, auctionCode: string): ExtractedVehic
   const { year, make, model } = parseTitle(item.publicName);
   const { amount, currency, text: valueText } = parseValue(item.value, item.valueType);
 
-  // Determine if this is a sold price or estimate
-  const isSold = item.sold || item.valueType?.toLowerCase().includes('sold');
+  // Determine if this is a sold price or estimate. "Not Sold" contains "sold": the old includes()
+  // test turned unsold lots' low estimates into sale prices (82 rows measured 2026-09-27; lock 1
+  // now refuses them). Sold = the API flag, or a value type that starts with "sold".
+  const valueTypeLc = String(item.valueType || '').toLowerCase().trim();
+  const isSold = item.sold === true || (valueTypeLc.startsWith('sold') && !valueTypeLc.includes('not sold') && !valueTypeLc.includes('unsold'));
   const soldPrice = isSold ? amount : null;
   const estimateText = !isSold ? valueText : item.preSaleEstimate || null;
 
@@ -252,7 +255,7 @@ function transformLotItem(item: RMSLotItem, auctionCode: string): ExtractedVehic
     sold_price: soldPrice,
     sold_price_text: isSold ? valueText : null,
     currency,
-    sold: item.sold,
+    sold: isSold,
     is_still_for_sale: item.isStillForSale,
     image_url: item.crop || null,
     rms_lot_id: item.biddingLotId,
@@ -378,6 +381,13 @@ async function saveVehicle(
       });
   }
 
+  // Resolve the real auction (sale) date from the auction code, not extraction time.
+  const knownAuctionDate = getKnownAuctions()
+    .find(a => a.code === vehicle.auction_code)?.date || null;
+  const soldAtIso = vehicle.sold
+    ? (knownAuctionDate ? new Date(`${knownAuctionDate}T12:00:00Z`).toISOString() : null)
+    : null;
+
   // Create vehicle_events record
   await supabase
     .from('vehicle_events')
@@ -390,7 +400,7 @@ async function saveVehicle(
         source_listing_id: listingUrlKey || vehicle.lot_number,
         event_status: vehicle.sold ? 'sold' : (vehicle.is_still_for_sale ? 'active' : 'ended'),
         final_price: vehicle.sold_price,
-        sold_at: vehicle.sold ? new Date().toISOString() : null,
+        sold_at: soldAtIso,
         metadata: {
           lot_number: vehicle.lot_number,
           auction_name: vehicle.auction_name,
@@ -411,7 +421,7 @@ async function saveVehicle(
     await supabase.from('timeline_events').insert({
       vehicle_id: vehicleId,
       event_type: 'auction_sold',
-      event_date: new Date().toISOString().split('T')[0],
+      event_date: knownAuctionDate || new Date().toISOString().split('T')[0],
       title: `Sold at ${vehicle.auction_name} (Lot ${vehicle.lot_number})`,
       description: `Sold for ${vehicle.sold_price_text || vehicle.sold_price.toLocaleString()} at RM Sotheby's ${vehicle.auction_name}`,
       source: 'rmsothebys_import',

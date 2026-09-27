@@ -65,6 +65,7 @@ interface BJVehicle {
   sale_price: number | null;
   description: string | null;
   auction_name: string | null;
+  event_date: string | null;
   lot_number: string | null;
   status: string | null;
   image_urls: string[];
@@ -234,6 +235,11 @@ function parseRscVehicleData(html: string, url: string): BJVehicle | null {
     // Event slug -> auction name
     const eventField = searchBlock.match(/\\?"event_slug\\?":\s*\\?"([^"\\]+)\\?"/);
     if (eventField) vehicle.auction_name = titleCase(eventField[1].replace(/-/g, " "));
+
+    // Event start date = the sale date. It sits in the RSC payload but was never
+    // read — the cause of BJ's 0% dated events. Pull the first ISO date.
+    const startDateField = html.match(/\\?"start_date\\?":\s*\\?"(\d{4}-\d{2}-\d{2})/);
+    if (startDateField) vehicle.event_date = startDateField[1];
 
     // Is sold
     const soldField = searchBlock.match(/\\?"is_sold\\?":\s*(true|false)/);
@@ -666,6 +672,7 @@ function newEmptyVehicle(url: string): BJVehicle {
     sale_price: null,
     description: null,
     auction_name: null,
+    event_date: null,
     lot_number: null,
     status: null,
     image_urls: [],
@@ -915,6 +922,13 @@ async function saveVehicle(
   }
 
   // Build raw data payload
+  // Sale rule (lock 1, 2026-09-27): a Barrett-Jackson figure is the sale only when the page says
+  // sold ("is_sold" in the RSC payload, SOLD in the markdown); on "Not Sold" / "Withdrawn" / unknown
+  // it is not a sale and goes to high_bid. The status travels with the price (nulls are stripped
+  // below, so an unknown result writes no status).
+  const bjStatus = String(vehicle.status || "").toLowerCase();
+  const bjSold = bjStatus === "sold";
+  const bjNotSold = bjStatus === "not sold";
   const rawData: Record<string, unknown> = {
     year: vehicle.year,
     make: vehicle.make,
@@ -925,7 +939,10 @@ async function saveVehicle(
     color: vehicle.exterior_color,
     interior_color: vehicle.interior_color,
     mileage: vehicle.mileage,
-    sale_price: vehicle.sale_price,
+    sale_price: bjSold ? vehicle.sale_price : null,
+    high_bid: !bjSold ? vehicle.sale_price : null,
+    sale_status: bjSold ? "sold" : (bjNotSold ? "not_sold" : null),
+    auction_outcome: bjSold ? "sold" : (bjNotSold ? "no_sale" : null),
     description: vehicle.description,
     discovery_url: vehicle.url,
     discovery_source: "barrett-jackson",
@@ -1076,9 +1093,13 @@ async function saveVehicle(
                         vehicle.status?.toLowerCase() === "withdrawn" ? "cancelled" :
                         "ended",
         final_price: vehicle.sale_price || null,
+        sold_at: vehicle.event_date && !isNaN(Date.parse(vehicle.event_date))
+          ? new Date(vehicle.event_date).toISOString()
+          : null,
         metadata: {
           lot_number: vehicle.lot_number,
           auction_name: vehicle.auction_name,
+          event_date: vehicle.event_date,
           extraction_method: vehicle.extraction_method,
           extractor_version: EXTRACTOR_VERSION,
         },

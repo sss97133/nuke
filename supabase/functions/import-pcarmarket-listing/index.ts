@@ -876,7 +876,12 @@ Deno.serve(async (req: Request) => {
       trim: norm.trim ?? null,
       vin: norm.vin ?? null,
       mileage: listing.mileage || null,
-      sale_price: listing.salePrice || null,
+      // Sale rule (lock 1, 2026-09-27): a bid is never a sale. listing.salePrice is PCarMarket's
+      // high bid (high_bid / auction_final_bid); it is the sale price only when the outcome is sold,
+      // and the status travels with it. Otherwise it is the high bid.
+      sale_price: listing.auctionOutcome === 'sold' ? listing.salePrice || null : null,
+      high_bid: listing.salePrice || null,
+      ...(listing.auctionOutcome === 'sold' ? { sale_status: 'sold' } : {}),
       sale_date: listing.saleDate || null,
       auction_end_date: listing.auctionEndDate || null,
       auction_outcome: listing.auctionOutcome || null,
@@ -1014,7 +1019,10 @@ Deno.serve(async (req: Request) => {
       }
       if (listing.auctionOutcome === 'sold') {
         vehicleEventData.final_price = listing.salePrice;
-        vehicleEventData.sold_at = new Date().toISOString();
+        // Real auction end date (parsed from page), never the scrape time.
+        // Fall back to saleDate; only if neither is present do we omit sold_at.
+        const soldAt = listing.auctionEndDate || listing.saleDate || null;
+        if (soldAt) vehicleEventData.sold_at = soldAt;
       }
 
       // Check if vehicle_event already exists
@@ -1059,13 +1067,17 @@ Deno.serve(async (req: Request) => {
       if (!userId) {
         console.error('Missing user_id for image import');
       } else {
-        // Delete existing PCarMarket images first
-        const { error: deleteError } = await supabase
+        // Supersede the previous PCarMarket import of this vehicle's photos instead of deleting it.
+        // Testimony is never deleted (lock 3, 2026-09-27, revoked DELETE on vehicle_images from
+        // service_role: the old delete failed silently and left the duplicates behind). The live
+        // unique index (vehicle_id, file_hash) ignores superseded rows, so the re-import lands.
+        const { error: supersedeError } = await supabase
           .from('vehicle_images')
-          .delete()
+          .update({ is_superseded: true, superseded_at: new Date().toISOString() })
           .eq('vehicle_id', vehicleId)
-          .eq('source', 'pcarmarket_listing');
-        if (deleteError) console.error('Failed to delete from vehicle_images:', deleteError?.message || deleteError);
+          .eq('source', 'pcarmarket_listing')
+          .or('is_superseded.is.null,is_superseded.eq.false');
+        if (supersedeError) console.error('Failed to supersede prior vehicle_images:', supersedeError?.message || supersedeError);
         
         // Import ALL images (not just 10)
         const imageInserts = listing.images.map((imageUrl, index) => ({

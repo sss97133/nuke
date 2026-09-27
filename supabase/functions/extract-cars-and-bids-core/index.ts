@@ -697,6 +697,9 @@ Deno.serve(async (req) => {
       // C&B: 'sold' = auction ended + reserve met, 'reserve_not_met' = ended without sale
       sale_price: extracted.auctionStatus === 'sold' ? extracted.currentBid : null,
       high_bid: extracted.auctionStatus !== 'sold' ? extracted.currentBid : null,
+      // Sale rule (lock 1, 2026-09-27): the status travels with the price (nulls are stripped below).
+      sale_status: extracted.auctionStatus === 'sold' ? 'sold' : (extracted.auctionStatus === 'reserve_not_met' ? 'not_sold' : null),
+      auction_outcome: extracted.auctionStatus === 'sold' ? 'sold' : (extracted.auctionStatus === 'reserve_not_met' ? 'reserve_not_met' : null),
       bid_count: extracted.bidCount,
       discovery_url: listingUrlCanonical,
       discovery_source: "carsandbids",
@@ -962,6 +965,8 @@ Deno.serve(async (req) => {
       current_price: extracted.currentBid,
       event_status: extracted.auctionStatus || "active",
       ended_at: extracted.endDate,
+      // sold_at = the auction end moment when the auction actually sold (C&B "Ended" = sold unless reserve not met)
+      sold_at: extracted.auctionStatus === 'sold' ? extracted.endDate : null,
       metadata: {
         title: extracted.title,
         seller_id: extracted.sellerId,

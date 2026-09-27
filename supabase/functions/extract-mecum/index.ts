@@ -627,7 +627,13 @@ async function saveVehicle(
     body_style: vehicle.body_style,
     mileage: vehicle.mileage,
     description: vehicle.description,
-    sale_price: vehicle.sale_price,
+    // Sale rule (lock 1, 2026-09-27): Mecum's hammer price is the sale only when the result says
+    // sold; on a "not sold" / "bid goes on" lot it is the high bid. The status travels with it
+    // (nulls are stripped below, so an unknown result writes neither).
+    sale_price: vehicle.status === "sold" ? vehicle.sale_price : null,
+    high_bid: vehicle.status !== "sold" ? vehicle.sale_price : null,
+    sale_status: vehicle.status === "sold" ? "sold" : (vehicle.status === "not sold" ? "not_sold" : null),
+    auction_outcome: vehicle.status === "sold" ? "sold" : null,
     discovery_url: vehicle.url,
     discovery_source: "mecum",
     listing_source: "mecum",
@@ -763,6 +769,12 @@ async function saveVehicle(
 
   if (!existingListing) {
     try {
+      // Run date IS the sale date for an auction lot. It was parsed above
+      // (vehicle.auction_date) but never persisted — the cause of the empty
+      // price-over-time charts. Persist it to sold_at.
+      const mecumSoldAt = vehicle.auction_date && !isNaN(Date.parse(vehicle.auction_date))
+        ? new Date(vehicle.auction_date).toISOString()
+        : null;
       await supabase.from("vehicle_events").insert({
         vehicle_id: vehicleId,
         source_platform: "mecum",
@@ -771,7 +783,8 @@ async function saveVehicle(
         source_listing_id: vehicle.lot_number || null,
         final_price: vehicle.sale_price,
         event_status: vehicle.status || "listed",
-        metadata: { title: vehicle.title },
+        sold_at: mecumSoldAt,
+        metadata: { title: vehicle.title, auction_date: vehicle.auction_date || null },
       });
     } catch { /* non-fatal */ }
   }
