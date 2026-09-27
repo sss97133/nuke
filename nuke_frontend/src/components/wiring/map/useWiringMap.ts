@@ -59,6 +59,7 @@ export interface MapWire {
   fromText: string | null;
   toText: string | null;
   buildState: string | null;
+  checks: Record<string, [string, string]> | null;   // rule checks R8-R14 (check_plug_ends.py --wires), derived each load
 }
 
 export interface MapEnd {
@@ -86,6 +87,7 @@ export interface MapCall {
   workStatus: string;
   assignee: string | null;
   decided: boolean;           // a locked decision (status decided): shown under LOCKED, with what it rules out
+  trust: string | null;       // T1 = the owner's own lock; T3 = an agent pick under his delegation (replaceable)
   chosen: string | null;
   scope: string | null;
   decidedOn: string | null;
@@ -120,7 +122,7 @@ export function useWiringMap(vehicleId: string | undefined): WiringMapData {
         supabase.from('harness_designs').select('id').eq('vehicle_id', vehicleId),
         supabase.from('vehicle_wiring_overlays').select('id').eq('vehicle_id', vehicleId),
         supabase.from('wiring_decisions')
-          .select('id, slug, subject, decision_kind, status, work_status, assignee, chosen, scope, decided_on, source')
+          .select('id, slug, subject, decision_kind, status, work_status, assignee, chosen, scope, decided_on, source, trust')
           .eq('vehicle_id', vehicleId).eq('is_superseded', false).not('decision_kind', 'is', null),   // calls, not receipts
       ]);
       if (designs.error || overlays.error || calls.error) return fail((designs.error || overlays.error || calls.error)!.message);
@@ -135,7 +137,7 @@ export function useWiringMap(vehicleId: string | undefined): WiringMapData {
           : Promise.resolve({ data: [], error: null }),
         overlayIds.length
           ? supabase.from('vehicle_custom_circuits')
-              .select('id, circuit_code, circuit_name, harness_section, design_status, derivation_version, wire_gauge_awg, wire_color, wire_type, from_endpoint_id, to_endpoint_id, from_cavity, to_cavity, from_component, to_component, build_state')
+              .select('id, circuit_code, circuit_name, harness_section, design_status, derivation_version, wire_gauge_awg, wire_color, wire_type, from_endpoint_id, to_endpoint_id, from_cavity, to_cavity, from_component, to_component, build_state, checks')
               .in('overlay_id', overlayIds).eq('is_superseded', false).limit(3000)
           : Promise.resolve({ data: [], error: null }),
         supabase.from('wire_termination_specs')
@@ -173,6 +175,7 @@ export function useWiringMap(vehicleId: string | undefined): WiringMapData {
           gauge: n(r.wire_gauge_awg), color: s(r.wire_color), spec: s(r.wire_type),
           fromId: s(r.from_endpoint_id), toId: s(r.to_endpoint_id), fromCavity: s(r.from_cavity), toCavity: s(r.to_cavity),
           fromText: s(r.from_component), toText: s(r.to_component), buildState: s(r.build_state),
+          checks: (r.checks as Record<string, [string, string]> | null) ?? null,
         })),
         ends: ((ends.data ?? []) as Row[]).map(r => ({
           circuitId: r.circuit_id as string, endpointId: r.endpoint_id as string, cavity: s(r.cavity),
@@ -182,7 +185,7 @@ export function useWiringMap(vehicleId: string | undefined): WiringMapData {
           id: r.id as string, slug: r.slug as string, subject: s(r.subject) ?? (r.slug as string), kind: s(r.decision_kind),
           status: s(r.status), workStatus: s(r.work_status) ?? 'open', assignee: s(r.assignee),
           decided: r.status === 'decided' || r.work_status === 'decided',
-          chosen: s(r.chosen), scope: s(r.scope), decidedOn: s(r.decided_on), source: s(r.source),
+          chosen: s(r.chosen), scope: s(r.scope), decidedOn: s(r.decided_on), source: s(r.source), trust: s(r.trust),
           options: opts.filter(o => o.decision_id === r.id).map(o => ({
             id: o.id as string, key: o.key as string, label: s(o.label) ?? '', zone: s(o.zone), source: s(o.source),
           })),
