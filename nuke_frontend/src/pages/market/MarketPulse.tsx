@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -213,31 +213,121 @@ function multiple(ratio: number): string {
   return ratio >= 3 ? '3×+' : ratio < 0.1 ? '<0.1×' : `${ratio.toFixed(1)}×`;
 }
 
-function explainHeat(a: LiveAuction, heat: Heat): string {
+function heatParts(a: LiveAuction, heat: Heat) {
   const band = a.band as NonNullable<LiveAuction['band']>;
-  const [, when, hotAbove, coldBelow] = BACKTEST.reduce((best, row) =>
-    Math.abs(row[0] - heat.hoursLeft) < Math.abs(best[0] - heat.hoursLeft) ? row : best);
-  const beyond = (a.currentBid ?? 0) > band.p90
-    ? ' The bid already tops 90% of those sales: this car is bringing more than its model page usually does (a rarer version, very low miles, or prices that have risen since), so the multiple says "beyond its comps", not how far.'
-    : '';
-  const outcome = heat.state === 'hot'
-    ? ` Of sold cars running this hot ${when} out, ${Math.round(hotAbove * 100)}% finished above the middle of their comparable sales.`
-    : heat.state === 'cold'
-      ? ` Of sold cars running this cold ${when} out, ${Math.round(coldBelow * 100)}% finished below the middle of their comparable sales.`
-      : '';
-  return `Bid ${usd(a.currentBid)} with ${left(heat.hoursLeft * HOUR)} left. ${band.comps} comparable BaT sales (same model page, weighted toward the same version, year, mileage and gearbox) put the middle at ${usd(band.p50)}, 80% range ${usd(band.p10)}–${usd(band.p90)}. With this much time left, cars at this price are usually bid to about ${Math.round(heat.share * 100)}% of their final, so a typical bid now is about ${usd(about(heat.typicalNow))}; this one is at ${multiple(heat.ratio)} that.${beyond}${outcome}`;
+  // Quote the checkpoint at or before this point in the auction (17 h left reads the 24 h record, not the 12 h one).
+  const [, when, hotAbove, coldBelow] = [...BACKTEST].reverse().find((row) => row[0] >= heat.hoursLeft) ?? BACKTEST[BACKTEST.length - 1];
+  return {
+    bid: usd(a.currentBid),
+    left: left(heat.hoursLeft * HOUR),
+    comps: band.comps,
+    middle: usd(band.p50),
+    range: `${usd(band.p10)}–${usd(band.p90)}`,
+    share: Math.round(heat.share * 100),
+    typical: usd(about(heat.typicalNow)),
+    multiple: multiple(heat.ratio),
+    beyond: (a.currentBid ?? 0) > band.p90
+      ? 'The bid already tops 90% of those sales: this car is bringing more than its model page usually does (a rarer version, very low miles, or prices that have risen since), so the multiple says "beyond its comps", not how far.'
+      : null,
+    outcome: heat.state === 'hot'
+      ? `Of sold cars running this hot ${when} out, ${Math.round(hotAbove * 100)}% finished above the middle of their comparable sales.`
+      : heat.state === 'cold'
+        ? `Of sold cars running this cold ${when} out, ${Math.round(coldBelow * 100)}% finished below the middle of their comparable sales.`
+        : null,
+  };
 }
 
+function explainHeat(a: LiveAuction, heat: Heat): string {
+  const x = heatParts(a, heat);
+  return `Bid ${x.bid} with ${x.left} left. ${x.comps} comparable BaT sales (same model page, weighted toward the same version, year, mileage and gearbox) put the middle at ${x.middle}, 80% range ${x.range}. With this much time left, cars at this price are usually bid to about ${x.share}% of their final, so a typical bid now is about ${x.typical}; this one is at ${x.multiple} that.${x.beyond ? ` ${x.beyond}` : ''}${x.outcome ? ` ${x.outcome}` : ''}`;
+}
+
+// A phone has no hover, so a tag is also a button: tapping it opens the reasoning (ExplainSheet). The title
+// attribute stays for mouse users. Tags sit inside row links, so the tap must not open the car.
+const ExplainContext = createContext<((a: LiveAuction, heat: Heat) => void) | null>(null);
+
 function HeatTag({ a, heat }: { a: LiveAuction; heat: Heat | null | undefined }) {
+  const explain = useContext(ExplainContext);
   if (!heat || heat.state === 'in line') return null;
   const hot = heat.state === 'hot';
+  const text = `${hot ? 'Hot' : 'Cold'} ${multiple(heat.ratio)}`;
+  const open = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    explain?.(a, heat);
+  };
   return (
     <span
       title={explainHeat(a, heat)}
-      style={{ ...label, color: 'var(--bg)', background: hot ? 'var(--success)' : 'var(--error)', padding: '1px 4px', flexShrink: 0, whiteSpace: 'nowrap' }}
+      role={explain ? 'button' : undefined}
+      tabIndex={explain ? 0 : undefined}
+      aria-label={explain ? `${text}: why` : undefined}
+      onClick={explain ? open : undefined}
+      onKeyDown={explain ? (e) => { if (e.key === 'Enter' || e.key === ' ') open(e); } : undefined}
+      style={{ ...label, color: 'var(--bg)', background: hot ? 'var(--success)' : 'var(--error)', padding: '1px 4px', flexShrink: 0, whiteSpace: 'nowrap', cursor: explain ? 'pointer' : undefined }}
     >
-      {hot ? 'Hot' : 'Cold'} {multiple(heat.ratio)}
+      {text}
     </span>
+  );
+}
+
+// The reasoning behind one tag, opened by tapping it: bottom sheet on a phone, a panel bottom-right on desktop.
+function ExplainSheet({ item, onClose, narrow }: { item: { a: LiveAuction; heat: Heat } | null; onClose: () => void; narrow: boolean }) {
+  useEffect(() => {
+    if (!item) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [item, onClose]);
+  if (!item) return null;
+  const { a, heat } = item;
+  const x = heatParts(a, heat);
+  const hot = heat.state === 'hot';
+  const rows: [string, string][] = [
+    ['Current bid', `${x.bid} · ${x.left} left`],
+    ['Comparable sales', `${x.comps} on its BaT model page, weighted toward the same version, year, mileage and gearbox`],
+    ['Their middle', `${x.middle} (80% range ${x.range})`],
+    ['Typical bid now', `about ${x.typical}: with this much time left, cars at this price are usually bid to about ${x.share}% of their final`],
+    ['This bid', `${x.multiple} typical`],
+  ];
+  return (
+    <div
+      role="dialog"
+      aria-label={`Why ${title(a)} is running ${heat.state}`}
+      style={{
+        position: 'fixed', zIndex: 2000, bottom: narrow ? 0 : 16, left: narrow ? 0 : 'auto', right: narrow ? 0 : 16,
+        width: narrow ? 'auto' : 440, maxHeight: '70vh', overflowY: 'auto', boxSizing: 'border-box',
+        background: 'var(--surface)', color: 'var(--text)', border: '2px solid var(--text)', padding: 12, fontSize: 12, fontFamily: 'Arial, sans-serif',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>{title(a)}</div>
+          <span style={{ ...label, color: 'var(--bg)', background: hot ? 'var(--success)' : 'var(--error)', padding: '1px 4px' }}>
+            {hot ? 'Running hot' : 'Running cold'} · {x.multiple}
+          </span>
+        </div>
+        <button onClick={onClose} aria-label="Close" style={{ ...label, color: 'var(--text)', background: 'transparent', border: '2px solid var(--text)', padding: '2px 8px', cursor: 'pointer' }}>
+          Close
+        </button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 10, rowGap: 6 }}>
+        {rows.map(([k, v]) => (
+          <React.Fragment key={k}>
+            <span style={{ ...label, paddingTop: 1 }}>{k}</span>
+            <span>{v}</span>
+          </React.Fragment>
+        ))}
+      </div>
+      {x.beyond && <p style={{ margin: '10px 0 0' }}>{x.beyond}</p>}
+      {x.outcome && <p style={{ margin: '10px 0 0' }}><span style={label}>Track record</span> {x.outcome}</p>}
+      <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>
+        <Link to={`/vehicle/${a.id}`} style={{ ...label, color: 'var(--text)' }}>Open the car</Link>
+        {a.listingUrl && (
+          <a href={a.listingUrl} target="_blank" rel="noopener noreferrer" style={{ ...label, color: 'var(--text-secondary)' }}>BaT listing ↗</a>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -517,6 +607,9 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   const [params, setParams] = useSearchParams();
   const [boardRef, boardWidth] = useWidth<HTMLDivElement>();
   const narrow = boardWidth > 0 && boardWidth < 640;
+  const [explaining, setExplaining] = useState<{ a: LiveAuction; heat: Heat } | null>(null);
+  const openExplain = useCallback((a: LiveAuction, heat: Heat) => setExplaining({ a, heat }), []);
+  const closeExplain = useCallback(() => setExplaining(null), []);
 
   const make = params.get('make')?.toUpperCase() ?? null;
   const win = (WINDOWS.some((w) => w.id === params.get('live')) ? params.get('live') : 'all') as Window;
@@ -561,6 +654,7 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   if (isError || (!isLoading && live.length === 0)) return <>{onUnavailable ?? null}</>;
 
   return (
+    <ExplainContext.Provider value={openExplain}>
     <div style={{ fontFamily: 'Arial, sans-serif', color: 'var(--text)', background: 'var(--bg)', padding: '12px 12px 32px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
@@ -639,10 +733,12 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
 
       {data?.source && (
         <div style={{ ...label, marginTop: 8 }}>
-          Source: {data.source}. Current bid = the highest bid on the listing when last read. Hot/cold compares it with where comparable BaT sales on the same model page are usually bid at the same point in the auction; hover a tag for the numbers.
+          Source: {data.source}. Current bid = the highest bid on the listing when last read. Hot/cold compares it with where comparable BaT sales on the same model page are usually bid at the same point in the auction; tap a tag for the numbers.
         </div>
       )}
+      <ExplainSheet item={explaining} onClose={closeExplain} narrow={narrow} />
     </div>
+    </ExplainContext.Provider>
   );
 }
 
