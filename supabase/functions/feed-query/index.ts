@@ -286,8 +286,16 @@ Deno.serve(async (req) => {
       query = query.or("is_sold.is.null,is_sold.eq.false");
     }
 
+    // A card shows primary_image_url. Live BaT lots carry the listing's cover image there without
+    // has_photos (no vehicle_images rows yet), and has_photos alone hid 1,168 of 1,169 live auctions.
     if (body.has_images !== false) {
-      query = query.eq("has_photos", true);
+      query = query.or("has_photos.eq.true,primary_image_url.not.is.null");
+    }
+
+    // newest/oldest: an end date more than 14 days out is a bad string, not a live auction (BaT runs
+    // 7 days); keep such rows out of the date sorts so they don't sit on top of "newest".
+    if (sortKey === "newest" || sortKey === "oldest") {
+      query = query.lte("event_at", new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString());
     }
 
     if (body.added_today === true) {
@@ -377,7 +385,7 @@ Deno.serve(async (req) => {
             "canonical_vehicle_type.in.(CAR,TRUCK,SUV,VAN,MINIVAN)," +
             "canonical_vehicle_type.is.null"
           )
-          .eq("has_photos", true)
+          .or("has_photos.eq.true,primary_image_url.not.is.null")
           .order("feed_rank_score", { ascending: false })
           .limit(limit + 1);
 
