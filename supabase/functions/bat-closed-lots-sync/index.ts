@@ -29,7 +29,12 @@ const corsHeaders = {
 
 const API = "https://bringatrailer.com/wp-json/bringatrailer/1.0/data/listings-filter";
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
-const SYNC_VERSION = "bat-closed-lots-sync:1.0.0";
+const SYNC_VERSION = "bat-closed-lots-sync:1.1.0";
+// import_queue.source_id for every row this sync queues. import_queue has no sources table; the value
+// is a fixed name-based UUID (uuid5 of "bat-closed-lots-sync" in the DNS namespace) so a drain can be
+// scoped to BaT rows alone with process-import-queue's existing source_id filter, without waking the
+// dormant extractors behind the 3,600+ failed non-BaT rows of 2026-03/04.
+const BAT_SETTLEMENT_SOURCE_ID = "4d3f0c9e-7a6b-5b21-9c0d-2f5e8a1b6c37";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -46,6 +51,7 @@ function canonicalLotUrl(raw: string): string | null {
 }
 
 /** Same row shape as scripts/bat-keep-fresh.mjs toRow(): BaT's catalog is the sold/date authority. */
+export { BAT_SETTLEMENT_SOURCE_ID };
 export function catalogRow(item: any) {
   const ts = item.sold_text_timestamp || item.timestamp_end;
   const endDate = ts ? new Date(Number(ts) * 1000).toISOString().slice(0, 10) : null;
@@ -152,6 +158,7 @@ Deno.serve(async (req) => {
         // queue the lot pages for the reader; import_queue.listing_url is unique → duplicates are no-ops
         const queueRows = fresh.map((r) => ({
           listing_url: r.bat_listing_url,
+          source_id: BAT_SETTLEMENT_SOURCE_ID,
           listing_title: r.bat_listing_title,
           listing_price: r.sale_price ?? r.final_bid ?? null,
           status: "pending",
