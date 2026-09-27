@@ -20,6 +20,10 @@ export interface PurchaseRecord {
   marketplace?: string; order_number?: string; order_date?: string; delivered_date?: string | null; paid_usd?: number;
   seller?: string | null; item_id?: string; part_numbers?: string[]; quantity?: number; condition?: string | null;
   design_match?: string; provenance_observation_id?: string | null;
+  // the money side (owner 2026-09-27: "i invoiced the client for that stuff... i finally got around to buying it"):
+  // what the client was billed for this part, from the build log and invoices, against what it cost
+  billing?: { status?: 'billed_and_paid' | 'not_billed' | 'planned_not_invoiced' | string; client?: string; billed_usd?: number;
+              planned_usd?: number; cost_usd?: number; margin_usd?: number; source?: string } | null;
 }
 
 export interface WiringFact {

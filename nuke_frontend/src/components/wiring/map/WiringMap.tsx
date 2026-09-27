@@ -527,12 +527,27 @@ function PurchaseLines({ cw, o }: { cw: Colorway; o: PurchaseRecord }) {
     o.order_number ? `${(o.marketplace ?? '').toUpperCase()} ORDER ${o.order_number}`.trim() : null].filter(Boolean).join(' · ');
   const what = [(o.quantity ?? 1) > 1 ? `${o.quantity} ×` : null, (o.part_numbers ?? []).join(' / ') || null].filter(Boolean).join(' ');
   const misfit = /^not\b/i.test(o.design_match ?? '');
+  const b = o.billing;
+  const usd = (n?: number) => (typeof n === 'number' ? `$${n.toFixed(2)}` : '?');
+  const who = (b?.client ?? 'the client').toUpperCase();
+  const billLine = !b ? null
+    : b.status === 'billed_and_paid'
+      ? `BILLED TO ${who} ${usd(b.billed_usd)} — PAID · COST ${usd(b.cost_usd)} · ${(b.margin_usd ?? 0) >= 0 ? '+' : '−'}${usd(Math.abs(b.margin_usd ?? 0))}`
+      : b.status === 'planned_not_invoiced'
+        ? `PLANNED FOR ${who}'S NEXT INVOICE (${usd(b.planned_usd)}) — NOT INVOICED · COST ${usd(b.cost_usd)}`
+        : `NOT BILLED TO ${who} — COST ${usd(b.cost_usd)}`;
   return (
     <div style={{ fontFamily: cw.fontMono, fontSize: 13, lineHeight: 1.55 }}>
       <div>{when}</div>
       {from && <div>{from}</div>}
       {what && <div>{what}{o.condition ? ` · ${o.condition.toUpperCase()}` : ''}</div>}
       {o.design_match && <div style={{ color: misfit ? cw.warn : cw.ok, fontWeight: 700 }}>DESIGN: {o.design_match.toUpperCase()}</div>}
+      {billLine && (
+        <div style={{ color: b?.status === 'billed_and_paid' ? cw.ink : cw.warn, fontWeight: 700 }} title={b?.source ?? ''}>
+          {billLine}
+        </div>
+      )}
+      {b?.source && <div style={{ color: cw.inkFaint, fontFamily: 'inherit' }}>{b.source.toUpperCase()}</div>}
     </div>
   );
 }
