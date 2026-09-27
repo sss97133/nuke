@@ -37,6 +37,17 @@ const RUNGS: { label: string; yes: string; no?: string }[] = [
   { label: 'BOUGHT', yes: 'bought' },
   { label: 'INSTALLED', yes: 'installed', no: 'not_installed' },
 ];
+// Owner 2026-09-27: "need to ensure all our wires are right". Each wire carries the registry's rule checks.
+const RULE_WORD: Record<string, string> = {
+  'R8 ends': 'BOTH ENDS', 'R9 pin': 'PIN FITS', 'R10 circuit': 'CIRCUIT COMPLETE', 'R11 command': 'WHAT SWITCHES IT',
+  'R12 firewall': 'FIREWALL PATH', 'R13 locked': 'LOCKED DECISIONS', 'R14 agree': 'RECORDS AGREE',
+};
+type Verdict = 'RIGHT' | 'WRONG' | 'INCOMPLETE' | 'UNCHECKED';
+function verdictOf(w: MapWire): Verdict {
+  const v = Object.values(w.checks ?? {});
+  if (!v.length) return 'UNCHECKED';
+  return v.some(x => x[0] === 'FAIL') ? 'WRONG' : v.some(x => x[0] === 'OPEN') ? 'INCOMPLETE' : 'RIGHT';
+}
 const ON_LADDER = new Set(['lined_up', 'bought', 'installed', 'not_installed']);
 const LEVEL_WORD: Record<string, string> = {
   lined_up: 'LINED UP', bought: 'BOUGHT', installed: 'INSTALLED', not_installed: 'NOT INSTALLED',
@@ -88,7 +99,7 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   // rollups per section (the group-context layer)
   const rollup = useMemo(() => {
     const r: Record<string, SectionRollup> = {};
-    for (const s of SECTIONS) r[s.id] = { nodes: 0, placed: 0, done: 0, needs: 0, decided: 0, concept: 0, bought: 0, installed: 0 };
+    for (const s of SECTIONS) r[s.id] = { nodes: 0, placed: 0, done: 0, needs: 0, decided: 0, concept: 0, bought: 0, installed: 0, right: 0, wrong: 0, incomplete: 0 };
     for (const n of map.nodes) {
       const x = n.section && r[n.section];
       if (!x) continue;
@@ -100,7 +111,11 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
     for (const w of map.wires) {
       const x = w.section && r[w.section];
       if (!x) continue;
-      if (w.designStatus === 'decided') x.decided += 1; else x.concept += 1;
+      if (w.designStatus === 'decided') {
+        x.decided += 1;
+        const v = verdictOf(w);
+        if (v === 'RIGHT') x.right += 1; else if (v === 'WRONG') x.wrong += 1; else if (v === 'INCOMPLETE') x.incomplete += 1;
+      } else x.concept += 1;
     }
     return r;
   }, [map.nodes, map.wires, facts]);
@@ -370,6 +385,7 @@ function NodeCard({ cw, n, map, byId, facts, onNode, onCall }: {
                 {' · '}{pathOf(w)}
                 {w.designStatus === 'concept' ? ' · CONCEPT' : ''}{isOpen ? ' ▾' : ' ▸'}
               </span>
+              <WireVerdict cw={cw} w={w} />
             </button>
             {isOpen && (
               <div style={{ paddingLeft: 8 }}>
@@ -378,6 +394,12 @@ function NodeCard({ cw, n, map, byId, facts, onNode, onCall }: {
                     {[end.terminal, end.seal].filter(Boolean).join(' + ') || '—'}{end.tool ? ` · TOOL ${end.tool}` : ''}
                   </Field>
                 )}
+                {Object.entries(w.checks ?? {}).filter(([, v]) => v[0] !== 'PASS').map(([k, v]) => (
+                  <Field key={k} cw={cw} label={RULE_WORD[k] ?? k}>
+                    <span style={{ color: v[0] === 'FAIL' ? cw.danger : cw.warn, fontWeight: 700 }}>{v[0] === 'FAIL' ? 'WRONG' : 'OPEN'}</span>
+                    {' — '}{v[1]}
+                  </Field>
+                ))}
                 {other && <button onClick={() => onNode(other.code)} style={linkStyle(cw)}>OPEN {other.code} ▸</button>}
                 <WireEvidence wireId={w.code} facts={facts} cw={cw} />
               </div>
@@ -402,7 +424,9 @@ function CallCard({ cw, c, map, byId, onNode }: {
     const out = c.links.filter(l => l.relation === 'blocks');
     return (
       <div>
-        <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 1, color: cw.ink }}>LOCKED DECISION</div>
+        <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 1, color: cw.ink }}>
+          {c.trust === 'T1' ? 'LOCKED DECISION' : 'DECIDED FOR YOU — REPLACEABLE'}
+        </div>
         <div style={{ fontSize: 17, fontWeight: 700, margin: '4px 0 8px' }}>{c.subject}</div>
         {c.chosen && <Field cw={cw} label="CHOSEN">{c.chosen}</Field>}
         {c.decidedOn && <Field cw={cw} label="DECIDED">{c.decidedOn}</Field>}
@@ -450,6 +474,19 @@ function CallCard({ cw, c, map, byId, onNode }: {
   );
 }
 
+// a wire's verdict from its rule checks: right, wrong (what fails), or incomplete (what is still open)
+function WireVerdict({ cw, w }: { cw: Colorway; w: MapWire }) {
+  const v = verdictOf(w);
+  if (v === 'UNCHECKED') return null;
+  const bad = Object.entries(w.checks ?? {}).filter(([, x]) => x[0] === (v === 'WRONG' ? 'FAIL' : 'OPEN')).map(([k]) => RULE_WORD[k] ?? k);
+  const tone = v === 'RIGHT' ? cw.ok : v === 'WRONG' ? cw.danger : cw.warn;
+  return (
+    <span style={{ display: 'block', fontSize: 14, color: tone, fontWeight: 700 }}>
+      {v}{bad.length ? ` — ${bad.join(', ')}` : ''}
+    </span>
+  );
+}
+
 // one photo (or receipt) and what it shows about this part; the photo opens full size
 function ProofRow({ cw, f }: { cw: Colorway; f: WiringFact }) {
   const tone = f.level === 'question' || f.level === 'not_installed' ? cw.warn
@@ -478,7 +515,7 @@ function ProofRow({ cw, f }: { cw: Colorway; f: WiringFact }) {
   );
 }
 
-interface SectionRollup { nodes: number; placed: number; done: number; needs: number; decided: number; concept: number; bought: number; installed: number }
+interface SectionRollup { nodes: number; placed: number; done: number; needs: number; decided: number; concept: number; bought: number; installed: number; right: number; wrong: number; incomplete: number }
 
 function Rollup({ cw, sec, rollup, calls }: {
   cw: Colorway; sec: Section | null; rollup: Record<string, SectionRollup>;
@@ -503,6 +540,11 @@ function Rollup({ cw, sec, rollup, calls }: {
             </div>
             <div style={{ fontFamily: cw.fontMono }}>
               {r.decided} WIRES DECIDED · {r.concept} CONCEPT
+            </div>
+            <div style={{ fontFamily: cw.fontMono }}>
+              <span style={{ color: cw.ok }}>RIGHT {r.right}</span>{' · '}
+              <span style={{ color: r.wrong ? cw.danger : cw.inkMuted }}>WRONG {r.wrong}</span>{' · '}
+              <span style={{ color: r.incomplete ? cw.warn : cw.inkMuted }}>INCOMPLETE {r.incomplete}</span>{' OF '}{r.decided}
             </div>
           </div>
         );
