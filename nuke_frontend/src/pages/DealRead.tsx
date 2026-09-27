@@ -488,7 +488,7 @@ export default function DealRead() {
   const specLine = [
     subject.engine_size || subject.engine_type,
     subject.transmission?.toLowerCase(),
-    subject.mileage != null ? `${fmtMiles(subject.mileage)}${typeof sd.mileage_claim === 'string' ? ' (TMU)' : ''}` : null,
+    subject.mileage != null ? `${fmtMiles(subject.mileage)}${typeof sd.mileage_claim === 'string' && /unknown|tmu/i.test(sd.mileage_claim as string) ? ' (TMU)' : ''}` : null,
     subject.color?.toLowerCase(),
     subject.location,
   ].filter(Boolean).join(' · ');
@@ -533,7 +533,7 @@ export default function DealRead() {
               <div className="dr-mono dr-muted" style={{ fontSize: 'var(--fs-10)' }}>no ask recorded</div>
             )}
             <div className="dr-mono dr-muted" style={{ fontSize: 'var(--fs-8)', marginTop: '4px' }}>
-              {venue}{seenOn ? ` · read ${seenOn}` : ''}{listedDays != null ? ` · listed ~${Math.round(listedDays / 7)} wk` : ''}
+              {venue}{seenOn ? ` · read ${seenOn}` : ''}{listedDays == null ? '' : listedDays < 1 ? ' · listed <1 d' : listedDays < 7 ? ` · listed ${listedDays} d` : ` · listed ~${Math.round(listedDays / 7)} wk`}
             </div>
             <div className="dr-mono" style={{ fontSize: 'var(--fs-8)', marginTop: '4px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
               {subject.listing_url && <a className="dr-link" href={subject.listing_url} target="_blank" rel="noreferrer">listing↗</a>}
