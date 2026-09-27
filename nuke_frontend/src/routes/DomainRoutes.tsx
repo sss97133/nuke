@@ -17,6 +17,8 @@ const BrowseVehicles = React.lazy(() => import('../pages/BrowseVehicles'));
 const LiveFloor = React.lazy(() => import('../live/LiveFloor'));
 // Cohort terminal — Bloomberg-for-a-cohort (year-make-model landing)
 const CohortTerminal = React.lazy(() => import('../pages/CohortTerminal'));
+// Deal read — a marketplace ask placed on the cohort's BaT sales record
+const DealRead = React.lazy(() => import('../pages/DealRead'));
 // R&D: white-label / "make this my app" showroom
 const BrandStudio = React.lazy(() => import('../pages/BrandStudio'));
 const PublicMap = React.lazy(() => import('../components/map/PublicMap'));
@@ -186,6 +188,7 @@ export const DomainRoutes = () => {
         {/* Search + Browse + Map: public */}
         <Route path="/search" element={<Search />} />
         <Route path="/cohort/:make/:model/:year" element={<CohortTerminal />} />
+        <Route path="/deal/:vehicleId" element={<DealRead />} />
         <Route path="/browse" element={<BrowseVehicles />} />
         <Route path="/live" element={<LiveFloor />} />
         <Route path="/map" element={<MapPage />} />
