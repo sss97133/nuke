@@ -2313,14 +2313,10 @@ Deno.serve(async (req) => {
           console.warn(`vehicle_images save failed (non-fatal): ${e?.message || String(e)}`);
         }
 
-        // Fire-and-forget: async image-vehicle match validation
-        if (vehicleId) {
-          fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/check-image-vehicle-match`, {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ vehicle_id: vehicleId, batch_size: 10 }),
-          }).catch(() => {});
-        }
+        // No image-vehicle match check for a BaT lot: its photos belong to the listing, there is nothing to
+        // match. The fire-and-forget check-image-vehicle-match call that stood here sent every photo to the
+        // system vision pool, where every provider failed (~17,600 failed calls in 2.3 h on 2026-09-27) and each
+        // failure stamped the photo 'ambiguous'. Removed 2026-09-27 (lead's measurement).
       }
     }
 
