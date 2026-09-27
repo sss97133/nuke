@@ -62,6 +62,7 @@ export function useBuildState(vehicleId: string | undefined): BuildStateApi {
         .from('vehicle_custom_circuits')
         .select('circuit_code, build_state')
         .eq('overlay_id', ov.id)
+        .eq('is_superseded', false)          // live rows only; replaced rows keep their history
         .limit(1000);
       if (cancelled) return;
       const map: Record<string, BuildState> = {};
@@ -92,6 +93,7 @@ export function useBuildState(vehicleId: string | undefined): BuildStateApi {
           .update({ build_state: next })
           .eq('overlay_id', overlayId)
           .eq('circuit_code', circuitCode)
+          .eq('is_superseded', false)
           .select('circuit_code');
         if (error) failure = error.message;
         else if (!data || data.length === 0) failure = 'no DB row for this circuit (write blocked or not ingested)';

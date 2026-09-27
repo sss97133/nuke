@@ -7,7 +7,7 @@
 import React, { Suspense, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import type { ManifestDevice, WireSpec } from '../components/wiring/overlayCompute';
+import type { ManifestDevice } from '../components/wiring/overlayCompute';
 import { useOverlayCompute } from '../components/wiring/useOverlayCompute';
 import { DeviceDetailPanel } from '../components/wiring/DeviceDetailPanel';
 import { CommandPalette } from '../components/wiring/CommandPalette';
@@ -35,6 +35,7 @@ const TopologyView = React.lazy(() =>
 const HarnessWorkbench = React.lazy(() =>
   import('../components/wiring/HarnessWorkbench').then(m => ({ default: m.HarnessWorkbench })),
 );
+const WiringMap = React.lazy(() => import('../components/wiring/map/WiringMap').then(m => ({ default: m.WiringMap })));
 const ConnectorInspector = React.lazy(() =>
   import('../components/wiring/ConnectorInspector').then(m => ({ default: m.ConnectorInspector })),
 );
@@ -63,7 +64,7 @@ const ZONE_COLORS: Record<string, string> = {
   underbody: '#666666',
 };
 
-type ViewTab = 'formboard' | 'schematics' | '3d' | 'data' | 'topology' | 'workbench' | 'connectors';
+type ViewTab = 'formboard' | 'schematics' | '3d' | 'data' | 'topology' | 'workbench' | 'connectors' | 'map';
 const TABS: { id: ViewTab; label: string; key: string }[] = [
   { id: 'formboard', label: 'FORMBOARD', key: '1' },
   { id: 'schematics', label: 'SCHEMATICS', key: '2' },
@@ -72,6 +73,7 @@ const TABS: { id: ViewTab; label: string; key: string }[] = [
   { id: 'topology', label: 'TOPOLOGY', key: '5' },
   { id: 'workbench', label: 'WORKBENCH', key: '6' },
   { id: 'connectors', label: 'CONNECTORS', key: '7' },
+  { id: 'map', label: 'MAP', key: '8' },
 ];
 
 // ── Camera state per view ─────────────────────────────────────────────
@@ -459,6 +461,11 @@ export default function WiringPlan() {
           {activeTab === 'connectors' && (
             <div style={{ position: 'absolute', inset: 0 }}>
               <ConnectorInspector devices={overlay.devices} vehicleId={vehicleId} />
+            </div>
+          )}
+          {activeTab === 'map' && (
+            <div style={{ position: 'absolute', inset: 0 }}>
+              <WiringMap vehicleId={vehicleId} />
             </div>
           )}
           {activeTab === 'topology' && (
