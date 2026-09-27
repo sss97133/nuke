@@ -17,7 +17,13 @@ export interface LiveAuction {
   noReserve: boolean;
   listingUrl: string | null;
   title: string | null; // the listing's own title as BaT publishes it
+  // Expected-price band from comparable BaT sales on the lot's model page (hammer_predictions, model 30;
+  // scripts/market/live-bands.mjs). Null when the lot isn't priced (no confident model page or < 5 comps).
+  band: { p10: number; p50: number; p90: number; tier: string; comps: number } | null;
 }
+
+// Median share of the final price that sold BaT cars had been bid at each hours-left mark, per price tier.
+export type BidCurve = Record<string, [number, number][]>;
 
 // The same board, read at an earlier moment (BAT-LIVE-BIDS index, migration 20260927210000).
 export interface BoardReading {
@@ -44,12 +50,16 @@ export interface MarketPulse {
   auctions: LiveAuction[];
   weekAgo: BoardReading | null;
   sameHour: SameHourRange | null;
+  curve: BidCurve | null;
 }
 
 // Lots BaT lists without a parsed make (wheel sets, replicas) are grouped under this label.
 export const NO_MAKE = 'NO MAKE';
 
-type Row = [string, number | null, string | null, string | null, number | null, string, string, string, string | null, boolean, string | null, string | null?];
+type Row = [
+  string, number | null, string | null, string | null, number | null, string, string, string, string | null, boolean,
+  string | null, (string | null)?, (number | null)?, (number | null)?, (number | null)?, (string | null)?, (number | null)?,
+];
 
 async function fetchPulse(): Promise<MarketPulse> {
   const { data, error } = await supabase.rpc('market_pulse_live');
@@ -82,7 +92,11 @@ async function fetchPulse(): Promise<MarketPulse> {
       noReserve: r[9] === true,
       listingUrl: r[10],
       title: r[11] ?? null,
+      band: r[13] != null && r[12] != null && r[14] != null
+        ? { p10: Number(r[12]), p50: Number(r[13]), p90: Number(r[14]), tier: String(r[15] ?? ''), comps: Number(r[16] ?? 0) }
+        : null,
     })),
+    curve: (data?.curve as BidCurve | undefined) ?? null,
   };
 }
 

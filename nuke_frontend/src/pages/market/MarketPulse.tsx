@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { squarify } from '../../lib/squarify';
-import { NO_MAKE, useMarketPulse, type BoardReading, type LiveAuction, type SameHourRange } from './useMarketPulse';
+import { NO_MAKE, useMarketPulse, type BidCurve, type BoardReading, type LiveAuction, type SameHourRange } from './useMarketPulse';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
 // Every figure is computed from the rows market_pulse_live() returns, and every
@@ -12,8 +12,8 @@ import { NO_MAKE, useMarketPulse, type BoardReading, type LiveAuction, type Same
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
-type Window = 'all' | '1h' | '24h' | 'new' | 'nr';
-type Sort = 'ending' | 'bid' | 'newest';
+type Window = 'all' | '1h' | '24h' | 'new' | 'nr' | 'hot' | 'cold';
+type Sort = 'ending' | 'bid' | 'newest' | 'hottest' | 'coldest';
 
 const WINDOWS: { id: Window; label: string }[] = [
   { id: 'all', label: 'Live auctions' },
@@ -21,6 +21,8 @@ const WINDOWS: { id: Window; label: string }[] = [
   { id: '24h', label: 'Ending < 24 h' },
   { id: 'new', label: 'First seen < 24 h' },
   { id: 'nr', label: 'No reserve' },
+  { id: 'hot', label: 'Running hot' },
+  { id: 'cold', label: 'Running cold' },
 ];
 
 // The board opens on the money; the soonest endings have their own panel beside the map.
@@ -28,6 +30,8 @@ const SORTS: { id: Sort; label: string }[] = [
   { id: 'bid', label: 'Highest bid' },
   { id: 'ending', label: 'Ending first' },
   { id: 'newest', label: 'First seen' },
+  { id: 'hottest', label: 'Hottest' },
+  { id: 'coldest', label: 'Coldest' },
 ];
 
 const label: React.CSSProperties = {
@@ -156,23 +160,112 @@ function Relativity({ value, weekAgo, sameHour }: { value: number; weekAgo: Boar
   );
 }
 
+// ---- Hot / cold ----------------------------------------------------------------------------------
+// heat = current bid / (band middle x the share of the final price comparable cars are usually bid to with
+// this much time left). The band is the lot's expected-price range from comparable BaT sales on its model
+// page, weighted toward its own version (scripts/market/live-bands.mjs, model version 31); the curve is
+// measured on 36,700 sales (migration 20260927230000). Past 120 h the curve rests on thin, early data, so no verdict.
+interface Heat { ratio: number; state: 'hot' | 'cold' | 'in line'; typicalNow: number; share: number; hoursLeft: number }
+const HEAT_MAX_H = 120;
+const HOT = 1.25;
+const COLD = 0.8;
+
+function curveAt(curve: BidCurve, tier: string, hours: number): number | null {
+  const pts = curve[tier];
+  if (!pts || pts.length === 0) return null;
+  const h = Math.max(pts[pts.length - 1][0], Math.min(pts[0][0], hours));
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [h1, v1] = pts[i];
+    const [h2, v2] = pts[i + 1];
+    if (h <= h1 && h >= h2) return v1 + ((v2 - v1) * (h1 - h)) / (h1 - h2);
+  }
+  return pts[pts.length - 1][1];
+}
+
+function heatOf(a: LiveAuction, curve: BidCurve | null, now: number): Heat | null {
+  if (!curve || !a.band || !a.currentBid || a.currentBid <= 0) return null;
+  const hoursLeft = (a.endsAt - now) / HOUR;
+  if (hoursLeft <= 0 || hoursLeft > HEAT_MAX_H) return null;
+  const share = curveAt(curve, a.band.tier, hoursLeft);
+  if (!share) return null;
+  const typicalNow = a.band.p50 * share;
+  const ratio = a.currentBid / typicalNow;
+  return { ratio, state: ratio >= HOT ? 'hot' : ratio <= COLD ? 'cold' : 'in line', typicalNow, share, hoursLeft };
+}
+
+// Backtest, 10,065 cars sold 2026-06-27..09-26, each priced only from sales before it: of the cars tagged hot at
+// this much time left, the share that finished above the middle of their comparable sales; of those tagged cold,
+// the share that finished below it. (In line: 46-49% above, i.e. no signal.)
+const BACKTEST: [number, string, number, number][] = [
+  [120, '5 days', 0.784, 0.781], [96, '4 days', 0.808, 0.797], [72, '3 days', 0.833, 0.809],
+  [48, '2 days', 0.855, 0.829], [24, 'a day', 0.884, 0.85], [12, '12 hours', 0.915, 0.876],
+];
+
+// Three significant figures: "about $166,000", not "$166,323".
+function about(n: number): number {
+  const step = 10 ** Math.max(0, Math.floor(Math.log10(Math.max(n, 1))) - 2);
+  return Math.round(n / step) * step;
+}
+
+// Past 3x the multiple mostly says the comps don't describe the car (backtest: 77% of those sold above 90% of their
+// comps), so it is shown as 3x+ rather than as a precise number.
+function multiple(ratio: number): string {
+  return ratio >= 3 ? '3×+' : ratio < 0.1 ? '<0.1×' : `${ratio.toFixed(1)}×`;
+}
+
+function explainHeat(a: LiveAuction, heat: Heat): string {
+  const band = a.band as NonNullable<LiveAuction['band']>;
+  const [, when, hotAbove, coldBelow] = BACKTEST.reduce((best, row) =>
+    Math.abs(row[0] - heat.hoursLeft) < Math.abs(best[0] - heat.hoursLeft) ? row : best);
+  const beyond = (a.currentBid ?? 0) > band.p90
+    ? ' The bid already tops 90% of those sales: this car is bringing more than its model page usually does (a rarer version, very low miles, or prices that have risen since), so the multiple says "beyond its comps", not how far.'
+    : '';
+  const outcome = heat.state === 'hot'
+    ? ` Of sold cars running this hot ${when} out, ${Math.round(hotAbove * 100)}% finished above the middle of their comparable sales.`
+    : heat.state === 'cold'
+      ? ` Of sold cars running this cold ${when} out, ${Math.round(coldBelow * 100)}% finished below the middle of their comparable sales.`
+      : '';
+  return `Bid ${usd(a.currentBid)} with ${left(heat.hoursLeft * HOUR)} left. ${band.comps} comparable BaT sales (same model page, weighted toward the same version, year, mileage and gearbox) put the middle at ${usd(band.p50)}, 80% range ${usd(band.p10)}–${usd(band.p90)}. With this much time left, cars at this price are usually bid to about ${Math.round(heat.share * 100)}% of their final, so a typical bid now is about ${usd(about(heat.typicalNow))}; this one is at ${multiple(heat.ratio)} that.${beyond}${outcome}`;
+}
+
+function HeatTag({ a, heat }: { a: LiveAuction; heat: Heat | null | undefined }) {
+  if (!heat || heat.state === 'in line') return null;
+  const hot = heat.state === 'hot';
+  return (
+    <span
+      title={explainHeat(a, heat)}
+      style={{ ...label, color: 'var(--bg)', background: hot ? 'var(--success)' : 'var(--error)', padding: '1px 4px', flexShrink: 0, whiteSpace: 'nowrap' }}
+    >
+      {hot ? 'Hot' : 'Cold'} {multiple(heat.ratio)}
+    </span>
+  );
+}
+
+// A make's color is the median heat of its priced live lots (3 or more); grey when unpriced or in line.
+function heatTone(median: number | null): { bg: string; fg: string } | null {
+  if (median == null) return null;
+  if (median >= 1.3) return { bg: 'var(--success)', fg: 'var(--bg)' };
+  if (median >= 1.1) return { bg: 'var(--success-dim)', fg: 'var(--text)' };
+  if (median <= 0.77) return { bg: 'var(--error)', fg: 'var(--bg)' };
+  if (median <= 0.9) return { bg: 'var(--error-dim)', fg: 'var(--text)' };
+  return null;
+}
+
+function median(xs: number[]): number | null {
+  if (xs.length === 0) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
 interface MakeNode {
   make: string;
   count: number;
   bids: number;
+  heats: number[];
 }
 
-// Tile color is the make's change against the same time last week, only when that reading was
-// recorded live (rebuilt readings have no per-make split). No reading, no color.
-function changeTone(pct: number | null): { bg: string; fg: string } | null {
-  if (pct == null || Math.abs(pct) < 2) return null;
-  if (pct >= 10) return { bg: 'var(--success)', fg: 'var(--bg)' };
-  if (pct > 0) return { bg: 'var(--success-dim)', fg: 'var(--text)' };
-  if (pct <= -10) return { bg: 'var(--error)', fg: 'var(--bg)' };
-  return { bg: 'var(--error-dim)', fg: 'var(--text)' };
-}
-
-function MarketMap({ auctions, selected, onSelect, weekAgo }: { auctions: LiveAuction[]; selected: string | null; onSelect: (make: string | null) => void; weekAgo: BoardReading | null }) {
+function MarketMap({ auctions, selected, onSelect, weekAgo, heat }: { auctions: LiveAuction[]; selected: string | null; onSelect: (make: string | null) => void; weekAgo: BoardReading | null; heat: Map<string, Heat | null> }) {
   const byMakeBefore = weekAgo?.source === 'live' ? weekAgo.byMake : null;
   const makeChange = (m: MakeNode) => {
     const before = byMakeBefore?.[m.make]?.[0];
@@ -183,13 +276,16 @@ function MarketMap({ auctions, selected, onSelect, weekAgo }: { auctions: LiveAu
   const makes = useMemo(() => {
     const by = new Map<string, MakeNode>();
     for (const a of auctions) {
-      const n = by.get(a.make) ?? { make: a.make, count: 0, bids: 0 };
+      const n = by.get(a.make) ?? { make: a.make, count: 0, bids: 0, heats: [] };
       n.count += 1;
       n.bids += a.currentBid ?? 0;
+      const h = heat.get(a.id);
+      if (h) n.heats.push(h.ratio);
       by.set(a.make, n);
     }
     return [...by.values()];
-  }, [auctions]);
+  }, [auctions, heat]);
+  const makeHeat = (m: MakeNode) => (m.heats.length >= 3 ? median(m.heats) : null);
   const rects = useMemo(
     () => (width > 0 ? squarify(makes.filter((m) => m.bids > 0).map((m) => ({ node: m, area: m.bids })), 0, 0, width, height) : []),
     [makes, width, height]
@@ -203,8 +299,8 @@ function MarketMap({ auctions, selected, onSelect, weekAgo }: { auctions: LiveAu
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4, minHeight: 12 }}>
         <span style={{ ...label, color: shown ? 'var(--text)' : 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {shown
-            ? `${shown.make} · ${shown.count} live · ${usd(shown.bids)} bid · ${((shown.bids / total) * 100).toFixed(1)}% of all bids${makeChange(shown) != null ? ` · ${signed(makeChange(shown) as number)} vs last week` : ''}`
-            : 'Current bids by make · area = dollars bid · hover or tap a make'}
+            ? `${shown.make} · ${shown.count} live · ${usd(shown.bids)} bid · ${((shown.bids / total) * 100).toFixed(1)}% of all bids${makeHeat(shown) != null ? ` · bids ${(makeHeat(shown) as number).toFixed(2)}× typical (median of ${shown.heats.length} priced)` : ''}${makeChange(shown) != null ? ` · ${signed(makeChange(shown) as number)} vs last week` : ''}`
+            : 'Current bids by make · area = dollars bid · color = bids vs comparable sales at this point (green hot, red cold) · hover or tap a make'}
         </span>
         {selected && (
           <button onClick={() => onSelect(null)} style={{ ...label, color: 'var(--text)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
@@ -217,7 +313,7 @@ function MarketMap({ auctions, selected, onSelect, weekAgo }: { auctions: LiveAu
         const active = selected === node.make;
         const dim = selected != null && !active;
         const roomy = w > 64 && h > 34;
-        const tone = changeTone(makeChange(node));
+        const tone = heatTone(makeHeat(node));
         return (
           <button
             key={node.make}
@@ -303,7 +399,7 @@ function BidCell({ auction, risen, stale }: { auction: LiveAuction; risen: boole
   );
 }
 
-function EndingNext({ auctions, risenIds, stale }: { auctions: LiveAuction[]; risenIds: Set<string>; stale: boolean }) {
+function EndingNext({ auctions, risenIds, stale, heat }: { auctions: LiveAuction[]; risenIds: Set<string>; stale: boolean; heat: Map<string, Heat | null> }) {
   const next = auctions.slice(0, 8);
   if (next.length === 0) return null;
   return (
@@ -318,7 +414,10 @@ function EndingNext({ auctions, risenIds, stale }: { auctions: LiveAuction[]; ri
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title(a)}</div>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 11, marginTop: 2 }}>
-              <BidCell auction={a} risen={risenIds.has(a.id)} stale={stale} />
+              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                <BidCell auction={a} risen={risenIds.has(a.id)} stale={stale} />
+                <HeatTag a={a} heat={heat.get(a.id)} />
+              </span>
               <Countdown endsAt={a.endsAt} strong />
             </div>
           </div>
@@ -332,7 +431,7 @@ function EndingNext({ auctions, risenIds, stale }: { auctions: LiveAuction[]; ri
 const ROW_H = 52;
 const ROW_H_NARROW = 42;
 
-function BoardRow({ a, risen, narrow, stale }: { a: LiveAuction; risen: boolean; narrow: boolean; stale: boolean }) {
+function BoardRow({ a, risen, narrow, stale, heat }: { a: LiveAuction; risen: boolean; narrow: boolean; stale: boolean; heat: Heat | null | undefined }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px', height: narrow ? ROW_H_NARROW : ROW_H, boxSizing: 'border-box', borderBottom: '2px solid var(--border)', fontSize: 11 }}>
       <div style={{ width: narrow ? 64 : 84, flexShrink: 0 }}>
@@ -342,6 +441,7 @@ function BoardRow({ a, risen, narrow, stale }: { a: LiveAuction; risen: boolean;
         <Thumb src={a.imageUrl} size={narrow ? 44 : 60} />
         <span style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title(a)}</span>
       </Link>
+      <HeatTag a={a} heat={heat} />
       {a.noReserve && <span style={{ ...label, color: 'var(--text)', border: '2px solid var(--text)', padding: '0 3px', flexShrink: 0 }}>NR</span>}
       <div style={{ width: narrow ? 84 : 104, textAlign: 'right', flexShrink: 0 }}>
         <BidCell auction={a} risen={risen} stale={stale} />
@@ -362,7 +462,7 @@ function BoardRow({ a, risen, narrow, stale }: { a: LiveAuction; risen: boolean;
 }
 
 // Every row stays reachable by scrolling; only the ones near the viewport are in the DOM.
-function Board({ rows, risenIds, narrow, stale }: { rows: LiveAuction[]; risenIds: Set<string>; narrow: boolean; stale: boolean }) {
+function Board({ rows, risenIds, narrow, stale, heat }: { rows: LiveAuction[]; risenIds: Set<string>; narrow: boolean; stale: boolean; heat: Map<string, Heat | null> }) {
   const listRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState(0);
   useLayoutEffect(() => {
@@ -382,7 +482,7 @@ function Board({ rows, risenIds, narrow, stale }: { rows: LiveAuction[]; risenId
         const a = rows[item.index];
         return (
           <div key={a.id} style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${item.start - offset}px)` }}>
-            <BoardRow a={a} risen={risenIds.has(a.id)} narrow={narrow} stale={stale} />
+            <BoardRow a={a} risen={risenIds.has(a.id)} narrow={narrow} stale={stale} heat={heat.get(a.id)} />
           </div>
         );
       })}
@@ -390,8 +490,10 @@ function Board({ rows, risenIds, narrow, stale }: { rows: LiveAuction[]; risenId
   );
 }
 
-function inWindow(a: LiveAuction, w: Window, now: number): boolean {
+function inWindow(a: LiveAuction, w: Window, now: number, heat?: Heat | null): boolean {
   switch (w) {
+    case 'hot': return heat?.state === 'hot';
+    case 'cold': return heat?.state === 'cold';
     case '1h': return a.endsAt - now < HOUR;
     case '24h': return a.endsAt - now < DAY;
     case 'new': return now - a.listedAt < DAY;
@@ -426,21 +528,25 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
   }, []);
 
   const live = useMemo(() => (data?.auctions ?? []).filter((a) => a.endsAt > now), [data, now]);
+  const heat = useMemo(() => new Map(live.map((a) => [a.id, heatOf(a, data?.curve ?? null, now)])), [live, data, now]);
 
   const figures = useMemo(() => {
-    const f: Record<Window, number> = { all: 0, '1h': 0, '24h': 0, new: 0, nr: 0 };
-    for (const a of live) for (const w of WINDOWS) if (inWindow(a, w.id, now)) f[w.id] += 1;
+    const f: Record<Window, number> = { all: 0, '1h': 0, '24h': 0, new: 0, nr: 0, hot: 0, cold: 0 };
+    for (const a of live) for (const w of WINDOWS) if (inWindow(a, w.id, now, heat.get(a.id))) f[w.id] += 1;
     return f;
-  }, [live, now]);
+  }, [live, now, heat]);
   const openBids = useMemo(() => live.reduce((s, a) => s + (a.currentBid ?? 0), 0), [live]);
   const syncBehind = data?.syncedAt != null && now - data.syncedAt > STALE_MS;
 
   const board = useMemo(() => {
-    const rows = live.filter((a) => (make == null || a.make === make) && inWindow(a, win, now));
+    const rows = live.filter((a) => (make == null || a.make === make) && inWindow(a, win, now, heat.get(a.id)));
+    const ratio = (a: LiveAuction) => heat.get(a.id)?.ratio ?? null;
     if (sort === 'bid') rows.sort((a, b) => (b.currentBid ?? 0) - (a.currentBid ?? 0));
     else if (sort === 'newest') rows.sort((a, b) => b.listedAt - a.listedAt);
+    else if (sort === 'hottest') rows.sort((a, b) => (ratio(b) ?? -1) - (ratio(a) ?? -1));
+    else if (sort === 'coldest') rows.sort((a, b) => (ratio(a) ?? Infinity) - (ratio(b) ?? Infinity));
     return rows;
-  }, [live, make, win, sort, now]);
+  }, [live, make, win, sort, now, heat]);
   const boardBids = useMemo(() => board.reduce((s, a) => s + (a.currentBid ?? 0), 0), [board]);
 
   if (isError || (!isLoading && live.length === 0)) return <>{onUnavailable ?? null}</>;
@@ -460,13 +566,16 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
       </div>
 
       {/* Figures. Each one is a filter on the board below. */}
-      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)', border: '2px solid var(--border)', background: 'var(--border)', gap: 2, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(3, 1fr)' : 'repeat(8, 1fr)', border: '2px solid var(--border)', background: 'var(--border)', gap: 2, marginBottom: 12 }}>
         <Figure caption="Current bids" value={isLoading ? '…' : usd(openBids, true)} active={false} onClick={() => setParam('live', null)} hint="Sum of the current high bid on every live auction" />
         {WINDOWS.map((w) => (
           <Figure
             key={w.id}
             caption={w.label}
-            hint={w.id === 'new' ? 'First seen by Nuke in the last 24 h; the live page is read every 15 min' : undefined}
+            hint={w.id === 'new' ? 'First seen by Nuke in the last 24 h; the live page is read every 15 min'
+              : w.id === 'hot' ? `Bid at least ${HOT}x where comparable sales usually are at this point in the auction (within 5 days of the close)`
+              : w.id === 'cold' ? `Bid at most ${COLD}x where comparable sales usually are at this point in the auction (within 5 days of the close)`
+              : undefined}
             value={isLoading ? '…' : figures[w.id].toLocaleString('en-US')}
             active={win === w.id && w.id !== 'all'}
             onClick={() => setParam('live', w.id === 'all' || win === w.id ? null : w.id)}
@@ -480,11 +589,11 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
 
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'minmax(0, 3fr) minmax(260px, 1fr)', gap: 12, marginBottom: 12 }}>
         <section style={{ minWidth: 0 }}>
-          <MarketMap auctions={live} selected={make} onSelect={(m) => setParam('make', m)} weekAgo={data?.weekAgo ?? null} />
+          <MarketMap auctions={live} selected={make} onSelect={(m) => setParam('make', m)} weekAgo={data?.weekAgo ?? null} heat={heat} />
         </section>
         <section style={{ border: '2px solid var(--border)', alignSelf: 'start', minWidth: 0 }}>
           <div style={{ ...label, padding: '6px 8px', borderBottom: '2px solid var(--border)' }}>Ending next</div>
-          <EndingNext auctions={live.filter((a) => make == null || a.make === make)} risenIds={risenIds} stale={syncBehind} />
+          <EndingNext auctions={live.filter((a) => make == null || a.make === make)} risenIds={risenIds} stale={syncBehind} heat={heat} />
         </section>
       </div>
 
@@ -515,12 +624,12 @@ export default function MarketPulse({ onUnavailable }: { onUnavailable?: React.R
             ))}
           </div>
         </div>
-        {isLoading ? null : <Board rows={board} risenIds={risenIds} narrow={narrow} stale={syncBehind} />}
+        {isLoading ? null : <Board rows={board} risenIds={risenIds} narrow={narrow} stale={syncBehind} heat={heat} />}
       </section>
 
       {data?.source && (
         <div style={{ ...label, marginTop: 8 }}>
-          Source: {data.source}. Current bid = the highest bid on the listing when last read.
+          Source: {data.source}. Current bid = the highest bid on the listing when last read. Hot/cold compares it with where comparable BaT sales on the same model page are usually bid at the same point in the auction; hover a tag for the numbers.
         </div>
       )}
     </div>
