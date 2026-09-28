@@ -29,6 +29,8 @@ interface Observation {
   structured_data: Record<string, unknown> | null;
   source_name: string | null;
   source_slug: string | null;
+  // a masked copy from vehicle_build_log_public: the detail page can't open it for a visitor
+  public_copy?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -154,6 +156,35 @@ function extractSummary(obs: Observation): string | null {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Public build log                                                    */
+/* ------------------------------------------------------------------ */
+
+// Work records are owner-only (2026-09-28). A visitor gets the masked public build log instead —
+// vehicle_build_log_public: date, item, category, supplier, labor, stage; no money, no people —
+// minus any row already read directly.
+async function fetchPublicBuildLog(vehicleId: string, have: Set<string>): Promise<Observation[]> {
+  const { data, error } = await supabase.rpc('vehicle_build_log_public', { p_vehicle_id: vehicleId });
+  if (error || !Array.isArray(data)) return [];
+  return data
+    .filter((r: any) => r.observation_id && !have.has(r.observation_id))
+    .map((r: any) => ({
+      id: r.observation_id,
+      kind: 'work_record',
+      observed_at: r.done_on ?? null,
+      ingested_at: r.done_on ?? '',
+      source_url: null,
+      confidence: null,
+      confidence_score: null,
+      content_text: [r.item, r.supplier, r.labor_minutes ? `${Math.round(Number(r.labor_minutes))} min` : null]
+        .filter(Boolean).join(' · ') || null,
+      structured_data: { category: r.category, supplier: r.supplier, labor_minutes: r.labor_minutes, build_stage: r.build_stage },
+      source_name: 'Build log',
+      source_slug: null,
+      public_copy: true,
+    }));
+}
+
+/* ------------------------------------------------------------------ */
 /*  Source host extraction                                              */
 /* ------------------------------------------------------------------ */
 
@@ -178,7 +209,7 @@ const ALL_KINDS = ['listing', 'sale_result', 'comment', 'bid', 'work_record', 'o
 /* ------------------------------------------------------------------ */
 
 const ObservationTimeline: React.FC = () => {
-  const { vehicle, observationCount } = useVehicleProfile();
+  const { vehicle, observationCount, isRowOwner } = useVehicleProfile();
   const [observations, setObservations] = useState<Observation[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -211,18 +242,18 @@ const ObservationTimeline: React.FC = () => {
           .order('observed_at', { ascending: false, nullsFirst: false })
           .limit(200);
 
-        if (fallback) {
-          setObservations(fallback.map((r: any) => ({
-            ...r,
-            source_name: null,
-            source_slug: null,
-          })));
-        }
+        let rows: Observation[] = (fallback || []).map((r: any) => ({
+          ...r,
+          source_name: null,
+          source_slug: null,
+        }));
+        if (!isRowOwner) rows = rows.concat(await fetchPublicBuildLog(vehicle.id, new Set(rows.map(r => r.id))));
+        setObservations(rows);
         return;
       }
 
       if (data) {
-        setObservations(data.map((r: any) => ({
+        let rows: Observation[] = data.map((r: any) => ({
           id: r.id,
           kind: r.kind,
           observed_at: r.observed_at,
@@ -234,14 +265,16 @@ const ObservationTimeline: React.FC = () => {
           structured_data: r.structured_data,
           source_name: r.observation_sources?.display_name ?? null,
           source_slug: r.observation_sources?.slug ?? null,
-        })));
+        }));
+        if (!isRowOwner) rows = rows.concat(await fetchPublicBuildLog(vehicle.id, new Set(rows.map(r => r.id))));
+        setObservations(rows);
       }
     } catch (err) {
       console.error('[ObservationTimeline] error:', err);
     } finally {
       setLoading(false);
     }
-  }, [vehicle?.id]);
+  }, [vehicle?.id, isRowOwner]);
 
   useEffect(() => {
     fetchObservations();
@@ -519,7 +552,7 @@ const ObservationTimeline: React.FC = () => {
                   {ago || dateDisplay}
                 </span>
               )}
-              {vehicle?.id && (
+              {vehicle?.id && !obs.public_copy && (
                 <Link
                   to={`/vehicle/${vehicle.id}/observation/${obs.id}`}
                   aria-label="Open observation detail"

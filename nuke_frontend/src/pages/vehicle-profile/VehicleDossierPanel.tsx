@@ -14,6 +14,7 @@ import { useVehicleProfile } from './VehicleProfileContext';
 import { usePopup } from '../../components/popups/usePopup';
 import { supabase } from '../../lib/supabase';
 import { useFieldEvidence, type FieldEvidenceMap, type FieldEvidenceGroup } from './hooks/useFieldEvidence';
+import { useVehiclePriceFacts, priceKindLabel } from './hooks/useVehiclePriceFacts';
 import FieldProvenanceDrawer, { SourceBadge } from './FieldProvenanceDrawer';
 
 const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
@@ -510,6 +511,9 @@ const VehicleDossierPanel: React.FC = () => {
   const navigate = useNavigate();
   const { openPopup } = usePopup();
   const { evidence, loading } = useFieldEvidence(vehicle?.id);
+  // the SALE PRICE row is the typed price said as what it is (sold / bid / ask), never a raw sale_price
+  const { priceFacts } = useVehiclePriceFacts(vehicle?.id);
+  const priceKind = priceKindLabel(priceFacts);
 
   // Auto-expand fields with multi-source evidence
   const autoExpandFields = useMemo(() => {
@@ -719,6 +723,7 @@ const VehicleDossierPanel: React.FC = () => {
         {FIELD_GROUPS.map((fg, gi) => {
           // Collect visible fields for this group
           const visibleFields = fg.fields.filter(field => {
+            if (field === 'sale_price') return !!priceKind;
             let pv = v[field];
             if ((pv == null || pv === '') && evidence[field]?.sources?.length > 0) {
               pv = evidence[field].primary.field_value;
@@ -766,9 +771,16 @@ const VehicleDossierPanel: React.FC = () => {
                 if ((pv == null || pv === '') && group && group.sources.length > 0) {
                   pv = group.primary.field_value;
                 }
-                const displayValue = fmtVal(field, pv);
+                let displayValue = fmtVal(field, pv);
+                let fieldLabel = FIELD_LABELS[field] || field.toUpperCase().replace(/_/g, ' ');
+                if (field === 'sale_price') {
+                  const on = priceFacts?.price_as_of
+                    ? new Date(priceFacts.price_as_of).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+                    : null;
+                  displayValue = priceKind ? fmtVal(field, priceFacts?.price_amount) + (on ? ` · ${on}` : '') : '';
+                  fieldLabel = priceKind === 'Sold' ? 'SALE PRICE' : (priceKind || '').toUpperCase();
+                }
                 if (!displayValue) return null;
-                const fieldLabel = FIELD_LABELS[field] || field.toUpperCase().replace(/_/g, ' ');
                 // Every field value opens its evidence popup — click-through chain
                 const handleValueClick = () => {
                   // Color fields also set gallery filter
