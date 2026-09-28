@@ -35,7 +35,7 @@ LAYERS = ["L1 plugs", "L2 wire", "L3 crossing", "L4 ends", "L5 material"]
 # 0.5 A on Outputs 1 – 8").
 PDM_CAP = {"PDM30": {"inputs": 16, "out20": 8, "out8": 22}, "PDM15": {"inputs": 16, "out20": 8, "out8": 7}}
 M130_PINS = 60                                        # 34-way A + 26-way B (M130 datasheet)
-BODY_CAP = {"FIREWALL-BODY-A": 12, "FIREWALL-BODY-B": 12, "FIREWALL-BODY-P": 4}
+BODY_CAP = {"FIREWALL-BODY-A": 12, "FIREWALL-BODY-B": 12, "FIREWALL-BODY-P": 4, "FIREWALL-BODY-C": 6}
 
 
 def load():
@@ -137,11 +137,19 @@ def capacity(reg, wires, opts, eps_yaml):
     by_opt = defaultdict(list)
     for w in wires:
         by_opt[w["option"]].append(w)
+    # the base ledger counts base and decided wires only; each candidate's take is reported on top of it (standards review,
+    # round 3: PW/PL wires were counted as used, so "candidates don't fit" was computed on an already-consumed base)
+    def pdm_refs(w):
+        for s_ in (str(w.get("frm") or ""), json.dumps(w.get("to") or "")):
+            for m in re.finditer(r"\b(PDM30|PDM15):(OUT|DIG)(\d+)", s_):
+                yield m.group(1), ("out" if m.group(2) == "OUT" else "in"), int(m.group(3))
+    is_cand = lambda w: (opts.get(w["option"]) or {}).get("status") in ("candidate", "rejected")
     pdm = {d: {"out": Counter(), "in": Counter()} for d in PDM_CAP}
     for w in wires:
-        for s in (str(w.get("frm") or ""), json.dumps(w.get("to") or "")):
-            for m in re.finditer(r"\b(PDM30|PDM15):(OUT|DIG)(\d+)", s):
-                pdm[m.group(1)]["out" if m.group(2) == "OUT" else "in"][int(m.group(3))] += 1
+        if is_cand(w):
+            continue
+        for d, kind, n in pdm_refs(w):
+            pdm[d][kind][n] += 1
     res = OrderedDict()
     res["61-pin (engine only)"] = OrderedDict(capacity=61, used=fw.get("crossing_now"), spare=fw.get("spare_cavities", []),
                                              source="kits_v5 firewall map; state rows 50, 53")
@@ -180,8 +188,13 @@ def capacity(reg, wires, opts, eps_yaml):
         d = OrderedDict(status=o["status"], designed_wires=len(ws))
         dd = o.get("demand") or {}
         d["crossings"] = dd.get("crossings", sum(1 for w in ws if re.search(r"FIREWALL", json.dumps(w))))
-        d["pdm30_outputs"] = dd.get("pdm30_outputs", len({m.group(1) for w in ws for m in re.finditer(r"PDM30:OUT(\d+)", str(w.get("frm")))}))
-        d["pdm30_inputs"] = dd.get("pdm30_inputs", len({m.group(1) for w in ws for m in re.finditer(r"PDM30:DIG(\d+)", json.dumps(w))}))
+        took = {(dv, k, n) for w in ws for dv, k, n in pdm_refs(w) if n not in pdm[dv][k]}     # on top of the base
+        d["pdm30_outputs"] = dd.get("pdm30_outputs", len({n for dv, k, n in took if dv == "PDM30" and k == "out"}))
+        d["pdm30_inputs"] = dd.get("pdm30_inputs", len({n for dv, k, n in took if dv == "PDM30" and k == "in"}))
+        d["pdm15_outputs"] = len({n for dv, k, n in took if dv == "PDM15" and k == "out"})
+        d["takes"] = sorted(f"{dv} {'OUT' if k == 'out' else 'DIG'}{n}" for dv, k, n in took)
+        # an output-setting conflict on a candidate's wires (reconcile_v5 pdm_settings) is the candidate's to resolve
+        d["setting_conflicts"] = sorted({w["pdm_limit"] for w in ws if "CONFLICT" in str(w.get("pdm_limit") or "")})
         d["notes"] = dd.get("notes")
         demand[code] = d
     verdict = OrderedDict()

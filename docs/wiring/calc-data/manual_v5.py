@@ -86,6 +86,56 @@ def open_word(s):
     return re.sub(r"\bUNKNOWN\b", "OPEN", re.sub(r"\bunknown\b", "OPEN", str(s)))
 
 
+_SOURCES = None
+
+
+def source_strings():
+    """Every registry text a page may print a piece of: endpoint devices, wire labels and notes, Dave's names."""
+    global _SOURCES
+    if _SOURCES is None:
+        r = json.load(open(CD / "k5_registry.json"))
+        src = set()
+        for ep in r["endpoints"].values():
+            for v in (ep.get("device"),) + tuple((ep.get("cavities") or {}).values() if isinstance(ep.get("cavities"), dict) else ()):
+                if v:
+                    src.add(str(v))
+        for w in r["wires"] + r["implied"]:
+            for v in (w.get("label"), w.get("notes"), kits_v5.dave_name(w)):
+                if v:
+                    src.add(str(v))
+        _SOURCES = [x for x in src if len(x) > 20]
+    return _SOURCES
+
+
+def fragment_faults(boxes):
+    """A printed text that stops in the middle of a word of the registry string it came from (review round 3: 'at the
+    das', 'SECOND reve master UP'): the page must print the whole string, or whole words and wrap."""
+    bad = []
+    heads = {}
+    for d in source_strings():
+        heads.setdefault(d[:14].lower(), []).append(d.lower())
+    for b in boxes:
+        t = str(b[4])
+        tl = t.lower()
+        hit = None
+        for i in range(0, max(1, len(tl) - 13)):
+            for dl in heads.get(tl[i:i + 14], ()):
+                rest = tl[i:]
+                n = 0
+                while n < len(rest) and n < len(dl) and rest[n] == dl[n]:
+                    n += 1
+                ends_word_here = n == len(rest) or not rest[n].isalnum()
+                # 24 characters in common before the cut: a short shared phrase is a coincidence, not a slice
+                if n >= 24 and n < len(dl) and dl[n - 1].isalnum() and dl[n].isalnum() and ends_word_here:
+                    hit = dl
+                    break
+            if hit:
+                break
+        if hit:
+            bad.append(f"word cut from the wire list's text: '{t[:70]}' (source: '{hit[:70]}')")
+    return bad
+
+
 def layout_faults(boxes, page_w, page_h, margin, footer=()):
     """Text a reader cannot read whole (review 2026-09-28): any text box past the bottom margin (into the footer) or
     past the left/right margin, and any label cut short with an ellipsis. footer = the texts allowed below the margin."""
@@ -319,7 +369,11 @@ def colour(w):
     c = (w.get("color") or "").strip()
     if not c and "Cat5" in str(w.get("spec")):
         return "CAT5 PAIR"
-    return "SHIELDED CABLE" if (not c or c == "cable") and "M27500" in str(w.get("spec")) else c.upper()
+    if "M27500" in str(w.get("spec")):
+        # a conductor of the shielded cable prints its own colour; until the wire list gives one it says so
+        own = [q.strip() for q in c.lower().split("/") if q.strip() and q.strip() not in ("cable", "shld")]
+        return f"{'/'.join(own).upper()} (SHIELDED)" if own else "SHIELDED, COLOUR OPEN"
+    return c.upper()
 
 
 def gauge_word(w):
@@ -335,6 +389,15 @@ def gauge_word(w):
 
 def gauge(w):
     return gauge_word(w)
+
+
+def circuit_word(w):
+    """How a circuit is named on a page: this build's circuit number when it is one ('13', '103G', '85a'), else the
+    builder's name for the wire (kits_v5.dave_name) — never a cut-list code like COIL1_SGND (review round 3)."""
+    wid = str((w or {}).get("id") or "")
+    if re.fullmatch(r"\d+[A-Za-z]?", wid):
+        return wid.upper()
+    return kits_v5.dave_name(w) if w else wid
 
 
 def page_contents(reg, wires, toc, shown, notes):
@@ -395,6 +458,8 @@ def readiness_blocks(reg):
         return []
     c = rd["configuration"]["buildable (base + decided)"]
     L = c["length"]
+    if sum(L.values()) != c["wires"]:
+        raise SystemExit(f"readiness: lengths {dict(L)} add to {sum(L.values())}, not the {c['wires']} buildable wires")
     opts = reg.get("options", {})
     dec = [o["name"].split(" — ")[0].split(",")[0] for o in opts.values() if o["status"] == "decided"]
     cand = [o["name"].split(" — ")[0].split(",")[0].split(" (")[0] for o in opts.values() if o["status"] == "candidate"]
@@ -402,8 +467,8 @@ def readiness_blocks(reg):
         ("h", "Where the harness stands"),
         ("p", f"The buildable harness is the base truck plus every option the owner has decided: {c['wires']} wires. "
               f"Of those, {c['L2 wire']} have both ends named, {c['L3 crossing']} have their firewall crossing settled, "
-              f"{c['L4 ends']} have a terminal part number at both ends. Lengths: {L.get('measured', 0)} measured, {L.get('estimated', 0)} estimated, "
-              f"{L.get('unknown', 0)} unknown. The Specifications page carries the count per option and per section, "
+              f"{c['L4 ends']} have a terminal part number at both ends. Lengths: {L.get('measured', 0)} measured, {L.get('twin', 0)} from the "
+              f"digital twin, {L.get('estimated', 0)} estimated, {L.get('unknown', 0)} unknown. The Specifications page carries the count per option and per section, "
               f"and the fill of every connector and PDM channel."),
         ("p", ("Decided options: " + ", ".join(dec) + ". " if dec else "") +
               ("Candidates, not yet decided: " + ", ".join(cand) + ". Their wires are carried in the composite design "
@@ -424,6 +489,40 @@ TWIN_PLUG.update({"K5H_EStopp_Actuator": "ESTOPP", "K5H_Subwoofer": "SUB-1", "K5
 OPEN_POSITION = {"M130-A": "mount not decided", "PDM30-A": "mount not decided"}
 
 
+def extra_locations():
+    """Plugs with no twin object: (3-D point, why there) from the map's working-assumption anchors."""
+    import load_map_rows as L
+    batt = json.load(open(CD / "twin_centers.json")).get("K5H_Battery")
+    out = {"FIREWALL-ENGINE": (L.ANCHORS["FWG_MAIN"][0], "firewall hole H3"),
+           "GND-BANK-CAB": (L.ANCHORS["PDM30"][0], "beside the body PDM30, under the dash")}
+    if batt:
+        out["PDM15-A"] = (tuple(batt), "beside the batteries")
+        out["GND-BANK-ENG"] = (tuple(batt), "the stud bank beside the batteries")
+    return out
+
+
+def project_bay(view, xyz):
+    """The figure's camera, recovered by a least-squares fit (DLT) of the twin object centres to their image positions;
+    None when the fit is poor (over 0.2 % of the image), so nothing is placed on a guess."""
+    import numpy as np
+    posf = OUT / "figures" / f"fig_bay_{view}_positions.json"
+    t = json.load(open(CD / "twin_centers.json"))
+    pos = json.load(posf.open())
+    common = [k for k in pos if k in t]
+    if len(common) < 8:
+        return None
+    A = []
+    for k in common:
+        (x, y, z), (u, v) = t[k], pos[k]
+        A.append([x, y, z, 1, 0, 0, 0, 0, -u * x, -u * y, -u * z, -u])
+        A.append([0, 0, 0, 0, x, y, z, 1, -v * x, -v * y, -v * z, -v])
+    P = np.linalg.svd(np.array(A, float))[2][-1].reshape(3, 4)
+    pr = lambda p: (P @ np.r_[p, 1])[:2] / (P @ np.r_[p, 1])[2]
+    if max(np.linalg.norm(pr(np.array(t[k], float)) - np.array(pos[k], float)) for k in common) > 0.002:
+        return None
+    return tuple(float(c) for c in pr(np.array(xyz, float)))
+
+
 def page_locations(reg, number, odd, view="top"):
     """COMPONENT LOCATION — the engine bay from the twin with the hood cut away, numbered call-outs, legend."""
     import base64
@@ -435,8 +534,9 @@ def page_locations(reg, number, odd, view="top"):
     p = Page(number, "Engine Harness", odd=odd)
     p.heading("Component Location — Engine Bay")
     p.txt(W / 2, p.y + 2, "View from above the driver's front quarter (azimuth −20°, elevation 62°), hood cut away. From the digital twin.", 7.5, anchor="middle")
-    fw, fh = W - 2 * M, (W - 2 * M) * 1100 / 1600
-    fx, fy = M, p.y + 10
+    fw = W - 2 * M - 80                                # the figure leaves room for the call-out tables under it
+    fh = fw * 1100 / 1600
+    fx, fy = M + 40, p.y + 10
     data = base64.b64encode(fig.read_bytes()).decode()
     p.el.append(f'<image x="{fx}" y="{fy}" width="{fw:.1f}" height="{fh:.1f}" href="data:image/png;base64,{data}"/>')
     p.rect(fx, fy, fw, fh, sw=0.8)
@@ -449,6 +549,16 @@ def page_locations(reg, number, odd, view="top"):
         x, y = pos[obj]
         if 0 <= x <= 1 and 0 <= y <= 1:
             pts.append((fx + x * fw, fy + y * fh, code))
+    # plugs that are not twin objects, placed from the working-assumption anchors (load_map_rows.ANCHORS; PDM15 and the
+    # engine ground bank beside the batteries = the twin battery's centre), projected with the figure's own camera
+    # recovered from the twin objects it drew (review round 3: the page lacked PDM15, the 61-pin and the ground banks)
+    assumed = {}
+    for code, (xyz, why) in extra_locations().items():
+        if code in eps:
+            uv = project_bay(view, xyz)
+            if uv is not None and 0 <= uv[0] <= 1 and 0 <= uv[1] <= 1:
+                pts.append((fx + uv[0] * fw, fy + uv[1] * fh, code))
+                assumed[code] = why
     # GM call-outs: the number sits clear of the cluster on a ring around it, a leader runs to the part (0A-5 Fig. 7)
     import math as _m
     cxm = sum(x for x, _, _ in pts) / max(len(pts), 1)
@@ -471,12 +581,16 @@ def page_locations(reg, number, odd, view="top"):
         p.el.append(f'<circle cx="{lx:.1f}" cy="{ly:.1f}" r="5.4" fill="#fff" stroke="#000" stroke-width="0.9"/>')
         p.txt(lx, ly + 2.4, str(n), 6.2, bold=True, anchor="middle")
         name = (eps[code].get("device") or code).split("(")[0].split(" — ")[0].strip()
-        items.append((n, name, OPEN_POSITION.get(code, "")))
+        items.append((n, name, OPEN_POSITION.get(code, "") or (f"working assumption, not a twin object: {assumed[code]}"
+                                                               if code in assumed else "")))
     p.y = fy + fh + 10
     half = (len(items) + 1) // 2
-    widths = [20, 158, COLW - 178]
-    y1 = p.table(M, p.y, widths, ["No.", "Component", "Note"], items[:half], size=6.4, lead=8.6)
-    y2 = p.table(M + COLW + GUT, p.y, widths, ["No.", "Component", "Note"], items[half:], size=6.4, lead=8.6)
+    widths = [18, 140, COLW - 158]
+    y1 = p.table(M, p.y, widths, ["No.", "Component", "Note"], items[:half], size=6.0, lead=7.8)
+    t1 = p.tail
+    y2 = p.table(M + COLW + GUT, p.y, widths, ["No.", "Component", "Note"], items[half:], size=6.0, lead=7.8)
+    if t1 is not p or p.tail is not p:
+        p.faults = ["component-location tables run past the page: shrink the figure or the rows"]
     p.y = max(y1, y2) + 10
     for ln in p.wrap("Call-outs sit at the twin's component positions; the twin insert draws each component as a placeholder "
                      "outline until its vendor CAD is added.", W - 2 * M, 6.4):
@@ -716,6 +830,15 @@ def page_firewall(reg, wires, number, odd):
             dev_end[wid] = f"{D.plug_title(tm['endpoint'], e_)} {tm.get('cavity') or '?'}"
         elif tm["endpoint"].startswith(("M130", "PDM30", "PDM15")):
             cab_end[wid] = f"{tm['endpoint'].replace('-', ' ')} {tm.get('cavity') or '?'}"
+        elif e_.get("side") == "cab" and wid not in cab_end:
+            # any other cab-side end (the Dakota VHX terminals): the plug and its terminal, from the termination row
+            import diagram_v5 as D
+            cab_end[wid] = f"{D.plug_title(tm['endpoint'], e_)} {tm.get('cavity') or '?'}"
+    # a shield drain has no engine-end termination: print what the wire list says happens there (it floats)
+    for wid, w in wires.items():
+        m_ = re.search(r"[^|;]*(?:floats|cut back|sleeved)[^|;]*", str(w.get("notes") or ""), re.I)
+        if m_ and wid not in dev_end:
+            dev_end[wid] = "none: " + m_.group(0).strip()
     def face(x_c, y_c, mirror, title, sub):
         p.el.append(f'<circle cx="{x_c:.1f}" cy="{y_c:.1f}" r="{R:.1f}" fill="none" stroke="#000" stroke-width="1.2"/>')
         p.rect(x_c - 7, y_c - R - 7, 14, 8, sw=1.0, rx=1.5)                   # master key
@@ -797,8 +920,11 @@ def page_firewall(reg, wires, number, odd):
         rows.append((cav, (wid or "—").upper(), gm_colour(f"{gauge(w)} {colour(w)}") if w else "spare",
                      kits_v5.dave_name(w).upper() if w else "", open_word((dev_end.get(wid) or "").upper()) if w else "",
                      open_word((cab_end.get(wid) or "").upper()) if w else ""))
-    widths = [26, 58, 76, 150, 130, W - 2 * M - 440]
-    p2.table(M, p2.y, widths, ["Cav", "Ckt", "Size, Color", "Function", "Engine End", "Cab End"], rows, size=5.8, lead=7.4)
+    widths = [24, 62, 72, 124, 150, W - 2 * M - 432]
+    blank = [r[0] for r in rows if r[1] != "—" and (not r[4] or not r[5])]
+    if blank:
+        p.__dict__.setdefault("faults", []).append(f"61-pin cavity table: an end left blank at {', '.join(blank)}")
+    p2.table(M, p2.y, widths, ["Cav", "Ckt", "Size, Color", "Function", "Engine End", "Cab End"], rows, size=5.6, lead=7.0)
     p.extra_pages = [p2] + p2.__dict__.pop("extra_pages", [])
     return p
 
@@ -869,11 +995,33 @@ PDM_P48 = {24: 4.5, 22: 6, 20: 8, 18: 11, 16: 15, 14: 22, 6: 90, 4: 120, 2: 150}
 SIZE20_PULL = "24 AWG ≥ 8 lbf · 22 ≥ 13 · 20 ≥ 21 (size-20 contact minimums, Checkline contact table: 36 / 57 / 92 N)"
 
 
+SUBSYSTEM_WORDS = {"CORE_ENGINE": "engine", "LIGHTING_EXTERIOR": "exterior lamps", "POWER_WINDOWS": "power windows",
+                   "DASH_CLUSTER_DAKOTA": "Dakota gauges", "CHARGING_STARTING": "charging and starting", "AUDIO": "audio",
+                   "HVAC_AC": "heater and A/C", "HARNESS_INFRA": "power spine and grounds", "TRANS_6L80E": "6L80E transmission",
+                   "ACCESSORY_12V": "12 V accessories", "LIGHTING_INTERIOR": "interior lamps", "COOLING": "cooling fan",
+                   "POWER_LOCKS": "power locks", "WIPERS_WASHER": "wipers and washer", "CAMERA_REAR": "rear camera",
+                   "EPARKING_BRAKE": "parking brake", "AMP_STEPS": "power steps", "FUEL": "fuel", "BRAKES_IBOOSTER": "iBooster",
+                   "DOME_COURTESY": "dome and courtesy lamps"}
+
+
+def used_for(ws):
+    """What a wire size carries, read from the wire list (review round 3: the typed 'blower, fan, iBooster' list had gone
+    stale): up to four wires by their own labels, else their subsystems, most wires first."""
+    from collections import Counter
+    if len(ws) <= 4:
+        return "; ".join(dict.fromkeys(str(w.get("label") or w["id"]) for w in ws))
+    c = Counter(SUBSYSTEM_WORDS.get(w.get("subsystem"), str(w.get("subsystem") or "other").replace("_", " ").lower()) for w in ws)
+    return ", ".join(f"{k} ({n})" for k, n in c.most_common())
+
+
 def page_wire_spec(reg, wires, number, odd):
     """WIRE SIZE AND SPECIFICATION — every wire type in the build, by spec and gauge, with its rating source."""
     p = Page(number, "Harness Standards", odd=odd)
     p.heading("Wire Size and Specification")
-    live = [w for w in wires.values() if isinstance(w.get("awg"), int)]
+    # one list for every count in the book: the buildable harness (base truck + decided options), as options_v5 counts it
+    build = [w for w in wires.values() if w.get("option_status") in ("base", "decided")]
+    live = [w for w in build if isinstance(w.get("awg"), int)]
+    no_gauge = [w for w in build if not isinstance(w.get("awg"), int)]
     from collections import Counter
     cnt = Counter((w.get("spec"), w["awg"], gauge_word(w)) for w in live)       # a parallel pair is its own row
     ft = reg["bom"]["wire_ft"]
@@ -881,15 +1029,17 @@ def page_wire_spec(reg, wires, number, odd):
     RATING = {a: (f"{v:g} A" + ("‡" if a <= 6 else "*")) for a, v in PDM_P48.items()}
     for (spec, awg, gw), n in sorted(cnt.items(), key=lambda kv: (str(kv[0][0]), -kv[0][1], kv[0][2])):
         feet = sum(v for k, v in ft.items() if k.startswith(f"{spec} {awg} AWG")) if gw == str(awg) else 0
-        use = ("signal, sensor 5 V / 0 V, CAN" if awg == 22 else "throttle motor, coil/injector +12 V branches, small loads" if awg in (20, 18)
-               else "PDM outputs, pigtails, grounds in the loom" if awg in (16, 14) else "blower, fan, iBooster, PDM feeds" if awg in (12, 10, 8)
-               else "battery, isolator, distribution, amplifier" if awg in (6, 4, 2) else "")
+        use = used_for([w for w in live if (w.get("spec"), w["awg"], gauge_word(w)) == (spec, awg, gw)])
         rate = RATING.get(awg, "not in the p.48 table")
         rows.append((str(spec), f"{gw} AWG", n, f"{feet:.0f} ft" if feet else "—", rate + (" each" if "×" in gw and awg in RATING else ""), use))
     p.faults = [f"wire rating {r[1]} printed {r[4]}, PDM manual p.48 gives {PDM_P48.get(int(r[1].split()[0].split('×')[-1]))} A"
                 for r in rows if r[4].replace(" each", "") != RATING.get(int(r[1].split()[0].split("×")[-1]), "not in the p.48 table")]
-    if sum(r[2] for r in rows) != len(live):
-        p.faults.append("wire spec rows do not add up to the wire list")
+    target = (reg.get("readiness") or {}).get("configuration", {}).get("buildable (base + decided)", {}).get("wires")
+    if sum(r[2] for r in rows) + len(no_gauge) != (target if target is not None else len(build)):
+        p.faults.append(f"wire spec rows ({sum(r[2] for r in rows)}) + leads with no gauge ({len(no_gauge)}) do not add up to the "
+                        f"{target} buildable wires")
+    if no_gauge:
+        rows.append(("kit lead or cable", "no gauge", len(no_gauge), "—", "—", used_for(no_gauge)))
     widths = [96, 44, 40, 48, 60, W - 2 * M - 288]
     p.y = p.table(M, p.y + 6, widths, ["Specification", "Size", "Wires", "Est. length", "Rating", "Used for"], rows, size=6.4, lead=8.4) + 14
     p.columns([("h", "The wire"),
@@ -960,6 +1110,12 @@ def page_tools(reg, number, odd):
     return getattr(p, "root", p)
 
 
+def fw_spares(reg):
+    sheets = kits_v5._load_sheets()
+    used = {str(t.get("cavity")) for t in reg["terminations"] if t["endpoint"] == "FIREWALL-ENGINE" and t.get("cavity")}
+    return [c for c in sheets.CAV_ORDER if c not in used]
+
+
 def page_procedures(reg, number, odd, families):
     """TERMINAL REPAIR AND CRIMPING — one block per connector family: the steps, the tool and setting, the pull test."""
     p = Page(number, "Harness Standards", odd=odd)
@@ -988,6 +1144,10 @@ def page_procedures(reg, number, odd, families):
             val = str(st.get("value") or "")
             if fam == "d38999_20" and st["do"] in ("pull test", "pull + look"):
                 val = SIZE20_PULL                         # the contact's own minimums, not the generic crimp values
+            if fam == "d38999_20" and re.search(r"empty cavit", st["do"] + " " + val, re.I):
+                sp_ = fw_spares(reg)                      # counted from the 61-pin fill, never typed (review round 3)
+                val = re.sub(r"\s*\(none if all 61 are used\)", "", val) + (
+                    f" — {len(sp_)} needed now: cavities {', '.join(sp_)} are spare" if sp_ else " — none needed: all 61 are used")
             val = val.replace("UNKNOWN:", "OPEN:").replace("UNKNOWN", "OPEN").replace("SEN_0V", "sensor 0 V")
             part = f" part {st['part']}" if st.get("part") else ""
             blocks.append(("p", f"{st['do'].upper()}{part}{(' — ' + ', '.join(names)) if names else ''}{(': ' + val) if val else ''}"))
@@ -1264,7 +1424,7 @@ def connector_pages(reg, wires, plugs, first, fig0):
         rows = []
         for t in ts:
             w = wires.get(t["wire"], {})
-            rows.append((str(t.get("cavity")), t["wire"].upper(),            # the cavity as the maker moulds it (coil a-d)
+            rows.append((str(t.get("cavity")), circuit_word(w) if w else t["wire"].upper(),   # the cavity as moulded (coil a-d)
                          gm_colour(f"{gauge(w)} {colour(w)}"), kits_v5.dave_name(w).upper(),
                          fw.get(t["wire"]) or "—", other_end(w, eid).upper()))
         ty = p.table(x, y + fh + 4, widths, ["Cav", "Ckt", "Wire", "Function", "Bulk", "To"], rows, size=6.2, head_size=6.2, lead=8.6)
@@ -1386,6 +1546,7 @@ def build():
     loc = page_locations(reg, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1)
     if loc:
         pages.append(loc)
+        pages += loc.__dict__.pop("extra_pages", [])
         toc.append(("Component Location", loc.number))
     import diagram_v5
     sheets = [] if "--pages-only" in sys.argv else diagram_v5.build(first_number=len(pages) + 1)
@@ -1399,6 +1560,7 @@ def build():
         bad += [f"{p.number}: {b}" for b in kits_v5.book_lint(text) if not b.startswith("unstamped")]
         bad += [f"{p.number}: overprint '{a}' over '{b}'" for a, b in diagram_v5.overlaps(p)]
         bad += [f"{p.number}: {b}" for b in layout_faults(p.boxes, W, H, M, footer=(REVISION,))]
+        bad += [f"{p.number}: {b}" for b in fragment_faults(p.boxes)]
         bad += [f"{p.number}: {b}" for b in getattr(p, "faults", [])]
         if any(b[4] == "(continued)" for b in p.boxes):
             body = [b for b in p.boxes if b[1] > M + 16 and b[4] not in ("(continued)", REVISION)]

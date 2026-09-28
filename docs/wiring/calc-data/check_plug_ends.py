@@ -279,9 +279,9 @@ def run_wires():
     base_of = lambda x: re.split(r"\s\(|:|\s->|\s\+", str(x or ""))[0].strip()
     codeish = lambda x: code_of(base_of(x)) or (base_of(x) if base_of(x) in eps else None)
     # the body circuits' own firewall crossing (never the engine-only 61-pin: state rows 50, 53)
-    body = {str(w): (eid, cav) for eid in ("FIREWALL-BODY-A", "FIREWALL-BODY-B", "FIREWALL-BODY-P")
+    body = {str(w): (eid, cav) for eid in ("FIREWALL-BODY-A", "FIREWALL-BODY-B", "FIREWALL-BODY-P", "FIREWALL-BODY-C")
             for w, cav in ((eps.get(eid) or {}).get("cavities") or {}).items()}
-    BODY_RANGE = {"FIREWALL-BODY-A": (16, 20), "FIREWALL-BODY-B": (16, 20), "FIREWALL-BODY-P": (12, 14)}
+    BODY_RANGE = {"FIREWALL-BODY-A": (16, 20), "FIREWALL-BODY-B": (16, 20), "FIREWALL-BODY-P": (12, 14), "FIREWALL-BODY-C": (14, 20)}
     ends = defaultdict(list)
     for t in r["terminations"]:
         ends[str(t["wire"])].append(t)
@@ -449,6 +449,13 @@ def run_wires():
                                        + ("" if ok else f" but {awg} AWG (its contacts take {lo}–{hi} AWG)"))
             else:
                 res["R12 firewall"] = ("FAIL", f"crosses the firewall ({a[0]} in the {sa} -> {b[0]} in the {sb}) with no path")
+        elif {sa, sb} == {CAB, OTHER} and kind != "april" and wid in body:
+            eid, cav = body[wid]
+            lo, hi = BODY_RANGE[eid]
+            awg = w.get("awg")
+            ok = isinstance(awg, int) and lo <= awg <= hi
+            res["R12 firewall"] = ("PASS" if ok else "FAIL", f"cab exit: body bulkhead {eid[-1]} cavity {cav}"
+                                   + ("" if ok else f" but {awg} AWG (its contacts take {lo}–{hi} AWG)"))
         elif {sa, sb} == {CAB, OTHER} and kind != "april" and any(
                 "crossing: bulkhead C" in " ".join(map(str, (eps.get(codeish(x) or "") or {}).get("open") or []))
                 or "crossing: bulkhead C" in str(w.get("notes") or "") for x in (a[0], b[0])):
@@ -526,9 +533,9 @@ def run_wires():
         "CAN bus": ("PASS" if hop_ok else "FAIL", "; ".join(hop_txt) + " — the PDMs take commands over CAN (MoTeC PDM manual "
                     "p.39: 4 messages × 8 bytes; p.23: a message that stops arriving times out); 100R at each end (p.50)"),
         "Body bulkhead": ("PASS" if all(sum(1 for e, _ in body.values() if e == k) <= n for k, n in
-                                         (("FIREWALL-BODY-A", 12), ("FIREWALL-BODY-B", 12), ("FIREWALL-BODY-P", 4))) else "FAIL",
+                                         (("FIREWALL-BODY-A", 12), ("FIREWALL-BODY-B", 12), ("FIREWALL-BODY-P", 4), ("FIREWALL-BODY-C", 6))) else "FAIL",
                           " · ".join(f"{k[-1]} {sum(1 for e, _ in body.values() if e == k)}/{n}" for k, n in
-                                     (("FIREWALL-BODY-A", 12), ("FIREWALL-BODY-B", 12), ("FIREWALL-BODY-P", 4)))
+                                     (("FIREWALL-BODY-A", 12), ("FIREWALL-BODY-B", 12), ("FIREWALL-BODY-P", 4), ("FIREWALL-BODY-C", 6)))
                           + " — body circuits cross here, never the engine-only 61-pin (state rows 50, 53)"),
         "61-pin cavities": ("PASS" if len(bulk) <= 61 else "FAIL",
                             f"{len(bulk)}/61 used · spare {', '.join(fw.get('spare_cavities', [])) or 'none'} · "

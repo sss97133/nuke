@@ -387,3 +387,11 @@ DTP06-2S: {vendor: prowire, kind: housing, name: "Deutsch DTP 2-way plug (socket
 DTP04-2P: {kind: housing, name: "Deutsch DTP 2-way receptacle (pins 0460-204-12141)", status: open, note: "vendor page not saved", sources: ["catalog/families.yaml dtp"]}
 DT06-2S: {kind: housing, name: "Deutsch DT 2-way plug (sockets 0462-201-16141, 20-16 AWG)", sources: ["reference_documents/web_snapshots/www.customconnectorkits.com__dt06-2s.md"]}
 DT04-2P: {kind: housing, name: "Deutsch DT 2-way receptacle (pins 0460-202-16141, 20-16 AWG)", sources: ["reference_documents/web_snapshots/www.customconnectorkits.com__dt04-2p.md"]}
+
+# ---------------------------------------------------------------- round 3
+"9918": {vendor: prowire, kind: lug, name: "HI-TEMP RING TERM 12-10 AWG, 3/8 in (M9) stud", sources: ["web_snapshots/www.prowireusa.com__p-1509-hi-temp-ring-term-12-10-3-8.md ('STUD SIZE 3/8\" (M9)', 'WIRE SIZE / RANGE 12-10 AWG')"]}
+DT04-6P-L012: {vendor: prowire, kind: housing, name: "Deutsch DT 6-way flanged receptacle, size 16 pins, 14-20 AWG", price: 6.217, sources: ["web_snapshots/www.prowireusa.com__p-2900-dt-6-way-flanged-receptacle.md"]}
+DT06-6S: {kind: housing, name: "Deutsch DT 6-way plug (mates DT04-6P-L012), size 16 sockets", sources: ["web_snapshots/www.prowireusa.com__p-2900-dt-6-way-flanged-receptacle.md (Mating Connector DT06-6S)"]}
+W6P: {kind: wedge, name: "Deutsch DT 6-way receptacle wedgelock", sources: ["web_snapshots/www.prowireusa.com__p-2900-dt-6-way-flanged-receptacle.md (Required Wedgelock W6P)"]}
+W6S: {kind: wedge, name: "Deutsch DT 6-way plug wedgelock", status: open, note: "the DT06-6S page is not saved; W6S follows the dt family's wedge_socket convention", sources: ["catalog/families.yaml dt"]}
+

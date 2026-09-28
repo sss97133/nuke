@@ -376,8 +376,9 @@ def attach(reg):
             per_end = [{"wires": [w], "part": lab(cfg(w)), "cavity": cav_of.get(w)} for w in wl]
         elif fid == "ring_small":
             # a named ground stud (G-*) takes one ring per wire, stacked; other ring endpoints keep their shared rings
-            per_end = [{"wires": [w], "part": "RING-SMALL", "cavity": f"ring {i}" if eid.startswith(("G-", "GND-")) else "ring"}
-                       for i, w in enumerate(wl, 1)]
+            lug = ep.get("lugs") or {}          # a named ring for a wire (round 3: FAN_GND 12 AWG on ProWire 9918)
+            per_end = [{"wires": [w], "part": " + ".join(lug[w]) if isinstance(lug.get(w), list) else (lug.get(w) or "RING-SMALL"),
+                        "cavity": f"ring {i}" if eid.startswith(("G-", "GND-")) else "ring"} for i, w in enumerate(wl, 1)]
         elif fid in ("kit_terminal", "te_amp_plug"):
             per_end = [{"wires": [w], "part": "kit terminal + seal", "cavity": cav_of.get(w)} for w in wl]
         elif fid == "lug":

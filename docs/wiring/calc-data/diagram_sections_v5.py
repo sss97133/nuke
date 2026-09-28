@@ -45,7 +45,7 @@ SHEET_PLAN = [
      ["^DOOR-L-PASS-P$", "^DOOR-L-PASS$", "^WIN-SW-L$", "^LOCK-SW-L$", "^window_motor_DS$", "^lock_actuator_DS$", "^SPK-FL$",
       "^DOOR-R-PASS-P$", "^DOOR-R-PASS$", "^WIN-SW-R$", "^LOCK-SW-R$", "^window_motor_PS$", "^lock_actuator_PS$", "^SPK-FR$"]),
     ("body_convenience", "tailgate-camera", "Tailgate window and rear camera", "cab",
-     r"^(TG-SW-DASH|TG-SW-KEY|TG-CUTOUT|rear_window_motor|Backup_Camera|MIRROR-MON)$"),
+     r"^(TG-SW-DASH|TG-SW-KEY|TG-CUTOUT|rear_window_motor|TG-MOTOR-ACI|TG-SW-MASTER|TG-SW-KEY-REV|Backup_Camera|MIRROR-MON)$"),
     ("body_convenience", "interior", "Dome, courtesy and cargo lamps, door jambs and power steps", "cab",
      r"^(DOME-LAMP|FOOTWELL-LAMPS|UNDERDASH-LAMPS|CARGO-LAMP|DOOR-JAMB-[LR]|AMP-STEP-CTRL)$"),
     ("body_convenience", "audio", "Amplifier, woofers and rear speakers", "cab", r"^(AMP|AMP-BLOCK|SUB|SUB-2|SPK-R[LR])$"),
@@ -53,7 +53,7 @@ SHEET_PLAN = [
     ("lighting_rear", "rear-lamps", "Tail, stop, backup, third brake, license and rear markers; cab roof clearance lamps",
      "cab", r"^(Tail_Light_(Left|Right)|Backup_Light_(Left|Right)|CHMSL|LICENSE-LAMP|MARKER-[LR]R|CLEARANCE-[LCR])$"),
     ("powertrain_chassis", "chassis", "Transfer-case switch, speed sender, gear sender and parking brake", "cab",
-     r"^(TCASE-4WD-SW|VSS|VSS-SENDER|GSS-3000|GSS-SENSOR|E-STOPP)$"),
+     r"^(TCASE-4WD-SW|VSS|VSS-SENDER|GSS-3000|GSS-SENSOR|E-STOPP|PCS-TCM)$"),
 ]
 
 # the computers: drawn on every sheet a run reaches them, pins named from the MoTeC designation files
@@ -61,11 +61,11 @@ COMPUTERS = ("M130-A", "M130-B", "PDM30-A", "PDM30-B", "PDM15-A", "PDM15-B", "DA
 ENGINE_COMPUTERS = ("PDM15-A", "PDM15-B")
 # junctions: ground banks, studs, rails — drawn where a run reaches them
 JUNCTIONS = ("GND-BANK-ENG", "PS-STUDS", "RAIL-COIL_PWR", "RAIL-INJ_PWR", "COIL-GROUND-RINGS", "PDM15-STUD",
-             "PDM30-STUD", "GND-BANK-CAB", "GND-SPLICE-REAR")
+             "PDM30-STUD", "GND-BANK-CAB", "GND-SPLICE-REAR", "FAN-JUNCTION")
 CAB_JUNCTIONS = ("PDM30-STUD", "GND-BANK-CAB", "GND-SPLICE-REAR")
 # crossings: the 61-pin (engine circuits only), the body bulkheads, the grommet for the big feeds
 CROSSINGS = ("FIREWALL-ENGINE", "FIREWALL-CABIN", "FIREWALL-BODY-A", "FIREWALL-BODY-B", "FIREWALL-BODY-P",
-             "FIREWALL-GROMMET")
+             "FIREWALL-BODY-C", "AMP-PASS", "FIREWALL-GROMMET")
 # the sheet that carries a wire with no plug end of its own (junction to junction, or computer only)
-JUNCTION_HOME = {"RAIL-COIL_PWR": "coils", "COIL-GROUND-RINGS": "coils", "RAIL-INJ_PWR": "injectors"}
+JUNCTION_HOME = {"RAIL-COIL_PWR": "coils", "COIL-GROUND-RINGS": "coils", "RAIL-INJ_PWR": "injectors", "FAN-JUNCTION": "throttle"}
 WIRE_HOME = [(r"^PCS_", "chassis"), (r"^COIL_GND$", "coils"), (r"^ECU_", "power"), (r"^(ETH_|UTC_|CAN_|62$)", "data")]

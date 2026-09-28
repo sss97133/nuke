@@ -2520,7 +2520,7 @@
    "kind": "v5",
    "label": "Radiator Fan 1",
    "from": [
-    "SPL-PDM15-OUT1 (PDM15:OUT1 + PDM15:OUT6 pigtails A1 + A10 + B3 + B9)",
+    "FAN-JUNCTION (stud: the 12 AWG tail to the fan)",
     null
    ],
    "to": [
@@ -2531,22 +2531,14 @@
     "engine bay",
     "engine bay"
    ],
-   "from_str": "SPL-PDM15-OUT1 (PDM15:OUT1 + PDM15:OUT6 pigtails A1 + A10 + B3 + B9)",
+   "from_str": "FAN-JUNCTION (stud: the 12 AWG tail to the fan)",
    "control": "CAN: M130 fan request (CAN from the M130 (MoTeC PDM manual p.39 CAN input, 4 messages x 8 bytes); a timed-out message switches it off (p.23)) \u2014 OUT1 and OUT6 on one channel (PDM manual p.22)",
    "subsystem": "COOLING",
    "engine_run": true,
    "rules": {
     "R8 ends": [
      "PASS",
-     "SPL-PDM15-OUT1 (PDM15:OUT1 + PDM15:OUT6 pigtails A1 + A10 + B3 + B9):None -> Radiator_Fan_1:power + (12 ga terminal, ProWire kit 30130628)"
-    ],
-    "R9 pin": [
-     "PASS",
-     "OUT1 20 A vs load 18.0 A"
-    ],
-    "R11 command": [
-     "PASS",
-     "switched by CAN: M130 fan request (CAN from the M130 (MoTeC PDM manual p.39 CAN input, 4 messages x 8 bytes); a timed-out message switches it off (p.23)) \u2014 OUT1 and OUT6 on one channel (PDM manual p.22)"
+     "FAN-JUNCTION (stud: the 12 AWG tail to the fan):None -> Radiator_Fan_1:power + (12 ga terminal, ProWire kit 30130628)"
     ]
    }
   },
@@ -2638,8 +2630,8 @@
      "M130:B08 -> VSS-SENDER:signal"
     ],
     "R12 firewall": [
-     "OPEN",
-     "crosses cab -> chassis through the body crossing: bulkhead C, cavity OPEN (the engine-only 61-pin is not its path, state row 50)"
+     "PASS",
+     "cab exit: body bulkhead C cavity 1"
     ]
    }
   },
@@ -3228,8 +3220,8 @@
     "B20"
    ],
    "to": [
-    "FUEL-LEVEL",
-    "1 (sender signal: #98 and #117 join in one splice before the plug)"
+    "SPL-FUEL-SND",
+    "sender side (with #117)"
    ],
    "sides": [
     "cab",
@@ -3242,7 +3234,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "M130:B20 -> FUEL-LEVEL:1 (sender signal: #98 and #117 join in one splice before the plug)"
+     "M130:B20 -> SPL-FUEL-SND:sender side (with #117)"
     ],
     "R9 pin": [
      "PASS",
@@ -4144,7 +4136,7 @@
    "kind": "v5",
    "label": "Dakota Fuel Level Sender",
    "from": [
-    "GM FUEL SNDR",
+    "SPL-FUEL-SND (sender side, with #98)",
     null
    ],
    "to": [
@@ -4152,17 +4144,17 @@
     "FUEL SND"
    ],
    "sides": [
-    "cab",
+    "other",
     "cab"
    ],
-   "from_str": "GM FUEL SNDR",
+   "from_str": "SPL-FUEL-SND (sender side, with #98)",
    "control": null,
    "subsystem": "DASH_CLUSTER_DAKOTA",
    "engine_run": true,
    "rules": {
     "R8 ends": [
      "PASS",
-     "GM FUEL SNDR:None -> Dakota VHX control box:FUEL SND"
+     "SPL-FUEL-SND (sender side, with #98):None -> Dakota VHX control box:FUEL SND"
     ]
    }
   },
@@ -5449,6 +5441,95 @@
    }
   },
   {
+   "wire": "FAN_LEG1",
+   "kind": "implied",
+   "label": "Fan feed leg 1: PDM15 OUT1 (pigtail splice) -> FAN-JUNCTION stud",
+   "from": [
+    "SPL-PDM15-OUT1 (PDM15:OUT1 pigtails A1 + A10)",
+    ""
+   ],
+   "to": [
+    "FAN-JUNCTION (stud)",
+    "stud"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "SPL-PDM15-OUT1 (PDM15:OUT1 pigtails A1 + A10)",
+   "control": "CAN: M130 fan request (MoTeC PDM manual p.39 CAN input) \u2014 OUT1 and OUT6 on one channel (p.22)",
+   "subsystem": "COOLING",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "SPL-PDM15-OUT1 (PDM15:OUT1 pigtails A1 + A10): -> FAN-JUNCTION (stud):stud"
+    ],
+    "R11 command": [
+     "PASS",
+     "switched by CAN: M130 fan request (MoTeC PDM manual p.39 CAN input) \u2014 OUT1 and OUT6 on one channel (p.22)"
+    ]
+   }
+  },
+  {
+   "wire": "FAN_LEG2",
+   "kind": "implied",
+   "label": "Fan feed leg 2: PDM15 OUT6 (pigtail splice) -> FAN-JUNCTION stud",
+   "from": [
+    "SPL-PDM15-OUT6 (PDM15:OUT6 pigtails B3 + B9)",
+    ""
+   ],
+   "to": [
+    "FAN-JUNCTION (stud)",
+    "stud"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "SPL-PDM15-OUT6 (PDM15:OUT6 pigtails B3 + B9)",
+   "control": "CAN: M130 fan request (MoTeC PDM manual p.39 CAN input) \u2014 OUT1 and OUT6 on one channel (p.22)",
+   "subsystem": "COOLING",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "SPL-PDM15-OUT6 (PDM15:OUT6 pigtails B3 + B9): -> FAN-JUNCTION (stud):stud"
+    ],
+    "R11 command": [
+     "PASS",
+     "switched by CAN: M130 fan request (MoTeC PDM manual p.39 CAN input) \u2014 OUT1 and OUT6 on one channel (p.22)"
+    ]
+   }
+  },
+  {
+   "wire": "FUEL_SND_LEAD",
+   "kind": "implied",
+   "label": "Fuel sender signal lead: the #98 / #117 splice to DT pin 1 above the tank lid",
+   "from": [
+    "SPL-FUEL-SND (lead side)",
+    ""
+   ],
+   "to": [
+    "FUEL-LEVEL (1)",
+    "1 (sender signal: the lead from splice SPL-FUEL-SND-1)"
+   ],
+   "sides": [
+    "other",
+    "other"
+   ],
+   "from_str": "SPL-FUEL-SND (lead side)",
+   "control": null,
+   "subsystem": "DASH_CLUSTER_DAKOTA",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "SPL-FUEL-SND (lead side): -> FUEL-LEVEL (1):1 (sender signal: the lead from splice SPL-FUEL-SND-1)"
+    ]
+   }
+  },
+  {
    "wire": "FAN_PWM",
    "kind": "implied",
    "label": "Radiator fan speed: M130 A34 low-side PWM -> SPAL white control lead",
@@ -5489,7 +5570,7 @@
    ],
    "to": [
     "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)",
-    "ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+    "ring 20"
    ],
    "sides": [
     "engine bay",
@@ -5502,7 +5583,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "FAN (ground): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+     "FAN (ground): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):ring 20"
     ]
    }
   },
@@ -7809,8 +7890,8 @@
      "DAKOTA-VHX (SPD +): -> VSS-SENDER (power):red lead (+5 V from SPD +)"
     ],
     "R12 firewall": [
-     "OPEN",
-     "crosses cab -> chassis through the body crossing: bulkhead C, cavity OPEN (the engine-only 61-pin is not its path, state row 50)"
+     "PASS",
+     "cab exit: body bulkhead C cavity 3"
     ]
    }
   },
@@ -7840,8 +7921,8 @@
      "VSS-SENDER (ground): -> DAKOTA-VHX (SPD -):SPD -"
     ],
     "R12 firewall": [
-     "OPEN",
-     "crosses cab -> chassis through the body crossing: bulkhead C, cavity OPEN (the engine-only 61-pin is not its path, state row 50)"
+     "PASS",
+     "cab exit: body bulkhead C cavity 4"
     ]
    }
   },
@@ -7871,8 +7952,8 @@
      "VSS-SENDER (signal): -> DAKOTA-VHX (SPD SND):SPD SND"
     ],
     "R12 firewall": [
-     "OPEN",
-     "crosses cab -> chassis through the body crossing: bulkhead C, cavity OPEN (the engine-only 61-pin is not its path, state row 50)"
+     "PASS",
+     "cab exit: body bulkhead C cavity 2"
     ]
    }
   },
@@ -9046,16 +9127,16 @@
    }
   },
   {
-   "wire": "BLOWER_LO",
+   "wire": "BLOWER_BAT",
    "kind": "implied",
-   "label": "Blower switch LOW lead to the resistor",
+   "label": "Blower switch LOW lead to the resistor BAT terminal (factory circuit 51)",
    "from": [
     "BLOWER-SW (LOW lead)",
     ""
    ],
    "to": [
-    "BLOWER-RES (LOW tap)",
-    "51 (resistor BAT terminal, low: BATT-R1-R2-R3)"
+    "BLOWER-RES (BAT tap)",
+    "BAT terminal (factory circuit 51; low: BATT-R1-R2-R3)"
    ],
    "sides": [
     "cab",
@@ -9068,7 +9149,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "BLOWER-SW (LOW lead): -> BLOWER-RES (LOW tap):51 (resistor BAT terminal, low: BATT-R1-R2-R3)"
+     "BLOWER-SW (LOW lead): -> BLOWER-RES (BAT tap):BAT terminal (factory circuit 51; low: BATT-R1-R2-R3)"
     ],
     "R12 firewall": [
      "PASS",
@@ -10634,114 +10715,6 @@
    }
   },
   {
-   "wire": "21_PT1",
-   "kind": "implied",
-   "label": "PDM15 OUT1+OUT6 pigtail 1 of 4 (pin A1) to the #21 splice",
-   "from": [
-    "PDM15",
-    "A1"
-   ],
-   "to": [
-    "SPL-PDM15-OUT1 (pigtail side)",
-    "splice 1"
-   ],
-   "sides": [
-    "engine bay",
-    "engine bay"
-   ],
-   "from_str": "PDM15:A1",
-   "control": "CAN: M130 fan request (CAN from the M130 (MoTeC PDM manual p.39 CAN input, 4 messages x 8 bytes); a timed-out message switches it off (p.23)) \u2014 OUT1 and OUT6 on one channel (PDM manual p.22)",
-   "subsystem": "COOLING",
-   "engine_run": true,
-   "rules": {
-    "R8 ends": [
-     "PASS",
-     "PDM15:A1 -> SPL-PDM15-OUT1 (pigtail side):splice 1"
-    ]
-   }
-  },
-  {
-   "wire": "21_PT2",
-   "kind": "implied",
-   "label": "PDM15 OUT1+OUT6 pigtail 2 of 4 (pin A10) to the #21 splice",
-   "from": [
-    "PDM15",
-    "A10"
-   ],
-   "to": [
-    "SPL-PDM15-OUT1 (pigtail side)",
-    "splice 2"
-   ],
-   "sides": [
-    "engine bay",
-    "engine bay"
-   ],
-   "from_str": "PDM15:A10",
-   "control": "CAN: M130 fan request (CAN from the M130 (MoTeC PDM manual p.39 CAN input, 4 messages x 8 bytes); a timed-out message switches it off (p.23)) \u2014 OUT1 and OUT6 on one channel (PDM manual p.22)",
-   "subsystem": "COOLING",
-   "engine_run": true,
-   "rules": {
-    "R8 ends": [
-     "PASS",
-     "PDM15:A10 -> SPL-PDM15-OUT1 (pigtail side):splice 2"
-    ]
-   }
-  },
-  {
-   "wire": "21_PT3",
-   "kind": "implied",
-   "label": "PDM15 OUT1+OUT6 pigtail 3 of 4 (pin B3) to the #21 splice",
-   "from": [
-    "PDM15",
-    "B3"
-   ],
-   "to": [
-    "SPL-PDM15-OUT1 (pigtail side)",
-    "splice 3"
-   ],
-   "sides": [
-    "engine bay",
-    "engine bay"
-   ],
-   "from_str": "PDM15:B3",
-   "control": "CAN: M130 fan request (CAN from the M130 (MoTeC PDM manual p.39 CAN input, 4 messages x 8 bytes); a timed-out message switches it off (p.23)) \u2014 OUT1 and OUT6 on one channel (PDM manual p.22)",
-   "subsystem": "COOLING",
-   "engine_run": true,
-   "rules": {
-    "R8 ends": [
-     "PASS",
-     "PDM15:B3 -> SPL-PDM15-OUT1 (pigtail side):splice 3"
-    ]
-   }
-  },
-  {
-   "wire": "21_PT4",
-   "kind": "implied",
-   "label": "PDM15 OUT1+OUT6 pigtail 4 of 4 (pin B9) to the #21 splice",
-   "from": [
-    "PDM15",
-    "B9"
-   ],
-   "to": [
-    "SPL-PDM15-OUT1 (pigtail side)",
-    "splice 4"
-   ],
-   "sides": [
-    "engine bay",
-    "engine bay"
-   ],
-   "from_str": "PDM15:B9",
-   "control": "CAN: M130 fan request (CAN from the M130 (MoTeC PDM manual p.39 CAN input, 4 messages x 8 bytes); a timed-out message switches it off (p.23)) \u2014 OUT1 and OUT6 on one channel (PDM manual p.22)",
-   "subsystem": "COOLING",
-   "engine_run": true,
-   "rules": {
-    "R8 ends": [
-     "PASS",
-     "PDM15:B9 -> SPL-PDM15-OUT1 (pigtail side):splice 4"
-    ]
-   }
-  },
-  {
    "wire": "66_PT1",
    "kind": "implied",
    "label": "PDM15 OUT5 pigtail 1 of 2 (pin A9) to the #66 splice",
@@ -10900,6 +10873,114 @@
     "R8 ends": [
      "PASS",
      "PDM15:A14 -> SPL-PDM15-OUT3 (pigtail side):splice 2"
+    ]
+   }
+  },
+  {
+   "wire": "FAN_LEG1_PT1",
+   "kind": "implied",
+   "label": "PDM15 OUT1 pigtail 1 of 2 (pin A1) to the #FAN_LEG1 splice",
+   "from": [
+    "PDM15",
+    "A1"
+   ],
+   "to": [
+    "SPL-PDM15-OUT1 (pigtail side)",
+    "splice 1"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "PDM15:A1",
+   "control": "CAN: M130 fan request (MoTeC PDM manual p.39 CAN input) \u2014 OUT1 and OUT6 on one channel (p.22)",
+   "subsystem": "COOLING",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM15:A1 -> SPL-PDM15-OUT1 (pigtail side):splice 1"
+    ]
+   }
+  },
+  {
+   "wire": "FAN_LEG1_PT2",
+   "kind": "implied",
+   "label": "PDM15 OUT1 pigtail 2 of 2 (pin A10) to the #FAN_LEG1 splice",
+   "from": [
+    "PDM15",
+    "A10"
+   ],
+   "to": [
+    "SPL-PDM15-OUT1 (pigtail side)",
+    "splice 2"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "PDM15:A10",
+   "control": "CAN: M130 fan request (MoTeC PDM manual p.39 CAN input) \u2014 OUT1 and OUT6 on one channel (p.22)",
+   "subsystem": "COOLING",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM15:A10 -> SPL-PDM15-OUT1 (pigtail side):splice 2"
+    ]
+   }
+  },
+  {
+   "wire": "FAN_LEG2_PT1",
+   "kind": "implied",
+   "label": "PDM15 OUT6 pigtail 1 of 2 (pin B3) to the #FAN_LEG2 splice",
+   "from": [
+    "PDM15",
+    "B3"
+   ],
+   "to": [
+    "SPL-PDM15-OUT6 (pigtail side)",
+    "splice 1"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "PDM15:B3",
+   "control": "CAN: M130 fan request (MoTeC PDM manual p.39 CAN input) \u2014 OUT1 and OUT6 on one channel (p.22)",
+   "subsystem": "COOLING",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM15:B3 -> SPL-PDM15-OUT6 (pigtail side):splice 1"
+    ]
+   }
+  },
+  {
+   "wire": "FAN_LEG2_PT2",
+   "kind": "implied",
+   "label": "PDM15 OUT6 pigtail 2 of 2 (pin B9) to the #FAN_LEG2 splice",
+   "from": [
+    "PDM15",
+    "B9"
+   ],
+   "to": [
+    "SPL-PDM15-OUT6 (pigtail side)",
+    "splice 2"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "PDM15:B9",
+   "control": "CAN: M130 fan request (MoTeC PDM manual p.39 CAN input) \u2014 OUT1 and OUT6 on one channel (p.22)",
+   "subsystem": "COOLING",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM15:B9 -> SPL-PDM15-OUT6 (pigtail side):splice 2"
     ]
    }
   },
@@ -18358,7 +18439,7 @@
   ],
   "Body bulkhead": [
    "PASS",
-   "A 12/12 \u00b7 B 12/12 \u00b7 P 1/4 \u2014 body circuits cross here, never the engine-only 61-pin (state rows 50, 53)"
+   "A 12/12 \u00b7 B 12/12 \u00b7 P 1/4 \u00b7 C 4/6 \u2014 body circuits cross here, never the engine-only 61-pin (state rows 50, 53)"
   ],
   "61-pin cavities": [
    "PASS",

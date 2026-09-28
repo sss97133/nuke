@@ -15,10 +15,8 @@ FUEL-LEVEL:
   kit:
     DT06-2S: 1
     DT04-2P: 1
-  splice_point: true
   pins:
-    '117': 1 (sender signal)
-    '98': '1 (sender signal: #98 and #117 join in one splice before the plug)'
+    FUEL_SND_LEAD: '1 (sender signal: the lead from splice SPL-FUEL-SND-1)'
     FUEL_SND_GND: 2 (FUEL -, sender ground)
   note: FUEL - goes 'only direct to the fuel level sensor', never chassis; run the sender as 'a twisted pair' (Dakota VHX manual p.11). DT size 16 contacts 0460-202-16141 /
     0462-201-16141 take 20-16 AWG, so the sender wires are 20 AWG
