@@ -1,0 +1,8 @@
+TCASE-4WD-SW:
+  family: open
+  note: 'owner 2026-09-27: the case is shifted by hand and the hubs are manual, so electric needs ''some fabbing which is possible''. The lamp says the case is in
+    4WD; locking the hubs stays a by-hand check.'
+  open:
+  - fabricated switch, not picked (registry family open; neither ring_small nor kit_terminal is named in the registry). The switch's terminals close this
+  sources:
+  - 'Dakota VHX manual p.6: 4x4 (-) ground-activated input'

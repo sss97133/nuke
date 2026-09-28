@@ -1,0 +1,13 @@
+DAK-OILP:
+  family: miniseal
+  pins:
+    '115': white lead (OIL SND)
+    DAK_OILP_5V: red lead (OIL +, 5 V)
+    DAK_OILP_GND: black lead + bare shield (OIL -)
+  note: 'maker''s document: Dakota Digital SEN-03-8 oil pressure sender with its three-wire harness plus bare shield · family miniseal: the sender has its own harness
+    (''three wire harness, plus one bare shield wire'', VHX manual p.10); DAK_OILP_GND joins the black lead and the shield in one splice'
+  open:
+  - 'SEN-03-8 lead gauges (splice colours; the ground splice holds black + shield + DAK_OILP_GND): bench'
+  sources:
+  - 'Dakota VHX manual 650314:P p.10 (reference_documents/component_drawings/dakota_digital_vhx_manual.pdf): ''The WHITE wire will connect to the OIL SND terminal,
+    the RED to OIL + (5V DC), and the BLACK and bare shield wire to OIL –'''

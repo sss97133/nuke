@@ -1,0 +1,15 @@
+IBOOSTER:
+  family: open
+  pins:
+    '52': red lead, housing pin 1 (always hot, 40 A)
+    IBOOST_WAKE: green lead, housing pin 20 (ignition, 5 A)
+    IBOOST_GND: black lead, housing pin 9 (GND)
+  note: 'maker''s document: Bosch iBooster Gen 2 with the Tulay Gen-2 universal harness: loose leads red 4.00 mm² (pin 1, always hot), green 0.50 mm² (pin 20, ignition),
+    black 4.00 mm² (pin 9, chassis ground)'
+  open:
+  - 'join of the 8 AWG #52 / IBOOST_GND to the 4.00 mm² Tulay leads: past a D-609-05 (16-12) — butt splice part OPEN'
+  - 'IBOOST_WAKE (20 AWG) to the 0.50 mm² green lead: D-609-03 fits by gauge; confirm at the bench'
+  sources:
+  - 'reference_documents/web_snapshots/tulayswirewerks.com__bosch-ibooster-gen-2-universal-wire-harness.md (loose wires: ''4.00 mm² – Red – Always Hot Power'', ''0.50
+    mm² – Green – Ignition Switched Power'', ''4.00 mm² – Black – Chassis Ground'')'
+  - 'reference_documents/web_snapshots/www.evcreate.com__wiring-the-ibooster.md (GEN2: 1 = 12V+ permanent 40A fused, 9 = GND, 20 = 12V+ ignition 5A fused)'

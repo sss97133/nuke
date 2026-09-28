@@ -1,0 +1,10 @@
+DOOR-L-PASS-P:
+  family: dtp
+  pins: {'34': '1', WIN_GND_L: '2', WIN_R_UP: '3', WIN_R_DN: '4'}
+  empty: 0
+  note: 'DESIGN CHOICE, not a maker fact: window feed, window ground, passenger UP, passenger DOWN in cavities 1-4'
+  kit: {}
+  mate: DTP06-4S + WP-4S (door side, sockets) to DTP04-4P + WP-4P (body side, pins); size 12 contacts 0460-204-12141 / 0462-203-12141
+  sources:
+  - KSV 4-Way Mated Deutsch DTP Connector Kit page (DTP04-4P, DTP06-4S, WP-4P, WP-4S; size 12 solid contacts 14-12 AWG), read 2026-09-28
+  - customconnectorkits DTP04-4P page (accepts size 12 pins; mates DTP06-4S), read 2026-09-28

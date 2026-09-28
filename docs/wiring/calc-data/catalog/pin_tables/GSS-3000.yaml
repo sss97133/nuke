@@ -1,0 +1,16 @@
+GSS-3000:
+  family: screw_terminal
+  pins:
+    DAK_GEAR: 1-WIRE
+    GSS_PWR: IGNITION+ (+12 V ignition)
+    GSS_GND: GROUND-
+    GSS_SENS_R: RED
+    GSS_SENS_G: GREEN (sensor wire green or white)
+    GSS_SENS_B: BLACK
+  kit: {}
+  mate: decoder screw-terminal strip (no plug)
+  open:
+  - ring or spade size for the decoder screw terminals and the torque are not stated in the GSS-3000 manual
+  sources:
+  - 'Dakota Digital GSS-3000 manual (MAN# 650715:G), decoder label and ''Installation: Wiring'': terminals IGNITION+, GROUND-, 1-WIRE, RED, GREEN, BLACK; sensor RED to RED, GREEN or WHITE to GREEN, BLACK
+    to BLACK; 1-WIRE to the control box GEAR terminal (reference_documents/web_snapshots/www.dakotadigital.com__GSS-3000.md)'

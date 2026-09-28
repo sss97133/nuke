@@ -1,0 +1,7 @@
+LOCK-SW-R:
+  family: open
+  kit: {}
+  mate: OPEN
+  open:
+  - the lock rocker is not named by maker or part number in the registry, so no terminal table can be read; pick the rocker, then read its sheet
+  sources: []

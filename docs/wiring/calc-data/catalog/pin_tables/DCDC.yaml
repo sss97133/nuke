@@ -1,0 +1,17 @@
+DCDC:
+  family: open
+  pins:
+    DCDC_IN: input + screw terminal
+    DCDC_OUT: output + screw terminal
+    DCDC_GND: negative screw terminal
+  note: 'engine running detection starts and stops it on its own, so no enable wire is needed; the two-pole remote H/L connector stays unused · maker''s document:
+    Victron Orion-Tr Smart 12/12-30 non-isolated: screw terminals for input +, output + and negative; 1.6 Nm; bare fine-strand wire, no ferrule needed'
+  open:
+  - 'remote on/off: the manual says ''The minimum requirement for the remote on/off terminal is a wire loop between the L- and H-pins'' — the wire''s note ''two-pole
+    connector stays unused'' only holds with Victron''s wire bridge left in place'
+  - 'cable/fuse: manual table for 12 V is a 60 A fuse with 10 mm² at 1-2 m (6 mm² at 0.5 m); the wire list has 8 AWG (8.4 mm²) behind a MIDI 40 A — check the run lengths
+    against the table'
+  - 'terminal count/labels (one or two negative terminals): in the manual''s connection figure, not its text'
+  sources:
+  - 'reference_documents/web_snapshots/www.victronenergy.com__34439-Orion-Tr_Smart_DC-DC_Charger-pdf-en.md (Orion-Tr Smart non-isolated manual Rev 07): ''4.2 Cable
+    and fuse recommendations'', ''4.4 Recommended torque: 1.6 Nm'', ''The use of ferrules is not required'', remote on/off L/H text'

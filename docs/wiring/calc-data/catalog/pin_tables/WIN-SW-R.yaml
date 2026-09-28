@@ -1,0 +1,20 @@
+WIN-SW-R:
+  family: open
+  pins:
+    '35': red (orange) 12 V hot feed lead of the Nu-Relics switch harness
+    WIN_GND_R: black ground lead of the Nu-Relics switch harness
+    WIN_R_UP: NEEDS CAVITY
+    WIN_R_DN: NEEDS CAVITY
+    WIN_MOT_R_A: NEEDS CAVITY
+    WIN_MOT_R_B: NEEDS CAVITY
+  kit: {}
+  mate: Nu-Relics switch plug on the kit's completed harness (red backing plate); part number not published
+  open:
+  - 'switch-plug terminal map for the UP/DOWN and motor leads: Nu-Relics harness-bag instruction sheet (wires are labelled on the harness) — read at the bench'
+  - how our feed and ground meet the kit harness (splice or plug) is not stated by Nu-Relics
+  - '#201 is sold as a ''Double'' switch set for door placement; the registry''s master-switch wiring (driver switch driving the passenger window over WIN_R_UP / WIN_R_DN) must be confirmed against the
+    kit actually bought'
+  sources:
+  - 'Nu-Relics ''General Instructions & Tips'' p.2: harness wires labelled for position, black = ground, red (orange) = 12 V hot feed (reference_documents/web_snapshots/www.nu-relics.com__General_Instructions_12-30-14.md)'
+  - 'Nu-Relics #201 chrome switches, door placement: ''completed wire harness'', no terminal map published (reference_documents/web_snapshots/www.nu-relics.com__201.md)'
+  - 'Nu-Relics 17383-2 page: ''No Switches (Will Include Motor Plugs and Terminals)''; ACI motors are reverse polarity, 2 poles, swapping the wires reverses direction (reference_documents/web_snapshots/www.nu-relics.com__17383-2.md)'

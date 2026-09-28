@@ -1,0 +1,18 @@
+SUB:
+  family: open
+  pins:
+    30a: + push terminal
+    SUB_JMP_P: + push terminal
+    30b: '- push terminal'
+    SUB_JMP_N: '- push terminal'
+  splice_point: true
+  note: 'maker''s document: JBL Club 102SL woofer 1: spring-loaded push terminals (+ / -), bare or tinned wire 14-8 AWG; SSI switch at 4 ohm · two 10 AWG wires share
+    each push terminal by design (amp lead + jumper to woofer 2); no crimp at this end (bare wire), so no family applies'
+  open:
+  - 'whether one push terminal holds two 10 AWG wires: bench. Alternative: the amp''s sub harness has two paralleled lead pairs (JL connection guide), one pair per
+    woofer, no jumper'
+  sources:
+  - 'reference_documents/web_snapshots/www.sonicelectronix.com__club10_12.md (JBL Club shallow subwoofers owner''s manual: ''Push down on the terminal to expose the
+    connection hole. Thread the bare wire end through the hole''; ''compatible with bare or tinned wires ... 14AWG and 8AWG''; SSI switch)'
+  - 'reference_documents/web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md (JL VX700/5i connection guide: power connector +12 VDC / Ground / Remote with set screws,
+    ''strip back 3/8 inch''; Analog Input harness Inputs 1-6 RCA; Speaker Output Harness A-D leads; Subwoofer Output Harness)'

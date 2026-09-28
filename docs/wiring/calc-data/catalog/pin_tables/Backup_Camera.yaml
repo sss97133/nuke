@@ -1,0 +1,10 @@
+Backup_Camera:
+  family: open
+  open:
+  - 'camera-end plug and which wires land at the camera: the Rear View Safety page lists ''1 x 33'' Camera Cable'' and ''1 x Power Harness with Two Camera Inputs''
+    — the kit''s power harness sits at the mirror monitor, and the camera appears to take power through its cable. Wires #97 and CAM_GND may belong at the monitor,
+    not the camera. Closes with the RVS-7180355-IR installation manual (not listed in the saved rearviewsafety.com manuals index)'
+  sources:
+  - 'reference_documents/web_snapshots/www.rearviewsafety.com__license-plate-backup-camera-system-rvs-7180355-ir.md (kit contents: 33'' camera cable, power harness
+    with two camera inputs; power DC 12-24 V)'
+  - 'reference_documents/web_snapshots/www.rearviewsafety.com__manuals.md (manual index: RVS-7180355-IR not found)'

@@ -1130,7 +1130,7 @@
    ],
    "to": [
     "TURN-SW",
-    "left front output"
+    "14 LT FRT LP (factory 20 LT BLU-14A)"
    ],
    "sides": [
     "cab",
@@ -1143,7 +1143,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:DIG4 -> TURN-SW:left front output"
+     "PDM30:DIG4 -> TURN-SW:14 LT FRT LP (factory 20 LT BLU-14A)"
     ]
    }
   },
@@ -1215,7 +1215,7 @@
    ],
    "to": [
     "HORN",
-    "+"
+    "horn terminal (circuit 29 dark green, connector 12004267)"
    ],
    "sides": [
     "cab",
@@ -1228,7 +1228,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT14 -> HORN:+"
+     "PDM30:OUT14 -> HORN:horn terminal (circuit 29 dark green, connector 12004267)"
     ],
     "R9 pin": [
      "PASS",
@@ -1332,7 +1332,7 @@
    ],
    "to": [
     "Brake light switch (factory, pedal)",
-    "switch lead"
+    "17 output cavity (factory 18 WHT-17 to the column connector)"
    ],
    "sides": [
     "cab",
@@ -1345,7 +1345,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:DIG14 -> Brake light switch (factory, pedal):switch lead"
+     "PDM30:DIG14 -> Brake light switch (factory, pedal):17 output cavity (factory 18 WHT-17 to the column connector)"
     ]
    }
   },
@@ -1390,7 +1390,7 @@
    ],
    "to": [
     "Tail_Light_Right",
-    "1157_RUN"
+    "tail filament lead (circuit 9 brown; 1157 3 CP filament)"
    ],
    "sides": [
     "cab",
@@ -1403,7 +1403,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT13 -> Tail_Light_Right:1157_RUN"
+     "PDM30:OUT13 -> Tail_Light_Right:tail filament lead (circuit 9 brown; 1157 3 CP filament)"
     ],
     "R9 pin": [
      "PASS",
@@ -1425,7 +1425,7 @@
    ],
    "to": [
     "Backup_Light_Right",
-    "+"
+    "feed lead (circuit 24 light green)"
    ],
    "sides": [
     "cab",
@@ -1438,7 +1438,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT15 -> Backup_Light_Right:+"
+     "PDM30:OUT15 -> Backup_Light_Right:feed lead (circuit 24 light green)"
     ],
     "R9 pin": [
      "PASS",
@@ -1460,7 +1460,7 @@
    ],
    "to": [
     "Side_Marker_L",
-    "blade_+"
+    "feed lead (circuit 9 brown)"
    ],
    "sides": [
     "cab",
@@ -1473,7 +1473,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT19 -> Side_Marker_L:blade_+"
+     "PDM30:OUT19 -> Side_Marker_L:feed lead (circuit 9 brown)"
     ],
     "R9 pin": [
      "PASS",
@@ -1495,7 +1495,7 @@
    ],
    "to": [
     "Side_Marker_R",
-    "blade_+"
+    "feed lead (circuit 9 brown)"
    ],
    "sides": [
     "cab",
@@ -1508,7 +1508,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT19 -> Side_Marker_R:blade_+"
+     "PDM30:OUT19 -> Side_Marker_R:feed lead (circuit 9 brown)"
     ],
     "R9 pin": [
      "PASS",
@@ -1530,7 +1530,7 @@
    ],
    "to": [
     "CLEARANCE-L",
-    "+"
+    "left cab roof clearance lamp + lead (splice)"
    ],
    "sides": [
     "cab",
@@ -1543,7 +1543,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT19 -> CLEARANCE-L:+"
+     "PDM30:OUT19 -> CLEARANCE-L:left cab roof clearance lamp + lead (splice)"
     ],
     "R9 pin": [
      "PASS",
@@ -1565,7 +1565,7 @@
    ],
    "to": [
     "PARK-TURN-LF",
-    "TURN (1157 high filament)"
+    "turn filament lead (circuit 14 light blue, LH front directional; 1157 high filament)"
    ],
    "sides": [
     "cab",
@@ -1578,7 +1578,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT27 -> PARK-TURN-LF:TURN (1157 high filament)"
+     "PDM30:OUT27 -> PARK-TURN-LF:turn filament lead (circuit 14 light blue, LH front directional; 1157 high filament)"
     ],
     "R9 pin": [
      "PASS",
@@ -1604,7 +1604,7 @@
    ],
    "to": [
     "Tail_Light_Left",
-    "1157_RUN"
+    "tail filament lead (circuit 9 brown; 1157 3 CP filament)"
    ],
    "sides": [
     "cab",
@@ -1617,7 +1617,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT13 -> Tail_Light_Left:1157_RUN"
+     "PDM30:OUT13 -> Tail_Light_Left:tail filament lead (circuit 9 brown; 1157 3 CP filament)"
     ],
     "R9 pin": [
      "PASS",
@@ -1639,7 +1639,7 @@
    ],
    "to": [
     "PARK-TURN-RF",
-    "TURN (1157 high filament)"
+    "turn filament lead (circuit 15 dark blue, RH front directional; 1157 high filament)"
    ],
    "sides": [
     "cab",
@@ -1652,7 +1652,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT28 -> PARK-TURN-RF:TURN (1157 high filament)"
+     "PDM30:OUT28 -> PARK-TURN-RF:turn filament lead (circuit 15 dark blue, RH front directional; 1157 high filament)"
     ],
     "R9 pin": [
      "PASS",
@@ -1678,7 +1678,7 @@
    ],
    "to": [
     "PARK-TURN-LF",
-    "PARK (1157 low filament)"
+    "park filament lead (circuit 9 brown; 1157 low filament)"
    ],
    "sides": [
     "cab",
@@ -1691,7 +1691,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT13 -> PARK-TURN-LF:PARK (1157 low filament)"
+     "PDM30:OUT13 -> PARK-TURN-LF:park filament lead (circuit 9 brown; 1157 low filament)"
     ],
     "R9 pin": [
      "PASS",
@@ -1717,7 +1717,7 @@
    ],
    "to": [
     "PARK-TURN-RF",
-    "PARK (1157 low filament)"
+    "park filament lead (circuit 9 brown; 1157 low filament)"
    ],
    "sides": [
     "cab",
@@ -1730,7 +1730,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT13 -> PARK-TURN-RF:PARK (1157 low filament)"
+     "PDM30:OUT13 -> PARK-TURN-RF:park filament lead (circuit 9 brown; 1157 low filament)"
     ],
     "R9 pin": [
      "PASS",
@@ -1756,7 +1756,7 @@
    ],
    "to": [
     "FLOOR-DIMMER",
-    "COMMON (feed)"
+    "10 feed cavity (factory 16 LT BLU-10)"
    ],
    "sides": [
     "cab",
@@ -1769,7 +1769,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT17 -> FLOOR-DIMMER:COMMON (feed)"
+     "PDM30:OUT17 -> FLOOR-DIMMER:10 feed cavity (factory 16 LT BLU-10)"
     ],
     "R9 pin": [
      "PASS",
@@ -1791,7 +1791,7 @@
    ],
    "to": [
     "FLOOR-DIMMER",
-    "COMMON (feed)"
+    "10 feed cavity (factory 16 LT BLU-10)"
    ],
    "sides": [
     "cab",
@@ -1804,7 +1804,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT18 -> FLOOR-DIMMER:COMMON (feed)"
+     "PDM30:OUT18 -> FLOOR-DIMMER:10 feed cavity (factory 16 LT BLU-10)"
     ],
     "R9 pin": [
      "PASS",
@@ -1826,7 +1826,7 @@
    ],
    "to": [
     "MARKER-LF",
-    "+"
+    "park-circuit lead (circuit 9 brown)"
    ],
    "sides": [
     "cab",
@@ -1839,7 +1839,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT19 -> MARKER-LF:+"
+     "PDM30:OUT19 -> MARKER-LF:park-circuit lead (circuit 9 brown)"
     ],
     "R9 pin": [
      "PASS",
@@ -1865,7 +1865,7 @@
    ],
    "to": [
     "MARKER-RF",
-    "+"
+    "park-circuit lead (circuit 9 brown)"
    ],
    "sides": [
     "cab",
@@ -1878,7 +1878,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT19 -> MARKER-RF:+"
+     "PDM30:OUT19 -> MARKER-RF:park-circuit lead (circuit 9 brown)"
     ],
     "R9 pin": [
      "PASS",
@@ -1904,7 +1904,7 @@
    ],
    "to": [
     "Backup_Light_Left",
-    "+"
+    "feed lead (circuit 24 light green)"
    ],
    "sides": [
     "cab",
@@ -1917,7 +1917,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT15 -> Backup_Light_Left:+"
+     "PDM30:OUT15 -> Backup_Light_Left:feed lead (circuit 24 light green)"
     ],
     "R9 pin": [
      "PASS",
@@ -1939,7 +1939,7 @@
    ],
    "to": [
     "CLEARANCE-C",
-    "+"
+    "center cab roof clearance lamp + lead (splice)"
    ],
    "sides": [
     "cab",
@@ -1952,7 +1952,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT19 -> CLEARANCE-C:+"
+     "PDM30:OUT19 -> CLEARANCE-C:center cab roof clearance lamp + lead (splice)"
     ],
     "R9 pin": [
      "PASS",
@@ -1974,7 +1974,7 @@
    ],
    "to": [
     "CLEARANCE-R",
-    "+"
+    "right cab roof clearance lamp + lead (splice)"
    ],
    "sides": [
     "cab",
@@ -1987,7 +1987,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT19 -> CLEARANCE-R:+"
+     "PDM30:OUT19 -> CLEARANCE-R:right cab roof clearance lamp + lead (splice)"
     ],
     "R9 pin": [
      "PASS",
@@ -2009,7 +2009,7 @@
    ],
    "to": [
     "LICENSE-LAMP",
-    "+"
+    "feed lead (circuit 9 brown, connector 2977721)"
    ],
    "sides": [
     "cab",
@@ -2022,7 +2022,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT19 -> LICENSE-LAMP:+"
+     "PDM30:OUT19 -> LICENSE-LAMP:feed lead (circuit 9 brown, connector 2977721)"
     ],
     "R9 pin": [
      "PASS",
@@ -2079,7 +2079,7 @@
    ],
    "to": [
     "WIN-SW-L",
-    "feed (+12 V)"
+    "red (orange) 12 V hot feed lead of the Nu-Relics switch harness"
    ],
    "sides": [
     "cab",
@@ -2092,7 +2092,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "SPL-PDM30-OUT3 (PDM30:OUT3 pigtails A5 + A14):None -> WIN-SW-L:feed (+12 V)"
+     "SPL-PDM30-OUT3 (PDM30:OUT3 pigtails A5 + A14):None -> WIN-SW-L:red (orange) 12 V hot feed lead of the Nu-Relics switch harness"
     ],
     "R11 command": [
      "PASS",
@@ -2110,7 +2110,7 @@
    ],
    "to": [
     "WIN-SW-R",
-    "feed (+12 V)"
+    "red (orange) 12 V hot feed lead of the Nu-Relics switch harness"
    ],
    "sides": [
     "cab",
@@ -2123,7 +2123,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "SPL-PDM30-OUT4 (PDM30:OUT4 pigtails A7 + A16):None -> WIN-SW-R:feed (+12 V)"
+     "SPL-PDM30-OUT4 (PDM30:OUT4 pigtails A7 + A16):None -> WIN-SW-R:red (orange) 12 V hot feed lead of the Nu-Relics switch harness"
     ],
     "R11 command": [
      "PASS",
@@ -2288,7 +2288,7 @@
    ],
    "to": [
     "DOME-LAMP",
-    "+"
+    "battery-feed terminal (factory 18 ORN-140 position)"
    ],
    "sides": [
     "cab",
@@ -2301,7 +2301,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT25 -> DOME-LAMP:+"
+     "PDM30:OUT25 -> DOME-LAMP:battery-feed terminal (factory 18 ORN-140 position)"
     ],
     "R9 pin": [
      "PASS",
@@ -2323,7 +2323,7 @@
    ],
    "to": [
     "UNDERDASH-LAMPS",
-    "+"
+    "under-dash LED + lead (splice)"
    ],
    "sides": [
     "cab",
@@ -2336,7 +2336,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT25 -> UNDERDASH-LAMPS:+"
+     "PDM30:OUT25 -> UNDERDASH-LAMPS:under-dash LED + lead (splice)"
     ],
     "R9 pin": [
      "PASS",
@@ -2358,7 +2358,7 @@
    ],
    "to": [
     "FOOTWELL-LAMPS",
-    "+"
+    "footwell LED + lead (splice)"
    ],
    "sides": [
     "cab",
@@ -2371,7 +2371,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT25 -> FOOTWELL-LAMPS:+"
+     "PDM30:OUT25 -> FOOTWELL-LAMPS:footwell LED + lead (splice)"
     ],
     "R9 pin": [
      "PASS",
@@ -2393,7 +2393,7 @@
    ],
    "to": [
     "USB-PORT",
-    "+12 V"
+    "USB port + lead (splice)"
    ],
    "sides": [
     "cab",
@@ -2406,7 +2406,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT30 -> USB-PORT:+12 V"
+     "PDM30:OUT30 -> USB-PORT:USB port + lead (splice)"
     ],
     "R9 pin": [
      "PASS",
@@ -2498,7 +2498,7 @@
    ],
    "to": [
     "AMP-STEP-CTRL",
-    "red lead (+12 V)"
+    "RED power lead (kit harness)"
    ],
    "sides": [
     "engine bay",
@@ -2511,7 +2511,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "Distribution stud (kit harness fuse):None -> AMP-STEP-CTRL:red lead (+12 V)"
+     "Distribution stud (kit harness fuse):None -> AMP-STEP-CTRL:RED power lead (kit harness)"
     ]
    }
   },
@@ -3097,7 +3097,7 @@
    ],
    "to": [
     "AC-CLUTCH",
-    "clutch lead"
+    "T1 single lead, male bullet (clutch coil +)"
    ],
    "sides": [
     "engine bay",
@@ -3110,7 +3110,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM15:OUT11 -> AC-CLUTCH:clutch lead"
+     "PDM15:OUT11 -> AC-CLUTCH:T1 single lead, male bullet (clutch coil +)"
     ],
     "R9 pin": [
      "PASS",
@@ -3132,7 +3132,7 @@
    ],
    "to": [
     "IBOOSTER",
-    "1 (constant 12 V)"
+    "red lead, housing pin 1 (always hot, 40 A)"
    ],
    "sides": [
     "engine bay",
@@ -3145,7 +3145,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "Distribution stud (MIDI 40 A):None -> IBOOSTER:1 (constant 12 V)"
+     "Distribution stud (MIDI 40 A):None -> IBOOSTER:red lead, housing pin 1 (always hot, 40 A)"
     ]
    }
   },
@@ -3186,7 +3186,7 @@
    ],
    "to": [
     "UNDERHOOD-LAMP",
-    "+"
+    "feed lead (1978 accessory: 18 BLK through a 4 A fuse holder)"
    ],
    "sides": [
     "cab",
@@ -3199,7 +3199,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT25 -> UNDERHOOD-LAMP:+"
+     "PDM30:OUT25 -> UNDERHOOD-LAMP:feed lead (1978 accessory: 18 BLK through a 4 A fuse holder)"
     ],
     "R9 pin": [
      "PASS",
@@ -5120,7 +5120,7 @@
    "kind": "implied",
    "label": "Isolator state (yellow, grounded while closed) to the M130 shutdown input",
    "from": [
-    "ISO-SWITCH (pin 7 splice, yellow)",
+    "SPL-ISO-YEL (stub splice on the switch's yellow wire, tab 7)",
     ""
    ],
    "to": [
@@ -5131,14 +5131,14 @@
     "cab",
     "cab"
    ],
-   "from_str": "ISO-SWITCH (pin 7 splice, yellow)",
+   "from_str": "SPL-ISO-YEL (stub splice on the switch's yellow wire, tab 7)",
    "control": null,
    "subsystem": "CHARGING_STARTING",
    "engine_run": true,
    "rules": {
     "R8 ends": [
      "PASS",
-     "ISO-SWITCH (pin 7 splice, yellow): -> M130:B14 (UDIG7):UDIG7"
+     "SPL-ISO-YEL (stub splice on the switch's yellow wire, tab 7): -> M130:B14 (UDIG7):UDIG7"
     ]
    }
   },
@@ -6368,7 +6368,7 @@
    ],
    "to": [
     "IGN-SWITCH (IGN/RUN terminal)",
-    "IGN/RUN terminal"
+    "IGN 1 (connector 6294642; factory 12 PNK-3A)"
    ],
    "sides": [
     "cab",
@@ -6381,7 +6381,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:DIG1 -> IGN-SWITCH (IGN/RUN terminal):IGN/RUN terminal"
+     "PDM30:DIG1 -> IGN-SWITCH (IGN/RUN terminal):IGN 1 (connector 6294642; factory 12 PNK-3A)"
     ]
    }
   },
@@ -6395,7 +6395,7 @@
    ],
    "to": [
     "IGN-SWITCH (SOL/START terminal)",
-    "SOL/START terminal"
+    "SOL (connector 6294642; factory 12 PPL/WHT-5)"
    ],
    "sides": [
     "cab",
@@ -6408,7 +6408,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:DIG10 -> IGN-SWITCH (SOL/START terminal):SOL/START terminal"
+     "PDM30:DIG10 -> IGN-SWITCH (SOL/START terminal):SOL (connector 6294642; factory 12 PPL/WHT-5)"
     ]
    }
   },
@@ -6422,7 +6422,7 @@
    ],
    "to": [
     "IGN-SWITCH (BAT terminal)",
-    "BAT terminal"
+    "BAT 2 (connector 6294642; factory 12 RED-2E)"
    ],
    "sides": [
     "cab",
@@ -6435,7 +6435,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:A28 -> IGN-SWITCH (BAT terminal):BAT terminal"
+     "PDM30:A28 -> IGN-SWITCH (BAT terminal):BAT 2 (connector 6294642; factory 12 RED-2E)"
     ]
    }
   },
@@ -6731,7 +6731,7 @@
    ],
    "to": [
     "WIN-SW-R (master UP)",
-    "master UP"
+    "NEEDS CAVITY"
    ],
    "sides": [
     "cab",
@@ -6744,7 +6744,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "WIN-SW-L (passenger UP): -> WIN-SW-R (master UP):master UP"
+     "WIN-SW-L (passenger UP): -> WIN-SW-R (master UP):NEEDS CAVITY"
     ]
    }
   },
@@ -6758,7 +6758,7 @@
    ],
    "to": [
     "WIN-SW-R (master DOWN)",
-    "master DOWN"
+    "NEEDS CAVITY"
    ],
    "sides": [
     "cab",
@@ -6771,7 +6771,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "WIN-SW-L (passenger DOWN): -> WIN-SW-R (master DOWN):master DOWN"
+     "WIN-SW-L (passenger DOWN): -> WIN-SW-R (master DOWN):NEEDS CAVITY"
     ]
    }
   },
@@ -6784,8 +6784,8 @@
     ""
    ],
    "to": [
-    "window_motor_DS:A",
-    "A"
+    "window_motor_DS:motor plug pole 1",
+    "motor plug pole 1"
    ],
    "sides": [
     "cab",
@@ -6798,7 +6798,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "WIN-SW-L (motor L A): -> window_motor_DS:A:A"
+     "WIN-SW-L (motor L A): -> window_motor_DS:motor plug pole 1:motor plug pole 1"
     ]
    }
   },
@@ -6811,8 +6811,8 @@
     ""
    ],
    "to": [
-    "window_motor_DS:B",
-    "B"
+    "window_motor_DS:motor plug pole 2",
+    "motor plug pole 2"
    ],
    "sides": [
     "cab",
@@ -6825,7 +6825,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "WIN-SW-L (motor L B): -> window_motor_DS:B:B"
+     "WIN-SW-L (motor L B): -> window_motor_DS:motor plug pole 2:motor plug pole 2"
     ]
    }
   },
@@ -6838,8 +6838,8 @@
     ""
    ],
    "to": [
-    "window_motor_PS:A",
-    "A"
+    "window_motor_PS:motor plug pole 1",
+    "motor plug pole 1"
    ],
    "sides": [
     "cab",
@@ -6852,7 +6852,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "WIN-SW-R (motor A): -> window_motor_PS:A:A"
+     "WIN-SW-R (motor A): -> window_motor_PS:motor plug pole 1:motor plug pole 1"
     ]
    }
   },
@@ -6865,8 +6865,8 @@
     ""
    ],
    "to": [
-    "window_motor_PS:B",
-    "B"
+    "window_motor_PS:motor plug pole 2",
+    "motor plug pole 2"
    ],
    "sides": [
     "cab",
@@ -6879,7 +6879,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "WIN-SW-R (motor B): -> window_motor_PS:B:B"
+     "WIN-SW-R (motor B): -> window_motor_PS:motor plug pole 2:motor plug pole 2"
     ]
    }
   },
@@ -7032,7 +7032,7 @@
    ],
    "to": [
     "TG-SW-DASH (feed)",
-    "feed"
+    "4 FEED (factory 12 R-70)"
    ],
    "sides": [
     "cab",
@@ -7045,7 +7045,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "SPL-PDM30-OUT1 (PDM30:OUT1 pigtails A1 + A10): -> TG-SW-DASH (feed):feed"
+     "SPL-PDM30-OUT1 (PDM30:OUT1 pigtails A1 + A10): -> TG-SW-DASH (feed):4 FEED (factory 12 R-70)"
     ],
     "R11 command": [
      "PASS",
@@ -7090,7 +7090,7 @@
    ],
    "to": [
     "TG-SW-KEY (UP in)",
-    "UP in"
+    "CLOSE terminal (circuit 183, window up)"
    ],
    "sides": [
     "cab",
@@ -7103,7 +7103,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "TG-SW-DASH (UP): -> TG-SW-KEY (UP in):UP in"
+     "TG-SW-DASH (UP): -> TG-SW-KEY (UP in):CLOSE terminal (circuit 183, window up)"
     ]
    }
   },
@@ -7117,7 +7117,7 @@
    ],
    "to": [
     "TG-SW-KEY (DOWN in)",
-    "DOWN in"
+    "OPEN terminal (circuit 184, window down)"
    ],
    "sides": [
     "cab",
@@ -7130,7 +7130,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "TG-SW-DASH (DOWN): -> TG-SW-KEY (DOWN in):DOWN in"
+     "TG-SW-DASH (DOWN): -> TG-SW-KEY (DOWN in):OPEN terminal (circuit 184, window down)"
     ]
    }
   },
@@ -7143,8 +7143,8 @@
     ""
    ],
    "to": [
-    "rear_window_motor:A",
-    "A"
+    "rear_window_motor:1 (UP, circuit 183 light blue)",
+    "1 (UP, circuit 183 light blue)"
    ],
    "sides": [
     "other",
@@ -7157,7 +7157,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "TG-SW-KEY (UP out): -> rear_window_motor:A:A"
+     "TG-SW-KEY (UP out): -> rear_window_motor:1 (UP, circuit 183 light blue):1 (UP, circuit 183 light blue)"
     ]
    }
   },
@@ -7170,8 +7170,8 @@
     ""
    ],
    "to": [
-    "rear_window_motor:B",
-    "B"
+    "rear_window_motor:2 (DOWN, circuit 184 tan/white)",
+    "2 (DOWN, circuit 184 tan/white)"
    ],
    "sides": [
     "other",
@@ -7184,7 +7184,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "TG-SW-KEY (DOWN out): -> rear_window_motor:B:B"
+     "TG-SW-KEY (DOWN out): -> rear_window_motor:2 (DOWN, circuit 184 tan/white):2 (DOWN, circuit 184 tan/white)"
     ]
    }
   },
@@ -7225,7 +7225,7 @@
    ],
    "to": [
     "MIRROR-MON (video in)",
-    "video in"
+    "camera input on the harness RCA adapter (plug-in, no splice)"
    ],
    "sides": [
     "other",
@@ -7238,7 +7238,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "Backup_Camera (video): -> MIRROR-MON (video in):video in"
+     "Backup_Camera (video): -> MIRROR-MON (video in):camera input on the harness RCA adapter (plug-in, no splice)"
     ]
    }
   },
@@ -7252,7 +7252,7 @@
    ],
    "to": [
     "MIRROR-MON (+12 V)",
-    "+12 V"
+    "RED 12 V power wire (ignition) \u2014 splice"
    ],
    "sides": [
     "cab",
@@ -7265,7 +7265,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT23 -> MIRROR-MON (+12 V):+12 V"
+     "PDM30:OUT23 -> MIRROR-MON (+12 V):RED 12 V power wire (ignition) \u2014 splice"
     ],
     "R11 command": [
      "PASS",
@@ -7310,7 +7310,7 @@
    ],
    "to": [
     "MIRROR-MON (reverse trigger)",
-    "reverse trigger"
+    "GREEN reverse trigger wire \u2014 splice"
    ],
    "sides": [
     "cab",
@@ -7323,7 +7323,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT15 -> MIRROR-MON (reverse trigger):reverse trigger"
+     "PDM30:OUT15 -> MIRROR-MON (reverse trigger):GREEN reverse trigger wire \u2014 splice"
     ],
     "R11 command": [
      "PASS",
@@ -7340,8 +7340,8 @@
     "OUT16"
    ],
    "to": [
-    "Tail_Light_Left:1157_BRK",
-    "1157_BRK"
+    "Tail_Light_Left:stop/turn filament lead (circuit 18 yellow, LH stop/directional; 1157 32 CP filament)",
+    "stop/turn filament lead (circuit 18 yellow, LH stop/directional; 1157 32 CP filament)"
    ],
    "sides": [
     "cab",
@@ -7354,7 +7354,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT16 -> Tail_Light_Left:1157_BRK:1157_BRK"
+     "PDM30:OUT16 -> Tail_Light_Left:stop/turn filament lead (circuit 18 yellow, LH stop/directional; 1157 32 CP filament):stop/turn filament lead (circuit 18 yellow, LH stop/directional; 1157 32 CP filament)"
     ],
     "R11 command": [
      "PASS",
@@ -7371,8 +7371,8 @@
     "OUT22"
    ],
    "to": [
-    "Tail_Light_Right:1157_BRK",
-    "1157_BRK"
+    "Tail_Light_Right:stop/turn filament lead (circuit 19 dark green, RH stop/directional; 1157 32 CP filament)",
+    "stop/turn filament lead (circuit 19 dark green, RH stop/directional; 1157 32 CP filament)"
    ],
    "sides": [
     "cab",
@@ -7385,7 +7385,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT22 -> Tail_Light_Right:1157_BRK:1157_BRK"
+     "PDM30:OUT22 -> Tail_Light_Right:stop/turn filament lead (circuit 19 dark green, RH stop/directional; 1157 32 CP filament):stop/turn filament lead (circuit 19 dark green, RH stop/directional; 1157 32 CP filament)"
     ],
     "R11 command": [
      "PASS",
@@ -7403,7 +7403,7 @@
    ],
    "to": [
     "BRAKE-SW (feed terminal)",
-    "feed terminal"
+    "140 feed cavity (factory 18 ORN-140A, battery fused)"
    ],
    "sides": [
     "cab",
@@ -7416,7 +7416,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:A28 -> BRAKE-SW (feed terminal):feed terminal"
+     "PDM30:A28 -> BRAKE-SW (feed terminal):140 feed cavity (factory 18 ORN-140A, battery fused)"
     ]
    }
   },
@@ -7430,7 +7430,7 @@
    ],
    "to": [
     "VSS-SENDER (power)",
-    "red (+5 V from SPD +)"
+    "red lead (+5 V from SPD +)"
    ],
    "sides": [
     "cab",
@@ -7443,7 +7443,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "DAKOTA-VHX (SPD +): -> VSS-SENDER (power):red (+5 V from SPD +)"
+     "DAKOTA-VHX (SPD +): -> VSS-SENDER (power):red lead (+5 V from SPD +)"
     ],
     "R12 firewall": [
      "OPEN",
@@ -8414,7 +8414,7 @@
    ],
    "to": [
     "HL-SW (park/tail terminal)",
-    "park/tail terminal"
+    "TAIL LP (cavity of factory 18 BRN-9A)"
    ],
    "sides": [
     "cab",
@@ -8427,7 +8427,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:DIG2 -> HL-SW (park/tail terminal):park/tail terminal"
+     "PDM30:DIG2 -> HL-SW (park/tail terminal):TAIL LP (cavity of factory 18 BRN-9A)"
     ]
    }
   },
@@ -8441,7 +8441,7 @@
    ],
    "to": [
     "HL-SW (headlamp terminal)",
-    "headlamp terminal"
+    "6 HEAD LP (cavity of factory 16 LT BLU-10)"
    ],
    "sides": [
     "cab",
@@ -8454,7 +8454,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:DIG3 -> HL-SW (headlamp terminal):headlamp terminal"
+     "PDM30:DIG3 -> HL-SW (headlamp terminal):6 HEAD LP (cavity of factory 16 LT BLU-10)"
     ]
    }
   },
@@ -8468,7 +8468,7 @@
    ],
    "to": [
     "HL-SW (battery feed terminal)",
-    "battery feed terminal"
+    "1 BAT FEED (cavity of factory 12 RED-2G)"
    ],
    "sides": [
     "cab",
@@ -8481,7 +8481,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:A28 -> HL-SW (battery feed terminal):battery feed terminal"
+     "PDM30:A28 -> HL-SW (battery feed terminal):1 BAT FEED (cavity of factory 12 RED-2G)"
     ]
    }
   },
@@ -8495,7 +8495,7 @@
    ],
    "to": [
     "TURN-SW (right front output)",
-    "right front output"
+    "15 RT FRT LP (factory 20 DK BLU-15A)"
    ],
    "sides": [
     "cab",
@@ -8508,7 +8508,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:DIG5 -> TURN-SW (right front output):right front output"
+     "PDM30:DIG5 -> TURN-SW (right front output):15 RT FRT LP (factory 20 DK BLU-15A)"
     ]
    }
   },
@@ -8522,7 +8522,7 @@
    ],
    "to": [
     "TURN-SW (turn + hazard flasher feeds, jumpered)",
-    "turn + hazard flasher feeds, jumpered"
+    "16 FLSHR + 27 HAZ WARN (factory 18 PPL-16 and 18 BRN-27), jumpered"
    ],
    "sides": [
     "cab",
@@ -8535,7 +8535,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:A28 -> TURN-SW (turn + hazard flasher feeds, jumpered):turn + hazard flasher feeds, jumpered"
+     "PDM30:A28 -> TURN-SW (turn + hazard flasher feeds, jumpered):16 FLSHR + 27 HAZ WARN (factory 18 PPL-16 and 18 BRN-27), jumpered"
     ]
    }
   },
@@ -8549,7 +8549,7 @@
    ],
    "to": [
     "HORN-SW (column horn contact)",
-    "column horn contact"
+    "28 HORN (column connector 12004147; factory 20 BLK-28)"
    ],
    "sides": [
     "cab",
@@ -8562,7 +8562,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:DIG6 -> HORN-SW (column horn contact):column horn contact"
+     "PDM30:DIG6 -> HORN-SW (column horn contact):28 HORN (column connector 12004147; factory 20 BLK-28)"
     ]
    }
   },
@@ -8638,7 +8638,7 @@
    ],
    "to": [
     "BLOWER-RES (LOW tap)",
-    "LOW tap"
+    "51 (resistor BAT terminal, low: BATT-R1-R2-R3)"
    ],
    "sides": [
     "cab",
@@ -8651,7 +8651,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "BLOWER-SW (LOW lead): -> BLOWER-RES (LOW tap):LOW tap"
+     "BLOWER-SW (LOW lead): -> BLOWER-RES (LOW tap):51 (resistor BAT terminal, low: BATT-R1-R2-R3)"
     ],
     "R12 firewall": [
      "PASS",
@@ -8669,7 +8669,7 @@
    ],
    "to": [
     "BLOWER-RES (M1 tap)",
-    "M1 tap"
+    "63 (M1: M1-R2-R3-blower)"
    ],
    "sides": [
     "cab",
@@ -8682,7 +8682,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "BLOWER-SW (M1 lead): -> BLOWER-RES (M1 tap):M1 tap"
+     "BLOWER-SW (M1 lead): -> BLOWER-RES (M1 tap):63 (M1: M1-R2-R3-blower)"
     ],
     "R12 firewall": [
      "PASS",
@@ -8700,7 +8700,7 @@
    ],
    "to": [
     "BLOWER-RES (M2 tap)",
-    "M2 tap"
+    "72 (M2: M2-R3-blower)"
    ],
    "sides": [
     "cab",
@@ -8713,7 +8713,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "BLOWER-SW (M2 lead): -> BLOWER-RES (M2 tap):M2 tap"
+     "BLOWER-SW (M2 lead): -> BLOWER-RES (M2 tap):72 (M2: M2-R3-blower)"
     ],
     "R12 firewall": [
      "PASS",
@@ -8731,7 +8731,7 @@
    ],
    "to": [
     "BLOWER-MOTOR (+)",
-    "+"
+    "+ blade terminal"
    ],
    "sides": [
     "engine bay",
@@ -8744,7 +8744,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "BLOWER-RES (motor lead): -> BLOWER-MOTOR (+):+"
+     "BLOWER-RES (motor lead): -> BLOWER-MOTOR (+):+ blade terminal"
     ]
    }
   },
@@ -8758,7 +8758,7 @@
    ],
    "to": [
     "BLOWER-MOTOR (+)",
-    "+"
+    "+ blade terminal"
    ],
    "sides": [
     "cab",
@@ -8771,7 +8771,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "SPL-PDM30-OUT2 (PDM30:OUT2 pigtails A3 + A12): -> BLOWER-MOTOR (+):+"
+     "SPL-PDM30-OUT2 (PDM30:OUT2 pigtails A3 + A12): -> BLOWER-MOTOR (+):+ blade terminal"
     ],
     "R11 command": [
      "PASS",
@@ -8793,7 +8793,7 @@
    ],
    "to": [
     "RADIO (yellow, constant +12 V)",
-    "yellow (constant)"
+    "yellow CONSTANT +12V lead \u2014 splice"
    ],
    "sides": [
     "cab",
@@ -8806,7 +8806,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT11 -> RADIO (yellow, constant +12 V):yellow (constant)"
+     "PDM30:OUT11 -> RADIO (yellow, constant +12 V):yellow CONSTANT +12V lead \u2014 splice"
     ],
     "R11 command": [
      "PASS",
@@ -8824,7 +8824,7 @@
    ],
    "to": [
     "AMP (REM)",
-    "REM"
+    "Remote turn-on input (power connector, set screw)"
    ],
    "sides": [
     "cab",
@@ -8837,7 +8837,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "RADIO (blue/white, amp turn-on): -> AMP (REM):REM"
+     "RADIO (blue/white, amp turn-on): -> AMP (REM):Remote turn-on input (power connector, set screw)"
     ]
    }
   },
@@ -8851,7 +8851,7 @@
    ],
    "to": [
     "AMP (input 1/2)",
-    "input 1/2"
+    "Input 1 + Input 2 (RCA, analog input harness)"
    ],
    "sides": [
     "cab",
@@ -8864,7 +8864,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "RADIO (front RCA line out): -> AMP (input 1/2):input 1/2"
+     "RADIO (front RCA line out): -> AMP (input 1/2):Input 1 + Input 2 (RCA, analog input harness)"
     ]
    }
   },
@@ -8878,7 +8878,7 @@
    ],
    "to": [
     "AMP (input 3/4)",
-    "input 3/4"
+    "Input 3 + Input 4 (RCA)"
    ],
    "sides": [
     "cab",
@@ -8891,7 +8891,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "RADIO (rear RCA line out): -> AMP (input 3/4):input 3/4"
+     "RADIO (rear RCA line out): -> AMP (input 3/4):Input 3 + Input 4 (RCA)"
     ]
    }
   },
@@ -8905,7 +8905,7 @@
    ],
    "to": [
     "SUB-2 (+)",
-    "+"
+    "+ push terminal"
    ],
    "sides": [
     "other",
@@ -8918,7 +8918,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "SUB (+): -> SUB-2 (+):+"
+     "SUB (+): -> SUB-2 (+):+ push terminal"
     ]
    }
   },
@@ -8932,7 +8932,7 @@
    ],
    "to": [
     "SUB-2 (-)",
-    "-"
+    "- push terminal"
    ],
    "sides": [
     "other",
@@ -8945,7 +8945,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "SUB (-): -> SUB-2 (-):-"
+     "SUB (-): -> SUB-2 (-):- push terminal"
     ]
    }
   },
@@ -8959,7 +8959,7 @@
    ],
    "to": [
     "AMP (sub input)",
-    "sub input"
+    "Input 5 + Input 6 (RCA)"
    ],
    "sides": [
     "cab",
@@ -8972,7 +8972,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "RADIO (sub RCA out): -> AMP (sub input):sub input"
+     "RADIO (sub RCA out): -> AMP (sub input):Input 5 + Input 6 (RCA)"
     ]
    }
   },
@@ -9040,7 +9040,7 @@
    ],
    "to": [
     "DAK-CTS (sender lead 2)",
-    "sender lead 2"
+    "sender lead (the other; to WTR -)"
    ],
    "sides": [
     "cab",
@@ -9053,7 +9053,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "DAKOTA-VHX (WTR -): -> DAK-CTS (sender lead 2):sender lead 2"
+     "DAKOTA-VHX (WTR -): -> DAK-CTS (sender lead 2):sender lead (the other; to WTR -)"
     ],
     "R12 firewall": [
      "PASS",
@@ -9071,7 +9071,7 @@
    ],
    "to": [
     "DAK-OILP (red, +5 V)",
-    "red, +5 V"
+    "red lead (OIL +, 5 V)"
    ],
    "sides": [
     "cab",
@@ -9084,7 +9084,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "DAKOTA-VHX (OIL +): -> DAK-OILP (red, +5 V):red, +5 V"
+     "DAKOTA-VHX (OIL +): -> DAK-OILP (red, +5 V):red lead (OIL +, 5 V)"
     ],
     "R12 firewall": [
      "PASS",
@@ -9102,7 +9102,7 @@
    ],
    "to": [
     "DAK-OILP (black + shield)",
-    "black + shield"
+    "black lead + bare shield (OIL -)"
    ],
    "sides": [
     "cab",
@@ -9115,7 +9115,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "DAKOTA-VHX (OIL -): -> DAK-OILP (black + shield):black + shield"
+     "DAKOTA-VHX (OIL -): -> DAK-OILP (black + shield):black lead + bare shield (OIL -)"
     ],
     "R12 firewall": [
      "PASS",
@@ -9481,7 +9481,7 @@
    ],
    "to": [
     "DCDC (IN +)",
-    "IN +"
+    "input + screw terminal"
    ],
    "sides": [
     "engine bay",
@@ -9494,7 +9494,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PS-STUDS (distribution stud, MIDI 40 A): -> DCDC (IN +):IN +"
+     "PS-STUDS (distribution stud, MIDI 40 A): -> DCDC (IN +):input + screw terminal"
     ]
    }
   },
@@ -9508,7 +9508,7 @@
    ],
    "to": [
     "ACC-BATT (+)",
-    "+"
+    "+ post"
    ],
    "sides": [
     "engine bay",
@@ -9521,7 +9521,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "DCDC (OUT +): -> ACC-BATT (+):+"
+     "DCDC (OUT +): -> ACC-BATT (+):+ post"
     ]
    }
   },
@@ -9643,7 +9643,7 @@
    ],
    "to": [
     "GSS-3000 (+12 V ignition)",
-    "+12 V ignition"
+    "IGNITION+ (+12 V ignition)"
    ],
    "sides": [
     "cab",
@@ -9656,7 +9656,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT29 -> GSS-3000 (+12 V ignition):+12 V ignition"
+     "PDM30:OUT29 -> GSS-3000 (+12 V ignition):IGNITION+ (+12 V ignition)"
     ],
     "R11 command": [
      "PASS",
@@ -9728,7 +9728,7 @@
    ],
    "to": [
     "GSS-3000 (GREEN)",
-    "GREEN"
+    "GREEN (sensor wire green or white)"
    ],
    "sides": [
     "other",
@@ -9741,7 +9741,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "GSS-SENSOR (green/white): -> GSS-3000 (GREEN):GREEN"
+     "GSS-SENSOR (green/white): -> GSS-3000 (GREEN):GREEN (sensor wire green or white)"
     ]
    }
   },
@@ -9836,7 +9836,7 @@
    ],
    "to": [
     "IBOOSTER (20, ignition 12 V)",
-    "20 (ignition 12 V)"
+    "green lead, housing pin 20 (ignition, 5 A)"
    ],
    "sides": [
     "cab",
@@ -9849,7 +9849,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT9 -> IBOOSTER (20, ignition 12 V):20 (ignition 12 V)"
+     "PDM30:OUT9 -> IBOOSTER (20, ignition 12 V):green lead, housing pin 20 (ignition, 5 A)"
     ],
     "R11 command": [
      "PASS",

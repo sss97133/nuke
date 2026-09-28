@@ -1,0 +1,6 @@
+FAN:
+  family: open
+  open:
+  - 'fan model unknown (Champion radiator, one fan): its plug closes this (state 0e(c)); registry wire #21 terminal says ''Weatherpack_2pin'' from the April concept
+    — not cited to a fan'
+  sources: []

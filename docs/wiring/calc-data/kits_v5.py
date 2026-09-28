@@ -395,6 +395,21 @@ def attach(reg):
                 if not rail and not code.startswith("D-609 ("):
                     need[code] += 1
                 per_end.append({"wires": [w], "part": code, "cavity": cav_of.get(w) or f"splice {i}"})
+        elif fid in ("dt", "dtp", "gm_blade", "screw_terminal", "contura"):
+            # families added 2026-09-28 (pin-table pass): the terminal comes from the family's per_end; a DT/DTP end takes the
+            # pin on the plug side and the socket on the receptacle side (the endpoint says which with `side: plug|receptacle`)
+            pe_ = fam.get("per_end") or {}
+            if fid in ("dt", "dtp"):
+                part = pe_.get("pin") if (ep.get("side") or "plug") == "plug" else pe_.get("socket")
+                if isinstance(ep.get("wires"), list) and pe_.get("socket"):   # a crossing: the mating half takes the other contact
+                    for _w in wl:
+                        need[pe_.get("socket") if part == pe_.get("pin") else pe_.get("pin")] += 1
+            else:
+                part = pe_.get("terminal") or f"{fid} terminal (OPEN)"
+            if part and not str(part).startswith("OPEN"):
+                for _w in wl:
+                    need[part] += 1
+            per_end = [{"wires": [w], "part": part, "cavity": cav_of.get(w)} for w in wl]
         elif fid in ("open", None, "none", "unknown"):
             # connector not picked yet: the wire still ends here (the map and the checks need the end); the part stays open
             per_end = [{"wires": [w], "part": "open (connector not picked)", "cavity": cav_of.get(w)} for w in wl]

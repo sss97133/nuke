@@ -355,3 +355,18 @@ WIRE-OD:
   od_mm:
     M22759/16: {24: 1.1, 22: 1.3, 20: 1.5, 18: 1.8, 16: 2.0, 14: 2.3, 12: 2.89, 10: 3.53, 8: 5.05, 6: 6.35, 4: 7.92, 2: 9.85}
     M22759/32: {24: 0.94, 22: 1.09, 20: 1.27, 18: 1.52, 16: 1.73, 14: 2.16, 12: 2.62}
+
+# --- Deutsch DT / DTP pass-throughs (doors; body bulkheads) — 2026-09-28 night, pin-table pass
+0460-202-16141: {vendor: customconnectorkits, kind: contact, family: dt, name: "Deutsch size 16 solid pin, nickel, 20–16 AWG", range_awg: [20, 16], sources: ["customconnectorkits 0460-202-16141 page (snapshot web_snapshots/www.customconnectorkits.com__0460-202-16141.md)"]}
+0462-201-16141: {vendor: customconnectorkits, kind: contact, family: dt, name: "Deutsch size 16 solid socket, nickel, 20–16 AWG", range_awg: [20, 16], sources: ["KSV 8-Way Mated Deutsch DT Connector Kit listing (0462-201-16141 sockets, 20-16 AWG)"]}
+0460-204-12141: {vendor: customconnectorkits, kind: contact, family: dtp, name: "Deutsch size 12 solid pin, nickel, 14–12 AWG", range_awg: [14, 12], sources: ["KSV 4-Way Mated Deutsch DTP Connector Kit page: size 12 solid contacts 14-12 AWG (snapshot web_snapshots/www.ksvlooms.com__mated-dtp-connector-kits-4-way.md)"]}
+0462-203-12141: {vendor: customconnectorkits, kind: contact, family: dtp, name: "Deutsch size 12 solid socket, nickel, 14–12 AWG", range_awg: [14, 12], sources: ["KSV 4-Way Mated Deutsch DTP Connector Kit page"]}
+DTP04-4P: {vendor: customconnectorkits, kind: housing, family: dtp, name: "Deutsch DTP 4-way receptacle (pins), gray — body side of the door window pass-through", sources: ["customconnectorkits DTP04-4P page: accepts size 12 pins; mates DTP06-4S; wedge WP-4P (snapshot web_snapshots/www.customconnectorkits.com__dtp04-4p.md)"]}
+DTP06-4S: {vendor: customconnectorkits, kind: housing, family: dtp, name: "Deutsch DTP 4-way plug (sockets), gray — door side of the window pass-through", sources: ["customconnectorkits DTP04-4P page (mating part DTP06-4S)"]}
+WP-4P: {vendor: customconnectorkits, kind: wedge, family: dtp, name: "Deutsch DTP 4-way receptacle wedgelock", sources: ["KSV 4-Way Mated Deutsch DTP Connector Kit page"]}
+WP-4S: {vendor: customconnectorkits, kind: wedge, family: dtp, name: "Deutsch DTP 4-way plug wedgelock", sources: ["KSV 4-Way Mated Deutsch DTP Connector Kit page"]}
+DT04-08PA: {vendor: customconnectorkits, kind: housing, family: dt, name: "Deutsch DT 8-way receptacle (pins), gray, A key — body side of the door lock/speaker pass-through", sources: ["customconnectorkits DT04-08PA page: accepts size 16 pins; wedge W8P; mates DT06-08SA (snapshot web_snapshots/www.customconnectorkits.com__dt04-08pa.md)"]}
+DT06-08SA: {vendor: customconnectorkits, kind: housing, family: dt, name: "Deutsch DT 8-way plug (sockets), gray, A key — door side of the lock/speaker pass-through", sources: ["customconnectorkits DT04-08PA page (mating part DT06-08SA)"]}
+W8P: {vendor: customconnectorkits, kind: wedge, family: dt, name: "Deutsch DT 8-way receptacle wedgelock", sources: ["customconnectorkits DT04-08PA page"]}
+W8S: {vendor: customconnectorkits, kind: wedge, family: dt, name: "Deutsch DT 8-way plug wedgelock", sources: ["KSV 8-Way Mated Deutsch DT Connector Kit listing (W8S)"]}
+0413-204-2005: {vendor: customconnectorkits, kind: plug, family: dt, name: "Deutsch size 16 cavity plug (spare cavities)", sources: ["families.yaml dt entry, 2026-09-28 (customconnectorkits catalogue)"]}

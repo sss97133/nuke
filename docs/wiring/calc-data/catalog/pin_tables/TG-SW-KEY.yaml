@@ -1,0 +1,22 @@
+TG-SW-KEY:
+  family: open
+  pins:
+    TG_BUS_UP: CLOSE terminal (circuit 183, window up)
+    TG_MOT_A: CLOSE terminal (circuit 183, window up)
+    TG_BUS_DN: OPEN terminal (circuit 184, window down)
+    TG_MOT_B: OPEN terminal (circuit 184, window down)
+  mate: GM 8900713 3-way connector body (1978 booklet p.16); a new-part equivalent is OPEN
+  splice_point: true
+  note: 'maker''s document: factory tailgate window key switch, 1978 GM connector 8900713: three terminals OPEN (circuit 184) / FEED (circuit 60) / CLOSE (circuit
+    183) · The factory key switch is NOT in series: it has one FEED terminal (circuit 60, battery via circuit breaker) and switches it to CLOSE (183) or OPEN (184).
+    Its outputs join the dash switch outputs at splices 183/184 on the way to the motor (1978 booklet p.16). Mapping the registry''s series wires onto it puts the
+    bus and motor wire of each direction on the same terminal (the factory splice moved to the switch), hence splice_point.'
+  open:
+  - 'FEED terminal (circuit 60) has no wire in the registry: the key switch cannot drive the motor without it (1978 booklet p.16) — registry fix, not a pin question'
+  - registry calls this switch 'in series between the dash switch and the motor'; the factory switch is in parallel (3 terminals, 1978 booklet p.16) — owner/registry
+    decision
+  - 1978 also has a normally-open 'tailgate closed' cutout switch (connector 2977647) in the UP line to the motor; the registry has no cutout switch
+  - '1977-specific key switch drawing: not on file (1978 booklet used; same body)'
+  sources:
+  - '1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) ''Power Rear Window (RPO A33)'' panel:
+    tailgate window switch 8900713 OPEN 184 / FEED 60 / CLOSE 183; splice-183, splice-184; cutout SW N/O 2977647'

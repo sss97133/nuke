@@ -1,0 +1,13 @@
+DOME-LAMP:
+  family: gm_blade
+  pins:
+    '67': battery-feed terminal (factory 18 ORN-140 position)
+    DOME_GND: switched-ground terminal (factory 18 WHT-156 position)
+  kit: {}
+  mate: Blazer dome lamps (RPO C8B) use terminals 2977080; the cab-only lamp uses socket 8911223 (1978 A-1)
+  note: our feed is PDM-switched and the ground is constant, so the factory switched-ground terminal now carries the plain ground
+  open:
+  - 'which dome lamp this truck carries (Blazer C8B pair or the single cab lamp): bench'
+  sources:
+  - 'ST-352 1978 C/K wiring booklet fold-out A-1 ''Cab, Engine and Chassis Wiring'' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the
+    ''77 K5): DOME LAMP CAB ONLY socket 8911223 and DOME LAMPS-BLAZER RPO C8B terminals 2977080, each on 18 ORN-140 + 18 WHT-156'

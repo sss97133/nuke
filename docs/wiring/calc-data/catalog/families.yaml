@@ -85,6 +85,7 @@ lug:
     - {do: boot splash studs, part: MS25171-3S, value: "outermost cover on alternator B+ and the PDM stud (Dave's photos)", source: "state 0i; ch.18 §7 layer 5"}
 
 ring_small:
+  wire_range_awg: [22, 10]          # a ring exists for every gauge; the part number per stud and gauge is the open item below
   label: small ring/spade terminal (sensor grounds, Dakota senders, starter S, isolator aux)
   per_end: {ring: RING-SMALL}
   steps:
@@ -96,7 +97,9 @@ ring_small:
 miniseal:
   label: MiniSeal stub splice (rail branches, PDM pigtail joins, tee taps)
   per_end: {splice_by_gauge: {26-20: D-609-03, 20-16: D-609-04, 16-12: D-609-05}}
+  wire_range_awg: [26, 12]          # the three splice sizes together (prowire 3137ct page: red 26–20 · blue 20–16 · yellow 16–12)
   steps:
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13 · 16 ≥ 30", source: "ch.18 §7"}
     - {do: strip, tool: [STRIP_26_16, STRIP_14_10], value: "stripper by gauge (26–16 / 14–10); strip length UNKNOWN — Raychem D-609 datasheet"}
     - {do: crimp, tool: MINISEAL_CRIMPER, value: "cavity by colour: red 26–20 · blue 20–16 · yellow 16–12", source: "prowire 3137ct page"}
     - {do: cover, part: SCL, tool: HEAT_GUN, value: "stub splices need SCL, ATUM or W5DL over them", source: "prowire MiniSeal page (receipt 2026-09-25 night)"}
@@ -138,3 +141,55 @@ te_amp_plug:
     - {do: crimp, tool: TE_AMP_CRIMPER}
     - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13", source: "ch.18 §7"}
     - {do: insert + lock, tool: hand, value: "pin 6 stays empty — plug it if the kit has a cavity plug"}
+
+# ---- families added 2026-09-28 (pin-table pass: the plugs existed, their families did not)
+dt:
+  label: Deutsch DT (door pass-throughs DOOR-L/R-PASS; body bulkheads A and B) — size 16 solid contacts
+  per_end: {pin: 0460-202-16141, socket: 0462-201-16141, wedge_pin: W12P, wedge_socket: W12S, cavity_plug: 0413-204-2005}
+  wire_range_awg: [20, 16]          # Deutsch size 16 solid contacts 0460-202-16141 / 0462-201-16141: 20–16 AWG — source: web_snapshots/www.customconnectorkits.com__0460-202-16141.md ("20-16 AWG", "13A", "4 way indent crimper")
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "OPEN: strip length — Deutsch DT contact datasheet (≈ 6 mm typical)"}
+    - {do: crimp, tool: HDT-48-00, value: "solid-barrel 4-indent; selector by contact size 16", source: "Deutsch HDT-48-00 hand crimp tool (size 16 selector)"}
+    - {do: pull test, tool: PULL_GAUGE, value: "20 AWG ≥ 13 lbf · 18 ≥ 20 · 16 ≥ 30", source: "ch.18 §7"}
+    - {do: insert, tool: hand, value: "push until the retention finger clicks; fit the wedge (W12P plug / W12S receptacle)", source: "Deutsch DT assembly instructions"}
+    - {do: plug empty cavities, part: 0413-204-2005, value: "one per spare cavity"}
+
+dtp:
+  label: Deutsch DTP (body bulkhead P) — size 12 contacts
+  per_end: {pin: 0460-204-12141, socket: 0462-203-12141, wedge_pin: WP-4P, wedge_socket: WP-4S}   # KSV "4-Way Mated Deutsch DTP Connector Kit" page: size 12 solid contacts 14–12 AWG, WP-4P / WP-4S wedgelocks (read 2026-09-28)
+  wire_range_awg: [14, 12]          # size 12 contacts, 14–12 AWG (endpoints.yaml FIREWALL-BODY-P source: ProWire DTP04-4P-L012)
+  steps:
+    - {do: strip, tool: STRIP_14_10, value: "OPEN: strip length — Deutsch DTP contact datasheet"}
+    - {do: crimp, tool: HDT-48-00, value: "solid-barrel 4-indent; selector by contact size 12", source: "Deutsch HDT-48-00 hand crimp tool (size 12 selector)"}
+    - {do: pull test, tool: PULL_GAUGE, value: "14 AWG ≥ 50 lbf · 12 ≥ 70", source: "ch.18 §7"}
+    - {do: insert, tool: hand, value: "push until it clicks; fit the wedge"}
+
+gm_blade:
+  label: GM factory blade connectors (Packard 56 series) at the ignition, light, dimmer, wiper, blower and column switches
+  per_end: {terminal: "OPEN: Packard 56-series terminal by gauge"}
+  wire_range_awg: [20, 10]          # 56-series female terminals are made 20–18, 16–14, 12, 10 AWG (CE Auto Electric Supply "Packard 56 Series Female Terminals" page, read 2026-09-28; .250 in tab)          # OPEN: range to be cited from the Packard 56 catalog; the factory wires are 18–14 AWG (1977 LTSM)
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "OPEN: strip length — Packard 56 terminal drawing"}
+    - {do: crimp, value: "OPEN: open-barrel 56-series crimper (Packard 12085271 or equivalent) — not yet in the special-tools list"}
+    - {do: pull test, tool: PULL_GAUGE, value: "20 AWG ≥ 13 lbf · 18 ≥ 20 · 16 ≥ 30 · 14 ≥ 50", source: "ch.18 §7"}
+    - {do: insert, tool: hand, value: "push in until the lance locks; check with a light pull"}
+
+screw_terminal:
+  label: screw terminals (Orion charger, amplifier block, radio/mirror harness blocks) — ring or spade per stud
+  per_end: {terminal: "OPEN: ring by stud size and gauge"}
+  wire_range_awg: [22, 6]           # the ring sets the range; the terminal part is the open item
+  steps:
+    - {do: strip, tool: [STRIP_26_16, STRIP_14_10]}
+    - {do: crimp, value: "OPEN: crimper follows the ring pick"}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 16 ≥ 30 · 10 ≥ 90", source: "ch.18 §7"}
+    - {do: land + torque, tool: TORQUE_INLB, value: "OPEN: torque per the device's manual"}
+
+contura:
+  label: Blue Sea 2145 Contura switch — 0.250 in quick-connect tabs (the 7700's dash switch)
+  per_end: {terminal: "OPEN: 0.250 in fully insulated female quick-connect, 16–14 AWG"}
+  wire_range_awg: [16, 14]          # "Use minimum 16 AWG wire for the Control Circuit" (Blue Sea 7700 instructions p.2)
+  steps:
+    - {do: strip, tool: STRIP_26_16}
+    - {do: crimp, value: "OPEN: quick-connect crimper — not yet in the special-tools list"}
+    - {do: pull test, tool: PULL_GAUGE, value: "16 AWG ≥ 30 lbf", source: "ch.18 §7"}
+    - {do: push on, tool: hand, value: "seat on the tab; heat-shrink over the barrel"}

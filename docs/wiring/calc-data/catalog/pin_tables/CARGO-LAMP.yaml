@@ -1,0 +1,7 @@
+CARGO-LAMP:
+  family: open
+  open:
+  - 'lamp not identified: 1977 manual p.838 lists ''Cargo lamp (C-K cab)'' 1142 and ''Cargo/dome lamp'' 211-2 (Utility). The picked lamp''s leads close this plug'
+  sources:
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional
+    1157, marker 168, back-up 1156, license 67, underhood 93)'

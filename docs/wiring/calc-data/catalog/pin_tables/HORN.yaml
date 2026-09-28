@@ -1,0 +1,13 @@
+HORN:
+  family: open
+  pins:
+    '48': horn terminal (circuit 29 dark green, connector 12004267)
+    HORN_GND: ''
+  mate: GM 12004267 1-way connector (1978 booklet p.13); new-part equivalent OPEN
+  note: 'maker''s document: factory horn: one terminal in a 1-way connector 12004267 (circuit 29), grounds through its mounting bracket'
+  open:
+  - 'HORN_GND: the factory horn has no ground terminal — it grounds through its bracket (1978 booklet p.13). A ring under the mount bolt, or a horn with a ground
+    terminal, closes this'
+  sources:
+  - '1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.13 (sheet A-1, front lighting / horn panel): ''HORN''
+    12004267, 16 DK GRN-29B / 12 DK GRN-29A'

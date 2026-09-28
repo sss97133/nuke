@@ -109,6 +109,12 @@ URLS = [
     "https://batterysales.com/product/34-78-pc1500dt-odyssey/",
     "https://batterysales.com/product/d34-78-8014-045-optima/",
     "https://www.autoloc.com/catalog/Actuators/Door-Lock-Actuators/AUTZT2000/Compact-2-Wire-Car-Door-Lock-Actuator-Heavy-Duty-12-Volt-Motor-13-Lbs-Power-12V",
+    # door pass-throughs re-picked to the window wires' gauge (2026-09-28 night: DTP size 12 for 14 AWG, DT 8-way for the rest)
+    "https://www.customconnectorkits.com/products/dtp04-4p",
+    "https://www.customconnectorkits.com/products/dt04-08pa",
+    "https://www.ksvlooms.com/products/mated-dtp-connector-kits-4-way",
+    # Packard 56-series terminal gauge sizes (the factory switch blades)
+    "https://ceautoelectricsupply.com/product/packard-56-series-female-terminals/",
 ]
 
 

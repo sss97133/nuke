@@ -1,0 +1,11 @@
+HEADLIGHT-R:
+  family: open
+  mate: H4 female 3-way connector — part OPEN
+  note: 'maker''s document: Truck-Lite 27270C 7 in LED headlamp: three 16 AWG leads hardwired to the lamp, ending in an H4 3-blade plug'
+  open:
+  - 'which H4 blade is LOW / HIGH / GND on the 27270C lead: not on the saved listings — the Truck-Lite 27270C instruction sheet closes it'
+  - 'factory 1978 sealed-beam plug for comparison: 2977804, cavities 11 high (light green) / 12 low (tan) / 150 ground (1978 booklet p.13)'
+  sources:
+  - 'reference_documents/web_snapshots/a1truckparts.net__truck-lite-27270c-clear-7-round-high-low-beam-headlight-hardwired-h4-connectors.md (''Number of Wires: 3'',
+    ''Lamp Connection: Hardwired'', ''Plug Side Two: H4 Connector'', ''Wire Gauge: 16'')'
+  - 1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.13 (sheet A-1, front lighting / horn panel)
