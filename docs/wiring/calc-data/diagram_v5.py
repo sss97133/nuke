@@ -290,7 +290,7 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
     span = max(max(xs_) - min(xs_), max(ys_) - min(ys_))
     R = 92.0
     scale = (2 * R - 22) / span
-    bulk_cx, bulk_cy = x2 + 120 + R, M + 60 + R
+    bulk_cx, bulk_cy = x2 + 120 + R, M + 104 + R      # the face sits low enough to leave a lane band above it
     bulk_x = bulk_cx - R
     lit = {}
     for wid in sheet_wires:
@@ -328,7 +328,8 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
         else:
             s.el.append(f'<circle cx="{X:.1f}" cy="{Y:.1f}" r="6.4" fill="none" stroke="#bbb" stroke-width="0.5"/>')
             s.txt(X, Y + 2.1, cav, 5.0, anchor="middle", colour="#bbb")
-    s.txt(bulk_cx, bulk_cy - R - 12, "61-PIN FIREWALL CONNECTOR — ENGINE SIDE, MATING FACE (SOCKET CONTACTS, FEMALE)", 6.4, bold=True, anchor="middle")
+    s.txt(bulk_cx, bulk_cy - R - 20, "61-PIN FIREWALL CONNECTOR", 6.4, bold=True, anchor="middle")
+    s.txt(bulk_cx, bulk_cy - R - 11, "ENGINE SIDE, MATING FACE (SOCKETS, FEMALE)", 5.6, bold=True, anchor="middle")
     s.txt(bulk_cx, bulk_cy + R + 11, "D38999/24WJ61SN receptacle · insert 25-61 · lit = on this sheet, filled in the wire's colour", 5.4, anchor="middle")
     bulk_bottom = bulk_cy + R + 16
     # runs reach a lit cavity from its left (engine side) and leave from its right (cab side)
@@ -401,9 +402,11 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
         elif cab and not jun:                      # to a cab computer with no bulkhead cavity yet: dashed, stamped
             ox, oy = pin_at[dev[0]]
             cx, cy = pin_at[cab[0]]
-            xc = chB + (nB % 40) * TRACK
-            nB += 1
-            s.line([(ox, oy), (xc, oy), (xc, cy), (cx, cy)], 0.8, "3 2", colour=base, stripe=stripe)
+            xc = chB + (nB % 40) * TRACK                  # routed OVER the 61-pin face, never through it
+            lane = bulk_cy - R - 26 - (nB % 12) * TRACK
+            xc2 = chC + (nC % 40) * TRACK
+            nB += 1; nC += 1
+            s.line([(ox, oy), (xc, oy), (xc, lane), (xc2, lane), (xc2, cy), (cx, cy)], 1.4, "3 2", colour=base, stripe=stripe)
             s.txt(ox + 4 + tw(label, 4.8) + 4, oy - 1.6, "OPEN: no bulkhead cavity", 4.8, italic=True, colour=ORANGE)
             open_runs = was_open + 1
         elif not jun and not fw:

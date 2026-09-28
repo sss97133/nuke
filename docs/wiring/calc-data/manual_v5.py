@@ -520,8 +520,8 @@ def page_firewall(reg, wires, number, odd):
     bom = reg["bom"]["parts"]
     parts_y = yaml.safe_load((CD / "catalog" / "parts.yaml").read_text())
     tools_y = {t_["id"]: t_ for t_ in reg["tools"]}
-    strip = [("D38999/24WJ61SN", "D38999-SERIES", "wall receptacle, shell 25, insert 61, socket contacts (female) — on the firewall", "series photo"),
-             ("D38999/26WJ61PN", "D38999-SERIES", "plug, shell 25, insert 61, pin contacts (male) — on the engine harness", "series photo"),
+    strip = [("D38999/24WJ61SN", "D38999-24WJ61SN", "jam-nut wall receptacle, shell 25, insert 61, sockets (female), on the firewall", None),
+             ("D38999/26WJ61PN", "D38999-26WJ61PN", "straight plug, shell 25, insert 61, pins (male), on the engine harness", None),
              ("M39029/56-351", "M39029-56-351", "size-20 socket contact, crimp, 20–24 AWG — receptacle, cab side", None),
              ("M39029/58-363", "M39029-58-363", "size-20 pin contact, crimp, 20–24 AWG — plug, engine side", None),
              ("M85049/69-25N", "M85049-69-25N", "accessory adapter, shell 25 (boot seat), one per side", None),
@@ -544,11 +544,11 @@ def page_firewall(reg, wires, number, odd):
         qty = bom.get(pn) or bom.get(pn.replace("M22520/2-01", "AFM8")) or ""
         p.txt(x_ + cell_w / 2, p.y + ph + 9, pn, 6.2, bold=True, anchor="middle")
         p.txt(x_ + cell_w / 2, p.y + ph + 16, f"×{qty}" if qty else "tool", 5.6, anchor="middle")
-        for j_, ln_ in enumerate(p.wrap(what + (f" ({note})" if note else ""), cell_w - 6, 5.0)[:4]):
-            p.txt(x_ + cell_w / 2, p.y + ph + 23 + j_ * 6, ln_, 5.0, anchor="middle")
+        for j_, ln_ in enumerate(p.wrap(what + (f" ({note})" if note else ""), cell_w - 4, 4.8)[:5]):
+            p.txt(x_ + cell_w / 2, p.y + ph + 23 + j_ * 5.8, ln_, 4.8, anchor="middle")
     p.y += ph + 52
     p.txt(M, p.y, "A band across a cavity is the wire's stripe colour (KK = 22 WHT/BLU, the crank shield drain). Grey = a plain grey wire. White = spare.", 6.2, italic=True)
-    p.txt(M, p.y + 9, "Photos are the vendors' product photos (DigiKey, DMC); the D38999 photo is the series, not the exact shell and insert.", 6.2, italic=True)
+    p.txt(M, p.y + 9, "Photos are the vendors' product photos of the exact part numbers (DigiKey, DMC). The two shells lined up are eBay surplus of the same numbers.", 6.2, italic=True)
     # ---- the cavity table, on the facing page
     p2 = Page(f"1-{int(number.split('-')[1]) + 1}", "Engine Harness", odd=not odd)
     p2.heading("Firewall Connector — Cavity Table")
