@@ -59,6 +59,44 @@ def wire_colours(w):
 
 SHIELD_RUN = ("#111111", "#ffffff")
 UNSET_RUN = "#fffffe"
+UNSET_GREY = "#a6a6a6"                          # not a wire colour (grey wire = #8a8a8a)
+
+
+CAND_DASH = "7 2 1.2 2"                         # dash-dot: a candidate option's run
+
+
+def is_candidate(wid):
+    w = (CTX.wires.get(str(wid)) if CTX and wid is not None else None) or {}
+    return w.get("option_status") == "candidate"
+
+
+def candidate_faults(sheet):
+    """A candidate wire drawn in the base style, or a sheet with candidates and no key (review round 3)."""
+    bad = [f"candidate wire {o} drawn in the base style" for o, _d, dash in getattr(sheet, "strokes", [])
+           if is_candidate(o) and dash != CAND_DASH]
+    if getattr(sheet, "cands", None) and not any("CANDIDATE" in str(b[4]) and "only one" in str(b[4]) for b in sheet.boxes):
+        bad.append("candidate wires on the sheet with no 'only one is built' key")
+    return bad
+
+
+def run_colour_faults(sheet, wires):
+    """A run may only be drawn in its own wire's colours: every stroke that is a wire-colour hex must be that wire's
+    base or stripe (review round 3, N1: colour-unset runs drew orange = the 5 V colour). Symbol strokes (no owner)
+    and the black edge are not wire colours of a run."""
+    wire_hex = {v.lower() for k, v in HEX.items() if k not in ("cable", "shld")} - {"#111111"}
+    bad = []
+    for owner, drawn, _dash in getattr(sheet, "strokes", []):
+        if owner is None or owner not in wires:
+            continue
+        own = {c.lower() for c in wire_colours(wires[owner]) if c}
+        for c in drawn:
+            c = c.lower()
+            if c in wire_hex and c not in own:
+                bad.append(f"run {owner} drawn in {c}, not its own colour")
+                break
+    if UNSET_GREY.lower() in wire_hex:
+        bad.append("the colour-not-set grey equals a wire colour")
+    return bad
 
 
 def colour_faults():
@@ -92,6 +130,7 @@ TITLES = {"CKP": "crank sensor", "CMP": "cam sensor", "MAP": "MAP sensor", "CLT-
           "DCDC": "DC-DC charger", "IBOOSTER": "brake booster (iBooster)", "CAN-BUS": "CAN bus trunk",
           "PORT-ETH": "M130 laptop port (RJ45)", "PORT-UTC": "PDM30 laptop port (XLR)", "FIREWALL-GROMMET": "firewall grommet",
           "FIREWALL-BODY-A": "body bulkhead A", "FIREWALL-BODY-B": "body bulkhead B", "FIREWALL-BODY-P": "body bulkhead P",
+          "FIREWALL-BODY-C": "body bulkhead C", "AMP-PASS": "floor pass-through at the amplifier",
           "FIREWALL-ENGINE": "61-pin firewall connector", "FIREWALL-CABIN": "61-pin firewall connector",
           "HEADLIGHT-L": "left headlight", "HEADLIGHT-R": "right headlight", "PARK-TURN-LF": "left front park/turn lamp",
           "PARK-TURN-RF": "right front park/turn lamp", "MARKER-LF": "left front marker", "MARKER-RF": "right front marker",
@@ -108,7 +147,7 @@ TITLES = {"CKP": "crank sensor", "CMP": "cam sensor", "MAP": "MAP sensor", "CLT-
           "LOCK-SW-R": "passenger lock switch", "window_motor_DS": "driver window motor",
           "window_motor_PS": "passenger window motor", "lock_actuator_DS": "driver lock actuator",
           "lock_actuator_PS": "passenger lock actuator", "SPK-FL": "driver door speaker", "SPK-FR": "passenger door speaker",
-          "TG-SW-DASH": "tailgate window dash switch", "TG-SW-KEY": "tailgate key switch", "TG-CUTOUT": "tailgate-closed cutout switch",
+          "TG-SW-DASH": "tailgate window dash switch", "TG-SW-KEY": "tailgate key switch", "TG-CUTOUT": "tailgate-closed cutout switch", "TG-SW-KEY-REV": "tailgate key switch (reversing)", "TG-SW-MASTER": "tailgate dash switch (reversing master)", "TG-MOTOR-ACI": "tailgate window motor (Nu-Relics ACI)",
           "rear_window_motor": "tailgate window motor", "Backup_Camera": "rear camera", "MIRROR-MON": "mirror display",
           "DOME-LAMP": "dome lamp", "FOOTWELL-LAMPS": "footwell lamps", "UNDERDASH-LAMPS": "under-dash lamps",
           "CARGO-LAMP": "cargo lamp", "DOOR-JAMB-L": "driver door jamb switch", "DOOR-JAMB-R": "passenger door jamb switch",
@@ -124,14 +163,19 @@ CODE_WORDS = [(r"\bCKP\b", "crank"), (r"\bCMP\b", "cam"), (r"\bCLT\b", "coolant 
               (r"\bOPS\b", "oil PSI"), (r"\bETB\b", "throttle body"), (r"\bAPS\b", "gas pedal"), (r"\bOTS\b", "oil temp"),
               (r"\bTAC\b", "throttle")]
 STRIP_FAMILY = {"FIREWALL-BODY-A": ("Deutsch DT 12-way, A key", 12), "FIREWALL-BODY-B": ("Deutsch DT 12-way, B key", 12),
-                "FIREWALL-BODY-P": ("Deutsch DTP 4-way", 4)}
+                "FIREWALL-BODY-P": ("Deutsch DTP 4-way", 4), "FIREWALL-BODY-C": ("Deutsch DT 6-way", 6)}
 
 
 def plug_title(e, ep):
     m = re.match(r"^(COIL|INJ)-(\d+)$", e)
     if m:
         return f"{'coil' if m.group(1) == 'COIL' else 'injector'} {m.group(2)}"
-    t = TITLES.get(e) or (ep.get("device") or e).split("(")[0].split(" — ")[0][:40].strip()
+    t = TITLES.get(e)
+    if not t:   # the device text up to its first bracket/dash, cut on a whole word (never mid-word: "the SECOND reve", 2026-09-28)
+        src = (ep.get("device") or e).split("(")[0].split(" — ")[0].strip()
+        t = src
+        if len(src) > 40:
+            t = src[:41].rsplit(" ", 1)[0].rstrip(" ,:;")
     for rx, word in CODE_WORDS:
         t = re.sub(rx, word, t)
     return t
@@ -182,15 +226,30 @@ class Sheet:
     def line(self, pts, w=0.8, dash=None, colour="#000", stripe=None, owner=None):
         """A run (owner = its wire id) or a symbol stroke. Stripe = a thin solid centre line in the stripe colour."""
         pts = [(self.X(x), y) for x, y in pts]
+        if is_candidate(owner):
+            dash = CAND_DASH                     # an undecided option: never drawn in the base style (review round 3)
+            self.__dict__.setdefault("cands", set()).add(owner)
         d = f' stroke-dasharray="{dash}"' if dash else ""
         P_ = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
-        if colour != "#000":                     # a coloured run: thin black edge so white wire shows on white paper
-            edge = ORANGE if colour == UNSET_RUN else "#000"   # colour not set: an orange edge
-            self.el.append(f'<polyline points="{P_}" fill="none" stroke="{edge}" stroke-width="{w + 0.9}" stroke-linejoin="round"{d}/>')
-        self.el.append(f'<polyline points="{P_}" fill="none" stroke="{colour}" stroke-width="{w}" stroke-linejoin="round"{d}/>')
-        if stripe:
-            self.el.append(f'<polyline points="{P_}" fill="none" stroke="{stripe}" stroke-width="{max(w * 0.36, 0.4):.2f}" stroke-linejoin="round"{d}/>')
+        drawn = []
+        if colour == UNSET_RUN:
+            # colour not set: a thin grey line with a black dotted overlay — never a wire colour (review round 3, N1:
+            # the orange edge read as the 5 V feed colour)
+            self.el.append(f'<polyline points="{P_}" fill="none" stroke="{UNSET_GREY}" stroke-width="{max(w * 0.55, 0.5):.2f}" '
+                           f'stroke-linejoin="round"{d}/>')
+            self.el.append(f'<polyline points="{P_}" fill="none" stroke="#000" stroke-width="{max(w * 0.55, 0.5):.2f}" '
+                           f'stroke-dasharray="0.5 1.6" stroke-linecap="round"/>')
+            drawn = [UNSET_GREY, "#000"]
+        else:
+            if colour != "#000":                 # a coloured run: thin black edge so white wire shows on white paper
+                self.el.append(f'<polyline points="{P_}" fill="none" stroke="#000" stroke-width="{w + 0.9}" stroke-linejoin="round"{d}/>')
+            self.el.append(f'<polyline points="{P_}" fill="none" stroke="{colour}" stroke-width="{w}" stroke-linejoin="round"{d}/>')
+            drawn = ["#000", colour]
+            if stripe:
+                self.el.append(f'<polyline points="{P_}" fill="none" stroke="{stripe}" stroke-width="{max(w * 0.36, 0.4):.2f}" stroke-linejoin="round"{d}/>')
+                drawn.append(stripe)
         self.runs.append((owner, list(pts)))
+        self.__dict__.setdefault("strokes", []).append((owner, drawn, dash))
 
     def rect(self, x, y, w, h, sw=0.9, rx=0, fill="none", dash=None, colour="#000", mark=False):
         if self.mx:
@@ -250,6 +309,51 @@ def mark_overprints(sheet):
     return out
 
 
+def shared_verticals(sheet, tol=1.0):
+    """Two different runs drawn down the same x over overlapping heights: the reader cannot tell which lands where
+    (review round 3, N6: #55 and #100 on one line into B8). Returns (run, run, x) per pair, once."""
+    vert = []
+    for owner, pts in sheet.runs:
+        if owner is None:
+            continue
+        for (ax, ay), (bx, by) in zip(pts, pts[1:]):
+            if abs(ax - bx) < 0.05 and abs(ay - by) > 0.5:
+                vert.append((owner, ax, min(ay, by), max(ay, by)))
+    out, seen = [], set()
+    vert.sort(key=lambda v: v[1])
+    for i, (o1, x1, a1, b1) in enumerate(vert):
+        for o2, x2, a2, b2 in vert[i + 1:]:
+            if x2 - x1 > tol:
+                break
+            if o1 != o2 and min(b1, b2) - max(a1, a2) > 0.5 and (o1, o2) not in seen and (o2, o1) not in seen:
+                seen.add((o1, o2))
+                out.append((o1, o2, x1))
+    return out
+
+
+def collinear_legs(sheet, gap=14.0, mates=lambda a, b: False):
+    """Two different runs on the same height whose horizontal legs meet or nearly meet end to end: they read as one
+    wire (review round 3, N6: #55's leg ran on into #100's leg to B8)."""
+    hor = []
+    for owner, pts in sheet.runs:
+        if owner is None:
+            continue
+        for (ax, ay), (bx, by) in zip(pts, pts[1:]):
+            if abs(ay - by) < 0.05 and abs(ax - bx) > 0.5:
+                hor.append((owner, round(ay, 1), min(ax, bx), max(ax, bx)))
+    out, seen = [], set()
+    hor.sort(key=lambda h: (h[1], h[2]))
+    for i, (o1, y1, a1, b1) in enumerate(hor):
+        for o2, y2, a2, b2 in hor[i + 1:]:
+            if y2 - y1 > 0.6:
+                break
+            apart = max(a2 - b1, a1 - b2)          # the clear distance between the two legs (negative = they overlap)
+            if o1 != o2 and apart < gap and (o1, o2) not in seen and (o2, o1) not in seen and not mates(o1, o2):
+                seen.add((o1, o2))
+                out.append((o1, o2, y1))
+    return out
+
+
 def run_strikes(sheet):
     """Text struck by a run that is not its own (review C22: labels struck through by runs). A text box counts as hit
     when any run segment passes through it (0.4 pt inside its edges); a label may sit on its own run."""
@@ -299,14 +403,25 @@ def fit_tail(text, width, size):
     return fit(head, width - tw(sep + tail, size), size) + sep + tail
 
 
-def wire_label(w, length=True):
+def wire_label(w, length=True, sheet=None):
     """GM style 'gauge colour-circuit', then the run's total length once: '22 WHT/ORN-99R · TOTAL RUN 4.6 FT EST'
-    (estimate until measured). length=False: the same wire labelled again on the sheet (the far side of a crossing):
-    the length is printed once per sheet, never repeated on both sides of an in-line connector (review 2026-09-28)."""
-    col = gm_colour(str(w.get("color") or "?").upper()).replace("CABLE", "SHLD").replace(" + ", "+")
-    head = f"{manual_v5.gauge_word(w)} {col}-{str(w['id']).upper()}"
+    (estimate until measured). A circuit with no number prints the builder's name for it; a colour not yet set prints
+    nothing (never '?-'). length=False: the same wire labelled again on the sheet (the far side of a crossing): the
+    length is printed once per sheet (review 2026-09-28). sheet: where the printed length is logged for the lint."""
+    colour_set = bool(re.sub(r"[?\s]", "", str(w.get("color") or "")))
+    col = gm_colour(str(w.get("color") or "").upper()).replace("CABLE", "SHLD").replace(" + ", "+") if colour_set else ""
+    numbered = bool(re.fullmatch(r"\d+[A-Za-z]?", str(w["id"])))
+    # a numbered circuit: 'gauge COLOUR-number'; a wire with no number: gauge and colour only (its sleeve text prints on
+    # the LABEL line under the run) — never a code in the run label, never '?-' (review round 3)
+    head = f"{manual_v5.gauge_word(w)} " + (f"{col}-{str(w['id']).upper()}" if col and numbered
+                                            else (str(w["id"]).upper() if numbered else col))
+    head = head.strip()
+    if w.get("option_status") == "candidate":
+        head += f" · CANDIDATE: {w.get('option')}"
     if not length:
         return head
+    if sheet is not None:
+        sheet.__dict__.setdefault("len_log", []).append(str(w["id"]))
     L = w.get("length_ft")
     basis = str(w.get("length_basis") or "").lower()
     if L:
@@ -327,7 +442,7 @@ def first_label(s, wid):
 def length_repeats(sheet):
     """Wires whose length is printed more than once on a sheet (review 2026-09-28: same length both sides of a crossing)."""
     from collections import Counter
-    c = Counter(m.group(1) for b in sheet.boxes for m in [re.search(r"-(\S+) · (?:TOTAL RUN|LENGTH OPEN)", str(b[4]))] if m)
+    c = Counter(getattr(sheet, "len_log", []))
     return [w for w, n in c.items() if n > 1]
 
 
@@ -512,6 +627,16 @@ class Ctx:
         wh = (self.eps.get(e) or {}).get("where")
         return "engine" if wh == "engine" else "x" if wh == "firewall" else "cab"
 
+    def pin_mates(self, a, b):
+        """True when two wires land on one pin or cavity (spliced there): their runs meet on purpose."""
+        pa = {(t["endpoint"], str(t.get("cavity"))) for t in self.ends.get(a, []) if t.get("cavity")}
+        pb = {(t["endpoint"], str(t.get("cavity"))) for t in self.ends.get(b, []) if t.get("cavity")}
+        if pa & pb:
+            return True
+        # an in-line splice's pigtails and the run they join, a shield drain and its cable
+        ra, rb = self.pigtail_of.get(a, (None,))[0], self.pigtail_of.get(b, (None,))[0]
+        return bool({a, ra} & {b, rb} - {None}) or re.sub(r"[gs]$", "", a) == re.sub(r"[gs]$", "", b)
+
     def crossing(self, w):
         """(needs a crossing?, the route's words) from the wire's own route; None when the row has no route."""
         cr = str(((w or {}).get("route") or {}).get("crossing") or "")
@@ -672,7 +797,8 @@ def assemble(ctx, sp, devs, extra, owned, num_of):
     for e in P.JUNCTIONS:
         if e in R_j:
             right.append(jun_box(ctx, e, R_j[e], "left"))
-    for e in ("FIREWALL-ENGINE", "FIREWALL-BODY-A", "FIREWALL-BODY-B", "FIREWALL-BODY-P", "FIREWALL-GROMMET"):
+    for e in ("FIREWALL-ENGINE", "FIREWALL-BODY-A", "FIREWALL-BODY-B", "FIREWALL-BODY-P", "FIREWALL-BODY-C", "AMP-PASS",
+              "FIREWALL-GROMMET"):
         if e not in X:
             continue
         if e == "FIREWALL-ENGINE":
@@ -829,8 +955,10 @@ def draw_column_box(s, b):
             s.txt(b.x + b.w / 2, yy + 2.2, r["mark"], 5.4, bold=bool(lit), anchor="middle",
                   colour=("#fff" if lit and fill in DARK else "#000") if lit else "#bbb")
             for k, ftxt in enumerate(r.get("far") or []):
-                s.txt(b.x + b.w + 4, yy + 2.0, fit_tail(ftxt, W - M - (b.x + b.w + 4), 4.8), 4.8, colour="#000",
-                      owner=r["wires"][0] if r["wires"] else None)
+                lines = wrap_text(ftxt, W - M - (b.x + b.w + 4), 4.8)          # wraps, never cut short
+                for q, ln in enumerate(lines):
+                    s.txt(b.x + b.w + 4, yy + 2.0 + (q - (len(lines) - 1) / 2) * 5.0, ln, 4.8, colour="#000",
+                          owner=r["wires"][0] if r["wires"] else None)
                 break
             continue
         if r.get("sid"):
@@ -899,7 +1027,16 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
     for b in right:
         if b.kind != "strip":
             b.w = R_w
-    stack(right, R_x, TOP)
+    # the right stack sits half a row lower than the left, so a left pin and a right pin never share a height and
+    # two runs' legs cannot line up end to end (review round 3, N6)
+    left_ys = [b.pin(i)[1] for b in left for i in range(len(b.rows))]
+
+    def clashes(off):
+        stack(right, R_x, TOP + off)
+        rys = [b.pin(i)[1] for b in right for i in range(len(b.rows))]
+        return sum(1 for ly in left_ys for ry in rys if abs(ly - ry) < 2.0)
+    best_off = min([ROW / 2] + [k * 0.75 for k in range(0, 16)], key=lambda o: (clashes(o), abs(o - ROW / 2)))
+    stack(right, R_x, TOP + best_off)
 
     # label widths decide where the lanes start
     labels = {wid: wire_label(w) for wid, w in ws.items()}
@@ -931,7 +1068,8 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
         strip_items = [it for k, it in model["x"] if k == "strip"]
         ybot = TOP
         if face_items:
-            face = draw_face(s, ctx, face_items[0], X0 + 20, ws)
+            pin_ys = [b.pin(i)[1] for b in left + right for i in range(len(b.rows))]
+            face = draw_face(s, ctx, face_items[0], X0 + 20, ws, avoid=pin_ys)
             for wid, v in face["in"].items():
                 xin[wid] = v
             for wid, v in face["out"].items():
@@ -942,7 +1080,11 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
             xcol_r = X0 + 60
         sx = X0 + 30
         for b in strip_items:
-            b.x, b.y = sx, ybot + 14
+            # a strip row never sits at a stack pin's height (runs would meet end to end, review round 3 N6)
+            pin_ys = [b2.pin(i)[1] for b2 in left + right for i in range(len(b2.rows))]
+            def strip_clash(y0_):
+                return sum(1 for i in range(len(b.rows)) for py in pin_ys if abs(y0_ + 4 + i * ROW + ROW / 2 - py) < 2.0)
+            b.x, b.y = sx, min((ybot + 14 + k * 1.5 for k in range(8)), key=lambda y0_: (strip_clash(y0_), y0_))
             draw_strip_engine(s, b)
             for i, r in enumerate(b.rows):
                 yy = b.pin(i)[1]
@@ -978,6 +1120,25 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
     stepC = min(3.2, (laneC[1] - laneC[0]) / nC) if laneC else 0
     open_runs, band_k = 0, 0
     splice_rows = OrderedDict()
+    # the heights of every left-hand leg (plug pins, crossing exits), by wire: a right-hand leg of another wire at the
+    # same height would continue it on one line
+    left_leg = defaultdict(set)
+    for wid_, pl in pts.items():
+        for p_ in pl:
+            if p_[2] == "L":
+                left_leg[round(p_[1] * 2) / 2].add(wid_)
+    for wid_, v in xout.items():
+        left_leg[round(v[1] * 2) / 2].add(wid_)
+
+    def jog(wid_, y_):
+        near = {w_ for yy, ws_ in left_leg.items() if abs(yy - y_) < 2.0 for w_ in ws_} - {wid_}
+        near = {w_ for w_ in near if not ctx.pin_mates(w_, wid_)}
+        if not near:
+            return 0
+        for j in (4.0, -4.0, 6.0, -6.0):
+            if not any(abs(yy - (y_ + j)) < 2.0 for yy in left_leg):
+                return j
+        return 4.0
     for wid in order:
         w = ws[wid]
         base, stripe = wire_colours(w)
@@ -1016,10 +1177,15 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
                 xc = laneC[0] + (iC % nC) * stepC + 1
                 iC += 1
                 draw([(xr, yr), (xc, yr)])
-                ys = [p[1] for p in Rp] + [yr]
-                draw([(xc, min(ys)), (xc, max(ys))])
+                ys = [yr]
                 for x_, y_, *_ in Rp:
-                    draw([(xc, y_), (x_, y_)])
+                    j = jog(wid, y_)
+                    if j:
+                        draw([(xc, y_ + j), (x_ - 10, y_ + j), (x_ - 10, y_), (x_, y_)])
+                    else:
+                        draw([(xc, y_), (x_, y_)])
+                    ys.append(y_ + j)
+                draw([(xc, min(ys)), (xc, max(ys))])
                 if len(Rp) > 1:
                     for x_, y_, *_ in Rp:
                         s.dot(xc, y_, 1.2)
@@ -1068,9 +1234,16 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
                 else:
                     xa = laneA[0] + (iA % nA) * stepA + 1
                     iA += 1
-                for x_, y_, *_ in allp:
-                    draw([(x_, y_), (xa, y_)])
-                ys = [p[1] for p in allp]
+                ys = []
+                for x_, y_, where_, *_ in allp:
+                    j = jog(wid, y_) if where_ == "R" else 0
+                    if j:
+                        # a right-hand leg at another wire's left-leg height: off that line, back onto the pin
+                        # just before the box (the two never read as one wire; review round 3, N6)
+                        draw([(xa, y_ + j), (x_ - 10, y_ + j), (x_ - 10, y_), (x_, y_)])
+                    else:
+                        draw([(x_, y_), (xa, y_)])
+                    ys.append(y_ + j)
                 draw([(xa, min(ys)), (xa, max(ys))])
                 if len(allp) > 2:
                     for x_, y_, *_ in allp:
@@ -1096,13 +1269,13 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
             taken.add((p[4].code, p[3].get("cav"), p[1]))
         for x_, y_, _w, r_, b_ in anc:
             x_ = b_.x + b_.w + (14 if b_.kind == "comp" else 0)     # clear of a splice dot at a computer pin
-            s.txt(x_ + 4, y_ - 1.4, wire_label(w, length=first_label(s, wid)), LBL, owner=wid)
+            s.txt(x_ + 4, y_ - 1.4, wire_label(w, length=first_label(s, wid), sheet=s), LBL, owner=wid)
             s.txt(x_ + 4, y_ + 4.6, circuit_label(w), LBL2, colour="#333", owner=wid)
         rp_ = sorted([p for p in Rp if notpig(p) and free_pt(p)], key=lambda p: (p[4].kind != "dev", len(p[3]["wires"])))
         if not anc and rp_:
             x_, y_ = rp_[0][0], rp_[0][1]
             taken.add((rp_[0][4].code, rp_[0][3].get("cav"), y_))
-            s.txt(x_ - 18, y_ - 1.4, wire_label(w, length=first_label(s, wid)), LBL, anchor="end", owner=wid)
+            s.txt(x_ - 18, y_ - 1.4, wire_label(w, length=first_label(s, wid), sheet=s), LBL, anchor="end", owner=wid)
             s.txt(x_ - 18, y_ + 4.6, circuit_label(w), LBL2, colour="#333", anchor="end", owner=wid)
     # shields: dashed oval around the cable's conductors near the plug; the drain leaves the oval (its run is drawn
     # with the others from the oval's point)
@@ -1130,6 +1303,10 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
             s.dot(px + dx, py, 2.0)
             # the splice ids under the dot, one per line, anchored on the side away from the pin box so a long list
             # never runs over it (review 2026-09-28: 'S-03/S-04/S-05' over the B16 box)
+            # the shield drain's solder sleeve (S02-03-R) is at this, the ECU, end: a hollow ring on the drain's leg
+            if any(re.fullmatch(r"\d+s", w_) for w_ in r["wires"]):
+                s.el.append(f'<circle cx="{s.X(px + 2.2 * dx):.1f}" cy="{py:.1f}" r="2.3" fill="#fff" stroke="#000" stroke-width="0.8"/>')
+                s.__dict__["sleeves"] = True
             for k_, sid_ in enumerate([x["id"] for x in sps] or ["S-?"]):
                 s.txt(px + dx, py + 6.2 + k_ * 4.6, sid_, 4.2, bold=True, anchor="middle", colour="#000" if sps else ORANGE)
             for x in sps:
@@ -1150,10 +1327,10 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
             px, py = b.pin(i)
             pw = ctx.wires[pt]
             if b.pins == "left":
-                s.txt(px - 18, py - 1.4, wire_label(pw), LBL, anchor="end", owner=r["wires"][0])
+                s.txt(px - 18, py - 1.4, wire_label(pw, sheet=s), LBL, anchor="end", owner=r["wires"][0])
                 s.txt(px - 18, py + 4.6, f"{circuit_label(pw)} · {sid}", LBL2, colour="#333", anchor="end", owner=r["wires"][0])
             else:
-                s.txt(px + 4, py - 1.4, wire_label(pw), LBL, owner=r["wires"][0])
+                s.txt(px + 4, py - 1.4, wire_label(pw, sheet=s), LBL, owner=r["wires"][0])
                 s.txt(px + 4, py + 4.6, f"{circuit_label(pw)} · {sid}", LBL2, colour="#333", owner=r["wires"][0])
     for b in right + left:
         if b.kind == "jun" and b.code.startswith("RAIL-"):
@@ -1180,7 +1357,14 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
     shield_line = None
     if any(r.get("shield") for b in left for r in b.rows):
         shield_line = ("SHIELDS: " + ctx.shield_rule) if ctx.shield_rule else "SHIELDS: drain grounding end OPEN"
+        if getattr(s, "sleeves", False):
+            shield_line += " · hollow ring on a drain at the ECU pin = its solder sleeve (S02-03-R)"
     s.mx = False                               # tables and footnotes read left to right in true positions
+    if getattr(s, "cands", None):
+        opts = sorted({ctx.wires[w_].get("option") for w_ in s.cands})
+        names = "; ".join(f"{o} = {(ctx.reg.get('options', {}).get(o) or {}).get('name', o).split(' (')[0]}" for o in opts)
+        s.txt(M, H - M - 12, f"DASH-DOT RUN TAGGED CANDIDATE = an option not yet decided ({names}): only one of the candidate "
+              f"wires and the base wires they replace is built.", 5.6, bold=True)
     facing = place_tables(s, ctx, number, title, head, lowest, plist, list(splice_rows.values()), open_notes, shield_line)
     s.footer = [f"{len(ws)} circuits drawn from the wire list · {open_runs} stamped OPEN (an end or a cavity not settled) · "
                 f"cavity marks are the moulded letters; positions are indicative · lengths are estimates until measured on the truck"]
@@ -1228,7 +1412,7 @@ def draw_strip_engine(s, b):
               colour=("#fff" if fill in DARK else "#000") if lit else "#bbb")
 
 
-def draw_face(s, ctx, items, x_left, ws):
+def draw_face(s, ctx, items, x_left, ws, avoid=()):
     """The 61-pin drawn to its insert arrangement (MILNEC 25-61, transcribed in scripts/generate_connector_build_sheets.py
     CAV_XY), engine-side mating face (the mirror of the insert's front face). Only this sheet's cavities are lit; runs end
     at the rim at the cavity's height with the cavity letter, never crossing the face."""
@@ -1249,6 +1433,10 @@ def draw_face(s, ctx, items, x_left, ws):
         y_ = bulk_cy + (xy[cav][1] - cy0) * scale
         if prev is not None and y_ - prev < 6.5:
             y_ = prev + 6.5
+        for _k in range(6):                         # clear of any stack pin's height (runs meeting end to end, N6)
+            if not any(abs(y_ - py) < 2.0 for py in avoid):
+                break
+            y_ += 1.5
         slot[cav] = y_
         prev = y_
     s.el.append(f'<circle cx="{s.X(bulk_cx):.1f}" cy="{bulk_cy:.1f}" r="{R:.1f}" fill="none" stroke="#000" stroke-width="1.1"/>')
@@ -1297,6 +1485,21 @@ def draw_face(s, ctx, items, x_left, ws):
         rim_r = bulk_cx + (R * R - dy * dy) ** 0.5 + tw(cav, 5.2, True) + 8
         s.line([(rim_r, y_), (right, y_)], 1.1, None, colour=wire_colours(ws[w2])[0], stripe=wire_colours(ws[w2])[1], owner=w2)
     return {"in": out_in, "out": out_out, "bottom": bulk_cy + R + 22, "right": right}
+
+
+def fw_spares(ctx):
+    """The 61-pin's empty cavities, from its fill in the termination rows (never a typed list)."""
+    sheets = kits_v5._load_sheets()
+    used = {str(t.get("cavity")) for t in ctx.reg["terminations"] if t["endpoint"] == "FIREWALL-ENGINE" and t.get("cavity")}
+    return [c for c in sheets.CAV_ORDER if c not in used]
+
+
+def live_spares(ctx, text):
+    """A note that lists the 61-pin spares ('the spares c, d, t, u') is printed with today's spares (review round 3,
+    N3: c carries FAN_PWM now); a sentence about one cavity being spare is dropped when that cavity is used."""
+    sp = fw_spares(ctx)
+    text = re.sub(r"\s*Cavity (\w+) is spare since[^.]*\.?", lambda m: m.group(0) if m.group(1) in sp else "", text)
+    return re.sub(r"(the spares )([A-Za-z]{1,2}(?:, [A-Za-z]{1,2})*)(?=\b)", lambda m: m.group(1) + (", ".join(sp) or "none"), text)
 
 
 def draw_can_topology(s, ctx, open_notes):
@@ -1353,7 +1556,11 @@ def draw_can_topology(s, ctx, open_notes):
         s.txt(M, y, fit("From: " + " · ".join(srcs), W - 2 * M, 5.0), 5.0, italic=True)
         y += 8
     for o in cb.get("open") or []:
-        s.txt(M, y, fit(f"OPEN: {o}", W - 2 * M, 5.4), 5.4, colour=ORANGE)
+        o = live_spares(ctx, o)
+        for ln in wrap_text(f"OPEN: {o}", W - 2 * M, 5.4):
+            s.txt(M, y, ln, 5.4, colour=ORANGE)
+            y += 7.4
+        y -= 7.4
         y += 8
     s.rects.append((M, y0 - 24, W - M, y))
 
@@ -1387,7 +1594,7 @@ def place_tables(s, ctx, number, title, head, lowest, plist, splices, open_notes
     if open_notes:
         blocks.append(("ENDS NOT RECORDED (OPEN)", [70, 170, 300], ["Circuit", "What is missing", "As the wire list gives it"],
                        [(a, b, c) for a, b, c in open_notes]))
-    floor = H - M - 14
+    floor = H - M - 22                         # leaves room for the shield rule and the candidate key at the foot
     rest = []
 
     def gaps(x0, x1):
@@ -1611,6 +1818,13 @@ def build(first_number=6):
             bad += [f"run {r} strikes text '{t_}'" for t_, r in run_strikes(sh)]
             bad += [f"text over a pin box: '{t_}'" for t_ in mark_overprints(sh)]
             bad += [f"wire {w_}: length printed more than once" for w_ in length_repeats(sh)]
+            bad += run_colour_faults(sh, ctx.wires)
+            bad += manual_v5.fragment_faults(sh.boxes)
+            bad += candidate_faults(sh)
+            bad += [f"off-sheet tag points nowhere: '{b_[4][:60]}'" for b_ in sh.boxes if "on no sheet" in str(b_[4])]
+            bad += [f"runs {a} and {b_} share a vertical at x {x:.0f} near a pin" for a, b_, x in shared_verticals(sh)]
+            bad += [f"runs {a} and {b_} run end to end at y {y:.0f} (they read as one wire)"
+                    for a, b_, y in collinear_legs(sh, mates=ctx.pin_mates)]
             if j:
                 cells = [b_ for b_ in sh.boxes if b_[1] > M + 64 and not str(b_[4]).isupper()]
                 rows_y = {round(b_[1]) for b_ in cells}
@@ -1651,6 +1865,8 @@ def build(first_number=6):
     for e in left:
         by_sec[SUB2SECTION.get(next((ctx.wires[str(w)].get("subsystem") for w in ctx.eps[e]["wires"] if str(w) in ctx.wires), None), "?")].append(e)
     print(f"plugs on no sheet ({len(left)}): " + ("; ".join(f"{k}: {', '.join(v)}" for k, v in by_sec.items()) or "none"))
+    if left:                                    # a plug on no sheet is a hole in the book (review round 3: the PCS wires)
+        raise SystemExit(f"plugs drawn on no sheet: {', '.join(left)} — add them to diagram_sections_v5.SHEET_PLAN")
     print(f"in-line splices drawn as dots on their runs: {len(ctx.inline)}; on no sheet: {', '.join(undrawn_splices) or 'none'}")
     nowhere = [wid for wid in ctx.wires if not ctx.ends.get(wid)]
     undrawn = [wid for wid in ctx.wires if wid not in DRAWN and wid not in ctx.pigtail_of and ctx.ends.get(wid)

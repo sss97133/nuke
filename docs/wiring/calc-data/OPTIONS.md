@@ -6,7 +6,7 @@ Vocabulary: composite design (every option) → configuration (base + decided) �
 
 | code | option | status | decided | wires | source |
 |---|---|---|---|---|---|
-| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 312 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
+| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 315 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
 | AUD | Audio — head unit, 5-channel amplifier, four coax speakers, two 10 in woofers | **decided** | 2026-09-27 | 21 | owner 2026-09-25 ("we are gonna do jbl 10 compact woofers, an amp ... and then the appropriate other speakers" |
 | STEPS | AMP Research power steps | **decided** | 2025-03-01 | 4 | client invoice Inv. 4 (AMP steps line, DB); WIRING_SYSTEM_KNOWLEDGE.md |
 | RC | Rear camera with mirror display | **decided** | 2026-09-27 | 6 | owner 2026-09-27 ("we also want like rear camera"); receipt 2026-09-27_wires-right-engine-start-doors-camera.m |
@@ -26,15 +26,15 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| buildable (base + decided) | 343 | 233 | 335 | 335 | 324 | 2 | 93 | m 0 · e 173 · u 163 |
-| composite (every option) | 371 | 237 | 360 | 363 | 352 | 2 | 93 | m 0 · e 176 · u 188 |
+| buildable (base + decided) | 346 | 237 | 338 | 342 | 328 | 3 | 93 | m 0 · e 173 · u 166 |
+| composite (every option) | 374 | 241 | 363 | 370 | 356 | 3 | 93 | m 0 · e 176 · u 191 |
 
 ### By option
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
 | AUD | 21 | 16 | 21 | 21 | 21 | 0 | 0 | m 0 · e 12 · u 9 |
-| BASE | 312 | 214 | 304 | 304 | 293 | 2 | 93 | m 0 · e 159 · u 146 |
+| BASE | 315 | 218 | 307 | 311 | 297 | 3 | 93 | m 0 · e 159 · u 149 |
 | PL | 6 | 0 | 6 | 6 | 6 | 0 | 0 | m 0 · e 1 · u 5 |
 | PW | 22 | 4 | 19 | 22 | 22 | 0 | 0 | m 0 · e 2 · u 20 |
 | RC | 6 | 3 | 6 | 6 | 6 | 0 | 0 | m 0 · e 1 · u 5 |
@@ -45,8 +45,8 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
 | body_convenience | 96 | 49 | 93 | 96 | 96 | 0 | 6 | m 0 · e 30 · u 66 |
-| dash_cabin | 47 | 29 | 47 | 44 | 46 | 1 | 13 | m 0 · e 16 · u 31 |
-| engine | 118 | 112 | 115 | 117 | 112 | 1 | 52 | m 0 · e 97 · u 19 |
+| dash_cabin | 48 | 30 | 48 | 48 | 47 | 2 | 13 | m 0 · e 16 · u 32 |
+| engine | 120 | 115 | 117 | 120 | 115 | 1 | 52 | m 0 · e 97 · u 21 |
 | lighting_front | 29 | 13 | 29 | 29 | 29 | 0 | 10 | m 0 · e 16 · u 13 |
 | lighting_rear | 23 | 5 | 23 | 23 | 23 | 0 | 0 | m 0 · e 9 · u 14 |
 | power_spine | 37 | 20 | 37 | 37 | 29 | 0 | 8 | m 0 · e 2 · u 30 |
@@ -61,15 +61,16 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | body bulkhead A | 12 | 12 | 0 | catalog/endpoints.yaml pins |
 | body bulkhead B | 12 | 12 | 0 | catalog/endpoints.yaml pins |
 | body bulkhead P | 4 | 1 | 3 | catalog/endpoints.yaml pins |
-| power grommet |  | 6 |  | kits_v5 firewall map |
-| PDM30 20 A outputs | 8 | 8 | 0 | PDM30 datasheet p.1; PDM user manual comparison table |
-| PDM30 8 A outputs | 22 | 22 | 0 | PDM30 datasheet p.1; PDM user manual comparison table |
+| body bulkhead C | 6 | 4 | 2 | catalog/endpoints.yaml pins |
+| power grommet |  | 7 |  | kits_v5 firewall map |
+| PDM30 20 A outputs | 8 | 6 | 2 | PDM30 datasheet p.1; PDM user manual comparison table |
+| PDM30 8 A outputs | 22 | 21 | 1 | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM30 inputs | 16 | 14 | 2 (DIG8, DIG16) | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM15 20 A outputs | 8 | 6 | 2 | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM15 8 A outputs | 7 | 4 | 3 | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM15 inputs | 16 | 2 | 14 (DIG1, DIG2, DIG3, DIG6, DIG7, DIG8, DIG9, DIG10, DIG11, DIG12, DIG13, DIG14, DIG15, DIG16) | PDM30 datasheet p.1; PDM user manual comparison table |
 | M130 pins | 60 | 52 | 8 | M130 datasheet; registry pinout (kits_v5) |
-| ground bank GND-BANK-ENG |  | 19 |  | catalog/endpoints.yaml wires; stud count not yet set |
+| ground bank GND-BANK-ENG |  | 20 |  | catalog/endpoints.yaml wires; stud count not yet set |
 | ground bank GND-BANK-CAB |  | 19 |  | catalog/endpoints.yaml wires; stud count not yet set |
 | ground bank GND-SPLICE-REAR |  | 13 |  | catalog/endpoints.yaml wires; stud count not yet set |
 
@@ -93,7 +94,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | M22759/16 22 AWG green/violet | 4.0 | 0 | not recorded | short by 4.0 ft |
 | M22759/16 22 AWG green/gray | 4.0 | 0 | not recorded | short by 4.0 ft |
 | M22759/16 22 AWG green/white | 9.2 | 0 | not recorded | short by 9.2 ft |
-| M22759/16 22 AWG gray | 52.6 | 0 | not recorded | short by 52.6 ft |
+| M22759/16 22 AWG gray | 39.3 | 0 | not recorded | short by 39.3 ft |
 | M22759/16 22 AWG white | 68.2 | 0 | not recorded | short by 68.2 ft |
 | M22759/16 22 AWG white/orange | 19.8 | 0 | not recorded | short by 19.8 ft |
 | M22759/16 22 AWG white/blue | 14.6 | 0 | not recorded | short by 14.6 ft |
@@ -134,26 +135,26 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | M22759/32 20 AWG black | 8.0 | 50.0 | not recorded | covered; also PDM15_GND1, PDM15_GND2, IGN_SW_0V (length not measured yet) |
 | M22759/32 20 AWG red | 99.5 | 40.0 | not recorded | short by 59.5 ft; also 93_PT1, 93_PT2 (length not measured yet) |
 | M22759/32 20 AWG green/blue | 42.3 | 0 | not recorded | short by 42.3 ft |
-| M22759/32 20 AWG gray | 32.0 | 0 | not recorded | short by 32.0 ft |
+| M22759/32 20 AWG gray | 45.2 | 0 | not recorded | short by 45.2 ft |
 | M22759/32 20 AWG white | 0 | 100.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
 | M22759/32 20 AWG white/brown | 5.5 | 10.0 | not recorded | covered |
 | M22759/32 20 AWG white/red | 5.5 | 10.0 | not recorded | covered |
-| M22759/32 18 AWG black | 21.9 | 0 | not recorded | short by 21.9 ft; also LTCD_GND (length not measured yet) |
+| M22759/32 18 AWG black | 21.9 | 0 | not recorded | short by 21.9 ft |
 | M22759/32 18 AWG brown/black | 18.4 | 0 | not recorded | short by 18.4 ft |
-| M22759/32 18 AWG red | 33.0 | 40.0 | not recorded | covered; also 21_PT1, 21_PT2, 21_PT3, 21_PT4 (length not measured yet) |
+| M22759/32 18 AWG red | 27.7 | 40.0 | not recorded | covered |
 | M22759/32 18 AWG violet | 15.9 | 20.0 | not recorded | covered |
 | M22759/32 18 AWG white | 0 | 100.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
 | M22759/32 18 AWG white/violet | 15.9 | 20.0 | not recorded | covered |
-| M22759/32 16 AWG black | 14.0 | 25.0 | not recorded | covered |
-| M22759/32 16 AWG red | 67.3 | 110.0 | not recorded | covered; also 54_PT1, 54_PT2, 34_PT1, 34_PT2, 35_PT1, 35_PT2, 51_PT1, 51_PT2, 72_PT1, 72_PT2, 66_PT1, 66_PT2, INJ_PWR_PT1, INJ_PWR_PT2, COIL_PWR_PT1, COIL_PWR_PT2 (length not measured yet) |
+| M22759/32 16 AWG black | 14.0 | 25.0 | not recorded | covered; also LTCD_GND (length not measured yet) |
+| M22759/32 16 AWG red | 66.8 | 110.0 | not recorded | covered; also 54_PT1, 54_PT2, 34_PT1, 34_PT2, 35_PT1, 35_PT2, 51_PT1, 51_PT2, 72_PT1, 72_PT2, 66_PT1, 66_PT2, INJ_PWR_PT1, INJ_PWR_PT2, COIL_PWR_PT1, COIL_PWR_PT2, FAN_LEG1_PT1, FAN_LEG1_PT2, FAN_LEG2_PT1, FAN_LEG2_PT2 (length not measured yet) |
 | M22759/32 16 AWG violet | 42.3 | 50.0 | not recorded | covered |
 | M22759/32 16 AWG white | 0 | 250.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
 | M22759/32 16 AWG white/violet | 42.3 | 50.0 | not recorded | covered |
 | M22759/32 14 AWG black | 21.2 | 0 | not recorded | short by 21.2 ft |
-| M22759/32 14 AWG red | 41.1 | 12.0 | not recorded | short by 29.1 ft |
+| M22759/32 14 AWG red | 42.8 | 12.0 | not recorded | short by 30.8 ft |
 | M22759/32 14 AWG white | 0 | 50.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
 | M22759/32 12 AWG black | 2.5 | 0 | not recorded | short by 2.5 ft |
-| M22759/32 12 AWG red | 7.8 | 20.0 | not recorded | covered |
+| M22759/32 12 AWG red | 11.8 | 20.0 | not recorded | covered; also FAN_LEG1, FAN_LEG2 (length not measured yet) |
 | M22759/32 12 AWG white | 0 | 20.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
 | 22 AWG shielded 2-conductor | 22.1 | 30.0 | not recorded | covered |
 
@@ -171,6 +172,6 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 ### Verdict
 
-- **body crossings:** Body firewall crossings: candidates would take 2; body bulkheads have 3 spare — fits, but only in the 4-way power connector P (size 12 contacts); signal wires need bulkhead C
-- **PDM30 outputs:** PDM30 outputs: candidates would take 5; 0 spare — does NOT fit; the engine PDM15 has 5 spare outputs for engine-bay loads
+- **body crossings:** Body firewall crossings: candidates would take 2; body bulkheads have 5 spare — fits, but only in the 4-way power connector P (size 12 contacts); signal wires need bulkhead C
+- **PDM30 outputs:** PDM30 outputs: candidates would take 5; 3 spare — does NOT fit; the engine PDM15 has 5 spare outputs for engine-bay loads
 - **PDM30 inputs:** PDM30 inputs: candidates would take 3; 2 spare — does NOT fit; PDM15 has 14 spare inputs, read over CAN

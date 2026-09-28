@@ -1,7 +1,7 @@
 BLOWER-RES:
   family: gm_blade
   pins:
-    BLOWER_LO: '51 (resistor BAT terminal, low: BATT-R1-R2-R3)'
+    BLOWER_BAT: 'BAT terminal (factory circuit 51; low: BATT-R1-R2-R3)'
     BLOWER_MED: '63 (M1: M1-R2-R3-blower)'
     BLOWER_M2: '72 (M2: M2-R3-blower)'
     BLOWER_MOT: '101 (BLO output; factory: to the blower relay)'

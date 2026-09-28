@@ -145,10 +145,10 @@ SPL-PDM30-OUT7:
 # Superseal pin; two 16 AWG pigtails do, joined to it in an in-line MiniSeal
 SPL-PDM15-OUT1:
   where: engine
-  device: "PDM15 OUT1 + OUT6 paralleled (PDM manual p.6, p.22): pins A1 + A10 + B3 + B9 (4 × 18 AWG, 6,480 CM) joined to the radiator fan feed #21 (12 AWG)"
+  device: "PDM15 OUT1 pigtail splice — pins A1 + A10 (2 × 16 AWG) joined to fan leg 1 FAN_LEG1 (12 AWG) to FAN-JUNCTION"
   family: miniseal
   kit: {M81824/1-3: 1}
-  wires: ["21_PT1", "21_PT2", "21_PT3", "21_PT4", "21"]
+  wires: ["FAN_LEG1_PT1", "FAN_LEG1_PT2", "FAN_LEG1"]
   note: "in-line MiniSeal: both pigtails in one end (2 × 2,580 = 5,160 CM, 12 AWG equivalent), the load wire out the other; pigtails cut to the same length so the two pins share the current"
   open: ["splice spot: within pigtail reach of the PDM15 connector, set at the formboard"]
   sources: ["MoTeC PDM user manual p.43 (PDM15 pinout: 20 A Output 1 on A1 with A10)", "MoTeC PDM user manual p.48 (recommended 20# to 16# for 20 A outputs; 16# = 15 A at 80 °C)", "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)", "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"]
@@ -396,7 +396,6 @@ VSS-SENDER:
   note: "#100 (M130 B08) and VSS_DAK (Dakota SPD SND) share the sender's white signal wire: one splice on the white lead, its MiniSeal size set by the sender lead's gauge (not on file: bench), spot set at the formboard"
   splice_point: true
   open:
-    - "crossing: bulkhead C, cavity OPEN — the sender is a chassis circuit, so #100 left 61-pin cavity d (engine-only firewall, state row 50; review A11); #100 and the three Dakota sender wires take the same cab-to-chassis path"
     - "M130 tap on the white signal: the manual says SPD + 'should not be hooked up to anything else' and is silent on a second input on the signal — confirm the sender drives both (bench), or feed the M130 from the VHX SPD OUT (2,000/4,000 PPM, manual p.8)"
   sources: ["Dakota VHX manual 650314:P p.8 (reference_documents/component_drawings/dakota_digital_vhx_manual.pdf): SPD + 'Connect the red wire from the SEN-01-5', SPD SND 'Dakota Digital supplies a 3-wire sensor ... SEN-01-5 ... the white wire is the speed signal', SPD - 'Connect the black wire from the SEN-01-5'", "summitracing.com dak-sen-01-5 (thread and PPM; page not saved)"]
 AC-CLUTCH:
@@ -1077,7 +1076,7 @@ FIREWALL-BODY-B:
   device: "body bulkhead B — second DT 12-way flanged receptacle, keyed apart from A (B key, DT04-12PB-L012 / DT06-12SB)"
   family: open
   kit: {}
-  pins: {"WIPER_T1": "1", "WIPER_T3": "2", "BLOWER_LO": "3", "BLOWER_MED": "4", "IBOOST_WAKE": "5", "48": "6", "49": "7",
+  pins: {"WIPER_T1": "1", "WIPER_T3": "2", "BLOWER_BAT": "3", "BLOWER_MED": "4", "IBOOST_WAKE": "5", "48": "6", "49": "7",
          "BLOWER_M2": "8", "ISO_CLOSE": "9", "ISO_OPEN": "10", "ISO_LED": "11", "ISO_SW_PWR": "12"}
   open: ["B-key part number: confirm the listing (A and B must not cross-mate)",
          "B is full (12 of 12): the next body wire through the firewall takes a third DT 12-way (C key, DT04-12PC-L012)"]
@@ -1165,7 +1164,7 @@ BLOWER-RES:
   device: "factory Four-Season blower resistor on the evaporator case — 4 terminals BAT / M1 / M2 / BLO (1978 C60 plug cavities 51 / 63 / 72 / 101; the '3 prongs' of the forum threads is superseded)"
   family: open
   kit: {}
-  wires: ["BLOWER_LO", "BLOWER_MED", "BLOWER_M2", "BLOWER_MOT"]
+  wires: ["BLOWER_BAT", "BLOWER_MED", "BLOWER_M2", "BLOWER_MOT"]
   sources: ["1977 Light Truck Service Manual p.87-88",
             "gmsquarebody.com threads 5343 + 38262 (snapshots): resistor on the blower housing with 3 prongs for the harness plug; low speeds through the switch and resistor, high through the relay"]
 BLOWER-MOTOR:
@@ -1187,7 +1186,8 @@ GND-BANK-ENG:
   device: "ground star: stud bank beside the batteries — both battery negatives, engine block (G1), frame (G2) and every engine-bay return land here; the only place the harness grounds meet the chassis"
   family: ring_small
   kit: {}
-  wires: ["PDM_GND1", "PDM_GND2", "PDM15_GND1", "PDM15_GND2", "LTCD_GND", "PUMP_GND", "HL_L_GND", "HL_R_GND", "PT_LF_GND", "PT_RF_GND", "MK_LF_GND", "MK_RF_GND", "HORN_GND", "WASH_GND", "UH_GND", "WIPER_GND", "BLOWER_GND", "ISO_GND", "STEP_GND"]
+  wires: ["PDM_GND1", "PDM_GND2", "PDM15_GND1", "PDM15_GND2", "LTCD_GND", "PUMP_GND", "HL_L_GND", "HL_R_GND", "PT_LF_GND", "PT_RF_GND", "MK_LF_GND", "MK_RF_GND", "HORN_GND", "WASH_GND", "UH_GND", "WIPER_GND", "BLOWER_GND", "ISO_GND", "STEP_GND", "FAN_GND"]
+  lugs: {FAN_GND: ["9918"]}     # 12 AWG on the 3/8 in star stud: ProWire 9918 hi-temp ring 12-10 AWG, 3/8 in (M9)
   note: "small returns take a ring each; the heavy ones (battery negatives, G1, G2, the cab return, amplifier, iBooster, DC-DC) take lugs and sit on the PS-STUDS list"
   sources: ["owner 2026-09-27: 'dave runs his grounds in the looms ... would be dumb to be grounding to body all the time'",
             "state 0i: Dave's DC primary ground-stud bank", "chapters/17 §17.4.7: PDM Batt- to battery negative"]
@@ -1235,7 +1235,7 @@ BLOWER-SW:
   device: "factory Four-Season blower switch in the control head — LO, M1, M2 through the resistor; HI as a PDM30 input (DIG7)"
   family: open
   kit: {}
-  wires: ["51", "45", "BLOWER_LO", "BLOWER_MED", "BLOWER_M2"]
+  wires: ["51", "45", "BLOWER_BAT", "BLOWER_MED", "BLOWER_M2"]
   open: ["count the switch's leads when the control head is out: 3 resistor leads + feed + HI is the A/C 4-speed layout"]
 DOOR-JAMB-L:
   where: cabin
@@ -1570,4 +1570,53 @@ TG-SW-KEY-REV:
   open: ["keyed reversing switch part: OPEN — the factory keyed switch (8900713, three terminals) is not a reversing switch, and no keyed reversing switch is on file; the owner may drop the key function (then TGR_UP/TGR_DN go straight to the motor side)",
          "cutout on a 2-pole reversing motor: the tailgate-closed cutout (TG-CUTOUT) opens motor pole A, so with the tailgate open the window stops in BOTH directions (the factory motor had separate UP/DOWN leads and a case ground) — owner/builder call whether to keep it"]
   sources: ["web_snapshots/www.nu-relics.com__17383-1.md", "1978 C-K wiring booklet ST-352-78 p.16 (key switch 8900713: OPEN 184 / FEED 60 / CLOSE 183)"]
+
+# ---------------- round 3: the cab exits that were named but not designed
+FIREWALL-BODY-C:
+  where: firewall
+  device: "body bulkhead C — Deutsch DT04-6P-L012 flanged 6-way receptacle + W6P wedge, DT06-6S plug + W6S wedge; size 16 contacts, 14-20 AWG, 13 A (the speed sender's cab exit)"
+  family: dt
+  kit: {DT04-6P-L012: 1, DT06-6S: 1, W6P: 1, W6S: 1, 0413-204-2005: 2}
+  pins: {"100": "1", VSS_DAK: "2", VSS_PWR: "3", VSS_GND: "4"}
+  empty: ["5", "6"]
+  route: "cab exit: body bulkhead C (Deutsch DT 6-way) to the frame rail and the NP205 speedometer drive"
+  note: "4 of 6 used; cavities 5 and 6 spare, each closed with a 0413-204-2005 cavity plug (families.yaml dt)"
+  open: ["hole: floor or kick panel near the transfer case, set at the mock-up (bench)"]
+  sources: ["web_snapshots/www.prowireusa.com__p-2900-dt-6-way-flanged-receptacle.md ('Wire Range: 14-20 AWG', 'Contact Size: 16 (each terminal is rated for 13.0 amps)', mating DT06-6S, wedgelock W6P)", "web_snapshots/www.customconnectorkits.com__dt04-6p-l012.md (W6P, DT06-6S)"]
+AMP-PASS:
+  where: firewall
+  device: "floor / rear-body pass-through near the amplifier: one Blue Sea 1003 CableClam per 2 AWG cable (#32, AMP_GND)"
+  family: none
+  kit: {BLUESEA-1003: 2}
+  wires: ["32", "AMP_GND"]
+  route: "engine bay → frame rail (outside) → floor pass-through (AMP-PASS, CableClam) → amp"
+  note: "M22759/16-2 is 0.388 in OD, under the CableClam's 0.56 in maximum cable diameter"
+  open: ["pass-through spot in the floor or rear body near the amp: bench"]
+  sources: ["web_snapshots/www.bluesea.com__CableClam_1.40in.md ('Max Cable Diameter 0.56in (14.22 mm)')", "web_snapshots/www.prowireusa.com__m22759-16-tefzel-wire.md (M22759/16-2-X OD .388 in)"]
+SPL-FUEL-SND:
+  where: rear
+  device: "fuel sender signal splice above the tank lid: #98 (M130) and #117 (Dakota) in one side, the 20 AWG lead to DT pin 1 out the other"
+  family: miniseal
+  kit: {M81824/1-2: 1}
+  wires: ["98", "117", "FUEL_SND_LEAD"]
+  note: "numbered splice SPL-FUEL-SND-1; in-line blue (2 x 20 AWG = 2,040 CM, 16 AWG equivalent; 20 AWG lead) — while both wires exist (see the #98/#117 adjudication)"
+  sources: ["ProWire 3137CT cavities 26-20 / 20-16 / 16-12 AWG", "ProWire Raychem MiniSeal page (M81824/1-2)"]
+SPL-PDM15-OUT6:
+  where: engine
+  device: "PDM15 OUT6 pigtail splice — pins B3 + B9 (2 × 16 AWG) joined to fan leg 2 FAN_LEG2 (12 AWG) to FAN-JUNCTION"
+  family: miniseal
+  kit: {M81824/1-3: 1}
+  wires: ["FAN_LEG2_PT1", "FAN_LEG2_PT2", "FAN_LEG2"]
+  note: "in-line MiniSeal M81824/1-3: 2 × 2,580 = 5,160 CM (12 AWG equivalent) in, 12 AWG out"
+  sources: ["MoTeC PDM user manual p.43 (20 A Output 6 on B3 with B9)", "ProWire 3137CT cavities 16-12 AWG"]
+FAN-JUNCTION:
+  where: engine
+  device: "fan feed junction: Blue Sea 2103 PowerPost Plus (3/8-16 stud, 150 A) near the PDM15 / fan breakout — two 12 AWG legs in (PDM15 OUT1, OUT6), one 12 AWG tail out to the fan"
+  family: lug
+  kit: {BLUESEA-2103: 1}
+  lugs: {FAN_LEG1: ["9918"], FAN_LEG2: ["9918"], "21": ["9918"]}
+  wires: [FAN_LEG1, FAN_LEG2, "21"]
+  note: "every lug a ProWire 9918 hi-temp ring (12-10 AWG, 3/8 in); the tail runs outside the loom to the fan (free-air rating)"
+  open: ["stud spot near the PDM15 / fan breakout: formboard"]
+  sources: ["web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md", "web_snapshots/www.prowireusa.com__p-1509-hi-temp-ring-term-12-10-3-8.md"]
 

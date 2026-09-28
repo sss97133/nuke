@@ -3,7 +3,7 @@ Tail_Light_Right:
   pins:
     '75': tail filament lead (circuit 9 brown; 1157 3 CP filament)
     REAR_ST_R: stop/turn filament lead (circuit 19 dark green, RH stop/directional; 1157 32 CP filament)
-    TL_R_GND: ground lead to the rear ground bus GND-SPLICE-REAR (the factory circuit 150 black went to a sheet-metal stud; state row 56 runs grounds in the loom, no body studs)
+    TL_R_GND: 'ground lead to the rear ground bus GND-SPLICE-REAR (state row 56 — grounds run in the loom, no body studs)'
   mate: GM socket 8911029 with leads (1978 booklet p.14); replacement socket part OPEN
   note: 'maker''s document: right tail/stop/turn lamp, 1157 bulb in GM socket 8911029 (3 leads: tail, stop/turn, ground)'
   open:

@@ -5,12 +5,11 @@ VSS-SENDER:
     VSS_GND: black lead (0 V to SPD -)
     VSS_DAK: white lead (signal)
     '100': white lead (signal)
-  note: '#100 (M130 B08) and VSS_DAK (Dakota SPD SND) share the sender''s white signal wire: one splice on the white lead, its MiniSeal size set by the sender lead''s
-    gauge (not on file: bench), spot set at the formboard · maker''s document: Dakota Digital SEN-01-5 speed sender with its own 3-wire cable (red +5 V, black ground,
-    white signal); the harness joins the cable''s leads · family miniseal: the sender comes with its cable (VHX manual p.8: ''the white wire is the speed signal ...
-    the red and black wires in the cable are power and ground''), so each harness wire joins a lead in a MiniSeal stub splice (same treatment as the Dakota box and
-    APS pigtails). #100 and VSS_DAK share the white lead: ONE splice holds both — the toolchain counts one D-609 per wire, so the kit list shows one splice too many
-    here.'
+  note: '#100 (M130 B08) and VSS_DAK (Dakota SPD SND) share the sender''s white signal wire: one splice on the white lead, its MiniSeal size set by the sender lead''s gauge
+    (not on file: bench), spot set at the formboard · maker''s document: Dakota Digital SEN-01-5 speed sender with its own 3-wire cable (red +5 V, black ground, white signal);
+    the harness joins the cable''s leads · family miniseal: the sender comes with its cable (VHX manual p.8: ''the white wire is the speed signal ... the red and black wires
+    in the cable are power and ground''), so each harness wire joins a lead in a MiniSeal stub splice (same treatment as the Dakota box and APS pigtails). #100 and VSS_DAK
+    share the white lead: ONE splice holds both — the toolchain counts one D-609 per wire, so the kit list shows one splice too many here.'
   open:
   - 'SEN-01-5 lead gauge (sets the splice colour with the two 22 AWG harness wires): bench'
   sources:

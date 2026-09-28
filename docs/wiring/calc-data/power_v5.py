@@ -13,6 +13,7 @@ drawing positions are this file's, the facts are the rows'):
 A fact the rows do not carry prints as OPEN (orange) with what closes it. No purchase state, no prices.
 Run standalone: python3 power_v5.py  (numbers from 1, into docs/wiring/output/manual/K5_power_<n>_<slug>.*)
 """
+import json
 import re
 import subprocess
 import sys
@@ -95,8 +96,11 @@ def plabel(w):
         ln = f"{L:.1f} FT{tag}"
     else:
         ln = "LENGTH OPEN"
+    col = "" if re.fullmatch(r"[?\s]*", col or "") else col
+    numbered = bool(re.fullmatch(r"\d+[A-Za-z]?", str(w["id"])))
     wid = str(w["id"]).upper()
-    return f"{awg_word(w)} {col + '-' if col else ''}{wid} · {ln}"
+    head = f"{col}-{wid}" if col and numbered else (wid if numbered else col)   # never a code, never '?-'
+    return " ".join(x for x in (awg_word(w), head) if x) + f" · {ln}"
 
 
 def awg_word(w):
@@ -154,7 +158,53 @@ def ps_lugs(eps_y, wid, w):
                 frm = lug
             else:
                 to = lug
+    # every other end: the lug its termination row names (its part, or a lug from the endpoint's kit that the row's
+    # cavity text names) — the same source on every page (review round 3: 1-49 said 210LTP, 1-53 said OPEN)
+    for t in _term_rows().get(str(wid), []):
+        lug = term_lug(t, eps_y)
+        if not lug:
+            continue
+        e = t["endpoint"]
+        if frm is None and e in end_text(w.get("frm")):
+            frm = lug
+        elif to is None and e in end_text(w.get("to")):
+            to = lug
     return frm, to
+
+
+_TERMS = None
+
+
+def _term_rows():
+    global _TERMS
+    if _TERMS is None:
+        _TERMS = {}
+        for t in json.load(open(CD / "k5_registry.json"))["terminations"]:
+            _TERMS.setdefault(str(t["wire"]), []).append(t)
+    return _TERMS
+
+
+def term_lug(t, eps_y):
+    """The lug at one termination: a lug part on the row, else the one lug of the endpoint's kit the cavity text names."""
+    parts_y = _parts()
+    for code in str(t.get("part") or "").split(" + "):
+        if (parts_y.get(code) or {}).get("kind") == "lug":
+            return code
+    kit = (eps_y.get(t["endpoint"]) or {}).get("kit") or {}
+    for code in kit:
+        if (parts_y.get(str(code)) or {}).get("kind") == "lug" and str(code) in str(t.get("cavity") or ""):
+            return str(code)
+    return None
+
+
+_PARTS = None
+
+
+def _parts():
+    global _PARTS
+    if _PARTS is None:
+        _PARTS = yaml.safe_load((CD / "catalog" / "parts.yaml").read_text()) or {}
+    return _PARTS
 
 
 def term_part(ends, wid, endpoint):
@@ -815,6 +865,25 @@ for _f, _k in (("pdm30_designations.txt", "PDM30"), ("pdm15_designations.txt", "
             PDM_DESIG.setdefault((_k, int(_p[1][3:])), []).append(_p[0].strip())
 
 
+def pigtail_sentence(box, out, wires):
+    """What the paired 20 A outputs actually take, counted from this PDM's own rows (review round 3, N4: the header said
+    'two 16 AWG pigtails' while the fan's are four 18 AWG and #93's 20 AWG)."""
+    from collections import Counter
+    per_out = []
+    for (b, n), wids in out.items():
+        if b != box:
+            continue
+        pig = [w for w in wids if re.search(r"_PT\d+$", w)]
+        if pig:
+            per_out.append((n, pig))
+    if not per_out:
+        return "No output here uses pigtails."
+    g = Counter(awg_word(wires[w]) for _n, ps in per_out for w in ps)
+    kinds = ", ".join(f"{k} × {v} AWG" for v, k in sorted(g.items(), key=lambda kv: -kv[1]))
+    return (f"{len(per_out)} outputs take pigtails, one per pin, joined in an in-line splice toward the load: "
+            f"{kinds} in all (each row below gives its gauge).")
+
+
 def pdm_outputs(reg, wires, ends):
     """{(box, output number): [wire ids]} from the termination rows, plus wires whose own row names 'PDMxx:OUTn' or
     '(OUTn' when no termination row carries it (ECU_PWR's PDM30 end)."""
@@ -888,7 +957,7 @@ def pages_distribution(reg, wires, ends, eps_y, parts, first, notes):
             lead_in = (f"{title}: battery feed {awg_word(fw)} AWG from the distribution stud through a "
                        f"{(f[0] + ' ' + str(f[1]) + ' A') if f and f[1] else 'fuse of OPEN value'}; total output {total} continuous; "
                        f"both battery − pins to the ground star in 20 AWG. {used} of {len([1 for (b, _n) in out if b == box])} outputs carry a circuit. "
-                       "Outputs are high-side, software-fused; paired 20 A pins take two 16 AWG pigtails joined at the load.")
+                       "Outputs are high-side, software-fused. " + pigtail_sentence(box, out, wires))
             for i, ln in enumerate(wrap_words(lead_in, PW - 2 * PM, 7.2)):
                 p.ctxt(PM, p.y + i * 9, ln, 7.2)
             p.y += len(wrap_words(lead_in, PW - 2 * PM, 7.2)) * 9 + 2
@@ -1041,6 +1110,7 @@ def publish(page, stem, height):
     bad += manual_v5.layout_faults(page.boxes, pw, height, pm, footer=(manual_v5.REVISION, *getattr(page, "footer", [])))
     bad += [f"text over a pin box: '{t_}'" for t_ in diagram_v5.mark_overprints(page)]
     bad += getattr(page, "faults", [])
+    bad += manual_v5.fragment_faults(page.boxes)
     if re.search(r"\$\d|\bcart\b|\bbuy\b|\bbought\b|\border(ed)?\b|lined up", text, re.I):
         bad.append("purchase language on the page")
     if bad:
