@@ -56,6 +56,11 @@ const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
 const BUCKET = 'vehicle-photos';                                  // same as iphoto-intake
 const USER_ID = process.env.NUKE_USER_ID || '0b9f107a-d124-49de-9ded-94698f63c1c4';
+// The signed python.org 3.13 osxphotos: its Full Disk Access, Photos and Automation grants
+// persist (Developer ID: Python Software Foundation). /opt/homebrew/bin/osxphotos runs on an
+// ad-hoc-signed Homebrew python whose grants do not survive, which broke this job in June.
+const OSXPHOTOS = process.env.OSXPHOTOS_BIN
+  || '/Library/Frameworks/Python.framework/Versions/3.13/bin/osxphotos';
 const STATE_DIR = join(homedir(), '.nuke');
 const STATE_FILE = join(STATE_DIR, 'photo-sync-state.json');
 const LOG_FILE = join(STATE_DIR, 'photo-sync.log');
@@ -117,15 +122,18 @@ function writeState(state) {
 
 // ─── 1. What's new in the Photos library? ────────────────────────────────────
 function queryNewPhotos(sinceISO) {
+  // Exact instant (osxphotos accepts ISO datetimes with an offset); the retry below falls
+  // back to the date-only form for older osxphotos builds.
+  const sinceExact = sinceISO.replace(/\.\d+Z$/, 'Z').replace(/Z$/, '+00:00');
   const sinceDate = sinceISO.slice(0, 10);
-  const result = spawnSync('osxphotos', [
-    'query', '--added-after', sinceDate, '--json',
+  const result = spawnSync(OSXPHOTOS, [
+    'query', '--added-after', sinceExact, '--json',
     '--not-hidden', '--photos-library-last',
   ], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
 
   if (result.status !== 0) {
     // --photos-library-last / --not-hidden may not exist on older osxphotos; retry minimal
-    const retry = spawnSync('osxphotos', ['query', '--added-after', sinceDate, '--json'],
+    const retry = spawnSync(OSXPHOTOS, ['query', '--added-after', sinceDate, '--json'],
       { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
     if (retry.status !== 0) {
       log(`FATAL osxphotos query failed: ${(retry.stderr || result.stderr || '').slice(0, 300)}`);
@@ -140,9 +148,18 @@ function queryNewPhotos(sinceISO) {
 function exportPhotos(uuids, destDir) {
   mkdirSync(destDir, { recursive: true });
   const uuidArgs = uuids.flatMap(u => ['--uuid', u]);
-  const result = spawnSync('osxphotos', [
+  const result = spawnSync(OSXPHOTOS, [
     'export', destDir, ...uuidArgs,
-    '--download-missing', '--overwrite', '--filename', '{original_name}',
+    // --download-missing drives Photos.app over Apple Events to fetch iCloud-only originals
+    // (2,674 of the 2,985 photos added Jun–Sep 2026 live only in iCloud). Those Automation
+    // grants persist ONLY for a Developer-ID-signed python: the python.org 3.13 framework
+    // (see OSXPHOTOS). Homebrew's ad-hoc python re-prompted every run (the 96-popups-a-day
+    // that paused this job 2026-06-10). PhotoKit (--use-photokit) hangs under launchd:
+    // 0 files, 0 network after 7 min on 2026-09-28.
+    // Files are named by Photos UUID so two photos with the same original name never collapse.
+    // Originals only: an edited render or a live-photo movie would export as an extra file
+    // with no matching metadata and count as "not exported" forever.
+    '--download-missing', '--skip-edited', '--skip-live', '--overwrite', '--filename', '{uuid}',
   ], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 20 * 60 * 1000 });
   if (result.status !== 0) log(`export warnings: ${(result.stderr || '').slice(0, 300)}`);
   return readdirSync(destDir).filter(f => IMAGE_EXT.has(extname(f).toLowerCase()));
@@ -286,7 +303,24 @@ async function main() {
 
   const photos = queryNewPhotos(since);
   const candidates = photos.filter(p => !p.ismovie && !p.hidden);
-  const images = candidates.filter(isVehicleish).slice(0, MAX_PER_RUN);
+  // Oldest-added first, so a capped batch is a contiguous prefix of the backlog and the
+  // watermark can advance to the batch's last date_added (see the end of this function).
+  const addedMs = p => { const t = Date.parse(p.date_added || p.date || ''); return Number.isFinite(t) ? t : Infinity; };
+  const vehicleish = candidates.filter(isVehicleish).sort((a, b) => addedMs(a) - addedMs(b));
+  // Two small ledgers ride in the state file so a retry never re-exports what already landed
+  // and one unexportable photo cannot hold the watermark hostage:
+  //   landed:       uuid → date_added of photos already in Nuke but still ahead of the watermark
+  //   unexportable: uuid → {attempts, added, filename, last}; after GIVE_UP attempts the photo is
+  //                 written to ~/.nuke/unexported.jsonl (a recorded gap, never a silent skip)
+  const landed = { ...(state.landed || {}) };
+  const tries = { ...(state.unexportable || {}) };
+  const GIVE_UP = 3;
+  const eligible = vehicleish.filter(p => !landed[p.uuid] && !((tries[p.uuid]?.attempts || 0) >= GIVE_UP));
+  const images = eligible.slice(0, MAX_PER_RUN);
+  const capped = eligible.length > images.length;
+  const alreadyLanded = vehicleish.length - eligible.length;
+  if (alreadyLanded > 0) log(`${alreadyLanded} photo(s) ahead of the watermark are already in Nuke or given up; not re-exported`);
+  if (capped) log(`batch capped at ${MAX_PER_RUN} of ${eligible.length} vehicle-ish photos; the rest follow in later runs`);
   const heldBack = candidates.filter(p => !isVehicleish(p));
   if (heldBack.length > 0) {
     log(`${heldBack.length} photo(s) held back on-device (no vehicle-ish labels — never uploaded)`);
@@ -313,17 +347,39 @@ async function main() {
   }
 
   const destDir = join(tmpdir(), `nuke-photo-sync-${Date.now()}`);
-  const exported = exportPhotos(images.map(p => p.uuid), destDir);
-  const metaByName = new Map();
-  for (const p of images) metaByName.set(p.original_filename, p);
+  const exported = exportPhotos(images.map(p => p.uuid), destDir);   // files named <uuid>.<ext>
+  const metaByUuid = new Map(images.map(p => [String(p.uuid).toLowerCase(), p]));
 
   let ok = 0, dup = 0, failed = 0;
-  for (const filename of exported) {
-    const meta = metaByName.get(filename) || {};
-    const res = await uploadPhoto(join(destDir, filename), filename, meta);
+  for (const file of exported) {
+    const meta = metaByUuid.get(file.replace(/\.[^.]+$/, '').toLowerCase());
+    if (!meta) { failed++; if (failed <= 3) log(`  no metadata for exported file ${file}`); continue; }
+    // Stored under the Photos UUID: two photos sharing one original name can never collide
+    // in the bucket (the old {original_name} path silently reused the first object's bytes).
+    const res = await uploadPhoto(join(destDir, file), file, meta);
+    if (res.ok) landed[meta.uuid] = meta.date_added || meta.date || runStartedAt;
     if (res.ok && res.dup) dup++;
     else if (res.ok) ok++;
-    else { failed++; if (failed <= 3) log(`  upload failed [${filename}]: ${res.err}`); }
+    else { failed++; if (failed <= 3) log(`  upload failed [${meta.original_filename || file}]: ${res.err}`); }
+  }
+
+  // Photos of the batch that produced no file: count an attempt; give up after GIVE_UP.
+  const exportedUuids = new Set(exported.map(f => f.replace(/\.[^.]+$/, '').toLowerCase()));
+  let stillOwed = 0, gaveUp = 0;
+  for (const p of images) {
+    if (exportedUuids.has(String(p.uuid).toLowerCase())) continue;
+    const t = tries[p.uuid] || { attempts: 0, added: p.date_added || p.date || null, filename: p.original_filename };
+    t.attempts += 1; t.last = runStartedAt; tries[p.uuid] = t;
+    if (t.attempts >= GIVE_UP) {
+      gaveUp++;
+      appendFileSync(join(STATE_DIR, 'unexported.jsonl'), JSON.stringify({
+        at: runStartedAt, uuid: p.uuid, file: p.original_filename, taken: p.date, added: t.added, attempts: t.attempts,
+      }) + '\n');
+      log(`  gave up on ${p.original_filename} (${p.uuid}) after ${t.attempts} export attempts; recorded in unexported.jsonl`);
+    } else {
+      stillOwed++;
+      if (stillOwed <= 3) log(`  not exported this run: ${p.original_filename} (${p.uuid}), attempt ${t.attempts} of ${GIVE_UP}`);
+    }
   }
 
   try { rmSync(destDir, { recursive: true, force: true }); } catch { /* ignore */ }
@@ -331,11 +387,33 @@ async function main() {
   // Advance state ONLY past what succeeded: if anything failed, do not move
   // the watermark — next run retries. (Silent-failure law: the daemon must
   // never claim progress it didn't make.)
-  const newState = { ...state, last_run: runStartedAt, last_result: `${ok} uploaded, ${dup} dup, ${failed} failed` };
-  if (failed === 0) newState.last_sync = runStartedAt;
+  // ...and only when every photo of the batch was exported AND landed. A capped batch
+  // advances the watermark to its last date_added, never to "now": the photos behind the
+  // cap are still unsynced. (2026-09-28: the old rule would have skipped ~2,400 of them.)
+  const notExported = stillOwed;                       // given-up photos are recorded, not owed
+  const complete = failed === 0 && notExported === 0;
+  let advancedTo = null;
+  if (complete) {
+    if (capped) {
+      const last = Math.max(...images.map(addedMs).filter(Number.isFinite));
+      if (Number.isFinite(last)) advancedTo = new Date(last).toISOString();
+    } else {
+      advancedTo = runStartedAt;
+    }
+  }
+  if (advancedTo) {
+    // Everything at or behind the new watermark is out of the query window; drop its ledger rows.
+    const cut = Date.parse(advancedTo);
+    for (const [u, d] of Object.entries(landed)) { const t = Date.parse(d); if (Number.isFinite(t) && t <= cut) delete landed[u]; }
+    for (const [u, t] of Object.entries(tries)) { const a = Date.parse(t.added || ''); if (Number.isFinite(a) && a <= cut) delete tries[u]; }
+  }
+  const newState = { ...state, last_run: runStartedAt, landed, unexportable: tries,
+    last_result: `${ok} uploaded, ${dup} dup, ${failed} failed, ${notExported} not exported, ${gaveUp} given up` };
+  if (advancedTo) newState.last_sync = advancedTo;
   writeState(newState);
 
-  log(`sync done — ${ok} uploaded, ${dup} duplicates, ${failed} failed${failed > 0 ? ' (watermark NOT advanced — will retry)' : ''}`);
+  log(`sync done — ${ok} uploaded, ${dup} duplicates, ${failed} failed, ${notExported} not exported, ${gaveUp} given up`
+    + (advancedTo ? ` (watermark → ${advancedTo})` : ' (watermark NOT advanced — will retry)'));
 
   // Heartbeat into the mesh so the pulse board sees this organ
   try {
