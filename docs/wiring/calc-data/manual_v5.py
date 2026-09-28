@@ -541,6 +541,9 @@ def build():
         pages.append(page_specs(reg, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1))
         toc.append(("Specifications", pages[-1].number))
     pages[0] = page_contents(reg, wires, toc, [e for e, _, _ in plugs], notes)
+    import diagram_v5
+    sheets = diagram_v5.build(first_number=len(pages) + 1)
+    toc.append(("Wiring Diagrams", sheets[0][0]))
     bad = []
     for p in pages:
         text = " ".join(re.sub(r"<[^>]+>", " ", e) for e in p.el)
@@ -554,8 +557,9 @@ def build():
         subprocess.run(["rsvg-convert", "-d", "150", "-p", "150", "-o", str(stem.with_suffix(".png")), str(stem.with_suffix(".svg"))], check=True)
         subprocess.run(["rsvg-convert", "-f", "pdf", "-o", str(stem.with_suffix(".pdf")), str(stem.with_suffix(".svg"))], check=True)
         pdfs.append(str(stem.with_suffix(".pdf")))
+    pdfs += [pdf for _, _, _, _, pdf in sheets]
     subprocess.run(["pdfunite", *pdfs, str(OUT / "K5_Harness_Manual.pdf")], check=True)
-    print(f"manual: {len(pages)} pages -> {OUT}")
+    print(f"manual: {len(pages)} pages + {len(sheets)} diagram sheets -> {OUT}")
 
 
 if __name__ == "__main__":
