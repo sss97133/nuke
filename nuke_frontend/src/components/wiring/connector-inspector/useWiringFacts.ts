@@ -26,6 +26,13 @@ export interface PurchaseRecord {
               planned_usd?: number; cost_usd?: number; margin_usd?: number; source?: string } | null;
 }
 
+// A part lined up to buy (owner 2026-09-27: "we need to price that out and do shopping cart stuff"): the listing it was
+// priced from — where it is sold, exactly what, how many, the price read and when. A listing is not a purchase.
+export interface ListingRecord {
+  site?: string; url?: string; part?: string; part_numbers?: string[]; quantity?: number; price_usd?: number;
+  captured?: string; stock?: string | null; note?: string | null;
+}
+
 export interface WiringFact {
   id: string;
   plug: string;
@@ -48,6 +55,7 @@ export interface WiringFact {
   eventDate: string | null;  // when the thing it proves happened (e.g. the purchase), if the photo states it
   ownerWords: boolean;       // the owner's own statement (structured_data.owner_confirmed), relayed from chat
   order: PurchaseRecord | null; // the purchase record behind an ACQUIRED rung
+  listing: ListingRecord | null; // the listing behind a LINED UP rung
 }
 
 export interface WiringFacts {
@@ -66,7 +74,7 @@ interface FactRow {
     plug?: string; plug_name?: string; wire_id?: string | null; property_key?: string; row_field?: string;
     value?: unknown; state?: string; check?: { status?: string }; proof?: PartProof;
     plugs?: string[]; proof_level?: string; photo?: { url?: string; taken_at?: string }; event_date?: string;
-    owner_confirmed?: boolean; order?: PurchaseRecord;
+    owner_confirmed?: boolean; order?: PurchaseRecord; listing?: ListingRecord;
   } | null;
   source_url: string | null;
   citation_excerpt: string | null;
@@ -116,6 +124,7 @@ export function useWiringFacts(vehicleId: string | undefined): WiringFacts {
           eventDate: sd.event_date ?? null,
           ownerWords: sd.owner_confirmed === true,
           order: sd.order ?? null,
+          listing: sd.listing ?? null,
         };
         if (f.wireId) (byWire[f.wireId] ??= []).push(f);
         else for (const p of (Array.isArray(sd.plugs) && sd.plugs.length ? sd.plugs : [f.plug])) (byPlug[p] ??= []).push(f);
