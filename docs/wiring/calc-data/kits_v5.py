@@ -70,7 +70,21 @@ def _load_sheets():
 
 
 def _y(name):
-    return yaml.safe_load((CAT / name).read_text())
+    data = yaml.safe_load((CAT / name).read_text())
+    if name == "endpoints.yaml":
+        # per-plug pin tables read from makers' documents live one file per plug in catalog/pin_tables/<CODE>.yaml
+        # ({CODE: {family, kit, pins, open, sources, ...}}); they overlay the base entry key by key, never replace it
+        for f in sorted((CAT / "pin_tables").glob("*.yaml")):
+            for code, over in (yaml.safe_load(f.read_text()) or {}).items():
+                base = data.setdefault(code, {})
+                for k, v in (over or {}).items():
+                    if k == "pins" and isinstance(base.get("pins"), dict) and isinstance(v, dict):
+                        base["pins"] = {**base["pins"], **v}
+                    elif k in ("sources", "open") and isinstance(base.get(k), list) and isinstance(v, list):
+                        base[k] = list(dict.fromkeys(base[k] + v))
+                    else:
+                        base[k] = v
+    return data
 
 
 def awg_equiv(cma):

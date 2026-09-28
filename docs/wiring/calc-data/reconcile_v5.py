@@ -1166,6 +1166,8 @@ def apply_decisions(rows):
                 w["conflicts"].append(f"decision: notes '{old_txt}' -> '{new_txt}'")
         if "protection" in d:
             w["protection"] = d["protection"]
+        if "parallel" in d:
+            w["parallel"] = d["parallel"]
         if "control" in d:
             w["control"] = d["control"]
         if "length_basis" in d:
@@ -1392,6 +1394,19 @@ def main():
                for i, l, f, t, g, s, src in IMPLIED]
     apply_decisions(wires)
     apply_implied_decisions(implied)
+    # the DC primary cables sized from physics (cable_sizing_v5.py -> cable_decisions.json): gauge, parallel count, fuse
+    _cab = json.load((CD / "cable_decisions.json").open()) if (CD / "cable_decisions.json").exists() else {}
+    for _w in list(wires) + list(implied):
+        _d = _cab.get(str(_w["id"]))
+        if not _d:
+            continue
+        if _w.get("awg") != _d["awg"]:
+            _w.setdefault("conflicts", []).append(f"decision: awg {_w.get('awg')} -> {_d['awg']} — {_d['why']}")
+            _w["awg"] = _d["awg"]
+        if _d.get("parallel", 1) > 1:
+            _w["parallel"] = _d["parallel"]
+        _w["protection"] = _d["fuse"]
+        _w["notes"] = (_w.get("notes") + " | " if _w.get("notes") else "") + _d["why"]
     assign_subsystems(list(wires) + list(implied))
     pigtails = add_pigtails(list(wires) + list(implied))
     implied += pigtails

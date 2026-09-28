@@ -1,0 +1,92 @@
+{
+ "63": {
+  "awg": 2,
+  "parallel": 2,
+  "fuse": "none",
+  "why": "sized from physics 2026-09-28: load 180 A (every load with the engine off: PDM30 100 + PDM15 80; cranking 200 A brief); ampacity 240 A (free air, 100 \u00b0C ambient (engine bay)) vs need 180 A; drop 0.018 V, cranking 0.02 V; none. cable_sizing_v5.py"
+ },
+ "ISO_OUT": {
+  "awg": 2,
+  "parallel": 2,
+  "fuse": "none",
+  "why": "sized from physics 2026-09-28: load 180 A (same current as #63); ampacity 240 A (free air, 100 \u00b0C ambient (engine bay)) vs need 180 A; drop None V, cranking None V; none. cable_sizing_v5.py"
+ },
+ "ODY_NEG": {
+  "awg": 2,
+  "parallel": 2,
+  "fuse": "none",
+  "why": "sized from physics 2026-09-28: load 180 A (the battery's return: same as #63); ampacity 240 A (free air, 100 \u00b0C ambient (engine bay)) vs need 180 A; drop None V, cranking None V; none. cable_sizing_v5.py"
+ },
+ "6": {
+  "awg": 2,
+  "parallel": 1,
+  "fuse": "none",
+  "why": "sized from physics 2026-09-28: load 0 A (cranking only, brief (unfused, ABYC cranking exemption); never below 2 AWG (ch.17 \u00a717.4.3 'same as the starter cable', \u00a717.5.6 Dave)); ampacity 120 A (free air, 100 \u00b0C ambient (engine bay)) vs need 0 A; drop 0.0 V, cranking 0.113 V; none. cable_sizing_v5.py"
+ },
+ "G1": {
+  "awg": 2,
+  "parallel": 2,
+  "fuse": "none",
+  "why": "sized from physics 2026-09-28: load 150 A (starter return 200 A brief; alternator return up to 150 A continuous through the block); ampacity 240 A (free air, 100 \u00b0C ambient (engine bay)) vs need 150 A; drop 0.048 V, cranking 0.064 V; none. cable_sizing_v5.py"
+ },
+ "59": {
+  "awg": 2,
+  "parallel": 2,
+  "fuse": "MEGA 200 A",
+  "why": "sized from physics 2026-09-28: load 150 A (Holley 197-302 rated 150 A); ampacity 240 A (free air, 100 \u00b0C ambient (engine bay)) vs need 235 A; drop 0.048 V; MEGA 200 A. cable_sizing_v5.py"
+ },
+ "PDM_BPOS": {
+  "awg": 2,
+  "parallel": 1,
+  "fuse": "MEGA 125 A",
+  "why": "sized from physics 2026-09-28: load 100 A (PDM30 total output 100 A continuous (manual p.35)); ampacity 150 A (free air, 80 \u00b0C ambient) vs need 147 A; drop 0.035 V; MEGA 125 A. cable_sizing_v5.py"
+ },
+ "PDM15_BPOS": {
+  "awg": 2,
+  "parallel": 1,
+  "fuse": "MEGA 100 A",
+  "why": "sized from physics 2026-09-28: load 80 A (PDM15 total output 80 A continuous (manual p.35)); ampacity 120 A (free air, 100 \u00b0C ambient (engine bay)) vs need 118 A; drop None V; MEGA 100 A. cable_sizing_v5.py"
+ },
+ "GND_RET_CAB": {
+  "awg": 2,
+  "parallel": 1,
+  "fuse": "none",
+  "why": "sized from physics 2026-09-28: load 100 A (every PDM30 load returns through it; runs in the loom through the grommet); ampacity 100 A (bundled 35 \u00b0C rise) vs need 100 A; drop None V; none. cable_sizing_v5.py"
+ },
+ "32": {
+  "awg": 2,
+  "parallel": 1,
+  "fuse": "MIDI 60 A",
+  "why": "sized from physics 2026-09-28: load 60 A (JL VX700/5i: 60 A fuse recommended; the run goes engine bay \u2192 bed, bundled with its ground); ampacity 100 A (bundled 35 \u00b0C rise) vs need 71 A; drop 0.404 V; MIDI 60 A. cable_sizing_v5.py"
+ },
+ "AMP_GND": {
+  "awg": 2,
+  "parallel": 1,
+  "fuse": "none",
+  "why": "sized from physics 2026-09-28: load 60 A (the amplifier's return, same length as #32); ampacity 100 A (bundled 35 \u00b0C rise) vs need 60 A; drop 0.404 V; none. cable_sizing_v5.py"
+ },
+ "52": {
+  "awg": 6,
+  "parallel": 1,
+  "fuse": "MIDI 40 A",
+  "why": "sized from physics 2026-09-28: load 40 A (OEM 40 A supply fuse (ch.17 \u00a717.5)); ampacity 75 A (free air, 100 \u00b0C ambient (engine bay)) vs need 47 A; drop 0.082 V; MIDI 40 A. cable_sizing_v5.py"
+ },
+ "DCDC_IN": {
+  "awg": 6,
+  "parallel": 1,
+  "fuse": "MIDI 40 A",
+  "why": "sized from physics 2026-09-28: load 35 A (Orion-Tr Smart 12/12-30: 30 A out, ~35 A in; MIDI 40 (ch.17)); ampacity 75 A (free air, 100 \u00b0C ambient (engine bay)) vs need 47 A; drop None V; MIDI 40 A. cable_sizing_v5.py"
+ },
+ "DCDC_OUT": {
+  "awg": 6,
+  "parallel": 1,
+  "fuse": "none",
+  "why": "sized from physics 2026-09-28: load 30 A (30 A charge); ampacity 75 A (free air, 100 \u00b0C ambient (engine bay)) vs need 30 A; drop None V; none. cable_sizing_v5.py"
+ },
+ "DCDC_GND": {
+  "awg": 6,
+  "parallel": 1,
+  "fuse": "none",
+  "why": "sized from physics 2026-09-28: load 35 A (the Orion's return); ampacity 75 A (free air, 100 \u00b0C ambient (engine bay)) vs need 35 A; drop None V; none. cable_sizing_v5.py"
+ }
+}

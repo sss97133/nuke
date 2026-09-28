@@ -41,7 +41,7 @@ BODY_CAP = {"FIREWALL-BODY-A": 12, "FIREWALL-BODY-B": 12, "FIREWALL-BODY-P": 4}
 def load():
     reg = json.load(REG.open())
     opts = yaml.safe_load((CD / "catalog" / "options.yaml").read_text())
-    eps_yaml = yaml.safe_load((CD / "catalog" / "endpoints.yaml").read_text())
+    eps_yaml = __import__("kits_v5")._y("endpoints.yaml")
     checks = json.load(CHECKS.open()) if CHECKS.exists() else {"wires": [], "devices": [], "system": {}}
     return reg, opts, eps_yaml, checks
 

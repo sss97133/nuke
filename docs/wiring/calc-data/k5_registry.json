@@ -6100,7 +6100,7 @@
     "pin": "+12 V",
     "terminal": "amp power terminal"
    },
-   "awg": 4,
+   "awg": 2,
    "spec": "M22759/16",
    "color": "red",
    "color_basis": "DAVE",
@@ -6108,16 +6108,18 @@
    "length_ft": 18.4,
    "length_basis": "cut list v4.2 zone estimate",
    "engine_running": false,
-   "notes": "",
+   "notes": "sized from physics 2026-09-28: load 60 A (JL VX700/5i: 60 A fuse recommended; the run goes engine bay → bed, bundled with its ground); ampacity 100 A (bundled 35 °C rise) vs need 71 A; drop 0.404 V; MIDI 60 A. cable_sizing_v5.py",
    "april": null,
    "conflicts": [
     "decision: awg 8 -> 4 — 8 AWG x 18.4 ft fails the 3 % rule; 4 AWG red M22759/16-4-2 (receipts/2026-09-25_orders-staged-prowire-ksv-ict.md, 17:30 addendum) | the amplifier runs off the accessory battery (owner 2026-09-27: YellowTop 'for other stuff like accessories'); the JL Audio VX700/5i takes '4-gauge power and ground leads and a 60-amp fuse' (Crutchfield page, snapshot web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md), so the MIDI at the battery is 60 A (owner 2026-09-27 ruled out Kicker: 'kicker is not cool... what a brand for a 100k truck'); it started at 'ECU'",
     "decision: frm ECU -> ACC-BATT (+, MIDI 60 A) — 8 AWG x 18.4 ft fails the 3 % rule; 4 AWG red M22759/16-4-2 (receipts/2026-09-25_orders-staged-prowire-ksv-ict.md, 17:30 addendum) | the amplifier runs off the accessory battery (owner 2026-09-27: YellowTop 'for other stuff like accessories'); the JL Audio VX700/5i takes '4-gauge power and ground leads and a 60-amp fuse' (Crutchfield page, snapshot web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md), so the MIDI at the battery is 60 A (owner 2026-09-27 ruled out Kicker: 'kicker is not cool... what a brand for a 100k truck'); it started at 'ECU'",
-    "decision: to None -> {'device': 'AMP', 'pin': '+12 V', 'terminal': 'amp power terminal'} — 8 AWG x 18.4 ft fails the 3 % rule; 4 AWG red M22759/16-4-2 (receipts/2026-09-25_orders-staged-prowire-ksv-ict.md, 17:30 addendum) | the amplifier runs off the accessory battery (owner 2026-09-27: YellowTop 'for other stuff like accessories'); the JL Audio VX700/5i takes '4-gauge power and ground leads and a 60-amp fuse' (Crutchfield page, snapshot web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md), so the MIDI at the battery is 60 A (owner 2026-09-27 ruled out Kicker: 'kicker is not cool... what a brand for a 100k truck'); it started at 'ECU'"
+    "decision: to None -> {'device': 'AMP', 'pin': '+12 V', 'terminal': 'amp power terminal'} — 8 AWG x 18.4 ft fails the 3 % rule; 4 AWG red M22759/16-4-2 (receipts/2026-09-25_orders-staged-prowire-ksv-ict.md, 17:30 addendum) | the amplifier runs off the accessory battery (owner 2026-09-27: YellowTop 'for other stuff like accessories'); the JL Audio VX700/5i takes '4-gauge power and ground leads and a 60-amp fuse' (Crutchfield page, snapshot web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md), so the MIDI at the battery is 60 A (owner 2026-09-27 ruled out Kicker: 'kicker is not cool... what a brand for a 100k truck'); it started at 'ECU'",
+    "decision: awg 4 -> 2 — sized from physics 2026-09-28: load 60 A (JL VX700/5i: 60 A fuse recommended; the run goes engine bay → bed, bundled with its ground); ampacity 100 A (bundled 35 °C rise) vs need 71 A; drop 0.404 V; MIDI 60 A. cable_sizing_v5.py"
    ],
    "sources": [
     "output/K5_cut_list_v4_2.txt:131"
    ],
+   "protection": "MIDI 60 A",
    "length_kind": "estimate",
    "option": "AUD",
    "option_status": "decided"
@@ -6169,7 +6171,7 @@
    "length_ft": 3.1,
    "length_basis": "twin: output/lego-book/power_spine_twin_lengths.txt (paths in the digital twin, battery at the passenger firewall corner); not taped on the truck",
    "engine_running": true,
-   "notes": "",
+   "notes": "sized from physics 2026-09-28: load 0 A (cranking only, brief (unfused, ABYC cranking exemption); never below 2 AWG (ch.17 §17.4.3 'same as the starter cable', §17.5.6 Dave)); ampacity 120 A (free air, 100 °C ambient (engine bay)) vs need 0 A; drop 0.0 V, cranking 0.113 V; none. cable_sizing_v5.py",
    "april": null,
    "conflicts": [
     "decision: awg 0 -> 2 — 2 AWG: cranking loop 7.6 ft drops 0.28 V at 200 A < 0.42 V ceiling, 1/0 question closed (state 0h); Dave's DC primary runs 2 AWG (state 0i) | chapters/17 §17.3: distribution stud -> starter feed, unfused (cranking-motor exemption)",
@@ -6180,6 +6182,7 @@
    "sources": [
     "output/K5_cut_list_v4_2.txt:137"
    ],
+   "protection": "none",
    "length_kind": "twin",
    "option": "BASE",
    "option_status": "base"
@@ -6204,7 +6207,7 @@
    "length_ft": 3.5,
    "length_basis": "twin: output/lego-book/power_spine_twin_lengths.txt (paths in the digital twin, battery at the passenger firewall corner); not taped on the truck",
    "engine_running": true,
-   "notes": "",
+   "notes": "sized from physics 2026-09-28: load 150 A (Holley 197-302 rated 150 A); ampacity 240 A (free air, 100 °C ambient (engine bay)) vs need 235 A; drop 0.048 V; MEGA 200 A. cable_sizing_v5.py",
    "april": {
     "id": "PTC-W004",
     "score": 1.0,
@@ -6227,6 +6230,8 @@
     "output/K5_cut_list_v4_2.txt:138",
     "build-plan/MASTER_CUT_LIST.csv:83"
    ],
+   "parallel": 2,
+   "protection": "MEGA 200 A",
    "length_kind": "twin",
    "option": "BASE",
    "option_status": "base"
@@ -6287,7 +6292,7 @@
    "length_ft": 1.1,
    "length_basis": "twin: output/lego-book/power_spine_twin_lengths.txt (paths in the digital twin, battery at the passenger firewall corner); not taped on the truck",
    "engine_running": true,
-   "notes": "",
+   "notes": "sized from physics 2026-09-28: load 180 A (every load with the engine off: PDM30 100 + PDM15 80; cranking 200 A brief); ampacity 240 A (free air, 100 °C ambient (engine bay)) vs need 180 A; drop 0.018 V, cranking 0.02 V; none. cable_sizing_v5.py",
    "april": {
     "id": "PTC-W002",
     "score": 1.0,
@@ -6309,6 +6314,8 @@
     "output/K5_cut_list_v4_2.txt:140",
     "build-plan/MASTER_CUT_LIST.csv:81"
    ],
+   "parallel": 2,
+   "protection": "none",
    "length_kind": "twin",
    "option": "BASE",
    "option_status": "base"
@@ -6446,7 +6453,7 @@
     "pin": "1 (constant 12 V)",
     "terminal": "Tulay harness"
    },
-   "awg": 8,
+   "awg": 6,
    "spec": "M22759/16",
    "color": "red",
    "color_basis": "DAVE",
@@ -6454,16 +6461,18 @@
    "length_ft": 4.6,
    "length_basis": "cut list v4.2 zone estimate",
    "engine_running": false,
-   "notes": "",
+   "notes": "sized from physics 2026-09-28: load 40 A (OEM 40 A supply fuse (ch.17 §17.5)); ampacity 75 A (free air, 100 °C ambient (engine bay)) vs need 47 A; drop 0.082 V; MIDI 40 A. cable_sizing_v5.py",
    "april": null,
    "conflicts": [
     "decision: frm ECU -> Distribution stud (MIDI 40 A) — chapters/17 §17.3 spine table: iBooster 8 AWG /16 (#52), MIDI 40 A; it started at 'ECU'",
     "decision: label Bosch V4 Electric Brake Booste -> iBooster power (direct, MIDI 40 A) — chapters/17 §17.3 spine table: iBooster 8 AWG /16 (#52), MIDI 40 A; it started at 'ECU'",
-    "decision: to None -> {'device': 'IBOOSTER', 'pin': '1 (constant 12 V)', 'terminal': 'Tulay harness'} — chapters/17 §17.3 spine table: iBooster 8 AWG /16 (#52), MIDI 40 A; it started at 'ECU'"
+    "decision: to None -> {'device': 'IBOOSTER', 'pin': '1 (constant 12 V)', 'terminal': 'Tulay harness'} — chapters/17 §17.3 spine table: iBooster 8 AWG /16 (#52), MIDI 40 A; it started at 'ECU'",
+    "decision: awg 8 -> 6 — sized from physics 2026-09-28: load 40 A (OEM 40 A supply fuse (ch.17 §17.5)); ampacity 75 A (free air, 100 °C ambient (engine bay)) vs need 47 A; drop 0.082 V; MIDI 40 A. cable_sizing_v5.py"
    ],
    "sources": [
     "output/K5_cut_list_v4_2.txt:148"
    ],
+   "protection": "MIDI 40 A",
    "length_kind": "estimate",
    "option": "BASE",
    "option_status": "base"
@@ -8554,7 +8563,7 @@
    "length_ft": 1.9,
    "length_basis": "twin: output/lego-book/power_spine_twin_lengths.txt (paths in the digital twin, battery at the passenger firewall corner); not taped on the truck",
    "engine_running": true,
-   "notes": "M6 stud. Sized to PDM30 datasheet max continuous total output 100 A (VALIDATION_REPORT.md; manual p.4: the PDM16/PDM32 Autosport pin suits 16 mm2 (6#) or 25 mm2 (4#), the PDM15/PDM30 \"use a 6 mm eyelet to suit the wire size\"; p.48 recommends 4# to 2# for battery pos). 2 AWG /16 (decision 2026-09-26, state 0n): 150 A at 80 °C / 120 A at 100 °C, single wire in free air (MoTeC PDM manual p.48), on the MEGA 125 A (100 A x 1.25, chapters/17 §17.5 item 5); the run is in the cab-side/grommet path, not beside the exhaust. EE audit \"150 A required\" is a nameplate sum ABOVE the device's own 100 A ceiling — see receipt. ALTERNATIVE (Skylar parallel-conductor principle): 2x 4 AWG M22759/16, equal length, lug-consolidated both ends — see receipt. fused MEGA 125 A at the distribution bus (chapters/17 §17.3 topology; lug 2516LTP on the MEGA holder's M8 stud).",
+   "notes": "M6 stud. Sized to PDM30 datasheet max continuous total output 100 A (VALIDATION_REPORT.md; manual p.4: the PDM16/PDM32 Autosport pin suits 16 mm2 (6#) or 25 mm2 (4#), the PDM15/PDM30 \"use a 6 mm eyelet to suit the wire size\"; p.48 recommends 4# to 2# for battery pos). 2 AWG /16 (decision 2026-09-26, state 0n): 150 A at 80 °C / 120 A at 100 °C, single wire in free air (MoTeC PDM manual p.48), on the MEGA 125 A (100 A x 1.25, chapters/17 §17.5 item 5); the run is in the cab-side/grommet path, not beside the exhaust. EE audit \"150 A required\" is a nameplate sum ABOVE the device's own 100 A ceiling — see receipt. ALTERNATIVE (Skylar parallel-conductor principle): 2x 4 AWG M22759/16, equal length, lug-consolidated both ends — see receipt. fused MEGA 125 A at the distribution bus (chapters/17 §17.3 topology; lug 2516LTP on the MEGA holder's M8 stud). | sized from physics 2026-09-28: load 100 A (PDM30 total output 100 A continuous (manual p.35)); ampacity 150 A (free air, 80 °C ambient) vs need 147 A; drop 0.035 V; MEGA 125 A. cable_sizing_v5.py",
    "april": null,
    "conflicts": [
     "decision: awg 0 -> 2 — 2 AWG: cranking loop 7.6 ft drops 0.28 V at 200 A < 0.42 V ceiling, 1/0 question closed (state 0h); Dave's DC primary runs 2 AWG (state 0i) | chapters/17 §17.3: distribution stud -> MEGA 125 A -> PDM30 stud",
@@ -8567,6 +8576,7 @@
    "sources": [
     "output/K5_cut_list_v4_2.txt:358"
    ],
+   "protection": "MEGA 125 A",
    "subsystem_basis": "always-built substrate: PDM feed, PDM config port, main grounds",
    "length_kind": "twin",
    "option": "BASE",
@@ -15601,6 +15611,9 @@
    "sources": [
     "output/lego-book/ch1_p1_power_spine.md (twin 41.7 in); chapters/17:69"
    ],
+   "parallel": 2,
+   "protection": "none",
+   "notes": "sized from physics 2026-09-28: load 150 A (starter return 200 A brief; alternator return up to 150 A continuous through the block); ampacity 240 A (free air, 100 °C ambient (engine bay)) vs need 150 A; drop 0.048 V, cranking 0.064 V; none. cable_sizing_v5.py",
    "subsystem": "HARNESS_INFRA",
    "subsystem_basis": "always-built substrate: PDM feed, PDM config port, main grounds",
    "length_kind": "twin",
@@ -16615,7 +16628,7 @@
    "status": "implied",
    "frm": "Distribution stud (MEGA 100 A)",
    "to": "PDM15 battery stud (M6)",
-   "awg": 4,
+   "awg": 2,
    "spec": "M22759/16",
    "color": "red",
    "sources": [
@@ -16623,8 +16636,11 @@
    ],
    "conflicts": [
     "decision: awg 6 -> 4 — fuse sized from the PDM15's 80 A total continuous output (MoTeC PDM manual p.35) x 1.25 = 100 A, the method of chapters/17 §17.5 item 5 (MEGA 125 A on the PDM30's 100 A); MEGA is made 100-500 A (chapters/17 §17.2 item 9) — 'MEGA 80 A' does not exist. The cable must carry the fuse: 6# = 90 A at 80 °C / 75 A at 100 °C (PDM manual p.48) is under 100 A; 4# = 120 A / 100 A carries it, and p.48 recommends 4# to 2# for battery pos (p.4 allows 6# or 4#). Supersedes chapters/17 §17.8 item 4's 6 AWG for this feed; lugs LUG-4AWG-M6 (PDM15 stud) and LUG-4AWG-M8 (MEGA holder), part numbers OPEN (power-spine review 2026-09-28)",
-    "decision: frm Distribution stud (MEGA 80 A) -> Distribution stud (MEGA 100 A) — fuse sized from the PDM15's 80 A total continuous output (MoTeC PDM manual p.35) x 1.25 = 100 A, the method of chapters/17 §17.5 item 5 (MEGA 125 A on the PDM30's 100 A); MEGA is made 100-500 A (chapters/17 §17.2 item 9) — 'MEGA 80 A' does not exist. The cable must carry the fuse: 6# = 90 A at 80 °C / 75 A at 100 °C (PDM manual p.48) is under 100 A; 4# = 120 A / 100 A carries it, and p.48 recommends 4# to 2# for battery pos (p.4 allows 6# or 4#). Supersedes chapters/17 §17.8 item 4's 6 AWG for this feed; lugs LUG-4AWG-M6 (PDM15 stud) and LUG-4AWG-M8 (MEGA holder), part numbers OPEN (power-spine review 2026-09-28)"
+    "decision: frm Distribution stud (MEGA 80 A) -> Distribution stud (MEGA 100 A) — fuse sized from the PDM15's 80 A total continuous output (MoTeC PDM manual p.35) x 1.25 = 100 A, the method of chapters/17 §17.5 item 5 (MEGA 125 A on the PDM30's 100 A); MEGA is made 100-500 A (chapters/17 §17.2 item 9) — 'MEGA 80 A' does not exist. The cable must carry the fuse: 6# = 90 A at 80 °C / 75 A at 100 °C (PDM manual p.48) is under 100 A; 4# = 120 A / 100 A carries it, and p.48 recommends 4# to 2# for battery pos (p.4 allows 6# or 4#). Supersedes chapters/17 §17.8 item 4's 6 AWG for this feed; lugs LUG-4AWG-M6 (PDM15 stud) and LUG-4AWG-M8 (MEGA holder), part numbers OPEN (power-spine review 2026-09-28)",
+    "decision: awg 4 -> 2 — sized from physics 2026-09-28: load 80 A (PDM15 total output 80 A continuous (manual p.35)); ampacity 120 A (free air, 100 °C ambient (engine bay)) vs need 118 A; drop None V; MEGA 100 A. cable_sizing_v5.py"
    ],
+   "protection": "MEGA 100 A",
+   "notes": "sized from physics 2026-09-28: load 80 A (PDM15 total output 80 A continuous (manual p.35)); ampacity 120 A (free air, 100 °C ambient (engine bay)) vs need 118 A; drop None V; MEGA 100 A. cable_sizing_v5.py",
    "subsystem": "HARNESS_INFRA",
    "subsystem_basis": "engine PDM feed and grounds (2026-09-27)",
    "length_kind": null,
@@ -17943,11 +17959,16 @@
    "status": "implied",
    "frm": "AMP (ground)",
    "to": "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)",
-   "awg": 4,
+   "awg": 2,
    "spec": "M22759/16",
    "sources": [
     "owner 2026-09-27: grounds run in the loom — 'dave runs his grounds in the looms ... would be dumb to be grounding to body all the time'; Dave's DC primary has a ground-stud bank (state 0i). Each zone's returns run in the harness to its ground bank; the banks return in the harness to the ground star, never through the body; ground cable matches the 4 AWG feed (#32, state 0n)"
    ],
+   "conflicts": [
+    "decision: awg 4 -> 2 — sized from physics 2026-09-28: load 60 A (the amplifier's return, same length as #32); ampacity 100 A (bundled 35 °C rise) vs need 60 A; drop 0.404 V; none. cable_sizing_v5.py"
+   ],
+   "protection": "none",
+   "notes": "sized from physics 2026-09-28: load 60 A (the amplifier's return, same length as #32); ampacity 100 A (bundled 35 °C rise) vs need 60 A; drop 0.404 V; none. cable_sizing_v5.py",
    "subsystem": "AUDIO",
    "subsystem_basis": "head unit, amplifier, woofer jumpers (2026-09-27)",
    "length_kind": null,
@@ -18448,6 +18469,8 @@
    "sources": [
     "owner 2026-09-27: grounds run in the loom — 'dave runs his grounds in the looms ... would be dumb to be grounding to body all the time'; Dave's DC primary has a ground-stud bank (state 0i). Each zone's returns run in the harness to its ground bank; the banks return in the harness to the ground star, never through the body; sized like the PDM30 feed (PDM_BPOS 2 AWG) since every cab load returns through it"
    ],
+   "protection": "none",
+   "notes": "sized from physics 2026-09-28: load 100 A (every PDM30 load returns through it; runs in the loom through the grommet); ampacity 100 A (bundled 35 °C rise) vs need 100 A; drop None V; none. cable_sizing_v5.py",
    "subsystem": "HARNESS_INFRA",
    "subsystem_basis": "ground returns in the loom (2026-09-27)",
    "length_kind": null,
@@ -18482,6 +18505,9 @@
    "sources": [
     "MoTeC PDM user manual p.7: 'Battery positive must generally be connected via an isolator switch or relay. The isolator must isolate the battery from all devices in the vehicle including the PDM, starter motor and alternator'; Blue Sea Systems 7700 ML-RBS instructions 990180170 Rev.006 (reference_documents/component_drawings/BlueSea_7700_ML-RBS_Instructions_990180170-006.pdf): magnetic latch, 'draws no current in ON or OFF state' (p.1); cranking 1,000A 30 s on 2/0 AWG (p.1); stud terminals A and B interchangeable, 3/8\"-16, 140 in-lb max; red = +VDC 24 hr via 10 A (min), black = ground, brown = to close, orange = to open, yellow = LED output; 'Use minimum 16 AWG wire for the Control Circuit' (p.2); chapters/17 §17.3: battery -> isolator -> distribution stud"
    ],
+   "parallel": 2,
+   "protection": "none",
+   "notes": "sized from physics 2026-09-28: load 180 A (same current as #63); ampacity 240 A (free air, 100 °C ambient (engine bay)) vs need 180 A; drop None V, cranking None V; none. cable_sizing_v5.py",
    "subsystem": "CHARGING_STARTING",
    "subsystem_basis": "isolator + dual batteries (2026-09-27)",
    "length_kind": null,
@@ -18601,6 +18627,9 @@
    "sources": [
     "owner 2026-09-27 (Odyssey for the running); the positive-side isolator leaves the negative as the ground star (chapters/17 §17.4.7: PDM Batt- to battery negative); 2 AWG like #63 (Blue Sea p.2: engine-starting wires need no circuit protection)"
    ],
+   "parallel": 2,
+   "protection": "none",
+   "notes": "sized from physics 2026-09-28: load 180 A (the battery's return: same as #63); ampacity 240 A (free air, 100 °C ambient (engine bay)) vs need 180 A; drop None V, cranking None V; none. cable_sizing_v5.py",
    "subsystem": "CHARGING_STARTING",
    "subsystem_basis": "battery negatives to the ground star (2026-09-27)",
    "length_kind": null,
@@ -18630,11 +18659,16 @@
    "status": "implied",
    "frm": "PS-STUDS (distribution stud, MIDI 40 A)",
    "to": "DCDC (IN +)",
-   "awg": 8,
+   "awg": 6,
    "spec": "M22759/16",
    "sources": [
     "Victron Orion-Tr Smart 12/12-30 non-isolated DC-DC charger ORI121236140 — 30 A, 'engine running detection', remote on-off on a two-pole H/L connector (powerwerx.com page, snapshot web_snapshots/powerwerx.com__victron-ori121236140-oriontrsmart-30a-nonisolated.md) — downstream of the isolator, so the charger stops when the truck is isolated"
    ],
+   "conflicts": [
+    "decision: awg 8 -> 6 — sized from physics 2026-09-28: load 35 A (Orion-Tr Smart 12/12-30: 30 A out, ~35 A in; MIDI 40 (ch.17)); ampacity 75 A (free air, 100 °C ambient (engine bay)) vs need 47 A; drop None V; MIDI 40 A. cable_sizing_v5.py"
+   ],
+   "protection": "MIDI 40 A",
+   "notes": "sized from physics 2026-09-28: load 35 A (Orion-Tr Smart 12/12-30: 30 A out, ~35 A in; MIDI 40 (ch.17)); ampacity 75 A (free air, 100 °C ambient (engine bay)) vs need 47 A; drop None V; MIDI 40 A. cable_sizing_v5.py",
    "subsystem": "CHARGING_STARTING",
    "subsystem_basis": "isolator + dual batteries (2026-09-27)",
    "length_kind": null,
@@ -18647,11 +18681,16 @@
    "status": "implied",
    "frm": "DCDC (OUT +)",
    "to": "ACC-BATT (+)",
-   "awg": 8,
+   "awg": 6,
    "spec": "M22759/16",
    "sources": [
     "Victron Orion-Tr Smart 12/12-30 non-isolated DC-DC charger ORI121236140 — 30 A, 'engine running detection', remote on-off on a two-pole H/L connector (powerwerx.com page, snapshot web_snapshots/powerwerx.com__victron-ori121236140-oriontrsmart-30a-nonisolated.md)"
    ],
+   "conflicts": [
+    "decision: awg 8 -> 6 — sized from physics 2026-09-28: load 30 A (30 A charge); ampacity 75 A (free air, 100 °C ambient (engine bay)) vs need 30 A; drop None V; none. cable_sizing_v5.py"
+   ],
+   "protection": "none",
+   "notes": "sized from physics 2026-09-28: load 30 A (30 A charge); ampacity 75 A (free air, 100 °C ambient (engine bay)) vs need 30 A; drop None V; none. cable_sizing_v5.py",
    "subsystem": "CHARGING_STARTING",
    "subsystem_basis": "isolator + dual batteries (2026-09-27)",
    "length_kind": null,
@@ -18664,11 +18703,16 @@
    "status": "implied",
    "frm": "DCDC (-)",
    "to": "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)",
-   "awg": 8,
+   "awg": 6,
    "spec": "M22759/16",
    "sources": [
     "Victron Orion-Tr Smart 12/12-30 non-isolated DC-DC charger ORI121236140 — 30 A, 'engine running detection', remote on-off on a two-pole H/L connector (powerwerx.com page, snapshot web_snapshots/powerwerx.com__victron-ori121236140-oriontrsmart-30a-nonisolated.md) — non-isolated: input and output share the negative"
    ],
+   "conflicts": [
+    "decision: awg 8 -> 6 — sized from physics 2026-09-28: load 35 A (the Orion's return); ampacity 75 A (free air, 100 °C ambient (engine bay)) vs need 35 A; drop None V; none. cable_sizing_v5.py"
+   ],
+   "protection": "none",
+   "notes": "sized from physics 2026-09-28: load 35 A (the Orion's return); ampacity 75 A (free air, 100 °C ambient (engine bay)) vs need 35 A; drop None V; none. cable_sizing_v5.py",
    "subsystem": "CHARGING_STARTING",
    "subsystem_basis": "isolator + dual batteries (2026-09-27)",
    "length_kind": null,
@@ -19567,7 +19611,7 @@
    "M22759/16 22 AWG brown": [
     "UTC_0V"
    ],
-   "M22759/16 4 AWG red": [
+   "M22759/16 2 AWG red": [
     "PDM15_BPOS"
    ],
    "M22759/32 20 AWG black": [
@@ -32535,9 +32579,8 @@
   },
   "wire_ft": {
    "M22759/16 2 AWG black": 4.0,
-   "M22759/16 2 AWG red": 11.0,
-   "M22759/16 4 AWG red": 21.2,
-   "M22759/16 8 AWG red": 5.3,
+   "M22759/16 2 AWG red": 32.2,
+   "M22759/16 6 AWG red": 5.3,
    "M22759/16 10 AWG black": 21.2,
    "M22759/16 10 AWG red": 21.2,
    "M22759/16 22 AWG brown": 30.7,
@@ -32822,9 +32865,17 @@
    "codes": [
     "M22759/16-8-2"
    ],
-   "need_ft": 5.3,
+   "need_ft": 0,
    "cart_ft": 30.0,
-   "status": "covered"
+   "status": "not claimed by this scope"
+  },
+  {
+   "kind": "wire",
+   "item": "M22759/16 6 AWG red",
+   "codes": [],
+   "need_ft": 5.3,
+   "cart_ft": 0,
+   "status": "short by 5.3 ft"
   },
   {
    "kind": "wire",
@@ -32842,9 +32893,9 @@
    "codes": [
     "M22759/16-4-2"
    ],
-   "need_ft": 21.2,
+   "need_ft": 0,
    "cart_ft": 24.0,
-   "status": "covered; also PDM15_BPOS (length not measured yet)"
+   "status": "not claimed by this scope"
   },
   {
    "kind": "wire",
@@ -32862,9 +32913,9 @@
    "codes": [
     "M22759/16-2-2"
    ],
-   "need_ft": 11.0,
+   "need_ft": 32.2,
    "cart_ft": 13.0,
-   "status": "covered"
+   "status": "short by 19.2 ft; also PDM15_BPOS (length not measured yet)"
   },
   {
    "kind": "wire",
@@ -34361,6 +34412,12 @@
     "why": "need 14.6 ft"
    },
    {
+    "code": "M22759/16-6-2",
+    "qty": 10,
+    "need_ft": 5.3,
+    "why": "need 5.3 ft"
+   },
+   {
     "code": "M22759/32-18-0",
     "qty": 25,
     "need_ft": 21.9,
@@ -34381,6 +34438,12 @@
   ],
   "set_qty": [
    {
+    "code": "M22759/16-2-2",
+    "qty_from": 13.0,
+    "qty": 35,
+    "need_ft": 32.2
+   },
+   {
     "code": "M22759/32-20-2",
     "qty_from": 40.0,
     "qty": 75,
@@ -34394,13 +34457,6 @@
    }
   ],
   "trim": [
-   {
-    "code": "M22759/16-8-2",
-    "qty_from": 30.0,
-    "qty": 10,
-    "need_ft": 5.3,
-    "saves": 81.28
-   },
    {
     "code": "M22759/32-16-2",
     "qty_from": 110.0,
@@ -44250,10 +44306,17 @@
      },
      {
       "item": "M22759/16 8 AWG red",
-      "need_ft": 5.3,
+      "need_ft": 0,
       "cart_ft": 30.0,
       "on_hand_ft": null,
-      "status": "covered"
+      "status": "not claimed by this scope"
+     },
+     {
+      "item": "M22759/16 6 AWG red",
+      "need_ft": 5.3,
+      "cart_ft": 0,
+      "on_hand_ft": null,
+      "status": "short by 5.3 ft"
      },
      {
       "item": "M22759/16 4 AWG black",
@@ -44264,10 +44327,10 @@
      },
      {
       "item": "M22759/16 4 AWG red",
-      "need_ft": 21.2,
+      "need_ft": 0,
       "cart_ft": 24.0,
       "on_hand_ft": null,
-      "status": "covered; also PDM15_BPOS (length not measured yet)"
+      "status": "not claimed by this scope"
      },
      {
       "item": "M22759/16 2 AWG black",
@@ -44278,10 +44341,10 @@
      },
      {
       "item": "M22759/16 2 AWG red",
-      "need_ft": 11.0,
+      "need_ft": 32.2,
       "cart_ft": 13.0,
       "on_hand_ft": null,
-      "status": "covered"
+      "status": "short by 19.2 ft; also PDM15_BPOS (length not measured yet)"
      },
      {
       "item": "M22759/32 22 AWG black",
