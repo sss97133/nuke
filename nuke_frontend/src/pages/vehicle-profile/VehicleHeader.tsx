@@ -1942,6 +1942,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     No aggregated market data available yet for this model.
                   </div>
                 )}
+                {vehicle?.make && displayModel && vehicle?.year && (
+                  <Link
+                    to={`/cohort/${encodeURIComponent(String(vehicle.make).toLowerCase())}/${encodeURIComponent(String(displayModel).toLowerCase())}/${vehicle.year}`}
+                    style={{ borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: '9px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text)', textDecoration: 'underline' }}
+                  >
+                    {vehicle.year} {vehicle.make} {displayModel} market →
+                  </Link>
+                )}
                 <Link
                   to={vehicle?.model
                     ? `/browse?make=${encodeURIComponent(String(vehicle?.make || ''))}&model=${encodeURIComponent(String(vehicle.model))}`

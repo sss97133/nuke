@@ -11,6 +11,7 @@
 
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -210,7 +211,14 @@ export default function PriceHistoryChart({ vehicleId, make, model, year, salePr
             Price History
           </div>
           <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
-            {totalCount} sales · {cohortLabel}
+            {totalCount} sales ·{' '}
+            <Link
+              to={`/cohort/${encodeURIComponent(make.toLowerCase())}/${encodeURIComponent(model.toLowerCase())}/${year}`}
+              style={{ color: 'inherit', textDecoration: 'underline' }}
+              title={`The ${year} ${make} ${model} market`}
+            >
+              {cohortLabel}
+            </Link>
           </div>
         </div>
         {avgPrice > 0 && (
