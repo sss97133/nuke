@@ -27,7 +27,7 @@ Every data point must come from a real source — a service manual, a product da
 
 - **Vehicle ID:** `e04bf9c5-b488-433b-be9a-3d307861d90b`
 - **VIN:** CCL187Z210370
-- **Owner/Client:** Scott (scott@li3go.com / sngtrading@gmail.com)
+- **Owner/Client:** the client (contact details live in the DB, not here)
 - **Builder:** NUKE LTD, 676 Wells Rd, Boulder City NV 89005
 - **Wiring Subcontractor:** Desert Performance (desertperformance@cox.net, 702-513-8837), same address
 
@@ -47,10 +47,10 @@ Every data point must come from a real source — a service manual, a product da
 - Camera: Rear backup, reverse-triggered
 
 ### Invoices (NUKE LTD → Client)
-- SW77002 (10/2023): $42,379 — vehicle + parts
-- SW77003 (02/2024): $18,946 — frame/drivetrain/suspension + paint
-- SW77005 (09/2024): $28,540 — Desert Performance wiring $15K, trans $2,380, interior $5,645, engine peripherals $2,150, fuel/exhaust $2,010, brakes $655
-- SW77006 (03/2025): $29,678 — labor $10K, Desert Performance wiring $5K, AMP steps $2,300, windows $1,800, wheels $4,264, tires $1,772, LED lighting $980, Delmo handles $350, machined pieces $2,350, CVF hinges $862
+- Inv. 1 (10/2023): vehicle + parts (amount in the DB)
+- Inv. 2 (02/2024): frame/drivetrain/suspension + paint (amount in the DB)
+- Inv. 3 (09/2024): Desert Performance wiring, trans, interior, engine peripherals, fuel/exhaust, brakes (amounts in the DB)
+- Inv. 4 (03/2025): labor, Desert Performance wiring, AMP steps, windows, wheels, tires, LED lighting, Delmo handles, machined pieces, CVF hinges (amounts in the DB)
 
 ### Reference Invoice (Desert Performance → Howard Barton, different vehicle)
 - Invoice #1190 (03/2019): $23,970 — complete Motec M130+PDM30 build on custom coupe
@@ -210,7 +210,7 @@ Colors are deterministic by function group, not random:
 |------|--------|--------|
 | Factory harness circuits (71) | ✅ VALIDATED | GM Service Manual Section 8C Circuit ID Table (40 MATCH, 3 corrected, 17 corrections total) |
 | GM Circuit ID table (219) | ✅ FROM SOURCE | Directly extracted from OCR'd manual pages 8C-46 through 8C-51 |
-| Invoice pricing (49) | ✅ FROM SOURCE | Desert Performance #1190 + NUKE SW77005/SW77006 |
+| Invoice pricing (49) | ✅ FROM SOURCE | Desert Performance #1190 + NUKE Inv. 3/4 |
 | ProWire connector prices (19) | ✅ FROM SOURCE | prowireusa.com product pages |
 | Wire specifications (11) | ✅ CLOSE | Based on real mil-spec standards |
 | Connector specifications (12) | ✅ CLOSE | Based on manufacturer data |

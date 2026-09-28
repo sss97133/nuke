@@ -85,6 +85,6 @@ e04bf9c5's active testimony is now **only GAA-native rows + gate-rejected/duplic
 ## Out of scope / still open (unchanged from prior receipt)
 
 - e04bf9c5 end-state oddity: `status='active'` + `is_public=true` + `deleted_at` set — should likely become a clean non-public ghost for GAA 43671; ghost `135cb20e` already holds GAA sale event `826883df`.
-- `owner_id` on e08bf694 is NULL, `owner_name` still "Scott (li3go)" — ownership promotion needs Skylar's explicit title-proof flow.
+- `owner_id` on e08bf694 is NULL, `owner_name` still "the client" — ownership promotion needs Skylar's explicit title-proof flow.
 - 72 videos + 5 WEBP/AVIF from the album have no intake path.
 - `reattribute_observation()` structural defects (ISSUES.md HIGH) unfixed.
