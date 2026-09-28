@@ -37,13 +37,16 @@ def tw(s, size, bold=False):
 
 class Page:
     def __init__(self, number, section, odd):
-        self.number, self.section, self.odd, self.el = number, section, odd, []
+        self.number, self.section, self.odd, self.el, self.boxes = number, section, odd, [], []
         self.y = M + 24
         num_x, num_anchor = (W - M, "end") if odd else (M, "start")
         self.txt(W / 2, M - 12, section.upper(), 9, bold=True, anchor="middle")
         self.txt(num_x, M - 12, number, 9, bold=True, anchor=num_anchor)
 
     def txt(self, x, y, s, size, bold=False, anchor="start", length=None, italic=False):
+        w_ = length or tw(str(s), size, bold)
+        x0 = x - (w_ if anchor == "end" else w_ / 2 if anchor == "middle" else 0)
+        self.boxes.append((x0, y - size * 0.78, x0 + w_, y + 0.2, str(s)))
         extra = f' textLength="{length:.1f}" lengthAdjust="spacing"' if length else ""
         style = ' font-style="italic"' if italic else ""
         self.el.append(f'<text x="{x:.1f}" y="{y:.1f}" font-family="{FONT}" font-size="{size}" '
@@ -321,10 +324,24 @@ def page_locations(reg, number, odd, view="top"):
     cym = sum(y for _, y, _ in pts) / max(len(pts), 1)
     ring = max((_m.hypot(x - cxm, y - cym) for x, y, _ in pts), default=0) + 42
     order = sorted(pts, key=lambda t: _m.atan2(t[1] - cym, t[0] - cxm))
+    angles = [_m.atan2(y - cym, x - cxm) for x, y, _ in order]
+    gap = 2 * _m.asin(min(1.0, 7.0 / ring))            # a number circle is 5.4 pt: keep centres ≥ 14 pt apart on the ring
+    if len(angles) * gap > 2 * _m.pi:
+        ring = 14.0 * len(angles) / (2 * _m.pi) + 6   # the ring grows until every number has room
+        gap = 2 * _m.asin(min(1.0, 7.0 / ring))
+    for _ in range(60):                                # relax: push neighbours apart around the circle
+        moved = False
+        for i in range(len(angles)):
+            j = (i + 1) % len(angles)
+            d_ = (angles[j] - angles[i]) % (2 * _m.pi)
+            if d_ < gap:
+                push = (gap - d_) / 2
+                angles[i] -= push; angles[j] += push; moved = True
+        if not moved:
+            break
     n = 0
-    for x, y, code in order:
+    for (x, y, code), a in zip(order, angles):
         n += 1
-        a = _m.atan2(y - cym, x - cxm)
         lx, ly = cxm + ring * _m.cos(a), cym + ring * _m.sin(a)
         lx = min(max(lx, fx + 8), fx + fw - 8); ly = min(max(ly, fy + 8), fy + fh - 8)
         p.line(lx, ly, x, y, 0.6)
@@ -618,6 +635,7 @@ def build():
     for p in pages:
         text = " ".join(re.sub(r"<[^>]+>", " ", e) for e in p.el)
         bad += [f"{p.number}: {b}" for b in kits_v5.book_lint(text) if not b.startswith("unstamped")]
+        bad += [f"{p.number}: overprint '{a}' over '{b}'" for a, b in diagram_v5.overlaps(p)]
     if bad:
         raise SystemExit("manual breaks the book's rules:\n  " + "\n  ".join(bad[:20]))
     pdfs = []
