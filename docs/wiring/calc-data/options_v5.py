@@ -64,7 +64,9 @@ def length_state(w):
     b = str(w.get("length_basis") or "").lower()
     if not w.get("length_ft"):
         return "unknown"
-    if re.search(r"measur|bench|twin|polyline", b):
+    if re.search(r"twin|polyline", b):
+        return "twin"
+    if re.search(r"measur|bench|taped on", b) and not re.search(r"not (yet )?(measured|taped)", b):
         return "measured"
     return "estimated"
 

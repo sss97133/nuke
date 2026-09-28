@@ -362,6 +362,10 @@ def run_wires():
             probs.append(("OPEN", f"far end {b[0]}: pin '{b[1] or '—'}' not read from its pinout"))
         res["R8 ends"] = ((worst([st for st, _ in probs]), "; ".join(x for _, x in probs)) if probs
                           else ("PASS", f"{a[0]}:{a[1]} -> {b[0]}:{b[1]}"))
+        # the PDM output that drives this wire: its start, or the in-line pigtail splice it starts at (SPL-<box>-OUTn,
+        # registry corrections 2026-09-28 review A1) — the output is the same, only the first 16 AWG legs moved
+        ms = re.match(r"^SPL-(PDM30|PDM15)-(OUT\d+)\b", str(frm or "")) if kind != "april" else None
+        drv = (ms.group(1), ms.group(2)) if ms else (a[0], a[1]) if a[0] in ("PDM30", "PDM15") else (None, None)
         # R9 pin fits the job
         subs = []
         if a[0] == "M130" and a[1] and not TODO.search(a[1]):
@@ -372,9 +376,9 @@ def run_wires():
                 subs.append(("OPEN", f"M130 {a[1]} not in the stored pin table"))
             elif want:
                 subs.append(("PASS" if any(fn[0].startswith(p) for p in want) else "FAIL", f"M130 {a[1]} = {fn[0]}"))
-        if a[0] in ("PDM30", "PDM15"):
-            ch = re.match(r"(OUT\d+)", str(a[1] or ""))
-            if not ch and re.search(r"OUT", str(a[1] or "")):
+        if drv[0]:
+            ch = re.match(r"(OUT\d+)", str(drv[1] or ""))
+            if not ch and re.search(r"OUT", str(drv[1] or "")):
                 subs.append(("FAIL", "PDM output channel not assigned (OUT?)"))
             elif ch:
                 dev = devices.get(_n(label)) or devices.get(_n(b[0]))
@@ -383,8 +387,8 @@ def run_wires():
                     amps = float(str(amps).split()[0]) if amps not in (None, "") else None
                 except ValueError:
                     amps = None
-                rate = PDM30_RATING_A.get(ch.group(1)) if a[0] == "PDM30" or int(ch.group(1)[3:]) <= 15 else None
-                if a[0] == "PDM15" and int(ch.group(1)[3:]) > 15:
+                rate = PDM30_RATING_A.get(ch.group(1)) if drv[0] == "PDM30" or int(ch.group(1)[3:]) <= 15 else None
+                if drv[0] == "PDM15" and int(ch.group(1)[3:]) > 15:
                     subs.append(("FAIL", f"the PDM15 has no {ch.group(1)} (OUT1-15, manual p.43)"))
                 if rate and amps is not None:
                     subs.append(("PASS" if amps <= rate else "FAIL", f"{ch.group(1)} {rate} A vs load {amps} A"))
@@ -394,7 +398,7 @@ def run_wires():
         if subs:
             res["R9 pin"] = (worst([s for s, _ in subs]), "; ".join(x for _, x in subs))
         # R11 command path
-        if a[0] in ("PDM30", "PDM15") and str(a[1] or "").startswith("OUT") and kind != "april":
+        if drv[0] and str(drv[1] or "").startswith("OUT") and kind != "april":
             ctl = w.get("control")
             res["R11 command"] = ("PASS", f"switched by {ctl}") if ctl else ("OPEN", "what switches this PDM output isn't recorded (a switch on a PDM input, or a CAN message from the M130)")
         load_key = _n(b[0]) if b[0] else None
@@ -427,6 +431,11 @@ def run_wires():
                                        + ("" if ok else f" but {awg} AWG (its contacts take {lo}–{hi} AWG)"))
             else:
                 res["R12 firewall"] = ("FAIL", f"crosses the firewall ({a[0]} in the {sa} -> {b[0]} in the {sb}) with no path")
+        elif {sa, sb} == {CAB, OTHER} and kind != "april" and any(
+                "crossing: bulkhead C" in " ".join(map(str, (eps.get(codeish(x) or "") or {}).get("open") or []))
+                or "crossing: bulkhead C" in str(w.get("notes") or "") for x in (a[0], b[0])):
+            res["R12 firewall"] = ("OPEN", "crosses cab -> chassis through the body crossing: bulkhead C, cavity OPEN "
+                                           "(the engine-only 61-pin is not its path, state row 50)")
         elif UNK in (sa, sb) and CAB in (sa, sb) and kind != "april":
             res["R12 firewall"] = ("OPEN", f"can't tell which side {a[0] if sa == UNK else b[0]} is on")
         # R13 locked decisions

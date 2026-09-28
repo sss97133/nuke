@@ -6,16 +6,17 @@ Vocabulary: composite design (every option) → configuration (base + decided) �
 
 | code | option | status | decided | wires | source |
 |---|---|---|---|---|---|
-| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 281 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
+| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 293 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
 | AUD | Audio — head unit, 5-channel amplifier, four coax speakers, two 10 in woofers | **decided** | 2026-09-27 | 21 | owner 2026-09-25 ("we are gonna do jbl 10 compact woofers, an amp ... and then the appropriate other speakers" |
 | STEPS | AMP Research power steps | **decided** | 2025-03-01 | 4 | client invoice Inv. 4 (AMP steps line, DB); WIRING_SYSTEM_KNOWLEDGE.md |
 | RC | Rear camera with mirror display | **decided** | 2026-09-27 | 6 | owner 2026-09-27 ("we also want like rear camera"); receipt 2026-09-27_wires-right-engine-start-doors-camera.m |
-| PW | Power windows, front doors (Nu-Relics 17383-2) | **candidate** |  | 10 | owner 2026-09-28 ("yet to decide if we do electric windows") supersedes owner 2026-09-27 ("we need power windo |
+| PW | Power windows, front doors (Nu-Relics 17383-2) | **candidate** |  | 14 | owner 2026-09-28 ("yet to decide if we do electric windows") supersedes owner 2026-09-27 ("we need power windo |
 | PL | Power door locks (AutoLoc AUTZT2000 actuators) | **candidate** |  | 6 | agent pick under delegation 2026-09-27 (endpoints.yaml doors block); the owner has not called locks |
 | FC | Front camera | **candidate** |  | 0 | owner 2026-09-28 ("any other cameras we want") |
 | AS | Auto start (remote start) | **candidate** |  | 0 | owner 2026-09-28 ("auto start") |
 | TS2 | Secondary turn signal location | **candidate** |  | 0 | owner 2026-09-28 ("secondary location of turn signals") |
 | LO4 | Transfer-case range switches, 4H and 4L (two switches in place of the single fabbed 4WD switch) | **candidate** |  | 0 | agent 2026-09-28: the PCS TCM-2650 guide (ZGP rev 2, 23 pp.) has no low-range input, so the range is only |
+| DISP | In-cab display and telemetry (owner prefers a wireless LCD; internet-connected) | **candidate** |  | 0 | owner 2026-09-28 ("need to decide if we are connecting an lcd somewhere. would prefer a wireless lcd ... some  |
 
 ## Readiness by layer
 
@@ -25,43 +26,43 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| buildable (base + decided) | 312 | 110 | 304 | 308 | 285 | 2 | 88 | m 5 · e 173 · u 134 |
-| composite (every option) | 328 | 110 | 320 | 324 | 301 | 2 | 88 | m 5 · e 176 · u 147 |
+| buildable (base + decided) | 324 | 124 | 316 | 316 | 302 | 2 | 92 | m 0 · e 173 · u 146 |
+| composite (every option) | 344 | 128 | 336 | 336 | 322 | 2 | 92 | m 0 · e 176 · u 163 |
 
 ### By option
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
 | AUD | 21 | 0 | 21 | 21 | 21 | 0 | 0 | m 0 · e 12 · u 9 |
-| BASE | 281 | 110 | 273 | 277 | 255 | 2 | 88 | m 5 · e 159 · u 117 |
+| BASE | 293 | 124 | 285 | 285 | 271 | 2 | 92 | m 0 · e 159 · u 129 |
 | PL | 6 | 0 | 6 | 6 | 6 | 0 | 0 | m 0 · e 1 · u 5 |
-| PW | 10 | 0 | 10 | 10 | 10 | 0 | 0 | m 0 · e 2 · u 8 |
+| PW | 14 | 4 | 14 | 14 | 14 | 0 | 0 | m 0 · e 2 · u 12 |
 | RC | 6 | 0 | 6 | 6 | 6 | 0 | 0 | m 0 · e 1 · u 5 |
-| STEPS | 4 | 0 | 4 | 4 | 3 | 0 | 0 | m 0 · e 1 · u 3 |
+| STEPS | 4 | 0 | 4 | 4 | 4 | 0 | 0 | m 0 · e 1 · u 3 |
 
 ### By section
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| body_convenience | 79 | 0 | 79 | 79 | 78 | 0 | 6 | m 0 · e 30 · u 49 |
-| dash_cabin | 43 | 6 | 42 | 43 | 41 | 1 | 10 | m 0 · e 16 · u 27 |
-| engine | 107 | 92 | 107 | 107 | 101 | 1 | 50 | m 0 · e 98 · u 9 |
+| body_convenience | 87 | 8 | 87 | 87 | 87 | 0 | 6 | m 0 · e 30 · u 57 |
+| dash_cabin | 47 | 10 | 46 | 44 | 46 | 1 | 13 | m 0 · e 16 · u 31 |
+| engine | 109 | 95 | 109 | 108 | 104 | 1 | 51 | m 0 · e 98 · u 11 |
 | lighting_front | 29 | 0 | 29 | 29 | 29 | 0 | 10 | m 0 · e 16 · u 13 |
 | lighting_rear | 21 | 1 | 21 | 21 | 21 | 0 | 0 | m 0 · e 9 · u 12 |
-| power_spine | 35 | 11 | 35 | 35 | 25 | 0 | 8 | m 5 · e 2 · u 28 |
+| power_spine | 37 | 14 | 37 | 37 | 29 | 0 | 8 | m 0 · e 2 · u 30 |
 | powertrain_chassis | 14 | 0 | 7 | 10 | 6 | 0 | 4 | m 0 · e 5 · u 9 |
 
 ## Capacity ledger
 
 | resource | capacity | used | spare | source |
 |---|---|---|---|---|
-| 61-pin (engine only) | 61 | 58 | c, t, u | kits_v5 firewall map; state rows 50, 53 |
+| 61-pin (engine only) | 61 | 57 | c, d, t, u | kits_v5 firewall map; state rows 50, 53 |
 | body bulkhead A | 12 | 12 | 0 | catalog/endpoints.yaml pins |
 | body bulkhead B | 12 | 12 | 0 | catalog/endpoints.yaml pins |
 | body bulkhead P | 4 | 1 | 3 | catalog/endpoints.yaml pins |
-| power grommet |  | 6 |  | kits_v5 firewall map |
+| power grommet |  | 7 |  | kits_v5 firewall map |
 | PDM30 20 A outputs | 8 | 8 | 0 | PDM30 datasheet p.1; PDM user manual comparison table |
-| PDM30 8 A outputs | 22 | 21 | 1 | PDM30 datasheet p.1; PDM user manual comparison table |
+| PDM30 8 A outputs | 22 | 22 | 0 | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM30 inputs | 16 | 14 | 2 (DIG8, DIG16) | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM15 20 A outputs | 8 | 4 | 4 | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM15 8 A outputs | 7 | 5 | 2 | PDM30 datasheet p.1; PDM user manual comparison table |
@@ -77,7 +78,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 |---|---|---|---|---|
 | M22759/16 22 AWG brown | 30.7 | 0 | not recorded | short by 30.7 ft; also UTC_0V (length not measured yet) |
 | M22759/16 22 AWG brown/black | 21.2 | 0 | not recorded | short by 21.2 ft |
-| M22759/16 22 AWG red | 255.8 | 0 | not recorded | short by 255.8 ft |
+| M22759/16 22 AWG red | 250.5 | 0 | not recorded | short by 250.5 ft |
 | M22759/16 22 AWG orange | 25.4 | 0 | not recorded | short by 25.4 ft |
 | M22759/16 22 AWG orange/black | 4.0 | 0 | not recorded | short by 4.0 ft |
 | M22759/16 22 AWG yellow | 4.0 | 0 | not recorded | short by 4.0 ft; also UTC_CANH, CAN_FW_H, CAN_LTCD_H (length not measured yet) |
@@ -102,7 +103,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | M22759/16 8 AWG black | 0 | 5.0 | not recorded | claimed by G3 — length not measured yet |
 | M22759/16 8 AWG red | 5.3 | 30.0 | not recorded | covered |
 | M22759/16 4 AWG black | 0 | 10.0 | not recorded | claimed by G2 — length not measured yet |
-| M22759/16 4 AWG red | 21.2 | 24.0 | not recorded | covered |
+| M22759/16 4 AWG red | 21.2 | 24.0 | not recorded | covered; also PDM15_BPOS (length not measured yet) |
 | M22759/16 2 AWG black | 4.0 | 6.0 | not recorded | covered |
 | M22759/16 2 AWG red | 11.0 | 13.0 | not recorded | covered |
 | M22759/32 22 AWG black | 0 | 100.0 | not recorded | not claimed by this scope |
@@ -130,19 +131,19 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | M22759/32 22 AWG white | 0 | 1000.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
 | M22759/32 22 AWG white/orange | 0 | 12.0 | not recorded | not claimed by this scope |
 | M22759/32 22 AWG white/yellow | 0 | 15.0 | not recorded | not claimed by this scope |
-| M22759/32 20 AWG black | 8.0 | 50.0 | not recorded | covered; also PDM15_GND1, PDM15_GND2, LTCD_GND (length not measured yet) |
+| M22759/32 20 AWG black | 8.0 | 50.0 | not recorded | covered; also PDM15_GND1, PDM15_GND2 (length not measured yet) |
 | M22759/32 20 AWG red | 72.0 | 40.0 | not recorded | short by 32.0 ft |
 | M22759/32 20 AWG white | 0 | 100.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
 | M22759/32 20 AWG white/brown | 5.5 | 10.0 | not recorded | covered |
 | M22759/32 20 AWG white/red | 5.5 | 10.0 | not recorded | covered |
-| M22759/32 18 AWG black | 21.9 | 0 | not recorded | short by 21.9 ft |
+| M22759/32 18 AWG black | 21.9 | 0 | not recorded | short by 21.9 ft; also LTCD_GND (length not measured yet) |
 | M22759/32 18 AWG brown/black | 18.4 | 0 | not recorded | short by 18.4 ft |
-| M22759/32 18 AWG red | 27.7 | 40.0 | not recorded | covered |
+| M22759/32 18 AWG red | 33.0 | 40.0 | not recorded | covered |
 | M22759/32 18 AWG violet | 15.9 | 20.0 | not recorded | covered |
 | M22759/32 18 AWG white | 0 | 100.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
 | M22759/32 18 AWG white/violet | 15.9 | 20.0 | not recorded | covered |
 | M22759/32 16 AWG black | 14.0 | 25.0 | not recorded | covered |
-| M22759/32 16 AWG red | 67.3 | 110.0 | not recorded | covered |
+| M22759/32 16 AWG red | 67.3 | 110.0 | not recorded | covered; also 34_PT1, 34_PT2, 35_PT1, 35_PT2, 51_PT1, 51_PT2, 72_PT1, 72_PT2, 21_PT1, 21_PT2 (length not measured yet) |
 | M22759/32 16 AWG violet | 42.3 | 50.0 | not recorded | covered |
 | M22759/32 16 AWG white | 0 | 250.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
 | M22759/32 16 AWG white/violet | 42.3 | 50.0 | not recorded | covered |
@@ -157,15 +158,16 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | option | designed wires | crossings | PDM30 outputs | PDM30 inputs | notes |
 |---|---|---|---|---|---|
-| PW | 10 | 0 | 2 | 0 |  |
+| PW | 14 | 0 | 2 | 0 |  |
 | PL | 6 | 0 | 1 | 0 |  |
 | FC | 0 | 2 | 1 | 0 | camera and display not picked; if the mirror display takes a second input, video only |
 | AS | 0 | 0 | 0 | 2 | receiver module in the cab; needs a constant feed and the PCS neutral input the PDM30 already reads |
 | TS2 | 0 | 0 | 0 | 0 | 2 lamp feeds + 2 grounds in the loom; the location sets the zone |
 | LO4 | 0 | 0 | 0 | 1 | cab-side lever; the hubs stay a by-hand check |
+| DISP | 0 | 0 | 1 | 0 | the CAN stub is the only harness consequence; the device choice (wired dash vs wireless bridge) is the owner's |
 
 ### Verdict
 
 - **body crossings:** Body firewall crossings: candidates would take 2; body bulkheads have 3 spare — fits, but only in the 4-way power connector P (size 12 contacts); signal wires need bulkhead C
-- **PDM30 outputs:** PDM30 outputs: candidates would take 4; 1 spare — does NOT fit; the engine PDM15 has 6 spare outputs for engine-bay loads
+- **PDM30 outputs:** PDM30 outputs: candidates would take 5; 0 spare — does NOT fit; the engine PDM15 has 6 spare outputs for engine-bay loads
 - **PDM30 inputs:** PDM30 inputs: candidates would take 3; 2 spare — does NOT fit; PDM15 has 14 spare inputs, read over CAN

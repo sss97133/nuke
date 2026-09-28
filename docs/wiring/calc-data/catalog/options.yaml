@@ -102,3 +102,16 @@ LO4:
     pdm30_inputs: 1    # 4L on a spare DIG (DIG8 or DIG16); 4H keeps the VHX 4x4 (-) wire #55
     crossings: 0
     notes: "cab-side lever; the hubs stay a by-hand check"
+
+DISP:
+  name: In-cab display and telemetry (owner prefers a wireless LCD; internet-connected)
+  status: candidate
+  source: >-
+    owner 2026-09-28 ("need to decide if we are connecting an lcd somewhere. would prefer a wireless lcd ... some connecting
+    to internet type shit"). Wired path = a MoTeC CAN dash (C125 family) on the CAN trunk; wireless path = a CAN-to-Wi-Fi/LTE
+    bridge in the cab feeding a tablet or phone. Neither picked.
+  demand:
+    crossings: 0        # cab side of the firewall; a CAN stub off the trunk within the 500 mm stub limit (PDM manual p.49)
+    pdm30_outputs: 1    # one switched 12 V feed for the dash or bridge
+    pdm30_inputs: 0
+    notes: "the CAN stub is the only harness consequence; the device choice (wired dash vs wireless bridge) is the owner's"

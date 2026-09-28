@@ -177,8 +177,10 @@ class Page:
 
     def svg(self):
         self.txt(W - M, H - M + 14, REVISION, 5.6, anchor="end")
+        body = "".join(self.el)
+        body = re.sub(r"&(?![a-zA-Z]+;|#\d+;|#x[0-9a-fA-F]+;)", "&amp;", body)      # a bare & (a map URL's &node=) breaks the SVG
         return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}pt" height="{H}pt" viewBox="0 0 {W} {H}">'
-                f'<rect width="{W}" height="{H}" fill="#fff"/>' + "".join(self.el) + "</svg>")
+                f'<rect width="{W}" height="{H}" fill="#fff"/>' + body + "</svg>")
 
 
 def connector_face(p, x, y, labels, title, pitch=26, cav=15, round_=False, href=None, colours=None):
@@ -415,11 +417,12 @@ def page_pinout(reg, wires, number, odd, dev, conn, n_pins, title, mating, sourc
         p.txt(X + cw / 2, Y - 3, pin, 6.6, bold=True, anchor="middle")
         if ws:
             label = str(ws[0]).upper() + (f" +{len(ws) - 1}" if len(ws) > 1 else "")
-            dark = base in ("#111", "#7a4a1d", "#2457c5", "#1f8a3b", "#7b3fa0", "#d3222a", "#555", "#8a8a8a")
-            p.txt(X + cw / 2, Y + ch + 8, fit(label, cw - 4, 5.6), 5.6, anchor="middle")
-            p.txt(X + cw / 2, Y + ch / 2 + 2, "", 5, anchor="middle")
-            if dark:
-                pass
+            size_ = 5.6
+            while tw(label, size_) > cw - 4 and size_ > 3.8:
+                size_ -= 0.3                                # a long id shrinks to fit its cell; it never overprints its neighbour
+            if tw(label, size_) > cw - 4:
+                label = label[:9] + "…"
+            p.txt(X + cw / 2, Y + ch + 8, label, size_, anchor="middle")
         else:
             desig = DESIG.get((dev, pin), ("", ""))[0]
             p.txt(X + cw / 2, Y + ch + 8, "spare" if desig not in ("-", "") else "n/c", 5.2, anchor="middle", italic=True)
@@ -1051,9 +1054,16 @@ def build():
         subprocess.run(["rsvg-convert", "-f", "pdf", "-o", str(stem.with_suffix(".pdf")), str(stem.with_suffix(".svg"))], check=True)
         diagram_v5.add_links(stem.with_suffix(".pdf"), p.boxes, H)
         pdfs.append(str(stem.with_suffix(".pdf")))
-    pdfs += [pdf for _, _, _, _, pdf in sheets]
+    pdfs += [s_[4] for s_ in sheets]
+    # Section 2 — DC primary (batteries, isolator, distribution, grounds, protection, cable schedule): power_v5
+    power = []
+    if "--pages-only" not in sys.argv:
+        import power_v5
+        power = power_v5.build(first_number=len(pages) + len(sheets) + 1)
+        pdfs += [p_[3] for p_ in power]
+        toc.append(("DC Primary and Grounds", power[0][0]))
     subprocess.run(["pdfunite", *pdfs, str(OUT / "K5_Harness_Manual.pdf")], check=True)
-    print(f"manual: {len(pages)} pages + {len(sheets)} diagram sheets -> {OUT}")
+    print(f"manual: {len(pages)} pages + {len(sheets)} diagram sheets + {len(power)} DC primary pages -> {OUT}")
 
 
 if __name__ == "__main__":
