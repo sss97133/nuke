@@ -1,0 +1,8 @@
+WASHER-PUMP:
+  family: open
+  note: 'the 1977 pump is cam-driven off the wiper motor (1977 manual Fig. 8-16, p.803/828); an electric pump in the jar is the square-body fix (gmsquarebody consensus
+    thread: ''a universal in-line pump or the later style that pops into the reservoir''). Two wires: #50 from PDM30 OUT26 and its ground in the loom.'
+  open:
+  - 'pump terminals: the USA1 1985-87 pump page carries no electrical data (snapshot) — read the pump in hand or pick a 12 V pump with a published plug'
+  sources:
+  - reference_documents/web_snapshots/www.usa1industries.com__1985-87-square-body-chevy-gmc-truck-windshield-wiper-washer-pump.md

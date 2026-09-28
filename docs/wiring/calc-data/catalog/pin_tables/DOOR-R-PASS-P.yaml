@@ -1,0 +1,9 @@
+DOOR-R-PASS-P:
+  family: dtp
+  pins: {'35': '1', WIN_GND_R: '2', WIN_R_UP: '3', WIN_R_DN: '4'}
+  empty: 0
+  note: 'DESIGN CHOICE, not a maker fact: same order as DOOR-L-PASS-P'
+  kit: {}
+  mate: DTP06-4S + WP-4S (door side, sockets) to DTP04-4P + WP-4P (body side, pins); size 12 contacts
+  sources:
+  - see DOOR-L-PASS-P

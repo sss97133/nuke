@@ -1,0 +1,12 @@
+UNDERDASH-LAMPS:
+  family: miniseal
+  pins:
+    '68': under-dash LED + lead (splice)
+    UD_GND: under-dash LED − lead (splice)
+  kit: {}
+  mate: 'none: splice to the device''s own leads'
+  open:
+  - 'under-dash LED not picked: its lead colours and lead gauge come from its sheet once chosen (the splice colour is sized from our wire only)'
+  sources:
+  - 'no maker document: the device is not picked yet; the registry terminates it on the device''s own leads (''lamp lead'' / ''port lead'' / ''outlet lead'', k5_registry.json), so the harness wire meets
+    each lead in a MiniSeal splice sized by the gauge'

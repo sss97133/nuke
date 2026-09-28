@@ -1,0 +1,17 @@
+BLOWER-MOTOR:
+  family: open
+  pins:
+    BLOWER_MOT: + blade terminal
+    BLOWER_HI: + blade terminal
+    BLOWER_GND: ''
+  splice_point: true
+  note: 'maker''s document: Four Seasons 35587 blower motor: one blade terminal, single speed · BLOWER_MOT and BLOWER_HI both feed the one blade: they join before
+    the blade terminal'
+  open:
+  - 'two 12 AWG wires onto one blade: combined area is past a D-609-05 (16-12) — join method OPEN'
+  - 'BLOWER_GND: the 35587 listing gives one blade and no ground lead; the factory 1978 C60 motor has a black ground lead to a stud (1978 booklet p.16) — read the
+    motor in hand'
+  sources:
+  - 'reference_documents/web_snapshots/mpparts.com__four-seasons-35587-blower-motor-single-shaft-35587.md (''Connector: Blade terminal'', ''Single Speed'', ''Lead
+    Wire: Plug'')'
+  - 1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) 'Air Conditioning RPO C-60' blower motor

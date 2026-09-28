@@ -1,0 +1,7 @@
+AC-LP-SW:
+  family: open
+  open:
+  - 'switch not picked (registry names no part): its plug and terminals close this. For reference the 1978 C60 discharge-pressure cut-out switch is a 2-terminal plug
+    12004275 (1978 booklet p.16)'
+  sources:
+  - 1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) 'Air Conditioning RPO C-60' panel

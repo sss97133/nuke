@@ -1,0 +1,16 @@
+HL-SW:
+  family: gm_blade
+  pins:
+    HL_SW_0V: 1 BAT FEED (cavity of factory 12 RED-2G)
+    HL_SW_HEAD: 6 HEAD LP (cavity of factory 16 LT BLU-10)
+    HL_SW_PARK: TAIL LP (cavity of factory 18 BRN-9A)
+  kit: {}
+  mate: GM connector 2977645 (light switch)
+  open:
+  - the key lists TAIL LP at switch terminals 3 and 4 and does not print which one the brown 9A cavity is; the 1977 manual p.781 calls terminal 4 brown/white and 5 brown, which disagrees with the 1978 key
+    (5 = tail feed fused) — read the terminal number at the bench
+  - 'factory 12-18 AWG terminals vs our 22 AWG: terminal part not named in the booklet'
+  sources:
+  - 'ST-352 1978 C/K wiring booklet fold-out A-1 ''Cab, Engine and Chassis Wiring'' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the
+    ''77 K5): LIGHT SW connector 2977645, key X dome, 1 bat feed, 2 panel, 3/4 tail, 5 tail feed fused, 6 head'
+  - 1977 Light Truck Service Manual Section 8 (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.779 (red battery wire, light blue to the dimmer) and p.781

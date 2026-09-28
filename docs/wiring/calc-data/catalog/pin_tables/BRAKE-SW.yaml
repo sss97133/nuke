@@ -1,0 +1,13 @@
+BRAKE-SW:
+  family: gm_blade
+  pins:
+    BRK_SW_0V: 140 feed cavity (factory 18 ORN-140A, battery fused)
+    '53': 17 output cavity (factory 18 WHT-17 to the column connector)
+  kit: {}
+  mate: GM connector 2984235 (stop lamp switch)
+  open:
+  - 'GM 2984235 terminal part and its range vs our 22 AWG: not named in the booklet (bench / GM parts catalogue)'
+  sources:
+  - 'ST-352 1978 C/K wiring booklet fold-out A-1 ''Cab, Engine and Chassis Wiring'' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the
+    ''77 K5): STOP LP SW, connector 2984235 with 18 ORN-140A and 18 WHT-17'
+  - 1977 Light Truck Service Manual Section 8 (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.777 (stoplamp switch listed in the lighting system)

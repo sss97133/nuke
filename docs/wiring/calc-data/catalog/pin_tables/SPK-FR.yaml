@@ -1,0 +1,13 @@
+SPK-FR:
+  family: kit_terminal
+  pins:
+    27a: '+ terminal: large 5.2 mm female crimp connector (supplied)'
+    27b: '− terminal: small 2.8 mm female crimp connector (supplied)'
+  kit: {}
+  mate: C2-650X speaker tabs (5.2 mm +, 2.8 mm −)
+  open:
+  - 'supplied connectors'' wire range vs 18 AWG and the crimper for them: not stated in the JL manual'
+  - 'no seal: unsealed quick-connects'
+  sources:
+  - 'JL Audio C2-650X owner''s manual p.3-4: ''The large connector is for the positive terminal and the small connector is for the negative terminal''; supplied two 5.2 mm and two 2.8 mm female crimpable
+    connectors (reference_documents/web_snapshots/content.abt.com__JL-Audio-C2-650X-owners-manual.md)'

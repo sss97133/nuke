@@ -1,0 +1,13 @@
+window_motor_PS:
+  family: kit_terminal
+  pins:
+    WIN_MOT_R_A: motor plug pole 1
+    WIN_MOT_R_B: motor plug pole 2
+  kit: {}
+  mate: Nu-Relics motor plug + terminals supplied with the 17383-2 kit (part numbers not published)
+  open:
+  - 'which pole is UP is set at the bench: Nu-Relics says swapping the two wires reverses the motor (pole 1 = A is a labelling choice, not a maker fact)'
+  - 'kit terminal wire range vs 14 AWG and the crimper for it: not published by Nu-Relics'
+  sources:
+  - 'Nu-Relics 17383-2 page: ''No Switches (Will Include Motor Plugs and Terminals)''; ACI motors are reverse polarity, 2 poles, swapping the wires reverses direction (reference_documents/web_snapshots/www.nu-relics.com__17383-2.md)'
+  - 'Nu-Relics ''General Instructions & Tips'' p.2: harness wires labelled for position, black = ground, red (orange) = 12 V hot feed (reference_documents/web_snapshots/www.nu-relics.com__General_Instructions_12-30-14.md)'

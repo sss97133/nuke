@@ -227,20 +227,39 @@ lock_actuator_PS:
   family: open
   kit: {}
   wires: ["LOCK_BUS_A", "LOCK_BUS_B"]
+DOOR-L-PASS-P:
+  where: cabin
+  device: "driver door pass-through, window power — Deutsch DTP 4-way: DTP04-4P + WP-4P (body side), DTP06-4S + WP-4S (door side), size 12 solid contacts 0460-204-12141 / 0462-203-12141 (14–12 AWG)"
+  family: dtp
+  kit: {}
+  wires: ["34", "WIN_GND_L", "WIN_R_UP", "WIN_R_DN"]
+  note: "physics, not preference: the ACI window motor draws 11 A at high load and 20 A at stall (Nu-Relics 17383-2 page, 'New ACI Motor AMP Draws'); 16 AWG carries 15 A at 80 °C (MoTeC PDM manual wiring table, PDF p.51) so its limit ceiling 0.85 x 15 = 12.8 A is under the 1.25 x 11 = 13.8 A floor (ch.17 §17.2.3); 14 AWG carries 22 A -> ceiling 18.7 A, floor 13.8 A: PDM30 OUT3 current limit 15 A. 14 AWG needs a size 12 contact, which the DT 12-way does not take (size 16, 20–16 AWG)"
+  sources: ["Nu-Relics 17383-2 page (motor amp draws; harness fused 30 A)", "MoTeC PDM user manual wiring table (PDF p.51): 16# 15 A / 14# 22 A single wire free air 80 °C", "KSV 4-Way Mated Deutsch DTP Connector Kit page (DTP04-4P, DTP06-4S, WP-4P, WP-4S, size 12 contacts 14–12 AWG)", "customconnectorkits DTP04-4P page (accepts size 12 pins; mates DTP06-4S)", "canon ch.17 §17.2.3 (fuse >= 125 % load, <= 85 % cable)"]
+  open: ["door boot/conduit: measure the hinge pillar gap (bench)", "PDM30 OUT3 current limit 15 A: set in PDM Manager, confirm the stall retry behaviour on the bench"]
 DOOR-L-PASS:
   where: cabin
-  device: driver door pass-through at the hinge pillar — Deutsch DT 12-way (DT04-12PA body side, DT06-12SA door side), size 16 contacts
-  family: open
+  device: "driver door pass-through, locks and speaker — Deutsch DT 8-way: DT04-08PA + W8P (body side), DT06-08SA + W8S (door side), size 16 solid contacts 0460-202-16141 / 0462-201-16141 (20–16 AWG); cavities 7–8 spare, plugged 0413-204-2005"
+  family: dt
   kit: {}
-  wires: ["34", "WIN_GND_L", "WIN_R_UP", "WIN_R_DN", "38", "LOCK_GND_L", "LOCK_BUS_A", "LOCK_BUS_B", "26a", "26b"]
-  open: ["DT 12-way housing, W12P/W12S wedges, size 16 contacts: not in the saved ProWire catalog — confirm the ProWire listing",
-         "door boot/conduit: measure the hinge pillar gap (bench)"]
+  wires: ["38", "LOCK_GND_L", "LOCK_BUS_A", "LOCK_BUS_B", "26a", "26b"]
+  sources: ["customconnectorkits DT04-08PA page (accepts size 16 pins; wedge W8P; mates DT06-08SA)", "customconnectorkits 0460-202-16141 page (size 16 contact, 20–16 AWG)"]
+  open: ["door boot/conduit: measure the hinge pillar gap (bench)"]
+DOOR-R-PASS-P:
+  where: cabin
+  device: "passenger door pass-through, window power — Deutsch DTP 4-way: DTP04-4P + WP-4P (body side), DTP06-4S + WP-4S (door side), size 12 solid contacts 0460-204-12141 / 0462-203-12141 (14–12 AWG)"
+  family: dtp
+  kit: {}
+  wires: ["35", "WIN_GND_R", "WIN_R_UP", "WIN_R_DN"]
+  note: "same sizing as DOOR-L-PASS-P: one ACI motor per line, 11 A high load / 20 A stall; 14 AWG, size 12 contacts; PDM30 OUT4 current limit 15 A"
+  sources: ["see DOOR-L-PASS-P"]
+  open: ["door boot/conduit: measure the hinge pillar gap (bench)"]
 DOOR-R-PASS:
   where: cabin
-  device: passenger door pass-through — Deutsch DT 12-way (DT04-12PA / DT06-12SA)
-  family: open
+  device: "passenger door pass-through, locks and speaker — Deutsch DT 8-way: DT04-08PA + W8P (body side), DT06-08SA + W8S (door side), size 16 solid contacts (20–16 AWG); cavities 7–8 spare, plugged 0413-204-2005"
+  family: dt
   kit: {}
-  wires: ["35", "WIN_GND_R", "WIN_R_UP", "WIN_R_DN", "LOCK_FEED_R", "LOCK_GND_R", "LOCK_BUS_A", "LOCK_BUS_B", "27a", "27b"]
+  wires: ["LOCK_FEED_R", "LOCK_GND_R", "LOCK_BUS_A", "LOCK_BUS_B", "27a", "27b"]
+  sources: ["see DOOR-L-PASS"]
 TG-SW-DASH:
   where: cabin
   device: factory electric tailgate window dash switch (reversing)
@@ -1391,8 +1410,18 @@ ISO-SWITCH:
   device: "Blue Sea 2145 SPDT (ON)-OFF-(ON) Contura switch, included with the 7700 — momentary: tap ON to close the isolator, OFF to open it; its LED shows closed"
   family: open
   kit: {}
-  pins: {ISO_OPEN: "1 (OPEN)", ISO_SW_PWR: "2 + 8 (common + LED power, jumpered)", ISO_CLOSE: "3 (CLOSE)", ISO_LED: "7 (LED ground)", ISO_KILL: "7 (splice on the yellow)"}
+  pins: {ISO_OPEN: "1 (OPEN)", ISO_SW_PWR: "2 + 8 (common + LED power, jumpered)", ISO_CLOSE: "3 (CLOSE)", ISO_LED: "7 (LED ground)"}
+  note: "the M130 shutdown tap (ISO_KILL) is a stub splice on the yellow wire, SPL-ISO-YEL, not a second wire on tab 7 (a 22 AWG signal wire cannot crimp in a 16–14 AWG quick-connect)"
   sources: ["Blue Sea 7700 instructions p.2 (control switch pins 1, 2, 3, 7, 8)"]
+SPL-ISO-YEL:
+  where: cabin
+  device: "stub splice on the isolator switch's yellow wire (ISO_LED, tab 7): the M130 shutdown tap ISO_KILL joins here; the yellow is not cut"
+  family: miniseal
+  kit: {}
+  wires: ["ISO_KILL"]
+  note: "tee, not a butt: the yellow runs through; ISO_KILL 22 AWG stubs onto it. Sleeve by total conductor area (16 AWG yellow + 22 AWG tap)"
+  open: ["MiniSeal size for a 16 + 22 AWG stub: by total CMA from the Raychem D-609 datasheet (D-609-04 covers 20–16)"]
+  sources: ["Blue Sea 7700 instructions p.2 (switch pin 7 to the yellow wire; minimum 16 AWG)", "ProWire 3137CT page (MiniSeal cavities 26-20 / 20-16 / 16-12 AWG)"]
 DCDC:
   where: engine
   device: "Victron Orion-Tr Smart 12/12-30 non-isolated DC-DC charger (ORI121236140), charges the YellowTop from the running system; lined up at Powerwerx, $215.05"

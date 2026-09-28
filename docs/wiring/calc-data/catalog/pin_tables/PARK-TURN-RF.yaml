@@ -1,0 +1,20 @@
+PARK-TURN-RF:
+  family: open
+  pins:
+    '84': park filament lead (circuit 9 brown; 1157 low filament)
+    '82': turn filament lead (circuit 15 dark blue, RH front directional; 1157 high filament)
+    PT_RF_GND: ground lead (circuit 150 black)
+  mate: GM socket 8911486 with leads (1978 booklet p.13); replacement socket part OPEN
+  note: 'maker''s document: right front park/turn lamp, 1157 bulb in GM socket 8911486 (3 leads: park, turn, ground)'
+  open:
+  - 'family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket''s leads;
+    that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)'
+  sources:
+  - '1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.13 (sheet A-1, front lighting / horn panel): ''PARKING
+    + DIR SIG LP'' socket 8911486 carries 18 BLK-150B, 18 BRN 9C, 18 LT BLU-14C'
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional
+    1157, marker 168, back-up 1156, license 67, underhood 93)'
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.786-787: lamp sockets belong to the wiring harness
+    (''twist wiring harness socket 90° counterclockwise and remove harness and bulb''; ''rotate wiring harness sockets counterclockwise and remove housing'')'
+  - '1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.8 circuit table: 14 light blue L.H. indicator and front
+    directional, 15 dark blue R.H.'

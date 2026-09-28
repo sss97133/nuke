@@ -1,0 +1,12 @@
+WIPER-SW:
+  family: gm_blade
+  kit: {}
+  mate: OPEN
+  open:
+  - 'switch cavities for motor terminal 1, terminal 3 and the washer contact: the 1977 manual (p.803-804) describes the circuit by motor terminals only; the 1978 booklet''s switch connector 12004706 (A-F)
+    serves the 1978 rectangular motor 12004622, not the ''77 round motor with terminal board 1/2/3 — needs the 1977 ST-352-77 booklet view or the bench'
+  sources:
+  - 1977 Light Truck Service Manual Section 8 (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.803-804 (grounding-type dash switch; LO grounds terminals 1 and 3, HI grounds terminal
+    1)
+  - ST-352 1978 C/K wiring booklet fold-out A-1 'Cab, Engine and Chassis Wiring' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the '77
+    K5) (1978 wiper/wash switch 12004706 — different motor, not used)

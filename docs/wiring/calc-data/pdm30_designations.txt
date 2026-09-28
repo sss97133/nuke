@@ -54,7 +54,7 @@ A27|DIG1|Digital/Switch Input 1
 A28|GND|0V
 A29|DIG3|Digital/Switch Input 3
 A30|DIG5|Digital/Switch Input 5
-A31|DIG6|Digital/Switch Input 6                             Pin       Name         Function
+A31|DIG6|Digital/Switch Input 6
 A32|DIG8|Digital/Switch Input 8                             C1        VBATT+       Battery Positive
 A33|DIG9|Digital/Switch Input 9
 A34|DIG10|Digital/Switch Input 10

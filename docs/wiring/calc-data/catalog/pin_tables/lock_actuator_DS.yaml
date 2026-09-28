@@ -1,0 +1,9 @@
+lock_actuator_DS:
+  family: open
+  kit: {}
+  mate: AutoLoc AUTZT2000 'Plug-In Harness' (2 wire); mate part not published
+  open:
+  - 'actuator lead colours and plug: AutoLoc instruction sheet packed with AUTZT2000 (the ''Get Instructions'' link on the product page returned no document, 2026-09-28)'
+  - which lead is LOCK vs UNLOCK is set by polarity at the bench
+  sources:
+  - 'AutoLoc AUTZT2000 product page: ''Wire :: Plug-In Harness'', ''2 wire heavy duty central locking actuator'', ''Control: negative ground'', 4.5 A (reference_documents/web_snapshots/shop.autoloc.com__compact-2-wire-car-door-lock-actuator-heavy-duty-12-volt-motor-13-lbs-power-12v.md)'

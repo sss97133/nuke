@@ -1,0 +1,9 @@
+SUB-2:
+  family: open
+  pins:
+    SUB_JMP_P: + push terminal
+    SUB_JMP_N: '- push terminal'
+  note: 'maker''s document: JBL Club 102SL woofer 2: push terminals (+ / -), bare wire 14-8 AWG · bare wire into a spring terminal: no crimp, so no family applies'
+  sources:
+  - 'reference_documents/web_snapshots/www.sonicelectronix.com__club10_12.md (JBL Club shallow subwoofers owner''s manual: ''Push down on the terminal to expose the
+    connection hole. Thread the bare wire end through the hole''; ''compatible with bare or tinned wires ... 14AWG and 8AWG''; SSI switch)'

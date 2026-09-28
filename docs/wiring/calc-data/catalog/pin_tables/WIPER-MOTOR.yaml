@@ -1,0 +1,10 @@
+WIPER-MOTOR:
+  family: open
+  note: 'terminal board: center = feed from the ignition; 1 = series field + armature to the dash switch (ground); 3 = shunt field to the dash switch; housing grounds
+    through the strap'
+  open:
+  - 'harness plug on the terminal board (part, blade size): not in the 1977 manual text — read the motor'
+  sources:
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.803: ''current passes through the ignition switch
+    to the center terminal of the wiper terminal board''; ''wiper terminal No. 1 ... to the dash switch to ground''; ''wiper terminal No. 3''; ''the wiper motor is
+    connected to the chassis through a ground strap'''

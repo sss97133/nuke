@@ -1,0 +1,10 @@
+BLOWER-SW:
+  family: gm_blade
+  kit: {}
+  mate: OPEN
+  open:
+  - the A/C control-head blower switch connector is not drawn with cavity labels in the 1978 booklet (A-4's 2984570 is the resistor / heater-switch connector); needs the 1977 booklet view or the lead count
+    at the bench (registry note stands)
+  sources:
+  - 'ST-352 1978 C/K wiring booklet fold-out A-4, boxes ''Heater - Heavy Duty'' and A/C (reference_documents/wiring_diagram_booklets/pages/1978_CK_A4_hvac_cruise_fuel_auxiliary.png): resistor key AUTO LOW
+    = BATT-R1-R2-R3, MED1 = M1-R2-R3, MED2 = M2-R3'

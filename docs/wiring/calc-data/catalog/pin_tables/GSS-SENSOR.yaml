@@ -1,0 +1,11 @@
+GSS-SENSOR:
+  family: open
+  pins:
+    GSS_SENS_R: red (cable attached to the sensor)
+    GSS_SENS_G: green or white (cable attached)
+    GSS_SENS_B: black (cable attached)
+  note: 'maker''s document: Dakota GSS-3000 sensor with its attached 10 ft cable (red, green or white, black); the cable''s other end lands on the decoder terminals
+    · no harness termination at the sensor: the cable is part of the sensor, so no family applies at this end'
+  sources:
+  - reference_documents/web_snapshots/www.dakotadigital.com__GSS-3000.md ('The sensor cable (10 feet long) attached to the sensor contains three wires'; RED / GREEN
+    or WHITE / BLACK to the decoder terminals)

@@ -1,0 +1,17 @@
+MARKER-LF:
+  family: open
+  pins:
+    '87': park-circuit lead (circuit 9 brown)
+    MK_LF_GND: second lead (factory turn circuit 14; now to ground)
+  mate: GM socket 6294015 with leads (1978 booklet p.13); replacement socket part OPEN
+  note: 'maker''s document: left front side marker, 168 bulb in GM socket 6294015: one lead from the park circuit, the other from the turn circuit (the factory marker
+    grounded through the turn filament)'
+  open:
+  - 'family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket''s leads;
+    that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)'
+  sources:
+  - '1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.13 (sheet A-1, front lighting / horn panel): ''SD MRK
+    LP'' socket 6294015 carries 20 BRN 9B and 20 LT BLU-14B'
+  - 1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.780
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional
+    1157, marker 168, back-up 1156, license 67, underhood 93)'

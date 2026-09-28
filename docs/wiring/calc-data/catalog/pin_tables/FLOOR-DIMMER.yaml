@@ -1,0 +1,17 @@
+FLOOR-DIMMER:
+  family: gm_blade
+  pins:
+    '85': 10 feed cavity (factory 16 LT BLU-10)
+    '86': 10 feed cavity (factory 16 LT BLU-10)
+    85a: 12 LOW cavity (factory 16 TAN-12)
+    86a: 12 LOW cavity (factory 16 TAN-12)
+    85b: 11 HIGH cavity (factory 16 LT GRN-11A)
+    86b: 11 HIGH cavity (factory 16 LT GRN-11A)
+    '121': 11 HIGH cavity (factory 16 LT GRN-11A)
+  mate: GM connector 8900855 (floor dimmer)
+  open:
+  - 'GM 8900855 terminal part: not named in the booklet (the D-609-05 joins bring each group down to one lead)'
+  sources:
+  - 'ST-352 1978 C/K wiring booklet fold-out A-1 ''Cab, Engine and Chassis Wiring'' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the
+    ''77 K5): DIMR SW connector 8900855 with 16 LT GRN-11A, 16 TAN-12, 16 LT BLU-10'
+  - 1977 Light Truck Service Manual Section 8 (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.779-780 (light blue feed, tan and light green outputs)

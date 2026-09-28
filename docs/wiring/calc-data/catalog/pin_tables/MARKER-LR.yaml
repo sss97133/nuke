@@ -1,0 +1,18 @@
+MARKER-LR:
+  family: open
+  pins:
+    '77': feed lead (circuit 9 brown)
+    MK_LR_GND: ground lead (circuit 150 black)
+  mate: GM socket 6294015 with leads (1978 booklet p.14); replacement socket part OPEN
+  note: 'maker''s document: left rear side marker, 168 bulb in GM socket 6294015 (feed + ground leads)'
+  open:
+  - 'family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket''s leads;
+    that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)'
+  - 'registry wire #77/#78 terminal says ''blade_female_0.187'' (April concept); the 1978 drawing shows a harness socket with leads, not a blade'
+  sources:
+  - '1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.14 (sheet A-2, ''Suburban & Blazer'' rear lighting
+    panel): side marker socket 6294015 carries 18 BRN-9B and 18 B-150C'
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional
+    1157, marker 168, back-up 1156, license 67, underhood 93)'
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.786-787: lamp sockets belong to the wiring harness
+    (''twist wiring harness socket 90° counterclockwise and remove harness and bulb''; ''rotate wiring harness sockets counterclockwise and remove housing'')'

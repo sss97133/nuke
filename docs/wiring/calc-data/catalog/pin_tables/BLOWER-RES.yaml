@@ -1,0 +1,17 @@
+BLOWER-RES:
+  family: open
+  pins:
+    BLOWER_LO: '51 (resistor BAT terminal, low: BATT-R1-R2-R3)'
+    BLOWER_MED: '63 (M1: M1-R2-R3-blower)'
+    BLOWER_M2: '72 (M2: M2-R3-blower)'
+    BLOWER_MOT: '101 (BLO output; factory: to the blower relay)'
+  note: 'maker''s document: factory A/C blower resistor on the evaporator case: FOUR terminals (BAT / M1 / M2 / BLO), 1978 C60 plug cavities 51 / 63 / 72 / 101'
+  open:
+  - registry device text says '3 prongs'; the 1978 C60 resistor plug has 4 cavities (51, 72, 63, 101) and the heater-only resistor 2965019 differs — confirm the resistor
+    on the truck
+  - 'plug body part for the 4-way resistor connector: not legible on the drawing'
+  sources:
+  - '1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) ''Air Conditioning RPO C-60'': resistor
+    plug 51 / 72 / 63 / 101, resistor table AUTO LOW BATT-R1-R2-R3, MED1 M1-R2-R3-BLOWER, MED2 M2-R3-BLOWER'
+  - '1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.8-9 circuit table: 51 yellow blower resistor feed low,
+    63 tan blower sw medium 1, 72 light blue blower sw medium 2, 101 dark blue resistor output to blower relay'

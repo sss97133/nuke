@@ -1,0 +1,13 @@
+rear_window_motor:
+  family: open
+  pins:
+    TG_MOT_A: 1 (UP, circuit 183 light blue)
+    TG_MOT_B: 2 (DOWN, circuit 184 tan/white)
+  mate: GM 6288909 2-way connector (1978 booklet p.16); new-part equivalent OPEN
+  note: 'maker''s document: factory tailgate window motor, 1978 GM connector 6288909 (2-way): UP-1 / DN-2, grounds through the motor case'
+  open:
+  - 'motor ground: the drawing shows the motor grounded through its case, no ground lead — confirm the tailgate ground path at the bench (1978 booklet p.16)'
+  - 'terminal family for the 6288909 body: not in families.yaml'
+  sources:
+  - '1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) ''Power Rear Window (RPO A33)'': tailgate
+    window motor connector 6288909, cavity ''UP-1'' = 12 LBL-183E, ''DN-2'' = 12 T/W-184C'

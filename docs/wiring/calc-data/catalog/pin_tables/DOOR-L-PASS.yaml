@@ -1,0 +1,10 @@
+DOOR-L-PASS:
+  family: dt
+  pins: {'38': '1', LOCK_GND_L: '2', LOCK_BUS_A: '3', LOCK_BUS_B: '4', 26a: '5', 26b: '6'}
+  empty: 2
+  note: 'DESIGN CHOICE, not a maker fact: Deutsch moulds cavities 1-8; assignment order lock feed, lock ground, lock bus A, lock bus B, speaker +, speaker -; cavities 7 and 8 plugged (0413-204-2005)'
+  kit: {}
+  mate: DT06-08SA + W8S (door side, sockets) to DT04-08PA + W8P (body side, pins)
+  sources:
+  - customconnectorkits DT04-08PA page (accepts size 16 pins; wedge W8P; mates DT06-08SA), read 2026-09-28
+  - cavity numbering 1-8 moulded on DT 8-way housings (maker convention); assignment order chosen 2026-09-28

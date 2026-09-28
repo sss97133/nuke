@@ -1,0 +1,11 @@
+HORN-SW:
+  family: gm_blade
+  pins:
+    HORN_SW: 28 HORN (column connector 12004147; factory 20 BLK-28)
+  kit: {}
+  mate: column connector 12004147 (shared with TURN-SW)
+  open:
+  - 'column connector terminal part and range vs 22 AWG: not named in the booklet'
+  sources:
+  - 'ST-352 1978 C/K wiring booklet fold-out A-1 ''Cab, Engine and Chassis Wiring'' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the
+    ''77 K5): DIR SIG SW column connector, cavity 28 HORN, button to ground'

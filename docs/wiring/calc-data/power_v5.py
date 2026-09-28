@@ -245,7 +245,7 @@ RESOLVE = [                                             # (regex over an end's w
     (r"starter B\+", "START:B+"), (r"STARTER-S", "START:S"), (r"alternator B\+", "ALT:B+"), (r"ALTERNATOR-SENSE", "ALT:L"),
     (r"PDM30:STUD", "PDM30:STUD"), (r"PDM15 battery stud", "PDM15:STUD"), (r"PDM15:OUT(\d+)", "PDM15:OUT"),
     (r"PDM30[: ]B6\b|PDM30:OUT24", "PDM30:OUT24"), (r"[Dd]istribution stud", "DIST:"), (r"^IBOOSTER", "IBOOST:1"),
-    (r"PCS harness B\+", "PCS:B+"), (r"AMP-STEP-CTRL", "STEP:+"), (r"^AMP ", "AMP:+"), (r"^ISOLATOR \((\w+)", "ISO:ctl"), (r"^ISO-SWITCH", "SW:"),
+    (r"PCS harness B\+", "PCS:B+"), (r"AMP-STEP-CTRL", "STEP:+"), (r"^AMP ", "AMP:+"), (r"^ISOLATOR \((\w+)", "ISO:ctl"), (r"^ISO-SWITCH", "SW:"), (r"^SPL-ISO-YEL", "SW:"),
     (r"^M130:(\w+)", "M130:"), (r"GND-BANK-ENG", "STAR:"), (r"COIL_GND_STAR_ECM_HEAD|COIL-GROUND-RINGS|head ring|ring on the head", "HEAD:"),
 ]
 

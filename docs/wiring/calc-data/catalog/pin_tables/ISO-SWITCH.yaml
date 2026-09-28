@@ -1,0 +1,8 @@
+ISO-SWITCH:
+  family: contura
+  kit: {}
+  mate: Blue Sea 2145 Contura switch terminals (type not on file)
+  open:
+  - the 0.250 in tab width comes from the contura family; it is not confirmed from a Blue Sea 2145 sheet (bluesea.com returned HTTP 403 on 2026-09-28)
+  sources:
+  - Blue Sea 7700 instructions p.2 control-switch steps 1-5 (reference_documents/component_drawings/BlueSea_7700_ML-RBS_Instructions_990180170-006.pdf)

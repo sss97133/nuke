@@ -1,0 +1,12 @@
+WIDEBAND:
+  family: open
+  mate: 'DTM 4-pin female, MoTeC #68054 (mates the LTCD''s DTM 4-pin male #68055)'
+  note: 'LTCD manual p.31: 110 mA typical plus the heater current, heater 0.5–1 A typical (up to 2 A on startup); p.37: ''Each sensor can draw over 3 Amps when cold''
+    — two sensors > 6.1 A cold, past 22 AWG''s 6 A (80 °C) / 5 A (100 °C) in the PDM manual p.48 table · pins 1 Battery - (black), 2 CAN Lo (green), 3 CAN Hi (white),
+    4 Battery + (red) — LTC user manual p.32'
+  open:
+  - 'no DTM family in families.yaml: a ''dtm'' family (DTM size-20 socket contact + DTM crimper, 16-20 AWG) closes the family; until then it stays open'
+  - '#68054 kit contents (housing, wedge, contacts): not in the LTC manual'
+  sources:
+  - 'MoTeC LTC user manual V1.7 p.32 Appendix B (reference_documents/component_drawings/motec_ltcd_user_manual.pdf): ''Power/CAN Connector DTM 4pin (M) (#68055) Mating
+    connector: DTM 4pin (F) (#68054)'''

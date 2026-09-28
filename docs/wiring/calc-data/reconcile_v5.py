@@ -260,7 +260,7 @@ IMPLIED = [
     ("UTC_CANL", "PDM config port CAN-LO (XLR pin 4)", "CAN-BUS (trunk #62 splice)", "PORT-UTC (XLR pin 4)", 22, "M22759/32 twisted", "MoTeC PDM manual p.48"),
     ("UTC_0V", "PDM config port 0V (XLR pin 1)", "PDM30:B22", "PORT-UTC (XLR pin 1)", 22, "M22759/32",
      "MoTeC PDM manual p.48 (UTC 0V) + p.47 (PDM30 B_22 = 0V)"),
-    ("ISO_KILL", "Isolator state (yellow, grounded while closed) to the M130 shutdown input", "ISO-SWITCH (pin 7 splice, yellow)",
+    ("ISO_KILL", "Isolator state (yellow, grounded while closed) to the M130 shutdown input", "SPL-ISO-YEL (stub splice on the switch's yellow wire, tab 7)",
      "M130:B14 (UDIG7)", 22, "M22759/32",
      "MoTeC PDM manual p.7: 'the isolator switch should have a secondary switch that is connected to a shutdown input on the "
      "ECU'; Blue Sea 7700 yellow = LED output, the LED's ground while the switch is closed (instructions p.2); M1 hardware spec "
@@ -695,7 +695,20 @@ TWIN = ("twin: output/lego-book/power_spine_twin_lengths.txt (paths in the digit
         "corner); not taped on the truck")
 DC2 = ("2 AWG: cranking loop 7.6 ft drops 0.28 V at 200 A < 0.42 V ceiling, 1/0 question closed (state 0h); "
        "Dave's DC primary runs 2 AWG (state 0i)")
+BLADE20 = ("terminal sets the floor: the factory switch blades are Packard 56-series terminals, made 20–18, 16–14, 12 and 10 AWG "
+           "(CE Auto Electric Supply 'Packard 56 Series Female Terminals' page, read 2026-09-28) — no 22 AWG size; the signal "
+           "is a switch-to-0V input at milliamps, so 20 AWG M22759/32 is the smallest wire that crimps. The PDM/M130 end takes "
+           "it: Superseal 1.0 contacts 24–16 AWG (state); 8 A outputs 24#–20# (PDM manual p.9)")
 DECISIONS = {
+    # --- 2026-09-28 night: pin-table pass (check_plug_ends R1 range vs the gm_blade family) ---
+    "53": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "121": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "33": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "46": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "45": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "42": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "43": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "67": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
     "60": {"retired": "superseded by #ECU_PWR on M130 A26 BAT_POS (receipts/2026-06-10_cut-list-v4.1-ecu-lifelines.md)"},
     "61": {"retired": "superseded pending retirement (receipts/2026-06-10_cut-list-v4.1-ecu-lifelines.md)"},
     "25": {"retired": "water pump is mechanical on the Holley mid-mount (K5_WIRING_STATE.md 0f(a))"},
@@ -1176,6 +1189,16 @@ def apply_decisions(rows):
 
 # ---- decisions on implied rows (same shape as DECISIONS; the old value goes to `conflicts`)
 IMPLIED_DECISIONS = {
+    "BRK_SW_0V": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "IGN_SW_0V": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "IGN_RUN_B": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "IGN_START": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "HL_SW_0V": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "HL_SW_HEAD": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "HL_SW_PARK": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "TURN_SW_R": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "TURN_SW_0V": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
+    "HORN_SW": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
     "LTCD_GND": {"awg": 18, "why": "the LTCD return carries the feed's current: sized with #64 (" + LTCD_WHY + ")"},
     "PDM15_BPOS": {"awg": 4, "frm": "Distribution stud (MEGA 100 A)",
                    "why": ("fuse sized from the PDM15's 80 A total continuous output (MoTeC PDM manual p.35) x 1.25 = 100 A, "

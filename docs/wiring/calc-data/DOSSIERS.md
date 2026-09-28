@@ -448,34 +448,35 @@ Kit: WPAPP30 ×1 (on the cart change) [1]
 
 | Wire | Spec | ECU / PDM end | Device end |
 |---|---|---|---|
-| #APS_T1_5V APS Track 1 5V Reference · v4.2 L396 | 22 AWG M22759/16 orange [8] | M130 A02 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [9] | G · D-609-03 [10] |
-| #APS_T1_SIG APS Track 1 Signal · v4.2 L395 | 22 AWG M22759/16 green/violet [8] | M130 B21 · SSC-N · AFM8 + K1S sel 6 · splice D-609-04 [9] | F · D-609-03 [10] |
-| #APS_T1_GND APS Track 1 Ground · v4.2 L397 | 22 AWG M22759/16 brown [11] | M130 B16 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [9] | E · D-609-03 [10] |
-| #APS_T2_GND APS Track 2 Ground · v4.2 L400 | 22 AWG M22759/16 white/blue [12] | M130 B15 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [9] | D · D-609-03 [10] |
-| #APS_T2_SIG APS Track 2 Signal · v4.2 L398 | 22 AWG M22759/16 green/gray [8] | M130 B22 · SSC-N · AFM8 + K1S sel 6 [13] | C · D-609-03 [10] |
-| #APS_T2_5V APS Track 2 5V Reference · v4.2 L399 | 22 AWG M22759/16 orange/black [8] | M130 A09 · SSC-N · AFM8 + K1S sel 6 [13] | B · D-609-03 [10] |
+| #APS_T1_5V APS Track 1 5V Reference · v4.2 L396 | 22 AWG M22759/16 orange [9] | M130 A02 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [10] | G · D-609-03 [11] |
+| #APS_T1_SIG APS Track 1 Signal · v4.2 L395 | 22 AWG M22759/16 green/violet [9] | M130 B21 · SSC-N · AFM8 + K1S sel 6 · splice D-609-04 [10] | F · D-609-03 [11] |
+| #APS_T1_GND APS Track 1 Ground · v4.2 L397 | 22 AWG M22759/16 brown [12] | M130 B16 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [10] | E · D-609-03 [11] |
+| #APS_T2_GND APS Track 2 Ground · v4.2 L400 | 22 AWG M22759/16 white/blue [13] | M130 B15 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [10] | D · D-609-03 [11] |
+| #APS_T2_SIG APS Track 2 Signal · v4.2 L398 | 22 AWG M22759/16 green/gray [9] | M130 B22 · SSC-N · AFM8 + K1S sel 6 [14] | C · D-609-03 [11] |
+| #APS_T2_5V APS Track 2 5V Reference · v4.2 L399 | 22 AWG M22759/16 orange/black [9] | M130 A09 · SSC-N · AFM8 + K1S sel 6 [14] | B · D-609-03 [11] |
 
-**Tools:** Ideal Stripmaster 45-1987 (Tefzel blades) + wire stop L-5270 — to buy [2] · Ideal Stripmaster 45-1611 (Tefzel blades) + wire stop L-5270 — to buy [3] · MiniSeal splice crimper (ProWire 3137CT = Raychem AD-1377) (3137CT) — to buy [4] · heat gun with reflector attachments — confirm you own it [5]
+**Tools:** pull gauge / spring scale, ≥ 50 lbf — confirm you own it [2] · Ideal Stripmaster 45-1987 (Tefzel blades) + wire stop L-5270 — to buy [3] · Ideal Stripmaster 45-1611 (Tefzel blades) + wire stop L-5270 — to buy [4] · MiniSeal splice crimper (ProWire 3137CT = Raychem AD-1377) (3137CT) — to buy [5] · heat gun with reflector attachments — confirm you own it [6]
 
-**Checks:** SSC-N strip length: measure the barrel on the first contact (bench) · device-end strip length: measure the terminal barrel on the first plug (bench) · pull test 22 AWG ≥ 8 lbf [6] · cut length, twist, sleeve grouping: formboard [7]
+**Checks:** SSC-N strip length: measure the barrel on the first contact (bench) · device-end strip length: measure the terminal barrel on the first plug (bench) · pull test 22 AWG ≥ 8 lbf [7] · cut length, twist, sleeve grouping: formboard [8]
 
 **Open:** before crimping, meter the pedal: G–E and B–D read a fixed resistance, F–E and C–D change as the pedal moves (the pin map is from a web source, not a GM manual) · cavity letters: read the WPAPP30 plug — the plug moulds 9 cavities, 6 wired (B–G); no saved source names the 3 unused ones (the third sensor's), and whether the pigtail carries 9 leads or 6 is not on the ICT page (review C24)
 
 **Sources:**
 
 1. https://www.ictbillet.com/products/ls-gen-3-truck-dbw-pedal-position-sensor-pigtail (snapshot 2026-09-27: $26 sale, $30 regular)
-2. prowire p-2025 page
-3. prowire p-2026 page
-4. prowire 3137ct page + Nuke catalog_parts name "BUTT SPLICE CRIMP TOOL (RAYCHEM AD 1377)"
-5. tools.yaml
-6. chapters/18 §7 (IPC/WHMA-A-620 §19.1)
-7. owner 2026-09-26; chapters/18 §6–8
-8. decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm
-9. ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5; ProWire 3137CT (MiniSeal cavities)
-10. ProWire 3137CT page: 'three cavities: 26-20 AWG (Red), 20-16 AWG (Blue) and 16-12 AWG (Yellow)' (snapshot 2026-09-26); eBay listing for the bought pedal: '72-98 C10 Square Body OBS LS Swap DBW', now sold as APS130 — 'Standard Ignition 9 Terminal Accelerator Pedal Position Sensor APS130' (O'Reilly title, web search 2026-09-27)
-11. decision: frm M130:B15 -> M130:B16 — pedal track 1 pairs with A2 5 V on B16, like Dave's analog sensors; track 2 keeps the second supply A9; decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm
-12. decision: color brown/black -> white/blue — pedal track 2 needs a separate 0 V from track 1 (GM dual-track APP); B15 is the other sensor 0 V; decision: frm M130:B16 -> M130:B15 — pedal track 2 needs a separate 0 V from track 1 (GM dual-track APP); B15 is the other sensor 0 V; decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm
-13. ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5
+2. chapters/18-construction-and-segmentation.md §7 (IPC/WHMA-A-620 §19.1 values)
+3. prowire p-2025 page
+4. prowire p-2026 page
+5. prowire 3137ct page + Nuke catalog_parts name "BUTT SPLICE CRIMP TOOL (RAYCHEM AD 1377)"
+6. tools.yaml
+7. chapters/18 §7 (IPC/WHMA-A-620 §19.1)
+8. owner 2026-09-26; chapters/18 §6–8
+9. decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm
+10. ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5; ProWire 3137CT (MiniSeal cavities)
+11. ProWire 3137CT page: 'three cavities: 26-20 AWG (Red), 20-16 AWG (Blue) and 16-12 AWG (Yellow)' (snapshot 2026-09-26); eBay listing for the bought pedal: '72-98 C10 Square Body OBS LS Swap DBW', now sold as APS130 — 'Standard Ignition 9 Terminal Accelerator Pedal Position Sensor APS130' (O'Reilly title, web search 2026-09-27)
+12. decision: frm M130:B15 -> M130:B16 — pedal track 1 pairs with A2 5 V on B16, like Dave's analog sensors; track 2 keeps the second supply A9; decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm
+13. decision: color brown/black -> white/blue — pedal track 2 needs a separate 0 V from track 1 (GM dual-track APP); B15 is the other sensor 0 V; decision: frm M130:B16 -> M130:B15 — pedal track 2 needs a separate 0 V from track 1 (GM dual-track APP); B15 is the other sensor 0 V; decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm
+14. ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5
 
 ## MAP — MAP sensor — GM Gen IV LS 1-bar (the sensor the LS 'crank/MAP' plug is keyed for) · 2 items open
 

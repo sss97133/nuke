@@ -1,0 +1,9 @@
+FUEL-PUMP:
+  family: open
+  note: '14 AWG feed from the engine PDM15 OUT10 (8 A), commanded over CAN by the M130; 14 AWG ground returns in the loom beside it to the ground star (owner 2026-09-27:
+    grounds in the loom). The hanger carries 4 wires: pump +, pump ground, level sender, sender ground.'
+  open:
+  - 'hanger-top plug and its cavities: not on Quantum''s QFS-H882 page (it says only ''without splicing electrical connectors inside the tank''; a buyer Q&A asks
+    for a ''weather pack connector'' part number and Quantum does not answer it). Read the hanger at the bench'
+  sources:
+  - reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md

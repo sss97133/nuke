@@ -1,0 +1,13 @@
+SPK-RL:
+  family: kit_terminal
+  pins:
+    28a: + (large tab, 5.2 mm female crimp connector)
+    28b: '- (small tab, 2.8 mm female crimp connector)'
+  mate: the two 5.2 mm + two 2.8 mm female crimp connectors supplied in the C2-650X box
+  note: 'maker''s document: left rear speaker, JL Audio C2-650X: + on the large (5.2 mm) tab, - on the small (2.8 mm) tab · family kit_terminal = the terminals come
+    in the maker''s box (JL), not a ProWire kit'
+  open:
+  - 'crimp tool and wire range for the JL-supplied 5.2/2.8 mm connectors: not in the owner''s manual (16 AWG wire) — read the connectors at the bench'
+  sources:
+  - 'reference_documents/web_snapshots/pdf.crutchfieldonline.com__136C2650X.PDF.md (JL C2-650x owner''s manual: supplied ''Two 5.2 mm female crimpable connectors
+    / Two 2.8 mm female crimpable connectors''; ''The large connector is for the positive terminal and the small connector is for the negative terminal'')'
