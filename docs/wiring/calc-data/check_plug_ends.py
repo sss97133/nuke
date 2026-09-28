@@ -286,7 +286,7 @@ def run_wires():
     for t in r["terminations"]:
         ends[str(t["wire"])].append(t)
     # side of the firewall for a named point
-    ep_side = {c: {"cabin": CAB, "engine": ENG, "firewall": None}.get(e.get("where"), OTHER) for c, e in eps.items()}
+    ep_side = {c: {"cabin": CAB, "engine": ENG, "firewall": None, "unknown": UNK}.get(e.get("where"), OTHER) for c, e in eps.items()}
     zone_side = {"engine_bay": ENG, "dash": CAB, "firewall": None, "rear": OTHER, "doors": OTHER, "underbody": OTHER}
     april_side = {"engine-harness": ENG, "lighting-front": ENG, "dash-cabin": CAB}
     section_side = {"engine": ENG, "power_spine": ENG, "lighting_front": ENG, "dash_cabin": CAB,
@@ -466,7 +466,8 @@ def run_wires():
             rec = code_of(to.get("device"))
             if far and rec and rec not in {t["endpoint"] for t in far}:
                 res["R14 agree"] = ("FAIL", f"record says {to.get('device')} ({rec}); write-up ends at {', '.join(t['endpoint'] for t in far)}")
-            elif far and TODO.search(str(to.get("pin") or "")) and far[0].get("cavity"):
+            elif far and TODO.search(str(to.get("pin") or "")) and far[0].get("cavity") and not TODO.search(str(far[0].get("cavity"))):
+                # (a record and a plug that both say the pin is unknown agree; R8 already stamps it OPEN — 2026-09-28)
                 res["R14 agree"] = ("FAIL", f"record pin '{to.get('pin')}'; write-up has cavity {far[0].get('cavity')} at {far[0]['endpoint']}")
             elif not far and code_of(to.get("device")) in eps and not str(to.get("device")).startswith(("M130",)):
                 res["R14 agree"] = ("OPEN", f"record says {to.get('device')}; its write-up doesn't list this wire")
@@ -515,7 +516,7 @@ def run_wires():
     # ---------------------------------------------------------------- system
     # the CAN bus, hop by hop: every node the design puts on it must be reached by a wire with both ends
     byid = {x["wire"]: x for x in out}
-    hops = [("M130", "PDM30", ["62"]), ("PDM30", "PDM15", ["CAN_FW_H", "CAN_FW_L"]), ("PDM15", "LTCD", ["CAN_LTCD_H", "CAN_LTCD_L"])]
+    hops = [("M130", "PDM30", ["CAN_HI", "CAN_LO"]), ("PDM30", "PDM15", ["CAN_FW_H", "CAN_FW_L"]), ("PDM15", "LTCD", ["CAN_LTCD_H", "CAN_LTCD_L"])]
     hop_txt, hop_ok = [], True
     for a_, b_, ids in hops:
         ok = all(i in byid and byid[i]["to"][0] and byid[i]["rules"].get("R8 ends", ("FAIL",))[0] != "FAIL" for i in ids)

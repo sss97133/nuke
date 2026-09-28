@@ -1,7 +1,10 @@
 AC-LP-SW:
   family: open
   open:
-  - 'switch not picked (registry names no part): its plug and terminals close this. For reference the 1978 C60 discharge-pressure cut-out switch is a 2-terminal plug
-    12004275 (1978 booklet p.16)'
+  - 'fitment to the ordered Bold accumulator''s switch port: not shown on the GM page — confirm the port thread on arrival'
+  - 'mating plug for the 2 male pins: not on the page'
   sources:
   - 1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) 'Air Conditioning RPO C-60' panel
+  - reference_documents/web_snapshots/parts.chevrolet.com__gm-genuine-parts-air-conditioning-clutch-cycling-switch-15035084.md
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2
+  device: GM 15035084 (ACDelco 15-5720) A/C clutch cycling switch, accumulator-mounted, 2 male pin terminals

@@ -6,7 +6,10 @@ OUTLET-12V:
   kit: {}
   mate: 'none: splice to the device''s own leads'
   open:
-  - '12 V outlet not picked: its lead colours and lead gauge come from its sheet once chosen (the splice colour is sized from our wire only)'
+  - 'terminal type: not on the page (read on arrival)'
   sources:
-  - 'no maker document: the device is not picked yet; the registry terminates it on the device''s own leads (''lamp lead'' / ''port lead'' / ''outlet lead'', k5_registry.json), so the harness wire meets
-    each lead in a MiniSeal splice sized by the gauge'
+  - 'no maker document: the device is not picked yet; the registry terminates it on the device''s own leads (''lamp lead'' / ''port lead'' / ''outlet lead'', k5_registry.json),
+    so the harness wire meets each lead in a MiniSeal splice sized by the gauge'
+  - reference_documents/web_snapshots/www.bluesea.com__Dash_Socket_12V_DC_with_Watertight_Cap.md
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2
+  device: Blue Sea 1011 12 V dash socket with watertight cap, 15 A max, IP45 with cap, 1-1/8 in hole

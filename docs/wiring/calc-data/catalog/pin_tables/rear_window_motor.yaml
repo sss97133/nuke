@@ -8,6 +8,7 @@ rear_window_motor:
     booklet draws GM factory blade connectors here (motor connector 6288909, 1978 booklet p.16); the Packard 56-series identity is the family''s (families.yaml),
     not printed on the drawing'
   open:
+  - 'the owner has no tailgate regulator or motor (lead 2026-09-28): this factory motor end is the base design; the Nu-Relics 17383-1 kit (TG-MOTOR-ACI + TG-RELAY) is the CANDIDATE that replaces it'
   - 'motor ground: the drawing shows the motor grounded through its case, no ground lead — confirm the tailgate ground path at the bench (1978 booklet p.16)'
   - 'terminal family for the 6288909 body: not in families.yaml'
   sources:

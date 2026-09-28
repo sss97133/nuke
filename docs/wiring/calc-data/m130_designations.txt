@@ -34,10 +34,10 @@ A33|OUT_HB5|Half Bridge Output 5
 A34|OUT_HB6|Half Bridge Output 6
 B01|UDIG1|Universal Digital Input 1
 B02|UDIG2|Universal Digital Input 2
-B03|AT1|Analogue Temperature Input 1                                 1k Pull up to SEN_5V_B
+B03|AT1|Analogue Temperature Input 1                                 1k Pull up to SEN_5V_A
 B04|AT2|Analogue Temperature Input 2                                 1k Pull up to SEN_5V_B
 B05|AT3|Analogue Temperature Input 3                                 1k Pull up to SEN_5V_A
-B06|AT4|Analogue Temperature Input 4                                 1k Pull up to SEN_5V_A
+B06|AT4|Analogue Temperature Input 4                                 1k Pull up to SEN_5V_B
 B07|KNOCK1|Knock Input 1
 B08|UDIG3|Universal Digital Input 3
 B09|UDIG4|Universal Digital Input 4
@@ -54,3 +54,7 @@ B19|SEN_6V3|Sensor 6.3V
 B20|AV6|Analogue Voltage Input 6
 B21|AV7|Analogue Voltage Input 7
 B22|AV8|Analogue Voltage Input 8
+B23|ETH_TX+|Ethernet Transmit+                                 Ethernet, green/white
+B24|ETH_TX-|Ethernet Transmit-                                 Ethernet, green
+B25|ETH_RX+|Ethernet Receive+                                 Ethernet, orange/white
+B26|ETH_RX-|Ethernet Receive-                                 Ethernet, orange

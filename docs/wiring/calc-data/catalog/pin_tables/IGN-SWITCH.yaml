@@ -6,12 +6,17 @@ IGN-SWITCH:
     IGN_START: SOL (connector 6294642; factory 12 PPL/WHT-5)
   kit: {}
   mate: GM connector 6294642 (ignition switch, BAT 1 / BAT 2 / IGN 1 / ACC / SOL side); 6294641 (BAT 3 / IGN 3 / GRD 1 / GRD 2) left unused
-  note: 'switch key on A-1: RUN = IGN 1 + BAT 1 connected; START = IGN 1 + BAT 1 + SOL connected; BAT 1 + 2 + 3 terminals common. BAT 2 is taken for IGN_SW_0V because the factory red wire sat there — any
-    BAT cavity is electrically the same (design choice)'
+  note: 'switch key on A-1: RUN = IGN 1 + BAT 1 connected; START = IGN 1 + BAT 1 + SOL connected; BAT 1 + 2 + 3 terminals common. BAT 2 is taken for IGN_SW_0V because the factory
+    red wire sat there — any BAT cavity is electrically the same (design choice)'
   open:
-  - '12 AWG factory terminals vs our 22 AWG wires: terminal part not named in the booklet; a 22 AWG wire likely needs doubling or a pigtail — bench'
-  - '1978 connector view used for the ''77 column: confirm on the truck'
+  - 'tilt or non-tilt: not verified — no column photo is cited in the research file or the 2026-05-17 receipts; read it off the column, then keep one part number'
   sources:
-  - 'ST-352 1978 C/K wiring booklet fold-out A-1 ''Cab, Engine and Chassis Wiring'' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the
-    ''77 K5): IGN SW connector views 6294642 / 6294641 and switch-position key'
-  - 1977 Light Truck Service Manual Section 8 (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.783 (ignition switch battery terminal vs output terminal test)
+  - 'ST-352 1978 C/K wiring booklet fold-out A-1 ''Cab, Engine and Chassis Wiring'' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png;
+    closest year on file to the ''77 K5): IGN SW connector views 6294642 / 6294641 and switch-position key'
+  - 1977 Light Truck Service Manual Section 8 (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.783 (ignition switch battery terminal vs output terminal
+    test)
+  - reference_documents/web_snapshots/www.oerparts.com__1990096.md
+  - reference_documents/web_snapshots/www.oerparts.com__1990084.md
+  - receipts/2026-05-17_ignition-switch-trq-swa77344-research.md (9 blade terminals)
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2
+  device: OER 1990096 (tilt column) or 1990084 (non-tilt) — 9-blade GM-pattern ignition switch for the 1977 column

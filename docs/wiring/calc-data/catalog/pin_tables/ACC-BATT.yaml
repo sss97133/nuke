@@ -1,15 +1,16 @@
 ACC-BATT:
   family: open
   pins:
-    '32': + post, via the MIDI 60 A holder (2 AWG lug on its M5 stud, part OPEN)
+    '32': '+ post, via the MIDI 60 A holder (210LTP, 2 AWG #10, on its M5 stud)'
     DCDC_OUT: + post
     ACC_NEG: '- post'
-  note: 'the isolator does not cut this battery: it feeds only the amplifier (#32, MIDI 60 A at the + post — the JL VX700/5i needs ''an external 60-amp ... fuse'',
-    Crutchfield snapshot) and is charged through the DC-DC charger, whose input is downstream of the isolator. #32 lands on the MIDI holder''s M5 stud: 410LTP (4
-    AWG, #10) · maker''s document: Optima YellowTop D34/78 (candidate; tray not set): dual SAE/GM terminals'
+  note: 'the isolator does not cut this battery: it feeds only the amplifier (#32, MIDI 60 A at the + post — the JL VX700/5i needs ''an external 60-amp ... fuse'', Crutchfield
+    snapshot) and is charged through the DC-DC charger, whose input is downstream of the isolator. #32 lands on the MIDI holder''s M5 stud: 210LTP (2 AWG, #10) · maker''s document:
+    Optima YellowTop D34/78 (candidate; tray not set): dual SAE/GM terminals'
   open:
-  - 'close path: lug per post, not ring_small — lug family; #32 went 4 → 2 AWG (DC primary receipt), so the 410LTP (4 AWG) on the MIDI stud needs its 2 AWG equivalent;
-    ACC_NEG 4 AWG and DCDC_OUT 6 AWG lugs OPEN (receipt: ''6 AWG 3/8 and M5 lugs are OPEN'')'
+  - 'close path: lug per post — lug family; #32''s MIDI-stud lug is 210LTP (web_snapshots/www.prowireusa.com__210LTP.md, ''2 AWG ... #10 STUD''); ACC_NEG 4 AWG and DCDC_OUT
+    6 AWG lugs at the battery posts OPEN (terminal choice below)'
   - 'terminal choice (SAE post vs GM side stud) and the MIDI holder mount: picked with the battery terminals'
   sources:
   - 'reference_documents/web_snapshots/batterysales.com__d34-78-8014-045-optima.md (''BCI Group Size: 34/78'', ''Terminals: Dual SAE/GM'')'
+  - web_snapshots/www.prowireusa.com__210LTP.md

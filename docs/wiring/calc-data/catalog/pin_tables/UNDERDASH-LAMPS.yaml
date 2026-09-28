@@ -8,5 +8,8 @@ UNDERDASH-LAMPS:
   open:
   - 'under-dash LED not picked: its lead colours and lead gauge come from its sheet once chosen (the splice colour is sized from our wire only)'
   sources:
-  - 'no maker document: the device is not picked yet; the registry terminates it on the device''s own leads (''lamp lead'' / ''port lead'' / ''outlet lead'', k5_registry.json), so the harness wire meets
-    each lead in a MiniSeal splice sized by the gauge'
+  - 'no maker document: the device is not picked yet; the registry terminates it on the device''s own leads (''lamp lead'' / ''port lead'' / ''outlet lead'', k5_registry.json),
+    so the harness wire meets each lead in a MiniSeal splice sized by the gauge'
+  - reference_documents/web_snapshots/www.lumiteclighting.com__mini-rail2-led-utility-light-2.md
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2
+  device: Lumitec Mini Rail2 101241 warm white LED, 360 mA at 12 V, 95 lm, 10-30 V, IP65 (leads)

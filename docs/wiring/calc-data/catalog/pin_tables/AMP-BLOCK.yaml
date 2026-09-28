@@ -1,0 +1,18 @@
+AMP-BLOCK:
+  device: two Blue Sea 2103 PowerPost Plus, 3/8-16 stud, 150 A, insulated base — one for + and one for -
+  family: lug
+  kit:
+    BLUESEA-2103: 2
+  lugs:
+    '32':
+    - 238LTP
+    AMP_GND:
+    - 238LTP
+    AMP_PWR_TAIL:
+    - DL438
+    AMP_GND_TAIL:
+    - DL438
+  note: 2 AWG in on 238LTP (2 AWG, 3/8 in), 4 AWG out on DL438 (4 AWG, 3/8 in); lug-on-stud, not set screws; 150 A >= the 60 A fuse
+  sources:
+  - reference_documents/web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2

@@ -157,7 +157,7 @@ def attach(reg):
     body_off = sorted(w for w in bulk if w in ENGINE_ONLY_OFF)
     overflow = [w for w, _ in sheets.OVERFLOW if w in wires and w not in retired and not wires[w].get("superseded")]
     # 2026-09-27 crossings: the CAN pair to the engine PDM15 and the isolator's ECU-shutdown wire take spare cavities
-    overflow += [w for w in ("CAN_FW_H", "CAN_FW_L", "DAK_CTS_RET", "DAK_OILP_5V", "DAK_OILP_GND")
+    overflow += [w for w in ("CAN_FW_H", "CAN_FW_L", "DAK_CTS_RET", "DAK_OILP_5V", "DAK_OILP_GND", "FAN_PWM")
                  if w in wires and w not in overflow]
     grommet = [w for w, _, _ in sheets.DIRECT_FEED if w in wires and w not in retired]
     for g in ("ECU_GND1", "ECU_GND2", "PDM_GND1", "PDM_GND2", "PDM_BPOS", "GND_RET_CAB"):
@@ -182,7 +182,7 @@ def attach(reg):
     bulk_spare = sorted(freed)
     # wires the engine PDM15 drives stay in the engine bay (2026-09-27): they no longer cross the firewall, so they give
     # their 61-pin cavities back and leave the power grommet
-    engine_local = {w for w in wires if str(wires[w].get("frm") or "").startswith("PDM15:")}
+    engine_local = {w for w in wires if str(wires[w].get("frm") or "").startswith(("PDM15:", "SPL-PDM15-"))}
     for w in [w for w in bulk if w in engine_local]:
         bulk_spare.append(bulk.pop(w))
     # spares = every cavity no CROSSING wire holds (the engine-only rule's 9 body circuits keep a stale entry in `bulk`)
@@ -322,8 +322,9 @@ def attach(reg):
         for code, q in (ep.get("kit") or {}).items():
             need[str(code)] += q
         for w, lug in (ep.get("lugs") or {}).items():
+            par = (wires.get(str(w)) or {}).get("parallel") or 1     # 2 x 2 AWG = two lugs per end
             for code in (lug if isinstance(lug, list) else [lug]):
-                need[code] += 1
+                need[code] += par
 
         # per-wire-end parts from the family
         fid = ep.get("family")
@@ -365,12 +366,14 @@ def attach(reg):
             pe_cfg = ep.get("per_end") or {"gt150": {"part": "12191818", "seal": "15366021"},
                                             "mp150": {"part": "12110847", "seal": "15324976"},
                                             "ev1": {"part": "68102"}}[fid]
+            by_wire = ep.get("per_end_wire") or {}          # per-wire contact where one plug mixes wire sizes
+            cfg = lambda w: by_wire.get(w) or pe_cfg
             for w in wl:
-                need[str(pe_cfg["part"])] += 1
-                if pe_cfg.get("seal"):
-                    need[str(pe_cfg["seal"])] += 1
-            label = " + ".join(str(x) for x in (pe_cfg["part"], pe_cfg.get("seal")) if x)
-            per_end = [{"wires": [w], "part": label, "cavity": cav_of.get(w)} for w in wl]
+                need[str(cfg(w)["part"])] += 1
+                if cfg(w).get("seal"):
+                    need[str(cfg(w)["seal"])] += 1
+            lab = lambda c: " + ".join(str(x) for x in (c["part"], c.get("seal")) if x)
+            per_end = [{"wires": [w], "part": lab(cfg(w)), "cavity": cav_of.get(w)} for w in wl]
         elif fid == "ring_small":
             # a named ground stud (G-*) takes one ring per wire, stacked; other ring endpoints keep their shared rings
             per_end = [{"wires": [w], "part": "RING-SMALL", "cavity": f"ring {i}" if eid.startswith(("G-", "GND-")) else "ring"}
@@ -471,7 +474,7 @@ def attach(reg):
             continue
         pad = PAD_ENGINE if re.search(r"ENGINE", w.get("section") or "", re.I) else PAD_BODY
         for k in ks:
-            feet[k] += L * pad
+            feet[k] += L * pad * (w.get("parallel") or 1)
 
     # ------------------------------------------------ carts
     cart = OrderedDict()     # code -> {vendor, qty, uom, ext}
@@ -601,10 +604,6 @@ def m130_pinout(reg, wires):
     for t in reg["terminations"]:
         if t["endpoint"] in ("M130-A", "M130-B") and t.get("cavity"):
             by_pin[t["cavity"]].append(t["wire"])
-    m = re.search(r"M130 (B\d+)/(B\d+)", (reg["endpoints"].get("CAN-BUS") or {}).get("device", ""))
-    if m:
-        for pin in m.groups():
-            by_pin[pin].append("62")
     rows = []
     for pin, code, name in ecu.get("M130", []):
         ws = [w for w in by_pin.get(pin, []) if w in wires]
@@ -1047,7 +1046,10 @@ SPECIAL_NAME = {"4a": "throttle motor −", "4b": "throttle motor +", "4c": "TPS
                 "APS_T2_GND": "pedal track 2 0 V", "COIL1_SGND": "coil 1 signal ground",
                 "INJ_PWR": "injector +12 V feed", "COIL_PWR": "coil +12 V feed", "DAK_OILP_GND": "Dakota oil sender 0 V",
                 "DAK_OILP_5V": "Dakota oil sender 5 V", "DAK_CTS_RET": "Dakota coolant sender return",
-                "LTCD_GND": "wideband 0 V", "VSS_PWR": "speed sender 5 V", "VSS_GND": "speed sender 0 V",
+                "LTCD_GND": "wideband 0 V", "CAN_HI": "CAN high (trunk)", "FAN_PWM": "fan speed PWM", "FAN_GND": "fan ground", "CAN_LO": "CAN low (trunk)",
+                "TGR_M_GND": "tailgate master switch ground", "TGR_UP": "tailgate master UP line", "TGR_DN": "tailgate master DOWN line",
+                "TGR_KEY_FEED": "tailgate key switch feed", "TGR_KEY_GND": "tailgate key switch ground", "TGR_CUT_IN": "tailgate cutout in (183C)",
+                "TGR_MOT_A": "tailgate motor pole A", "TGR_MOT_B": "tailgate motor pole B", "VSS_PWR": "speed sender 5 V", "VSS_GND": "speed sender 0 V",
                 "VSS_DAK": "speed sender signal (Dakota)"}
 
 

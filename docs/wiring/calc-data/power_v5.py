@@ -101,8 +101,8 @@ def plabel(w):
 
 def awg_word(w):
     """The gauge as printed: a kit's own lead says so; a missing gauge is OPEN, never 'None'."""
-    if w.get("awg"):
-        return (f"{w['parallel']}×" if w.get("parallel", 1) > 1 else "") + str(w["awg"])
+    if w.get("gauge") or w.get("awg"):
+        return manual_v5.gauge_word(w)             # the wire list's gauge field: one cable, one gauge on every page
     return "KIT LEAD" if "kit" in str(w.get("spec") or "").lower() else "AWG OPEN"
 
 
@@ -245,7 +245,7 @@ RESOLVE = [                                             # (regex over an end's w
     (r"starter B\+", "START:B+"), (r"STARTER-S", "START:S"), (r"alternator B\+", "ALT:B+"), (r"ALTERNATOR-SENSE", "ALT:L"),
     (r"PDM30:STUD", "PDM30:STUD"), (r"PDM15 battery stud", "PDM15:STUD"), (r"PDM15:OUT(\d+)", "PDM15:OUT"),
     (r"PDM30[: ]B6\b|PDM30:OUT24", "PDM30:OUT24"), (r"[Dd]istribution stud", "DIST:"), (r"^IBOOSTER", "IBOOST:1"),
-    (r"PCS harness B\+", "PCS:B+"), (r"AMP-STEP-CTRL", "STEP:+"), (r"^AMP ", "AMP:+"), (r"AMP-BLOCK", "AMP:+"), (r"^ISOLATOR \((\w+)", "ISO:ctl"), (r"^ISO-SWITCH", "SW:"), (r"^SPL-ISO-YEL", "SW:"),
+    (r"PCS harness B\+|^PCS-TCM \(12 V battery\)", "PCS:B+"), (r"AMP-STEP-CTRL", "STEP:+"), (r"^AMP ", "AMP:+"), (r"AMP-BLOCK", "AMP:+"), (r"^ISOLATOR \((\w+)", "ISO:ctl"), (r"^ISO-SWITCH", "SW:"), (r"^SPL-ISO-YEL", "SW:"),
     (r"^M130:(\w+)", "M130:"), (r"GND-BANK-ENG", "STAR:"), (r"COIL_GND_STAR_ECM_HEAD|COIL-GROUND-RINGS|head ring|ring on the head", "HEAD:"),
 ]
 
@@ -309,6 +309,13 @@ LAYOUT_A = {
 COLS_A = {"ODY": (50, 120), "ACC": (50, 120), "ISO": (290, 120), "AMP": (290, 120), "DIST": (520, 110),
           "START": (860, 120), "ALT": (860, 120), "PDM15": (860, 120), "IBOOST": (860, 120), "PCS": (860, 120),
           "PDM30": (860, 120), "DCDC": (860, 120), "STEP": (860, 120), "M130": (1066, 110), "STRIP": (640, 44), "SW": (860, 120)}
+
+
+def label_lines(s, x0, y, text, width, size=5.0):
+    """A row label wrapped onto lines centred on its run (never cut short)."""
+    lines = manual_v5.wrap_text(text, width, size)
+    for k, ln in enumerate(lines):
+        s.txt(x0, y + 1.8 + (k - (len(lines) - 1) / 2) * (size + 0.7), ln, size)
 
 
 def sheet_dc_primary(reg, wires, ends, eps_y, parts, number, next_sheet):
@@ -383,7 +390,7 @@ def sheet_dc_primary(reg, wires, ends, eps_y, parts, number, next_sheet):
             return f"ring · OPEN {notes.tag('small ring terminals carry no part number (stud size and gauge not set)')}", True
         if lug:
             if str(lug) == "DL214" and awg_num(w) != 2:
-                g = w.get("awg")
+                g = awg_word(w)
                 return f"DL214 · OPEN {notes.tag(f'{wid}: the DL214 in the stud list is a 2 AWG lug, the cable is {g} AWG; closes with a lug for that gauge on an M6 stud')}", True
             return str(lug), False
         code = NODE_EP.get(node)
@@ -550,6 +557,7 @@ def sheet_dc_primary(reg, wires, ends, eps_y, parts, number, next_sheet):
     notes_foot(s, notes.listed(), 698, 5)
     s.txt(SM, SH_ - SM + 10, f"{count['cables']} circuits · {count['fuses']} fuses · {count['grounds']} returns to the banks (drawn in full on sheet {next_sheet}) · "
           f"{len(notes.items)} OPEN notes · a label with no colour = colour not yet set · lengths are estimates until measured on the truck", 6)
+    s.footer = getattr(s, "footer", []) + [s.boxes[-1][4]]   # the sheet's own footer line
     return s, count, notes
 
 
@@ -645,7 +653,7 @@ def sheet_grounds(reg, wires, ends, eps_y, parts, number, prev_sheet):
             s.cur_owner = wid
             y = y0 + i * RP
             far = w["frm"] if bank not in end_text(w.get("frm")) else w["to"]
-            s.txt(x0, y + 1.8, diagram_v5.fit(w.get("label") or wid, 118, 5.0), 5.0)
+            label_lines(s, x0, y, w.get("label") or wid, 118)
             run(s, [(x0 + 122, y), (bx, y)], w)
             s.txt(x0 + 124, y - 1.8, plabel(w), 4.8)
             f_lug, t_lug = ps_lugs(eps_y, wid, w)
@@ -703,7 +711,7 @@ def sheet_grounds(reg, wires, ends, eps_y, parts, number, prev_sheet):
         w = wires[wid]
         s.cur_owner = wid
         y = y0 + i * rp
-        s.txt(x0, y + 1.8, diagram_v5.fit(kits_v5.dave_name(w) if re.match(r"COIL\d", wid) else (w.get("label") or wid), 112, 5.0), 5.0)
+        label_lines(s, x0, y, kits_v5.dave_name(w) if re.match(r"COIL\d", wid) else (w.get("label") or wid), 112)
         run(s, [(x0 + 116, y), (bx, y)], w)
         s.txt(x0 + 118, y - 1.8, plabel(w), 4.8)
         part, cav = term_part(ends, wid, "COIL-GROUND-RINGS")
@@ -739,6 +747,7 @@ def sheet_grounds(reg, wires, ends, eps_y, parts, number, prev_sheet):
     notes_foot(s, notes.listed(), 698, 3)
     s.txt(SM, SH_ - SM + 10, f"{count['returns']} returns drawn · power returns and sensor 0 V stay separate · the DC primary sheet "
           f"{prev_sheet} carries the battery negatives in context · lengths are estimates until measured on the truck", 6)
+    s.footer = getattr(s, "footer", []) + [s.boxes[-1][4]]   # the sheet's own footer line
     count["OPEN"] = len(notes.items)
     return s, count, notes
 
@@ -752,7 +761,7 @@ class CPage(manual_v5.Page):
             self.el[-1] = self.el[-1].replace("<text ", f'<text fill="{colour}" ', 1)
 
     def grid(self, x, y, widths, header, rows, size=6.0, lead=8.2):
-        """A GM table; a cell starting 'OPEN' prints orange. Cells are fitted, never wrapped: long facts go to notes."""
+        """A GM table; a cell starting 'OPEN' prints orange. Cells wrap onto more lines, never cut short."""
         total, top = sum(widths), y
         y += lead + 1
         cx = x
@@ -762,12 +771,15 @@ class CPage(manual_v5.Page):
         self.line(x, y + 1.4, x + total, y + 1.4, 0.7)
         y += 1.4
         for r in rows:
+            cells = [manual_v5.wrap_text(str(v), w_ - 4, size) for w_, v in zip(widths, r)]
             y += lead
             cx = x
-            for w_, v in zip(widths, r):
-                s = diagram_v5.fit(str(v), w_ - 4, size)
-                self.ctxt(cx + 2.2, y - 2.4, s, size, colour=ORANGE if s.startswith("OPEN") else "#000", italic=s.startswith("OPEN"))
+            for w_, v, lines in zip(widths, r, cells):
+                op = str(v).startswith("OPEN")
+                for k, ln in enumerate(lines):
+                    self.ctxt(cx + 2.2, y - 2.4 + k * (size + 1.3), ln, size, colour=ORANGE if op else "#000", italic=op)
                 cx += w_
+            y += (max(len(c) for c in cells) - 1) * (size + 1.3)
         y += 2.4
         self.rect(x, top, total, y - top, sw=0.9)
         cx = x
@@ -873,7 +885,7 @@ def pages_distribution(reg, wires, ends, eps_y, parts, first, notes):
             p.heading("Power Distribution" + (" (cont.)" if k else ""), 13)
             fw = wires.get(feed, {})
             f = fuse_of(fw) if fw else None
-            lead_in = (f"{title}: battery feed {fw.get('awg')} AWG from the distribution stud through a "
+            lead_in = (f"{title}: battery feed {awg_word(fw)} AWG from the distribution stud through a "
                        f"{(f[0] + ' ' + str(f[1]) + ' A') if f and f[1] else 'fuse of OPEN value'}; total output {total} continuous; "
                        f"both battery − pins to the ground star in 20 AWG. {used} of {len([1 for (b, _n) in out if b == box])} outputs carry a circuit. "
                        "Outputs are high-side, software-fused; paired 20 A pins take two 16 AWG pigtails joined at the load.")
@@ -948,7 +960,7 @@ def page_protection(reg, wires, ends, eps_y, parts, number, notes, page=None):
         why = {"63": "battery post to isolator stud A: the only unprotected cable; keep it shortest, sheathed and clamped",
                "ISO_OUT": "isolator stud B to the distribution stud: upstream of every fuse; sheathed and clamped",
                "6": "cranking-motor exemption: a fuse that survives cranking cannot protect it; the isolator kills it"}[wid]
-        unf.append((wid.upper(), w.get("label"), w.get("awg"), f_lug or "OPEN", t_lug or "OPEN", why))
+        unf.append((wid.upper(), w.get("label"), awg_word(w), f_lug or "OPEN", t_lug or "OPEN", why))
     p.y = p.grid(PM, p.y, [40, 110, 22, 44, 44, 256], ["Circuit", "Cable", "AWG", "Lug, from", "Lug, to", "Why no fuse"], unf, size=5.6, lead=8.2) + 12
     return p, len(rows), len(unf)
 
@@ -984,7 +996,7 @@ def page_cable_schedule(reg, wires, ends, eps_y, parts, number):
                 return f"OPEN {notes.tag('small rings carry no part number yet')}"
             if lug:
                 if str(lug) == "DL214" and awg_num(w) != 2:
-                    g = w.get("awg")
+                    g = awg_word(w)
                     return f"OPEN {notes.tag(f'{wid}: DL214 is a 2 AWG lug; the cable is {g} AWG; closes with a lug for that gauge on an M6 stud')}"
                 return str(lug)
             words = end_text(w.get(side))
@@ -1024,6 +1036,11 @@ def publish(page, stem, height):
     bad += [f"overprint: '{a}' over '{b}'" for a, b in diagram_v5.overlaps(page)]
     if hasattr(page, "runs") and hasattr(diagram_v5, "run_strikes"):
         bad += [f"text struck by run {r}: '{t}'" for t, r in diagram_v5.run_strikes(page)]
+    pw = diagram_v5.W if isinstance(page, diagram_v5.Sheet) else manual_v5.W
+    pm = diagram_v5.M if isinstance(page, diagram_v5.Sheet) else manual_v5.M
+    bad += manual_v5.layout_faults(page.boxes, pw, height, pm, footer=(manual_v5.REVISION, *getattr(page, "footer", [])))
+    bad += [f"text over a pin box: '{t_}'" for t_ in diagram_v5.mark_overprints(page)]
+    bad += getattr(page, "faults", [])
     if re.search(r"\$\d|\bcart\b|\bbuy\b|\bbought\b|\border(ed)?\b|lined up", text, re.I):
         bad.append("purchase language on the page")
     if bad:
@@ -1031,7 +1048,7 @@ def publish(page, stem, height):
     stem.with_suffix(".svg").write_text(page.svg())
     subprocess.run(["rsvg-convert", "-d", "150", "-p", "150", "-o", str(stem.with_suffix(".png")), str(stem.with_suffix(".svg"))], check=True)
     subprocess.run(["rsvg-convert", "-f", "pdf", "-o", str(stem.with_suffix(".pdf")), str(stem.with_suffix(".svg"))], check=True)
-    diagram_v5.add_links(stem.with_suffix(".pdf"), page.boxes, height)
+    diagram_v5.add_links(stem.with_suffix(".pdf"), manual_v5.link_parts(page.boxes), height)
     return str(stem.with_suffix(".pdf"))
 
 

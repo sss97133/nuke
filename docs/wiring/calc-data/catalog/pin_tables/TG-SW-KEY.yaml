@@ -5,6 +5,7 @@ TG-SW-KEY:
     TG_CUT_IN: CLOSE terminal (circuit 183, window up; to the tailgate-closed cutout)
     TG_BUS_DN: OPEN terminal (circuit 184, window down)
     TG_MOT_B: OPEN terminal (circuit 184, window down)
+  closed: 'FEED terminal (circuit 60) carries TG_KEY_FEED (+ the candidate TGR_FEED); drawn in parallel with the dash switch; the tailgate-closed cutout 2977647 is endpoint TG-CUTOUT (1978 booklet p.16) — 2026-09-28'
   mate: GM 8900713 3-way connector body (1978 booklet p.16); a new-part equivalent is OPEN
   splice_point: true
   note: 'maker''s document: factory tailgate window key switch, 1978 GM connector 8900713: three terminals OPEN (circuit 184) / FEED (circuit 60) / CLOSE (circuit
@@ -14,10 +15,6 @@ TG-SW-KEY:
     GM factory blade connectors here (key switch connector 8900713, 1978 booklet p.16); the Packard 56-series identity is the family''s (families.yaml), not printed
     on the drawing'
   open:
-  - 'FEED terminal (circuit 60) has no wire in the registry: the key switch cannot drive the motor without it (1978 booklet p.16) — registry fix, not a pin question'
-  - registry calls this switch 'in series between the dash switch and the motor'; the factory switch is in parallel (3 terminals, 1978 booklet p.16) — owner/registry
-    decision
-  - 1978 also has a normally-open 'tailgate closed' cutout switch (connector 2977647) in the UP line to the motor; the registry has no cutout switch
   - '1977-specific key switch drawing: not on file (1978 booklet used; same body)'
   sources:
   - '1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) ''Power Rear Window (RPO A33)'' panel:

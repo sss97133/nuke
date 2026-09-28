@@ -1,9 +1,23 @@
 FUEL-PUMP:
-  family: open
-  note: '14 AWG feed from the engine PDM15 OUT10 (8 A), commanded over CAN by the M130; 14 AWG ground returns in the loom beside it to the ground star (owner 2026-09-27:
-    grounds in the loom). The hanger carries 4 wires: pump +, pump ground, level sender, sender ground.'
+  family: dtp
+  note: 'pump ground returns in the loom to the ground star: the pump is ''externally grounded to the vehicle chassis'' (Dakota VHX manual p.11); the BKCN-GM''s four terminals
+    carry pump +, pump -, sender, sender ground'
   open:
-  - 'hanger-top plug and its cavities: not on Quantum''s QFS-H882 page (it says only ''without splicing electrical connectors inside the tank''; a buyer Q&A asks
-    for a ''weather pack connector'' part number and Quantum does not answer it). Read the hanger at the bench'
+  - 'BKCN-GM top-side mating plug part number: not on Quantum''s page — read it off the part'
+  - 'keyed 10 mm hole in the H882 lid: read at the bench; if absent, the QFS-BKCN-01 gland (3/4 in hole) is the fallback and the sender ground goes to a lid screw'
+  - 'pigtail from the bulkhead to the DTP/DT plugs: length set at the tank'
   sources:
   - reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md
+  - reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md
+  - reference_documents/web_snapshots/www.highflowfuel.com__quantum-fuel-cell-electrical-bulkhead-fitting-10ga-wire-fuel-pump-assembly-w-teflon-washers.md
+  - reference_documents/component_drawings/dakota_digital_vhx_manual.pdf p.11
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §1
+  device: 'Quantum QFS-H882 hanger with P367 pump (have), 5.1 A at 60 psi — tank top: Quantum QFS-BKCN-GM 4-terminal bulkhead (14 A per terminal), then a Deutsch DTP 2-way
+    above the lid for the pump pair'
+  kit:
+    QFS-BKCN-GM: 1
+    DTP06-2S: 1
+    DTP04-2P: 1
+  pins:
+    '66': 1 (pump +)
+    PUMP_GND: 2 (pump -)

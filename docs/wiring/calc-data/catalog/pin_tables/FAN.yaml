@@ -1,6 +1,23 @@
 FAN:
-  family: open
+  family: kit_terminal
   open:
-  - 'fan model unknown (Champion radiator, one fan): its plug closes this (state 0e(c)); registry wire #21 terminal says ''Weatherpack_2pin'' from the April concept
-    — not cited to a fan'
-  sources: []
+  - 'hot-soak ambient at the fan run — needs: hot-soak air temperature at the fan motor, thermocouple, engine at operating temp after shutdown (bench/first start). Above 90
+    C, the close path is 10 AWG (50 A free air, ProWire singles table) with the fan plug''s 12 ga terminal fed by a short 12 AWG tail'
+  - 'soft start / inrush: no SPAL or Kartek text on file says the brushless controller soft-starts (Kartek: ''Peak amperage ... only when the fan is spinning at full speed'');
+    the research file''s ''does not pull an inrush'' has no saved source'
+  - Kartek says the SBL-YAZ-PT10 harness is still needed for ECU/PWM control; the ProWire 30130628 kit carries the control terminals — confirm which mates the 30107090 plug
+  sources:
+  - reference_documents/component_drawings/SPAL_Brushless_Fan_Wiring_Diagram.pdf (30107090 row; 'FAN TO CHASSIS GROUND')
+  - reference_documents/web_snapshots/www.kartek.com__spal-30107090-plus-series-16-brushless-puller-fan-300w-2053-peak-cfm-drop-in-mount-sits-in-shroud.md
+  - reference_documents/web_snapshots/www.prowireusa.com__SPAL-BRUSHLESS-FAN-CONNECTOR-KIT-30130628.md
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2
+  - web_snapshots/www.prowireusa.com__Aerospace%20&%20Defense%20Singles%20Ampacity%20Rating.md
+  device: SPAL 30107090 16 in drop-in brushless puller fan, 2053 CFM, 17 x 17 in housing (matches the Champion 17 in core), 300 W — 'roughly 25 amp max'
+  kit:
+    '30130628': 1
+  pins:
+    '21': power + (12 ga terminal, ProWire kit 30130628)
+    FAN_GND: ground - (12 ga terminal, ProWire kit 30130628)
+    FAN_PWM: PWM control (white lead; 20-18 ga control terminal, ProWire kit 30130628)
+  note: 'power on OUT1+OUT6 (paralleled), speed on the M130 A34 low-side PWM (100 Hz), blue override and yellow unused · BUILD: route the fan feed apart from its ground and
+    outside the loom from the breakout to the fan (free-air rating, ProWire singles table)'

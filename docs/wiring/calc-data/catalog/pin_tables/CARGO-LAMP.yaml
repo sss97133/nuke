@@ -1,7 +1,12 @@
 CARGO-LAMP:
-  family: open
-  open:
-  - 'lamp not identified: 1977 manual p.838 lists ''Cargo lamp (C-K cab)'' 1142 and ''Cargo/dome lamp'' 211-2 (Utility). The picked lamp''s leads close this plug'
+  family: miniseal
+  open: []
   sources:
-  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional
-    1157, marker 168, back-up 1156, license 67, underhood 93)'
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional 1157,
+    marker 168, back-up 1156, license 67, underhood 93)'
+  - reference_documents/web_snapshots/www.truck-lite.com__80251c-1.md
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2
+  device: Truck-Lite 80251C 80 Series 10-diode LED dome, 2 A, hardwired stripped leads, die-cast aluminium
+  pins:
+    '74': lamp + lead (stripped end, splice)
+    CARGO_GND: lamp - lead (stripped end, splice)
