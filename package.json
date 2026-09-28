@@ -253,7 +253,11 @@
     "day:classify": "dotenvx run -- node scripts/daily-receipt/classify-unfiled-day.mjs",
     "ops:schema-census": "dotenvx run -- node scripts/schema-pressure-census.mjs",
     "ledger:facts": "node scripts/ledger/refresh-facts.mjs",
-    "market:live-bands": "dotenvx run -q -- node scripts/market/live-bands.mjs"
+    "market:live-bands": "dotenvx run -q -- node scripts/market/live-bands.mjs",
+    "bat:keep-fresh": "dotenvx run -- node scripts/bat-keep-fresh.mjs",
+    "bat:catalog": "node scripts/bat-keep-fresh.mjs --no-db --save-dir scripts/data/bat-catalog --max-pages 40 --caught-up 99 --delay-ms 1500 && node scripts/bat-keep-fresh.mjs --by-category --fresh --no-db --save-dir scripts/data/bat-catalog --delay-ms 1500",
+    "bat:lots": "deno run -A scripts/bat-lots-local.ts",
+    "bat:archive": "duckdb scripts/data/bat-archive.duckdb < scripts/bat-archive.sql"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.62",
