@@ -34,7 +34,7 @@
 | R1 range | 521 pass / 28 fail / 282 open | 549 pass / 0 fail / 282 open |
 | engine-run set | 174 wires, 168 every-rule pass, 0 fail | unchanged |
 | buildable harness readiness | 324 wires · L1 181 · L2 316 · L3 316 · L4 302 · L5 2 | unchanged |
-| book | 50 pages, 0 lint | **50 pages** (18 text + 26 sheets + 6 DC primary), 0 lint, 476 link annotations in `output/manual/K5_Harness_Manual.pdf` |
+| book | 50 pages, 0 lint | **51 476 pages** (19 text + 26 sheets + 6 DC primary), 0 lint,  link annotations in `output/manual/K5_Harness_Manual.pdf` |
 
 The 11 R13 "locked" device failures and 34 wires are the April concept rows already ruled out by locked decisions (they leave the map); unchanged.
 
