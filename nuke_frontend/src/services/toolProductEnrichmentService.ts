@@ -423,30 +423,6 @@ export class ToolProductEnrichmentService {
         return;
       }
       
-      // Save primary image
-      if (product.primaryImageUrl && catalog) {
-        // Use OpenAI to extract structured data if available
-        if (import.meta.env?.VITE_OPENAI_API_KEY && product.primaryImageUrl) {
-          try {
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                prompt: `Extract structured data from the image at ${product.primaryImageUrl}`,
-                max_tokens: 100
-              })
-            });
-            const data = await response.json();
-            console.log('OpenAI response:', data);
-          } catch (error) {
-            console.error('OpenAI error:', error);
-          }
-        }
-      }
-      
       // Save additional images
       if (product.additionalImages && catalog) {
         const imageInserts = product.additionalImages.map((url, index) => ({

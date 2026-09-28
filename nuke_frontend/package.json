@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "postbuild": "node scripts/check-client-secrets.mjs",
+    "check:secrets": "node scripts/check-client-secrets.mjs --src-only",
     "vercel-build": "vite build",
     "build-with-tsc": "tsc -b && vite build",
     "lint": "eslint .",
