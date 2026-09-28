@@ -71,6 +71,14 @@ const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
 const INCLUDE_UNLABELED = args.includes('--include-unlabeled');
 const sinceArg = (() => { const i = args.indexOf('--since'); return i >= 0 ? args[i + 1] : null; })();
+// Two-phase mode (2026-09-28): the runner reads the Photos library with the signed python.org osxphotos
+// itself, so dotenvx and node never touch Photos. macOS charges Photos access to the first unsigned
+// process in the chain; dotenvx is ad-hoc signed, so its Allow never sticks and it prompted every run.
+const argVal = (name) => { const a = args.find((x) => x.startsWith(`${name}=`)); return a ? a.slice(name.length + 1) : null; };
+const QUERY_JSON = argVal('--query-json');  // osxphotos query output written by the runner
+const PLAN_OUT = argVal('--plan-out');      // write the chosen uuids and stop (no Photos access)
+const PLAN_IN = argVal('--plan-in');        // upload the uuids of an earlier plan
+const EXPORT_DIR = argVal('--export-dir');  // files the runner exported, named <uuid>.<ext>
 
 // ─── On-device privacy gate ──────────────────────────────────────────────────
 // Per docs/architecture/IMAGE_OWNERSHIP_ONTOLOGY.md: a photo library contains
@@ -335,26 +343,35 @@ async function main() {
   }
   const state = readState();
   const since = sinceArg || state.last_sync || new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const runStartedAt = new Date().toISOString();
+  let runStartedAt = new Date().toISOString();
   log(`sync start — photos added since ${since}${DRY_RUN ? ' (DRY RUN)' : ''}`);
 
-  const photos = queryNewPhotos(since);
-  const candidates = photos.filter(p => !p.ismovie && !p.hidden);
+  const photos = QUERY_JSON ? JSON.parse(readFileSync(QUERY_JSON, 'utf8') || '[]') : queryNewPhotos(since);
   // Oldest-added first, so a capped batch is a contiguous prefix of the backlog and the
   // watermark can advance to the batch's last date_added (see the end of this function).
   const addedMs = p => { const t = Date.parse(p.date_added || p.date || ''); return Number.isFinite(t) ? t : Infinity; };
+  const landed = { ...(state.landed || {}) };
+  const tries = { ...(state.unexportable || {}) };
+  const GIVE_UP = 3;
+  let images, capped;
+  if (PLAN_IN) {
+    const plan = JSON.parse(readFileSync(PLAN_IN, 'utf8'));
+    const byUuid = new Map(photos.map((p) => [p.uuid, p]));
+    images = (plan.uuids || []).map((u) => byUuid.get(u)).filter(Boolean);
+    capped = !!plan.capped;
+    if (plan.run_started_at) runStartedAt = plan.run_started_at;
+    log(`upload phase: ${images.length} planned photo(s)`);
+  } else {
+  const candidates = photos.filter(p => !p.ismovie && !p.hidden);
   const vehicleish = candidates.filter(isVehicleish).sort((a, b) => addedMs(a) - addedMs(b));
   // Two small ledgers ride in the state file so a retry never re-exports what already landed
   // and one unexportable photo cannot hold the watermark hostage:
   //   landed:       uuid → date_added of photos already in Nuke but still ahead of the watermark
   //   unexportable: uuid → {attempts, added, filename, last}; after GIVE_UP attempts the photo is
   //                 written to ~/.nuke/unexported.jsonl (a recorded gap, never a silent skip)
-  const landed = { ...(state.landed || {}) };
-  const tries = { ...(state.unexportable || {}) };
-  const GIVE_UP = 3;
   const eligible = vehicleish.filter(p => !landed[p.uuid] && !((tries[p.uuid]?.attempts || 0) >= GIVE_UP));
-  const images = eligible.slice(0, MAX_PER_RUN);
-  const capped = eligible.length > images.length;
+  images = eligible.slice(0, MAX_PER_RUN);
+  capped = eligible.length > images.length;
   const alreadyLanded = vehicleish.length - eligible.length;
   if (alreadyLanded > 0) log(`${alreadyLanded} photo(s) ahead of the watermark are already in Nuke or given up; not re-exported`);
   if (capped) log(`batch capped at ${MAX_PER_RUN} of ${eligible.length} vehicle-ish photos; the rest follow in later runs`);
@@ -370,6 +387,7 @@ async function main() {
       }) + '\n');
     }
   }
+  }
 
   if (images.length === 0) {
     log('nothing new');
@@ -382,9 +400,17 @@ async function main() {
     images.forEach(p => log(`  would sync: ${p.original_filename} taken=${p.date} gps=${p.latitude != null}`));
     return;
   }
+  if (PLAN_OUT) {
+    writeFileSync(PLAN_OUT, JSON.stringify({ uuids: images.map((p) => p.uuid), capped, run_started_at: runStartedAt }));
+    writeFileSync(`${PLAN_OUT}.uuids`, images.map((p) => p.uuid).join('\n') + '\n');
+    log(`plan: ${images.length} photo(s) to export`);
+    return;
+  }
 
-  const destDir = join(tmpdir(), `nuke-photo-sync-${Date.now()}`);
-  const exported = exportPhotos(images.map(p => p.uuid), destDir);   // files named <uuid>.<ext>
+  const destDir = EXPORT_DIR || join(tmpdir(), `nuke-photo-sync-${Date.now()}`);
+  const exported = EXPORT_DIR                                          // files named <uuid>.<ext>
+    ? readdirSync(EXPORT_DIR).filter((f) => IMAGE_EXT.has(extname(f).toLowerCase()))
+    : exportPhotos(images.map(p => p.uuid), destDir);
   const metaByUuid = new Map(images.map(p => [String(p.uuid).toLowerCase(), p]));
 
   let ok = 0, dup = 0, failed = 0;
@@ -419,7 +445,7 @@ async function main() {
     }
   }
 
-  try { rmSync(destDir, { recursive: true, force: true }); } catch { /* ignore */ }
+  if (!EXPORT_DIR) { try { rmSync(destDir, { recursive: true, force: true }); } catch { /* ignore */ } }
 
   // Advance state ONLY past what succeeded: if anything failed, do not move
   // the watermark — next run retries. (Silent-failure law: the daemon must
