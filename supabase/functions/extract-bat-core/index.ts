@@ -2081,8 +2081,12 @@ Deno.serve(async (req) => {
             const k = keyFromRow(r);
             if (!k) continue;
             if (!byKey.has(k)) byKey.set(k, r);
+            // Only BaT link rows carry hashes made by the recipe below (sha256 of the text-decoded download). An
+            // owner's uploaded photo carries the app's byte hash, which that recipe never reproduces, so hashing
+            // every gallery photo against them matched nothing and spent the worker's CPU: on the owner's 1966
+            // Mustang (373 hashed photos) every read died "CPU Time exceeded" before its auction record (2026-09-28).
             const fh = String((r as any)?.file_hash || "").trim();
-            if (fh) existingFileHashes.add(fh);
+            if (fh && k.includes("bringatrailer.com")) existingFileHashes.add(fh);
           }
 
           const updates: any[] = [];
