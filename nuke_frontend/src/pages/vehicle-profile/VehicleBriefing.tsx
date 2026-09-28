@@ -65,6 +65,40 @@ function useEyeRead(vehicleId: string | undefined): EyeRead | null {
 }
 
 // ---------------------------------------------------------------------------
+// Typed price — vehicle_price_facts: one price with its kind (sold / bid / ask /
+// estimate) and date, so a high bid or a stale ask is never read as a sale.
+// ---------------------------------------------------------------------------
+
+interface PriceFacts {
+  price_kind: 'sold' | 'bid' | 'ask' | 'estimate' | null;
+  price_amount: number | null;
+  price_as_of: string | null;
+  price_live: boolean | null;
+}
+
+function useVehiclePrice(vehicleId: string | undefined): { price: PriceFacts | null; loaded: boolean } {
+  const [state, setState] = useState<{ id?: string; price: PriceFacts | null }>({ price: null });
+  useEffect(() => {
+    if (!vehicleId) return;
+    let alive = true;
+    supabase
+      .rpc('vehicle_price_facts', { p_vehicle_ids: [vehicleId] })
+      .then(({ data }) => {
+        if (!alive) return;
+        const row: any = Array.isArray(data) ? data[0] : null;
+        setState({
+          id: vehicleId,
+          price: row && row.price_kind && Number(row.price_amount) > 0
+            ? { ...row, price_amount: Number(row.price_amount) }
+            : null,
+        });
+      }, () => { if (alive) setState({ id: vehicleId, price: null }); });
+    return () => { alive = false; };
+  }, [vehicleId]);
+  return { price: state.price, loaded: state.id === vehicleId };
+}
+
+// ---------------------------------------------------------------------------
 // Design tokens — matches vehicle-profile.css system
 // ---------------------------------------------------------------------------
 
@@ -96,18 +130,28 @@ function generateHeadline(
   intel: VehicleIntel | null,
   observationCount: number,
   eyeRead: EyeRead | null = null,
+  priceFacts: PriceFacts | null = null,
 ): HeadlineResult | null {
   // Priority 0: the Eye's evidence-graded read. When it exists, THE value story
   // is the band vs the real price — never the undefended model estimate.
   if (eyeRead?.band) {
     const [lo, hi] = eyeRead.band;
     const fmt = (n: number) => '$' + Math.round(n / 100) / 10 + 'k';
-    const price = vehicle?.sale_price || vehicle?.sold_price || vehicle?.asking_price || vehicle?.price;
+    // a real price is a sale, a bid or a current ask, said as what it is; an estimate is not a price
+    const real = priceFacts && priceFacts.price_kind !== 'estimate' ? priceFacts : null;
+    const price = real?.price_amount;
     const cls = eyeRead.conditionClass ? ` · ${eyeRead.conditionClass}` : '';
-    if (price && price > 0) {
-      const pos = price < lo ? `${fmt(price)} is BELOW the band`
-        : price <= hi ? `${fmt(price)} is IN BAND`
-        : `${fmt(price)} is ${fmt(price - hi)} above what the evidence proves`;
+    if (real && price && price > 0) {
+      const on = real.price_as_of
+        ? ' (' + new Date(real.price_as_of).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) + ')'
+        : '';
+      const said = real.price_kind === 'sold' ? `sold ${fmt(price)}${on}`
+        : real.price_kind === 'ask' ? `asking ${fmt(price)}`
+        : real.price_live ? `current bid ${fmt(price)}`
+        : `high bid ${fmt(price)}${on}`;
+      const pos = price < lo ? `${said} is BELOW the band`
+        : price <= hi ? `${said} is IN BAND`
+        : `${said} is ${fmt(price - hi)} above what the evidence proves`;
       return {
         text: `Evidence read: ${fmt(lo)}–${fmt(hi)} as-is${cls} — ${pos}`,
         severity: price <= hi ? 'ok' : 'warning',
@@ -136,7 +180,8 @@ function generateHeadline(
   // Only compare when both values are in the same ballpark (within 5x of each other)
   // to avoid nonsense like "$310 sale price vs $27K estimate" where $310 is a BaT bid, not asking
   const estimate = vehicle?.nuke_estimate;
-  const asking = vehicle?.asking_price || vehicle?.price;
+  // only a current ask is "priced at"; a sold car's old asking_price is not
+  const asking = priceFacts?.price_kind === 'ask' ? priceFacts.price_amount : null;
   if (estimate && asking && estimate > 0 && asking > 0) {
     const ratio = Math.max(estimate, asking) / Math.min(estimate, asking);
     if (ratio < 5) {
@@ -275,10 +320,11 @@ const VehicleBriefing: React.FC = () => {
   const { vehicle, vehicleIntel, vehicleIntelLoading, observationCount } = useVehicleProfile();
   const [showComps, setShowComps] = useState(false);
   const eyeRead = useEyeRead(vehicle?.id);
+  const { price: priceFacts, loaded: priceLoaded } = useVehiclePrice(vehicle?.id);
 
-  if (!vehicle || vehicleIntelLoading) return null;
+  if (!vehicle || vehicleIntelLoading || !priceLoaded) return null;
 
-  const headline = generateHeadline(vehicle, vehicleIntel, observationCount, eyeRead);
+  const headline = generateHeadline(vehicle, vehicleIntel, observationCount, eyeRead, priceFacts);
   const estimate = vehicle.nuke_estimate;
   const scores = vehicleIntel?.scores;
   const comps = vehicleIntel?.recent_comps;
