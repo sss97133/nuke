@@ -92,22 +92,26 @@ function usePriceHistory(vehicleId: string, make: string, model: string, year: n
       const events: PriceEvent[] = [];
 
       // 1. This vehicle's sale events from vehicle_events
+      // A sale is a sold event with its own date: a live bid (current_price) is not a sale, and a row's
+      // created_at is when Nuke imported it, not when the car sold (2026-09-27).
       const { data: vehicleEvents } = await supabase
         .from('vehicle_events')
-        .select('id, final_price, current_price, sold_at, ended_at, created_at, source_platform')
+        .select('id, final_price, sold_at, ended_at, event_status, source_platform')
         .eq('vehicle_id', vehicleId)
-        .or('final_price.not.is.null,current_price.not.is.null')
-        .order('created_at', { ascending: true })
+        .not('final_price', 'is', null)
+        .order('ended_at', { ascending: true, nullsFirst: false })
         .limit(50);
 
       if (vehicleEvents) {
         for (const ev of vehicleEvents) {
-          const price = ev.final_price ?? ev.current_price;
-          if (!price || price <= 0) continue;
+          const price = ev.final_price;
+          const when = ev.sold_at || ev.ended_at;
+          if (!price || price <= 0 || !when) continue;
+          if (ev.event_status && ev.event_status !== 'sold' && !ev.sold_at) continue;
           events.push({
             id: ev.id,
             sale_price: price,
-            event_date: ev.sold_at || ev.ended_at || ev.created_at,
+            event_date: when,
             source_platform: ev.source_platform,
             year,
             make,
@@ -117,37 +121,31 @@ function usePriceHistory(vehicleId: string, make: string, model: string, year: n
         }
       }
 
-      // 2. Cohort comparable sales (same make + model, +/- 3 years)
-      const yearMin = year - 3;
-      const yearMax = year + 3;
-      const { data: cohortEvents } = await supabase
-        .from('vehicle_events')
-        .select('id, vehicle_id, final_price, sold_at, ended_at, created_at, source_platform, vehicles!inner(year, make, model)')
-        .neq('vehicle_id', vehicleId)
-        .not('final_price', 'is', null)
-        .gte('vehicles.year', yearMin)
-        .lte('vehicles.year', yearMax)
-        .ilike('vehicles.make', make)
-        .ilike('vehicles.model', model)
-        .order('created_at', { ascending: true })
-        .limit(200);
+      // 2. Cohort comparable sales (same make + model family, +/- 3 years): get_model_price_history — sales
+      //    only (the sale rule), each at its sale date, the latest 300. The vehicle_events!inner(vehicles)
+      //    filter this replaced took 15 s and timed out for visitors (2026-09-27).
+      const { data: cohort } = await supabase.rpc('get_model_price_history', {
+        p_make: make,
+        p_model: model,
+        p_limit: 300,
+        p_year_min: year - 3,
+        p_year_max: year + 3,
+      });
 
-      if (cohortEvents) {
-        for (const ev of cohortEvents as any[]) {
-          const price = ev.final_price;
-          if (!price || price <= 0) continue;
-          const v = ev.vehicles;
-          events.push({
-            id: ev.id,
-            sale_price: price,
-            event_date: ev.sold_at || ev.ended_at || ev.created_at,
-            source_platform: ev.source_platform,
-            year: v?.year ?? null,
-            make: v?.make ?? null,
-            model: v?.model ?? null,
-            is_this_vehicle: false,
-          });
-        }
+      for (const s of (Array.isArray(cohort) ? cohort : []) as any[]) {
+        if (!s || s.vehicle_id === vehicleId) continue;
+        const price = Number(s.price);
+        if (!price || price <= 0 || !s.date) continue;
+        events.push({
+          id: `sale-${s.vehicle_id}-${s.date}`,
+          sale_price: price,
+          event_date: s.date,
+          source_platform: s.platform ?? null,
+          year: s.year ?? null,
+          make,
+          model: s.model ?? null,
+          is_this_vehicle: false,
+        });
       }
 
       return events;

@@ -203,7 +203,7 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
               <PriceHistoryChart
                 vehicleId={vehicle.id}
                 make={vehicle.make}
-                model={vehicle.model}
+                model={(vehicle as any).normalized_model || vehicle.model}
                 year={vehicle.year}
                 salePrice={vehicle.sale_price}
               />
