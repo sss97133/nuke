@@ -40,7 +40,7 @@ BUY_WORDS = re.compile(r"\s*\b(when carted|carted|in the cart|cart\w*|lined up[^
 # ------------------------------------------------------------------ data
 def load():
     reg, wires, ends = diagram_v5.load()
-    eps_y = yaml.safe_load((CD / "catalog" / "endpoints.yaml").read_text())
+    eps_y = __import__("kits_v5")._y("endpoints.yaml")
     parts = yaml.safe_load((CD / "catalog" / "parts.yaml").read_text())
     return reg, wires, ends, eps_y, parts
 
@@ -102,7 +102,7 @@ def plabel(w):
 def awg_word(w):
     """The gauge as printed: a kit's own lead says so; a missing gauge is OPEN, never 'None'."""
     if w.get("awg"):
-        return str(w["awg"])
+        return (f"{w['parallel']}×" if w.get("parallel", 1) > 1 else "") + str(w["awg"])
     return "KIT LEAD" if "kit" in str(w.get("spec") or "").lower() else "AWG OPEN"
 
 
@@ -332,10 +332,8 @@ def sheet_dc_primary(reg, wires, ends, eps_y, parts, number, next_sheet):
     s = PSheet(number, "DC primary — batteries, isolator, distribution, charging, starting",
                f"{len(wids)} circuits from the wire list · label = gauge colour-circuit · length · heavy line = 4 AWG and heavier · "
                f"part under each end = its lug or terminal · orange = OPEN, lettered notes at the foot")
-    ctype = notes.tag("cable type for the 2 and 4 AWG runs: Tefzel M22759/16 as drawn, or Dave's 600 V battery cable in DR-25 as "
-                      "on his DC primary; closes on the owner's call")
-    s.txt(SW_ / 2, SM + 40, f"OPEN {ctype}: THE 2 AWG AND 4 AWG CABLE TYPE IS NOT SETTLED (TEFZEL M22759/16 DRAWN; DAVE RUNS 600 V BATTERY CABLE) — SEE NOTE {ctype}",
-          6.4, bold=True, anchor="middle", colour=ORANGE)
+    s.txt(SW_ / 2, SM + 40, "CABLES SIZED FROM PHYSICS (cable_sizing_v5): 2 AWG M22759/16 THROUGHOUT THE SPINE; 2×2 AWG IN PARALLEL, EQUAL LENGTH, EACH IN ITS OWN SLEEVE "
+          "WHERE ONE CABLE CANNOT CARRY THE FUSE — SEE THE CABLE SCHEDULE", 6.0, bold=True, anchor="middle")
 
     # ---- boxes
     titles = {"ODY": "Odyssey — running battery", "ACC": "YellowTop — accessory battery",
@@ -565,7 +563,7 @@ def fuse_open_note(wid, kind, parts):
 
 def head_ring_note():
     try:
-        eps = yaml.safe_load((CD / "catalog" / "endpoints.yaml").read_text())
+        eps = __import__("kits_v5")._y("endpoints.yaml")
         op = [clean(o) for o in (eps.get("COIL-GROUND-RINGS") or {}).get("open") or [] if re.search(r"ground point|stud", str(o))]
         if op:
             return "head ring (16 coil grounds, the coil rail, M130 A10/A11): " + op[0]
@@ -967,7 +965,6 @@ def page_cable_schedule(reg, wires, ends, eps_y, parts, number):
     for i, ln in enumerate(wrap_words(lead_in, PW - 2 * PM, 7.2)):
         p.ctxt(PM, p.y + i * 9, ln, 7.2)
     p.y += len(wrap_words(lead_in, PW - 2 * PM, 7.2)) * 9 + 2
-    ctype = notes.tag("cable type for 2 and 4 AWG: Tefzel M22759/16 as listed, or Dave's 600 V battery cable in DR-25; the owner's call")
     sleeve = notes.tag("sleeve: DR-25, sized per bundle at the formboard; no size is set per cable")
     t1, t2 = [], []
     for wid in cables:
@@ -979,9 +976,7 @@ def page_cable_schedule(reg, wires, ends, eps_y, parts, number):
         frm = re.sub(r"\s*\(ground star[^)]*\)", " (ground star)", end_text(w.get("frm")))
         to = re.sub(r"\s*\(ground star[^)]*\)", " (ground star)", end_text(w.get("to")))
         spec = str(w.get("spec") or "OPEN")
-        if awg_num(w) <= 4 and "M22759" in spec:
-            spec = f"OPEN {ctype}"
-        t1.append((wid.upper(), clean(frm.replace("PS-STUDS", "stud")), clean(to.replace("PS-STUDS", "stud")), w.get("awg"), spec, length))
+        t1.append((wid.upper(), clean(frm.replace("PS-STUDS", "stud")), clean(to.replace("PS-STUDS", "stud")), awg_word(w), spec, length))
         f_lug, t_lug = ps_lugs(eps_y, wid, w)
         state = []
         def far(lug, side):

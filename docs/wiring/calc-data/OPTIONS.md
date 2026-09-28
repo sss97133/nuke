@@ -101,11 +101,12 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | M22759/16 10 AWG black | 21.2 | 30.0 | not recorded | covered |
 | M22759/16 10 AWG red | 21.2 | 30.0 | not recorded | covered |
 | M22759/16 8 AWG black | 0 | 5.0 | not recorded | claimed by G3 — length not measured yet |
-| M22759/16 8 AWG red | 5.3 | 30.0 | not recorded | covered |
+| M22759/16 8 AWG red | 0 | 30.0 | not recorded | not claimed by this scope |
+| M22759/16 6 AWG red | 5.3 | 0 | not recorded | short by 5.3 ft |
 | M22759/16 4 AWG black | 0 | 10.0 | not recorded | claimed by G2 — length not measured yet |
-| M22759/16 4 AWG red | 21.2 | 24.0 | not recorded | covered; also PDM15_BPOS (length not measured yet) |
+| M22759/16 4 AWG red | 0 | 24.0 | not recorded | not claimed by this scope |
 | M22759/16 2 AWG black | 4.0 | 6.0 | not recorded | covered |
-| M22759/16 2 AWG red | 11.0 | 13.0 | not recorded | covered |
+| M22759/16 2 AWG red | 32.2 | 13.0 | not recorded | short by 19.2 ft; also PDM15_BPOS (length not measured yet) |
 | M22759/32 22 AWG black | 0 | 100.0 | not recorded | not claimed by this scope |
 | M22759/32 22 AWG brown | 0 | 45.0 | not recorded | not claimed by this scope |
 | M22759/32 22 AWG brown/black | 0 | 35.0 | not recorded | not claimed by this scope |
