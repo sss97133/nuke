@@ -23,3 +23,13 @@ Order of operations (each step prints its counts):
 `drive_reader.sh` feeds lot URLs to the deployed reader (extract-bat-core v4) for lots prod never
 had; `gen_missing.sql` lists them. `gen_descriptions.sql` + `lookup_raw.sh` prepare the full BaT
 write-ups as `raw_listing_description` receipts (the description card's own read path).
+
+Long runs (2026-09-28): `run_streams.sh <run-dir> [streams] [pace_s]` supervises `drive_reader.sh` over
+`<run-dir>/slice_<i>.txt` under launchd + `caffeinate -i` (RunAtLoad, restart on failure), pauses the streams
+while the REST p50 is over 1 s, and writes `<run-dir>/DONE` when every slice has had a clean pass. Run dirs
+live outside the repo and outside /tmp (e.g. `~/nuke-logs/`): on 2026-09-28 the streams died with the session
+that started them, and the reboot then wiped the scratchpad holding their logs.
+`fix_taken_at.sh` (BaT link photos stamped with the import time → NULL via `correct_image_provenance`, walked
+by created_at day) and `drive_valuation.sh` (force-recompute estimates for a listed set of vehicles, gated
+on REST and host load1) were recovered from the 2026-09-27 session transcript; their working dir is `$BATW`
+(default `~/nuke-logs/bat-corrections`).
