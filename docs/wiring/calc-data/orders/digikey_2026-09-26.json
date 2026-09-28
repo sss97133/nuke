@@ -1,0 +1,85 @@
+{
+ "vendor": "digikey",
+ "account_cart": "guest cart (owner's Chrome profile)",
+ "captured": "2026-09-26",
+ "status": "NOT ordered \u2014 ordering paused 2026-09-26; reference only",
+ "lines": [
+  {
+   "code": "M39029/58-363",
+   "mfr": "Amphenol",
+   "qty": 70,
+   "ext": 46.51,
+   "note": "D38999 #20 pin contact (plug /26WJ61PN side)"
+  },
+  {
+   "code": "M39029/56-351",
+   "mfr": "Amphenol",
+   "qty": 70,
+   "ext": 75.03,
+   "note": "D38999 #20 socket contact (receptacle /24WJ61SN side)"
+  },
+  {
+   "code": "02980900TXN",
+   "mfr": "Littelfuse",
+   "qty": 2,
+   "ext": 44.42,
+   "note": "MEGA fuse holder"
+  },
+  {
+   "code": "0498900.TXN",
+   "mfr": "Littelfuse",
+   "qty": 3,
+   "ext": 48.75,
+   "note": "MIDI fuse holder w/ cover"
+  },
+  {
+   "code": "0298125.ZXEH",
+   "mfr": "Littelfuse",
+   "qty": 2,
+   "ext": null,
+   "note": "MEGA 125 A"
+  },
+  {
+   "code": "0298175.ZXEH",
+   "mfr": "Littelfuse",
+   "qty": 1,
+   "ext": null,
+   "note": "MEGA 175 A"
+  },
+  {
+   "code": "0298200.ZXEH",
+   "mfr": "Littelfuse",
+   "qty": 1,
+   "ext": null,
+   "note": "MEGA 200 A (alternator fuse = builder pick at install, ch.17 \u00a717.3.2)"
+  },
+  {
+   "code": "0498040.M",
+   "mfr": "Littelfuse",
+   "qty": 3,
+   "ext": null,
+   "note": "MIDI 40 A, M5 hole (iBooster, pump, spare)"
+  },
+  {
+   "code": "M85049/69-25N",
+   "mfr": "Amphenol PCD",
+   "qty": 2,
+   "ext": 45.48,
+   "note": "shell-25 accessory adapter for the 202K163 boot"
+  },
+  {
+   "code": "NC5FD-L-1",
+   "mfr": "Neutrik",
+   "qty": 1,
+   "ext": 14.61,
+   "note": "5-pin female XLR, latching \u2014 PDM30 UTC port (PDM manual p.48)"
+  }
+ ],
+ "fuse_lines_ext_sum": 38.57,
+ "fuse_lines_note": "per-line prices for the 4 fuse lines were not captured; their sum is derived = 8-line read-back $253.28 \u2212 the four priced lines $214.71",
+ "line_count": 10,
+ "total": 313.37,
+ "sources": [
+  "receipts/2026-09-25_orders-staged-prowire-ksv-ict.md addenda 2026-09-26 PM + night"
+ ]
+}

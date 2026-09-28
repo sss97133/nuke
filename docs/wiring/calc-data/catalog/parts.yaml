@@ -1,0 +1,344 @@
+# K5 harness — PARTS catalog (curated input; reconcile_v5.py → kits_v5.py)
+#
+# One entry per orderable code, keyed EXACTLY as the vendor cart shows it (orders/*.json), so the
+# BOM derived from the registry diffs line-for-line against the carts. Wire (M22759/…, M27500-…) is
+# decoded from the MIL code in kits_v5.py and not repeated here.
+#
+# kind: kit | contact | terminal | seal | plug | housing | backshell | boot | adapter | lug | splice |
+#       sleeve | shrink | marker | adhesive | fuse | holder | stud | connector | cable | module | tool
+# pool: parts not tied to one wire end (shrink stock, markers, fuses) → claimed by a pool, sized at
+#       the formboard (canon ch.18 §6–7), not per endpoint.
+# status for parts outside every cart: to_buy | via_dave (bought with the M130) | open (a pick or a
+#       photo decides the PN).
+
+# ---------------------------------------------------------------- MoTeC M130 / PDM30 (Superseal 1.0)
+M800-KIT-N:
+  vendor: prowire
+  kind: kit
+  name: 34 + 26-way Superseal 1.0 Key 1 housings + 65 SSC-N solid contacts (5 extra)
+  contains: {housing_34: 1, housing_26: 1, SSC-N: 65}
+  fits: ["M130 (A #65044, B #65045)", "PDM30 (A #65044, B #65045)"]
+  sources: [prowire M800-KIT-N page, fetched 2026-09-26, "motec_m130_datasheet.pdf p.4–5", "motec_pdm30_datasheet.pdf (Connector A #65044, B #65045)"]
+SSC-N:
+  vendor: prowire
+  kind: contact
+  name: Superseal 1.0 solid contact, nickel, 16–24 AWG
+  family: ssc
+  range_awg: [24, 16]
+  sources: [prowire SSC-N page, fetched 2026-09-26]
+4-1437284-3:
+  vendor: prowire
+  kind: plug
+  name: Superseal 1.0 cavity sealing plug
+  family: ssc
+  sources: [prowire 4-1437284-3 page title, fetched 2026-09-26]
+SSB-34BS-PA66:
+  vendor: prowire
+  kind: backshell
+  name: 34-way Superseal 1.0 thermoplastic backshell
+  note: designed for SSB rubber boots; Raychem boots need the billet backshell
+  sources: [prowire SuperSealSystem page, fetched 2026-09-26]
+SSB-26BS-PA66:
+  vendor: prowire
+  kind: backshell
+  name: 26-way Superseal 1.0 thermoplastic backshell
+  note: designed for SSB rubber boots; Raychem boots need the billet backshell
+  sources: [prowire SuperSealSystem page, fetched 2026-09-26]
+
+# ---------------------------------------------------------------- firewall D38999 25-61
+D38999/24WJ61SN:
+  vendor: ebay
+  kind: housing
+  name: D38999 jam-nut receptacle, shell 25, insert 61 × #20, sockets
+  sources: [state row 43, K5_connector_FIREWALL_D38999.svg]
+D38999/26WJ61PN:
+  vendor: ebay
+  kind: housing
+  name: D38999 plug, shell 25, insert 61 × #20, pins
+  sources: [state row 43, K5_connector_FIREWALL_D38999.svg]
+M39029/56-351:
+  vendor: digikey
+  kind: contact
+  name: D38999 size-20 socket contact, crimp, 20–24 AWG (receptacle / cabin side)
+  family: d38999_20
+  range_awg: [24, 20]
+  sources: [K5_connector_FIREWALL_D38999.svg, "chapters/18 §3.2 (#20 = 20–24 AWG, 7.5 A)"]
+M39029/58-363:
+  vendor: digikey
+  kind: contact
+  name: D38999 size-20 pin contact, crimp, 20–24 AWG (plug / engine side)
+  family: d38999_20
+  range_awg: [24, 20]
+  sources: [K5_connector_FIREWALL_D38999.svg, "chapters/18 §3.2"]
+MS27488-20-2:
+  vendor: prowire
+  kind: plug
+  name: sealing plug, size 20 contact cavity
+  status: to_buy
+  note: only needed for empty cavities after the engine-only reassignment
+  sources: [prowire MS27488-20-2 page, fetched 2026-09-26 ($0.18)]
+M85049/69-25N:
+  vendor: digikey
+  kind: adapter
+  name: accessory adapter, shell 25 (boot seat), C Ø max 1.44 in
+  sources: [receipt 2026-09-25 night (Amphenol PCD datasheet)]
+202K163-25-0:
+  vendor: prowire
+  kind: boot
+  name: Raychem 202K163 straight shrink boot (43 mm unshrunk → 28.2 / 9.9 mm)
+  sources: [receipt 2026-09-25 night (core-ics dimensions)]
+ADHESIVES-KIT:
+  vendor: prowire
+  kind: adhesive
+  name: RT125 epoxy + dispenser + 10 mixers
+  sources: ["prowire p-2360; RT125 page (−55…+150 °C, IP68), fetched 2026-09-26"]
+
+# ---------------------------------------------------------------- engine sensor / actuator plug kits
+"68212":
+  vendor: prowire
+  kind: kit
+  name: GM LS2/LS7 6-way DBW throttle-body connector kit
+  contains: {housing_6: 1, terminal: 6, seal: 6, tpa: 1, axial_lock: 1}
+  range_awg: [22, 20]
+  sources: [prowire 68212 page body, fetched 2026-09-26]
+COIL-CONN-LS2/7:
+  vendor: prowire
+  kind: kit
+  name: GM LS2/LS7 coil connector kit (D514A, D513A, D585, D581)
+  contains: {housing_4: 1, seal: 4, terminal: 4, tpa: 1}
+  range_awg: UNKNOWN
+  sources: [prowire p-2069 page body, fetched 2026-09-26]
+LS-CRANK-CONN-KIT:
+  vendor: prowire
+  kind: kit
+  name: GM LS crank / MAP 3-way Metri-Pack kit
+  contains: {housing_3: 1, seal: 3, terminal: 3, tpa: 1}
+  range_awg: [20, 18]
+  sources: [prowire p-2077 page body ("3 Terminals To Suit 20-18 ga"), fetched 2026-09-26]
+LS-CAM-CONN-KIT:
+  vendor: prowire
+  kind: kit
+  name: GM Gen IV LS cam 3-way Metri-Pack kit
+  contains: {housing_3: 1, seal: 3, terminal: 3, tpa: 1}
+  range_awg: [20, 18]
+  sources: [prowire p-2076 page body, fetched 2026-09-26]
+"68201":
+  vendor: prowire
+  kind: kit
+  name: GM LS2/LS7 2-way knock sensor connector kit
+  contains: {housing_2: 1, tpa: 1, cpa: 1, seal: 2, terminal: 2}
+  range_awg: [18, 16]
+  note: housing + TPA + CPA used; for our 22 AWG, terminals/seals come from the 22 AWG line of the housing's family
+  sources: [prowire 68201 page body ("2 Cable Seals 18-16 Ga · 2 Terminals 18-16 Ga"), fetched 2026-09-26]
+"68104":
+  vendor: prowire
+  kind: kit
+  name: Bosch 3-pin MAP connector (cart line; page not re-read)
+  range_awg: UNKNOWN
+  note: Bosch 3-pin MAP plug — not needed once the MAP is the GM Gen IV LS sensor (a second LS-CRANK-CONN-KIT instead)
+  sources: [cart read-back 2026-09-26]
+8CYLK-90:
+  vendor: prowire
+  kind: kit
+  name: 8-cyl EV1 injector connector kit with 90° boots
+  contains: {ev1_housing_with_clip: 8, boot_90: 8, marker_kit_1_8: 1}
+  note: NO TERMINALS in this kit — they come from ProWire 68102 (Junior Power Timer)
+  sources: [prowire p-3718 page body, fetched 2026-09-26]
+"68102":
+  vendor: prowire
+  kind: terminal
+  family: ev1
+  name: Junior Power Timer 2.8 mm female terminal, 20–16 AWG (EV1 injector plug)
+  price: 0.327
+  note: 20 AWG injector power in single; the 22 AWG driver wire goes in doubled (MoTeC C125 manual p.21)
+  sources: ["ProWire p-3769 '20-16 GA JPT timer terminal' (fetched 2026-09-26)", "EV1 plugs are TE Junior Power Timer 2.8 mm (JPT female sockets 0.5–1.0 mm²)"]
+WCTHB50:
+  vendor: ictbillet
+  kind: kit
+  name: LT Gen 5 throttle body connector component kit (5-wire SENT TBs) — connector + terminals + extras
+  price: 23.00
+  note: "TE AMP terminals, '18AWG wire w/ TE Co AMP series crimper'; 20 AWG motor wires single, 22 AWG signals doubled"
+  sources: ["https://www.ictbillet.com/products/lt-gen-v-throttle-body-connector-component-kit (fetched 2026-09-26)"]
+"12110847":
+  vendor: prowire
+  kind: terminal
+  family: mp150
+  range_awg: [22, 18]
+  name: Metri-Pack 150 female terminal, 18–22 AWG
+  price: 0.092
+  sources: ["ProWire p-506 '12110847 FEMALE TERMINAL 18-22 AWG' (fetched 2026-09-26)"]
+"15324976":
+  vendor: prowire
+  kind: seal
+  family: mp150
+  name: Metri-Pack 150 cable seal, 20–22 AWG
+  price: 0.049
+  sources: ["ProWire p-2061 'Metri-Pack 150 Seal — used with 20-22 gauge wire' (fetched 2026-09-26)"]
+  insulation_mm: [1.3, 2.1]
+  insulation_source: "ConnectorID aptiv-15324976 'Wire Insul Dia.: 1.3 - 2.1 mm' (snapshot web_snapshots/www.connectorid.com__aptiv-15324976.md)"
+"15324974":
+  vendor: prowire
+  kind: seal
+  family: mp150
+  name: Metri-Pack 150 cable seal, blue (smaller wire)
+  insulation_mm: [1.0, 1.9]
+  insulation_source: "ConnectorID aptiv-15324974 'Wire Insul Dia.: 1.0 - 1.9 mm' (snapshot web_snapshots/www.connectorid.com__aptiv-15324974.md)"
+  note: not on any order; the fallback if 22 AWG /16 is loose in the white 15324976 (bench check)
+WPAPP30:
+  vendor: ictbillet
+  kind: pigtail
+  name: LS Gen 3 truck DBW pedal pigtail (9-wire pedal systems 2000-2005) — OEM Delphi housing, seals, terminals on 6 in TXL leads
+  price: 26.00
+  sources: ["https://www.ictbillet.com/products/ls-gen-3-truck-dbw-pedal-position-sensor-pigtail (snapshot 2026-09-27: $26 sale, $30 regular)"]
+"15326829":
+  vendor: prowire
+  kind: housing
+  name: GT150 6-way female housing — drive-by-wire pedal
+  price: 2.18
+  sources: ["ProWire p-3845 '15326829 GT150 6 Way Female Housing DBW — used on some drive by wire pedals' (fetched 2026-09-26)"]
+"15317363":
+  vendor: prowire
+  kind: tpa
+  name: GT150 6-way TPA
+  price: 0.275
+  sources: ["ProWire p-3846 (fetched 2026-09-26)"]
+GT150-AIR-TEMP-KIT:
+  vendor: prowire
+  kind: kit
+  name: GT150 air-temp sensor plug kit
+  price: 3.10
+  sources: ["ProWire p-1754 'Air Temp Sensor Conn-KIT' (fetched 2026-09-26)"]
+GT150-WTR-TEMP-KIT:
+  vendor: prowire
+  kind: kit
+  name: GT150 2-way liquid-temp sensor kit (LS coolant temp)
+  sources: [prowire p-1753 title, fetched 2026-09-26; receipt 2026-09-25 (fits ACDelco 213-4514 / 19236568)]
+"12191818":
+  vendor: prowire
+  kind: terminal
+  name: GT150 female terminal 20–22 AWG
+  family: gt150
+  range_awg: [22, 20]
+  sources: [prowire p-2268 title, fetched 2026-09-26]
+"15366021":
+  vendor: prowire
+  kind: seal
+  name: GT150 cable seal, white
+  family: gt150
+  sources: ["Custom Connector Kits 15366021 'Delphi GT 150 White Cable Seal for 22-20 AWG' (snapshot 2026-09-26)", prowire 15366021 title]
+  insulation_mm: [1.2, 1.9]
+  insulation_source: "Custom Connector Kits 15366021 'For cable diameter of 1.2-1.9mm' (snapshot web_snapshots/www.customconnectorkits.com__15366021.md)"
+ICT-GEN4-OILP:
+  vendor: ictbillet
+  kind: housing
+  name: LS Gen IV round 3-wire oil-pressure connector housing
+  note: terminals + seals = ProWire 12191818 + 15366021 (ICT recommends the GT150 crimper)
+  sources: [receipt 2026-09-25 PM (2)]
+
+# ---------------------------------------------------------------- power spine
+238LTP: {vendor: prowire, kind: lug, name: "2 AWG lug, 3/8 in (M9) stud, tinned, seamless", die: "18840 GREY", sources: [prowire 238LTP page]}
+2516LTP: {vendor: prowire, kind: lug, name: "2 AWG lug, 5/16 in stud (MEGA M8)", sources: [receipt 2026-09-25 PM]}
+DL214: {vendor: prowire, kind: lug, name: "2 AWG lug, 1/4 in stud (PDM30 M6)", sources: [receipt 2026-09-25 DC primary]}
+DL438: {vendor: prowire, kind: lug, name: "4 AWG lug, 3/8 in stud", sources: [receipt 2026-09-25 DC primary]}
+838TP: {vendor: prowire, kind: lug, name: "8 AWG lug, 3/8 in stud", sources: [receipt 2026-09-25 DC primary]}
+810TP: {vendor: prowire, kind: lug, pool: power_spine, name: "8 AWG lug, #10 stud (MIDI M5)", sources: [receipt 2026-09-25 PM]}
+410LTP: {vendor: prowire, kind: lug, pool: power_spine, name: "4 AWG lug, #10 stud (MIDI M5, amp)", sources: [receipt 2026-09-25 PM]}
+CPA-100-3/4-RED: {vendor: prowire, kind: shrink, pool: lug_shrink, name: "3:1 adhesive-lined shrink 3/4 in, red, 4 ft", sources: [prowire 238LTP heat-shrink options]}
+CPA-100-1/2-RED: {vendor: prowire, kind: shrink, pool: lug_shrink, name: "3:1 adhesive-lined shrink 1/2 in, red, 4 ft"}
+CPA-100-3/8-RED: {vendor: prowire, kind: shrink, pool: lug_shrink, name: "3:1 adhesive-lined shrink 3/8 in, red, 4 ft"}
+CPA-100-3/4-BK:
+  vendor: prowire
+  kind: shrink
+  pool: lug_shrink
+  name: 3:1 adhesive-lined shrink 3/4 in, black (negative lugs)
+  status: to_buy
+  note: canon ch.18 §7 layer 4 — black band on every negative lug; the cart holds red only
+  sources: [prowire 238LTP heat-shrink options ("CPA 3:1 Black: CPA-100-3/4-BK")]
+MS25171-3S: {vendor: amazon, kind: boot, pool: power_spine, name: "stud boot, 6-pack (one cart line = 6 boots)", sources: [receipt 2026-09-25 PM]}
+"Blue Sea 2019": {vendor: amazon, kind: stud, pool: power_spine, name: "PowerBar dual 3/8 in stud — marine, kept: matches Dave's block; ProWire studs are 60 °C", sources: [receipt 2026-09-25 PM]}
+02980900TXN: {vendor: digikey, pool: power_spine, kind: holder, name: "Littelfuse MEGA fuse holder (M8 studs)"}
+0498900.TXN: {vendor: digikey, pool: power_spine, kind: holder, name: "Littelfuse MIDI fuse holder with cover (M5)"}
+0298125.ZXEH: {vendor: digikey, pool: power_spine, kind: fuse, name: "MEGA 125 A"}
+0298175.ZXEH: {vendor: digikey, pool: power_spine, kind: fuse, name: "MEGA 175 A"}
+0298200.ZXEH: {vendor: digikey, pool: power_spine, kind: fuse, name: "MEGA 200 A (alternator fuse = builder pick at install)"}
+0498040.M: {vendor: digikey, pool: power_spine, kind: fuse, name: "MIDI 40 A, M5 (iBooster, pump, spare)"}
+ISOLATOR:
+  vendor: moroso
+  kind: module
+  name: "Moroso 74102 battery isolator (PICK 4) — 1/2 in-20 main studs + 10-32 aux pair (M130 shutdown)"
+  status: open
+  note: out of stock at moroso.com; needs 2 AWG × 1/2 in lugs (ProWire has none)
+  sources: [receipt 2026-09-25 PM; MoTeC PDM manual p.7]
+LUG-2AWG-1/2:
+  kind: lug
+  name: 2 AWG lug, 1/2 in stud (isolator)
+  status: to_buy
+  note: not at ProWire; source with the isolator
+  sources: [receipt 2026-09-25 PM]
+RING-SMALL:
+  kind: lug
+  name: small ring terminals (sensor/Dakota sender studs, starter S, isolator 10-32 aux, dash star)
+  status: open
+  note: "PN per stud size + gauge UNKNOWN; none in any cart"
+  sources: [build book engine table rows 'Dakota senders', 'Starter trigger', 'grounds']
+
+# ---------------------------------------------------------------- splices, shields, markers, shrink
+D-609-03: {vendor: prowire, kind: splice, family: miniseal, name: "MiniSeal stub splice, red (26–20 AWG cavity)", range_awg: [26, 20], sources: ["ProWire 3137CT page: 'three cavities: 26-20 AWG (Red), 20-16 AWG (Blue) and 16-12 AWG (Yellow)' (snapshot 2026-09-26)"]}
+D-609-04: {vendor: prowire, kind: splice, family: miniseal, name: "MiniSeal stub splice, blue (20–16)", range_awg: [20, 16], sources: ["ProWire 3137CT page: 'three cavities: 26-20 AWG (Red), 20-16 AWG (Blue) and 16-12 AWG (Yellow)' (snapshot 2026-09-26)"]}
+D-609-05: {vendor: prowire, kind: splice, family: miniseal, name: "MiniSeal stub splice, yellow (16–12) — PDM pigtail joins + rails", range_awg: [16, 12], sources: ["ProWire 3137CT page: 'three cavities: 26-20 AWG (Red), 20-16 AWG (Blue) and 16-12 AWG (Yellow)' (snapshot 2026-09-26)"]}
+S02-03-R: {vendor: prowire, kind: sleeve, family: solder_sleeve, name: "solder sleeve M83519/2-3, 22 AWG lead"}
+PRO-IDENT-KIT:
+  vendor: prowire
+  kind: marker
+  pool: markers
+  name: "MIL-STD-681 colour-ring markers, 1/8 in 3:1, 10 colours × 250 (digit code per colour)"
+  note: Dave's 61-pin method — white 22 AWG + colour-ring cavity codes (state 0i)
+  sources: [prowire PRO-IDENT-KIT page, fetched 2026-09-26]
+DR-25-3/16-0: {vendor: prowire, kind: shrink, pool: jacket, name: "DR-25 3/16 in, per ft"}
+DR-25-1/4-0: {vendor: prowire, kind: shrink, pool: jacket, name: "DR-25 1/4 in, per ft"}
+DR-25-3/8-0: {vendor: prowire, kind: shrink, pool: jacket, name: "DR-25 3/8 in, per ft"}
+DR-25-1/2-0: {vendor: prowire, kind: shrink, pool: jacket, name: "DR-25 1/2 in, per ft"}
+DR-25-3/4-0: {vendor: prowire, kind: shrink, pool: jacket, name: "DR-25 3/4 in, per ft"}
+DR-25-1-0: {vendor: prowire, kind: shrink, pool: jacket, name: "DR-25 1 in, per ft"}
+SCL-1875-1: {vendor: prowire, kind: shrink, pool: seal_shrink, name: "SCL adhesive-lined 3/16 in pack"}
+SCL-250-1250: {vendor: prowire, kind: shrink, pool: seal_shrink, name: "SCL adhesive-lined 1/4 in pack"}
+SCL-375-1250: {vendor: prowire, kind: shrink, pool: seal_shrink, name: "SCL adhesive-lined 3/8 in pack"}
+SCL-500-1250: {vendor: prowire, kind: shrink, pool: seal_shrink, name: "SCL adhesive-lined 1/2 in pack"}
+SCL-1/2-0-STK: {vendor: prowire, kind: shrink, pool: seal_shrink, name: "SCL 1/2 in, 4 ft stick"}
+
+# ---------------------------------------------------------------- comms ports
+NC5FD-L-1: {vendor: digikey, kind: connector, family: xlr_solder, name: "Neutrik 5-pin female XLR, latching — PDM30 UTC port", sources: ["MoTeC PDM user manual p.48"]}
+M-RJ45-CABLE:
+  vendor: prowire
+  kind: cable
+  name: panel-mount Ethernet cable, 1 m (M130 laptop port)
+  status: to_buy
+  note: "M1 Tune manual p.10: Cat5 to a panel RJ45, wired crossover at the loom side so a standard laptop cable works; loom end lands on M130 B23–B26 SSC-N"
+  sources: [prowire M-RJ45-CABLE page ($15.44), fetched 2026-09-26; M1 Tune manual p.10]
+MOTEC-UTC-61059:
+  vendor: motec
+  kind: module
+  name: MoTeC UTC USB-to-CAN adapter #61059 (PDM30 config)
+  status: via_dave
+  sources: ["MoTeC PDM user manual p.48 ('not compatible with MoTeC CAN cable')"]
+CAN-TERM-100R:
+  vendor: digikey
+  kind: resistor
+  name: CAN terminator 100 ohm, 0.25 W, axial — one, at the end of the bus opposite the UTC plug
+  status: to_buy
+  note: "MoTeC: 100R (0.25 W) terminators, not 120R; a bus under 2 m takes one resistor (this bus: 3.5 ft)"
+  sources: ["MoTeC PDM user manual p.50 'CAN Bus Wiring Requirements' + 'Short CAN Bus'"]
+
+# ---------------------------------------------------------------- tools that sit in a cart (the Tools table carries them)
+M81969/14-10: {vendor: prowire, kind: tool, name: "size-20 insertion/removal tool, MIL-C-38999", tool: M81969_14_10}
+M22520/2-01: {vendor: ebay, kind: tool, name: "DMC AFM8 crimp frame (picked listing)", tool: AFM8}
+M22520/2-10: {vendor: ebay, kind: tool, name: "DMC K43 positioner (picked listing)", tool: K43}
+
+# ---------------------------------------------------------------- wire outside diameters (for the seal-fit rule; not order lines)
+# ProWire's own spec tables, nominal diameter. Snapshots: web_snapshots/www.prowireusa.com__m22759-16-tefzel-wire.md, __m22759-32-tefzel-wire.md
+WIRE-OD:
+  kind: reference
+  source: "ProWire M22759/16 and M22759/32 tables, 'Nom. Diameter' mm column (fetched 2026-09-26)"
+  od_mm:
+    M22759/16: {24: 1.1, 22: 1.3, 20: 1.5, 18: 1.8, 16: 2.0, 14: 2.3, 12: 2.89, 10: 3.53, 8: 5.05, 6: 6.35, 4: 7.92, 2: 9.85}
+    M22759/32: {24: 0.94, 22: 1.09, 20: 1.27, 18: 1.52, 16: 1.73, 14: 2.16, 12: 2.62}

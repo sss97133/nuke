@@ -1,0 +1,140 @@
+# K5 harness — TERMINATION FAMILIES (curated input; reconcile_v5.py → kits_v5.py)
+#
+# One family = one way of finishing a wire end. Each has the parts it consumes per wire end and the
+# ordered steps, each naming the tool (tools.yaml id) in the builder's hand and the setting/value.
+# A value we do not hold is `UNKNOWN: <what closes it>` — never a guess.
+#
+# Deferred by design (owner 2026-09-26 + canon ch.18 §7/§8): cut lengths, twist/turns, and which
+# wires share a DR-25/SCL sleeve (sizes follow the measured bundle ODs off the formboard).
+
+ssc:
+  label: Superseal 1.0 solid contact — M130 A/B and PDM30 A/B
+  per_end: {contact: SSC-N}
+  wire_range_awg: [24, 16]
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "UNKNOWN: SSC-N strip length — ask ProWire or measure the barrel depth"}
+    - {do: crimp, tool: [AFM8, K1S], value: "selector 24→5, 22→6, 20→7, 18→8, 16→8", source: "prowire SSC-N tooling chart"}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13 · 16 ≥ 30", source: "ch.18 §7"}
+    - {do: insert, tool: hand, value: "push through the housing seal until the clip locks", source: "prowire SSC-N ('beryllium copper gold-plated clip just like OE')"}
+    - {do: plug empty cavities, part: 4-1437284-3, value: "one per empty cavity", source: "receipt 2026-09-25 (kits don't include cavity plugs)"}
+    - {do: backshell, part_by_endpoint: backshell, source: "prowire SuperSealSystem page"}
+    - {do: boot, value: "HELD on the M130 mount: SSB rubber boot (straight / 70° / 90° / 90° up-down) on the thermoplastic backshell, or billet backshell + Raychem 202K152-25-0 (straight) / 202K153-25-0 (90°)", source: "prowire M800-KIT-N + SuperSealSystem pages"}
+
+d38999_20:
+  label: D38999 size-20 crimp contact — firewall bulkhead 25-61
+  per_end: {contact_cabin: M39029/56-351, contact_engine: M39029/58-363}
+  sides:
+    cabin: "receptacle D38999/24WJ61SN (firewall, jam nut) — sockets M39029/56-351"
+    engine: "plug D38999/26WJ61PN (engine loom) — pins M39029/58-363"
+  wire_range_awg: [24, 20]
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "UNKNOWN: strip length — M39029/56 + /58 slash-sheet or Amphenol contact datasheet"}
+    - {do: crimp, tool: [AFM8, K43], value: "selector 24→4, 22→5, 20→6", source: "K43 plate (receipt 2026-09-25 addendum 2026-09-26)"}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13", source: "ch.18 §7"}
+    - {do: insert, tool: M81969_14_10, value: "rear insertion until the contact seats", source: "Farnell 1992545 datasheet (receipt 2026-09-25)"}
+    - {do: seal empty cavities, part: MS27488-20-2, value: "one per empty cavity (none if all 61 are used)", source: "K5_connector_FIREWALL_D38999.svg ('Seal plugs in spare cavities')"}
+    - {do: accessory adapter, part: M85049/69-25N, value: "one per shell (2)", source: "receipt 2026-09-25 night; Amphenol PCD datasheet 'C Ø max 1.44 in'"}
+    - {do: boot, part: 202K163-25-0, tool: [EPOXY_DISPENSER, HEAT_GUN], value: "RT125 epoxy under the boot (−55…+150 °C, IP68)", source: "prowire: 'It is necessary to use adhesive when attaching the shrink boot'; RT125 page"}
+    - {do: mount receptacle, tool: TORQUE_INLB, value: "jam nut 120–130 in-lb; couple hand-tight + 1/8 turn", source: "K5_connector_FIREWALL_D38999.svg (CONNECTOR_DATA_REPORT 1.1–1.8)"}
+
+gt150:
+  label: Delphi GT150 sealed terminal (coolant temp ECU, oil pressure ECU)
+  per_end: {terminal: "12191818", seal: "15366021"}
+  wire_range_awg: [22, 20]
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "UNKNOWN: strip length — Aptiv 12191818 drawing"}
+    - {do: seal on, part: "15366021", value: "slide the white seal on before crimping"}
+    - {do: crimp, tool: GT150_CRIMPER, value: "wire + seal in one stroke", source: "prowire p-1233 (15359996)"}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13", source: "ch.18 §7"}
+    - {do: insert, tool: hand, value: "push to seat until it locks", source: "prowire p-1233 ('Push To Seat terminals')"}
+
+kit_terminal:
+  label: GM sensor/actuator plug from a ProWire kit (terminal + seal + TPA inside the kit)
+  per_end: {from_kit: true}
+  steps:
+    - {do: check range, value: "kit terminal range vs the wire gauge — see the endpoint's range note"}
+    - {do: strip, tool: STRIP_26_16, value: "UNKNOWN: strip length per kit terminal"}
+    - {do: seal on, value: "kit cable seal"}
+    - {do: crimp, tool: by_endpoint, value: "UNKNOWN unless the endpoint names the crimper"}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13 · 16 ≥ 30", source: "ch.18 §7"}
+    - {do: insert + lock, tool: hand, value: "seat terminal, close TPA (and CPA where supplied)"}
+
+ev1:
+  label: Bosch EV1 injector plug (8CYLK-90 housings + 90° boots, ProWire 68102 Junior Power Timer terminals)
+  per_end: {terminal: "68102"}
+  steps:
+    - {do: boot on, value: "slide the 90° boot on the wire first (unsealed housing; the boot seals)", source: "prowire 8CYLK-90 page (Qty 8 rubber 90º boots)"}
+    - {do: strip, tool: STRIP_26_16, value: "UNKNOWN: strip length per terminal"}
+    - {do: double over, value: "the 22 AWG driver wire is stripped 2x and folded back = ~18 AWG (MoTeC C125 manual p.21); the 20 AWG power branch goes in single"}
+    - {do: crimp, tool: JPT_CRIMPER, value: "open-barrel crimp, die per TE application spec"}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13", source: "ch.18 §7"}
+    - {do: insert, tool: hand, value: "seat into housing; spring clip retains the plug on the injector"}
+    - {do: mark, part: 8CYLK-90, value: "kit's 1–8 markers under RT-375 clear shrink", source: "prowire 8CYLK-90 page"}
+
+lug:
+  label: tinned-copper lug, hex crimp, adhesive shrink (power spine)
+  per_end: {lug: by_endpoint, shrink: by_polarity}
+  steps:
+    - {do: cut, tool: CABLE_CUTTER}
+    - {do: strip, tool: STRIP_CABLE, value: "strip to the barrel depth (238LTP barrel length .525 in)", source: "prowire 238LTP technical information"}
+    - {do: shrink on, value: "CPA 3:1 red on positives, black on negatives, slid on before crimping", source: "ch.18 §7 layers 2 + 4; prowire 238LTP heat-shrink options"}
+    - {do: crimp, tool: HEX_CRIMPER, value: "die per lug (238LTP = GREY)", source: "prowire 238LTP page"}
+    - {do: pull + look, tool: hand, value: "crimp centred, no barrel cracks", source: "ch.18 §7"}
+    - {do: shrink, tool: HEAT_GUN, value: "adhesive beads visibly at both ends", source: "ch.18 §7 layer 2"}
+    - {do: land + torque, tool: TORQUE_INLB, value: "UNKNOWN: torque per stud datasheet (Blue Sea 2019, Littelfuse MEGA/MIDI, starter, alternator, PDM M6)"}
+    - {do: boot splash studs, part: MS25171-3S, value: "outermost cover on alternator B+ and the PDM stud (Dave's photos)", source: "state 0i; ch.18 §7 layer 5"}
+
+ring_small:
+  label: small ring/spade terminal (sensor grounds, Dakota senders, starter S, isolator aux)
+  per_end: {ring: RING-SMALL}
+  steps:
+    - {do: pick part, value: "UNKNOWN: ring PN per stud size + gauge — none in any cart"}
+    - {do: strip, tool: STRIP_26_16}
+    - {do: crimp, value: "UNKNOWN: crimper follows the ring pick"}
+    - {do: seal, part: SCL, tool: HEAT_GUN, value: "SCL over barrel onto the wire", source: "build book: 'ProWire's SCL packs seal them'"}
+
+miniseal:
+  label: MiniSeal stub splice (rail branches, PDM pigtail joins, tee taps)
+  per_end: {splice_by_gauge: {26-20: D-609-03, 20-16: D-609-04, 16-12: D-609-05}}
+  steps:
+    - {do: strip, tool: [STRIP_26_16, STRIP_14_10], value: "stripper by gauge (26–16 / 14–10); strip length UNKNOWN — Raychem D-609 datasheet"}
+    - {do: crimp, tool: MINISEAL_CRIMPER, value: "cavity by colour: red 26–20 · blue 20–16 · yellow 16–12", source: "prowire 3137ct page"}
+    - {do: cover, part: SCL, tool: HEAT_GUN, value: "stub splices need SCL, ATUM or W5DL over them", source: "prowire MiniSeal page (receipt 2026-09-25 night)"}
+
+solder_sleeve:
+  label: shield drain termination (CKP, CMP, knock cables — ECU end only)
+  per_end: {sleeve: S02-03-R}
+  steps:
+    - {do: prep, value: "remove jacket, expose shield window", tool: STRIP_26_16}
+    - {do: sleeve, part: S02-03-R, tool: HEAT_GUN, value: "reflector on the gun; solder ring flows, lead exits as the drain", source: "S02-03-R = M83519/2-3, 22 AWG lead (receipt 2026-09-25 night)"}
+    - {do: land drain, value: "drain to SEN_0V at the ECU end only; sensor end floats", source: "K5_connector_shopping_list.txt (shielded cable connectors)"}
+
+xlr_solder:
+  label: Neutrik 5-pin female XLR, solder cups (PDM30 UTC config port)
+  per_end: {connector: NC5FD-L-1}
+  steps:
+    - {do: strip + tin, tool: [STRIP_26_16, SOLDER_IRON]}
+    - {do: solder, tool: SOLDER_IRON, value: "pin 1 = 0V, 4 = CAN-LO, 5 = CAN-HI; H/L twisted", source: "MoTeC PDM user manual p.48"}
+    - {do: insulate, tool: HEAT_GUN, value: "small shrink over each cup"}
+
+mp150:
+  label: Metri-Pack 150 sealed terminal for 22 AWG (crank, cam, MAP, knock housings from the ProWire kits)
+  per_end: {terminal: "12110847", seal: "15324976"}
+  wire_range_awg: [22, 18]
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "UNKNOWN: strip length — Aptiv 12110847 drawing"}
+    - {do: seal on, part: "15324976", value: "20–22 AWG seal on before crimping (the kits' own seals are sized for 18–20 AWG insulation)"}
+    - {do: crimp, tool: MP150_CRIMPER, value: "wire + seal", source: "ProWire p-2104 (12155975)"}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf", source: "ch.18 §7"}
+    - {do: insert + lock, tool: hand, value: "seat, then close the kit's TPA"}
+
+te_amp_plug:
+  label: Gen V throttle-body plug (ICT WCTHB50, TE AMP terminals)
+  per_end: {from_kit: true}
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "UNKNOWN: strip length per the TE terminal drawing"}
+    - {do: double over, value: "22 AWG signal wires doubled (~18 AWG, MoTeC C125 manual p.21); 20 AWG motor wires single"}
+    - {do: seal on, value: "kit seal"}
+    - {do: crimp, tool: TE_AMP_CRIMPER}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13", source: "ch.18 §7"}
+    - {do: insert + lock, tool: hand, value: "pin 6 stays empty — plug it if the kit has a cavity plug"}
