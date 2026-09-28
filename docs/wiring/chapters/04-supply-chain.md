@@ -82,12 +82,12 @@ Complete Motec M130+PDM30 build on a custom coupe. Total: $23,970. Key prices:
 ### NUKE LTD Invoices (K5 Blazer Build)
 | Invoice | Date | Total | Key Items |
 |---------|------|-------|-----------|
-| SW77002 | Oct 2023 | $42,379 | Vehicle + parts |
-| SW77003 | Feb 2024 | $18,946 | Frame/drivetrain/suspension + paint |
-| SW77005 | Sep 2024 | $28,540 | Desert Perf wiring $15K, trans $2.4K, interior $5.6K |
-| SW77006 | Mar 2025 | $29,678 | Labor $10K, Desert Perf wiring $5K, AMP steps $2.3K, wheels $4.3K |
+| Inv. 1 | Oct 2023 | (DB) | Vehicle + parts |
+| Inv. 2 | Feb 2024 | (DB) | Frame/drivetrain/suspension + paint |
+| Inv. 3 | Sep 2024 | (DB) | Desert Perf wiring, trans, interior |
+| Inv. 4 | Mar 2025 | (DB) | Labor, Desert Perf wiring, AMP steps, wheels |
 
-**Total K5 build cost through SW77006: $119,543**
+**Total K5 build cost through Inv. 4: in the DB (billed-and-paid ledger on the vehicle).**
 
 ## Supply Chain Automation Concept
 

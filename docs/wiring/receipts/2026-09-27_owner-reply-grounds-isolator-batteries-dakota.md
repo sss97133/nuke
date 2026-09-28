@@ -168,7 +168,7 @@ windows too. and whatever else."
 - **Carts:** no browser was connected, so the build book's new section "6. Audio, windows, power: lined up Sep 27" has
   14 linked lines, $3,709.19 before shipping and tax. Every price was read from a saved page snapshot.
   - Gmail shows no order for any of them.
-  - The window kit is Nu-Relics 17383-2 at $508 plus switch option #201 at $116. It was billed on SW77006 ($1,800,
+  - The window kit is Nu-Relics 17383-2 at $508 plus switch option #201 at $116. It was billed on Inv. 4 (amount in the DB,
     paid).
 - **Build book decision table updated:** battery (owner's call), disconnect (Blue Sea, with why not Moroso or Cartek)
   and audio (the picks above).

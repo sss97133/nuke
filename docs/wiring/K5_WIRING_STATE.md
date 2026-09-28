@@ -5,8 +5,8 @@
 **Vehicle:** 1977 Chevrolet K5 Blazer · VIN **CKR187F127263** · LS3 6.2L · MoTeC M130 + PDM30
 **Vehicle ID (canonical):** `e08bf694-970f-4cbe-8a74-8715158a0f2e` per Skylar's direct verbal correction 2026-05-17 ("it's the 7263 VIN that's the correct VIN"). All 141 `vehicle_build_manifest` rows are CORRECTLY attached to this vehicle. Earlier sessions wrote `appendix-d-k5-build.md` with the wrong VIN (`CCL187Z210370` / `e04bf9c5`); needs amendment.
 **Roles:** Skylar = owner + builder (NUKE LTD). Scott = client + soon-to-be-owner (purchases on completion).
-**Client:** Scott (scott@li3go.com). **Builder:** NUKE LTD, 676 Wells Rd, Boulder City NV 89005. **Wiring sub:** Desert Performance (same address).
-**Build value:** $119,543 cumulative invoices Oct 2023 → Mar 2025 (SW77002, SW77003, SW77005, SW77006). This is a paid client build, not a project.
+**Client:** the client (contact in the DB). **Builder:** NUKE LTD, Boulder City NV. **Wiring sub:** Desert Performance (same address).
+**Build value:** four client invoices Oct 2023 → Mar 2025 (Inv. 1–4; amounts in the DB). This is a paid client build, not a project.
 
 **Last updated:** 2026-06-10
 

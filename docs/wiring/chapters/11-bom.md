@@ -56,7 +56,7 @@ The BOM tracks three states:
 ### Price Sources
 
 Every price in the BOM traces to one of three sources:
-1. **Invoice learned pricing** (49 entries) — real prices from Desert Performance Invoice #1190 and NUKE LTD invoices SW77002-SW77006
+1. **Invoice learned pricing** (49 entries) — real prices from Desert Performance Invoice #1190 and NUKE LTD invoices Inv. 1–4
 2. **ProWire catalog** (9,649 parts) — online prices for connectors, wire, tools
 3. **Estimate** — flagged with `(est)`, based on typical market pricing for the part category
 

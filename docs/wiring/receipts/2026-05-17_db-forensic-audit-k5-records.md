@@ -7,10 +7,10 @@
 ## 1. The three focal UUIDs
 
 ### `e08bf694-970f-4cbe-8a74-8715158a0f2e` — Skylar's K5 (canonical)
-- VIN `CKR187F127263`, color "Maroon", model "Blazer", created 2025-09-20 by `0b9f107a-…` (= shkylar@gmail.com / Skylar Williams).
+- VIN `CKR187F127263`, color "Maroon", model "Blazer", created 2025-09-20 by `0b9f107a-…` (= the owner's account).
 - `source = user-submission`, `profile_origin = user_uploaded`.
 - 2,653 `vehicle_images` rows, 709 observations, 141 build_manifest rows.
-- `owner_name = "Scott (li3go)"`, `owner_contact = "scott@li3go.com"` set during a 2026-04-28 "A/R sweep" note that wrongly reclassified it as a customer asset. The auth.users creator is Skylar — that field is wrong.
+- `owner_name = "the client"`, `owner_contact = "[client email, in the DB]"` set during a 2026-04-28 "A/R sweep" note that wrongly reclassified it as a customer asset. The auth.users creator is Skylar — that field is wrong.
 - Storage layout (image folder paths on this vehicle):
   - `21501c21-…/hd_archive/…` → 793 images (folder of merged-in vehicle, see §1c)
   - `e08bf694-…/iphoto` → 202; `e08bf694-…/user_upload` → 84; `vehicles/user_upload` → 531; null/`ssd_blast` → 967; misc → 76.
@@ -74,7 +74,7 @@ To get a definitive phash-based dup check, run an offline batch (per-vehicle pHa
 | **Leave** `e04bf9c5` row in `vehicles` | row itself | Already soft-deleted with `merged_into_vehicle_id` set — keep as audit trail. |
 | **Leave** `21501c21` as-is | — | Already cleanly merged; folder is cosmetic stale. |
 | **Hard-delete** `135cb20e-1177-4a45-8134-f045d9f446e7` | empty 2026-05-03 dup carrying the same GAA URL | Zero images, zero observations, looks like accidental re-import; verify with Skylar before delete. |
-| **Fix attribution** on `e08bf694`: clear `owner_name = "Scott (li3go)"` / `owner_contact = "scott@li3go.com"` | `vehicles` row | The 2026-04-28 A/R sweep note that set this was based on the same crossed-wire theory Skylar overturned 2026-05-17. Real owner = Skylar / NUKE LTD. |
+| **Fix attribution** on `e08bf694`: clear `owner_name = "the client"` / `owner_contact = "[client email, in the DB]"` | `vehicles` row | The 2026-04-28 A/R sweep note that set this was based on the same crossed-wire theory Skylar overturned 2026-05-17. Real owner = Skylar / NUKE LTD. |
 | **No action** on the other 65 1977-Blazer rows | — | They are clean auction scrapes, FB Marketplace saves, or already-archived placeholders. None share images with Skylar's K5. |
 
 ## 6. Sources
