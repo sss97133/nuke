@@ -14,6 +14,7 @@ title = "Nuke Key Guardian"
     '''your-.*-key''',
     '''<your-''',
     '''sk_test_51SKWCO''',  # already-rotated test keys known to be in history
+    '''^ebf9109d7d01bb4b636f2da0b8eccda4$''',  # AEM 30-2131 instruction sheet: the document hash in its public URL (documents.aemelectronics.com), not a token
   ]
 
 [[rules]]

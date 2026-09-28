@@ -7,11 +7,15 @@ WIDEBAND:
     dtm)'
   open:
   - '#68054 kit contents (housing, wedge, contacts): not in the LTC manual'
-  - '0462-201-20141 wire range: the vendor page says only ''for 20 AWG''; #64 and LTCD_GND are 18 AWG and the CAN pair 22 AWG — the Deutsch contact drawing closes
-    R1'
+  - '#68054 kit sockets: if the MoTeC kit ships only 0462-201-20141 (20 AWG), the two 16-18 AWG sockets 0462-005-20141 are bought apart'
   sources:
   - 'MoTeC LTC user manual V1.7 p.32 Appendix B (reference_documents/component_drawings/motec_ltcd_user_manual.pdf): ''Power/CAN Connector DTM 4pin (M) (#68055) Mating
     connector: DTM 4pin (F) (#68054)'''
   - web_snapshots/www.customconnectorkits.com__0462-201-20141.md ('Size 20 Nickel Plated Solid Socket for 20 AWG', 'Max 7.5 amps', '4 way indent crimper')
   per_end:
     part: 0462-201-20141
+  per_end_wire:
+    '64': {part: 0462-005-20141}
+    LTCD_GND: {part: 0462-005-20141}
+  contact_note: 'DEUTSCH Contacts Catalog p.125 (PDF p.7) ''Solid Contacts - Common Contact System'': 0462-201-20** = 20 AWG, 0462-005-20** = 16-18 AWG, both 7.5 A: the 18 AWG feed and ground take 0462-005-20141, the CAN pair (now 20 AWG) 0462-201-20141'
+

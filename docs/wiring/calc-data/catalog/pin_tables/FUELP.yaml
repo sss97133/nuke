@@ -1,8 +1,18 @@
 FUELP:
-  family: open
-  note: Dave's convention 1 0 V, 2 5 V, 3 signal — confirm against the sensor picked
+  family: kit_terminal
+  note: AEM 'Packard 3-Pin' plug with its mating plug and 'Pull to Seat' pins included; 4.5 mA at 5 V (AEM instructions 10-2131 Rev C). Dave's 1/2/3 order is replaced by the
+    sensor's own letters once read
   open:
-  - 'sensor not picked. Candidate: a GM 3-wire pressure sensor like the oil pressure ECU sensor (OILP-ECU, gt150 family, LS3 round 3-pin); the family and cavity numbers
-    follow the sensor picked and its GM connector drawing'
+  - 'pin letters: in the AEM 10-2131 PDF drawing, not its text — read before crimping'
   sources:
   - Dave's M130 sheet (1 = 0 V, 2 = 5 V, 3 = signal convention, already in the base entry)
+  - reference_documents/web_snapshots/documents.aemelectronics.com__ebf9109d7d01bb4b636f2da0b8eccda4eb4fb343.md (instructions 10-2131 Rev C)
+  - reference_documents/web_snapshots/www.aemelectronics.com__30-2130-100.md
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2
+  device: fuel pressure sensor AEM 30-2131-100, 0-100 psig, 0.5-4.5 V, 5 V supply, 1/8 NPT (14.7 ft-lbf), 316L wetted
+  kit:
+    AEM-30-2131-100: 1
+  pins:
+    112g: 0 V (AEM pin letter unknown until the 10-2131 drawing is read)
+    112r: 5 V (AEM pin letter unknown until the 10-2131 drawing is read)
+    '112': signal (AEM pin letter unknown until the 10-2131 drawing is read)

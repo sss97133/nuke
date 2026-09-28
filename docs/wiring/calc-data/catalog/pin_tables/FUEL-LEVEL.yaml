@@ -1,9 +1,24 @@
 FUEL-LEVEL:
-  family: open
+  family: dt
   open:
-  - 'sender terminals on the QFS-H882 hanger (it ''Includes Sending Unit''): not on the page — read at the bench. Factory 1978 Blazer tank unit for comparison: one
-    terminal (circuit 30 tan) + a black ground lead to a 5/16 stud (1978 booklet p.14)'
+  - 'sender ohms: Quantum does not publish them — measure empty and full on the VHX TEST screen (manual p.14) before choosing GM 90 (p.23) or CUSTOM'
+  - 'the 270 ohm M130 pull-up and the Dakota on one sender: confirm the Dakota reads true (bench)'
   sources:
   - reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md
-  - '1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.14 (sheet A-2, ''Suburban & Blazer'' rear lighting
-    panel): ''FUEL METER TANK UNIT'''
+  - '1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.14 (sheet A-2, ''Suburban & Blazer'' rear lighting panel): ''FUEL
+    METER TANK UNIT'''
+  - reference_documents/web_snapshots/www.highflowfuel.com__qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm.md
+  - reference_documents/web_snapshots/www.customconnectorkits.com__0460-202-16141.md
+  - reference_documents/component_drawings/dakota_digital_vhx_manual.pdf p.11, p.14, p.23
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §1
+  device: Quantum H882 level sender — through the QFS-BKCN-GM bulkhead, then a Deutsch DT 2-way above the lid (sender signal + FUEL -, twisted)
+  kit:
+    DT06-2S: 1
+    DT04-2P: 1
+  splice_point: true
+  pins:
+    '117': 1 (sender signal)
+    '98': '1 (sender signal: #98 and #117 join in one splice before the plug)'
+    FUEL_SND_GND: 2 (FUEL -, sender ground)
+  note: FUEL - goes 'only direct to the fuel level sensor', never chassis; run the sender as 'a twisted pair' (Dakota VHX manual p.11). DT size 16 contacts 0460-202-16141 /
+    0462-201-16141 take 20-16 AWG, so the sender wires are 20 AWG

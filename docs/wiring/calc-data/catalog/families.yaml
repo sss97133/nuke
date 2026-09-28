@@ -30,7 +30,7 @@ d38999_20:
   steps:
     - {do: strip, tool: STRIP_26_16, value: "UNKNOWN: strip length — M39029/56 + /58 slash-sheet or Amphenol contact datasheet"}
     - {do: crimp, tool: [AFM8, K43], value: "selector 24→4, 22→5, 20→6", source: "K43 plate (receipt 2026-09-25 addendum 2026-09-26)"}
-    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13", source: "ch.18 §7"}
+    - {do: pull test, tool: PULL_GAUGE, value: "24 AWG ≥ 8 lbf · 22 ≥ 13 · 20 ≥ 21", source: "Checkline wire pull test standards, size-20 M39029 contacts (receipt 2026-09-26 dave-sheet addendum)"}
     - {do: insert, tool: M81969_14_10, value: "rear insertion until the contact seats", source: "Farnell 1992545 datasheet (receipt 2026-09-25)"}
     - {do: seal empty cavities, part: MS27488-20-2, value: "one per empty cavity (none if all 61 are used)", source: "K5_connector_FIREWALL_D38999.svg ('Seal plugs in spare cavities')"}
     - {do: accessory adapter, part: M85049/69-25N, value: "one per shell (2)", source: "receipt 2026-09-25 night; Amphenol PCD datasheet 'C Ø max 1.44 in'"}

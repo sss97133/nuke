@@ -128,16 +128,17 @@ Kit: LS-CAM-CONN-KIT ×1 [1]
 13. decision: frm M130:B16 -> M130:B15 — Dave's M130 sheet ('M130 ECU Overland Bronco.xlsx', Sensor Connections) — SYNC 2 = 0 volt white/blue (B15)
 14. ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5
 
-## CAN-BUS — M1 CAN bus: trunk M130 → PDM30 → 61-pin → PDM15 → LTCD, with the UTC stub · 8 items open
+## CAN-BUS — M1 CAN bus: trunk M130 → PDM30 → 61-pin → PDM15 → LTCD, with the UTC stub · 9 items open
 
 Kit: CAN-TERM-100R ×2 (on the cart change) [1]
 
 | Wire | Spec | ECU / PDM end | Device end |
 |---|---|---|---|
-| #62 CAN trunk M130 to PDM30 (Hi B17 / Lo B18) · v4.2 L139 | 22 AWG M22759/16 yellow + green [4] | M130 B17 · SSC-N · AFM8 + K1S sel 6 [5] | ? · open (connector not picked) [6] (open) |
-| #UTC_CANH PDM config port CAN-HI (XLR pin 5) [7] | 22 AWG M22759/16 twisted yellow [8] | — | ? · open (connector not picked) [6] (open) |
-| #UTC_CANL PDM config port CAN-LO (XLR pin 4) [9] | 22 AWG M22759/16 twisted green [8] | — | ? · open (connector not picked) [6] (open) |
-| #UTC_0V PDM config port 0V (XLR pin 1) [10] | 22 AWG M22759/16 brown [8] | PDM30 B22 · SSC-N · AFM8 + K1S sel 6 [5] | ? · open (connector not picked) [6] (open) |
+| #CAN_HI CAN trunk High: M130 B17 CAN_HI -> PDM30 B26 CAN High [4] | 22 AWG M22759/16 twisted | M130 B17 · SSC-N · AFM8 + K1S sel 6 [5] | ? · open (connector not picked) [6] (open) |
+| #CAN_LO CAN trunk Low: M130 B18 CAN_LO -> PDM30 B25 CAN Low [7] | 22 AWG M22759/16 twisted | M130 B18 · SSC-N · AFM8 + K1S sel 6 [5] | ? · open (connector not picked) [6] (open) |
+| #UTC_CANH PDM config port CAN-HI (XLR pin 5) [8] | 22 AWG M22759/16 twisted yellow [9] | — | ? · open (connector not picked) [6] (open) |
+| #UTC_CANL PDM config port CAN-LO (XLR pin 4) [10] | 22 AWG M22759/16 twisted green [9] | — | ? · open (connector not picked) [6] (open) |
+| #UTC_0V PDM config port 0V (XLR pin 1) [11] | 22 AWG M22759/16 brown [9] | PDM30 B22 · SSC-N · AFM8 + K1S sel 6 [5] | ? · open (connector not picked) [6] (open) |
 
 **Tools:** none beyond the kit
 
@@ -150,13 +151,14 @@ Kit: CAN-TERM-100R ×2 (on the cart change) [1]
 1. MoTeC PDM user manual p.50 'CAN Bus Wiring Requirements' + 'Short CAN Bus'
 2. chapters/18 §7 (IPC/WHMA-A-620 §19.1)
 3. owner 2026-09-26; chapters/18 §6–8
-4. decision: awg 24 -> 22 — MoTeC PDM user manual p.50 CAN Bus Wiring Requirements: 'twisted 22# Tefzel is usually OK', min one twist per 50 mm; 24# is not offered | M130 datasheet B17 CAN_HI / B18 CAN_LO; PDM30 datasheet B26/B25; the bus now reaches the engine PDM15 and the LTCD (> 2 m), so it takes a 100R at each end — M130 end and LTCD end (MoTeC PDM manual p.50); agent choice under owner delegation 2026-09-27 ('you can choose the parts ... get it done ... i can tell u to replace later') — replaceable; decision: frm ECU -> M130:B17 — MoTeC PDM user manual p.50 CAN Bus Wiring Requirements: 'twisted 22# Tefzel is usually OK', min one twist per 50 mm; 24# is not offered | M130 datasheet B17 CAN_HI / B18 CAN_LO; PDM30 datasheet B26/B25; the bus now reaches the engine PDM15 and the LTCD (> 2 m), so it takes a 100R at each end — M130 end and LTCD end (MoTeC PDM manual p.50); agent choice under owner delegation 2026-09-27 ('you can choose the parts ... get it done ... i can tell u to replace later') — replaceable; decision: label CAN Bus Network -> CAN trunk M130 to PDM30 (Hi B17 / Lo B18) — MoTeC PDM user manual p.50 CAN Bus Wiring Requirements: 'twisted 22# Tefzel is usually OK', min one twist per 50 mm; 24# is not offered | M130 datasheet B17 CAN_HI / B18 CAN_LO; PDM30 datasheet B26/B25; the bus now reaches the engine PDM15 and the LTCD (> 2 m), so it takes a 100R at each end — M130 end and LTCD end (MoTeC PDM manual p.50); agent choice under owner delegation 2026-09-27 ('you can choose the parts ... get it done ... i can tell u to replace later') — replaceable; decision: to None -> {'device': 'PDM30', 'pin': 'B26 CAN Hi / B25 CAN Lo', 'terminal': 'Superseal 1.0'} — MoTeC PDM user manual p.50 CAN Bus Wiring Requirements: 'twisted 22# Tefzel is usually OK', min one twist per 50 mm; 24# is not offered | M130 datasheet B17 CAN_HI / B18 CAN_LO; PDM30 datasheet B26/B25; the bus now reaches the engine PDM15 and the LTCD (> 2 m), so it takes a 100R at each end — M130 end and LTCD end (MoTeC PDM manual p.50); agent choice under owner delegation 2026-09-27 ('you can choose the parts ... get it done ... i can tell u to replace later') — replaceable; decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm
+4. MoTeC M1 hardware techspec: B17 CAN_HI 'CAN Bus 1 High'; MoTeC PDM user manual p.44 PDM30 B_26 CAN High; p.49 twisted pair
 5. ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5
 6. MoTeC PDM user manual p.49-50 'CAN Bus Wiring Requirements' + 'Short CAN Bus'
-7. MoTeC PDM manual p.48; state 0k
-8. decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm
-9. MoTeC PDM manual p.48
-10. MoTeC PDM manual p.48 (UTC 0V) + p.47 (PDM30 B_22 = 0V)
+7. MoTeC M1 hardware techspec: B18 CAN_LO 'CAN Bus 1 Low'; MoTeC PDM user manual p.44 PDM30 B_25 CAN Low; p.49 twisted pair
+8. MoTeC PDM manual p.48; state 0k
+9. decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm
+10. MoTeC PDM manual p.48
+11. MoTeC PDM manual p.48 (UTC 0V) + p.47 (PDM30 B_22 = 0V)
 
 ## PORT-UTC — PDM30 config port — 5-pin female XLR for the MoTeC UTC · solved
 
@@ -164,8 +166,8 @@ Kit: NC5FD-L-1 ×1 [1]
 
 | Wire | Spec | ECU / PDM end | Device end |
 |---|---|---|---|
-| #UTC_CANH PDM config port CAN-HI (XLR pin 5) [6] | 22 AWG M22759/16 twisted yellow [7] | — | CAN-BUS (trunk #62 splice) |
-| #UTC_CANL PDM config port CAN-LO (XLR pin 4) [8] | 22 AWG M22759/16 twisted green [7] | — | CAN-BUS (trunk #62 splice) |
+| #UTC_CANH PDM config port CAN-HI (XLR pin 5) [6] | 22 AWG M22759/16 twisted yellow [7] | — | CAN-BUS (trunk CAN_HI splice) |
+| #UTC_CANL PDM config port CAN-LO (XLR pin 4) [8] | 22 AWG M22759/16 twisted green [7] | — | CAN-BUS (trunk CAN_LO splice) |
 | #UTC_0V PDM config port 0V (XLR pin 1) [9] | 22 AWG M22759/16 brown [7] | PDM30 B22 · SSC-N · AFM8 + K1S sel 6 [10] | — |
 
 **Tools:** Ideal Stripmaster 45-1987 (Tefzel blades) + wire stop L-5270 — to buy [2] · soldering iron + solder — confirm you own it [3] · heat gun with reflector attachments — confirm you own it [3]
@@ -248,6 +250,7 @@ Kit: D38999/26WJ61PN ×1 [1] · M85049/69-25N ×1 [2] · 202K163-25-0 ×1 [3] ·
 | #DAK_CTS_RET Dakota temp sender (SEN-04-5) second wire -> VHX WTR - [48] | 22 AWG M22759/16 | — | cavity X: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [18] | X · M39029/58-363 [20] |
 | #DAK_OILP_5V Dakota oil sensor (SEN-03-8) +5 V (red) from VHX OIL + [49] | 22 AWG M22759/16 | — | cavity i: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [18] | i · M39029/58-363 [20] |
 | #DAK_OILP_GND Dakota oil sensor (SEN-03-8) ground (black + bare shield) to VHX OIL - [50] | 22 AWG M22759/16 | — | cavity a: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [18] | a · M39029/58-363 [20] |
+| #FAN_PWM Radiator fan speed: M130 A34 low-side PWM -> SPAL white control lead [51] | 20 AWG M22759/32 | M130 A34 · SSC-N · AFM8 + K1S sel 7 [17] | cavity c: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [18] | c · M39029/58-363 [20] |
 
 **Tools:** Ideal Stripmaster 45-1987 (Tefzel blades) + wire stop L-5270 — to buy [5] · DMC AFM8 crimp frame (M22520/2-01) — picked [6] · DMC K43 positioner (for AFM8) (M22520/2-10) — picked [7] · pull gauge / spring scale, ≥ 50 lbf — confirm you own it [8] · insertion/removal tool, size 20, MIL-C-38999 (M81969/14-10) — in the cart [9] · RT125 epoxy dispenser + mixers — in the cart [10] · heat gun with reflector attachments — confirm you own it [11] · inch-pound torque wrench — confirm you own it [12]
 
@@ -305,6 +308,7 @@ Kit: D38999/26WJ61PN ×1 [1] · M85049/69-25N ×1 [2] · 202K163-25-0 ×1 [3] ·
 48. Dakota VHX manual 650314:P p.9 (reference_documents/component_drawings/dakota_digital_vhx_manual.pdf): SEN-04-5 uses a two-wire harness — one wire to WTR SND, the other to WTR -
 49. Dakota VHX manual 650314:P p.9 (reference_documents/component_drawings/dakota_digital_vhx_manual.pdf): OIL + supplies 5 V DC to the SEN-03-8 red wire only
 50. Dakota VHX manual 650314:P p.9 (reference_documents/component_drawings/dakota_digital_vhx_manual.pdf): three-wire harness plus a bare shield — white OIL SND, red OIL +, black and the shield to OIL -; keep it away from plug wires
+51. SPAL brushless PWM requirements (Kartek, image https://www.kartek.com/mm5/graphics/00000002/spal-brushless-fans-engine-ecu-pwm-pulse-width-modulation-requirements.jpg, read 2026-09-28): PWM 50-500 Hz, typical 100 Hz, 0-100 % duty, 4.8 mA; Kartek page (web_snapshots/www.kartek.com__spal-30107090-...md): 'negative or grounding type PWM ... the controller or ECU provides the low' on the white wire. PDM outputs are high side only (PDM manual p.22), so the M130 drives it: A34 OUT_HB6 is unused (M130 pinout) and a half bridge's 'high and low side drivers can be PWM', low side to 20 kHz (M1 hardware techspec, Half Bridge Output). 20 AWG: the kit's control terminals take 20-18 ga (ProWire 30130628), the 61-pin #20 contacts 20-24 AWG
 
 ## TB — throttle body GM 12699160 (Gen V truck, SENT position sensor, 5-wire plug) · 3 items open
 

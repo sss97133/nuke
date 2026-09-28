@@ -6,7 +6,10 @@ USB-PORT:
   kit: {}
   mate: 'none: splice to the device''s own leads'
   open:
-  - 'USB port not picked: its lead colours and lead gauge come from its sheet once chosen (the splice colour is sized from our wire only)'
+  - 'lead type and colours: not on the page (read on arrival)'
   sources:
-  - 'no maker document: the device is not picked yet; the registry terminates it on the device''s own leads (''lamp lead'' / ''port lead'' / ''outlet lead'', k5_registry.json), so the harness wire meets
-    each lead in a MiniSeal splice sized by the gauge'
+  - 'no maker document: the device is not picked yet; the registry terminates it on the device''s own leads (''lamp lead'' / ''port lead'' / ''outlet lead'', k5_registry.json),
+    so the harness wire meets each lead in a MiniSeal splice sized by the gauge'
+  - reference_documents/web_snapshots/www.bluesea.com__12_24V_DC_Dual_USB_Charger_4.8A_with_Intelligent_Device_Recognition.md
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2
+  device: Blue Sea 1045 dual USB charger, 4.8 A total at 5 V, 9-32 V in, IP45 with cap, 1-1/8 in hole

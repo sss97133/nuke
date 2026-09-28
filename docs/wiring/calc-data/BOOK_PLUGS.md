@@ -229,6 +229,7 @@ Kit: D38999/26WJ61PN ×1: **BUY NOW**, on the eBay list (surplus listing chosen)
 | Z | cam 6.3 V | 22 AWG white/orange | M130 B19 |
 | a | Dakota oil sender 0 V | 22 AWG  | DAKOTA-VHX (OIL -) |
 | b | cam shield drain | 22 AWG white/blue | M130 B15 |
+| c | fan speed PWM | 20 AWG  | M130 A34 |
 | e | TPS 5 V | 22 AWG orange | M130 A02 |
 | f | TPS 0 V | 22 AWG brown | M130 B16 |
 | g | fuel PSI 0 V | 22 AWG brown/black | M130 B16 |
@@ -262,15 +263,16 @@ Kit: D38999/26WJ61PN ×1: **BUY NOW**, on the eBay list (surplus listing chosen)
 | NN | crank 6.3 V | 22 AWG white/orange | M130 B19 |
 | PP | knock 1 shield drain | 22 AWG brown | M130 B16 |
 
-From: your Sep 25 orders · ProWire RT125 epoxy page · Dave's M130 sheet · MoTeC PDM manual p.50 (CAN)
+From: your Sep 25 orders · ProWire RT125 epoxy page · Dave's M130 sheet · MoTeC PDM manual p.50 (CAN) · [kartek.com](https://www.kartek.com/mm5/graphics/00000002/spal-brushless-fans-engine-ecu-pwm-pulse-width-modulation-requirements.jpg,)
 
-## CAN bus (M130 to PDM30) · 8 items open
+## CAN bus (M130 to PDM30) · 9 items open
 
 Kit: CAN-TERM-100R ×2: **BUY NOW**, to add to the DigiKey cart
 
 | Wire | Size, colour | From | To |
 |---|---|---|---|
-| CAN trunk | 22 AWG yellow + green | M130 B17 (high) / B18 (low) | PDM30 B26 / B25; one 100 Ω terminator at the PDM30 end |
+| CAN high (trunk) | 22 AWG  | M130 B17 | PDM30 B26 (CAN High) |
+| CAN low (trunk) | 22 AWG  | M130 B18 | PDM30 B25 (CAN Low) |
 
 The laptop-port branch off this trunk is under PDM30 laptop port.
 
@@ -290,8 +292,8 @@ Kit: NC5FD-L-1 ×1: **BUY NOW**, in the DigiKey cart
 
 | Wire | Size, colour | From | To |
 |---|---|---|---|
-| laptop port CAN high | 22 AWG yellow | CAN-BUS (trunk #62 splice) | PORT-UTC (XLR pin 5) |
-| laptop port CAN low | 22 AWG green | CAN-BUS (trunk #62 splice) | PORT-UTC (XLR pin 4) |
+| laptop port CAN high | 22 AWG yellow | CAN-BUS (trunk CAN_HI splice) | PORT-UTC (XLR pin 5) |
+| laptop port CAN low | 22 AWG green | CAN-BUS (trunk CAN_LO splice) | PORT-UTC (XLR pin 4) |
 | laptop port 0 V | 22 AWG brown | PDM30 B22 | PORT-UTC (XLR pin 1) |
 
 From: MoTeC PDM manual p.48

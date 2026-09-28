@@ -1,7 +1,12 @@
 CHMSL:
   family: open
   open:
-  - no 1977 factory third brake lamp (not in the 1977 manual p.838 bulb data); the lamp is not picked — its leads close this plug
+  - 'power connector type: ''Power connector'' only on the page — read on arrival'
+  - 'rejected: Truck-Lite 61500R is an amber strobe under an FMCSA exemption'
   sources:
-  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional
-    1157, marker 168, back-up 1156, license 67, underhood 93)'
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional 1157,
+    marker 168, back-up 1156, license 67, underhood 93)'
+  - reference_documents/web_snapshots/www.oraclelights.com__linear-universal-led-3rd-brake-light-chmsl-module-red.md
+  - reference_documents/web_snapshots/www.truck-lite.com__61500r.md
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2
+  device: ORACLE 4514-003 Linear Universal LED third brake module, red, 7 in, 6 W at 12-24 V (0.5 A at 12 V), IP68

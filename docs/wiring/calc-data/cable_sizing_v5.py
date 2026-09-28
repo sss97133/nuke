@@ -62,6 +62,9 @@ CABLES = [
          why_load="the amplifier's ground tail, same rule"),
     dict(id="52", hot=True, frm="distribution stud", to="iBooster 1", cont=40, peak=None, fuse="MIDI", fuse_fixed=40, ft=4.6, bundled=False,
          why_load="OEM 40 A supply fuse (ch.17 §17.5)"),
+    dict(id="IBOOST_GND", hot=True, frm="iBooster ground", to="ground star", cont=40, peak=None, fuse=None, ft=None, bundled=False,
+         why_load="the iBooster's return carries #52's current (OEM 40 A supply fuse, ch.17 §17.5): sized like its feed so the "
+                  "cable is one gauge on every page (book review 2026-09-28: it printed 8 AWG while #52 is 6)"),
     dict(id="DCDC_IN", hot=True, frm="distribution stud", to="Orion IN +", cont=35, peak=None, fuse="MIDI", fuse_fixed=60, ft=None, bundled=False,
          why_load="Orion-Tr Smart 12/12-30: 30 A out, ~35 A in. Fuse is the maker's: Victron Orion-Tr Smart manual §4.2 "
                   "'Cable and fuse recommendations', 12 V row: external battery protection fuse 60 A, minimum cable 6 mm² at 0.5 m, "

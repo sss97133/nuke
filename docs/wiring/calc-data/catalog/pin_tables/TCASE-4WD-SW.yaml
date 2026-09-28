@@ -1,8 +1,11 @@
 TCASE-4WD-SW:
   family: open
-  note: 'owner 2026-09-27: the case is shifted by hand and the hubs are manual, so electric needs ''some fabbing which is possible''. The lamp says the case is in
-    4WD; locking the hubs stays a by-hand check.'
+  note: 'replaces the fabricated bracket switch: ''twin pin type sealed electrical connectors'''
   open:
-  - fabricated switch, not picked (registry family open; neither ring_small nor kit_terminal is named in the registry). The switch's terminals close this
+  - 'the fitment list starts at 1980 Blazer: confirm the poppet port on this 1977 case'
+  - 'closed-in-4WD sense: confirm with an ohmmeter (Dakota 4x4 (-) is ground-activated)'
   sources:
   - 'Dakota VHX manual p.6: 4x4 (-) ground-activated input'
+  - reference_documents/web_snapshots/torqueking.com__qu30048-weather-proof-np205c-transfer-case-indicator-switch.md
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2
+  device: Torque King QU30048 weather-proof NP205 indicator switch (normally ON, in place of a front-output poppet plug; 15/16 hex, max 16 lb-ft) + QU90002 pigtail

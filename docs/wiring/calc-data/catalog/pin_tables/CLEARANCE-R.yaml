@@ -6,7 +6,11 @@ CLEARANCE-R:
   kit: {}
   mate: 'none: splice to the device''s own leads'
   open:
-  - 'right cab roof clearance lamp not picked: its lead colours and lead gauge come from its sheet once chosen (the splice colour is sized from our wire only)'
+  - LMC lists 5 roof lamps per truck; the registry keeps 3 (L/C/R) — owner item
+  - 'the 36-3770 harness pigtail''s join to this harness: read on arrival'
   sources:
-  - 'no maker document: the device is not picked yet; the registry terminates it on the device''s own leads (''lamp lead'' / ''port lead'' / ''outlet lead'', k5_registry.json), so the harness wire meets
-    each lead in a MiniSeal splice sized by the gauge'
+  - 'no maker document: the device is not picked yet; the registry terminates it on the device''s own leads (''lamp lead'' / ''port lead'' / ''outlet lead'', k5_registry.json),
+    so the harness wire meets each lead in a MiniSeal splice sized by the gauge'
+  - reference_documents/web_snapshots/www.lmctruck.com__cc-1973-87-roof-marker-lamp.md
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2
+  device: 'LMC 1973-87 roof marker: 36-4481 amber lens + 36-4482 pad + 36-0368 amber LED 194-type bulb, in the LMC harness 36-3770'

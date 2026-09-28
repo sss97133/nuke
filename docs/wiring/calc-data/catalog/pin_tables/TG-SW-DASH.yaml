@@ -4,12 +4,16 @@ TG-SW-DASH:
     TG_FEED: 4 FEED (factory 12 R-70)
     TG_BUS_UP: 5 UP (factory 12 LBL-183)
     TG_BUS_DN: 3 DOWN (factory 12 T-184)
-    TG_GND: NEEDS CAVITY
   kit: {}
   mate: GM connector 8911352 (tailgate window switch, 1978 A-4)
   open:
-  - 'TG_GND has no terminal: the factory dash switch is drawn with three terminals (3 DOWN, 4 FEED, 5 UP) only; the registry''s reversing-switch ground needs the 1977 booklet view (ST-352-77) or the bench'
+  - 'TG_GND retired 2026-09-28: the factory dash switch has three terminals (3 DOWN, 4 FEED, 5 UP) and no ground (1978 booklet p.16)'
   - '12 AWG factory terminals in 8911352 vs our 14 AWG: terminal part not named in the booklet'
   sources:
-  - 'ST-352 1978 C/K wiring booklet fold-out A-4, box ''Power Rear Window R.P.O. A33'' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A4_hvac_cruise_fuel_auxiliary.png): tailgate window switch
-    terminals 5-UP, 4-FEED, 3-DOWN'
+  - 'ST-352 1978 C/K wiring booklet fold-out A-4, box ''Power Rear Window R.P.O. A33'' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A4_hvac_cruise_fuel_auxiliary.png):
+    tailgate window switch terminals 5-UP, 4-FEED, 3-DOWN'
+  - reference_documents/web_snapshots/www.motorcityk5.com__i-13220-rear-power-tailgate-window-switch-on-dash-73-91-blazer.md
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2
+  device: 'Motor City K5 MCK5REARWINDOWSWITCH dash tailgate window switch: 6 blades, ''only top or bottom 3 will be used''; loose blade terminals (''will not accept stock harness
+    pigtail'')'
+  note: the original 3-terminal switch 8911352 is no longer available; this is the only current part for the dash location

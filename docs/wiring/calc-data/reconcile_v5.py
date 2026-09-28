@@ -255,9 +255,13 @@ IMPLIED = [
     ("ETH_TX-", "M130 Ethernet TX- to cab RJ45", "M130:B24", "PORT-ETH (socket pin 6)", 24, "Cat5 pair", "MoTeC M1 Tune manual p.10"),
     ("ETH_RX+", "M130 Ethernet RX+ to cab RJ45", "M130:B25", "PORT-ETH (socket pin 1)", 24, "Cat5 pair", "MoTeC M1 Tune manual p.10"),
     ("ETH_RX-", "M130 Ethernet RX- to cab RJ45", "M130:B26", "PORT-ETH (socket pin 2)", 24, "Cat5 pair", "MoTeC M1 Tune manual p.10"),
-    ("UTC_CANH", "PDM config port CAN-HI (XLR pin 5)", "CAN-BUS (trunk #62 splice)", "PORT-UTC (XLR pin 5)", 22, "M22759/32 twisted",
+    ("CAN_HI", "CAN trunk High: M130 B17 CAN_HI -> PDM30 B26 CAN High", "M130:B17", "PDM30:B26 (CAN High)", 22, "M22759/16 twisted",
+     "MoTeC M1 hardware techspec: B17 CAN_HI 'CAN Bus 1 High'; MoTeC PDM user manual p.44 PDM30 B_26 CAN High; p.49 twisted pair"),
+    ("CAN_LO", "CAN trunk Low: M130 B18 CAN_LO -> PDM30 B25 CAN Low", "M130:B18", "PDM30:B25 (CAN Low)", 22, "M22759/16 twisted",
+     "MoTeC M1 hardware techspec: B18 CAN_LO 'CAN Bus 1 Low'; MoTeC PDM user manual p.44 PDM30 B_25 CAN Low; p.49 twisted pair"),
+    ("UTC_CANH", "PDM config port CAN-HI (XLR pin 5)", "CAN-BUS (trunk CAN_HI splice)", "PORT-UTC (XLR pin 5)", 22, "M22759/32 twisted",
      "MoTeC PDM manual p.48; state 0k"),
-    ("UTC_CANL", "PDM config port CAN-LO (XLR pin 4)", "CAN-BUS (trunk #62 splice)", "PORT-UTC (XLR pin 4)", 22, "M22759/32 twisted", "MoTeC PDM manual p.48"),
+    ("UTC_CANL", "PDM config port CAN-LO (XLR pin 4)", "CAN-BUS (trunk CAN_LO splice)", "PORT-UTC (XLR pin 4)", 22, "M22759/32 twisted", "MoTeC PDM manual p.48"),
     ("UTC_0V", "PDM config port 0V (XLR pin 1)", "PDM30:B22", "PORT-UTC (XLR pin 1)", 22, "M22759/32",
      "MoTeC PDM manual p.48 (UTC 0V) + p.47 (PDM30 B_22 = 0V)"),
     ("ISO_KILL", "Isolator state (yellow, grounded while closed) to the M130 shutdown input", "SPL-ISO-YEL (stub splice on the switch's yellow wire, tab 7)",
@@ -298,10 +302,30 @@ DAVE_SHEET = "Desert Performance 'M130 ECU Overland Bronco.xlsx' (Dave's M130 sh
 DEKA = "Siemens Deka FI114961: EV1 (Minitimer), 12.5 ohm (siemensdeka.com product page)"
 BRANCH_EST = "ordering estimate (DEL-Stributor cluster / fuel rail) — cut last"
 BRANCH_EXTRA = {}
+SPALD = ("SPAL 12 VDC brushless fan wiring diagram (reference_documents/component_drawings/SPAL_Brushless_Fan_Wiring_Diagram.pdf): "
+         "'FAN TO CHASSIS GROUND'; power red through a fuse; ProWire 30130628 kit: two 12 ga power terminals, two 20-18 ga control "
+         "(web_snapshots/www.prowireusa.com__SPAL-BRUSHLESS-FAN-CONNECTOR-KIT-30130628.md)")
+FANPWM = ("SPAL brushless PWM requirements (Kartek, image https://www.kartek.com/mm5/graphics/00000002/spal-brushless-fans-engine-ecu-"
+          "pwm-pulse-width-modulation-requirements.jpg, read 2026-09-28): PWM 50-500 Hz, typical 100 Hz, 0-100 % duty, 4.8 mA; Kartek "
+          "page (web_snapshots/www.kartek.com__spal-30107090-...md): 'negative or grounding type PWM ... the controller or ECU provides "
+          "the low' on the white wire. PDM outputs are high side only (PDM manual p.22), so the M130 drives it: A34 OUT_HB6 is unused "
+          "(M130 pinout) and a half bridge's 'high and low side drivers can be PWM', low side to 20 kHz (M1 hardware techspec, Half "
+          "Bridge Output). 20 AWG: the kit's control terminals take 20-18 ga (ProWire 30130628), the 61-pin #20 contacts 20-24 AWG")
+IMPLIED += [("FAN_PWM", "Radiator fan speed: M130 A34 low-side PWM -> SPAL white control lead", "M130:A34", "FAN (PWM white lead)", 20,
+             "M22759/32", FANPWM)]
+BRANCH_EXTRA["FAN_PWM"] = {"length_ft": 4.6, "length_basis": "cut list v4.2 zone estimate (the M130-to-engine-bay runs)",
+                           "control": "M1 tune: A34 as a low-side PWM fan output at 100 Hz; set speed 25-100 % over 10-90 % duty (SPAL chart)"}
+IMPLIED += [("FAN_GND", "Radiator fan ground (SPAL 30107090 black) in the loom to the ground star", "FAN (ground)", GSTAR_EARLY, 12,
+             "M22759/32", SPALD + "; the fan had no ground wire in the registry; grounds run in the loom (state row 56)")]
+BRANCH_EXTRA["FAN_GND"] = {"color": "black", "length_ft": 2.2, "length_basis": "follows #21 (twin: battery -> K5H_RadFan_1, x 1.2 pad)"}
 IMPLIED += [("PUMP_GND", "Fuel pump ground: hanger ground terminal to a frame stud near the tank", "FUEL-PUMP (hanger ground)",
              GSTAR_EARLY, 14, "M22759/32", "QFS P367 5.1 A (highflowfuel.com); matches the #66 feed gauge; returns in the loom with "
              "#66 to the ground star (owner 2026-09-27: grounds in the loom)")]
-BRANCH_EXTRA["PUMP_GND"] = {"color": "black", "length_ft": 3.0, "length_basis": "ordering estimate — cut last"}
+BRANCH_EXTRA["PUMP_GND"] = {"color": "black", "length_ft": 18.4,
+                            "length_basis": "follows #66: the ground returns in the loom beside the feed from the tank to the "
+                                            "engine-bay ground star (owner 2026-09-27: grounds in the loom), so it is the feed's "
+                                            "18.4 ft cut list v4.2 zone estimate — was a 3.0 ft 'ordering estimate' that assumed a "
+                                            "frame stud by the tank"}
 for _n in range(1, 9):
     IMPLIED += [
         (f"COIL{_n}_PWR", f"Coil {_n} switched +12 V (pin d) from the COIL_PWR rail", "COIL_PWR rail splice", f"COIL-{_n}:d",
@@ -391,6 +415,19 @@ IMPLIED += [
      "M22759/32", "factory circuit"),
     ("TG_MOT_A", "Tailgate key switch -> window motor lead A", "TG-SW-KEY (UP out)", "rear_window_motor:A", 14, "M22759/32",
      "factory circuit (inside the tailgate)"),
+    # candidate (not bought): Nu-Relics 17383-1 with option #100 (no switches; motor plug + terminals), driven the way the doors
+    # are: a reverse-polarity master switch at the dash feeding a second reversing switch (the key switch) in series; no relay
+    # (state row 54). TG_FEED (PDM30 OUT1, a 20 A pair already pigtailed) feeds the master in this configuration.
+    ("TGR_M_GND", "Tailgate master switch ground (rests the motor leads to ground)", "TG-SW-MASTER (ground)", GCAB_EARLY, 14, "M22759/32", "TGR"),
+    ("TGR_UP", "Tailgate master switch UP line -> keyed switch in series", "TG-SW-MASTER (UP)", "TG-SW-KEY-REV (master UP in)", 14, "M22759/32", "TGR"),
+    ("TGR_DN", "Tailgate master switch DOWN line -> keyed switch in series", "TG-SW-MASTER (DOWN)", "TG-SW-KEY-REV (master DOWN in)", 14, "M22759/32", "TGR"),
+    ("TGR_KEY_FEED", "Keyed switch feed, branched at the master switch feed", "TG-SW-MASTER (feed, spliced to TG_FEED)", "TG-SW-KEY-REV (feed)", 14,
+     "M22759/32", "TGR"),
+    ("TGR_KEY_GND", "Keyed switch ground to the rear ground bus", "TG-SW-KEY-REV (ground)", "GND-SPLICE-REAR (rear harness ground bus)", 14,
+     "M22759/32", "TGR"),
+    ("TGR_CUT_IN", "Keyed switch motor lead A -> tailgate-closed cutout (183C)", "TG-SW-KEY-REV (motor A)", "TG-CUTOUT (183C)", 14, "M22759/32", "TGR"),
+    ("TGR_MOT_A", "Tailgate-closed cutout (183E) -> ACI motor pole A", "TG-CUTOUT (183E)", "TG-MOTOR-ACI (pole A)", 14, "M22759/32", "TGR"),
+    ("TGR_MOT_B", "Keyed switch motor lead B -> ACI motor pole B", "TG-SW-KEY-REV (motor B)", "TG-MOTOR-ACI (pole B)", 14, "M22759/32", "TGR"),
     ("TG_KEY_FEED", "Tailgate key switch FEED (factory circuit 60), branched from the dash switch feed", "TG-SW-DASH (feed, spliced to TG_FEED)",
      "TG-SW-KEY (FEED, circuit 60)", 14, "M22759/32", "TG78"),
     ("TG_CUT_IN", "Tailgate window UP line: splice 183 (key switch CLOSE terminal) -> tailgate-closed cutout switch (circuit 183C)",
@@ -423,7 +460,18 @@ TG78 = ("1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_b
         "battery via the 30 A circuit breaker) / CLOSE 183, in PARALLEL with the dash switch 8911352 (5 UP / 4 FEED / 3 DOWN): the "
         "two switches' outputs join at splice-183 and splice-184; the UP line then runs through the N/O 'tailgate closed' cutout "
         "switch 2977647 (12 LBL-183C in, 12 LBL-183E out) to the motor 6288909 UP-1; DN-2 = 12 T/W-184C")
-IMPLIED[:] = [(i, l, f, t, g, sp, TG78 if src == "TG78" else src) for i, l, f, t, g, sp, src in IMPLIED]
+TGR = ("Nu-Relics 17383-1 tailgate regulator + new ACI motor (web_snapshots/www.nu-relics.com__17383-1.md): option #100 'No "
+       "Switches (Will Include Motor Plugs and Terminals)', option #121 'Standard Chrome Switches - 1 single switches'; ACI motor "
+       "3 A no load / 5 A low / 11 A high load / 20 A stall; 'Our ACI motors are reverse polarity motors and require reverse "
+       "polarity switches' — power to one pole, ground to the other, not the case. Modelled like the doors (master in series with "
+       "the second switch, Nu-Relics 17383-2; " + REV + "); state row 54 (no relay). Leads 14 AWG: 22 A at 80 C (MoTeC PDM manual "
+       "p.48) covers the 20 A stall; the feed is TG_FEED from PDM30 OUT1, a 20 A pair with pigtails, limit at or under the 14 AWG "
+       "rating. CANDIDATE — the owner has no regulator and has not bought the kit")
+IMPLIED[:] = [(i, l, f, t, g, sp, TG78 if src == "TG78" else TGR if src == "TGR" else src) for i, l, f, t, g, sp, src in IMPLIED]
+# implied rows a later fact retires: they leave the wire list but stay in the registry (retired_implied), never deleted
+IMPLIED_RETIRED = {"TG_GND": ("the factory dash switch 8911352 has three terminals, 5 UP / 4 FEED / 3 DOWN, and no ground (1978 "
+                              "booklet p.16, sheet A-4); the ground came from the reversing-switch design, which the factory "
+                              "switches do not use (book review 2026-09-28)")}
 TGW = "tailgate circuit redrawn to the factory drawing (" + TG78 + "; pin-table review 2026-09-28)"
 BLW = ("1978 C-K wiring booklet p.16 sheet A-4 'Air Conditioning RPO C-60' + p.8-9 circuit table (catalog/pin_tables/BLOWER-RES.yaml): "
        "the A/C resistor plug has FOUR cavities — 51 low (BAT), 63 M1, 72 M2, 101 output to the blower; not '3 prongs'")
@@ -494,7 +542,7 @@ AMPR = ("AMP Research PowerStep install guide IM75146 (reference_documents/compo
         "splice into the door switch wires (steps 14-15)")
 ESTOPP = ("E-Stopp ESK001 wiring diagram (reference_documents/component_drawings/extracted/estopp_esk001_wiring.png): "
           "control box G red +12 V from battery, F blue safety to ignition, H black ground, E green button/ground-sync (kit)")
-IBOOST = ("chapters/17 §17.3: MIDI 40 A -> iBooster, 8 AWG /16 (#52); Bosch OEM supply 40 A on pin 1, ignition 12 V 5 A on "
+IBOOST = ("chapters/17 §17.3: MIDI 40 A -> iBooster, 6 AWG /16 (#52, cable_decisions.json: a MIDI 40 needs 47 A of cable, 8 AWG bundled is 40 A); Bosch OEM supply 40 A on pin 1, ignition 12 V 5 A on "
           "pin 20; state §1 'Bosch iBooster Gen 2 (Tesla salvage + Tulay connector)', installed on the driver firewall (state)")
 AMPWHY = "JL VX700/5i guide (web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md) 'Power Connector': '4 AWG is the required copper wire size for this amplifier'; spec table 'Min. Copper Power/GND Wire 4 AWG', 'Recommended Fuse 60 A'. The 18.4 ft loop needs 2 AWG for the 3 % drop (4 AWG 0.62 V = 4.4 %; cable_sizing_v5), so the run lands on a reducing block beside the amp and a short 4 AWG tail enters the set screw. JL's own step A: 'install a fused distribution block near the amplifiers'. 4 AWG under the 60 A MIDI: 72 A bundled x 0.85 = 61 A >= 60 A"
 GSTAR = "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)"
@@ -763,7 +811,7 @@ DECISIONS = {
                   "Aeromotive A1000 35 A the 8 AWG came from; drop over 18.4 ft at 5.1 A: 16 AWG 0.40 V (3.0 %), "
                   "14 AWG 0.26 V (1.9 %) using MoTeC PDM manual p.48 resistances",
            "note": "PDM output drives the pump directly — no relay (owner row 54), no MIDI fuse; the PDM limit protects the wire",
-           "protection": ("PDM15 OUT10 maximum-current setting, 8 A (an 8 A output; MoTeC PDM manual p.23 Over-Current Shutdown "
+           "protection": ("PDM15 OUT5 maximum-current setting, 8 A (MoTeC PDM manual p.23 Over-Current Shutdown "
                           "'to protect the wire and the PDM output'; p.25: a device drawing no more than 5 A takes a wire rated 8 A "
                           "and an 8 A setting — the P367 draws 5.1 A at 60 psi). No inline fuse: chapters/17 §17.8 item 6 "
                           "'PDM-switched loads carry none (the PDM is the fuse)'. The §17.5 'Fuel pump ... MIDI 30-40A' row sized "
@@ -806,8 +854,23 @@ LTCD_WHY = ("LTCD manual p.31: 110 mA typical plus the heater current, heater 0.
 CAN_CMD = "CAN from the M130 (MoTeC PDM manual p.39 CAN input, 4 messages x 8 bytes); a timed-out message switches it off (p.23)"
 D0927 = {
     # engine PDM loads (PDM15 in the engine bay: no firewall crossing for these feeds)
-    "21": {"frm": "PDM15:OUT1", "control": "CAN: M130 fan request (" + CAN_CMD + ")",
-           "why": "one radiator fan (owner, Gemini T78) on a 20 A output of the engine PDM; " + AGENT},
+    "21": {"frm": "PDM15:OUT1+OUT6", "control": "CAN: M130 fan request (" + CAN_CMD + ") — OUT1 and OUT6 on one channel (PDM manual p.22)",
+           "why": ("one radiator fan (owner, Gemini T78): SPAL 30107090 'roughly 25 amp max' (300 W / 12 V, web_snapshots/www.kartek.com__"
+                   "spal-30107090-...md) is over one 20 A output's 20 A continuous (PDM manual p.36), so OUT1 and the free OUT6 are paralleled "
+                   "(p.6: 'can be connected in parallel to increase current capacity'); " + AGENT),
+           "note": "BUILD: route the fan feed apart from its ground and outside the loom from the breakout to the fan (free-air rating, ProWire singles table) | OPEN — needs: hot-soak air temperature at the fan motor, thermocouple, engine at operating temp after shutdown (bench/first start). Above 90 C, the close path is 10 AWG (50 A free air, ProWire singles table) with the fan plug's 12 ga terminal fed by a short 12 AWG tail",
+           "length_ft": 2.2, "length_basis": ("twin: K5H_Battery (the PDM15's working position 'by the battery'; the twin has no PDM15 "
+                                               "object) to K5H_RadFan_1, 0.55 m = 1.8 ft axis-aligned (twin_centers.json), x 1.2 engine pad "
+                                               "(state row 33); not taped on the truck"),
+           "protection": ("PDM15 OUT1 + OUT6, 16 A each = 32 A: the lowest equal pair >= 1.25 x 25 A = 31.25 A (1 A steps, PDM manual "
+                          "p.36), so the limit cannot come down further. 12 AWG end to end (4 x 18 AWG pigtails -> M81824/1-3 -> 12 AWG -> "
+                          "the 12 ga SPAL terminal): ProWire 'Aerospace & Defense Singles Ampacity Rating' (web_snapshots/www.prowireusa.com__Aerospace%20&%20Defense%20Singles%20Ampacity%20Rating.md, linked from ProWire's Tefzel chart 'for wire/s in free air and not bundled'): single conductor in free air, 12 AWG = 38 A at a 60 C difference (150 C Tefzel, 90 C ambient), 10 AWG = 50 A; Table 2: 2 conductors x 0.85. The short run (twin 2.2 ft) leaves the loom at the breakout, so it is rated in "
+                          "free air, not on the bundled chart (ch.16 §2.2). Alone: 38 A >= 37.6 A (32 A / 0.85, ch.17 rule) and >= 32 A "
+                          "(MoTeC p.25: the wire carries the setting). Paired with FAN_GND: 38 x 0.85 = 32.3 A — passes MoTeC's rule, "
+                          "misses the 85 % rule. OPEN: (1) both results need ambient <= 90 C at the fan run; the table has no column for "
+                          "the 100 C engine-bay figure used elsewhere; (2) route #21 apart from FAN_GND past the breakout to keep the "
+                          "single-conductor rating, or accept MoTeC's rule for the pair. SPAL gives no fuse value ('varies dependent on "
+                          "the SPAL brushless motor size')")},
     "22": {"retired": "one radiator fan (owner, Gemini thread T78; endpoints.yaml FAN)"},
     "INJ_PWR": {"frm": "PDM15:OUT2", "to": {"device": "INJ_PWR rail splice", "pin": "splice: feeds INJ1-8_PWR", "terminal": "D-609-05"},
                 "control": "ignition RUN over CAN from the PDM30 (DIG1); the M130 can cut it over CAN",
@@ -818,14 +881,23 @@ D0927 = {
                  "why": "8 x D510C on the DEL-Stributor bracket (state §1) on a 20 A output; " + AGENT},
     "COIL_GND": {"to": {"device": "COIL-GROUND-RINGS", "pin": "head ring terminal", "terminal": "ring"},
                  "why": "coil grounds land on the head (Dave's sheet: coil pin a chassis ground to a head ring terminal)"},
-    "66": {"frm": "PDM15:OUT10", "to": {"device": "FUEL-PUMP", "pin": "pump + (hanger connector: read off the hanger, bench)",
-                                        "terminal": "open"},
+    "66": {"frm": "PDM15:OUT5", "to": {"device": "FUEL-PUMP", "pin": "pump + (hanger connector: read off the hanger, bench)",
+                                       "terminal": "open"},
            "control": "CAN: M130 fuel pump request (" + CAN_CMD + ")",
-           "why": "the pump was wired to a relay; relays are out (owner row 54), so an 8 A PDM15 output drives the 5.1 A pump; " + AGENT},
+           "protection": ("PDM15 OUT5 maximum-current setting 8 A (a 20 A output programmable in 1 A steps, PDM manual p.36; "
+                          "p.25: a device drawing about 5 A takes an 8 A setting — the P367 draws 5.1 A at 60 psi); no inline fuse "
+                          "(chapters/17 §17.8 item 6 'the PDM is the fuse')"),
+           "why": "the pump was wired to a relay; relays are out (owner row 54). OUT10 was an 8 A single pin: the 14 AWG feed "
+                  "(3 % drop over 18.4 ft) is past the Superseal contact's 24-16 AWG and MoTeC's 24#-20# for 8 A outputs (p.48), "
+                  "so it moves to the free 20 A pair OUT5 (A9 + A17, PDM manual p.43) and takes the pigtail + M81824/1-3 "
+                  "treatment of #21; OUT10 is free again (book review 2026-09-28); " + AGENT},
     "23": {"frm": "PDM15:OUT11", "to": {"device": "AC-CLUTCH", "pin": "clutch lead", "terminal": "open"},
            "control": "CAN: M130 A/C request, interlocked by the PDM15 low/high pressure switch inputs",
            "why": "compressor ordered 2026-09-24 (state §1 A/C hard parts); clutch is an engine-bay load; " + AGENT},
     "64": {"frm": "PDM15:OUT12", "label": "LTCD power (+12 V)", "awg": 18, "spec": "M22759/32",
+           "protection": ("PDM15 OUT12 maximum-current setting 7 A: the DTM size-20 socket is rated 7.5 A (DEUTSCH Contacts Catalog "
+                          "p.125, 'Solid Contacts - Common Contact System'), under the 8 A output; the LTCD's cold draw is > 6.1 A "
+                          "(LTC manual p.31 + p.37, a lower bound) — if a cold start trips 7 A, the feed needs a second contact"),
            "to": {"device": "WIDEBAND", "pin": "4 (Battery +, red)", "terminal": "DTM06-4S (MoTeC #68054)"},
            "control": "ignition RUN over CAN from the PDM30 (DIG1)",
            "why": "MoTeC LTCD user manual Power/CAN connector pin 4; " + AGENT + " | 22 -> 18 AWG: " + LTCD_WHY},
@@ -852,9 +924,17 @@ D0927 = {
     "102g": {"to": {"device": "Oil_Pressure_Sensor_ECU", "pin": "1 (0 V)", "terminal": "per OILP-ECU write-up"}},
     "102r": {"to": {"device": "Oil_Pressure_Sensor_ECU", "pin": "2 (5 V)", "terminal": "per OILP-ECU write-up"}},
     # Dakota (dual-sender lock 2026-05-14; manual 650314:P p.6: power and ground 18 AWG)
-    "98": {"retired": "the GM fuel sender feeds the Dakota (dual-sender lock 2026-05-14, newer than the AV-input row); the M130 has "
-                      "no analog input left (state 0e(a)); DAKOTA_VHX_ARCHITECTURE.md FIX 1"},
-    "117": {"to": {"device": "Dakota VHX control box", "pin": "FUEL SND", "terminal": "screw terminal"}},
+    "98": {"frm": "M130:B20", "label": "Fuel level sender -> M130 AV6 (with the Dakota #117 in parallel)", "awg": 20, "spec": "M22759/32",
+           "to": {"device": "FUEL-LEVEL", "pin": "sender terminal, shared with #117 (unknown until read at the bench)", "terminal": "open"},
+           "why": ("un-retired: state §1 row 32 locks 'Fuel sender: GM 0-90 ohm -> AV input + 270 ohm pull-up'. The later Dakota lock "
+                   "(row 36, receipts/2026-05-14_addendum-dakota-dual-sender-wires.md) keeps it: '#117 ... In parallel with #98 Fuel "
+                   "Level Sender (ECU)'; row 46 (v4.2, 2026-06-10) leaves 'AV6/B20 left free for #98'; B20 AV6 is unused in the "
+                   "M130 pinout. The retirement's 'no analog input left' (0e(a)) predates nothing that took B20. Book review 2026-09-28"),
+           "note": ("270 ohm pull-up to a sensor 5 V at the ECU end (state row 32; the 5 V letter follows the A7 pairing ruling); "
+                    "OPEN: confirm the Dakota FUEL SND still reads true with the M130 pull-up on the same sender (bench) — "
+                    "DAKOTA_VHX_ARCHITECTURE.md FIX 1 flagged the pin as unassigned, not the parallel reading")},
+    "117": {"to": {"device": "Dakota VHX control box", "pin": "FUEL SND", "terminal": "screw terminal"}, "awg": 20, "spec": "M22759/32",
+            "why": "the tank-top plug is a Deutsch DT 2-way (size 16 contacts 0460-202-16141 / 0462-201-16141, '20-16 AWG': web_snapshots/www.customconnectorkits.com__0460-202-16141.md), so 22 AWG is under its floor; the sender carries mA, so 20 AWG M22759/32 is the smallest that fits (research/2026-09-28_unpicked-parts-and-fuel-hanger.md §1.3). Dakota VHX manual p.11: run the sender as 'a twisted pair'; FUEL - goes 'only direct to the fuel level sensor'"},
     "119": {"frm": "PDM30:OUT27", "to": {"device": "Dakota VHX control box", "pin": "L TURN", "terminal": "screw terminal"},
             "control": "tap of the left turn output: the PDM flashes OUT27 from the turn switch input DIG4 (channel plan)"},
     "120": {"frm": "PDM30:OUT28", "to": {"device": "Dakota VHX control box", "pin": "R TURN", "terminal": "screw terminal"},
@@ -947,7 +1027,10 @@ D0927 = {
     "PDM_GND1": {"to": {"device": "BAT-", "pin": "battery negative post (star)", "terminal": "ring"},
                  "why": "chapters/17 §17.4.7: both PDM Batt- pins to battery negative"},
     "PDM_GND2": {"to": {"device": "BAT-", "pin": "battery negative post (star)", "terminal": "ring"}, "why": "chapters/17 §17.4.7"},
-    "62": {"frm": "M130:B17", "label": "CAN trunk M130 to PDM30 (Hi B17 / Lo B18)",
+    "62": {"retired": ("one record for a twisted pair: split into CAN_HI (M130 B17 CAN_HI -> PDM30 B26 CAN High) and CAN_LO "
+                       "(B18 CAN_LO -> B25 CAN Low) — MoTeC M1 hardware techspec (B17 'CAN Bus 1 High', B18 'CAN Bus 1 Low'); PDM "
+                       "manual p.44; the M130 pinout showed B18 spare with both conductors on B17 (book review 2026-09-28)"),
+           "frm": "M130:B17", "label": "CAN trunk M130 to PDM30 (Hi B17 / Lo B18)",
            "to": {"device": "PDM30", "pin": "B26 CAN Hi / B25 CAN Lo", "terminal": "Superseal 1.0"},
            "why": "M130 datasheet B17 CAN_HI / B18 CAN_LO; PDM30 datasheet B26/B25; the bus now reaches the engine PDM15 and the LTCD "
                   "(> 2 m), so it takes a 100R at each end — M130 end and LTCD end (MoTeC PDM manual p.50); " + AGENT},
@@ -1082,9 +1165,10 @@ D0927B = {
     "1": {"retired": "the AMP Research kit harness drives and reverses both step motors (IM75146) — a PDM output can't reverse a motor"},
     "2": {"retired": "as #1"},
     # ---- brakes: iBooster (direct MIDI feed), E-Stopp
-    "52": {"frm": "Distribution stud (MIDI 40 A)", "label": "iBooster power (direct, MIDI 40 A)", "awg": 8, "spec": "M22759/16",
+    "52": {"frm": "Distribution stud (MIDI 40 A)", "label": "iBooster power (direct, MIDI 40 A)", "awg": 6, "spec": "M22759/16",
            "to": {"device": "IBOOSTER", "pin": "1 (constant 12 V)", "terminal": "Tulay harness"},
-           "why": "chapters/17 §17.3 spine table: iBooster 8 AWG /16 (#52), MIDI 40 A; it started at 'ECU'"},
+           "why": "chapters/17 §17.3 spine table: MIDI 40 A; gauge from cable_decisions.json (6 AWG: a MIDI 40 needs 47 A of cable, "
+                  "8 AWG bundled is 40 A — cable_sizing_v5.py); the ch.17 table's 8 AWG is superseded; it started at 'ECU'"},
     "54": {"to": {"device": "E-STOPP", "pin": "G (red, +12 V)", "terminal": "kit lead"},
            "control": "always on (E-Stopp wire G is a battery feed; the brake has to set key-off)"},
     # ---- the v4 DC-primary runs: their ends are the power-spine studs (chapters/17 §17.3), not 'ECU'
@@ -1137,6 +1221,7 @@ SUBSYSTEM_RULES = [
     (r"^(PDM_BPOS|PDM_GND[12]|UTC_.*|G[123])$", "HARNESS_INFRA", "always-built substrate: PDM feed, PDM config port, main grounds"),
     (r"^ISO_KILL$", "CHARGING_STARTING", "battery isolator shutdown contact (state 0b)"),
     (r"^PUMP_GND$", "FUEL", "fuel pump ground (receipt 2026-09-26 device ends)"),
+    (r"^(FAN_GND|FAN_PWM)$", "COOLING", "radiator fan ground and PWM (2026-09-28 parts picks)"),
     (r"^(PDM15_.*)$", "HARNESS_INFRA", "engine PDM feed and grounds (2026-09-27)"),
     (r"^(IGN_.*|START_TRIG)$", "CHARGING_STARTING", "ignition switch as PDM inputs, starter trigger from the engine PDM (2026-09-27)"),
     (r"^(CAN_.*|LTCD_GND)$", "CORE_ENGINE", "CAN bus to the engine PDM and the LTCD (2026-09-27)"),
@@ -1144,6 +1229,7 @@ SUBSYSTEM_RULES = [
     (r"^(WIN_.*)$", "POWER_WINDOWS", "door power windows (2026-09-27)"),
     (r"^(LOCK_.*)$", "POWER_LOCKS", "door power locks (2026-09-27)"),
     (r"^(TG_.*)$", "POWER_WINDOWS", "factory power tailgate window (2026-09-27)"),
+    (r"^(TGR_.*)$", "POWER_WINDOWS", "Nu-Relics tailgate kit on reversing switches, CANDIDATE (2026-09-28, row 54: no relay)"),
     (r"^(CAM_.*|MIRROR_.*)$", "CAMERA_REAR", "rear camera + mirror display (2026-09-27)"),
     (r"^(REAR_ST_.*|BRK_SW_0V)$", "LIGHTING_EXTERIOR", "rear stop/turn outputs and the brake switch input (2026-09-27)"),
     (r"^(VSS_.*)$", "DASH_CLUSTER_DAKOTA", "road speed sender (2026-09-27)"),
@@ -1210,6 +1296,23 @@ def apply_decisions(rows):
 
 # ---- decisions on implied rows (same shape as DECISIONS; the old value goes to `conflicts`)
 IMPLIED_DECISIONS = {
+    "FAN_GND": {"note": "BUILD: route the fan feed apart from its ground and outside the loom from the breakout to the fan (free-air rating, ProWire singles table) | OPEN — needs: hot-soak air temperature at the fan motor, thermocouple, engine at operating temp after shutdown (bench/first start). Above 90 C, the close path is 10 AWG (50 A free air, ProWire singles table) with the fan plug's 12 ga terminal fed by a short 12 AWG tail"},
+    # ---- 8: the PCS TCM-2650 as an endpoint (its harness plug waits on the ZGP drawing; the pins say so)
+    "PCS_BATT": {"to": "PCS-TCM (12 V battery)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.1 constant 12 V; endpoint PCS-TCM (book review 2026-09-28)"},
+    "PCS_IGN": {"to": "PCS-TCM (ignition)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.1 ignition; endpoint PCS-TCM"},
+    "PCS_TPS": {"to": "PCS-TCM (analog 1)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.13 + Table 4 (analog 1 may piggyback an ECU sensor); endpoint PCS-TCM"},
+    "PCS_RPM": {"to": "PCS-TCM (speed input 3, orange/black)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.12 speed input 3 = RPM, orange/black; endpoint PCS-TCM"},
+    "PCS_BRK": {"frm": "CHMSL (+ feed tap: 12 V while braking)", "to": "PCS-TCM (brake light input)",
+                 "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.18 'Brake Light' digital input (TCC unlock on brake). The factory brake switch now switches 0 V into "
+                        "PDM30 DIG14 and no longer carries 12 V, so the brake-on 12 V comes from the brake lamp output (CHMSL feed); "
+                        "input polarity OPEN until the ZGP drawing"},
+    "PCS_NS": {"frm": "PCS-TCM (PWM vs Lever Position output: neutral)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.19-20 ground-only outputs; endpoint PCS-TCM"},
+    "PCS_REV": {"frm": "PCS-TCM (PWM vs Lever Position output: reverse)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.19-20 ground-only outputs; endpoint PCS-TCM"},
+    # ---- 4: the LTCD CAN pair on DTM size-20 sockets (20 AWG only)
+    "CAN_LTCD_H": {"awg": 20, "spec": "M22759/32 twisted", "why": "DEUTSCH Contacts Catalog p.125 'Solid Contacts - Common Contact "
+                   "System': size-20 socket 0462-201-20** takes 20 AWG (0.50 mm2) only; 22 AWG is under it. 20 AWG twisted still meets "
+                   "the MoTeC CAN rule (PDM manual p.49 'twisted 22# Tefzel is usually OK' is a floor, not a size)"},
+    "CAN_LTCD_L": {"awg": 20, "spec": "M22759/32 twisted", "why": "as CAN_LTCD_H: DEUTSCH Contacts Catalog p.125, size-20 socket 20 AWG only"},
     "TG_BUS_UP": {"label": "Tailgate window UP line: dash switch UP -> splice 183 at the key switch CLOSE terminal",
                   "to": "TG-SW-KEY (CLOSE, splice 183)", "why": "the key switch is in parallel, not in series: " + TGW},
     "TG_BUS_DN": {"label": "Tailgate window DOWN line: dash switch DOWN -> splice 184 at the key switch OPEN terminal",
@@ -1282,25 +1385,57 @@ PIGTAIL_WHY = ("review A1 (receipt 2026-09-28_reviews-and-shape-rules.md; state 
                "(ProWire M800-KIT-N); in-line MiniSeal M81824/1-3 (ProWire Raychem MiniSeal page: 'Butt: M81824/1 series')")
 
 
+PIG_RULE = ("one conductor can't fill both cavities of a paired 20 A output (MoTeC PDM manual p.43/p.44 '20 A Output n (with "
+            "Axx)'), so every load on OUT1-8 takes two equal pigtails and an in-line MiniSeal. Pigtail gauge makes both splice "
+            "sides fit one colour (3137CT cavities 26-20 / 20-16 / 16-12): a 12-16 AWG load takes 2 x 16 AWG into M81824/1-3 "
+            "(yellow); an 18-20 AWG load takes 2 x 20 AWG into M81824/1-2 (blue); a 22-24 AWG load is raised to 20 AWG first "
+            "(red can't take 2 x 20). 20 AWG pigtails are inside MoTeC's 20#-16# for 20 A outputs (p.48) and carry 2 x 8 A at "
+            "80 C, so that output's limit is set to 16 A or less (review 2026-09-28, second book review)")
+
+
 def add_pigtails(rows):
-    """Return the pigtail rows; re-point each heavy load wire at its splice (the old frm goes to `conflicts`)."""
+    """Return the pigtail rows; re-point every load on a paired 20 A output at its splice (the old frm goes to `conflicts`)."""
     out = []
     for w in rows:
-        m = re.fullmatch(r"(PDM30|PDM15):(OUT[1-8])", str(w.get("frm") or ""))
-        if w.get("retired") or not m or not isinstance(w.get("awg"), int) or w["awg"] >= 16:
+        m = re.fullmatch(r"(PDM30|PDM15):(OUT[1-8])(?:\+(OUT[1-8]))?", str(w.get("frm") or ""))
+        if w.get("retired") or not m or not isinstance(w.get("awg"), int) or w["awg"] < 12:
             continue
-        box, ch = m.groups()
+        box, ch, ch2 = m.groups()
         p1, p2 = PDM20_PINS[ch]
         spl = f"SPL-{box}-{ch}"
+        if ch2:     # two paralleled 20 A outputs (MoTeC PDM manual p.6, p.22): four 18 AWG pigtails = 6,480 CM, inside one yellow
+            pins4 = PDM20_PINS[ch] + PDM20_PINS[ch2]
+            old = w["frm"]
+            w["frm"] = f"{spl} ({box}:{ch} + {box}:{ch2} pigtails {' + '.join(pins4)})"
+            w.setdefault("conflicts", []).append(
+                f"decision: frm {old} -> {w['frm']} — two paralleled 20 A outputs: MoTeC PDM manual p.6 'Two or more output pins can "
+                f"be connected in parallel to increase current capacity ... must all be of the same type', p.22 'configured to use a "
+                f"common channel or an identical condition'; four 18 AWG pigtails (20#-16#, p.6) = 6,480 CM fit one M81824/1-3 "
+                f"(16-12 AWG, 6,530 CM max); four 16 AWG (10,320 CM) would not")
+            for n, pin in enumerate(pins4, 1):
+                out.append(OrderedDict(
+                    id=f"{w['id']}_PT{n}", label=f"{box} {ch}+{ch2} pigtail {n} of 4 (pin {pin}) to the #{w['id']} splice",
+                    status="implied", frm=f"{box}:{pin}", to=f"{spl} (pigtail side)", awg=18, spec="M22759/32", splice="M81824/1-3",
+                    color=w.get("color"), length_ft=None, length_basis="pigtail: all four legs the same length, cut at the formboard",
+                    control=w.get("control"), subsystem=w.get("subsystem"), subsystem_basis=f"pigtail of #{w['id']}",
+                    pigtail_of=w["id"], conflicts=[], sources=[PIGTAIL_WHY]))
+            continue
+        if w["awg"] >= 22:
+            w.setdefault("conflicts", []).append(f"decision: awg {w['awg']} -> 20 — a 22-24 AWG load can't share a MiniSeal "
+                                                 f"colour with 2 x 20 AWG pigtails ({PIG_RULE})")
+            w["awg"] = 20
+            if str(w.get("spec") or "").startswith("M22759/16"):
+                w["spec"] = "M22759/32" + str(w["spec"])[len("M22759/16"):]
+        pg, sp = (16, "M81824/1-3") if w["awg"] <= 16 else (20, "M81824/1-2")
         old = w["frm"]
         w["frm"] = f"{spl} ({box}:{ch} pigtails {p1} + {p2})"
         w.setdefault("conflicts", []).append(
-            f"decision: frm {old} -> {w['frm']} — the {w['awg']} AWG load wire starts at the in-line splice; the two 16 AWG "
-            f"pigtails {w['id']}_PT1/_PT2 land on {box} {p1} and {p2} ({PIGTAIL_WHY})")
+            f"decision: frm {old} -> {w['frm']} — the {w['awg']} AWG load wire starts at the in-line {sp}; the two {pg} AWG "
+            f"pigtails {w['id']}_PT1/_PT2 land on {box} {p1} and {p2} ({PIGTAIL_WHY}; {PIG_RULE})")
         for n, pin in ((1, p1), (2, p2)):
             out.append(OrderedDict(
                 id=f"{w['id']}_PT{n}", label=f"{box} {ch} pigtail {n} of 2 (pin {pin}) to the #{w['id']} splice",
-                status="implied", frm=f"{box}:{pin}", to=f"{spl} (pigtail side)", awg=16, spec="M22759/32",
+                status="implied", frm=f"{box}:{pin}", to=f"{spl} (pigtail side)", awg=pg, spec="M22759/32", splice=sp,
                 color=w.get("color"), length_ft=None,
                 length_basis="pigtail: both legs the same length, cut at the formboard",
                 control=w.get("control"), subsystem=w.get("subsystem"),
@@ -1381,6 +1516,46 @@ def length_kind(w):
     b = str(w.get("length_basis") or "").lower()
     return "tape" if b.startswith("tape") else "twin" if b.startswith("twin") else "estimate"
 
+
+
+# ---- review item 7 (2026-09-28): where each end is, and so what a wire crosses. Four places, not two: the engine bay, the cab,
+#      the firewall itself, and OUTSIDE the cab (frame, tank, bed, tailgate, doors). Only engine bay <-> cab crosses the
+#      firewall; engine bay <-> outside runs along the frame (no firewall); cab <-> outside leaves the cab through the body
+#      crossing (bulkhead C, not designed yet). The pages read `side` on each endpoint and `route` on each wire.
+SIDE_OF = {"engine": "engine bay", "cabin": "cab", "firewall": "firewall", "rear": "outside", "chassis": "outside",
+           "doors": "outside", "unknown": "unknown"}
+
+
+def routes(reg):
+    eps = reg["endpoints"]
+    for eid, ep in eps.items():
+        ep["side"] = "cab" if eid.startswith(("M130", "PDM30")) else "engine bay" if eid.startswith("PDM15") else \
+            SIDE_OF.get(ep.get("where"), "unknown")
+    ends = defaultdict(list)
+    for t in reg["terminations"]:
+        ends[str(t["wire"])].append(t)
+    fw = reg.get("kits_meta", {}).get("firewall", {})
+    grom = set(map(str, fw.get("grommet", [])))
+    for w in list(reg["wires"]) + list(reg["implied"]):
+        if w.get("retired"):
+            continue
+        tl = ends.get(str(w["id"]), [])
+        via = [t for t in tl if eps.get(t["endpoint"], {}).get("side") == "firewall"]
+        sides = sorted({eps[t["endpoint"]]["side"] for t in tl if t["endpoint"] in eps} - {"firewall"})
+        if set(sides) >= {"engine bay", "cab"}:
+            cross = (f"firewall: {via[0]['endpoint']} {via[0].get('cavity') or ''}".strip() if via else
+                     "firewall: grommet" if str(w["id"]) in grom else "firewall: NO CROSSING RECORDED")
+        elif set(sides) >= {"cab", "outside"}:
+            cross = ("cab exit: body crossing (bulkhead C), cavity OPEN" if "bulkhead C" in str(w.get("notes") or "") + " ".join(
+                str(o) for t in tl for o in (eps.get(t["endpoint"], {}).get("open") or []))
+                     else "cab exit: through the body to the outside (path not recorded)")
+        elif set(sides) >= {"engine bay", "outside"}:
+            cross = "none: engine bay to outside along the frame, no firewall"
+        elif "unknown" in sides:
+            cross = "unknown: an end has no recorded side"
+        else:
+            cross = "none: both ends on one side"
+        w["route"] = OrderedDict(sides=sides, crossing=cross)
 
 # endpoint fields the kit build does not carry, copied from the catalog into the registry (review A10: CAN topology as data)
 ENDPOINT_EXTRA = ("topology", "cavities", "empty")
@@ -1463,6 +1638,8 @@ def main():
     implied = [OrderedDict(id=i, label=l, status="implied", frm=f, to=t, awg=g, spec=s,
                            **IMPLIED_EXTRA.get(i, {}), sources=[src])
                for i, l, f, t, g, s, src in IMPLIED]
+    retired_implied = [dict(w, retired=IMPLIED_RETIRED[w["id"]]) for w in implied if w["id"] in IMPLIED_RETIRED]
+    implied = [w for w in implied if w["id"] not in IMPLIED_RETIRED]
     apply_decisions(wires)
     apply_implied_decisions(implied)
     # the DC primary cables sized from physics (cable_sizing_v5.py -> cable_decisions.json): gauge, parallel count, fuse
@@ -1491,6 +1668,8 @@ def main():
             w["spec"] = "M22759/16" + str(w["spec"])[len("M22759/32"):]
     for w in list(wires) + list(implied):
         w["length_kind"] = length_kind(w)
+        if isinstance(w.get("awg"), int):          # one printed gauge per cable, parallel conductors included
+            w["gauge"] = (f"{w['parallel']} x {w['awg']} AWG" if (w.get("parallel") or 1) > 1 else f"{w['awg']} AWG")
 
     reg = OrderedDict(
         meta=OrderedDict(
@@ -1513,6 +1692,8 @@ def main():
     import kits_v5    # per-plug kits, tools per step, BOM vs carts (same build, same registry)
     kits_v5.attach(reg)
     reg["kits_meta"]["pins_from_terminations"] = pins_from_terminations(reg)
+    reg["retired_implied"] = retired_implied
+    routes(reg)
     cat = kits_v5._y("endpoints.yaml")
     for eid, ep in reg["endpoints"].items():
         for k in ENDPOINT_EXTRA:
@@ -1522,9 +1703,10 @@ def main():
         spl = str(w["to"]).split(" ")[0]
         if w["id"].endswith("_PT1"):
             load = w["pigtail_of"]
-            reg["splices"].append({"at": spl, "wires": [w["id"], w["id"][:-1] + "2", load], "splice": "M81824/1-3",
-                                   "type": "in-line", "sides": [[w["id"], w["id"][:-1] + "2"], [load]],
-                                   "equiv_awg": [kits_v5.awg_equiv(2 * kits_v5.CMA[16]),
+            legs = [x["id"] for x in pigtails if x["pigtail_of"] == load]
+            reg["splices"].append({"at": spl, "wires": legs + [load], "splice": w["splice"],
+                                   "type": "in-line", "sides": [legs, [load]],
+                                   "equiv_awg": [kits_v5.awg_equiv(len(legs) * kits_v5.CMA[w["awg"]]),
                                                  next(x["awg"] for x in list(wires) + list(implied) if x["id"] == load)]})
     OUT_REG.write_text(json.dumps(reg, indent=1, ensure_ascii=False) + "\n")
     write_report(wires, candidates, implied, apr, pairs)

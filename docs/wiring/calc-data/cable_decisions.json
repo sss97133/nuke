@@ -83,6 +83,12 @@
   "fuse": "MIDI 40 A",
   "why": "sized from physics 2026-09-28: load 40 A (OEM 40 A supply fuse (ch.17 \u00a717.5)); ampacity 75 A (free air, 100 \u00b0C ambient (engine bay)) vs need 47 A; drop 0.082 V; MIDI 40 A. cable_sizing_v5.py"
  },
+ "IBOOST_GND": {
+  "awg": 6,
+  "parallel": 1,
+  "fuse": "none",
+  "why": "sized from physics 2026-09-28: load 40 A (the iBooster's return carries #52's current (OEM 40 A supply fuse, ch.17 \u00a717.5): sized like its feed so the cable is one gauge on every page (book review 2026-09-28: it printed 8 AWG while #52 is 6)); ampacity 75 A (free air, 100 \u00b0C ambient (engine bay)) vs need 40 A; drop None V; none. cable_sizing_v5.py"
+ },
  "DCDC_IN": {
   "awg": 6,
   "parallel": 1,

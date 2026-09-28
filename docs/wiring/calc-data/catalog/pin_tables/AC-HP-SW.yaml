@@ -1,7 +1,10 @@
 AC-HP-SW:
   family: open
   open:
-  - 'switch not picked (registry names no part): its plug and terminals close this. For reference the 1978 C60 discharge-pressure cut-out switch is a 2-terminal plug
-    12004275 (1978 booklet p.16)'
+  - 'liquid-line port for 3/8-24: Vintage Air''s in-line switch-port page returned 404 — port part number OPEN'
+  - 'switch plug type: not on the Summit page'
   sources:
   - 1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) 'Air Conditioning RPO C-60' panel
+  - reference_documents/web_snapshots/www.summitracing.com__vta-11079-vus.md
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2 (owner 2026-09-27 called the trinary 'low value data')
+  device: 'Vintage Air 11079-VUS binary switch: low cut-out 30 psi, high cut-out 406 psi, 3/8-24 male, 2 wires'

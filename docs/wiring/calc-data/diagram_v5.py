@@ -27,8 +27,9 @@ from pathlib import Path
 CD = Path(__file__).resolve().parent
 sys.path.insert(0, str(CD))
 import kits_v5                                         # noqa: E402
-from manual_v5 import gm_colour, tw, FONT              # noqa: E402
+from manual_v5 import gm_colour, tw, FONT, wrap_text   # noqa: E402
 import diagram_sections_v5 as P                        # noqa: E402
+import manual_v5                                       # noqa: E402
 
 OUT = CD.parent / "output" / "manual"
 W, H, M = 1224, 792, 36                                # tabloid landscape, points
@@ -48,9 +49,29 @@ def wire_colours(w):
     """(base hex, stripe hex or None) from the registry colour words ('white/red' = white with a red stripe)."""
     col = str(w.get("color") or "").lower().split("+")[0]
     parts = [x.strip() for x in col.split("/") if x.strip()]
-    base = HEX.get(parts[0], "#333333") if parts else "#333333"
+    if parts and parts[0] in ("cable", "shld"):
+        return SHIELD_RUN                      # shielded-cable conductor: black with a white centre line, never grey
+    if not parts or parts[0] not in HEX:
+        return UNSET_RUN, None                 # colour not set: white with an orange edge (Sheet.line)
     stripe = HEX.get(parts[1]) if len(parts) > 1 else None
-    return base, stripe
+    return HEX[parts[0]], stripe
+
+
+SHIELD_RUN = ("#111111", "#ffffff")
+UNSET_RUN = "#fffffe"
+
+
+def colour_faults():
+    """The run looks that mean something other than a wire colour must not equal any wire colour's look
+    (review 2026-09-28: grey meant both a grey wire and a shielded cable)."""
+    looks = {(HEX[c], None) for c in HEX if c not in ("cable", "shld")}
+    looks |= {(HEX[a], HEX[b]) for a in HEX for b in HEX if a != b and a not in ("cable", "shld") and b not in ("cable", "shld")}
+    bad = []
+    if SHIELD_RUN in looks:
+        bad.append("the shielded-cable run is drawn like a wire colour")
+    if (UNSET_RUN, None) in looks:
+        bad.append("the colour-not-set run is drawn like a wire colour")
+    return bad
 
 
 # Dave's words for plug titles (the book's rule: no cut-list codes on a page)
@@ -136,13 +157,20 @@ def load():
 
 class Sheet:
     def __init__(self, number, title, subtitle, head="ENGINE HARNESS"):
-        self.el, self.number, self.boxes, self.runs, self.rects = [], number, [], [], []
+        self.el, self.number, self.boxes, self.runs, self.rects, self.marks = [], number, [], [], [], []
+        self.mx = False                  # mirror: an engine-layout sheet is drawn cab-left, engine-right (one orientation)
         self.txt(W / 2, M - 8, f"{head} — WIRING DIAGRAM", 9, bold=True, anchor="middle")
         self.txt(W - M, M - 8, number, 9, bold=True, anchor="end")
         self.txt(W / 2, M + 14, title.upper(), 14, bold=True, anchor="middle")
         self.txt(W / 2, M + 26, subtitle, 7, anchor="middle")
 
+    def X(self, x):
+        return W - x if self.mx else x
+
     def txt(self, x, y, s, size, bold=False, anchor="start", italic=False, colour="#000", href=None, owner=None):
+        if self.mx:
+            x = W - x
+            anchor = {"start": "end", "end": "start"}.get(anchor, anchor)
         w_ = tw(str(s), size, bold)
         x0 = x - (w_ if anchor == "end" else w_ / 2 if anchor == "middle" else 0)
         self.boxes.append((x0, y - size * 0.78, x0 + w_, y + 0.2, str(s), href, owner))
@@ -153,25 +181,33 @@ class Sheet:
 
     def line(self, pts, w=0.8, dash=None, colour="#000", stripe=None, owner=None):
         """A run (owner = its wire id) or a symbol stroke. Stripe = a thin solid centre line in the stripe colour."""
+        pts = [(self.X(x), y) for x, y in pts]
         d = f' stroke-dasharray="{dash}"' if dash else ""
         P_ = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
         if colour != "#000":                     # a coloured run: thin black edge so white wire shows on white paper
-            self.el.append(f'<polyline points="{P_}" fill="none" stroke="#000" stroke-width="{w + 0.9}" stroke-linejoin="round"{d}/>')
+            edge = ORANGE if colour == UNSET_RUN else "#000"   # colour not set: an orange edge
+            self.el.append(f'<polyline points="{P_}" fill="none" stroke="{edge}" stroke-width="{w + 0.9}" stroke-linejoin="round"{d}/>')
         self.el.append(f'<polyline points="{P_}" fill="none" stroke="{colour}" stroke-width="{w}" stroke-linejoin="round"{d}/>')
         if stripe:
             self.el.append(f'<polyline points="{P_}" fill="none" stroke="{stripe}" stroke-width="{max(w * 0.36, 0.4):.2f}" stroke-linejoin="round"{d}/>')
         self.runs.append((owner, list(pts)))
 
-    def rect(self, x, y, w, h, sw=0.9, rx=0, fill="none", dash=None, colour="#000"):
+    def rect(self, x, y, w, h, sw=0.9, rx=0, fill="none", dash=None, colour="#000", mark=False):
+        if self.mx:
+            x = W - x - w
         d = f' stroke-dasharray="{dash}"' if dash else ""
         self.rects.append((x, y, x + w, y + h))
+        if mark:
+            self.marks.append((x, y, x + w, y + h))   # a pin box: no text but its own mark may sit on it
         self.el.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" rx="{rx}" fill="{fill}" stroke="{colour}" stroke-width="{sw}"{d}/>')
 
     def dot(self, x, y, r=1.6):
-        self.el.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r}" fill="#000"/>')
+        self.el.append(f'<circle cx="{self.X(x):.1f}" cy="{y:.1f}" r="{r}" fill="#000"/>')
+        self.marks.append((self.X(x) - r, y - r, self.X(x) + r, y + r, "dot"))
 
     def arrow(self, x, y, left=False):
-        s = -1 if left else 1
+        x = self.X(x)
+        s = (1 if left else -1) if self.mx else (-1 if left else 1)
         self.el.append(f'<polygon points="{x:.1f},{y:.1f} {x - s * 4:.1f},{y - 2:.1f} {x - s * 4:.1f},{y + 2:.1f}" fill="#000"/>')
 
     def ground(self, x, y, owner=None):
@@ -196,6 +232,21 @@ def overlaps(sheet):
             bx0, by0, bx1, by1, bt = B[j][:5]
             if ax0 < bx1 - 0.5 and bx0 < ax1 - 0.5 and ay0 < by1 - 0.5 and by0 < ay1 - 0.5:
                 out.append((at, bt))
+    return out
+
+
+def mark_overprints(sheet):
+    """Text over a pin box that is not that box's own mark (review 2026-09-28: 'S-03/S-04/S-05' printed over the B16
+    pin box). A mark's own label sits wholly inside its box; anything else touching a pin box is an overprint."""
+    out = []
+    for m in getattr(sheet, "marks", []):
+        if len(m) > 4:                   # dots are drawn over runs on purpose; only pin boxes are checked
+            continue
+        mx0, my0, mx1, my1 = m
+        for x0, y0, x1, y1, t, *_ in sheet.boxes:
+            inside = x0 >= mx0 - 0.6 and x1 <= mx1 + 0.6 and y0 >= my0 - 1.2 and y1 <= my1 + 1.2
+            if not inside and x0 < mx1 - 0.3 and mx0 < x1 - 0.3 and y0 < my1 - 0.3 and my0 < y1 - 0.3:
+                out.append(t)
     return out
 
 
@@ -248,15 +299,36 @@ def fit_tail(text, width, size):
     return fit(head, width - tw(sep + tail, size), size) + sep + tail
 
 
-def wire_label(w):
-    """GM style 'gauge colour-circuit', then the length: '22 WHT/ORN-99R · 4.6 FT EST' (estimate until measured)."""
+def wire_label(w, length=True):
+    """GM style 'gauge colour-circuit', then the run's total length once: '22 WHT/ORN-99R · TOTAL RUN 4.6 FT EST'
+    (estimate until measured). length=False: the same wire labelled again on the sheet (the far side of a crossing):
+    the length is printed once per sheet, never repeated on both sides of an in-line connector (review 2026-09-28)."""
     col = gm_colour(str(w.get("color") or "?").upper()).replace("CABLE", "SHLD").replace(" + ", "+")
+    head = f"{manual_v5.gauge_word(w)} {col}-{str(w['id']).upper()}"
+    if not length:
+        return head
     L = w.get("length_ft")
     basis = str(w.get("length_basis") or "").lower()
     if L:
-        tag = "" if re.search(r"measur|bench", basis) else " EST"
-        return f"{w.get('awg') or '?'} {col}-{str(w['id']).upper()} · {L:.1f} FT{tag}"
-    return f"{w.get('awg') or '?'} {col}-{str(w['id']).upper()} · LENGTH OPEN"
+        tag = "" if re.match(r"measur|bench", basis) else " EST"
+        return f"{head} · TOTAL RUN {L:.1f} FT{tag}"
+    return f"{head} · LENGTH OPEN"
+
+
+def first_label(s, wid):
+    """True the first time a wire is labelled on this sheet: its length goes on that label only."""
+    seen = s.__dict__.setdefault("len_shown", set())
+    if wid in seen:
+        return False
+    seen.add(wid)
+    return True
+
+
+def length_repeats(sheet):
+    """Wires whose length is printed more than once on a sheet (review 2026-09-28: same length both sides of a crossing)."""
+    from collections import Counter
+    c = Counter(m.group(1) for b in sheet.boxes for m in [re.search(r"-(\S+) · (?:TOTAL RUN|LENGTH OPEN)", str(b[4]))] if m)
+    return [w for w, n in c.items() if n > 1]
 
 
 def circuit_label(w):
@@ -314,21 +386,38 @@ def sheet_parts(reg, eps_on_sheet, parts, junction_wires=None):
 # ------------------------------------------------------------------------------------------------ the page model
 class Box:
     """A column item: a plug, junction, computer, off-sheet tag list or bulkhead strip. pins 'right' = the left stack
-    (runs leave to the right), 'left' = the right stack. rows: dicts {cav, text, wires, mark, far}."""
+    (runs leave to the right), 'left' = the right stack. rows: dicts {cav, text, wires, mark, far}. A row whose text is
+    wider than the box wraps onto more lines (never cut short); its pin stays on the row's first line."""
+    SUB = 6.2                              # a wrapped row's next line
+
     def __init__(self, kind, code, title, rows, width=BOX_W, pins="right"):
         self.kind, self.code, self.title, self.rows, self.w, self.pins = kind, code, title, rows, width, pins
         self.x = self.y = 0.0
         self.foot = []                     # part lines printed under a plug box
 
+    def mark_w(self, r):
+        return max(9, tw(r["mark"], 5.2, True) + 3) if r.get("mark") else 0
+
+    def lines(self, i):
+        r = self.rows[i]
+        if self.kind == "strip" or not r.get("text"):
+            return [r.get("text") or ""]
+        return wrap_text(r["text"], self.w - 12 - self.mark_w(r), 5.4)
+
+    def row_h(self, i):
+        # a computer pin with several splices stacks their ids under its dot: the row makes room for them
+        extra = max(len(self.lines(i)) - 1, (self.rows[i].get("n_tags") or 1) - 1)
+        return ROW + extra * self.SUB
+
     @property
     def h(self):
-        return len(self.rows) * ROW + 8
+        return sum(self.row_h(i) for i in range(len(self.rows))) + 8
 
     def span(self):                        # vertical space the item takes in its stack (title + box + foot + gap)
         return 12 + self.h + (len(self.foot) * 5.4 + 4 if self.foot else 0) + 12
 
     def pin(self, i):
-        yy = self.y + 4 + i * ROW + ROW / 2
+        yy = self.y + 4 + sum(self.row_h(k) for k in range(i)) + ROW / 2
         return (self.x + self.w if self.pins == "right" else self.x, yy)
 
 
@@ -363,6 +452,29 @@ class Ctx:
                     self.inline[e] = rec
                     for pt in sp["sides"][0]:
                         self.pigtail_of[str(pt)] = (main[0], rec)
+        # rails: the kit's stub splices numbered after the splice list, once for the book (never restarting per rail).
+        # A daisy chain of n splices takes the feed and the first branch in its first splice, one branch in each
+        # middle splice and the rest in the last (endpoint note: '16+18+18 then 18+18+18'); where each sits along the
+        # rail is set at the formboard.
+        self.rail_sid, self.rail_by_cav, self.rail_recs = {}, {}, OrderedDict()
+        k = len(self.splices)
+        for e in P.JUNCTIONS:
+            if not e.startswith("RAIL-") or e not in self.eps:
+                continue
+            ep = self.eps[e]
+            n = int((ep.get("kit") or {}).get("D-609-05") or 0)
+            ws_ = [str(x) for x in ep.get("wires") or []]
+            if not n or not ws_:
+                continue
+            ids = [f"S-{k + i + 1:02d}" for i in range(n)]
+            k += n
+            pos = [0] + [min(max(j - 1, 0), n - 1) for j in range(1, len(ws_))]
+            for wid, j in zip(ws_, pos):
+                self.rail_sid[(e, wid)] = ids[j]
+                self.rail_recs.setdefault((e, ids[j]), []).append(wid)
+            for t in self.reg["terminations"]:
+                if t["endpoint"] == e and (e, str(t["wire"])) in self.rail_sid:
+                    self.rail_by_cav[(e, str(t.get("cavity")))] = self.rail_sid[(e, str(t["wire"]))]
         # the shield rule, as the wire rows state it
         self.shield_rule = None
         for w in self.wires.values():
@@ -609,11 +721,23 @@ def comp_box(ctx, e, items, pins):
         d = ctx.desig.get((dev, norm_pin(cav))) if cav else None
         text = f"{d[0]} — {d[1]}" if d else (words(cav) if cav and not re.match(r"^[AB]\d+$", str(cav)) else "pin function not on file")
         mark = cav_mark(norm_pin(cav)) if cav else "?"
-        rows.append({"cav": cav, "text": text, "wires": wl, "mark": mark})
+        n_tags = sum(1 for sp_ in ctx.splices if sp_["endpoint"] == e and sp_["cav"] == norm_pin(cav)) if cav else 0
+        rows.append({"cav": cav, "text": text, "wires": wl, "mark": mark, "n_tags": n_tags})
     return Box("comp", e, plug_title(e, ctx.eps.get(e, {})), rows, pins=pins)
 
 
 def jun_box(ctx, e, items, pins):
+    rows = []
+    if e.startswith("RAIL-") and any((e, wid) in ctx.rail_sid for wid, _ in items):
+        # a rail: every branch lands on its stub splice, drawn as a dot with the splice id (no cavity box)
+        for wid, cav in sorted(items, key=lambda p: (ctx.rail_sid.get((e, p[0]), "S-99"), p[0])):
+            sid = ctx.rail_sid.get((e, wid), "S-?")
+            rows.append({"cav": sid, "text": f"{sid} — {kits_v5.dave_name(ctx.wires[wid])}", "wires": [wid], "mark": "",
+                         "sid": sid})
+        ids = sorted({r["sid"] for r in rows})
+        allid = sorted({v for (ee, _), v in ctx.rail_sid.items() if ee == e})
+        b = Box("jun", e, f"{plug_title(e, ctx.eps.get(e, {}))} · {len(allid)} splices {allid[0]}–{allid[-1]}", rows, pins=pins)
+        return b
     rows = []
     for wid, cav in sorted(items, key=lambda p: (sort_key(p[1] if p[1] is not None else f"?{p[0]}"), p[0])):
         rows.append({"cav": cav, "text": f"{words(cav) if cav else 'terminal OPEN'} — {kits_v5.dave_name(ctx.wires[wid])}",
@@ -623,6 +747,7 @@ def jun_box(ctx, e, items, pins):
 
 def dest_text(ctx, e, cav, owned, num_of):
     t = plug_title(e, ctx.eps.get(e, {}))
+    cav = ctx.rail_by_cav.get((e, str(cav)), cav)
     c = f" {words(cav)}" if cav else " (cavity OPEN)"
     n = num_of(owned[e]) if e in owned else None
     return f"→ {t}{c} · sheet {n}" if n else f"→ {t}{c} · on no sheet: OPEN"
@@ -694,18 +819,28 @@ def draw_column_box(s, b):
                       owner=r["wires"][0] if r["wires"] else None)
                 break
             continue
-        if b.pins == "right":
-            mw = max(9, tw(r["mark"], 5.2, True) + 3) if r["mark"] else 0
-            if r["mark"]:
-                s.rect(b.x + b.w - 3 - mw, yy - 3.4, mw, 6.8, sw=0.6, fill="#fff")
-                s.txt(b.x + b.w - 3 - mw / 2, yy + 2.2, r["mark"], 5.2, bold=True, anchor="middle")
-            s.txt(b.x + 4, yy + 2.2, fit_tail(r["text"], b.w - 12 - mw, 5.4), 5.4, italic=b.kind == "tag" or bool(r.get("shield")))
-        else:
-            mw = max(9, tw(r["mark"], 5.2, True) + 3) if r["mark"] else 0
-            if r["mark"]:
-                s.rect(b.x + 3, yy - 3.4, mw, 6.8, sw=0.6, fill="#fff")
-                s.txt(b.x + 3 + mw / 2, yy + 2.2, r["mark"], 5.2, bold=True, anchor="middle")
-            s.txt(b.x + (mw + 7 if r["mark"] else 4), yy + 2.2, fit_tail(r["text"], b.w - 12 - mw, 5.4), 5.4, italic=b.kind == "tag")
+        if r.get("sid"):
+            s.dot(px, yy, 2.0)                  # the stub splice this branch lands on
+        mw = b.mark_w(r)
+        italic = b.kind == "tag" or bool(r.get("shield"))
+        # the pin box sits on the pin's side; the text starts just clear of it (on a mirrored sheet the box's sides swap,
+        # so the text is anchored from the other edge and still reads left to right from the mark)
+        mark_x = b.x + b.w - 3 - mw if b.pins == "right" else b.x + 3
+        if r["mark"]:
+            s.rect(mark_x, yy - 3.4, mw, 6.8, sw=0.6, fill="#fff", mark=True)
+            s.txt(mark_x + mw / 2, yy + 2.2, r["mark"], 5.2, bold=True, anchor="middle")
+        for k, ln in enumerate(b.lines(i)):
+            ty = yy + 2.2 + k * Box.SUB
+            if b.pins == "right":
+                if s.mx:
+                    s.txt(b.x + b.w - 7 - mw, ty, ln, 5.4, italic=italic, anchor="end")
+                else:
+                    s.txt(b.x + 4, ty, ln, 5.4, italic=italic)
+            else:
+                if s.mx:
+                    s.txt(b.x + b.w - 4, ty, ln, 5.4, italic=italic, anchor="end")
+                else:
+                    s.txt(b.x + (mw + 7 if r["mark"] else 4), ty, ln, 5.4, italic=italic)
     yy = b.y + b.h + 6
     for ln in b.foot:
         s.txt(b.x + 2, yy + 2, ln, 4.6, colour="#333", italic=ln.startswith("+"))
@@ -728,6 +863,7 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
            f"dashed = an end or a cavity not settled · plug boxes are pin maps, not the plug's shape"
            + ("; the 61-pin is drawn to its insert arrangement" if any(k == "face" for k, _ in model["x"]) else ""))
     s = Sheet(number, title, sub, head)
+    s.mx = bool(model["eng"])                  # engine layout drawn cab-left, engine-right: the book's one orientation
 
     # ---- left stack
     left, right = model["left"], model["right"]
@@ -879,7 +1015,7 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
             else:
                 draw([(xr, yr), (xr + 10, yr)])
             # the cab side carries the same label
-            s.txt(xr + 4, yr - 1.4, fit(labels[wid], laneC[0] - xr - 10, LBL), LBL, owner=wid)
+            s.txt(xr + 4, yr - 1.4, wire_label(w, length=False), LBL, owner=wid)
         elif eng and Lp and Rp:
             # no crossing cavity: over the top of the sheet, dashed, stamped
             xa = laneA[0] + (iA % nA) * stepA + 1
@@ -941,13 +1077,13 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
             taken.add((p[4].code, p[3].get("cav"), p[1]))
         for x_, y_, _w, r_, b_ in anc:
             x_ = b_.x + b_.w + (14 if b_.kind == "comp" else 0)     # clear of a splice dot at a computer pin
-            s.txt(x_ + 4, y_ - 1.4, fit(labels[wid], zoneL - 14 - (x_ - b_.x - b_.w), LBL), LBL, owner=wid)
+            s.txt(x_ + 4, y_ - 1.4, wire_label(w, length=first_label(s, wid)), LBL, owner=wid)
             s.txt(x_ + 4, y_ + 4.6, circuit_label(w), LBL2, colour="#333", owner=wid)
         rp_ = sorted([p for p in Rp if notpig(p) and free_pt(p)], key=lambda p: (p[4].kind != "dev", len(p[3]["wires"])))
         if not anc and rp_:
             x_, y_ = rp_[0][0], rp_[0][1]
             taken.add((rp_[0][4].code, rp_[0][3].get("cav"), y_))
-            s.txt(x_ - 18, y_ - 1.4, fit(labels[wid], 100, LBL), LBL, anchor="end", owner=wid)
+            s.txt(x_ - 18, y_ - 1.4, wire_label(w, length=first_label(s, wid)), LBL, anchor="end", owner=wid)
             s.txt(x_ - 18, y_ + 4.6, circuit_label(w), LBL2, colour="#333", anchor="end", owner=wid)
     # shields: dashed oval around the cable's conductors near the plug; the drain leaves the oval (its run is drawn
     # with the others from the oval's point)
@@ -958,7 +1094,7 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
             ys = [b.pin(k)[1] for k, rr in enumerate(b.rows) if rr["wires"] and rr["wires"][0] in r["shield"]]
             drain = r["wires"][0]
             y_top, y_bot = min(ys) - 3.5, max(ys) + 3.5
-            s.el.append(f'<ellipse cx="{xo:.1f}" cy="{(y_top + y_bot) / 2:.1f}" rx="3.2" ry="{(y_bot - y_top) / 2:.1f}" '
+            s.el.append(f'<ellipse cx="{s.X(xo):.1f}" cy="{(y_top + y_bot) / 2:.1f}" rx="3.2" ry="{(y_bot - y_top) / 2:.1f}" '
                         f'fill="none" stroke="#000" stroke-width="0.6" stroke-dasharray="1.6 1.2"/>')
             base, stripe = wire_colours(ws[drain])
             s.line([(xo, y_bot), (xo, b.pin(i)[1])], 1.1, None, colour=base, stripe=stripe, owner=drain)
@@ -973,8 +1109,10 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
             px, py = b.pin(i)
             dx = -8 if b.pins == "left" else 8
             s.dot(px + dx, py, 2.0)
-            ids = "/".join(x["id"] for x in sps) or "S-?"
-            s.txt(px + dx, py + 6.2, ids, 4.2, bold=True, anchor="middle", colour="#000" if sps else ORANGE)
+            # the splice ids under the dot, one per line, anchored on the side away from the pin box so a long list
+            # never runs over it (review 2026-09-28: 'S-03/S-04/S-05' over the B16 box)
+            for k_, sid_ in enumerate([x["id"] for x in sps] or ["S-?"]):
+                s.txt(px + dx, py + 6.2 + k_ * 4.6, sid_, 4.2, bold=True, anchor="middle", colour="#000" if sps else ORANGE)
             for x in sps:
                 splice_rows[x["id"]] = (x["id"], f"{b.code} {r['cav']}", ", ".join(str(q).upper() for q in x["wires"]),
                                         str(x.get("splice") or "OPEN"), "formboard: OPEN")
@@ -993,15 +1131,25 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
             px, py = b.pin(i)
             pw = ctx.wires[pt]
             if b.pins == "left":
-                s.txt(px - 18, py - 1.4, fit(wire_label(pw), 100, LBL), LBL, anchor="end", owner=r["wires"][0])
+                s.txt(px - 18, py - 1.4, wire_label(pw), LBL, anchor="end", owner=r["wires"][0])
                 s.txt(px - 18, py + 4.6, f"{circuit_label(pw)} · {sid}", LBL2, colour="#333", anchor="end", owner=r["wires"][0])
             else:
-                s.txt(px + 4, py - 1.4, fit(wire_label(pw), zoneL - 14, LBL), LBL, owner=r["wires"][0])
+                s.txt(px + 4, py - 1.4, wire_label(pw), LBL, owner=r["wires"][0])
                 s.txt(px + 4, py + 4.6, f"{circuit_label(pw)} · {sid}", LBL2, colour="#333", owner=r["wires"][0])
+    for b in right + left:
+        if b.kind == "jun" and b.code.startswith("RAIL-"):
+            for r in b.rows:
+                sid = r.get("sid")
+                if sid and sid not in splice_rows:
+                    joined = ctx.rail_recs.get((b.code, sid), [])
+                    splice_rows[sid] = (sid, f"{plug_title(b.code, ctx.eps.get(b.code, {})).lower()}",
+                                        ", ".join(q.upper() for q in joined) + " + the rail", "D-609-05",
+                                        "formboard: order along the rail OPEN")
     for wid, rec in model["merged"].items():
         pts_ = [str(x).upper() for x in rec["sides"][0]]
         splice_rows[rec["id"]] = (rec["id"], "in-line", f"{' + '.join(pts_)} → {wid.upper()}", str(rec.get("splice") or "OPEN"),
                                   "formboard: OPEN")
+    s.mx = False                               # the CAN topology strip and the tables are drawn in true positions
     if sp["key"] == "data":
         draw_can_topology(s, ctx, open_notes)
     # ---- tables: parts, splices, ends not recorded, shield rule
@@ -1013,7 +1161,10 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
     shield_line = None
     if any(r.get("shield") for b in left for r in b.rows):
         shield_line = ("SHIELDS: " + ctx.shield_rule) if ctx.shield_rule else "SHIELDS: drain grounding end OPEN"
+    s.mx = False                               # tables and footnotes read left to right in true positions
     facing = place_tables(s, ctx, number, title, head, lowest, plist, list(splice_rows.values()), open_notes, shield_line)
+    s.footer = [f"{len(ws)} circuits drawn from the wire list · {open_runs} stamped OPEN (an end or a cavity not settled) · "
+                f"cavity marks are the moulded letters; positions are indicative · lengths are estimates until measured on the truck"]
     s.txt(M, H - M + 8, f"{len(ws)} circuits drawn from the wire list · {open_runs} stamped OPEN (an end or a cavity not settled) · "
           f"cavity marks are the moulded letters; positions are indicative · lengths are estimates until measured on the truck", 6)
     return s, facing, len(ws) + len(model["pigtail_at"]), open_runs
@@ -1047,7 +1198,7 @@ def draw_strip_engine(s, b):
     href = MAP_URL + b.code
     s.txt(b.x + b.w / 2, b.y - 22, b.title.upper(), 5.6, bold=True, anchor="middle", href=href)
     s.txt(b.x + b.w / 2, b.y - 13, b.family.upper() + " · CAVITY MAP", 4.6, anchor="middle")
-    s.txt(b.x + b.w / 2, b.y - 4, "engine side | cab side", 4.2, anchor="middle")
+    s.txt(b.x + b.w / 2, b.y - 4, "cab side | engine side" if s.mx else "engine side | cab side", 4.2, anchor="middle")
     s.rect(b.x, b.y, b.w, b.h, sw=1.0, rx=1)
     for i, r in enumerate(b.rows):
         yy = b.pin(i)[1]
@@ -1081,25 +1232,27 @@ def draw_face(s, ctx, items, x_left, ws):
             y_ = prev + 6.5
         slot[cav] = y_
         prev = y_
-    s.el.append(f'<circle cx="{bulk_cx:.1f}" cy="{bulk_cy:.1f}" r="{R:.1f}" fill="none" stroke="#000" stroke-width="1.1"/>')
-    s.rects.append((bulk_cx - R, bulk_cy - R, bulk_cx + R, bulk_cy + R))
+    s.el.append(f'<circle cx="{s.X(bulk_cx):.1f}" cy="{bulk_cy:.1f}" r="{R:.1f}" fill="none" stroke="#000" stroke-width="1.1"/>')
+    s.rects.append((s.X(bulk_cx) - R, bulk_cy - R, s.X(bulk_cx) + R, bulk_cy + R))
     s.rect(bulk_cx - 6, bulk_cy - R - 6, 12, 7, sw=0.9, rx=1.5)
     for cav, (px_, py_) in xy.items():
         X = bulk_cx - (px_ - cx0) * scale
         Y = bulk_cy + (py_ - cy0) * scale
         if cav in lit:
             base_, stripe_ = wire_colours(ws[lit[cav]])
-            s.el.append(f'<circle cx="{X:.1f}" cy="{Y:.1f}" r="6.4" fill="{base_}" stroke="#000" stroke-width="0.9"/>')
+            s.el.append(f'<circle cx="{s.X(X):.1f}" cy="{Y:.1f}" r="6.4" fill="{base_}" stroke="#000" stroke-width="0.9"/>')
             if stripe_:
                 cid = f"clip_{tag_id(cav)}_{len(s.el)}"
-                s.el.append(f'<clipPath id="{cid}"><circle cx="{X:.1f}" cy="{Y:.1f}" r="6.4"/></clipPath>'
-                            f'<rect x="{X - 7:.1f}" y="{Y + 1.6:.1f}" width="14" height="2.4" fill="{stripe_}" clip-path="url(#{cid})"/>')
+                s.el.append(f'<clipPath id="{cid}"><circle cx="{s.X(X):.1f}" cy="{Y:.1f}" r="6.4"/></clipPath>'
+                            f'<rect x="{s.X(X) - 7:.1f}" y="{Y + 1.6:.1f}" width="14" height="2.4" fill="{stripe_}" clip-path="url(#{cid})"/>')
             s.txt(X, Y + 2.1, cav, 5.4, bold=True, anchor="middle", colour="#fff" if base_ in DARK else "#000")
         else:
-            s.el.append(f'<circle cx="{X:.1f}" cy="{Y:.1f}" r="6.4" fill="none" stroke="#bbb" stroke-width="0.5"/>')
+            s.el.append(f'<circle cx="{s.X(X):.1f}" cy="{Y:.1f}" r="6.4" fill="none" stroke="#bbb" stroke-width="0.5"/>')
             s.txt(X, Y + 2.1, cav, 5.0, anchor="middle", colour="#bbb")
     s.txt(bulk_cx, bulk_cy - R - 20, "61-PIN FIREWALL CONNECTOR", 6.4, bold=True, anchor="middle", href=MAP_URL + "FIREWALL-ENGINE")
-    s.txt(bulk_cx, bulk_cy - R - 11, "ENGINE SIDE, MATING FACE (SOCKETS, FEMALE)", 5.6, bold=True, anchor="middle")
+    # drawn mirrored on a cab-left sheet, the engine-side mating face becomes the cab side's rear (wire-entry) view
+    s.txt(bulk_cx, bulk_cy - R - 11, "CAB SIDE, REAR — WIRE ENTRY (SOCKETS CRIMPED HERE)" if s.mx else
+          "ENGINE SIDE, MATING FACE (SOCKETS, FEMALE)", 5.6, bold=True, anchor="middle")
     s.txt(bulk_cx, bulk_cy + R + 11, "D38999/24WJ61SN receptacle · insert 25-61", 5.4, anchor="middle")
     s.txt(bulk_cx, bulk_cy + R + 18, "lit = on this sheet, in the wire's colour", 5.4, anchor="middle")
     out_in, out_out = {}, {}
@@ -1206,47 +1359,100 @@ def place_tables(s, ctx, number, title, head, lowest, plist, splices, open_notes
     """Parts, splices and ends not recorded go in the clear space under the drawing (searched column by column); what
     does not fit goes on facing pages. The shield rule prints at the foot of the sheet."""
     blocks = []
-    rows_of = lambda L: [(c, fit(n, 206, 5.2), k, q, fit(", ".join(u), 224, 5.2)) for c, n, k, q, u in L]
+    rows_of = lambda L: [(c, n, k, q, ", ".join(u)) for c, n, k, q, u in L]
     if plist:
         blocks.append(("PARTS ON THIS SHEET", [92, 210, 46, 66, 228], ["Part number", "Part", "Kind", "Qty", "Used on"], rows_of(plist)))
     if splices:
         blocks.append(("SPLICES ON THIS SHEET", [34, 70, 300, 110, 70], ["Id", "At pin", "Wires joined", "Splice part", "Position"],
-                       [(a, b, fit(c, 296, 5.2), d, e) for a, b, c, d, e in splices]))
+                       [(a, b, c, d, e) for a, b, c, d, e in splices]))
     if open_notes:
         blocks.append(("ENDS NOT RECORDED (OPEN)", [70, 170, 300], ["Circuit", "What is missing", "As the wire list gives it"],
-                       [(a, b, fit(c, 296, 5.2)) for a, b, c in open_notes]))
+                       [(a, b, c) for a, b, c in open_notes]))
     floor = H - M - 14
     rest = []
-    for name, widths, hdr, rows in blocks:
+
+    def gaps(x0, x1):
+        """Clear vertical stretches over the column x0..x1 (between everything already drawn there)."""
+        busy = []
+        for bx0, by0, bx1, by1, *_ in s.boxes:
+            if bx0 < x1 + 6 and bx1 > x0 - 6 and by0 > M + 30:
+                busy.append((by0 - 4, by1 + 4))
+        for _o, pts in s.runs:
+            for (ax, ay), (bx, by) in zip(pts, pts[1:]):
+                if min(ax, bx) < x1 + 6 and max(ax, bx) > x0 - 6:
+                    busy.append((min(ay, by) - 4, max(ay, by) + 4))
+        for rx0, ry0, rx1, ry1 in s.rects:
+            if rx0 < x1 + 6 and rx1 > x0 - 6:
+                busy.append((ry0 - 4, ry1 + 4))
+        busy.sort()
+        out, y = [], TOP
+        for b0, b1 in busy:
+            if b0 > y:
+                out.append((y, min(b0, floor)))
+            y = max(y, b1)
+        if y < floor:
+            out.append((y, floor))
+        return [(g0, g1) for g0, g1 in out if g1 > g0]
+
+    def best_spot(widths, rows):
+        """Where on the sheet the most of these rows fit (rows placed, x, y); None when not even two rows fit."""
         tw_ = sum(widths)
-        need = 12 + (len(rows) + 1) * 8.2 + 6
         best = None
         x0 = M
         while x0 + tw_ <= W - M:
-            y0 = free_below(s, x0 - 6, x0 + tw_ + 6) + 26
-            if y0 + need <= floor and (best is None or y0 < best[1] - 0.1):
-                best = (x0, y0)
+            for g0, g1 in gaps(x0, x0 + tw_):
+                y0 = g0 + 22
+                k = 0
+                while k < len(rows) and y0 + 8.2 + 1.2 + table_rows_h(widths, rows[:k + 1]) + 4 <= g1:
+                    k += 1
+                if k and (best is None or k > best[0] or (k == best[0] and y0 < best[2] - 0.1)):
+                    best = (k, x0, y0)
             x0 += 24
-        if best:
-            s.txt(best[0], best[1] - 4, name, 7, bold=True)
-            table(s, best[0], best[1], widths, hdr, rows)
-        else:
-            rest.append((name, widths, hdr, rows))
+        return best if best and (best[0] >= min(2, len(rows))) else None
+
+    for name, widths, hdr, rows in blocks:
+        # a table that does not fit whole is continued in the next clear space on the sheet; only rows no space
+        # on the sheet can take go to a facing page (review 2026-09-28: facing pages holding one or two rows)
+        part = 0
+        while rows:
+            # the table's own widths first, then narrower versions (cells wrap) before anything leaves the sheet:
+            # the first width that takes every row, else the one that takes the most
+            spot, use = None, widths
+            for f in (1.0, 0.8, 0.62, 0.5):
+                cand = [max(34, round(w_ * f)) for w_ in widths]
+                sp_ = best_spot(cand, rows)
+                if sp_ and (spot is None or sp_[0] > spot[0]):
+                    spot, use = sp_, cand
+                if spot and spot[0] == len(rows):
+                    break
+            if not spot:
+                rest.append((name if not part else f"{name} (continued)", widths, hdr, rows))
+                break
+            k, x0, y0 = spot
+            s.txt(x0, y0 - 4, name if not part else f"{name} (continued)", 7, bold=True)
+            table(s, x0, y0, use, hdr, rows[:k])
+            rows, part = rows[k:], part + 1
     if shield_line:
         s.txt(M, H - M - 2, shield_line, 5.6, bold=True)
     facing = []
     if rest:
         s.txt(W - M, H - M - 2, f"continued on the facing page: {', '.join(b[0].lower() for b in rest)}", 5.4, italic=True, anchor="end")
-        per = int((H - M - 90) / 8.2) - 2
-        pages, cur, used = [], [], 0
+        room = H - M - 14 - (M + 58)
+        pages, cur, used = [], [], 0.0
         for name, widths, hdr, rows in rest:
-            for i in range(0, len(rows), per):
-                chunk = rows[i:i + per]
-                if used + len(chunk) + 4 > per and cur:
-                    pages.append(cur)
-                    cur, used = [], 0
-                cur.append((name, widths, hdr, chunk))
-                used += len(chunk) + 4
+            while rows:
+                k = 0
+                while k < len(rows) and used + 30 + table_rows_h(widths, rows[:k + 1]) <= room:
+                    k += 1
+                if k == 0:
+                    if cur:
+                        pages.append(cur)
+                        cur, used = [], 0.0
+                        continue
+                    k = 1
+                cur.append((name, widths, hdr, rows[:k]))
+                used += 30 + table_rows_h(widths, rows[:k])
+                rows = rows[k:]
         if cur:
             pages.append(cur)
         for pg in pages:
@@ -1259,7 +1465,12 @@ def place_tables(s, ctx, number, title, head, lowest, plist, splices, open_notes
     return facing
 
 
+def table_rows_h(widths, rows, size=5.2, lead=8.2):
+    return sum(lead + (max(len(wrap_text(str(v), w_ - 5, size)) for w_, v in zip(widths, r)) - 1) * (size + 1.2) for r in rows)
+
+
 def table(s, x, y, widths, header, rows, size=5.2, lead=8.2):
+    """A ruled table; cells wrap onto more lines, never cut short."""
     total, top = sum(widths), y
     y += lead + 1
     cx = x
@@ -1269,11 +1480,14 @@ def table(s, x, y, widths, header, rows, size=5.2, lead=8.2):
     s.line([(x, y + 1.2), (x + total, y + 1.2)], 0.7)
     y += 1.2
     for r in rows:
+        cells = [wrap_text(str(v), w_ - 5, size) for w_, v in zip(widths, r)]
         y += lead
         cx = x
-        for w_, v in zip(widths, r):
-            s.txt(cx + 2.5, y - 2.4, str(v), size)
+        for w_, lines in zip(widths, cells):
+            for k, ln in enumerate(lines):
+                s.txt(cx + 2.5, y - 2.4 + k * (size + 1.2), ln, size)
             cx += w_
+        y += (max(len(c) for c in cells) - 1) * (size + 1.2)
     y += 2.5
     s.rect(x, top, total, y - top, sw=0.8)
     return y
@@ -1376,16 +1590,36 @@ def build(first_number=6):
             bad = [b for b in kits_v5.book_lint(text) if not b.startswith("unstamped")]
             bad += [f"overprint: '{a}' over '{b}'" for a, b in overlaps(sh)]
             bad += [f"run {r} strikes text '{t_}'" for t_, r in run_strikes(sh)]
+            bad += [f"text over a pin box: '{t_}'" for t_ in mark_overprints(sh)]
+            bad += [f"wire {w_}: length printed more than once" for w_ in length_repeats(sh)]
+            if j:
+                cells = [b_ for b_ in sh.boxes if b_[1] > M + 64 and not str(b_[4]).isupper()]
+                rows_y = {round(b_[1]) for b_ in cells}
+                if len(rows_y) < 6:
+                    bad.append(f"parts-and-notes page with {len(rows_y)} rows: fold it into its sheet")
+            bad += manual_v5.layout_faults(sh.boxes, W, H, M, footer=tuple(getattr(sh, "footer", ())))
+            bad += getattr(sh, "faults", [])
             if bad:
                 bad_all += [f"{number} {sp['key']}: {b}" for b in bad]
             stem = OUT / f"K5_diagram_{number}_{sp['key']}{'' if j == 0 else '_parts'}"
             stem.with_suffix(".svg").write_text(sh.svg())
             subprocess.run(["rsvg-convert", "-d", "150", "-p", "150", "-o", str(stem.with_suffix(".png")), str(stem.with_suffix(".svg"))], check=True)
             subprocess.run(["rsvg-convert", "-f", "pdf", "-o", str(stem.with_suffix(".pdf")), str(stem.with_suffix(".svg"))], check=True)
-            add_links(stem.with_suffix(".pdf"), sh.boxes, H)
+            add_links(stem.with_suffix(".pdf"), manual_v5.link_parts(sh.boxes), H)
             made.append((number, t if j == 0 else t + " — parts and notes", nw if j == 0 else 0, nopen if j == 0 else 0,
                          str(stem.with_suffix(".pdf"))))
             sections.append(sp["section"])
+    bad_all += colour_faults()
+    seen_ids = {}
+    for (e, sid), _w in ctx.rail_recs.items():
+        if sid in seen_ids and seen_ids[sid] != e:
+            bad_all.append(f"rail splice {sid} used on both {seen_ids[sid]} and {e}")
+        seen_ids[sid] = e
+    for e in {e for e, _ in ctx.rail_recs}:
+        n_ids = len({sid for (ee, sid) in ctx.rail_recs if ee == e})
+        n_kit = int((ctx.eps[e].get("kit") or {}).get("D-609-05") or 0)
+        if n_ids != n_kit:
+            bad_all.append(f"{e}: {n_ids} splice ids drawn, the parts table counts {n_kit}")
     if bad_all:
         raise SystemExit(f"diagrams break the book's rules ({len(bad_all)}):\n  " + "\n  ".join(bad_all[:40]))
     # leftovers: every plug owned by exactly one sheet; every other endpoint drawn somewhere
