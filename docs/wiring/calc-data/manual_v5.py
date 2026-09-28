@@ -461,8 +461,8 @@ def page_firewall(reg, wires, number, odd):
     p = Page(number, "Engine Harness", odd=odd)
     p.heading("Firewall Connector — 61-Pin, Both Faces")
     fw = reg["endpoints"].get("FIREWALL-ENGINE", {})
-    p.txt(W / 2, p.y + 2, "D38999/24WJ61SN wall receptacle on the firewall (engine side), D38999/26WJ61PN plug on the engine harness. "
-          "Every engine circuit crosses here; body circuits never do.", 7.2, anchor="middle")
+    p.txt(W / 2, p.y + 2, "D38999/24WJ61SN wall receptacle on the firewall (socket contacts, female), D38999/26WJ61PN plug on the engine harness "
+          "(pin contacts, male). Every engine circuit crosses here; body circuits never do.", 7.2, anchor="middle")
     p.txt(W / 2, p.y + 12, "Where on the firewall it mounts is not decided: the M130 mount (state §4) sets it. Positions are the insert arrangement, not a measurement.", 7.2, anchor="middle")
     xs = [v[0] for v in xy.values()]; ys = [v[1] for v in xy.values()]
     cx0, cy0 = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
@@ -497,19 +497,22 @@ def page_firewall(reg, wires, number, odd):
             # the cavity: filled with the wire's colour (stripe as a band), the moulded letter bold in the centre
             p.el.append(f'<circle cx="{X:.1f}" cy="{Y:.1f}" r="7.6" fill="{base if w else "#fff"}" stroke="{"#000" if w else "#bbb"}" stroke-width="{0.8 if w else 0.5}"/>')
             if stripe:
-                p.el.append(f'<path d="M {X - 7.6:.1f} {Y + 2.2:.1f} A 7.6 7.6 0 0 0 {X + 7.6:.1f} {Y + 2.2:.1f} L {X + 7.6:.1f} {Y + 4.6:.1f} A 7.6 7.6 0 0 1 {X - 7.6:.1f} {Y + 4.6:.1f} Z" fill="{stripe}"/>')
+                cid = f"fwclip_{'m' if mirror else 'c'}_{cav}{'U' if cav[:1].isupper() else 'l'}"
+                p.el.append(f'<clipPath id="{cid}"><circle cx="{X:.1f}" cy="{Y:.1f}" r="7.6"/></clipPath>'
+                            f'<rect x="{X - 8:.1f}" y="{Y + 2.4:.1f}" width="16" height="2.8" fill="{stripe}" clip-path="url(#{cid})"/>')
             dark = base in ("#111", "#7a4a1d", "#2457c5", "#1f8a3b", "#7b3fa0", "#d3222a", "#555", "#8a8a8a")
             p.txt(X, Y + 2.2, cav, 6.2, bold=True, anchor="middle", italic=False)
             if dark:
                 p.el[-1] = p.el[-1].replace('<text ', '<text fill="#fff" ', 1)
-        p.txt(x_c, y_c + R + 14, title.upper(), 8, bold=True, anchor="middle")
-        p.txt(x_c, y_c + R + 24, sub, 6.4, anchor="middle")
+        p.txt(x_c, y_c + R + 14, title.upper(), 7.2, bold=True, anchor="middle")
+        for i_, ln_ in enumerate(p.wrap(sub, COLW - 6, 6.2)):
+            p.txt(x_c, y_c + R + 24 + i_ * 8, ln_, 6.2, anchor="middle")
     yc = p.y + 34 + R
-    face(M + COLW / 2, yc, True, "Engine side — receptacle mating face",
-         "socket insert seen from the engine bay; letters mirrored from the pin-insert drawing")
-    face(M + COLW + GUT + COLW / 2, yc, False, "Cab side — plug pin insert, front face",
-         "as the MILNEC 25-61 drawing shows it; the engine harness plug mates from this side")
-    p.y = yc + R + 34
+    face(M + COLW / 2, yc, True, "Engine side — mating face (sockets, female)",
+         "D38999/24WJ61SN on the firewall, seen from the engine bay; the harness plug's pins (male) enter here")
+    face(M + COLW + GUT + COLW / 2, yc, False, "Cab side — rear, wire entry (sockets crimped here)",
+         "the cab wires enter from this side; same view as the engine-harness plug's pin face (D38999/26WJ61PN, male)")
+    p.y = yc + R + 50
     # per-cavity text, the way a builder reads it at the connector: cavity · circuit · size, colour · function ·
     # where the wire goes on that side (engine side: the plug and cavity; cab side: the computer pin)
     rows = []
