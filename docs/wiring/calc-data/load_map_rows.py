@@ -61,8 +61,8 @@ FAMILIES = {"ssc", "d38999_20", "gt150", "mp150", "ev1", "kit_terminal", "te_amp
 def endpoint_type(code, device=""):
     """The plug's kind: its code decides first, the description only when the code says nothing (2026-09-27: the
     description-first read typed the amplifier GROUND from 'power and ground', the coils DISPLAY from 'cluster')."""
-    rules = ((r"^M130|ECU|CONTROLLER|MODULE|TCM|LTCD|-CTRL\b", "ecu"), (r"^PDM|FUSE ?BLOCK|DISTRIBUTION|PS-STUD", "power_distribution"),
-             (r"FIREWALL|BULKHEAD|PORT-|CAN-BUS|CONNECTOR|XLR|RJ45", "connector"), (r"GROUND|GND|STAR|RING", "ground"),
+    rules = ((r"^M130|^ECU|CONTROLLER|MODULE|TCM|LTCD|-CTRL\b", "ecu"),   # OILP-ECU / CLT-ECU are sensors (2026-09-28) (r"^PDM|FUSE ?BLOCK|DISTRIBUTION|PS-STUD", "power_distribution"),
+             (r"FIREWALL|BULKHEAD|PORT-|CAN-BUS|CONNECTOR|XLR|RJ45", "connector"), (r"GROUND|GND|STAR(?!T)|RING", "ground"),
              (r"SPLICE|RAIL", "splice"), (r"RELAY", "relay"), (r"FUSE", "fuse"),
              (r"BATTER|ALTERNATOR|GENERATOR", "power_source"),
              (r"SWITCH|IGN-SW|DIMMER|BUTTON|(^|-)SW(-|$)", "switch"),
@@ -118,7 +118,12 @@ for n in range(3, 9):
 # master plugs replaced by another node (superseded_by points at the replacement)
 REPLACED_NODES = {"G-FRONT-L": "GND-BANK-ENG", "G-FRONT-R": "GND-BANK-ENG", "G-FIREWALL": "GND-BANK-ENG",
                   "G-FRAME-REAR": "GND-BANK-ENG", "G-KICK-L": "GND-BANK-CAB", "G-KICK-R": "GND-BANK-CAB",
-                  "G-ROOF": "GND-BANK-CAB", "DASH-STAR": "GND-BANK-CAB", "G-REAR": "GND-SPLICE-REAR"}
+                  "G-ROOF": "GND-BANK-CAB", "DASH-STAR": "GND-BANK-CAB", "G-REAR": "GND-SPLICE-REAR",
+                  # April parts a later decision replaced (state §1 / 0x): the P367 pump, one fan, the Blue Sea 7700, the
+                  # Gen 2 iBooster, the PDMs instead of a fuse block, the factory brake switch
+                  "Aeromotive_A1000": "FUEL-PUMP", "Radiator_Fan_2": "FAN", "RBD190_Disconnect": "ISOLATOR",
+                  "Bosch_iBooster_Gen1": "IBOOSTER", "Main_Fuse_Distribution_Block": "PDM30-A",
+                  "nurelics_fusebox_feed": "PDM30-A", "Brake_Light_Switch_Wilwood_340-3930": "BRAKE-SW"}
 
 
 # April device names that are the SAME physical part as a master-list node (identity, not just function):
@@ -161,14 +166,40 @@ ALIASES = {**{f"Fuel_Injector_{i}": f"INJ-{i}" for i in range(1, 9)},
            "speaker_FR_DS_door_plus": "SPK-FL", "speaker_FR_DS_door_minus": "SPK-FL",
            "speaker_FR_PS_door_plus": "SPK-FR", "speaker_FR_PS_door_minus": "SPK-FR",
            "speaker_RR_DS_quarter_plus": "SPK-RL", "speaker_RR_DS_quarter_minus": "SPK-RL",
-           "speaker_RR_PS_quarter_plus": "SPK-RR", "speaker_RR_PS_quarter_minus": "SPK-RR", "sub_CompR12": "SUB"}
+           "speaker_RR_PS_quarter_plus": "SPK-RR", "speaker_RR_PS_quarter_minus": "SPK-RR", "sub_CompR12": "SUB",
+           # 2026-09-28 (owner: "why does the oil pressure sensor miss its plug... what about the starter connector"): April
+           # rows still drawn beside the plug that is the same part
+           "Starter_Motor": "STARTER-S", "STARTER_TRIG": "STARTER-S", "Alternator": "ALTERNATOR-SENSE",
+           "Radiator_Fan_1": "FAN", "GM_Fuel_Sender": "FUEL-LEVEL", "License_Plate_Light": "LICENSE-LAMP",
+           "Third_Brake_Light": "CHMSL", "Cargo_Bed_Light": "CARGO-LAMP", "Park_Turn_L": "PARK-TURN-LF",
+           "Park_Turn_R": "PARK-TURN-RF", "window_switch_driver": "WIN-SW-L", "window_switch_pass": "WIN-SW-R",
+           "Battery_Positive_Post": "ODYSSEY", "battery_pos": "ODYSSEY", "Battery_Negative_Post": "GND-BANK-ENG",
+           "battery_neg": "GND-BANK-ENG", "Chassis_Star": "GND-BANK-ENG", "STAR_BAT_CHASSIS": "GND-BANK-ENG",
+           "STAR_BAT_ENG": "GND-BANK-ENG", "STAR_ENG_FRAME": "GND-BANK-ENG", "COIL_GND_STAR_ECM_HEAD": "COIL-GROUND-RINGS",
+           "amp_fuse_holder": "ACC-BATT", "amp_remote_in": "AMP", "courtesy_underdash": "UNDERDASH-LAMPS"}
 
 
 ALIAS_N = {re.sub(r"[^a-z0-9]", "", k.lower()): v for k, v in ALIASES.items()}
 
 
+# Every other plug with a component object in the twin: that object's world-space bounding-box centre, dumped from
+# ~/k5-harness-pull/K5_harness_workspace_v2.blend into twin_centers.json (2026-09-28; same frame as ANCHORS: the CMP, MAP,
+# knock and M130 anchors match the dump to the millimetre). Owner: "the missing sensors is annoying".
+TWIN_OBJ = {"CLT-ECU": "K5H_CLT", "IAT": "K5H_IAT", "OILP-ECU": "K5H_OilPress", "OILT": "K5H_OilTemp", "FUELP": "K5H_FuelPress",
+            "ALTERNATOR-SENSE": "K5H_Alternator", "STARTER-S": "K5H_Starter", "ODYSSEY": "K5H_Battery", "FAN": "K5H_RadFan_1",
+            "AC-CLUTCH": "K5H_AC_Compressor", "IBOOSTER": "K5H_iBooster", "VSS-SENDER": "K5H_VSS", "E-STOPP": "K5H_EStopp_Actuator",
+            "SUB": "K5H_Subwoofer", "AMP": "K5H_Amplifier", "TCASE-4WD-SW": "K5H_TransferCase", "PCS-TCM": "K5H_6L80E",
+            **{f"INJ-{i}": f"K5H_Injector_{i}" for i in range(1, 9)}}
+_TC = Path(__file__).with_name("twin_centers.json")
+TWIN_POS = json.load(open(_TC)) if _TC.exists() else {}
+
+
 def position(code):
     a = NODE_ANCHOR.get(code)
+    if not a and TWIN_OBJ.get(code) in TWIN_POS:
+        x, y, z = TWIN_POS[TWIN_OBJ[code]]
+        return {"pos_x_m": x, "pos_y_m": y, "pos_z_m": z,
+                "pos_source": f"digital-twin object {TWIN_OBJ[code]} centre (K5_harness_workspace_v2.blend, twin_centers.json)"}
     if not a:
         return {}
     (x, y, z), note = ANCHORS[a]
@@ -256,7 +287,7 @@ def main():
         for end in ("frm", "to"):
             d = c.get(end) if isinstance(c.get(end), dict) else {}
             dev = str(d.get("device") or "").strip()
-            if not dev or dev in nodes or dev in ALIASES:
+            if not dev or dev in nodes or dev in ALIASES or dev in REPLACED_NODES:
                 continue
             nodes[dev] = {
                 "design_id": DESIGN, "code": dev, "name": dev.replace("_", " ")[:200], "endpoint_type": endpoint_type(dev),
@@ -414,10 +445,19 @@ def main():
     if blocked:
         print(f"locked decisions block {len(blocked)} node(s); not loaded: {', '.join(sorted(blocked))}")
     # nodes
-    NODE_KEYS = ("name", "endpoint_type", "family", "harness_section", "part_number", "notes", "design_status")
+    NODE_KEYS = ("name", "endpoint_type", "family", "harness_section", "part_number", "notes", "design_status", "pos_x_m", "pos_y_m", "pos_source")
     live_n = api.get("harness_endpoints", "select=id,code,work_status,assignee," + ",".join(NODE_KEYS)
                      + f"&design_id=eq.{DESIGN}&is_superseded=eq.false&code=not.is.null&limit=5000") or []
     have = {r["code"]: r["id"] for r in live_n}
+    # rows with no code are function-level placeholders from an earlier generator ("Headlights (Low Beam)", "Starter
+    # Motor"): the plug rows carry those facts now. Superseded, never deleted (2026-09-28)
+    nocode = api.get("harness_endpoints", f"select=id,name&design_id=eq.{DESIGN}&is_superseded=eq.false&code=is.null&limit=500") or []
+    for r in nocode:
+        if PLAN:
+            print(f"   - placeholder '{r['name']}' leaves the map (no code; the plug rows carry it)")
+        else:
+            api.patch("harness_endpoints", f"id=eq.{r['id']}&is_superseded=eq.false",
+                      {"is_superseded": True, "source": f"function-level placeholder with no plug code; superseded by the plug rows (k5_registry v5 @ {SHA})"})
     changed_n = [(r, nodes[r["code"]]) for r in live_n if r["code"] in nodes and r["code"] not in blocked
                  and any((r.get(k) or None) != (nodes[r["code"]].get(k) or None) for k in NODE_KEYS)]
     new_nodes = [n for c, n in nodes.items() if c not in have and c not in blocked]

@@ -853,7 +853,7 @@ ALTERNATOR-SENSE:
   sources: ["holley_midmount_fitment.pdf p.15", "Holley_Mid_Mount_Accessory_Drive_Kit.pdf (kit contents: 197-302 + 197-400)"]
 STARTER-S:
   where: engine
-  device: starter solenoid S terminal
+  device: "starter motor — S (trigger) terminal here; its B+ stud takes the 2 AWG cranking cable #6 from the distribution stud (DC primary sheet)"
   family: ring_small
   kit: {RING-SMALL: 1}
   wires: ["START_TRIG"]
