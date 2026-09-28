@@ -142,6 +142,10 @@ def overlaps(sheet):
     return out
 
 
+def tag_id(cav):
+    return "".join(ch if ch.isalnum() else "_" for ch in str(cav)) + ("U" if str(cav)[:1].isupper() else "l")
+
+
 def cav_mark(cav):
     c = str(cav)
     if re.match(r"^[A-Za-z]{1,2}$|^[A-Z]?\d{1,3}$", c):
@@ -311,14 +315,21 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
         X = bulk_cx - (px_ - cx0) * scale                                          # mirrored: seen from the engine bay
         Y = bulk_cy + (py_ - cy0) * scale
         if cav in lit:
-            s.el.append(f'<circle cx="{X:.1f}" cy="{Y:.1f}" r="6.4" fill="#fff" stroke="#000" stroke-width="0.9"/>')
-            s.txt(X, Y + 2.1, cav, 5.4, bold=True, anchor="middle")
+            w_ = sheet_wires.get(lit[cav]) or {}
+            base_, stripe_ = wire_colours(w_)
+            s.el.append(f'<circle cx="{X:.1f}" cy="{Y:.1f}" r="6.4" fill="{base_}" stroke="#000" stroke-width="0.9"/>')
+            if stripe_:
+                cid = f"clip_{tag_id(cav)}_{len(s.el)}"
+                s.el.append(f'<clipPath id="{cid}"><circle cx="{X:.1f}" cy="{Y:.1f}" r="6.4"/></clipPath>'
+                            f'<rect x="{X - 7:.1f}" y="{Y + 1.6:.1f}" width="14" height="2.4" fill="{stripe_}" clip-path="url(#{cid})"/>')
+            dark_ = base_ in ("#111111", "#7a4a1d", "#2457c5", "#1f8a3b", "#7b3fa0", "#d3222a", "#555555", "#8a8a8a")
+            s.txt(X, Y + 2.1, cav, 5.4, bold=True, anchor="middle", colour="#fff" if dark_ else "#000")
             bulk_pins[cav] = (X - 6.4, slot[cav], X + 6.4)
         else:
             s.el.append(f'<circle cx="{X:.1f}" cy="{Y:.1f}" r="6.4" fill="none" stroke="#bbb" stroke-width="0.5"/>')
             s.txt(X, Y + 2.1, cav, 5.0, anchor="middle", colour="#bbb")
-    s.txt(bulk_cx, bulk_cy - R - 12, "61-PIN FIREWALL CONNECTOR — ENGINE SIDE, MATING FACE", 6.4, bold=True, anchor="middle")
-    s.txt(bulk_cx, bulk_cy + R + 11, "D38999/24WJ61SN receptacle · insert 25-61 · lit = on this sheet", 5.4, anchor="middle")
+    s.txt(bulk_cx, bulk_cy - R - 12, "61-PIN FIREWALL CONNECTOR — ENGINE SIDE, MATING FACE (SOCKET CONTACTS, FEMALE)", 6.4, bold=True, anchor="middle")
+    s.txt(bulk_cx, bulk_cy + R + 11, "D38999/24WJ61SN receptacle · insert 25-61 · lit = on this sheet, filled in the wire's colour", 5.4, anchor="middle")
     bulk_bottom = bulk_cy + R + 16
     # runs reach a lit cavity from its left (engine side) and leave from its right (cab side)
     cavs = list(lit)
@@ -376,15 +387,17 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
             # the run stops at the face's rim at the cavity's height and is tagged with the cavity letter; no leader is
             # drawn across the face (GM's way: the letter at the rim, the reader finds the lit cavity)
             rim_l = bulk_cx - (R * R - (by - bulk_cy) ** 2) ** 0.5
-            s.line([(ox, oy), (xc, oy), (xc, by), (rim_l - 10, by)], 1.4, dashed, colour=base, stripe=stripe)
-            s.txt(rim_l - 12, by + 1.8, fw[0], 4.8, bold=True, anchor="end")
+            tw_ = tw(fw[0], 5.2, True)
+            s.line([(ox, oy), (xc, oy), (xc, by), (rim_l - tw_ - 8, by)], 1.4, dashed, colour=base, stripe=stripe)
+            s.txt(rim_l - 3, by + 1.9, fw[0], 5.2, bold=True, anchor="end")
             if cab:
                 cx, cy = pin_at[cab[0]]
                 xc2 = chC + (nC % 40) * TRACK
                 nC += 1
                 rim_r = bulk_cx + (R * R - (by - bulk_cy) ** 2) ** 0.5
-                s.txt(rim_r + 12, by + 1.8, fw[0], 4.8, bold=True)
-                s.line([(rim_r + 10, by), (xc2, by), (xc2, cy), (cx, cy)], 1.4, dashed, colour=base, stripe=stripe)
+                tw_ = tw(fw[0], 5.2, True)
+                s.txt(rim_r + 3, by + 1.9, fw[0], 5.2, bold=True)
+                s.line([(rim_r + tw_ + 8, by), (xc2, by), (xc2, cy), (cx, cy)], 1.4, dashed, colour=base, stripe=stripe)
         elif cab and not jun:                      # to a cab computer with no bulkhead cavity yet: dashed, stamped
             ox, oy = pin_at[dev[0]]
             cx, cy = pin_at[cab[0]]
