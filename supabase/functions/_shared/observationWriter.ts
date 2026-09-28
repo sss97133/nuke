@@ -422,6 +422,15 @@ async function gapFillVehicle(
     throw new Error(`Vehicle ${vehicleId} not found: ${fetchError?.message || "no data"}`);
   }
 
+  // Only real vehicles columns gap-fill. Any other field (e.g. mileage_claim) stays testimony in the observation
+  // and its field evidence; sending it in the UPDATE would fail the whole gap-fill for every field.
+  for (const k of Object.keys(safeFields)) {
+    if (!Object.prototype.hasOwnProperty.call(existing, k)) delete safeFields[k];
+  }
+  if (Object.keys(safeFields).length === 0) {
+    return { gapFilled: [], confirmed: [], conflicted: [] };
+  }
+
   const defaultMetadata: ProvenanceMetadata = {
     extraction_version: WRITER_VERSION,
     extraction_method: extractionMethod,
