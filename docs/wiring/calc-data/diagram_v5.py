@@ -348,22 +348,30 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
                 s.line([(ox, oy), (ox + 24, oy)], 0.8, "3 2", colour=base, stripe=stripe)
                 s.txt(ox + 4 + tw(label, 4.8) + 4, oy - 1.6, f"to {plug_title(far, eps.get(far, {}))}", 4.8, italic=True, colour=ORANGE)
                 open_runs = was_open + 1
-    # ---- parts list for this sheet (GM prints part numbers at the plugs; here every plug's kit, terminals and seals)
-    plist = sheet_parts(reg, devs, [j for j in junctions if any((j, c) in pin_at for c in [k[1] for k in pin_at if k[0] == j])], parts)
+    # ---- parts list for this sheet (GM prints part numbers at the plugs; here every plug's kit, terminals and seals),
+    # under the plug column once the runs are done; what does not fit goes on a facing page
+    plist = sheet_parts(reg, devs, [j for j in junctions if any(k[0] == j for k in pin_at)], parts)
     widths = [88, 200, 46, 30, 52, 40, 150]
-    cab_bottom = max([y for (ee, _), (_, y) in pin_at.items() if ee in CAB_BOXES] or [M + 48])
-    px, py = W - M - sum(widths), max(cab_bottom, bulk_bottom) + 26
+    lowest = max([y for (_, _), (_, y) in pin_at.items()] + [M + 48])
+    px, py = M, lowest + 34
     avail = int((H - M - 14 - py) / 8.2) - 2
-    shown = plist[:max(avail, 0)]
+    shown = plist[:max(avail, 0)] if avail >= 3 else []
+    rows_of = lambda L: [(c, fit(n, 196, 5.2), k, q, v, (f"${p:.2f}" if isinstance(p, (int, float)) else ""), fit(w, 146, 5.2)) for c, n, k, q, v, p, w in L]
+    extra = []
     if shown:
         s.txt(px, py - 4, "PARTS ON THIS SHEET", 7, bold=True)
-        rows = [(c, fit(n, 196, 5.2), k, q, v, (f"${p:.2f}" if isinstance(p, (int, float)) else ""), fit(w, 146, 5.2)) for c, n, k, q, v, p, w in shown]
-        table(s, px, py, widths, ["Code", "Part", "Kind", "Qty", "Vendor", "Each", "Where it stands"], rows)
-        if len(plist) > len(shown):
-            s.txt(px, H - M - 2, f"+{len(plist) - len(shown)} more parts: see the kits report", 5.4, italic=True)
+        table(s, px, py, widths, ["Code", "Part", "Kind", "Qty", "Vendor", "Each", "Where it stands"], rows_of(shown))
+    rest = plist[len(shown):]
+    if rest:
+        s.txt(px, H - M - 2, f"{len(rest)} more parts on the facing page", 5.4, italic=True)
+        per = int((H - M - 90) / 8.2) - 2
+        for i in range(0, len(rest), per):
+            e = Sheet(number + ("" if i == 0 else f"-{i // per + 1}"), title + " — parts", f"{len(plist)} parts on this sheet's plugs")
+            table(e, M, M + 52, widths, ["Code", "Part", "Kind", "Qty", "Vendor", "Each", "Where it stands"], rows_of(rest[i:i + per]))
+            extra.append(e)
     s.txt(M, H - M + 8, f"{len(sheet_wires)} circuits drawn from the wire list · {open_runs} stamped OPEN (an end or a cavity not settled) · "
           f"cavity marks are the moulded letters; positions are indicative · wire colours are the ordered colours", 6)
-    return s, len(sheet_wires), open_runs
+    return s, len(sheet_wires), open_runs, extra
 
 
 def table(s, x, y, widths, header, rows, size=5.2, lead=8.2):
@@ -430,16 +438,17 @@ def build(first_number=6):
                     if str(wid) in wires:
                         sheet_wires[str(wid)] = wires[str(wid)]
             t = title + (f" ({i + 1} of {len(pages)})" if len(pages) > 1 else "")
-            s, nw, nopen = sheet_engine(reg, wires, ends, f"1-{n}", key, t, page, sheet_wires, junctions, parts)
-            text = " ".join(re.sub(r"<[^>]+>", " ", e) for e in s.el)
-            bad = [b for b in kits_v5.book_lint(text) if not b.startswith("unstamped")]
-            if bad:
-                raise SystemExit(f"diagram {key} breaks the book's rules:\n  " + "\n  ".join(bad[:10]))
-            stem = OUT / f"K5_diagram_1-{n}_{key}{'' if len(pages) == 1 else chr(96 + i + 1)}"
-            stem.with_suffix(".svg").write_text(s.svg())
-            subprocess.run(["rsvg-convert", "-d", "150", "-p", "150", "-o", str(stem.with_suffix(".png")), str(stem.with_suffix(".svg"))], check=True)
-            subprocess.run(["rsvg-convert", "-f", "pdf", "-o", str(stem.with_suffix(".pdf")), str(stem.with_suffix(".svg"))], check=True)
-            made.append((f"1-{n}", t, nw, nopen, str(stem.with_suffix(".pdf"))))
+            s, nw, nopen, extra = sheet_engine(reg, wires, ends, f"1-{n}", key, t, page, sheet_wires, junctions, parts)
+            for j, sh in enumerate([s] + extra):
+                text = " ".join(re.sub(r"<[^>]+>", " ", e) for e in sh.el)
+                bad = [b for b in kits_v5.book_lint(text) if not b.startswith("unstamped")]
+                if bad:
+                    raise SystemExit(f"diagram {key} breaks the book's rules:\n  " + "\n  ".join(bad[:10]))
+                stem = OUT / f"K5_diagram_1-{n}_{key}{'' if len(pages) == 1 else chr(96 + i + 1)}{'' if j == 0 else '_parts' + str(j)}"
+                stem.with_suffix(".svg").write_text(sh.svg())
+                subprocess.run(["rsvg-convert", "-d", "150", "-p", "150", "-o", str(stem.with_suffix(".png")), str(stem.with_suffix(".svg"))], check=True)
+                subprocess.run(["rsvg-convert", "-f", "pdf", "-o", str(stem.with_suffix(".pdf")), str(stem.with_suffix(".svg"))], check=True)
+                made.append((f"1-{n}" + ("" if j == 0 else " parts"), t, nw if j == 0 else 0, nopen if j == 0 else 0, str(stem.with_suffix(".pdf"))))
             n += 1
     left = [e for e in engine_plugs if e not in taken and e not in junctions]
     for num, t, nw, nopen, pdf in made:
