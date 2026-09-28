@@ -641,6 +641,55 @@ def main():
     api.insert("wiring_decision_links", lrows)
     print(f"calls: {len(drows)} inserted · options {len(arows)} · links {len(lrows)}")
 
+    # ------------------------------------------------ options (variants): one decision row per option, coupled to its plugs
+    # options_v5.py writes reg['options'] (catalog/options.yaml). status: base/decided -> decided · candidate -> candidate
+    # (needs_owner) · rejected -> rejected. A status change supersedes the live row; nothing is deleted.
+    STATUS = {"base": ("decided", "decided"), "decided": ("decided", "decided"),
+              "candidate": ("candidate", "needs_owner"), "rejected": ("rejected", "decided")}
+    all_d = api.get("wiring_decisions", f"select=id,slug,status,is_superseded&vehicle_id=eq.{K5}") or []
+    have_slug = {r["slug"] for r in all_d}
+    n_new = n_sup = n_link = 0
+    ep_by_wire = {}
+    for eid, e in eps.items():
+        for w in (e.get("wires") or []):
+            ep_by_wire.setdefault(str(w), set()).add(eid)
+    for code, o in (reg.get("options") or {}).items():
+        st, work = STATUS[o["status"]]
+        base = f"opt-{code.lower()}"
+        live = [r for r in all_d if not r["is_superseded"] and re.match(rf"^{re.escape(base)}(-|$)", r["slug"])]
+        cur = live[0] if live else None
+        if cur and cur["status"] == st:
+            did = cur["id"]
+        else:
+            slug = next(s_ for s_ in (base, f"{base}-{st}", f"{base}-{st}-{NOW[:10]}") if s_ not in have_slug)
+            row = {"vehicle_id": K5, "slug": slug, "subject": f"Option {code}: {o['name']}", "status": st,
+                   "decision_kind": "architecture", "work_status": work, "receipt_path": "docs/wiring/calc-data/OPTIONS.md",
+                   "source": (o.get("source") or "")[:400], "method": "options_v5 (catalog/options.yaml)", "observed_at": NOW,
+                   "trust": "T1" if "owner" in (o.get("source") or "") else "T3",
+                   "decided_on": (NOW[:10] if st == "decided" else None)}
+            if PLAN:
+                print(f"PLAN option {code}: would insert {slug} ({st}/{work})" + (f", superseding {cur['slug']} ({cur['status']})" if cur else ""))
+                continue
+            ins = api.insert("wiring_decisions", [row])
+            did = ins[0]["id"] if ins else None
+            n_new += 1
+            if cur and did:
+                api.patch("wiring_decisions", f"id=eq.{cur['id']}", {"is_superseded": True, "superseded_by": did})
+                n_sup += 1
+        if not did:
+            continue
+        plugs = sorted({e for w in o.get("wires") or [] for e in ep_by_wire.get(str(w), ())} & set(have))
+        existing_l = {r["endpoint_id"] for r in (api.get("wiring_decision_links", f"select=endpoint_id&decision_id=eq.{did}&relation=eq.coupled_with") or [])}
+        lrows = [{"decision_id": did, "relation": "coupled_with", "endpoint_id": have[e],
+                  "note": f"plug carries option {code}", "source": "options_v5 (registry wires -> plugs)", "trust": "T3"}
+                 for e in plugs if have[e] not in existing_l]
+        if PLAN:
+            print(f"PLAN option {code}: {len(plugs)} plugs, {len(lrows)} new links")
+            continue
+        api.insert("wiring_decision_links", lrows)
+        n_link += len(lrows)
+    print(f"options: {len(reg.get('options') or {})} · rows inserted {n_new} · superseded {n_sup} · plug links {n_link}")
+
 
 if __name__ == "__main__":
     main()
