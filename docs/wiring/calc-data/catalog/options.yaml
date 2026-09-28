@@ -1,0 +1,104 @@
+# options.yaml — the K5 harness option dictionary (variants), read by options_v5.py.
+#
+# Vocabulary follows harness-design practice, not our own coinage: the composite ("150%") design carries every option;
+# a configuration selects options and derives the buildable ("100%") harness; each wire and plug carries the option
+# it belongs to (Siemens Capital "option/variant enabled ... composite 150% design and derivative decomposition",
+# siemens.com Capital HarnessXC; Zuken E3.series "options and variants ... BOMs and wire lists based on the active
+# option and variant selection", zuken.com Harness Builder 2025).
+#
+# status:  base       always built (the truck does not run or is not street-legal without it)
+#          decided    the owner said yes; its wires are designed and count in capacity, material and the manual
+#          candidate  named but not decided; its wires (if designed) are carried in the composite only, and its DEMAND
+#                     on the firewall, PDM channels and inputs is shown against the spares
+#          rejected   the owner said no; its rows are retired through a blocks link, never deleted
+# Every status change cites the owner's words or the receipt. Agents never promote a candidate.
+
+BASE:
+  name: Base truck — engine, power spine, comms, factory body functions
+  status: base
+  source: K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits)
+  subsystems: [CORE_ENGINE, HARNESS_INFRA, CHARGING_STARTING, FUEL, COOLING, TRANS_6L80E, BRAKES_IBOOSTER,
+               LIGHTING_EXTERIOR, LIGHTING_INTERIOR, DOME_COURTESY, WIPERS_WASHER, HVAC_AC, DASH_CLUSTER_DAKOTA,
+               ACCESSORY_12V, EPARKING_BRAKE]
+  wire_patterns: ["^TG_"]          # the factory electric tailgate window is a base function, not the door-window option
+
+AUD:
+  name: Audio — head unit, 5-channel amplifier, four coax speakers, two 10 in woofers
+  status: decided
+  decided: 2026-09-27
+  source: >-
+    owner 2026-09-25 ("we are gonna do jbl 10 compact woofers, an amp ... and then the appropriate other speakers");
+          owner 2026-09-27 ("kicker is not cool"); receipt 2026-09-27_owner-reply-grounds-isolator-batteries-dakota.md addendum 2
+  subsystems: [AUDIO]
+
+STEPS:
+  name: AMP Research power steps
+  status: decided
+  decided: 2025-03-01
+  source: client invoice Inv. 4 (AMP steps line, DB); WIRING_SYSTEM_KNOWLEDGE.md
+  subsystems: [AMP_STEPS]
+
+RC:
+  name: Rear camera with mirror display
+  status: decided
+  decided: 2026-09-27
+  source: owner 2026-09-27 ("we also want like rear camera"); receipt 2026-09-27_wires-right-engine-start-doors-camera.md
+  subsystems: [CAMERA_REAR]
+
+PW:
+  name: Power windows, front doors (Nu-Relics 17383-2)
+  status: candidate
+  source: >-
+    owner 2026-09-28 ("yet to decide if we do electric windows") supersedes owner 2026-09-27 ("we need power windows");
+          the kit was billed on Inv. 4 (DB) — bought, not yet decided to fit
+  subsystems: [POWER_WINDOWS]
+  wire_patterns: ["^WIN_"]
+  history:
+    - {date: 2026-09-27, status: decided, source: "owner: 'we need power windows its never been addressed'"}
+    - {date: 2026-09-28, status: candidate, source: "owner: 'yet to decide if we doe electric windows, auto start'"}
+
+PL:
+  name: Power door locks (AutoLoc AUTZT2000 actuators)
+  status: candidate
+  source: agent pick under delegation 2026-09-27 (endpoints.yaml doors block); the owner has not called locks
+  subsystems: [POWER_LOCKS]
+  wire_patterns: ["^LOCK_"]
+
+FC:
+  name: Front camera
+  status: candidate
+  source: owner 2026-09-28 ("any other cameras we want")
+  demand:              # what fitting it would consume, before any wire is designed
+    crossings: 2       # video to the cab display + a switched feed; through body bulkhead C (B is 12/12)
+    pdm30_outputs: 1
+    notes: "camera and display not picked; if the mirror display takes a second input, video only"
+
+AS:
+  name: Auto start (remote start)
+  status: candidate
+  source: owner 2026-09-28 ("auto start")
+  demand:
+    pdm30_inputs: 2    # start request + a disable/hood input from a receiver; the PDM30 already owns RUN/START logic
+    crossings: 0
+    notes: "receiver module in the cab; needs a constant feed and the PCS neutral input the PDM30 already reads"
+
+TS2:
+  name: Secondary turn signal location
+  status: candidate
+  source: owner 2026-09-28 ("secondary location of turn signals")
+  demand:
+    crossings: 0       # a branch off the existing left/right turn outputs, spliced in the same zone
+    pdm30_outputs: 0
+    notes: "2 lamp feeds + 2 grounds in the loom; the location sets the zone"
+
+LO4:
+  name: Transfer-case range switches, 4H and 4L (two switches in place of the single fabbed 4WD switch)
+  status: candidate
+  source: >-
+    agent 2026-09-28: the PCS TCM-2650 guide (ZGP rev 2, 23 pp.) has no low-range input, so the range is only
+          knowable to the M130/PDM30 by a switch; VHX manual p.6 4x4 (-) is ground-activated; owner 2026-09-27
+          "the t case is manual ... unless we do some fabbing which is possible"
+  demand:
+    pdm30_inputs: 1    # 4L on a spare DIG (DIG8 or DIG16); 4H keeps the VHX 4x4 (-) wire #55
+    crossings: 0
+    notes: "cab-side lever; the hubs stay a by-hand check"

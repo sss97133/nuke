@@ -245,11 +245,69 @@ def page_contents(reg, wires, toc, shown, notes):
               f"{solved} of the {len(shown)} plugs in this section are complete down to terminal, seal and crimp tool. "
               f"Under each figure: the kit, terminals and seals to buy, then anything still open, stamped BUY NOW, "
               f"YOUR PICK or LATER. Open items shared by several plugs are the numbered notes below."),
+    ] + readiness_blocks(reg) + [
         ("note", "The M130 mount spot is still open. This section is drawn for a cab mount."),
         ("note", "Cut lengths, twist and which wires share a sleeve are set on the formboard, not in this section."),
         ("note", "Match wires to the molded cavity letters, not to the position in the drawing."),
     ] + [("note", text, pre) for pre, text in notes]
     p.columns(blocks)
+    return p
+
+
+def readiness_blocks(reg):
+    """Where the whole harness stands, by layer, from options_v5 (empty when it has not run)."""
+    rd = reg.get("readiness")
+    if not rd:
+        return []
+    c = rd["configuration"]["buildable (base + decided)"]
+    L = c["length"]
+    opts = reg.get("options", {})
+    dec = [o["name"].split(" — ")[0].split(",")[0] for o in opts.values() if o["status"] == "decided"]
+    cand = [o["name"].split(" — ")[0].split(",")[0].split(" (")[0] for o in opts.values() if o["status"] == "candidate"]
+    return [
+        ("h", "Where the harness stands"),
+        ("p", f"The buildable harness is the base truck plus every option the owner has decided: {c['wires']} wires. "
+              f"Of those, {c['L2 wire']} have both ends named, {c['L3 crossing']} have their firewall crossing settled, "
+              f"{c['L4 ends']} have a terminal part number at both ends, and {c['L5 material']} are covered by a "
+              f"captured cart. Lengths: {L.get('measured', 0)} measured, {L.get('estimated', 0)} estimated, "
+              f"{L.get('unknown', 0)} unknown. The Specifications page carries the count per option and per section, "
+              f"and the fill of every connector and PDM channel."),
+        ("p", ("Decided options: " + ", ".join(dec) + ". " if dec else "") +
+              ("Candidates, not yet decided: " + ", ".join(cand) + ". Their wires are carried in the composite design "
+               "and are not in the buildable count." if cand else "")),
+    ]
+
+
+def page_specs(reg, number, odd):
+    """SPECIFICATIONS — options, readiness by section, connector and channel fill (LTSM specifications-page layout)."""
+    p = Page(number, "Engine Harness", odd=odd)
+    p.heading("Specifications")
+    rd, cap, opts = reg["readiness"], reg["capacity"], reg["options"]
+    p.txt(M, p.y + 6, "OPTIONS", 8.5, bold=True)
+    rows = [(code, o["name"][:70], o["status"].upper(), len(o["wires"])) for code, o in opts.items()]
+    p.y = p.table(M, p.y + 10, [40, 340, 70, 66], ["Code", "Option", "Status", "Wires"], rows, size=6.6, lead=9.2)
+    p.txt(M, p.y + 14, "READINESS BY SECTION (WIRES PASSING EACH LAYER / WIRES)", 8.5, bold=True)
+    hdr = ["Section", "Wires", "Both ends", "Crossing", "Terminals", "Material", "Measured", "No length"]
+    rows = []
+    for g, r in rd["by_section"].items():
+        rows.append((g.replace("_", " "), r["wires"], r["L2 wire"], r["L3 crossing"], r["L4 ends"], r["L5 material"],
+                     r["length"].get("measured", 0), r["length"].get("unknown", 0)))
+    c = rd["configuration"]["buildable (base + decided)"]
+    rows.append(("BUILDABLE HARNESS", c["wires"], c["L2 wire"], c["L3 crossing"], c["L4 ends"], c["L5 material"],
+                 c["length"].get("measured", 0), c["length"].get("unknown", 0)))
+    p.y = p.table(M, p.y + 18, [126, 50, 70, 64, 66, 62, 64, 60], hdr, rows, size=6.6, lead=9.2)
+    p.txt(M, p.y + 14, "CONNECTOR AND CHANNEL FILL", 8.5, bold=True)
+    rows = []
+    for k, r in cap["resources"].items():
+        if "lines" in r:
+            continue
+        sp = r["spare"]
+        sp = ", ".join(sp) if isinstance(sp, list) else ("—" if sp is None else sp)
+        rows.append((k, "—" if r["capacity"] is None else r["capacity"], r["used"], sp))
+    p.y = p.table(M, p.y + 18, [200, 80, 80, 156], ["Resource", "Capacity", "Used", "Spare"], rows, size=6.6, lead=9.2)
+    notes = [("note", v) for v in cap["verdict"].values()]
+    p.y += 8
+    p.columns([("h", "What the candidate options would take")] + notes, top=p.y)
     return p
 
 
@@ -479,6 +537,9 @@ def build():
     toc = [("Connector Identification", conn[0].number)]
     pages.append(page_tabulation(reg, wires, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1))
     toc.append(("Circuit Tabulation", pages[-1].number))
+    if reg.get("readiness"):
+        pages.append(page_specs(reg, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1))
+        toc.append(("Specifications", pages[-1].number))
     pages[0] = page_contents(reg, wires, toc, [e for e, _, _ in plugs], notes)
     bad = []
     for p in pages:
