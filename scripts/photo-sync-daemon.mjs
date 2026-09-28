@@ -79,7 +79,34 @@ const sinceArg = (() => { const i = args.indexOf('--since'); return i >= 0 ? arg
 // (free, private); we sync only what its labels say is plausibly vehicle
 // evidence. Everything else never leaves this Mac. Server-side vision_gate /
 // classification remains as the second pass for what does get through.
-const VEHICLE_LABEL_RE = /vehicle|car|truck|automobile|motorcycle|van|jeep|tractor|trailer|wheel|tire|engine|machine|garage|workshop|tool|boat|text|document|receipt|paper/i;
+// Whole-label matching against Apple's own vocabulary. The old substring regex
+// (/car|tool|document|.../) let 59 Child, 161 People, 15 Bed/Bedroom and 242 Document
+// photos into the public bucket by 2026-09-28: "Document" matched itself, "car" matched
+// "Carton"/"Cardboard Box", "tool" matched "Stool". Labels below are the exact strings
+// measured on the owner's library (vehicle_images.apple_ml_labels), lower-cased.
+const norm = (s) => String(s).trim().toLowerCase();
+const VEHICLE_LABELS = new Set([
+  'vehicle', 'automobile', 'car', 'wheel', 'tire', 'vehicle engine', 'engine', 'muscle car',
+  'garage', 'sportscar', 'sports car', 'antique car', 'vintage car', 'classic car', 'truck',
+  'pickup truck', 'monster truck', 'off-road vehicle', 'compact sport utility vehicle',
+  'sport utility vehicle', 'supercar', 'performance car', 'city car', 'steering wheel',
+  'automobile grille', 'jeep', 'boat', 'motorcycle', 'van', 'tractor', 'trailer', 'bus',
+  'land vehicle', 'motor vehicle', 'hot rod', 'auto part', 'rim', 'hubcap', 'bumper',
+  'headlamp', 'workshop', 'machine', 'tool', 'toolbox', 'nascar',
+]);
+// Never leave the Mac, anywhere, with any other label present.
+const ALWAYS_PRIVATE = new Set([
+  'child', 'baby', 'toddler', 'teen', 'selfie', 'swimsuit', 'bikini', 'underwear', 'lingerie',
+  'bed', 'bedroom', 'bath', 'bathtub', 'nudity',
+]);
+// Documents and receipts are financial/identity material: they never go to the public
+// bucket. They reach Nuke through the receipts path, not this daemon.
+const DOCUMENT_LIKE = new Set([
+  'document', 'paper', 'newspaper', 'receipt', 'text', 'screenshot', 'handwriting', 'card',
+  'credit card', 'id card', 'passport', 'letter', 'envelope', 'menu',
+]);
+// People off a shop: private by default, even with a car in frame.
+const PEOPLE = new Set(['people', 'adult', 'portrait', 'face', 'crowd', 'family']);
 
 // Known shop coordinates — GPS at a work location is a STRONGER vehicle signal
 // than any Apple label. Apple frequently leaves work photos unlabeled (all 106
@@ -98,12 +125,21 @@ function isAtShop(photo) {
   return SHOP_LOCATIONS.some((s) => Math.abs(lat - s.lat) < SHOP_TOL && Math.abs(lon - s.lon) < SHOP_TOL);
 }
 
-function isVehicleish(photo) {
+// The on-device gate: Apple Photos has already labeled every photo on this Mac; the cloud
+// only ever sees what passes here. Returns the reason, so held-back decisions are auditable.
+function gateReason(photo) {
+  const labels = (photo.labels || photo.labels_normalized || []).map(norm);
+  const has = (set) => labels.some((l) => set.has(l));
+  if (has(ALWAYS_PRIVATE)) return 'hold:private';
+  if (has(DOCUMENT_LIKE)) return 'hold:document';
   // GPS-at-shop passes regardless of labels — work location beats Apple's tagging.
-  if (isAtShop(photo)) return true;
-  const labels = photo.labels || photo.labels_normalized || [];
-  if (labels.length === 0) return INCLUDE_UNLABELED; // unlabeled off-shop: private by default
-  return labels.some((l) => VEHICLE_LABEL_RE.test(String(l)));
+  if (isAtShop(photo)) return 'pass:shop';
+  if (labels.length === 0) return INCLUDE_UNLABELED ? 'pass:unlabeled' : 'hold:unlabeled';
+  if (has(PEOPLE)) return 'hold:people';
+  return has(VEHICLE_LABELS) ? 'pass:vehicle' : 'hold:not-vehicle';
+}
+function isVehicleish(photo) {
+  return gateReason(photo).startsWith('pass');
 }
 
 function log(msg) {
@@ -255,7 +291,7 @@ async function uploadPhoto(filePath, filename, meta) {
 // per-photo decisions to ~/.nuke/label-audit.jsonl and prints the summary
 // that answers: how many photos have labels at all, what are the labels,
 // what would the gate sync vs hold back. This is the dataset for tuning
-// VEHICLE_LABEL_RE — measure, don't guess.
+// VEHICLE_LABELS / the private sets — measure, don't guess.
 async function auditLabels(days) {
   const since = new Date(Date.now() - days * 86400 * 1000).toISOString();
   const photos = queryNewPhotos(since).filter(p => !p.ismovie && !p.hidden);
@@ -273,7 +309,7 @@ async function auditLabels(days) {
     for (const l of labels) labelCounts.set(l, (labelCounts.get(l) || 0) + 1);
     appendFileSync(auditFile, JSON.stringify({
       file: p.original_filename, taken: p.date, gps: p.latitude != null,
-      labels, decision: sync ? 'sync' : 'hold',
+      labels, decision: sync ? 'sync' : 'hold', gate: gateReason(p),
     }) + '\n');
   }
 
@@ -284,9 +320,10 @@ async function auditLabels(days) {
   console.log(`would sync:    ${wouldSync}`);
   console.log(`held on-device:${photos.length - wouldSync}`);
   console.log(`top labels:`);
-  for (const [l, n] of top) console.log(`  ${String(n).padStart(5)}  ${l}${VEHICLE_LABEL_RE.test(l) ? '   ← gate matches' : ''}`);
+  const mark = (l) => { const k = norm(l); return ALWAYS_PRIVATE.has(k) ? '   ← private (never syncs)' : DOCUMENT_LIKE.has(k) ? '   ← document (never syncs)' : PEOPLE.has(k) ? '   ← people (off-shop hold)' : VEHICLE_LABELS.has(k) ? '   ← vehicle' : ''; };
+  for (const [l, n] of top) console.log(`  ${String(n).padStart(5)}  ${l}${mark(l)}`);
   console.log(`\nper-photo decisions: ${auditFile}`);
-  console.log(`If real vehicle photos show under "held", widen VEHICLE_LABEL_RE with the labels you see here.`);
+  console.log(`If real vehicle photos show under "held", add their exact labels to VEHICLE_LABELS.`);
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -328,7 +365,7 @@ async function main() {
     const heldFile = join(STATE_DIR, 'held-back.jsonl');
     for (const p of heldBack) {
       appendFileSync(heldFile, JSON.stringify({
-        at: runStartedAt, file: p.original_filename, taken: p.date,
+        at: runStartedAt, file: p.original_filename, taken: p.date, gate: gateReason(p),
         labels: p.labels || [], gps: p.latitude != null,
       }) + '\n');
     }
