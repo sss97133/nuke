@@ -12,6 +12,7 @@ Words follow the build book's rules (kits_v5.dave_name / book_lint): Dave's name
 Output: docs/wiring/output/manual/*.svg, *.png (150 dpi) and K5_Harness_Manual.pdf.
 """
 import json
+import yaml
 import re
 import subprocess
 from html import escape
@@ -433,13 +434,11 @@ def page_pinout(reg, wires, number, odd, dev, conn, n_pins, title, mating, sourc
         if ws:
             w = wires.get(ws[0]) or {}
             far = kits_v5.dave_name(w) + (f" (+{len(ws) - 1} spliced)" if len(ws) > 1 else "")
-            rows.append((pin, d_[0], ", ".join(x_.upper() for x_ in ws[:3]), gm_colour(f"{gauge(w)} {colour(w)}"), far.upper()))
+            rows.append((pin, d_[0], ", ".join(x_.upper() for x_ in ws[:4]), gm_colour(f"{gauge(w)} {colour(w)}"), far.upper()))
         else:
             rows.append((pin, d_[0], "—", "", ("NOT USED" if d_[0] == "-" else "SPARE") if d_ != ("", "") else "SPARE"))
-    half = (len(rows) + 1) // 2
-    widths = [26, 58, 56, 60, 51]
-    p.table(M, p.y, widths, ["Pin", "MoTeC", "Circuit", "Size, Color", "Goes To"], rows[:half], size=5.6, lead=7.4)
-    p.table(M + COLW + GUT, p.y, widths, ["Pin", "MoTeC", "Circuit", "Size, Color", "Goes To"], rows[half:], size=5.6, lead=7.4)
+    widths = [30, 66, 96, 78, W - 2 * M - 270]
+    p.table(M, p.y, widths, ["Pin", "MoTeC", "Circuit", "Size, Color", "Goes To"], rows, size=5.6, lead=7.2)
     return p
 
 
@@ -461,9 +460,12 @@ def page_firewall(reg, wires, number, odd):
     p = Page(number, "Engine Harness", odd=odd)
     p.heading("Firewall Connector — 61-Pin, Both Faces")
     fw = reg["endpoints"].get("FIREWALL-ENGINE", {})
-    p.txt(W / 2, p.y + 2, "D38999/24WJ61SN wall receptacle on the firewall (socket contacts, female), D38999/26WJ61PN plug on the engine harness "
-          "(pin contacts, male). Every engine circuit crosses here; body circuits never do.", 7.2, anchor="middle")
-    p.txt(W / 2, p.y + 12, "Where on the firewall it mounts is not decided: the M130 mount (state §4) sets it. Positions are the insert arrangement, not a measurement.", 7.2, anchor="middle")
+    intro = ("D38999/24WJ61SN wall receptacle on the firewall (socket contacts, female); D38999/26WJ61PN plug on the engine harness "
+             "(pin contacts, male). Every engine circuit crosses here; body circuits never do. Where on the firewall it mounts is not "
+             "decided: the M130 mount (state §4) sets it. Positions are the insert arrangement, not a measurement.")
+    for i_, ln_ in enumerate(p.wrap(intro, W - 2 * M, 7.2)):
+        p.txt(W / 2, p.y + 2 + i_ * 9, ln_, 7.2, anchor="middle")
+    p.y += 9 * (len(p.wrap(intro, W - 2 * M, 7.2)) - 2)
     xs = [v[0] for v in xy.values()]; ys = [v[1] for v in xy.values()]
     cx0, cy0 = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
     span = max(max(xs) - min(xs), max(ys) - min(ys))
@@ -512,9 +514,46 @@ def page_firewall(reg, wires, number, odd):
          "D38999/24WJ61SN on the firewall, seen from the engine bay; the harness plug's pins (male) enter here")
     face(M + COLW + GUT + COLW / 2, yc, False, "Cab side — rear, wire entry (sockets crimped here)",
          "the cab wires enter from this side; same view as the engine-harness plug's pin face (D38999/26WJ61PN, male)")
-    p.y = yc + R + 50
-    # per-cavity text, the way a builder reads it at the connector: cavity · circuit · size, colour · function ·
-    # where the wire goes on that side (engine side: the plug and cavity; cab side: the computer pin)
+    p.y = yc + R + 46
+    # ---- the parts: receptacle, plug, contacts, backshells, boots, tools (photos where a vendor photo is on file)
+    import base64
+    bom = reg["bom"]["parts"]
+    parts_y = yaml.safe_load((CD / "catalog" / "parts.yaml").read_text())
+    tools_y = {t_["id"]: t_ for t_ in reg["tools"]}
+    strip = [("D38999/24WJ61SN", "D38999-SERIES", "wall receptacle, shell 25, insert 61, socket contacts (female) — on the firewall", "series photo"),
+             ("D38999/26WJ61PN", "D38999-SERIES", "plug, shell 25, insert 61, pin contacts (male) — on the engine harness", "series photo"),
+             ("M39029/56-351", "M39029-56-351", "size-20 socket contact, crimp, 20–24 AWG — receptacle, cab side", None),
+             ("M39029/58-363", "M39029-58-363", "size-20 pin contact, crimp, 20–24 AWG — plug, engine side", None),
+             ("M85049/69-25N", "M85049-69-25N", "accessory adapter, shell 25 (boot seat), one per side", None),
+             ("202K163-25-0", None, "Raychem straight shrink boot, one per side", None),
+             ("M22520/2-01", "AFM8", "DMC AFM8 crimp frame (tool)", None),
+             ("M22520/2-10", "K43", "DMC K43 positioner for the size-20 contacts (tool)", None),
+             ("M81969/14-10", "M81969-14-10", "size-20 insertion/removal tool (tool)", None)]
+    p.txt(M, p.y, "PARTS — THE CONNECTOR, ITS CONTACTS, BACKSHELLS, BOOTS AND TOOLS", 8.5, bold=True)
+    p.y += 6
+    cell_w = (W - 2 * M) / len(strip)
+    ph = 46
+    for i_, (pn, img, what, note) in enumerate(strip):
+        x_ = M + i_ * cell_w
+        f = PRODUCT_IMAGES / f"{img}.png" if img else None
+        if f and f.exists():
+            uri = "data:image/png;base64," + base64.b64encode(f.read_bytes()).decode()
+            p.el.append(f'<image x="{x_ + (cell_w - ph) / 2:.1f}" y="{p.y:.1f}" width="{ph}" height="{ph}" preserveAspectRatio="xMidYMid meet" href="{uri}"/>')
+        else:
+            p.txt(x_ + cell_w / 2, p.y + ph / 2 + 2, "no photo on file", 5.2, anchor="middle", italic=True)
+        qty = bom.get(pn) or bom.get(pn.replace("M22520/2-01", "AFM8")) or ""
+        p.txt(x_ + cell_w / 2, p.y + ph + 9, pn, 6.2, bold=True, anchor="middle")
+        p.txt(x_ + cell_w / 2, p.y + ph + 16, f"×{qty}" if qty else "tool", 5.6, anchor="middle")
+        for j_, ln_ in enumerate(p.wrap(what + (f" ({note})" if note else ""), cell_w - 6, 5.0)[:4]):
+            p.txt(x_ + cell_w / 2, p.y + ph + 23 + j_ * 6, ln_, 5.0, anchor="middle")
+    p.y += ph + 52
+    p.txt(M, p.y, "A band across a cavity is the wire's stripe colour (KK = 22 WHT/BLU, the crank shield drain). Grey = a plain grey wire. White = spare.", 6.2, italic=True)
+    p.txt(M, p.y + 9, "Photos are the vendors' product photos (DigiKey, DMC); the D38999 photo is the series, not the exact shell and insert.", 6.2, italic=True)
+    # ---- the cavity table, on the facing page
+    p2 = Page(f"1-{int(number.split('-')[1]) + 1}", "Engine Harness", odd=not odd)
+    p2.heading("Firewall Connector — Cavity Table")
+    p2.txt(W / 2, p2.y + 2, "Cavity · circuit · size, colour · function · ENGINE END (the plug and cavity in the engine bay) · CAB END (the computer pin). Spares are marked.", 6.6, anchor="middle")
+    p2.y += 8
     rows = []
     for cav in sheets.CAV_ORDER:
         wid = cav_wire.get(cav)
@@ -522,12 +561,9 @@ def page_firewall(reg, wires, number, odd):
         rows.append((cav, (wid or "—").upper(), gm_colour(f"{gauge(w)} {colour(w)}") if w else "spare",
                      kits_v5.dave_name(w).upper() if w else "", (dev_end.get(wid) or "").upper() if w else "",
                      (cab_end.get(wid) or "").upper() if w else ""))
-    half = (len(rows) + 1) // 2
-    widths = [20, 36, 50, 64, 50, 38]
-    p.txt(M, p.y - 2, "ENGINE END = the plug and cavity in the engine bay · CAB END = the computer pin", 6.2, italic=True)
-    p.y += 4
-    p.table(M, p.y, widths, ["Cav", "Ckt", "Size, Color", "Function", "Engine End", "Cab End"], rows[:half], size=5.4, lead=7.2)
-    p.table(M + COLW + GUT, p.y, widths, ["Cav", "Ckt", "Size, Color", "Function", "Engine End", "Cab End"], rows[half:], size=5.4, lead=7.2)
+    widths = [26, 58, 76, 150, 130, W - 2 * M - 440]
+    p2.table(M, p2.y, widths, ["Cav", "Ckt", "Size, Color", "Function", "Engine End", "Cab End"], rows, size=5.8, lead=7.4)
+    p.extra_pages = [p2]
     return p
 
 
@@ -728,7 +764,6 @@ def connector_pages(reg, wires, plugs, first, fig0):
         if uri:
             px_ = fx + face_w + 10
             p.el.append(f'<image x="{px_:.1f}" y="{y + 2:.1f}" width="{photo_w}" height="{photo_w}" preserveAspectRatio="xMidYMid meet" href="{uri}"/>')
-            p.rect(px_, y + 2, photo_w, photo_w, sw=0.5)
             p.txt(px_ + photo_w / 2, y + photo_w + 9, "plug kit, vendor photo", 5.2, anchor="middle", italic=True)
         rows = []
         for t in ts:
@@ -822,8 +857,11 @@ def build():
     toc = [("Connector Identification", conn[0].number)]
     pages.append(page_tabulation(reg, wires, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1))
     toc.append(("Circuit Tabulation", pages[-1].number))
-    pages.append(page_firewall(reg, wires, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1))
+    fwp = page_firewall(reg, wires, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1)
+    pages.append(fwp)
     toc.append(("Firewall Connector, Both Faces", pages[-1].number))
+    pages += getattr(fwp, "extra_pages", [])
+    toc.append(("Firewall Connector, Cavity Table", pages[-1].number))
     first_pin = None
     for dev, conn, n_pins, ttl, mating, src in PINOUTS:
         pg = page_pinout(reg, wires, f"1-{len(pages) + 1}", (len(pages) + 1) % 2 == 1, dev, conn, n_pins, ttl, mating, src)
