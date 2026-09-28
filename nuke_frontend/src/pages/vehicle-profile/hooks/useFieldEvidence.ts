@@ -288,8 +288,9 @@ async function fetchAndProcessEvidence(vehicleId: string): Promise<FieldEvidence
     created_at: r.created_at,
   }));
 
-  // Filter out rejected evidence — don't include in conflict analysis or display
-  const active = mapped.filter(r => r.status !== 'rejected');
+  // Filter out rejected and superseded evidence — neither is a current source, so neither enters the
+  // conflict analysis or the display (their history stays in field_evidence.contradicting_signals)
+  const active = mapped.filter(r => r.status !== 'rejected' && r.status !== 'superseded');
 
   // Merge agent-write consensus (projection_event) as additional evidence sources — the
   // corrections engine converges into the SAME provenance UI, not a parallel display.
