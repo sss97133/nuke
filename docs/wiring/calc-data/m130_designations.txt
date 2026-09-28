@@ -1,0 +1,56 @@
+A01|OUT_HB2|Half Bridge Output 2
+A02|SEN_5V0_A|Sensor 5.0V A
+A03|IGN_LS1|Low Side Ignition 1
+A04|IGN_LS2|Low Side Ignition 2
+A05|IGN_LS3|Low Side Ignition 3
+A06|IGN_LS4|Low Side Ignition 4
+A07|IGN_LS5|Low Side Ignition 5
+A08|IGN_LS6|Low Side Ignition 6
+A09|SEN_5V0_B|Sensor 5.0V B
+A10|BAT_NEG1|Battery Negative
+A11|BAT_NEG2|Battery Negative
+A12|IGN_LS7|Low Side Ignition 7
+A13|IGN_LS8|Low Side Ignition 8
+A14|AV1|Analogue Voltage Input 1
+A15|AV2|Analogue Voltage Input 2
+A16|AV3|Analogue Voltage Input 3
+A17|AV4|Analogue Voltage Input 4
+A18|OUT_HB1|Half Bridge Output 1
+A19|INJ_PH1|Peak Hold Injector 1
+A20|INJ_PH2|Peak Hold Injector 2
+A21|INJ_PH3|Peak Hold Injector 3
+A22|INJ_PH4|Peak Hold Injector 4
+A23|INJ_LS1|Low Side Injector 1
+A24|INJ_LS2|Low Side Injector 2
+A25|AV5|Analogue Voltage Input 5
+A26|BAT_POS|Battery Positive
+A27|INJ_PH5|Peak Hold Injector 5
+A28|INJ_PH6|Peak Hold Injector 6
+A29|INJ_PH7|Peak Hold Injector 7
+A30|INJ_PH8|Peak Hold Injector 8
+A31|OUT_HB3|Half Bridge Output 3
+A32|OUT_HB4|Half Bridge Output 4
+A33|OUT_HB5|Half Bridge Output 5
+A34|OUT_HB6|Half Bridge Output 6
+B01|UDIG1|Universal Digital Input 1
+B02|UDIG2|Universal Digital Input 2
+B03|AT1|Analogue Temperature Input 1                                 1k Pull up to SEN_5V_B
+B04|AT2|Analogue Temperature Input 2                                 1k Pull up to SEN_5V_B
+B05|AT3|Analogue Temperature Input 3                                 1k Pull up to SEN_5V_A
+B06|AT4|Analogue Temperature Input 4                                 1k Pull up to SEN_5V_A
+B07|KNOCK1|Knock Input 1
+B08|UDIG3|Universal Digital Input 3
+B09|UDIG4|Universal Digital Input 4
+B10|UDIG5|Universal Digital Input 5
+B11|UDIG6|Universal Digital Input 6
+B12|BAT_BAK|Battery Backup
+B13|KNOCK2|Knock Input 2
+B14|UDIG7|Universal Digital Input 7
+B15|SEN_0V_A|Sensor 0V A
+B16|SEN_0V_B|Sensor 0V B
+B17|CAN_HI|CAN_HI           CAN Bus 1 High
+B18|CAN_LO|CAN_LO           CAN Bus 1 Low
+B19|SEN_6V3|Sensor 6.3V
+B20|AV6|Analogue Voltage Input 6
+B21|AV7|Analogue Voltage Input 7
+B22|AV8|Analogue Voltage Input 8

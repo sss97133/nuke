@@ -294,6 +294,17 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
             if t["endpoint"] == "FIREWALL-ENGINE" and t.get("cavity") in xy:
                 lit[t["cavity"]] = wid
     bulk_pins = {}
+    # rim slots: two lit cavities at nearly the same height would print their rim tags on top of each other, so tags
+    # (and the run's last horizontal) take slots at least 6.5 pt apart, ordered by the cavity's true height
+    slot = {}
+    order = sorted(lit, key=lambda c: xy[c][1])
+    prev = None
+    for cav in order:
+        y_ = bulk_cy + (xy[cav][1] - cy0) * scale
+        if prev is not None and y_ - prev < 6.5:
+            y_ = prev + 6.5
+        slot[cav] = y_
+        prev = y_
     s.el.append(f'<circle cx="{bulk_cx:.1f}" cy="{bulk_cy:.1f}" r="{R:.1f}" fill="none" stroke="#000" stroke-width="1.1"/>')
     s.rect(bulk_cx - 6, bulk_cy - R - 6, 12, 7, sw=0.9, rx=1.5)                     # master key at the top
     for cav, (px_, py_) in xy.items():
@@ -302,7 +313,7 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
         if cav in lit:
             s.el.append(f'<circle cx="{X:.1f}" cy="{Y:.1f}" r="6.4" fill="#fff" stroke="#000" stroke-width="0.9"/>')
             s.txt(X, Y + 2.1, cav, 5.4, bold=True, anchor="middle")
-            bulk_pins[cav] = (X - 6.4, Y, X + 6.4)
+            bulk_pins[cav] = (X - 6.4, slot[cav], X + 6.4)
         else:
             s.el.append(f'<circle cx="{X:.1f}" cy="{Y:.1f}" r="6.4" fill="none" stroke="#bbb" stroke-width="0.5"/>')
             s.txt(X, Y + 2.1, cav, 5.0, anchor="middle", colour="#bbb")
@@ -325,7 +336,7 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
         y += h + 22
 
     # ---- runs
-    chA, chB, chC = x1 + 96, x2 + 14, bulk_cx + R + 14     # channels: devices→junctions, →bulkhead, bulkhead→cab
+    chA, chB, chC = x1 + 96, x2 + 14, bulk_cx + R + 30     # channels: devices→junctions, →bulkhead, bulkhead→cab
     nA = nB = nC = 0
     open_runs = 0
     for wid, w in sheet_wires.items():
@@ -362,16 +373,18 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
             xc = chB + ((nB % 40) * TRACK)
             nB += 1
             # the run stops at the face's rim at the cavity's height; a thin leader inside the circle points to the cavity
+            # the run stops at the face's rim at the cavity's height and is tagged with the cavity letter; no leader is
+            # drawn across the face (GM's way: the letter at the rim, the reader finds the lit cavity)
             rim_l = bulk_cx - (R * R - (by - bulk_cy) ** 2) ** 0.5
-            s.line([(ox, oy), (xc, oy), (xc, by), (rim_l, by)], 1.4, dashed, colour=base, stripe=stripe)
-            s.line([(rim_l, by), (bx, by)], 0.5, colour="#888")
+            s.line([(ox, oy), (xc, oy), (xc, by), (rim_l - 10, by)], 1.4, dashed, colour=base, stripe=stripe)
+            s.txt(rim_l - 12, by + 1.8, fw[0], 4.8, bold=True, anchor="end")
             if cab:
                 cx, cy = pin_at[cab[0]]
                 xc2 = chC + (nC % 40) * TRACK
                 nC += 1
                 rim_r = bulk_cx + (R * R - (by - bulk_cy) ** 2) ** 0.5
-                s.line([(bx2, by), (rim_r, by)], 0.5, colour="#888")
-                s.line([(rim_r, by), (xc2, by), (xc2, cy), (cx, cy)], 1.4, dashed, colour=base, stripe=stripe)
+                s.txt(rim_r + 12, by + 1.8, fw[0], 4.8, bold=True)
+                s.line([(rim_r + 10, by), (xc2, by), (xc2, cy), (cx, cy)], 1.4, dashed, colour=base, stripe=stripe)
         elif cab and not jun:                      # to a cab computer with no bulkhead cavity yet: dashed, stamped
             ox, oy = pin_at[dev[0]]
             cx, cy = pin_at[cab[0]]
