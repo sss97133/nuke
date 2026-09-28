@@ -17,7 +17,7 @@ import {
   COLORWAYS, COLORWAY_LIST, COLORWAY_STORAGE_KEY, ColorwayContext, DEFAULT_COLORWAY,
   frame, isColorwayId, rule, textOn, type Colorway, type ColorwayId,
 } from '../connector-inspector/colorways';
-import { useWiringFacts, type WiringFact, type PurchaseRecord } from '../connector-inspector/useWiringFacts';
+import { useWiringFacts, type WiringFact, type PurchaseRecord, type ListingRecord } from '../connector-inspector/useWiringFacts';
 import { optimizeImageUrl } from '../../../lib/imageOptimizer';
 import { WireEvidence } from '../connector-inspector/WireEvidence';
 import {
@@ -101,12 +101,13 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
   // rollups per section (the group-context layer)
   const rollup = useMemo(() => {
     const r: Record<string, SectionRollup> = {};
-    for (const s of SECTIONS) r[s.id] = { nodes: 0, placed: 0, done: 0, needs: 0, decided: 0, concept: 0, bought: 0, installed: 0, right: 0, wrong: 0, incomplete: 0 };
+    for (const s of SECTIONS) r[s.id] = { nodes: 0, placed: 0, done: 0, needs: 0, decided: 0, concept: 0, linedUp: 0, bought: 0, installed: 0, right: 0, wrong: 0, incomplete: 0 };
     for (const n of map.nodes) {
       const x = n.section && r[n.section];
       if (!x) continue;
       x.nodes += 1; if (n.x != null) x.placed += 1; if (n.workStatus === 'done') x.done += 1; if (n.workStatus === 'needs_owner') x.needs += 1;
       const dp = deviceProof(facts, n.code);
+      if (dp.some(f => f.level === 'lined_up')) x.linedUp += 1;
       if (dp.some(f => f.level === 'bought')) x.bought += 1;
       if (dp.some(f => f.level === 'installed')) x.installed += 1;
     }
@@ -507,13 +508,42 @@ function ProofRow({ cw, f }: { cw: Colorway; f: WiringFact }) {
           {LEVEL_WORD[f.level ?? ''] ?? (f.level ?? '').toUpperCase()}{f.eventDate ? ` ${f.eventDate}` : ''}
           {f.seenAt ? ` · PHOTO ${f.seenAt.slice(0, 10)}` : ''}
         </div>
-        {f.order ? <PurchaseLines cw={cw} o={f.order} /> : <div>{f.value}</div>}
+        {f.order ? <PurchaseLines cw={cw} o={f.order} /> : f.listing ? <ListingLines cw={cw} l={f.listing} /> : <div>{f.value}</div>}
         <div style={{ color: cw.inkFaint }}>
           {f.order ? `PURCHASE RECORD — THE OWNER'S ${(f.order.marketplace ?? 'ORDER').toUpperCase()} ORDER`
+            : f.listing ? 'A LISTING, NOT A PURCHASE — ORDER IT FROM THE LINK'
             : f.ownerWords ? "THE OWNER'S WORDS" : f.level === 'question' ? 'RAISED BY A PHOTO ON THIS PROFILE'
             : "READ FROM THE VEHICLE'S OWN PHOTO · NOT YET CONFIRMED BY THE OWNER"}
         </div>
       </div>
+    </div>
+  );
+}
+
+// a lined-up part: where it is sold, exactly what, how many, the price read and when — not a purchase
+function ListingLines({ cw, l }: { cw: Colorway; l: ListingRecord }) {
+  const usd = (n?: number) => (typeof n === 'number' ? `$${n.toFixed(2)}` : null);
+  const qty = l.quantity ?? 1;
+  const each = usd(l.price_usd);
+  const what = [qty > 1 ? `${qty} ×` : null, l.part ?? null,
+    (l.part_numbers ?? []).length ? `(${(l.part_numbers ?? []).join(' / ')})` : null].filter(Boolean).join(' ');
+  const short = /out of stock|backorder/i.test(l.stock ?? '');
+  return (
+    <div style={{ fontFamily: cw.fontMono, fontSize: 13, lineHeight: 1.55 }}>
+      {l.site && <div>AT {l.site.toUpperCase()}</div>}
+      {what && <div>{what}</div>}
+      {each && (
+        <div>
+          {each}{qty > 1 ? ` EACH · ${usd((l.price_usd ?? 0) * qty)} FOR ${qty}` : ''}{l.captured ? ` · PRICE READ ${l.captured}` : ''}
+        </div>
+      )}
+      {l.stock && <div style={{ color: short ? cw.warn : cw.ink, fontWeight: short ? 700 : 400 }}>{l.stock.toUpperCase()}</div>}
+      {l.note && <div style={{ color: cw.warn }}>{l.note.toUpperCase()}</div>}
+      {l.url && (
+        <a href={l.url} target="_blank" rel="noreferrer" style={{ ...linkStyle(cw), fontFamily: cw.fontMono, fontSize: 13 }}>
+          OPEN THE LISTING ▸
+        </a>
+      )}
     </div>
   );
 }
@@ -552,7 +582,7 @@ function PurchaseLines({ cw, o }: { cw: Colorway; o: PurchaseRecord }) {
   );
 }
 
-interface SectionRollup { nodes: number; placed: number; done: number; needs: number; decided: number; concept: number; bought: number; installed: number; right: number; wrong: number; incomplete: number }
+interface SectionRollup { nodes: number; placed: number; done: number; needs: number; decided: number; concept: number; linedUp: number; bought: number; installed: number; right: number; wrong: number; incomplete: number }
 
 function Rollup({ cw, sec, rollup, calls }: {
   cw: Colorway; sec: Section | null; rollup: Record<string, SectionRollup>;
@@ -573,7 +603,7 @@ function Rollup({ cw, sec, rollup, calls }: {
               {r.done}/{r.nodes} NODES DONE · {r.placed} PLACED · {r.needs} NEED YOU
             </div>
             <div style={{ fontFamily: cw.fontMono }}>
-              ACQUIRED {r.bought}/{r.nodes} · INSTALLED {r.installed}/{r.nodes} (PROOF ON FILE)
+              LINED UP {r.linedUp}/{r.nodes} · ACQUIRED {r.bought}/{r.nodes} · INSTALLED {r.installed}/{r.nodes} (PROOF ON FILE)
             </div>
             <div style={{ fontFamily: cw.fontMono }}>
               {r.decided} WIRES DECIDED · {r.concept} CONCEPT
