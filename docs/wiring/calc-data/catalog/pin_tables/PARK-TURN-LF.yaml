@@ -7,6 +7,7 @@ PARK-TURN-LF:
   mate: GM socket 8911486 with leads (1978 booklet p.13); replacement socket part OPEN
   note: 'maker''s document: left front park/turn lamp, 1157 bulb in GM socket 8911486 (3 leads: park, turn, ground)'
   open:
+  - 'decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call'
   - 'family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket''s leads;
     that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)'
   sources:

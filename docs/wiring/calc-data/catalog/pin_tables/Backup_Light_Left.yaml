@@ -6,6 +6,7 @@ Backup_Light_Left:
   mate: GM socket 8911027 with leads (1978 booklet p.14); replacement socket part OPEN
   note: 'maker''s document: left back-up lamp, 1156 bulb in GM socket 8911027 (feed + ground leads), in the tail lamp housing'
   open:
+  - 'decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call'
   - 'family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket''s leads;
     that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)'
   sources:

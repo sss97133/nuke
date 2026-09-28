@@ -1,10 +1,12 @@
 HORN:
-  family: open
+  family: gm_blade
   pins:
     '48': horn terminal (circuit 29 dark green, connector 12004267)
     HORN_GND: ''
   mate: GM 12004267 1-way connector (1978 booklet p.13); new-part equivalent OPEN
-  note: 'maker''s document: factory horn: one terminal in a 1-way connector 12004267 (circuit 29), grounds through its mounting bracket'
+  note: 'maker''s document: factory horn: one terminal in a 1-way connector 12004267 (circuit 29), grounds through its mounting bracket · family gm_blade: the 1978
+    booklet draws GM factory blade connectors here (horn connector 12004267, 1978 booklet p.13); the Packard 56-series identity is the family''s (families.yaml),
+    not printed on the drawing'
   open:
   - 'HORN_GND: the factory horn has no ground terminal — it grounds through its bracket (1978 booklet p.13). A ring under the mount bolt, or a horn with a ground
     terminal, closes this'

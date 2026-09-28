@@ -1,12 +1,13 @@
 BLOWER-MOTOR:
-  family: open
+  family: gm_blade
   pins:
     BLOWER_MOT: + blade terminal
     BLOWER_HI: + blade terminal
     BLOWER_GND: ''
   splice_point: true
   note: 'maker''s document: Four Seasons 35587 blower motor: one blade terminal, single speed · BLOWER_MOT and BLOWER_HI both feed the one blade: they join before
-    the blade terminal'
+    the blade terminal · family gm_blade: the 1978 booklet draws GM factory blade connectors here (motor feed connector 2977976, 1978 booklet p.16; Four Seasons 35587
+    ''Connector: Blade terminal'' (mpparts snapshot)); the Packard 56-series identity is the family''s (families.yaml), not printed on the drawing'
   open:
   - 'two 12 AWG wires onto one blade: combined area is past a D-609-05 (16-12) — join method OPEN'
   - 'BLOWER_GND: the 35587 listing gives one blade and no ground lead; the factory 1978 C60 motor has a black ground lead to a stud (1978 booklet p.16) — read the

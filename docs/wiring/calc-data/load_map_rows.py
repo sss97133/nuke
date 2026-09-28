@@ -54,7 +54,8 @@ APRIL2SECTION = {"engine-harness": "engine", "dash-cabin": "dash_cabin", "body-c
                  "lighting-front": "lighting_front", "lighting-rear": "lighting_rear", "powertrain-chassis": "powertrain_chassis"}
 REAR = re.compile(r"TAIL|REAR|BRAKE|BACKUP|REVERSE|LICENSE|3RD|THIRD|TRAILER", re.I)
 FAMILIES = {"ssc", "d38999_20", "gt150", "mp150", "ev1", "kit_terminal", "te_amp_plug", "ring_small", "lug", "miniseal",
-            "solder_sleeve", "xlr_solder"}
+            "solder_sleeve", "xlr_solder",
+            "dt", "dtp", "dtm", "gm_blade", "screw_terminal", "contura"}   # admitted by migration 20260929010000
 
 
 def endpoint_type(code, device=""):

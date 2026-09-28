@@ -105,7 +105,8 @@ def run():
             res = {}
             # R1 range
             rng = (parts.get(term) or {}).get("range_awg") if term else None
-            rng = rng or ep.get("range") or fam.get("wire_range_awg")
+            rng = rng or (ep.get("range_by_wire") or {}).get(str(t["wire"])) or ep.get("range") or fam.get("wire_range_awg")
+            # range_by_wire: a maker gives a range per cavity (JL VX700/5i power plug: power/ground 4 AWG, remote 18-10 AWG)
             if not isinstance(eff, int):
                 res["R1 range"] = ("OPEN", f"wire gauge unknown ({awg})")
             elif not rng:
@@ -121,11 +122,28 @@ def run():
                     srng = (parts.get(sp.group(1)) or {}).get("range_awg") if sp else None
                     if srng and not (min(srng) <= awg <= max(srng)):
                         res["R1 range"] = ("FAIL", f"load wire {awg} AWG is outside the splice {sp.group(1)} range {max(srng)}–{min(srng)} AWG")
-            # R2 cavity
+            # a device lead shared by several wires is ONE splice: judge its fill on the combined gauge (kits_v5.splice_for,
+            # the 3137CT cavity rule), not wire by wire (2026-09-28: #100 + VSS_DAK on the SEN-01-5 white lead)
             cv = t.get("cavity")
+            sp_code = next((c for c in codes if c.startswith("D-609")), None)
+            if sp_code and cv and cav_count[str(cv)] > 1:
+                grp = [x for x in ts if str(x.get("cavity")) == str(cv)]
+                awgs = [wires.get(str(x["wire"]), {}).get("awg") for x in grp]
+                srng = (parts.get(sp_code) or {}).get("range_awg")
+                if all(isinstance(a, int) for a in awgs) and srng:
+                    _, eq = kits_v5.splice_for(awgs)
+                    ok = min(srng) <= eq <= max(srng)
+                    res["R1 range"] = ("PASS" if ok else "FAIL",
+                                       f"one splice for {len(grp)} wires ({' + '.join(map(str, awgs))} AWG = {eq} AWG equivalent, "
+                                       f"before the device's own lead) vs {sp_code} {max(srng)}–{min(srng)} AWG")
+            # R2 cavity
             stud_family = (ep.get("family") or t.get("family")) in ("ring_small", "lug")
+            not_cavity = cv and any(str(cv) in str(o) and "not a cavity" in str(o) for o in (ep.get("open") or []))
             if not cv or cv in ("NEEDS CAVITY",):
                 res["R2 cavity"] = ("OPEN", "no cavity assigned")
+            elif not_cavity:
+                # the plug's own write-up says this pin text is a description, not a cavity (2026-09-28: E-Stopp #126)
+                res["R2 cavity"] = ("OPEN", f"'{cv}' is not a cavity (the plug's open item says so) — cavity not read yet")
             elif stud_family and str(cv) in ("ring", "lug") and cav_count[str(cv)] > 1:
                 res["R2 cavity"] = ("OPEN", f"{cav_count[str(cv)]} wires share '{cv}' — which ring/stud each lands on isn't recorded"
                                             + (f" (plan: {ep.get('note')})" if ep.get("note") else ""))
@@ -196,7 +214,7 @@ def run():
                 else:
                     ok = any(fn[0].startswith(p) for p in want)
                     res["R6 ecu pin"] = ("PASS" if ok else "FAIL", f"'{name}' on {pin} = {fn[0]} ({fn[1]})")
-            results.append({"endpoint": eid, "wire": t["wire"], "name": name, "cavity": cv, "rules": res})
+            results.append({"endpoint": eid, "wire": t["wire"], "name": name, "cavity": cv, "part": t.get("part"), "rules": res})
     return results
 
 
@@ -571,6 +589,9 @@ def main():
     clean = sum(1 for x in res if all(st == "PASS" for st, _ in x["rules"].values()))
     fails = [x for x in res if any(st == "FAIL" for st, _ in x["rules"].values())]
     print(f"wire ends: {ends} · every rule PASS: {clean} · any FAIL: {len(fails)} · rest OPEN somewhere: {ends - clean - len(fails)}")
+    lead_ends = [x for x in res if str(x.get("part") or "").startswith("D-609")]
+    print(f"device-lead MiniSeal splices: {len({(x['endpoint'], str(x['cavity'])) for x in lead_ends})} for {len(lead_ends)} wire ends "
+          f"(a lead shared by several wires is one splice)")
     for rule in sorted(tally):
         c = tally[rule]
         print(f"  {rule:11s} PASS {c['PASS']:4d}  FAIL {c['FAIL']:3d}  OPEN {c['OPEN']:4d}")

@@ -15,7 +15,7 @@
   "counts": {
    "active": 174,
    "candidate": 243,
-   "implied": 197,
+   "implied": 201,
    "devices": 141
   }
  },
@@ -6124,9 +6124,9 @@
    "subsystem": "AUDIO",
    "frm": "ACC-BATT (+, MIDI 60 A)",
    "to": {
-    "device": "AMP",
-    "pin": "+12 V",
-    "terminal": "amp power terminal"
+    "device": "AMP-BLOCK",
+    "pin": "+ in (2 AWG)",
+    "terminal": "block set screw"
    },
    "awg": 2,
    "spec": "M22759/16",
@@ -6141,7 +6141,7 @@
    "conflicts": [
     "decision: awg 8 -> 4 — 8 AWG x 18.4 ft fails the 3 % rule; 4 AWG red M22759/16-4-2 (receipts/2026-09-25_orders-staged-prowire-ksv-ict.md, 17:30 addendum) | the amplifier runs off the accessory battery (owner 2026-09-27: YellowTop 'for other stuff like accessories'); the JL Audio VX700/5i takes '4-gauge power and ground leads and a 60-amp fuse' (Crutchfield page, snapshot web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md), so the MIDI at the battery is 60 A (owner 2026-09-27 ruled out Kicker: 'kicker is not cool... what a brand for a 100k truck'); it started at 'ECU'",
     "decision: frm ECU -> ACC-BATT (+, MIDI 60 A) — 8 AWG x 18.4 ft fails the 3 % rule; 4 AWG red M22759/16-4-2 (receipts/2026-09-25_orders-staged-prowire-ksv-ict.md, 17:30 addendum) | the amplifier runs off the accessory battery (owner 2026-09-27: YellowTop 'for other stuff like accessories'); the JL Audio VX700/5i takes '4-gauge power and ground leads and a 60-amp fuse' (Crutchfield page, snapshot web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md), so the MIDI at the battery is 60 A (owner 2026-09-27 ruled out Kicker: 'kicker is not cool... what a brand for a 100k truck'); it started at 'ECU'",
-    "decision: to None -> {'device': 'AMP', 'pin': '+12 V', 'terminal': 'amp power terminal'} — 8 AWG x 18.4 ft fails the 3 % rule; 4 AWG red M22759/16-4-2 (receipts/2026-09-25_orders-staged-prowire-ksv-ict.md, 17:30 addendum) | the amplifier runs off the accessory battery (owner 2026-09-27: YellowTop 'for other stuff like accessories'); the JL Audio VX700/5i takes '4-gauge power and ground leads and a 60-amp fuse' (Crutchfield page, snapshot web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md), so the MIDI at the battery is 60 A (owner 2026-09-27 ruled out Kicker: 'kicker is not cool... what a brand for a 100k truck'); it started at 'ECU'",
+    "decision: to None -> {'device': 'AMP-BLOCK', 'pin': '+ in (2 AWG)', 'terminal': 'block set screw'} — 8 AWG x 18.4 ft fails the 3 % rule; 4 AWG red M22759/16-4-2 (receipts/2026-09-25_orders-staged-prowire-ksv-ict.md, 17:30 addendum) | the amplifier runs off the accessory battery (owner 2026-09-27: YellowTop 'for other stuff like accessories'); the JL Audio VX700/5i takes '4-gauge power and ground leads and a 60-amp fuse' (Crutchfield page, snapshot web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md), so the MIDI at the battery is 60 A (owner 2026-09-27 ruled out Kicker: 'kicker is not cool... what a brand for a 100k truck'); it started at 'ECU'",
     "decision: awg 4 -> 2 — sized from physics 2026-09-28: load 60 A (JL VX700/5i: 60 A fuse recommended; the run goes engine bay → bed, bundled with its ground); ampacity 100 A (bundled 35 °C rise) vs need 71 A; drop 0.404 V; MIDI 60 A. cable_sizing_v5.py"
    ],
    "sources": [
@@ -17209,14 +17209,18 @@
   },
   {
    "id": "TG_BUS_UP",
-   "label": "Tailgate window UP line: dash switch -> tailgate key switch",
+   "label": "Tailgate window UP line: dash switch UP -> splice 183 at the key switch CLOSE terminal",
    "status": "implied",
    "frm": "TG-SW-DASH (UP)",
-   "to": "TG-SW-KEY (UP in)",
+   "to": "TG-SW-KEY (CLOSE, splice 183)",
    "awg": 14,
    "spec": "M22759/32",
    "sources": [
     "factory circuit: the key switch sits in series between the dash switch and the motor"
+   ],
+   "conflicts": [
+    "decision: label Tailgate window UP line: dash switch -> tailgate key switch -> Tailgate window UP line: dash switch UP -> splice 183 at the key switch CLOSE terminal — the key switch is in parallel, not in series: tailgate circuit redrawn to the factory drawing (1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16, sheet A-4 'Power Rear Window (RPO A33)' (read from the page image 2026-09-28): key switch 8900713 = OPEN 184 / FEED 60 (12 OR/B-60, battery via the 30 A circuit breaker) / CLOSE 183, in PARALLEL with the dash switch 8911352 (5 UP / 4 FEED / 3 DOWN): the two switches' outputs join at splice-183 and splice-184; the UP line then runs through the N/O 'tailgate closed' cutout switch 2977647 (12 LBL-183C in, 12 LBL-183E out) to the motor 6288909 UP-1; DN-2 = 12 T/W-184C; pin-table review 2026-09-28)",
+    "decision: to TG-SW-KEY (UP in) -> TG-SW-KEY (CLOSE, splice 183) — the key switch is in parallel, not in series: tailgate circuit redrawn to the factory drawing (1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16, sheet A-4 'Power Rear Window (RPO A33)' (read from the page image 2026-09-28): key switch 8900713 = OPEN 184 / FEED 60 (12 OR/B-60, battery via the 30 A circuit breaker) / CLOSE 183, in PARALLEL with the dash switch 8911352 (5 UP / 4 FEED / 3 DOWN): the two switches' outputs join at splice-183 and splice-184; the UP line then runs through the N/O 'tailgate closed' cutout switch 2977647 (12 LBL-183C in, 12 LBL-183E out) to the motor 6288909 UP-1; DN-2 = 12 T/W-184C; pin-table review 2026-09-28)"
    ],
    "subsystem": "POWER_WINDOWS",
    "subsystem_basis": "factory power tailgate window (2026-09-27)",
@@ -17226,14 +17230,18 @@
   },
   {
    "id": "TG_BUS_DN",
-   "label": "Tailgate window DOWN line: dash switch -> tailgate key switch",
+   "label": "Tailgate window DOWN line: dash switch DOWN -> splice 184 at the key switch OPEN terminal",
    "status": "implied",
    "frm": "TG-SW-DASH (DOWN)",
-   "to": "TG-SW-KEY (DOWN in)",
+   "to": "TG-SW-KEY (OPEN, splice 184)",
    "awg": 14,
    "spec": "M22759/32",
    "sources": [
     "factory circuit"
+   ],
+   "conflicts": [
+    "decision: label Tailgate window DOWN line: dash switch -> tailgate key switch -> Tailgate window DOWN line: dash switch DOWN -> splice 184 at the key switch OPEN terminal — the key switch is in parallel, not in series: tailgate circuit redrawn to the factory drawing (1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16, sheet A-4 'Power Rear Window (RPO A33)' (read from the page image 2026-09-28): key switch 8900713 = OPEN 184 / FEED 60 (12 OR/B-60, battery via the 30 A circuit breaker) / CLOSE 183, in PARALLEL with the dash switch 8911352 (5 UP / 4 FEED / 3 DOWN): the two switches' outputs join at splice-183 and splice-184; the UP line then runs through the N/O 'tailgate closed' cutout switch 2977647 (12 LBL-183C in, 12 LBL-183E out) to the motor 6288909 UP-1; DN-2 = 12 T/W-184C; pin-table review 2026-09-28)",
+    "decision: to TG-SW-KEY (DOWN in) -> TG-SW-KEY (OPEN, splice 184) — the key switch is in parallel, not in series: tailgate circuit redrawn to the factory drawing (1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16, sheet A-4 'Power Rear Window (RPO A33)' (read from the page image 2026-09-28): key switch 8900713 = OPEN 184 / FEED 60 (12 OR/B-60, battery via the 30 A circuit breaker) / CLOSE 183, in PARALLEL with the dash switch 8911352 (5 UP / 4 FEED / 3 DOWN): the two switches' outputs join at splice-183 and splice-184; the UP line then runs through the N/O 'tailgate closed' cutout switch 2977647 (12 LBL-183C in, 12 LBL-183E out) to the motor 6288909 UP-1; DN-2 = 12 T/W-184C; pin-table review 2026-09-28)"
    ],
    "subsystem": "POWER_WINDOWS",
    "subsystem_basis": "factory power tailgate window (2026-09-27)",
@@ -17243,9 +17251,9 @@
   },
   {
    "id": "TG_MOT_A",
-   "label": "Tailgate key switch -> window motor lead A",
+   "label": "Tailgate-closed cutout switch -> window motor UP (circuit 183E)",
    "status": "implied",
-   "frm": "TG-SW-KEY (UP out)",
+   "frm": "TG-CUTOUT (183E)",
    "to": "rear_window_motor:1 (UP, circuit 183 light blue)",
    "awg": 14,
    "spec": "M22759/32",
@@ -17253,20 +17261,58 @@
    "sources": [
     "factory circuit (inside the tailgate)"
    ],
+   "conflicts": [
+    "decision: frm TG-SW-KEY (UP out) -> TG-CUTOUT (183E) — the UP line reaches the motor through the N/O tailgate-closed cutout switch 2977647: tailgate circuit redrawn to the factory drawing (1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16, sheet A-4 'Power Rear Window (RPO A33)' (read from the page image 2026-09-28): key switch 8900713 = OPEN 184 / FEED 60 (12 OR/B-60, battery via the 30 A circuit breaker) / CLOSE 183, in PARALLEL with the dash switch 8911352 (5 UP / 4 FEED / 3 DOWN): the two switches' outputs join at splice-183 and splice-184; the UP line then runs through the N/O 'tailgate closed' cutout switch 2977647 (12 LBL-183C in, 12 LBL-183E out) to the motor 6288909 UP-1; DN-2 = 12 T/W-184C; pin-table review 2026-09-28)",
+    "decision: label Tailgate key switch -> window motor lead A -> Tailgate-closed cutout switch -> window motor UP (circuit 183E) — the UP line reaches the motor through the N/O tailgate-closed cutout switch 2977647: tailgate circuit redrawn to the factory drawing (1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16, sheet A-4 'Power Rear Window (RPO A33)' (read from the page image 2026-09-28): key switch 8900713 = OPEN 184 / FEED 60 (12 OR/B-60, battery via the 30 A circuit breaker) / CLOSE 183, in PARALLEL with the dash switch 8911352 (5 UP / 4 FEED / 3 DOWN): the two switches' outputs join at splice-183 and splice-184; the UP line then runs through the N/O 'tailgate closed' cutout switch 2977647 (12 LBL-183C in, 12 LBL-183E out) to the motor 6288909 UP-1; DN-2 = 12 T/W-184C; pin-table review 2026-09-28)",
+    "pin text from the termination rows (one home for pins, review A3): to 'rear_window_motor:A' -> 'rear_window_motor:1 (UP, circuit 183 light blue)'"
+   ],
    "subsystem": "POWER_WINDOWS",
    "subsystem_basis": "factory power tailgate window (2026-09-27)",
    "length_kind": null,
-   "conflicts": [
-    "pin text from the termination rows (one home for pins, review A3): to 'rear_window_motor:A' -> 'rear_window_motor:1 (UP, circuit 183 light blue)'"
+   "option": "BASE",
+   "option_status": "base"
+  },
+  {
+   "id": "TG_KEY_FEED",
+   "label": "Tailgate key switch FEED (factory circuit 60), branched from the dash switch feed",
+   "status": "implied",
+   "frm": "TG-SW-DASH (feed, spliced to TG_FEED)",
+   "to": "TG-SW-KEY (FEED, circuit 60)",
+   "awg": 14,
+   "spec": "M22759/32",
+   "control": "shares TG_FEED (PDM30 OUT1 on DIG1 ignition RUN): the key switch works only key-on — the factory fed it always-hot (circuit 60 via the 30 A breaker); owner call whether OUT1 runs always-on",
+   "sources": [
+    "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16, sheet A-4 'Power Rear Window (RPO A33)' (read from the page image 2026-09-28): key switch 8900713 = OPEN 184 / FEED 60 (12 OR/B-60, battery via the 30 A circuit breaker) / CLOSE 183, in PARALLEL with the dash switch 8911352 (5 UP / 4 FEED / 3 DOWN): the two switches' outputs join at splice-183 and splice-184; the UP line then runs through the N/O 'tailgate closed' cutout switch 2977647 (12 LBL-183C in, 12 LBL-183E out) to the motor 6288909 UP-1; DN-2 = 12 T/W-184C"
    ],
+   "subsystem": "POWER_WINDOWS",
+   "subsystem_basis": "factory power tailgate window (2026-09-27)",
+   "length_kind": null,
+   "option": "BASE",
+   "option_status": "base"
+  },
+  {
+   "id": "TG_CUT_IN",
+   "label": "Tailgate window UP line: splice 183 (key switch CLOSE terminal) -> tailgate-closed cutout switch (circuit 183C)",
+   "status": "implied",
+   "frm": "TG-SW-KEY (CLOSE, splice 183)",
+   "to": "TG-CUTOUT (183C)",
+   "awg": 14,
+   "spec": "M22759/32",
+   "control": "the tailgate-closed cutout passes UP only with the tailgate shut (1978 booklet p.16)",
+   "sources": [
+    "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16, sheet A-4 'Power Rear Window (RPO A33)' (read from the page image 2026-09-28): key switch 8900713 = OPEN 184 / FEED 60 (12 OR/B-60, battery via the 30 A circuit breaker) / CLOSE 183, in PARALLEL with the dash switch 8911352 (5 UP / 4 FEED / 3 DOWN): the two switches' outputs join at splice-183 and splice-184; the UP line then runs through the N/O 'tailgate closed' cutout switch 2977647 (12 LBL-183C in, 12 LBL-183E out) to the motor 6288909 UP-1; DN-2 = 12 T/W-184C"
+   ],
+   "subsystem": "POWER_WINDOWS",
+   "subsystem_basis": "factory power tailgate window (2026-09-27)",
+   "length_kind": null,
    "option": "BASE",
    "option_status": "base"
   },
   {
    "id": "TG_MOT_B",
-   "label": "Tailgate key switch -> window motor lead B",
+   "label": "Splice 184 (key switch OPEN terminal) -> window motor DOWN (circuit 184C)",
    "status": "implied",
-   "frm": "TG-SW-KEY (DOWN out)",
+   "frm": "TG-SW-KEY (OPEN, splice 184)",
    "to": "rear_window_motor:2 (DOWN, circuit 184 tan/white)",
    "awg": 14,
    "spec": "M22759/32",
@@ -17274,12 +17320,14 @@
    "sources": [
     "factory circuit (inside the tailgate)"
    ],
+   "conflicts": [
+    "decision: frm TG-SW-KEY (DOWN out) -> TG-SW-KEY (OPEN, splice 184) — tailgate circuit redrawn to the factory drawing (1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16, sheet A-4 'Power Rear Window (RPO A33)' (read from the page image 2026-09-28): key switch 8900713 = OPEN 184 / FEED 60 (12 OR/B-60, battery via the 30 A circuit breaker) / CLOSE 183, in PARALLEL with the dash switch 8911352 (5 UP / 4 FEED / 3 DOWN): the two switches' outputs join at splice-183 and splice-184; the UP line then runs through the N/O 'tailgate closed' cutout switch 2977647 (12 LBL-183C in, 12 LBL-183E out) to the motor 6288909 UP-1; DN-2 = 12 T/W-184C; pin-table review 2026-09-28)",
+    "decision: label Tailgate key switch -> window motor lead B -> Splice 184 (key switch OPEN terminal) -> window motor DOWN (circuit 184C) — tailgate circuit redrawn to the factory drawing (1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16, sheet A-4 'Power Rear Window (RPO A33)' (read from the page image 2026-09-28): key switch 8900713 = OPEN 184 / FEED 60 (12 OR/B-60, battery via the 30 A circuit breaker) / CLOSE 183, in PARALLEL with the dash switch 8911352 (5 UP / 4 FEED / 3 DOWN): the two switches' outputs join at splice-183 and splice-184; the UP line then runs through the N/O 'tailgate closed' cutout switch 2977647 (12 LBL-183C in, 12 LBL-183E out) to the motor 6288909 UP-1; DN-2 = 12 T/W-184C; pin-table review 2026-09-28)",
+    "pin text from the termination rows (one home for pins, review A3): to 'rear_window_motor:B' -> 'rear_window_motor:2 (DOWN, circuit 184 tan/white)'"
+   ],
    "subsystem": "POWER_WINDOWS",
    "subsystem_basis": "factory power tailgate window (2026-09-27)",
    "length_kind": null,
-   "conflicts": [
-    "pin text from the termination rows (one home for pins, review A3): to 'rear_window_motor:B' -> 'rear_window_motor:2 (DOWN, circuit 184 tan/white)'"
-   ],
    "option": "BASE",
    "option_status": "base"
   },
@@ -17602,6 +17650,7 @@
    "sources": [
     "owner 2026-09-27: grounds run in the loom — 'dave runs his grounds in the looms ... would be dumb to be grounding to body all the time'; Dave's DC primary has a ground-stud bank (state 0i). Each zone's returns run in the harness to its ground bank; the banks return in the harness to the ground star, never through the body"
    ],
+   "notes": "factory grounds through the bracket (catalog/pin_tables/HORN.yaml, 1978 booklet); the wire stays for the Tefzel harness (no chassis-ground reliance, chapters/17 §17.4; state row 56)",
    "subsystem": "ACCESSORY_12V",
    "subsystem_basis": "horn button and ground (2026-09-27)",
    "length_kind": null,
@@ -17636,6 +17685,7 @@
    "sources": [
     "owner 2026-09-27: grounds run in the loom — 'dave runs his grounds in the looms ... would be dumb to be grounding to body all the time'; Dave's DC primary has a ground-stud bank (state 0i). Each zone's returns run in the harness to its ground bank; the banks return in the harness to the ground star, never through the body"
    ],
+   "notes": "factory grounds through the mount (catalog/pin_tables/UNDERHOOD-LAMP.yaml, 1978 booklet); the wire stays for the Tefzel harness (no chassis-ground reliance, chapters/17 §17.4; state row 56)",
    "subsystem": "LIGHTING_INTERIOR",
    "subsystem_basis": "interior lamp grounds (2026-09-27)",
    "length_kind": null,
@@ -17789,6 +17839,7 @@
    "sources": [
     "owner 2026-09-27: grounds run in the loom — 'dave runs his grounds in the looms ... would be dumb to be grounding to body all the time'; Dave's DC primary has a ground-stud bank (state 0i). Each zone's returns run in the harness to its ground bank; the banks return in the harness to the ground star, never through the body"
    ],
+   "notes": "factory grounds through the housing (catalog/pin_tables/LICENSE-LAMP.yaml, 1978 booklet); the wire stays for the Tefzel harness (no chassis-ground reliance, chapters/17 §17.4; state row 56)",
    "subsystem": "LIGHTING_EXTERIOR",
    "subsystem_basis": "lamp grounds and the factory lighting switches as PDM inputs (2026-09-27)",
    "length_kind": null,
@@ -18018,14 +18069,14 @@
   },
   {
    "id": "AMP_GND",
-   "label": "Amplifier ground, 4 AWG in the loom to the ground star",
+   "label": "Amplifier ground run: reducing block beside the amp to the ground star",
    "status": "implied",
-   "frm": "AMP (ground)",
+   "frm": "AMP-BLOCK (- in, 2 AWG)",
    "to": "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)",
    "awg": 2,
    "spec": "M22759/16",
    "sources": [
-    "owner 2026-09-27: grounds run in the loom — 'dave runs his grounds in the looms ... would be dumb to be grounding to body all the time'; Dave's DC primary has a ground-stud bank (state 0i). Each zone's returns run in the harness to its ground bank; the banks return in the harness to the ground star, never through the body; ground cable matches the 4 AWG feed (#32, state 0n)"
+    "owner 2026-09-27: grounds run in the loom — 'dave runs his grounds in the looms ... would be dumb to be grounding to body all the time'; Dave's DC primary has a ground-stud bank (state 0i). Each zone's returns run in the harness to its ground bank; the banks return in the harness to the ground star, never through the body; ground cable matches the feed (#32, state 0n)"
    ],
    "conflicts": [
     "decision: awg 4 -> 2 — sized from physics 2026-09-28: load 60 A (the amplifier's return, same length as #32); ampacity 100 A (bundled 35 °C rise) vs need 60 A; drop 0.404 V; none. cable_sizing_v5.py"
@@ -18037,6 +18088,40 @@
    "length_kind": null,
    "option": "AUD",
    "option_status": "decided"
+  },
+  {
+   "id": "AMP_PWR_TAIL",
+   "label": "Amplifier +12 V tail: reducing block to the amp power plug (4 AWG, JL's required size)",
+   "status": "implied",
+   "frm": "AMP-BLOCK (+ out, 4 AWG)",
+   "to": "AMP (+12 VDC, power plug set screw)",
+   "awg": 4,
+   "spec": "M22759/16",
+   "sources": [
+    "JL VX700/5i guide (web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md) 'Power Connector': '4 AWG is the required copper wire size for this amplifier'; spec table 'Min. Copper Power/GND Wire 4 AWG', 'Recommended Fuse 60 A'. The 18.4 ft loop needs 2 AWG for the 3 % drop (4 AWG 0.62 V = 4.4 %; cable_sizing_v5), so the run lands on a reducing block beside the amp and a short 4 AWG tail enters the set screw. JL's own step A: 'install a fused distribution block near the amplifiers'. 4 AWG under the 60 A MIDI: 72 A bundled x 0.85 = 61 A >= 60 A"
+   ],
+   "protection": "none",
+   "notes": "sized from physics 2026-09-28: load 60 A (short tail into the JL power plug: 'Min. Copper Power/GND Wire 4 AWG' (JL VX700/5i spec table); protected by #32's MIDI 60 A); ampacity 120 A (free air, 80 °C ambient) vs need 60 A; drop None V; none. cable_sizing_v5.py",
+   "length_kind": null,
+   "option": "BASE",
+   "option_status": "base"
+  },
+  {
+   "id": "AMP_GND_TAIL",
+   "label": "Amplifier ground tail: amp power plug to the reducing block (4 AWG, JL's required size)",
+   "status": "implied",
+   "frm": "AMP (Ground, power plug set screw)",
+   "to": "AMP-BLOCK (- out, 4 AWG)",
+   "awg": 4,
+   "spec": "M22759/16",
+   "sources": [
+    "JL VX700/5i guide (web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md) 'Power Connector': '4 AWG is the required copper wire size for this amplifier'; spec table 'Min. Copper Power/GND Wire 4 AWG', 'Recommended Fuse 60 A'. The 18.4 ft loop needs 2 AWG for the 3 % drop (4 AWG 0.62 V = 4.4 %; cable_sizing_v5), so the run lands on a reducing block beside the amp and a short 4 AWG tail enters the set screw. JL's own step A: 'install a fused distribution block near the amplifiers'. 4 AWG under the 60 A MIDI: 72 A bundled x 0.85 = 61 A >= 60 A"
+   ],
+   "protection": "none",
+   "notes": "sized from physics 2026-09-28: load 60 A (the amplifier's ground tail, same rule); ampacity 120 A (free air, 80 °C ambient) vs need 60 A; drop None V; none. cable_sizing_v5.py",
+   "length_kind": null,
+   "option": "BASE",
+   "option_status": "base"
   },
   {
    "id": "IBOOST_GND",
@@ -18230,6 +18315,9 @@
    "sources": [
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs) p.87-88: blower resistor on the evaporator case; 73-87 C/K A/C resistor = 3 prongs, low speeds through the switch and resistor, high through the relay (gmsquarebody.com threads 38262, 5343)"
    ],
+   "conflicts": [
+    "decision: resistor text '3 prongs' -> 4 terminals, this wire on cavity 51 — 1978 C-K wiring booklet p.16 sheet A-4 'Air Conditioning RPO C-60' + p.8-9 circuit table (catalog/pin_tables/BLOWER-RES.yaml): the A/C resistor plug has FOUR cavities — 51 low (BAT), 63 M1, 72 M2, 101 output to the blower; not '3 prongs'"
+   ],
    "subsystem": "HVAC_AC",
    "subsystem_basis": "factory Four-Season blower circuit (2026-09-27)",
    "length_kind": null,
@@ -18247,6 +18335,9 @@
    "sources": [
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs) p.87-88; 3-prong resistor (gmsquarebody.com)"
    ],
+   "conflicts": [
+    "decision: resistor text '3-prong resistor' -> 4 terminals, this wire on cavity 63 — 1978 C-K wiring booklet p.16 sheet A-4 'Air Conditioning RPO C-60' + p.8-9 circuit table (catalog/pin_tables/BLOWER-RES.yaml): the A/C resistor plug has FOUR cavities — 51 low (BAT), 63 M1, 72 M2, 101 output to the blower; not '3 prongs'"
+   ],
    "subsystem": "HVAC_AC",
    "subsystem_basis": "factory Four-Season blower circuit (2026-09-27)",
    "length_kind": null,
@@ -18263,6 +18354,9 @@
    "spec": "M22759/32",
    "sources": [
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs) p.87-88; the third resistor prong (gmsquarebody.com); confirm the lead count against the control head when it is out"
+   ],
+   "conflicts": [
+    "decision: 'the third resistor prong' -> cavity 72 of 4 — 1978 C-K wiring booklet p.16 sheet A-4 'Air Conditioning RPO C-60' + p.8-9 circuit table (catalog/pin_tables/BLOWER-RES.yaml): the A/C resistor plug has FOUR cavities — 51 low (BAT), 63 M1, 72 M2, 101 output to the blower; not '3 prongs'"
    ],
    "subsystem": "HVAC_AC",
    "subsystem_basis": "factory Four-Season blower circuit (2026-09-27)",
@@ -18335,10 +18429,13 @@
    "status": "implied",
    "frm": "RADIO (blue/white, amp turn-on)",
    "to": "AMP (REM)",
-   "awg": 20,
+   "awg": 18,
    "spec": "M22759/32",
    "sources": [
     "RetroSound Model Hermosa manual p.16 (reference_documents/component_drawings/RetroSound_Hermosa_Manual.pdf): yellow constant +12 V, red ignition/ACC, black ground, blue/white remote/amp turn-on, front + rear RCA line outs; head unit per chapters/appendix-d-k5-build.md 'RetroSound Hermosa + Kicker amp/speakers/sub'; replaces the retired amplifier-coil wire #96"
+   ],
+   "conflicts": [
+    "decision: awg 20 -> 18 — JL Audio VX700/5i: 'The power connector will accept up to 4-gauge power and ground wire, and 10-18-gauge wire for the remote turn-on' (web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md, manual excerpt); 20 AWG is under the connector's range — 18 AWG M22759/32"
    ],
    "subsystem": "AUDIO",
    "subsystem_basis": "head unit, amplifier, woofer jumpers (2026-09-27)",
@@ -18734,20 +18831,21 @@
   },
   {
    "id": "DCDC_IN",
-   "label": "DC-DC charger input from the distribution stud (MIDI 40 A)",
+   "label": "DC-DC charger input from the distribution stud (MIDI 60 A)",
    "status": "implied",
-   "frm": "PS-STUDS (distribution stud, MIDI 40 A)",
+   "frm": "PS-STUDS (distribution stud, MIDI 60 A)",
    "to": "DCDC (IN +)",
    "awg": 6,
    "spec": "M22759/16",
    "sources": [
     "Victron Orion-Tr Smart 12/12-30 non-isolated DC-DC charger ORI121236140 — 30 A, 'engine running detection', remote on-off on a two-pole H/L connector (powerwerx.com page, snapshot web_snapshots/powerwerx.com__victron-ori121236140-oriontrsmart-30a-nonisolated.md) — downstream of the isolator, so the charger stops when the truck is isolated"
    ],
+   "notes": "fuse MIDI 60 A, the maker's number: Victron Orion-Tr Smart manual §4.2 Figure 6 'Cable and fuse recommendations', 12 V row: external battery protection fuse 60 A, minimum cable 6 mm2 at 0.5 m, 10 mm2 at 1-2 m (web_snapshots/www.victronenergy.com__34439-Orion-Tr_Smart_DC-DC_Charger-pdf-en.md). The 6 AWG (13.3 mm2) cable meets 10 mm2 and carries it: 75 A at 100 C x 0.85 = 64 A >= 60 A. chapters/17's MIDI 40 (35 A x 1.25 = 44 A rounded down) was under both the 125 % floor and the maker; superseded 2026-09-28 | sized from physics 2026-09-28: load 35 A (Orion-Tr Smart 12/12-30: 30 A out, ~35 A in. Fuse is the maker's: Victron Orion-Tr Smart manual §4.2 'Cable and fuse recommendations', 12 V row: external battery protection fuse 60 A, minimum cable 6 mm² at 0.5 m, 10 mm² at 1–2 m (snapshot 2026-09-28). ch.17's MIDI 40 was 35 A x 1.25 = 44 A rounded down — under the 125 % floor and under the maker's number; superseded 2026-09-28 night); ampacity 75 A (free air, 100 °C ambient (engine bay)) vs need 71 A; drop None V; MIDI 60 A. cable_sizing_v5.py",
    "conflicts": [
-    "decision: awg 8 -> 6 — sized from physics 2026-09-28: load 35 A (Orion-Tr Smart 12/12-30: 30 A out, ~35 A in; MIDI 40 (ch.17)); ampacity 75 A (free air, 100 °C ambient (engine bay)) vs need 47 A; drop None V; MIDI 40 A. cable_sizing_v5.py"
+    "fuse: MIDI 40 A (chapters/17) -> MIDI 60 A (Victron manual §4.2)",
+    "decision: awg 8 -> 6 — sized from physics 2026-09-28: load 35 A (Orion-Tr Smart 12/12-30: 30 A out, ~35 A in. Fuse is the maker's: Victron Orion-Tr Smart manual §4.2 'Cable and fuse recommendations', 12 V row: external battery protection fuse 60 A, minimum cable 6 mm² at 0.5 m, 10 mm² at 1–2 m (snapshot 2026-09-28). ch.17's MIDI 40 was 35 A x 1.25 = 44 A rounded down — under the 125 % floor and under the maker's number; superseded 2026-09-28 night); ampacity 75 A (free air, 100 °C ambient (engine bay)) vs need 71 A; drop None V; MIDI 60 A. cable_sizing_v5.py"
    ],
-   "protection": "MIDI 40 A",
-   "notes": "sized from physics 2026-09-28: load 35 A (Orion-Tr Smart 12/12-30: 30 A out, ~35 A in; MIDI 40 (ch.17)); ampacity 75 A (free air, 100 °C ambient (engine bay)) vs need 47 A; drop None V; MIDI 40 A. cable_sizing_v5.py",
+   "protection": "MIDI 60 A",
    "subsystem": "CHARGING_STARTING",
    "subsystem_basis": "isolator + dual batteries (2026-09-27)",
    "length_kind": null,
@@ -19455,11 +19553,12 @@
    "source": "K5_WIRING_STATE.md row 33"
   },
   "device_end_coverage": {
-   "mapped": 417,
-   "wire_ends": 458,
+   "mapped": 421,
+   "wire_ends": 466,
    "endpoints_without_pin_map": [
     "AC-HP-SW",
     "AC-LP-SW",
+    "AMP-BLOCK",
     "BLOWER-SW",
     "Backup_Camera",
     "CARGO-LAMP",
@@ -19514,6 +19613,8 @@
    "TG_BUS_UP",
    "TG_BUS_DN",
    "TG_MOT_A",
+   "TG_KEY_FEED",
+   "TG_CUT_IN",
    "TG_MOT_B",
    "CAM_GND",
    "CAM_VIDEO",
@@ -19558,6 +19659,8 @@
    "ESTOPP_GND",
    "STEP_GND",
    "AMP_GND",
+   "AMP_PWR_TAIL",
+   "AMP_GND_TAIL",
    "IBOOST_GND",
    "HL_SW_PARK",
    "HL_SW_HEAD",
@@ -19767,6 +19870,7 @@
     "prowire M800-KIT-N page"
    ],
    "splice_point": null,
+   "range_by_wire": null,
    "cavity_count": 34
   },
   "M130-B": {
@@ -19874,6 +19978,7 @@
     "motec_m130_datasheet.pdf p.5"
    ],
    "splice_point": null,
+   "range_by_wire": null,
    "cavity_count": 26
   },
   "PDM30-A": {
@@ -20007,6 +20112,7 @@
     "scripts/generate_connector_build_sheets.py PDM_A_PIN"
    ],
    "splice_point": null,
+   "range_by_wire": null,
    "cavity_count": 34
   },
   "PDM30-B": {
@@ -20098,6 +20204,7 @@
     "scripts/generate_connector_build_sheets.py PDM_B_PIN"
    ],
    "splice_point": null,
+   "range_by_wire": null,
    "cavity_count": 26
   },
   "PDM30-STUD": {
@@ -20122,7 +20229,8 @@
     "motec_pdm30_datasheet.pdf ('Mating: eyelet and M6 nut')",
     "build book DC primary table (DL214 = PDM30 M6)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "PDM15-A": {
    "device": "MoTeC PDM15 (engine PDM), connector A (34-way,",
@@ -20192,6 +20300,7 @@
     "owner 2026-09-24 'multiple PDM'; split engine/body 2026-09-27"
    ],
    "splice_point": null,
+   "range_by_wire": null,
    "cavity_count": 34
   },
   "PDM15-B": {
@@ -20232,6 +20341,7 @@
     "motec_pdm_user_manual.pdf p.43 (PDM15 pinout)"
    ],
    "splice_point": null,
+   "range_by_wire": null,
    "cavity_count": 26
   },
   "PDM15-STUD": {
@@ -20258,7 +20368,8 @@
     "motec_pdm_user_manual.pdf p.43 (connector C: M6 stud, Battery +)",
     "motec_pdm_user_manual.pdf p.48 (wire table; battery pos 4# to 2#)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "SPL-PDM15-OUT1": {
    "device": "PDM15 OUT1 pigtail splice — pins A1 + A10 (2 × 16 AWG) joined to the radiator fan feed #21 (12 AWG)",
@@ -20293,7 +20404,8 @@
     "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)",
     "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "SPL-PDM15-OUT4": {
    "device": "PDM15 OUT4 pigtail splice — pins A7 + A16 (2 × 16 AWG) joined to the starter S trigger START_TRIG (12 AWG)",
@@ -20328,7 +20440,8 @@
     "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)",
     "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "SPL-PDM30-OUT1": {
    "device": "PDM30 OUT1 pigtail splice — pins A1 + A10 (2 × 16 AWG) joined to the tailgate window feed TG_FEED (14 AWG)",
@@ -20363,7 +20476,8 @@
     "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)",
     "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "SPL-PDM30-OUT2": {
    "device": "PDM30 OUT2 pigtail splice — pins A3 + A12 (2 × 16 AWG) joined to the blower HIGH feed BLOWER_HI (12 AWG)",
@@ -20398,7 +20512,8 @@
     "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)",
     "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "SPL-PDM30-OUT3": {
    "device": "PDM30 OUT3 pigtail splice — pins A5 + A14 (2 × 16 AWG) joined to the driver window switch feed #34 (14 AWG)",
@@ -20433,7 +20548,8 @@
     "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)",
     "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "SPL-PDM30-OUT4": {
    "device": "PDM30 OUT4 pigtail splice — pins A7 + A16 (2 × 16 AWG) joined to the passenger window switch feed #35 (14 AWG)",
@@ -20468,7 +20584,8 @@
     "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)",
     "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "SPL-PDM30-OUT6": {
    "device": "PDM30 OUT6 pigtail splice — pins B3 + B9 (2 × 16 AWG) joined to the blower switch feed #51 (12 AWG)",
@@ -20503,7 +20620,8 @@
     "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)",
     "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "SPL-PDM30-OUT8": {
    "device": "PDM30 OUT8 pigtail splice — pins B7 + B13 (2 × 16 AWG) joined to the 12 V outlet feed #72 (14 AWG)",
@@ -20538,7 +20656,8 @@
     "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)",
     "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "WIN-SW-L": {
    "device": "driver door switch panel — window master (both windows) + lock rocker, Nu-Relics 17383-2 chrome reverse-polarity switches",
@@ -20581,7 +20700,8 @@
     "Nu-Relics #201 chrome switches, door placement: 'completed wire harness', no terminal map published (reference_documents/web_snapshots/www.nu-relics.com__201.md)",
     "Nu-Relics 17383-2 page: 'No Switches (Will Include Motor Plugs and Terminals)'; ACI motors are reverse polarity, 2 poles, swapping the wires reverses direction (reference_documents/web_snapshots/www.nu-relics.com__17383-2.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "WIN-SW-R": {
    "device": "passenger door window switch (in series with the master), Nu-Relics 17383-2",
@@ -20623,7 +20743,8 @@
     "Nu-Relics #201 chrome switches, door placement: 'completed wire harness', no terminal map published (reference_documents/web_snapshots/www.nu-relics.com__201.md)",
     "Nu-Relics 17383-2 page: 'No Switches (Will Include Motor Plugs and Terminals)'; ACI motors are reverse polarity, 2 poles, swapping the wires reverses direction (reference_documents/web_snapshots/www.nu-relics.com__17383-2.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "window_motor_DS": {
    "device": "driver window motor (Nu-Relics 17383-2 regulator + motor)",
@@ -20654,7 +20775,8 @@
     "Nu-Relics 17383-2 page: 'No Switches (Will Include Motor Plugs and Terminals)'; ACI motors are reverse polarity, 2 poles, swapping the wires reverses direction (reference_documents/web_snapshots/www.nu-relics.com__17383-2.md)",
     "Nu-Relics 'General Instructions & Tips' p.2: harness wires labelled for position, black = ground, red (orange) = 12 V hot feed (reference_documents/web_snapshots/www.nu-relics.com__General_Instructions_12-30-14.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "window_motor_PS": {
    "device": "passenger window motor (Nu-Relics 17383-2)",
@@ -20685,7 +20807,8 @@
     "Nu-Relics 17383-2 page: 'No Switches (Will Include Motor Plugs and Terminals)'; ACI motors are reverse polarity, 2 poles, swapping the wires reverses direction (reference_documents/web_snapshots/www.nu-relics.com__17383-2.md)",
     "Nu-Relics 'General Instructions & Tips' p.2: harness wires labelled for position, black = ground, red (orange) = 12 V hot feed (reference_documents/web_snapshots/www.nu-relics.com__General_Instructions_12-30-14.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "LOCK-SW-L": {
    "device": "driver lock rocker (reversing, rests to ground)",
@@ -20711,7 +20834,8 @@
     "the lock rocker is not named by maker or part number in the registry, so no terminal table can be read; pick the rocker, then read its sheet"
    ],
    "sources": [],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "LOCK-SW-R": {
    "device": "passenger lock rocker (reversing, rests to ground)",
@@ -20737,7 +20861,8 @@
     "the lock rocker is not named by maker or part number in the registry, so no terminal table can be read; pick the rocker, then read its sheet"
    ],
    "sources": [],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "lock_actuator_DS": {
    "device": "driver door lock actuator, AutoLoc AUTZT2000 (2-wire, 13 lb)",
@@ -20765,7 +20890,8 @@
     "autoloc.com AUTZT2000",
     "AutoLoc AUTZT2000 product page: 'Wire :: Plug-In Harness', '2 wire heavy duty central locking actuator', 'Control: negative ground', 4.5 A (reference_documents/web_snapshots/shop.autoloc.com__compact-2-wire-car-door-lock-actuator-heavy-duty-12-volt-motor-13-lbs-power-12v.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "lock_actuator_PS": {
    "device": "passenger door lock actuator, AutoLoc AUTZT2000",
@@ -20792,7 +20918,8 @@
    "sources": [
     "AutoLoc AUTZT2000 product page: 'Wire :: Plug-In Harness', '2 wire heavy duty central locking actuator', 'Control: negative ground', 4.5 A (reference_documents/web_snapshots/shop.autoloc.com__compact-2-wire-car-door-lock-actuator-heavy-duty-12-volt-motor-13-lbs-power-12v.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "DOOR-L-PASS-P": {
    "device": "driver door pass-through, window power — Deutsch DTP 4-way: DTP04-4P + WP-4P (body side), DTP06-4S + WP-4S (door side), size 12 solid contacts 0460-204-12141 / 0462-203-12141 (14–12 AWG)",
@@ -20835,7 +20962,8 @@
     "KSV 4-Way Mated Deutsch DTP Connector Kit page (DTP04-4P, DTP06-4S, WP-4P, WP-4S; size 12 solid contacts 14-12 AWG), read 2026-09-28",
     "customconnectorkits DTP04-4P page (accepts size 12 pins; mates DTP06-4S), read 2026-09-28"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "DOOR-L-PASS": {
    "device": "driver door pass-through, locks and speaker — Deutsch DT 8-way: DT04-08PA + W8P (body side), DT06-08SA + W8S (door side), size 16 solid contacts 0460-202-16141 / 0462-201-16141 (20–16 AWG); cavities 7–8 spare, plugged 0413-204-2005",
@@ -20878,7 +21006,8 @@
     "customconnectorkits DT04-08PA page (accepts size 16 pins; wedge W8P; mates DT06-08SA), read 2026-09-28",
     "cavity numbering 1-8 moulded on DT 8-way housings (maker convention); assignment order chosen 2026-09-28"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "DOOR-R-PASS-P": {
    "device": "passenger door pass-through, window power — Deutsch DTP 4-way: DTP04-4P + WP-4P (body side), DTP06-4S + WP-4S (door side), size 12 solid contacts 0460-204-12141 / 0462-203-12141 (14–12 AWG)",
@@ -20914,7 +21043,8 @@
    "sources": [
     "see DOOR-L-PASS-P"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "DOOR-R-PASS": {
    "device": "passenger door pass-through, locks and speaker — Deutsch DT 8-way: DT04-08PA + W8P (body side), DT06-08SA + W8S (door side), size 16 solid contacts (20–16 AWG); cavities 7–8 spare, plugged 0413-204-2005",
@@ -20952,7 +21082,8 @@
    "sources": [
     "see DOOR-L-PASS"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "TG-SW-DASH": {
    "device": "factory electric tailgate window dash switch (reversing)",
@@ -20960,12 +21091,14 @@
    "family": "gm_blade",
    "kit": {},
    "wires": [
+    "TG_KEY_FEED",
     "TG_FEED",
     "TG_BUS_UP",
     "TG_BUS_DN",
     "TG_GND"
    ],
    "cavities": {
+    "TG_KEY_FEED": "4 FEED (factory 12 R-70)",
     "TG_FEED": "4 FEED (factory 12 R-70)",
     "TG_BUS_UP": "5 UP (factory 12 LBL-183)",
     "TG_BUS_DN": "3 DOWN (factory 12 T-184)",
@@ -20979,7 +21112,7 @@
    ],
    "out_of_range": [],
    "pigtailed": [],
-   "note": null,
+   "note": "the key switch feed TG_KEY_FEED leaves the FEED terminal with TG_FEED (one splice on the feed lead)",
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
@@ -20987,50 +21120,92 @@
     "12 AWG factory terminals in 8911352 vs our 14 AWG: terminal part not named in the booklet"
    ],
    "sources": [
+    "1978 C-K wiring booklet ST-352-78 p.16 sheet A-4 'Power Rear Window (RPO A33)' (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf)",
     "ST-352 1978 C/K wiring booklet fold-out A-4, box 'Power Rear Window R.P.O. A33' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A4_hvac_cruise_fuel_auxiliary.png): tailgate window switch terminals 5-UP, 4-FEED, 3-DOWN"
    ],
-   "splice_point": null
+   "splice_point": true,
+   "range_by_wire": null
   },
   "TG-SW-KEY": {
-   "device": "factory tailgate key switch (in series between the dash switch and the motor)",
+   "device": "factory tailgate key switch 8900713 — IN PARALLEL with the dash switch: FEED (circuit 60) switched to CLOSE (183) or OPEN (184); the dash switch outputs join at its CLOSE/OPEN terminals (factory splices 183/184)",
    "where": "rear",
-   "family": "open",
+   "family": "gm_blade",
    "kit": {},
    "wires": [
+    "TG_KEY_FEED",
+    "TG_CUT_IN",
     "TG_BUS_UP",
-    "TG_MOT_A",
     "TG_BUS_DN",
     "TG_MOT_B"
    ],
    "cavities": {
+    "TG_KEY_FEED": "FEED terminal (circuit 60)",
+    "TG_CUT_IN": "CLOSE terminal (circuit 183, window up; to the tailgate-closed cutout)",
     "TG_BUS_UP": "CLOSE terminal (circuit 183, window up)",
-    "TG_MOT_A": "CLOSE terminal (circuit 183, window up)",
     "TG_BUS_DN": "OPEN terminal (circuit 184, window down)",
     "TG_MOT_B": "OPEN terminal (circuit 184, window down)"
    },
    "empty": null,
    "doubled": null,
-   "range": null,
+   "range": [
+    20,
+    10
+   ],
    "out_of_range": [],
    "pigtailed": [],
-   "note": "maker's document: factory tailgate window key switch, 1978 GM connector 8900713: three terminals OPEN (circuit 184) / FEED (circuit 60) / CLOSE (circuit 183) · The factory key switch is NOT in series: it has one FEED terminal (circuit 60, battery via circuit breaker) and switches it to CLOSE (183) or OPEN (184). Its outputs join the dash switch outputs at splices 183/184 on the way to the motor (1978 booklet p.16). Mapping the registry's series wires onto it puts the bus and motor wire of each direction on the same terminal (the factory splice moved to the switch), hence splice_point.",
+   "note": "maker's document: factory tailgate window key switch, 1978 GM connector 8900713: three terminals OPEN (circuit 184) / FEED (circuit 60) / CLOSE (circuit 183) · The factory key switch is NOT in series: it has one FEED terminal (circuit 60, battery via circuit breaker) and switches it to CLOSE (183) or OPEN (184). Its outputs join the dash switch outputs at splices 183/184 on the way to the motor (1978 booklet p.16). Mapping the registry's series wires onto it puts the bus and motor wire of each direction on the same terminal (the factory splice moved to the switch), hence splice_point. · family gm_blade: the 1978 booklet draws GM factory blade connectors here (key switch connector 8900713, 1978 booklet p.16); the Packard 56-series identity is the family's (families.yaml), not printed on the drawing",
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
+    "key-off operation: the factory fed this switch always-hot (circuit 60, 30 A breaker); here TG_KEY_FEED shares PDM30 OUT1 on ignition RUN — owner call whether OUT1 runs always-on",
+    "pin table: TG_MOT_A now starts at the cutout switch (183E), so its CLOSE-terminal entry in catalog/pin_tables/TG-SW-KEY.yaml belongs to TG_CUT_IN (pin-table owner)",
     "FEED terminal (circuit 60) has no wire in the registry: the key switch cannot drive the motor without it (1978 booklet p.16) — registry fix, not a pin question",
     "registry calls this switch 'in series between the dash switch and the motor'; the factory switch is in parallel (3 terminals, 1978 booklet p.16) — owner/registry decision",
     "1978 also has a normally-open 'tailgate closed' cutout switch (connector 2977647) in the UP line to the motor; the registry has no cutout switch",
     "1977-specific key switch drawing: not on file (1978 booklet used; same body)"
    ],
    "sources": [
+    "1978 C-K wiring booklet ST-352-78 p.16 sheet A-4 'Power Rear Window (RPO A33)' (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf)",
     "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) 'Power Rear Window (RPO A33)' panel: tailgate window switch 8900713 OPEN 184 / FEED 60 / CLOSE 183; splice-183, splice-184; cutout SW N/O 2977647"
    ],
-   "splice_point": true
+   "splice_point": true,
+   "range_by_wire": null
+  },
+  "TG-CUTOUT": {
+   "device": "tailgate-closed cutout switch, normally open, GM connector 2977647 — in the window UP line (183C in, 183E out to motor UP-1); the window goes up only with the tailgate shut",
+   "where": "rear",
+   "family": "open",
+   "kit": {},
+   "wires": [
+    "TG_CUT_IN",
+    "TG_MOT_A"
+   ],
+   "cavities": {
+    "TG_CUT_IN": "183C (from splice 183)",
+    "TG_MOT_A": "183E (to motor UP-1)"
+   },
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": null,
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [
+    "1977-specific drawing not on file (1978 booklet used; the K5 tailgate carries the same switch) — confirm it is on the truck (bench)",
+    "terminal family for the 2977647 body: not in families.yaml"
+   ],
+   "sources": [
+    "1978 C-K wiring booklet ST-352-78 p.16 sheet A-4 'Power Rear Window (RPO A33)' (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf): 'CUTOUT SW N/O' 2977647, 12 LBL-183C / 12 LBL-183E, 'TAILGATE CLOSED'"
+   ],
+   "splice_point": null,
+   "range_by_wire": null
   },
   "rear_window_motor": {
    "device": "factory electric tailgate window motor",
    "where": "rear",
-   "family": "open",
+   "family": "gm_blade",
    "kit": {},
    "wires": [
     "TG_MOT_A",
@@ -21042,10 +21217,13 @@
    },
    "empty": null,
    "doubled": null,
-   "range": null,
+   "range": [
+    20,
+    10
+   ],
    "out_of_range": [],
    "pigtailed": [],
-   "note": "maker's document: factory tailgate window motor, 1978 GM connector 6288909 (2-way): UP-1 / DN-2, grounds through the motor case",
+   "note": "maker's document: factory tailgate window motor, 1978 GM connector 6288909 (2-way): UP-1 / DN-2, grounds through the motor case · family gm_blade: the 1978 booklet draws GM factory blade connectors here (motor connector 6288909, 1978 booklet p.16); the Packard 56-series identity is the family's (families.yaml), not printed on the drawing",
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
@@ -21055,7 +21233,8 @@
    "sources": [
     "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) 'Power Rear Window (RPO A33)': tailgate window motor connector 6288909, cavity 'UP-1' = 12 LBL-183E, 'DN-2' = 12 T/W-184C"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "Backup_Camera": {
    "device": "license-plate backup camera, Rear View Safety RVS-7180355-IR (night vision)",
@@ -21084,7 +21263,8 @@
     "reference_documents/web_snapshots/www.rearviewsafety.com__license-plate-backup-camera-system-rvs-7180355-ir.md (kit contents: 33' camera cable, power harness with two camera inputs; power DC 12-24 V)",
     "reference_documents/web_snapshots/www.rearviewsafety.com__manuals.md (manual index: RVS-7180355-IR not found)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "MIRROR-MON": {
    "device": "replacement rearview mirror with display (RVS-7180355-IR kit) — camera shows in reverse",
@@ -21123,7 +21303,8 @@
     "Rear View Safety RVS-718-BB 'G-Series Rear View Replacement Mirror Monitor' manual p.9 Wiring: RED 12 V power to ignition, BLACK ground, GREEN reverse trigger, camera cable to the harness RCA adapter (reference_documents/web_snapshots/www.surveillance-video.com__RVS-718-BB-Instruction-Manual.md)",
     "RVS-7180355-IR kit page: 'OEM style G-Series Mirror Monitor', 'Power Harness with Two Camera Inputs' (reference_documents/web_snapshots/www.rearviewsafety.com__license-plate-backup-camera-system-rvs-7180355-ir.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "Tail_Light_Left": {
    "device": "left tail lamp, 1157 socket (RUN = park/tail group; BRK = stop/turn output)",
@@ -21149,6 +21330,7 @@
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
+    "decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call",
     "family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket's leads; that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)"
    ],
    "sources": [
@@ -21156,7 +21338,8 @@
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional 1157, marker 168, back-up 1156, license 67, underhood 93)",
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.786-787: lamp sockets belong to the wiring harness ('twist wiring harness socket 90° counterclockwise and remove harness and bulb'; 'rotate wiring harness sockets counterclockwise and remove housing')"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "Tail_Light_Right": {
    "device": "right tail lamp, 1157 socket",
@@ -21182,6 +21365,7 @@
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
+    "decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call",
     "family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket's leads; that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)"
    ],
    "sources": [
@@ -21189,7 +21373,8 @@
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional 1157, marker 168, back-up 1156, license 67, underhood 93)",
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.786-787: lamp sockets belong to the wiring harness ('twist wiring harness socket 90° counterclockwise and remove harness and bulb'; 'rotate wiring harness sockets counterclockwise and remove housing')"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "Backup_Light_Left": {
    "device": "left backup lamp",
@@ -21213,6 +21398,7 @@
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
+    "decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call",
     "family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket's leads; that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)"
    ],
    "sources": [
@@ -21220,7 +21406,8 @@
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional 1157, marker 168, back-up 1156, license 67, underhood 93)",
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.786-787: lamp sockets belong to the wiring harness ('twist wiring harness socket 90° counterclockwise and remove harness and bulb'; 'rotate wiring harness sockets counterclockwise and remove housing')"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "Backup_Light_Right": {
    "device": "right backup lamp",
@@ -21244,6 +21431,7 @@
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
+    "decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call",
     "family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket's leads; that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)"
    ],
    "sources": [
@@ -21251,7 +21439,8 @@
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional 1157, marker 168, back-up 1156, license 67, underhood 93)",
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.786-787: lamp sockets belong to the wiring harness ('twist wiring harness socket 90° counterclockwise and remove harness and bulb'; 'rotate wiring harness sockets counterclockwise and remove housing')"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "CHMSL": {
    "device": "third brake light (CHMSL) — lights with the brake",
@@ -21277,7 +21466,8 @@
    "sources": [
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional 1157, marker 168, back-up 1156, license 67, underhood 93)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "BRAKE-SW": {
    "device": "factory brake light switch at the pedal — switches 0V (PDM30 A28) into PDM30 DIG14",
@@ -21310,7 +21500,8 @@
     "ST-352 1978 C/K wiring booklet fold-out A-1 'Cab, Engine and Chassis Wiring' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the '77 K5): STOP LP SW, connector 2984235 with 18 ORN-140A and 18 WHT-17",
     "1977 Light Truck Service Manual Section 8 (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.777 (stoplamp switch listed in the lighting system)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "VSS-SENDER": {
    "device": "Dakota Digital SEN-01-5 speed sender on the NP205 speedometer drive (7/8-18 GM thread, 16k PPM) — 3-wire: red +5 V, black 0 V, white signal",
@@ -21350,7 +21541,8 @@
     "summitracing.com dak-sen-01-5 (thread and PPM; page not saved)",
     "Dakota VHX manual 650314:P p.8 (reference_documents/component_drawings/dakota_digital_vhx_manual.pdf): SPD +, SPD SND, SPD - text"
    ],
-   "splice_point": true
+   "splice_point": true,
+   "range_by_wire": null
   },
   "AC-CLUTCH": {
    "device": "A/C compressor clutch, Sanden 7176 SD7B10 (ordered 2026-09-24) — engine PDM15 OUT11",
@@ -21379,7 +21571,8 @@
     "Sanden compressor catalog (reference_documents/component_drawings/Sanden_Compressors_ATC_Catalog.pdf) p.14: 7176 = 7B10, 12 V, wire end 'T1'; p.7 wire end types: 'T1 w/o diode ... 1 Wire, Male, Bullet'",
     "Sanden SD7 service manual p.14 (normal clutch current 3.6-4.2 A at 12 VDC)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "AC-LP-SW": {
    "device": "A/C low-pressure switch (accumulator) — switches ground into PDM15 DIG4",
@@ -21405,7 +21598,8 @@
    "sources": [
     "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) 'Air Conditioning RPO C-60' panel"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "AC-HP-SW": {
    "device": "A/C high-pressure switch (liquid line) — switches ground into PDM15 DIG5",
@@ -21431,7 +21625,8 @@
    "sources": [
     "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) 'Air Conditioning RPO C-60' panel"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "PORT-ETH": {
    "device": "M130 laptop port — panel RJ45 (Cat5, crossover at the loom side)",
@@ -21463,7 +21658,8 @@
     "M1 Tune manual p.10",
     "prowire M-RJ45-CABLE page"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "CAN-BUS": {
    "device": "M1 CAN bus: trunk M130 → PDM30 → 61-pin → PDM15 → LTCD, with the UTC stub",
@@ -21497,6 +21693,7 @@
     "MoTeC PDM user manual p.49-50 'CAN Bus Wiring Requirements' + 'Short CAN Bus'"
    ],
    "splice_point": null,
+   "range_by_wire": null,
    "topology": {
     "order": [
      {
@@ -21571,7 +21768,8 @@
    "sources": [
     "MoTeC PDM user manual p.48"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "FIREWALL-CABIN": {
    "device": "D38999/24WJ61SN jam-nut receptacle — cabin side (sockets)",
@@ -21717,7 +21915,8 @@
     "K5_connector_FIREWALL_D38999.svg",
     "scripts/generate_connector_build_sheets.py assign_bulkhead()"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "FIREWALL-ENGINE": {
    "device": "D38999/26WJ61PN plug — engine loom side (pins)",
@@ -21862,7 +22061,8 @@
    "sources": [
     "K5_connector_FIREWALL_D38999.svg"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "FIREWALL-GROMMET": {
    "device": "firewall grommet crossings for wires too big for",
@@ -21893,7 +22093,8 @@
    "sources": [
     "K5_connector_FIREWALL_D38999.svg 'DOES NOT PASS BULKHEAD — DIRECT FEED'"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "TB": {
    "device": "throttle body GM 12699160 (Gen V truck, SENT position sensor, 5-wire plug)",
@@ -21942,7 +22143,8 @@
     "MoTeC GPR (M130) fw 01.11.0099 release notes: Throttle Servo 2 (includes SENT Secure Serial Decode Type)",
     "ICT Billet WCTHB50 'LT Gen 5 Throttle Body Connector Component Kit' ($23; TE AMP; 18 AWG recommended)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "COIL-1": {
    "device": "LS coil 1 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)",
@@ -21981,7 +22183,8 @@
     "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "COIL-2": {
    "device": "LS coil 2 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)",
@@ -22020,7 +22223,8 @@
     "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "COIL-3": {
    "device": "LS coil 3 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)",
@@ -22059,7 +22263,8 @@
     "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "COIL-4": {
    "device": "LS coil 4 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)",
@@ -22098,7 +22303,8 @@
     "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "COIL-5": {
    "device": "LS coil 5 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)",
@@ -22137,7 +22343,8 @@
     "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "COIL-6": {
    "device": "LS coil 6 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)",
@@ -22176,7 +22383,8 @@
     "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "COIL-7": {
    "device": "LS coil 7 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)",
@@ -22215,7 +22423,8 @@
     "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "COIL-8": {
    "device": "LS coil 8 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)",
@@ -22254,7 +22463,8 @@
     "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "INJ-1": {
    "device": "injector 1 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)",
@@ -22288,7 +22498,8 @@
     "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "INJ-2": {
    "device": "injector 2 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)",
@@ -22322,7 +22533,8 @@
     "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "INJ-3": {
    "device": "injector 3 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)",
@@ -22356,7 +22568,8 @@
     "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "INJ-4": {
    "device": "injector 4 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)",
@@ -22390,7 +22603,8 @@
     "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "INJ-5": {
    "device": "injector 5 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)",
@@ -22424,7 +22638,8 @@
     "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "INJ-6": {
    "device": "injector 6 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)",
@@ -22458,7 +22673,8 @@
     "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "INJ-7": {
    "device": "injector 7 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)",
@@ -22492,7 +22708,8 @@
     "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "INJ-8": {
    "device": "injector 8 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)",
@@ -22526,7 +22743,8 @@
     "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)",
     "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "CKP": {
    "device": "crank sensor (Gen IV 58x, front cover, Hall)",
@@ -22564,7 +22782,8 @@
     "ProWire 12110847 'female terminal 18-22 AWG' + 15324976 'Metri-Pack 150 seal, 20-22 gauge' (pages fetched 2026-09-26)",
     "msextra forum 'GM LS Gen IV 58x 5v sensor pull up': 58X sensors have a 5 V supply and need a pull-up to 5 V"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "CMP": {
    "device": "cam sensor (Gen IV, front cover, Hall)",
@@ -22602,7 +22821,8 @@
     "ProWire 12110847 'female terminal 18-22 AWG' + 15324976 'Metri-Pack 150 seal, 20-22 gauge' (pages fetched 2026-09-26)",
     "msextra forum 'GM LS Gen IV 58x 5v sensor pull up': 58X sensors have a 5 V supply and need a pull-up to 5 V"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "KNOCK-1": {
    "device": "knock sensor bank 1",
@@ -22638,7 +22858,8 @@
     "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins",
     "ProWire 12110847 'female terminal 18-22 AWG' + 15324976 'Metri-Pack 150 seal, 20-22 gauge' (pages fetched 2026-09-26)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "KNOCK-2": {
    "device": "knock sensor bank 2",
@@ -22674,7 +22895,8 @@
     "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins",
     "ProWire 12110847 'female terminal 18-22 AWG' + 15324976 'Metri-Pack 150 seal, 20-22 gauge' (pages fetched 2026-09-26)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "MAP": {
    "device": "MAP sensor — GM Gen IV LS 1-bar (the sensor the LS 'crank/MAP' plug is keyed for)",
@@ -22713,7 +22935,8 @@
     "ProWire 12110847 'female terminal 18-22 AWG' + 15324976 'Metri-Pack 150 seal, 20-22 gauge' (pages fetched 2026-09-26)",
     "ProWire LS-CRANK-CONN-KIT: keyed for GM LS2/LS7 crank sensors as well as MAP sensors"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "IAT": {
    "device": "intake air temp — GM GT150 2-way thermistor",
@@ -22745,7 +22968,8 @@
    "sources": [
     "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "CLT-ECU": {
    "device": "coolant temp for the M130 (LS ECT, GT150 2-way)",
@@ -22777,7 +23001,8 @@
    "sources": [
     "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "OILT": {
    "device": "oil temp — GM GT150 2-way thermistor (same family as the ECT)",
@@ -22809,7 +23034,8 @@
    "sources": [
     "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "OILP-ECU": {
    "device": "oil pressure for the M130 (LS3 Gen IV round 3-pin)",
@@ -22843,7 +23069,8 @@
    "sources": [
     "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "FUELP": {
    "device": "fuel pressure sensor (not picked)",
@@ -22876,7 +23103,8 @@
     "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins",
     "Dave's M130 sheet (1 = 0 V, 2 = 5 V, 3 = signal convention, already in the base entry)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "DAK-CTS": {
    "device": "Dakota Digital SEN-04-5 100–300 °F temp sender — two-wire harness (either wire to WTR SND / WTR –), 1/8 NPT, head or intake",
@@ -22911,7 +23139,8 @@
     "gauge-feed lock 2026-05-14 (wiring_decisions k5-gauge-feed-decided)",
     "Dakota VHX manual 650314:P p.9 (reference_documents/component_drawings/dakota_digital_vhx_manual.pdf): WTR SND / WTR - text"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "DAK-OILP": {
    "device": "Dakota Digital SEN-03-8 0–100 psi solid-state oil pressure sensor — white OIL SND, red OIL + (5 V), black + bare shield OIL –, 1/8 NPT",
@@ -22948,12 +23177,13 @@
     "gauge-feed lock 2026-05-14 (wiring_decisions k5-gauge-feed-decided)",
     "Dakota VHX manual 650314:P p.10 (reference_documents/component_drawings/dakota_digital_vhx_manual.pdf): 'The WHITE wire will connect to the OIL SND terminal, the RED to OIL + (5V DC), and the BLACK and bare shield wire to OIL –'"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "WIDEBAND": {
    "device": "MoTeC LTCD + 2 × LSU 4.9 (not owned — bought with the M130 via Dave)",
    "where": "engine",
-   "family": "open",
+   "family": "dtm",
    "kit": {},
    "wires": [
     "LTCD_GND",
@@ -22972,22 +23202,24 @@
    "range": null,
    "out_of_range": [],
    "pigtailed": [],
-   "note": "LTCD manual p.31: 110 mA typical plus the heater current, heater 0.5–1 A typical (up to 2 A on startup); p.37: 'Each sensor can draw over 3 Amps when cold' — two sensors > 6.1 A cold, past 22 AWG's 6 A (80 °C) / 5 A (100 °C) in the PDM manual p.48 table · pins 1 Battery - (black), 2 CAN Lo (green), 3 CAN Hi (white), 4 Battery + (red) — LTC user manual p.32",
+   "note": "LTCD manual p.31: 110 mA typical plus the heater current, heater 0.5–1 A typical (up to 2 A on startup); p.37: 'Each sensor can draw over 3 Amps when cold' — two sensors > 6.1 A cold, past 22 AWG's 6 A (80 °C) / 5 A (100 °C) in the PDM manual p.48 table · pins 1 Battery - (black), 2 CAN Lo (green), 3 CAN Hi (white), 4 Battery + (red) — LTC user manual p.32 · family dtm: #68054 is the DTM 4-pin FEMALE, so the harness takes size-20 sockets 0462-201-20141 and wedge WM-4S (families.yaml dtm)",
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
     "mount within the LTCD's sensor-lead reach of the exhaust (MoTeC LTCD user manual); sensors plug into LTCD connectors A/B",
     "feed and ground are 18 AWG (> 6.1 A cold, sized to the PDM15 OUT12 8 A limit at 100 °C): confirm the #68054 DTM contacts take 18 AWG (bench)",
     "set PDM15 OUT12's current limit to 8 A (the wire's 100 °C rating is 9 A)",
-    "no DTM family in families.yaml: a 'dtm' family (DTM size-20 socket contact + DTM crimper, 16-20 AWG) closes the family; until then it stays open",
-    "#68054 kit contents (housing, wedge, contacts): not in the LTC manual"
+    "#68054 kit contents (housing, wedge, contacts): not in the LTC manual",
+    "0462-201-20141 wire range: the vendor page says only 'for 20 AWG'; #64 and LTCD_GND are 18 AWG and the CAN pair 22 AWG — the Deutsch contact drawing closes R1"
    ],
    "sources": [
     "MoTeC LTCD user manual p.31 (Appendix A Specifications) + p.37 (Appendix D Power Connections)",
     "MoTeC PDM user manual p.48 wire table",
-    "MoTeC LTC user manual V1.7 p.32 Appendix B (reference_documents/component_drawings/motec_ltcd_user_manual.pdf): 'Power/CAN Connector DTM 4pin (M) (#68055) Mating connector: DTM 4pin (F) (#68054)'"
+    "MoTeC LTC user manual V1.7 p.32 Appendix B (reference_documents/component_drawings/motec_ltcd_user_manual.pdf): 'Power/CAN Connector DTM 4pin (M) (#68055) Mating connector: DTM 4pin (F) (#68054)'",
+    "web_snapshots/www.customconnectorkits.com__0462-201-20141.md ('Size 20 Nickel Plated Solid Socket for 20 AWG', 'Max 7.5 amps', '4 way indent crimper')"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "ALTERNATOR-SENSE": {
    "device": "Holley 197-302 alternator — pigtail 197-400 (have)",
@@ -23018,7 +23250,8 @@
     "holley_midmount_fitment.pdf p.15",
     "Holley_Mid_Mount_Accessory_Drive_Kit.pdf (kit contents: 197-302 + 197-400)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "STARTER-S": {
    "device": "starter solenoid S terminal",
@@ -23046,7 +23279,8 @@
     "S-terminal stud size: read off the starter (bench)"
    ],
    "sources": [],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "FAN": {
    "device": "radiator fan (Champion radiator, ONE fan per owner T78; model unknown)",
@@ -23070,7 +23304,8 @@
     "fan model unknown (Champion radiator, one fan): its plug closes this (state 0e(c)); registry wire #21 terminal says 'Weatherpack_2pin' from the April concept — not cited to a fan"
    ],
    "sources": [],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "PS-STUDS": {
    "device": "DC primary cable ends (Odyssey, Blue Sea isolator studs, distribution stud, starter, alternator, block, frame, PDM, MEGA/MIDI, ground star)",
@@ -23122,7 +23357,8 @@
     "state 0i",
     "chapters/17"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "APS": {
    "device": "DBW pedal bought 2025-04-02 (eBay order 26-12889-28142): '72-98 C10 Square Body OBS LS Swap DBW' pedal — GM Gen III truck pedal (OE 15751307 family), 9-cavity plug with 6 wired; the third sensor's 3 cavities stay empty",
@@ -23173,6 +23409,7 @@
     "ICT Billet WPAPP30 'LS Gen 3 Truck DBW Pedal Position Sensor Wire Pigtail', 'LS Gen 3 Truck DBW 9-wire Pedal Systems' 2000-2005, $26 (snapshot web_snapshots/www.ictbillet.com__ls-gen-3-truck-dbw-pedal-position-sensor-pigtail.md)"
    ],
    "splice_point": null,
+   "range_by_wire": null,
    "cavity_count": 9
   },
   "DAKOTA-VHX": {
@@ -23245,7 +23482,8 @@
    "sources": [
     "Dakota VHX manual p.6 terminal list (reference_documents/component_drawings/dakota_digital_vhx_manual.pdf)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "IGN-SWITCH": {
    "device": "column ignition switch (factory) — switches ground into the PDM inputs (RUN, START); carries a signal, not load current",
@@ -23282,7 +23520,8 @@
     "ST-352 1978 C/K wiring booklet fold-out A-1 'Cab, Engine and Chassis Wiring' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the '77 K5): IGN SW connector views 6294642 / 6294641 and switch-position key",
     "1977 Light Truck Service Manual Section 8 (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.783 (ignition switch battery terminal vs output terminal test)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "FUEL-PUMP": {
    "device": "Quantum QFS-H882 hanger with P367 pump (have) — 5.1 A at 60 psi",
@@ -23310,7 +23549,8 @@
     "https://www.highflowfuel.com/fuel-pump-oem-replacement-hfp-367-qfs/ (4.6 A @ 45 psi, 5.1 A @ 60 psi)",
     "reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "FUEL-LEVEL": {
    "device": "tank level sender (ECU",
@@ -23339,7 +23579,8 @@
     "reference_documents/web_snapshots/www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs.md",
     "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.14 (sheet A-2, 'Suburban & Blazer' rear lighting panel): 'FUEL METER TANK UNIT'"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "RAIL-COIL_PWR": {
    "device": "COIL_PWR 16 AWG rail daisy-chained to the 8 coil d-pins",
@@ -23375,7 +23616,8 @@
    "sources": [
     "registry note 'daisy-chained'; ProWire 3137ct cavity ranges"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "RAIL-INJ_PWR": {
    "device": "INJ_PWR 16 AWG rail daisy-chained to the 8 injector pin-1s",
@@ -23411,7 +23653,8 @@
    "sources": [
     "registry note 'daisy-chain at fuel rail'; ProWire 3137ct cavity ranges"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "COIL-GROUND-RINGS": {
    "device": "head ring terminals for the coil a (chassis) and b (signal) grounds",
@@ -23460,7 +23703,8 @@
     "Dave's M130 sheet: coil a and b to 'head ring terminal'",
     "chapters/17 §17.4.6 (ECM grounds direct on the head or block), §17.7.3 (equal-length pair)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "FIREWALL-BODY-A": {
    "device": "body bulkhead A — Deutsch DT04-12PA-L012 flanged 12-way receptacle (A key), DT06-12SA plug; size 16 contacts, 16–20 AWG",
@@ -23511,7 +23755,8 @@
     "ksvlooms.com 12-way DT04-12PA-L012 flanged receptacle kit (nickel pins 20-16 AWG)",
     "buydeutsch.com DT04-12PA-L012 (12-pin receptacle, A key, flange)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "FIREWALL-BODY-B": {
    "device": "body bulkhead B — second DT 12-way flanged receptacle, keyed apart from A (B key, DT04-12PB-L012 / DT06-12SB)",
@@ -23559,7 +23804,8 @@
     "B is full (12 of 12): the next body wire through the firewall takes a third DT 12-way (C key, DT04-12PC-L012)"
    ],
    "sources": [],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "FIREWALL-BODY-P": {
    "device": "body bulkhead P — Deutsch DTP04-4P-L012 flanged 4-way receptacle, DTP06-4S plug; size 12 contacts, 12–14 AWG",
@@ -23586,7 +23832,8 @@
    "sources": [
     "ProWire DTP04-4P-L012 'DTP 4 way flanged receptacle' + 0460-204-12141 / 0462-203-12141 'size 12, 12-14 AWG' (catalog_parts)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "HEADLIGHT-L": {
    "device": "left headlight, Truck-Lite 27270C 7-in round LED (dual input LOW / HIGH + ground; locked 2026-05-14)",
@@ -23620,7 +23867,8 @@
     "reference_documents/web_snapshots/a1truckparts.net__truck-lite-27270c-clear-7-round-high-low-beam-headlight-hardwired-h4-connectors.md ('Number of Wires: 3', 'Lamp Connection: Hardwired', 'Plug Side Two: H4 Connector', 'Wire Gauge: 16')",
     "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.13 (sheet A-1, front lighting / horn panel)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "HEADLIGHT-R": {
    "device": "right headlight, Truck-Lite 27270C",
@@ -23653,7 +23901,8 @@
     "reference_documents/web_snapshots/a1truckparts.net__truck-lite-27270c-clear-7-round-high-low-beam-headlight-hardwired-h4-connectors.md ('Number of Wires: 3', 'Lamp Connection: Hardwired', 'Plug Side Two: H4 Connector', 'Wire Gauge: 16')",
     "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.13 (sheet A-1, front lighting / horn panel)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "PARK-TURN-LF": {
    "device": "left front park/turn lamp (1157: park = low filament, turn = high filament)",
@@ -23679,6 +23928,7 @@
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
+    "decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call",
     "family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket's leads; that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)"
    ],
    "sources": [
@@ -23687,7 +23937,8 @@
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.786-787: lamp sockets belong to the wiring harness ('twist wiring harness socket 90° counterclockwise and remove harness and bulb'; 'rotate wiring harness sockets counterclockwise and remove housing')",
     "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.8 circuit table: 14 light blue L.H. indicator and front directional, 15 dark blue R.H."
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "PARK-TURN-RF": {
    "device": "right front park/turn lamp (1157)",
@@ -23713,6 +23964,7 @@
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
+    "decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call",
     "family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket's leads; that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)"
    ],
    "sources": [
@@ -23721,7 +23973,8 @@
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.786-787: lamp sockets belong to the wiring harness ('twist wiring harness socket 90° counterclockwise and remove harness and bulb'; 'rotate wiring harness sockets counterclockwise and remove housing')",
     "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.8 circuit table: 14 light blue L.H. indicator and front directional, 15 dark blue R.H."
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "MARKER-LF": {
    "device": "left front side marker (factory socket: park feed + a second lead that used to ground through the turn filament)",
@@ -23745,6 +23998,7 @@
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
+    "decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call",
     "family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket's leads; that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)"
    ],
    "sources": [
@@ -23753,7 +24007,8 @@
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.780",
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional 1157, marker 168, back-up 1156, license 67, underhood 93)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "MARKER-RF": {
    "device": "right front side marker",
@@ -23777,6 +24032,7 @@
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
+    "decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call",
     "family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket's leads; that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)"
    ],
    "sources": [
@@ -23784,12 +24040,13 @@
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.780",
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional 1157, marker 168, back-up 1156, license 67, underhood 93)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "HORN": {
    "device": "horn (factory location on the core support)",
    "where": "engine",
-   "family": "open",
+   "family": "gm_blade",
    "kit": {},
    "wires": [
     "48",
@@ -23801,10 +24058,13 @@
    },
    "empty": null,
    "doubled": null,
-   "range": null,
+   "range": [
+    20,
+    10
+   ],
    "out_of_range": [],
    "pigtailed": [],
-   "note": "maker's document: factory horn: one terminal in a 1-way connector 12004267 (circuit 29), grounds through its mounting bracket",
+   "note": "maker's document: factory horn: one terminal in a 1-way connector 12004267 (circuit 29), grounds through its mounting bracket · family gm_blade: the 1978 booklet draws GM factory blade connectors here (horn connector 12004267, 1978 booklet p.13); the Packard 56-series identity is the family's (families.yaml), not printed on the drawing",
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
@@ -23813,7 +24073,8 @@
    "sources": [
     "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.13 (sheet A-1, front lighting / horn panel): 'HORN' 12004267, 16 DK GRN-29B / 12 DK GRN-29A"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "WASHER-PUMP": {
    "device": "12 V electric washer pump in the washer jar — lined up: USA1 Industries 1985-87 square-body washer jar kit (SKU 20530, $56.90) + 1985-87 washer pump (SKU 20151, $19.95)",
@@ -23844,7 +24105,8 @@
     "web_snapshots/www.gmsquarebody.com__general-concensus-on-fixing-the-windshield-washer-pump.26964.md",
     "reference_documents/web_snapshots/www.usa1industries.com__1985-87-square-body-chevy-gmc-truck-windshield-wiper-washer-pump.md"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "UNDERHOOD-LAMP": {
    "device": "underhood lamp",
@@ -23868,18 +24130,20 @@
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
+    "decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call",
     "UH_GND: the factory lamp has no ground lead — it grounds through its mount (1978 booklet p.16). A ground lead or ring at the mount closes this"
    ],
    "sources": [
     "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) 'Underhood Lamp Accessory' panel",
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional 1157, marker 168, back-up 1156, license 67, underhood 93)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "WIPER-MOTOR": {
    "device": "factory 2-speed wiper motor on the cowl (terminal board 1 / center feed / 3; park switch inside; ground strap)",
    "where": "engine",
-   "family": "open",
+   "family": "gm_blade",
    "kit": {},
    "wires": [
     "49",
@@ -23895,10 +24159,13 @@
    },
    "empty": null,
    "doubled": null,
-   "range": null,
+   "range": [
+    20,
+    10
+   ],
    "out_of_range": [],
    "pigtailed": [],
-   "note": "terminal board: center = feed from the ignition; 1 = series field + armature to the dash switch (ground); 3 = shunt field to the dash switch; housing grounds through the strap",
+   "note": "terminal board: center = feed from the ignition; 1 = series field + armature to the dash switch (ground); 3 = shunt field to the dash switch; housing grounds through the strap · family gm_blade: the 1978 booklet draws GM factory blade connectors here (wiper terminal board harness plug, 1977 manual p.803 'terminal board'); the Packard 56-series identity is the family's (families.yaml), not printed on the drawing",
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
@@ -23908,12 +24175,13 @@
     "1977 Light Truck Service Manual p.802-803, p.815",
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.803: 'current passes through the ignition switch to the center terminal of the wiper terminal board'; 'wiper terminal No. 1 ... to the dash switch to ground'; 'wiper terminal No. 3'; 'the wiper motor is connected to the chassis through a ground strap'"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "BLOWER-RES": {
-   "device": "factory Four-Season blower resistor on the evaporator case (3 prongs)",
+   "device": "factory Four-Season blower resistor on the evaporator case — 4 terminals BAT / M1 / M2 / BLO (1978 C60 plug cavities 51 / 63 / 72 / 101; the '3 prongs' of the forum threads is superseded)",
    "where": "engine",
-   "family": "open",
+   "family": "gm_blade",
    "kit": {},
    "wires": [
     "BLOWER_LO",
@@ -23929,10 +24197,13 @@
    },
    "empty": null,
    "doubled": null,
-   "range": null,
+   "range": [
+    20,
+    10
+   ],
    "out_of_range": [],
    "pigtailed": [],
-   "note": "maker's document: factory A/C blower resistor on the evaporator case: FOUR terminals (BAT / M1 / M2 / BLO), 1978 C60 plug cavities 51 / 63 / 72 / 101",
+   "note": "maker's document: factory A/C blower resistor on the evaporator case: FOUR terminals (BAT / M1 / M2 / BLO), 1978 C60 plug cavities 51 / 63 / 72 / 101 · family gm_blade: the 1978 booklet draws GM factory blade connectors here (4-cavity resistor plug 51/72/63/101, 1978 booklet p.16 sheet A-4 'Air Conditioning RPO C-60'); the Packard 56-series identity is the family's (families.yaml), not printed on the drawing",
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
@@ -23945,12 +24216,13 @@
     "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) 'Air Conditioning RPO C-60': resistor plug 51 / 72 / 63 / 101, resistor table AUTO LOW BATT-R1-R2-R3, MED1 M1-R2-R3-BLOWER, MED2 M2-R3-BLOWER",
     "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.8-9 circuit table: 51 yellow blower resistor feed low, 63 tan blower sw medium 1, 72 light blue blower sw medium 2, 101 dark blue resistor output to blower relay"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "BLOWER-MOTOR": {
    "device": "blower motor, 4 Seasons 35587 (ordered 2026-09-24, state row 55)",
    "where": "engine",
-   "family": "open",
+   "family": "gm_blade",
    "kit": {},
    "wires": [
     "BLOWER_MOT",
@@ -23964,10 +24236,13 @@
    },
    "empty": null,
    "doubled": null,
-   "range": null,
+   "range": [
+    20,
+    10
+   ],
    "out_of_range": [],
    "pigtailed": [],
-   "note": "maker's document: Four Seasons 35587 blower motor: one blade terminal, single speed · BLOWER_MOT and BLOWER_HI both feed the one blade: they join before the blade terminal",
+   "note": "maker's document: Four Seasons 35587 blower motor: one blade terminal, single speed · BLOWER_MOT and BLOWER_HI both feed the one blade: they join before the blade terminal · family gm_blade: the 1978 booklet draws GM factory blade connectors here (motor feed connector 2977976, 1978 booklet p.16; Four Seasons 35587 'Connector: Blade terminal' (mpparts snapshot)); the Packard 56-series identity is the family's (families.yaml), not printed on the drawing",
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
@@ -23978,7 +24253,8 @@
     "reference_documents/web_snapshots/mpparts.com__four-seasons-35587-blower-motor-single-shaft-35587.md ('Connector: Blade terminal', 'Single Speed', 'Lead Wire: Plug')",
     "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) 'Air Conditioning RPO C-60' blower motor"
    ],
-   "splice_point": true
+   "splice_point": true,
+   "range_by_wire": null
   },
   "IBOOSTER": {
    "device": "Bosch iBooster Gen 2 (Tesla) with the Tulay connector — installed on the driver firewall (state)",
@@ -24013,7 +24289,8 @@
     "reference_documents/web_snapshots/tulayswirewerks.com__bosch-ibooster-gen-2-universal-wire-harness.md (loose wires: '4.00 mm² – Red – Always Hot Power', '0.50 mm² – Green – Ignition Switched Power', '4.00 mm² – Black – Chassis Ground')",
     "reference_documents/web_snapshots/www.evcreate.com__wiring-the-ibooster.md (GEN2: 1 = 12V+ permanent 40A fused, 9 = GND, 20 = 12V+ ignition 5A fused)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "GND-BANK-ENG": {
    "device": "ground star: stud bank beside the batteries — both battery negatives, engine block (G1), frame (G2) and every engine-bay return land here; the only place the harness grounds meet the chassis",
@@ -24059,7 +24336,8 @@
     "state 0i: Dave's DC primary ground-stud bank",
     "chapters/17 §17.4.7: PDM Batt- to battery negative"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "FLOOR-DIMMER": {
    "device": "factory floor dimmer switch (feed + LOW and HIGH outputs; light blue and tan wires)",
@@ -24106,7 +24384,8 @@
     "ST-352 1978 C/K wiring booklet fold-out A-1 'Cab, Engine and Chassis Wiring' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the '77 K5): DIMR SW connector 8900855 with 16 LT GRN-11A, 16 TAN-12, 16 LT BLU-10",
     "1977 Light Truck Service Manual Section 8 (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.779-780 (light blue feed, tan and light green outputs)"
    ],
-   "splice_point": true
+   "splice_point": true,
+   "range_by_wire": null
   },
   "HL-SW": {
    "device": "factory push-pull headlight switch — feed terminal on PDM30 0V, park and head outputs to DIG2 / DIG3",
@@ -24143,7 +24422,8 @@
     "ST-352 1978 C/K wiring booklet fold-out A-1 'Cab, Engine and Chassis Wiring' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the '77 K5): LIGHT SW connector 2977645, key X dome, 1 bat feed, 2 panel, 3/4 tail, 5 tail feed fused, 6 head",
     "1977 Light Truck Service Manual Section 8 (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.779 (red battery wire, light blue to the dimmer) and p.781"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "TURN-SW": {
    "device": "factory column turn/hazard switch (column connector) — turn and hazard feeds on PDM30 0V, front outputs to DIG4 / DIG5",
@@ -24181,7 +24461,8 @@
     "ST-352 1978 C/K wiring booklet fold-out A-1 'Cab, Engine and Chassis Wiring' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the '77 K5): DIR SIG SW column connector 12004147 (17 ST LT SW, 19 RT RR LP, 18 LT RR LP, 16 FLSHR, 27 HAZ WARN, 15 RT FRT LP, 14 LT FRT LP, 28 HORN)",
     "1977 Light Truck Service Manual Section 8 (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.783 (brown wire in the turn signal column connector)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "HORN-SW": {
    "device": "factory horn button (grounds through the column) on PDM30 DIG6",
@@ -24211,7 +24492,8 @@
    "sources": [
     "ST-352 1978 C/K wiring booklet fold-out A-1 'Cab, Engine and Chassis Wiring' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the '77 K5): DIR SIG SW column connector, cavity 28 HORN, button to ground"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "WIPER-SW": {
    "device": "factory wiper/washer dash switch (grounding type, grounds through its mounting)",
@@ -24243,7 +24525,8 @@
     "1977 Light Truck Service Manual Section 8 (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.803-804 (grounding-type dash switch; LO grounds terminals 1 and 3, HI grounds terminal 1)",
     "ST-352 1978 C/K wiring booklet fold-out A-1 'Cab, Engine and Chassis Wiring' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the '77 K5) (1978 wiper/wash switch 12004706 — different motor, not used)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "BLOWER-SW": {
    "device": "factory Four-Season blower switch in the control head — LO, M1, M2 through the resistor; HI as a PDM30 input (DIG7)",
@@ -24276,7 +24559,8 @@
    "sources": [
     "ST-352 1978 C/K wiring booklet fold-out A-4, boxes 'Heater - Heavy Duty' and A/C (reference_documents/wiring_diagram_booklets/pages/1978_CK_A4_hvac_cruise_fuel_auxiliary.png): resistor key AUTO LOW = BATT-R1-R2-R3, MED1 = M1-R2-R3, MED2 = M2-R3"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "DOOR-JAMB-L": {
    "device": "driver door jamb switch (factory pin switch, grounds through the body) — PDM30 DIG12 + AMP Research trigger",
@@ -24308,7 +24592,8 @@
    "sources": [
     "ST-352 1978 C/K wiring booklet fold-out A-1 'Cab, Engine and Chassis Wiring' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the '77 K5): DR JAMB SW, one terminal 2984369 on circuit 156"
    ],
-   "splice_point": true
+   "splice_point": true,
+   "range_by_wire": null
   },
   "DOOR-JAMB-R": {
    "device": "passenger door jamb switch — PDM30 DIG13 + AMP Research trigger",
@@ -24340,7 +24625,8 @@
    "sources": [
     "ST-352 1978 C/K wiring booklet fold-out A-1 'Cab, Engine and Chassis Wiring' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the '77 K5): DR JAMB SW, one terminal 2984369 on circuit 156"
    ],
-   "splice_point": true
+   "splice_point": true,
+   "range_by_wire": null
   },
   "DOME-LAMP": {
    "device": "dome lamp (cab roof)",
@@ -24372,7 +24658,8 @@
    "sources": [
     "ST-352 1978 C/K wiring booklet fold-out A-1 'Cab, Engine and Chassis Wiring' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the '77 K5): DOME LAMP CAB ONLY socket 8911223 and DOME LAMPS-BLAZER RPO C8B terminals 2977080, each on 18 ORN-140 + 18 WHT-156"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "UNDERDASH-LAMPS": {
    "device": "under-dash courtesy LEDs",
@@ -24404,7 +24691,8 @@
    "sources": [
     "no maker document: the device is not picked yet; the registry terminates it on the device's own leads ('lamp lead' / 'port lead' / 'outlet lead', k5_registry.json), so the harness wire meets each lead in a MiniSeal splice sized by the gauge"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "FOOTWELL-LAMPS": {
    "device": "footwell LEDs",
@@ -24436,7 +24724,8 @@
    "sources": [
     "no maker document: the device is not picked yet; the registry terminates it on the device's own leads ('lamp lead' / 'port lead' / 'outlet lead', k5_registry.json), so the harness wire meets each lead in a MiniSeal splice sized by the gauge"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "CLEARANCE-L": {
    "device": "cab roof clearance lamp, left",
@@ -24468,7 +24757,8 @@
    "sources": [
     "no maker document: the device is not picked yet; the registry terminates it on the device's own leads ('lamp lead' / 'port lead' / 'outlet lead', k5_registry.json), so the harness wire meets each lead in a MiniSeal splice sized by the gauge"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "CLEARANCE-C": {
    "device": "cab roof clearance lamp, center",
@@ -24500,7 +24790,8 @@
    "sources": [
     "no maker document: the device is not picked yet; the registry terminates it on the device's own leads ('lamp lead' / 'port lead' / 'outlet lead', k5_registry.json), so the harness wire meets each lead in a MiniSeal splice sized by the gauge"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "CLEARANCE-R": {
    "device": "cab roof clearance lamp, right",
@@ -24532,7 +24823,8 @@
    "sources": [
     "no maker document: the device is not picked yet; the registry terminates it on the device's own leads ('lamp lead' / 'port lead' / 'outlet lead', k5_registry.json), so the harness wire meets each lead in a MiniSeal splice sized by the gauge"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "USB-PORT": {
    "device": "USB charging port",
@@ -24564,7 +24856,8 @@
    "sources": [
     "no maker document: the device is not picked yet; the registry terminates it on the device's own leads ('lamp lead' / 'port lead' / 'outlet lead', k5_registry.json), so the harness wire meets each lead in a MiniSeal splice sized by the gauge"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "OUTLET-12V": {
    "device": "12 V outlet",
@@ -24596,7 +24889,8 @@
    "sources": [
     "no maker document: the device is not picked yet; the registry terminates it on the device's own leads ('lamp lead' / 'port lead' / 'outlet lead', k5_registry.json), so the harness wire meets each lead in a MiniSeal splice sized by the gauge"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "RADIO": {
    "device": "RetroSound RetroRadio Motor 2B for 1973-87 Chevy C/K trucks, in place of appendix D's Hermosa (backordered at $279.95) — plug A power, front + rear + sub RCA pre-outs, amp turn-on lead; lined up at retromanufacturing.com, $346.99",
@@ -24647,7 +24941,8 @@
     "RetroSound Motor 2B user manual p.3: pre-outs front, rear, subwoofer; separate amp turn-on lead (reference_documents/component_drawings/RetroSound_Motor-2B_User_Manual.pdf)",
     "RetroSound Installation & Assembly Manual step 6: power and speaker harnesses end in bare wires joined to the vehicle wiring (reference_documents/web_snapshots/help.retromanufacturing.com__InstallationAssembly_Manual.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "SPK-FL": {
    "device": "driver door speaker — JL Audio C2-650X 6.5 in 2-way coax (lined up at Crutchfield, $279.99 a pair; 2 pairs cover the 4 spots) — through DOOR-L-PASS",
@@ -24677,7 +24972,8 @@
    "sources": [
     "JL Audio C2-650X owner's manual p.3-4: 'The large connector is for the positive terminal and the small connector is for the negative terminal'; supplied two 5.2 mm and two 2.8 mm female crimpable connectors (reference_documents/web_snapshots/content.abt.com__JL-Audio-C2-650X-owners-manual.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "SPK-FR": {
    "device": "passenger door speaker — JL Audio C2-650X 6.5 in 2-way coax (lined up at Crutchfield, $279.99 a pair; 2 pairs cover the 4 spots) — through DOOR-R-PASS",
@@ -24707,7 +25003,8 @@
    "sources": [
     "JL Audio C2-650X owner's manual p.3-4: 'The large connector is for the positive terminal and the small connector is for the negative terminal'; supplied two 5.2 mm and two 2.8 mm female crimpable connectors (reference_documents/web_snapshots/content.abt.com__JL-Audio-C2-650X-owners-manual.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "GND-BANK-CAB": {
    "device": "cab ground bank beside the PDM30: an insulated stud bus; every cab return lands here and goes back to the ground star through GND_RET_CAB (2 AWG), never through the body",
@@ -24751,7 +25048,8 @@
    "sources": [
     "owner 2026-09-27 (grounds in the loom)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "LICENSE-LAMP": {
    "device": "license plate lamp",
@@ -24775,13 +25073,15 @@
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
+    "decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call",
     "LIC_GND: the factory license lamp has no ground lead — it grounds through its housing (1978 booklet p.14). A ground lead or ring at the lamp mount is needed; lamp part OPEN"
    ],
    "sources": [
     "1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.14 (sheet A-2, 'Suburban & Blazer' rear lighting panel): 'LIC LAMP' single 18 B lead through connector 2977721, housing ground symbol",
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional 1157, marker 168, back-up 1156, license 67, underhood 93)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "CARGO-LAMP": {
    "device": "cargo/bed lamp",
@@ -24807,7 +25107,8 @@
    "sources": [
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional 1157, marker 168, back-up 1156, license 67, underhood 93)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "MARKER-LR": {
    "device": "left rear side marker",
@@ -24831,6 +25132,7 @@
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
+    "decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call",
     "family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket's leads; that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)",
     "registry wire #77/#78 terminal says 'blade_female_0.187' (April concept); the 1978 drawing shows a harness socket with leads, not a blade"
    ],
@@ -24839,7 +25141,8 @@
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional 1157, marker 168, back-up 1156, license 67, underhood 93)",
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.786-787: lamp sockets belong to the wiring harness ('twist wiring harness socket 90° counterclockwise and remove harness and bulb'; 'rotate wiring harness sockets counterclockwise and remove housing')"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "MARKER-RR": {
    "device": "right rear side marker",
@@ -24863,6 +25166,7 @@
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
+    "decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call",
     "family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket's leads; that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)",
     "registry wire #77/#78 terminal says 'blade_female_0.187' (April concept); the 1978 drawing shows a harness socket with leads, not a blade"
    ],
@@ -24871,16 +25175,17 @@
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.838 lamp bulb data (C-K: tail/stop 1157, park/directional 1157, marker 168, back-up 1156, license 67, underhood 93)",
     "1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.786-787: lamp sockets belong to the wiring harness ('twist wiring harness socket 90° counterclockwise and remove harness and bulb'; 'rotate wiring harness sockets counterclockwise and remove housing')"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "AMP": {
    "device": "JL Audio VX700/5i 5-channel amplifier with DSP (75 W x 4 + 300 W sub); lined up at Crutchfield, $1,449.99",
    "where": "rear",
-   "family": "open",
+   "family": "screw_terminal",
    "kit": {},
    "wires": [
-    "32",
-    "AMP_GND",
+    "AMP_PWR_TAIL",
+    "AMP_GND_TAIL",
     "RADIO_REM",
     "RCA_FRONT",
     "RCA_REAR",
@@ -24897,8 +25202,8 @@
     "30b"
    ],
    "cavities": {
-    "32": "+12 VDC (power connector, set screw)",
-    "AMP_GND": "Ground (power connector, set screw)",
+    "AMP_PWR_TAIL": "+12 VDC (power connector, set screw)",
+    "AMP_GND_TAIL": "Ground (power connector, set screw)",
     "RADIO_REM": "Remote turn-on input (power connector, set screw)",
     "RCA_FRONT": "Input 1 + Input 2 (RCA, analog input harness)",
     "RCA_REAR": "Input 3 + Input 4 (RCA)",
@@ -24916,10 +25221,16 @@
    },
    "empty": null,
    "doubled": null,
-   "range": null,
-   "out_of_range": [],
+   "range": [
+    22,
+    6
+   ],
+   "out_of_range": [
+    "AMP_PWR_TAIL (4 AWG vs 22–6)",
+    "AMP_GND_TAIL (4 AWG vs 22–6)"
+   ],
    "pigtailed": [],
-   "note": "75 W x 4 at 4 ohm + 300 W x 1 at 2 ohm; 4 AWG power and ground leads, 60 A fuse; 9-13/16 x 2-1/8 x 6-3/4 in; tuned with JL's TuN app over USB · maker's document: JL Audio VX700/5i: removable power plug (set-screw receptacles), analog input harness (6 RCA inputs), speaker output harness (leads A-D), subwoofer output harness (2 lead pairs, paralleled inside) · Channel letters A-D against the registry's CH1-CH4 are our assignment: the DSP routes any input to any output (TüN). Signal/DC-offset auto turn-on senses Input 1 only, so the front RCA pair on Inputs 1/2 keeps that option.",
+   "note": "75 W x 4 at 4 ohm + 300 W x 1 at 2 ohm; 4 AWG power and ground leads, 60 A fuse; 9-13/16 x 2-1/8 x 6-3/4 in; tuned with JL's TuN app over USB · maker's document: JL Audio VX700/5i: removable power plug (set-screw receptacles), analog input harness (6 RCA inputs), speaker output harness (leads A-D), subwoofer output harness (2 lead pairs, paralleled inside) · Channel letters A-D against the registry's CH1-CH4 are our assignment: the DSP routes any input to any output (TüN). Signal/DC-offset auto turn-on senses Input 1 only, so the front RCA pair on Inputs 1/2 keeps that option. · family screw_terminal: the power plug's +12 VDC / Ground / Remote take bare wire under set screws, strip 3/8 in (10 mm); torque: none given — the JL guide says only 'tighten each set screw firmly' (retailspecs snapshot, Making Connections). The speaker/sub outputs and RCA inputs are harness leads and jacks, not screws: the family is right for 32 / AMP_GND / RADIO_REM only",
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
@@ -24927,7 +25238,8 @@
     "input count for the radio's sub RCA (see RCA_SUB)",
     "RADIO_REM is 20 AWG; the power plug takes '10-18-gauge wire for the remote turn-on' (Crutchfield snapshot) — go to 18 AWG or confirm the set screw holds 20",
     "speaker/sub harness lead colours per channel: not in the connection guide text — read the harness",
-    "subwoofer harness has 'two pairs of wire leads ... connected in parallel inside the harness': each woofer could take its own pair instead of the SUB_JMP jumpers — owner's call"
+    "subwoofer harness has 'two pairs of wire leads ... connected in parallel inside the harness': each woofer could take its own pair instead of the SUB_JMP jumpers — owner's call",
+    "#32 and AMP_GND are now 2 AWG (receipts/2026-09-28_dc-primary-cables-sized-from-physics.md) but the JL power plug is made for 4 AWG ('4 AWG is the required copper wire size') — a 2-to-4 AWG step (distribution block near the amp) or a different run; registry call"
    ],
    "sources": [
     "web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md ('4-gauge power and ground leads and a 60-amp fuse recommended'; DSP input routing and mixing)",
@@ -24935,7 +25247,21 @@
     "reference_documents/web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md (JL VX700/5i connection guide: power connector +12 VDC / Ground / Remote with set screws, 'strip back 3/8 inch'; Analog Input harness Inputs 1-6 RCA; Speaker Output Harness A-D leads; Subwoofer Output Harness)",
     "reference_documents/web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md ('removable plug with C-Clamp terminals ... up to 4-gauge power and ground wire, and 10-18-gauge wire for the remote turn-on')"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": {
+    "AMP_PWR_TAIL": [
+     4,
+     4
+    ],
+    "AMP_GND_TAIL": [
+     4,
+     4
+    ],
+    "RADIO_REM": [
+     18,
+     10
+    ]
+   }
   },
   "SPK-RL": {
    "device": "left rear speaker — JL Audio C2-650X 6.5 in 2-way coax (lined up at Crutchfield, $279.99 a pair; 2 pairs cover the 4 spots)",
@@ -24964,7 +25290,8 @@
    "sources": [
     "reference_documents/web_snapshots/pdf.crutchfieldonline.com__136C2650X.PDF.md (JL C2-650x owner's manual: supplied 'Two 5.2 mm female crimpable connectors / Two 2.8 mm female crimpable connectors'; 'The large connector is for the positive terminal and the small connector is for the negative terminal')"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "SPK-RR": {
    "device": "right rear speaker — JL Audio C2-650X 6.5 in 2-way coax (lined up at Crutchfield, $279.99 a pair; 2 pairs cover the 4 spots)",
@@ -24993,7 +25320,8 @@
    "sources": [
     "reference_documents/web_snapshots/pdf.crutchfieldonline.com__136C2650X.PDF.md (JL C2-650x owner's manual: supplied 'Two 5.2 mm female crimpable connectors / Two 2.8 mm female crimpable connectors'; 'The large connector is for the positive terminal and the small connector is for the negative terminal')"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "SUB": {
    "device": "woofer 1 of 2 — JBL Club 102SL 10 in shallow-mount (3.25 in deep), impedance switch set to 4 ohm; the two in parallel = 2 ohm on the amp's 300 W sub channel; lined up at Crutchfield, $274.95 each",
@@ -25030,7 +25358,8 @@
     "reference_documents/web_snapshots/www.sonicelectronix.com__club10_12.md (JBL Club shallow subwoofers owner's manual: 'Push down on the terminal to expose the connection hole. Thread the bare wire end through the hole'; 'compatible with bare or tinned wires ... 14AWG and 8AWG'; SSI switch)",
     "reference_documents/web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md (JL VX700/5i connection guide: power connector +12 VDC / Ground / Remote with set screws, 'strip back 3/8 inch'; Analog Input harness Inputs 1-6 RCA; Speaker Output Harness A-D leads; Subwoofer Output Harness)"
    ],
-   "splice_point": true
+   "splice_point": true,
+   "range_by_wire": null
   },
   "SUB-2": {
    "device": "woofer 2 of 2 — JBL Club 102SL, switch at 4 ohm, jumpered in parallel with woofer 1",
@@ -25058,7 +25387,8 @@
     "web_snapshots/www.crutchfield.com__JBL-Club-102SL.md",
     "reference_documents/web_snapshots/www.sonicelectronix.com__club10_12.md (JBL Club shallow subwoofers owner's manual: 'Push down on the terminal to expose the connection hole. Thread the bare wire end through the hole'; 'compatible with bare or tinned wires ... 14AWG and 8AWG'; SSI switch)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "GND-SPLICE-REAR": {
    "device": "rear ground bus where the rear harness branches: an insulated stud bus; returns to the cab bank through GND_RET_REAR, not through the body",
@@ -25095,7 +25425,8 @@
    "sources": [
     "owner 2026-09-27 (grounds in the loom)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "AMP-STEP-CTRL": {
    "device": "AMP Research PowerStep kit harness + controller (drives and reverses both step motors)",
@@ -25130,7 +25461,8 @@
     "amp_research_75146_install.pdf steps 8, 14-15",
     "AMP Research IM75146 install guide p.6 step 8 (reference_documents/component_drawings/amp_research_75146_install.pdf): 'Attach power lead (RED wire) to positive pole ... Negative lead (BLACK wire) to negative pole'; p.7 steps 15-16 Posi-Tap trigger splice"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "E-STOPP": {
    "device": "E-Stopp ESK001 electric parking brake — actuator on the parking-brake cable + control box, dash button in the kit",
@@ -25169,7 +25501,8 @@
     "reference_documents/component_drawings/extracted/estopp_esk001_wiring.png (ESK001 component overview & wiring diagram)",
     "reference_documents/web_snapshots/estopp.com__troubleshooting.md ('power to the control box are 16 gauge'; 'The green wire is a low-current switched ground', about 25 mA)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "TCASE-4WD-SW": {
    "device": "4WD indicator switch, fabricated: a sealed normally-open plunger switch on a bracket at the transfer-case shift lever, closed in 4-high and 4-low -> Dakota VHX 4x4 (-)",
@@ -25198,7 +25531,8 @@
     "owner 2026-09-27",
     "Dakota VHX manual p.6: 4x4 (-) ground-activated input"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "ODYSSEY": {
    "device": "Odyssey AGM — the running battery (owner 2026-09-27); model set by the tray, not bought yet",
@@ -25228,28 +25562,59 @@
    "open": [
     "Odyssey model / group size: set by the tray at the mock-up",
     "fused-tap holders at the + post: picked with the battery terminals",
+    "close path: lug per post, not ring_small — lug family; 2 AWG = 238LTP (lug family strip note; 2 x 2 AWG on #63/ODY_NEG per receipts/2026-09-28_dc-primary-cables-sized-from-physics.md); stud size set by the post choice (SAE post clamp vs GM side stud 3/8-16); fused-tap ring lugs for the 16 AWG taps OPEN",
     "battery model set by the tray (registry); post clamp vs side-stud lugs and the fused-tap holders: picked with the battery terminals"
    ],
    "sources": [
     "owner 2026-09-27: 'we picked the batteries ... an odessey for the running and also a yellow optima for other stuff like accessories'",
     "reference_documents/web_snapshots/batterysales.com__34-78-pc1500dt-odyssey.md ('BCI Group Size: 34/78', 'Terminals: SAE Post / GM Side')"
    ],
-   "splice_point": true
+   "splice_point": true,
+   "range_by_wire": null
+  },
+  "AMP-BLOCK": {
+   "device": "power reducing block beside the amplifier: 2 AWG in (+ #32, - AMP_GND) to 4 AWG out (AMP_PWR_TAIL, AMP_GND_TAIL) — two single-circuit blocks, + and -",
+   "where": "rear",
+   "family": "open",
+   "kit": {},
+   "wires": [
+    "32",
+    "AMP_GND",
+    "AMP_PWR_TAIL",
+    "AMP_GND_TAIL"
+   ],
+   "cavities": null,
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "why it exists: JL requires 4 AWG at the amp's power plug; the 18.4 ft loop needs 2 AWG for the 3 % drop (JL VX700/5i guide 'Power Connector', step A: 'install a fused distribution block near the amplifiers'). Unfused here: the MIDI 60 A at the YellowTop + protects both gauges (4 AWG bundled 72 A x 0.85 = 61 A)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [
+    "block part: a 1-in/1-out reducing block rated >= 60 A taking 2 AWG in and 4 AWG out, + and - (sealed, rear-cargo mount) — part number not picked",
+    "mount spot beside the amp: formboard / bench"
+   ],
+   "sources": [
+    "JL VX700/5i guide (web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md): Power Connector, spec table",
+    "calc-data/CABLE_SIZING.md: #32 and AMP_GND 2 AWG from the 3 % drop"
+   ],
+   "splice_point": null,
+   "range_by_wire": null
   },
   "ACC-BATT": {
    "device": "Optima YellowTop — the accessory battery (owner 2026-09-27); beside the Odyssey; model set by the tray",
    "where": "engine",
    "family": "open",
-   "kit": {
-    "410LTP": 1
-   },
+   "kit": {},
    "wires": [
     "32",
     "DCDC_OUT",
     "ACC_NEG"
    ],
    "cavities": {
-    "32": "+ post, via the MIDI 60 A holder (410LTP on its M5 stud)",
+    "32": "+ post, via the MIDI 60 A holder (2 AWG lug on its M5 stud, part OPEN)",
     "DCDC_OUT": "+ post",
     "ACC_NEG": "- post"
    },
@@ -25264,6 +25629,7 @@
    "open": [
     "YellowTop model / tray; the default spot is the engine bay beside the Odyssey — the amp's power and ground runs change if it moves behind the seat",
     "MIDI 60 A part number not on file (MIDI-60A)",
+    "close path: lug per post, not ring_small — lug family; #32 went 4 → 2 AWG (DC primary receipt), so the 410LTP (4 AWG) on the MIDI stud needs its 2 AWG equivalent; ACC_NEG 4 AWG and DCDC_OUT 6 AWG lugs OPEN (receipt: '6 AWG 3/8 and M5 lugs are OPEN')",
     "terminal choice (SAE post vs GM side stud) and the MIDI holder mount: picked with the battery terminals"
    ],
    "sources": [
@@ -25271,7 +25637,8 @@
     "web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md ('4-gauge power and ground leads and a 60-amp fuse recommended'; 'An external 60-amp AFS, AGU, or MAXI fuse (not included) must be installed')",
     "reference_documents/web_snapshots/batterysales.com__d34-78-8014-045-optima.md ('BCI Group Size: 34/78', 'Terminals: Dual SAE/GM')"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "ISOLATOR": {
    "device": "Blue Sea Systems 7700 ML-RBS remote battery switch with manual control, 12 V, 500 A continuous, on the Odyssey positive (studs A/B, 3/8 in-16); lined up at Powerwerx, $322.09",
@@ -25313,7 +25680,8 @@
     "MoTeC PDM user manual p.7 (isolator on battery positive, rated for the starter, secondary contact to an ECU shutdown input)",
     "Cartek XR dropped: its instructions p.3 say 'designed for motorsport use only and should not be used on road/street vehicles'"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "ISO-SWITCH": {
    "device": "Blue Sea 2145 SPDT (ON)-OFF-(ON) Contura switch, included with the 7700 — momentary: tap ON to close the isolator, OFF to open it; its LED shows closed",
@@ -25350,7 +25718,8 @@
     "Blue Sea 7700 instructions p.2 (control switch pins 1, 2, 3, 7, 8)",
     "Blue Sea 7700 instructions p.2 control-switch steps 1-5 (reference_documents/component_drawings/BlueSea_7700_ML-RBS_Instructions_990180170-006.pdf)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "SPL-ISO-YEL": {
    "device": "stub splice on the isolator switch's yellow wire (ISO_LED, tab 7): the M130 shutdown tap ISO_KILL joins here; the yellow is not cut",
@@ -25379,12 +25748,13 @@
     "Blue Sea 7700 instructions p.2 (switch pin 7 to the yellow wire; minimum 16 AWG)",
     "ProWire 3137CT page (MiniSeal cavities 26-20 / 20-16 / 16-12 AWG)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "DCDC": {
    "device": "Victron Orion-Tr Smart 12/12-30 non-isolated DC-DC charger (ORI121236140), charges the YellowTop from the running system; lined up at Powerwerx, $215.05",
    "where": "engine",
-   "family": "open",
+   "family": "screw_terminal",
    "kit": {},
    "wires": [
     "DCDC_IN",
@@ -25398,23 +25768,29 @@
    },
    "empty": null,
    "doubled": null,
-   "range": null,
+   "range": [
+    22,
+    6
+   ],
    "out_of_range": [],
    "pigtailed": [],
-   "note": "engine running detection starts and stops it on its own, so no enable wire is needed; the two-pole remote H/L connector stays unused · maker's document: Victron Orion-Tr Smart 12/12-30 non-isolated: screw terminals for input +, output + and negative; 1.6 Nm; bare fine-strand wire, no ferrule needed",
+   "note": "engine running detection starts and stops it on its own, so no enable wire is needed; the two-pole remote H/L connector stays unused · maker's document: Victron Orion-Tr Smart 12/12-30 non-isolated: screw terminals for input +, output + and negative; 1.6 Nm; bare fine-strand wire, no ferrule needed · family screw_terminal: torque 1.6 Nm (Orion manual §4.4 'Recommended torque'), held 5 s; bare fine-strand wire, 'The use of ferrules is not required' (§4.2)",
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
     "terminal type for 8 AWG at the Orion's screw terminals: from the Orion manual when carted",
+    "DCDC_IN fuse: decided MIDI 60 A, the maker's external battery protection fuse (manual §4.2 Figure 6, 12 V row); 6 AWG carries it",
     "remote on/off: the manual says 'The minimum requirement for the remote on/off terminal is a wire loop between the L- and H-pins' — the wire's note 'two-pole connector stays unused' only holds with Victron's wire bridge left in place",
     "cable/fuse: manual table for 12 V is a 60 A fuse with 10 mm² at 1-2 m (6 mm² at 0.5 m); the wire list has 8 AWG (8.4 mm²) behind a MIDI 40 A — check the run lengths against the table",
     "terminal count/labels (one or two negative terminals): in the manual's connection figure, not its text"
    ],
    "sources": [
     "web_snapshots/powerwerx.com__victron-ori121236140-oriontrsmart-30a-nonisolated.md",
+    "web_snapshots/www.victronenergy.com__34439-Orion-Tr_Smart_DC-DC_Charger-pdf-en.md (§4.2 cable and fuse recommendations; §4.5-4.7 remote on/off)",
     "reference_documents/web_snapshots/www.victronenergy.com__34439-Orion-Tr_Smart_DC-DC_Charger-pdf-en.md (Orion-Tr Smart non-isolated manual Rev 07): '4.2 Cable and fuse recommendations', '4.4 Recommended torque: 1.6 Nm', 'The use of ferrules is not required', remote on/off L/H text"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "GSS-3000": {
    "device": "Dakota Digital GSS-3000 gear shift sender: decoder under the dash; its sensor sits on the transmission detent shaft and comes with a 10 ft 3-wire cable",
@@ -25456,7 +25832,8 @@
     "web_snapshots/www.dakotadigital.com__GSS-3000.md (MAN# 650715:G)",
     "Dakota Digital GSS-3000 manual (MAN# 650715:G), decoder label and 'Installation: Wiring': terminals IGNITION+, GROUND-, 1-WIRE, RED, GREEN, BLACK; sensor RED to RED, GREEN or WHITE to GREEN, BLACK to BLACK; 1-WIRE to the control box GEAR terminal (reference_documents/web_snapshots/www.dakotadigital.com__GSS-3000.md)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   },
   "GSS-SENSOR": {
    "device": "GSS-3000 sensor on the transmission detent shaft (mounting plate on the pan, rod to the shift arm)",
@@ -25486,7 +25863,8 @@
     "web_snapshots/www.dakotadigital.com__GSS-3000.md",
     "reference_documents/web_snapshots/www.dakotadigital.com__GSS-3000.md ('The sensor cable (10 feet long) attached to the sensor contains three wires'; RED / GREEN or WHITE / BLACK to the decoder terminals)"
    ],
-   "splice_point": null
+   "splice_point": null,
+   "range_by_wire": null
   }
  },
  "terminations": [
@@ -27723,6 +28101,15 @@
    "doubled": null
   },
   {
+   "wire": "TG_KEY_FEED",
+   "endpoint": "TG-SW-DASH",
+   "where": "cabin",
+   "cavity": "4 FEED (factory 12 R-70)",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
+   "doubled": null
+  },
+  {
    "wire": "TG_FEED",
    "endpoint": "TG-SW-DASH",
    "where": "cabin",
@@ -27759,21 +28146,30 @@
    "doubled": null
   },
   {
+   "wire": "TG_KEY_FEED",
+   "endpoint": "TG-SW-KEY",
+   "where": "rear",
+   "cavity": "FEED terminal (circuit 60)",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
+   "doubled": null
+  },
+  {
+   "wire": "TG_CUT_IN",
+   "endpoint": "TG-SW-KEY",
+   "where": "rear",
+   "cavity": "CLOSE terminal (circuit 183, window up; to the tailgate-closed cutout)",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
+   "doubled": null
+  },
+  {
    "wire": "TG_BUS_UP",
    "endpoint": "TG-SW-KEY",
    "where": "rear",
    "cavity": "CLOSE terminal (circuit 183, window up)",
-   "part": "open (connector not picked)",
-   "family": "open",
-   "doubled": null
-  },
-  {
-   "wire": "TG_MOT_A",
-   "endpoint": "TG-SW-KEY",
-   "where": "rear",
-   "cavity": "CLOSE terminal (circuit 183, window up)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -27781,8 +28177,8 @@
    "endpoint": "TG-SW-KEY",
    "where": "rear",
    "cavity": "OPEN terminal (circuit 184, window down)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -27790,6 +28186,24 @@
    "endpoint": "TG-SW-KEY",
    "where": "rear",
    "cavity": "OPEN terminal (circuit 184, window down)",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
+   "doubled": null
+  },
+  {
+   "wire": "TG_CUT_IN",
+   "endpoint": "TG-CUTOUT",
+   "where": "rear",
+   "cavity": "183C (from splice 183)",
+   "part": "open (connector not picked)",
+   "family": "open",
+   "doubled": null
+  },
+  {
+   "wire": "TG_MOT_A",
+   "endpoint": "TG-CUTOUT",
+   "where": "rear",
+   "cavity": "183E (to motor UP-1)",
    "part": "open (connector not picked)",
    "family": "open",
    "doubled": null
@@ -27799,8 +28213,8 @@
    "endpoint": "rear_window_motor",
    "where": "rear",
    "cavity": "1 (UP, circuit 183 light blue)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -27808,8 +28222,8 @@
    "endpoint": "rear_window_motor",
    "where": "rear",
    "cavity": "2 (DOWN, circuit 184 tan/white)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -28024,7 +28438,7 @@
    "endpoint": "VSS-SENDER",
    "where": "rear",
    "cavity": "white lead (signal)",
-   "part": "D-609-03",
+   "part": "D-609-04",
    "family": "miniseal",
    "doubled": null
   },
@@ -28033,7 +28447,7 @@
    "endpoint": "VSS-SENDER",
    "where": "rear",
    "cavity": "white lead (signal)",
-   "part": "D-609-03",
+   "part": "D-609-04",
    "family": "miniseal",
    "doubled": null
   },
@@ -29959,8 +30373,8 @@
    "endpoint": "WIDEBAND",
    "where": "engine",
    "cavity": "1",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "0462-201-20141",
+   "family": "dtm",
    "doubled": null
   },
   {
@@ -29968,8 +30382,8 @@
    "endpoint": "WIDEBAND",
    "where": "engine",
    "cavity": "2",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "0462-201-20141",
+   "family": "dtm",
    "doubled": null
   },
   {
@@ -29977,8 +30391,8 @@
    "endpoint": "WIDEBAND",
    "where": "engine",
    "cavity": "3",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "0462-201-20141",
+   "family": "dtm",
    "doubled": null
   },
   {
@@ -29986,8 +30400,8 @@
    "endpoint": "WIDEBAND",
    "where": "engine",
    "cavity": "4",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "0462-201-20141",
+   "family": "dtm",
    "doubled": null
   },
   {
@@ -31201,8 +31615,8 @@
    "endpoint": "HORN",
    "where": "engine",
    "cavity": "horn terminal (circuit 29 dark green, connector 12004267)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -31210,8 +31624,8 @@
    "endpoint": "HORN",
    "where": "engine",
    "cavity": "",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -31255,8 +31669,8 @@
    "endpoint": "WIPER-MOTOR",
    "where": "engine",
    "cavity": "center (feed)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -31264,8 +31678,8 @@
    "endpoint": "WIPER-MOTOR",
    "where": "engine",
    "cavity": "1",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -31273,8 +31687,8 @@
    "endpoint": "WIPER-MOTOR",
    "where": "engine",
    "cavity": "3",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -31282,8 +31696,8 @@
    "endpoint": "WIPER-MOTOR",
    "where": "engine",
    "cavity": "strap",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -31291,8 +31705,8 @@
    "endpoint": "BLOWER-RES",
    "where": "engine",
    "cavity": "51 (resistor BAT terminal, low: BATT-R1-R2-R3)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -31300,8 +31714,8 @@
    "endpoint": "BLOWER-RES",
    "where": "engine",
    "cavity": "63 (M1: M1-R2-R3-blower)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -31309,8 +31723,8 @@
    "endpoint": "BLOWER-RES",
    "where": "engine",
    "cavity": "72 (M2: M2-R3-blower)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -31318,8 +31732,8 @@
    "endpoint": "BLOWER-RES",
    "where": "engine",
    "cavity": "101 (BLO output; factory: to the blower relay)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -31327,8 +31741,8 @@
    "endpoint": "BLOWER-MOTOR",
    "where": "engine",
    "cavity": "+ blade terminal",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -31336,8 +31750,8 @@
    "endpoint": "BLOWER-MOTOR",
    "where": "engine",
    "cavity": "+ blade terminal",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -31345,8 +31759,8 @@
    "endpoint": "BLOWER-MOTOR",
    "where": "engine",
    "cavity": "",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: Packard 56-series terminal by gauge",
+   "family": "gm_blade",
    "doubled": null
   },
   {
@@ -31957,7 +32371,7 @@
    "endpoint": "RADIO",
    "where": "cabin",
    "cavity": "blue/white REMOTE/AMP TURN-ON lead — splice",
-   "part": "D-609-03",
+   "part": "D-609-04",
    "family": "miniseal",
    "doubled": null
   },
@@ -32268,21 +32682,21 @@
    "doubled": null
   },
   {
-   "wire": "32",
+   "wire": "AMP_PWR_TAIL",
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "+12 VDC (power connector, set screw)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
-   "wire": "AMP_GND",
+   "wire": "AMP_GND_TAIL",
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "Ground (power connector, set screw)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32290,8 +32704,8 @@
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "Remote turn-on input (power connector, set screw)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32299,8 +32713,8 @@
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "Input 1 + Input 2 (RCA, analog input harness)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32308,8 +32722,8 @@
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "Input 3 + Input 4 (RCA)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32317,8 +32731,8 @@
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "Input 5 + Input 6 (RCA)",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32326,8 +32740,8 @@
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "speaker output A + lead",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32335,8 +32749,8 @@
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "speaker output A - lead",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32344,8 +32758,8 @@
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "speaker output B + lead",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32353,8 +32767,8 @@
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "speaker output B - lead",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32362,8 +32776,8 @@
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "speaker output C + lead",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32371,8 +32785,8 @@
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "speaker output C - lead",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32380,8 +32794,8 @@
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "speaker output D + lead",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32389,8 +32803,8 @@
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "speaker output D - lead",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32398,8 +32812,8 @@
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "subwoofer output + lead",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32407,8 +32821,8 @@
    "endpoint": "AMP",
    "where": "rear",
    "cavity": "subwoofer output - lead",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32746,9 +33160,45 @@
   },
   {
    "wire": "32",
+   "endpoint": "AMP-BLOCK",
+   "where": "rear",
+   "cavity": null,
+   "part": "open (connector not picked)",
+   "family": "open",
+   "doubled": null
+  },
+  {
+   "wire": "AMP_GND",
+   "endpoint": "AMP-BLOCK",
+   "where": "rear",
+   "cavity": null,
+   "part": "open (connector not picked)",
+   "family": "open",
+   "doubled": null
+  },
+  {
+   "wire": "AMP_PWR_TAIL",
+   "endpoint": "AMP-BLOCK",
+   "where": "rear",
+   "cavity": null,
+   "part": "open (connector not picked)",
+   "family": "open",
+   "doubled": null
+  },
+  {
+   "wire": "AMP_GND_TAIL",
+   "endpoint": "AMP-BLOCK",
+   "where": "rear",
+   "cavity": null,
+   "part": "open (connector not picked)",
+   "family": "open",
+   "doubled": null
+  },
+  {
+   "wire": "32",
    "endpoint": "ACC-BATT",
    "where": "engine",
-   "cavity": "+ post, via the MIDI 60 A holder (410LTP on its M5 stud)",
+   "cavity": "+ post, via the MIDI 60 A holder (2 AWG lug on its M5 stud, part OPEN)",
    "part": "open (connector not picked)",
    "family": "open",
    "doubled": null
@@ -32866,8 +33316,8 @@
    "endpoint": "DCDC",
    "where": "engine",
    "cavity": "input + screw terminal",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32875,8 +33325,8 @@
    "endpoint": "DCDC",
    "where": "engine",
    "cavity": "output + screw terminal",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -32884,8 +33334,8 @@
    "endpoint": "DCDC",
    "where": "engine",
    "cavity": "negative screw terminal",
-   "part": "open (connector not picked)",
-   "family": "open",
+   "part": "OPEN: ring by stud size and gauge",
+   "family": "screw_terminal",
    "doubled": null
   },
   {
@@ -33364,6 +33814,7 @@
    "0460-202-16141": 12,
    "0460-204-12141": 8,
    "0462-201-16141": 12,
+   "0462-201-20141": 4,
    "0462-203-12141": 8,
    "12110847": 13,
    "12191818": 9,
@@ -33373,7 +33824,6 @@
    "238LTP": 11,
    "2516LTP": 4,
    "4-1437284-3": 55,
-   "410LTP": 1,
    "68102": 16,
    "68201": 2,
    "810TP": 2,
@@ -33384,8 +33834,8 @@
    "CAN-TERM-100R": 2,
    "COIL-CONN-LS2/7": 8,
    "CPA-100-3/4-BK": 1,
-   "D-609-03": 54,
-   "D-609-04": 16,
+   "D-609-03": 51,
+   "D-609-04": 18,
    "D-609-05": 33,
    "D38999/24WJ61SN": 1,
    "D38999/26WJ61PN": 1,
@@ -34290,6 +34740,16 @@
    "status": "missing — in no cart"
   },
   {
+   "kind": "?",
+   "item": "0462-201-20141",
+   "name": "",
+   "need": 4,
+   "cart": 0,
+   "inside": [],
+   "vendor": null,
+   "status": "missing — in no cart"
+  },
+  {
    "kind": "contact",
    "item": "0462-203-12141",
    "name": "Deutsch size 12 solid socket, nickel, 14–12 AWG",
@@ -34403,7 +34863,7 @@
    "kind": "lug",
    "item": "410LTP",
    "name": "4 AWG lug, #10 stud (MIDI M5, amp)",
-   "need": 1,
+   "need": 0,
    "cart": 3,
    "inside": [],
    "vendor": "prowire",
@@ -34573,21 +35033,21 @@
    "kind": "splice",
    "item": "D-609-03",
    "name": "MiniSeal stub splice, red (26–20 AWG cavity)",
-   "need": 54,
+   "need": 51,
    "cart": 20,
    "inside": [],
    "vendor": "prowire",
-   "status": "short by 34"
+   "status": "short by 31"
   },
   {
    "kind": "splice",
    "item": "D-609-04",
    "name": "MiniSeal stub splice, blue (20–16)",
-   "need": 16,
+   "need": 18,
    "cart": 25,
    "inside": [],
    "vendor": "prowire",
-   "status": "covered (+9 spare)"
+   "status": "covered (+7 spare)"
   },
   {
    "kind": "splice",
@@ -35369,6 +35829,14 @@
     "status": "missing — in no cart"
    },
    {
+    "code": "0462-201-20141",
+    "name": "",
+    "need": 4,
+    "cart": 0,
+    "vendor": null,
+    "status": "missing — in no cart"
+   },
+   {
     "code": "0462-203-12141",
     "name": "Deutsch size 12 solid socket, nickel, 14–12 AWG",
     "need": 8,
@@ -35451,10 +35919,10 @@
    {
     "code": "D-609-03",
     "name": "MiniSeal stub splice, red (26–20 AWG cavity)",
-    "need": 54,
+    "need": 51,
     "cart": 20,
     "vendor": "prowire",
-    "status": "short by 34"
+    "status": "short by 31"
    },
    {
     "code": "D-609-05",
@@ -35611,6 +36079,7 @@
    "status": "alt",
    "families": [
     "dt",
+    "dtm",
     "dtp"
    ],
    "buy": {
@@ -35719,6 +36188,7 @@
     "contura",
     "d38999_20",
     "dt",
+    "dtm",
     "ev1",
     "gm_blade",
     "gt150",
@@ -35878,6 +36348,7 @@
     "contura",
     "d38999_20",
     "dt",
+    "dtm",
     "dtp",
     "ev1",
     "gm_blade",
@@ -41798,7 +42269,7 @@
     "crosses": false
    },
    "64": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -41825,7 +42296,7 @@
     "crosses": true
    },
    "26a": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -41834,7 +42305,7 @@
     "crosses": false
    },
    "26b": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -41843,7 +42314,7 @@
     "crosses": false
    },
    "27a": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -41852,7 +42323,7 @@
     "crosses": false
    },
    "27b": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -41861,7 +42332,7 @@
     "crosses": false
    },
    "28a": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -41870,7 +42341,7 @@
     "crosses": false
    },
    "28b": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -41879,7 +42350,7 @@
     "crosses": false
    },
    "29a": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -41888,7 +42359,7 @@
     "crosses": false
    },
    "29b": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43004,7 +43475,7 @@
     "crosses": true
    },
    "CAN_LTCD_H": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43013,7 +43484,7 @@
     "crosses": false
    },
    "CAN_LTCD_L": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43022,7 +43493,7 @@
     "crosses": false
    },
    "LTCD_GND": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43184,7 +43655,7 @@
     "crosses": false
    },
    "TG_BUS_UP": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43193,7 +43664,7 @@
     "crosses": false
    },
    "TG_BUS_DN": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43210,8 +43681,26 @@
     "length": "unknown",
     "crosses": false
    },
-   "TG_MOT_B": {
+   "TG_KEY_FEED": {
+    "L1 plugs": true,
+    "L2 wire": true,
+    "L3 crossing": true,
+    "L4 ends": true,
+    "L5 material": false,
+    "length": "unknown",
+    "crosses": false
+   },
+   "TG_CUT_IN": {
     "L1 plugs": false,
+    "L2 wire": true,
+    "L3 crossing": true,
+    "L4 ends": true,
+    "L5 material": false,
+    "length": "unknown",
+    "crosses": false
+   },
+   "TG_MOT_B": {
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43373,7 +43862,7 @@
     "crosses": false
    },
    "HORN_GND": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43400,7 +43889,7 @@
     "crosses": false
    },
    "WIPER_GND": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43409,7 +43898,7 @@
     "crosses": false
    },
    "BLOWER_GND": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43606,6 +44095,24 @@
     "length": "unknown",
     "crosses": false
    },
+   "AMP_PWR_TAIL": {
+    "L1 plugs": false,
+    "L2 wire": true,
+    "L3 crossing": true,
+    "L4 ends": true,
+    "L5 material": false,
+    "length": "unknown",
+    "crosses": false
+   },
+   "AMP_GND_TAIL": {
+    "L1 plugs": false,
+    "L2 wire": true,
+    "L3 crossing": true,
+    "L4 ends": true,
+    "L5 material": false,
+    "length": "unknown",
+    "crosses": false
+   },
    "IBOOST_GND": {
     "L1 plugs": false,
     "L2 wire": true,
@@ -43715,7 +44222,7 @@
     "crosses": true
    },
    "BLOWER_MOT": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43742,7 +44249,7 @@
     "crosses": false
    },
    "RADIO_REM": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43751,7 +44258,7 @@
     "crosses": false
    },
    "RCA_FRONT": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43760,7 +44267,7 @@
     "crosses": false
    },
    "RCA_REAR": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43787,7 +44294,7 @@
     "crosses": false
    },
    "RCA_SUB": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43949,7 +44456,7 @@
     "crosses": false
    },
    "DCDC_IN": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -43967,7 +44474,7 @@
     "crosses": false
    },
    "DCDC_GND": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -44231,7 +44738,7 @@
   "by_option": {
    "AUD": {
     "wires": 21,
-    "L1 plugs": 3,
+    "L1 plugs": 15,
     "L2 wire": 21,
     "L3 crossing": 21,
     "L4 ends": 21,
@@ -44243,17 +44750,17 @@
     }
    },
    "BASE": {
-    "wires": 293,
-    "L1 plugs": 175,
-    "L2 wire": 285,
-    "L3 crossing": 285,
-    "L4 ends": 271,
+    "wires": 297,
+    "L1 plugs": 189,
+    "L2 wire": 289,
+    "L3 crossing": 289,
+    "L4 ends": 275,
     "L5 material": 2,
     "crossings": 92,
     "length": {
      "estimated": 159,
      "twin": 5,
-     "unknown": 129
+     "unknown": 133
     }
    },
    "PL": {
@@ -44311,21 +44818,21 @@
   },
   "by_section": {
    "body_convenience": {
-    "wires": 87,
-    "L1 plugs": 30,
-    "L2 wire": 87,
-    "L3 crossing": 87,
-    "L4 ends": 87,
+    "wires": 89,
+    "L1 plugs": 48,
+    "L2 wire": 89,
+    "L3 crossing": 89,
+    "L4 ends": 89,
     "L5 material": 0,
     "crossings": 6,
     "length": {
      "estimated": 30,
-     "unknown": 57
+     "unknown": 59
     }
    },
    "dash_cabin": {
     "wires": 47,
-    "L1 plugs": 25,
+    "L1 plugs": 27,
     "L2 wire": 46,
     "L3 crossing": 44,
     "L4 ends": 46,
@@ -44338,7 +44845,7 @@
    },
    "engine": {
     "wires": 109,
-    "L1 plugs": 96,
+    "L1 plugs": 100,
     "L2 wire": 109,
     "L3 crossing": 108,
     "L4 ends": 104,
@@ -44377,7 +44884,7 @@
    },
    "power_spine": {
     "wires": 37,
-    "L1 plugs": 18,
+    "L1 plugs": 20,
     "L2 wire": 37,
     "L3 crossing": 37,
     "L4 ends": 29,
@@ -44401,37 +44908,49 @@
      "estimated": 5,
      "unknown": 9
     }
+   },
+   "unsectioned": {
+    "wires": 2,
+    "L1 plugs": 0,
+    "L2 wire": 2,
+    "L3 crossing": 2,
+    "L4 ends": 2,
+    "L5 material": 0,
+    "crossings": 0,
+    "length": {
+     "unknown": 2
+    }
    }
   },
   "configuration": {
    "buildable (base + decided)": {
-    "wires": 324,
-    "L1 plugs": 181,
-    "L2 wire": 316,
-    "L3 crossing": 316,
-    "L4 ends": 302,
+    "wires": 328,
+    "L1 plugs": 207,
+    "L2 wire": 320,
+    "L3 crossing": 320,
+    "L4 ends": 306,
     "L5 material": 2,
     "crossings": 92,
     "length": {
      "estimated": 173,
      "twin": 5,
-     "unknown": 146
+     "unknown": 150
     }
    }
   },
   "composite": {
    "composite (every option)": {
-    "wires": 344,
-    "L1 plugs": 185,
-    "L2 wire": 336,
-    "L3 crossing": 336,
-    "L4 ends": 322,
+    "wires": 348,
+    "L1 plugs": 211,
+    "L2 wire": 340,
+    "L3 crossing": 340,
+    "L4 ends": 326,
     "L5 material": 2,
     "crossings": 92,
     "length": {
      "estimated": 176,
      "twin": 5,
-     "unknown": 163
+     "unknown": 167
     }
    }
   }
@@ -44661,6 +45180,8 @@
     "TG_BUS_UP",
     "TG_BUS_DN",
     "TG_MOT_A",
+    "TG_KEY_FEED",
+    "TG_CUT_IN",
     "TG_MOT_B",
     "REAR_ST_L",
     "REAR_ST_R",
@@ -44697,6 +45218,8 @@
     "USB_GND",
     "OUT12V_GND",
     "ESTOPP_GND",
+    "AMP_PWR_TAIL",
+    "AMP_GND_TAIL",
     "IBOOST_GND",
     "HL_SW_PARK",
     "HL_SW_HEAD",

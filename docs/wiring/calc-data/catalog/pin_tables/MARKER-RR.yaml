@@ -6,6 +6,7 @@ MARKER-RR:
   mate: GM socket 6294015 with leads (1978 booklet p.14); replacement socket part OPEN
   note: 'maker''s document: right rear side marker, 168 bulb in GM socket 6294015 (feed + ground leads)'
   open:
+  - 'decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call'
   - 'family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket''s leads;
     that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)'
   - 'registry wire #77/#78 terminal says ''blade_female_0.187'' (April concept); the 1978 drawing shows a harness socket with leads, not a blade'

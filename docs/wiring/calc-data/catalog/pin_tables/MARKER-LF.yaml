@@ -7,6 +7,7 @@ MARKER-LF:
   note: 'maker''s document: left front side marker, 168 bulb in GM socket 6294015: one lead from the park circuit, the other from the turn circuit (the factory marker
     grounded through the turn filament)'
   open:
+  - 'decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call'
   - 'family stays open: the factory socket is part of the GM harness (1977 manual p.786-787), so the device end is a replacement socket or the old socket''s leads;
     that choice (new pigtail socket + splice, or crimp) is not made in the registry (device-end connectors deferred, receipts/2026-06-10_connector-build-sheets.md)'
   sources:

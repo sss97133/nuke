@@ -112,6 +112,9 @@ URLS = [
     # door pass-throughs re-picked to the window wires' gauge (2026-09-28 night: DTP size 12 for 14 AWG, DT 8-way for the rest)
     "https://www.customconnectorkits.com/products/dtp04-4p",
     "https://www.customconnectorkits.com/products/dt04-08pa",
+    # DTM size-20 contacts for the MoTeC LTC power/CAN plug #68054 (WIDEBAND, pin-table pass 2026-09-28)
+    "https://www.customconnectorkits.com/products/0462-201-20141",
+    "https://www.customconnectorkits.com/products/0460-202-20141",
     "https://www.ksvlooms.com/products/mated-dtp-connector-kits-4-way",
     # Packard 56-series terminal gauge sizes (the factory switch blades)
     "https://ceautoelectricsupply.com/product/packard-56-series-female-terminals/",

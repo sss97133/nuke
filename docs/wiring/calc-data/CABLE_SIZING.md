@@ -11,14 +11,16 @@ Rules and sources are in the script's docstring. A cable passes when its ampacit
 | G1 | ground star → engine block | 150 A / 200 A brief | none | 2 AWG | **2 × 2 AWG** | 240 vs 150 | 0.048 / 0.064 | free air, 100 °C ambient (engine bay) | yes |
 | 59 | alternator B+ → distribution stud | 150 A | MEGA 200 A | 2 AWG | **2 × 2 AWG** | 240 vs 235 | 0.048 / 0.0 | free air, 100 °C ambient (engine bay) | yes |
 | PDM_BPOS | distribution stud → PDM30 stud | 100 A | MEGA 125 A | 2 AWG | **2 AWG** | 150 vs 147 | 0.035 / 0.0 | free air, 80 °C ambient | yes |
-| PDM15_BPOS | distribution stud → PDM15 stud | 80 A | MEGA 100 A | 4 AWG | **2 AWG** | 120 vs 118 | — (no length) / 0.0 | free air, 100 °C ambient (engine bay) | yes |
+| PDM15_BPOS | distribution stud → PDM15 stud | 80 A | MEGA 100 A | 2 AWG | **2 AWG** | 120 vs 118 | — (no length) / 0.0 | free air, 100 °C ambient (engine bay) | yes |
 | GND_RET_CAB | cab ground bank → ground star | 100 A | none | 2 AWG | **2 AWG** | 100 vs 100 | — (no length) / 0.0 | bundled 35 °C rise | yes |
-| 32 | YellowTop + → amplifier +12 V | 60 A | MIDI 60 A | 4 AWG | **2 AWG** | 100 vs 71 | 0.404 / 0.0 | bundled 35 °C rise | yes |
-| AMP_GND | amplifier − → ground star | 60 A | none | 4 AWG | **2 AWG** | 100 vs 60 | 0.404 / 0.0 | bundled 35 °C rise | yes |
-| 52 | distribution stud → iBooster 1 | 40 A | MIDI 40 A | 8 AWG | **6 AWG** | 75 vs 47 | 0.082 / 0.0 | free air, 100 °C ambient (engine bay) | yes |
-| DCDC_IN | distribution stud → Orion IN + | 35 A | MIDI 40 A | 8 AWG | **6 AWG** | 75 vs 47 | — (no length) / 0.0 | free air, 100 °C ambient (engine bay) | yes |
-| DCDC_OUT | Orion OUT + → YellowTop + | 30 A | none | 8 AWG | **6 AWG** | 75 vs 30 | — (no length) / 0.0 | free air, 100 °C ambient (engine bay) | yes |
-| DCDC_GND | Orion − → ground star | 35 A | none | 8 AWG | **6 AWG** | 75 vs 35 | — (no length) / 0.0 | free air, 100 °C ambient (engine bay) | yes |
+| 32 | YellowTop + → amplifier +12 V | 60 A | MIDI 60 A | 2 AWG | **2 AWG** | 100 vs 71 | 0.404 / 0.0 | bundled 35 °C rise | yes |
+| AMP_GND | amplifier − → ground star | 60 A | none | 2 AWG | **2 AWG** | 100 vs 60 | 0.404 / 0.0 | bundled 35 °C rise | yes |
+| AMP_PWR_TAIL | reducing block + → amplifier +12 V plug | 60 A | none | None AWG | **4 AWG** | 120 vs 60 | — (no length) / 0.0 | free air, 80 °C ambient | yes |
+| AMP_GND_TAIL | amplifier ground plug → reducing block - | 60 A | none | None AWG | **4 AWG** | 120 vs 60 | — (no length) / 0.0 | free air, 80 °C ambient | yes |
+| 52 | distribution stud → iBooster 1 | 40 A | MIDI 40 A | 6 AWG | **6 AWG** | 75 vs 47 | 0.082 / 0.0 | free air, 100 °C ambient (engine bay) | yes |
+| DCDC_IN | distribution stud → Orion IN + | 35 A | MIDI 60 A | 6 AWG | **6 AWG** | 75 vs 71 | — (no length) / 0.0 | free air, 100 °C ambient (engine bay) | yes |
+| DCDC_OUT | Orion OUT + → YellowTop + | 30 A | none | 6 AWG | **6 AWG** | 75 vs 30 | — (no length) / 0.0 | free air, 100 °C ambient (engine bay) | yes |
+| DCDC_GND | Orion − → ground star | 35 A | none | 6 AWG | **6 AWG** | 75 vs 35 | — (no length) / 0.0 | free air, 100 °C ambient (engine bay) | yes |
 
 ## What the table says
 

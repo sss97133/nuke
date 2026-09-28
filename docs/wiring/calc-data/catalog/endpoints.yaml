@@ -265,13 +265,29 @@ TG-SW-DASH:
   device: factory electric tailgate window dash switch (reversing)
   family: open
   kit: {}
-  wires: ["TG_FEED", "TG_GND", "TG_BUS_UP", "TG_BUS_DN"]
+  wires: ["TG_FEED", "TG_GND", "TG_BUS_UP", "TG_BUS_DN", "TG_KEY_FEED"]
+  pins: {TG_KEY_FEED: "4 FEED (factory 12 R-70)"}
+  splice_point: true
+  note: "the key switch feed TG_KEY_FEED leaves the FEED terminal with TG_FEED (one splice on the feed lead)"
+  sources: ["1978 C-K wiring booklet ST-352-78 p.16 sheet A-4 'Power Rear Window (RPO A33)' (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf)"]
 TG-SW-KEY:
   where: rear
-  device: factory tailgate key switch (in series between the dash switch and the motor)
+  device: "factory tailgate key switch 8900713 — IN PARALLEL with the dash switch: FEED (circuit 60) switched to CLOSE (183) or OPEN (184); the dash switch outputs join at its CLOSE/OPEN terminals (factory splices 183/184)"
   family: open
   kit: {}
-  wires: ["TG_BUS_UP", "TG_BUS_DN", "TG_MOT_A", "TG_MOT_B"]
+  pins: {TG_KEY_FEED: "FEED terminal (circuit 60)", TG_CUT_IN: "CLOSE terminal (circuit 183, window up)"}
+  open:
+    - "key-off operation: the factory fed this switch always-hot (circuit 60, 30 A breaker); here TG_KEY_FEED shares PDM30 OUT1 on ignition RUN — owner call whether OUT1 runs always-on"
+    - "pin table: TG_MOT_A now starts at the cutout switch (183E), so its CLOSE-terminal entry in catalog/pin_tables/TG-SW-KEY.yaml belongs to TG_CUT_IN (pin-table owner)"
+  sources: ["1978 C-K wiring booklet ST-352-78 p.16 sheet A-4 'Power Rear Window (RPO A33)' (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf)"]
+TG-CUTOUT:
+  where: rear
+  device: "tailgate-closed cutout switch, normally open, GM connector 2977647 — in the window UP line (183C in, 183E out to motor UP-1); the window goes up only with the tailgate shut"
+  family: open
+  kit: {}
+  pins: {TG_CUT_IN: "183C (from splice 183)", TG_MOT_A: "183E (to motor UP-1)"}
+  open: ["1977-specific drawing not on file (1978 booklet used; the K5 tailgate carries the same switch) — confirm it is on the truck (bench)", "terminal family for the 2977647 body: not in families.yaml"]
+  sources: ["1978 C-K wiring booklet ST-352-78 p.16 sheet A-4 'Power Rear Window (RPO A33)' (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf): 'CUTOUT SW N/O' 2977647, 12 LBL-183C / 12 LBL-183E, 'TAILGATE CLOSED'"]
 rear_window_motor:
   where: rear
   device: factory electric tailgate window motor
@@ -873,7 +889,7 @@ PS-STUDS:
     ISO_OUT: [238LTP, 238LTP]
     ODY_NEG: [238LTP, 238LTP]
     ACC_NEG: [DL438, DL438]
-    DCDC_IN: [810TP]              # MIDI 40 A holder, M5 stud
+    DCDC_IN: [810TP]              # MIDI 60 A holder, M5 stud · 810TP is the 8 AWG lug; the cable is 6 AWG: 6 AWG M5 lug OPEN
     PDM_BPOS: [2516LTP]           # MEGA 125 A holder, M8 stud (the PDM30 end is PDM30-STUD DL214)
     PDM15_BPOS: [LUG-4AWG-M8]     # MEGA 100 A holder, M8 stud (the PDM15 end is PDM15-STUD)
     "52": [810TP]                 # MIDI 40 A holder, M5 stud
@@ -1106,7 +1122,7 @@ WIPER-MOTOR:
   sources: ["1977 Light Truck Service Manual p.802-803, p.815"]
 BLOWER-RES:
   where: engine
-  device: "factory Four-Season blower resistor on the evaporator case (3 prongs)"
+  device: "factory Four-Season blower resistor on the evaporator case — 4 terminals BAT / M1 / M2 / BLO (1978 C60 plug cavities 51 / 63 / 72 / 101; the '3 prongs' of the forum threads is superseded)"
   family: open
   kit: {}
   wires: ["BLOWER_LO", "BLOWER_MED", "BLOWER_M2", "BLOWER_MOT"]
@@ -1306,7 +1322,7 @@ AMP:
   note: "75 W x 4 at 4 ohm + 300 W x 1 at 2 ohm; 4 AWG power and ground leads, 60 A fuse; 9-13/16 x 2-1/8 x 6-3/4 in; tuned with JL's TuN app over USB"
   family: open
   kit: {}
-  wires: ["32", "AMP_GND", "RADIO_REM", "RCA_FRONT", "RCA_REAR", "RCA_SUB", "26a", "26b", "27a", "27b", "28a", "28b", "29a", "29b", "30a", "30b"]
+  wires: ["AMP_PWR_TAIL", "AMP_GND_TAIL", "RADIO_REM", "RCA_FRONT", "RCA_REAR", "RCA_SUB", "26a", "26b", "27a", "27b", "28a", "28b", "29a", "29b", "30a", "30b"]
   open: ["mount spot (cargo area, near the woofers)", "input count for the radio's sub RCA (see RCA_SUB)"]
   sources: ["web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md ('4-gauge power and ground leads and a 60-amp fuse recommended'; DSP input routing and mixing)",
             "owner 2026-09-27: 'kicker is not cool... what a brand for a 100k truck'"]
@@ -1382,13 +1398,23 @@ ODYSSEY:
   note: "the + post carries #63 to the isolator plus two small fused taps that must stay live when the truck is isolated: the isolator's own control power (red, 10 A) and the dash switch feed (5 A)"
   open: ["Odyssey model / group size: set by the tray at the mock-up", "fused-tap holders at the + post: picked with the battery terminals"]
   sources: ["owner 2026-09-27: 'we picked the batteries ... an odessey for the running and also a yellow optima for other stuff like accessories'"]
+AMP-BLOCK:
+  where: rear
+  device: "power reducing block beside the amplifier: 2 AWG in (+ #32, - AMP_GND) to 4 AWG out (AMP_PWR_TAIL, AMP_GND_TAIL) — two single-circuit blocks, + and -"
+  family: open
+  kit: {}
+  wires: ["32", "AMP_GND", "AMP_PWR_TAIL", "AMP_GND_TAIL"]
+  note: "why it exists: JL requires 4 AWG at the amp's power plug; the 18.4 ft loop needs 2 AWG for the 3 % drop (JL VX700/5i guide 'Power Connector', step A: 'install a fused distribution block near the amplifiers'). Unfused here: the MIDI 60 A at the YellowTop + protects both gauges (4 AWG bundled 72 A x 0.85 = 61 A)"
+  open: ["block part: a 1-in/1-out reducing block rated >= 60 A taking 2 AWG in and 4 AWG out, + and - (sealed, rear-cargo mount) — part number not picked", "mount spot beside the amp: formboard / bench"]
+  sources: ["JL VX700/5i guide (web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md): Power Connector, spec table", "calc-data/CABLE_SIZING.md: #32 and AMP_GND 2 AWG from the 3 % drop"]
 ACC-BATT:
   where: engine
   device: "Optima YellowTop — the accessory battery (owner 2026-09-27); beside the Odyssey; model set by the tray"
   family: open
   wires: ["32", ACC_NEG, DCDC_OUT]
   note: "the isolator does not cut this battery: it feeds only the amplifier (#32, MIDI 60 A at the + post — the JL VX700/5i needs 'an external 60-amp ... fuse', Crutchfield snapshot) and is charged through the DC-DC charger, whose input is downstream of the isolator. #32 lands on the MIDI holder's M5 stud: 410LTP (4 AWG, #10)"
-  kit: {410LTP: 1}
+  kit: {}
+  open: ["lug for #32 (now 2 AWG) at the YellowTop + post: it lands on the MIDI holder's M5 stud (0498900.TXN), so a 2 AWG lug with an M5 hole — part number OPEN (410LTP was the 4 AWG lug)"]
   open: ["YellowTop model / tray; the default spot is the engine bay beside the Odyssey — the amp's power and ground runs change if it moves behind the seat", "MIDI 60 A part number not on file (MIDI-60A)"]
   sources: ["owner 2026-09-27", "web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md ('4-gauge power and ground leads and a 60-amp fuse recommended'; 'An external 60-amp AFS, AGU, or MAXI fuse (not included) must be installed')"]
 ISOLATOR:
@@ -1428,9 +1454,11 @@ DCDC:
   family: open
   kit: {}
   wires: [DCDC_IN, DCDC_OUT, DCDC_GND]
-  note: "engine running detection starts and stops it on its own, so no enable wire is needed; the two-pole remote H/L connector stays unused"
-  open: ["terminal type for 8 AWG at the Orion's screw terminals: from the Orion manual when carted"]
-  sources: ["web_snapshots/powerwerx.com__victron-ori121236140-oriontrsmart-30a-nonisolated.md"]
+  note: "engine running detection starts and stops it on its own, so no enable wire is needed — but the remote on/off must be closed: keep the factory wire bridge between the L and H pins (or a switch across L-H). Victron manual §4.5/4.6: 'remove the wire bridge' to install, then 'Reconnect the remote on/off to activate the product'; §4.7 option a) a switch wired between the L-H pins"
+  open: ["terminal type for 8 AWG at the Orion's screw terminals: from the Orion manual when carted",
+         "DCDC_IN fuse: decided MIDI 60 A, the maker's external battery protection fuse (manual §4.2 Figure 6, 12 V row); 6 AWG carries it"]
+  sources: ["web_snapshots/powerwerx.com__victron-ori121236140-oriontrsmart-30a-nonisolated.md",
+            "web_snapshots/www.victronenergy.com__34439-Orion-Tr_Smart_DC-DC_Charger-pdf-en.md (§4.2 cable and fuse recommendations; §4.5-4.7 remote on/off)"]
 GSS-3000:
   where: cabin
   device: "Dakota Digital GSS-3000 gear shift sender: decoder under the dash; its sensor sits on the transmission detent shaft and comes with a 10 ft 3-wire cable"

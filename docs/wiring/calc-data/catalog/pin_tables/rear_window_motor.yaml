@@ -1,10 +1,12 @@
 rear_window_motor:
-  family: open
+  family: gm_blade
   pins:
     TG_MOT_A: 1 (UP, circuit 183 light blue)
     TG_MOT_B: 2 (DOWN, circuit 184 tan/white)
   mate: GM 6288909 2-way connector (1978 booklet p.16); new-part equivalent OPEN
-  note: 'maker''s document: factory tailgate window motor, 1978 GM connector 6288909 (2-way): UP-1 / DN-2, grounds through the motor case'
+  note: 'maker''s document: factory tailgate window motor, 1978 GM connector 6288909 (2-way): UP-1 / DN-2, grounds through the motor case · family gm_blade: the 1978
+    booklet draws GM factory blade connectors here (motor connector 6288909, 1978 booklet p.16); the Packard 56-series identity is the family''s (families.yaml),
+    not printed on the drawing'
   open:
   - 'motor ground: the drawing shows the motor grounded through its case, no ground lead — confirm the tailgate ground path at the bench (1978 booklet p.16)'
   - 'terminal family for the 6288909 body: not in families.yaml'
