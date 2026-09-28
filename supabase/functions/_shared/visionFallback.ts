@@ -3,10 +3,14 @@
 // ECONOMICS (per Skylar, 2026-06-16): Nuke does NOT fund cloud inference. The caller brings the
 // compute — their connected Claude / ChatGPT / Gemini subscription or key (stored in
 // `user_ai_providers`, resolved by getUserApiKey). They pay. Nuke owns the harness (YONO free
-// tier + the consensus engine); the caller owns the inference. A `system` env key is only a
-// temporary bootstrap pool and is reported as such so cost-bearer is always visible; the durable
-// path is: YONO (free) → the USER's connected provider (BYOK). Anthropic is a first-class tier
-// because "connect your Claude subscription" is a primary flow.
+// tier + the consensus engine); the caller owns the inference. The path is: YONO (free) → the
+// USER's connected provider (BYOK). Anthropic is a first-class tier because "connect your Claude
+// subscription" is a primary flow.
+//
+// The `system` env-key pool (Nuke's temporary bootstrap) is RETIRED (Skylar, 2026-09-28): every tier
+// in it had died — gemini-2.0-flash-lite 404 (model gone), claude-haiku-4-5 400, gpt-4o-mini 429 "no
+// credits remaining", ~5,900 failed attempts each 2026-09-27 21:00–23:17Z, $0 billed, nothing analyzed.
+// getUserApiKey still falls back to env keys for other callers; this module takes only user keys.
 //
 // When neither YONO nor a user key is available, callers should surface
 // "connect your AI subscription to enable analysis" rather than silently spending Nuke's money.
@@ -25,21 +29,21 @@ const PROVIDER_PREFS: Array<{ provider: Provider; model: string; env: string }> 
 
 interface ResolvedTier extends LLMConfig { keySource: "user" | "system"; }
 
-// Resolve usable tiers for this caller. user-source tiers (BYOK — caller pays) rank ahead of any
-// system-pool tier (Nuke's temporary bootstrap). Returns [] if nothing is available.
+// Resolve usable tiers for this caller: the caller's own connected providers (BYOK — caller pays),
+// cheapest first. Returns [] when the caller has none; callers then say "connect your AI subscription".
 async function resolveTiers(supabase: unknown, userId: string | null): Promise<ResolvedTier[]> {
   const tiers: ResolvedTier[] = [];
   for (const p of PROVIDER_PREFS) {
     try {
       const r = await getUserApiKey(supabase, userId, p.provider, p.env);
-      if (r.apiKey) {
+      // user keys only: the system pool is retired (header)
+      if (r.apiKey && r.source === "user") {
         tiers.push({ provider: p.provider, model: r.modelName || p.model, apiKey: r.apiKey, source: r.source, keySource: r.source });
       }
     } catch {
       // provider unavailable for this caller; skip
     }
   }
-  tiers.sort((a, b) => (a.keySource === "user" ? 0 : 1) - (b.keySource === "user" ? 0 : 1));
   return tiers;
 }
 
