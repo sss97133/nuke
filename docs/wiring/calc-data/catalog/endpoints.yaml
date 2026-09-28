@@ -1,0 +1,1292 @@
+# K5 harness — ENDPOINTS (plugs, studs, ports) with their kits (curated input; → kits_v5.py)
+#
+# One entry = one physical termination point a user could click on the future map: the connector,
+# stud or port, which wires land there (registry ids, incl. `implied`), the kit that builds it, and
+# what is still open. Scope of this pass = Chapter 1 (engine running) + power spine + comms ports.
+#
+#   where:   cabin | firewall | engine | chassis | rear
+#   family:  families.yaml id (steps + tools come from there)
+#   kit:     parts consumed once per endpoint {code: qty}; per-wire-end parts come from the family
+#   wires:   registry ids landing here; `pins: M130:A` = every registry wire whose `frm` is on that
+#            connector; `pdm: A` = every PDM30 output/ground wire whose pin maps to connector A
+#   range:   wire range the kit's terminals accept (AWG, small..large)
+#   open:    what still has to be decided or checked — each with how it closes
+
+# ============================================================== cabin: the two computers
+M130-A:
+  where: cabin
+  device: MoTeC M130, connector A (34-way Superseal 1.0, Key 1, MoTeC #65044)
+  family: ssc
+  kit: {M800-KIT-N: 0.5, SSB-34BS-PA66: 1}
+  cavities: 34
+  wires: {pins: "M130:A"}
+  open:
+    - "boot: HELD on the M130 mount (state §4) — SSB rubber boot on this backshell, or billet + Raychem 202K152/153"
+  sources: ["motec_m130_datasheet.pdf p.4", "prowire M800-KIT-N page"]
+M130-B:
+  where: cabin
+  device: MoTeC M130, connector B (26-way Superseal 1.0, Key 1, MoTeC #65045)
+  family: ssc
+  kit: {M800-KIT-N: 0.5, SSB-26BS-PA66: 1}
+  cavities: 26
+  wires: {pins: "M130:B"}
+  open:
+    - "boot: HELD on the M130 mount"
+  sources: ["motec_m130_datasheet.pdf p.5"]
+PDM30-A:
+  where: cabin
+  device: MoTeC PDM30, connector A (34-way, #65044)
+  family: ssc
+  kit: {M800-KIT-N: 0.5, SSB-34BS-PA66: 1}
+  cavities: 34
+  wires: {pdm: A}
+  open:
+    - "20 A outputs take 2 × 16 AWG pigtails (Superseal max 16 AWG), joined to the load wire with D-609-05 (registry meta note)"
+    - "channels for INJ_PWR, COIL_PWR, the fuel pump and the second PDM split are unassigned (state 0h(5), row 54)"
+  sources: ["motec_pdm30_datasheet.pdf", "scripts/generate_connector_build_sheets.py PDM_A_PIN"]
+PDM30-B:
+  where: cabin
+  device: MoTeC PDM30, connector B (26-way, #65045)
+  family: ssc
+  kit: {M800-KIT-N: 0.5, SSB-26BS-PA66: 1}
+  cavities: 26
+  wires: {pdm: B}
+  sources: ["motec_pdm30_datasheet.pdf", "scripts/generate_connector_build_sheets.py PDM_B_PIN"]
+PDM30-STUD:
+  where: cabin
+  device: PDM30 battery stud (M6; "eyelet and M6 nut")
+  family: lug
+  kit: {}
+  lugs: {PDM_BPOS: DL214}
+  wires: [PDM_BPOS]
+  sources: ["motec_pdm30_datasheet.pdf ('Mating: eyelet and M6 nut')", "build book DC primary table (DL214 = PDM30 M6)"]
+
+PDM15-A:
+  where: engine
+  device: MoTeC PDM15 (engine PDM), connector A (34-way, #65044) — engine bay by the battery (working position)
+  family: ssc
+  kit: {M800-KIT-N: 0.5, SSB-34BS-PA66: 1}
+  cavities: 34
+  wires: {pdm: A, box: PDM15}
+  open:
+    - "20 A outputs take 2 × 16 AWG pigtails (Superseal max 16 AWG), joined to the load wire with D-609-05"
+    - "mount: away from exhaust heat — 110 °C max internal, 100 °C recommended (MoTeC PDM user manual, Mounting)"
+  sources: ["motec_pdm_user_manual.pdf p.43 (PDM15 pinout)", "owner 2026-09-24 'multiple PDM'; split engine/body 2026-09-27"]
+PDM15-B:
+  where: engine
+  device: MoTeC PDM15 (engine PDM), connector B (26-way, #65045)
+  family: ssc
+  kit: {M800-KIT-N: 0.5, SSB-26BS-PA66: 1}
+  cavities: 26
+  wires: {pdm: B, box: PDM15}
+  sources: ["motec_pdm_user_manual.pdf p.43 (PDM15 pinout)"]
+PDM15-STUD:
+  where: engine
+  device: PDM15 battery stud (M6; "eyelet and M6 nut")
+  family: lug
+  kit: {}
+  lugs: {PDM15_BPOS: DL214}
+  wires: [PDM15_BPOS]
+  sources: ["motec_pdm_user_manual.pdf p.43 (connector C: M6 stud, Battery +)"]
+
+# ============================================================== doors, tailgate, camera, rear lamps, speed (2026-09-27)
+# Owner 2026-09-27: "we need power windows its never been addressed. we have nothing in the doors. we also want like rear
+# camera". Parts picked under his delegation ("i can tell u to replace later"). No relays (row 54): every motor reverses
+# through its switch; the PDM output is the fuse.
+WIN-SW-L:
+  where: cabin
+  device: driver door switch panel — window master (both windows) + lock rocker, Nu-Relics 17383-2 chrome reverse-polarity switches
+  family: open
+  kit: {}
+  wires: ["34", "WIN_GND_L", "WIN_R_UP", "WIN_R_DN", "WIN_MOT_L_A", "WIN_MOT_L_B"]
+  open: ["switch terminal map from the Nu-Relics kit instructions (bench)"]
+  sources: ["nu-relics.com 17383-2"]
+WIN-SW-R:
+  where: cabin
+  device: passenger door window switch (in series with the master), Nu-Relics 17383-2
+  family: open
+  kit: {}
+  wires: ["35", "WIN_GND_R", "WIN_R_UP", "WIN_R_DN", "WIN_MOT_R_A", "WIN_MOT_R_B"]
+  sources: ["nu-relics.com 17383-2"]
+window_motor_DS:
+  where: cabin
+  device: driver window motor (Nu-Relics 17383-2 regulator + motor)
+  family: open
+  kit: {}
+  wires: ["WIN_MOT_L_A", "WIN_MOT_L_B"]
+window_motor_PS:
+  where: cabin
+  device: passenger window motor (Nu-Relics 17383-2)
+  family: open
+  kit: {}
+  wires: ["WIN_MOT_R_A", "WIN_MOT_R_B"]
+LOCK-SW-L:
+  where: cabin
+  device: driver lock rocker (reversing, rests to ground)
+  family: open
+  kit: {}
+  wires: ["38", "LOCK_GND_L", "LOCK_BUS_A", "LOCK_BUS_B"]
+LOCK-SW-R:
+  where: cabin
+  device: passenger lock rocker (reversing, rests to ground)
+  family: open
+  kit: {}
+  wires: ["LOCK_FEED_R", "LOCK_GND_R", "LOCK_BUS_A", "LOCK_BUS_B"]
+lock_actuator_DS:
+  where: cabin
+  device: driver door lock actuator, AutoLoc AUTZT2000 (2-wire, 13 lb)
+  family: open
+  kit: {}
+  wires: ["LOCK_BUS_A", "LOCK_BUS_B"]
+  sources: ["autoloc.com AUTZT2000"]
+lock_actuator_PS:
+  where: cabin
+  device: passenger door lock actuator, AutoLoc AUTZT2000
+  family: open
+  kit: {}
+  wires: ["LOCK_BUS_A", "LOCK_BUS_B"]
+DOOR-L-PASS:
+  where: cabin
+  device: driver door pass-through at the hinge pillar — Deutsch DT 12-way (DT04-12PA body side, DT06-12SA door side), size 16 contacts
+  family: open
+  kit: {}
+  wires: ["34", "WIN_GND_L", "WIN_R_UP", "WIN_R_DN", "38", "LOCK_GND_L", "LOCK_BUS_A", "LOCK_BUS_B", "26a", "26b"]
+  open: ["DT 12-way housing, W12P/W12S wedges, size 16 contacts: not in the saved ProWire catalog — confirm the ProWire listing",
+         "door boot/conduit: measure the hinge pillar gap (bench)"]
+DOOR-R-PASS:
+  where: cabin
+  device: passenger door pass-through — Deutsch DT 12-way (DT04-12PA / DT06-12SA)
+  family: open
+  kit: {}
+  wires: ["35", "WIN_GND_R", "WIN_R_UP", "WIN_R_DN", "LOCK_FEED_R", "LOCK_GND_R", "LOCK_BUS_A", "LOCK_BUS_B", "27a", "27b"]
+TG-SW-DASH:
+  where: cabin
+  device: factory electric tailgate window dash switch (reversing)
+  family: open
+  kit: {}
+  wires: ["TG_FEED", "TG_GND", "TG_BUS_UP", "TG_BUS_DN"]
+TG-SW-KEY:
+  where: rear
+  device: factory tailgate key switch (in series between the dash switch and the motor)
+  family: open
+  kit: {}
+  wires: ["TG_BUS_UP", "TG_BUS_DN", "TG_MOT_A", "TG_MOT_B"]
+rear_window_motor:
+  where: rear
+  device: factory electric tailgate window motor
+  family: open
+  kit: {}
+  wires: ["TG_MOT_A", "TG_MOT_B"]
+Backup_Camera:
+  where: rear
+  device: license-plate backup camera, Rear View Safety RVS-7180355-IR (night vision)
+  family: open
+  kit: {}
+  wires: ["97", "CAM_GND", "CAM_VIDEO"]
+  sources: ["rearviewsafety.com RVS-7180355-IR"]
+MIRROR-MON:
+  where: cabin
+  device: replacement rearview mirror with display (RVS-7180355-IR kit) — camera shows in reverse
+  family: open
+  kit: {}
+  wires: ["CAM_VIDEO", "MIRROR_PWR", "MIRROR_GND", "MIRROR_TRIG"]
+Tail_Light_Left:
+  where: rear
+  device: left tail lamp, 1157 socket (RUN = park/tail group; BRK = stop/turn output)
+  family: open
+  kit: {}
+  wires: ["81", "REAR_ST_L", "TL_L_GND"]
+Tail_Light_Right:
+  where: rear
+  device: right tail lamp, 1157 socket
+  family: open
+  kit: {}
+  wires: ["75", "REAR_ST_R", "TL_R_GND"]
+Backup_Light_Left:
+  where: rear
+  device: left backup lamp
+  family: open
+  kit: {}
+  wires: ["89", "BU_L_GND"]
+Backup_Light_Right:
+  where: rear
+  device: right backup lamp
+  family: open
+  kit: {}
+  wires: ["76", "BU_R_GND"]
+CHMSL:
+  where: rear
+  device: third brake light (CHMSL) — lights with the brake
+  family: open
+  kit: {}
+  wires: ["93", "CHMSL_GND"]
+BRAKE-SW:
+  where: cabin
+  device: factory brake light switch at the pedal — switches 0V (PDM30 A28) into PDM30 DIG14
+  family: open
+  kit: {}
+  wires: ["53", "BRK_SW_0V"]
+VSS-SENDER:
+  where: rear
+  device: Dakota Digital SEN-01-5 speed sender on the NP205 speedometer drive (7/8-18 GM thread, 16k PPM)
+  family: open
+  kit: {}
+  wires: ["100", "VSS_PWR", "VSS_GND", "VSS_DAK"]
+  sources: ["summitracing.com dak-sen-01-5"]
+AC-CLUTCH:
+  where: engine
+  device: A/C compressor clutch, Sanden 7176 SD7B10 (ordered 2026-09-24) — engine PDM15 OUT11
+  family: open
+  kit: {}
+  wires: ["23"]
+AC-LP-SW:
+  where: engine
+  device: A/C low-pressure switch (accumulator) — switches ground into PDM15 DIG4
+  family: open
+  kit: {}
+  wires: ["105", "AC_LP_0V"]
+AC-HP-SW:
+  where: engine
+  device: A/C high-pressure switch (liquid line) — switches ground into PDM15 DIG5
+  family: open
+  kit: {}
+  wires: ["111", "AC_HP_0V"]
+
+# ============================================================== cabin: laptop ports
+PORT-ETH:
+  where: cabin
+  device: M130 laptop port — panel RJ45 (Cat5, crossover at the loom side)
+  family: ssc
+  kit: {M-RJ45-CABLE: 1}
+  wires: [ETH_TX+, ETH_TX-, ETH_RX+, ETH_RX-]
+  note: "crossover at the loom side (M1 Tune p.10): B23 TX+ → socket pin 3, B24 TX- → 6, B25 RX+ → 1, B26 RX- → 2 (Dave's B23-B26); the panel cable's own conductor colours get read on arrival"
+  sources: ["M1 Tune manual p.10", "prowire M-RJ45-CABLE page"]
+CAN-BUS:
+  where: cabin
+  device: M1 CAN trunk (M130 B17/B18 to PDM30 B26/B25, 3.5 ft) with the UTC stub
+  family: none
+  kit: {CAN-TERM-100R: 1}
+  wires: ["62", UTC_CANH, UTC_CANL, UTC_0V]
+  note: "22 AWG twisted, at least one twist per 50 mm; bus under 2 m = one 100R at the end opposite the UTC plug"
+  sources: ["MoTeC PDM user manual p.50 'CAN Bus Wiring Requirements' + 'Short CAN Bus'"]
+PORT-UTC:
+  where: cabin
+  device: PDM30 config port — 5-pin female XLR for the MoTeC UTC #61059
+  family: xlr_solder
+  kit: {NC5FD-L-1: 1}
+  wires: [UTC_CANH, UTC_CANL, UTC_0V]
+  note: "the UTC #61059 adapter itself is bought with the M130/PDM30 via Dave"
+  sources: ["MoTeC PDM user manual p.48"]
+
+# ============================================================== firewall bulkhead
+FIREWALL-CABIN:
+  where: firewall
+  device: D38999/24WJ61SN jam-nut receptacle — cabin side (sockets)
+  family: d38999_20
+  side: cabin
+  kit: {D38999/24WJ61SN: 1, M85049/69-25N: 1, 202K163-25-0: 1, ADHESIVES-KIT: 0.5}
+  wires: {bulkhead: true}
+  sources: ["K5_connector_FIREWALL_D38999.svg", "scripts/generate_connector_build_sheets.py assign_bulkhead()"]
+FIREWALL-ENGINE:
+  where: firewall
+  device: D38999/26WJ61PN plug — engine loom side (pins)
+  family: d38999_20
+  side: engine
+  kit: {D38999/26WJ61PN: 1, M85049/69-25N: 1, 202K163-25-0: 1, ADHESIVES-KIT: 0.5}
+  wires: {bulkhead: true}
+  sources: ["K5_connector_FIREWALL_D38999.svg"]
+FIREWALL-GROMMET:
+  where: firewall
+  device: firewall grommet crossings for wires too big for #20 contacts (H1–H4 on the build sheet)
+  family: none
+  kit: {}
+  wires: {grommet: true}
+  open:
+    - "grommet PNs: none picked — K5_harness_protection_catalog.md names the protection; pick at the formboard"
+  sources: ["K5_connector_FIREWALL_D38999.svg 'DOES NOT PASS BULKHEAD — DIRECT FEED'"]
+
+# ============================================================== engine: throttle, spark, fuel
+TB:
+  where: engine
+  device: throttle body GM 12699160 (Gen V truck, SENT position sensor, 5-wire plug)
+  family: te_amp_plug
+  kit: {WCTHB50: 1}
+  crimper: TE_AMP_CRIMPER
+  pins: {4b: "1", 4a: "2", 4c: "3", 4f: "4", 4e: "5"}
+  empty: ["6"]
+  doubled: [4c, 4e, 4f]
+  note: "pin 1 motor +, 2 motor -, 3 SENT position, 4 low reference, 5 +5 V, 6 not used; TPS2 (#4d) retired; #4c moves to B09 (UDIG4)"
+  open:
+    - "pin order for 12699160 is taken from other GM SENT throttle bodies (MaxxECU: 12678223; rusefi: 12617792); no saved source names 12699160 (audit_citations 2026-09-26) — meter the throttle body's pins before crimping: the two motor pins are the pair with a low resistance between them"
+  sources:
+    - "MaxxECU 'E-Throttle bodies' — GM 12678223 SENT pinout (https://www.maxxecu.com/webhelp/wirings-e-throttle_bodies.html)"
+    - "rusefi wiki 'SENT ETB Electronic Throttle Body' — GM SENT TBs share this pinout (12617792, 2014-19 Silverado)"
+    - "Michigan Motorsports: 12746422 supersedes 12699160 / 12730580 / 12740724 (2022-24 6.2L/6.6L gas trucks)"
+    - "Holley 199R10762 Appendix 3.0 + Terminator X docs: LT throttle bodies share one connector, not the LS 6-pin"
+    - "MoTeC GPR (M130) fw 01.11.0099 release notes: Throttle Servo 2 (includes SENT Secure Serial Decode Type)"
+    - "ICT Billet WCTHB50 'LT Gen 5 Throttle Body Connector Component Kit' ($23; TE AMP; 18 AWG recommended)"
+  replaces_cart: ["68212"]   # the LS2/LS7 GT150 6-way — fits Gen IV TBs, not this one
+COIL-1:
+  where: engine
+  device: LS coil 1 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)
+  family: kit_terminal
+  kit: {COIL-CONN-LS2/7: 1}
+  pins: {COIL1_GND: a, COIL1_SGND: b, "24": c, COIL1_PWR: d}
+  doubled: ["24"]
+  note: "a chassis ground and b signal ground to the head ring terminal; c trigger from the M130; d switched +12 V (Dave's coil pinout)"
+  open:
+    - "kit terminal crimper: UNKNOWN — the ProWire page names none; read the terminal PN off the kit bag"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+    - "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+COIL-2:
+  where: engine
+  device: LS coil 2 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)
+  family: kit_terminal
+  kit: {COIL-CONN-LS2/7: 1}
+  pins: {COIL2_GND: a, COIL2_SGND: b, "9": c, COIL2_PWR: d}
+  doubled: ["9"]
+  note: "a chassis ground and b signal ground to the head ring terminal; c trigger from the M130; d switched +12 V (Dave's coil pinout)"
+  open:
+    - "kit terminal crimper: UNKNOWN — the ProWire page names none; read the terminal PN off the kit bag"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+    - "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+COIL-3:
+  where: engine
+  device: LS coil 3 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)
+  family: kit_terminal
+  kit: {COIL-CONN-LS2/7: 1}
+  pins: {COIL3_GND: a, COIL3_SGND: b, "5": c, COIL3_PWR: d}
+  doubled: ["5"]
+  note: "a chassis ground and b signal ground to the head ring terminal; c trigger from the M130; d switched +12 V (Dave's coil pinout)"
+  open:
+    - "kit terminal crimper: UNKNOWN — the ProWire page names none; read the terminal PN off the kit bag"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+    - "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+COIL-4:
+  where: engine
+  device: LS coil 4 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)
+  family: kit_terminal
+  kit: {COIL-CONN-LS2/7: 1}
+  pins: {COIL4_GND: a, COIL4_SGND: b, "10": c, COIL4_PWR: d}
+  doubled: ["10"]
+  note: "a chassis ground and b signal ground to the head ring terminal; c trigger from the M130; d switched +12 V (Dave's coil pinout)"
+  open:
+    - "kit terminal crimper: UNKNOWN — the ProWire page names none; read the terminal PN off the kit bag"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+    - "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+COIL-5:
+  where: engine
+  device: LS coil 5 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)
+  family: kit_terminal
+  kit: {COIL-CONN-LS2/7: 1}
+  pins: {COIL5_GND: a, COIL5_SGND: b, "7": c, COIL5_PWR: d}
+  doubled: ["7"]
+  note: "a chassis ground and b signal ground to the head ring terminal; c trigger from the M130; d switched +12 V (Dave's coil pinout)"
+  open:
+    - "kit terminal crimper: UNKNOWN — the ProWire page names none; read the terminal PN off the kit bag"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+    - "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+COIL-6:
+  where: engine
+  device: LS coil 6 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)
+  family: kit_terminal
+  kit: {COIL-CONN-LS2/7: 1}
+  pins: {COIL6_GND: a, COIL6_SGND: b, "11": c, COIL6_PWR: d}
+  doubled: ["11"]
+  note: "a chassis ground and b signal ground to the head ring terminal; c trigger from the M130; d switched +12 V (Dave's coil pinout)"
+  open:
+    - "kit terminal crimper: UNKNOWN — the ProWire page names none; read the terminal PN off the kit bag"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+    - "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+COIL-7:
+  where: engine
+  device: LS coil 7 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)
+  family: kit_terminal
+  kit: {COIL-CONN-LS2/7: 1}
+  pins: {COIL7_GND: a, COIL7_SGND: b, "8": c, COIL7_PWR: d}
+  doubled: ["8"]
+  note: "a chassis ground and b signal ground to the head ring terminal; c trigger from the M130; d switched +12 V (Dave's coil pinout)"
+  open:
+    - "kit terminal crimper: UNKNOWN — the ProWire page names none; read the terminal PN off the kit bag"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+    - "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+COIL-8:
+  where: engine
+  device: LS coil 8 (ACDelco D510C / GM 12611424, DEL-Stributor cluster)
+  family: kit_terminal
+  kit: {COIL-CONN-LS2/7: 1}
+  pins: {COIL8_GND: a, COIL8_SGND: b, "12": c, COIL8_PWR: d}
+  doubled: ["12"]
+  note: "a chassis ground and b signal ground to the head ring terminal; c trigger from the M130; d switched +12 V (Dave's coil pinout)"
+  open:
+    - "kit terminal crimper: UNKNOWN — the ProWire page names none; read the terminal PN off the kit bag"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+    - "ProWire COIL-CONN-LS2/7 (keyed for D514A/D513A/D585/D581); D510C cross-references 12570616 / UF413 (afa-motors listing) — same coil family"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+INJ-1:
+  where: engine
+  device: injector 1 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)
+  family: ev1
+  kit: {8CYLK-90: 0.125}
+  per_end: {part: "68102"}
+  pins: {"13": "1", INJ1_PWR: "2"}
+  doubled: ["13"]
+  note: "pin 1 = M130 injector driver (white), pin 2 = +12 V (red), per Dave's sheet; the EV1 coil is not polarized"
+  sources:
+    - "siemensdeka.com FI114961 product page: EV1 (Minitimer) connector, high impedance 12.5 ohm"
+    - "Dave's M130 sheet: injector 1 = fuel injector output (white), 2 = relay power (red)"
+    - "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+INJ-2:
+  where: engine
+  device: injector 2 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)
+  family: ev1
+  kit: {8CYLK-90: 0.125}
+  per_end: {part: "68102"}
+  pins: {"14": "1", INJ2_PWR: "2"}
+  doubled: ["14"]
+  note: "pin 1 = M130 injector driver (white), pin 2 = +12 V (red), per Dave's sheet; the EV1 coil is not polarized"
+  sources:
+    - "siemensdeka.com FI114961 product page: EV1 (Minitimer) connector, high impedance 12.5 ohm"
+    - "Dave's M130 sheet: injector 1 = fuel injector output (white), 2 = relay power (red)"
+    - "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+INJ-3:
+  where: engine
+  device: injector 3 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)
+  family: ev1
+  kit: {8CYLK-90: 0.125}
+  per_end: {part: "68102"}
+  pins: {"15": "1", INJ3_PWR: "2"}
+  doubled: ["15"]
+  note: "pin 1 = M130 injector driver (white), pin 2 = +12 V (red), per Dave's sheet; the EV1 coil is not polarized"
+  sources:
+    - "siemensdeka.com FI114961 product page: EV1 (Minitimer) connector, high impedance 12.5 ohm"
+    - "Dave's M130 sheet: injector 1 = fuel injector output (white), 2 = relay power (red)"
+    - "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+INJ-4:
+  where: engine
+  device: injector 4 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)
+  family: ev1
+  kit: {8CYLK-90: 0.125}
+  per_end: {part: "68102"}
+  pins: {"16": "1", INJ4_PWR: "2"}
+  doubled: ["16"]
+  note: "pin 1 = M130 injector driver (white), pin 2 = +12 V (red), per Dave's sheet; the EV1 coil is not polarized"
+  sources:
+    - "siemensdeka.com FI114961 product page: EV1 (Minitimer) connector, high impedance 12.5 ohm"
+    - "Dave's M130 sheet: injector 1 = fuel injector output (white), 2 = relay power (red)"
+    - "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+INJ-5:
+  where: engine
+  device: injector 5 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)
+  family: ev1
+  kit: {8CYLK-90: 0.125}
+  per_end: {part: "68102"}
+  pins: {"17": "1", INJ5_PWR: "2"}
+  doubled: ["17"]
+  note: "pin 1 = M130 injector driver (white), pin 2 = +12 V (red), per Dave's sheet; the EV1 coil is not polarized"
+  sources:
+    - "siemensdeka.com FI114961 product page: EV1 (Minitimer) connector, high impedance 12.5 ohm"
+    - "Dave's M130 sheet: injector 1 = fuel injector output (white), 2 = relay power (red)"
+    - "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+INJ-6:
+  where: engine
+  device: injector 6 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)
+  family: ev1
+  kit: {8CYLK-90: 0.125}
+  per_end: {part: "68102"}
+  pins: {"18": "1", INJ6_PWR: "2"}
+  doubled: ["18"]
+  note: "pin 1 = M130 injector driver (white), pin 2 = +12 V (red), per Dave's sheet; the EV1 coil is not polarized"
+  sources:
+    - "siemensdeka.com FI114961 product page: EV1 (Minitimer) connector, high impedance 12.5 ohm"
+    - "Dave's M130 sheet: injector 1 = fuel injector output (white), 2 = relay power (red)"
+    - "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+INJ-7:
+  where: engine
+  device: injector 7 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)
+  family: ev1
+  kit: {8CYLK-90: 0.125}
+  per_end: {part: "68102"}
+  pins: {"19": "1", INJ7_PWR: "2"}
+  doubled: ["19"]
+  note: "pin 1 = M130 injector driver (white), pin 2 = +12 V (red), per Dave's sheet; the EV1 coil is not polarized"
+  sources:
+    - "siemensdeka.com FI114961 product page: EV1 (Minitimer) connector, high impedance 12.5 ohm"
+    - "Dave's M130 sheet: injector 1 = fuel injector output (white), 2 = relay power (red)"
+    - "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+INJ-8:
+  where: engine
+  device: injector 8 (Siemens Deka FI114961, 60 lb/hr, EV1, 12.5 ohm)
+  family: ev1
+  kit: {8CYLK-90: 0.125}
+  per_end: {part: "68102"}
+  pins: {"20": "1", INJ8_PWR: "2"}
+  doubled: ["20"]
+  note: "pin 1 = M130 injector driver (white), pin 2 = +12 V (red), per Dave's sheet; the EV1 coil is not polarized"
+  sources:
+    - "siemensdeka.com FI114961 product page: EV1 (Minitimer) connector, high impedance 12.5 ohm"
+    - "Dave's M130 sheet: injector 1 = fuel injector output (white), 2 = relay power (red)"
+    - "EV1 plugs are sold as TE Junior Power Timer (2.8 mm) kits; JPT female sockets 0.5–1.0 mm² (web search 2026-09-26)"
+    - "MoTeC C125 manual p.21: a 22# wire doubled over = an 18# wire, suitable for many common sensor terminals"
+CKP:
+  where: engine
+  device: crank sensor (Gen IV 58x, front cover, Hall)
+  open: ["seal fit: 15324976 (white) seals 1.3–2.1 mm, but /16-22 is 1.27–1.37 mm and the shielded cable's conductor OD is unchecked. 15324974 (blue, 1.0–1.9 mm) covers both: confirm it fits terminal 12110847's seal crimp, then swap (ConnectorID CID1133 / CID1583 drop-in pages via Firecrawl 2026-09-26; ProWire M22759/16 datasheet)"]
+  family: mp150
+  kit: {LS-CRANK-CONN-KIT: 1}
+  per_end: {part: "12110847", seal: "15324976"}
+  crimper: MP150_CRIMPER
+  pins: {"99": "1", 99g: "2", 99r: "3"}
+  note: "1 signal (B1), 2 0 V (B15, white/blue), 3 6.3 V (B19, white/orange) — Dave's sheet"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+    - "ProWire 12110847 'female terminal 18-22 AWG' + 15324976 'Metri-Pack 150 seal, 20-22 gauge' (pages fetched 2026-09-26)"
+    - "msextra forum 'GM LS Gen IV 58x 5v sensor pull up': 58X sensors have a 5 V supply and need a pull-up to 5 V"
+CMP:
+  where: engine
+  device: cam sensor (Gen IV, front cover, Hall)
+  open: ["seal fit: 15324976 (white) seals 1.3–2.1 mm, but /16-22 is 1.27–1.37 mm and the shielded cable's conductor OD is unchecked. 15324974 (blue, 1.0–1.9 mm) covers both: confirm it fits terminal 12110847's seal crimp, then swap (ConnectorID CID1133 / CID1583 drop-in pages via Firecrawl 2026-09-26; ProWire M22759/16 datasheet)"]
+  family: mp150
+  kit: {LS-CAM-CONN-KIT: 1}
+  per_end: {part: "12110847", seal: "15324976"}
+  crimper: MP150_CRIMPER
+  pins: {101r: "1", 101g: "2", "101": "3"}
+  note: "1 6.3 V (B19), 2 0 V (B15), 3 signal (B2) — Dave's sheet"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+    - "ProWire 12110847 'female terminal 18-22 AWG' + 15324976 'Metri-Pack 150 seal, 20-22 gauge' (pages fetched 2026-09-26)"
+    - "msextra forum 'GM LS Gen IV 58x 5v sensor pull up': 58X sensors have a 5 V supply and need a pull-up to 5 V"
+KNOCK-1:
+  where: engine
+  device: knock sensor bank 1
+  family: mp150
+  kit: {"68201": 1}
+  per_end: {part: "12110847", seal: "15324976"}
+  crimper: MP150_CRIMPER
+  pins: {"103": "1", 103g: "2"}
+  note: "1 signal, 2 return; the shield drains at the ECU end only"
+  open:
+    - "68201 terminal family not named on the page: Metri-Pack 150 -> 12110847 + 15324976; GT150 -> 12191818 + 15366021 (both on the order)"
+    - "seal fit: 15324976 (white) seals 1.3–2.1 mm and the shielded cable's conductor OD is unchecked; 15324974 (blue, 1.0–1.9 mm) is the likely seal if the 12110847 path is used — confirm it with the terminal (ConnectorID CID1133 / CID1583 drop-in pages via Firecrawl 2026-09-26)"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+    - "ProWire 12110847 'female terminal 18-22 AWG' + 15324976 'Metri-Pack 150 seal, 20-22 gauge' (pages fetched 2026-09-26)"
+KNOCK-2:
+  where: engine
+  device: knock sensor bank 2
+  family: mp150
+  kit: {"68201": 1}
+  per_end: {part: "12110847", seal: "15324976"}
+  crimper: MP150_CRIMPER
+  pins: {"104": "1", 104g: "2"}
+  note: "1 signal, 2 return; the shield drains at the ECU end only"
+  open:
+    - "68201 terminal family not named on the page: Metri-Pack 150 -> 12110847 + 15324976; GT150 -> 12191818 + 15366021 (both on the order)"
+    - "seal fit: 15324976 (white) seals 1.3–2.1 mm and the shielded cable's conductor OD is unchecked; 15324974 (blue, 1.0–1.9 mm) is the likely seal if the 12110847 path is used — confirm it with the terminal (ConnectorID CID1133 / CID1583 drop-in pages via Firecrawl 2026-09-26)"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+    - "ProWire 12110847 'female terminal 18-22 AWG' + 15324976 'Metri-Pack 150 seal, 20-22 gauge' (pages fetched 2026-09-26)"
+MAP:
+  where: engine
+  device: MAP sensor — GM Gen IV LS 1-bar (the sensor the LS 'crank/MAP' plug is keyed for)
+  open: ["sensor not in any cart yet", "seal fit: 15324976 (white, 1.3–2.1 mm) is marginal for /16-22 (1.27–1.37 mm); 15324974 (blue, 1.0–1.9 mm) fits — confirm it with terminal 12110847, then swap (ConnectorID CID1133 / CID1583 drop-in pages via Firecrawl 2026-09-26; ProWire M22759/16 datasheet)"]
+  family: mp150
+  kit: {LS-CRANK-CONN-KIT: 1}
+  per_end: {part: "12110847", seal: "15324976"}
+  crimper: MP150_CRIMPER
+  pins: {108g: "1", "108": "2", 108r: "3"}
+  note: "1 0 V, 2 signal, 3 5 V"
+  replaces_cart: ["68104"]   # Bosch 3-pin MAP plug — not this sensor
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+    - "ProWire 12110847 'female terminal 18-22 AWG' + 15324976 'Metri-Pack 150 seal, 20-22 gauge' (pages fetched 2026-09-26)"
+    - "ProWire LS-CRANK-CONN-KIT: keyed for GM LS2/LS7 crank sensors as well as MAP sensors"
+IAT:
+  where: engine
+  device: intake air temp — GM GT150 2-way thermistor
+  family: gt150
+  kit: {GT150-AIR-TEMP-KIT: 1}
+  pins: {109g: "1", "109": "2"}
+  note: "1 0 V, 2 signal (thermistor: either way works)"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+CLT-ECU:
+  where: engine
+  device: coolant temp for the M130 (LS ECT, GT150 2-way)
+  family: gt150
+  kit: {GT150-WTR-TEMP-KIT: 1}
+  pins: {110g: "1", "110": "2"}
+  note: "1 0 V, 2 signal"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+OILT:
+  where: engine
+  device: oil temp — GM GT150 2-way thermistor (same family as the ECT)
+  family: gt150
+  kit: {GT150-WTR-TEMP-KIT: 1}
+  pins: {113g: "1", "113": "2"}
+  note: "1 0 V, 2 signal"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+OILP-ECU:
+  where: engine
+  device: oil pressure for the M130 (LS3 Gen IV round 3-pin)
+  family: gt150
+  kit: {ICT-GEN4-OILP: 1}
+  pins: {102g: "1", 102r: "2", "102": "3"}
+  note: "1 0 V, 2 5 V, 3 signal"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+FUELP:
+  where: engine
+  device: fuel pressure sensor (not picked)
+  family: open
+  kit: {}
+  pins: {112g: "1", 112r: "2", "112": "3"}
+  note: "Dave's convention 1 0 V, 2 5 V, 3 signal — confirm against the sensor picked"
+  open:
+    - "sensor not picked; the plug follows it"
+  sources:
+    - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
+
+DAK-CTS:
+  where: engine
+  device: "Dakota Digital SEN-04-5 100–300 °F temp sender — two-wire harness (either wire to WTR SND / WTR –), 1/8 NPT, head or intake"
+  family: open
+  kit: {}
+  wires: ["114", "DAK_CTS_RET"]
+  open: ["boss (head or intake, 1/8 NPT bushing) and the join to the sender's own leads (bench)"]
+  sources: ["Dakota VHX manual 650314:P p.9", "gauge-feed lock 2026-05-14 (wiring_decisions k5-gauge-feed-decided)"]
+DAK-OILP:
+  where: engine
+  device: "Dakota Digital SEN-03-8 0–100 psi solid-state oil pressure sensor — white OIL SND, red OIL + (5 V), black + bare shield OIL –, 1/8 NPT"
+  family: open
+  kit: {}
+  wires: ["115", "DAK_OILP_5V", "DAK_OILP_GND"]
+  open: ["port on the block or an oil line off it (bench); keep the leads away from plug wires (manual)"]
+  sources: ["Dakota VHX manual 650314:P p.9", "gauge-feed lock 2026-05-14 (wiring_decisions k5-gauge-feed-decided)"]
+WIDEBAND:
+  where: engine
+  device: MoTeC LTCD + 2 × LSU 4.9 (not owned — bought with the M130 via Dave)
+  family: open
+  kit: {}
+  wires: ["64", "CAN_LTCD_H", "CAN_LTCD_L", "LTCD_GND"]
+  open: ["mount within the LTCD's sensor-lead reach of the exhaust (MoTeC LTCD user manual); sensors plug into LTCD connectors A/B"]
+  pins: {"LTCD_GND": "1", "CAN_LTCD_L": "2", "CAN_LTCD_H": "3", "64": "4"}
+ALTERNATOR-SENSE:
+  where: engine
+  device: Holley 197-302 alternator — pigtail 197-400 (have)
+  family: miniseal
+  kit: {}
+  pins: {"ALT_L": "L (197-400 pigtail, 560 ohm in line)"}
+  open: ["Holley names only the L lead; any other pigtail lead (S sense) is read off the pigtail at the bench"]
+  sources: ["holley_midmount_fitment.pdf p.15", "Holley_Mid_Mount_Accessory_Drive_Kit.pdf (kit contents: 197-302 + 197-400)"]
+STARTER-S:
+  where: engine
+  device: starter solenoid S terminal
+  family: ring_small
+  kit: {RING-SMALL: 1}
+  wires: ["START_TRIG"]
+  open: ["S-terminal stud size: read off the starter (bench)"]
+FAN:
+  where: engine
+  device: radiator fan (Champion radiator, ONE fan per owner T78; model unknown)
+  family: open
+  kit: {}
+  wires: ["21", "22"]
+  open: ["fan model sets the plug and whether #22 exists (state 0e(c))"]
+WATER-PUMP:
+  where: engine
+  device: electric water pump (#25)
+  family: none
+  kit: {}
+  wires: ["25"]
+  retired: "the water pump is mechanical on the Holley mid-mount (locked decision 2026-09-24, state §1; owner 2026-09-27: the whole system is set up to be based on the holley mid mount)"
+
+# ============================================================== power spine (DC primary)
+PS-STUDS:
+  where: engine
+  device: DC primary cable ends (Odyssey, Blue Sea isolator studs, distribution stud, starter, alternator, block, frame, PDM, MEGA/MIDI, ground star)
+  family: lug
+  kit: {CPA-100-3/4-BK: 1}      # black band on every negative lug (ch.18 §7 layer 4); red CPA is carted
+  lugs:
+    "63": [238LTP, 238LTP]
+    "6": [238LTP, 2516LTP]
+    "59": [2516LTP, 238LTP]
+    G1: [238LTP, 238LTP]
+    G2: [DL438, DL438]
+    G3: [838TP, 838TP]
+    ISO_OUT: [238LTP, 238LTP]
+    ODY_NEG: [238LTP, 238LTP]
+    ACC_NEG: [DL438, DL438]
+    DCDC_IN: [838TP]
+    DCDC_GND: [838TP]
+    AMP_GND: [DL438]
+    IBOOST_GND: [838TP]
+    GND_RET_CAB: [238LTP, 238LTP]
+  wires: ["63", "6", "59", G1, G2, G3, ISO_OUT, ODY_NEG, ACC_NEG, DCDC_IN, DCDC_GND, AMP_GND, IBOOST_GND, GND_RET_CAB]
+  open:
+    - "topology is Dave's DC primary (battery → isolator → stud → branches) but the registry still carries the v4 runs #63/#6/#59 — the power-spine chapter re-draws them"
+    - "stud sizes: starter + alternator 5/16 in is the build book's assumption; isolator studs are 3/8 in-16 (Blue Sea 7700), so 238LTP fits them"
+    - "lug torque per stud: isolator 140 in-lb max (Blue Sea 7700 instructions p.1-2); the others UNKNOWN (datasheets)"
+  sources: ["build book 'DC primary' table", "state 0i", "chapters/17"]
+
+# ============================================================== cabin: pedal, gauges, switches
+APS:
+  where: cabin
+  device: "DBW pedal bought 2025-04-02 (eBay order 26-12889-28142): '72-98 C10 Square Body OBS LS Swap DBW' pedal — GM Gen III truck pedal (OE 15751307 family), 9-cavity plug with 6 wired; the third sensor's 3 cavities stay empty"
+  family: miniseal
+  kit: {WPAPP30: 1}
+  per_end: {part: D-609-03}
+  pins: {APS_T1_5V: G, APS_T1_SIG: F, APS_T1_GND: E, APS_T2_GND: D, APS_T2_SIG: C, APS_T2_5V: B}
+  note: "G APP1 5 V, F APP1 signal, E APP1 low ref, D APP2 low ref, C APP2 signal, B APP2 5 V. The plug is ICT Billet's WPAPP30 pigtail (OEM Delphi housing, seals and terminals on 6 in leads); each lead joins the harness with a red MiniSeal splice. The M130 reads both tracks and drives the throttle body itself, so the pedal does not have to match the throttle body — only the M1 pedal calibration does."
+  open:
+    - "before crimping, meter the pedal: G–E and B–D read a fixed resistance, F–E and C–D change as the pedal moves (the pin map is from a web source, not a GM manual)"
+  replaces_cart: ["15326829", "15317363"]
+  sources:
+    - "eBay listing for the bought pedal: '72-98 C10 Square Body OBS LS Swap DBW', now sold as APS130 — 'Standard Ignition 9 Terminal Accelerator Pedal Position Sensor APS130' (O'Reilly title, web search 2026-09-27)"
+    - "square-body LS-swap pedal: OE 15751307 / 15974034 / 15984422 / ACC-1049, 'original 9-pin DBW connector layout used on 2001–2007 GM LS platforms' (web search 2026-09-27: maXpeedingrods / Hawks / PSI listings)"
+    - "pinout 1999-2005 GM truck APP: G 5 V ref APP1, F APP1 signal, E low ref APP1, D low ref APP2, C APP2 signal, B 5 V ref APP2; 'only 6 pins in use, and the 3rd APP sensor is not used' (web search 2026-09-27; LS1Tech / Diesel Place threads)"
+    - "ICT Billet WPAPP30 'LS Gen 3 Truck DBW Pedal Position Sensor Wire Pigtail', 'LS Gen 3 Truck DBW 9-wire Pedal Systems' 2000-2005, $26 (snapshot web_snapshots/www.ictbillet.com__ls-gen-3-truck-dbw-pedal-position-sensor-pigtail.md)"
+DAKOTA-VHX:
+  where: cabin
+  device: Dakota Digital VHX control box
+  family: miniseal
+  kit: {}
+  pins: {"71": "ACC. POWER", "114": "WTR SND", "115": "OIL SND", "116": "TACH", "117": "FUEL SND", "123": "GROUND", "39": "DIM (+)",
+         "55": "4x4 (-)", "119": "LEFT (+)", "120": "RIGHT (+)", "121": "HIGH (+)", "DAK_CONST": "CONST. POWER",
+         "VSS_PWR": "SPD +", "VSS_GND": "SPD -", "VSS_DAK": "SPD SND", "FUEL_SND_GND": "FUEL -",
+         "DAK_CTS_RET": "WTR -", "DAK_OILP_5V": "OIL +", "DAK_OILP_GND": "OIL -",
+         "DAK_CEL": "CHECK ENG (-)", "DAK_BRAKE": "BRAKE (-)", "DAK_GEAR": "GEAR (1 WIRE)"}
+  sources: ["Dakota VHX manual p.6 terminal list (reference_documents/component_drawings/dakota_digital_vhx_manual.pdf)"]
+  unused: {"WARN / CRUISE (-) / WAIT (+) / ADJ SND": "not used"}
+  open: ["VHX harness joins by splice (proposal); gauge-feed fork (state 0c) may replace 114/115/116/117 with CAN"]
+IGN-SWITCH:
+  where: cabin
+  device: column ignition switch (factory) — switches ground into the PDM inputs (RUN, START); carries a signal, not load current
+  family: open
+  kit: {}
+  wires: ["IGN_RUN_B", "IGN_START", "IGN_SW_0V"]
+  open: ["under-dash chapter: factory column connector vs splice"]
+DASH-STAR:
+  retired: "grounds run in the loom (owner 2026-09-27): #123 lands on the cab ground bank GND-BANK-CAB"
+  where: cabin
+  device: dash star ground stud
+  family: ring_small
+  kit: {}
+  wires: ["123"]
+
+# ============================================================== rear
+FUEL-PUMP:
+  where: rear
+  device: Quantum QFS-H882 hanger with P367 pump (have) — 5.1 A at 60 psi
+  family: open
+  kit: {}
+  wires: ["66", PUMP_GND]
+  note: "14 AWG feed from the engine PDM15 OUT10 (8 A), commanded over CAN by the M130; 14 AWG ground returns in the loom beside it to the ground star (owner 2026-09-27: grounds in the loom). The hanger carries 4 wires: pump +, pump ground, level sender, sender ground."
+  open: ["hanger-top plug: not on Quantum's pages — read it when the tank is out. If it is a light-duty plug, replace it (owner 2026-09-27: 'change it to milspec as needed') with a sealed 4-way sized for the two 14 AWG pump wires plus the sender pair; part picked from the plug it replaces"]
+  sources: ["https://www.highflowfuel.com/fuel-pump-oem-replacement-hfp-367-qfs/ (4.6 A @ 45 psi, 5.1 A @ 60 psi)"]
+FUEL-LEVEL:
+  where: rear
+  device: tank level sender (ECU #98 + Dakota #117 in parallel)
+  family: open
+  kit: {}
+  wires: ["117", "FUEL_SND_GND"]
+  open: ["sender location on the Quantum hanger vs factory sender: photo", "sender ground: a wire to the Dakota FUEL -, or its flange (bench)"]
+VSS:
+  where: rear
+  device: road-speed source (NP205 output — recommended)
+  family: open
+  kit: {}
+  wires: ["100"]
+  open: ["speed source decision (state 0k)"]
+
+
+# ============================================================== rails and ground rings (coil + injector branches)
+RAIL-COIL_PWR:
+  where: engine
+  device: COIL_PWR 16 AWG rail daisy-chained to the 8 coil d-pins
+  family: miniseal
+  kit: {D-609-05: 7}
+  wires: [COIL_PWR, COIL1_PWR, COIL2_PWR, COIL3_PWR, COIL4_PWR, COIL5_PWR, COIL6_PWR, COIL7_PWR, COIL8_PWR]
+  note: "7 stub splices (16+18+18 then 18+18+18 = 13 AWG equivalent, inside D-609-05's 16–12); splice spots set at the formboard"
+  sources: ["registry note 'daisy-chained'; ProWire 3137ct cavity ranges"]
+RAIL-INJ_PWR:
+  where: engine
+  device: INJ_PWR 16 AWG rail daisy-chained to the 8 injector pin-1s
+  family: miniseal
+  kit: {D-609-05: 7}
+  wires: [INJ_PWR, INJ1_PWR, INJ2_PWR, INJ3_PWR, INJ4_PWR, INJ5_PWR, INJ6_PWR, INJ7_PWR, INJ8_PWR]
+  note: "7 stub splices (16+20+20 then 20+20+20 = 14 AWG equivalent, inside D-609-05)"
+  sources: ["registry note 'daisy-chain at fuel rail'; ProWire 3137ct cavity ranges"]
+COIL-GROUND-RINGS:
+  where: engine
+  device: head ring terminals for the coil a (chassis) and b (signal) grounds
+  family: ring_small
+  kit: {RING-SMALL: 4}
+  wires: [COIL1_GND, COIL2_GND, COIL3_GND, COIL4_GND, COIL5_GND, COIL6_GND, COIL7_GND, COIL8_GND, COIL1_SGND, COIL2_SGND, COIL3_SGND, COIL4_SGND, COIL5_SGND, COIL6_SGND, COIL7_SGND, COIL8_SGND]
+  note: "4 rings: chassis and signal grounds kept separate (Dave), 4 x 18 AWG per ring = 12 AWG barrel"
+  sources: ["Dave's M130 sheet: coil a and b to 'head ring terminal'"]
+
+# ============================================================== the whole truck (2026-09-27 evening)
+# Owner: "work on the whole truck"; "wiring in the factory switches and modules and figure out how they work in a can bus
+# motec computer". Factory switches stay factory: the ones with a separate common become PDM30 inputs (their common goes to
+# PDM30 0V, A28 — chapters/17 §17.7.7, PDM manual p.47); the wiper and blower keep their own factory circuits (1977 manual
+# p.803, p.87-88) with a PDM output as the fused feed. Body circuits cross the firewall through FIREWALL-BODY-*, never
+# the engine-only 61-pin (state rows 50, 53). Ground studs are named here; their exact spot is set at the formboard.
+
+# ---------------- body firewall crossing (agent pick, replaceable: wiring_decisions k5-body-firewall-crossing-decided)
+FIREWALL-BODY-A:
+  where: firewall
+  device: "body bulkhead A — Deutsch DT04-12PA-L012 flanged 12-way receptacle (A key), DT06-12SA plug; size 16 contacts, 16–20 AWG"
+  family: open
+  kit: {}
+  pins: {"85a": "1", "85b": "2", "86a": "3", "86b": "4", "83": "5", "84": "6", "80": "7", "82": "8", "87": "9", "88": "10",
+         "50": "11", "73": "12"}
+  open: ["DT 12-way flanged housing + W12P/W12S wedges + size 16 contacts: not in the saved ProWire catalog — KSV sells the DT04-12PA-L012 kit (nickel contacts, 20–16 AWG); confirm and cart",
+         "hole: the factory bulkhead opening (driver side) or a plate beside the 61-pin — set at the firewall mock-up"]
+  sources: ["ksvlooms.com 12-way DT04-12PA-L012 flanged receptacle kit (nickel pins 20-16 AWG)",
+            "buydeutsch.com DT04-12PA-L012 (12-pin receptacle, A key, flange)"]
+FIREWALL-BODY-B:
+  where: firewall
+  device: "body bulkhead B — second DT 12-way flanged receptacle, keyed apart from A (B key, DT04-12PB-L012 / DT06-12SB)"
+  family: open
+  kit: {}
+  pins: {"WIPER_T1": "1", "WIPER_T3": "2", "BLOWER_LO": "3", "BLOWER_MED": "4", "IBOOST_WAKE": "5", "48": "6", "49": "7",
+         "BLOWER_M2": "8", "ISO_CLOSE": "9", "ISO_OPEN": "10", "ISO_LED": "11", "ISO_SW_PWR": "12"}
+  open: ["B-key part number: confirm the listing (A and B must not cross-mate)",
+         "B is full (12 of 12): the next body wire through the firewall takes a third DT 12-way (C key, DT04-12PC-L012)"]
+FIREWALL-BODY-P:
+  where: firewall
+  device: "body bulkhead P — Deutsch DTP04-4P-L012 flanged 4-way receptacle, DTP06-4S plug; size 12 contacts, 12–14 AWG"
+  family: open
+  kit: {}
+  pins: {"BLOWER_HI": "1"}
+  open: ["3 spare cavities (body power feeds 12-14 AWG)"]
+  sources: ["ProWire DTP04-4P-L012 'DTP 4 way flanged receptacle' + 0460-204-12141 / 0462-203-12141 'size 12, 12-14 AWG' (catalog_parts)"]
+
+# ---------------- front lamps, horn, washer, wiper, blower, iBooster (engine side of the firewall)
+HEADLIGHT-L:
+  where: engine
+  device: "left headlight, Truck-Lite 27270C 7-in round LED (dual input LOW / HIGH + ground; locked 2026-05-14)"
+  family: open
+  kit: {}
+  pins: {"85a": "LOW", "85b": "HIGH", "HL_L_GND": "GND"}
+  sources: ["receipts/2026-05-14_decision-high-beam-floor-dimmer.md"]
+HEADLIGHT-R:
+  where: engine
+  device: "right headlight, Truck-Lite 27270C"
+  family: open
+  kit: {}
+  pins: {"86a": "LOW", "86b": "HIGH", "HL_R_GND": "GND"}
+PARK-TURN-LF:
+  where: engine
+  device: "left front park/turn lamp (1157: park = low filament, turn = high filament)"
+  family: open
+  kit: {}
+  pins: {"83": "PARK", "80": "TURN", "PT_LF_GND": "GND"}
+PARK-TURN-RF:
+  where: engine
+  device: "right front park/turn lamp (1157)"
+  family: open
+  kit: {}
+  pins: {"84": "PARK", "82": "TURN", "PT_RF_GND": "GND"}
+MARKER-LF:
+  where: engine
+  device: "left front side marker (factory socket: park feed + a second lead that used to ground through the turn filament)"
+  family: open
+  kit: {}
+  wires: ["87", "MK_LF_GND"]
+  sources: ["1977 Light Truck Service Manual p.780"]
+MARKER-RF:
+  where: engine
+  device: "right front side marker"
+  family: open
+  kit: {}
+  wires: ["88", "MK_RF_GND"]
+HORN:
+  where: engine
+  device: "horn (factory location on the core support)"
+  family: open
+  kit: {}
+  wires: ["48", "HORN_GND"]
+WASHER-PUMP:
+  where: engine
+  device: "12 V electric washer pump in the washer jar — lined up: USA1 Industries 1985-87 square-body washer jar kit (SKU 20530, $56.90) + 1985-87 washer pump (SKU 20151, $19.95)"
+  family: open
+  kit: {}
+  wires: ["50", "WASH_GND"]
+  note: "the 1977 pump is cam-driven off the wiper motor (1977 manual Fig. 8-16, p.803/828); an electric pump in the jar is the square-body fix (gmsquarebody consensus thread: 'a universal in-line pump or the later style that pops into the reservoir'). Two wires: #50 from PDM30 OUT26 and its ground in the loom."
+  open: ["the USA1 pump listing does not say electric: confirm before carting (fallback: a universal 12 V in-line pump)",
+         "confirm the 85-87 jar sits on the 1977 inner-fender mounts at the mock-up"]
+  sources: ["web_snapshots/www.usa1industries.com__1985-87-square-body-chevy-gmc-truck-washer-jar-kit.md",
+            "web_snapshots/www.usa1industries.com__1985-87-square-body-chevy-gmc-truck-windshield-wiper-washer-pump.md",
+            "web_snapshots/www.gmsquarebody.com__general-concensus-on-fixing-the-windshield-washer-pump.26964.md"]
+UNDERHOOD-LAMP:
+  where: engine
+  device: "underhood lamp"
+  family: open
+  kit: {}
+  wires: ["73", "UH_GND"]
+WIPER-MOTOR:
+  where: engine
+  device: "factory 2-speed wiper motor on the cowl (terminal board 1 / center feed / 3; park switch inside; ground strap)"
+  family: open
+  kit: {}
+  pins: {"49": "center (feed)", "WIPER_T1": "1", "WIPER_T3": "3", "WIPER_GND": "strap"}
+  sources: ["1977 Light Truck Service Manual p.802-803, p.815"]
+BLOWER-RES:
+  where: engine
+  device: "factory Four-Season blower resistor on the evaporator case (3 prongs)"
+  family: open
+  kit: {}
+  wires: ["BLOWER_LO", "BLOWER_MED", "BLOWER_M2", "BLOWER_MOT"]
+  sources: ["1977 Light Truck Service Manual p.87-88",
+            "gmsquarebody.com threads 5343 + 38262 (snapshots): resistor on the blower housing with 3 prongs for the harness plug; low speeds through the switch and resistor, high through the relay"]
+BLOWER-MOTOR:
+  where: engine
+  device: "blower motor, 4 Seasons 35587 (ordered 2026-09-24, state row 55)"
+  family: open
+  kit: {}
+  wires: ["BLOWER_MOT", "BLOWER_HI", "BLOWER_GND"]
+IBOOSTER:
+  where: engine
+  device: "Bosch iBooster Gen 2 (Tesla) with the Tulay connector — installed on the driver firewall (state)"
+  family: open
+  kit: {}
+  pins: {"52": "1 (constant 12 V)", "IBOOST_WAKE": "20 (ignition 12 V)", "IBOOST_GND": "ground"}
+  open: ["pigtail unterminated (state): Tulay harness pin-out for ground and wake read at the bench"]
+  sources: ["chapters/17 §17.3 (pin 1 constant 40 A, pin 20 ignition 5 A)"]
+GND-BANK-ENG:
+  where: engine
+  device: "ground star: stud bank beside the batteries — both battery negatives, engine block (G1), frame (G2) and every engine-bay return land here; the only place the harness grounds meet the chassis"
+  family: ring_small
+  kit: {}
+  wires: ["PDM_GND1", "PDM_GND2", "PDM15_GND1", "PDM15_GND2", "LTCD_GND", "PUMP_GND", "HL_L_GND", "HL_R_GND", "PT_LF_GND", "PT_RF_GND", "MK_LF_GND", "MK_RF_GND", "HORN_GND", "WASH_GND", "UH_GND", "WIPER_GND", "BLOWER_GND", "ISO_GND", "STEP_GND"]
+  note: "small returns take a ring each; the heavy ones (battery negatives, G1, G2, the cab return, amplifier, iBooster, DC-DC) take lugs and sit on the PS-STUDS list"
+  sources: ["owner 2026-09-27: 'dave runs his grounds in the looms ... would be dumb to be grounding to body all the time'",
+            "state 0i: Dave's DC primary ground-stud bank", "chapters/17 §17.4.7: PDM Batt- to battery negative"]
+
+# ---------------- cab: factory switches, lamps, audio head, accessories
+FLOOR-DIMMER:
+  where: cabin
+  device: "factory floor dimmer switch (feed + LOW and HIGH outputs; light blue and tan wires)"
+  family: open
+  pins: {"85": "COMMON", "86": "COMMON", "85a": "LOW", "86a": "LOW", "85b": "HIGH", "86b": "HIGH", "121": "HIGH"}
+  splice_point: true
+  kit: {D-609-05: 3}
+  note: "each blade takes one lead: #85+#86 join in a D-609-05 before COMMON, #85a+#86a before LOW, #85b+#86b+#121 before HIGH"
+  sources: ["1977 Light Truck Service Manual p.779-780", "receipts/2026-05-14_decision-high-beam-floor-dimmer.md"]
+HL-SW:
+  where: cabin
+  device: "factory push-pull headlight switch — feed terminal on PDM30 0V, park and head outputs to DIG2 / DIG3"
+  family: open
+  kit: {}
+  wires: ["HL_SW_PARK", "HL_SW_HEAD", "HL_SW_0V"]
+  open: ["terminal letters read off the switch (bench)"]
+TURN-SW:
+  where: cabin
+  device: "factory column turn/hazard switch (column connector) — turn and hazard feeds on PDM30 0V, front outputs to DIG4 / DIG5"
+  family: open
+  kit: {}
+  wires: ["33", "TURN_SW_R", "TURN_SW_0V"]
+  open: ["column connector cavities read at the bench (brown = hazard feed, white = stop input, left unused)"]
+  sources: ["1977 Light Truck Service Manual p.783-784"]
+HORN-SW:
+  where: cabin
+  device: "factory horn button (grounds through the column) on PDM30 DIG6"
+  family: open
+  kit: {}
+  wires: ["HORN_SW"]
+WIPER-SW:
+  where: cabin
+  device: "factory wiper/washer dash switch (grounding type, grounds through its mounting)"
+  family: open
+  kit: {}
+  wires: ["46", "WIPER_T1", "WIPER_T3"]
+  sources: ["1977 Light Truck Service Manual p.803"]
+BLOWER-SW:
+  where: cabin
+  device: "factory Four-Season blower switch in the control head — LO, M1, M2 through the resistor; HI as a PDM30 input (DIG7)"
+  family: open
+  kit: {}
+  wires: ["51", "45", "BLOWER_LO", "BLOWER_MED", "BLOWER_M2"]
+  open: ["count the switch's leads when the control head is out: 3 resistor leads + feed + HI is the A/C 4-speed layout"]
+DOOR-JAMB-L:
+  where: cabin
+  device: "driver door jamb switch (factory pin switch, grounds through the body) — PDM30 DIG12 + AMP Research trigger"
+  family: open
+  kit: {}
+  wires: ["42", "STEP_DOOR_L"]
+DOOR-JAMB-R:
+  where: cabin
+  device: "passenger door jamb switch — PDM30 DIG13 + AMP Research trigger"
+  family: open
+  kit: {}
+  wires: ["43", "STEP_DOOR_R"]
+DOME-LAMP:
+  where: cabin
+  device: "dome lamp (cab roof)"
+  family: open
+  kit: {}
+  wires: ["67", "DOME_GND"]
+UNDERDASH-LAMPS:
+  where: cabin
+  device: "under-dash courtesy LEDs"
+  family: open
+  kit: {}
+  wires: ["68", "UD_GND"]
+FOOTWELL-LAMPS:
+  where: cabin
+  device: "footwell LEDs"
+  family: open
+  kit: {}
+  wires: ["69", "FW_GND"]
+CLEARANCE-L:
+  where: cabin
+  device: "cab roof clearance lamp, left"
+  family: open
+  kit: {}
+  wires: ["79", "CL_L_GND"]
+CLEARANCE-C:
+  where: cabin
+  device: "cab roof clearance lamp, center"
+  family: open
+  kit: {}
+  wires: ["90", "CL_C_GND"]
+CLEARANCE-R:
+  where: cabin
+  device: "cab roof clearance lamp, right"
+  family: open
+  kit: {}
+  wires: ["91", "CL_R_GND"]
+USB-PORT:
+  where: cabin
+  device: "USB charging port"
+  family: open
+  kit: {}
+  wires: ["70", "USB_GND"]
+OUTLET-12V:
+  where: cabin
+  device: "12 V outlet"
+  family: open
+  kit: {}
+  wires: ["72", "OUT12V_GND"]
+RADIO:
+  where: cabin
+  device: "RetroSound RetroRadio Motor 2B for 1973-87 Chevy C/K trucks, in place of appendix D's Hermosa (backordered at $279.95) — plug A power, front + rear + sub RCA pre-outs, amp turn-on lead; lined up at retromanufacturing.com, $346.99"
+  family: open
+  kit: {}
+  pins: {"31": "red (IGN/ACC)", "RADIO_CONST": "yellow (constant)", "RADIO_GND": "black (ground)",
+         "RADIO_REM": "blue/white (amp turn-on)", "RCA_FRONT": "front RCA line out", "RCA_REAR": "rear RCA line out",
+         "RCA_SUB": "sub RCA out"}
+  open: ["read the amp turn-on lead's colour on the Motor 2B harness (the Hermosa's is blue/white)"]
+  sources: ["RetroSound Model Hermosa manual p.16 (reference_documents/component_drawings/RetroSound_Hermosa_Manual.pdf)",
+            "RetroSound Motor 2B user manual p.3 (pre-outs front, rear, subwoofer; separate amp turn-on lead) and p.19-20 (red accessory, yellow constant, black ground) — reference_documents/component_drawings/RetroSound_Motor-2B_User_Manual.pdf",
+            "web_snapshots/www.retromanufacturing.com__1973-87-chevrolet-c-k-series-trucks-retroradio.md (M2 $346.99, M4 $416.99)",
+            "web_snapshots/classicparts.com__1973-87-retro-radio-hermosa-sku-69-710f-chr-chr.md (Hermosa $279.95, out of stock)"]
+SPK-FL:
+  where: cabin
+  device: "driver door speaker — JL Audio C2-650X 6.5 in 2-way coax (lined up at Crutchfield, $279.99 a pair; 2 pairs cover the 4 spots) — through DOOR-L-PASS"
+  family: open
+  kit: {}
+  wires: ["26a", "26b"]
+SPK-FR:
+  where: cabin
+  device: "passenger door speaker — JL Audio C2-650X 6.5 in 2-way coax (lined up at Crutchfield, $279.99 a pair; 2 pairs cover the 4 spots) — through DOOR-R-PASS"
+  family: open
+  kit: {}
+  wires: ["27a", "27b"]
+GND-BANK-CAB:
+  where: cabin
+  device: "cab ground bank beside the PDM30: an insulated stud bus; every cab return lands here and goes back to the ground star through GND_RET_CAB (2 AWG), never through the body"
+  family: ring_small
+  kit: {}
+  wires: ["123", "WIN_GND_L", "WIN_GND_R", "LOCK_GND_L", "LOCK_GND_R", "TG_GND", "MIRROR_GND", "CL_L_GND", "CL_C_GND", "CL_R_GND", "DOME_GND", "UD_GND", "FW_GND", "USB_GND", "OUT12V_GND", "RADIO_GND", "GSS_GND", "TCASE_SW_GND", "GND_RET_REAR"]
+  note: "GND_RET_CAB (2 AWG) leaves this bank on a lug (PS-STUDS list)"
+  sources: ["owner 2026-09-27 (grounds in the loom)"]
+
+# ---------------- rear body and chassis
+LICENSE-LAMP:
+  where: rear
+  device: "license plate lamp"
+  family: open
+  kit: {}
+  wires: ["92", "LIC_GND"]
+CARGO-LAMP:
+  where: rear
+  device: "cargo/bed lamp"
+  family: open
+  kit: {}
+  wires: ["74", "CARGO_GND"]
+MARKER-LR:
+  where: rear
+  device: "left rear side marker"
+  family: open
+  kit: {}
+  wires: ["77", "MK_LR_GND"]
+MARKER-RR:
+  where: rear
+  device: "right rear side marker"
+  family: open
+  kit: {}
+  wires: ["78", "MK_RR_GND"]
+AMP:
+  where: rear
+  device: "JL Audio VX700/5i 5-channel amplifier with DSP (75 W x 4 + 300 W sub); lined up at Crutchfield, $1,449.99"
+  note: "75 W x 4 at 4 ohm + 300 W x 1 at 2 ohm; 4 AWG power and ground leads, 60 A fuse; 9-13/16 x 2-1/8 x 6-3/4 in; tuned with JL's TuN app over USB"
+  family: open
+  kit: {}
+  wires: ["32", "AMP_GND", "RADIO_REM", "RCA_FRONT", "RCA_REAR", "RCA_SUB", "26a", "26b", "27a", "27b", "28a", "28b", "29a", "29b", "30a", "30b"]
+  open: ["mount spot (cargo area, near the woofers)", "input count for the radio's sub RCA (see RCA_SUB)"]
+  sources: ["web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md ('4-gauge power and ground leads and a 60-amp fuse recommended'; DSP input routing and mixing)",
+            "owner 2026-09-27: 'kicker is not cool... what a brand for a 100k truck'"]
+SPK-RL:
+  where: rear
+  device: "left rear speaker — JL Audio C2-650X 6.5 in 2-way coax (lined up at Crutchfield, $279.99 a pair; 2 pairs cover the 4 spots)"
+  family: open
+  kit: {}
+  wires: ["28a", "28b"]
+SPK-RR:
+  where: rear
+  device: "right rear speaker — JL Audio C2-650X 6.5 in 2-way coax (lined up at Crutchfield, $279.99 a pair; 2 pairs cover the 4 spots)"
+  family: open
+  kit: {}
+  wires: ["29a", "29b"]
+SUB:
+  where: rear
+  device: "woofer 1 of 2 — JBL Club 102SL 10 in shallow-mount (3.25 in deep), impedance switch set to 4 ohm; the two in parallel = 2 ohm on the amp's 300 W sub channel; lined up at Crutchfield, $274.95 each"
+  family: open
+  kit: {}
+  wires: ["30a", "30b", SUB_JMP_P, SUB_JMP_N]
+  open: ["enclosure: sealed box sized for two shallow 10s, built or bought once the cargo-area spot is set"]
+  sources: ["owner 2026-09-25: 'we are gonna do jbl 10\" compact woofers, an amp not sure which and then the appropriate other speakers'",
+            "web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (in stock, $274.95 each; the Club WS1000 page lists it as the in-stock replacement)"]
+SUB-2:
+  where: rear
+  device: "woofer 2 of 2 — JBL Club 102SL, switch at 4 ohm, jumpered in parallel with woofer 1"
+  family: open
+  kit: {}
+  wires: [SUB_JMP_P, SUB_JMP_N]
+  sources: ["web_snapshots/www.crutchfield.com__JBL-Club-102SL.md"]
+GND-SPLICE-REAR:
+  where: rear
+  device: "rear ground bus where the rear harness branches: an insulated stud bus; returns to the cab bank through GND_RET_REAR, not through the body"
+  family: ring_small
+  kit: {}
+  wires: ["CAM_GND", "MK_LR_GND", "MK_RR_GND", "TL_L_GND", "TL_R_GND", "BU_L_GND", "BU_R_GND", "LIC_GND", "CHMSL_GND", "CARGO_GND", "ESTOPP_GND", "GND_RET_REAR"]
+  sources: ["owner 2026-09-27 (grounds in the loom)"]
+AMP-STEP-CTRL:
+  where: chassis
+  device: "AMP Research PowerStep kit harness + controller (drives and reverses both step motors)"
+  family: open
+  kit: {}
+  wires: ["3", "STEP_GND", "STEP_DOOR_L", "STEP_DOOR_R"]
+  open: ["the saved guide is the 2011-14 Silverado kit (IM75146): the K5 kit's harness and trigger polarity read on arrival"]
+  sources: ["amp_research_75146_install.pdf steps 8, 14-15"]
+E-STOPP:
+  where: chassis
+  device: "E-Stopp ESK001 electric parking brake — actuator on the parking-brake cable + control box, dash button in the kit"
+  family: open
+  kit: {}
+  pins: {"54": "G (red, +12 V)", "ESTOPP_IGN": "F (blue, safety to ignition)", "ESTOPP_GND": "H (black, ground)",
+         "126": "button harness (kit plug)", "DAK_BRAKE": "E (green, switched ground: brake indicator)"}
+  sources: ["reference_documents/component_drawings/extracted/estopp_esk001_wiring.png (E = GRN 'Ground Sync Trigger')",
+            "estopp.com troubleshooting: 'The green wire is a low-current switched ground' (about 25 mA) — web_snapshots/estopp.com__troubleshooting.md"]
+TCASE-4WD-SW:
+  where: chassis
+  device: "4WD indicator switch, fabricated: a sealed normally-open plunger switch on a bracket at the transfer-case shift lever, closed in 4-high and 4-low -> Dakota VHX 4x4 (-)"
+  family: open
+  kit: {}
+  wires: ["55", "TCASE_SW_GND"]
+  note: "owner 2026-09-27: the case is shifted by hand and the hubs are manual, so electric needs 'some fabbing which is possible'. The lamp says the case is in 4WD; locking the hubs stays a by-hand check."
+  open: ["switch part and bracket picked at the fab; if the case has a threaded indicator-switch port, a screw-in switch replaces the bracket"]
+  sources: ["Dakota VHX manual p.6: 4x4 (-) = 4 wheel drive indicator input, ground-activated", "owner 2026-09-27"]
+
+# ---------------- 2026-09-27 owner reply: batteries, isolator, DC-DC charger, gear sensor
+ODYSSEY:
+  where: engine
+  device: "Odyssey AGM — the running battery (owner 2026-09-27); model set by the tray, not bought yet"
+  family: open
+  kit: {}
+  wires: ["63", ODY_NEG, ISO_PWR, ISO_SW_PWR]
+  note: "the + post carries #63 to the isolator plus two small fused taps that must stay live when the truck is isolated: the isolator's own control power (red, 10 A) and the dash switch feed (5 A)"
+  open: ["Odyssey model / group size: set by the tray at the mock-up", "fused-tap holders at the + post: picked with the battery terminals"]
+  sources: ["owner 2026-09-27: 'we picked the batteries ... an odessey for the running and also a yellow optima for other stuff like accessories'"]
+ACC-BATT:
+  where: engine
+  device: "Optima YellowTop — the accessory battery (owner 2026-09-27); beside the Odyssey; model set by the tray"
+  family: open
+  kit: {}
+  wires: ["32", ACC_NEG, DCDC_OUT]
+  note: "the isolator does not cut this battery: it feeds only the amplifier (#32, MIDI 50 A at the + post) and is charged through the DC-DC charger, whose input is downstream of the isolator"
+  open: ["YellowTop model / tray; the default spot is the engine bay beside the Odyssey — the amp's power and ground runs change if it moves behind the seat"]
+  sources: ["owner 2026-09-27"]
+ISOLATOR:
+  where: engine
+  device: "Blue Sea Systems 7700 ML-RBS remote battery switch with manual control, 12 V, 500 A continuous, on the Odyssey positive (studs A/B, 3/8 in-16); lined up at Powerwerx, $322.09"
+  family: miniseal
+  kit: {}
+  per_end: {part: D-609-04}
+  pins: {ISO_PWR: "red (+12 V 24 hr)", ISO_GND: "black (ground)", ISO_CLOSE: "brown (+12 V to close)", ISO_OPEN: "orange (+12 V to open)", ISO_LED: "yellow (LED output)"}
+  note: "#63 lands on stud A and ISO_OUT leaves stud B (both on the stud list). The five control leads are the switch's tinned wires, joined to the harness with blue MiniSeal splices (Blue Sea: 16 AWG minimum for the control circuit). Manual override knob with LOCK OFF for service."
+  open: ["mount close to the batteries, not over a vented battery (Blue Sea p.2); spot set at the mock-up"]
+  sources: ["reference_documents/component_drawings/BlueSea_7700_ML-RBS_Instructions_990180170-006.pdf p.1-2",
+            "web_snapshots/www.bluesea.com__ML-RBS_Remote_Battery_Switch_with_Manual_Control_-_12V_DC_500A.md (specifications)",
+            "web_snapshots/powerwerx.com__blue-sea-7700-ml-rbs-remote-battery-switch.md ($322.09)",
+            "MoTeC PDM user manual p.7 (isolator on battery positive, rated for the starter, secondary contact to an ECU shutdown input)",
+            "Cartek XR dropped: its instructions p.3 say 'designed for motorsport use only and should not be used on road/street vehicles'"]
+ISO-SWITCH:
+  where: cabin
+  device: "Blue Sea 2145 SPDT (ON)-OFF-(ON) Contura switch, included with the 7700 — momentary: tap ON to close the isolator, OFF to open it; its LED shows closed"
+  family: open
+  kit: {}
+  pins: {ISO_OPEN: "1 (OPEN)", ISO_SW_PWR: "2 + 8 (common + LED power, jumpered)", ISO_CLOSE: "3 (CLOSE)", ISO_LED: "7 (LED ground)", ISO_KILL: "7 (splice on the yellow)"}
+  sources: ["Blue Sea 7700 instructions p.2 (control switch pins 1, 2, 3, 7, 8)"]
+DCDC:
+  where: engine
+  device: "Victron Orion-Tr Smart 12/12-30 non-isolated DC-DC charger (ORI121236140), charges the YellowTop from the running system; lined up at Powerwerx, $215.05"
+  family: open
+  kit: {}
+  wires: [DCDC_IN, DCDC_OUT, DCDC_GND]
+  note: "engine running detection starts and stops it on its own, so no enable wire is needed; the two-pole remote H/L connector stays unused"
+  open: ["terminal type for 8 AWG at the Orion's screw terminals: from the Orion manual when carted"]
+  sources: ["web_snapshots/powerwerx.com__victron-ori121236140-oriontrsmart-30a-nonisolated.md"]
+GSS-3000:
+  where: cabin
+  device: "Dakota Digital GSS-3000 gear shift sender: decoder under the dash; its sensor sits on the transmission detent shaft and comes with a 10 ft 3-wire cable"
+  family: open
+  kit: {}
+  wires: [DAK_GEAR, GSS_PWR, GSS_GND, GSS_SENS_R, GSS_SENS_G, GSS_SENS_B]
+  note: "1-WIRE -> VHX GEAR lights the gear readout; the decoder learns each gear position (set mode)"
+  open: ["the 10 ft sensor cable has to reach the decoder: route from the transmission pan to under the dash is measured at the mock-up"]
+  sources: ["web_snapshots/www.dakotadigital.com__GSS-3000.md (MAN# 650715:G)"]
+GSS-SENSOR:
+  where: chassis
+  device: "GSS-3000 sensor on the transmission detent shaft (mounting plate on the pan, rod to the shift arm)"
+  family: open
+  kit: {}
+  wires: [GSS_SENS_R, GSS_SENS_G, GSS_SENS_B]
+  sources: ["web_snapshots/www.dakotadigital.com__GSS-3000.md"]

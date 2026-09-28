@@ -1,0 +1,653 @@
+{
+ "vendor": "prowire",
+ "account_cart": "Q27156",
+ "captured": "2026-09-26",
+ "method": "read back from prowireusa.com/cart in the owner's logged-in Chrome (one tab, read-only, closed after); line codes, quantities, extended prices",
+ "status": "NOT ordered \u2014 ordering paused 2026-09-26 (K5_WIRING_STATE 0l); reference only",
+ "tax": "exempt (owner's ProWire account)",
+ "lines": [
+  {
+   "code": "M22759/32-22-9",
+   "qty": 1000.0,
+   "uom": "FT",
+   "ext": 181.0,
+   "unit": 0.181
+  },
+  {
+   "code": "M22759/32-22-0",
+   "qty": 100.0,
+   "uom": "FT",
+   "ext": 29.1,
+   "unit": 0.291
+  },
+  {
+   "code": "M22759/32-20-0",
+   "qty": 50.0,
+   "uom": "FT",
+   "ext": 30.25,
+   "unit": 0.605
+  },
+  {
+   "code": "M22759/32-20-9",
+   "qty": 100.0,
+   "uom": "FT",
+   "ext": 36.0,
+   "unit": 0.36
+  },
+  {
+   "code": "M22759/32-18-9",
+   "qty": 100.0,
+   "uom": "FT",
+   "ext": 51.8,
+   "unit": 0.518
+  },
+  {
+   "code": "M22759/32-16-9",
+   "qty": 250.0,
+   "uom": "FT",
+   "ext": 141.0,
+   "unit": 0.564
+  },
+  {
+   "code": "M22759/32-16-2",
+   "qty": 110.0,
+   "uom": "FT",
+   "ext": 80.41,
+   "unit": 0.731
+  },
+  {
+   "code": "M22759/32-16-0",
+   "qty": 25.0,
+   "uom": "FT",
+   "ext": 38.68,
+   "unit": 1.547
+  },
+  {
+   "code": "M22759/32-14-9",
+   "qty": 50.0,
+   "uom": "FT",
+   "ext": 78.05,
+   "unit": 1.561
+  },
+  {
+   "code": "M22759/32-12-9",
+   "qty": 20.0,
+   "uom": "FT",
+   "ext": 86.48,
+   "unit": 4.324
+  },
+  {
+   "code": "M22759/16-8-2",
+   "qty": 30.0,
+   "uom": "FT",
+   "ext": 121.92,
+   "unit": 4.064
+  },
+  {
+   "code": "68212",
+   "qty": 1,
+   "uom": "EA",
+   "ext": 7.38
+  },
+  {
+   "code": "COIL-CONN-LS2/7",
+   "qty": 9,
+   "uom": "EA",
+   "ext": 39.19
+  },
+  {
+   "code": "LS-CRANK-CONN-KIT",
+   "qty": 1,
+   "uom": "EA",
+   "ext": 8.01
+  },
+  {
+   "code": "LS-CAM-CONN-KIT",
+   "qty": 1,
+   "uom": "EA",
+   "ext": 8.29
+  },
+  {
+   "code": "8CYLK-90",
+   "qty": 1,
+   "uom": "EA",
+   "ext": 47.24
+  },
+  {
+   "code": "M800-KIT-N",
+   "qty": 2,
+   "uom": "EA",
+   "ext": 99.1
+  },
+  {
+   "code": "M22759/16-2-2",
+   "qty": 13.0,
+   "uom": "FT",
+   "ext": 208.85,
+   "unit": 16.065
+  },
+  {
+   "code": "M22759/16-2-0",
+   "qty": 6.0,
+   "uom": "FT",
+   "ext": 110.09,
+   "unit": 18.348
+  },
+  {
+   "code": "M22759/16-10-2",
+   "qty": 30.0,
+   "uom": "FT",
+   "ext": 83.22,
+   "unit": 2.774
+  },
+  {
+   "code": "M22759/16-10-0",
+   "qty": 30.0,
+   "uom": "FT",
+   "ext": 97.14,
+   "unit": 3.238
+  },
+  {
+   "code": "M27500-22ML2T08",
+   "qty": 30.0,
+   "uom": "FT",
+   "ext": 50.97,
+   "unit": 1.699
+  },
+  {
+   "code": "SSC-N",
+   "qty": 20,
+   "uom": "EA",
+   "ext": 20.0
+  },
+  {
+   "code": "68201",
+   "qty": 2,
+   "uom": "EA",
+   "ext": 9.68
+  },
+  {
+   "code": "68104",
+   "qty": 1,
+   "uom": "EA",
+   "ext": 9.04
+  },
+  {
+   "code": "DR-25-1/4-0",
+   "qty": 25.0,
+   "uom": "FT",
+   "ext": 36.9,
+   "unit": 1.476
+  },
+  {
+   "code": "DR-25-3/8-0",
+   "qty": 25.0,
+   "uom": "FT",
+   "ext": 77.13,
+   "unit": 3.085
+  },
+  {
+   "code": "DR-25-1/2-0",
+   "qty": 25.0,
+   "uom": "FT",
+   "ext": 96.88,
+   "unit": 3.875
+  },
+  {
+   "code": "DR-25-3/4-0",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 37.04,
+   "unit": 3.704
+  },
+  {
+   "code": "M22759/32-22-1",
+   "qty": 45.0,
+   "uom": "FT",
+   "ext": 27.77,
+   "unit": 0.617
+  },
+  {
+   "code": "M22759/32-22-2",
+   "qty": 400.0,
+   "uom": "FT",
+   "ext": 97.2,
+   "unit": 0.243
+  },
+  {
+   "code": "M22759/32-22-3",
+   "qty": 30.0,
+   "uom": "FT",
+   "ext": 18.51,
+   "unit": 0.617
+  },
+  {
+   "code": "M22759/32-22-4",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 6.85,
+   "unit": 0.685
+  },
+  {
+   "code": "M22759/32-22-5",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 6.64,
+   "unit": 0.664
+  },
+  {
+   "code": "M22759/32-22-6",
+   "qty": 30.0,
+   "uom": "FT",
+   "ext": 18.51,
+   "unit": 0.617
+  },
+  {
+   "code": "M22759/32-22-8",
+   "qty": 165.0,
+   "uom": "FT",
+   "ext": 48.18,
+   "unit": 0.292
+  },
+  {
+   "code": "M22759/32-22-10-PRSP",
+   "qty": 35.0,
+   "uom": "FT",
+   "ext": 24.47,
+   "unit": 0.699
+  },
+  {
+   "code": "M22759/32-22-30-PRSP",
+   "qty": 20.0,
+   "uom": "FT",
+   "ext": 15.4,
+   "unit": 0.77
+  },
+  {
+   "code": "M22759/32-22-41-PRSP",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 7.92,
+   "unit": 0.792
+  },
+  {
+   "code": "M22759/32-22-42-PRSP",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 7.19,
+   "unit": 0.719
+  },
+  {
+   "code": "M22759/32-22-43-PRSP",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 7.19,
+   "unit": 0.719
+  },
+  {
+   "code": "M22759/32-22-46-PRSP",
+   "qty": 12.0,
+   "uom": "FT",
+   "ext": 8.63,
+   "unit": 0.719
+  },
+  {
+   "code": "M22759/32-22-51-PRSP",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 6.72,
+   "unit": 0.672
+  },
+  {
+   "code": "M22759/32-22-52-PRSP",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 7.68,
+   "unit": 0.768
+  },
+  {
+   "code": "M22759/32-22-53-PRSP",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 7.68,
+   "unit": 0.768
+  },
+  {
+   "code": "M22759/32-22-54-PRSP",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 6.97,
+   "unit": 0.697
+  },
+  {
+   "code": "M22759/32-22-56-PRSP",
+   "qty": 50.0,
+   "uom": "FT",
+   "ext": 34.85,
+   "unit": 0.697
+  },
+  {
+   "code": "M22759/32-22-57-PRSP",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 6.72,
+   "unit": 0.672
+  },
+  {
+   "code": "M22759/32-22-58-PRSP",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 6.97,
+   "unit": 0.697
+  },
+  {
+   "code": "M22759/32-22-59-PRSP",
+   "qty": 12.0,
+   "uom": "FT",
+   "ext": 8.06,
+   "unit": 0.672
+  },
+  {
+   "code": "M22759/32-22-93-PRSP",
+   "qty": 12.0,
+   "uom": "FT",
+   "ext": 7.93,
+   "unit": 0.661
+  },
+  {
+   "code": "M22759/32-22-94-PRSP",
+   "qty": 15.0,
+   "uom": "FT",
+   "ext": 10.62,
+   "unit": 0.708
+  },
+  {
+   "code": "M22759/32-20-2",
+   "qty": 40.0,
+   "uom": "FT",
+   "ext": 35.8,
+   "unit": 0.895
+  },
+  {
+   "code": "M22759/32-20-91-PRSP",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 7.92,
+   "unit": 0.792
+  },
+  {
+   "code": "M22759/32-20-92-PRSP",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 7.92,
+   "unit": 0.792
+  },
+  {
+   "code": "M22759/32-18-2",
+   "qty": 40.0,
+   "uom": "FT",
+   "ext": 51.04,
+   "unit": 1.276
+  },
+  {
+   "code": "M22759/32-14-2",
+   "qty": 12.0,
+   "uom": "FT",
+   "ext": 32.65,
+   "unit": 2.721
+  },
+  {
+   "code": "M22759/32-12-2",
+   "qty": 20.0,
+   "uom": "FT",
+   "ext": 79.88,
+   "unit": 3.994
+  },
+  {
+   "code": "M22759/16-4-0",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 102.37,
+   "unit": 10.237
+  },
+  {
+   "code": "M22759/16-8-0",
+   "qty": 5.0,
+   "uom": "FT",
+   "ext": 20.24,
+   "unit": 4.048
+  },
+  {
+   "code": "M22759/32-18-7",
+   "qty": 20.0,
+   "uom": "FT",
+   "ext": 25.64,
+   "unit": 1.282
+  },
+  {
+   "code": "M22759/32-18-97-PRSP",
+   "qty": 20.0,
+   "uom": "FT",
+   "ext": 22.8,
+   "unit": 1.14
+  },
+  {
+   "code": "M22759/32-16-7",
+   "qty": 50.0,
+   "uom": "FT",
+   "ext": 51.75,
+   "unit": 1.035
+  },
+  {
+   "code": "M22759/32-16-97-PRSP",
+   "qty": 50.0,
+   "uom": "FT",
+   "ext": 58.2,
+   "unit": 1.164
+  },
+  {
+   "code": "M22759/16-4-2",
+   "qty": 24.0,
+   "uom": "FT",
+   "ext": 226.03,
+   "unit": 9.418
+  },
+  {
+   "code": "PRO-IDENT-KIT",
+   "qty": 1,
+   "uom": "EA",
+   "ext": 42.24
+  },
+  {
+   "code": "238LTP",
+   "qty": 10,
+   "uom": "EA",
+   "ext": 17.03
+  },
+  {
+   "code": "2516LTP",
+   "qty": 8,
+   "uom": "EA",
+   "ext": 14.53
+  },
+  {
+   "code": "DL438",
+   "qty": 4,
+   "uom": "EA",
+   "ext": 18.99
+  },
+  {
+   "code": "DL214",
+   "qty": 2,
+   "uom": "EA",
+   "ext": 9.36
+  },
+  {
+   "code": "838TP",
+   "qty": 4,
+   "uom": "EA",
+   "ext": 5.35
+  },
+  {
+   "code": "CPA-100-3/4-RED",
+   "qty": 1.0,
+   "uom": "4FT",
+   "ext": 11.39,
+   "unit": 11.39
+  },
+  {
+   "code": "CPA-100-1/2-RED",
+   "qty": 1.0,
+   "uom": "4FT",
+   "ext": 6.76,
+   "unit": 6.76
+  },
+  {
+   "code": "CPA-100-3/8-RED",
+   "qty": 1.0,
+   "uom": "4FT",
+   "ext": 5.33,
+   "unit": 5.33
+  },
+  {
+   "code": "M81969/14-10",
+   "qty": 3,
+   "uom": "EA",
+   "ext": 3.25
+  },
+  {
+   "code": "810TP",
+   "qty": 5,
+   "uom": "EA",
+   "ext": 6.52
+  },
+  {
+   "code": "410LTP",
+   "qty": 3,
+   "uom": "EA",
+   "ext": 4.41
+  },
+  {
+   "code": "4-1437284-3",
+   "qty": 40,
+   "uom": "EA",
+   "ext": 7.28
+  },
+  {
+   "code": "202K163-25-0",
+   "qty": 2,
+   "uom": "EA",
+   "ext": 32.86
+  },
+  {
+   "code": "ADHESIVES-KIT",
+   "qty": 1,
+   "uom": "EA",
+   "ext": 95.55
+  },
+  {
+   "code": "DR-25-1-0",
+   "qty": 10.0,
+   "uom": "FT",
+   "ext": 58.56,
+   "unit": 5.856
+  },
+  {
+   "code": "DR-25-3/16-0",
+   "qty": 25.0,
+   "uom": "FT",
+   "ext": 37.43,
+   "unit": 1.497
+  },
+  {
+   "code": "SCL-1875-1",
+   "qty": 1.0,
+   "uom": "PK",
+   "ext": 6.38
+  },
+  {
+   "code": "SCL-250-1250",
+   "qty": 1.0,
+   "uom": "PK",
+   "ext": 10.22
+  },
+  {
+   "code": "SCL-375-1250",
+   "qty": 1.0,
+   "uom": "PK",
+   "ext": 13.82
+  },
+  {
+   "code": "SCL-500-1250",
+   "qty": 1.0,
+   "uom": "PK",
+   "ext": 14.09
+  },
+  {
+   "code": "SCL-1/2-0-STK",
+   "qty": 1.0,
+   "uom": "4FT",
+   "ext": 11.08,
+   "unit": 11.078
+  },
+  {
+   "code": "D-609-03",
+   "qty": 20,
+   "uom": "EA",
+   "ext": 19.4
+  },
+  {
+   "code": "D-609-04",
+   "qty": 25,
+   "uom": "EA",
+   "ext": 43.65
+  },
+  {
+   "code": "D-609-05",
+   "qty": 20,
+   "uom": "EA",
+   "ext": 32.04
+  },
+  {
+   "code": "S02-03-R",
+   "qty": 8,
+   "uom": "EA",
+   "ext": 11.14
+  },
+  {
+   "code": "GT150-WTR-TEMP-KIT",
+   "qty": 2,
+   "uom": "EA",
+   "ext": 6.21
+  },
+  {
+   "code": "12191818",
+   "qty": 12,
+   "uom": "EA",
+   "ext": 2.99
+  },
+  {
+   "code": "15366021",
+   "qty": 12,
+   "uom": "EA",
+   "ext": 2.35
+  },
+  {
+   "code": "SSB-34BS-PA66",
+   "qty": 2,
+   "uom": "EA",
+   "ext": 14.14
+  },
+  {
+   "code": "SSB-26BS-PA66",
+   "qty": 2,
+   "uom": "EA",
+   "ext": 14.14
+  }
+ ],
+ "line_count": 96,
+ "total": 3620.23,
+ "sources": [
+  "receipts/2026-09-25_orders-staged-prowire-ksv-ict.md (addenda through 2026-09-26 night)"
+ ]
+}

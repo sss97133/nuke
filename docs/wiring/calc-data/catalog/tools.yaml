@@ -1,0 +1,185 @@
+# K5 harness — TOOLS catalog (curated input to the registry build; reconcile_v5.py → kits_v5.py)
+#
+# Every tool a build step calls for. families.yaml names these ids step by step, so the registry can
+# say which tool is in the builder's hand at every termination.
+#
+# status:  picked        = a specific listing chosen, not bought
+#          in_cart       = sits in a staged cart (orders/*.json)
+#          to_buy        = needed, in no cart yet
+#          confirm_owned = common shop tool — owner confirms he has it (else to_buy)
+#          alt           = acceptable substitute for another tool, not planned
+# Facts carry their source; a fact we do not have is `UNKNOWN: <what closes it>`.
+
+AFM8:
+  name: DMC AFM8 crimp frame
+  pn: M22520/2-01
+  does: 4-indent crimp for machined contacts; takes a positioner per contact
+  range: 20–32 AWG ("suitable for crimping wires from 20 AWG to 32 AWG")
+  status: picked
+  buy: {vendor: ebay, ref: "336813500716", price: 50.00}
+  alt_buy: {vendor: prowire, url: "https://www.prowireusa.com/M22520-2-01-afm8-crimp-frame", price: 698.06, note: "new"}
+  note: genuine Daniels, no positioner, no returns. No eBay order confirmation in Gmail as of 2026-09-26.
+  sources:
+    - prowire M22520-2-01-afm8-crimp-frame page, fetched 2026-09-26
+    - receipts/2026-09-25_orders-staged-prowire-ksv-ict.md, addendum 2026-09-26 (61-pin crimper picked)
+
+K43:
+  name: DMC K43 positioner (for AFM8)
+  pn: M22520/2-10
+  for: [M39029/56-351, M39029/58-363]
+  settings_awg_to_selector: {24: 4, 22: 5, 20: 6}
+  status: picked
+  buy: {vendor: ebay, ref: "178217121942", price: 30.00}
+  sources:
+    - listing plate photo "MS27490-20…MS27655-20"; cross-ref MS27490-20 = M39029/56-351, MS27493-20 = M39029/58-363 (receipt 2026-09-25, addendum 2026-09-26)
+
+K1S:
+  name: DMC K1S positioner (for AFM8)
+  pn: M22520/2-02
+  for: [SSC-N]
+  settings_awg_to_selector: {24: 5, 22: 6, 20: 7, 18: 8, 16: 8}
+  note: >-
+    ProWire: the AFM8 is not specifically designed for 16 AWG, but their SSC-N tests at selector 8
+    reached 60.16 lbf (267 N), above MIL and IPC values.
+  status: to_buy
+  buy: {vendor: prowire, url: "https://www.prowireusa.com/p-1384-k1s-postioner.html", price: 126.36}
+  sources:
+    - prowire SSC-N page, "Tooling Chart for SuperSeal Solid Contacts" + "M22520/2-01 (AFM8) K1S Selector Settings", fetched 2026-09-26
+
+HDT-48-00:
+  name: Deutsch HDT-48-00 solid-barrel crimp tool
+  does: 8-indent crimp, Deutsch size 20/16/12 solid contacts; no positioner
+  for: [SSC-N]
+  status: alt
+  note: listed by ProWire as an SSC-N tool; AFM8 + K1S covers the same job and shares the frame with the 61-pin contacts.
+  buy: {vendor: prowire, url: "https://www.prowireusa.com/deutsch-hdt-48-00-solid-barrel-crimp-tool.html", price: 445.20}
+  sources: [prowire HDT-48-00 page + SSC-N tooling chart, fetched 2026-09-26]
+
+GT150_CRIMPER:
+  name: Delphi/Aptiv GT150 hand crimper
+  pn: "15359996"
+  does: crimps wire and seal in one operation; push-to-seat GT150 terminals; standard and mini seals
+  range: 22–16 AWG sealed terminals
+  for: ["12191818", "15366021", GT150-WTR-TEMP-KIT]
+  status: to_buy
+  buy: {vendor: prowire, url: "https://www.prowireusa.com/p-1233-delphi-gt150-hand-crimp-tool.html", price: 156.49}
+  sources: [prowire p-1233 page, fetched 2026-09-26; ICT Billet oil-pressure page ("We recommend using Delphi/Aptiv GT150 series crimper")]
+
+MP150_CRIMPER:
+  name: Metri-Pack 150/280 sealed crimp tool
+  pn: "12155975"
+  status: to_buy
+  for: [LS-CRANK-CONN-KIT, LS-CAM-CONN-KIT, "12110847"]
+  note: "covers Metri-Pack 150 terminals incl. 12110847; whether the coil and knock kit terminals are Metri-Pack is open on those plugs"
+  buy: {vendor: prowire, url: "https://www.prowireusa.com/p-2104-metri-pack-150-280-sealed-crimp-tool.html", code: "12155975", price: 110.40}
+  sources: ["ProWire p-2104 'Metri-Pack 150/280 sealed crimp tool' 12155975 (snapshot 2026-09-26)", prowire sitemap + crank/cam kit pages ("GM LS Crank / MAP Connector Kit 3 Way Metri Pack"), fetched 2026-09-26]
+
+JPT_CRIMPER:
+  name: open-barrel crimper for TE Junior Power Timer 2.8 mm terminals (EV1)
+  status: to_buy
+  for: ["68102"]
+  note: "UNKNOWN: tool PN — the TE application spec for the terminal PN printed on the ProWire bag names the die"
+  sources: []
+
+TE_AMP_CRIMPER:
+  name: TE AMP hand crimper for the Gen V throttle-body terminals
+  status: to_buy
+  for: [WCTHB50]
+  note: "UNKNOWN: tool PN — ICT says 'TE Co AMP series crimper'; the TE terminal PN on the kit bag names the tool"
+  sources: ["ICT Billet WCTHB50 page (fetched 2026-09-26)"]
+
+MINISEAL_CRIMPER:
+  name: MiniSeal splice crimper (ProWire 3137CT = Raychem AD-1377)
+  pn: 3137CT
+  does: indent crimp with a splice locator; cavities 26–20 AWG (red), 20–16 (blue), 16–12 (yellow)
+  for: [D-609-03, D-609-04, D-609-05]
+  status: to_buy
+  buy: {vendor: prowire, url: "https://www.prowireusa.com/3137ct.html", price: 158.40}
+  sources: [prowire 3137ct page + Nuke catalog_parts name "BUTT SPLICE CRIMP TOOL (RAYCHEM AD 1377)", fetched 2026-09-26]
+
+HEX_CRIMPER:
+  name: 18840 hex crimper, rotating die set, 8–4/0 AWG
+  pn: "18840"
+  does: hexagonal crimp on uninsulated copper lugs; 26 in. handles; die chart on handle
+  for: [238LTP, 2516LTP, DL214, DL438, 410LTP, 810TP, 838TP]
+  settings: {238LTP: GREY die}
+  status: to_buy
+  buy: {vendor: prowire, url: "https://www.prowireusa.com/p-3087-terminal-crimper-hex-crimp-8-4-0-awg.html", price: 147.01}
+  note: "Die per lug beyond 238LTP: UNKNOWN — each lug page lists its die (238LTP page: 18840 GREY)."
+  sources: [prowire p-3087 page + 238LTP page ("Hex Crimp Tool: 18840 (use GREY die)"), fetched 2026-09-26]
+
+STRIP_26_16:
+  name: Ideal Stripmaster 45-1987 (Tefzel blades) + wire stop L-5270
+  range: 26–16 AWG; M22759/16 and /32
+  status: to_buy
+  buy: {vendor: prowire, url: "https://www.prowireusa.com/p-2025-ideal-stripmater-tefzel-stripper-26-16-ga.html", code: "45-1987", price: 313.54}
+  sources: [prowire p-2025 page, fetched 2026-09-26]
+
+STRIP_14_10:
+  name: Ideal Stripmaster 45-1611 (Tefzel blades) + wire stop L-5270
+  range: 14–10 AWG; M22759/16 and /32
+  status: to_buy
+  buy: {vendor: prowire, url: "https://www.prowireusa.com/p-2026-ideal-stripmater-tefzel-stripper-14-10-ga.html", code: "45-1611", price: 313.54}
+  sources: [prowire p-2026 page, fetched 2026-09-26]
+
+STRIP_CABLE:
+  name: stripper for 2/4/8 AWG M22759/16 cable
+  status: to_buy
+  note: "UNKNOWN: model — ProWire sells none in its sitemap under stripper; a rotary cable stripper or knife per builder."
+  sources: []
+
+M81969_14_10:
+  name: insertion/removal tool, size 20, MIL-C-38999
+  pn: M81969/14-10
+  for: [M39029/56-351, M39029/58-363]
+  status: in_cart
+  note: /14-11 is NOT for 38999.
+  sources: [Farnell "Installing and Removal Tools" datasheet 1992545.pdf (receipt 2026-09-25 addendum 2026-09-26 PM)]
+
+HEAT_GUN:
+  name: heat gun with reflector attachments
+  does: recovers DR-25, SCL, CPA, 202K boots; solder sleeves need the reflector
+  status: confirm_owned
+  note: ProWire's sitemap lists no heat gun.
+  sources: []
+
+EPOXY_DISPENSER:
+  name: RT125 epoxy dispenser + mixers
+  status: in_cart
+  note: "comes in ADHESIVES-KIT. ProWire: adhesive is necessary when attaching the shrink boot."
+  sources: [receipt 2026-09-25 addendum 2026-09-26 night]
+
+SOLDER_IRON:
+  name: soldering iron + solder
+  for: [NC5FD-L-1]
+  status: confirm_owned
+  note: the Neutrik NC5FD-L-1 XLR terminates by solder cups.
+  sources: []
+
+FLUSH_CUTTER:
+  name: flush cutter, 12–26 AWG
+  status: confirm_owned
+  sources: []
+
+CABLE_CUTTER:
+  name: cable cutter, 2–8 AWG
+  status: confirm_owned
+  sources: []
+
+DMM:
+  name: multimeter
+  does: continuity on every wire; CAN H–L resistance unpowered (≈60 Ω with both 120 Ω terminators)
+  status: confirm_owned
+  sources: ['state 0d(c): "ohm H-L unpowered"']
+
+TORQUE_INLB:
+  name: inch-pound torque wrench
+  does: D38999 jam nut 120–130 in-lb; lug nuts per stud datasheet
+  status: confirm_owned
+  sources: ['output/connector-sheets/K5_connector_FIREWALL_D38999.svg ("JAM NUT 120-130 in-lb", CONNECTOR_DATA_REPORT 1.1-1.8)']
+
+PULL_GAUGE:
+  name: pull gauge / spring scale, ≥ 50 lbf
+  does: crimp pull test — 22 AWG ≥ 8 lbf, 20 ≥ 13, 16 ≥ 30, 14 ≥ 50
+  status: confirm_owned
+  sources: ["chapters/18-construction-and-segmentation.md §7 (IPC/WHMA-A-620 §19.1 values)"]
