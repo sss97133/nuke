@@ -1798,6 +1798,29 @@ async function handleVehicle(args: Record<string, unknown>): Promise<ToolResult>
   return toolOk(populated);
 }
 
+// A vehicle's price as agents should read it: one answer with its kind (sold, bid, ask, estimate)
+// and each fact kept apart with its date. A sale is only a sale when vehicle_sale_basis() says so,
+// so an ask or a bid is never reported as sold (vehicle_price_facts, 2026-09-28).
+async function priceFacts(supabase: ReturnType<typeof sb>, vid: string) {
+  const { data } = await supabase.rpc("vehicle_price_facts", { p_vehicle_ids: [vid] });
+  const r = Array.isArray(data) ? data[0] : null;
+  if (!r) return null;
+  return {
+    kind: r.price_kind,
+    amount: r.price_amount,
+    as_of: r.price_as_of,
+    live: r.price_live,
+    outcome: r.outcome,
+    sold: r.sold_basis ? { amount: r.sold_amount, on: r.sold_on, basis: r.sold_basis, from: r.sold_amount_from } : null,
+    ask: r.ask_amount != null ? { amount: r.ask_amount, as_of: r.ask_as_of } : null,
+    bid: r.bid_amount != null ? { amount: r.bid_amount, on: r.bid_on, from: r.bid_from } : null,
+    estimate: r.estimate_amount != null
+      ? { amount: r.estimate_amount, confidence: r.estimate_confidence, as_of: r.estimate_as_of }
+      : null,
+    source_url: r.source_url,
+  };
+}
+
 async function handleGetVehicle(args: Record<string, unknown>): Promise<ToolResult> {
   const supabase = sb();
   const vid = String(args.vehicle_id);
@@ -1807,7 +1830,7 @@ async function handleGetVehicle(args: Record<string, unknown>): Promise<ToolResu
     .select(
       "id, vin, year, make, model, trim, series, body_style, engine_type, engine_displacement, " +
       "transmission, drivetrain, exterior_color:color, interior_color, mileage, " +
-      "sale_price, asking_price, canonical_sold_price, canonical_outcome, canonical_platform, " +
+      "canonical_platform, " +
       "status, auction_status, reserve_status, " +
       "nuke_estimate, nuke_estimate_confidence, deal_score, heat_score, " +
       "primary_image_url, image_count, observation_count, " +
@@ -1827,7 +1850,7 @@ async function handleGetVehicle(args: Record<string, unknown>): Promise<ToolResu
     .select("id", { count: "exact", head: true })
     .eq("vehicle_id", vid);
 
-  return toolOk({ ...vehicle, event_count: eventCount ?? 0 });
+  return toolOk({ ...vehicle, price: await priceFacts(supabase, vid), event_count: eventCount ?? 0 });
 }
 
 async function handleQueryVehicleDeep(args: Record<string, unknown>): Promise<ToolResult> {
@@ -1925,6 +1948,7 @@ async function handleQueryVehicleDeep(args: Record<string, unknown>): Promise<To
 
   const vehicle = results[idx++]?.data;
   if (!vehicle) return toolErr("Vehicle not found");
+  const price = await priceFacts(supabase, vid);
 
   const response: Record<string, unknown> = {
     identity: {
@@ -1957,15 +1981,12 @@ async function handleQueryVehicleDeep(args: Record<string, unknown>): Promise<To
     recent_service_history: vehicle.recent_service_history || null,
     title_status: vehicle.title_status || null,
     documents_on_hand: vehicle.documents_on_hand || null,
+    price,
     valuation: {
       nuke_estimate: vehicle.nuke_estimate,
       confidence: vehicle.nuke_estimate_confidence,
       deal_score: vehicle.deal_score,
       heat_score: vehicle.heat_score,
-      canonical_sold_price: vehicle.canonical_sold_price,
-      canonical_outcome: vehicle.canonical_outcome,
-      asking_price: vehicle.asking_price,
-      sale_price: vehicle.sale_price,
     },
     status: {
       status: vehicle.status,
