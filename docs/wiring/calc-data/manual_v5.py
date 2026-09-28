@@ -1375,6 +1375,9 @@ def build():
         pages.append(pg)
         toc.append((ttl, pg.number))
         pages += pg.__dict__.pop("extra_pages", [])
+    if not reg.get("readiness"):
+        # the specifications page silently vanished when the registry was rebuilt without options_v5 (2026-09-28)
+        sys.exit("manual: k5_registry.json has no options/readiness — run options_v5.py after reconcile_v5.py, then rebuild")
     if reg.get("readiness"):
         pg = page_specs(reg, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1)
         pages.append(pg)
