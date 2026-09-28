@@ -28,7 +28,7 @@ from pathlib import Path
 
 import yaml
 
-REPO = Path("/Users/skylar/nuke")
+REPO = Path(__file__).resolve().parents[3]   # the checkout this file lives in (was hard-coded /Users/skylar/nuke)
 CD = REPO / "docs/wiring/calc-data"
 CAT = CD / "catalog"
 ORD = CD / "orders"
@@ -42,6 +42,9 @@ PAD_ENGINE, PAD_BODY = 1.20, 1.15            # state row 33: 20 % engine bay, 15
 CMA = {24: 404, 22: 642, 20: 1020, 18: 1620, 16: 2580, 14: 4110, 12: 6530}   # AWG circular mils
 MINISEAL = [("D-609-03", 26, 20), ("D-609-04", 20, 16), ("D-609-05", 16, 12)]  # prowire 3137ct cavities
 ENGINE_ONLY_OFF = {"23", "50", "73", "83", "84", "87", "88", "80", "82"}     # state row 50 (Dave, 2026-06-18)
+# chassis circuits the June build sheet listed as 61-pin overflow; they cross in the body crossing instead (state row 50)
+CHASSIS_OFF = {"100": "speed sender (Dakota SEN-01-5 on the NP205) is a chassis circuit: crossing = bulkhead C, cavity OPEN "
+                      "(review A11, receipt 2026-09-28 registry corrections)"}
 SHIELD_CABLES = {"99": "99g", "101": "101g", "103": "103g", "104": "104g"}   # M27500 2C: signal + cond 2
 POOL_STATUS = {
     "jacket": "stock — DR-25 sized per bundle at the formboard",
@@ -182,6 +185,13 @@ def attach(reg):
             bulk_spare.sort(key=lambda c: (sheets.CAV_XY[c][0] - ax) ** 2 + (sheets.CAV_XY[c][1] - ay) ** 2)
         bulk[w] = reassigned[w] = bulk_spare.pop(0)
     bulk_spare = sorted(bulk_spare, key=str)
+    # chassis circuits leave the 61-pin AFTER the nearest-cavity pass, so no other wire's cavity moves (review A11)
+    for w in CHASSIS_OFF:
+        if w in bulk and w in crossing:
+            crossing.remove(w)
+            bulk_spare = sorted(bulk_spare + [bulk.pop(w)], key=str)
+            reassigned.pop(w, None)
+            overflow = [x for x in overflow if x != w]
     grommet = [w for w in grommet if w not in engine_local]
     # 2026-09-27 whole truck: rows the April direct-feed list put in the grommet that no longer cross there
     GROMMET_OFF = {"51": "the blower feed ends at the control-head switch in the cab; its speed leads cross in body bulkhead B",
@@ -206,11 +216,20 @@ def attach(reg):
         frm = (w.get("frm") or "").strip()
         m = pin_re.match(frm)
         if m:
-            return [(m.group(1), m.group(2), int(m.group(3)))]
-        m = re.match(r"^(PDM30|PDM15):(OUT\d+|DIG\d+|GND|VBAT-|CANHI|CANLO)\b", frm)
-        if m:
-            return [(m.group(1), c, p) for c, p in out_pins.get(m.group(2), [])]
-        return []
+            got = [(m.group(1), m.group(2), int(m.group(3)))]
+        else:
+            m = re.match(r"^(PDM30|PDM15):(OUT\d+|DIG\d+|GND|VBAT-|CANHI|CANLO)\b", frm)
+            got = [(m.group(1), c, p) for c, p in out_pins.get(m.group(2), [])] if m else []
+        # a far end named as one ECU/PDM pin ends there too (2026-09-28 power-spine review: ISO_KILL at M130 B14, ECU_PWR at
+        # PDM30 B6, CAN_FW_H/L at PDM15 B26/B25 had no termination row). A record naming two pins ("B26 ... / B25 ...") is a
+        # pair modelled as one wire and stays as it is.
+        to = w.get("to")
+        tt = to if isinstance(to, str) else (f"{to.get('device')}:{to.get('pin')}" if isinstance(to, dict)
+                                              and to.get("device") in ("M130", "PDM30", "PDM15") else "")
+        m = pin_re.match(str(tt).strip())
+        if m and "/" not in str(tt):
+            got.append((m.group(1), m.group(2), int(m.group(3))))
+        return got
 
     # ------------------------------------------------ dead endpoints leave the registry
     # An endpoint is dead when it is retired itself, or when every wire it lists is retired. The #25 lesson
@@ -275,7 +294,10 @@ def attach(reg):
                 if not isinstance(a, int) or big <= a <= small:
                     continue
                 if eid.startswith(("PDM30", "PDM15")) and a < big:
-                    note = f"{w} {a} AWG: 2 × 16 AWG pigtails + D-609-05"
+                    # a paired 20 A output takes two 16 AWG pigtails; a single 8 A pin can't (review A1, PDM manual p.48)
+                    note = (f"{w} {a} AWG: 2 × 16 AWG pigtails + M81824/1-3 in-line" if "+" in str(cav_of.get(w, ""))
+                            else f"{w} {a} AWG on a single 8 A pin: OPEN — one 16 AWG pigtail + M81824/1-3, or a lighter wire "
+                                 "(PDM manual p.48: 24# to 20# on 8 A outputs)")
                     if a < 12:
                         note += " — load wire is past D-609-05's 16–12 range: step-down splice or a 12 AWG run"
                     pigtailed.append(note)
@@ -977,7 +999,13 @@ SPECIAL_NAME = {"4a": "throttle motor −", "4b": "throttle motor +", "4c": "TPS
                 "ETH_TX+": "Ethernet TX+", "ETH_TX-": "Ethernet TX−", "ETH_RX+": "Ethernet RX+", "ETH_RX-": "Ethernet RX−",
                 "ECU_PWR": "ECU 12 V supply", "ECU_GND1": "ECU ground 1", "ECU_GND2": "ECU ground 2",
                 "116": "Dakota tach", "118": "Dakota speedo", "PCS_RPM": "PCS RPM input (tach mirror)",
-                "PCS_TPS": "PCS throttle input (pedal track 1 tap)"}
+                "PCS_TPS": "PCS throttle input (pedal track 1 tap)",
+                # review C23 (2026-09-28): Dave's words for codes the pages printed
+                "APS_T2_GND": "pedal track 2 0 V", "COIL1_SGND": "coil 1 signal ground",
+                "INJ_PWR": "injector +12 V feed", "COIL_PWR": "coil +12 V feed", "DAK_OILP_GND": "Dakota oil sender 0 V",
+                "DAK_OILP_5V": "Dakota oil sender 5 V", "DAK_CTS_RET": "Dakota coolant sender return",
+                "LTCD_GND": "wideband 0 V", "VSS_PWR": "speed sender 5 V", "VSS_GND": "speed sender 0 V",
+                "VSS_DAK": "speed sender signal (Dakota)"}
 
 
 CAB_END = {"ECU": "M130 (pin not assigned yet)", "PDM30": "PDM30 (channel not assigned yet)",
@@ -1155,7 +1183,7 @@ GENERIC_SOURCES = {"ProWire SSC-N tooling chart · MoTeC M130 datasheet", "61-pi
                    "[DMC tooling for M39029/56-351](https://dmctools.com/m39029/contact/196)", "IPC/WHMA-A-620 pull-test values",
                    "MoTeC PDM + C125 manuals (22 AWG wire is M22759/16-22)",
                    "[Checkline pull-test sheet](https://www.checkline.com/res/products/126677/wire_pull_test_standards.pdf)"}
-END_WORD = [(r"^COIL_PWR rail splice$", "coil power rail (splice)"), (r"^INJ_PWR rail splice$", "injector power rail (splice)"),
+END_WORD = [(r"^COIL_PWR rail splice$", "coil +12 V splice"), (r"^INJ_PWR rail splice$", "injector +12 V splice"),
             (r"^CAN trunk #62$", "CAN trunk (splice)"), (r"^Ground star \(cab\)$", "cab ground star"),
             (r"^XLR NC5FDL1 pin (\d)$", r"XLR pin \1"), (r"^RJ45 service port pin (\d)$", r"RJ45 pin \1"),
             (r"^head ring terminal \((.+)\)$", r"head ring terminal, \1")]

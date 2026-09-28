@@ -22,6 +22,7 @@ M130-A:
   wires: {pins: "M130:A"}
   open:
     - "boot: HELD on the M130 mount (state §4) — SSB rubber boot on this backshell, or billet + Raychem 202K152/153"
+    - "5 V/0 V pairing: techspec A02↔B15/A09↔B16 vs Dave's sheet A2/B16 — Dave to rule. M1 hardware techspec pp.16-17: A02 SEN_5V0_A, A09 SEN_5V0_B, B15 SEN_0V_A, B16 SEN_0V_B; canon chapters/17 'SEN_0V letter-pairing rule' items 8-9: match letters; Dave's M130 sheet returns the A2 sensors on B16 and pedal track 2 (A9) on B15. The registry follows Dave's sheet until he rules; no wire moved (review A7, receipt 2026-09-28 registry corrections)"
   sources: ["motec_m130_datasheet.pdf p.4", "prowire M800-KIT-N page"]
 M130-B:
   where: cabin
@@ -32,6 +33,7 @@ M130-B:
   wires: {pins: "M130:B"}
   open:
     - "boot: HELD on the M130 mount"
+    - "5 V/0 V pairing: techspec A02↔B15/A09↔B16 vs Dave's sheet A2/B16 — Dave to rule. M1 hardware techspec pp.16-17: A02 SEN_5V0_A, A09 SEN_5V0_B, B15 SEN_0V_A, B16 SEN_0V_B; canon chapters/17 'SEN_0V letter-pairing rule' items 8-9: match letters; Dave's M130 sheet returns the A2 sensors on B16 and pedal track 2 (A9) on B15. The registry follows Dave's sheet until he rules; no wire moved (review A7, receipt 2026-09-28 registry corrections)"
   sources: ["motec_m130_datasheet.pdf p.5"]
 PDM30-A:
   where: cabin
@@ -41,7 +43,8 @@ PDM30-A:
   cavities: 34
   wires: {pdm: A}
   open:
-    - "20 A outputs take 2 × 16 AWG pigtails (Superseal max 16 AWG), joined to the load wire with D-609-05 (registry meta note)"
+    - "20 A outputs feeding a wire heavier than 16 AWG (#34, #35, TG_FEED, BLOWER_HI on A; #51, #72 on B): 2 × 16 AWG M22759/32 pigtails, one per pin, equal length, into an in-line MiniSeal M81824/1-3 with the load wire out the other end (SPL-PDM30-OUTn endpoints; the pigtails are registry wires). MoTeC PDM manual p.48: 20# to 16# for 20 A outputs, 16# = 15 A at 80 °C; a D-609 stub splice can't take all three (2 × 16 + 12 AWG = 11,690 CM, past the 16–12 AWG cavity of the 3137CT)"
+    - "one wire of 16 AWG or finer on a paired 20 A output (#93 22 AWG on A9+A17 here, #54 16 AWG on B5+B11 on B): one conductor can't fill both cavities (PDM manual p.44 pairs each 20 A output on two pins) — a second equal-length conductor, a pigtail pair, or an 8 A output if the load allows (builder's call; review A1 follow-on)"
     - "channels for INJ_PWR, COIL_PWR, the fuel pump and the second PDM split are unassigned (state 0h(5), row 54)"
   sources: ["motec_pdm30_datasheet.pdf", "scripts/generate_connector_build_sheets.py PDM_A_PIN"]
 PDM30-B:
@@ -69,7 +72,9 @@ PDM15-A:
   cavities: 34
   wires: {pdm: A, box: PDM15}
   open:
-    - "20 A outputs take 2 × 16 AWG pigtails (Superseal max 16 AWG), joined to the load wire with D-609-05"
+    - "20 A outputs feeding a wire heavier than 16 AWG (#21 fan OUT1, START_TRIG OUT4): 2 × 16 AWG M22759/32 pigtails, one per pin, equal length, into an in-line MiniSeal M81824/1-3 with the load wire out the other end (SPL-PDM15-OUTn endpoints; the pigtails are registry wires). MoTeC PDM manual p.48: 20# to 16# for 20 A outputs, 16# = 15 A at 80 °C; a D-609 stub splice can't take all three (2 × 16 + 12 AWG = 11,690 CM, past the 16–12 AWG cavity of the 3137CT)"
+    - "one 16 AWG rail feed on a paired 20 A output (INJ_PWR A3+A12, COIL_PWR A5+A14): one conductor can't fill both cavities (PDM manual p.43) — two equal-length 16 AWG conductors into the rail splice, or a pigtail pair (builder's call)"
+    - "#66 fuel pump 14 AWG on the single 8 A pin A4 (OUT10): the Superseal contact takes 24–16 AWG and MoTeC recommends 24# to 20# on 8 A outputs (PDM manual p.48). Either one 16 AWG pigtail into an in-line M81824/1-3 (16 is past the 8 A recommendation, inside the contact), or #66 at 16 AWG (0.40 V, 3.0 % at 5.1 A over 18.4 ft — the record's own figure). Builder's call"
     - "mount: away from exhaust heat — 110 °C max internal, 100 °C recommended (MoTeC PDM user manual, Mounting)"
   sources: ["motec_pdm_user_manual.pdf p.43 (PDM15 pinout)", "owner 2026-09-24 'multiple PDM'; split engine/body 2026-09-27"]
 PDM15-B:
@@ -85,9 +90,86 @@ PDM15-STUD:
   device: PDM15 battery stud (M6; "eyelet and M6 nut")
   family: lug
   kit: {}
-  lugs: {PDM15_BPOS: DL214}
+  lugs: {PDM15_BPOS: LUG-4AWG-M6}
   wires: [PDM15_BPOS]
-  sources: ["motec_pdm_user_manual.pdf p.43 (connector C: M6 stud, Battery +)"]
+  note: "PDM15_BPOS is 4 AWG (was 6 AWG on DL214, a 2 AWG lug): MoTeC PDM manual p.48 recommends 4# to 2# for battery positive, and a MEGA 100 A needs a cable rated at least 100 A (4# = 100 A at 100 °C; 6# = 75 A)"
+  open: ["4 AWG M6 lug: part number not on file (LUG-4AWG-M6)"]
+  sources: ["motec_pdm_user_manual.pdf p.43 (connector C: M6 stud, Battery +)", "motec_pdm_user_manual.pdf p.48 (wire table; battery pos 4# to 2#)"]
+
+# ---------------- PDM 20 A output pigtail splices (review A1, 2026-09-28): a load wire heavier than 16 AWG never lands on a
+# Superseal pin; two 16 AWG pigtails do, joined to it in an in-line MiniSeal
+SPL-PDM15-OUT1:
+  where: engine
+  device: "PDM15 OUT1 pigtail splice — pins A1 + A10 (2 × 16 AWG) joined to the radiator fan feed #21 (12 AWG)"
+  family: miniseal
+  kit: {M81824/1-3: 1}
+  wires: ["21_PT1", "21_PT2", "21"]
+  note: "in-line MiniSeal: both pigtails in one end (2 × 2,580 = 5,160 CM, 12 AWG equivalent), the load wire out the other; pigtails cut to the same length so the two pins share the current"
+  open: ["splice spot: within pigtail reach of the PDM15 connector, set at the formboard"]
+  sources: ["MoTeC PDM user manual p.43 (PDM15 pinout: 20 A Output 1 on A1 with A10)", "MoTeC PDM user manual p.48 (recommended 20# to 16# for 20 A outputs; 16# = 15 A at 80 °C)", "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)", "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"]
+SPL-PDM15-OUT4:
+  where: engine
+  device: "PDM15 OUT4 pigtail splice — pins A7 + A16 (2 × 16 AWG) joined to the starter S trigger START_TRIG (12 AWG)"
+  family: miniseal
+  kit: {M81824/1-3: 1}
+  wires: ["START_TRIG_PT1", "START_TRIG_PT2", "START_TRIG"]
+  note: "in-line MiniSeal: both pigtails in one end (2 × 2,580 = 5,160 CM, 12 AWG equivalent), the load wire out the other; pigtails cut to the same length so the two pins share the current"
+  open: ["splice spot: within pigtail reach of the PDM15 connector, set at the formboard"]
+  sources: ["MoTeC PDM user manual p.43 (PDM15 pinout: 20 A Output 4 on A7 with A16)", "MoTeC PDM user manual p.48 (recommended 20# to 16# for 20 A outputs; 16# = 15 A at 80 °C)", "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)", "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"]
+SPL-PDM30-OUT1:
+  where: cabin
+  device: "PDM30 OUT1 pigtail splice — pins A1 + A10 (2 × 16 AWG) joined to the tailgate window feed TG_FEED (14 AWG)"
+  family: miniseal
+  kit: {M81824/1-3: 1}
+  wires: ["TG_FEED_PT1", "TG_FEED_PT2", "TG_FEED"]
+  note: "in-line MiniSeal: both pigtails in one end (2 × 2,580 = 5,160 CM, 12 AWG equivalent), the load wire out the other; pigtails cut to the same length so the two pins share the current"
+  open: ["splice spot: within pigtail reach of the PDM30 connector, set at the formboard"]
+  sources: ["MoTeC PDM user manual p.44 (PDM30 pinout: 20 A Output 1 on A1 with A10)", "MoTeC PDM user manual p.48 (recommended 20# to 16# for 20 A outputs; 16# = 15 A at 80 °C)", "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)", "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"]
+SPL-PDM30-OUT2:
+  where: cabin
+  device: "PDM30 OUT2 pigtail splice — pins A3 + A12 (2 × 16 AWG) joined to the blower HIGH feed BLOWER_HI (12 AWG)"
+  family: miniseal
+  kit: {M81824/1-3: 1}
+  wires: ["BLOWER_HI_PT1", "BLOWER_HI_PT2", "BLOWER_HI"]
+  note: "in-line MiniSeal: both pigtails in one end (2 × 2,580 = 5,160 CM, 12 AWG equivalent), the load wire out the other; pigtails cut to the same length so the two pins share the current"
+  open: ["splice spot: within pigtail reach of the PDM30 connector, set at the formboard"]
+  sources: ["MoTeC PDM user manual p.44 (PDM30 pinout: 20 A Output 2 on A3 with A12)", "MoTeC PDM user manual p.48 (recommended 20# to 16# for 20 A outputs; 16# = 15 A at 80 °C)", "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)", "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"]
+SPL-PDM30-OUT3:
+  where: cabin
+  device: "PDM30 OUT3 pigtail splice — pins A5 + A14 (2 × 16 AWG) joined to the driver window switch feed #34 (14 AWG)"
+  family: miniseal
+  kit: {M81824/1-3: 1}
+  wires: ["34_PT1", "34_PT2", "34"]
+  note: "in-line MiniSeal: both pigtails in one end (2 × 2,580 = 5,160 CM, 12 AWG equivalent), the load wire out the other; pigtails cut to the same length so the two pins share the current"
+  open: ["splice spot: within pigtail reach of the PDM30 connector, set at the formboard"]
+  sources: ["MoTeC PDM user manual p.44 (PDM30 pinout: 20 A Output 3 on A5 with A14)", "MoTeC PDM user manual p.48 (recommended 20# to 16# for 20 A outputs; 16# = 15 A at 80 °C)", "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)", "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"]
+SPL-PDM30-OUT4:
+  where: cabin
+  device: "PDM30 OUT4 pigtail splice — pins A7 + A16 (2 × 16 AWG) joined to the passenger window switch feed #35 (14 AWG)"
+  family: miniseal
+  kit: {M81824/1-3: 1}
+  wires: ["35_PT1", "35_PT2", "35"]
+  note: "in-line MiniSeal: both pigtails in one end (2 × 2,580 = 5,160 CM, 12 AWG equivalent), the load wire out the other; pigtails cut to the same length so the two pins share the current"
+  open: ["splice spot: within pigtail reach of the PDM30 connector, set at the formboard"]
+  sources: ["MoTeC PDM user manual p.44 (PDM30 pinout: 20 A Output 4 on A7 with A16)", "MoTeC PDM user manual p.48 (recommended 20# to 16# for 20 A outputs; 16# = 15 A at 80 °C)", "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)", "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"]
+SPL-PDM30-OUT6:
+  where: cabin
+  device: "PDM30 OUT6 pigtail splice — pins B3 + B9 (2 × 16 AWG) joined to the blower switch feed #51 (12 AWG)"
+  family: miniseal
+  kit: {M81824/1-3: 1}
+  wires: ["51_PT1", "51_PT2", "51"]
+  note: "in-line MiniSeal: both pigtails in one end (2 × 2,580 = 5,160 CM, 12 AWG equivalent), the load wire out the other; pigtails cut to the same length so the two pins share the current"
+  open: ["splice spot: within pigtail reach of the PDM30 connector, set at the formboard"]
+  sources: ["MoTeC PDM user manual p.44 (PDM30 pinout: 20 A Output 6 on B3 with B9)", "MoTeC PDM user manual p.48 (recommended 20# to 16# for 20 A outputs; 16# = 15 A at 80 °C)", "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)", "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"]
+SPL-PDM30-OUT8:
+  where: cabin
+  device: "PDM30 OUT8 pigtail splice — pins B7 + B13 (2 × 16 AWG) joined to the 12 V outlet feed #72 (14 AWG)"
+  family: miniseal
+  kit: {M81824/1-3: 1}
+  wires: ["72_PT1", "72_PT2", "72"]
+  note: "in-line MiniSeal: both pigtails in one end (2 × 2,580 = 5,160 CM, 12 AWG equivalent), the load wire out the other; pigtails cut to the same length so the two pins share the current"
+  open: ["splice spot: within pigtail reach of the PDM30 connector, set at the formboard"]
+  sources: ["MoTeC PDM user manual p.44 (PDM30 pinout: 20 A Output 8 on B7 with B13)", "MoTeC PDM user manual p.48 (recommended 20# to 16# for 20 A outputs; 16# = 15 A at 80 °C)", "ProWire 3137CT page (cavities 26-20 / 20-16 / 16-12 AWG) + Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; D-609 = stub)", "state 0h(1); review A1 (receipt 2026-09-28_reviews-and-shape-rules.md)"]
 
 # ============================================================== doors, tailgate, camera, rear lamps, speed (2026-09-27)
 # Owner 2026-09-27: "we need power windows its never been addressed. we have nothing in the doors. we also want like rear
@@ -228,11 +310,16 @@ BRAKE-SW:
   wires: ["53", "BRK_SW_0V"]
 VSS-SENDER:
   where: rear
-  device: Dakota Digital SEN-01-5 speed sender on the NP205 speedometer drive (7/8-18 GM thread, 16k PPM)
+  device: "Dakota Digital SEN-01-5 speed sender on the NP205 speedometer drive (7/8-18 GM thread, 16k PPM) — 3-wire: red +5 V, black 0 V, white signal"
   family: open
   kit: {}
-  wires: ["100", "VSS_PWR", "VSS_GND", "VSS_DAK"]
-  sources: ["summitracing.com dak-sen-01-5"]
+  pins: {VSS_PWR: "red (+5 V from SPD +)", VSS_GND: "black (0 V to SPD -)", VSS_DAK: "white (signal)", "100": "white (signal)"}
+  note: "#100 (M130 B08) and VSS_DAK (Dakota SPD SND) share the sender's white signal wire: one splice on the white lead, its MiniSeal size set by the sender lead's gauge (not on file: bench), spot set at the formboard"
+  splice_point: true
+  open:
+    - "crossing: bulkhead C, cavity OPEN — the sender is a chassis circuit, so #100 left 61-pin cavity d (engine-only firewall, state row 50; review A11); #100 and the three Dakota sender wires take the same cab-to-chassis path"
+    - "M130 tap on the white signal: the manual says SPD + 'should not be hooked up to anything else' and is silent on a second input on the signal — confirm the sender drives both (bench), or feed the M130 from the VHX SPD OUT (2,000/4,000 PPM, manual p.8)"
+  sources: ["Dakota VHX manual 650314:P p.8 (reference_documents/component_drawings/dakota_digital_vhx_manual.pdf): SPD + 'Connect the red wire from the SEN-01-5', SPD SND 'Dakota Digital supplies a 3-wire sensor ... SEN-01-5 ... the white wire is the speed signal', SPD - 'Connect the black wire from the SEN-01-5'", "summitracing.com dak-sen-01-5 (thread and PPM; page not saved)"]
 AC-CLUTCH:
   where: engine
   device: A/C compressor clutch, Sanden 7176 SD7B10 (ordered 2026-09-24) — engine PDM15 OUT11
@@ -263,12 +350,33 @@ PORT-ETH:
   sources: ["M1 Tune manual p.10", "prowire M-RJ45-CABLE page"]
 CAN-BUS:
   where: cabin
-  device: M1 CAN trunk (M130 B17/B18 to PDM30 B26/B25, 3.5 ft) with the UTC stub
+  device: "M1 CAN bus: trunk M130 → PDM30 → 61-pin → PDM15 → LTCD, with the UTC stub"
   family: none
-  kit: {CAN-TERM-100R: 1}
+  kit: {CAN-TERM-100R: 2}
   wires: ["62", UTC_CANH, UTC_CANL, UTC_0V]
-  note: "22 AWG twisted, at least one twist per 50 mm; bus under 2 m = one 100R at the end opposite the UTC plug"
-  sources: ["MoTeC PDM user manual p.50 'CAN Bus Wiring Requirements' + 'Short CAN Bus'"]
+  note: "22 AWG twisted, at least one twist per 50 mm; the bus reaches the engine PDM15 and the LTCD (> 2 m), so a 100R 0.25 W at each end — the M130 end and the LTCD end (MoTeC PDM manual p.49-50)"
+  topology:
+    order:
+      - {node: M130, pins: "B17 CAN Hi / B18 CAN Lo", role: "trunk end: 100R here"}
+      - {node: PDM30, pins: "B26 CAN High / B25 CAN Low", role: "on the trunk, stub 500 mm max"}
+      - {node: "61-pin firewall", pins: "GG CAN Hi (CAN_FW_H) / j CAN Lo (CAN_FW_L)", role: "trunk passes through"}
+      - {node: PDM15, pins: "B26 CAN High / B25 CAN Low", role: "on the trunk, stub 500 mm max"}
+      - {node: LTCD, pins: "DTM 4-pin #68054: 3 CAN Hi (white) / 2 CAN Lo (green)", role: "trunk end: 100R here"}
+    stubs:
+      - {node: "UTC port (PORT-UTC)", pins: "XLR 5 CAN-HI / 4 CAN-LO / 1 0V", rule: "stub 500 mm max, within 500 mm of one end of the trunk"}
+    terminators: "100R 0.25 W at each end of the trunk (p.49)"
+    twist: "twisted pair, minimum one twist per 50 mm (2 in) (p.49-50)"
+    stub_max_mm: 500
+    utc_within_mm_of_end: 500
+    bus_max_m: 16
+    cable: "100R data cable preferred; twisted 22# Tefzel is usually OK (p.49)"
+    sources: ["MoTeC PDM user manual PN 63029 p.49 'UTC Wiring for PC Connection' + 'CAN Bus Wiring Requirements'", "p.50 bus drawing + 'Short CAN Bus'", "MoTeC LTCD user manual p.37 'General CAN Bus Wiring Requirements' (same rules)", "MoTeC PDM user manual p.43 (PDM15 B25 CAN Low, B26 CAN High), p.44 (PDM30)"]
+  open:
+    - "CAN cavities GG and j are not adjacent on the 61-pin: choose an adjacent pair from the spares c, d, t, u or accept (the twisted pair splits across the insert; review A10). Cavity d is spare since the speed sender left the 61-pin (review A11)"
+    - "UTC stub: splice the UTC pair onto the trunk within 500 mm of the M130 end, stub 500 mm max (p.49); the splice point is not placed yet"
+    - "PDM30 and PDM15 stubs 500 mm max off the trunk (p.49): each PDM takes two wires per CAN pin (trunk in, trunk out) or a short stub — set at the formboard"
+    - "LTCD lead length from the PDM15: not measured (it is the far trunk end, with its own 100R)"
+  sources: ["MoTeC PDM user manual p.49-50 'CAN Bus Wiring Requirements' + 'Short CAN Bus'"]
 PORT-UTC:
   where: cabin
   device: PDM30 config port — 5-pin female XLR for the MoTeC UTC #61059
@@ -317,6 +425,7 @@ TB:
   doubled: [4c, 4e, 4f]
   note: "pin 1 motor +, 2 motor -, 3 SENT position, 4 low reference, 5 +5 V, 6 not used; TPS2 (#4d) retired; #4c moves to B09 (UDIG4)"
   open:
+    - "pin order: cite a GM end view of 12699160 before terminating (review A2; state row 29 and 0s: the order is borrowed from other GM SENT bodies)"
     - "pin order for 12699160 is taken from other GM SENT throttle bodies (MaxxECU: 12678223; rusefi: 12617792); no saved source names 12699160 (audit_citations 2026-09-26) — meter the throttle body's pins before crimping: the two motor pins are the pair with a low resistance between them"
   sources:
     - "MaxxECU 'E-Throttle bodies' — GM 12678223 SENT pinout (https://www.maxxecu.com/webhelp/wirings-e-throttle_bodies.html)"
@@ -693,8 +802,12 @@ WIDEBAND:
   family: open
   kit: {}
   wires: ["64", "CAN_LTCD_H", "CAN_LTCD_L", "LTCD_GND"]
-  open: ["mount within the LTCD's sensor-lead reach of the exhaust (MoTeC LTCD user manual); sensors plug into LTCD connectors A/B"]
+  open: ["mount within the LTCD's sensor-lead reach of the exhaust (MoTeC LTCD user manual); sensors plug into LTCD connectors A/B",
+         "feed and ground are 18 AWG (> 6.1 A cold, sized to the PDM15 OUT12 8 A limit at 100 °C): confirm the #68054 DTM contacts take 18 AWG (bench)",
+         "set PDM15 OUT12's current limit to 8 A (the wire's 100 °C rating is 9 A)"]
   pins: {"LTCD_GND": "1", "CAN_LTCD_L": "2", "CAN_LTCD_H": "3", "64": "4"}
+  note: "LTCD manual p.31: 110 mA typical plus the heater current, heater 0.5–1 A typical (up to 2 A on startup); p.37: 'Each sensor can draw over 3 Amps when cold' — two sensors > 6.1 A cold, past 22 AWG's 6 A (80 °C) / 5 A (100 °C) in the PDM manual p.48 table"
+  sources: ["MoTeC LTCD user manual p.31 (Appendix A Specifications) + p.37 (Appendix D Power Connections)", "MoTeC PDM user manual p.48 wire table"]
 ALTERNATOR-SENSE:
   where: engine
   device: Holley 197-302 alternator — pigtail 197-400 (have)
@@ -734,23 +847,31 @@ PS-STUDS:
   lugs:
     "63": [238LTP, 238LTP]
     "6": [238LTP, 2516LTP]
-    "59": [2516LTP, 238LTP]
+    "59": [2516LTP, 2516LTP]     # alternator B+ (5/16 in, build-book assumption) · MEGA holder M8 at the distribution bus
     G1: [238LTP, 238LTP]
     G2: [DL438, DL438]
     G3: [838TP, 838TP]
     ISO_OUT: [238LTP, 238LTP]
     ODY_NEG: [238LTP, 238LTP]
     ACC_NEG: [DL438, DL438]
-    DCDC_IN: [838TP]
+    DCDC_IN: [810TP]              # MIDI 40 A holder, M5 stud
+    PDM_BPOS: [2516LTP]           # MEGA 125 A holder, M8 stud (the PDM30 end is PDM30-STUD DL214)
+    PDM15_BPOS: [LUG-4AWG-M8]     # MEGA 100 A holder, M8 stud (the PDM15 end is PDM15-STUD)
+    "52": [810TP]                 # MIDI 40 A holder, M5 stud
+    "3": [AMP-KIT-RING]           # AMP Research kit harness red lead, its own fuse (IM75146 step 8)
+    PCS_BATT: [RING-SMALL]        # 5 A fused tap: holder type OPEN
     DCDC_GND: [838TP]
     AMP_GND: [DL438]
     IBOOST_GND: [838TP]
     GND_RET_CAB: [238LTP, 238LTP]
-  wires: ["63", "6", "59", G1, G2, G3, ISO_OUT, ODY_NEG, ACC_NEG, DCDC_IN, DCDC_GND, AMP_GND, IBOOST_GND, GND_RET_CAB]
+  wires: ["63", "6", "59", G1, G2, G3, ISO_OUT, ODY_NEG, ACC_NEG, DCDC_IN, DCDC_GND, AMP_GND, IBOOST_GND, GND_RET_CAB, PDM_BPOS, PDM15_BPOS, "52", "3", PCS_BATT]
   open:
     - "topology is Dave's DC primary (battery → isolator → stud → branches) but the registry still carries the v4 runs #63/#6/#59 — the power-spine chapter re-draws them"
     - "stud sizes: starter + alternator 5/16 in is the build book's assumption; isolator studs are 3/8 in-16 (Blue Sea 7700), so 238LTP fits them"
     - "lug torque per stud: isolator 140 in-lb max (Blue Sea 7700 instructions p.1-2); the others UNKNOWN (datasheets)"
+    - "a fused branch lands on its holder's stud, not the 3/8 in distribution stud: MEGA holder 02980900TXN = M8 (2516LTP for 2 AWG), MIDI holder 0498900.TXN = M5 (810TP for 8 AWG, 410LTP for 4 AWG) — stud sizes from the 2026-09-25 cart receipt; the Littelfuse holder datasheets are not on file"
+    - "PCS_BATT 5 A fused tap: the holder is not picked (MIDI starts at 30 A, chapters/17 §17.2 item 9); ring PN OPEN (RING-SMALL)"
+    - "PDM15_BPOS fuse: MEGA 100 A (PDM15 80 A total continuous x 1.25, MoTeC PDM manual p.35; chapters/17 §17.5 item 5) — part number not on file (MEGA-100A)"
   sources: ["build book 'DC primary' table", "state 0i", "chapters/17"]
 
 # ============================================================== cabin: pedal, gauges, switches
@@ -761,9 +882,12 @@ APS:
   kit: {WPAPP30: 1}
   per_end: {part: D-609-03}
   pins: {APS_T1_5V: G, APS_T1_SIG: F, APS_T1_GND: E, APS_T2_GND: D, APS_T2_SIG: C, APS_T2_5V: B}
+  cavities: 9
+  empty: ["unlettered 1", "unlettered 2", "unlettered 3"]
   note: "G APP1 5 V, F APP1 signal, E APP1 low ref, D APP2 low ref, C APP2 signal, B APP2 5 V. The plug is ICT Billet's WPAPP30 pigtail (OEM Delphi housing, seals and terminals on 6 in leads); each lead joins the harness with a red MiniSeal splice. The M130 reads both tracks and drives the throttle body itself, so the pedal does not have to match the throttle body — only the M1 pedal calibration does."
   open:
     - "before crimping, meter the pedal: G–E and B–D read a fixed resistance, F–E and C–D change as the pedal moves (the pin map is from a web source, not a GM manual)"
+    - "cavity letters: read the WPAPP30 plug — the plug moulds 9 cavities, 6 wired (B–G); no saved source names the 3 unused ones (the third sensor's), and whether the pigtail carries 9 leads or 6 is not on the ICT page (review C24)"
   replaces_cart: ["15326829", "15317363"]
   sources:
     - "eBay listing for the bought pedal: '72-98 C10 Square Body OBS LS Swap DBW', now sold as APS130 — 'Standard Ignition 9 Terminal Accelerator Pedal Position Sensor APS130' (O'Reilly title, web search 2026-09-27)"
@@ -816,6 +940,7 @@ FUEL-LEVEL:
   wires: ["117", "FUEL_SND_GND"]
   open: ["sender location on the Quantum hanger vs factory sender: photo", "sender ground: a wire to the Dakota FUEL -, or its flange (bench)"]
 VSS:
+  retired: "superseded by VSS-SENDER: the speed source is decided — NP205 speedometer drive + Dakota SEN-01-5 (state 0v)"
   where: rear
   device: road-speed source (NP205 output — recommended)
   family: open
@@ -846,9 +971,12 @@ COIL-GROUND-RINGS:
   device: head ring terminals for the coil a (chassis) and b (signal) grounds
   family: ring_small
   kit: {RING-SMALL: 4}
-  wires: [COIL1_GND, COIL2_GND, COIL3_GND, COIL4_GND, COIL5_GND, COIL6_GND, COIL7_GND, COIL8_GND, COIL1_SGND, COIL2_SGND, COIL3_SGND, COIL4_SGND, COIL5_SGND, COIL6_SGND, COIL7_SGND, COIL8_SGND]
-  note: "4 rings: chassis and signal grounds kept separate (Dave), 4 x 18 AWG per ring = 12 AWG barrel"
-  sources: ["Dave's M130 sheet: coil a and b to 'head ring terminal'"]
+  wires: [COIL1_GND, COIL2_GND, COIL3_GND, COIL4_GND, COIL5_GND, COIL6_GND, COIL7_GND, COIL8_GND, COIL1_SGND, COIL2_SGND, COIL3_SGND, COIL4_SGND, COIL5_SGND, COIL6_SGND, COIL7_SGND, COIL8_SGND, ECU_GND1, ECU_GND2]
+  note: "4 rings for the coils: chassis and signal grounds kept separate (Dave), 4 x 18 AWG per ring = 12 AWG barrel. The M130 grounds A10/A11 (ECU_GND1/2, 16 AWG, equal length) land on the head too (chapters/17 §17.4.6)"
+  open:
+    - "ground point, stud size, lug count: name it (state row 56 banks) — Dave's sheet says only 'head ring terminal'; no stud, bank or count is recorded for the 16 coil grounds or the M130 grounds A10/A11 (review A9)"
+    - "ring terminal part numbers: per stud size and gauge (RING-SMALL is OPEN, review B19)"
+  sources: ["Dave's M130 sheet: coil a and b to 'head ring terminal'", "chapters/17 §17.4.6 (ECM grounds direct on the head or block), §17.7.3 (equal-length pair)"]
 
 # ============================================================== the whole truck (2026-09-27 evening)
 # Owner: "work on the whole truck"; "wiring in the factory switches and modules and figure out how they work in a can bus
@@ -1239,11 +1367,11 @@ ACC-BATT:
   where: engine
   device: "Optima YellowTop — the accessory battery (owner 2026-09-27); beside the Odyssey; model set by the tray"
   family: open
-  kit: {}
   wires: ["32", ACC_NEG, DCDC_OUT]
-  note: "the isolator does not cut this battery: it feeds only the amplifier (#32, MIDI 50 A at the + post) and is charged through the DC-DC charger, whose input is downstream of the isolator"
-  open: ["YellowTop model / tray; the default spot is the engine bay beside the Odyssey — the amp's power and ground runs change if it moves behind the seat"]
-  sources: ["owner 2026-09-27"]
+  note: "the isolator does not cut this battery: it feeds only the amplifier (#32, MIDI 60 A at the + post — the JL VX700/5i needs 'an external 60-amp ... fuse', Crutchfield snapshot) and is charged through the DC-DC charger, whose input is downstream of the isolator. #32 lands on the MIDI holder's M5 stud: 410LTP (4 AWG, #10)"
+  kit: {410LTP: 1}
+  open: ["YellowTop model / tray; the default spot is the engine bay beside the Odyssey — the amp's power and ground runs change if it moves behind the seat", "MIDI 60 A part number not on file (MIDI-60A)"]
+  sources: ["owner 2026-09-27", "web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md ('4-gauge power and ground leads and a 60-amp fuse recommended'; 'An external 60-amp AFS, AGU, or MAXI fuse (not included) must be installed')"]
 ISOLATOR:
   where: engine
   device: "Blue Sea Systems 7700 ML-RBS remote battery switch with manual control, 12 V, 500 A continuous, on the Odyssey positive (studs A/B, 3/8 in-16); lined up at Powerwerx, $322.09"

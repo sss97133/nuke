@@ -256,36 +256,49 @@ CPA-100-3/4-BK:
   sources: [prowire 238LTP heat-shrink options ("CPA 3:1 Black: CPA-100-3/4-BK")]
 MS25171-3S: {vendor: amazon, kind: boot, pool: power_spine, name: "stud boot, 6-pack (one cart line = 6 boots)", sources: [receipt 2026-09-25 PM]}
 "Blue Sea 2019": {vendor: amazon, kind: stud, pool: power_spine, name: "PowerBar dual 3/8 in stud — marine, kept: matches Dave's block; ProWire studs are 60 °C", sources: [receipt 2026-09-25 PM]}
-02980900TXN: {vendor: digikey, pool: power_spine, kind: holder, name: "Littelfuse MEGA fuse holder (M8 studs)"}
-0498900.TXN: {vendor: digikey, pool: power_spine, kind: holder, name: "Littelfuse MIDI fuse holder with cover (M5)"}
+02980900TXN: {vendor: digikey, pool: power_spine, kind: holder, name: "Littelfuse MEGA fuse holder (M8 studs)", stud: M8, lug_2awg: 2516LTP, sources: ["receipts/2026-09-25_orders-staged-prowire-ksv-ict.md (lug adds: 810TP/410LTP 'to the MIDI M5 studs', 2516LTP 'to the MEGA M8 studs'); state 0j(a). Littelfuse holder datasheets not on file"]}
+0498900.TXN: {vendor: digikey, pool: power_spine, kind: holder, name: "Littelfuse MIDI fuse holder with cover (M5)", stud: M5, lug_8awg: 810TP, lug_4awg: 410LTP, sources: ["receipts/2026-09-25_orders-staged-prowire-ksv-ict.md (lug adds: 810TP/410LTP 'to the MIDI M5 studs', 2516LTP 'to the MEGA M8 studs'); state 0j(a). Littelfuse holder datasheets not on file"]}
+MEGA-100A: {kind: fuse, pool: power_spine, name: "MEGA 100 A (PDM15 feed)", status: open, note: "Littelfuse part number not on file (the carted MEGAs are 125/175/200 A: 0298125/175/200.ZXEH); value from the PDM15 80 A total continuous output x 1.25 (MoTeC PDM manual p.35; chapters/17 §17.5 item 5 method)", sources: ["MoTeC PDM user manual p.35 (Total output current, continuous: PDM15 80 A)"]}
+MIDI-60A: {kind: fuse, pool: power_spine, name: "MIDI 60 A (amplifier feed at the YellowTop)", status: open, note: "Littelfuse MIDI 60 A part number not on file (the carted MIDI is 0498040.M, 40 A)", sources: ["JL Audio VX700/5i manual via Crutchfield: 'An external 60-amp AFS, AGU, or MAXI fuse (not included) must be installed' (web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md)"]}
+LUG-4AWG-M6: {kind: lug, name: "4 AWG lug, M6 (1/4 in) stud — PDM15 battery stud", status: open, note: "no 4 AWG 1/4 in lug in parts.yaml, the carts, or the ProWire catalog_parts scrape (read-only query 2026-09-28): pick"}
+LUG-4AWG-M8: {kind: lug, name: "4 AWG lug, M8 (5/16 in) stud — MEGA holder end of the PDM15 feed", status: open, note: "no 4 AWG 5/16 in lug in parts.yaml, the carts, or the ProWire catalog_parts scrape (read-only query 2026-09-28): pick"}
+AMP-KIT-RING: {kind: lug, name: "ring on the AMP Research kit harness red lead (battery +)", status: open, note: "comes on the kit harness (IM75146 step 8); its stud fit read on arrival"}
 0298125.ZXEH: {vendor: digikey, pool: power_spine, kind: fuse, name: "MEGA 125 A"}
 0298175.ZXEH: {vendor: digikey, pool: power_spine, kind: fuse, name: "MEGA 175 A"}
 0298200.ZXEH: {vendor: digikey, pool: power_spine, kind: fuse, name: "MEGA 200 A (alternator fuse = builder pick at install)"}
 0498040.M: {vendor: digikey, pool: power_spine, kind: fuse, name: "MIDI 40 A, M5 (iBooster, pump, spare)"}
-ISOLATOR:
+MOROSO-74102:
   vendor: moroso
   kind: module
   name: "Moroso 74102 battery isolator (PICK 4) — 1/2 in-20 main studs + 10-32 aux pair (M130 shutdown)"
-  status: open
-  note: out of stock at moroso.com; needs 2 AWG × 1/2 in lugs (ProWire has none)
+  status: retired
+  retired: "superseded by the Blue Sea 7700 ML-RBS on the Odyssey positive (state row 57 and 0x; receipt 2026-09-27_owner-reply-grounds-isolator-batteries-dakota.md)"
   sources: [receipt 2026-09-25 PM; MoTeC PDM manual p.7]
 LUG-2AWG-1/2:
   kind: lug
-  name: 2 AWG lug, 1/2 in stud (isolator)
-  status: to_buy
-  note: not at ProWire; source with the isolator
+  name: 2 AWG lug, 1/2 in stud (Moroso isolator)
+  status: retired
+  retired: "the Moroso's 1/2 in studs are gone with it: the Blue Sea 7700 studs are 3/8 in-16, which 238LTP fits (endpoints.yaml PS-STUDS)"
   sources: [receipt 2026-09-25 PM]
+BLUESEA-7700:
+  vendor: powerwerx
+  kind: module
+  name: "Blue Sea Systems 7700 ML-RBS remote battery switch with manual control, 12 V, 500 A continuous — studs A/B 3/8 in-16, 140 in-lb max; control leads red/black/brown/orange/yellow (16 AWG minimum)"
+  status: picked
+  note: "the decided isolator (owner 2026-09-27 'pick the isolator'; wiring_decisions k5-battery-isolator-decided); lined up at Powerwerx, $322.09 (endpoints.yaml ISOLATOR)"
+  sources: ["reference_documents/component_drawings/BlueSea_7700_ML-RBS_Instructions_990180170-006.pdf p.1-2", "web_snapshots/www.bluesea.com__ML-RBS_Remote_Battery_Switch_with_Manual_Control_-_12V_DC_500A.md"]
 RING-SMALL:
   kind: lug
-  name: small ring terminals (sensor/Dakota sender studs, starter S, isolator 10-32 aux, dash star)
+  name: small ring terminals (starter S, coil and ECU head-ring grounds, ground banks, sender studs)
   status: open
-  note: "PN per stud size + gauge UNKNOWN; none in any cart"
+  note: "OPEN: ring terminal PN by stud (M5/M6/M8/3/8 in) and gauge. None in parts.yaml or any cart, and the ProWire catalog scrape (catalog_parts, supplier_url prowireusa.com) has no ring terminals (read-only query 2026-09-28). Each stud size is itself open (starter S: read off the starter; head ring: review A9), so the PN follows the stud (review B19)"
   sources: [build book engine table rows 'Dakota senders', 'Starter trigger', 'grounds']
 
 # ---------------------------------------------------------------- splices, shields, markers, shrink
 D-609-03: {vendor: prowire, kind: splice, family: miniseal, name: "MiniSeal stub splice, red (26–20 AWG cavity)", range_awg: [26, 20], sources: ["ProWire 3137CT page: 'three cavities: 26-20 AWG (Red), 20-16 AWG (Blue) and 16-12 AWG (Yellow)' (snapshot 2026-09-26)"]}
 D-609-04: {vendor: prowire, kind: splice, family: miniseal, name: "MiniSeal stub splice, blue (20–16)", range_awg: [20, 16], sources: ["ProWire 3137CT page: 'three cavities: 26-20 AWG (Red), 20-16 AWG (Blue) and 16-12 AWG (Yellow)' (snapshot 2026-09-26)"]}
-D-609-05: {vendor: prowire, kind: splice, family: miniseal, name: "MiniSeal stub splice, yellow (16–12) — PDM pigtail joins + rails", range_awg: [16, 12], sources: ["ProWire 3137CT page: 'three cavities: 26-20 AWG (Red), 20-16 AWG (Blue) and 16-12 AWG (Yellow)' (snapshot 2026-09-26)"]}
+D-609-05: {vendor: prowire, kind: splice, family: miniseal, name: "MiniSeal stub splice, yellow (16–12) — rails and ECU pin splices", range_awg: [16, 12], sources: ["ProWire 3137CT page: 'three cavities: 26-20 AWG (Red), 20-16 AWG (Blue) and 16-12 AWG (Yellow)' (snapshot 2026-09-26)"]}
+M81824/1-3: {vendor: prowire, kind: splice, family: miniseal, name: "MiniSeal in-line (butt) splice, yellow, with its sealing sleeve — PDM 20 A output pigtail joins (2 × 16 AWG in, load wire out)", range_awg: [16, 12], note: "range per the 3137CT crimp cavity (16–12 AWG); ProWire's MiniSeal category page gives the yellow band as 12-10AWG — bench-check a 14 AWG load in it", sources: ["ProWire Raychem MiniSeal splices page ('Butt: M81824/1 series comes with a color-coordinated heat-shrink sleeve'; lists Item No. M81824/1-3) (snapshot web_snapshots/www.prowireusa.com__raychem-miniseal-splices.md)", "ProWire 3137CT page: 'three cavities: 26-20 AWG (Red), 20-16 AWG (Blue) and 16-12 AWG (Yellow)' (snapshot 2026-09-26)"]}
 S02-03-R: {vendor: prowire, kind: sleeve, family: solder_sleeve, name: "solder sleeve M83519/2-3, 22 AWG lead"}
 PRO-IDENT-KIT:
   vendor: prowire
@@ -324,9 +337,9 @@ MOTEC-UTC-61059:
 CAN-TERM-100R:
   vendor: digikey
   kind: resistor
-  name: CAN terminator 100 ohm, 0.25 W, axial — one, at the end of the bus opposite the UTC plug
+  name: CAN terminator 100 ohm, 0.25 W, axial — one at each end of the trunk (M130 end, LTCD end)
   status: to_buy
-  note: "MoTeC: 100R (0.25 W) terminators, not 120R; a bus under 2 m takes one resistor (this bus: 3.5 ft)"
+  note: "MoTeC: 100R (0.25 W) terminators, not 120R, at each end of the trunk; the one-resistor short-bus rule (under 2 m) no longer applies — the bus runs to the engine PDM15 and the LTCD (review A10)"
   sources: ["MoTeC PDM user manual p.50 'CAN Bus Wiring Requirements' + 'Short CAN Bus'"]
 
 # ---------------------------------------------------------------- tools that sit in a cart (the Tools table carries them)

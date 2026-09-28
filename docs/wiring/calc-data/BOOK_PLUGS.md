@@ -43,7 +43,7 @@ From: 61-pin cavity map (June 10 build sheet) · IPC/WHMA-A-620 pull-test values
 | Open-barrel crimper for TE Junior Power Timer 2.8 mm terminals (EV1) | Injector plugs | LATER — the terminal part number on the kit bag names it |
 | TE AMP hand crimper for the Gen V throttle-body terminals | Throttle-body plug | LATER — the terminal part number on the kit bag names it |
 
-## Throttle body (GM 12699160, Gen V SENT) · 2 items open
+## Throttle body (GM 12699160, Gen V SENT) · 3 items open
 
 Kit: WCTHB50 ×1: **BUY NOW**, to add to the ICT Billet order
 
@@ -54,6 +54,8 @@ Kit: WCTHB50 ×1: **BUY NOW**, to add to the ICT Billet order
 | TPS signal (SENT) | 22 AWG green/brown, doubled over at the terminal | 3 | FF | M130 B09 |
 | TPS 0 V | 22 AWG brown, doubled over at the terminal | 4 | f | M130 B16 (spliced) |
 | TPS 5 V | 22 AWG orange, doubled over at the terminal | 5 | e | M130 A02 (spliced) |
+
+**LATER** — pin order: cite a GM end view of 12699160 before terminating (review A2; state row 29 and 0s: the order is borrowed from other GM SENT bodies)
 
 **LATER** — bench check before crimping: this throttle body's pin order is borrowed from other GM SENT throttle bodies (no saved source names 12699160); meter it — the two motor pins are the pair with a low resistance between them
 
@@ -72,7 +74,7 @@ Kit: COIL-CONN-LS2/7 ×1: **BUY NOW**, in the ProWire cart
 | coil 1 chassis ground | 18 AWG black | a | — | head ring terminal, chassis ground |
 | coil 1 signal ground | 18 AWG brown/black | b | — | head ring terminal, signal ground |
 | coil 1 trigger | 22 AWG white, doubled over at the terminal | c | M | M130 A13 |
-| coil 1 +12 V | 18 AWG red | d | — | coil power rail (splice) |
+| coil 1 +12 V | 18 AWG red | d | — | coil +12 V splice |
 
 **LATER** — the terminal part number on the kit bag names the crimper
 
@@ -87,7 +89,7 @@ Kit: 8CYLK-90 (one kit covers 8): **BUY NOW**, in the ProWire cart
 | Wire | Size, colour | Injector pin | 61-pin | Other end |
 |---|---|---|---|---|
 | injector 1 driver | 22 AWG white, doubled over at the terminal | 1 | D | M130 A19 |
-| injector 1 +12 V | 20 AWG red | 2 | — | injector power rail (splice) |
+| injector 1 +12 V | 20 AWG red | 2 | — | injector +12 V splice |
 
 **LATER** — open-barrel crimper for TE Junior Power Timer 2.8 mm terminals (EV1): the terminal part number in the kit names it
 
@@ -177,7 +179,7 @@ Kit: ICT-GEN4-OILP ×1: **BUY NOW**, on the ICT Billet link
 
 From: Dave's M130 sheet · your Sep 25 orders
 
-## Gas pedal (GM Gen III truck pedal, 9-way plug, bought 2025-04-02) · 1 item open
+## Gas pedal (GM Gen III truck pedal, 9-way plug, bought 2025-04-02) · 2 items open
 
 Kit: WPAPP30 ×1: **BUY NOW**, to add to the ICT Billet order
 
@@ -191,6 +193,8 @@ Kit: WPAPP30 ×1: **BUY NOW**, to add to the ICT Billet order
 | pedal track 2 5 V | 22 AWG orange/black | B | — | M130 A09 |
 
 **LATER** — before crimping, meter the pedal: G–E and B–D read a fixed resistance, F–E and C–D change as the pedal moves (the pin map is from a web source, not a GM manual)
+
+**LATER** — cavity letters: read the WPAPP30 plug — the plug moulds 9 cavities, 6 wired (B–G); no saved source names the 3 unused ones (the third sensor's), and whether the pigtail carries 9 leads or 6 is not on the ICT page (review C24)
 
 From: [ICT Billet WCTHB50](https://www.ictbillet.com/products/lt-gen-v-throttle-body-connector-component-kit)
 
@@ -220,17 +224,16 @@ Kit: D38999/26WJ61PN ×1: **BUY NOW**, on the eBay list (surplus listing chosen)
 | U | coil 7 trigger | 22 AWG white | M130 A05 |
 | V | coil 8 trigger | 22 AWG white | M130 A12 |
 | W | oil temp 0 V | 22 AWG brown | M130 B16 |
-| X | Dakota temp sender (SEN-04-5) second wire -> VHX WTR - | 22 AWG  | DAKOTA-VHX (WTR -) |
+| X | Dakota coolant sender return | 22 AWG  | DAKOTA-VHX (WTR -) |
 | Y | coolant temp 0 V | 22 AWG brown/black | M130 B16 |
 | Z | cam 6.3 V | 22 AWG white/orange | M130 B19 |
-| a | Dakota oil sensor (SEN-03-8) ground (black + bare shield) to VHX OIL - | 22 AWG  | DAKOTA-VHX (OIL -) |
+| a | Dakota oil sender 0 V | 22 AWG  | DAKOTA-VHX (OIL -) |
 | b | cam shield drain | 22 AWG white/blue | M130 B15 |
-| d | speed sensor | 22 AWG gray | M130 B08 |
 | e | TPS 5 V | 22 AWG orange | M130 A02 |
 | f | TPS 0 V | 22 AWG brown | M130 B16 |
 | g | fuel PSI 0 V | 22 AWG brown/black | M130 B16 |
 | h | fuel PSI 5 V | 22 AWG orange | M130 A02 |
-| i | Dakota oil sensor (SEN-03-8) +5 V (red) from VHX OIL + | 22 AWG  | DAKOTA-VHX (OIL +) |
+| i | Dakota oil sender 5 V | 22 AWG  | DAKOTA-VHX (OIL +) |
 | j | CAN Lo: body PDM30 to engine PDM15, through the 61-pin | 22 AWG green | PDM30 CANLO |
 | k | Dakota oil sender | 22 AWG green/white | DAK-OILP (SEN-03-8 white, signal) |
 | m | oil PSI 5 V | 22 AWG orange | M130 A02 |
@@ -261,15 +264,23 @@ Kit: D38999/26WJ61PN ×1: **BUY NOW**, on the eBay list (surplus listing chosen)
 
 From: your Sep 25 orders · ProWire RT125 epoxy page · Dave's M130 sheet · MoTeC PDM manual p.50 (CAN)
 
-## CAN bus (M130 to PDM30) · 4 items open
+## CAN bus (M130 to PDM30) · 8 items open
 
-Kit: CAN-TERM-100R ×1: **BUY NOW**, to add to the DigiKey cart
+Kit: CAN-TERM-100R ×2: **BUY NOW**, to add to the DigiKey cart
 
 | Wire | Size, colour | From | To |
 |---|---|---|---|
 | CAN trunk | 22 AWG yellow + green | M130 B17 (high) / B18 (low) | PDM30 B26 / B25; one 100 Ω terminator at the PDM30 end |
 
 The laptop-port branch off this trunk is under PDM30 laptop port.
+
+**LATER** — CAN cavities GG and j are not adjacent on the 61-pin: choose an adjacent pair from the spares c, d, t, u or accept (the twisted pair splits across the insert; review A10). Cavity d is spare since the speed sender left the 61-pin (review A11)
+
+**LATER** — UTC stub: splice the UTC pair onto the trunk within 500 mm of the M130 end, stub 500 mm max (p.49); the splice point is not placed yet
+
+**LATER** — PDM30 and PDM15 stubs 500 mm max off the trunk (p.49): each PDM takes two wires per CAN pin (trunk in, trunk out) or a short stub — set at the formboard
+
+**LATER** — LTCD lead length from the PDM15: not measured (it is the far trunk end, with its own 100R)
 
 From: MoTeC PDM manual p.50 (CAN)
 
