@@ -250,7 +250,8 @@ def rows_for(eps, e, wires, ends):
 
 def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, junctions, parts):
     eps = reg["endpoints"]
-    sub = f"{len(devs)} plugs · {len(sheet_wires)} circuits · label = gauge colour-circuit · dashed = an end or a cavity not settled"
+    sub = (f"{len(devs)} plugs · {len(sheet_wires)} circuits · label = gauge colour-circuit · dashed = an end or a cavity not settled · "
+           f"plug boxes are pin maps, not the plug's shape; the 61-pin is drawn to its insert arrangement")
     s = Sheet(number, title, sub)
     pin_at = {}                                    # (endpoint, cavity) -> (x, y)
 
@@ -273,36 +274,43 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
     lowest_left = y
     x1 = x_dev + BOX_W
 
-    # ---- column 3: the 61-pin, rows ordered by where the runs arrive
+    # ---- column 3: the 61-pin firewall connector drawn as its real insert arrangement (MILNEC 25-61 front face of
+    # the pin insert, transcribed in scripts/generate_connector_build_sheets.py CAV_XY; the receptacle's mating face
+    # seen from the engine bay is the mirror). Only this sheet's cavities are lit; the rest print faint.
     x_jun = x1 + 210
     x2 = x_jun + BOX_W
-    bulk_x = x2 + 120
-    bulk = OrderedDict()
+    sheets = kits_v5._load_sheets()
+    xy = sheets.CAV_XY
+    xs_ = [v[0] for v in xy.values()]; ys_ = [v[1] for v in xy.values()]
+    cx0, cy0 = (min(xs_) + max(xs_)) / 2, (min(ys_) + max(ys_)) / 2
+    span = max(max(xs_) - min(xs_), max(ys_) - min(ys_))
+    R = 92.0
+    scale = (2 * R - 22) / span
+    bulk_cx, bulk_cy = x2 + 120 + R, M + 60 + R
+    bulk_x = bulk_cx - R
+    lit = {}
     for wid in sheet_wires:
         for t in ends.get(wid, []):
-            if t["endpoint"] == "FIREWALL-ENGINE" and t.get("cavity"):
-                src = next(((u["endpoint"], end_key(u)) for u in ends[wid] if (u["endpoint"], end_key(u)) in pin_at), None)
-                bulk.setdefault(t["cavity"], pin_at[src][1] if src else 1e9)
-    cavs = sorted(bulk, key=lambda c: bulk[c])
+            if t["endpoint"] == "FIREWALL-ENGINE" and t.get("cavity") in xy:
+                lit[t["cavity"]] = wid
     bulk_pins = {}
-    if cavs:
-        bp, bh = draw_box(s, bulk_x, M + 48, "61-pin firewall connector, engine side", [(c, "") for c in cavs], width=44, side="left")
-        for cav, (px, py) in bp.items():
-            bulk_pins[cav] = (px, py, px + 44)
-        s.txt(bulk_x + 22, M + 48 + bh + 9, "D38999 61-WAY", 5.4, anchor="middle")
-    bulk_bottom = (M + 48 + bh + 14) if cavs else (M + 48)
-
-    # ---- column 2: engine-bay junctions (pins on the left), only the rows this sheet's wires use
-    y = bulk_bottom + 10                           # below the bulkhead rows, so runs to the bulkhead cross no box
-    for e in junctions:
-        rows = [(c, t) for c, t in rows_for(eps, e, wires, ends)
-                if any(str(t_["wire"]) in sheet_wires for t_ in ends_at(ends, e, c, sheet_wires))]
-        if not rows:
-            continue
-        pins, h = draw_box(s, x_jun, y, plug_title(e, eps[e]), rows, side="left", code=e)
-        for cav, pt in pins.items():
-            pin_at[(e, cav)] = pt
-        y += h + 22
+    s.el.append(f'<circle cx="{bulk_cx:.1f}" cy="{bulk_cy:.1f}" r="{R:.1f}" fill="none" stroke="#000" stroke-width="1.1"/>')
+    s.rect(bulk_cx - 6, bulk_cy - R - 6, 12, 7, sw=0.9, rx=1.5)                     # master key at the top
+    for cav, (px_, py_) in xy.items():
+        X = bulk_cx - (px_ - cx0) * scale                                          # mirrored: seen from the engine bay
+        Y = bulk_cy + (py_ - cy0) * scale
+        if cav in lit:
+            s.el.append(f'<circle cx="{X:.1f}" cy="{Y:.1f}" r="6.4" fill="#fff" stroke="#000" stroke-width="0.9"/>')
+            s.txt(X, Y + 2.1, cav, 5.4, bold=True, anchor="middle")
+            bulk_pins[cav] = (X - 6.4, Y, X + 6.4)
+        else:
+            s.el.append(f'<circle cx="{X:.1f}" cy="{Y:.1f}" r="6.4" fill="none" stroke="#bbb" stroke-width="0.5"/>')
+            s.txt(X, Y + 2.1, cav, 5.0, anchor="middle", colour="#bbb")
+    s.txt(bulk_cx, bulk_cy - R - 12, "61-PIN FIREWALL CONNECTOR — ENGINE SIDE, MATING FACE", 6.4, bold=True, anchor="middle")
+    s.txt(bulk_cx, bulk_cy + R + 11, "D38999/24WJ61SN receptacle · insert 25-61 · lit = on this sheet", 5.4, anchor="middle")
+    bulk_bottom = bulk_cy + R + 16
+    # runs reach a lit cavity from its left (engine side) and leave from its right (cab side)
+    cavs = list(lit)
 
     # ---- column 4: cab computers (pins on the left), one row per pin
     x_ecu = W - M - BOX_W
@@ -317,7 +325,7 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
         y += h + 22
 
     # ---- runs
-    chA, chB, chC = x1 + 96, x2 + 14, bulk_x + 44 + 14     # channels: devices→junctions, →bulkhead, bulkhead→cab
+    chA, chB, chC = x1 + 96, x2 + 14, bulk_cx + R + 14     # channels: devices→junctions, →bulkhead, bulkhead→cab
     nA = nB = nC = 0
     open_runs = 0
     for wid, w in sheet_wires.items():
@@ -353,12 +361,17 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
             ox, oy = pin_at[dev[0]] if dev else pin_at[jun[0]]
             xc = chB + ((nB % 40) * TRACK)
             nB += 1
-            s.line([(ox, oy), (xc, oy), (xc, by), (bx, by)], 1.4, dashed, colour=base, stripe=stripe)
+            # the run stops at the face's rim at the cavity's height; a thin leader inside the circle points to the cavity
+            rim_l = bulk_cx - (R * R - (by - bulk_cy) ** 2) ** 0.5
+            s.line([(ox, oy), (xc, oy), (xc, by), (rim_l, by)], 1.4, dashed, colour=base, stripe=stripe)
+            s.line([(rim_l, by), (bx, by)], 0.5, colour="#888")
             if cab:
                 cx, cy = pin_at[cab[0]]
                 xc2 = chC + (nC % 40) * TRACK
                 nC += 1
-                s.line([(bx2, by), (xc2, by), (xc2, cy), (cx, cy)], 1.4, dashed, colour=base, stripe=stripe)
+                rim_r = bulk_cx + (R * R - (by - bulk_cy) ** 2) ** 0.5
+                s.line([(bx2, by), (rim_r, by)], 0.5, colour="#888")
+                s.line([(rim_r, by), (xc2, by), (xc2, cy), (cx, cy)], 1.4, dashed, colour=base, stripe=stripe)
         elif cab and not jun:                      # to a cab computer with no bulkhead cavity yet: dashed, stamped
             ox, oy = pin_at[dev[0]]
             cx, cy = pin_at[cab[0]]

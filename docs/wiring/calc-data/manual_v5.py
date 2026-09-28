@@ -170,27 +170,19 @@ class Page:
 
 
 def connector_face(p, x, y, labels, title, pitch=26, cav=15, round_=False, href=None):
-    """An in-line harness connector seen from the mating face: housing, lock tab, one cavity per terminal with the
-    moulded cavity marking above it (GM booklet end-view style). Positions are indicative; the moulded letters rule."""
+    """A plug's PIN MAP: one square per cavity with the moulded marking above it, no housing outline. The housing's true
+    shape is drawn only from the maker's drawing (owner 2026-09-28: an inaccurate plug shape is worse than none)."""
     n = len(labels)
     w = n * pitch + 16
     h = cav + 30
-    if round_:
-        r = n * pitch / 2 + 4
-        cy = y + 10 + h / 2 + 4
-        p.el.append(f'<circle cx="{x + w / 2:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="none" stroke="#000" stroke-width="1.1"/>')
-        p.rect(x + w / 2 - 6, cy - r - 6, 12, 7, sw=1.0, rx=1.5)   # key
-        h = (cy + r) - (y + 10) + 2
-    else:
-        p.rect(x, y + 10, w, h, sw=1.1, rx=4)
-        p.rect(x + w / 2 - 14, y + 2, 28, 8, sw=1.0, rx=1.5)            # lock tab
     for i, lab in enumerate(labels):
         cx = x + 8 + i * pitch + (pitch - cav) / 2
-        cyy = y + 26 + (4 if round_ else 0)
+        cyy = y + 26
         p.rect(cx, cyy, cav, cav, sw=0.9, fill="#fff")
-        p.txt(cx + cav / 2, cyy - 4, str(lab).upper(), 7.5, bold=True, anchor="middle")
+        p.txt(cx + cav / 2, cyy - 4, str(lab), 7.5, bold=True, anchor="middle")
     p.txt(x + w / 2, y + h + 22, title.upper(), 6.8, bold=True, anchor="middle", href=href)
-    return w, h + 26
+    p.txt(x + w / 2, y + h + 30, "pin map — cavity order as moulded; housing shape not drawn", 5.6, anchor="middle", italic=True)
+    return w, h + 34
 
 
 # ---------------------------------------------------------------- content
@@ -245,7 +237,8 @@ def page_contents(reg, wires, toc, shown, notes):
               "injector and coil drives, green and yellow for sensor signals. Circuit numbers are this build's wire "
               "numbers. The text printed on each wire label is still open; it waits on Dave's names."),
         ("h", "Connector identification"),
-        ("p", f"Each plug is shown from its mating face with the cavity letters molded on the connector. "
+        ("p", f"Each plug is shown as a pin map: one square per cavity with the marking moulded on the connector, in moulded order, "
+              f"and no housing outline until the maker's drawing is on file. "
               f"{solved} of the {len(shown)} plugs in this section are complete down to terminal, seal and crimp tool. "
               f"Under each figure: the plug kit, terminal and seal part numbers, then DESIGN COMPLETE or OPEN with the fact "
               f"still missing. Open items shared by several plugs are the numbered notes below. Nothing in this book says "
@@ -361,6 +354,94 @@ def page_locations(reg, number, odd, view="top"):
     p.y += 12
     p.txt(M, H - M + 2, "Call-outs sit at the twin's component positions; the twin insert draws each component as a placeholder outline until its vendor CAD is added.", 6.4)
     return p
+
+
+DESIG = {}
+for _f, _key in (("m130_designations.txt", "M130"), ("pdm30_designations.txt", "PDM30"), ("pdm15_designations.txt", "PDM15")):
+    _p = CD / _f
+    if _p.exists():
+        for _l in _p.read_text().splitlines():
+            _parts = _l.split("|")
+            if len(_parts) >= 3:
+                DESIG[(_key, re.sub(r"^([AB])0?(\d+)$", lambda m_: m_.group(1) + m_.group(2), _parts[0]))] = (_parts[1], _parts[2])
+HEXC = {"white": "#f2f2f2", "black": "#111", "red": "#d3222a", "orange": "#f28c28", "yellow": "#e8c31c", "green": "#1f8a3b",
+        "blue": "#2457c5", "brown": "#7a4a1d", "gray": "#8a8a8a", "grey": "#8a8a8a", "violet": "#7b3fa0", "purple": "#7b3fa0",
+        "pink": "#e58fb6", "tan": "#c8a675", "cable": "#555", "shld": "#555"}
+
+
+def page_pinout(reg, wires, number, odd, dev, conn, n_pins, title, mating, source):
+    """A computer connector, full page, in colour: every pin in moulded order (a pin map, not the housing's shape: the
+    TE drawing with the cavity arrangement is not on file yet), the wire in it coloured as ordered, and the table
+    pin · MoTeC designation · circuit · wire · goes to."""
+    eid = f"{dev}-{conn}"
+    ends = {}
+    for tm in reg["terminations"]:
+        if tm["endpoint"] == eid and tm.get("cavity"):
+            ends.setdefault(tm["cavity"], []).append(tm["wire"])
+    def norm(c):
+        return re.sub(r"^([AB])0?(\d+)$", lambda m_: m_.group(1) + m_.group(2), str(c))
+    used = {norm(c): v for c, v in ends.items()}
+    p = Page(number, "Engine Harness", odd=odd)
+    p.heading(title)
+    p.txt(W / 2, p.y + 2, f"Mating connector {mating}.", 7, anchor="middle")
+    p.txt(W / 2, p.y + 11, f"Pin map in moulded order; the housing shape and row layout wait for the TE drawing. Pin functions: {source}.", 7, anchor="middle")
+    p.y += 9
+    # the map: pins in rows of 12 (a print order, not the housing's rows)
+    per_row = 12
+    cw, ch = 40, 30
+    x0 = M + (W - 2 * M - per_row * cw) / 2
+    y0 = p.y + 16
+    for i in range(1, n_pins + 1):
+        pin = f"{conn}{i}"
+        r_, c_ = divmod(i - 1, per_row)
+        X, Y = x0 + c_ * cw, y0 + r_ * (ch + 26)
+        ws = used.get(pin, [])
+        w = wires.get(ws[0]) if ws else None
+        col = str((w or {}).get("color") or "").lower().split("+")[0]
+        parts = [q.strip() for q in col.split("/") if q.strip()]
+        base = HEXC.get(parts[0], "#ddd") if parts else "#fff"
+        stripe = HEXC.get(parts[1]) if len(parts) > 1 else None
+        p.rect(X + 3, Y, cw - 6, ch, sw=0.9, fill=base if w else "#fff")
+        if stripe:
+            p.el.append(f'<rect x="{X + 3:.1f}" y="{Y + ch * 0.4:.1f}" width="{cw - 6:.1f}" height="{ch * 0.2:.1f}" fill="{stripe}"/>')
+        p.txt(X + cw / 2, Y - 3, pin, 6.6, bold=True, anchor="middle")
+        if ws:
+            label = str(ws[0]).upper() + (f" +{len(ws) - 1}" if len(ws) > 1 else "")
+            dark = base in ("#111", "#7a4a1d", "#2457c5", "#1f8a3b", "#7b3fa0", "#d3222a", "#555", "#8a8a8a")
+            p.txt(X + cw / 2, Y + ch + 8, fit(label, cw - 4, 5.6), 5.6, anchor="middle")
+            p.txt(X + cw / 2, Y + ch / 2 + 2, "", 5, anchor="middle")
+            if dark:
+                pass
+        else:
+            desig = DESIG.get((dev, pin), ("", ""))[0]
+            p.txt(X + cw / 2, Y + ch + 8, "spare" if desig not in ("-", "") else "n/c", 5.2, anchor="middle", italic=True)
+    rows_n = (n_pins + per_row - 1) // per_row
+    p.y = y0 + rows_n * (ch + 26) + 6
+    # the table
+    rows = []
+    for i in range(1, n_pins + 1):
+        pin = f"{conn}{i}"
+        d_ = DESIG.get((dev, pin), ("", ""))
+        ws = used.get(pin, [])
+        if ws:
+            w = wires.get(ws[0]) or {}
+            far = kits_v5.dave_name(w) + (f" (+{len(ws) - 1} spliced)" if len(ws) > 1 else "")
+            rows.append((pin, d_[0], ", ".join(x_.upper() for x_ in ws[:3]), gm_colour(f"{gauge(w)} {colour(w)}"), far.upper()))
+        else:
+            rows.append((pin, d_[0], "—", "", ("NOT USED" if d_[0] == "-" else "SPARE") if d_ != ("", "") else "SPARE"))
+    half = (len(rows) + 1) // 2
+    widths = [26, 58, 56, 60, 51]
+    p.table(M, p.y, widths, ["Pin", "MoTeC", "Circuit", "Size, Color", "Goes To"], rows[:half], size=5.6, lead=7.4)
+    p.table(M + COLW + GUT, p.y, widths, ["Pin", "MoTeC", "Circuit", "Size, Color", "Goes To"], rows[half:], size=5.6, lead=7.4)
+    return p
+
+
+PINOUTS = [("M130", "A", 34, "M130 Connector A — 34-Way Pinout", "TE Superseal 1.0 34-way key 1, TE 4-1437290-0 (MoTeC 65044)", "M130 datasheet p.3"),
+           ("M130", "B", 26, "M130 Connector B — 26-Way Pinout", "TE Superseal 1.0 26-way key 1, TE 3-1437290-7 (MoTeC 65045)", "M130 datasheet p.4"),
+           ("PDM30", "A", 34, "PDM30 Connector A — 34-Way Pinout", "TE Superseal 1.0 34-way, MoTeC 65044", "PDM30 datasheet p.2"),
+           ("PDM30", "B", 26, "PDM30 Connector B — 26-Way Pinout", "TE Superseal 1.0 26-way, MoTeC 65045", "PDM30 datasheet p.2"),
+           ("PDM15", "A", 34, "Engine PDM15 Connector A — 34-Way Pinout", "TE Superseal 1.0 34-way, MoTeC 65044", "PDM user manual p.42"),
+           ("PDM15", "B", 26, "Engine PDM15 Connector B — 26-Way Pinout", "TE Superseal 1.0 26-way, MoTeC 65045", "PDM user manual p.42")]
 
 
 def page_firewall(reg, wires, number, odd):
@@ -684,6 +765,12 @@ def build():
     toc.append(("Circuit Tabulation", pages[-1].number))
     pages.append(page_firewall(reg, wires, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1))
     toc.append(("Firewall Connector, Both Faces", pages[-1].number))
+    first_pin = None
+    for dev, conn, n_pins, ttl, mating, src in PINOUTS:
+        pg = page_pinout(reg, wires, f"1-{len(pages) + 1}", (len(pages) + 1) % 2 == 1, dev, conn, n_pins, ttl, mating, src)
+        pages.append(pg)
+        first_pin = first_pin or pg.number
+    toc.append(("Computer Pinouts, in Colour", first_pin))
     if reg.get("readiness"):
         pages.append(page_specs(reg, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1))
         toc.append(("Specifications", pages[-1].number))
