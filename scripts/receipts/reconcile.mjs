@@ -14,7 +14,9 @@
  *   Q2 how paid      payment_method + card last four (placeholders such as 1234 or **** are not cards)
  *   Q3 whose card    owner-only facts in vehicle_observations (structured_data.fact =
  *                    'payment_instrument_holder'); card numbers never live in this repo
- *   Q4 books line    an exact-amount line within 4 days in qb_transactions => the paying account
+ *   Q4 books line    an exact-amount line within 4 days in qb_transactions => the paying account, and
+ *                    its holder from owner-only facts (fact = 'payment_account_holder'); an account held
+ *                    by an organization makes that organization the payer
  *   Q5 entity claims owner statements (fact = 'entity_has_no_vendor_accounts'): a printed customer
  *                    name for such an entity is not evidence that it paid
  *   Q6 what for      the receipt's own words (OCR blocks, extracted vehicle hint, line items)
@@ -87,16 +89,18 @@ async function loadFacts(userIds) {
   const { data, error } = await sb.from('vehicle_observations')
     .select('id,subject_type,subject_id,structured_data')
     .is('vehicle_id', null).or('is_superseded.is.null,is_superseded.eq.false')
-    .in('structured_data->>fact', ['payment_instrument_holder', 'entity_has_no_vendor_accounts']);
+    .in('structured_data->>fact', ['payment_instrument_holder', 'entity_has_no_vendor_accounts', 'payment_account_holder']);
   if (error) throw error;
   const cards = new Map();          // `${userId}:${last4}` -> fact
   const noAccountOrgs = new Map();  // orgId -> fact
+  const accounts = [];              // { number, holder, obs }
   for (const o of data) {
     const sd = o.structured_data || {};
     if (sd.fact === 'payment_instrument_holder' && userIds.has(o.subject_id)) cards.set(`${o.subject_id}:${sd.instrument?.last4}`, { obs: o.id, grade: sd.grade, holder: sd.holder });
     if (sd.fact === 'entity_has_no_vendor_accounts') noAccountOrgs.set(sd.entity?.id, { obs: o.id, statement: sd.statement });
+    if (sd.fact === 'payment_account_holder' && sd.account?.number) accounts.push({ number: String(sd.account.number), holder: sd.holder, obs: o.id });
   }
-  return { cards, noAccountOrgs };
+  return { cards, noAccountOrgs, accounts };
 }
 
 async function loadVehicles(userId) {
@@ -148,7 +152,12 @@ function decide(r, facts, vehicles, books) {
     payer = { type: 'user', id: r.user_id, via: 'cash at the counter by the author', grade: 'cash' };
   }
   a.q3_card = payer?.via?.startsWith('card') ? payer : (card ? 'unknown' : 'no card');
-  if (!payer && books) payer = { type: 'user', id: r.user_id, via: `books line ${books.id} (${books.payment_account || 'account unnamed'})`, grade: 'books' };
+  if (!payer && books) {
+    const acct = facts.accounts.find((x) => String(books.payment_account || '').includes(x.number));
+    payer = acct && acct.holder?.type === 'organization'
+      ? { type: 'organization', id: acct.holder.id, via: `books line ${books.id} from ${books.payment_account}`, grade: 'books+account', fact: acct.obs }
+      : { type: 'user', id: r.user_id, via: `books line ${books.id} (${books.payment_account || 'account unnamed'})`, grade: acct ? 'books+account' : 'books', ...(acct ? { fact: acct.obs } : {}) };
+  }
   a.q4_books = books ? { line: books.id, account: books.payment_account, date: books.date } : null;
 
   const words = wordsOf(r);
@@ -177,6 +186,8 @@ function decide(r, facts, vehicles, books) {
   a.q6_vehicle_candidate = vehicle ? { id: vehicle.id, name: `${vehicle.year} ${vehicle.make} ${vehicle.model}`, via: 'named on the receipt' } : null;
   if (vehicle) unresolved.push(`candidate ${vehicle.year} ${vehicle.model} needs a second signal (photos or a work session) before allocation`);
 
+  // An organization owns the expense only when its own card or account paid.
+  if (payer?.type === 'organization') return { answers: a, payer, expense_of: { type: 'organization', id: payer.id }, scope: { type: 'org', id: payer.id }, unresolved };
   const scope = { type: 'unknown', id: null };
   return { answers: a, payer: payer || { type: 'unknown' }, expense_of: { type: 'user', id: r.user_id }, scope, unresolved };
 }
@@ -206,8 +217,8 @@ async function main() {
     if (live && d.scope.type === 'vehicle' && live.vehicle_id !== d.scope.id) {
       const { error } = await sb.rpc('reattribute_observation', { p_observation_type: 'observation', p_observation_id: live.id, p_target_vehicle_id: d.scope.id, p_reason: reason, p_actor_user_id: r.user_id });
       if (error) { tally.failed++; console.log(`   allocate failed: ${error.message}`); continue; }
-    } else if (live && !live.vehicle_id && !(live.subject_type === 'user' && live.subject_id === r.user_id)) {
-      const { error } = await sb.rpc('reassign_observation_subject', { p_observation_id: live.id, p_subject_type: 'user', p_subject_id: r.user_id, p_reason: reason, p_actor_user_id: r.user_id });
+    } else if (live && !live.vehicle_id && !(live.subject_type === (d.expense_of.type === 'organization' ? 'organization' : 'user') && live.subject_id === d.expense_of.id)) {
+      const { error } = await sb.rpc('reassign_observation_subject', { p_observation_id: live.id, p_subject_type: d.expense_of.type === 'organization' ? 'organization' : 'user', p_subject_id: d.expense_of.id, p_reason: reason, p_actor_user_id: r.user_id });
       if (error) { tally.failed++; console.log(`   subject write failed: ${error.message}`); continue; }
     }
     tally.landed++;
