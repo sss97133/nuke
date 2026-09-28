@@ -780,6 +780,9 @@ const VehicleDossierPanel: React.FC = () => {
                   displayValue = priceKind ? fmtVal(field, priceFacts?.price_amount) + (on ? ` · ${on}` : '') : '';
                   fieldLabel = priceKind === 'Sold' ? 'SALE PRICE' : (priceKind || '').toUpperCase();
                 }
+                // the listing's own qualifier on the reading, e.g. BaT "10k Miles Shown, TMU" -> "10,000 mi · shown, TMU"
+                const mileageClaim = field === 'mileage' ? evidence['mileage_claim']?.primary?.field_value : null;
+                if (mileageClaim && displayValue) displayValue = `${displayValue} · ${mileageClaim}`;
                 if (!displayValue) return null;
                 // Every field value opens its evidence popup — click-through chain
                 const handleValueClick = () => {

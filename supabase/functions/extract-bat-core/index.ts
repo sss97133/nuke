@@ -282,6 +282,7 @@ function extractEssentials(html: string): {
   listing_category: string | null;
   vin: string | null;
   mileage: number | null;
+  mileage_claim: string | null; // BaT's qualifier on the reading: "shown", "shown, TMU", "TMU"
   exterior_color: string | null;
   interior_color: string | null;
   transmission: string | null;
@@ -569,6 +570,7 @@ function extractEssentials(html: string): {
   // Listing Details list items (VIN/chassis, mileage, colors, transmission, engine)
   let vin: string | null = null;
   let mileage: number | null = null;
+  let mileage_claim: string | null = null;
   let exterior_color: string | null = null;
   let interior_color: string | null = null;
   let transmission: string | null = null;
@@ -607,6 +609,14 @@ function extractEssentials(html: string): {
           const n = Math.round(parseFloat(milesKMatch[1]) * 1000);
           if (Number.isFinite(n) && n > 0 && n < 10000000) mileage = n;
         }
+      }
+      // BaT's qualifier on the reading: "10k Miles Shown, TMU" = the odometer shows 10k and the true total is
+      // unknown; "Miles Shown" = the reading, not verified. A plain "Miles" line carries no qualifier.
+      if (!mileage_claim && t.length <= 80 && /\b(?:miles?|kilometers?|km|TMU)\b/i.test(t) &&
+          /\b(?:TMU|true mileage unknown|shown|indicated)\b/i.test(t)) {
+        const tmu = /\bTMU\b|true mileage unknown/i.test(t);
+        const shown = /\b(?:shown|indicated)\b/i.test(t);
+        mileage_claim = tmu ? (shown ? "shown, TMU" : "TMU") : "shown";
       }
       if (!transmission) {
         const looksLikeTransmission =
@@ -698,6 +708,7 @@ function extractEssentials(html: string): {
     listing_category,
     vin,
     mileage,
+    mileage_claim,
     exterior_color,
     interior_color,
     transmission,
@@ -1896,6 +1907,7 @@ Deno.serve(async (req) => {
       if (essentials.sale_price) obsFields.sale_price = essentials.sale_price;
       if (essentials.high_bid) obsFields.high_bid = essentials.high_bid;
       if (essentials.mileage) obsFields.mileage = essentials.mileage;
+      if (essentials.mileage_claim) obsFields.mileage_claim = essentials.mileage_claim;
       if (bestExteriorColor) obsFields.color = bestExteriorColor;
       if (bestInteriorColor) obsFields.interior_color = bestInteriorColor;
       if (essentials.transmission) obsFields.transmission = essentials.transmission;
