@@ -391,6 +391,10 @@ IMPLIED += [
      "M22759/32", "factory circuit"),
     ("TG_MOT_A", "Tailgate key switch -> window motor lead A", "TG-SW-KEY (UP out)", "rear_window_motor:A", 14, "M22759/32",
      "factory circuit (inside the tailgate)"),
+    ("TG_KEY_FEED", "Tailgate key switch FEED (factory circuit 60), branched from the dash switch feed", "TG-SW-DASH (feed, spliced to TG_FEED)",
+     "TG-SW-KEY (FEED, circuit 60)", 14, "M22759/32", "TG78"),
+    ("TG_CUT_IN", "Tailgate window UP line: splice 183 (key switch CLOSE terminal) -> tailgate-closed cutout switch (circuit 183C)",
+     "TG-SW-KEY (CLOSE, splice 183)", "TG-CUTOUT (183C)", 14, "M22759/32", "TG78"),
     ("TG_MOT_B", "Tailgate key switch -> window motor lead B", "TG-SW-KEY (DOWN out)", "rear_window_motor:B", 14, "M22759/32",
      "factory circuit (inside the tailgate)"),
     # rear camera (license plate) + mirror display
@@ -414,6 +418,15 @@ IMPLIED += [
     ("VSS_GND", "Speed sender ground (SPD -)", "VSS-SENDER (ground)", "DAKOTA-VHX (SPD -)", 22, "M22759/16", SEN015 + "; VHX manual p.6"),
     ("VSS_DAK", "Speed sender signal to the Dakota SPD SND input", "VSS-SENDER (signal)", "DAKOTA-VHX (SPD SND)", 22, "M22759/16", SEN015 + "; VHX manual p.6"),
 ]
+TG78 = ("1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16, sheet A-4 "
+        "'Power Rear Window (RPO A33)' (read from the page image 2026-09-28): key switch 8900713 = OPEN 184 / FEED 60 (12 OR/B-60, "
+        "battery via the 30 A circuit breaker) / CLOSE 183, in PARALLEL with the dash switch 8911352 (5 UP / 4 FEED / 3 DOWN): the "
+        "two switches' outputs join at splice-183 and splice-184; the UP line then runs through the N/O 'tailgate closed' cutout "
+        "switch 2977647 (12 LBL-183C in, 12 LBL-183E out) to the motor 6288909 UP-1; DN-2 = 12 T/W-184C")
+IMPLIED[:] = [(i, l, f, t, g, sp, TG78 if src == "TG78" else src) for i, l, f, t, g, sp, src in IMPLIED]
+TGW = "tailgate circuit redrawn to the factory drawing (" + TG78 + "; pin-table review 2026-09-28)"
+BLW = ("1978 C-K wiring booklet p.16 sheet A-4 'Air Conditioning RPO C-60' + p.8-9 circuit table (catalog/pin_tables/BLOWER-RES.yaml): "
+       "the A/C resistor plug has FOUR cavities — 51 low (BAT), 63 M1, 72 M2, 101 output to the blower; not '3 prongs'")
 IMPLIED_EXTRA_0927 = {
     "PDM15_BPOS": {"color": "red"}, "PDM15_GND1": {"color": "black"}, "PDM15_GND2": {"color": "black"},
     "CAN_FW_H": {"color": "yellow"}, "CAN_FW_L": {"color": "green"},       # Dave's colours: yellow CAN-H, green CAN-L
@@ -424,6 +437,9 @@ IMPLIED_EXTRA_0927 = {
     "START_TRIG": {"control": "PDM15 logic over CAN: START request (PDM30 DIG10) AND PCS neutral (PDM30 DIG11) AND the M130 crank-enable bit"},
     "PCS_IGN": {"control": "ignition RUN over CAN from the PDM30 (DIG1)"},
     "TG_FEED": {"control": "PDM30 DIG1 ignition RUN (the factory switches do the switching; the PDM is the fuse)"},
+    "TG_KEY_FEED": {"control": "shares TG_FEED (PDM30 OUT1 on DIG1 ignition RUN): the key switch works only key-on — the factory "
+                               "fed it always-hot (circuit 60 via the 30 A breaker); owner call whether OUT1 runs always-on"},
+    "TG_CUT_IN": {"control": "the tailgate-closed cutout passes UP only with the tailgate shut (1978 booklet p.16)"},
     "MIRROR_PWR": {"control": "PDM30 DIG1 ignition RUN"},
     "LOCK_FEED_R": {"control": "always on (same output as #38: you lock the truck key-off)"},
     "TG_MOT_A": {"control": "factory dash + key switches reverse the motor; fed by TG_FEED (PDM30 OUT1 on DIG1)"},
@@ -480,6 +496,7 @@ ESTOPP = ("E-Stopp ESK001 wiring diagram (reference_documents/component_drawings
           "control box G red +12 V from battery, F blue safety to ignition, H black ground, E green button/ground-sync (kit)")
 IBOOST = ("chapters/17 §17.3: MIDI 40 A -> iBooster, 8 AWG /16 (#52); Bosch OEM supply 40 A on pin 1, ignition 12 V 5 A on "
           "pin 20; state §1 'Bosch iBooster Gen 2 (Tesla salvage + Tulay connector)', installed on the driver firewall (state)")
+AMPWHY = "JL VX700/5i guide (web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md) 'Power Connector': '4 AWG is the required copper wire size for this amplifier'; spec table 'Min. Copper Power/GND Wire 4 AWG', 'Recommended Fuse 60 A'. The 18.4 ft loop needs 2 AWG for the 3 % drop (4 AWG 0.62 V = 4.4 %; cable_sizing_v5), so the run lands on a reducing block beside the amp and a short 4 AWG tail enters the set screw. JL's own step A: 'install a fused distribution block near the amplifiers'. 4 AWG under the 60 A MIDI: 72 A bundled x 0.85 = 61 A >= 60 A"
 GSTAR = "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)"
 GCAB = "GND-BANK-CAB (cab ground bank beside the PDM30)"
 GFL = GFR_ = GFW = GSTAR                       # engine-bay loads return in the loom to the ground star
@@ -528,8 +545,12 @@ IMPLIED += [
     ("ESTOPP_GND", "E-Stopp control box ground (wire H, black)", "E-STOPP (H, black)", GREAR, 16, "M22759/32", ESTOPP),
     ("STEP_GND", "AMP Research harness negative (black lead) to battery negative", "AMP-STEP-CTRL (black lead)", GSTAR_EARLY, None,
      "kit harness", AMPR),
-    ("AMP_GND", "Amplifier ground, 4 AWG in the loom to the ground star", "AMP (ground)", GSTAR, 4, "M22759/16",
-     GND_WHY + "; ground cable matches the 4 AWG feed (#32, state 0n)"),
+    ("AMP_GND", "Amplifier ground run: reducing block beside the amp to the ground star", "AMP-BLOCK (- in, 2 AWG)", GSTAR, 4, "M22759/16",
+     GND_WHY + "; ground cable matches the feed (#32, state 0n)"),
+    ("AMP_PWR_TAIL", "Amplifier +12 V tail: reducing block to the amp power plug (4 AWG, JL's required size)", "AMP-BLOCK (+ out, 4 AWG)",
+     "AMP (+12 VDC, power plug set screw)", 4, "M22759/16", AMPWHY),
+    ("AMP_GND_TAIL", "Amplifier ground tail: amp power plug to the reducing block (4 AWG, JL's required size)", "AMP (Ground, power plug set screw)",
+     "AMP-BLOCK (- out, 4 AWG)", 4, "M22759/16", AMPWHY),
     ("IBOOST_GND", "iBooster ground to battery negative", "IBOOSTER (ground, Tulay harness)", GSTAR_EARLY, 8, "M22759/16",
      IBOOST + "; chapters/17 §17.3: battery-iBooster is a spine cable, its ground returns to the star"),
     # ---- factory switches as PDM30 inputs (switch-to-ground; the switch carries a signal, not load current)
@@ -636,7 +657,7 @@ IMPLIED += [
      "§17.4.7: PDM Batt- to battery negative); 2 AWG like #63 (Blue Sea p.2: engine-starting wires need no circuit protection)"),
     ("ACC_NEG", "YellowTop negative to the ground star", "ACC-BATT (-)", GSTAR, 4, "M22759/16",
      "owner 2026-09-27 (YellowTop for accessories); carries the amplifier's return (#32 is 4 AWG) and the DC-DC charge current"),
-    ("DCDC_IN", "DC-DC charger input from the distribution stud (MIDI 40 A)", "PS-STUDS (distribution stud, MIDI 40 A)", "DCDC (IN +)", 8,
+    ("DCDC_IN", "DC-DC charger input from the distribution stud (MIDI 60 A)", "PS-STUDS (distribution stud, MIDI 60 A)", "DCDC (IN +)", 8,
      "M22759/16", ORION + " — downstream of the isolator, so the charger stops when the truck is isolated"),
     ("DCDC_OUT", "DC-DC charger output to the YellowTop positive", "DCDC (OUT +)", "ACC-BATT (+)", 8, "M22759/16", ORION),
     ("DCDC_GND", "DC-DC charger negative to the ground star", "DCDC (-)", GSTAR, 8, "M22759/16",
@@ -1049,7 +1070,7 @@ D0927B = {
     "30b": {"to": {"device": "SUB", "pin": "-", "terminal": "speaker terminal"}},
     "31": {"to": {"device": "RADIO", "pin": "red (ignition/ACC +12 V)", "terminal": "harness plug A"},
            "control": "PDM30 DIG1 ignition RUN", "why": "RetroSound Model Hermosa manual p.16"},
-    "32": {"frm": "ACC-BATT (+, MIDI 60 A)", "to": {"device": "AMP", "pin": "+12 V", "terminal": "amp power terminal"},
+    "32": {"frm": "ACC-BATT (+, MIDI 60 A)", "to": {"device": "AMP-BLOCK", "pin": "+ in (2 AWG)", "terminal": "block set screw"},
            "why": "the amplifier runs off the accessory battery (owner 2026-09-27: YellowTop 'for other stuff like accessories'); "
                   "the JL Audio VX700/5i takes '4-gauge power and ground leads and a 60-amp fuse' (Crutchfield page, snapshot "
                   "web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md), so the MIDI at the battery is 60 A (owner 2026-09-27 "
@@ -1189,6 +1210,29 @@ def apply_decisions(rows):
 
 # ---- decisions on implied rows (same shape as DECISIONS; the old value goes to `conflicts`)
 IMPLIED_DECISIONS = {
+    "TG_BUS_UP": {"label": "Tailgate window UP line: dash switch UP -> splice 183 at the key switch CLOSE terminal",
+                  "to": "TG-SW-KEY (CLOSE, splice 183)", "why": "the key switch is in parallel, not in series: " + TGW},
+    "TG_BUS_DN": {"label": "Tailgate window DOWN line: dash switch DOWN -> splice 184 at the key switch OPEN terminal",
+                  "to": "TG-SW-KEY (OPEN, splice 184)", "why": "the key switch is in parallel, not in series: " + TGW},
+    "TG_MOT_A": {"label": "Tailgate-closed cutout switch -> window motor UP (circuit 183E)", "frm": "TG-CUTOUT (183E)",
+                 "why": "the UP line reaches the motor through the N/O tailgate-closed cutout switch 2977647: " + TGW},
+    "TG_MOT_B": {"label": "Splice 184 (key switch OPEN terminal) -> window motor DOWN (circuit 184C)",
+                 "frm": "TG-SW-KEY (OPEN, splice 184)", "why": TGW},
+    "BLOWER_LO": {"conflict": "decision: resistor text '3 prongs' -> 4 terminals, this wire on cavity 51 — " + BLW},
+    "BLOWER_MED": {"conflict": "decision: resistor text '3-prong resistor' -> 4 terminals, this wire on cavity 63 — " + BLW},
+    "BLOWER_M2": {"conflict": "decision: 'the third resistor prong' -> cavity 72 of 4 — " + BLW},
+    "RADIO_REM": {"awg": 18, "why": ("JL Audio VX700/5i: 'The power connector will accept up to 4-gauge power and ground wire, and "
+                                     "10-18-gauge wire for the remote turn-on' (web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md, "
+                                     "manual excerpt); 20 AWG is under the connector's range — 18 AWG M22759/32")},
+    "DCDC_IN": {"note": ("fuse MIDI 60 A, the maker's number: Victron Orion-Tr Smart manual §4.2 Figure 6 'Cable and fuse "
+                         "recommendations', 12 V row: external battery protection fuse 60 A, minimum cable 6 mm2 at 0.5 m, 10 mm2 at "
+                         "1-2 m (web_snapshots/www.victronenergy.com__34439-Orion-Tr_Smart_DC-DC_Charger-pdf-en.md). The 6 AWG "
+                         "(13.3 mm2) cable meets 10 mm2 and carries it: 75 A at 100 C x 0.85 = 64 A >= 60 A. chapters/17's MIDI 40 "
+                         "(35 A x 1.25 = 44 A rounded down) was under both the 125 % floor and the maker; superseded 2026-09-28"),
+                "conflict": "fuse: MIDI 40 A (chapters/17) -> MIDI 60 A (Victron manual §4.2)"},
+    "HORN_GND": {"note": "factory grounds through the bracket (catalog/pin_tables/HORN.yaml, 1978 booklet); the wire stays for the Tefzel harness (no chassis-ground reliance, chapters/17 §17.4; state row 56)"},
+    "LIC_GND": {"note": "factory grounds through the housing (catalog/pin_tables/LICENSE-LAMP.yaml, 1978 booklet); the wire stays for the Tefzel harness (no chassis-ground reliance, chapters/17 §17.4; state row 56)"},
+    "UH_GND": {"note": "factory grounds through the mount (catalog/pin_tables/UNDERHOOD-LAMP.yaml, 1978 booklet); the wire stays for the Tefzel harness (no chassis-ground reliance, chapters/17 §17.4; state row 56)"},
     "BRK_SW_0V": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
     "IGN_SW_0V": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
     "IGN_RUN_B": {"awg": 20, "spec": "M22759/32", "why": BLADE20},
@@ -1220,6 +1264,10 @@ def apply_implied_decisions(rows):
             if f in d and w.get(f) != d[f]:
                 w.setdefault("conflicts", []).append(f"decision: {f} {w.get(f)} -> {d[f]} — {d['why']}")
                 w[f] = d[f]
+        if "note" in d:
+            w["notes"] = (w.get("notes") + " | " if w.get("notes") else "") + d["note"]
+        if "conflict" in d:
+            w.setdefault("conflicts", []).append(d["conflict"])
 
 
 # ---- review A1 (2026-09-28): a load wire heavier than 16 AWG never lands on a Superseal pin. Each 20 A output is two

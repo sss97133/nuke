@@ -6,7 +6,7 @@ Vocabulary: composite design (every option) → configuration (base + decided) �
 
 | code | option | status | decided | wires | source |
 |---|---|---|---|---|---|
-| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 293 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
+| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 297 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
 | AUD | Audio — head unit, 5-channel amplifier, four coax speakers, two 10 in woofers | **decided** | 2026-09-27 | 21 | owner 2026-09-25 ("we are gonna do jbl 10 compact woofers, an amp ... and then the appropriate other speakers" |
 | STEPS | AMP Research power steps | **decided** | 2025-03-01 | 4 | client invoice Inv. 4 (AMP steps line, DB); WIRING_SYSTEM_KNOWLEDGE.md |
 | RC | Rear camera with mirror display | **decided** | 2026-09-27 | 6 | owner 2026-09-27 ("we also want like rear camera"); receipt 2026-09-27_wires-right-engine-start-doors-camera.m |
@@ -26,15 +26,15 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| buildable (base + decided) | 324 | 181 | 316 | 316 | 302 | 2 | 92 | m 0 · e 173 · u 146 |
-| composite (every option) | 344 | 185 | 336 | 336 | 322 | 2 | 92 | m 0 · e 176 · u 163 |
+| buildable (base + decided) | 328 | 207 | 320 | 320 | 306 | 2 | 92 | m 0 · e 173 · u 150 |
+| composite (every option) | 348 | 211 | 340 | 340 | 326 | 2 | 92 | m 0 · e 176 · u 167 |
 
 ### By option
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| AUD | 21 | 3 | 21 | 21 | 21 | 0 | 0 | m 0 · e 12 · u 9 |
-| BASE | 293 | 175 | 285 | 285 | 271 | 2 | 92 | m 0 · e 159 · u 129 |
+| AUD | 21 | 15 | 21 | 21 | 21 | 0 | 0 | m 0 · e 12 · u 9 |
+| BASE | 297 | 189 | 289 | 289 | 275 | 2 | 92 | m 0 · e 159 · u 133 |
 | PL | 6 | 0 | 6 | 6 | 6 | 0 | 0 | m 0 · e 1 · u 5 |
 | PW | 14 | 4 | 14 | 14 | 14 | 0 | 0 | m 0 · e 2 · u 12 |
 | RC | 6 | 3 | 6 | 6 | 6 | 0 | 0 | m 0 · e 1 · u 5 |
@@ -44,13 +44,14 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| body_convenience | 87 | 30 | 87 | 87 | 87 | 0 | 6 | m 0 · e 30 · u 57 |
-| dash_cabin | 47 | 25 | 46 | 44 | 46 | 1 | 13 | m 0 · e 16 · u 31 |
-| engine | 109 | 96 | 109 | 108 | 104 | 1 | 51 | m 0 · e 98 · u 11 |
+| body_convenience | 89 | 48 | 89 | 89 | 89 | 0 | 6 | m 0 · e 30 · u 59 |
+| dash_cabin | 47 | 27 | 46 | 44 | 46 | 1 | 13 | m 0 · e 16 · u 31 |
+| engine | 109 | 100 | 109 | 108 | 104 | 1 | 51 | m 0 · e 98 · u 11 |
 | lighting_front | 29 | 13 | 29 | 29 | 29 | 0 | 10 | m 0 · e 16 · u 13 |
 | lighting_rear | 21 | 3 | 21 | 21 | 21 | 0 | 0 | m 0 · e 9 · u 12 |
-| power_spine | 37 | 18 | 37 | 37 | 29 | 0 | 8 | m 0 · e 2 · u 30 |
+| power_spine | 37 | 20 | 37 | 37 | 29 | 0 | 8 | m 0 · e 2 · u 30 |
 | powertrain_chassis | 14 | 0 | 7 | 10 | 6 | 0 | 4 | m 0 · e 5 · u 9 |
+| unsectioned | 2 | 0 | 2 | 2 | 2 | 0 | 0 | m 0 · e 0 · u 2 |
 
 ## Capacity ledger
 

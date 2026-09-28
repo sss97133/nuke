@@ -193,3 +193,16 @@ contura:
     - {do: crimp, value: "OPEN: quick-connect crimper — not yet in the special-tools list"}
     - {do: pull test, tool: PULL_GAUGE, value: "16 AWG ≥ 30 lbf", source: "ch.18 §7"}
     - {do: push on, tool: hand, value: "seat on the tab; heat-shrink over the barrel"}
+
+dtm:
+  label: Deutsch DTM (MoTeC LTC power/CAN plug #68054, DTM 4-pin female) — size 20 solid contacts
+  per_end: {socket: 0462-201-20141, pin: 0460-202-20141, wedge_socket: WM-4S, wedge_pin: WM-4P}
+  # plug: MoTeC LTC user manual V1.7 p.32 'Power/CAN Connector DTM 4pin (M) (#68055) Mating connector: DTM 4pin (F) (#68054)'
+  # contacts: web_snapshots/www.customconnectorkits.com__0462-201-20141.md and __0460-202-20141.md ('Size 20 ... Solid Socket/Pin
+  #   for 20 AWG', 'Max 7.5 amps', 'Crimps with a 4 way indent crimper'). Those pages name only 20 AWG, so no wire_range_awg is
+  #   written: R1 stays OPEN until the Deutsch contact drawing (0462-201-20141 range) is on file.
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "OPEN: strip length — Deutsch DTM contact drawing"}
+    - {do: crimp, tool: HDT-48-00, value: "solid-barrel 4-indent; selector by contact size 20", source: "tools.yaml HDT-48-00 ('Deutsch size 20/16/12 solid contacts'); vendor page '4 way indent crimper'"}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13 · 18 ≥ 20", source: "ch.18 §7"}
+    - {do: insert, tool: hand, value: "push until the retention finger clicks; fit the WM-4S wedge"}

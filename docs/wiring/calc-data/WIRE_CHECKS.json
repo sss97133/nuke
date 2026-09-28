@@ -2957,8 +2957,8 @@
     null
    ],
    "to": [
-    "AMP",
-    "+12 V"
+    "AMP-BLOCK",
+    "+ in (2 AWG)"
    ],
    "sides": [
     "engine bay",
@@ -2971,7 +2971,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "ACC-BATT (+, MIDI 60 A):None -> AMP:+12 V"
+     "ACC-BATT (+, MIDI 60 A):None -> AMP-BLOCK:+ in (2 AWG)"
     ]
    }
   },
@@ -7083,13 +7083,13 @@
   {
    "wire": "TG_BUS_UP",
    "kind": "implied",
-   "label": "Tailgate window UP line: dash switch -> tailgate key switch",
+   "label": "Tailgate window UP line: dash switch UP -> splice 183 at the key switch CLOSE terminal",
    "from": [
     "TG-SW-DASH (UP)",
     ""
    ],
    "to": [
-    "TG-SW-KEY (UP in)",
+    "TG-SW-KEY (CLOSE, splice 183)",
     "CLOSE terminal (circuit 183, window up)"
    ],
    "sides": [
@@ -7103,20 +7103,20 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "TG-SW-DASH (UP): -> TG-SW-KEY (UP in):CLOSE terminal (circuit 183, window up)"
+     "TG-SW-DASH (UP): -> TG-SW-KEY (CLOSE, splice 183):CLOSE terminal (circuit 183, window up)"
     ]
    }
   },
   {
    "wire": "TG_BUS_DN",
    "kind": "implied",
-   "label": "Tailgate window DOWN line: dash switch -> tailgate key switch",
+   "label": "Tailgate window DOWN line: dash switch DOWN -> splice 184 at the key switch OPEN terminal",
    "from": [
     "TG-SW-DASH (DOWN)",
     ""
    ],
    "to": [
-    "TG-SW-KEY (DOWN in)",
+    "TG-SW-KEY (OPEN, splice 184)",
     "OPEN terminal (circuit 184, window down)"
    ],
    "sides": [
@@ -7130,16 +7130,16 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "TG-SW-DASH (DOWN): -> TG-SW-KEY (DOWN in):OPEN terminal (circuit 184, window down)"
+     "TG-SW-DASH (DOWN): -> TG-SW-KEY (OPEN, splice 184):OPEN terminal (circuit 184, window down)"
     ]
    }
   },
   {
    "wire": "TG_MOT_A",
    "kind": "implied",
-   "label": "Tailgate key switch -> window motor lead A",
+   "label": "Tailgate-closed cutout switch -> window motor UP (circuit 183E)",
    "from": [
-    "TG-SW-KEY (UP out)",
+    "TG-CUTOUT (183E)",
     ""
    ],
    "to": [
@@ -7150,23 +7150,77 @@
     "other",
     "other"
    ],
-   "from_str": "TG-SW-KEY (UP out)",
+   "from_str": "TG-CUTOUT (183E)",
    "control": "factory dash + key switches reverse the motor; fed by TG_FEED (PDM30 OUT1 on DIG1)",
    "subsystem": "POWER_WINDOWS",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "TG-SW-KEY (UP out): -> rear_window_motor:1 (UP, circuit 183 light blue):1 (UP, circuit 183 light blue)"
+     "TG-CUTOUT (183E): -> rear_window_motor:1 (UP, circuit 183 light blue):1 (UP, circuit 183 light blue)"
+    ]
+   }
+  },
+  {
+   "wire": "TG_KEY_FEED",
+   "kind": "implied",
+   "label": "Tailgate key switch FEED (factory circuit 60), branched from the dash switch feed",
+   "from": [
+    "TG-SW-DASH (feed, spliced to TG_FEED)",
+    ""
+   ],
+   "to": [
+    "TG-SW-KEY (FEED, circuit 60)",
+    "FEED terminal (circuit 60)"
+   ],
+   "sides": [
+    "cab",
+    "other"
+   ],
+   "from_str": "TG-SW-DASH (feed, spliced to TG_FEED)",
+   "control": "shares TG_FEED (PDM30 OUT1 on DIG1 ignition RUN): the key switch works only key-on \u2014 the factory fed it always-hot (circuit 60 via the 30 A breaker); owner call whether OUT1 runs always-on",
+   "subsystem": "POWER_WINDOWS",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "TG-SW-DASH (feed, spliced to TG_FEED): -> TG-SW-KEY (FEED, circuit 60):FEED terminal (circuit 60)"
+    ]
+   }
+  },
+  {
+   "wire": "TG_CUT_IN",
+   "kind": "implied",
+   "label": "Tailgate window UP line: splice 183 (key switch CLOSE terminal) -> tailgate-closed cutout switch (circuit 183C)",
+   "from": [
+    "TG-SW-KEY (CLOSE, splice 183)",
+    ""
+   ],
+   "to": [
+    "TG-CUTOUT (183C)",
+    "183C (from splice 183)"
+   ],
+   "sides": [
+    "other",
+    "other"
+   ],
+   "from_str": "TG-SW-KEY (CLOSE, splice 183)",
+   "control": "the tailgate-closed cutout passes UP only with the tailgate shut (1978 booklet p.16)",
+   "subsystem": "POWER_WINDOWS",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "TG-SW-KEY (CLOSE, splice 183): -> TG-CUTOUT (183C):183C (from splice 183)"
     ]
    }
   },
   {
    "wire": "TG_MOT_B",
    "kind": "implied",
-   "label": "Tailgate key switch -> window motor lead B",
+   "label": "Splice 184 (key switch OPEN terminal) -> window motor DOWN (circuit 184C)",
    "from": [
-    "TG-SW-KEY (DOWN out)",
+    "TG-SW-KEY (OPEN, splice 184)",
     ""
    ],
    "to": [
@@ -7177,14 +7231,14 @@
     "other",
     "other"
    ],
-   "from_str": "TG-SW-KEY (DOWN out)",
+   "from_str": "TG-SW-KEY (OPEN, splice 184)",
    "control": "factory dash + key switches reverse the motor; fed by TG_FEED (PDM30 OUT1 on DIG1)",
    "subsystem": "POWER_WINDOWS",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "TG-SW-KEY (DOWN out): -> rear_window_motor:2 (DOWN, circuit 184 tan/white):2 (DOWN, circuit 184 tan/white)"
+     "TG-SW-KEY (OPEN, splice 184): -> rear_window_motor:2 (DOWN, circuit 184 tan/white):2 (DOWN, circuit 184 tan/white)"
     ]
    }
   },
@@ -8353,9 +8407,9 @@
   {
    "wire": "AMP_GND",
    "kind": "implied",
-   "label": "Amplifier ground, 4 AWG in the loom to the ground star",
+   "label": "Amplifier ground run: reducing block beside the amp to the ground star",
    "from": [
-    "AMP (ground)",
+    "AMP-BLOCK (- in, 2 AWG)",
     ""
    ],
    "to": [
@@ -8366,14 +8420,68 @@
     "other",
     "engine bay"
    ],
-   "from_str": "AMP (ground)",
+   "from_str": "AMP-BLOCK (- in, 2 AWG)",
    "control": null,
    "subsystem": "AUDIO",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "AMP (ground): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+     "AMP-BLOCK (- in, 2 AWG): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+    ]
+   }
+  },
+  {
+   "wire": "AMP_PWR_TAIL",
+   "kind": "implied",
+   "label": "Amplifier +12 V tail: reducing block to the amp power plug (4 AWG, JL's required size)",
+   "from": [
+    "AMP-BLOCK (+ out, 4 AWG)",
+    ""
+   ],
+   "to": [
+    "AMP (+12 VDC, power plug set screw)",
+    "+12 VDC (power connector, set screw)"
+   ],
+   "sides": [
+    "other",
+    "other"
+   ],
+   "from_str": "AMP-BLOCK (+ out, 4 AWG)",
+   "control": null,
+   "subsystem": null,
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "AMP-BLOCK (+ out, 4 AWG): -> AMP (+12 VDC, power plug set screw):+12 VDC (power connector, set screw)"
+    ]
+   }
+  },
+  {
+   "wire": "AMP_GND_TAIL",
+   "kind": "implied",
+   "label": "Amplifier ground tail: amp power plug to the reducing block (4 AWG, JL's required size)",
+   "from": [
+    "AMP (Ground, power plug set screw)",
+    ""
+   ],
+   "to": [
+    "AMP-BLOCK (- out, 4 AWG)",
+    "- out, 4 AWG"
+   ],
+   "sides": [
+    "other",
+    "other"
+   ],
+   "from_str": "AMP (Ground, power plug set screw)",
+   "control": null,
+   "subsystem": null,
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "AMP (Ground, power plug set screw): -> AMP-BLOCK (- out, 4 AWG):- out, 4 AWG"
     ]
    }
   },

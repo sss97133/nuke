@@ -1,12 +1,17 @@
 WIDEBAND:
-  family: open
+  family: dtm
   mate: 'DTM 4-pin female, MoTeC #68054 (mates the LTCD''s DTM 4-pin male #68055)'
   note: 'LTCD manual p.31: 110 mA typical plus the heater current, heater 0.5–1 A typical (up to 2 A on startup); p.37: ''Each sensor can draw over 3 Amps when cold''
     — two sensors > 6.1 A cold, past 22 AWG''s 6 A (80 °C) / 5 A (100 °C) in the PDM manual p.48 table · pins 1 Battery - (black), 2 CAN Lo (green), 3 CAN Hi (white),
-    4 Battery + (red) — LTC user manual p.32'
+    4 Battery + (red) — LTC user manual p.32 · family dtm: #68054 is the DTM 4-pin FEMALE, so the harness takes size-20 sockets 0462-201-20141 and wedge WM-4S (families.yaml
+    dtm)'
   open:
-  - 'no DTM family in families.yaml: a ''dtm'' family (DTM size-20 socket contact + DTM crimper, 16-20 AWG) closes the family; until then it stays open'
   - '#68054 kit contents (housing, wedge, contacts): not in the LTC manual'
+  - '0462-201-20141 wire range: the vendor page says only ''for 20 AWG''; #64 and LTCD_GND are 18 AWG and the CAN pair 22 AWG — the Deutsch contact drawing closes
+    R1'
   sources:
   - 'MoTeC LTC user manual V1.7 p.32 Appendix B (reference_documents/component_drawings/motec_ltcd_user_manual.pdf): ''Power/CAN Connector DTM 4pin (M) (#68055) Mating
     connector: DTM 4pin (F) (#68054)'''
+  - web_snapshots/www.customconnectorkits.com__0462-201-20141.md ('Size 20 Nickel Plated Solid Socket for 20 AWG', 'Max 7.5 amps', '4 way indent crimper')
+  per_end:
+    part: 0462-201-20141

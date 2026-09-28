@@ -1,7 +1,8 @@
 WIPER-MOTOR:
-  family: open
+  family: gm_blade
   note: 'terminal board: center = feed from the ignition; 1 = series field + armature to the dash switch (ground); 3 = shunt field to the dash switch; housing grounds
-    through the strap'
+    through the strap · family gm_blade: the 1978 booklet draws GM factory blade connectors here (wiper terminal board harness plug, 1977 manual p.803 ''terminal
+    board''); the Packard 56-series identity is the family''s (families.yaml), not printed on the drawing'
   open:
   - 'harness plug on the terminal board (part, blade size): not in the 1977 manual text — read the motor'
   sources:

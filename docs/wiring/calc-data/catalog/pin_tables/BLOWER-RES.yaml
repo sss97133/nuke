@@ -1,11 +1,13 @@
 BLOWER-RES:
-  family: open
+  family: gm_blade
   pins:
     BLOWER_LO: '51 (resistor BAT terminal, low: BATT-R1-R2-R3)'
     BLOWER_MED: '63 (M1: M1-R2-R3-blower)'
     BLOWER_M2: '72 (M2: M2-R3-blower)'
     BLOWER_MOT: '101 (BLO output; factory: to the blower relay)'
-  note: 'maker''s document: factory A/C blower resistor on the evaporator case: FOUR terminals (BAT / M1 / M2 / BLO), 1978 C60 plug cavities 51 / 63 / 72 / 101'
+  note: 'maker''s document: factory A/C blower resistor on the evaporator case: FOUR terminals (BAT / M1 / M2 / BLO), 1978 C60 plug cavities 51 / 63 / 72 / 101 ·
+    family gm_blade: the 1978 booklet draws GM factory blade connectors here (4-cavity resistor plug 51/72/63/101, 1978 booklet p.16 sheet A-4 ''Air Conditioning
+    RPO C-60''); the Packard 56-series identity is the family''s (families.yaml), not printed on the drawing'
   open:
   - registry device text says '3 prongs'; the 1978 C60 resistor plug has 4 cavities (51, 72, 63, 101) and the heater-only resistor 2965019 differs — confirm the resistor
     on the truck

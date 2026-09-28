@@ -1,8 +1,12 @@
 AMP:
-  family: open
+  family: screw_terminal
+  range_by_wire:   # JL VX700/5i guide spec table (web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md): +12 VDC 4 AWG, Ground 4 AWG, Remote 18 to 10 AWG
+    AMP_PWR_TAIL: [4, 4]
+    AMP_GND_TAIL: [4, 4]
+    RADIO_REM: [18, 10]
   pins:
-    '32': +12 VDC (power connector, set screw)
-    AMP_GND: Ground (power connector, set screw)
+    AMP_PWR_TAIL: +12 VDC (power connector, set screw)
+    AMP_GND_TAIL: Ground (power connector, set screw)
     RADIO_REM: Remote turn-on input (power connector, set screw)
     RCA_FRONT: Input 1 + Input 2 (RCA, analog input harness)
     RCA_REAR: Input 3 + Input 4 (RCA)
@@ -20,12 +24,17 @@ AMP:
   note: '75 W x 4 at 4 ohm + 300 W x 1 at 2 ohm; 4 AWG power and ground leads, 60 A fuse; 9-13/16 x 2-1/8 x 6-3/4 in; tuned with JL''s TuN app over USB · maker''s
     document: JL Audio VX700/5i: removable power plug (set-screw receptacles), analog input harness (6 RCA inputs), speaker output harness (leads A-D), subwoofer
     output harness (2 lead pairs, paralleled inside) · Channel letters A-D against the registry''s CH1-CH4 are our assignment: the DSP routes any input to any output
-    (TüN). Signal/DC-offset auto turn-on senses Input 1 only, so the front RCA pair on Inputs 1/2 keeps that option.'
+    (TüN). Signal/DC-offset auto turn-on senses Input 1 only, so the front RCA pair on Inputs 1/2 keeps that option. · family screw_terminal: the power plug''s +12
+    VDC / Ground / Remote take bare wire under set screws, strip 3/8 in (10 mm); torque: none given — the JL guide says only ''tighten each set screw firmly'' (retailspecs
+    snapshot, Making Connections). The speaker/sub outputs and RCA inputs are harness leads and jacks, not screws: the family is right for 32 / AMP_GND / RADIO_REM
+    only'
   open:
   - RADIO_REM is 20 AWG; the power plug takes '10-18-gauge wire for the remote turn-on' (Crutchfield snapshot) — go to 18 AWG or confirm the set screw holds 20
   - 'speaker/sub harness lead colours per channel: not in the connection guide text — read the harness'
   - 'subwoofer harness has ''two pairs of wire leads ... connected in parallel inside the harness'': each woofer could take its own pair instead of the SUB_JMP jumpers
     — owner''s call'
+  - '#32 and AMP_GND are now 2 AWG (receipts/2026-09-28_dc-primary-cables-sized-from-physics.md) but the JL power plug is made for 4 AWG (''4 AWG is the required
+    copper wire size'') — a 2-to-4 AWG step (distribution block near the amp) or a different run; registry call'
   sources:
   - 'reference_documents/web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md (JL VX700/5i connection guide: power connector +12 VDC / Ground / Remote with set screws,
     ''strip back 3/8 inch''; Analog Input harness Inputs 1-6 RCA; Speaker Output Harness A-D leads; Subwoofer Output Harness)'

@@ -5,6 +5,7 @@ LICENSE-LAMP:
     LIC_GND: ''
   note: 'maker''s document: license lamp, 67 bulb; factory lamp has ONE feed lead (connector 2977721) and grounds through its housing'
   open:
+  - 'decision needed: factory socket in the harness vs new pigtail socket + splice; owner/builder call'
   - 'LIC_GND: the factory license lamp has no ground lead — it grounds through its housing (1978 booklet p.14). A ground lead or ring at the lamp mount is needed;
     lamp part OPEN'
   sources:

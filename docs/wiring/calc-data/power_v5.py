@@ -245,7 +245,7 @@ RESOLVE = [                                             # (regex over an end's w
     (r"starter B\+", "START:B+"), (r"STARTER-S", "START:S"), (r"alternator B\+", "ALT:B+"), (r"ALTERNATOR-SENSE", "ALT:L"),
     (r"PDM30:STUD", "PDM30:STUD"), (r"PDM15 battery stud", "PDM15:STUD"), (r"PDM15:OUT(\d+)", "PDM15:OUT"),
     (r"PDM30[: ]B6\b|PDM30:OUT24", "PDM30:OUT24"), (r"[Dd]istribution stud", "DIST:"), (r"^IBOOSTER", "IBOOST:1"),
-    (r"PCS harness B\+", "PCS:B+"), (r"AMP-STEP-CTRL", "STEP:+"), (r"^AMP ", "AMP:+"), (r"^ISOLATOR \((\w+)", "ISO:ctl"), (r"^ISO-SWITCH", "SW:"), (r"^SPL-ISO-YEL", "SW:"),
+    (r"PCS harness B\+", "PCS:B+"), (r"AMP-STEP-CTRL", "STEP:+"), (r"^AMP ", "AMP:+"), (r"AMP-BLOCK", "AMP:+"), (r"^ISOLATOR \((\w+)", "ISO:ctl"), (r"^ISO-SWITCH", "SW:"), (r"^SPL-ISO-YEL", "SW:"),
     (r"^M130:(\w+)", "M130:"), (r"GND-BANK-ENG", "STAR:"), (r"COIL_GND_STAR_ECM_HEAD|COIL-GROUND-RINGS|head ring|ring on the head", "HEAD:"),
 ]
 
@@ -340,7 +340,7 @@ def sheet_dc_primary(reg, wires, ends, eps_y, parts, number, next_sheet):
               "ISO": "isolator — Blue Sea 7700 ML-RBS", "DIST": "distribution stud — Blue Sea 2019",
               "START": "starter", "ALT": "alternator — Holley 197-302", "PDM15": "engine PDM15",
               "IBOOST": "iBooster", "PCS": "PCS TCM-2650 (transmission)", "PDM30": "body PDM30 (cab)",
-              "DCDC": "DC-DC charger — Victron Orion-Tr 12/12-30", "AMP": "amplifier — JL VX700/5i",
+              "DCDC": "DC-DC charger — Victron Orion-Tr 12/12-30", "AMP": "amp reducing block, 2 to 4 AWG (JL VX700/5i beyond)",
               "M130": "MoTeC M130", "STRIP": "body bulkhead B", "SW": "dash switch — Blue Sea 2145",
               "STEP": "AMP Research step controller"}
     box_notes = {"ISO": "studs A/B 3/8-16, 140 in-lb max · 1,000 A 30 s cranking on 2/0",

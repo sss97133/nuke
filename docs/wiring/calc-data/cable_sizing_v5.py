@@ -56,10 +56,17 @@ CABLES = [
          why_load="JL VX700/5i: 60 A fuse recommended; the run goes engine bay → bed, bundled with its ground"),
     dict(id="AMP_GND", loop=2, frm="amplifier −", to="ground star", cont=60, peak=None, fuse=None, ft=18.4, bundled=True,
          why_load="the amplifier's return, same length as #32"),
+    dict(id="AMP_PWR_TAIL", frm="reducing block +", to="amplifier +12 V plug", cont=60, peak=None, fuse=None, ft=None, bundled=False, min_awg="4",
+         why_load="short tail into the JL power plug: 'Min. Copper Power/GND Wire 4 AWG' (JL VX700/5i spec table); protected by #32's MIDI 60 A"),
+    dict(id="AMP_GND_TAIL", frm="amplifier ground plug", to="reducing block -", cont=60, peak=None, fuse=None, ft=None, bundled=False, min_awg="4",
+         why_load="the amplifier's ground tail, same rule"),
     dict(id="52", hot=True, frm="distribution stud", to="iBooster 1", cont=40, peak=None, fuse="MIDI", fuse_fixed=40, ft=4.6, bundled=False,
          why_load="OEM 40 A supply fuse (ch.17 §17.5)"),
-    dict(id="DCDC_IN", hot=True, frm="distribution stud", to="Orion IN +", cont=35, peak=None, fuse="MIDI", fuse_fixed=40, ft=None, bundled=False,
-         why_load="Orion-Tr Smart 12/12-30: 30 A out, ~35 A in; MIDI 40 (ch.17)"),
+    dict(id="DCDC_IN", hot=True, frm="distribution stud", to="Orion IN +", cont=35, peak=None, fuse="MIDI", fuse_fixed=60, ft=None, bundled=False,
+         why_load="Orion-Tr Smart 12/12-30: 30 A out, ~35 A in. Fuse is the maker's: Victron Orion-Tr Smart manual §4.2 "
+                  "'Cable and fuse recommendations', 12 V row: external battery protection fuse 60 A, minimum cable 6 mm² at 0.5 m, "
+                  "10 mm² at 1–2 m (snapshot 2026-09-28). ch.17's MIDI 40 was 35 A x 1.25 = 44 A rounded down — under the 125 % floor "
+                  "and under the maker's number; superseded 2026-09-28 night"),
     dict(id="DCDC_OUT", hot=True, frm="Orion OUT +", to="YellowTop +", cont=30, peak=None, fuse=None, ft=None, bundled=False, why_load="30 A charge"),
     dict(id="DCDC_GND", hot=True, frm="Orion −", to="ground star", cont=35, peak=None, fuse=None, ft=None, bundled=False, why_load="the Orion's return"),
     # ACC_NEG (YellowTop − → star) and G2 (star → frame) are not resized: their lengths are not in the twin and their loads

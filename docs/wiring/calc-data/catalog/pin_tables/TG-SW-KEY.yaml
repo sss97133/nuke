@@ -1,8 +1,8 @@
 TG-SW-KEY:
-  family: open
+  family: gm_blade
   pins:
     TG_BUS_UP: CLOSE terminal (circuit 183, window up)
-    TG_MOT_A: CLOSE terminal (circuit 183, window up)
+    TG_CUT_IN: CLOSE terminal (circuit 183, window up; to the tailgate-closed cutout)
     TG_BUS_DN: OPEN terminal (circuit 184, window down)
     TG_MOT_B: OPEN terminal (circuit 184, window down)
   mate: GM 8900713 3-way connector body (1978 booklet p.16); a new-part equivalent is OPEN
@@ -10,7 +10,9 @@ TG-SW-KEY:
   note: 'maker''s document: factory tailgate window key switch, 1978 GM connector 8900713: three terminals OPEN (circuit 184) / FEED (circuit 60) / CLOSE (circuit
     183) · The factory key switch is NOT in series: it has one FEED terminal (circuit 60, battery via circuit breaker) and switches it to CLOSE (183) or OPEN (184).
     Its outputs join the dash switch outputs at splices 183/184 on the way to the motor (1978 booklet p.16). Mapping the registry''s series wires onto it puts the
-    bus and motor wire of each direction on the same terminal (the factory splice moved to the switch), hence splice_point.'
+    bus and motor wire of each direction on the same terminal (the factory splice moved to the switch), hence splice_point. · family gm_blade: the 1978 booklet draws
+    GM factory blade connectors here (key switch connector 8900713, 1978 booklet p.16); the Packard 56-series identity is the family''s (families.yaml), not printed
+    on the drawing'
   open:
   - 'FEED terminal (circuit 60) has no wire in the registry: the key switch cannot drive the motor without it (1978 booklet p.16) — registry fix, not a pin question'
   - registry calls this switch 'in series between the dash switch and the motor'; the factory switch is in parallel (3 terminals, 1978 booklet p.16) — owner/registry

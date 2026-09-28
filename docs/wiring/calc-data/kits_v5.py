@@ -389,12 +389,25 @@ def attach(reg):
                         return code
                 return "D-609 (gauge unknown)"
             rail = bool(ep.get("kit"))                      # the rails carry their D-609-05s in the kit already
+            # wires that share one device lead (same pin text) go in ONE splice, sized on their combined circular-mil
+            # area (2026-09-28: #100 + VSS_DAK on the SEN-01-5 white lead = 2 x 640 CM -> 18 AWG equivalent -> D-609-04)
+            _CM_AREA = {26: 254, 24: 404, 22: 640, 20: 1020, 18: 1620, 16: 2580, 14: 4110, 12: 6530, 10: 10380}
+            def _equiv(ws):
+                gs = [wires[x].get("awg") for x in ws]
+                if len(ws) == 1 or not all(isinstance(g, int) and g in _CM_AREA for g in gs):
+                    return gs[0]
+                tot = sum(_CM_AREA[g] for g in gs)
+                return max((g for g, a in _CM_AREA.items() if a >= tot), default=None)
+            groups = {}
+            for w in wl:
+                groups.setdefault(cav_of.get(w) or f"_{w}", []).append(w)
             per_end = []
-            for i, w in enumerate(wl, 1):
-                code = "rail splice (in the kit)" if rail else _splice(wires[w].get("awg"))
+            for i, (cv, ws) in enumerate(groups.items(), 1):
+                code = "rail splice (in the kit)" if rail else _splice(_equiv(ws))
                 if not rail and not code.startswith("D-609 ("):
                     need[code] += 1
-                per_end.append({"wires": [w], "part": code, "cavity": cav_of.get(w) or f"splice {i}"})
+                for w in ws:
+                    per_end.append({"wires": [w], "part": code, "cavity": cav_of.get(w) or f"splice {i}"})
         elif fid in ("dt", "dtp", "gm_blade", "screw_terminal", "contura"):
             # families added 2026-09-28 (pin-table pass): the terminal comes from the family's per_end; a DT/DTP end takes the
             # pin on the plug side and the socket on the receptacle side (the endpoint says which with `side: plug|receptacle`)
@@ -427,7 +440,8 @@ def attach(reg):
             range=rng, out_of_range=[x for x in out_of_range if x.split(" ")[0] not in doubled],
             pigtailed=pigtailed, note=ep.get("note"),
             branch_wires_missing=ep.get("branch_wires_missing", 0), unknown_wire_ids=missing_ids,
-            open=ep.get("open", []), sources=ep.get("sources", []), splice_point=ep.get("splice_point"))
+            open=ep.get("open", []), sources=ep.get("sources", []), splice_point=ep.get("splice_point"),
+            range_by_wire=ep.get("range_by_wire"))
 
     # shield terminations: one solder sleeve per shielded cable (ECU end only)
     for sig in SHIELD_CABLES:
