@@ -25,6 +25,7 @@ from manual_v5 import gm_colour, tw, FONT              # noqa: E402
 OUT = CD.parent / "output" / "manual"
 W, H, M = 1224, 792, 36                                # tabloid landscape, points
 ROW = 9.2                                              # one wire row
+MAP_URL = "https://nuke.ag/vehicle/e08bf694-970f-4cbe-8a74-8715158a0f2e/wiring?tab=map&node="   # the plug's card on the truck's map
 ORANGE = "#E67300"                                     # OPEN stamps (the sheet convention since 2026-06-09)
 HEX = {"white": "#f2f2f2", "black": "#111111", "red": "#d3222a", "orange": "#f28c28", "yellow": "#e8c31c", "green": "#1f8a3b",
        "blue": "#2457c5", "brown": "#7a4a1d", "gray": "#8a8a8a", "grey": "#8a8a8a", "violet": "#7b3fa0", "purple": "#7b3fa0",
@@ -94,13 +95,14 @@ class Sheet:
         self.txt(W / 2, M + 14, title.upper(), 14, bold=True, anchor="middle")
         self.txt(W / 2, M + 26, subtitle, 7, anchor="middle")
 
-    def txt(self, x, y, s, size, bold=False, anchor="start", italic=False, colour="#000"):
+    def txt(self, x, y, s, size, bold=False, anchor="start", italic=False, colour="#000", href=None):
         w_ = tw(str(s), size, bold)
         x0 = x - (w_ if anchor == "end" else w_ / 2 if anchor == "middle" else 0)
-        self.boxes.append((x0, y - size * 0.78, x0 + w_, y + 0.2, str(s)))
+        self.boxes.append((x0, y - size * 0.78, x0 + w_, y + 0.2, str(s), href))
         st = ' font-style="italic"' if italic else ""
-        self.el.append(f'<text x="{x:.1f}" y="{y:.1f}" font-family="{FONT}" font-size="{size}" fill="{colour}" '
-                       f'font-weight="{"bold" if bold else "normal"}" text-anchor="{anchor}"{st}>{escape(str(s))}</text>')
+        t = (f'<text x="{x:.1f}" y="{y:.1f}" font-family="{FONT}" font-size="{size}" fill="{colour}" '
+             f'font-weight="{"bold" if bold else "normal"}" text-anchor="{anchor}"{st}>{escape(str(s))}</text>')
+        self.el.append(f'<a href="{escape(href)}">{t}</a>' if href else t)
 
     def line(self, pts, w=0.8, dash=None, colour="#000", stripe=None):
         d = f' stroke-dasharray="{dash}"' if dash else ""
@@ -132,9 +134,9 @@ def overlaps(sheet):
     B = sheet.boxes
     out = []
     for i in range(len(B)):
-        ax0, ay0, ax1, ay1, at = B[i]
+        ax0, ay0, ax1, ay1, at = B[i][:5]
         for j in range(i + 1, len(B)):
-            bx0, by0, bx1, by1, bt = B[j]
+            bx0, by0, bx1, by1, bt = B[j][:5]
             if ax0 < bx1 - 0.5 and bx0 < ax1 - 0.5 and ay0 < by1 - 0.5 and by0 < ay1 - 0.5:
                 out.append((at, bt))
     return out
@@ -158,19 +160,26 @@ def fit(text, width, size):
 
 
 def wire_label(w):
+    """GM style 'gauge colour-circuit', then the length: '22 WHT/ORN-99R · 4.6 FT EST' (estimate until measured)."""
     col = gm_colour(str(w.get("color") or "?")).upper().replace("CABLE", "SHLD")
-    return f"{w.get('awg') or '?'} {col}-{str(w['id']).upper()}"
+    L = w.get("length_ft")
+    basis = str(w.get("length_basis") or "").lower()
+    if L:
+        tag = "" if re.search(r"measur|bench", basis) else " EST"
+        return f"{w.get('awg') or '?'} {col}-{str(w['id']).upper()} · {L:.1f} FT{tag}"
+    return f"{w.get('awg') or '?'} {col}-{str(w['id']).upper()} · LENGTH OPEN"
 
 
 def end_on(ends, eid_rx):
     return [t for t in ends if re.match(eid_rx, t["endpoint"])]
 
 
-def draw_box(s, x, y, title, rows, width=BOX_W, side="right"):
-    """A device seen from its plug: title, one row per cavity. rows: [(cavity, text)]. Returns {cavity: (x_edge, y)}."""
+def draw_box(s, x, y, title, rows, width=BOX_W, side="right", code=None):
+    """A device seen from its plug: title, one row per cavity. rows: [(cavity, text)]. Returns {cavity: (x_edge, y)}.
+    The title links to the plug's card on the truck's map (the part being installed, its proof, its photos)."""
     h = len(rows) * ROW + 8
     s.rect(x, y, width, h, sw=1.0, rx=3)
-    s.txt(x + width / 2, y - 3, title.upper(), 6.4, bold=True, anchor="middle")
+    s.txt(x + width / 2, y - 3, title.upper(), 6.4, bold=True, anchor="middle", href=(MAP_URL + code) if code else None)
     pins = {}
     for i, (cav, text) in enumerate(rows):
         yy = y + 6 + i * ROW + ROW / 2
@@ -188,30 +197,30 @@ def draw_box(s, x, y, title, rows, width=BOX_W, side="right"):
 
 
 def plug_part_lines(reg, e, parts):
-    """The plug's kit, terminals and seals as printed under its box: code ×n, and where each stands against the carts."""
+    """The plug's kit, terminals and seals as printed under its box: part number ×n and what it is. No purchase state."""
     ep = reg["endpoints"].get(e) or {}
     out = []
-    for code, qty, stamp, where in kits_v5.kit_stamps(reg, ep):
-        out.append((f"{code} {qty}", where))
-    for code, kind, n, n_all, stamp, where in kits_v5.plug_parts(reg, e):
-        out.append((f"{code} ×{n}", where))
+    for code, qty, _s, _w in kits_v5.kit_stamps(reg, ep):
+        out.append((f"{code} {qty}", (parts.get(str(code)) or {}).get("name", "plug kit")))
+    for code, kind, n, n_all, _s, _w in kits_v5.plug_parts(reg, e):
+        out.append((f"{code} ×{n}", (parts.get(str(code)) or {}).get("name", kind)))
     return out
 
 
 def sheet_parts(reg, devs, junctions, parts):
-    """Every part the sheet's plugs use: (code, name, kind, qty on this sheet, vendor, price, where)."""
+    """Every part the sheet's plugs use: (part number, name, kind, qty on this sheet, plugs it is used on)."""
     rows = OrderedDict()
-    diff = {d["item"]: d for d in reg["diff"] if d["kind"] != "wire"}
     for e in list(devs) + list(junctions):
         ep = reg["endpoints"].get(e) or {}
         for code, q in (ep.get("kit") or {}).items():
-            r = rows.setdefault(code, [code, (parts.get(code) or {}).get("name", ""), (parts.get(code) or {}).get("kind", "kit"), 0,
-                                       (parts.get(code) or {}).get("vendor", ""), (parts.get(code) or {}).get("price"), kits_v5._where(diff.get(code))])
+            r = rows.setdefault(code, [code, (parts.get(code) or {}).get("name", ""), (parts.get(code) or {}).get("kind", "kit"), 0, []])
             r[3] += q if q >= 1 else 0
-        for code, kind, n, n_all, stamp, where in kits_v5.plug_parts(reg, e):
-            r = rows.setdefault(code, [code, (parts.get(code) or {}).get("name", ""), kind, 0, (parts.get(code) or {}).get("vendor", ""),
-                                       (parts.get(code) or {}).get("price"), where])
+            r[4].append(plug_title(e, ep))
+        for code, kind, n, n_all, _s, _w in kits_v5.plug_parts(reg, e):
+            r = rows.setdefault(code, [code, (parts.get(code) or {}).get("name", ""), kind, 0, []])
             r[3] += n
+            if plug_title(e, ep) not in r[4]:
+                r[4].append(plug_title(e, ep))
     return list(rows.values())
 
 
@@ -249,7 +258,7 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
     x_dev, y = M + 10, M + 48
     for e in devs:
         rows = rows_for(eps, e, wires, ends)
-        pins, h = draw_box(s, x_dev, y, plug_title(e, eps[e]), rows)
+        pins, h = draw_box(s, x_dev, y, plug_title(e, eps[e]), rows, code=e)
         for cav, pt in pins.items():
             pin_at[(e, cav)] = pt
         pl = plug_part_lines(reg, e, parts)
@@ -261,6 +270,7 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
             s.txt(x_dev + 2, yy, f"+{len(pl) - 3} more in the parts list", 4.6, italic=True, colour="#333")
             yy += 5.4
         y = yy + 14
+    lowest_left = y
     x1 = x_dev + BOX_W
 
     # ---- column 3: the 61-pin, rows ordered by where the runs arrive
@@ -289,7 +299,7 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
                 if any(str(t_["wire"]) in sheet_wires for t_ in ends_at(ends, e, c, sheet_wires))]
         if not rows:
             continue
-        pins, h = draw_box(s, x_jun, y, plug_title(e, eps[e]), rows, side="left")
+        pins, h = draw_box(s, x_jun, y, plug_title(e, eps[e]), rows, side="left", code=e)
         for cav, pt in pins.items():
             pin_at[(e, cav)] = pt
         y += h + 22
@@ -301,7 +311,7 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
         rows = [(c, t) for c, t in rows_for(eps, e, wires, ends) if ends_at(ends, e, c, sheet_wires)]
         if not rows:
             continue
-        pins, h = draw_box(s, x_ecu, y, plug_title(e, eps[e]), rows, side="left")
+        pins, h = draw_box(s, x_ecu, y, plug_title(e, eps[e]), rows, side="left", code=e)
         for cav, pt in pins.items():
             pin_at[(e, cav)] = pt
         y += h + 22
@@ -371,26 +381,26 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
     # ---- parts list for this sheet (GM prints part numbers at the plugs; here every plug's kit, terminals and seals),
     # under the plug column once the runs are done; what does not fit goes on a facing page
     plist = sheet_parts(reg, devs, [j for j in junctions if any(k[0] == j for k in pin_at)], parts)
-    widths = [88, 200, 46, 30, 52, 40, 150]
-    lowest = max([y for (_, _), (_, y) in pin_at.items()] + [M + 48])
-    px, py = M, lowest + 34
+    widths = [92, 210, 46, 30, 228]
+    lowest = max([y for (_, _), (_, y) in pin_at.items()] + [M + 48, lowest_left - 6])
+    px, py = M, lowest + 30
     avail = int((H - M - 14 - py) / 8.2) - 2
     shown = plist[:max(avail, 0)] if avail >= 3 else []
-    rows_of = lambda L: [(c, fit(n, 196, 5.2), k, q, v, (f"${p:.2f}" if isinstance(p, (int, float)) else ""), fit(w, 146, 5.2)) for c, n, k, q, v, p, w in L]
+    rows_of = lambda L: [(c, fit(n, 206, 5.2), k, q, fit(", ".join(u), 224, 5.2)) for c, n, k, q, u in L]
     extra = []
     if shown:
         s.txt(px, py - 4, "PARTS ON THIS SHEET", 7, bold=True)
-        table(s, px, py, widths, ["Code", "Part", "Kind", "Qty", "Vendor", "Each", "Where it stands"], rows_of(shown))
+        table(s, px, py, widths, ["Part number", "Part", "Kind", "Qty", "Used on"], rows_of(shown))
     rest = plist[len(shown):]
     if rest:
         s.txt(px, H - M - 2, f"{len(rest)} more parts on the facing page", 5.4, italic=True)
         per = int((H - M - 90) / 8.2) - 2
         for i in range(0, len(rest), per):
             e = Sheet(number + ("" if i == 0 else f"-{i // per + 1}"), title + " — parts", f"{len(plist)} parts on this sheet's plugs")
-            table(e, M, M + 52, widths, ["Code", "Part", "Kind", "Qty", "Vendor", "Each", "Where it stands"], rows_of(rest[i:i + per]))
+            table(e, M, M + 52, widths, ["Part number", "Part", "Kind", "Qty", "Used on"], rows_of(rest[i:i + per]))
             extra.append(e)
     s.txt(M, H - M + 8, f"{len(sheet_wires)} circuits drawn from the wire list · {open_runs} stamped OPEN (an end or a cavity not settled) · "
-          f"cavity marks are the moulded letters; positions are indicative · wire colours are the ordered colours", 6)
+          f"cavity marks are the moulded letters; positions are indicative · lengths are estimates until measured on the truck", 6)
     return s, len(sheet_wires), open_runs, extra
 
 
@@ -440,6 +450,23 @@ def paginate(reg, wires, ends, devs, budget=H - 2 * M - 70):
     return pages
 
 
+def add_links(pdf_path, boxes, page_h):
+    """rsvg-convert drops SVG links; write them back as PDF link annotations from the recorded text boxes."""
+    try:
+        from pypdf import PdfReader, PdfWriter
+        from pypdf.annotations import Link
+    except ImportError:
+        return 0
+    links = [b for b in boxes if len(b) > 5 and b[5]]
+    if not links:
+        return 0
+    r = PdfReader(str(pdf_path)); w = PdfWriter(); w.append(r)
+    for x0, y0, x1, y1, _t, href in links:
+        w.add_annotation(page_number=0, annotation=Link(rect=(x0 - 1, page_h - y1 - 1, x1 + 1, page_h - y0 + 1), url=href))
+    w.write(str(pdf_path))
+    return len(links)
+
+
 def build(first_number=6):
     reg, wires, ends = load()
     eps = reg["endpoints"]
@@ -473,6 +500,7 @@ def build(first_number=6):
                 stem.with_suffix(".svg").write_text(sh.svg())
                 subprocess.run(["rsvg-convert", "-d", "150", "-p", "150", "-o", str(stem.with_suffix(".png")), str(stem.with_suffix(".svg"))], check=True)
                 subprocess.run(["rsvg-convert", "-f", "pdf", "-o", str(stem.with_suffix(".pdf")), str(stem.with_suffix(".svg"))], check=True)
+                add_links(stem.with_suffix(".pdf"), sh.boxes, H)
                 made.append((f"1-{n}" + ("" if j == 0 else " parts"), t, nw if j == 0 else 0, nopen if j == 0 else 0, str(stem.with_suffix(".pdf"))))
             n += 1
     left = [e for e in engine_plugs if e not in taken and e not in junctions]
