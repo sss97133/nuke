@@ -101,7 +101,8 @@ export class ClearingHouseProvider implements PaymentProvider {
   private apiUrl: string;
 
   constructor(apiKey?: string, apiUrl?: string) {
-    this.apiKey = apiKey || (import.meta.env.VITE_CLEARING_HOUSE_API_KEY as string | undefined) || '';
+    // Never from VITE_* env: a payment key read there ships in public JavaScript.
+    this.apiKey = apiKey || '';
     this.apiUrl = apiUrl || (import.meta.env.VITE_CLEARING_HOUSE_API_URL as string | undefined) || '';
   }
 

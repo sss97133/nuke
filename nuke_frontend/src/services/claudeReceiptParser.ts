@@ -31,7 +31,9 @@ export interface ClaudeReceiptParseResult {
 }
 
 export class ClaudeReceiptParser {
-  private static CLAUDE_API_KEY = import.meta.env.VITE_NUKE_CLAUDE_API || import.meta.env.VITE_CLAUDE_API_KEY;
+  // The browser holds no provider key: anything read from VITE_* ships in public JavaScript.
+  // Receipt AI belongs to the server-side receipt-extract function.
+  private static CLAUDE_API_KEY = '';
 
   /**
    * Convert file to base64 for image processing
@@ -64,7 +66,7 @@ export class ClaudeReceiptParser {
           supplier: 'Unknown',
           date: new Date().toISOString()
         },
-        errors: ['Claude API key not configured. Please add VITE_NUKE_CLAUDE_API to your .env file']
+        errors: ['Receipt reading runs on the server and is not available in the browser.']
       };
     }
 
@@ -240,7 +242,7 @@ Return ONLY JSON.`
           supplier: 'Unknown',
           date: new Date().toISOString()
         },
-        errors: ['Claude API key not configured. Please add VITE_NUKE_CLAUDE_API to your .env file']
+        errors: ['Receipt reading runs on the server and is not available in the browser.']
       };
     }
 
@@ -438,7 +440,7 @@ Return ONLY the JSON object, no explanation or markdown.`
           supplier: 'Unknown',
           date: new Date().toISOString()
         },
-        errors: ['Claude API key not configured. Please add VITE_NUKE_CLAUDE_API to your .env file']
+        errors: ['Receipt reading runs on the server and is not available in the browser.']
       };
     }
 

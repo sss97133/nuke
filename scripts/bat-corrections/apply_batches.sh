@@ -1,5 +1,5 @@
 #!/bin/bash
-# apply_batches.sh <batches-dir> <log.jsonl> [max_batches] [sleep_s=5] [max_waits=10]
+# apply_batches.sh <batches-dir> <log.jsonl> [max_batches] [sleep_s=5] [max_waits=10]   (env: ASSERTED_BY, REASON — no single quotes)
 # Calls correct_vehicle_sale_provenance_batch once per batch file (JSON array of vehicle rows),
 # through the Management API (scripts/data/q.sh). Between batches: one REST probe; if it exceeds
 # 3s, wait and re-probe before continuing. Every result (counts, stale, missing) is appended to the log.
@@ -27,7 +27,7 @@ for f in "$DIR"/batch_*.json; do
   call_rows() { # $1 = json array
     local rows="$1" n r ms h left right
     n=$(echo "$rows" | jq 'length'); [ "$n" = "0" ] && { echo '{"ok":true,"vehicles_corrected":0,"fields_corrected":0,"fields_noop":0,"stale":[],"missing":[]}'; return 0; }
-    local s0=$(date +%s%N); r=$(./scripts/data/q.sh "select correct_vehicle_sale_provenance_batch(\$j\$${rows}\$j\$::jsonb, 'bat-archive-2026-09-27', 'BaT catalog + lot page truth (session cb179857)')"); ms=$(( ($(date +%s%N) - s0)/1000000 ))
+    local s0=$(date +%s%N); r=$(./scripts/data/q.sh "select correct_vehicle_sale_provenance_batch(\$j\$${rows}\$j\$::jsonb, '${ASSERTED_BY:-bat-archive-2026-09-27}', '${REASON:-BaT catalog + lot page truth (session cb179857)}')"); ms=$(( ($(date +%s%N) - s0)/1000000 ))
     if echo "$r" | grep -q '^\['; then echo "$r" | jq -c --argjson ms "$ms" '.[0].correct_vehicle_sale_provenance_batch + {rpc_ms: $ms}'; return 0; fi
     if echo "$r" | grep -q '57014'; then
       if [ "$n" -le 1 ]; then

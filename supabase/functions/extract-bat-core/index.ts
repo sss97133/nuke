@@ -1669,9 +1669,14 @@ Deno.serve(async (req) => {
           updatePayload.high_bid = extractedHighBid;
         }
 
-        // Keep auction_outcome consistent (best-effort; depends on schema).
-        if (extractedReserve === "reserve_not_met") updatePayload.auction_outcome = "reserve_not_met";
-        if (extractedReserve === "no_sale") updatePayload.auction_outcome = "no_sale";
+        // Keep auction_outcome consistent — unless the vehicle already carries a sale from an earlier lot. A later
+        // auction that didn't sell doesn't undo that sale: vehicle_sale_basis reads a no-sale outcome next to
+        // sale_status 'sold' as contradicting testimony and drops the real sale from comps (1,910 relisted BaT cars on
+        // 2026-09-28). This lot's own result is kept in its auction_events row.
+        if (!alreadySold) {
+          if (extractedReserve === "reserve_not_met") updatePayload.auction_outcome = "reserve_not_met";
+          if (extractedReserve === "no_sale") updatePayload.auction_outcome = "no_sale";
+        }
         }
       } else if (!hasExtractedBid && (extractedReserve === "reserve_not_met" || extractedReserve === "no_sale")) {
         // CRITICAL: Reserve Not Met with no bid data extracted (extraction may have failed).
@@ -1682,8 +1687,11 @@ Deno.serve(async (req) => {
             updatePayload.sale_price = null;
             updatePayload.high_bid = null;
           }
-          if (extractedReserve === "reserve_not_met") updatePayload.auction_outcome = "reserve_not_met";
-          if (extractedReserve === "no_sale") updatePayload.auction_outcome = "no_sale";
+          // an earlier lot's sale stands (see above); this lot's result lives in auction_events
+          if (!alreadySold) {
+            if (extractedReserve === "reserve_not_met") updatePayload.auction_outcome = "reserve_not_met";
+            if (extractedReserve === "no_sale") updatePayload.auction_outcome = "no_sale";
+          }
         }
       } else {
         if (listingIsLatestOrEqual) {
