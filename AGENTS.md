@@ -12,7 +12,14 @@ source. The stack:
 
 Nuke is pre-launch, and production is the test environment.
 
-Before you decide any function or table is alive or dead, read `docs/ledger/README.md`. Before you make
+**Start at the atlas.** It is computed from the live database, so it is always current:
+- `v_schema_atlas` has one row per table: live activity (written / read-only / idle), rows, size,
+  description, columns described, owners, writers, triggers and links.
+- `v_job_health` does the same for scheduled jobs.
+
+For example: `scripts/data/q.sh "select * from v_schema_atlas where table_name = 'vehicles'"`.
+`docs/ledger/` is an older snapshot. Before you decide any function or table is alive or dead, check
+the atlas, then `docs/ledger/README.md`. Before you make
 a new function, table or folder, check `docs/ledger/CAPABILITY_MAP.md`
 (`node scripts/guardrails/check-capability-before-mint.mjs "<name>"`) and extend what already exists.
 
