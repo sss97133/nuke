@@ -26,6 +26,10 @@ import kits_v5
 CD = Path(__file__).resolve().parent
 OUT = CD.parent / "output" / "manual"
 W, H, M = 612, 792, 48
+import datetime as _dt
+import subprocess as _sp
+_sha = _sp.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, cwd=str(Path(__file__).resolve().parent)).stdout.strip() or "local"
+REVISION = f"K5 harness book · wire list v5 · rev {_dt.date.today().isoformat()} · {_sha}"
 HEXC = {"white": "#f2f2f2", "black": "#111", "red": "#d3222a", "orange": "#f28c28", "yellow": "#e8c31c", "green": "#1f8a3b",
         "blue": "#2457c5", "brown": "#7a4a1d", "gray": "#8a8a8a", "grey": "#8a8a8a", "violet": "#7b3fa0", "purple": "#7b3fa0",
         "pink": "#e58fb6", "tan": "#c8a675", "cable": "#555", "shld": "#555"}                      # US letter in points, like the LTSM; 2/3 in margins
@@ -172,6 +176,7 @@ class Page:
         self.txt(cx, y, s, 7.5, anchor="middle")
 
     def svg(self):
+        self.txt(W - M, H - M + 14, REVISION, 5.6, anchor="end")
         return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}pt" height="{H}pt" viewBox="0 0 {W} {H}">'
                 f'<rect width="{W}" height="{H}" fill="#fff"/>' + "".join(self.el) + "</svg>")
 
@@ -294,12 +299,13 @@ def readiness_blocks(reg):
 # twin object -> registry plug (only plugs that exist in the registry get a call-out; the twin insert's boxes are
 # placeholders, so the figure locates, it does not depict — figures_v5.py docstring)
 TWIN_PLUG = {"K5H_CKP": "CKP", "K5H_CMP": "CMP", "K5H_CLT": "CLT-ECU", "K5H_IAT": "IAT", "K5H_MAP": "MAP",
-             "K5H_OilPress": "OILP-ECU", "K5H_OilTemp": "OILT", "K5H_FuelPress": "FPS", "K5H_KS1": "KNOCK-1", "K5H_KS2": "KNOCK-2",
-             "K5H_ThrottleBody_12605109": "TB", "K5H_Alternator": "ALTERNATOR", "K5H_Starter": "STARTER-S", "K5H_Battery": "ODYSSEY",
-             "K5H_RadFan_1": "RADIATOR-FAN", "K5H_AC_Compressor": "AC-CLUTCH", "K5H_iBooster": "IBOOSTER", "K5H_Wideband_Ctrl": "LTCD",
+             "K5H_OilPress": "OILP-ECU", "K5H_OilTemp": "OILT", "K5H_FuelPress": "FUELP", "K5H_KS1": "KNOCK-1", "K5H_KS2": "KNOCK-2",
+             "K5H_ThrottleBody_12605109": "TB", "K5H_Alternator": "ALTERNATOR-SENSE", "K5H_Starter": "STARTER-S", "K5H_Battery": "ODYSSEY",
+             "K5H_RadFan_1": "FAN", "K5H_AC_Compressor": "AC-CLUTCH", "K5H_iBooster": "IBOOSTER", "K5H_Wideband_Ctrl": "WIDEBAND",
              "K5H_FuelPump_Sender": "FUELP", "K5H_VSS": "VSS-SENDER", "K5H_MoTeC_PDM30": "PDM30-A", "K5H_MoTeC_M130": "M130-A"}
 TWIN_PLUG.update({f"K5H_Coil_{i}": f"COIL-{i}" for i in range(1, 9)})
 TWIN_PLUG.update({f"K5H_Injector_{i}": f"INJ-{i}" for i in range(1, 9)})
+TWIN_PLUG.update({"K5H_EStopp_Actuator": "ESTOPP", "K5H_Subwoofer": "SUB-1", "K5H_Amplifier": "AMP", "K5H_TransferCase": "TCASE-4WD-SW", "K5H_6L80E": "PCS-TCM"})
 OPEN_POSITION = {"M130-A": "mount not decided (state §4)", "PDM30-A": "mount not decided (state §4)"}
 
 
@@ -335,20 +341,11 @@ def page_locations(reg, number, odd, view="top"):
     ring = max((_m.hypot(x - cxm, y - cym) for x, y, _ in pts), default=0) + 42
     order = sorted(pts, key=lambda t: _m.atan2(t[1] - cym, t[0] - cxm))
     angles = [_m.atan2(y - cym, x - cxm) for x, y, _ in order]
-    gap = 2 * _m.asin(min(1.0, 7.0 / ring))            # a number circle is 5.4 pt: keep centres ≥ 14 pt apart on the ring
-    if len(angles) * gap > 2 * _m.pi:
-        ring = 14.0 * len(angles) / (2 * _m.pi) + 6   # the ring grows until every number has room
-        gap = 2 * _m.asin(min(1.0, 7.0 / ring))
-    for _ in range(60):                                # relax: push neighbours apart around the circle
-        moved = False
-        for i in range(len(angles)):
-            j = (i + 1) % len(angles)
-            d_ = (angles[j] - angles[i]) % (2 * _m.pi)
-            if d_ < gap:
-                push = (gap - d_) / 2
-                angles[i] -= push; angles[j] += push; moved = True
-        if not moved:
-            break
+    # numbers sit evenly around the ring in the order of their parts' bearings (GM plate practice): no two can touch
+    n_ = len(angles)
+    ring = max(ring, 15.0 * n_ / (2 * _m.pi) + 6)
+    a0 = angles[0] if angles else 0.0
+    angles = [a0 + i_ * 2 * _m.pi / n_ for i_ in range(n_)]
     n = 0
     for (x, y, code), a in zip(order, angles):
         n += 1
