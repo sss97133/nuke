@@ -23,7 +23,10 @@ import kits_v5
 
 CD = Path(__file__).resolve().parent
 OUT = CD.parent / "output" / "manual"
-W, H, M = 612, 792, 48                      # US letter in points, like the LTSM; 2/3 in margins
+W, H, M = 612, 792, 48
+HEXC = {"white": "#f2f2f2", "black": "#111", "red": "#d3222a", "orange": "#f28c28", "yellow": "#e8c31c", "green": "#1f8a3b",
+        "blue": "#2457c5", "brown": "#7a4a1d", "gray": "#8a8a8a", "grey": "#8a8a8a", "violet": "#7b3fa0", "purple": "#7b3fa0",
+        "pink": "#e58fb6", "tan": "#c8a675", "cable": "#555", "shld": "#555"}                      # US letter in points, like the LTSM; 2/3 in margins
 GUT = 14                                     # column gutter
 COLW = (W - 2 * M - GUT) / 2
 FONT = "Helvetica, Arial, sans-serif"
@@ -169,7 +172,7 @@ class Page:
                 f'<rect width="{W}" height="{H}" fill="#fff"/>' + "".join(self.el) + "</svg>")
 
 
-def connector_face(p, x, y, labels, title, pitch=26, cav=15, round_=False, href=None):
+def connector_face(p, x, y, labels, title, pitch=26, cav=15, round_=False, href=None, colours=None):
     """A plug's PIN MAP: one square per cavity with the moulded marking above it, no housing outline. The housing's true
     shape is drawn only from the maker's drawing (owner 2026-09-28: an inaccurate plug shape is worse than none)."""
     n = len(labels)
@@ -178,7 +181,14 @@ def connector_face(p, x, y, labels, title, pitch=26, cav=15, round_=False, href=
     for i, lab in enumerate(labels):
         cx = x + 8 + i * pitch + (pitch - cav) / 2
         cyy = y + 26
-        p.rect(cx, cyy, cav, cav, sw=0.9, fill="#fff")
+        fill, stripe = "#fff", None
+        if colours and i < len(colours) and colours[i]:
+            parts_ = [q.strip() for q in str(colours[i]).lower().split("+")[0].split("/") if q.strip()]
+            fill = HEXC.get(parts_[0], "#ddd") if parts_ else "#fff"
+            stripe = HEXC.get(parts_[1]) if len(parts_) > 1 else None
+        p.rect(cx, cyy, cav, cav, sw=0.9, fill=fill)
+        if stripe:
+            p.el.append(f'<rect x="{cx:.1f}" y="{cyy + cav * 0.4:.1f}" width="{cav:.1f}" height="{cav * 0.2:.1f}" fill="{stripe}"/>')
         p.txt(cx + cav / 2, cyy - 4, str(lab), 7.5, bold=True, anchor="middle")
     p.txt(x + w / 2, y + h + 22, title.upper(), 6.8, bold=True, anchor="middle", href=href)
     p.txt(x + w / 2, y + h + 30, "pin map — cavity order as moulded; housing shape not drawn", 5.6, anchor="middle", italic=True)
@@ -364,9 +374,6 @@ for _f, _key in (("m130_designations.txt", "M130"), ("pdm30_designations.txt", "
             _parts = _l.split("|")
             if len(_parts) >= 3:
                 DESIG[(_key, re.sub(r"^([AB])0?(\d+)$", lambda m_: m_.group(1) + m_.group(2), _parts[0]))] = (_parts[1], _parts[2])
-HEXC = {"white": "#f2f2f2", "black": "#111", "red": "#d3222a", "orange": "#f28c28", "yellow": "#e8c31c", "green": "#1f8a3b",
-        "blue": "#2457c5", "brown": "#7a4a1d", "gray": "#8a8a8a", "grey": "#8a8a8a", "violet": "#7b3fa0", "purple": "#7b3fa0",
-        "pink": "#e58fb6", "tan": "#c8a675", "cable": "#555", "shld": "#555"}
 
 
 def page_pinout(reg, wires, number, odd, dev, conn, n_pins, title, mating, source):
@@ -462,6 +469,17 @@ def page_firewall(reg, wires, number, odd):
     span = max(max(xs) - min(xs), max(ys) - min(ys))
     R = (COLW - 30) / 2
     scale = (2 * R - 30) / span
+    dev_end, cab_end = {}, {}
+    for tm in reg["terminations"]:
+        wid = str(tm["wire"])
+        if tm["endpoint"] in ("FIREWALL-ENGINE", "FIREWALL-CABIN"):
+            continue
+        e_ = reg["endpoints"].get(tm["endpoint"], {})
+        if e_.get("where") == "engine":
+            import diagram_v5 as D
+            dev_end[wid] = f"{D.plug_title(tm['endpoint'], e_)} {tm.get('cavity') or '?'}"
+        elif tm["endpoint"].startswith(("M130", "PDM30", "PDM15")):
+            cab_end[wid] = f"{tm['endpoint'].replace('-', ' ')} {tm.get('cavity') or '?'}"
     def face(x_c, y_c, mirror, title, sub):
         p.el.append(f'<circle cx="{x_c:.1f}" cy="{y_c:.1f}" r="{R:.1f}" fill="none" stroke="#000" stroke-width="1.2"/>')
         p.rect(x_c - 7, y_c - R - 7, 14, 8, sw=1.0, rx=1.5)                   # master key
@@ -471,10 +489,19 @@ def page_firewall(reg, wires, number, odd):
                 dx = -dx
             X, Y = x_c + dx, y_c + dy
             wid = cav_wire.get(cav)
-            p.el.append(f'<circle cx="{X:.1f}" cy="{Y:.1f}" r="7.6" fill="{"#fff" if wid else "#eee"}" stroke="#000" stroke-width="0.7"/>')
-            p.txt(X, Y - 1.2, cav, 5.6, bold=True, anchor="middle")
-            if wid:
-                p.txt(X, Y + 5.2, str(wid).upper()[:7], 4.4, anchor="middle")
+            w = wires.get(wid) if wid else None
+            col = str((w or {}).get("color") or "").lower().split("+")[0]
+            parts_ = [q.strip() for q in col.split("/") if q.strip()]
+            base = HEXC.get(parts_[0], "#ddd") if (w and parts_) else "#fff"
+            stripe = HEXC.get(parts_[1]) if (w and len(parts_) > 1) else None
+            # the cavity: filled with the wire's colour (stripe as a band), the moulded letter bold in the centre
+            p.el.append(f'<circle cx="{X:.1f}" cy="{Y:.1f}" r="7.6" fill="{base if w else "#fff"}" stroke="{"#000" if w else "#bbb"}" stroke-width="{0.8 if w else 0.5}"/>')
+            if stripe:
+                p.el.append(f'<path d="M {X - 7.6:.1f} {Y + 2.2:.1f} A 7.6 7.6 0 0 0 {X + 7.6:.1f} {Y + 2.2:.1f} L {X + 7.6:.1f} {Y + 4.6:.1f} A 7.6 7.6 0 0 1 {X - 7.6:.1f} {Y + 4.6:.1f} Z" fill="{stripe}"/>')
+            dark = base in ("#111", "#7a4a1d", "#2457c5", "#1f8a3b", "#7b3fa0", "#d3222a", "#555", "#8a8a8a")
+            p.txt(X, Y + 2.2, cav, 6.2, bold=True, anchor="middle", italic=False)
+            if dark:
+                p.el[-1] = p.el[-1].replace('<text ', '<text fill="#fff" ', 1)
         p.txt(x_c, y_c + R + 14, title.upper(), 8, bold=True, anchor="middle")
         p.txt(x_c, y_c + R + 24, sub, 6.4, anchor="middle")
     yc = p.y + 34 + R
@@ -483,16 +510,21 @@ def page_firewall(reg, wires, number, odd):
     face(M + COLW + GUT + COLW / 2, yc, False, "Cab side — plug pin insert, front face",
          "as the MILNEC 25-61 drawing shows it; the engine harness plug mates from this side")
     p.y = yc + R + 34
-    # cavity table: cavity · circuit · size, colour · wire name, in cavity order
+    # per-cavity text, the way a builder reads it at the connector: cavity · circuit · size, colour · function ·
+    # where the wire goes on that side (engine side: the plug and cavity; cab side: the computer pin)
     rows = []
     for cav in sheets.CAV_ORDER:
         wid = cav_wire.get(cav)
         w = wires.get(wid) if wid else None
-        rows.append((cav, (wid or "—").upper(), gm_colour(f"{gauge(w)} {colour(w)}") if w else "spare", kits_v5.dave_name(w).upper() if w else ""))
+        rows.append((cav, (wid or "—").upper(), gm_colour(f"{gauge(w)} {colour(w)}") if w else "spare",
+                     kits_v5.dave_name(w).upper() if w else "", (dev_end.get(wid) or "").upper() if w else "",
+                     (cab_end.get(wid) or "").upper() if w else ""))
     half = (len(rows) + 1) // 2
-    widths = [26, 52, 70, 103]
-    p.table(M, p.y, widths, ["Cav", "Circuit", "Size, Color", "Circuit Name"], rows[:half], size=5.8, lead=7.6)
-    p.table(M + COLW + GUT, p.y, widths, ["Cav", "Circuit", "Size, Color", "Circuit Name"], rows[half:], size=5.8, lead=7.6)
+    widths = [20, 36, 50, 64, 50, 38]
+    p.txt(M, p.y - 2, "ENGINE END = the plug and cavity in the engine bay · CAB END = the computer pin", 6.2, italic=True)
+    p.y += 4
+    p.table(M, p.y, widths, ["Cav", "Ckt", "Size, Color", "Function", "Engine End", "Cab End"], rows[:half], size=5.4, lead=7.2)
+    p.table(M + COLW + GUT, p.y, widths, ["Cav", "Ckt", "Size, Color", "Function", "Engine End", "Cab End"], rows[half:], size=5.4, lead=7.2)
     return p
 
 
@@ -640,6 +672,20 @@ def siblings(reg, wires, eid):
     return cols
 
 
+PRODUCT_IMAGES = Path("/Users/skylar/nuke/reference_documents/product_images")
+
+
+def kit_photo(reg, eid):
+    """The plug kit's vendor product photo, if one is on file (reference_documents/product_images, gitignored; the
+    source URL of each is in sources.json there)."""
+    import base64
+    for code in (reg["endpoints"].get(eid, {}).get("kit") or {}):
+        f = PRODUCT_IMAGES / (str(code).replace("/", "-") + ".png")
+        if f.exists():
+            return code, "data:image/png;base64," + base64.b64encode(f.read_bytes()).decode()
+    return None, None
+
+
 def connector_pages(reg, wires, plugs, first, fig0):
     """Connector identification pages. plugs: (endpoint, title, typical count or None). Two columns,
     rows packed from the top; a new page starts when the next row won't fit. Open items shared by
@@ -668,9 +714,19 @@ def connector_pages(reg, wires, plugs, first, fig0):
         ts = sorted(dev.get(eid, {}).values(), key=lambda t: str(t.get("cavity")))
         labels = [t.get("cavity") for t in ts]
         name = title.rsplit(" ", 1)[0] if typ else title
-        _, fh = connector_face(p, x + (COLW - (len(labels) * 26 + 16)) / 2, y, labels,
+        code, uri = kit_photo(reg, eid)
+        face_w = len(labels) * 26 + 16
+        photo_w = 58 if uri else 0
+        fx = x + (COLW - face_w - (photo_w + 10 if uri else 0)) / 2
+        _, fh = connector_face(p, fx, y, labels,
                                f"{name} (typical)" if typ else title, round_=(eid == "OILP-ECU"),
+                               colours=[wires.get(t_["wire"], {}).get("color") for t_ in ts],
                                href="https://nuke.ag/vehicle/e08bf694-970f-4cbe-8a74-8715158a0f2e/wiring?tab=map&node=" + eid)
+        if uri:
+            px_ = fx + face_w + 10
+            p.el.append(f'<image x="{px_:.1f}" y="{y + 2:.1f}" width="{photo_w}" height="{photo_w}" preserveAspectRatio="xMidYMid meet" href="{uri}"/>')
+            p.rect(px_, y + 2, photo_w, photo_w, sw=0.5)
+            p.txt(px_ + photo_w / 2, y + photo_w + 9, "plug kit, vendor photo", 5.2, anchor="middle", italic=True)
         rows = []
         for t in ts:
             w = wires.get(t["wire"], {})
