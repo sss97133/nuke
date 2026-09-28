@@ -4,8 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { generateIdentityBasedAvatar, getMonogramFromIdentity, type UserIdentity } from '../../utils/identityBasedAvatar';
-import { supabase } from '../../lib/supabase';
+import { generateIdentityBasedAvatar, getMonogramFromIdentity, fetchBatIdentity, type UserIdentity } from '../../utils/identityBasedAvatar';
 
 interface AsciiAvatarProps {
   seed: string; // Username, user ID, or any string to generate unique avatar
@@ -40,13 +39,8 @@ export const AsciiAvatar: React.FC<AsciiAvatarProps> = ({
         };
         
         if (platform === 'bat') {
-          const { data: extIdentity } = await supabase
-            .from('external_identities')
-            .select('handle, metadata')
-            .eq('platform', 'bat')
-            .eq('handle', seed)
-            .maybeSingle();
-          
+          const extIdentity = await fetchBatIdentity(seed);
+
           if (extIdentity?.metadata) {
             userIdentity.comment_analysis = extIdentity.metadata.comment_analysis;
             userIdentity.username_parts = extIdentity.metadata.comment_analysis?.username_parts;

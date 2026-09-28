@@ -46,6 +46,50 @@ export async function generateIdentityBasedAvatar(
   return generatePatternFromIdentity(identity);
 }
 
+export interface BatIdentityRow {
+  handle: string;
+  metadata: any;
+  claimed_by_user_id: string | null;
+}
+
+// One external_identities read per BaT handle per page, batched. A comment thread renders an avatar per
+// comment, and each avatar used to send three requests (two identity reads plus the author's last 50
+// comments site-wide, which the pattern never read): a 133-comment BaT page sent 945 API requests and
+// settled in ~32 s (2026-09-27). Handles asked for in the same tick go out as one `in` query.
+const batIdentityCache = new Map<string, Promise<BatIdentityRow | null>>();
+let batQueue: string[] = [];
+let batWaiters = new Map<string, (row: BatIdentityRow | null) => void>();
+let batFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function flushBatIdentities(): Promise<void> {
+  const handles = batQueue;
+  const waiters = batWaiters;
+  batQueue = [];
+  batWaiters = new Map();
+  batFlushTimer = null;
+  for (let i = 0; i < handles.length; i += 100) {
+    const chunk = handles.slice(i, i + 100);
+    const { data, error } = await supabase
+      .from('external_identities')
+      .select('handle, metadata, claimed_by_user_id')
+      .eq('platform', 'bat')
+      .in('handle', chunk);
+    const byHandle = new Map<string, BatIdentityRow>();
+    for (const row of (data ?? []) as BatIdentityRow[]) if (!byHandle.has(row.handle)) byHandle.set(row.handle, row);
+    for (const h of chunk) waiters.get(h)?.(error ? null : byHandle.get(h) ?? null);
+  }
+}
+
+export function fetchBatIdentity(handle: string): Promise<BatIdentityRow | null> {
+  const hit = batIdentityCache.get(handle);
+  if (hit) return hit;
+  const pending = new Promise<BatIdentityRow | null>((resolve) => { batWaiters.set(handle, resolve); });
+  batIdentityCache.set(handle, pending);
+  batQueue.push(handle);
+  if (!batFlushTimer) batFlushTimer = setTimeout(() => { void flushBatIdentities(); }, 15);
+  return pending;
+}
+
 /**
  * Load user identity from database
  */
@@ -60,12 +104,7 @@ async function loadUserIdentity(
 
   // If BaT platform, check external_identities
   if (platform === 'bat') {
-    const { data: extIdentity } = await supabase
-      .from('external_identities')
-      .select('handle, metadata, claimed_by_user_id')
-      .eq('platform', 'bat')
-      .eq('handle', seed)
-      .maybeSingle();
+    const extIdentity = await fetchBatIdentity(seed);
 
     if (extIdentity?.metadata) {
       identity.comment_analysis = extIdentity.metadata.comment_analysis;
@@ -76,27 +115,11 @@ async function loadUserIdentity(
         total_listings: extIdentity.metadata.listings_count
       };
     }
-
-    // Get comments from the unified auction_comments table (BaT-only path)
-    const { data: comments } = await supabase
-      .from('auction_comments')
-      .select('comment_text, vehicle_id, posted_at, vehicle:vehicles(title)')
-      .eq('platform', 'bat')
-      .eq('author_username', seed)
-      .order('posted_at', { ascending: false })
-      .limit(50);
-
-    if (comments && comments.length > 0) {
-      identity.comments = comments.map(c => ({
-        vehicle_title: (c.vehicle as any)?.title || 'Unknown',
-        comment_text: c.comment_text,
-        posted_at: c.posted_at || new Date().toISOString()
-      }));
-    }
   }
 
-  // Analyze username if no other data
-  if (!identity.comment_analysis && !identity.comments) {
+  // Analyze username if no other data. A BaT avatar belongs to a commenter, whose comment history used to
+  // skip this step; it still does, so every existing pattern stays the same.
+  if (!identity.comment_analysis && platform !== 'bat') {
     identity.username_parts = analyzeUsername(seed);
   }
 
