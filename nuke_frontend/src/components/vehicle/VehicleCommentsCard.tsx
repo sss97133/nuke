@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import VehicleMemePanel from './VehicleMemePanel';
 import { FallbackAvatar } from '../common/AsciiAvatar';
+import { decodeHtmlEntities } from '../../utils/htmlEntities';
 import { useVehicleCommentsUnified } from '../../hooks/useVehicleCommentsUnified';
 
 interface Comment {
@@ -327,7 +328,8 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
     // "Cannot read properties of null (reading 'length')" inside an Array.map at
     // VehicleCommentsCard. Some comment rows arrive with null/non-string comment_text.
     if (text == null) return null;
-    const safeText = typeof text === 'string' ? text : String(text ?? '');
+    // BaT comment text is stored HTML-escaped as served ("Don&#039;t"); decode for display
+    const safeText = decodeHtmlEntities(typeof text === 'string' ? text : String(text ?? ''));
     if (!safeText) return null;
     // Parse markdown-style meme references: [meme:Title](url)
     const memeRegex = /\[meme:([^\]]+)\]\(([^)]+)\)/g;
