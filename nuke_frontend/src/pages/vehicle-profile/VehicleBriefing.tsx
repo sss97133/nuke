@@ -16,6 +16,7 @@ import React, { useState, useEffect } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
 import type { VehicleIntel, CommentIntel, Apparition, CompSale } from './hooks/useVehicleIntel';
+import { useVehiclePriceFacts, type PriceFacts } from './hooks/useVehiclePriceFacts';
 
 // ---------------------------------------------------------------------------
 // Eye read — the evidence-graded appraisal (vehicle_condition_scores).
@@ -62,40 +63,6 @@ function useEyeRead(vehicleId: string | undefined): EyeRead | null {
     return () => { alive = false; };
   }, [vehicleId]);
   return read;
-}
-
-// ---------------------------------------------------------------------------
-// Typed price — vehicle_price_facts: one price with its kind (sold / bid / ask /
-// estimate) and date, so a high bid or a stale ask is never read as a sale.
-// ---------------------------------------------------------------------------
-
-interface PriceFacts {
-  price_kind: 'sold' | 'bid' | 'ask' | 'estimate' | null;
-  price_amount: number | null;
-  price_as_of: string | null;
-  price_live: boolean | null;
-}
-
-function useVehiclePrice(vehicleId: string | undefined): { price: PriceFacts | null; loaded: boolean } {
-  const [state, setState] = useState<{ id?: string; price: PriceFacts | null }>({ price: null });
-  useEffect(() => {
-    if (!vehicleId) return;
-    let alive = true;
-    supabase
-      .rpc('vehicle_price_facts', { p_vehicle_ids: [vehicleId] })
-      .then(({ data }) => {
-        if (!alive) return;
-        const row: any = Array.isArray(data) ? data[0] : null;
-        setState({
-          id: vehicleId,
-          price: row && row.price_kind && Number(row.price_amount) > 0
-            ? { ...row, price_amount: Number(row.price_amount) }
-            : null,
-        });
-      }, () => { if (alive) setState({ id: vehicleId, price: null }); });
-    return () => { alive = false; };
-  }, [vehicleId]);
-  return { price: state.price, loaded: state.id === vehicleId };
 }
 
 // ---------------------------------------------------------------------------
@@ -320,9 +287,9 @@ const VehicleBriefing: React.FC = () => {
   const { vehicle, vehicleIntel, vehicleIntelLoading, observationCount } = useVehicleProfile();
   const [showComps, setShowComps] = useState(false);
   const eyeRead = useEyeRead(vehicle?.id);
-  const { price: priceFacts, loaded: priceLoaded } = useVehiclePrice(vehicle?.id);
+  const { priceFacts, priceSettled } = useVehiclePriceFacts(vehicle?.id);
 
-  if (!vehicle || vehicleIntelLoading || !priceLoaded) return null;
+  if (!vehicle || vehicleIntelLoading || !priceSettled) return null;
 
   const headline = generateHeadline(vehicle, vehicleIntel, observationCount, eyeRead, priceFacts);
   const estimate = vehicle.nuke_estimate;

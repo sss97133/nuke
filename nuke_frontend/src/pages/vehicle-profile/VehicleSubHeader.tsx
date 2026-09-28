@@ -1,5 +1,6 @@
 import React from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
+import { useVehiclePriceFacts, priceKindLabel } from './hooks/useVehiclePriceFacts';
 import { BadgePortal } from '../../components/badges/BadgePortal';
 import { OdometerBadge } from '../../components/vehicle/OdometerBadge';
 
@@ -53,6 +54,7 @@ const TOKEN = {
 
 const VehicleSubHeader: React.FC = () => {
   const { vehicle } = useVehicleProfile();
+  const { priceFacts, priceSettled } = useVehiclePriceFacts(vehicle?.id);
   if (!vehicle) return null;
 
   const year         = vehicle.year ?? vehicle.model_year ?? '';
@@ -138,7 +140,7 @@ const VehicleSubHeader: React.FC = () => {
           <BadgePortal dimension="source" value={location} label={location} variant="dimension" static />
         )}
         {/* THIN badge — sparse vehicle indicator */}
-        {(() => {
+        {priceSettled && (() => {
           const v = vehicle as any;
           const specFields = [
             v?.mileage ?? v?.odometer ?? v?.miles,
@@ -150,7 +152,7 @@ const VehicleSubHeader: React.FC = () => {
             v?.exterior_color ?? v?.color,
             v?.interior_color,
             v?.fuel_type,
-            v?.sale_price ?? v?.sold_price ?? v?.price,
+            priceKindLabel(priceFacts) ? priceFacts?.price_amount : null, // a sold / bid / ask price, never a raw sale_price
             v?.description,
             v?.city ?? v?.seller_city ?? v?.location,
           ];
