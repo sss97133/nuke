@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { VehicleHeaderProps } from './types';
 import { useVehicleProfile } from './VehicleProfileContext';
+import { useVehiclePriceFacts } from './hooks/useVehiclePriceFacts';
 import { supabase } from '../../lib/supabase';
 import { VehicleDeduplicationService } from '../../services/vehicleDeduplicationService';
 // Deprecated modals (history/analysis/tag review) intentionally removed from UI
@@ -87,6 +88,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     auctionPulse,
   } = useVehicleProfile();
   const popupCtx = useContext(PopupStackContext);
+  // the typed price (vehicle_price_facts): every price this header shows, said as sold / bid / ask
+  const { priceFacts, priceSettled } = useVehiclePriceFacts(vehicle?.id);
+  const typedSold = priceFacts?.price_kind === 'sold';
   const isOwner = isRowOwner || ctxVerifiedOwner;
   const { isVerifiedOwner, contributorRole } = permissions || {};
   const suppressExternalListing = !!userOwnershipClaim;
@@ -197,65 +201,20 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
   const getAutoDisplay = () => {
     if (!vehicle) return { amount: null as number | null, label: '' };
-    
-    // CORRECT PRIORITY ORDER (DO NOT USE current_value):
-    // 1. sale_price (actual sold price)
-    // 2. winning_bid (auction result)
-    // 3. high_bid (RNM auctions)
-    // 4. Live bid (from vehicle_events/auctionPulse for active auctions)
-    // 5. Current bid (from vehicle, if no external listing)
-    // 6. Asking price (only if for sale)
-    
-    const v = vehicle as any;
-    
-    // 1. Sale price / final bid
-    // NOTE: Many auction imports historically stored "Bid to" (RNM) into `vehicles.sale_price`.
-    // We must not label this as "Sold for" when reserve was not met.
-    if (typeof vehicle.sale_price === 'number' && vehicle.sale_price > 0) {
-      const outcome = String(v.auction_outcome || '').toLowerCase();
-      const reserveStatus = String(v.reserve_status || '').toLowerCase();
-      const isUnsold = reserveStatus === 'reserve_not_met' || reserveStatus === 'no_sale' || outcome === 'reserve_not_met' || outcome === 'no_sale';
-      if (isUnsold) {
-        return { amount: vehicle.sale_price, label: 'High Bid' };
-      }
-      if (outcome === 'sold') {
-        return { amount: vehicle.sale_price, label: 'SOLD FOR' };
-      }
-      return { amount: vehicle.sale_price, label: 'Sold for' };
-    }
-    
-    // 2. Winning bid (auction result)
-    if (typeof v.winning_bid === 'number' && Number.isFinite(v.winning_bid) && v.winning_bid > 0) {
-      return { amount: v.winning_bid, label: 'Winning Bid' };
-    }
-    
-    // 3. High bid (RNM auctions)
-    if (typeof v.high_bid === 'number' && Number.isFinite(v.high_bid) && v.high_bid > 0) {
-      return { amount: v.high_bid, label: 'High Bid' };
-    }
-    
-    // 4. Live bid from auction telemetry (vehicle_events pulse)
+
+    // 1. A live auction's current bid from telemetry (fresher than the vehicles row)
     try {
-      // First check auctionPulse (most up-to-date)
-      if (auctionPulse?.listing_url) {
+      if (!typedSold && auctionPulse?.listing_url) {
         const status = String(auctionPulse.listing_status || '').toLowerCase();
         const isLive = status === 'active' || status === 'live';
-        const isSold = status === 'sold';
-
-        const pulseFinal = parseMoneyNumber((auctionPulse as any).final_price);
-        if (isSold && pulseFinal) {
-          return { amount: pulseFinal, label: 'SOLD FOR' };
-        }
         const pulseBid = parseMoneyNumber((auctionPulse as any).current_bid);
         if (isLive && pulseBid) {
           return { amount: pulseBid, label: 'Current Bid' };
         }
       }
-      
-      // Fallback: check vehicle_events directly from vehicle data
       const v: any = vehicle as any;
       const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
-      if (externalListing) {
+      if (!typedSold && externalListing) {
         // Treat listing as live if either:
         // - end_date is in the future, OR
         // - end_date is missing but status indicates 'active' or 'live'
@@ -271,25 +230,19 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     } catch {
       // ignore
     }
-    
-    // 5. Current bid from vehicle (if no external listing)
-    if (typeof vehicle.current_bid === 'number' && Number.isFinite(vehicle.current_bid) && vehicle.current_bid > 0) {
-      return { amount: vehicle.current_bid, label: 'Current Bid' };
-    }
-    
-    // 6. Asking price (show if exists - having an asking price implies it's for sale)
-    const askingPrice = typeof vehicle.asking_price === 'number' 
-      ? vehicle.asking_price 
-      : (typeof vehicle.asking_price === 'string' ? parseFloat(vehicle.asking_price) : null);
-    if (askingPrice && !isNaN(askingPrice) && askingPrice > 0) {
-      return { amount: askingPrice, label: 'Asking' };
-    }
-    
+
+    // 2. The typed price: a sale, a bid or a current ask, said as what it is. Never a raw sale_price (an RNM
+    // "bid to", a platform price with no sale marker or an old ask is not a sale), and never an estimate.
+    const amount = priceFacts?.price_amount ?? null;
+    if (amount && priceFacts?.price_kind === 'sold') return { amount, label: 'SOLD FOR' };
+    if (amount && priceFacts?.price_kind === 'bid') return { amount, label: priceFacts.price_live ? 'Current Bid' : 'High Bid' };
+    if (amount && priceFacts?.price_kind === 'ask') return { amount, label: 'Asking' };
+
     // Reserve Not Met with no price
-    if (v.auction_outcome === 'reserve_not_met') {
+    if ((vehicle as any).auction_outcome === 'reserve_not_met') {
       return { amount: null, label: 'Reserve Not Met' };
     }
-    
+
     // No price available - DO NOT fall back to current_value, purchase_price, msrp, or estimates
     return { amount: null, label: '' };
   };
@@ -335,27 +288,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       return { amount: null, label: '' };
     }
     if (mode === 'sale') {
-      // FACT-BASED: Only show sale_price if it has a verified source
-      if (typeof vehicle.sale_price === 'number') {
-        // Check if sale_price has a verified source
-        if (!priceSources.sale_price && !(vehicle as any).bat_auction_url) {
-          // No verified source - don't show unverified prices
-          return { amount: null, label: '' };
-        }
-        
-        // Respect auction outcome / reserve status for proper disclosure
-        const outcome = String((vehicle as any).auction_outcome || '').toLowerCase();
-        const reserveStatus = String((vehicle as any).reserve_status || '').toLowerCase();
-        if (outcome === 'sold') {
-          return { amount: vehicle.sale_price, label: 'SOLD FOR' };
-        } else if (outcome === 'reserve_not_met' || reserveStatus === 'reserve_not_met') {
-          // Don't show high bid for RNM - user needs to click for details
-          return { amount: null, label: 'Reserve Not Met' };
-        } else if (outcome === 'no_sale' || reserveStatus === 'no_sale') {
-          return { amount: null, label: 'No Sale' };
-        } else {
-          return { amount: vehicle.sale_price, label: 'Sold for' };
-        }
+      // A sale only when the typed price proves one — never a raw sale_price
+      if (typedSold && priceFacts?.sold_amount) {
+        return { amount: priceFacts.sold_amount, label: 'SOLD FOR' };
+      }
+      const outcome = String((vehicle as any).auction_outcome || '').toLowerCase();
+      const reserveStatus = String((vehicle as any).reserve_status || '').toLowerCase();
+      if (outcome === 'reserve_not_met' || reserveStatus === 'reserve_not_met') {
+        // Don't show high bid for RNM - user needs to click for details
+        return { amount: null, label: 'Reserve Not Met' };
+      }
+      if (outcome === 'no_sale' || reserveStatus === 'no_sale') {
+        return { amount: null, label: 'No Sale' };
       }
       return { amount: null, label: '' };
     }
@@ -845,25 +789,35 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       }
     };
 
-    const saleDate = (vehicle as any)?.sale_date || (vehicle as any)?.bat_sale_date || null;
-    pushEntry({
-      id: 'sale',
-      label: 'Recorded Sale',
-      amount: vehicle.sale_price,
-      date: saleDate,
-      source: fieldSource('sale_price', (vehicle as any)?.platform_source || 'Vehicle record'),
-      confidence: fieldConfidence('sale_price')
-    });
-
-    const batSale = (vehicle as any)?.bat_sold_price;
-    if (typeof batSale === 'number' && batSale !== vehicle.sale_price) {
+    // sale and bid come from the typed price: a sale only when one is proven, a high bid said as a bid
+    if (typedSold) {
       pushEntry({
-        id: 'bat_sale',
-        label: 'Bring a Trailer Result',
-        amount: batSale,
-        date: (vehicle as any)?.bat_sale_date || saleDate,
-        source: 'Bring a Trailer',
-        confidence: fieldConfidence('bat_sold_price')
+        id: 'sale',
+        label: 'Recorded Sale',
+        amount: priceFacts?.sold_amount,
+        date: priceFacts?.sold_on || null,
+        source: fieldSource('sale_price', (vehicle as any)?.platform_source || 'Vehicle record'),
+        confidence: fieldConfidence('sale_price')
+      });
+
+      const batSale = (vehicle as any)?.bat_sold_price;
+      if (typeof batSale === 'number' && batSale !== priceFacts?.sold_amount) {
+        pushEntry({
+          id: 'bat_sale',
+          label: 'Bring a Trailer Result',
+          amount: batSale,
+          date: (vehicle as any)?.bat_sale_date || priceFacts?.sold_on || null,
+          source: 'Bring a Trailer',
+          confidence: fieldConfidence('bat_sold_price')
+        });
+      }
+    } else if (priceFacts?.bid_amount) {
+      pushEntry({
+        id: 'high_bid',
+        label: priceFacts.price_live ? 'Current Bid' : 'High Bid',
+        amount: priceFacts.bid_amount,
+        date: priceFacts.bid_on || null,
+        source: priceFacts.platform || undefined,
       });
     }
 
@@ -914,7 +868,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       source: 'Factory data'
     });
 
-    const order = ['sale', 'bat_sale', 'asking', 'auction', 'estimate', 'purchase', 'msrp'];
+    const order = ['sale', 'bat_sale', 'high_bid', 'asking', 'auction', 'estimate', 'purchase', 'msrp'];
     const priority = (id: string) => {
       const idx = order.indexOf(id);
       return idx === -1 ? order.length : idx;
@@ -925,14 +879,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         self.findIndex(s => s.label === entry.label && s.amount === entry.amount) === index
       )
       .sort((a, b) => priority(a.id) - priority(b.id));
-  }, [vehicle, valuation]);
+  }, [vehicle, valuation, priceFacts, typedSold]);
 
   // "saleDate" is used purely for the small "Xd ago" indicator.
   // For unsold auctions (RNM / bid-to), we prefer the auction end date so the user still sees recency.
   const saleDate = (() => {
     const v: any = vehicle as any;
-    const explicit = v?.sale_date || v?.bat_sale_date || ((auctionPulse as any)?.sold_at ?? null);
-    if (explicit) return explicit;
+    // the typed price's own date: the sale, the auction end for a high bid, the ask's last sighting
+    if (priceFacts?.price_kind && priceFacts.price_kind !== 'estimate' && priceFacts.price_as_of) return priceFacts.price_as_of;
+    if (typedSold || priceFacts?.price_kind === 'ask') return null;
 
     const vehicleEvent = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
     const activeListing: any = auctionPulse || vehicleEvent;
@@ -954,10 +909,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const pulseStatus = auctionPulse?.listing_url ? String(auctionPulse.listing_status || '').toLowerCase() : '';
   const pulseFinal = parseMoneyNumber((auctionPulse as any)?.final_price);
   const pulseSoldAt = (auctionPulse as any)?.sold_at ?? null;
-  const isSoldContext =
-    vehicleSaleStatus === 'sold' ||
-    vehicleOutcome === 'sold' ||
-    (pulseStatus === 'sold' && (pulseFinal !== null || !!pulseSoldAt));
+  // sold = the typed price proves a sale (not a status alone, not a telemetry final price)
+  const isSoldContext = typedSold;
   const priceDescriptor = isSoldContext ? 'Sold price' : primaryLabel;
   
   // Calculate days since sale validation (sale date)
@@ -976,6 +929,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   
   // For RNM (Reserve Not Met), show blurred high bid instead of "Set a price"
   const isRNM = (() => {
+    if (typedSold) return false;
     const outcome = String((vehicle as any)?.auction_outcome || '').toLowerCase();
     if (outcome === 'reserve_not_met' || outcome === 'no_sale') return true;
     const status = auctionPulse?.listing_url ? String(auctionPulse.listing_status || '').toLowerCase() : '';
@@ -999,88 +953,31 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     // If we can't determine end date, be conservative.
     return false;
   })();
-  const highBid = (vehicle as any)?.high_bid || (vehicle as any)?.winning_bid;
+  const highBid = priceFacts?.bid_amount ?? null;
   const priceDisplay = useMemo(() => {
-    // HIGHEST PRIORITY: If vehicle has a sale_price, always show it (overrides auction pulse)
-    const vehicleSalePrice = parseMoneyNumber((vehicle as any)?.sale_price);
-    const vehicleSaleDate = (vehicle as any)?.sale_date || saleDate;
-    const vehicleIsSold = vehicleSaleDate !== null || 
-                         String((vehicle as any)?.sale_status || '').toLowerCase() === 'sold' ||
-                         String((vehicle as any)?.auction_outcome || '').toLowerCase() === 'sold';
-    
-    // If vehicle is sold and has sale_price, show it (no "Bid:" prefix)
-    if (vehicleIsSold && vehicleSalePrice) {
-      return formatCurrency(vehicleSalePrice);
+    // A proven sale (the typed price) always shows, over any auction telemetry and any display mode
+    if (typedSold && priceFacts?.sold_amount) {
+      return formatCurrency(priceFacts.sold_amount);
     }
-    
-    // If we have external auction telemetry, reflect it directly in the header.
-    // Check both auctionPulse and vehicle_events for the most up-to-date data
+
+    // A live auction: the telemetry's current bid (fresher than the vehicles row)
     const v: any = vehicle as any;
     const externalListing = v?.vehicle_events?.[0] ?? v?.external_listings?.[0];
     const activeListing = auctionPulse || externalListing;
-    
-    if (activeListing?.listing_url || activeListing) {
+    if (!typedSold && activeListing) {
       // CRITICAL: Use end_date to determine if auction is truly live (more reliable than status field)
       const endDate = activeListing.end_date;
       const endTimestamp = endDate ? new Date(endDate).getTime() : 0;
       const isLive = Number.isFinite(endTimestamp) && endTimestamp > Date.now();
-      
-      const status = String(activeListing.listing_status || '').toLowerCase();
-      const isSold = status === 'sold';
-      const isEnded = (status === 'ended' || status === 'reserve_not_met') && !isLive; // Only ended if past end_date
-      
-      // Get current_bid from the most up-to-date source
       const currentBid = parseMoneyNumber((activeListing as any).current_bid);
-      
-      // Live auction: show current bid (only if vehicle isn't sold)
-      if (isLive && !vehicleIsSold && currentBid) {
-        return `Bid: ${formatCurrency(currentBid)}`;
-      }
-      if (isLive && !vehicleIsSold) return 'BID';
-      
-      // Sold: show final price (NO "Bid:" prefix) or SOLD badge
-      if (isSold) {
-        const finalPrice = parseMoneyNumber((activeListing as any).final_price) ?? vehicleSalePrice;
-        if (finalPrice) {
-          // Don't show "Bid:" prefix for sold vehicles - just show the price
-          return formatCurrency(finalPrice);
-        }
-        return 'SOLD';
-      }
-      
-      // Ended/RNM: show final price, high bid, or sale price if available (NO "Bid:" prefix)
-      if (isEnded) {
-        const finalPrice = parseMoneyNumber((activeListing as any).final_price);
-        const winBid = parseMoneyNumber((vehicle as any)?.winning_bid);
-        const hBid = parseMoneyNumber((vehicle as any)?.high_bid);
-        
-        // Prioritize sale price over bid amounts for ended auctions
-        if (vehicleSalePrice) return formatCurrency(vehicleSalePrice);
-        if (finalPrice) return formatCurrency(finalPrice);
-        if (winBid) return formatCurrency(winBid);
-        if (hBid) return formatCurrency(hBid);
-        
-        // If we have asking price and it's marked for sale, show it
-        const askingPrice = typeof (vehicle as any)?.asking_price === 'number' && (vehicle as any).asking_price > 0 && ((vehicle as any).is_for_sale === true || String((vehicle as any).sale_status || '').toLowerCase() === 'for_sale')
-          ? (vehicle as any).asking_price
-          : null;
-        if (askingPrice) return formatCurrency(askingPrice);
-        
-        // For ended auctions without price, don't show "Auction" - show status or nothing
-        if (status === 'reserve_not_met') return 'RNM';
-        // Don't show "Ended" or "Auction" - fall through to show price from primaryAmount if available
-      }
-      
-      // Unknown status: fall through to primary amount
+      if (isLive && currentBid) return `Bid: ${formatCurrency(currentBid)}`;
+      if (isLive) return 'BID';
+      const status = String(activeListing.listing_status || '').toLowerCase();
+      if (primaryAmount === null && status === 'reserve_not_met') return 'RNM';
     }
 
-    // Check if vehicle is sold (sale_date exists or sale_status is 'sold')
-    const isSold = vehicleSaleDate !== null || 
-                   String((vehicle as any)?.sale_status || '').toLowerCase() === 'sold' ||
-                   String((vehicle as any)?.auction_outcome || '').toLowerCase() === 'sold';
-
     // Check for future auction date - if we have one and would show "Set a price", show the auction date instead
-    if (futureAuctionListing && primaryAmount === null && !isRNM && !isSold) {
+    if (futureAuctionListing && primaryAmount === null && !isRNM && !typedSold) {
       // Check start_date, end_date, or metadata.sale_date
       const auctionDate = futureAuctionListing.start_date || 
                           futureAuctionListing.end_date || 
@@ -1101,26 +998,27 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       }
     }
 
+    // Until the typed price answers, show nothing rather than a raw number
+    if (!priceSettled) return '';
+
     // Fallback to primary amount or RNM high bid
     return primaryAmount !== null
       ? formatCurrency(primaryAmount)
       : (isRNM && highBid)
         ? formatCurrency(highBid)
-        : isSold
+        : typedSold
           ? 'SOLD'
           : 'Set a price';
-  }, [vehicle, auctionPulse, futureAuctionListing, primaryAmount, isRNM, highBid, saleDate]);
+  }, [vehicle, auctionPulse, futureAuctionListing, primaryAmount, isRNM, highBid, typedSold, priceFacts, priceSettled]);
 
   const priceHoverText = (() => {
     // Hover reveals more detail (without adding noise to the visible header).
+    if (typedSold && priceFacts?.sold_amount) {
+      return `Sold price: ${formatCurrency(priceFacts.sold_amount)}`;
+    }
     if (auctionPulse?.listing_url) {
       const status = String(auctionPulse.listing_status || '').toLowerCase();
-      const isSold = status === 'sold';
       const isLive = status === 'active' || status === 'live';
-      const finalPrice = parseMoneyNumber((auctionPulse as any).final_price);
-      if (isSold && finalPrice) {
-        return `Sold price: ${formatCurrency(finalPrice)}`;
-      }
       const bid = parseMoneyNumber((auctionPulse as any).current_bid);
       if (isLive && bid) {
         return `Current bid: ${formatCurrency(bid)}`;
@@ -3662,9 +3560,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   const status = String(auctionPulse.listing_status || '').toLowerCase();
                   const endDate = auctionPulse.end_date ? new Date(auctionPulse.end_date).getTime() : null;
                   const isPastEnd = endDate !== null && endDate < Date.now();
-                  const vehicleIsSold = (vehicle as any)?.sale_status === 'sold' || 
-                                       (vehicle as any)?.sale_price > 0 || 
-                                       (vehicle as any)?.auction_outcome === 'sold';
+                  const vehicleIsSold = typedSold;
                   const isLiveStatus = (status === 'active' || status === 'live') && !isPastEnd && !vehicleIsSold;
                   const isSoldStatus = status === 'sold' || status === 'ended' || vehicleIsSold;
                   
@@ -4907,8 +4803,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             final_price: (() => {
               const pulseFinal = typeof (auctionPulse as any)?.final_price === 'number' ? (auctionPulse as any).final_price : null;
               if (typeof pulseFinal === 'number' && Number.isFinite(pulseFinal) && pulseFinal > 0) return pulseFinal;
-              const vSale = typeof (vehicle as any)?.sale_price === 'number' ? (vehicle as any).sale_price : null;
-              if (typeof vSale === 'number' && Number.isFinite(vSale) && vSale > 0) return vSale;
+              if (typedSold && priceFacts?.sold_amount) return priceFacts.sold_amount;
               return null;
             })(),
             current_bid: (() => {
