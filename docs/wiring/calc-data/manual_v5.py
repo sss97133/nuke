@@ -278,6 +278,71 @@ def readiness_blocks(reg):
     ]
 
 
+# twin object -> registry plug (only plugs that exist in the registry get a call-out; the twin insert's boxes are
+# placeholders, so the figure locates, it does not depict — figures_v5.py docstring)
+TWIN_PLUG = {"K5H_CKP": "CKP", "K5H_CMP": "CMP", "K5H_CLT": "CLT-ECU", "K5H_IAT": "IAT", "K5H_MAP": "MAP",
+             "K5H_OilPress": "OILP-ECU", "K5H_OilTemp": "OILT", "K5H_FuelPress": "FPS", "K5H_KS1": "KNOCK-1", "K5H_KS2": "KNOCK-2",
+             "K5H_ThrottleBody_12605109": "TB", "K5H_Alternator": "ALTERNATOR", "K5H_Starter": "STARTER-S", "K5H_Battery": "ODYSSEY",
+             "K5H_RadFan_1": "RADIATOR-FAN", "K5H_AC_Compressor": "AC-CLUTCH", "K5H_iBooster": "IBOOSTER", "K5H_Wideband_Ctrl": "LTCD",
+             "K5H_FuelPump_Sender": "FUELP", "K5H_VSS": "VSS-SENDER", "K5H_MoTeC_PDM30": "PDM30-A", "K5H_MoTeC_M130": "M130-A"}
+TWIN_PLUG.update({f"K5H_Coil_{i}": f"COIL-{i}" for i in range(1, 9)})
+TWIN_PLUG.update({f"K5H_Injector_{i}": f"INJ-{i}" for i in range(1, 9)})
+OPEN_POSITION = {"M130-A": "mount not decided (state §4)", "PDM30-A": "mount not decided (state §4)"}
+
+
+def page_locations(reg, number, odd, view="top"):
+    """COMPONENT LOCATION — the engine bay from the twin with the hood cut away, numbered call-outs, legend."""
+    import base64
+    fig = OUT / "figures" / f"fig_bay_{view}.png"
+    posf = OUT / "figures" / f"fig_bay_{view}_positions.json"
+    if not (fig.exists() and posf.exists()):
+        return None
+    pos = json.load(posf.open())
+    p = Page(number, "Engine Harness", odd=odd)
+    p.heading("Component Location — Engine Bay")
+    p.txt(W / 2, p.y + 2, "View from above the driver's front quarter (azimuth −20°, elevation 62°), hood cut away. From the digital twin.", 7.5, anchor="middle")
+    fw, fh = W - 2 * M, (W - 2 * M) * 1100 / 1600
+    fx, fy = M, p.y + 10
+    data = base64.b64encode(fig.read_bytes()).decode()
+    p.el.append(f'<image x="{fx}" y="{fy}" width="{fw:.1f}" height="{fh:.1f}" href="data:image/png;base64,{data}"/>')
+    p.rect(fx, fy, fw, fh, sw=0.8)
+    items = []
+    eps = reg["endpoints"]
+    pts = []
+    for obj, code in TWIN_PLUG.items():
+        if obj not in pos or code not in eps:
+            continue
+        x, y = pos[obj]
+        if 0 <= x <= 1 and 0 <= y <= 1:
+            pts.append((fx + x * fw, fy + y * fh, code))
+    # GM call-outs: the number sits clear of the cluster on a ring around it, a leader runs to the part (0A-5 Fig. 7)
+    import math as _m
+    cxm = sum(x for x, _, _ in pts) / max(len(pts), 1)
+    cym = sum(y for _, y, _ in pts) / max(len(pts), 1)
+    ring = max((_m.hypot(x - cxm, y - cym) for x, y, _ in pts), default=0) + 42
+    order = sorted(pts, key=lambda t: _m.atan2(t[1] - cym, t[0] - cxm))
+    n = 0
+    for x, y, code in order:
+        n += 1
+        a = _m.atan2(y - cym, x - cxm)
+        lx, ly = cxm + ring * _m.cos(a), cym + ring * _m.sin(a)
+        lx = min(max(lx, fx + 8), fx + fw - 8); ly = min(max(ly, fy + 8), fy + fh - 8)
+        p.line(lx, ly, x, y, 0.6)
+        p.el.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="1.4" fill="#000"/>')
+        p.el.append(f'<circle cx="{lx:.1f}" cy="{ly:.1f}" r="5.4" fill="#fff" stroke="#000" stroke-width="0.9"/>')
+        p.txt(lx, ly + 2.4, str(n), 6.2, bold=True, anchor="middle")
+        name = (eps[code].get("device") or code).split("(")[0].split(" — ")[0][:46]
+        items.append((n, name, OPEN_POSITION.get(code, "")))
+    p.y = fy + fh + 10
+    half = (len(items) + 1) // 2
+    widths = [22, 190, 46]
+    p.table(M, p.y, widths, ["No.", "Component", "Note"], items[:half], size=6.4, lead=8.6)
+    p.table(M + COLW + GUT, p.y, widths, ["No.", "Component", "Note"], items[half:], size=6.4, lead=8.6)
+    p.y += 12
+    p.txt(M, H - M + 2, "Call-outs sit at the twin's component positions; the twin insert draws each component as a placeholder outline until its vendor CAD is added.", 6.4)
+    return p
+
+
 def page_specs(reg, number, odd):
     """SPECIFICATIONS — options, readiness by section, connector and channel fill (LTSM specifications-page layout)."""
     p = Page(number, "Engine Harness", odd=odd)
@@ -540,10 +605,15 @@ def build():
     if reg.get("readiness"):
         pages.append(page_specs(reg, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1))
         toc.append(("Specifications", pages[-1].number))
-    pages[0] = page_contents(reg, wires, toc, [e for e, _, _ in plugs], notes)
+    loc = page_locations(reg, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1)
+    if loc:
+        pages.append(loc)
+        toc.append(("Component Location", loc.number))
     import diagram_v5
     sheets = diagram_v5.build(first_number=len(pages) + 1)
     toc.append(("Wiring Diagrams", sheets[0][0]))
+
+    pages[0] = page_contents(reg, wires, toc, [e for e, _, _ in plugs], notes)
     bad = []
     for p in pages:
         text = " ".join(re.sub(r"<[^>]+>", " ", e) for e in p.el)

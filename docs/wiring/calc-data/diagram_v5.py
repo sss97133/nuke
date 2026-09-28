@@ -88,13 +88,16 @@ def load():
 
 class Sheet:
     def __init__(self, number, title, subtitle):
-        self.el, self.number = [], number
+        self.el, self.number, self.boxes = [], number, []
         self.txt(W / 2, M - 8, "ENGINE HARNESS — WIRING DIAGRAM", 9, bold=True, anchor="middle")
         self.txt(W - M, M - 8, number, 9, bold=True, anchor="end")
         self.txt(W / 2, M + 14, title.upper(), 14, bold=True, anchor="middle")
         self.txt(W / 2, M + 26, subtitle, 7, anchor="middle")
 
     def txt(self, x, y, s, size, bold=False, anchor="start", italic=False, colour="#000"):
+        w_ = tw(str(s), size, bold)
+        x0 = x - (w_ if anchor == "end" else w_ / 2 if anchor == "middle" else 0)
+        self.boxes.append((x0, y - size * 0.78, x0 + w_, y + 0.2, str(s)))
         st = ' font-style="italic"' if italic else ""
         self.el.append(f'<text x="{x:.1f}" y="{y:.1f}" font-family="{FONT}" font-size="{size}" fill="{colour}" '
                        f'font-weight="{"bold" if bold else "normal"}" text-anchor="{anchor}"{st}>{escape(str(s))}</text>')
@@ -124,10 +127,25 @@ class Sheet:
                 f'<rect width="{W}" height="{H}" fill="#fff"/>' + "".join(self.el) + "</svg>")
 
 
+def overlaps(sheet):
+    """Pairs of text boxes that intersect: the page cannot ship with overprinted text (owner 2026-09-28)."""
+    B = sheet.boxes
+    out = []
+    for i in range(len(B)):
+        ax0, ay0, ax1, ay1, at = B[i]
+        for j in range(i + 1, len(B)):
+            bx0, by0, bx1, by1, bt = B[j]
+            if ax0 < bx1 - 0.5 and bx0 < ax1 - 0.5 and ay0 < by1 - 0.5 and by0 < ay1 - 0.5:
+                out.append((at, bt))
+    return out
+
+
 def cav_mark(cav):
     c = str(cav)
     if re.match(r"^[A-Za-z]{1,2}$|^[A-Z]?\d{1,3}$", c):
         return c
+    if c.startswith("?"):
+        return "?"                                    # cavity not settled: the OPEN stamp on the run says so
     return "○"                                        # ring, lug, splice, stud: a terminal, not a moulded cavity
 
 
@@ -198,7 +216,8 @@ def sheet_parts(reg, devs, junctions, parts):
 
 
 def rows_for(eps, e, wires, ends):
-    """One row per cavity of plug e, in cavity order; text = Dave's name of the first wire on it (+ count)."""
+    """One row per known cavity (its wires share it, GM style); a wire whose cavity is not settled gets its own row,
+    keyed by its id, so no two labels ever print on one line."""
     per = OrderedDict()
     for wid in eps[e].get("wires") or []:
         w = wires.get(str(wid))
@@ -206,9 +225,10 @@ def rows_for(eps, e, wires, ends):
             continue
         for t in ends.get(str(wid), []):
             if t["endpoint"] == e:
-                per.setdefault(str(t.get("cavity") or "?"), []).append(w)
+                key = str(t.get("cavity")) if t.get("cavity") else f"?{wid}"
+                per.setdefault(key, []).append(w)
     def key(c):
-        return re.sub(r"\d+", lambda m: m.group().zfill(3), c)
+        return (1 if c.startswith("?") else 0, re.sub(r"\d+", lambda m: m.group().zfill(3), c))
     rows = []
     for cav in sorted(per, key=key):
         ws = per[cav]
@@ -236,10 +256,10 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
         yy = y + h + 6
         for code_q, where in pl[:3]:
             s.txt(x_dev + 2, yy, fit(f"{code_q} — {where}", BOX_W - 4, 4.6), 4.6, colour="#333")
-            yy += 5.0
+            yy += 5.4
         if len(pl) > 3:
             s.txt(x_dev + 2, yy, f"+{len(pl) - 3} more in the parts list", 4.6, italic=True, colour="#333")
-            yy += 5.0
+            yy += 5.4
         y = yy + 14
     x1 = x_dev + BOX_W
 
@@ -251,7 +271,7 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
     for wid in sheet_wires:
         for t in ends.get(wid, []):
             if t["endpoint"] == "FIREWALL-ENGINE" and t.get("cavity"):
-                src = next(((u["endpoint"], str(u.get("cavity") or "?")) for u in ends[wid] if (u["endpoint"], str(u.get("cavity") or "?")) in pin_at), None)
+                src = next(((u["endpoint"], end_key(u)) for u in ends[wid] if (u["endpoint"], end_key(u)) in pin_at), None)
                 bulk.setdefault(t["cavity"], pin_at[src][1] if src else 1e9)
     cavs = sorted(bulk, key=lambda c: bulk[c])
     bulk_pins = {}
@@ -292,7 +312,7 @@ def sheet_engine(reg, wires, ends, number, key, title, devs, sheet_wires, juncti
     open_runs = 0
     for wid, w in sheet_wires.items():
         te = ends.get(wid, [])
-        at = [(t["endpoint"], str(t.get("cavity") or "?")) for t in te if (t["endpoint"], str(t.get("cavity") or "?")) in pin_at]
+        at = [(t["endpoint"], end_key(t)) for t in te if (t["endpoint"], end_key(t)) in pin_at]
         dev = [k for k in at if k[0] in devs]
         jun = [k for k in at if k[0] in junctions]
         cab = [k for k in at if k[0] in CAB_BOXES]
@@ -394,8 +414,12 @@ def table(s, x, y, widths, header, rows, size=5.2, lead=8.2):
     return y
 
 
+def end_key(t):
+    return str(t.get("cavity")) if t.get("cavity") else f"?{t['wire']}"
+
+
 def ends_at(ends, e, cav, sheet_wires):
-    return [t for wid in sheet_wires for t in ends.get(wid, []) if t["endpoint"] == e and str(t.get("cavity") or "?") == str(cav)]
+    return [t for wid in sheet_wires for t in ends.get(wid, []) if t["endpoint"] == e and end_key(t) == str(cav)]
 
 
 def paginate(reg, wires, ends, devs, budget=H - 2 * M - 70):
@@ -405,7 +429,7 @@ def paginate(reg, wires, ends, devs, budget=H - 2 * M - 70):
     for e in devs:
         n_rows = len(rows_for(eps, e, wires, ends))
         n_parts = min(len(plug_part_lines(reg, e, {})), 4)
-        h = n_rows * ROW + 8 + 6 + n_parts * 5.0 + 14 + 10
+        h = n_rows * ROW + 8 + 6 + n_parts * 5.4 + 14 + 10
         if cur and used + h > budget:
             pages.append(cur)
             cur, used = [], 0
@@ -442,8 +466,9 @@ def build(first_number=6):
             for j, sh in enumerate([s] + extra):
                 text = " ".join(re.sub(r"<[^>]+>", " ", e) for e in sh.el)
                 bad = [b for b in kits_v5.book_lint(text) if not b.startswith("unstamped")]
+                bad += [f"overprint: '{a}' over '{b}'" for a, b in overlaps(sh)]
                 if bad:
-                    raise SystemExit(f"diagram {key} breaks the book's rules:\n  " + "\n  ".join(bad[:10]))
+                    raise SystemExit(f"diagram {key} breaks the book's rules ({len(bad)}):\n  " + "\n  ".join(bad[:12]))
                 stem = OUT / f"K5_diagram_1-{n}_{key}{'' if len(pages) == 1 else chr(96 + i + 1)}{'' if j == 0 else '_parts' + str(j)}"
                 stem.with_suffix(".svg").write_text(sh.svg())
                 subprocess.run(["rsvg-convert", "-d", "150", "-p", "150", "-o", str(stem.with_suffix(".png")), str(stem.with_suffix(".svg"))], check=True)
