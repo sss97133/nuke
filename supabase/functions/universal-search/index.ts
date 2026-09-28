@@ -455,8 +455,10 @@ Deno.serve(async (req) => {
     let vehicleTotalCount = 0;
 
     // --- VEHICLES (full-text search with ts_rank) ---
+    // The deep search below waits for this branch (vehicleSearchDone) and runs only when it found too few cars.
+    let vehicleSearchDone: Promise<void> = Promise.resolve();
     if (allowedTypes.includes('vehicle')) {
-      searches.push((async () => {
+      vehicleSearchDone = (async () => {
         // Vehicles are the primary content — give them most of the result slots
         const vehicleLimit = Math.max(sanitizedLimit - 6, Math.ceil(sanitizedLimit * 0.75));
 
@@ -683,7 +685,8 @@ Deno.serve(async (req) => {
             });
           }
         }
-      })());
+      })();
+      searches.push(vehicleSearchDone);
     }
 
     // --- USER'S OWN VEHICLES (parallel search for authenticated users) ---
@@ -870,6 +873,13 @@ Deno.serve(async (req) => {
     if (allowedTypes.includes('vehicle') && queryType === 'text') {
       searches.push((async () => {
         try {
+          // search_vehicles_deep ranks every text match in vehicle_search_index (1.6 GB): 'porsche 911' matched
+          // 17,952 rows and took 35.5 s, holding every search to that (2026-09-28: 'porsche 911' 42–55 s end to
+          // end). It adds description / comment / evidence matches, which a make-model query already answered
+          // by the main vehicle search does not need: run it only when that search found fewer than half a page.
+          await vehicleSearchDone;
+          const vehicleSlots = Math.max(sanitizedLimit - 6, Math.ceil(sanitizedLimit * 0.75));
+          if (results.filter(r => r.type === 'vehicle').length >= Math.ceil(vehicleSlots / 2)) return;
           const { data: deepResults, error: deepErr } = await supabase.rpc('search_vehicles_deep', {
             p_query: trimmedQuery,
             p_limit: 20,
