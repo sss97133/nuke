@@ -53,51 +53,12 @@ export class ProfessionalToolsService {
    */
   static async parseGenericReceipt(text: string, imageUrl?: string): Promise<ParsedTool[]> {
     const tools: ParsedTool[] = [];
-    
-    // Use OpenAI to extract structured data if available
-    if (import.meta.env.VITE_OPENAI_API_KEY && imageUrl) {
-      try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4-vision-preview',
-            messages: [{
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: `Extract all tools from this receipt. For each tool, provide:
-                    - name (product description)
-                    - part_number (product part number)
-                    - serial_number (if visible)
-                    - purchase_price
-                    - purchase_date
-                    - supplier (brand/store name)
-                    Return as JSON array.`
-                },
-                {
-                  type: 'image_url',
-                  image_url: { url: imageUrl }
-                }
-              ]
-            }],
-            max_tokens: 4096
-          })
-        });
-        
-        const data = await response.json();
-        const extracted = JSON.parse(data.choices[0].message.content);
-        return extracted;
-      } catch (error) {
-        console.error('AI extraction failed:', error);
-      }
-    }
-    
-    // Fallback to pattern matching
+
+    // No AI extraction in the browser: a provider key here ships in public JavaScript.
+    // Image receipts belong to the server-side receipt-extract function.
+    void imageUrl;
+
+    // Pattern matching
     const lines = text.split('\n');
     const pricePattern = /\$?([\d,]+\.?\d{0,2})/g;
     const datePattern = /(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/;
