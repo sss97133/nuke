@@ -505,8 +505,22 @@ class Ctx:
             return "engine"
         if e in P.CAB_JUNCTIONS:
             return "cab"
+        # the endpoint's own side (engine bay / cab / firewall / outside), set in the wire list; 'where' only as a fallback
+        sd = str((self.eps.get(e) or {}).get("side") or "").lower()
+        if sd:
+            return {"engine bay": "engine", "cab": "cab", "firewall": "x", "outside": "outside"}.get(sd, "cab")
         wh = (self.eps.get(e) or {}).get("where")
         return "engine" if wh == "engine" else "x" if wh == "firewall" else "cab"
+
+    def crossing(self, w):
+        """(needs a crossing?, the route's words) from the wire's own route; None when the row has no route."""
+        cr = str(((w or {}).get("route") or {}).get("crossing") or "")
+        if not cr:
+            return None, ""
+        # only a firewall or bulkhead crossing needs a crossing cavity on this sheet; a cab exit through the body to the
+        # outside (doors, rear lamps, frame runs) and an end with no recorded side are not firewall crossings
+        need = not cr.lower().startswith("none") and bool(re.search(r"bulkhead|firewall|61-pin|grommet", cr, re.I))
+        return need, cr
 
 
 def plan(ctx):
@@ -1016,7 +1030,7 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
                 draw([(xr, yr), (xr + 10, yr)])
             # the cab side carries the same label
             s.txt(xr + 4, yr - 1.4, wire_label(w, length=False), LBL, owner=wid)
-        elif eng and Lp and Rp:
+        elif eng and Lp and Rp and ctx.crossing(w)[0] is not False:
             # no crossing cavity: over the top of the sheet, dashed, stamped
             xa = laneA[0] + (iA % nA) * stepA + 1
             iA += 1
@@ -1032,12 +1046,17 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
             if not dashed:
                 open_runs += 1
                 dashed = "3 2"
-            open_notes.append((wid.upper(), "crosses the firewall with no crossing cavity", endpoint_words(w)))
+            need, cr = ctx.crossing(w)
+            open_notes.append((wid.upper(), f"crossing: {cr}" if cr else "crosses the firewall with no crossing cavity", endpoint_words(w)))
         else:
             allp = Lp + Rp
-            sides = {ctx.side(e) for e, _ in ends if e not in P.CROSSINGS} - {"x"}
-            if not eng and len(sides) == 2 and not any(e in P.CROSSINGS for e, _ in ends):
-                open_notes.append((wid.upper(), "crosses the firewall with no crossing cavity", endpoint_words(w)))
+            need, cr = ctx.crossing(w)
+            if need is None:                            # no route on the row: judge by the ends' sides
+                sides = {ctx.side(e) for e, _ in ends if e not in P.CROSSINGS} - {"x", "outside"}
+                need = len(sides) == 2
+            if not eng and need and not any(e in P.CROSSINGS for e, _ in ends):
+                open_notes.append((wid.upper(), f"crossing: {cr}" if cr else "crosses the firewall with no crossing cavity",
+                                   endpoint_words(w)))
                 if not dashed:
                     dashed = "3 2"
                     open_runs += 1
