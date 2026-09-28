@@ -37,17 +37,21 @@ def tw(s, size, bold=False):
 
 class Page:
     def __init__(self, number, section, odd):
-        self.number, self.section, self.odd, self.el = number, section, odd, []
+        self.number, self.section, self.odd, self.el, self.boxes = number, section, odd, [], []
         self.y = M + 24
         num_x, num_anchor = (W - M, "end") if odd else (M, "start")
         self.txt(W / 2, M - 12, section.upper(), 9, bold=True, anchor="middle")
         self.txt(num_x, M - 12, number, 9, bold=True, anchor=num_anchor)
 
-    def txt(self, x, y, s, size, bold=False, anchor="start", length=None, italic=False):
+    def txt(self, x, y, s, size, bold=False, anchor="start", length=None, italic=False, href=None):
+        w_ = length or tw(str(s), size, bold)
+        x0 = x - (w_ if anchor == "end" else w_ / 2 if anchor == "middle" else 0)
+        self.boxes.append((x0, y - size * 0.78, x0 + w_, y + 0.2, str(s), href))
         extra = f' textLength="{length:.1f}" lengthAdjust="spacing"' if length else ""
         style = ' font-style="italic"' if italic else ""
-        self.el.append(f'<text x="{x:.1f}" y="{y:.1f}" font-family="{FONT}" font-size="{size}" '
-                       f'font-weight="{"bold" if bold else "normal"}" text-anchor="{anchor}"{style}{extra}>{escape(s)}</text>')
+        t = (f'<text x="{x:.1f}" y="{y:.1f}" font-family="{FONT}" font-size="{size}" '
+             f'font-weight="{"bold" if bold else "normal"}" text-anchor="{anchor}"{style}{extra}>{escape(s)}</text>')
+        self.el.append(f'<a href="{escape(href)}">{t}</a>' if href else t)
 
     def line(self, x1, y1, x2, y2, w=0.6, dash=None):
         d = f' stroke-dasharray="{dash}"' if dash else ""
@@ -165,7 +169,7 @@ class Page:
                 f'<rect width="{W}" height="{H}" fill="#fff"/>' + "".join(self.el) + "</svg>")
 
 
-def connector_face(p, x, y, labels, title, pitch=26, cav=15, round_=False):
+def connector_face(p, x, y, labels, title, pitch=26, cav=15, round_=False, href=None):
     """An in-line harness connector seen from the mating face: housing, lock tab, one cavity per terminal with the
     moulded cavity marking above it (GM booklet end-view style). Positions are indicative; the moulded letters rule."""
     n = len(labels)
@@ -185,7 +189,7 @@ def connector_face(p, x, y, labels, title, pitch=26, cav=15, round_=False):
         cyy = y + 26 + (4 if round_ else 0)
         p.rect(cx, cyy, cav, cav, sw=0.9, fill="#fff")
         p.txt(cx + cav / 2, cyy - 4, str(lab).upper(), 7.5, bold=True, anchor="middle")
-    p.txt(x + w / 2, y + h + 22, title.upper(), 6.8, bold=True, anchor="middle")
+    p.txt(x + w / 2, y + h + 22, title.upper(), 6.8, bold=True, anchor="middle", href=href)
     return w, h + 26
 
 
@@ -243,12 +247,15 @@ def page_contents(reg, wires, toc, shown, notes):
         ("h", "Connector identification"),
         ("p", f"Each plug is shown from its mating face with the cavity letters molded on the connector. "
               f"{solved} of the {len(shown)} plugs in this section are complete down to terminal, seal and crimp tool. "
-              f"Under each figure: the kit, terminals and seals to buy, then anything still open, stamped BUY NOW, "
-              f"YOUR PICK or LATER. Open items shared by several plugs are the numbered notes below."),
+              f"Under each figure: the plug kit, terminal and seal part numbers, then DESIGN COMPLETE or OPEN with the fact "
+              f"still missing. Open items shared by several plugs are the numbered notes below. Nothing in this book says "
+              f"whether a part has been bought; that lives on the truck's map."),
     ] + readiness_blocks(reg) + [
         ("note", "The M130 mount spot is still open. This section is drawn for a cab mount."),
-        ("note", "Cut lengths, twist and which wires share a sleeve are set on the formboard, not in this section."),
+        ("note", "Lengths printed on the wiring diagram sheets are estimates from the twin and the cut list until measured on the truck; "
+                 "twist and which wires share a sleeve are set on the formboard."),
         ("note", "Match wires to the molded cavity letters, not to the position in the drawing."),
+        ("note", "Every plug title is a link to that plug's card on the truck's map: the part being installed, its proof and photos."),
     ] + [("note", text, pre) for pre, text in notes]
     p.columns(blocks)
     return p
@@ -268,14 +275,144 @@ def readiness_blocks(reg):
         ("h", "Where the harness stands"),
         ("p", f"The buildable harness is the base truck plus every option the owner has decided: {c['wires']} wires. "
               f"Of those, {c['L2 wire']} have both ends named, {c['L3 crossing']} have their firewall crossing settled, "
-              f"{c['L4 ends']} have a terminal part number at both ends, and {c['L5 material']} are covered by a "
-              f"captured cart. Lengths: {L.get('measured', 0)} measured, {L.get('estimated', 0)} estimated, "
+              f"{c['L4 ends']} have a terminal part number at both ends. Lengths: {L.get('measured', 0)} measured, {L.get('estimated', 0)} estimated, "
               f"{L.get('unknown', 0)} unknown. The Specifications page carries the count per option and per section, "
               f"and the fill of every connector and PDM channel."),
         ("p", ("Decided options: " + ", ".join(dec) + ". " if dec else "") +
               ("Candidates, not yet decided: " + ", ".join(cand) + ". Their wires are carried in the composite design "
                "and are not in the buildable count." if cand else "")),
     ]
+
+
+# twin object -> registry plug (only plugs that exist in the registry get a call-out; the twin insert's boxes are
+# placeholders, so the figure locates, it does not depict — figures_v5.py docstring)
+TWIN_PLUG = {"K5H_CKP": "CKP", "K5H_CMP": "CMP", "K5H_CLT": "CLT-ECU", "K5H_IAT": "IAT", "K5H_MAP": "MAP",
+             "K5H_OilPress": "OILP-ECU", "K5H_OilTemp": "OILT", "K5H_FuelPress": "FPS", "K5H_KS1": "KNOCK-1", "K5H_KS2": "KNOCK-2",
+             "K5H_ThrottleBody_12605109": "TB", "K5H_Alternator": "ALTERNATOR", "K5H_Starter": "STARTER-S", "K5H_Battery": "ODYSSEY",
+             "K5H_RadFan_1": "RADIATOR-FAN", "K5H_AC_Compressor": "AC-CLUTCH", "K5H_iBooster": "IBOOSTER", "K5H_Wideband_Ctrl": "LTCD",
+             "K5H_FuelPump_Sender": "FUELP", "K5H_VSS": "VSS-SENDER", "K5H_MoTeC_PDM30": "PDM30-A", "K5H_MoTeC_M130": "M130-A"}
+TWIN_PLUG.update({f"K5H_Coil_{i}": f"COIL-{i}" for i in range(1, 9)})
+TWIN_PLUG.update({f"K5H_Injector_{i}": f"INJ-{i}" for i in range(1, 9)})
+OPEN_POSITION = {"M130-A": "mount not decided (state §4)", "PDM30-A": "mount not decided (state §4)"}
+
+
+def page_locations(reg, number, odd, view="top"):
+    """COMPONENT LOCATION — the engine bay from the twin with the hood cut away, numbered call-outs, legend."""
+    import base64
+    fig = OUT / "figures" / f"fig_bay_{view}.png"
+    posf = OUT / "figures" / f"fig_bay_{view}_positions.json"
+    if not (fig.exists() and posf.exists()):
+        return None
+    pos = json.load(posf.open())
+    p = Page(number, "Engine Harness", odd=odd)
+    p.heading("Component Location — Engine Bay")
+    p.txt(W / 2, p.y + 2, "View from above the driver's front quarter (azimuth −20°, elevation 62°), hood cut away. From the digital twin.", 7.5, anchor="middle")
+    fw, fh = W - 2 * M, (W - 2 * M) * 1100 / 1600
+    fx, fy = M, p.y + 10
+    data = base64.b64encode(fig.read_bytes()).decode()
+    p.el.append(f'<image x="{fx}" y="{fy}" width="{fw:.1f}" height="{fh:.1f}" href="data:image/png;base64,{data}"/>')
+    p.rect(fx, fy, fw, fh, sw=0.8)
+    items = []
+    eps = reg["endpoints"]
+    pts = []
+    for obj, code in TWIN_PLUG.items():
+        if obj not in pos or code not in eps:
+            continue
+        x, y = pos[obj]
+        if 0 <= x <= 1 and 0 <= y <= 1:
+            pts.append((fx + x * fw, fy + y * fh, code))
+    # GM call-outs: the number sits clear of the cluster on a ring around it, a leader runs to the part (0A-5 Fig. 7)
+    import math as _m
+    cxm = sum(x for x, _, _ in pts) / max(len(pts), 1)
+    cym = sum(y for _, y, _ in pts) / max(len(pts), 1)
+    ring = max((_m.hypot(x - cxm, y - cym) for x, y, _ in pts), default=0) + 42
+    order = sorted(pts, key=lambda t: _m.atan2(t[1] - cym, t[0] - cxm))
+    angles = [_m.atan2(y - cym, x - cxm) for x, y, _ in order]
+    gap = 2 * _m.asin(min(1.0, 7.0 / ring))            # a number circle is 5.4 pt: keep centres ≥ 14 pt apart on the ring
+    if len(angles) * gap > 2 * _m.pi:
+        ring = 14.0 * len(angles) / (2 * _m.pi) + 6   # the ring grows until every number has room
+        gap = 2 * _m.asin(min(1.0, 7.0 / ring))
+    for _ in range(60):                                # relax: push neighbours apart around the circle
+        moved = False
+        for i in range(len(angles)):
+            j = (i + 1) % len(angles)
+            d_ = (angles[j] - angles[i]) % (2 * _m.pi)
+            if d_ < gap:
+                push = (gap - d_) / 2
+                angles[i] -= push; angles[j] += push; moved = True
+        if not moved:
+            break
+    n = 0
+    for (x, y, code), a in zip(order, angles):
+        n += 1
+        lx, ly = cxm + ring * _m.cos(a), cym + ring * _m.sin(a)
+        lx = min(max(lx, fx + 8), fx + fw - 8); ly = min(max(ly, fy + 8), fy + fh - 8)
+        p.line(lx, ly, x, y, 0.6)
+        p.el.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="1.4" fill="#000"/>')
+        p.el.append(f'<circle cx="{lx:.1f}" cy="{ly:.1f}" r="5.4" fill="#fff" stroke="#000" stroke-width="0.9"/>')
+        p.txt(lx, ly + 2.4, str(n), 6.2, bold=True, anchor="middle")
+        name = (eps[code].get("device") or code).split("(")[0].split(" — ")[0][:46]
+        items.append((n, name, OPEN_POSITION.get(code, "")))
+    p.y = fy + fh + 10
+    half = (len(items) + 1) // 2
+    widths = [22, 190, 46]
+    p.table(M, p.y, widths, ["No.", "Component", "Note"], items[:half], size=6.4, lead=8.6)
+    p.table(M + COLW + GUT, p.y, widths, ["No.", "Component", "Note"], items[half:], size=6.4, lead=8.6)
+    p.y += 12
+    p.txt(M, H - M + 2, "Call-outs sit at the twin's component positions; the twin insert draws each component as a placeholder outline until its vendor CAD is added.", 6.4)
+    return p
+
+
+def page_firewall(reg, wires, number, odd):
+    """FIREWALL CONNECTOR — the 61-pin seen from both sides. Cavity positions: MILNEC insert arrangement 25-61 (front
+    face of the pin insert), transcribed in scripts/generate_connector_build_sheets.py CAV_XY; the receptacle's mating
+    face seen from the engine side is its mirror. Each cavity carries its circuit and wire."""
+    sheets = kits_v5._load_sheets()
+    xy = sheets.CAV_XY
+    cav_wire = {t.get("cavity"): t["wire"] for t in reg["terminations"] if t["endpoint"] == "FIREWALL-ENGINE" and t.get("cavity")}
+    p = Page(number, "Engine Harness", odd=odd)
+    p.heading("Firewall Connector — 61-Pin, Both Faces")
+    fw = reg["endpoints"].get("FIREWALL-ENGINE", {})
+    p.txt(W / 2, p.y + 2, "D38999/24WJ61SN wall receptacle on the firewall (engine side), D38999/26WJ61PN plug on the engine harness. "
+          "Every engine circuit crosses here; body circuits never do.", 7.2, anchor="middle")
+    p.txt(W / 2, p.y + 12, "Where on the firewall it mounts is not decided: the M130 mount (state §4) sets it. Positions are the insert arrangement, not a measurement.", 7.2, anchor="middle")
+    xs = [v[0] for v in xy.values()]; ys = [v[1] for v in xy.values()]
+    cx0, cy0 = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+    span = max(max(xs) - min(xs), max(ys) - min(ys))
+    R = (COLW - 30) / 2
+    scale = (2 * R - 30) / span
+    def face(x_c, y_c, mirror, title, sub):
+        p.el.append(f'<circle cx="{x_c:.1f}" cy="{y_c:.1f}" r="{R:.1f}" fill="none" stroke="#000" stroke-width="1.2"/>')
+        p.rect(x_c - 7, y_c - R - 7, 14, 8, sw=1.0, rx=1.5)                   # master key
+        for cav, (px_, py_) in xy.items():
+            dx, dy = (px_ - cx0) * scale, (py_ - cy0) * scale
+            if mirror:
+                dx = -dx
+            X, Y = x_c + dx, y_c + dy
+            wid = cav_wire.get(cav)
+            p.el.append(f'<circle cx="{X:.1f}" cy="{Y:.1f}" r="7.6" fill="{"#fff" if wid else "#eee"}" stroke="#000" stroke-width="0.7"/>')
+            p.txt(X, Y - 1.2, cav, 5.6, bold=True, anchor="middle")
+            if wid:
+                p.txt(X, Y + 5.2, str(wid).upper()[:7], 4.4, anchor="middle")
+        p.txt(x_c, y_c + R + 14, title.upper(), 8, bold=True, anchor="middle")
+        p.txt(x_c, y_c + R + 24, sub, 6.4, anchor="middle")
+    yc = p.y + 34 + R
+    face(M + COLW / 2, yc, True, "Engine side — receptacle mating face",
+         "socket insert seen from the engine bay; letters mirrored from the pin-insert drawing")
+    face(M + COLW + GUT + COLW / 2, yc, False, "Cab side — plug pin insert, front face",
+         "as the MILNEC 25-61 drawing shows it; the engine harness plug mates from this side")
+    p.y = yc + R + 34
+    # cavity table: cavity · circuit · size, colour · wire name, in cavity order
+    rows = []
+    for cav in sheets.CAV_ORDER:
+        wid = cav_wire.get(cav)
+        w = wires.get(wid) if wid else None
+        rows.append((cav, (wid or "—").upper(), gm_colour(f"{gauge(w)} {colour(w)}") if w else "spare", kits_v5.dave_name(w).upper() if w else ""))
+    half = (len(rows) + 1) // 2
+    widths = [26, 52, 70, 103]
+    p.table(M, p.y, widths, ["Cav", "Circuit", "Size, Color", "Circuit Name"], rows[:half], size=5.8, lead=7.6)
+    p.table(M + COLW + GUT, p.y, widths, ["Cav", "Circuit", "Size, Color", "Circuit Name"], rows[half:], size=5.8, lead=7.6)
+    return p
 
 
 def page_specs(reg, number, odd):
@@ -387,18 +524,24 @@ KIND_WORD = {"kit": "plug kit", "housing": "housing", "tpa": "TPA", "terminal": 
 
 
 def legend(reg, eid, typical):
-    """Everything it takes to build this plug, stamped: kits, terminals and seals, then what is still open."""
+    """What it takes to build this plug, as part numbers, then its design state: DESIGN COMPLETE, or OPEN with the
+    one fact still missing. Purchase state never prints here (owner 2026-09-28: the manual states done or not done)."""
     parts = kits_v5._y("parts.yaml")
     ep, out = reg["endpoints"].get(eid, {}), []
-    for code, qty, stamp, where in kits_v5.kit_stamps(reg, ep):
+    for code, qty, _stamp, _where in kits_v5.kit_stamps(reg, ep):
         kind = KIND_WORD.get((parts.get(str(code)) or {}).get("kind"), "part")
-        out.append((stamp, f"{kind} {code}{'' if qty == '×1' else ' ' + qty}, {where}", False))
-    for code, kind, n, need, stamp, where in kits_v5.plug_parts(reg, eid):
+        out.append(("PART", f"{kind} {code}{'' if qty == '×1' else ' ' + qty}", False))
+    for code, kind, n, need, _stamp, _where in kits_v5.plug_parts(reg, eid):
         here = n * (typical or 1)
-        count = f"×{here}" + (f" ({n} per plug)" if typical else f" ({need} in all)" if need != here else "")
-        out.append((stamp, f"{KIND_WORD.get(kind, kind)} {code} {count}, {where}", False))
-    for stamp, words in kits_v5.plug_opens(ep, reg["dossiers"].get(eid)):
-        out.append((stamp, words, True))
+        count = f"×{here}" + (f" ({n} per plug)" if typical else "")
+        out.append(("PART", f"{KIND_WORD.get(kind, kind)} {code} {count}", False))
+    opens = [(st, words) for st, words in kits_v5.plug_opens(ep, reg["dossiers"].get(eid))
+             if not re.search(r"\bcart\b|order|buy|price|\$", words, re.I)]
+    if opens:
+        for st, words in opens:
+            out.append(("OPEN", words, True))
+    else:
+        out.append(("DESIGN COMPLETE", "every wire end, terminal and seal is named", False))
     return out
 
 
@@ -438,13 +581,15 @@ def connector_pages(reg, wires, plugs, first, fig0):
     for (stamp, words), titles in shared:
         who = ", ".join(t for t in titles[:-1]) + " and " + titles[-1]
         notes.append((f"NOTE {number[(stamp, words)]} — {stamp}:", f"{who[0].upper() + who[1:]}. {words[0].upper() + words[1:]}."))
+    notes = [n_ for n_ in notes if not re.search(r"\bcart\b|order|buy|price", n_[1], re.I)]
 
     def draw(p, eid, title, typ, x, y, fig):
         ts = sorted(dev.get(eid, {}).values(), key=lambda t: str(t.get("cavity")))
         labels = [t.get("cavity") for t in ts]
         name = title.rsplit(" ", 1)[0] if typ else title
         _, fh = connector_face(p, x + (COLW - (len(labels) * 26 + 16)) / 2, y, labels,
-                               f"{name} (typical)" if typ else title, round_=(eid == "OILP-ECU"))
+                               f"{name} (typical)" if typ else title, round_=(eid == "OILP-ECU"),
+                               href="https://nuke.ag/vehicle/e08bf694-970f-4cbe-8a74-8715158a0f2e/wiring?tab=map&node=" + eid)
         rows = []
         for t in ts:
             w = wires.get(t["wire"], {})
@@ -537,17 +682,25 @@ def build():
     toc = [("Connector Identification", conn[0].number)]
     pages.append(page_tabulation(reg, wires, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1))
     toc.append(("Circuit Tabulation", pages[-1].number))
+    pages.append(page_firewall(reg, wires, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1))
+    toc.append(("Firewall Connector, Both Faces", pages[-1].number))
     if reg.get("readiness"):
         pages.append(page_specs(reg, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1))
         toc.append(("Specifications", pages[-1].number))
-    pages[0] = page_contents(reg, wires, toc, [e for e, _, _ in plugs], notes)
+    loc = page_locations(reg, f"1-{len(pages) + 1}", odd=(len(pages) + 1) % 2 == 1)
+    if loc:
+        pages.append(loc)
+        toc.append(("Component Location", loc.number))
     import diagram_v5
     sheets = diagram_v5.build(first_number=len(pages) + 1)
     toc.append(("Wiring Diagrams", sheets[0][0]))
+
+    pages[0] = page_contents(reg, wires, toc, [e for e, _, _ in plugs], notes)
     bad = []
     for p in pages:
         text = " ".join(re.sub(r"<[^>]+>", " ", e) for e in p.el)
         bad += [f"{p.number}: {b}" for b in kits_v5.book_lint(text) if not b.startswith("unstamped")]
+        bad += [f"{p.number}: overprint '{a}' over '{b}'" for a, b in diagram_v5.overlaps(p)]
     if bad:
         raise SystemExit("manual breaks the book's rules:\n  " + "\n  ".join(bad[:20]))
     pdfs = []
@@ -556,6 +709,7 @@ def build():
         stem.with_suffix(".svg").write_text(p.svg())
         subprocess.run(["rsvg-convert", "-d", "150", "-p", "150", "-o", str(stem.with_suffix(".png")), str(stem.with_suffix(".svg"))], check=True)
         subprocess.run(["rsvg-convert", "-f", "pdf", "-o", str(stem.with_suffix(".pdf")), str(stem.with_suffix(".svg"))], check=True)
+        diagram_v5.add_links(stem.with_suffix(".pdf"), p.boxes, H)
         pdfs.append(str(stem.with_suffix(".pdf")))
     pdfs += [pdf for _, _, _, _, pdf in sheets]
     subprocess.run(["pdfunite", *pdfs, str(OUT / "K5_Harness_Manual.pdf")], check=True)
