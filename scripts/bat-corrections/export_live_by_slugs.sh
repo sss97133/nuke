@@ -13,7 +13,9 @@ for f in "$W"/c_*; do
   arr=$(awk '{printf "%s'"'"'http://bringatrailer.com/listing/%s'"'"','"'"'https://bringatrailer.com/listing/%s'"'"','"'"'http://bringatrailer.com/listing/%s/'"'"','"'"'https://bringatrailer.com/listing/%s/'"'"'", (NR>1?",":""), $1,$1,$1,$1}' "$f")
   for attempt in 1 2 3 4; do
     res=$($Q "select id, bat_auction_url, listing_url, discovery_url, vin, year, make, model, sale_price, sold_price, bat_sold_price, winning_bid, high_bid, canonical_sold_price, canonical_outcome, auction_outcome, reserve_status, sale_status, sale_date, bat_sale_date, auction_end_date, bat_buyer, bat_seller, merged_into_vehicle_id, deleted_at, is_public, status, updated_at, description_source, length(description) as description_len, (provenance_metadata ? 'sale_provenance_corrections') as has_corr from vehicles where bat_auction_url = any(array[$arr]) or listing_url = any(array[$arr]) or discovery_url = any(array[$arr])")
-    if echo "$res" | grep -q '^\['; then break; fi
+    # a whole JSON array or retry: a timed-out call (curl exit 28) can hand back a partial body that still
+    # starts with "[" — on 2026-09-28 two such chunks passed a '^\[' check and silently lost 1,498 rows
+    if echo "$res" | jq -e 'type == "array"' >/dev/null 2>&1; then break; fi
     echo "$(date -u +%FT%TZ) chunk $n attempt $attempt: $(echo "$res" | cut -c1-120)" >&2
     sleep $((attempt * 20)); res=""
   done
