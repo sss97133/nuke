@@ -130,6 +130,7 @@ If the owner picks `STEP-DCMD` (after the bay-PDM decision lands):
 | B4 | **Travel time** deploy and retract | stopwatch or the same log | T_max (≤ 5 s), t_min |
 | B5 | **DCMD input**: does Motor A follow Control A with a pull-down, and what value | 12 V supply as the "PDM output", resistor decade to ground, meter on Motor A | the pull-down value; confirms the inferred high state (research §5) |
 | B6 | Motor plug housing and the kit harness lead gauge | read the parts | the motor-end splice size (M81824/1-2 or /1-3) |
+| B7 | The DT mating plugs' E-seal (C015) part numbers for the DCMD's 4-pin and 2-pin, and the 18 AWG /32 control branches | Deutsch catalogue (state row 0ai: E-seal numbers not on file) | seals on thin-wall Tefzel |
 | T1 | Motor-lead and feed lengths | harness-cad twin polyline, then tape on the truck | the voltage-drop check in research §7 |
 
 ## Unknowns (execution is blocked until each closes)

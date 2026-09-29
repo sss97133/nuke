@@ -173,6 +173,10 @@ currents fit it and a pulled-down input drives it.
 - In the box: "DT02-2S", printed that way (Deutsch's 2-way plug is DT06-2S; check the part in the box), DT06-4S, DTM06-4S
   and DTM04-4P.
 - The Deutsch DT family is already in the build (`catalog/parts.yaml`: DT06-2S / DT04-2P with size-16 contacts, 20–16 AWG).
+- **Seals (state row 0ai, Deutsch datasheet p.5):** the #16 E-seal takes 1.35–3.05 mm and the N-seal 2.24–3.68 mm. Every
+  M22759/32 size is under the N-seal minimum, so both mating plugs need their E-seal (C015) versions. 20 AWG /32 (1.27 mm)
+  is under even the E-seal, so the control branches into the DT are 18 AWG /32 (1.52 mm), not Haltech's 20. The power,
+  ground and motor leads at the DT are 16 AWG /32 (1.73 mm). The E-seal part numbers aren't on file.
 
 **Where it sits:**
 - In the engine bay beside the bay PDM, one bridge per side, low near each front wheel-well opening. This is a proposed

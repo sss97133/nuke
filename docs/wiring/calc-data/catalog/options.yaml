@@ -110,8 +110,10 @@ STEP-DCMD:
       PDM30 (the path the engine loads use, state 0v); road speed from the M130's M1 General stream (#100 VSS on the NP205
       speedo drive). End of travel = P_L / P_R current rise (0.2 A resolution on outputs 9-32, PDM manual p.26) plus a 5 s window
       (the AMP controller's own window, troubleshooting guide p.5). Control high driving the lead to +12 V is inferred; the
-      pull-down value is UNKNOWN (the DCMD pull-up is not published): bench check or Haltech. Without a bay PDM the DCMDs move
-      to the cab with the PDM and the motor leads exit the floor as in STEP-RQ
+      pull-down value is UNKNOWN (the DCMD pull-up is not published): bench check or Haltech. Every DT mating plug on this
+      harness (the DCMD's 4-pin and 2-pin) needs its E-seal (C015) version: M22759/32 is under the N-seal range, and 20 AWG /32
+      is under even the E-seal minimum, so the control branches into the DT are 18 AWG (state row 0ai; E-seal part numbers not
+      on file). Without a bay PDM the DCMDs move to the cab with the PDM and the motor leads exit the floor as in STEP-RQ
     adds:
       - {id: STEPD_PWR_L_PT, gauge: 20, spec: M22759/32, from: "bay PDM32 8 A output P_L (connector B)", to: "SPL-STEPD-PL (M81824/1-2)", current_a: null, length_ft_est: null, basis: "pin pigtail (the 8 A pin takes 24-20 AWG, PDM manual p.48); length at the formboard"}
       - {id: STEPD_PWR_L, gauge: 16, spec: M22759/32, from: "SPL-STEPD-PL", to: "DCMD-L 4-pin DT, +12 V", current_a: null, length_ft_est: null, basis: "Haltech's 16 AWG power size (quick start guide p.3); motor current unknown; length waits on the bay-PDM spot and the harness-cad polyline"}
@@ -120,12 +122,12 @@ STEP-DCMD:
       - {id: STEPD_GND_L, gauge: 16, spec: M22759/32, from: "DCMD-L 4-pin DT, ground", to: "GND-BANK-ENG", current_a: null, length_ft_est: null, basis: "as STEPD_PWR_L (grounds in the loom, state s1 row 56)"}
       - {id: STEPD_GND_R, gauge: 16, spec: M22759/32, from: "DCMD-R 4-pin DT, ground", to: "GND-BANK-ENG", current_a: null, length_ft_est: null, basis: "as STEPD_GND_L"}
       - {id: STEPD_X, gauge: 20, spec: M22759/32, from: "bay PDM32 8 A output X (connector B)", to: "SPL-STEPD-X (M81824/1-2)", current_a: null, length_ft_est: null, basis: "control line; current = two DCMD inputs + their pull-downs, value unknown until the bench (far below the output's 1 A step)"}
-      - {id: STEPD_X_L, gauge: 20, spec: M22759/32, from: "SPL-STEPD-X", to: "DCMD-L Control A (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "as STEPD_X"}
-      - {id: STEPD_X_R, gauge: 20, spec: M22759/32, from: "SPL-STEPD-X", to: "DCMD-R Control A (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "as STEPD_X"}
+      - {id: STEPD_X_L, gauge: 18, spec: M22759/32, from: "SPL-STEPD-X", to: "DCMD-L Control A (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "18 AWG, not Haltech's 20: 20 AWG /32 (1.27 mm) is under the DT E-seal minimum 1.35 mm, 18 AWG /32 (1.52 mm) seals (state row 0ai); current as STEPD_X"}
+      - {id: STEPD_X_R, gauge: 18, spec: M22759/32, from: "SPL-STEPD-X", to: "DCMD-R Control A (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "as STEPD_X_L"}
       - {id: STEPD_Y, gauge: 20, spec: M22759/32, from: "bay PDM32 8 A output Y (connector B)", to: "SPL-STEPD-Y (M81824/1-2)", current_a: null, length_ft_est: null, basis: "as STEPD_X"}
-      - {id: STEPD_Y_L, gauge: 20, spec: M22759/32, from: "SPL-STEPD-Y", to: "DCMD-L Control B (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "as STEPD_X"}
-      - {id: STEPD_Y_R, gauge: 20, spec: M22759/32, from: "SPL-STEPD-Y", to: "DCMD-R Control B (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "as STEPD_X"}
-      - {id: STEPD_ML_A, gauge: null, spec: M22759/32, from: "DCMD-L 2-pin DT, Motor A", to: "left motor plug pigtail (kit harness, orange lead), M81824/1-2 or /1-3", current_a: null, length_ft_est: null, basis: "gauge 16/14/12 AWG by the measured running current (research s7: 3 % drop over the run); path = AMP harness route down the driver wheel well and along the frame (IM75146 p.6)"}
+      - {id: STEPD_Y_L, gauge: 18, spec: M22759/32, from: "SPL-STEPD-Y", to: "DCMD-L Control B (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "as STEPD_X_L"}
+      - {id: STEPD_Y_R, gauge: 18, spec: M22759/32, from: "SPL-STEPD-Y", to: "DCMD-R Control B (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "as STEPD_X_L"}
+      - {id: STEPD_ML_A, gauge: null, spec: M22759/32, from: "DCMD-L 2-pin DT, Motor A", to: "left motor plug pigtail (kit harness, orange lead), M81824/1-2 or /1-3", current_a: null, length_ft_est: null, basis: "gauge 16/14/12 AWG by the measured running current (research s7: 3 % drop over the run); 16 AWG at the DT (size-16 contact 20-16 AWG, E-seal), spliced up after it; path = AMP harness route down the driver wheel well and along the frame (IM75146 p.6)"}
       - {id: STEPD_ML_B, gauge: null, spec: M22759/32, from: "DCMD-L 2-pin DT, Motor B", to: "left motor plug pigtail (white lead)", current_a: null, length_ft_est: null, basis: "as STEPD_ML_A"}
       - {id: STEPD_MR_A, gauge: null, spec: M22759/32, from: "DCMD-R 2-pin DT, Motor A", to: "right motor plug pigtail (orange/black lead)", current_a: null, length_ft_est: null, basis: "as STEPD_ML_A, passenger side"}
       - {id: STEPD_MR_B, gauge: null, spec: M22759/32, from: "DCMD-R 2-pin DT, Motor B", to: "right motor plug pigtail (white/black lead)", current_a: null, length_ft_est: null, basis: "as STEPD_ML_A, passenger side"}
