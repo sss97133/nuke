@@ -829,3 +829,110 @@ TOP-FINISH:
       top's inside area and rib spacing (T-15), its weight, the panel material. Alternatives: research §5.
     adds: []
 
+
+# ============================================================== wheel speed sensors, tone rings, knuckle mounts (2026-09-30)
+# Owner 2026-09-29: "we need to deal with TPS sensors and then the other side of the sensor which we have to figure out how to
+# install that machine or whatever machining part of the axle the knuckle". Read as wheel speed sensors, the tone rings they read
+# and the knuckle mounts. Research, prices and every source: research/2026-09-30_wheel-speed-sensors.md (web pages snapshotted
+# 2026-09-29 to reference_documents/web_snapshots/, gitignored). Nothing on the truck needs wheel speeds: the iBooster runs
+# standalone on its pedal sensor, the PCS needs only engine RPM, the Dakota reads the NP205 sender. They buy traction and launch
+# control in 2WD and slip logging. None of these is decided. options_v5 has no demand keys for M130 pins, 61-pin cavities or
+# PDM15 outputs, so those numbers are in each entry's notes.
+
+WSS-F2:
+  name: Front wheel speed sensors, two ZF GS100502 on machined tone rings, into M130 UDIG5 / UDIG6 (traction and launch control in 2WD)
+  status: candidate
+  source: >-
+    owner 2026-09-29 (above). MoTeC M1 Launch Control User Guide v1.0 p.3: "A minimum of two sensors (one each of Driven Wheel and
+    Non-Driven Wheel Speed) is recommended"; the driven one is the NP205 sender #100 on M130 B08, which MoTeC's own GPR example
+    pinout names "Wheel Speed Rear Drive Sensor" (web_snapshots/www.motec.com.au__GPR.md). UDIG as the wheel-speed resource: MoTeC
+    help centre "Checklist Wheel Speed Setup" (motec.zendesk.com__14594472064015-Checklist-Wheel-Speed-Setup.md) and M1 hardware
+    techspec p.9 ("Can be used for REF/SYNC, CAM position, wheel speed")
+  product: {maker: ZF, pn: GS100502, price_usd: 33.80, price_date: 2026-09-29, each: true,
+            specs: "Hall, open-collector sinking 20 mA max, 5-24 V at 6 mA max, 1.5 mm air gap, near zero to 15 kHz, M12x1 aluminium body 65.5 mm, 20 AWG x 1 m leads, -40 to 125 C, IP67 (ZF GS1005-GS1007 datasheet, 2016-07-06); DigiKey qty 1, 1,300 in stock"}
+  demand:
+    crossings: 0            # no body bulkhead; the two signals take 2 of the 3 spare 61-pin cavities (d, t, u), see notes
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    limits: ["new PDM15 8 A output at 1 A, the smallest step (PDM manual p.1 'Outputs are programmable in 1 A steps'); load 2 x 6 mA (ZF p.1)"]
+    door_cavities: 0
+    notes: >-
+      M130 B10 (UDIG5) front left and B11 (UDIG6) front right: 52 -> 54 of 60 pins, and the last two UDIGs. 61-pin 58 -> 60 of 61;
+      registry #100 may take cavity d back when body bulkhead C goes under the 0ah call, which would fill it. One PDM15 8 A output
+      (OUT10, OUT12, OUT14 or OUT15 are free) feeds both sensors, and their 0 V goes to GND-BANK-ENG, so only the two signals
+      cross (Dave's call against the MoTeC-pattern SEN_5V0_B / SEN_0V supply, which takes 2 more cavities). Mechanical: two
+      low-carbon steel tone rings pressed on registers turned on the inboard barrels of the front hub-and-discs (1977 LTSM
+      pp.305-306). Teeth are at least ZF's 5.0 mm high, 2.5 mm wide, 10 mm apart (12.5 mm pitch, count = floor(pi x tip dia /
+      12.5), at least 24 per MoTeC, 48 preferred). Two bolt-on brackets go under two spindle nuts (25 ft-lb K10/K20, LTSM
+      p.307) or the caliper support-bracket bolts. Each corner has a DTM04-3P / DTM06-3S at the frame, inside the rail channel.
+      OPEN: hub barrel OD, tire size, corner temperature (125 C sensor; Bosch HA-M at 160 C is the fallback), machine-shop
+      quote, and 61-pin cavity approval
+    adds:
+      - {id: WSS_FL_SIG, gauge: 20, spec: M22759/32, from: "WSS-FL DTM06-3S cavity 3 (ZF black, output)", to: "M130:B10 (UDIG5) through a spare 61-pin cavity", current_a: 0, length_ft_est: null, basis: "not derived: the front hub, the frame hose bracket and the 61-pin plate are not all placed in the twin yet"}
+      - {id: WSS_FR_SIG, gauge: 20, spec: M22759/32, from: "WSS-FR DTM06-3S cavity 3 (ZF black, output)", to: "M130:B11 (UDIG6) through a spare 61-pin cavity", current_a: 0, length_ft_est: null, basis: "as WSS_FL_SIG"}
+      - {id: WSS_F_PWR, gauge: 20, spec: M22759/32, from: "PDM15 8 A output (OUT10, 12, 14 or 15), 1 A limit", to: "SPL-WSS-F (front sensor feed splice)", current_a: 0.012, length_ft_est: null, basis: "2 x 6 mA max (ZF datasheet p.1); length as WSS_FL_SIG"}
+      - {id: WSS_FL_PWR, gauge: 20, spec: M22759/32, from: "SPL-WSS-F", to: "WSS-FL DTM06-3S cavity 1 (ZF brown, supply)", current_a: 0.006, length_ft_est: null, basis: "as WSS_FL_SIG"}
+      - {id: WSS_FR_PWR, gauge: 20, spec: M22759/32, from: "SPL-WSS-F", to: "WSS-FR DTM06-3S cavity 1 (ZF brown, supply)", current_a: 0.006, length_ft_est: null, basis: "as WSS_FL_SIG"}
+      - {id: WSS_FL_GND, gauge: 20, spec: M22759/32, from: "WSS-FL DTM06-3S cavity 2 (ZF blue, ground)", to: "GND-BANK-ENG", current_a: 0.006, length_ft_est: null, basis: "as WSS_FL_SIG"}
+      - {id: WSS_FR_GND, gauge: 20, spec: M22759/32, from: "WSS-FR DTM06-3S cavity 2 (ZF blue, ground)", to: "GND-BANK-ENG", current_a: 0.006, length_ft_est: null, basis: "as WSS_FL_SIG"}
+    mass_g_est: "not estimated: lengths unknown (20 AWG /32 is 1.95 g/ft, header); the ZF sensor mass is not published"
+
+WSS-4E:
+  name: Four wheel speed sensors (ZF GS100502) into a MoTeC E888 expander in the cab, read by the M130 over CAN
+  status: candidate
+  alternative_to: WSS-F2
+  source: >-
+    M1 Launch Control User Guide p.3 ("with four wheel speed sensors the preferred option"). E888 #14007 page ("4 x digital inputs
+    with frequency measurement", web_snapshots/www.motec.com.au__E888.md). E888/E816 manual (16 Dec 2005): p.15 (-10 to 70 C,
+    9-22 V, 150 mA, no CAN terminator on board) and p.17 (DIG1-4 Schmitt trigger, 1 Hz-6 kHz, 2700 ohm pull-up). GPR page:
+    "Support of MoTeC devices: ADR, E8XX, PDM, SLM, VCS" and "Wheel Speed sensors front/rear left/right, wired or CAN input"
+  product: {maker: MoTeC, pn: "E888 #14007 + 4 x ZF GS100502", price_usd: null, price_date: 2026-09-29,
+            specs: "E888 price not published (MoTeC dealer quote); ZF GS100502 33.80 each (DigiKey, 2026-09-29)"}
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    taps: ["PDM30 OUT24 (the M130 feed, RUN): E888 12 V"]
+    limits: ["OUT24 group: + 0.15 A for the E888 (manual p.15), sensors excluded"]
+    door_cavities: 0
+    notes: >-
+      The E888's -10 to 70 C rating keeps it out of the engine bay, so it sits in the cab beside the M130 on a CAN stub of 500 mm
+      or less (PDM manual p.49). The fronts cross the 61-pin exactly as in WSS-F2 (2 cavities, PDM15 feed, GND-BANK-ENG). The rears
+      cross at the rear bulkhead the 0ah call allows: 4 contacts (2 signals, the E888 +8 V aux feed and its 0 V). The rear rings
+      are a ring under the wheel-stud heads or one pressed on the C-lock shafts (LTSM pp.365-366), sensor tabs on the existing
+      disc-conversion caliper brackets. Rear axle likely GM 12-bolt 8-7/8 (photo 5aefc0bd shows 11 cover bolts; count to confirm).
+      OPEN: whether GPR lets an E888 digital input be a wheel-speed resource (M1 Tune 1.5 or a dealer), the E888 price, the +8 V
+      aux supply rating, and a rear ring design from the shop
+    adds:
+      - {id: E888_PWR, gauge: 20, spec: M22759/32, from: "PDM30:OUT24 (splice with ECU_PWR)", to: "E888 12 V (A17; B8, B9 also, per wiring diagram A17)", current_a: 0.15, length_ft_est: null, basis: "E888 beside the M130 (spot open, mounts.yaml M130)"}
+      - {id: E888_GND, gauge: 20, spec: M22759/32, from: "E888 GND (A10; A11, B15, B16 also)", to: "GND-BANK-CAB", current_a: 0.15, length_ft_est: null, basis: "as E888_PWR"}
+      - {id: E888_CAN_H, gauge: 22, spec: M22759/16 twisted, from: "CAN trunk stub (M130 to PDM30 segment)", to: "E888 B23 (CAN HI)", current_a: 0, length_ft_est: 1.6, basis: "the 500 mm (20 in) stub ceiling: devices join the trunk 'with up to 500 mm (20 in) of twisted wire' (PDM manual p.49)"}
+      - {id: E888_CAN_L, gauge: 22, spec: M22759/16 twisted, from: "CAN trunk stub (M130 to PDM30 segment)", to: "E888 B24 (CAN LO)", current_a: 0, length_ft_est: 1.6, basis: "as E888_CAN_H"}
+      - {id: WSS4_FL_SIG, gauge: 20, spec: M22759/32, from: "WSS-FL DTM06-3S cavity 3", to: "E888 B11 (DIG1) through a spare 61-pin cavity", current_a: 0, length_ft_est: null, basis: "as WSS-F2 WSS_FL_SIG"}
+      - {id: WSS4_FR_SIG, gauge: 20, spec: M22759/32, from: "WSS-FR DTM06-3S cavity 3", to: "E888 B10 (DIG2) through a spare 61-pin cavity", current_a: 0, length_ft_est: null, basis: "as WSS4_FL_SIG"}
+      - {id: WSS4_RL_SIG, gauge: 20, spec: M22759/32, from: "WSS-RL DTM06-3S cavity 3", to: "E888 B19 (DIG3) through the rear crossing", current_a: 0, length_ft_est: null, basis: "rear crossing not designed (0ah)"}
+      - {id: WSS4_RR_SIG, gauge: 20, spec: M22759/32, from: "WSS-RR DTM06-3S cavity 3", to: "E888 B18 (DIG4) through the rear crossing", current_a: 0, length_ft_est: null, basis: "as WSS4_RL_SIG"}
+      - {id: WSS4_R_PWR, gauge: 20, spec: M22759/32, from: "E888 +8 V aux (A16 or B22)", to: "SPL-WSS-R, then the RL and RR DTM cavity 1", current_a: 0.012, length_ft_est: null, basis: "2 x 6 mA max (ZF p.1)"}
+      - {id: WSS4_R_GND, gauge: 20, spec: M22759/32, from: "SPL-WSS-R ground (RL and RR DTM cavity 2)", to: "E888 0 V (A15 or B21)", current_a: 0.012, length_ft_est: null, basis: "as WSS4_R_PWR"}
+      - {id: WSS4_F_PWR, gauge: 20, spec: M22759/32, from: "PDM15 8 A output (OUT10, 12, 14 or 15), 1 A limit", to: "SPL-WSS-F (front sensor feed splice)", current_a: 0.012, length_ft_est: null, basis: "as WSS-F2 WSS_F_PWR"}
+      - {id: WSS4_FL_PWR, gauge: 20, spec: M22759/32, from: "SPL-WSS-F", to: "WSS-FL DTM06-3S cavity 1", current_a: 0.006, length_ft_est: null, basis: "as WSS-F2"}
+      - {id: WSS4_FR_PWR, gauge: 20, spec: M22759/32, from: "SPL-WSS-F", to: "WSS-FR DTM06-3S cavity 1", current_a: 0.006, length_ft_est: null, basis: "as WSS-F2"}
+      - {id: WSS4_FL_GND, gauge: 20, spec: M22759/32, from: "WSS-FL DTM06-3S cavity 2", to: "GND-BANK-ENG", current_a: 0.006, length_ft_est: null, basis: "as WSS-F2"}
+      - {id: WSS4_FR_GND, gauge: 20, spec: M22759/32, from: "WSS-FR DTM06-3S cavity 2", to: "GND-BANK-ENG", current_a: 0.006, length_ft_est: null, basis: "as WSS-F2"}
+    mass_g_est: "not estimated: lengths unknown; E888 310 g (manual p.15)"
+
+WSS-PREP:
+  name: Wheel-speed provision only, front tone rings and sensor brackets machined and fitted, no sensors or wires
+  status: candidate
+  alternative_to: WSS-F2
+  source: >-
+    research/2026-09-30_wheel-speed-sensors.md s6: the machining (rings pressed on the front hub-and-disc barrels, brackets at the
+    knuckles) is the long-lead half of WSS-F2 and needs the hubs off; sensors and wires can follow if the 61-pin can spare two
+    cavities. MoTeC help-centre reply: "It's always a good idea to make provisions in your wiring harness for wheel speed
+    sensors" (forum, motec.zendesk.com__16900136044559-Driven-wheel-speed.md)
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    door_cavities: 0
+    notes: "mechanical only: machine-shop drawings D1-D4 in the research file; no harness change, so it takes nothing from the ledger. OPEN: the same measurements as WSS-F2 (hub barrel OD, spindle-nut pattern, axial space behind the rotor)"
