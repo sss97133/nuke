@@ -18,13 +18,37 @@
 #   attach       where each wire lands: {n, ep (endpoint id), at [mm], dir (the way the wire leaves)}
 #   mount        mounting holes and studs: {n, at, dir (the way the bolt goes in), d}
 generated: '2026-09-29'
-ends_covered: 23
-ends_complete: 20
+ends_covered: 29
+ends_complete: 26
 ends_total: 178
 ends:
   ACC-BATT:
     models:
     - ACC-BATT
+    complete: true
+  CKP:
+    models:
+    - '12048074'
+    - '12129946'
+    - '15324976'
+    - 213-4573
+    - CKP
+    complete: true
+  CLT-ECU:
+    models:
+    - '12191818'
+    - '15366021'
+    - '15449028'
+    - 213-4514
+    - CLT-ECU
+    complete: true
+  CMP:
+    models:
+    - '12048074'
+    - '12129946'
+    - '15324976'
+    - 213-3826
+    - CMP
     complete: true
   DCDC:
     models:
@@ -119,6 +143,14 @@ ends:
     missing:
     - QFS-BKCN-GM bulkhead
     - QFS-H882 hanger and P367 pump
+  IAT:
+    models:
+    - '12191818'
+    - '15366021'
+    - '15449028'
+    - 213-243
+    - IAT
+    complete: true
   IBST-DIAG:
     models:
     - 0413-204-2005
@@ -135,9 +167,25 @@ ends:
     models:
     - M130-A
     complete: true
+  MAP:
+    models:
+    - '12048074'
+    - '12129946'
+    - '15324976'
+    - 538-24
+    - MAP
+    complete: true
   ODYSSEY:
     models:
     - ODYSSEY
+    complete: true
+  OILT:
+    models:
+    - '12191818'
+    - '15366021'
+    - '15449028'
+    - 213-4514
+    - OILT
     complete: true
   PDM15-A:
     models:
@@ -3136,6 +3184,2832 @@ parts:
     outputs and 100 A; 260 g vs 270 g (p.35). Both are magnesium with only a coated board, not sealed (p.35).'
   - MoTeC's p.47 sketch shows the battery cable ('4 Power Connection') leaving the stud upward; the attach point points +Y.
   script: docs/wiring/calc-data/cad/fab/PDM30-A.py
+- id: '12129946'
+  endpoints:
+  - CKP
+  - CMP
+  - MAP
+  what: 'Delphi Metri-Pack 150 3-way sealed female connector, type 102 (grey, the LS crank / MAP key), drawing 12129958 table:
+    body 12129945, seal 12052842, TPA 12052845'
+  maker: Delphi (Aptiv)
+  maker_pn: '12129946'
+  shape_basis: maker drawing
+  dims_mm:
+    l: 26.0
+    w: 18.6
+    h: 22.0
+  dims_note: 26 long x 18.6 wide x 22 high (Delphi drawing, reference dims)
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    housing:
+      hex: '#8f9591'
+      from: 'customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): grey body; drawing table ''GRA'''
+    seal:
+      hex: '#5b3a6e'
+      from: 'customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): purple seal; drawing table seal
+        12052842 ''PPL'''
+    lock:
+      hex: '#e9e0cf'
+      from: 'customconnectorkits.com/products/12052845 product photo (fetched 2026-09-29): natural (cream) TPA'
+    terminals:
+      hex: '#c9c6bf'
+      from: 'reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf p.66 (150 female terminals, cable seals):
+        ''Silicon Bronze / Tin''; tin colour'
+    cable seals:
+      hex: '#f1efe9'
+      from: 'customconnectorkits.com/products/15324976 product photo (fetched 2026-09-29): white; customconnectorkits calls
+        it ''for 16-14 AWG'' (ProWire: 20-22)'
+  attach:
+  - n: cavA
+    ep: CKP
+    at:
+    - 6.0
+    - 0.0
+    - 17.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: Metri-Pack 150 terminal
+  - n: cavB
+    ep: CKP
+    at:
+    - 0.0
+    - 0.0
+    - 17.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: Metri-Pack 150 terminal
+  - n: cavC
+    ep: CKP
+    at:
+    - -6.0
+    - 0.0
+    - 17.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: Metri-Pack 150 terminal
+  mount: []
+  params:
+  - name: L
+    value: 26.0
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(26)'
+    basis: maker
+  - name: W
+    value: 18.6
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) bottom view '(18.6)' over the connector seal
+    basis: maker
+  - name: H
+    value: 22.0
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(22)' over the seal and the lock arm, arm flexed (dashed)
+    basis: maker
+  - name: pitch
+    value: 6.0
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) type 101 view: ''(6)'' between cavities, ''(12)'' across'
+    basis: maker
+  - name: rear_l
+    value: 7.0
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: rear_w
+    value: 15.0
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) bottom view '(15)'
+    basis: maker
+  - name: rear_h
+    value: 6.5
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(6.5)'
+    basis: maker
+  - name: seal_l
+    value: 7.8
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+    note: three ridges
+  - name: seal_h
+    value: 12.5
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: flange_l
+    value: 2.0
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: flange_h
+    value: 11.6
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: nose_l
+    value: 8.5
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view: (26) - (17.5)'
+    basis: maker
+  - name: nose_h
+    value: 7.2
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(7.2)'
+    basis: maker
+  - name: nose_w
+    value: 19.6
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating information: the shroud''s 22.9 less its two 1.5 walls, less 0.3 clearance'
+    basis: design
+  - name: arm_drop
+    value: 7.4
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view ''(7.4)'': centreline to the lock arm'
+    basis: maker
+  - name: arm_hook
+    value: 5.5
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view ''(5.5)'': the arm''s hook'
+    basis: maker
+  checks:
+  - check: overall length (drawing)
+    model: 26.0
+    drawing: 26.0
+    tol: 0.3
+    ok: true
+  - check: cavity pitch (drawing)
+    model: 6.0
+    drawing: 6.0
+    tol: 0.01
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Terminals are photo-scaled (+-20 %): the maker''s terminal drawings are not on file.'
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: delphi sealed sensor connectors
+  mates: the sensor's shroud
+  cavities:
+    A:
+    - 6.0
+    - 0.0
+    B:
+    - 0.0
+    - 0.0
+    C:
+    - -6.0
+    - 0.0
+  numbering: cavity letters A-B(-C) as moulded (drawing 12129958 bottom view 'C B A'); A at +X
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: '15449028'
+  endpoints:
+  - CLT-ECU
+  - OILT
+  - IAT
+  what: 'Delphi GT 150 2-way sealed female connector, type 102, drawing 15449030 table: connector 15449024, PLR 15336006,
+    seal 12040750'
+  maker: Delphi (Aptiv)
+  maker_pn: '15449028'
+  shape_basis: maker drawing
+  dims_mm:
+    l: 30.65
+    w: 17.04
+    h: 14.6
+  dims_note: 30.65 long x 17.04 wide x 14.6 high (Delphi drawing, reference dims)
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    housing:
+      hex: '#1f1f21'
+      from: 'customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): black body; reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf
+        p.1 (GT 150 terminals, cable seals, housings) ''Black'''
+    seal:
+      hex: '#3a7fd0'
+      from: 'customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): blue connector seal (12040750)'
+    lock:
+      hex: '#b3336e'
+      from: 'customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): magenta PLR (15336006) at the nose'
+    terminals:
+      hex: '#c9c6bf'
+      from: 'reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf p.1 (GT 150 terminals, cable seals,
+        housings): ''Tin Brass / Tin''; tin colour'
+    cable seals:
+      hex: '#f1efe9'
+      from: 'reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf p.1 (GT 150 terminals, cable seals,
+        housings): ''15366021 ... Silicone White'''
+  attach:
+  - n: cavA
+    ep: CLT-ECU
+    at:
+    - 1.75
+    - 0.0
+    - 21.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: GT 150 terminal
+  - n: cavB
+    ep: CLT-ECU
+    at:
+    - -1.75
+    - 0.0
+    - 21.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: GT 150 terminal
+  mount: []
+  params:
+  - name: L
+    value: 30.65
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      type 101 side view, dimension 1: ''(30.65)'''
+    basis: maker
+  - name: W
+    value: 17.04
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      front view, dimension 5: ''17.04 +0.15 -0.5'''
+    basis: maker
+  - name: H
+    value: 14.6
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      front view, dimension 3: ''14.6'''
+    basis: maker
+  - name: pitch
+    value: 3.5
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      front view, dimension 4: ''3.5'''
+    basis: maker
+  - name: rear_l
+    value: 8.7
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: rear_w
+    value: 11.8
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: rear_h
+    value: 10.2
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: seal_l
+    value: 9.0
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+    note: four ridges
+  - name: seal_h
+    value: 12.7
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: flange_l
+    value: 1.5
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: flange_h
+    value: 11.4
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: nose_l
+    value: 9.15
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+    note: the PLR's face to the seal flange
+  - name: nose_h
+    value: 8.7
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: nose_w
+    value: 10.2
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  checks:
+  - check: overall length (drawing)
+    model: 30.65
+    drawing: 30.65
+    tol: 0.3
+    ok: true
+  - check: cavity pitch (drawing)
+    model: 3.5
+    drawing: 3.5
+    tol: 0.01
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Terminals are photo-scaled (+-20 %): the maker''s terminal drawings are not on file.'
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: delphi sealed sensor connectors
+  mates: the sensor's shroud
+  cavities:
+    A:
+    - 1.75
+    - 0.0
+    B:
+    - -1.75
+    - 0.0
+  numbering: cavity letters A-B(-C) as moulded (drawing 12129958 bottom view 'C B A'); A at +X
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: '12048074'
+  endpoints:
+  - CKP
+  - CMP
+  - MAP
+  what: Metri-Pack 150 sealed female terminal, 20-18 AWG (0.8-1.0 mm2), tin-plated silicon bronze
+  maker: Delphi (Aptiv)
+  maker_pn: '12048074'
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 15.5
+    w: 2.6
+    h: 1.9
+  dims_note: 15.5 long, box 2.6 x 1.9 (photo +-20 %)
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    plating:
+      hex: '#c9c6bf'
+      from: 'reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf p.66 (150 female terminals, cable seals):
+        ''Silicon Bronze / Tin''; tin colour'
+  attach:
+  - n: crimp
+    ep: CKP
+    at:
+    - 0.0
+    - 0.0
+    - 15.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: crimp barrel
+  mount: []
+  params:
+  - name: box_w
+    value: 2.6
+    source: customconnectorkits.com/products/12048074 product photo (fetched 2026-09-29) (the reel photo's inset), scaled
+      from the 1.5 mm Metri-Pack 150 blade it takes (reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf
+      (Delphi drawing 12129958) mating information)
+    basis: photo
+    note: +-20 %
+  - name: box_h
+    value: 1.9
+    source: customconnectorkits.com/products/12048074 product photo (fetched 2026-09-29) (the reel photo's inset), scaled
+      from the 1.5 mm Metri-Pack 150 blade it takes (reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf
+      (Delphi drawing 12129958) mating information)
+    basis: photo
+    note: +-20 %
+  - name: box_l
+    value: 7.5
+    source: customconnectorkits.com/products/12048074 product photo (fetched 2026-09-29) (the reel photo's inset), scaled
+      from the 1.5 mm Metri-Pack 150 blade it takes (reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf
+      (Delphi drawing 12129958) mating information)
+    basis: photo
+    note: +-20 %
+  - name: length
+    value: 15.5
+    source: customconnectorkits.com/products/12048074 product photo (fetched 2026-09-29) (the reel photo's inset), scaled
+      from the 1.5 mm Metri-Pack 150 blade it takes (reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf
+      (Delphi drawing 12129958) mating information)
+    basis: photo
+    note: +-20 %
+  checks:
+  - check: length (photo-scaled)
+    model: 15.5
+    drawing: 15.5
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: delphi sealed sensor connectors
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: '12191818'
+  endpoints:
+  - CLT-ECU
+  - OILT
+  - IAT
+  what: GT 150 sealed female terminal, 22-20 AWG (0.35-0.50 mm2), tin-plated brass
+  maker: Delphi (Aptiv)
+  maker_pn: '12191818'
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 13.0
+    w: 2.2
+    h: 1.7
+  dims_note: 13 long, box 2.2 x 1.7 (photo +-20 %)
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    plating:
+      hex: '#c9c6bf'
+      from: 'reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf p.1 (GT 150 terminals, cable seals,
+        housings): ''Tin Brass / Tin''; tin colour'
+  attach:
+  - n: crimp
+    ep: CLT-ECU
+    at:
+    - 0.0
+    - 0.0
+    - 13.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: crimp barrel
+  mount: []
+  params:
+  - name: box_w
+    value: 2.2
+    source: customconnectorkits.com/products/12191818 product photo (fetched 2026-09-29) (reel photo), scaled from the 1.5
+      mm GT 150 blade
+    basis: photo
+    note: +-20 %
+  - name: box_h
+    value: 1.7
+    source: customconnectorkits.com/products/12191818 product photo (fetched 2026-09-29) (reel photo), scaled from the 1.5
+      mm GT 150 blade
+    basis: photo
+    note: +-20 %
+  - name: box_l
+    value: 6.5
+    source: customconnectorkits.com/products/12191818 product photo (fetched 2026-09-29) (reel photo), scaled from the 1.5
+      mm GT 150 blade
+    basis: photo
+    note: +-20 %
+  - name: length
+    value: 13.0
+    source: customconnectorkits.com/products/12191818 product photo (fetched 2026-09-29) (reel photo), scaled from the 1.5
+      mm GT 150 blade
+    basis: photo
+    note: +-20 %
+  checks:
+  - check: length (photo-scaled)
+    model: 13.0
+    drawing: 13.0
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: delphi sealed sensor connectors
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: '15324976'
+  endpoints:
+  - CKP
+  - CMP
+  - MAP
+  what: Metri-Pack 150 cable seal, white
+  maker: Delphi (Aptiv)
+  maker_pn: '15324976'
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 6.5
+    w: 4.6
+    h: 4.6
+  dims_note: OD 4.6 x 6.5 long, bore 1.3
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    seal:
+      hex: '#f1efe9'
+      from: 'customconnectorkits.com/products/15324976 product photo (fetched 2026-09-29): white; customconnectorkits calls
+        it ''for 16-14 AWG'' (ProWire: 20-22)'
+  attach:
+  - n: wire
+    ep: CKP
+    at:
+    - 0.0
+    - 0.0
+    - 6.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: cable seal
+  mount: []
+  params:
+  - name: od
+    value: 4.6
+    source: customconnectorkits.com/products/15324976 product photo (fetched 2026-09-29), scaled from its 1.3-2.1 mm cable
+      range (parts.yaml, ConnectorID)
+    basis: photo
+    note: +-15 %
+  - name: len
+    value: 6.5
+    source: customconnectorkits.com/products/15324976 product photo (fetched 2026-09-29), scaled from its 1.3-2.1 mm cable
+      range (parts.yaml, ConnectorID)
+    basis: photo
+    note: +-15 %
+  - name: bore
+    value: 1.3
+    source: customconnectorkits.com/products/15324976 product photo (fetched 2026-09-29), scaled from its 1.3-2.1 mm cable
+      range (parts.yaml, ConnectorID)
+    basis: maker
+  checks:
+  - check: length (photo-scaled)
+    model: 6.5
+    drawing: 6.5
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: delphi sealed sensor connectors
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: '15366021'
+  endpoints:
+  - CLT-ECU
+  - OILT
+  - IAT
+  what: GT 150 cable seal, white, 1.20-1.85 mm cable
+  maker: Delphi (Aptiv)
+  maker_pn: '15366021'
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 5.5
+    w: 3.4
+    h: 3.4
+  dims_note: OD 3.4 x 5.5 long, bore 1.2
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    seal:
+      hex: '#f1efe9'
+      from: 'reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf p.1 (GT 150 terminals, cable seals,
+        housings): ''15366021 ... Silicone White'''
+  attach:
+  - n: wire
+    ep: CLT-ECU
+    at:
+    - 0.0
+    - 0.0
+    - 5.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: cable seal
+  mount: []
+  params:
+  - name: od
+    value: 3.4
+    source: 'reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf p.1 (GT 150 terminals, cable seals,
+      housings): cable range 1.20-1.85 (the bore); OD and length photo-scaled (customconnectorkits.com/products/15366021 product
+      photo (fetched 2026-09-29))'
+    basis: photo
+    note: +-15 %
+  - name: len
+    value: 5.5
+    source: 'reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf p.1 (GT 150 terminals, cable seals,
+      housings): cable range 1.20-1.85 (the bore); OD and length photo-scaled (customconnectorkits.com/products/15366021 product
+      photo (fetched 2026-09-29))'
+    basis: photo
+    note: +-15 %
+  - name: bore
+    value: 1.2
+    source: 'reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf p.1 (GT 150 terminals, cable seals,
+      housings): cable range 1.20-1.85 (the bore); OD and length photo-scaled (customconnectorkits.com/products/15366021 product
+      photo (fetched 2026-09-29))'
+    basis: maker
+  checks:
+  - check: length (photo-scaled)
+    model: 5.5
+    drawing: 5.5
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: delphi sealed sensor connectors
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: 213-4573
+  endpoints:
+  - CKP
+  what: LS Gen IV 58X crankshaft position sensor (front cover, Hall)
+  maker: ACDelco
+  maker_pn: ACDelco 213-4573 (GM 12615626)
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 57.9
+    w: 23.5
+    h: 23.5
+  dims_note: about 58 x 24 x 24 (photo-scaled, +-25 %)
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    body:
+      hex: '#1d2230'
+      from: 'GM photo 213-4573: dark navy body'
+    O-ring:
+      hex: '#2f8a55'
+      from: 'GM photo: green O-ring'
+    sensing tip:
+      hex: '#d9d9d4'
+      from: 'GM photo: white sensing tip'
+  attach:
+  - n: connector
+    ep: CKP
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: shroud mouth (the plug seats here)
+  mount: []
+  params:
+  - name: shroud_w
+    value: 22.9
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION A-A: ''22.9 +-0.15'''
+    basis: maker
+  - name: shroud_wall
+    value: 1.5
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information: ''1.5 CONSTANT'''
+    basis: maker
+  - name: shroud_depth
+    value: 18.9
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION B-B: ''18.9'''
+    basis: maker
+  - name: shroud_in_h
+    value: 10.8
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION B-B: ''10.8'''
+    basis: maker
+  - name: shroud_blade_l
+    value: 10.05
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information: ''10.05 +-0.3'''
+    basis: maker
+  - name: body_d
+    value: 22.0
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: body_l
+    value: 26.0
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: O-ring_d
+    value: 23.5
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: O-ring_l
+    value: 1.6
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: barrel_d
+    value: 16.0
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: barrel_l
+    value: 9.0
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: sensing_tip_d
+    value: 12.0
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: sensing_tip_l
+    value: 4.0
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: shroud width (maker / design)
+    model: 22.9
+    drawing: 22.9
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'The body is sized off the maker''s photo against the Metri-Pack 150 shroud width 22.9, +-25 %: no dimensioned drawing
+    of the sensor is on file.'
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: delphi sealed sensor connectors
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: 213-3826
+  endpoints:
+  - CMP
+  what: LS Gen IV camshaft position sensor (front timing cover, Hall)
+  maker: ACDelco
+  maker_pn: ACDelco 213-3826 (GM 12591720)
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 44.9
+    w: 52.0
+    h: 25.0
+  dims_note: about 45 x 52 x 25 (photo-scaled, +-25 %)
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    body:
+      hex: '#a8aaa9'
+      from: 'GM photo 213-3826: light grey body'
+    O-ring:
+      hex: '#1b1b1b'
+      from: 'GM photo: black O-ring'
+    mounting ear:
+      hex: '#9c9e9d'
+      from: 'GM photo: grey ear'
+  attach:
+  - n: connector
+    ep: CMP
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: shroud mouth (the plug seats here)
+  mount: []
+  params:
+  - name: shroud_w
+    value: 22.9
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION A-A: ''22.9 +-0.15'''
+    basis: maker
+  - name: shroud_wall
+    value: 1.5
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information: ''1.5 CONSTANT'''
+    basis: maker
+  - name: shroud_depth
+    value: 18.9
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION B-B: ''18.9'''
+    basis: maker
+  - name: shroud_in_h
+    value: 10.8
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION B-B: ''10.8'''
+    basis: maker
+  - name: shroud_blade_l
+    value: 10.05
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information: ''10.05 +-0.3'''
+    basis: maker
+  - name: body_d
+    value: 24.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: body_l
+    value: 12.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ear_0
+    value: 30.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ear_1
+    value: 14.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ear_2
+    value: 3.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ear_3
+    value: 6.5
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: O-ring_d
+    value: 25.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: O-ring_l
+    value: 1.8
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: barrel_d
+    value: 22.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: barrel_l
+    value: 14.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: shroud width (maker / design)
+    model: 22.9
+    drawing: 22.9
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'The body is sized off the maker''s photo against the Metri-Pack 150 shroud width 22.9, +-25 %: no dimensioned drawing
+    of the sensor is on file.'
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: delphi sealed sensor connectors
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: 538-24
+  endpoints:
+  - MAP
+  what: MAP sensor, 1 bar, GM/Delphi-style body with a hose nipple
+  maker: Holley
+  maker_pn: Holley 538-24
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 56.9
+    w: 74.0
+    h: 26.0
+  dims_note: about 57 x 74 x 26 (photo-scaled, +-25 %)
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    body:
+      hex: '#b9bcbd'
+      from: 'Summit photo hly-538-24: light grey body'
+    mounting ears:
+      hex: '#b1b4b5'
+      from: 'Summit photo: grey'
+    vacuum nipple:
+      hex: '#aeb1b2'
+      from: 'Summit photo: grey'
+  attach:
+  - n: connector
+    ep: MAP
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: shroud mouth (the plug seats here)
+  mount: []
+  params:
+  - name: shroud_w
+    value: 22.9
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION A-A: ''22.9 +-0.15'''
+    basis: maker
+  - name: shroud_wall
+    value: 1.5
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information: ''1.5 CONSTANT'''
+    basis: maker
+  - name: shroud_depth
+    value: 18.9
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION B-B: ''18.9'''
+    basis: maker
+  - name: shroud_in_h
+    value: 10.8
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION B-B: ''10.8'''
+    basis: maker
+  - name: shroud_blade_l
+    value: 10.05
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information: ''10.05 +-0.3'''
+    basis: maker
+  - name: body_0
+    value: 58.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: body_1
+    value: 17.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: body_2
+    value: 38.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ears_0
+    value: 74.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ears_1
+    value: 3.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ears_2
+    value: 12.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ears_3
+    value: 5.5
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: vacuum_nipple_0
+    value: 5.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: vacuum_nipple_1
+    value: 9.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: shroud width (maker / design)
+    model: 22.9
+    drawing: 22.9
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'The body is sized off the maker''s photo against the Metri-Pack 150 shroud width 22.9, +-25 %: no dimensioned drawing
+    of the sensor is on file.'
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: delphi sealed sensor connectors
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: 213-4514
+  endpoints:
+  - CLT-ECU
+  - OILT
+  what: LS engine coolant temperature sensor (GT 150 2-way, M12 x 1.5)
+  maker: ACDelco
+  maker_pn: ACDelco 213-4514 (GM 19236568)
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 46.1
+    w: 21.9
+    h: 19.0
+  dims_note: about 46 x 22 x 19 (photo-scaled, +-25 %)
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    body:
+      hex: '#232323'
+      from: 'GM photo 213-4514: black connector end'
+    hex:
+      hex: '#c19a4b'
+      from: 'GM photo: brass hex'
+    sealing washer:
+      hex: '#c46a3a'
+      from: 'GM photo: copper washer'
+    thread M12 x 1.5:
+      hex: '#c8a55a'
+      from: 'GM photo: brass'
+    probe:
+      hex: '#c9a050'
+      from: 'GM photo: brass probe'
+  attach:
+  - n: connector
+    ep: CLT-ECU
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: shroud mouth (the plug seats here)
+  mount: []
+  params:
+  - name: shroud_w
+    value: 19.84
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030):
+      the plug''s 17.04 seal width + two 1.4 walls'
+    basis: design
+    note: the drawing shows no sensor side
+  - name: shroud_in_h
+    value: 12.9
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030):
+      the seal''s scaled 12.7 + 0.2'
+    basis: design
+  - name: shroud_wall
+    value: 1.4
+    source: design wall for the GT 150 sensor shroud
+    basis: design
+  - name: shroud_depth
+    value: 10.9
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030):
+      the nose (9.15) and flange (1.5) + 0.25'
+    basis: design
+  - name: hex_d
+    value: 19.0
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: hex_l
+    value: 8.0
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: sealing_washer_d
+    value: 17.0
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: sealing_washer_l
+    value: 1.2
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: thread_M12_x_1.5_d
+    value: 12.0
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: thread_M12_x_1.5_l
+    value: 12.0
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: probe_d
+    value: 7.0
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: probe_l
+    value: 14.0
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: shroud width (maker / design)
+    model: 19.84
+    drawing: 19.84
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'The body is sized off the maker''s photo against its M12 x 1.5 thread (part_media.yaml CLT-ECU), +-25 %: no dimensioned
+    drawing of the sensor is on file.'
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: delphi sealed sensor connectors
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: 213-243
+  endpoints:
+  - IAT
+  what: intake air temperature sensor, push-in thermistor in a grommet
+  maker: ACDelco
+  maker_pn: ACDelco 213-243 (GM 12160244)
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 49.9
+    w: 21.0
+    h: 21.0
+  dims_note: about 50 x 21 x 21 (photo-scaled, +-25 %)
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    body:
+      hex: '#1c1c1c'
+      from: 'GM photo 213-243: black'
+    grommet land:
+      hex: '#1c1c1c'
+      from: 'GM photo: black'
+    thermistor cage:
+      hex: '#262626'
+      from: 'GM photo: black cage'
+  attach:
+  - n: connector
+    ep: IAT
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: shroud mouth (the plug seats here)
+  mount: []
+  params:
+  - name: shroud_w
+    value: 19.84
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030):
+      the plug''s 17.04 seal width + two 1.4 walls'
+    basis: design
+    note: the drawing shows no sensor side
+  - name: shroud_in_h
+    value: 12.9
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030):
+      the seal''s scaled 12.7 + 0.2'
+    basis: design
+  - name: shroud_wall
+    value: 1.4
+    source: design wall for the GT 150 sensor shroud
+    basis: design
+  - name: shroud_depth
+    value: 10.9
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030):
+      the nose (9.15) and flange (1.5) + 0.25'
+    basis: design
+  - name: body_d
+    value: 17.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  - name: body_l
+    value: 10.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  - name: grommet_land_d
+    value: 21.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  - name: grommet_land_l
+    value: 6.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  - name: barrel_d
+    value: 13.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  - name: barrel_l
+    value: 14.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  - name: thermistor_cage_d
+    value: 9.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  - name: thermistor_cage_l
+    value: 9.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: shroud width (maker / design)
+    model: 19.84
+    drawing: 19.84
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'The body is sized off the maker''s photo against the GT 150 shroud (the plug''s 17.04 seal width + walls), +-25 %: no
+    dimensioned drawing of the sensor is on file.'
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: delphi sealed sensor connectors
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: CKP
+  endpoints:
+  - CKP
+  what: 'CKP: LS Gen IV 58X crankshaft position sensor (front cover, Hall) with its Metri-Pack 150 plug 12129946, mated'
+  maker: Delphi (Aptiv) / ACDelco
+  maker_pn: ACDelco 213-4573 (GM 12615626) + 12129946
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 75.7
+    w: 23.5
+    h: 23.5
+  dims_note: sensor and plug mated, about 76 long
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    body:
+      hex: '#1d2230'
+      from: 'GM photo 213-4573: dark navy body'
+    O-ring:
+      hex: '#2f8a55'
+      from: 'GM photo: green O-ring'
+    sensing tip:
+      hex: '#d9d9d4'
+      from: 'GM photo: white sensing tip'
+    plug housing:
+      hex: '#8f9591'
+      from: 'customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): grey body; drawing table ''GRA'''
+    plug seal:
+      hex: '#5b3a6e'
+      from: 'customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): purple seal; drawing table seal
+        12052842 ''PPL'''
+    plug lock:
+      hex: '#e9e0cf'
+      from: 'customconnectorkits.com/products/12052845 product photo (fetched 2026-09-29): natural (cream) TPA'
+  attach:
+  - n: cavA
+    ep: CKP
+    at:
+    - 6.0
+    - 0.0
+    - 17.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: Metri-Pack 150 terminal 12048074
+  - n: cavB
+    ep: CKP
+    at:
+    - 0.0
+    - 0.0
+    - 17.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: Metri-Pack 150 terminal 12048074
+  - n: cavC
+    ep: CKP
+    at:
+    - -6.0
+    - 0.0
+    - 17.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: Metri-Pack 150 terminal 12048074
+  mount: []
+  params:
+  - name: shroud_w
+    value: 22.9
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION A-A: ''22.9 +-0.15'''
+    basis: maker
+  - name: shroud_wall
+    value: 1.5
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information: ''1.5 CONSTANT'''
+    basis: maker
+  - name: shroud_depth
+    value: 18.9
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION B-B: ''18.9'''
+    basis: maker
+  - name: shroud_in_h
+    value: 10.8
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION B-B: ''10.8'''
+    basis: maker
+  - name: shroud_blade_l
+    value: 10.05
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information: ''10.05 +-0.3'''
+    basis: maker
+  - name: body_d
+    value: 22.0
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: body_l
+    value: 26.0
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: O-ring_d
+    value: 23.5
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: O-ring_l
+    value: 1.6
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: barrel_d
+    value: 16.0
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: barrel_l
+    value: 9.0
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: sensing_tip_d
+    value: 12.0
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: sensing_tip_l
+    value: 4.0
+    source: the product photo part_media.yaml lists for CKP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: 12129946.L
+    value: 26.0
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(26)'
+    basis: maker
+  - name: 12129946.W
+    value: 18.6
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) bottom view '(18.6)' over the connector seal
+    basis: maker
+  - name: 12129946.H
+    value: 22.0
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(22)' over the seal and the lock arm, arm flexed (dashed)
+    basis: maker
+  - name: 12129946.pitch
+    value: 6.0
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) type 101 view: ''(6)'' between cavities, ''(12)'' across'
+    basis: maker
+  - name: 12129946.rear_l
+    value: 7.0
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: 12129946.rear_w
+    value: 15.0
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) bottom view '(15)'
+    basis: maker
+  - name: 12129946.rear_h
+    value: 6.5
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(6.5)'
+    basis: maker
+  - name: 12129946.seal_l
+    value: 7.8
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+    note: three ridges
+  - name: 12129946.seal_h
+    value: 12.5
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: 12129946.flange_l
+    value: 2.0
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: 12129946.flange_h
+    value: 11.6
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: 12129946.nose_l
+    value: 8.5
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view: (26) - (17.5)'
+    basis: maker
+  - name: 12129946.nose_h
+    value: 7.2
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(7.2)'
+    basis: maker
+  - name: 12129946.nose_w
+    value: 19.6
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating information: the shroud''s 22.9 less its two 1.5 walls, less 0.3 clearance'
+    basis: design
+  - name: 12129946.arm_drop
+    value: 7.4
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view ''(7.4)'': centreline to the lock arm'
+    basis: maker
+  - name: 12129946.arm_hook
+    value: 5.5
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view ''(5.5)'': the arm''s hook'
+    basis: maker
+  checks:
+  - check: plug seal flange at the shroud mouth
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns:
+  - 'The body is sized off the maker''s photo against the Metri-Pack 150 shroud width 22.9, +-25 %: no dimensioned drawing
+    of the sensor is on file.'
+  - Terminals photo-scaled (+-20 %).
+  cross_checks: []
+  notes:
+  - the registry names terminal 12110847 for these wires; the kit (ProWire LS-CRANK-CONN-KIT) ships 12048074, the Metri-Pack
+    150 sealed female terminal drawn here (part_media flags 12110847 as a Metri-Pack 280 tangless terminal)
+  kind: assembly
+  family: delphi sealed sensor connectors
+  pieces:
+  - 213-4573
+  - '12129946'
+  - '12048074'
+  - '15324976'
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: CMP
+  endpoints:
+  - CMP
+  what: 'CMP: LS Gen IV camshaft position sensor (front timing cover, Hall) with its Metri-Pack 150 plug 12129946, mated'
+  maker: Delphi (Aptiv) / ACDelco
+  maker_pn: ACDelco 213-3826 (GM 12591720) + 12129946
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 62.7
+    w: 52.0
+    h: 25.0
+  dims_note: sensor and plug mated, about 63 long
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    body:
+      hex: '#a8aaa9'
+      from: 'GM photo 213-3826: light grey body'
+    O-ring:
+      hex: '#1b1b1b'
+      from: 'GM photo: black O-ring'
+    mounting ear:
+      hex: '#9c9e9d'
+      from: 'GM photo: grey ear'
+    plug housing:
+      hex: '#8f9591'
+      from: 'customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): grey body; drawing table ''GRA'''
+    plug seal:
+      hex: '#5b3a6e'
+      from: 'customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): purple seal; drawing table seal
+        12052842 ''PPL'''
+    plug lock:
+      hex: '#e9e0cf'
+      from: 'customconnectorkits.com/products/12052845 product photo (fetched 2026-09-29): natural (cream) TPA'
+  attach:
+  - n: cavA
+    ep: CMP
+    at:
+    - 6.0
+    - 0.0
+    - 17.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: Metri-Pack 150 terminal 12048074
+  - n: cavB
+    ep: CMP
+    at:
+    - 0.0
+    - 0.0
+    - 17.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: Metri-Pack 150 terminal 12048074
+  - n: cavC
+    ep: CMP
+    at:
+    - -6.0
+    - 0.0
+    - 17.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: Metri-Pack 150 terminal 12048074
+  mount: []
+  params:
+  - name: shroud_w
+    value: 22.9
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION A-A: ''22.9 +-0.15'''
+    basis: maker
+  - name: shroud_wall
+    value: 1.5
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information: ''1.5 CONSTANT'''
+    basis: maker
+  - name: shroud_depth
+    value: 18.9
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION B-B: ''18.9'''
+    basis: maker
+  - name: shroud_in_h
+    value: 10.8
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION B-B: ''10.8'''
+    basis: maker
+  - name: shroud_blade_l
+    value: 10.05
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information: ''10.05 +-0.3'''
+    basis: maker
+  - name: body_d
+    value: 24.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: body_l
+    value: 12.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ear_0
+    value: 30.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ear_1
+    value: 14.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ear_2
+    value: 3.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ear_3
+    value: 6.5
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: O-ring_d
+    value: 25.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: O-ring_l
+    value: 1.8
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: barrel_d
+    value: 22.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: barrel_l
+    value: 14.0
+    source: the product photo part_media.yaml lists for CMP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: 12129946.L
+    value: 26.0
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(26)'
+    basis: maker
+  - name: 12129946.W
+    value: 18.6
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) bottom view '(18.6)' over the connector seal
+    basis: maker
+  - name: 12129946.H
+    value: 22.0
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(22)' over the seal and the lock arm, arm flexed (dashed)
+    basis: maker
+  - name: 12129946.pitch
+    value: 6.0
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) type 101 view: ''(6)'' between cavities, ''(12)'' across'
+    basis: maker
+  - name: 12129946.rear_l
+    value: 7.0
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: 12129946.rear_w
+    value: 15.0
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) bottom view '(15)'
+    basis: maker
+  - name: 12129946.rear_h
+    value: 6.5
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(6.5)'
+    basis: maker
+  - name: 12129946.seal_l
+    value: 7.8
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+    note: three ridges
+  - name: 12129946.seal_h
+    value: 12.5
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: 12129946.flange_l
+    value: 2.0
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: 12129946.flange_h
+    value: 11.6
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: 12129946.nose_l
+    value: 8.5
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view: (26) - (17.5)'
+    basis: maker
+  - name: 12129946.nose_h
+    value: 7.2
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(7.2)'
+    basis: maker
+  - name: 12129946.nose_w
+    value: 19.6
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating information: the shroud''s 22.9 less its two 1.5 walls, less 0.3 clearance'
+    basis: design
+  - name: 12129946.arm_drop
+    value: 7.4
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view ''(7.4)'': centreline to the lock arm'
+    basis: maker
+  - name: 12129946.arm_hook
+    value: 5.5
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view ''(5.5)'': the arm''s hook'
+    basis: maker
+  checks:
+  - check: plug seal flange at the shroud mouth
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns:
+  - 'The body is sized off the maker''s photo against the Metri-Pack 150 shroud width 22.9, +-25 %: no dimensioned drawing
+    of the sensor is on file.'
+  - Terminals photo-scaled (+-20 %).
+  cross_checks: []
+  notes:
+  - 'the LS cam plug (ProWire LS-CAM-CONN-KIT) is drawn as the 12129946 Metri-Pack 150 3-way: the kit''s housing part number
+    is not on file (same family and cavity count; keys may differ)'
+  - the registry names terminal 12110847 for these wires; the kit (ProWire LS-CRANK-CONN-KIT) ships 12048074, the Metri-Pack
+    150 sealed female terminal drawn here (part_media flags 12110847 as a Metri-Pack 280 tangless terminal)
+  kind: assembly
+  family: delphi sealed sensor connectors
+  pieces:
+  - 213-3826
+  - '12129946'
+  - '12048074'
+  - '15324976'
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: MAP
+  endpoints:
+  - MAP
+  what: 'MAP: MAP sensor, 1 bar, GM/Delphi-style body with a hose nipple with its Metri-Pack 150 plug 12129946, mated'
+  maker: Delphi (Aptiv) / Holley
+  maker_pn: Holley 538-24 + 12129946
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 74.7
+    w: 74.0
+    h: 26.0
+  dims_note: sensor and plug mated, about 75 long
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    body:
+      hex: '#b9bcbd'
+      from: 'Summit photo hly-538-24: light grey body'
+    mounting ears:
+      hex: '#b1b4b5'
+      from: 'Summit photo: grey'
+    vacuum nipple:
+      hex: '#aeb1b2'
+      from: 'Summit photo: grey'
+    plug housing:
+      hex: '#8f9591'
+      from: 'customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): grey body; drawing table ''GRA'''
+    plug seal:
+      hex: '#5b3a6e'
+      from: 'customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): purple seal; drawing table seal
+        12052842 ''PPL'''
+    plug lock:
+      hex: '#e9e0cf'
+      from: 'customconnectorkits.com/products/12052845 product photo (fetched 2026-09-29): natural (cream) TPA'
+  attach:
+  - n: cavA
+    ep: MAP
+    at:
+    - 6.0
+    - 0.0
+    - 17.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: Metri-Pack 150 terminal 12048074
+  - n: cavB
+    ep: MAP
+    at:
+    - 0.0
+    - 0.0
+    - 17.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: Metri-Pack 150 terminal 12048074
+  - n: cavC
+    ep: MAP
+    at:
+    - -6.0
+    - 0.0
+    - 17.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: Metri-Pack 150 terminal 12048074
+  mount: []
+  params:
+  - name: shroud_w
+    value: 22.9
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION A-A: ''22.9 +-0.15'''
+    basis: maker
+  - name: shroud_wall
+    value: 1.5
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information: ''1.5 CONSTANT'''
+    basis: maker
+  - name: shroud_depth
+    value: 18.9
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION B-B: ''18.9'''
+    basis: maker
+  - name: shroud_in_h
+    value: 10.8
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information, SECTION B-B: ''10.8'''
+    basis: maker
+  - name: shroud_blade_l
+    value: 10.05
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating connector information: ''10.05 +-0.3'''
+    basis: maker
+  - name: body_0
+    value: 58.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: body_1
+    value: 17.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: body_2
+    value: 38.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ears_0
+    value: 74.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ears_1
+    value: 3.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ears_2
+    value: 12.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: mounting_ears_3
+    value: 5.5
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: vacuum_nipple_0
+    value: 5.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: vacuum_nipple_1
+    value: 9.0
+    source: the product photo part_media.yaml lists for MAP (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the Metri-Pack 150 shroud width 22.9
+    basis: photo
+    note: +-25 %
+  - name: 12129946.L
+    value: 26.0
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(26)'
+    basis: maker
+  - name: 12129946.W
+    value: 18.6
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) bottom view '(18.6)' over the connector seal
+    basis: maker
+  - name: 12129946.H
+    value: 22.0
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(22)' over the seal and the lock arm, arm flexed (dashed)
+    basis: maker
+  - name: 12129946.pitch
+    value: 6.0
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) type 101 view: ''(6)'' between cavities, ''(12)'' across'
+    basis: maker
+  - name: 12129946.rear_l
+    value: 7.0
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: 12129946.rear_w
+    value: 15.0
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) bottom view '(15)'
+    basis: maker
+  - name: 12129946.rear_h
+    value: 6.5
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(6.5)'
+    basis: maker
+  - name: 12129946.seal_l
+    value: 7.8
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+    note: three ridges
+  - name: 12129946.seal_h
+    value: 12.5
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: 12129946.flange_l
+    value: 2.0
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: 12129946.flange_h
+    value: 11.6
+    source: scaled off reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi
+      drawing 12129958) side and bottom views at the printed (26) length
+    basis: scaled
+  - name: 12129946.nose_l
+    value: 8.5
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view: (26) - (17.5)'
+    basis: maker
+  - name: 12129946.nose_h
+    value: 7.2
+    source: reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view '(7.2)'
+    basis: maker
+  - name: 12129946.nose_w
+    value: 19.6
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) mating information: the shroud''s 22.9 less its two 1.5 walls, less 0.3 clearance'
+    basis: design
+  - name: 12129946.arm_drop
+    value: 7.4
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view ''(7.4)'': centreline to the lock arm'
+    basis: maker
+  - name: 12129946.arm_hook
+    value: 5.5
+    source: 'reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf (Delphi drawing
+      12129958) side view ''(5.5)'': the arm''s hook'
+    basis: maker
+  checks:
+  - check: plug seal flange at the shroud mouth
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns:
+  - 'The body is sized off the maker''s photo against the Metri-Pack 150 shroud width 22.9, +-25 %: no dimensioned drawing
+    of the sensor is on file.'
+  - Terminals photo-scaled (+-20 %).
+  cross_checks: []
+  notes:
+  - the registry names terminal 12110847 for these wires; the kit (ProWire LS-CRANK-CONN-KIT) ships 12048074, the Metri-Pack
+    150 sealed female terminal drawn here (part_media flags 12110847 as a Metri-Pack 280 tangless terminal)
+  kind: assembly
+  family: delphi sealed sensor connectors
+  pieces:
+  - 538-24
+  - '12129946'
+  - '12048074'
+  - '15324976'
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: CLT-ECU
+  endpoints:
+  - CLT-ECU
+  what: 'CLT-ECU: LS engine coolant temperature sensor (GT 150 2-way, M12 x 1.5) with its GT 150 plug 15449028, mated'
+  maker: Delphi (Aptiv) / ACDelco
+  maker_pn: ACDelco 213-4514 (GM 19236568) + 15449028
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 67.9
+    w: 21.9
+    h: 19.0
+  dims_note: sensor and plug mated, about 68 long
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    body:
+      hex: '#232323'
+      from: 'GM photo 213-4514: black connector end'
+    hex:
+      hex: '#c19a4b'
+      from: 'GM photo: brass hex'
+    sealing washer:
+      hex: '#c46a3a'
+      from: 'GM photo: copper washer'
+    thread M12 x 1.5:
+      hex: '#c8a55a'
+      from: 'GM photo: brass'
+    probe:
+      hex: '#c9a050'
+      from: 'GM photo: brass probe'
+    plug housing:
+      hex: '#1f1f21'
+      from: 'customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): black body; reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf
+        p.1 (GT 150 terminals, cable seals, housings) ''Black'''
+    plug seal:
+      hex: '#3a7fd0'
+      from: 'customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): blue connector seal (12040750)'
+    plug lock:
+      hex: '#b3336e'
+      from: 'customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): magenta PLR (15336006) at the nose'
+  attach:
+  - n: cavA
+    ep: CLT-ECU
+    at:
+    - 1.75
+    - 0.0
+    - 21.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: GT 150 terminal 12191818
+  - n: cavB
+    ep: CLT-ECU
+    at:
+    - -1.75
+    - 0.0
+    - 21.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: GT 150 terminal 12191818
+  mount: []
+  params:
+  - name: shroud_w
+    value: 19.84
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030):
+      the plug''s 17.04 seal width + two 1.4 walls'
+    basis: design
+    note: the drawing shows no sensor side
+  - name: shroud_in_h
+    value: 12.9
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030):
+      the seal''s scaled 12.7 + 0.2'
+    basis: design
+  - name: shroud_wall
+    value: 1.4
+    source: design wall for the GT 150 sensor shroud
+    basis: design
+  - name: shroud_depth
+    value: 10.9
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030):
+      the nose (9.15) and flange (1.5) + 0.25'
+    basis: design
+  - name: hex_d
+    value: 19.0
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: hex_l
+    value: 8.0
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: sealing_washer_d
+    value: 17.0
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: sealing_washer_l
+    value: 1.2
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: thread_M12_x_1.5_d
+    value: 12.0
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: thread_M12_x_1.5_l
+    value: 12.0
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: probe_d
+    value: 7.0
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: probe_l
+    value: 14.0
+    source: the product photo part_media.yaml lists for CLT-ECU (scratchpad copy of the maker's image, 2026-09-29), scaled
+      from its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: 15449028.L
+    value: 30.65
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      type 101 side view, dimension 1: ''(30.65)'''
+    basis: maker
+  - name: 15449028.W
+    value: 17.04
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      front view, dimension 5: ''17.04 +0.15 -0.5'''
+    basis: maker
+  - name: 15449028.H
+    value: 14.6
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      front view, dimension 3: ''14.6'''
+    basis: maker
+  - name: 15449028.pitch
+    value: 3.5
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      front view, dimension 4: ''3.5'''
+    basis: maker
+  - name: 15449028.rear_l
+    value: 8.7
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.rear_w
+    value: 11.8
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.rear_h
+    value: 10.2
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.seal_l
+    value: 9.0
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+    note: four ridges
+  - name: 15449028.seal_h
+    value: 12.7
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.flange_l
+    value: 1.5
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.flange_h
+    value: 11.4
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.nose_l
+    value: 9.15
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+    note: the PLR's face to the seal flange
+  - name: 15449028.nose_h
+    value: 8.7
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.nose_w
+    value: 10.2
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  checks:
+  - check: plug seal flange at the shroud mouth
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns:
+  - 'The body is sized off the maker''s photo against its M12 x 1.5 thread (part_media.yaml CLT-ECU), +-25 %: no dimensioned
+    drawing of the sensor is on file.'
+  - Terminals photo-scaled (+-20 %).
+  cross_checks: []
+  notes: []
+  kind: assembly
+  family: delphi sealed sensor connectors
+  pieces:
+  - 213-4514
+  - '15449028'
+  - '12191818'
+  - '15366021'
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: OILT
+  endpoints:
+  - OILT
+  what: 'OILT: LS engine coolant temperature sensor (GT 150 2-way, M12 x 1.5) with its GT 150 plug 15449028, mated'
+  maker: Delphi (Aptiv) / ACDelco
+  maker_pn: ACDelco 213-4514 (GM 19236568) + 15449028
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 67.9
+    w: 21.9
+    h: 19.0
+  dims_note: sensor and plug mated, about 68 long
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    body:
+      hex: '#232323'
+      from: 'GM photo 213-4514: black connector end'
+    hex:
+      hex: '#c19a4b'
+      from: 'GM photo: brass hex'
+    sealing washer:
+      hex: '#c46a3a'
+      from: 'GM photo: copper washer'
+    thread M12 x 1.5:
+      hex: '#c8a55a'
+      from: 'GM photo: brass'
+    probe:
+      hex: '#c9a050'
+      from: 'GM photo: brass probe'
+    plug housing:
+      hex: '#1f1f21'
+      from: 'customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): black body; reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf
+        p.1 (GT 150 terminals, cable seals, housings) ''Black'''
+    plug seal:
+      hex: '#3a7fd0'
+      from: 'customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): blue connector seal (12040750)'
+    plug lock:
+      hex: '#b3336e'
+      from: 'customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): magenta PLR (15336006) at the nose'
+  attach:
+  - n: cavA
+    ep: OILT
+    at:
+    - 1.75
+    - 0.0
+    - 21.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: GT 150 terminal 12191818
+  - n: cavB
+    ep: OILT
+    at:
+    - -1.75
+    - 0.0
+    - 21.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: GT 150 terminal 12191818
+  mount: []
+  params:
+  - name: shroud_w
+    value: 19.84
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030):
+      the plug''s 17.04 seal width + two 1.4 walls'
+    basis: design
+    note: the drawing shows no sensor side
+  - name: shroud_in_h
+    value: 12.9
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030):
+      the seal''s scaled 12.7 + 0.2'
+    basis: design
+  - name: shroud_wall
+    value: 1.4
+    source: design wall for the GT 150 sensor shroud
+    basis: design
+  - name: shroud_depth
+    value: 10.9
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030):
+      the nose (9.15) and flange (1.5) + 0.25'
+    basis: design
+  - name: hex_d
+    value: 19.0
+    source: the product photo part_media.yaml lists for OILT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: hex_l
+    value: 8.0
+    source: the product photo part_media.yaml lists for OILT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: sealing_washer_d
+    value: 17.0
+    source: the product photo part_media.yaml lists for OILT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: sealing_washer_l
+    value: 1.2
+    source: the product photo part_media.yaml lists for OILT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: thread_M12_x_1.5_d
+    value: 12.0
+    source: the product photo part_media.yaml lists for OILT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: thread_M12_x_1.5_l
+    value: 12.0
+    source: the product photo part_media.yaml lists for OILT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: probe_d
+    value: 7.0
+    source: the product photo part_media.yaml lists for OILT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: probe_l
+    value: 14.0
+    source: the product photo part_media.yaml lists for OILT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      its M12 x 1.5 thread (part_media.yaml CLT-ECU)
+    basis: photo
+    note: +-25 %
+  - name: 15449028.L
+    value: 30.65
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      type 101 side view, dimension 1: ''(30.65)'''
+    basis: maker
+  - name: 15449028.W
+    value: 17.04
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      front view, dimension 5: ''17.04 +0.15 -0.5'''
+    basis: maker
+  - name: 15449028.H
+    value: 14.6
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      front view, dimension 3: ''14.6'''
+    basis: maker
+  - name: 15449028.pitch
+    value: 3.5
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      front view, dimension 4: ''3.5'''
+    basis: maker
+  - name: 15449028.rear_l
+    value: 8.7
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.rear_w
+    value: 11.8
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.rear_h
+    value: 10.2
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.seal_l
+    value: 9.0
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+    note: four ridges
+  - name: 15449028.seal_h
+    value: 12.7
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.flange_l
+    value: 1.5
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.flange_h
+    value: 11.4
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.nose_l
+    value: 9.15
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+    note: the PLR's face to the seal flange
+  - name: 15449028.nose_h
+    value: 8.7
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.nose_w
+    value: 10.2
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  checks:
+  - check: plug seal flange at the shroud mouth
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns:
+  - 'The body is sized off the maker''s photo against its M12 x 1.5 thread (part_media.yaml CLT-ECU), +-25 %: no dimensioned
+    drawing of the sensor is on file.'
+  - Terminals photo-scaled (+-20 %).
+  cross_checks: []
+  notes:
+  - 'no oil-temperature sensor part number is recorded (part_media OILT): drawn as the ECT it shares a family with'
+  kind: assembly
+  family: delphi sealed sensor connectors
+  pieces:
+  - 213-4514
+  - '15449028'
+  - '12191818'
+  - '15366021'
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
+- id: IAT
+  endpoints:
+  - IAT
+  what: 'IAT: intake air temperature sensor, push-in thermistor in a grommet with its GT 150 plug 15449028, mated'
+  maker: Delphi (Aptiv) / ACDelco
+  maker_pn: ACDelco 213-243 (GM 12160244) + 15449028
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 71.7
+    w: 21.0
+    h: 21.0
+  dims_note: sensor and plug mated, about 72 long
+  frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
+    wires; +Y the lock side
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wires: +Z
+      mating: -Z
+      lock: +Y
+  colors:
+    body:
+      hex: '#1c1c1c'
+      from: 'GM photo 213-243: black'
+    grommet land:
+      hex: '#1c1c1c'
+      from: 'GM photo: black'
+    thermistor cage:
+      hex: '#262626'
+      from: 'GM photo: black cage'
+    plug housing:
+      hex: '#1f1f21'
+      from: 'customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): black body; reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf
+        p.1 (GT 150 terminals, cable seals, housings) ''Black'''
+    plug seal:
+      hex: '#3a7fd0'
+      from: 'customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): blue connector seal (12040750)'
+    plug lock:
+      hex: '#b3336e'
+      from: 'customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): magenta PLR (15336006) at the nose'
+  attach:
+  - n: cavA
+    ep: IAT
+    at:
+    - 1.75
+    - 0.0
+    - 21.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: GT 150 terminal 12191818
+  - n: cavB
+    ep: IAT
+    at:
+    - -1.75
+    - 0.0
+    - 21.5
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: GT 150 terminal 12191818
+  mount: []
+  params:
+  - name: shroud_w
+    value: 19.84
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030):
+      the plug''s 17.04 seal width + two 1.4 walls'
+    basis: design
+    note: the drawing shows no sensor side
+  - name: shroud_in_h
+    value: 12.9
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030):
+      the seal''s scaled 12.7 + 0.2'
+    basis: design
+  - name: shroud_wall
+    value: 1.4
+    source: design wall for the GT 150 sensor shroud
+    basis: design
+  - name: shroud_depth
+    value: 10.9
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030):
+      the nose (9.15) and flange (1.5) + 0.25'
+    basis: design
+  - name: body_d
+    value: 17.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  - name: body_l
+    value: 10.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  - name: grommet_land_d
+    value: 21.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  - name: grommet_land_l
+    value: 6.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  - name: barrel_d
+    value: 13.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  - name: barrel_l
+    value: 14.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  - name: thermistor_cage_d
+    value: 9.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  - name: thermistor_cage_l
+    value: 9.0
+    source: the product photo part_media.yaml lists for IAT (scratchpad copy of the maker's image, 2026-09-29), scaled from
+      the GT 150 shroud (the plug's 17.04 seal width + walls)
+    basis: photo
+    note: +-25 %
+  - name: 15449028.L
+    value: 30.65
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      type 101 side view, dimension 1: ''(30.65)'''
+    basis: maker
+  - name: 15449028.W
+    value: 17.04
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      front view, dimension 5: ''17.04 +0.15 -0.5'''
+    basis: maker
+  - name: 15449028.H
+    value: 14.6
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      front view, dimension 3: ''14.6'''
+    basis: maker
+  - name: 15449028.pitch
+    value: 3.5
+    source: 'reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing 15449030)
+      front view, dimension 4: ''3.5'''
+    basis: maker
+  - name: 15449028.rear_l
+    value: 8.7
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.rear_w
+    value: 11.8
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.rear_h
+    value: 10.2
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.seal_l
+    value: 9.0
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+    note: four ridges
+  - name: 15449028.seal_h
+    value: 12.7
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.flange_l
+    value: 1.5
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.flange_h
+    value: 11.4
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.nose_l
+    value: 9.15
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+    note: the PLR's face to the seal flange
+  - name: 15449028.nose_h
+    value: 8.7
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  - name: 15449028.nose_w
+    value: 10.2
+    source: scaled off reference_documents/component_drawings/Delphi_15449030_GT150_2way_female_15449028.pdf (Delphi drawing
+      15449030) type 101 side view at the printed (30.65) length
+    basis: scaled
+  checks:
+  - check: plug seal flange at the shroud mouth
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns:
+  - 'The body is sized off the maker''s photo against the GT 150 shroud (the plug''s 17.04 seal width + walls), +-25 %: no
+    dimensioned drawing of the sensor is on file.'
+  - Terminals photo-scaled (+-20 %).
+  cross_checks: []
+  notes:
+  - 'the IAT plug (ProWire GT150-AIR-TEMP-KIT) is drawn as the 15449028 GT 150 2-way (sibling: the kit''s housing part number
+    is not on file)'
+  kind: assembly
+  family: delphi sealed sensor connectors
+  pieces:
+  - 213-243
+  - '15449028'
+  - '12191818'
+  - '15366021'
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_delphi.py
 - id: DT04-2P
   endpoints:
   - FUEL-LEVEL

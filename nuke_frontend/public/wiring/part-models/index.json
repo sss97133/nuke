@@ -8,6 +8,36 @@
    ],
    "complete": true
   },
+  "CKP": {
+   "models": [
+    "12048074",
+    "12129946",
+    "15324976",
+    "213-4573",
+    "CKP"
+   ],
+   "complete": true
+  },
+  "CLT-ECU": {
+   "models": [
+    "12191818",
+    "15366021",
+    "15449028",
+    "213-4514",
+    "CLT-ECU"
+   ],
+   "complete": true
+  },
+  "CMP": {
+   "models": [
+    "12048074",
+    "12129946",
+    "15324976",
+    "213-3826",
+    "CMP"
+   ],
+   "complete": true
+  },
   "DCDC": {
    "models": [
     "DCDC"
@@ -125,6 +155,16 @@
     "QFS-H882 hanger and P367 pump"
    ]
   },
+  "IAT": {
+   "models": [
+    "12191818",
+    "15366021",
+    "15449028",
+    "213-243",
+    "IAT"
+   ],
+   "complete": true
+  },
   "IBST-DIAG": {
    "models": [
     "0413-204-2005",
@@ -147,9 +187,29 @@
    ],
    "complete": true
   },
+  "MAP": {
+   "models": [
+    "12048074",
+    "12129946",
+    "15324976",
+    "538-24",
+    "MAP"
+   ],
+   "complete": true
+  },
   "ODYSSEY": {
    "models": [
     "ODYSSEY"
+   ],
+   "complete": true
+  },
+  "OILT": {
+   "models": [
+    "12191818",
+    "15366021",
+    "15449028",
+    "213-4514",
+    "OILT"
    ],
    "complete": true
   },
@@ -1217,6 +1277,1309 @@
     "budget_mm": 80.0,
     "source": "receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md: 60-80 mm below the connector face for the plug and boot"
    }
+  },
+  "12129946": {
+   "endpoints": [
+    "CKP",
+    "CMP",
+    "MAP"
+   ],
+   "what": "Delphi Metri-Pack 150 3-way sealed female connector, type 102 (grey, the LS crank / MAP key), drawing 12129958 table: body 12129945, seal 12052842, TPA 12052845",
+   "maker": "Delphi (Aptiv)",
+   "maker_pn": "12129946",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 26.0,
+    "w": 18.6,
+    "h": 22.0
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#8f9591",
+     "from": "customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): grey body; drawing table 'GRA'"
+    },
+    "seal": {
+     "hex": "#5b3a6e",
+     "from": "customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): purple seal; drawing table seal 12052842 'PPL'"
+    },
+    "lock": {
+     "hex": "#e9e0cf",
+     "from": "customconnectorkits.com/products/12052845 product photo (fetched 2026-09-29): natural (cream) TPA"
+    },
+    "terminals": {
+     "hex": "#c9c6bf",
+     "from": "reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf p.66 (150 female terminals, cable seals): 'Silicon Bronze / Tin'; tin colour"
+    },
+    "cable seals": {
+     "hex": "#f1efe9",
+     "from": "customconnectorkits.com/products/15324976 product photo (fetched 2026-09-29): white; customconnectorkits calls it 'for 16-14 AWG' (ProWire: 20-22)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cavA",
+     "ep": "CKP",
+     "at": [
+      6.0,
+      0.0,
+      17.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "Metri-Pack 150 terminal"
+    },
+    {
+     "n": "cavB",
+     "ep": "CKP",
+     "at": [
+      0.0,
+      0.0,
+      17.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "Metri-Pack 150 terminal"
+    },
+    {
+     "n": "cavC",
+     "ep": "CKP",
+     "at": [
+      -6.0,
+      0.0,
+      17.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "Metri-Pack 150 terminal"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "delphi sealed sensor connectors",
+   "mates": "the sensor's shroud"
+  },
+  "15449028": {
+   "endpoints": [
+    "CLT-ECU",
+    "OILT",
+    "IAT"
+   ],
+   "what": "Delphi GT 150 2-way sealed female connector, type 102, drawing 15449030 table: connector 15449024, PLR 15336006, seal 12040750",
+   "maker": "Delphi (Aptiv)",
+   "maker_pn": "15449028",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 30.65,
+    "w": 17.04,
+    "h": 14.6
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#1f1f21",
+     "from": "customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): black body; reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf p.1 (GT 150 terminals, cable seals, housings) 'Black'"
+    },
+    "seal": {
+     "hex": "#3a7fd0",
+     "from": "customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): blue connector seal (12040750)"
+    },
+    "lock": {
+     "hex": "#b3336e",
+     "from": "customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): magenta PLR (15336006) at the nose"
+    },
+    "terminals": {
+     "hex": "#c9c6bf",
+     "from": "reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf p.1 (GT 150 terminals, cable seals, housings): 'Tin Brass / Tin'; tin colour"
+    },
+    "cable seals": {
+     "hex": "#f1efe9",
+     "from": "reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf p.1 (GT 150 terminals, cable seals, housings): '15366021 ... Silicone White'"
+    }
+   },
+   "attach": [
+    {
+     "n": "cavA",
+     "ep": "CLT-ECU",
+     "at": [
+      1.75,
+      0.0,
+      21.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "GT 150 terminal"
+    },
+    {
+     "n": "cavB",
+     "ep": "CLT-ECU",
+     "at": [
+      -1.75,
+      0.0,
+      21.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "GT 150 terminal"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "delphi sealed sensor connectors",
+   "mates": "the sensor's shroud"
+  },
+  "12048074": {
+   "endpoints": [
+    "CKP",
+    "CMP",
+    "MAP"
+   ],
+   "what": "Metri-Pack 150 sealed female terminal, 20-18 AWG (0.8-1.0 mm2), tin-plated silicon bronze",
+   "maker": "Delphi (Aptiv)",
+   "maker_pn": "12048074",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 15.5,
+    "w": 2.6,
+    "h": 1.9
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "plating": {
+     "hex": "#c9c6bf",
+     "from": "reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf p.66 (150 female terminals, cable seals): 'Silicon Bronze / Tin'; tin colour"
+    }
+   },
+   "attach": [
+    {
+     "n": "crimp",
+     "ep": "CKP",
+     "at": [
+      0.0,
+      0.0,
+      15.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "crimp barrel"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "delphi sealed sensor connectors"
+  },
+  "12191818": {
+   "endpoints": [
+    "CLT-ECU",
+    "OILT",
+    "IAT"
+   ],
+   "what": "GT 150 sealed female terminal, 22-20 AWG (0.35-0.50 mm2), tin-plated brass",
+   "maker": "Delphi (Aptiv)",
+   "maker_pn": "12191818",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 13.0,
+    "w": 2.2,
+    "h": 1.7
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "plating": {
+     "hex": "#c9c6bf",
+     "from": "reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf p.1 (GT 150 terminals, cable seals, housings): 'Tin Brass / Tin'; tin colour"
+    }
+   },
+   "attach": [
+    {
+     "n": "crimp",
+     "ep": "CLT-ECU",
+     "at": [
+      0.0,
+      0.0,
+      13.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "crimp barrel"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "delphi sealed sensor connectors"
+  },
+  "15324976": {
+   "endpoints": [
+    "CKP",
+    "CMP",
+    "MAP"
+   ],
+   "what": "Metri-Pack 150 cable seal, white",
+   "maker": "Delphi (Aptiv)",
+   "maker_pn": "15324976",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 6.5,
+    "w": 4.6,
+    "h": 4.6
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "seal": {
+     "hex": "#f1efe9",
+     "from": "customconnectorkits.com/products/15324976 product photo (fetched 2026-09-29): white; customconnectorkits calls it 'for 16-14 AWG' (ProWire: 20-22)"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "CKP",
+     "at": [
+      0.0,
+      0.0,
+      6.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "cable seal"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "delphi sealed sensor connectors"
+  },
+  "15366021": {
+   "endpoints": [
+    "CLT-ECU",
+    "OILT",
+    "IAT"
+   ],
+   "what": "GT 150 cable seal, white, 1.20-1.85 mm cable",
+   "maker": "Delphi (Aptiv)",
+   "maker_pn": "15366021",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 5.5,
+    "w": 3.4,
+    "h": 3.4
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "seal": {
+     "hex": "#f1efe9",
+     "from": "reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf p.1 (GT 150 terminals, cable seals, housings): '15366021 ... Silicone White'"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "CLT-ECU",
+     "at": [
+      0.0,
+      0.0,
+      5.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "cable seal"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "delphi sealed sensor connectors"
+  },
+  "213-4573": {
+   "endpoints": [
+    "CKP"
+   ],
+   "what": "LS Gen IV 58X crankshaft position sensor (front cover, Hall)",
+   "maker": "ACDelco",
+   "maker_pn": "ACDelco 213-4573 (GM 12615626)",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 57.9,
+    "w": 23.5,
+    "h": 23.5
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d2230",
+     "from": "GM photo 213-4573: dark navy body"
+    },
+    "O-ring": {
+     "hex": "#2f8a55",
+     "from": "GM photo: green O-ring"
+    },
+    "sensing tip": {
+     "hex": "#d9d9d4",
+     "from": "GM photo: white sensing tip"
+    }
+   },
+   "attach": [
+    {
+     "n": "connector",
+     "ep": "CKP",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "shroud mouth (the plug seats here)"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "delphi sealed sensor connectors"
+  },
+  "213-3826": {
+   "endpoints": [
+    "CMP"
+   ],
+   "what": "LS Gen IV camshaft position sensor (front timing cover, Hall)",
+   "maker": "ACDelco",
+   "maker_pn": "ACDelco 213-3826 (GM 12591720)",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 44.9,
+    "w": 52.0,
+    "h": 25.0
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#a8aaa9",
+     "from": "GM photo 213-3826: light grey body"
+    },
+    "O-ring": {
+     "hex": "#1b1b1b",
+     "from": "GM photo: black O-ring"
+    },
+    "mounting ear": {
+     "hex": "#9c9e9d",
+     "from": "GM photo: grey ear"
+    }
+   },
+   "attach": [
+    {
+     "n": "connector",
+     "ep": "CMP",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "shroud mouth (the plug seats here)"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "delphi sealed sensor connectors"
+  },
+  "538-24": {
+   "endpoints": [
+    "MAP"
+   ],
+   "what": "MAP sensor, 1 bar, GM/Delphi-style body with a hose nipple",
+   "maker": "Holley",
+   "maker_pn": "Holley 538-24",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 56.9,
+    "w": 74.0,
+    "h": 26.0
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#b9bcbd",
+     "from": "Summit photo hly-538-24: light grey body"
+    },
+    "mounting ears": {
+     "hex": "#b1b4b5",
+     "from": "Summit photo: grey"
+    },
+    "vacuum nipple": {
+     "hex": "#aeb1b2",
+     "from": "Summit photo: grey"
+    }
+   },
+   "attach": [
+    {
+     "n": "connector",
+     "ep": "MAP",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "shroud mouth (the plug seats here)"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "delphi sealed sensor connectors"
+  },
+  "213-4514": {
+   "endpoints": [
+    "CLT-ECU",
+    "OILT"
+   ],
+   "what": "LS engine coolant temperature sensor (GT 150 2-way, M12 x 1.5)",
+   "maker": "ACDelco",
+   "maker_pn": "ACDelco 213-4514 (GM 19236568)",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 46.1,
+    "w": 21.9,
+    "h": 19.0
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#232323",
+     "from": "GM photo 213-4514: black connector end"
+    },
+    "hex": {
+     "hex": "#c19a4b",
+     "from": "GM photo: brass hex"
+    },
+    "sealing washer": {
+     "hex": "#c46a3a",
+     "from": "GM photo: copper washer"
+    },
+    "thread M12 x 1.5": {
+     "hex": "#c8a55a",
+     "from": "GM photo: brass"
+    },
+    "probe": {
+     "hex": "#c9a050",
+     "from": "GM photo: brass probe"
+    }
+   },
+   "attach": [
+    {
+     "n": "connector",
+     "ep": "CLT-ECU",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "shroud mouth (the plug seats here)"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "delphi sealed sensor connectors"
+  },
+  "213-243": {
+   "endpoints": [
+    "IAT"
+   ],
+   "what": "intake air temperature sensor, push-in thermistor in a grommet",
+   "maker": "ACDelco",
+   "maker_pn": "ACDelco 213-243 (GM 12160244)",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 49.9,
+    "w": 21.0,
+    "h": 21.0
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#1c1c1c",
+     "from": "GM photo 213-243: black"
+    },
+    "grommet land": {
+     "hex": "#1c1c1c",
+     "from": "GM photo: black"
+    },
+    "thermistor cage": {
+     "hex": "#262626",
+     "from": "GM photo: black cage"
+    }
+   },
+   "attach": [
+    {
+     "n": "connector",
+     "ep": "IAT",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "shroud mouth (the plug seats here)"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "delphi sealed sensor connectors"
+  },
+  "CKP": {
+   "endpoints": [
+    "CKP"
+   ],
+   "what": "CKP: LS Gen IV 58X crankshaft position sensor (front cover, Hall) with its Metri-Pack 150 plug 12129946, mated",
+   "maker": "Delphi (Aptiv) / ACDelco",
+   "maker_pn": "ACDelco 213-4573 (GM 12615626) + 12129946",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 75.7,
+    "w": 23.5,
+    "h": 23.5
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#1d2230",
+     "from": "GM photo 213-4573: dark navy body"
+    },
+    "O-ring": {
+     "hex": "#2f8a55",
+     "from": "GM photo: green O-ring"
+    },
+    "sensing tip": {
+     "hex": "#d9d9d4",
+     "from": "GM photo: white sensing tip"
+    },
+    "plug housing": {
+     "hex": "#8f9591",
+     "from": "customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): grey body; drawing table 'GRA'"
+    },
+    "plug seal": {
+     "hex": "#5b3a6e",
+     "from": "customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): purple seal; drawing table seal 12052842 'PPL'"
+    },
+    "plug lock": {
+     "hex": "#e9e0cf",
+     "from": "customconnectorkits.com/products/12052845 product photo (fetched 2026-09-29): natural (cream) TPA"
+    }
+   },
+   "attach": [
+    {
+     "n": "cavA",
+     "ep": "CKP",
+     "at": [
+      6.0,
+      0.0,
+      17.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "Metri-Pack 150 terminal 12048074"
+    },
+    {
+     "n": "cavB",
+     "ep": "CKP",
+     "at": [
+      0.0,
+      0.0,
+      17.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "Metri-Pack 150 terminal 12048074"
+    },
+    {
+     "n": "cavC",
+     "ep": "CKP",
+     "at": [
+      -6.0,
+      0.0,
+      17.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "Metri-Pack 150 terminal 12048074"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "delphi sealed sensor connectors",
+   "pieces": [
+    "213-4573",
+    "12129946",
+    "12048074",
+    "15324976"
+   ],
+   "missing": []
+  },
+  "CMP": {
+   "endpoints": [
+    "CMP"
+   ],
+   "what": "CMP: LS Gen IV camshaft position sensor (front timing cover, Hall) with its Metri-Pack 150 plug 12129946, mated",
+   "maker": "Delphi (Aptiv) / ACDelco",
+   "maker_pn": "ACDelco 213-3826 (GM 12591720) + 12129946",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 62.7,
+    "w": 52.0,
+    "h": 25.0
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#a8aaa9",
+     "from": "GM photo 213-3826: light grey body"
+    },
+    "O-ring": {
+     "hex": "#1b1b1b",
+     "from": "GM photo: black O-ring"
+    },
+    "mounting ear": {
+     "hex": "#9c9e9d",
+     "from": "GM photo: grey ear"
+    },
+    "plug housing": {
+     "hex": "#8f9591",
+     "from": "customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): grey body; drawing table 'GRA'"
+    },
+    "plug seal": {
+     "hex": "#5b3a6e",
+     "from": "customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): purple seal; drawing table seal 12052842 'PPL'"
+    },
+    "plug lock": {
+     "hex": "#e9e0cf",
+     "from": "customconnectorkits.com/products/12052845 product photo (fetched 2026-09-29): natural (cream) TPA"
+    }
+   },
+   "attach": [
+    {
+     "n": "cavA",
+     "ep": "CMP",
+     "at": [
+      6.0,
+      0.0,
+      17.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "Metri-Pack 150 terminal 12048074"
+    },
+    {
+     "n": "cavB",
+     "ep": "CMP",
+     "at": [
+      0.0,
+      0.0,
+      17.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "Metri-Pack 150 terminal 12048074"
+    },
+    {
+     "n": "cavC",
+     "ep": "CMP",
+     "at": [
+      -6.0,
+      0.0,
+      17.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "Metri-Pack 150 terminal 12048074"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "delphi sealed sensor connectors",
+   "pieces": [
+    "213-3826",
+    "12129946",
+    "12048074",
+    "15324976"
+   ],
+   "missing": []
+  },
+  "MAP": {
+   "endpoints": [
+    "MAP"
+   ],
+   "what": "MAP: MAP sensor, 1 bar, GM/Delphi-style body with a hose nipple with its Metri-Pack 150 plug 12129946, mated",
+   "maker": "Delphi (Aptiv) / Holley",
+   "maker_pn": "Holley 538-24 + 12129946",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 74.7,
+    "w": 74.0,
+    "h": 26.0
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#b9bcbd",
+     "from": "Summit photo hly-538-24: light grey body"
+    },
+    "mounting ears": {
+     "hex": "#b1b4b5",
+     "from": "Summit photo: grey"
+    },
+    "vacuum nipple": {
+     "hex": "#aeb1b2",
+     "from": "Summit photo: grey"
+    },
+    "plug housing": {
+     "hex": "#8f9591",
+     "from": "customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): grey body; drawing table 'GRA'"
+    },
+    "plug seal": {
+     "hex": "#5b3a6e",
+     "from": "customconnectorkits.com/products/12129946 product photo (fetched 2026-09-29): purple seal; drawing table seal 12052842 'PPL'"
+    },
+    "plug lock": {
+     "hex": "#e9e0cf",
+     "from": "customconnectorkits.com/products/12052845 product photo (fetched 2026-09-29): natural (cream) TPA"
+    }
+   },
+   "attach": [
+    {
+     "n": "cavA",
+     "ep": "MAP",
+     "at": [
+      6.0,
+      0.0,
+      17.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "Metri-Pack 150 terminal 12048074"
+    },
+    {
+     "n": "cavB",
+     "ep": "MAP",
+     "at": [
+      0.0,
+      0.0,
+      17.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "Metri-Pack 150 terminal 12048074"
+    },
+    {
+     "n": "cavC",
+     "ep": "MAP",
+     "at": [
+      -6.0,
+      0.0,
+      17.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "Metri-Pack 150 terminal 12048074"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "delphi sealed sensor connectors",
+   "pieces": [
+    "538-24",
+    "12129946",
+    "12048074",
+    "15324976"
+   ],
+   "missing": []
+  },
+  "CLT-ECU": {
+   "endpoints": [
+    "CLT-ECU"
+   ],
+   "what": "CLT-ECU: LS engine coolant temperature sensor (GT 150 2-way, M12 x 1.5) with its GT 150 plug 15449028, mated",
+   "maker": "Delphi (Aptiv) / ACDelco",
+   "maker_pn": "ACDelco 213-4514 (GM 19236568) + 15449028",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 67.9,
+    "w": 21.9,
+    "h": 19.0
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#232323",
+     "from": "GM photo 213-4514: black connector end"
+    },
+    "hex": {
+     "hex": "#c19a4b",
+     "from": "GM photo: brass hex"
+    },
+    "sealing washer": {
+     "hex": "#c46a3a",
+     "from": "GM photo: copper washer"
+    },
+    "thread M12 x 1.5": {
+     "hex": "#c8a55a",
+     "from": "GM photo: brass"
+    },
+    "probe": {
+     "hex": "#c9a050",
+     "from": "GM photo: brass probe"
+    },
+    "plug housing": {
+     "hex": "#1f1f21",
+     "from": "customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): black body; reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf p.1 (GT 150 terminals, cable seals, housings) 'Black'"
+    },
+    "plug seal": {
+     "hex": "#3a7fd0",
+     "from": "customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): blue connector seal (12040750)"
+    },
+    "plug lock": {
+     "hex": "#b3336e",
+     "from": "customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): magenta PLR (15336006) at the nose"
+    }
+   },
+   "attach": [
+    {
+     "n": "cavA",
+     "ep": "CLT-ECU",
+     "at": [
+      1.75,
+      0.0,
+      21.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "GT 150 terminal 12191818"
+    },
+    {
+     "n": "cavB",
+     "ep": "CLT-ECU",
+     "at": [
+      -1.75,
+      0.0,
+      21.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "GT 150 terminal 12191818"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "delphi sealed sensor connectors",
+   "pieces": [
+    "213-4514",
+    "15449028",
+    "12191818",
+    "15366021"
+   ],
+   "missing": []
+  },
+  "OILT": {
+   "endpoints": [
+    "OILT"
+   ],
+   "what": "OILT: LS engine coolant temperature sensor (GT 150 2-way, M12 x 1.5) with its GT 150 plug 15449028, mated",
+   "maker": "Delphi (Aptiv) / ACDelco",
+   "maker_pn": "ACDelco 213-4514 (GM 19236568) + 15449028",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 67.9,
+    "w": 21.9,
+    "h": 19.0
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#232323",
+     "from": "GM photo 213-4514: black connector end"
+    },
+    "hex": {
+     "hex": "#c19a4b",
+     "from": "GM photo: brass hex"
+    },
+    "sealing washer": {
+     "hex": "#c46a3a",
+     "from": "GM photo: copper washer"
+    },
+    "thread M12 x 1.5": {
+     "hex": "#c8a55a",
+     "from": "GM photo: brass"
+    },
+    "probe": {
+     "hex": "#c9a050",
+     "from": "GM photo: brass probe"
+    },
+    "plug housing": {
+     "hex": "#1f1f21",
+     "from": "customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): black body; reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf p.1 (GT 150 terminals, cable seals, housings) 'Black'"
+    },
+    "plug seal": {
+     "hex": "#3a7fd0",
+     "from": "customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): blue connector seal (12040750)"
+    },
+    "plug lock": {
+     "hex": "#b3336e",
+     "from": "customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): magenta PLR (15336006) at the nose"
+    }
+   },
+   "attach": [
+    {
+     "n": "cavA",
+     "ep": "OILT",
+     "at": [
+      1.75,
+      0.0,
+      21.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "GT 150 terminal 12191818"
+    },
+    {
+     "n": "cavB",
+     "ep": "OILT",
+     "at": [
+      -1.75,
+      0.0,
+      21.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "GT 150 terminal 12191818"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "delphi sealed sensor connectors",
+   "pieces": [
+    "213-4514",
+    "15449028",
+    "12191818",
+    "15366021"
+   ],
+   "missing": []
+  },
+  "IAT": {
+   "endpoints": [
+    "IAT"
+   ],
+   "what": "IAT: intake air temperature sensor, push-in thermistor in a grommet with its GT 150 plug 15449028, mated",
+   "maker": "Delphi (Aptiv) / ACDelco",
+   "maker_pn": "ACDelco 213-243 (GM 12160244) + 15449028",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 71.7,
+    "w": 21.0,
+    "h": 21.0
+   },
+   "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wires": "+Z",
+     "mating": "-Z",
+     "lock": "+Y"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#1c1c1c",
+     "from": "GM photo 213-243: black"
+    },
+    "grommet land": {
+     "hex": "#1c1c1c",
+     "from": "GM photo: black"
+    },
+    "thermistor cage": {
+     "hex": "#262626",
+     "from": "GM photo: black cage"
+    },
+    "plug housing": {
+     "hex": "#1f1f21",
+     "from": "customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): black body; reference_documents/component_drawings/Delphi_GT_150_280_630_Catalog.pdf p.1 (GT 150 terminals, cable seals, housings) 'Black'"
+    },
+    "plug seal": {
+     "hex": "#3a7fd0",
+     "from": "customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): blue connector seal (12040750)"
+    },
+    "plug lock": {
+     "hex": "#b3336e",
+     "from": "customconnectorkits.com/products/15449028 product photo (fetched 2026-09-29): magenta PLR (15336006) at the nose"
+    }
+   },
+   "attach": [
+    {
+     "n": "cavA",
+     "ep": "IAT",
+     "at": [
+      1.75,
+      0.0,
+      21.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "GT 150 terminal 12191818"
+    },
+    {
+     "n": "cavB",
+     "ep": "IAT",
+     "at": [
+      -1.75,
+      0.0,
+      21.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "GT 150 terminal 12191818"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "delphi sealed sensor connectors",
+   "pieces": [
+    "213-243",
+    "15449028",
+    "12191818",
+    "15366021"
+   ],
+   "missing": []
   },
   "DT04-2P": {
    "endpoints": [
