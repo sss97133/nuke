@@ -595,3 +595,234 @@ DPASS12:
     notes: >-
       same size-16 contacts (0460-202-16141 / 0462-201-16141, 20-16 AWG) and crimper as the 8-way; wedges W12P / W12S. OPEN: the
       12-way's vendor page is not saved, and its body is larger than the 8-way's, so check it through the door conduit
+
+
+# ============================================================== removable fiberglass top: disconnect, solar, lights, camera, finish (2026-09-30)
+# Owner 2026-09-29: "we need a really cool disconnect if we're gonna be running anything on the fiberglass top so the cargo
+# lights ... dreamed of doing solar panel install should be crazy and the problem is probably we had to run fat ass wires to
+# it ... we need to actually do like the lighting design ... how do we finish the roof doing insulate it or delete it raw ...
+# do we put any cameras or anything in it". Research, options, prices and every source:
+# research/2026-09-30_fiberglass-top-disconnect-solar-lighting.md. None of these is decided.
+# The 1977 K5 has a steel half-cab roof over the front seats; the fiberglass top covers the rear only (1977 LTSM PDF p.155:
+# the top is clamped "against the steel cab"). Only what sits on the top crosses TOP-DISC. Lengths: top side = the plug at the
+# lower rear pillar to the part; body side = the part to the PDM30; together they split the registry's 18.4 ft zone estimate
+# for #93/#74 (13 ft body + 5.5 ft top), +15 % pad already in (state §1 row 34). Every length is an estimate until tape item
+# T-15 (wiring/geometry, PR #417) is taped.
+
+TOP-DISC:
+  name: Top disconnect — one round MIL-DTL-38999 Series III, shell 17 insert 26 (26 x #20), at the lower rear pillar
+  status: candidate
+  source: >-
+    owner 2026-09-29 ("we need a really cool disconnect if we're gonna be running anything on the fiberglass top"); owner 2026-09-29 via
+    the pieces lane: other bulkheads only round ones (receipts/2026-09-29_owner-calls-one-61pin-at-fusebox-hole.md). Spot: GM's own
+    disconnect for the top's dome-lamp harness sits behind an access plate at the lower rear pillar (1987 Light Duty Truck Service
+    Manual PDF p.1363, 10A5-12, Fig. 17: "Access plate (108) and dome lamp wiring harness"); the 1978 C-K booklet ST-352-78 foldout A-1
+    feeds the Blazer dome lamp through a 2-way connector 8905978/8905979 ("BLAZER RPO-CB8"). Connector data: MILNEC TX (MIL-DTL-38999
+    Series III equivalents) catalog Rev. 2235: p.B-9 (#20 = 7.5 A with 20 AWG, test rating; jacket seal 1.02-2.11 mm), p.B-19 (17-26 =
+    26 x #20, service I), pp.B-23/B-24 (plug and wall-mount receptacle), p.B-49 (TXAB boot adapter, K2 = recommended straight boot),
+    pp.B-51/B-52 (covers, stowage receptacle), p.A-14 ("a single 360° turn of the ratchet coupling ring ... without the need for
+    tools"); local copy reference_documents/component_drawings/MILNEC_D38999_series_III_catalog.pdf
+  product: {maker: "MIL-DTL-38999 Series III (MILNEC TX shown)", pn: "D38999/20WE26PN receptacle (body, pins) + D38999/26WE26SN plug (top, sockets); MILNEC TX00W17-26PN-K2-02 + TX06W17-26SN-K2; stowage receptacle TXCD-17W-02 on the top",
+            price_usd: null, price_date: 2026-09-29,
+            specs: "shell 17: plug OD 1.406 in (35.7 mm), 1.234 in (31.3 mm) long; receptacle flange 1.323 in (33.6 mm) square, holes 1.062 in (27.0 mm) apart, front-mount cutout 1.016 in (25.8 mm); IP67; contacts M39029/58-363 pins + M39029/56-351 sockets (the 61-pin's, catalog/parts.yaml), empty cavities MS27488-20-2; tools AFM8 + K43 + M81969/14-10 (catalog/tools.yaml)"}
+  demand:
+    crossings: 0          # not a firewall crossing: the top joint is inside the body shell
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    top_cavities: {capacity: 26, used_by_every_top_candidate: 14, spare: 12, reserved: "4 of the spares for a top-mounted Starlink DC pair if the dish ever moves to the top (nav-comms 2026-09-29 puts it on the steel half-cab roof)"}
+    notes: >-
+      Pins on the body receptacle (capped when the top is off), sockets on the top's plug (the solar contacts are live in daylight); the
+      plug parks in a stowage receptacle on the top. Unplug first, and never under PV load. Paralleled #20 pairs carry the PV poles and the
+      lamp return, so the 61-pin's AFM8 + K43 tooling does every contact. Letters and the final insert wait for the mock-up (chapters/18 §6).
+      Alternatives, cavity plan, boots: research §1.
+    adds:
+      - {id: TOPD_RTN_T, gauge: 16, spec: M22759/32, from: "SPL-TOP-RTN (top lamp-return splice, rear pillar top)", to: "SPL-TOPD-RTN-T (plug backshell)", current_a: 7.8, length_ft_est: 4.0, basis: "pillar: 0.6 m (unknown, T-15) + 15 %; 5.4 A with TOP-LIGHT, 7.8 A with TOP-LIGHT-SIDE"}
+      - {id: TOPD_RTN_T1, gauge: 20, spec: M22759/32, from: "SPL-TOPD-RTN-T (M81824/1-2)", to: "TOP-DISC plug (return cavity 1)", current_a: 3.9, length_ft_est: 0.5, basis: "one of a paralleled pair, equal length (canon ch.16 §3.3)"}
+      - {id: TOPD_RTN_T2, gauge: 20, spec: M22759/32, from: "SPL-TOPD-RTN-T", to: "TOP-DISC plug (return cavity 2)", current_a: 3.9, length_ft_est: 0.5, basis: "as TOPD_RTN_T1"}
+      - {id: TOPD_RTN_B1, gauge: 20, spec: M22759/32, from: "TOP-DISC receptacle (return cavity 1)", to: "SPL-TOPD-RTN-B (M81824/1-2)", current_a: 3.9, length_ft_est: 0.5, basis: "paralleled pair, equal length"}
+      - {id: TOPD_RTN_B2, gauge: 20, spec: M22759/32, from: "TOP-DISC receptacle (return cavity 2)", to: "SPL-TOPD-RTN-B", current_a: 3.9, length_ft_est: 0.5, basis: "as TOPD_RTN_B1"}
+      - {id: TOPD_RTN_B, gauge: 16, spec: M22759/32, from: "SPL-TOPD-RTN-B", to: "GND-SPLICE-REAR (rear ground bus)", current_a: 7.8, length_ft_est: 4.0, basis: "pillar base to the rear floor bus (estimate); 0.15 V at 7.8 A; replaces base CHMSL_GND and CARGO_GND when those lamps move to the top"}
+    mass_g_est: "about 110 g of wire (16 AWG at 9.68 lb/1000 ft x 8 ft + 20 AWG at 5.18 lb/1000 ft x 2 ft, canon ch.16 §1.8); connector, boots and stowage receptacle not published"
+
+TOP-SOLAR:
+  name: Solar on the top — one rigid 235 W 72-cell panel on a low rack, Victron SmartSolar MPPT 75/15 beside the YellowTop, next to the Orion
+  status: candidate
+  requires: [TOP-DISC]
+  source: >-
+    owner 2026-09-29 ("dreamed of doing solar panel install should be crazy and the problem is probably we had to run fat ass wires to it").
+    Victron BlueSolar Monocrystalline current-models datasheet (SPM042357203: 235 W, 1350 x 880 x 30 mm, 12.48 kg, Vmp 41.4 V, Imp 5.68 A,
+    Voc 49.6 V, Isc 6.02 A, max series fuse 10 A, Voc -0.35 %/°C, Pmpp -0.45 %/°C, -40 to +85 °C, 900 mm MC4 leads), fetched 2026-09-29;
+    SmartSolar MPPT 75/10-100/20 datasheet (75/15: 15 A, 220 W nominal at 12 V, 75 V max PV, 15 A max PV Isc, terminals 6 mm2/AWG10,
+    IP43/IP22, 100 x 113 x 50 mm, 0.6 kg) and manual Rev 10 02/2026 (§4.1 within 3 m of the battery, never above it; §4.2 battery fuse
+    20-25 A for the 75/15; §4.3 recommended for a 12 V battery: "72 (2x 12V panel in series or 1x 24V panel)"; §4.4 the PV array is not
+    grounded); VE.Smart Networking manual Rev 05 02/2024 p.4: Orion-Tr Smart "No - Not yet supported", so the Orion and the MPPT charge the
+    YellowTop side by side on battery voltage with the same AGM settings
+  product: {maker: Victron Energy, pn: "SPM042357203 panel + SmartSolar MPPT 75/15", price_usd: null, price_date: 2026-09-29,
+            specs: "panel 1350 x 880 x 30 mm, 12.48 kg; MPPT 100 x 113 x 50 mm, 0.6 kg; rack, roof gland and PV breaker not picked"}
+  demand:
+    crossings: 0          # the PV pair crosses TOP-DISC, not the firewall; with the YellowTop in the engine bay the MPPT sits cab side and its battery pair takes two Blue Sea 1003 CableClams
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    top_cavities: 4
+    limits: ["PV+ fuse 10 A at the MPPT: >= 1.25 x 1.25 x Isc 6.02 A = 9.4 A, <= 0.85 x 12.5 A (16 AWG bundled, canon ch.16 §2.3), and = the panel's 10 A maximum series fuse", "battery fuse 20 A within 7 in of the YellowTop + (Victron manual §4.2; canon ch.17 §17.2)"]
+    notes: >-
+      The fat-wire answer is 16 AWG: a series string stays at the panel's 6.02 A (1.1 % drop to a bed MPPT, 2.3 % to a cab one); only the
+      3 ft MPPT-to-battery pair is 10 AWG. Rigid on a rack because a panel bonded to the fiberglass models at about 105 °C on a 47.6 °C day
+      (Sandia/pvlib, NASA POWER), over the flexible panels' 85 °C rating. About 78 Ah/day as a year average (0.8 derate assumed). PV- is
+      never grounded. OPEN: roof size (T-15), the top's weight, the rack, the YellowTop's spot. Alternatives: research §2.
+    adds:
+      - {id: PV_P_T, gauge: 16, spec: M22759/32, from: "roof gland (step splice from the panel's MC4 lead)", to: "SPL-PV-P-T (plug backshell)", current_a: 6.02, length_ft_est: 4.5, basis: "roof rear edge to the lower pillar: 0.6 m pillar (unknown, T-15) + 0.5 m along the header, + 15 %"}
+      - {id: PV_P_T1, gauge: 20, spec: M22759/32, from: "SPL-PV-P-T (M81824/1-2)", to: "TOP-DISC plug (PV+ cavity 1)", current_a: 3.0, length_ft_est: 0.5, basis: "paralleled pair, equal length"}
+      - {id: PV_P_T2, gauge: 20, spec: M22759/32, from: "SPL-PV-P-T", to: "TOP-DISC plug (PV+ cavity 2)", current_a: 3.0, length_ft_est: 0.5, basis: "as PV_P_T1"}
+      - {id: PV_N_T, gauge: 16, spec: M22759/32, from: "roof gland (step splice from the panel's MC4 lead)", to: "SPL-PV-N-T (plug backshell)", current_a: 6.02, length_ft_est: 4.5, basis: "as PV_P_T"}
+      - {id: PV_N_T1, gauge: 20, spec: M22759/32, from: "SPL-PV-N-T (M81824/1-2)", to: "TOP-DISC plug (PV- cavity 1)", current_a: 3.0, length_ft_est: 0.5, basis: "paralleled pair"}
+      - {id: PV_N_T2, gauge: 20, spec: M22759/32, from: "SPL-PV-N-T", to: "TOP-DISC plug (PV- cavity 2)", current_a: 3.0, length_ft_est: 0.5, basis: "paralleled pair"}
+      - {id: PV_P_B1, gauge: 20, spec: M22759/32, from: "TOP-DISC receptacle (PV+ cavity 1)", to: "SPL-PV-P-B (M81824/1-2)", current_a: 3.0, length_ft_est: 0.5, basis: "paralleled pair"}
+      - {id: PV_P_B2, gauge: 20, spec: M22759/32, from: "TOP-DISC receptacle (PV+ cavity 2)", to: "SPL-PV-P-B", current_a: 3.0, length_ft_est: 0.5, basis: "paralleled pair"}
+      - {id: PV_P_B, gauge: 16, spec: M22759/32, from: "SPL-PV-P-B", to: "PV-BRK (10 A PV+ fuse and 2-pole PV breaker) then MPPT PV+", current_a: 6.02, length_ft_est: 4.0, basis: "MPPT beside a YellowTop in the bed; 13 ft if the MPPT sits cab side (still 16 AWG: 2.3 % of Vmp)"}
+      - {id: PV_N_B1, gauge: 20, spec: M22759/32, from: "TOP-DISC receptacle (PV- cavity 1)", to: "SPL-PV-N-B (M81824/1-2)", current_a: 3.0, length_ft_est: 0.5, basis: "paralleled pair"}
+      - {id: PV_N_B2, gauge: 20, spec: M22759/32, from: "TOP-DISC receptacle (PV- cavity 2)", to: "SPL-PV-N-B", current_a: 3.0, length_ft_est: 0.5, basis: "paralleled pair"}
+      - {id: PV_N_B, gauge: 16, spec: M22759/32, from: "SPL-PV-N-B", to: "PV-BRK (second pole) then MPPT PV-", current_a: 6.02, length_ft_est: 4.0, basis: "as PV_P_B; PV- is never grounded (Victron manual §4.4)"}
+      - {id: MPPT_BAT_P, gauge: 10, spec: M22759/16, from: "MPPT BAT+", to: "YellowTop + (20 A fuse within 7 in)", current_a: 15, length_ft_est: 3, basis: "Victron §4.1 within 3 m; a 20 A fuse needs 23.5 A of cable: 10 AWG bundled 30 A passes, 12 AWG (20 A) fails; the terminal takes AWG10 at most"}
+      - {id: MPPT_BAT_N, gauge: 10, spec: M22759/16, from: "MPPT BAT-", to: "YellowTop - (the single ground connection near the battery, Victron §4.4)", current_a: 15, length_ft_est: 3, basis: "as MPPT_BAT_P"}
+    mass_g_est: "about 390 g of wire (16 AWG 17 ft, 20 AWG 4 ft, 10 AWG 6 ft; canon ch.16 §1.8 weights); panel 12.48 kg and MPPT 0.6 kg (Victron); rack not picked"
+
+TOP-LIGHT:
+  name: Top and cargo lighting — CHMSL on the top's rear header, cargo lamp on the top's ceiling, two rear work/scene lamps (Baja Designs S1 flush) on PDM30 OUT21
+  status: candidate
+  requires: [TOP-DISC, CANKEY]
+  source: >-
+    owner 2026-09-29 ("we need to actually do like the lighting design and we didn't do that"). Base lamps kept as picked
+    (research/2026-09-28_unpicked-parts-and-fuel-hanger.md): CHMSL ORACLE 4514-003 (7 in, 6 W, IP68; the same page also says 0.15 A, the
+    registry uses 0.5 A) and CARGO-LAMP Truck-Lite 80251C (2 A, 10 x 1 W LEDs, 18.19 x 5.75 x 1.08 in overall with its bracket,
+    web_snapshots/www.truck-lite.com__80251c-1.md). Work/scene lamp: Baja Designs S1 flush mount, 20 W / 1.45 A, 2.1 x 2.1 x 2.1 in, 0.4 lb,
+    9-28 V, IP69K, MIL-STD-810G (reseller listings of the 381001 family, 2026-09-29; the maker's own page refused the fetch). PDM rule: an
+    output is set at 1.25 x its load in 1 A steps and stays <= 0.85 x its pin lead (MoTeC PDM manual printed p.48: 20 AWG = 8 A at 80 °C)
+  product: {maker: "Baja Designs", pn: "S1 flush mount, work/scene lens", price_usd: null, price_date: 2026-09-29, each: true,
+            specs: "1.45 A, 2.1 in cube, IP69K; lumens for the work/scene lens not confirmed on a maker page"}
+  demand:
+    crossings: 0
+    pdm30_outputs: 1      # OUT21 (B1), the last spare 8 A output; the PL candidate also names OUT21 but needs a 20 A output for its 12 A
+    pdm30_inputs: 0       # switched from a CANKEY button, not a DIG input
+    top_cavities: 3       # CHMSL, CARGO, WORK (the return pair belongs to TOP-DISC)
+    taps: ["PDM30 OUT5 (#93 CHMSL, brake) and OUT25 (#74 CARGO, courtesy) stay as they are; their wires gain a TOP-DISC break"]
+    limits: ["OUT21 set 4 A: 1.25 x 2.9 A = 3.6 A; the 20 AWG pin lead allows 6.8 A and one #20 contact 6.4 A", "OUT25 stays at 4.73 A (registry); no new top courtesy load goes on it (options-rd PUD limits)"]
+    notes: >-
+      CHMSL outside on the top's rear header above the tailgate glass; work lamps flush in the header corners; cargo lamp centred on the
+      ceiling between the ribs. The dome lamp and CLEARANCE-L/C/R stay on the steel half-cab roof, so they never cross TOP-DISC. Lamps end in
+      sealed Deutsch DT plugs. Work lamps come on from a keypad button (reverse too is a PDM logic choice). Plan table: research §3.
+    adds:
+      - {id: 93_T, gauge: 20, spec: M22759/32, from: "TOP-DISC plug (CHMSL cavity)", to: "CHMSL + (DT06-2S)", current_a: 0.5, length_ft_est: 5.5, basis: "base #93 ends at the TOP-DISC receptacle (its 18.4 ft splits 13 + 5.5): up the pillar and across half the 1657 mm rear opening (fr88.body.tailgate.top-A-B)"}
+      - {id: CHMSL_GND_T, gauge: 20, spec: M22759/32, from: "CHMSL - (DT06-2S)", to: "SPL-TOP-RTN", current_a: 0.5, length_ft_est: 3.5, basis: "header centre to the pillar top: half the 1657 mm opening + 15 %"}
+      - {id: 74_T, gauge: 20, spec: M22759/32, from: "TOP-DISC plug (CARGO cavity)", to: "CARGO-LAMP + (DT06-2S)", current_a: 2.0, length_ft_est: 6.0, basis: "base #74 ends at the TOP-DISC receptacle; pillar + half the ceiling; 20 AWG passes (0.38 V over 19 ft)"}
+      - {id: CARGO_GND_T, gauge: 20, spec: M22759/32, from: "CARGO-LAMP -", to: "SPL-TOP-RTN", current_a: 2.0, length_ft_est: 4.0, basis: "ceiling centre to the pillar top (estimate)"}
+      - {id: WORK_P, gauge: 20, spec: M22759/32, from: "PDM30:OUT21 (B1)", to: "SPL-WORK-1 (M81824/1-2)", current_a: 2.9, length_ft_est: 1.0, basis: "8 A output pins take 24-20 AWG (PDM manual printed p.48)"}
+      - {id: WORK_B, gauge: 16, spec: M22759/32, from: "SPL-WORK-1", to: "SPL-WORK-2 (at the TOP-DISC receptacle)", current_a: 2.9, length_ft_est: 13.0, basis: "body share of the 18.4 ft zone; all-20 AWG would drop 0.56 V (4.0 %), a 16 AWG body run keeps the feed at 0.38 V (2.7 %)"}
+      - {id: WORK_BT, gauge: 20, spec: M22759/32, from: "SPL-WORK-2 (M81824/1-2)", to: "TOP-DISC receptacle (WORK cavity)", current_a: 2.9, length_ft_est: 0.5, basis: "#20 contacts take 20-24 AWG (MILNEC p.B-9)"}
+      - {id: WORK_T, gauge: 20, spec: M22759/32, from: "TOP-DISC plug (WORK cavity)", to: "SPL-WORK-3 (rear header)", current_a: 2.9, length_ft_est: 4.0, basis: "plug up the pillar to the header"}
+      - {id: WORK_L, gauge: 20, spec: M22759/32, from: "SPL-WORK-3", to: "WORK-LAMP-L + (DT06-2S)", current_a: 1.45, length_ft_est: 1.5, basis: "near header corner"}
+      - {id: WORK_R, gauge: 20, spec: M22759/32, from: "SPL-WORK-3", to: "WORK-LAMP-R + (DT06-2S)", current_a: 1.45, length_ft_est: 6.0, basis: "across the 1657 mm opening + 15 %"}
+      - {id: WORK_L_GND, gauge: 20, spec: M22759/32, from: "WORK-LAMP-L -", to: "SPL-TOP-RTN", current_a: 1.45, length_ft_est: 1.5, basis: "near corner"}
+      - {id: WORK_R_GND, gauge: 20, spec: M22759/32, from: "WORK-LAMP-R -", to: "SPL-TOP-RTN", current_a: 1.45, length_ft_est: 6.0, basis: "far corner"}
+    mass_g_est: "about 150 g of wire (20 AWG 39 ft, 16 AWG 13 ft); lamps 2 x 0.4 lb (reseller); the CHMSL and cargo lamp are already in the base"
+
+TOP-LIGHT-SIDE:
+  name: Side scene lamps on the top above the quarter windows (Truck-Lite 81335C x2), on their own 8 A output
+  status: candidate
+  requires: [TOP-DISC, TOP-LIGHT, CANKEY]
+  source: >-
+    Truck-Lite 81335C page (fetched 2026-09-29): "81 Series, LED, 6 Diode, 3x9 Rectangular Perimeter Light, Surface Mount, 12V, .180 Bullet",
+    1000 lm, 1.2 A, 2.5 x 8.9 x 1.69 in (63.5 x 226 x 43 mm), 1.35 lb, die-cast aluminium, bracket mount; no IP rating on the page
+  product: {maker: Truck-Lite, pn: 81335C, price_usd: null, price_date: 2026-09-29, each: true, specs: "1000 lm, 1.2 A, 63.5 x 226 x 43 mm, 1.35 lb"}
+  demand:
+    crossings: 0
+    pdm30_outputs: 1      # no PDM30 output is left once TOP-LIGHT takes OUT21: this needs the PDM15 moved to the cab (mounts.yaml PDM15) or it is not buildable
+    pdm30_inputs: 0
+    top_cavities: 1
+    limits: ["its own output, set 3 A (1.25 x 2.4 A); sharing OUT21 with the work lamps would need 7 A, over the 20 AWG pin lead's 6.8 A"]
+    notes: "camp light down both sides; the top's side walls carry the sliding quarter windows (photos lane), so the lamps sit on the strip above them. OPEN: the IP rating (not on the Truck-Lite page)"
+    adds:
+      - {id: SIDE_P, gauge: 20, spec: M22759/32, from: "PDM15:OUT (a spare 8 A output, PDM15 in the cab)", to: "SPL-SIDE-1 (M81824/1-2)", current_a: 2.4, length_ft_est: 1.0, basis: "as WORK_P"}
+      - {id: SIDE_B, gauge: 16, spec: M22759/32, from: "SPL-SIDE-1", to: "SPL-SIDE-2 (at the TOP-DISC receptacle)", current_a: 2.4, length_ft_est: 13.0, basis: "as WORK_B; 0.33 V (2.3 %)"}
+      - {id: SIDE_BT, gauge: 20, spec: M22759/32, from: "SPL-SIDE-2 (M81824/1-2)", to: "TOP-DISC receptacle (SIDE cavity)", current_a: 2.4, length_ft_est: 0.5, basis: "as WORK_BT"}
+      - {id: SIDE_T, gauge: 20, spec: M22759/32, from: "TOP-DISC plug (SIDE cavity)", to: "SPL-SIDE-3 (pillar top)", current_a: 2.4, length_ft_est: 3.0, basis: "up the pillar"}
+      - {id: SIDE_L, gauge: 20, spec: M22759/32, from: "SPL-SIDE-3", to: "SIDE-LAMP-L +", current_a: 1.2, length_ft_est: 3.0, basis: "along the near side above the quarter window (estimate)"}
+      - {id: SIDE_R, gauge: 20, spec: M22759/32, from: "SPL-SIDE-3", to: "SIDE-LAMP-R +", current_a: 1.2, length_ft_est: 8.0, basis: "across the header and along the far side (estimate)"}
+      - {id: SIDE_L_GND, gauge: 20, spec: M22759/32, from: "SIDE-LAMP-L -", to: "SPL-TOP-RTN", current_a: 1.2, length_ft_est: 3.0, basis: "as SIDE_L"}
+      - {id: SIDE_R_GND, gauge: 20, spec: M22759/32, from: "SIDE-LAMP-R -", to: "SPL-TOP-RTN", current_a: 1.2, length_ft_est: 8.0, basis: "as SIDE_R"}
+    mass_g_est: "about 150 g of wire; lamps 2 x 1.35 lb (Truck-Lite)"
+
+CANKEY:
+  name: MoTeC 8-button CAN keypad on the dash, for the top lamps and the other switchless add-ons
+  status: candidate
+  source: >-
+    MoTeC PDM manual PN 63029 (Oct 2021): up to four MoTeC CAN keypads per PDM, three LEDs per button driven by PDM channels (pp.19, 29);
+    a keypad keeps the PDM out of standby unless it is powered from a switched output (p.13). John Reed Racing listing (fetched 2026-09-29):
+    8-button $574.00, 15-button $589.00, IP67, "only 4 wires required". PDM30 inputs: 14 of 16 used, and the two spares (DIG8, DIG16) are
+    already wanted by AS and LO4 (options_v5 capacity ledger)
+  product: {maker: MoTeC, pn: "CAN keypad, 8 button", price_usd: 574.00, price_date: 2026-09-29, specs: "IP67, 4 wires; size, current and plug not on the listing"}
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    taps: ["PDM30 OUT29 (ignition group, #71): keypad power, so the PDM can still sleep", "CAN trunk #62: one stub splice"]
+    notes: "the cheap path is a dash switch on DIG16, and then AS or LO4 loses its input; a keypad adds 8 buttons for zero inputs. OPEN: keypad current and its plug"
+    adds:
+      - {id: KEY_PWR, gauge: 20, spec: M22759/32, from: "PDM30:OUT29 (splice with #71 at the PDM30)", to: "CANKEY +12 V", current_a: null, length_ft_est: 3.0, basis: "dash beside the PDM30 (spot open)"}
+      - {id: KEY_GND, gauge: 20, spec: M22759/32, from: "CANKEY 0 V", to: "GND-BANK-CAB", current_a: null, length_ft_est: 3.0, basis: "as KEY_PWR"}
+      - {id: KEY_CANH, gauge: 22, spec: "M22759/16 twisted pair", from: "splice on CAN_HI (#62 trunk)", to: "CANKEY CAN-H", current_a: 0, length_ft_est: 1.6, basis: "stub <= 500 mm (PDM manual p.49, as in the DISP note)"}
+      - {id: KEY_CANL, gauge: 22, spec: "M22759/16 twisted pair", from: "splice on CAN_LO (#62 trunk)", to: "CANKEY CAN-L", current_a: 0, length_ft_est: 1.6, basis: "as KEY_CANH"}
+    mass_g_est: "about 30 g of wire; keypad mass not published"
+
+TOP-CAM:
+  name: Rear high-mount camera on the top's rear header (EchoMaster PHD5N1, flush housing, CVBS, mirrored), the mirror's driving view
+  status: candidate
+  requires: [TOP-DISC]
+  source: >-
+    owner 2026-09-29 ("do we put any cameras or anything in it"). EchoMaster PHD5N1 catalog page (web_snapshots/catalog.echomaster.com__phd5n1.md,
+    2026-09-29): $159.00, AHD 720p or CVBS 480p selectable, 170°, IP67, mirrored or non-mirrored selectable, five housings including flush,
+    5-pin plug + 20 ft extension; current and size not published. The decided RC mirror (RVS-7180355-IR page) has "Video Input 2 Channel",
+    CVBS 1 Vp-p 75 ohm. Video path agreed with options-rd (2026-09-29): VS41 switcher input 1, the default view (their MIRD candidate),
+    whose output feeds mirror CH2; CH1 stays the plate camera on reverse
+  product: {maker: EchoMaster, pn: PHD5N1, price_usd: 159.00, price_date: 2026-09-29, specs: "CVBS 480p mode, 170°, IP67; current and size not published"}
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    top_cavities: 4
+    taps: ["PDM30 OUT23 (RC mirror feed, RUN): camera power (options-rd counts the group at 1.91 A before the VS41 and this camera)"]
+    limits: ["OUT23 group + this camera's current (not published; carried as <= 0.3 A until measured)"]
+    notes: >-
+      One rear camera: a forward one on the top would look over the steel cab roof and miss the hood. Without MIRD it competes with FC for
+      mirror CH2 (owner call). Video crosses TOP-DISC as the kit coax's centre and braid on two #20 cavities; the camera ground and braid
+      return to GND-BANK-CAB beside the mirror, not the rear bus. Alternatives: research §4.
+    adds:
+      - {id: CAM2_PWR_B, gauge: 20, spec: M22759/32, from: "PDM30:OUT23 (splice with MIRROR_PWR at the PDM30)", to: "TOP-DISC receptacle (CAM PWR cavity)", current_a: 0.3, length_ft_est: 13.0, basis: "body share of the zone estimate"}
+      - {id: CAM2_PWR_T, gauge: 20, spec: M22759/32, from: "TOP-DISC plug (CAM PWR cavity)", to: "CAM2 +12 V (kit plug, spliced)", current_a: 0.3, length_ft_est: 5.5, basis: "as 93_T"}
+      - {id: CAM2_GND_T, gauge: 20, spec: M22759/32, from: "CAM2 ground", to: "TOP-DISC plug (CAM GND cavity)", current_a: 0.3, length_ft_est: 5.5, basis: "as 93_T"}
+      - {id: CAM2_GND_B, gauge: 20, spec: M22759/32, from: "TOP-DISC receptacle (CAM GND cavity)", to: "GND-BANK-CAB (beside the mirror/VS41 ground)", current_a: 0.3, length_ft_est: 13.0, basis: "one video ground reference"}
+      - {id: CAM2_VID_T, gauge: null, spec: "kit coax (EchoMaster extension, cut)", from: "CAM2 video", to: "TOP-DISC plug (VID + SHLD cavities)", current_a: 0, length_ft_est: 5.5, basis: "shielded, canon ch.16 §7.1 (video)"}
+      - {id: CAM2_VID_B, gauge: null, spec: "kit coax (RCA)", from: "TOP-DISC receptacle (VID + SHLD cavities)", to: "MIRD VS41 input 1 (or mirror CH2)", current_a: 0, length_ft_est: 13.0, basis: "as CAM_VIDEO's cab run"}
+    mass_g_est: "about 65 g of 20 AWG; coax and camera not published"
+
+TOP-FINISH:
+  name: Finish the top's inside — butyl on the flats, a closed-cell thermal layer and removable headliner panels, the top harness in the rib channels behind them
+  status: candidate
+  source: >-
+    owner 2026-09-29 ("how do we finish the roof doing insulate it or delete it raw"). State §1 row 42 ("K5 insulation = COMPLETE (roof,
+    firewall, floor)") rests on "I've already insulated the vehicle" (receipt 2026-05-23). The photos lane (2026-09-29) found bare moulded
+    fiberglass under the top (2021-06-12), bare painted steel under the half-cab roof (2024-10 to 2024-12) and Kilmat butyl only on the
+    cargo-tub walls (2026-01-31 and 02-01), so the lock does not cover the top. Materials and prices: Dynamat Xtreme bulk pack 36 sq ft
+    $239.95 (dynamat.com, 2026-09-29; maker claims 9-18 dB for a full install); Lizard Skin Ceramic Insulation 1 gal $89.95, 22-25 sq ft at
+    .040-.060 in, "can reduce heat transfer by up to 30 degrees F" (raybuck.com, 2026-09-29); Click Bond cable-tie mount kit, 4 mounts,
+    $97.75 (aircraftspruce.com 04-06000, 2026-09-29)
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    notes: >-
+      Behind panels the top harness runs in the rib channels in DR-25 on bonded mounts, with service loops at every lamp and at the pillar;
+      left raw, the same bundle is exposed and clipped at least every 18 in (ABYC E-11). The harness goes in before any insulation. OPEN: the
+      top's inside area and rib spacing (T-15), its weight, the panel material. Alternatives: research §5.
+    adds: []
+
