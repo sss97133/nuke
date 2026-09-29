@@ -261,17 +261,20 @@ Whether M1 Tune works through a router's network is **unknown**; MoTeC documents
 - **Load.** Starlink at its input rating, 60 W / 12 V = 5.0 A (W1, W3), plus the router at 19 W max / 12 V = 1.6 A (W25):
   6.6 A. The Car Adapter's own loss is not published (unknown), so the 5.0 A is at the Mini's rating, not measured at the
   socket.
-- **Limit.** 1.25 × 6.6 A = 8.25 A, so 9 A in the PDM's 1 A steps (ch.17 §17.1; L4 p.27 [24]: up to 10 A on an 8 A
-  output). Starlink alone: 1.25 × 5.0 = 6.25, so 7 A.
-- **Wire.** 18 AWG M22759/32 (ch.16 §1.5): 11 A at 80 °C (L4 p.51 [48]), 0.85 × 11 = 9.35 A, at least the 9 A limit. 20 AWG
-  (8 A, 0.85 × 8 = 6.8 A) is short even for Starlink alone. The registry already runs 18 AWG on an 8 A output pin (#71 on
-  OUT29, terminated SSC-N) and the SSC-N solid contact takes 16–24 AWG (`catalog/parts.yaml` SSC-N).
-- **Drop.** About 8 ft of feed and return at 6.6 A on 18 AWG (6.23 Ω/1000 ft, ch.16 §1.8): 0.33 V, 2.4 %, under the 3 %
-  ceiling (ch.16 §2.4). Lengths are estimates.
+- **Limit.** 1.25 × 6.6 A = 8.25 A, so 9 A in the PDM's 1 A steps (ch.17 §17.1; L4 p.27 [24]: a 20 A output can be set
+  up to 25 A, an 8 A output up to 10 A). Starlink alone: 1.25 × 5.0 = 6.25, so 7 A.
+- **Wire.** COMMS wants a **20 A output**. MoTeC's wire table puts 20–16 AWG on 20 A outputs and 24–20 AWG on 8 A outputs
+  (L4 p.51 [48]). On a 20 A output, the two pins take 2 × 16 AWG pigtails into SPL-COMMS, the registry's pattern for paired
+  20 A outputs. The branches are 18 AWG M22759/32 (ch.16 §1.5): 11 A at 80 °C, 0.85 × 11 = 9.35 A, at least the 9 A limit.
+  On an 8 A output, MoTeC's 20 AWG lead allows only 0.85 × 8 = 6.8 A, under even the 7 A Starlink-alone setting. That
+  would be a deliberate exception: an 18 AWG lead on the SSC-N contact (16–24 AWG, `catalog/parts.yaml`), as the registry
+  already does for #71 on OUT29, plus a Superseal seal check (top-design's note, 2026-09-29).
+- **Drop.** On the Starlink path at 5.0 A: paired 16 AWG pigtails, then 4 ft of feed and 3 ft of ground in 18 AWG
+  (6.23 Ω/1000 ft, ch.16 §1.8). That's 0.23 V, 1.6 %, under the 3 % ceiling (ch.16 §2.4). Lengths are estimates.
 - **Which output.** None is free on the PDM30. The base ledger has OUT3 and OUT4 (20 A) and OUT21 (8 A) spare, and they're
   taken as follows: PW takes OUT3/OUT4; PL and top-design's TOP-LIGHT both name OUT21 (PL needs 12 A and a 20 A output
   anyway: capacity ledger `setting_conflicts`). options-rd shares OUT23/25/27/28/15/11/13. So COMMS takes OUT3 if PW is
-  not fitted. If PW is fitted, COMMS waits for more cab outputs: the PDM15 moved to the cab (`mounts.yaml`, state row
+  not fitted (OUT3 is a 20 A output). If PW is fitted, COMMS waits for more cab outputs: the PDM15 moved to the cab (`mounts.yaml`, state row
   0ag(b)) or a second body PDM. Until then, option B (the dash outlet).
 - **Switching.** On with ignition RUN (PDM30 DIG1), held on after key-off by a latch, and off below a battery-voltage
   threshold (L4 p.4 [1] low-battery logic). The latch is a CANKEY button (top-design's CAN keypad candidate) or, without a
@@ -291,7 +294,7 @@ Whether M1 Tune works through a router's network is **unknown**; MoTeC documents
 | device | supply | output and switching | DC-DC / USB-C | protection | wire (ch.16 §1.5) | cables and route |
 |---|---|---|---|---|---|---|
 | CANmod.gps | 5.0–26 V, 0.6 W (W12): 0.05 A at 12 V | taps PDM30 OUT29 (the ignition RUN group: #71 Dakota VHX, GSS_PWR; top-design's CANKEY also taps it). Not shared with a motor or solenoid (W14 supply quality) | none | the PDM output; OUT29's limit is still OPEN (VHX and GSS-3000 currents unpublished) | power + ground 20 AWG M22759/32; CAN stub 22 AWG M22759/16 twisted, 500 mm max (L4 p.52), ground carried with the pair (W13, W14) | DB9: 9 supply, 3 GND, 7 CAN H, 2 CAN L (W13); internal 120 Ω termination defaults ON: switch it OFF on a stub (W15); antenna SMA 3 m to the roof |
-| Starlink Mini | 60 W max, 25–40 W typical (W1) | the COMMS output (§3.1) | the Starlink Mini Car Adapter (12–24 V outlet in, W9); the Mini needs a 100 W, 20 V/5 A USB-C source (W5) | the PDM output (9 A with the router, 7 A alone) | 18 AWG M22759/32 to the socket | Mini USB-C Cable 5 m, roof → pillar → socket; the USB-C end stays inside (W7) |
+| Starlink Mini | 60 W max, 25–40 W typical (W1) | the COMMS output (§3.1), a 20 A output | the Starlink Mini Car Adapter (12–24 V outlet in, W9); the Mini needs a 100 W, 20 V/5 A USB-C source (W5) | the PDM output (9 A with the router, 7 A alone) | 2 × 16 AWG pigtails, then 18 AWG M22759/32 to the socket | Mini USB-C Cable 5 m, roof → pillar → socket; the USB-C end stays inside (W7) |
 | Peplink MAX BR1 Pro 5G | 10–30 V, 19 W max (W25) | the COMMS output, same group | none | the PDM output | 18 AWG M22759/32 (it shares the 9 A group) | 4-pin Micro-Fit (W25; its pin order not fetched: unknown); Mobility 42G CFD-200/RG-174 leads down the pillar (W27); Mini Starlink Cable 15 m to its WAN (W9) |
 | GPS-L10 (alt.) | 4.0–6.0 V, 38 mA (W20) | M130 5 V sensor supply, on with the M130 | none | the M130's supply | 22 AWG M22759/16 | DTM 4-pin, mating #68054: 1 Bat−, 2 TX → M130 B11, 3 not connected, 4 5 V (W20). Where pin 1 lands is Dave's call: the manual says "Battery Negative on the logging device", and M1 sensor 0 V pins must carry no current paths (L2 p.14) |
 
@@ -314,7 +317,7 @@ Whether M1 Tune works through a router's network is **unknown**; MoTeC documents
   cavities, a paralleled pair of #20 per pole. It stays on the PDM output, no fuse: 7 A alone or 9 A with the router on the
   same output, and never above 11 A, because the pole's weak link is the 2 × 20 AWG tails at 0.85 × 14 A = 11.9 A
   (top-design's check; ProWire chart 20 AWG 7 A, ch.16 §2.3). One M81824/1-3 (16–12 AWG) cannot step 12 AWG straight to
-  2 × 20 AWG, so each side steps through a 16 AWG stub (/1-3 then /1-2). The loop is 0.41 V (2.9 %) at 5.0 A with 12 AWG
+  2 × 20 AWG, so each side steps through a 16 AWG stub (/1-3 then /1-2). The loop is 0.35 V (2.5 %) at 5.0 A with 12 AWG
   in the body, 14 AWG in the top and a 12 AWG return to the rear bus. top-design has reserved exactly those 4 spares ("4 of the spares for a
   top-mounted Starlink DC pair", TOP-DISC `top_cavities`, #420). At 5.0 A per pole that is 2.5 A per
   #20 contact, under the 7.5 A MILNEC test rating top-design cites. The USB-C cable and the Ethernet cable are one-piece

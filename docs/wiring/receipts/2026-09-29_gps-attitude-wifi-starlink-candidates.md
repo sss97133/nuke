@@ -64,8 +64,10 @@
   OUT23/25/27/28/15/11/13.
   - COMMS takes OUT3 if PW is not fitted. Otherwise it waits for the cab-PDM decision (PDM15 to the cab, or a second body
     PDM).
-  - The COMMS limit is 9 A with the router (1.25 × 6.6 A), 7 A for Starlink alone. The lead is 18 AWG (0.85 × 11 A =
-    9.35 A, PDM manual printed p.48).
+  - The COMMS limit is 9 A with the router (1.25 × 6.6 A), 7 A for Starlink alone. It needs a 20 A output: 2 × 16 AWG
+    pigtails, per MoTeC's 20–16 AWG for 20 A outputs, then 18 AWG branches (0.85 × 11 A = 9.35 A, PDM manual printed p.48).
+    On an 8 A output, MoTeC's 20 AWG lead allows only 6.8 A, so that would be a deliberate 18 AWG-on-SSC-N exception with a
+    seal check (top-design's note).
 - **Starlink power.** Input 12–48 V, 60 W; average 25–40 W (spec sheet) or 20–40 W with a 15 W idle (help article). Starlink
   guarantees only its own supply and cable, so the pick is its own Mini Car Adapter (12–24 V outlet in, USB-C out) rather
   than a hard-wired barrel.
@@ -86,11 +88,11 @@ totals (options-rd, #416).
 
 - Options: 49 (45 candidate, 3 decided, 1 base). Buildable and composite wire counts are unchanged, because the candidates
   are undesigned and live in `adds`.
-- Planned wires: NAV 5, NAV-L10 3, COM 4, COM-ACC 2, COM-TOP 17, RTR 4.
+- Planned wires: NAV 5, NAV-L10 3, COM 5, COM-ACC 2, COM-TOP 18, RTR 4.
 - Drops (canon ch.16 §1.8 resistances; lengths are estimates):
-  - COMMS: 0.33 V (2.4 %) at 6.6 A over 8 ft of 18 AWG
-  - COM-TOP: 0.41 V (2.9 %) at 5.0 A (12 AWG body, 16 AWG stubs into both backshells, 2 × #20 per pole, 14 AWG top side,
-    12 AWG return; router's 1.6 A counted on the 2 ft output lead)
+  - COMMS, Starlink path: 0.23 V (1.6 %) at 5.0 A (paired 16 AWG pigtails, 4 ft feed and 3 ft ground of 18 AWG)
+  - COM-TOP: 0.35 V (2.5 %) at 5.0 A (paired pigtails, 12 AWG body, 16 AWG stubs into both backshells, 2 × #20 per pole,
+    14 AWG top side, 12 AWG return; router's 1.6 A counted on the pigtails)
   - NAV: 0.003 V
 
 ## Coordination
@@ -104,6 +106,8 @@ totals (options-rd, #416).
   - COM-TOP is PDM-protected, not fused: 7 A alone, 9 A with RTR, never above 11 A (the 2 × 20 AWG tails, 0.85 × 14 A).
   - The 12 AWG → 2 × 20 AWG step goes through a 16 AWG stub on each side (M81824/1-3, then /1-2). Bench-check both fits.
   - OUT29's setting is recomputed at 1.25 × the group (#71, GSS_PWR, CANKEY, NAV) once the currents are known.
+  - Follow-up note: MoTeC's table puts 24–20 AWG on 8 A outputs. The COMMS output is therefore a 20 A output with paired
+    16 AWG pigtails (COM and COM-TOP); an 8 A output would be a written exception.
 - **options-rd:** no output claimed that options-rd uses (OUT23/25/27/28/15/11/13).
 - **pieces audit (2026-09-29):** NAV-L10 `conflicts_with: [WSS-F2]`, because wheel-speed's WSS-F2 takes M130 B10 and B11 (the last two
   spare UDIGs) and NAV-L10 names B11. The recommended NAV (CAN) is clear of it.

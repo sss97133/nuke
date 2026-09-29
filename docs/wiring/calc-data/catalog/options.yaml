@@ -967,11 +967,11 @@ COM:
   wire_patterns: ["^COMMS_", "^SL_"]
   demand:
     crossings: 0
-    pdm30_outputs: 1      # none is free: PW takes OUT3/OUT4, PL and TOP-LIGHT name OUT21. OUT3 if PW is not fitted; else a cab output from the PDM15-to-cab (mounts.yaml PDM15, state row 0ag(b)) or second-body-PDM decision; until then COM-DASH
+    pdm30_outputs: 1      # a 20 A output (MoTeC's wire table puts 20-16 AWG on 20 A outputs). None is free: PW takes OUT3/OUT4, PL and TOP-LIGHT name OUT21. OUT3 if PW is not fitted; else a cab output from the PDM15-to-cab (mounts.yaml PDM15, state row 0ag(b)) or second-body-PDM decision; until then COM-DASH
     pdm30_inputs: 0       # on with RUN; the camp latch is a CANKEY button if top-design's CANKEY is built, else a PDM off-delay
     top_cavities: 0
     taps: ["PDM30 DIG1 (ignition RUN) in the output's logic", "CANKEY button for the camp latch, if CANKEY is built"]
-    limits: ["COMMS output 7 A for Starlink alone (1.25 x 5.0 A, the Mini's 60 W rating at 12 V) or 9 A with RTR (1.25 x 6.6 A = 8.25 A); an 8 A output takes up to 10 A (PDM manual printed p.24); the 18 AWG lead allows 0.85 x 11 A = 9.35 A (printed p.48, 80 C)", "drop 0.33 V (2.4 %) at 6.6 A over 8 ft of 18 AWG (6.23 ohm/1000 ft, canon ch.16 §1.8)"]
+    limits: ["COMMS output 7 A for Starlink alone (1.25 x 5.0 A, the Mini's 60 W rating at 12 V) or 9 A with RTR (1.25 x 6.6 A = 8.25 A), on a 20 A output: its two pins take 2 x 16 AWG pigtails (PDM manual printed p.48: 20-16 AWG for 20 A outputs) into SPL-COMMS; the 18 AWG branches allow 0.85 x 11 A = 9.35 A (printed p.48, 80 C)", "on an 8 A output MoTeC's 24-20 AWG leads allow at most 0.85 x 8 A = 6.8 A, under even the 7 A Starlink-alone setting: an 8 A output would be a deliberate exception, an 18 AWG lead on the SSC-N contact (16-24 AWG) as the registry already does for #71 on OUT29, with a Superseal seal check (top-design, 2026-09-29)", "drop on the Starlink path 0.23 V (1.6 %) at 5.0 A: paired 16 AWG pigtails, 4 ft feed and 3 ft ground of 18 AWG (6.23 ohm/1000 ft, canon ch.16 §1.8)"]
     notes: >-
       Off below a battery-voltage threshold (PDM logic) and kept alive key-off in one of the PDM's four stay-alive outputs, only
       if the owner wants camp use (threshold and delay: owner/Dave). The Car Adapter's minimum input and loss are not
@@ -981,11 +981,12 @@ COM:
       50 C; NASA POWER's 2001-2020 July maximum for Las Vegas is 47.6 C (research/2026-09-30_fiberglass-top-disconnect-solar-lighting.md). The Mini's Wi-Fi inside the cab is untested
       (check with a phone at the mock-up).
     adds:
-      - {id: COMMS_FEED, gauge: 18, spec: M22759/32, from: "PDM30 COMMS output (OUT3 pigtails if PW is not fitted)", to: "SPL-COMMS (in-line splice under the dash)", current_a: 6.6, length_ft_est: 2, basis: "splice beside the PDM30 (estimate)"}
-      - {id: SL_SOCK_P, gauge: 18, spec: M22759/32, from: "SPL-COMMS", to: "STARLINK-SOCKET + (Blue Sea 1011, as OUTLET-12V)", current_a: 5.0, length_ft_est: 2, basis: "socket under the dash by the pillar the USB-C cable goes up (estimate)"}
+      - {id: COMMS_PT1, gauge: 16, spec: M22759/32, from: "PDM30 COMMS output, first pin (OUT3 if PW is not fitted)", to: "SPL-COMMS (in-line splice beside the PDM30)", current_a: 3.3, length_ft_est: 0.5, basis: "one of the 20 A output's paired pigtails, as the registry's SPL-PDM30-OUT8; equal length"}
+      - {id: COMMS_PT2, gauge: 16, spec: M22759/32, from: "PDM30 COMMS output, second pin", to: "SPL-COMMS", current_a: 3.3, length_ft_est: 0.5, basis: "as COMMS_PT1"}
+      - {id: SL_SOCK_P, gauge: 18, spec: M22759/32, from: "SPL-COMMS", to: "STARLINK-SOCKET + (Blue Sea 1011, as OUTLET-12V)", current_a: 5.0, length_ft_est: 4, basis: "socket under the dash by the pillar the USB-C cable goes up (estimate)"}
       - {id: SL_SOCK_N, gauge: 18, spec: M22759/32, from: "STARLINK-SOCKET -", to: "GND-BANK-CAB", current_a: 5.0, length_ft_est: 3, basis: "to the cab bank beside the PDM30 (estimate)"}
       - {id: SL_USBC, gauge: null, spec: "Starlink Mini USB-C Cable, 5 m (maker's, from the Car Adapter kit)", from: "Mini Car Adapter in STARLINK-SOCKET", to: "Starlink Mini barrel input", current_a: 0, length_ft_est: 16.4, basis: "the maker's cable length; roof -> headliner -> pillar -> under the dash; coil the rest"}
-    mass_g_est: "about 24 g of wire (canon ch.16 §1.8); dish 1.10 kg (spec sheet); adapter and mount not published (their packages are 0.43 kg and 0.6 kg)"
+    mass_g_est: "about 29 g of wire (canon ch.16 §1.8); dish 1.10 kg (spec sheet); adapter and mount not published (their packages are 0.43 kg and 0.6 kg)"
 
 COM-DASH:
   name: Starlink Mini powered from the existing dash 12 V outlet (Car Adapter in OUTLET-12V), key-on only
@@ -1050,13 +1051,14 @@ COM-TOP:
     pdm30_outputs: 1      # the same COMMS output as COM; it is PDM-protected, not fused
     pdm30_inputs: 0
     top_cavities: 4       # 2 x #20 paralleled per pole; top-design has reserved exactly these 4 (TOP-DISC 18 of 26 with it)
-    limits: ["PDM output, no fuse: 7 A for Starlink alone (1.25 x 5.0 A) or 9 A with RTR on the same output; never above 11 A, the top pole's 2 x 20 AWG tails at 0.85 x 14 A = 11.9 A", "5.0 A per pole = 2.5 A per #20 contact (7.5 A test rating)", "loop drop at 5.0 A: 0.41 V (2.9 %) with RTR's 1.6 A also on the 2 ft output lead, 0.39 V (2.8 %) without (canon ch.16 §1.8 resistances; 3 % ceiling ch.16 §2.4)"]
+    limits: ["PDM output, no fuse: 7 A for Starlink alone (1.25 x 5.0 A) or 9 A with RTR on the same output; never above 11 A, the top pole's 2 x 20 AWG tails at 0.85 x 14 A = 11.9 A", "5.0 A per pole = 2.5 A per #20 contact (7.5 A test rating)", "loop drop at 5.0 A: 0.35 V (2.5 %), with RTR's 1.6 A also on the paired pigtails (canon ch.16 §1.8 resistances; 3 % ceiling ch.16 §2.4)", "the COMMS output is a 20 A output, as in COM (an 8 A output is the same deliberate exception)"]
     notes: >-
       Unplug TOP-DISC before the top comes off (top-design). Over the disconnect the router cannot take Starlink by Ethernet; it
       joins the Mini's Wi-Fi instead. Each side of the joint steps 12 or 14 AWG -> 16 AWG stub (M81824/1-3) -> 2 x 20 AWG
       (M81824/1-2); bench-check both splice fits. The top's flat area and rib structure under the mount are tape item T-15.
     adds:
-      - {id: SLT_OUT, gauge: 16, spec: M22759/32, from: "PDM30 COMMS output pin (SSC-N, 16-24 AWG)", to: "SPL-COMMS", current_a: 6.6, length_ft_est: 2, basis: "COM's cab socket is not built in this version, so the output lead is its own; 16 AWG is the largest the pin contact takes"}
+      - {id: SLT_PT1, gauge: 16, spec: M22759/32, from: "PDM30 COMMS output, first pin (a 20 A output)", to: "SPL-COMMS", current_a: 3.3, length_ft_est: 0.5, basis: "COM's pigtails are not built in this version, so these are its own; paired 16 AWG, MoTeC's range for 20 A outputs (PDM manual printed p.48)"}
+      - {id: SLT_PT2, gauge: 16, spec: M22759/32, from: "PDM30 COMMS output, second pin", to: "SPL-COMMS", current_a: 3.3, length_ft_est: 0.5, basis: "as SLT_PT1"}
       - {id: SLT_FEED, gauge: 12, spec: M22759/32, from: "SPL-COMMS", to: "SPL-SLT-P-B0 (M81824/1-3)", current_a: 5.0, length_ft_est: 13, basis: "top-design's 13 ft body share of the 18.4 ft zone; 12 AWG for the drop"}
       - {id: SLT_P_BS, gauge: 16, spec: M22759/32, from: "SPL-SLT-P-B0", to: "SPL-SLT-P-B (M81824/1-2)", current_a: 5.0, length_ft_est: 0.5, basis: "stub into the receptacle backshell: 12 -> 16 on /1-3, 16 -> 2 x 20 on /1-2 (top-design)"}
       - {id: SLT_P_B1, gauge: 20, spec: M22759/32, from: "SPL-SLT-P-B", to: "TOP-DISC receptacle (Starlink + cavity 1)", current_a: 2.5, length_ft_est: 0.5, basis: "paralleled pair, equal length (canon ch.16 §3.3)"}
@@ -1073,7 +1075,7 @@ COM-TOP:
       - {id: SLT_N_B2, gauge: 20, spec: M22759/32, from: "TOP-DISC receptacle (Starlink - cavity 2)", to: "SPL-SLT-N-B", current_a: 2.5, length_ft_est: 0.5, basis: "as SLT_N_B1"}
       - {id: SLT_N_BS, gauge: 16, spec: M22759/32, from: "SPL-SLT-N-B", to: "SPL-SLT-N-B0 (M81824/1-3)", current_a: 5.0, length_ft_est: 0.5, basis: "stub out of the receptacle backshell"}
       - {id: SLT_N_B, gauge: 12, spec: M22759/32, from: "SPL-SLT-N-B0", to: "GND-SPLICE-REAR", current_a: 5.0, length_ft_est: 4, basis: "pillar base to the rear ground bus, as top-design's TOPD_RTN_B; 12 AWG for the drop"}
-    mass_g_est: "about 230 g of wire (canon ch.16 §1.8 /16 weights, an upper bound for /32), most of it the 12 AWG body feed"
+    mass_g_est: "about 224 g of wire (canon ch.16 §1.8 /16 weights, an upper bound for /32), most of it the 12 AWG body feed"
 
 RTR:
   name: Truck router, Peplink MAX BR1 Pro 5G, on the COMMS output; Starlink in by Ethernet; Mobility 42G roof antenna or the stick antennas
