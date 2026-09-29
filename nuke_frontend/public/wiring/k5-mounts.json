@@ -1,6 +1,6 @@
 {
  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
- "generated_at": "2026-09-29T18:10Z",
+ "generated_at": "2026-09-29T21:29Z",
  "source": "docs/wiring/calc-data/catalog/mounts.yaml",
  "boxes": [
   {
@@ -1138,6 +1138,31 @@
    ],
    "open": [
     "It is an option, not decided."
+   ]
+  },
+  "BRAKE-WARN-SW": {
+   "id": "BRAKE-WARN-SW",
+   "what": "Brake warning switch on the proportioning valve (one wire)",
+   "where": "On the proportioning valve, on the front crossmember under the radiator where the brake lines meet",
+   "zone": "engine",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "Owner 2026-09-29: \"proportioning valve has a sensor on it a one wire situtation ... its mounted on a cross member under the radiator where all the brake lines go\".",
+     "source": "owner, 2026-09-29"
+    },
+    {
+     "text": "The switch grounds through the valve body: jumpering its wire to ground lights the brake warning lamp.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf PDF p.406 (Testing Electrical Circuit of Combination Valve)"
+    },
+    {
+     "text": "It is read on the engine PDM15, next to the valve, with no firewall crossing.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml BRAKE-WARN-SW"
+    }
+   ],
+   "open": [
+    "Which valve is on the truck and its part number: read the valve body.",
+    "Its exact spot on the crossmember: from the owner's photos or the brake-line render."
    ]
   },
   "WIDEBAND": {

@@ -620,6 +620,15 @@ IMPLIED += [
      "booster's side with spare inputs (DIG1 A27, pdm15_designations.txt), read by the PDM30 over CAN; switch-to-0V pattern, chapters/17 §17.7.7"),
     ("BFL_0V", "Brake-fluid level sensor return -> PDM15 0V", "PDM15:B22", "BRAKE-FLUID-LVL (return lead)", 20, "M22759/32",
      SW0V + "; PDM15 B22 = 0V (pdm15_designations.txt)"),
+    # ---- brake warning switch on the proportioning (combination) valve: owner 2026-09-29; one wire, the valve body is the return
+    ("BWS_SIG", "Brake warning switch (proportioning valve) -> PDM15 DIG2 (brake-circuit imbalance, own dash message over CAN)",
+     "PDM15:DIG2 (A19)", "BRAKE-WARN-SW (switch terminal)", 20, "M22759/32",
+     "owner 2026-09-29: 'proportioning valve has a sensor on it a one wire situtation where if it disconnects it triggers the brake "
+     "light on we can wire that and code that ... its mounted on a cross member under the radiator where all the brake lines go'; "
+     "1977 LTSM PDF p.406 'Testing Electrical Circuit of Combination Valve': jumper the switch wire to ground and the warning lamp "
+     "lights, so the switch grounds through the valve body (one wire). The valve sits in the engine bay, so the engine PDM15 reads "
+     "it with no firewall crossing (DIG2 A19, pdm15_designations.txt), and the PDM30/dash get it over CAN; switch-to-ground "
+     "pattern, chapters/17 §17.7.7"),
 ]
 
 

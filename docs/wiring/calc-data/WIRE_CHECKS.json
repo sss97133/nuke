@@ -26,8 +26,8 @@
      "M130:A01 -> Electronic_Throttle_Body:2 (motor -)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A01 = OUT_HB2"
+     "OPEN",
+     "M130 A01 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -61,8 +61,8 @@
      "M130:A18 -> Electronic_Throttle_Body:1 (motor +)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A18 = OUT_HB1"
+     "OPEN",
+     "M130 A18 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -96,8 +96,8 @@
      "M130:B09 -> Electronic_Throttle_Body:3 (SENT)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B09 = UDIG4"
+     "OPEN",
+     "M130 B09 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -131,8 +131,8 @@
      "M130:A02 -> Electronic_Throttle_Body:5 (+5 V)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A02 = SEN_5V0_A"
+     "OPEN",
+     "M130 A02 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -166,8 +166,8 @@
      "M130:B16 -> Electronic_Throttle_Body:4 (low reference)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B16 = SEN_0V_B"
+     "OPEN",
+     "M130 B16 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -201,8 +201,8 @@
      "M130:A03 -> Ignition_Coil_3:c (trigger)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A03 = IGN_LS1"
+     "OPEN",
+     "M130 A03 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -236,8 +236,8 @@
      "M130:A04 -> Ignition_Coil_5:c (trigger)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A04 = IGN_LS2"
+     "OPEN",
+     "M130 A04 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -271,8 +271,8 @@
      "M130:A05 -> Ignition_Coil_7:c (trigger)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A05 = IGN_LS3"
+     "OPEN",
+     "M130 A05 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -306,8 +306,8 @@
      "M130:A06 -> Ignition_Coil_2:c (trigger)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A06 = IGN_LS4"
+     "OPEN",
+     "M130 A06 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -341,8 +341,8 @@
      "M130:A07 -> Ignition_Coil_4:c (trigger)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A07 = IGN_LS5"
+     "OPEN",
+     "M130 A07 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -376,8 +376,8 @@
      "M130:A08 -> Ignition_Coil_6:c (trigger)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A08 = IGN_LS6"
+     "OPEN",
+     "M130 A08 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -411,8 +411,8 @@
      "M130:A12 -> Ignition_Coil_8:c (trigger)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A12 = IGN_LS7"
+     "OPEN",
+     "M130 A12 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -446,8 +446,8 @@
      "M130:A19 -> Fuel_Injector_1:1 (signal)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A19 = INJ_PH1"
+     "OPEN",
+     "M130 A19 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -481,8 +481,8 @@
      "M130:A20 -> Fuel_Injector_2:1 (signal)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A20 = INJ_PH2"
+     "OPEN",
+     "M130 A20 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -516,8 +516,8 @@
      "M130:A21 -> Fuel_Injector_3:1 (signal)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A21 = INJ_PH3"
+     "OPEN",
+     "M130 A21 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -551,8 +551,8 @@
      "M130:A22 -> Fuel_Injector_4:1 (signal)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A22 = INJ_PH4"
+     "OPEN",
+     "M130 A22 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -586,8 +586,8 @@
      "M130:A27 -> Fuel_Injector_5:1 (signal)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A27 = INJ_PH5"
+     "OPEN",
+     "M130 A27 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -621,8 +621,8 @@
      "M130:A28 -> Fuel_Injector_6:1 (signal)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A28 = INJ_PH6"
+     "OPEN",
+     "M130 A28 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -656,8 +656,8 @@
      "M130:A29 -> Fuel_Injector_7:1 (signal)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A29 = INJ_PH7"
+     "OPEN",
+     "M130 A29 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -691,8 +691,8 @@
      "M130:A30 -> Fuel_Injector_8:1 (signal)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A30 = INJ_PH8"
+     "OPEN",
+     "M130 A30 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -726,8 +726,8 @@
      "M130:A13 -> Ignition_Coil_1:c (trigger)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A13 = IGN_LS8"
+     "OPEN",
+     "M130 A13 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -796,8 +796,8 @@
      "M130:B01 -> Crank_Position_Sensor:1 \u2014 OPEN until a GM end view of the crank sensor is cited (Dave's sheet)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B01 = UDIG1"
+     "OPEN",
+     "M130 B01 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -831,8 +831,8 @@
      "M130:B02 -> Cam_Position_Sensor:3 \u2014 OPEN until a GM end view of the cam sensor is cited (Dave's sheet)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B02 = UDIG2"
+     "OPEN",
+     "M130 B02 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -866,8 +866,8 @@
      "M130:A25 -> Oil_Pressure_Sensor_ECU:3 (signal)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A25 = AV5"
+     "OPEN",
+     "M130 A25 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -901,8 +901,8 @@
      "M130:B07 -> Knock_Sensor_Bank_1:pin1 (signal)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B07 = KNOCK1"
+     "OPEN",
+     "M130 B07 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -936,8 +936,8 @@
      "M130:B13 -> Knock_Sensor_Bank_2:pin1 (signal)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B13 = KNOCK2"
+     "OPEN",
+     "M130 B13 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -971,8 +971,8 @@
      "M130:A15 -> MAP_Sensor:pin2 (signal)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A15 = AV2"
+     "OPEN",
+     "M130 A15 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -1006,8 +1006,8 @@
      "M130:B03 -> Intake_Air_Temp_Sensor:2 (signal)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B03 = AT1"
+     "OPEN",
+     "M130 B03 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -1041,8 +1041,8 @@
      "M130:B04 -> Coolant_Temp_Sensor_ECU:2 (signal)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B04 = AT2"
+     "OPEN",
+     "M130 B04 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -1077,7 +1077,7 @@
     ],
     "R9 pin": [
      "OPEN",
-     "M130 A16 = AV3; device pin 'signal (AEM pin letter unknown until the 10-2131 drawing is read)' not read from the pinout"
+     "M130 A16 not in the stored pin table; device pin 'signal (AEM pin letter unknown until the 10-2131 drawing is read)' not read from the pinout"
     ],
     "R12 firewall": [
      "PASS",
@@ -1111,8 +1111,8 @@
      "M130:B05 -> Oil_Temperature_Sensor:2 (signal)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B05 = AT3"
+     "OPEN",
+     "M130 B05 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -1293,7 +1293,7 @@
    ],
    "to": [
     "WASHER-PUMP",
-    "pin 1 (+)"
+    "93B cavity: solenoid feed side (1978 booklet 18 YEL/BLK-93B, the wiper motor feed)"
    ],
    "sides": [
     "cab",
@@ -1306,7 +1306,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT26 -> WASHER-PUMP:pin 1 (+)"
+     "PDM30:OUT26 -> WASHER-PUMP:93B cavity: solenoid feed side (1978 booklet 18 YEL/BLK-93B, the wiper motor feed)"
     ],
     "R9 pin": [
      "PASS",
@@ -2633,6 +2633,10 @@
      "PASS",
      "M130:B08 -> VSS-SENDER:signal"
     ],
+    "R9 pin": [
+     "OPEN",
+     "M130 B08 not in the stored pin table"
+    ],
     "R12 firewall": [
      "PASS",
      "cab exit: body bulkhead C cavity 1"
@@ -3261,8 +3265,8 @@
      "M130:B20 -> SPL-FUEL-SND:sender side (with #117)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B20 = AV6"
+     "OPEN",
+     "M130 B20 not in the stored pin table"
     ]
    }
   },
@@ -3346,8 +3350,8 @@
      "M130:B16 -> Intake_Air_Temp_Sensor:1 (GND)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B16 = SEN_0V_B"
+     "OPEN",
+     "M130 B16 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -3381,8 +3385,8 @@
      "M130:B16 -> Coolant_Temp_Sensor_ECU:1 (GND)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B16 = SEN_0V_B"
+     "OPEN",
+     "M130 B16 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -3416,8 +3420,8 @@
      "M130:B16 -> Oil_Temperature_Sensor:1 (GND)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B16 = SEN_0V_B"
+     "OPEN",
+     "M130 B16 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -3451,8 +3455,8 @@
      "M130:B16 -> Oil_Pressure_Sensor_ECU:1 (0 V)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B16 = SEN_0V_B"
+     "OPEN",
+     "M130 B16 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -3486,8 +3490,8 @@
      "M130:A02 -> Oil_Pressure_Sensor_ECU:2 (5 V)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A02 = SEN_5V0_A"
+     "OPEN",
+     "M130 A02 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -3521,8 +3525,8 @@
      "M130:B16 -> MAP_Sensor:1 \u2014 OPEN until a GM end view of the MAP sensor is cited (Dave's sheet)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B16 = SEN_0V_B"
+     "OPEN",
+     "M130 B16 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -3556,8 +3560,8 @@
      "M130:A02 -> MAP_Sensor:3 \u2014 OPEN until a GM end view of the MAP sensor is cited (Dave's sheet)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A02 = SEN_5V0_A"
+     "OPEN",
+     "M130 A02 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -3592,7 +3596,7 @@
     ],
     "R9 pin": [
      "OPEN",
-     "M130 B16 = SEN_0V_B; device pin '0 V (AEM pin letter unknown until the 10-2131 drawing is read)' not read from the pinout"
+     "M130 B16 not in the stored pin table; device pin '0 V (AEM pin letter unknown until the 10-2131 drawing is read)' not read from the pinout"
     ],
     "R12 firewall": [
      "PASS",
@@ -3627,7 +3631,7 @@
     ],
     "R9 pin": [
      "OPEN",
-     "M130 A02 = SEN_5V0_A; device pin '5 V (AEM pin letter unknown until the 10-2131 drawing is read)' not read from the pinout"
+     "M130 A02 not in the stored pin table; device pin '5 V (AEM pin letter unknown until the 10-2131 drawing is read)' not read from the pinout"
     ],
     "R12 firewall": [
      "PASS",
@@ -3661,8 +3665,8 @@
      "M130:B15 -> CKP:2 \u2014 OPEN until a GM end view of the crank sensor is cited (Dave's sheet)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B15 = SEN_0V_A"
+     "OPEN",
+     "M130 B15 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -3696,8 +3700,8 @@
      "M130:B19 -> Crank_Position_Sensor:pin3 (+V if Hall)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B19 = SEN_6V3"
+     "OPEN",
+     "M130 B19 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -3731,8 +3735,8 @@
      "M130:B15 -> None:None"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B15 = SEN_0V_A"
+     "OPEN",
+     "M130 B15 not in the stored pin table"
     ]
    }
   },
@@ -3762,8 +3766,8 @@
      "M130:B15 -> Cam_Position_Sensor:2 \u2014 OPEN until a GM end view of the cam sensor is cited (Dave's sheet)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B15 = SEN_0V_A"
+     "OPEN",
+     "M130 B15 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -3797,8 +3801,8 @@
      "M130:B19 -> Cam_Position_Sensor:1 \u2014 OPEN until a GM end view of the cam sensor is cited (Dave's sheet)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B19 = SEN_6V3"
+     "OPEN",
+     "M130 B19 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -3832,8 +3836,8 @@
      "M130:B15 -> None:None"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B15 = SEN_0V_A"
+     "OPEN",
+     "M130 B15 not in the stored pin table"
     ]
    }
   },
@@ -3863,8 +3867,8 @@
      "M130:B16 -> Knock_Sensor_Bank_1:pin2 (return)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B16 = SEN_0V_B"
+     "OPEN",
+     "M130 B16 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -3898,8 +3902,8 @@
      "M130:B16 -> None:None"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B16 = SEN_0V_B"
+     "OPEN",
+     "M130 B16 not in the stored pin table"
     ]
    }
   },
@@ -3929,8 +3933,8 @@
      "M130:B16 -> Knock_Sensor_Bank_2:pin2 (return)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B16 = SEN_0V_B"
+     "OPEN",
+     "M130 B16 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -3964,8 +3968,8 @@
      "M130:B16 -> None:None"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B16 = SEN_0V_B"
+     "OPEN",
+     "M130 B16 not in the stored pin table"
     ]
    }
   },
@@ -4150,8 +4154,8 @@
      "M130:A31 -> M130_A31_HB1:TACH"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A31 = OUT_HB3"
+     "OPEN",
+     "M130 A31 not in the stored pin table"
     ]
    }
   },
@@ -4491,8 +4495,8 @@
      "M130:A26 -> PDM30:B6 (PDM30:OUT24, 8 A) \u2014 on with ignition RUN"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A26 = BAT_POS"
+     "OPEN",
+     "M130 A26 not in the stored pin table"
     ]
    }
   },
@@ -4522,8 +4526,8 @@
      "M130:A10 -> COIL-GROUND-RINGS:ECM ground ring on the head"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A10 = BAT_NEG1"
+     "OPEN",
+     "M130 A10 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -4557,8 +4561,8 @@
      "M130:A11 -> COIL-GROUND-RINGS:ECM ground ring on the head"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A11 = BAT_NEG2"
+     "OPEN",
+     "M130 A11 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -4689,8 +4693,8 @@
      "M130:B21 -> APS:F"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B21 = AV7"
+     "OPEN",
+     "M130 B21 not in the stored pin table"
     ]
    }
   },
@@ -4720,8 +4724,8 @@
      "M130:A02 -> APS:G"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A02 = SEN_5V0_A"
+     "OPEN",
+     "M130 A02 not in the stored pin table"
     ]
    }
   },
@@ -4751,8 +4755,8 @@
      "M130:B16 -> APS:E"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B16 = SEN_0V_B"
+     "OPEN",
+     "M130 B16 not in the stored pin table"
     ]
    }
   },
@@ -4782,8 +4786,8 @@
      "M130:B22 -> APS:C"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B22 = AV8"
+     "OPEN",
+     "M130 B22 not in the stored pin table"
     ]
    }
   },
@@ -4813,8 +4817,8 @@
      "M130:A09 -> APS:B"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A09 = SEN_5V0_B"
+     "OPEN",
+     "M130 A09 not in the stored pin table"
     ]
    }
   },
@@ -4844,8 +4848,8 @@
      "M130:B15 -> APS:D"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B15 = SEN_0V_A"
+     "OPEN",
+     "M130 B15 not in the stored pin table"
     ]
    }
   },
@@ -4956,8 +4960,8 @@
      "M130:B23 -> PORT-ETH (socket pin 3):socket pin 3"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B23 = ETH_TX+"
+     "OPEN",
+     "M130 B23 not in the stored pin table"
     ]
    }
   },
@@ -4987,8 +4991,8 @@
      "M130:B24 -> PORT-ETH (socket pin 6):socket pin 6"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B24 = ETH_TX-"
+     "OPEN",
+     "M130 B24 not in the stored pin table"
     ]
    }
   },
@@ -5018,8 +5022,8 @@
      "M130:B25 -> PORT-ETH (socket pin 1):socket pin 1"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B25 = ETH_RX+"
+     "OPEN",
+     "M130 B25 not in the stored pin table"
     ]
    }
   },
@@ -5049,8 +5053,8 @@
      "M130:B26 -> PORT-ETH (socket pin 2):socket pin 2"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B26 = ETH_RX-"
+     "OPEN",
+     "M130 B26 not in the stored pin table"
     ]
    }
   },
@@ -5080,8 +5084,8 @@
      "M130:B17 -> PDM30:B26 (CAN High):CAN High"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B17 = CAN_HI"
+     "OPEN",
+     "M130 B17 not in the stored pin table"
     ]
    }
   },
@@ -5111,8 +5115,8 @@
      "M130:B18 -> PDM30:B25 (CAN Low):CAN Low"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B18 = CAN_LO"
+     "OPEN",
+     "M130 B18 not in the stored pin table"
     ]
    }
   },
@@ -5370,8 +5374,8 @@
      "M130:B21 -> PCS-HARNESS-4610 (analog 1 lead):analog 1 lead (lead label OPEN until the TCM-4610 drawing)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 B21 = AV7"
+     "OPEN",
+     "M130 B21 not in the stored pin table"
     ]
    }
   },
@@ -5401,8 +5405,8 @@
      "M130:A33 -> PCS-HARNESS-4610 (speed input 3 lead, orange/black):speed input 3 lead, orange/black (ZGP p.11)"
     ],
     "R9 pin": [
-     "PASS",
-     "M130 A33 = OUT_HB5"
+     "OPEN",
+     "M130 A33 not in the stored pin table"
     ]
    }
   },
@@ -5716,6 +5720,10 @@
     "R8 ends": [
      "PASS",
      "M130:A34 -> FAN (PWM white lead):PWM control (white lead; 20-18 ga control terminal, ProWire kit 30130628)"
+    ],
+    "R9 pin": [
+     "OPEN",
+     "M130 A34 not in the stored pin table"
     ],
     "R12 firewall": [
      "PASS",
@@ -8233,6 +8241,33 @@
    }
   },
   {
+   "wire": "BWS_SIG",
+   "kind": "implied",
+   "label": "Brake warning switch (proportioning valve) -> PDM15 DIG2 (brake-circuit imbalance, own dash message over CAN)",
+   "from": [
+    "PDM15",
+    "DIG2"
+   ],
+   "to": [
+    "BRAKE-WARN-SW (switch terminal)",
+    "switch terminal (single; plug and terminal OPEN)"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "PDM15:DIG2 (A19)",
+   "control": null,
+   "subsystem": null,
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM15:DIG2 -> BRAKE-WARN-SW (switch terminal):switch terminal (single; plug and terminal OPEN)"
+    ]
+   }
+  },
+  {
    "wire": "DAK_CONST_FH",
    "kind": "implied",
    "label": "DAK_CONST fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",
@@ -10574,6 +10609,10 @@
     "R8 ends": [
      "PASS",
      "M130:A32 -> DAKOTA-VHX (CHECK ENG (-)):CHECK ENG (-)"
+    ],
+    "R9 pin": [
+     "OPEN",
+     "M130 A32 not in the stored pin table"
     ]
    }
   },
@@ -16837,6 +16876,10 @@
     "R8 ends": [
      "PASS",
      "M130:B02_pin101 -> Fuel_Pump_Relay:COIL_85"
+    ],
+    "R9 pin": [
+     "OPEN",
+     "M130 B02_pin101 not in the stored pin table"
     ],
     "R12 firewall": [
      "FAIL",
