@@ -10404,6 +10404,10 @@
     "R12 firewall": [
      "PASS",
      "body bulkhead B cavity 12"
+    ],
+    "R15 protected": [
+     "PASS",
+     "5 A inline fuse at the Odyssey + (Blue Sea 7700 instructions p.2: pin 2 'through"
     ]
    }
   },

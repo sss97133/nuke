@@ -99,6 +99,8 @@ def run():
             pig = next((pn for pn in (ep.get("pigtailed") or []) if pn.split(" ")[0] == str(t["wire"])), None)
             if pig:
                 eff = 16            # the contact holds a 16 AWG pigtail; the load wire meets it in the splice
+            if w.get("protection_parts") and (ep.get("family") == "lug" or ep.get("stud")):
+                eff = 12            # round 5: the stud ring sits on the in-line fuse holder's 12 AWG pigtail (Blue Sea 5065: 'Supplied with 12 AWG pigtails')
             name = kits_v5.dave_name(w) if w else str(t["wire"])
             codes = [c for c in str(t.get("part") or "").split(" + ") if c]
             term = next((c for c in codes if (parts.get(c) or {}).get("kind") in ("terminal", "contact")), None)

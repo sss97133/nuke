@@ -33918,6 +33918,26 @@
    "doubled": null
   },
   {
+   "wire": "PCS_BRK",
+   "endpoint": "SPL-PDM30-OUT5",
+   "where": "cabin",
+   "cavity": "splice 4",
+   "factory_circuit": null,
+   "part": "rail splice (in the kit)",
+   "family": "miniseal",
+   "doubled": null
+  },
+  {
+   "wire": "TRANS_BRK",
+   "endpoint": "SPL-PDM30-OUT5",
+   "where": "cabin",
+   "cavity": "splice 5",
+   "factory_circuit": null,
+   "part": "rail splice (in the kit)",
+   "family": "miniseal",
+   "doubled": null
+  },
+  {
    "wire": "54_PT1",
    "endpoint": "SPL-PDM30-OUT7",
    "where": "cabin",
@@ -41951,7 +41971,7 @@
    "CPA-100-3/8-RED": 1,
    "D-609-03": 53,
    "D-609-04": 20,
-   "D-609-05": 31,
+   "D-609-05": 32,
    "D38999/24WJ61SN": 1,
    "D38999/26WJ61PN": 1,
    "DL214": 2,
@@ -43403,11 +43423,11 @@
    "kind": "splice",
    "item": "D-609-03",
    "name": "MiniSeal stub splice, red (26–20 AWG cavity)",
-   "need": 53,
+   "need": 54,
    "cart": 20,
    "inside": [],
    "vendor": "prowire",
-   "status": "short by 33"
+   "status": "short by 34"
   },
   {
    "kind": "splice",
@@ -43423,11 +43443,11 @@
    "kind": "splice",
    "item": "D-609-05",
    "name": "MiniSeal stub splice, yellow (16–12) — rails and ECU pin splices",
-   "need": 31,
+   "need": 32,
    "cart": 20,
    "inside": [],
    "vendor": "prowire",
-   "status": "short by 11"
+   "status": "short by 12"
   },
   {
    "kind": "housing",
@@ -44695,18 +44715,18 @@
    {
     "code": "D-609-03",
     "name": "MiniSeal stub splice, red (26–20 AWG cavity)",
-    "need": 53,
+    "need": 54,
     "cart": 20,
     "vendor": "prowire",
-    "status": "short by 33"
+    "status": "short by 34"
    },
    {
     "code": "D-609-05",
     "name": "MiniSeal stub splice, yellow (16–12) — rails and ECU pin splices",
-    "need": 31,
+    "need": 32,
     "cart": 20,
     "vendor": "prowire",
-    "status": "short by 11"
+    "status": "short by 12"
    },
    {
     "code": "DL438",
