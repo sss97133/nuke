@@ -16,6 +16,8 @@ interface Box {
   id: string; what: string; where: string; zone: string;
   status: 'decided' | 'proposed' | 'open' | 'flag';
   why: Reason[]; instead?: Alt[]; open?: string[];
+  nodes?: string[];   // map node codes whose box photo shows here (devices in k5-part-photos.json)
+  parts?: string[];   // part codes whose maker photos show here (photos in k5-part-photos.json)
 }
 
 const WORD: Record<Box['status'], string> = { decided: 'DECIDED', proposed: 'PROPOSED', open: 'NEEDS YOU', flag: 'BREAKS A MAKER RULE' };
@@ -62,6 +64,12 @@ export function MountsPanel({ vehicleId, cw }: { vehicleId?: string; cw: Colorwa
               </button>
               {on && (
                 <div style={{ padding: '2px 8px 10px 8px', fontSize: 13, lineHeight: 1.45 }}>
+                  {(!!b.nodes?.length || !!b.parts?.length) && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start', margin: '4px 0' }}>
+                      {(b.nodes ?? []).map(c => <DevicePhoto key={c} code={c} cw={cw} />)}
+                      {!!b.parts?.length && <PartPhotos codes={b.parts.join(',')} cw={cw} />}
+                    </div>
+                  )}
                   <div style={{ fontWeight: 700, color: cw.inkMuted, marginTop: 4 }}>WHY</div>
                   {b.why.map((w, j) => (
                     <div key={j} style={{ marginTop: 3 }}>
