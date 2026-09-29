@@ -19,6 +19,681 @@
 #   mount        mounting holes and studs: {n, at, dir (the way the bolt goes in), d}
 generated: '2026-09-29'
 parts:
+- id: ACC-BATT
+  endpoints:
+  - ACC-BATT
+  what: Accessory battery, Optima YellowTop D34/78 dual-purpose AGM, dual terminal (the candidate)
+  maker: Optima (Clarios)
+  maker_pn: 8014-045 (YellowTop D34/78)
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 254.46
+    w: 174.9
+    h: 199.16
+  dims_note: 254.46 x 174.90 x 199.16 to the post tops (Optima); the side terminal bosses stand 8 mm proud of the case front
+    in the model (not in any source)
+  frame: origin at the centre of the base; +Z up, +X along the length, the side terminals face -Y, positive at -X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces:
+      side_terminals: -Y
+      posts: +Z
+      positive: -X
+  colors:
+    case:
+      hex: '#abbec1'
+      from: 'Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+        (Clarios, fetched 2026-09-29), k-means of the region (case, 58%); Optima states ''Case: Light Gray'''
+    lid:
+      hex: '#efc626'
+      from: 'Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+        (Clarios, fetched 2026-09-29), k-means of the region (cover, 59%); Optima states ''Cover: OPTIMA Yellow'''
+    lead:
+      hex: '#8f9294'
+      from: not visible in the photo (posts are capped); drawn lead grey
+    cap_pos:
+      hex: '#b81e22'
+      from: Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+        (Clarios, fetched 2026-09-29), k-means of the region (red + terminal cap, 87%)
+    cap_neg:
+      hex: '#121316'
+      from: Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+        (Clarios, fetched 2026-09-29), k-means of the region (black - terminal cap, 94%)
+    label_black:
+      hex: '#201d1d'
+      from: Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+        (Clarios, fetched 2026-09-29), k-means of the region (label top band, 63%)
+    label_yellow:
+      hex: '#f0d30e'
+      from: Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+        (Clarios, fetched 2026-09-29), k-means of the region (label lower band, 65%)
+    label_white:
+      hex: '#ebe3e2'
+      from: Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+        (Clarios, fetched 2026-09-29), k-means of the region (logo outline and stripe)
+    logo_red:
+      hex: '#de212f'
+      from: Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+        (Clarios, fetched 2026-09-29), k-means of the region (logo lower half, 88%)
+    text_black:
+      hex: '#262220'
+      from: Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+        (Clarios, fetched 2026-09-29), k-means of the region ('OPTIMA' lettering)
+  attach:
+  - n: pos_post
+    ep: ACC-BATT
+    at:
+    - -69.0
+    - -45.05
+    - 199.16
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: post
+    note: 'SAE + post (size assumed); #32 via the MIDI holder, DCDC_OUT'
+  - n: neg_post
+    ep: ACC-BATT
+    at:
+    - 68.6
+    - -45.05
+    - 199.16
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: post
+    note: SAE - post; ACC_NEG
+  - n: pos_side
+    ep: ACC-BATT
+    at:
+    - -40.5
+    - -95.45
+    - 138.0
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: stud
+    note: GM side terminal +, 3/8-16
+  - n: neg_side
+    ep: ACC-BATT
+    at:
+    - 45.0
+    - -95.45
+    - 138.0
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: stud
+    note: GM side terminal -, 3/8-16
+  mount:
+  - n: base
+    at:
+    - 0
+    - 0
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: stands on its plinth; the hold-down clamps the cover or the plinth (tray not set)
+  params:
+  - name: length
+    value: 254.46
+    source: 'reference_documents/component_drawings/Optima_YellowTop_Full_Specs.pdf p.7 (Product Specifications: Model D34/78,
+      part 8014-045): Length 10.018 in / 254.46 mm'
+    basis: maker
+  - name: width
+    value: 174.9
+    source: 'reference_documents/component_drawings/Optima_YellowTop_Full_Specs.pdf p.7 (Product Specifications: Model D34/78,
+      part 8014-045): Width 6.886 in / 174.90 mm'
+    basis: maker
+    note: taken as the case; Optima does not say if it includes the side terminals
+  - name: height
+    value: 199.16
+    source: 'reference_documents/component_drawings/Optima_YellowTop_Full_Specs.pdf p.7 (Product Specifications: Model D34/78,
+      part 8014-045): Height 7.841 in / 199.16 mm (height at the top of terminals)'
+    basis: maker
+  - name: side_thread
+    value: 9.525
+    source: 'reference_documents/component_drawings/Optima_YellowTop_Full_Specs.pdf p.7 (Product Specifications: Model D34/78,
+      part 8014-045): ''GM style side terminal (3/8"-16UNC-2B threaded nut)'''
+    basis: maker
+  - name: plinth_h
+    value: 13.5
+    source: sized off Clarios's front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+      (Clarios, fetched 2026-09-29) against the printed 254.46 length
+    basis: photo
+    note: base plinth
+  - name: can_d
+    value: 84.8
+    source: sized off Clarios's front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+      (Clarios, fetched 2026-09-29) against the printed 254.46 length; six SpiralCell cans, three across the length (254.46
+      / 3)
+    basis: photo
+  - name: lid_z0
+    value: 162.0
+    source: sized off Clarios's front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+      (Clarios, fetched 2026-09-29) against the printed 254.46 length
+    basis: photo
+    note: yellow cover's lower edge above the base
+  - name: lid_z1
+    value: 181.0
+    source: sized off Clarios's front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+      (Clarios, fetched 2026-09-29) against the printed 254.46 length
+    basis: photo
+    note: cover top (the posts stand on it)
+  - name: post_x_pos
+    value: -69.0
+    source: sized off Clarios's front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+      (Clarios, fetched 2026-09-29) against the printed 254.46 length
+    basis: photo
+    note: + post centre along the length
+  - name: post_x_neg
+    value: 68.6
+    source: sized off Clarios's front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+      (Clarios, fetched 2026-09-29) against the printed 254.46 length
+    basis: photo
+    note: '- post centre along the length'
+  - name: post_y
+    value: -45.05
+    source: 'no top view in any source: posts drawn over the front row of cans'
+    basis: assumed
+  - name: pos_top_d
+    value: 17.5
+    source: 'Optima prints no post size: a standard SAE positive post is assumed'
+    basis: assumed
+  - name: pos_base_d
+    value: 19.5
+    source: as pos_top_d
+    basis: assumed
+  - name: neg_top_d
+    value: 15.9
+    source: as pos_top_d
+    basis: assumed
+  - name: neg_base_d
+    value: 17.9
+    source: as pos_top_d
+    basis: assumed
+  - name: side_x_pos
+    value: -40.5
+    source: sized off Clarios's front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+      (Clarios, fetched 2026-09-29) against the printed 254.46 length
+    basis: photo
+    note: + side terminal centre along the length
+  - name: side_x_neg
+    value: 45.0
+    source: sized off Clarios's front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+      (Clarios, fetched 2026-09-29) against the printed 254.46 length
+    basis: photo
+    note: '- side terminal centre along the length'
+  - name: side_z
+    value: 138.0
+    source: sized off Clarios's front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+      (Clarios, fetched 2026-09-29) against the printed 254.46 length
+    basis: photo
+    note: side terminals above the base
+  - name: side_boss_d
+    value: 34.0
+    source: sized off Clarios's front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+      (Clarios, fetched 2026-09-29) against the printed 254.46 length
+    basis: photo
+    note: knurled side-terminal boss
+  - name: side_proud
+    value: 8.0
+    source: no side view in any source
+    basis: assumed
+    note: side boss out from the case front
+  - name: tower_w
+    value: 36.0
+    source: sized off Clarios's front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+      (Clarios, fetched 2026-09-29) against the printed 254.46 length
+    basis: photo
+    note: yellow terminal tower width
+  - name: tower_z0
+    value: 121.0
+    source: sized off Clarios's front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+      (Clarios, fetched 2026-09-29) against the printed 254.46 length
+    basis: photo
+  - name: label_z0
+    value: 47.0
+    source: sized off Clarios's front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+      (Clarios, fetched 2026-09-29) against the printed 254.46 length
+    basis: photo
+  - name: label_z1
+    value: 118.0
+    source: sized off Clarios's front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+      (Clarios, fetched 2026-09-29) against the printed 254.46 length
+    basis: photo
+  - name: label_w
+    value: 64.0
+    source: sized off Clarios's front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png
+      (Clarios, fetched 2026-09-29) against the printed 254.46 length
+    basis: photo
+    note: as seen from the front
+  checks:
+  - check: length
+    model: 254.46
+    drawing: 254.46
+    ok: true
+  - check: case width (the cover)
+    model: 174.9
+    drawing: 174.9
+    ok: true
+  - check: height to the post tops
+    model: 199.16
+    drawing: 199.16
+    ok: true
+  branding:
+    what:
+    - 'label on the middle can: black and yellow bands, the logo, ''OPTIMA'', ''BY CLARIOS'''
+    basis: 'branding, redrawn from photo: text and shapes sized off the maker''s product photo; fonts are stand-ins; cosmetic,
+      never used for fit; no maker artwork used'
+    source: Clarios front photo OPTIMA_YT_D34-78_Front_Global
+  unknowns:
+  - 'No dimensioned drawing: the six cans, cover, towers and terminal positions are sized off Clarios''s photo.'
+  - Where the posts sit front to back is not in any source (no top view); they are drawn over the front cans.
+  - Whether Optima's 174.90 width includes the side terminals is not stated; the model treats it as the case.
+  - The SAE post diameters are a standard SAE post (Optima prints none); the caps in the photo are left off.
+  - The battery that gets bought is still open (mounts.yaml ACC-BATT status open).
+  cross_checks: []
+  notes: []
+  script: docs/wiring/calc-data/cad/fab/ACC-BATT.py
+- id: DCDC
+  endpoints:
+  - DCDC
+  what: DC-DC charger, Victron Orion-Tr Smart 12/12-30A (360 W) non-isolated
+  maker: Victron Energy
+  maker_pn: ORI121236140 (Orion-Tr Smart 12/12-30A non-isolated)
+  shape_basis: maker drawing
+  dims_mm:
+    l: 186.0
+    w: 132.3
+    h: 84.2
+  dims_note: 186 over the base flanges x 132.3 over the heatsink lip x 84.2 tall (Victron's drawing); the terminal block and
+    the remote plug stand a few mm proud of the housing front
+  frame: origin at the centre of the base; +Z up, +X along the 186 length, the terminal block faces -Y, remote plug at -X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces:
+      terminals: -Y
+      label: +Z
+      remote: -Y
+  colors:
+    housing:
+      hex: '#2490d6'
+      from: Victron product photo https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png
+        (Victron, fetched 2026-09-29), k-means of the region (housing, 70%)
+    sink:
+      hex: '#2a2925'
+      from: Victron product photo https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png
+        (Victron, fetched 2026-09-29), k-means of the region (heatsink fins and flanges, 67%)
+    block:
+      hex: '#373430'
+      from: Victron product photo https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png
+        (Victron, fetched 2026-09-29), k-means of the region (terminal block, 74%)
+    clamp:
+      hex: '#c4ba9c'
+      from: Victron product photo https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png
+        (Victron, fetched 2026-09-29), k-means of the region (terminal clamps, 79%)
+    screw:
+      hex: '#b8bcc0'
+      from: 'terminal clamp metal: not sampled (small); drawn steel'
+    remote:
+      hex: '#59a87f'
+      from: Victron product photo https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png
+        (Victron, fetched 2026-09-29), k-means of the region (remote plug, the lit face)
+    mark_white:
+      hex: '#f4f6f8'
+      from: Victron product photo https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png
+        (Victron, fetched 2026-09-29), k-means of the region (label lettering, near-white)
+    stripe:
+      hex: '#f97d09'
+      from: Victron product photo https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png
+        (Victron, fetched 2026-09-29), k-means of the region (orange stripe, 85%)
+  attach:
+  - n: in_pos
+    ep: DCDC
+    at:
+    - -10.1
+    - -64.6
+    - 52.5
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: IN + (input from the Odyssey side, DCDC_IN); bare fine-strand wire, 1.6 Nm (manual 4.2, 4.4)
+  - n: gnd
+    ep: DCDC
+    at:
+    - 0.0
+    - -64.6
+    - 52.5
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: GND - (DCDC_GND); bare fine-strand wire, 1.6 Nm (manual 4.2, 4.4)
+  - n: out_pos
+    ep: DCDC
+    at:
+    - 10.1
+    - -64.6
+    - 52.5
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: screw terminal
+    note: OUT + (to the accessory battery, DCDC_OUT); bare fine-strand wire, 1.6 Nm (manual 4.2, 4.4)
+  - n: remote
+    ep: DCDC
+    at:
+    - -43.4
+    - -65.4
+    - 46.7
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: plug
+    note: remote on/off L / H, unused in this build (wire bridge in)
+  mount:
+  - n: slot_LF
+    at:
+    - -87.0
+    - -35.75
+    - 4.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 8.0
+    note: open slot, 8 wide with an R4 end, 6 in from the plate edge
+  - n: slot_LB
+    at:
+    - -87.0
+    - 35.75
+    - 4.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 8.0
+    note: open slot, 8 wide with an R4 end, 6 in from the plate edge
+  - n: slot_RF
+    at:
+    - 87.0
+    - -35.75
+    - 4.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 8.0
+    note: open slot, 8 wide with an R4 end, 6 in from the plate edge
+  - n: slot_RB
+    at:
+    - 87.0
+    - 35.75
+    - 4.0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 8.0
+    note: open slot, 8 wide with an R4 end, 6 in from the plate edge
+  params:
+  - name: length
+    value: 186.0
+    source: https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf (Victron,
+      fetched 2026-09-29) (front view, over the flanges)
+    basis: maker
+  - name: depth
+    value: 132.3
+    source: https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf (Victron,
+      fetched 2026-09-29) (side view, over the heatsink lip)
+    basis: maker
+  - name: height
+    value: 84.2
+    source: https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf (Victron,
+      fetched 2026-09-29) (front view, base to the housing top)
+    basis: maker
+  - name: flange_t
+    value: 4.0
+    source: https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf (Victron,
+      fetched 2026-09-29) (front view, flange thickness)
+    basis: maker
+  - name: slot_pitch_x
+    value: 174.0
+    source: https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf (Victron,
+      fetched 2026-09-29) (top view, slot centres across the length)
+    basis: maker
+  - name: slot_pitch_y
+    value: 71.5
+    source: https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf (Victron,
+      fetched 2026-09-29) (top view, slot centres)
+    basis: maker
+  - name: slot_edge
+    value: 25.0
+    source: https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf (Victron,
+      fetched 2026-09-29) (top view, slot centre to the plate edge, both ends)
+    basis: maker
+  - name: slot_w
+    value: 8.0
+    source: https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf (Victron,
+      fetched 2026-09-29) (detail A, slot width, R4)
+    basis: maker
+  - name: slot_in
+    value: 6.0
+    source: https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf (Victron,
+      fetched 2026-09-29) (detail A, slot centre in from the edge)
+    basis: maker
+  - name: housing_over
+    value: 5.2
+    source: https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf (Victron,
+      fetched 2026-09-29) (top view, housing beyond the plate)
+    basis: maker
+  - name: plate_w
+    value: 121.5
+    source: 'https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf (Victron,
+      fetched 2026-09-29): 25 + 71.5 + 25'
+    basis: maker
+    note: base plate front to back
+  - name: fin_n
+    value: 12
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+  - name: fin_pitch
+    value: 13.0
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+  - name: fin_t
+    value: 2.2
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+  - name: fin_top
+    value: 32.0
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+    note: fins end under the heatsink plate
+  - name: fin_gap
+    value: 1.4
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+    note: fin tips stop short of the mounting surface
+  - name: sink_w
+    value: 163.0
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+    note: heatsink plate / lip length
+  - name: sink_top
+    value: 39.6
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+  - name: housing_w
+    value: 153.0
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+    note: blue housing length
+  - name: housing_d
+    value: 118.0
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+    note: blue housing depth
+  - name: housing_r
+    value: 10.0
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+    note: top edge round
+  - name: block_w
+    value: 55.0
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+    note: black terminal block
+  - name: block_front
+    value: 64.6
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+    note: block face from the centre
+  - name: block_back
+    value: 40.7
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+  - name: block_top
+    value: 83.0
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+  - name: term_pitch
+    value: 10.1
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+    note: screw terminal pitch
+  - name: term_z
+    value: 52.5
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+    note: terminal centre above the base
+  - name: window_w
+    value: 34.4
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+  - name: window_z0
+    value: 42.0
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+  - name: window_z1
+    value: 63.0
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+  - name: remote_x
+    value: -43.4
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+    note: green remote H/L plug centre
+  - name: remote_w
+    value: 14.4
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+  - name: remote_z0
+    value: 34.4
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+  - name: remote_z1
+    value: 59.0
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+  - name: remote_proud
+    value: 6.4
+    source: scaled off https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf
+      (Victron, fetched 2026-09-29), scale from its printed 186 length
+    basis: scaled
+  checks:
+  - check: length over the flanges
+    model: 186.0
+    drawing: 186.0
+    ok: true
+  - check: depth over the heatsink lip
+    model: 132.3
+    drawing: 132.3
+    ok: true
+  - check: height
+    model: 84.2
+    drawing: 84.2
+    ok: true
+  - check: slot count
+    model: 4
+    drawing: 4
+    ok: true
+  - check: slot centres across the length
+    model: 174.0
+    drawing: 174.0
+    ok: true
+  - check: slot centres front to back
+    model: 71.5
+    drawing: 71.5
+    ok: true
+  - check: slot centre to the plate edge
+    model: 25.0
+    drawing: 25.0
+    ok: true
+  - check: slot centre in from the flange end
+    model: 6.0
+    drawing: 6.0
+    ok: true
+  - check: heatsink lip beyond the plate (top view 5.2)
+    model: 5.4
+    drawing: 5.2
+    ok: true
+  branding:
+    what:
+    - '''victron energy'''
+    - '''Orion-Tr Smart'''
+    - '''12 | 12 - 30'''
+    - '''Non-isolated DC/DC charger'''
+    - orange stripe
+    - '''IN + / GND - / OUT +'' on the terminal block'
+    - '''L H REMOTE'''
+    basis: 'branding, redrawn from photo: text and shapes sized off the maker''s product photo; fonts are stand-ins; cosmetic,
+      never used for fit; no maker artwork used'
+    source: Victron product photo (front-angle) ORI121236140
+  unknowns:
+  - The fins, heatsink plate, housing, terminal block and remote plug are scaled off the drawing (no printed number).
+  - The remote H/L plug is unused in this build only while Victron's wire bridge stays in (pin table DCDC).
+  cross_checks: []
+  notes:
+  - 'Mounting: ''Mount vertically on a non-flammable surface, with the power terminals facing downwards'' (reference_documents/web_snapshots/www.victronenergy.com__34439-Orion-Tr_Smart_DC-DC_Charger-pdf-en.md);
+    mounts.yaml flags the DCDC placement.'
+  script: docs/wiring/calc-data/cad/fab/DCDC.py
 - id: M130-A
   endpoints:
   - M130-A
@@ -577,6 +1252,395 @@ parts:
   - MoTeC's label is a raised badge (product photo). It is drawn as a flush panel in a 0.4 mm recess so the printed 38.7 depth
     holds; its lettering is redrawn from the photo as cosmetic text, not MoTeC's artwork.
   script: docs/wiring/calc-data/cad/fab/M130-A.py
+- id: ODYSSEY
+  endpoints:
+  - ODYSSEY
+  what: Running battery, Odyssey Extreme group 34/78, dual terminal (SAE top posts + GM side studs)
+  maker: EnerSys (Odyssey)
+  maker_pn: 34/78-PC1500DT (ODX-AGM34 78)
+  shape_basis: maker drawing
+  dims_mm:
+    l: 277.0
+    w: 178.0
+    h: 201.0
+  dims_note: 277 long over the rim (256 at the base); 173 over the hold-down ledges, 159 the body, 178 over the side bosses;
+    184 to the lid, 201 to the post tops
+  frame: origin at the centre of the base; +Z up, +X along the length, the side terminals face -Y, positive at -X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces:
+      side_terminals: -Y
+      posts: +Z
+      positive: -X
+  colors:
+    case:
+      hex: '#272526'
+      from: product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means
+        of the region (case, 90%)
+    lid:
+      hex: '#e61d2c'
+      from: product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means
+        of the region (lid, 91%)
+    lead:
+      hex: '#8f9294'
+      from: not visible in the photo (posts are capped); drawn lead grey
+    cap_pos:
+      hex: '#e71c37'
+      from: product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means
+        of the region (red + side-terminal cap, 92%)
+    cap_neg:
+      hex: '#202020'
+      from: product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means
+        of the region (black - side-terminal cap, 79%)
+    label:
+      hex: '#23232c'
+      from: product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means
+        of the region (label background, 71%)
+    label_red:
+      hex: '#f43210'
+      from: product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means
+        of the region (label's red band, 79%)
+    mark_red:
+      hex: '#fc330f'
+      from: product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means
+        of the region ('ODYSSEY' lettering)
+    mark_white:
+      hex: '#f2f2f2'
+      from: product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means
+        of the region (white lettering; near-white, clipped in the photo)
+  attach:
+  - n: pos_post
+    ep: ODYSSEY
+    at:
+    - -105.0
+    - -50.5
+    - 201.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: post
+    note: SAE + post, 19.3 mm at the base, 17.2 at the top, 18.6 tall
+  - n: neg_post
+    ep: ODYSSEY
+    at:
+    - 105.0
+    - -50.5
+    - 201.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: post
+    note: SAE - post, 17.7 / 15.6 mm, 18.6 tall
+  - n: pos_side
+    ep: ODYSSEY
+    at:
+    - -105.0
+    - -94.5
+    - 128.0
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: stud
+    note: GM side terminal +, 3/8-16 UNC, 0.34 in deep
+  - n: neg_side
+    ep: ODYSSEY
+    at:
+    - 105.0
+    - -94.5
+    - 128.0
+    dir:
+    - 0
+    - -1
+    - 0
+    kind: stud
+    note: GM side terminal -, 3/8-16 UNC
+  mount:
+  - n: ledge_front
+    at:
+    - 0
+    - -86.0
+    - 12.0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: hold-down ledge along the side-terminal (-Y) side
+  - n: ledge_rear
+    at:
+    - 0
+    - 80.0
+    - 12.0
+    dir:
+    - 0
+    - 0
+    - -1
+    note: hold-down ledge along the +Y side, flush with the lid's back edge
+  params:
+  - name: len_rim
+    value: 277.0
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, dimensioned drawing (front view, over
+      the rim); reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, Dimensions & Weight table 'Length
+      277 mm'
+    basis: maker
+  - name: len_base
+    value: 256.0
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, dimensioned drawing (front view, at
+      the base)
+    basis: maker
+  - name: w_ledges
+    value: 173.0
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, dimensioned drawing (end view, over
+      the hold-down ledges); reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, Dimensions & Weight
+      table 'Width 173 mm'
+    basis: maker
+  - name: w_body
+    value: 159.0
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, dimensioned drawing (end view, the
+      case body)
+    basis: maker
+  - name: w_over
+    value: 178.0
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, dimensioned drawing (end view, over
+      the side-terminal bosses)
+    basis: maker
+  - name: h_case
+    value: 184.0
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, dimensioned drawing (end view); reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf
+      p.1, Dimensions & Weight table 'Height Container 185 mm'
+    basis: maker
+  - name: h_posts
+    value: 201.0
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, dimensioned drawing; reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf
+      p.1, Dimensions & Weight table 'Height (to top of terminals) 201 mm'
+    basis: maker
+  - name: post_pitch
+    value: 210.0
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, dimensioned drawing (front view, post
+      centres)
+    basis: maker
+  - name: post_from_front
+    value: 33.0
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, dimensioned drawing (top view, post
+      centre to the front edge)
+    basis: maker
+  - name: post_from_back
+    value: 134.0
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, dimensioned drawing (top view, post
+      centre to the back edge)
+    basis: maker
+  - name: side_z
+    value: 128.0
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, dimensioned drawing (front view, side
+      terminals above the base)
+    basis: maker
+  - name: side_below_top
+    value: 54.0
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, dimensioned drawing (front view, side
+      terminals below the case top)
+    basis: maker
+  - name: pos_top_d
+    value: 17.2
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, Terminal Type table (SAE positive,
+      top)
+    basis: maker
+  - name: pos_base_d
+    value: 19.3
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, Terminal Type table (SAE positive,
+      base)
+    basis: maker
+  - name: neg_top_d
+    value: 15.6
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, Terminal Type table (SAE negative,
+      top)
+    basis: maker
+  - name: neg_base_d
+    value: 17.7
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, Terminal Type table (SAE negative,
+      base)
+    basis: maker
+  - name: post_h
+    value: 18.6
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, Terminal Type table (SAE post height)
+    basis: maker
+  - name: side_boss_d
+    value: 28.5
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, Terminal Type table (side terminal
+      boss, outer circle)
+    basis: maker
+  - name: side_face_d
+    value: 21.6
+    source: 'reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, Terminal Type table (side terminal,
+      inner circle: the lead face the lug seats on)'
+    basis: maker
+  - name: side_thread_d
+    value: 9.525
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, Terminal Type table ('3/8-16 THREAD'),
+      3/8 in major diameter
+    basis: maker
+  - name: side_thread_l
+    value: 8.64
+    source: reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, Terminal Type table ('0.34" DEEP')
+    basis: maker
+  - name: len_top_body
+    value: 269.0
+    source: scaled off reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 drawing, scale from its printed
+      277 length
+    basis: scaled
+    note: case body length at the top of its tapered ends
+  - name: z_rim
+    value: 150.0
+    source: scaled off reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 drawing, scale from its printed
+      277 length
+    basis: scaled
+    note: rim bottom above the base
+  - name: rim_t
+    value: 10.0
+    source: scaled off reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 drawing, scale from its printed
+      277 length
+    basis: scaled
+  - name: lid_len
+    value: 268.0
+    source: scaled off reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 drawing, scale from its printed
+      277 length
+    basis: scaled
+  - name: lid_w
+    value: 167.0
+    source: 'reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1, dimensioned drawing (top view: 33
+      + 134)'
+    basis: maker
+    note: lid depth front to back
+  - name: ledge_len
+    value: 240.0
+    source: scaled off reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 drawing, scale from its printed
+      277 length
+    basis: scaled
+    note: hold-down ledge length
+  - name: ledge_h
+    value: 12.0
+    source: scaled off reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 drawing, scale from its printed
+      277 length
+    basis: scaled
+  - name: post_well_d
+    value: 24.0
+    source: scaled off reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 drawing, scale from its printed
+      277 length
+    basis: scaled
+    note: well in the lid round each post (the posts stand 18.6 with their tops at 201)
+  - name: tower_w
+    value: 29.4
+    source: scaled off reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 drawing, scale from its printed
+      277 length
+    basis: scaled
+    note: black terminal tower above each side terminal
+  - name: tower_z0
+    value: 141.0
+    source: scaled off reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 drawing, scale from its printed
+      277 length
+    basis: scaled
+    note: tower bottom above the base
+  - name: label_w
+    value: 193.6
+    source: scaled off reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 drawing, scale from its printed
+      277 length
+    basis: scaled
+    note: label panel on the front
+  - name: label_z0
+    value: 34.3
+    source: scaled off reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 drawing, scale from its printed
+      277 length
+    basis: scaled
+  - name: label_z1
+    value: 111.8
+    source: scaled off reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 drawing, scale from its printed
+      277 length
+    basis: scaled
+  - name: rib_n
+    value: 9
+    source: sized off the product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 against
+      the printed 277 length
+    basis: photo
+    note: vertical cell ribs between the towers
+  - name: rib_w
+    value: 3.0
+    source: sized off the product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 against
+      the printed 277 length
+    basis: photo
+  - name: rib_t
+    value: 1.2
+    source: not in the drawing
+    basis: assumed
+    note: rib standing proud of the case front
+  checks:
+  - check: length over the rim
+    model: 277.0
+    drawing: 277.0
+    ok: true
+  - check: length at the base
+    model: 256.0
+    drawing: 256.0
+    ok: true
+  - check: width over the side bosses (back of lid to boss face)
+    model: 178.0
+    drawing: 178.0
+    ok: true
+  - check: width over the hold-down ledges
+    model: 173.0
+    drawing: 173.0
+    ok: true
+  - check: height to the post tops
+    model: 201.0
+    drawing: 201.0
+    ok: true
+  - check: post centre spacing
+    model: 210.0
+    drawing: 210.0
+    ok: true
+  - check: post centre to the front edge
+    model: 33.0
+    drawing: 33.0
+    ok: true
+  - check: post centre to the back edge
+    model: 134.0
+    drawing: 134.0
+    ok: true
+  - check: side terminals above the base
+    model: 128.0
+    drawing: 128.0
+    ok: true
+  - check: post height
+    model: 18.6
+    drawing: 18.6
+    ok: true
+  branding:
+    what:
+    - label panel with the red band
+    - '''ODYSSEY'''
+    - '''Extreme'''
+    - '''ODX-AGM34/78'''
+    - '''EnerSys'''
+    - '''AGM2'''
+    basis: 'branding, redrawn from photo: text and shapes sized off the maker''s product photo; fonts are stand-ins; cosmetic,
+      never used for fit; no maker artwork used'
+    source: product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1
+  unknowns:
+  - The case taper, rim, lid, towers, ledges and label panel are scaled off the drawing, not dimensioned.
+  - 'The 173 ledges and the 178 overall only both hold if the ledges end flush with the lid''s back edge (the end view draws
+    them so): the model offsets them 3 mm toward the side terminals.'
+  - The posts stand 18.6 (terminal table) with their tops at 201 (drawing), so they sit in 1.6 mm wells in the 184 lid; the
+    well size is scaled.
+  - The container height reads 184 on the drawing and 185 in the table; the model uses the drawing's 184.
+  - 'The drawing''s 54 (side terminal to the case top) and 128 (to the base) add to 182, 2 short of its own 184: the model
+    keeps 128 and 184.'
+  - The battery that gets bought is still open (mounts.yaml ODYSSEY status open); this is the candidate.
+  cross_checks:
+  - 'batterysales.com gives 10.86 x 7.09 x 7.88 in (276 x 180 x 200). Its 7.09 in (180) is over the side bosses (the maker''s
+    178), not the 173 case: a tray sized at 180 wide fits the ledges with 3.5 mm a side.'
+  notes: []
+  script: docs/wiring/calc-data/cad/fab/ODYSSEY.py
 - id: PDM15-A
   endpoints:
   - PDM15-A
@@ -1177,7 +2241,7 @@ parts:
       sheet 1 (34-way) and sheet 2 (26-way), the numbered view placed right of the side view: third-angle (the sheet''s projection
       symbol), so it is the wire side. Rows 1-9 / 10-17 / 18-25 / 26-34 (26-way: 1-7 / 8-13 / 14-19 / 20-26), cavity 1 top-left
       with the polarity-marked lock on top'
-    names: docs/wiring/calc-data/pdm15_designations.txt (MoTeC PDM manual pinout, p.42)
+    names: docs/wiring/calc-data/pdm15_designations.txt (MoTeC PDM manual pinout, p.43)
     orientation_unknown: 'Which way the plug''s polarity side faces is not printed by MoTeC: the model puts TE''s polarity-marked
       lock on the header''s latch side (the front of the unit), which puts A1 and B1 front-left looking up. Check A1 against
       the moulded numbers before a pin is trusted.'

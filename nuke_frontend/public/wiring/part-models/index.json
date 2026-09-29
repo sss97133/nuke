@@ -2,6 +2,340 @@
  "generated": "2026-09-29",
  "source": "docs/wiring/calc-data/catalog/part_models.yaml",
  "parts": {
+  "ACC-BATT": {
+   "endpoints": [
+    "ACC-BATT"
+   ],
+   "what": "Accessory battery, Optima YellowTop D34/78 dual-purpose AGM, dual terminal (the candidate)",
+   "maker": "Optima (Clarios)",
+   "maker_pn": "8014-045 (YellowTop D34/78)",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 254.46,
+    "w": 174.9,
+    "h": 199.16
+   },
+   "frame": "origin at the centre of the base; +Z up, +X along the length, the side terminals face -Y, positive at -X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "side_terminals": "-Y",
+     "posts": "+Z",
+     "positive": "-X"
+    }
+   },
+   "colors": {
+    "case": {
+     "hex": "#abbec1",
+     "from": "Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png (Clarios, fetched 2026-09-29), k-means of the region (case, 58%); Optima states 'Case: Light Gray'"
+    },
+    "lid": {
+     "hex": "#efc626",
+     "from": "Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png (Clarios, fetched 2026-09-29), k-means of the region (cover, 59%); Optima states 'Cover: OPTIMA Yellow'"
+    },
+    "lead": {
+     "hex": "#8f9294",
+     "from": "not visible in the photo (posts are capped); drawn lead grey"
+    },
+    "cap_pos": {
+     "hex": "#b81e22",
+     "from": "Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png (Clarios, fetched 2026-09-29), k-means of the region (red + terminal cap, 87%)"
+    },
+    "cap_neg": {
+     "hex": "#121316",
+     "from": "Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png (Clarios, fetched 2026-09-29), k-means of the region (black - terminal cap, 94%)"
+    },
+    "label_black": {
+     "hex": "#201d1d",
+     "from": "Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png (Clarios, fetched 2026-09-29), k-means of the region (label top band, 63%)"
+    },
+    "label_yellow": {
+     "hex": "#f0d30e",
+     "from": "Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png (Clarios, fetched 2026-09-29), k-means of the region (label lower band, 65%)"
+    },
+    "label_white": {
+     "hex": "#ebe3e2",
+     "from": "Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png (Clarios, fetched 2026-09-29), k-means of the region (logo outline and stripe)"
+    },
+    "logo_red": {
+     "hex": "#de212f",
+     "from": "Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png (Clarios, fetched 2026-09-29), k-means of the region (logo lower half, 88%)"
+    },
+    "text_black": {
+     "hex": "#262220",
+     "from": "Clarios front photo https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png (Clarios, fetched 2026-09-29), k-means of the region ('OPTIMA' lettering)"
+    }
+   },
+   "attach": [
+    {
+     "n": "pos_post",
+     "ep": "ACC-BATT",
+     "at": [
+      -69.0,
+      -45.05,
+      199.16
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "post",
+     "note": "SAE + post (size assumed); #32 via the MIDI holder, DCDC_OUT"
+    },
+    {
+     "n": "neg_post",
+     "ep": "ACC-BATT",
+     "at": [
+      68.6,
+      -45.05,
+      199.16
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "post",
+     "note": "SAE - post; ACC_NEG"
+    },
+    {
+     "n": "pos_side",
+     "ep": "ACC-BATT",
+     "at": [
+      -40.5,
+      -95.45,
+      138.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "stud",
+     "note": "GM side terminal +, 3/8-16"
+    },
+    {
+     "n": "neg_side",
+     "ep": "ACC-BATT",
+     "at": [
+      45.0,
+      -95.45,
+      138.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "stud",
+     "note": "GM side terminal -, 3/8-16"
+    }
+   ],
+   "mount": [
+    {
+     "n": "base",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "stands on its plinth; the hold-down clamps the cover or the plinth (tray not set)"
+    }
+   ]
+  },
+  "DCDC": {
+   "endpoints": [
+    "DCDC"
+   ],
+   "what": "DC-DC charger, Victron Orion-Tr Smart 12/12-30A (360 W) non-isolated",
+   "maker": "Victron Energy",
+   "maker_pn": "ORI121236140 (Orion-Tr Smart 12/12-30A non-isolated)",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 186.0,
+    "w": 132.3,
+    "h": 84.2
+   },
+   "frame": "origin at the centre of the base; +Z up, +X along the 186 length, the terminal block faces -Y, remote plug at -X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "terminals": "-Y",
+     "label": "+Z",
+     "remote": "-Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#2490d6",
+     "from": "Victron product photo https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png (Victron, fetched 2026-09-29), k-means of the region (housing, 70%)"
+    },
+    "sink": {
+     "hex": "#2a2925",
+     "from": "Victron product photo https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png (Victron, fetched 2026-09-29), k-means of the region (heatsink fins and flanges, 67%)"
+    },
+    "block": {
+     "hex": "#373430",
+     "from": "Victron product photo https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png (Victron, fetched 2026-09-29), k-means of the region (terminal block, 74%)"
+    },
+    "clamp": {
+     "hex": "#c4ba9c",
+     "from": "Victron product photo https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png (Victron, fetched 2026-09-29), k-means of the region (terminal clamps, 79%)"
+    },
+    "screw": {
+     "hex": "#b8bcc0",
+     "from": "terminal clamp metal: not sampled (small); drawn steel"
+    },
+    "remote": {
+     "hex": "#59a87f",
+     "from": "Victron product photo https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png (Victron, fetched 2026-09-29), k-means of the region (remote plug, the lit face)"
+    },
+    "mark_white": {
+     "hex": "#f4f6f8",
+     "from": "Victron product photo https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png (Victron, fetched 2026-09-29), k-means of the region (label lettering, near-white)"
+    },
+    "stripe": {
+     "hex": "#f97d09",
+     "from": "Victron product photo https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png (Victron, fetched 2026-09-29), k-means of the region (orange stripe, 85%)"
+    }
+   },
+   "attach": [
+    {
+     "n": "in_pos",
+     "ep": "DCDC",
+     "at": [
+      -10.1,
+      -64.6,
+      52.5
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "IN + (input from the Odyssey side, DCDC_IN); bare fine-strand wire, 1.6 Nm (manual 4.2, 4.4)"
+    },
+    {
+     "n": "gnd",
+     "ep": "DCDC",
+     "at": [
+      0.0,
+      -64.6,
+      52.5
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "GND - (DCDC_GND); bare fine-strand wire, 1.6 Nm (manual 4.2, 4.4)"
+    },
+    {
+     "n": "out_pos",
+     "ep": "DCDC",
+     "at": [
+      10.1,
+      -64.6,
+      52.5
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "screw terminal",
+     "note": "OUT + (to the accessory battery, DCDC_OUT); bare fine-strand wire, 1.6 Nm (manual 4.2, 4.4)"
+    },
+    {
+     "n": "remote",
+     "ep": "DCDC",
+     "at": [
+      -43.4,
+      -65.4,
+      46.7
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "plug",
+     "note": "remote on/off L / H, unused in this build (wire bridge in)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "slot_LF",
+     "at": [
+      -87.0,
+      -35.75,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 8.0,
+     "note": "open slot, 8 wide with an R4 end, 6 in from the plate edge"
+    },
+    {
+     "n": "slot_LB",
+     "at": [
+      -87.0,
+      35.75,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 8.0,
+     "note": "open slot, 8 wide with an R4 end, 6 in from the plate edge"
+    },
+    {
+     "n": "slot_RF",
+     "at": [
+      87.0,
+      -35.75,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 8.0,
+     "note": "open slot, 8 wide with an R4 end, 6 in from the plate edge"
+    },
+    {
+     "n": "slot_RB",
+     "at": [
+      87.0,
+      35.75,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 8.0,
+     "note": "open slot, 8 wide with an R4 end, 6 in from the plate edge"
+    }
+   ]
+  },
   "M130-A": {
    "endpoints": [
     "M130-A",
@@ -157,6 +491,164 @@
     "budget_mm": 80.0,
     "source": "receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md: 60-80 mm below the connector face for the plug and boot"
    }
+  },
+  "ODYSSEY": {
+   "endpoints": [
+    "ODYSSEY"
+   ],
+   "what": "Running battery, Odyssey Extreme group 34/78, dual terminal (SAE top posts + GM side studs)",
+   "maker": "EnerSys (Odyssey)",
+   "maker_pn": "34/78-PC1500DT (ODX-AGM34 78)",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 277.0,
+    "w": 178.0,
+    "h": 201.0
+   },
+   "frame": "origin at the centre of the base; +Z up, +X along the length, the side terminals face -Y, positive at -X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "side_terminals": "-Y",
+     "posts": "+Z",
+     "positive": "-X"
+    }
+   },
+   "colors": {
+    "case": {
+     "hex": "#272526",
+     "from": "product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means of the region (case, 90%)"
+    },
+    "lid": {
+     "hex": "#e61d2c",
+     "from": "product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means of the region (lid, 91%)"
+    },
+    "lead": {
+     "hex": "#8f9294",
+     "from": "not visible in the photo (posts are capped); drawn lead grey"
+    },
+    "cap_pos": {
+     "hex": "#e71c37",
+     "from": "product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means of the region (red + side-terminal cap, 92%)"
+    },
+    "cap_neg": {
+     "hex": "#202020",
+     "from": "product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means of the region (black - side-terminal cap, 79%)"
+    },
+    "label": {
+     "hex": "#23232c",
+     "from": "product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means of the region (label background, 71%)"
+    },
+    "label_red": {
+     "hex": "#f43210",
+     "from": "product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means of the region (label's red band, 79%)"
+    },
+    "mark_red": {
+     "hex": "#fc330f",
+     "from": "product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means of the region ('ODYSSEY' lettering)"
+    },
+    "mark_white": {
+     "hex": "#f2f2f2",
+     "from": "product photo in reference_documents/component_drawings/Odyssey_PC1500DT_Datasheet.pdf p.1 (EnerSys), k-means of the region (white lettering; near-white, clipped in the photo)"
+    }
+   },
+   "attach": [
+    {
+     "n": "pos_post",
+     "ep": "ODYSSEY",
+     "at": [
+      -105.0,
+      -50.5,
+      201.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "post",
+     "note": "SAE + post, 19.3 mm at the base, 17.2 at the top, 18.6 tall"
+    },
+    {
+     "n": "neg_post",
+     "ep": "ODYSSEY",
+     "at": [
+      105.0,
+      -50.5,
+      201.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "post",
+     "note": "SAE - post, 17.7 / 15.6 mm, 18.6 tall"
+    },
+    {
+     "n": "pos_side",
+     "ep": "ODYSSEY",
+     "at": [
+      -105.0,
+      -94.5,
+      128.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "stud",
+     "note": "GM side terminal +, 3/8-16 UNC, 0.34 in deep"
+    },
+    {
+     "n": "neg_side",
+     "ep": "ODYSSEY",
+     "at": [
+      105.0,
+      -94.5,
+      128.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "stud",
+     "note": "GM side terminal -, 3/8-16 UNC"
+    }
+   ],
+   "mount": [
+    {
+     "n": "ledge_front",
+     "at": [
+      0,
+      -86.0,
+      12.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "hold-down ledge along the side-terminal (-Y) side"
+    },
+    {
+     "n": "ledge_rear",
+     "at": [
+      0,
+      80.0,
+      12.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "hold-down ledge along the +Y side, flush with the lid's back edge"
+    }
+   ]
   },
   "PDM15-A": {
    "endpoints": [

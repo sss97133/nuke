@@ -5,7 +5,7 @@ MoTeC's PDM user manual draws both on one sheet ("PDM15 and PDM30", printed p.47
 (34-way A, 26-way B, 67.5 mm span). What differs from the M130 is the M6 power stud on the flat case front,
 74.3 mm above the bottom edge and 17.9 mm proud. What differs between the two PDMs is inside (15 vs 30 outputs,
 80 vs 100 A, 260 vs 270 g, specifications p.35) and the label; their cases and connectors are the same (p.35 case
-size table, p.42 PDM15 connectors, p.44 PDM30 connectors).
+size table, p.43 PDM15 connectors, p.44 PDM30 connectors).
 """
 import motec_m1case as M1
 import superseal as SS
@@ -112,7 +112,7 @@ def make_spec(model):
         "keepout_src": KO,
         "designations": f"{model.lower()}_designations.txt", "pin_fmt": "{k}{n}",
         "designations_src": f"docs/wiring/calc-data/{model.lower()}_designations.txt (MoTeC PDM manual pinout, "
-                            f"{'p.44' if model == 'PDM30' else 'p.42'})",
+                            f"{'p.44' if model == 'PDM30' else 'p.43'})",
         "pin_orientation_note": ("Which way the plug's polarity side faces is not printed by MoTeC: the model puts TE's "
                                  "polarity-marked lock on the header's latch side (the front of the unit), which puts A1 and "
                                  "B1 front-left looking up. Check A1 against the moulded numbers before a pin is trusted."),

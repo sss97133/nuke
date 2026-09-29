@@ -21,6 +21,7 @@ upright = "--upright" in argv
 px = int(argv[argv.index("--px") + 1]) if "--px" in argv else 1600
 LIGHT = float(argv[argv.index("--light") + 1]) if "--light" in argv else 0.042   # calibrated with the edge lights: the M130 case face renders near the photo's #2d2e2f
 FAST = "--fast" in argv
+PHOTO_EL = float(argv[argv.index("--photo-el") + 1]) if "--photo-el" in argv else 12.0
 out.mkdir(parents=True, exist_ok=True)
 pid = glb.stem
 
@@ -244,5 +245,5 @@ if FAST:
 else:
     shoot("hero", 38, 22, px, int(px * 0.75), show_clear=False)
     shoot("clearance", 35, -12 if not upright else 18, px, int(px * 0.9), show_clear=True, fit=1.08)
-    shoot("photo_match", 0, 12, 1000, 1000, show_clear=False, transparent=True, fit=1.3, show_mated=False)
+    shoot("photo_match", 0, PHOTO_EL, 1000, 1000, show_clear=False, transparent=True, fit=1.3, show_mated=False)
     shoot("bare", 38, 22, px, int(px * 0.75), show_clear=False, show_mated=False)

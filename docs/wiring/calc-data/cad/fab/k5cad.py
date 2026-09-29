@@ -16,6 +16,7 @@ Nothing here traces a maker's image: shapes come from the numbers.
 """
 import json
 import math
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -146,9 +147,13 @@ def _set_finishes(path, finish_of):
 
 
 # ------------------------------------------------------------------------------------------ the drawing
-VIEWS = {  # name: (eye direction from the part, up hint)
+VIEWS = {  # name: (eye direction from the part, up hint). "wall" parts: maker's up is +Y, the face is +Z.
     "front": ((0, 0, 1), (0, 1, 0)), "top": ((0, 1, 0), (0, 0, -1)), "right": ((1, 0, 0), (0, 1, 0)),
     "bottom": ((0, -1, 0), (0, 0, 1)), "left": ((-1, 0, 0), (0, 1, 0)), "back": ((0, 0, -1), (0, 1, 0)),
+}
+VIEWS_FLOOR = {  # "floor" parts stand on their base: maker's up is +Z, the front faces -Y.
+    "front": ((0, -1, 0), (0, 0, 1)), "top": ((0, 0, 1), (0, 1, 0)), "right": ((1, 0, 0), (0, 0, 1)),
+    "left": ((-1, 0, 0), (0, 0, 1)), "back": ((0, 1, 0), (0, 0, 1)), "bottom": ((0, 0, -1), (0, -1, 0)),
 }
 
 
@@ -162,9 +167,10 @@ def _norm(a):
 
 
 class View:
-    def __init__(self, sheet, kind, shapes, origin, hidden=True, label=None):
+    def __init__(self, sheet, kind, shapes, origin, hidden=True, label=None, viewset="wall", scale=1.0):
         self.sheet, self.kind, self.ox, self.oy = sheet, kind, origin[0], origin[1]
-        e, up = VIEWS[kind]
+        self.s = scale
+        e, up = (VIEWS_FLOOR if viewset == "floor" else VIEWS)[kind]
         f = tuple(-c for c in e)
         self.r = _norm(_cross(f, up))
         self.t = _norm(_cross(self.r, f))
@@ -185,10 +191,10 @@ class View:
     def xy(self, p):
         """World point (mm) -> sheet point (mm, y down)."""
         u, w = self.uv(p)
-        return (self.ox + u, self.oy - w)
+        return (self.ox + u * self.s, self.oy - w * self.s)
 
     def _uv_xy(self, u, w):
-        return (self.ox + u, self.oy - w)
+        return (self.ox + u * self.s, self.oy - w * self.s)
 
     def svg(self):
         out = []
@@ -201,7 +207,7 @@ class View:
                 else:
                     n = max(8, min(64, int(e.length / 1.2)))
                     pts = [e.position_at(i / n) for i in range(n + 1)]
-                d.append("M" + " L".join(f"{self.ox + p.X:.2f},{self.oy - p.Y:.2f}" for p in pts))
+                d.append("M" + " L".join(f"{self.ox + p.X * self.s:.2f},{self.oy - p.Y * self.s:.2f}" for p in pts))
             if d:
                 out.append(f'<path class="{cls}" d="{" ".join(d)}"/>')
         return "\n".join(out)
@@ -213,8 +219,8 @@ class Sheet:
         self.views = {}
         self.els = []
 
-    def view(self, kind, shapes, origin, hidden=True, label=None):
-        vw = View(self, kind, shapes, origin, hidden=hidden, label=label)
+    def view(self, kind, shapes, origin, hidden=True, label=None, viewset="wall", scale=1.0):
+        vw = View(self, kind, shapes, origin, hidden=hidden, label=label, viewset=viewset, scale=scale)
         self.views[kind] = vw
         return vw
 
@@ -244,19 +250,22 @@ class Sheet:
         basis = dimv.basis if isinstance(dimv, Dim) else "maker"
         color = BASIS_COLOR.get(basis, "#1a2027")
         a, b = view.uv(p1), view.uv(p2)
+        k = 1.0 / view.s
+        offset = offset * k
+        g1, g2 = 0.8 * k, 1.2 * k
         if axis is None:
             axis = "h" if abs(b[0] - a[0]) >= abs(b[1] - a[1]) else "v"
         if axis == "h":
             yv = max(a[1], b[1]) + offset if offset > 0 else min(a[1], b[1]) + offset
             A, B = view._uv_xy(a[0], yv), view._uv_xy(b[0], yv)
-            self.line(view._uv_xy(a[0], a[1] + (0.8 if offset > 0 else -0.8)), view._uv_xy(a[0], yv + (1.2 if offset > 0 else -1.2)), "ext")
-            self.line(view._uv_xy(b[0], b[1] + (0.8 if offset > 0 else -0.8)), view._uv_xy(b[0], yv + (1.2 if offset > 0 else -1.2)), "ext")
+            self.line(view._uv_xy(a[0], a[1] + (g1 if offset > 0 else -g1)), view._uv_xy(a[0], yv + (g2 if offset > 0 else -g2)), "ext")
+            self.line(view._uv_xy(b[0], b[1] + (g1 if offset > 0 else -g1)), view._uv_xy(b[0], yv + (g2 if offset > 0 else -g2)), "ext")
             meas = abs(b[0] - a[0])
         else:
             xv = max(a[0], b[0]) + offset if offset > 0 else min(a[0], b[0]) + offset
             A, B = view._uv_xy(xv, a[1]), view._uv_xy(xv, b[1])
-            self.line(view._uv_xy(a[0] + (0.8 if offset > 0 else -0.8), a[1]), view._uv_xy(xv + (1.2 if offset > 0 else -1.2), a[1]), "ext")
-            self.line(view._uv_xy(b[0] + (0.8 if offset > 0 else -0.8), b[1]), view._uv_xy(xv + (1.2 if offset > 0 else -1.2), b[1]), "ext")
+            self.line(view._uv_xy(a[0] + (g1 if offset > 0 else -g1), a[1]), view._uv_xy(xv + (g2 if offset > 0 else -g2), a[1]), "ext")
+            self.line(view._uv_xy(b[0] + (g1 if offset > 0 else -g1), b[1]), view._uv_xy(xv + (g2 if offset > 0 else -g2), b[1]), "ext")
             meas = abs(b[1] - a[1])
         self.els.append(f'<line x1="{A[0]:.2f}" y1="{A[1]:.2f}" x2="{B[0]:.2f}" y2="{B[1]:.2f}" stroke="{color}" stroke-width="0.18"/>')
         self._arrow(A, (A[0] - B[0], A[1] - B[1]), color)
@@ -268,7 +277,7 @@ class Sheet:
             text = "≈" + text
         text = prefix + text
         mid = ((A[0] + B[0]) / 2, (A[1] + B[1]) / 2)
-        small = meas < 3.2 * max(2, len(text)) * 0.55
+        small = meas * view.s < 3.2 * max(2, len(text)) * 0.55
         if axis == "h":
             if small:
                 self.text((max(A[0], B[0]) + 1.5, mid[1] + 1.0), text, color=color, anchor="start")
@@ -357,3 +366,177 @@ class Sheet:
                f'<rect x="5" y="5" width="{self.w - 10}" height="{self.h - 10}" fill="none" stroke="#10151a" stroke-width="0.5"/>\n'
                f'{body_}\n' + "\n".join(self.els) + "\n</svg>\n")
         Path(path).write_text(svg)
+
+
+# ------------------------------------------------------------------------------------------ generic parts
+def checks_from(mod, bodies):
+    """mod.CHECKS: [(name, fn(bodies) -> model value, printed value, tol)]."""
+    out = []
+    for name, fn, want, *tol in getattr(mod, "CHECKS", []):
+        got = fn(bodies)
+        tl = tol[0] if tol else 0.05
+        out.append({"check": name, "model": round(got, 3) if isinstance(got, float) else got, "drawing": want,
+                    "ok": (abs(got - want) <= tl) if isinstance(want, (int, float)) and not isinstance(want, bool) else got == want})
+    return out
+
+
+def meta_for(mod, bodies):
+    A = mod.PART
+    return {"id": A["pid"], "endpoints": A["endpoints"], "what": A["what"], "maker": A["maker"], "maker_pn": A["pn"],
+            "shape_basis": A["shape_basis"], "dims_mm": A["dims_mm"], "dims_note": A.get("dims_note", ""),
+            "frame": A["frame"], "axes": A["axes"],
+            "colors": {k: {"hex": c[0], "from": c[1]} for k, c in mod.COLORS.items()},
+            "attach": mod.attach_points(), "mount": mod.mount_points() if hasattr(mod, "mount_points") else [],
+            **({"keepout": A["keepout"]} if A.get("keepout") else {}),
+            "params": params_table(mod.P), "checks": checks_from(mod, bodies),
+            "branding": {"what": A.get("branding", []),
+                         "basis": "branding, redrawn from photo: text and shapes sized off the maker's product photo; fonts "
+                                  "are stand-ins; cosmetic, never used for fit; no maker artwork used",
+                         "source": A.get("photo_short", "")} if A.get("branding") else {},
+            "unknowns": A.get("unknowns", []), "cross_checks": A.get("cross_checks", []), "notes": A.get("notes", [])}
+
+
+def _extent(view, shapes):
+    lo, hi = [1e9, 1e9], [-1e9, -1e9]
+    for s in shapes:
+        bb = s.bounding_box()
+        for x in (bb.min.X, bb.max.X):
+            for y in (bb.min.Y, bb.max.Y):
+                for z in (bb.min.Z, bb.max.Z):
+                    u, w = view.uv((x, y, z))
+                    lo, hi = [min(lo[0], u), min(lo[1], w)], [max(hi[0], u), max(hi[1], w)]
+    return lo, hi
+
+
+def auto_drawing(mod, bodies, extra, meta, path):
+    """Third-angle FRONT / RIGHT / TOP at a standard scale that fits, overall dimensions from the model, the part's
+    own dimensions (mod.annotate), the title block and the dimension table."""
+    A = mod.PART
+    vs = A.get("viewset", "floor")
+    solid = [(b, "solid") for b in bodies]
+    ko = [(b, "keepout") for b in extra if b.label.startswith("keep-out")]
+    mated = [(b, "mated") for b in extra if not b.label.startswith("keep-out")]
+    probe = View(None, "front", [], (0, 0), viewset=vs)
+    probe_r = View(None, "right", [], (0, 0), viewset=vs)
+    probe_t = View(None, "top", [], (0, 0), viewset=vs)
+    shp = bodies + [b for b in extra]
+    (fl, fh), (rl, rh), (tl, th) = _extent(probe, shp), _extent(probe_r, shp), _extent(probe_t, shp)
+    fw, fhh = fh[0] - fl[0], fh[1] - fl[1]
+    rw, th_ = rh[0] - rl[0], th[1] - tl[1]
+    avail_w, avail_h = 230.0, 230.0
+    scale = 1.0
+    for s in (1.0, 0.5, 0.4, 0.25, 0.2, 0.1, 0.05):
+        if (fw + rw) * s + 60 <= avail_w and (fhh + th_) * s + 70 <= avail_h:
+            scale = s
+            break
+    else:
+        scale = 0.05
+    FX = 30 + (-fl[0]) * scale + 10
+    FY = 40 + th_ * scale + 25 + fh[1] * scale
+    RX = FX + fh[0] * scale + 35 + (-rl[0]) * scale
+    TY = FY - fh[1] * scale - 22 - th[1] * scale
+    S = Sheet(480, 272, A["pid"])
+    front = S.view("front", solid + mated, (FX, FY), hidden=False, viewset=vs, scale=scale)
+    right = S.view("right", solid + mated + ko, (RX, FY), hidden=True, viewset=vs, scale=scale)
+    top = S.view("top", solid + mated, (FX, TY), hidden=False, viewset=vs, scale=scale)
+    S.text((FX + (fl[0] + fh[0]) / 2 * scale, FY - fl[1] * scale + 14), "FRONT VIEW", size=3.4, weight="bold")
+    S.text((RX + (rl[0] + rh[0]) / 2 * scale, FY - rl[1] * scale + 14), "RIGHT VIEW", size=3.4, weight="bold")
+    S.text((FX + (tl[0] + th[0]) / 2 * scale, TY - th[1] * scale - 5), "TOP VIEW", size=3.4, weight="bold")
+    if hasattr(mod, "annotate"):
+        mod.annotate(S, {"front": front, "right": right, "top": top})
+    tx, ty = 272, 18
+    ratio = {1.0: "1:1", 0.5: "1:2", 0.4: "1:2.5", 0.25: "1:4", 0.2: "1:5", 0.1: "1:10", 0.05: "1:20"}[scale]
+    S.text((tx, ty), A["title"], size=5.0, anchor="start", weight="bold")
+    S.text((tx, ty + 6), f"K5 harness reference model (build123d) · mm · {ratio} · third-angle projection", size=2.8, anchor="start")
+    S.text((tx, ty + 10.5), f"Redrawn from {A['maker']}'s published numbers, not a {A['maker']} drawing. Endpoints "
+                            f"{', '.join(A['endpoints'])}.", size=2.8, anchor="start")
+    S.text((tx, ty + 15), "Origin: " + A["frame"][:120], size=2.6, anchor="start")
+    S.text((tx, ty + 21), "blue = printed by the maker · orange ≈ scaled off the maker's drawing · purple ≈ sized off a photo · "
+                          "green = our clearance · red = assumed", size=2.6, anchor="start", weight="bold")
+    y = S.table(mod.P, tx, ty + 28, A["refs"])
+    S.text((tx, y + 2), "Colours: " + ", ".join(f"{k} {c[0]}" for k, c in mod.COLORS.items())[:150], size=2.3, anchor="start")
+    yy = y + 5.5
+    for line, col in A.get("drawing_notes", []):
+        S.text((tx, yy), line, size=2.3, anchor="start", color=BASIS_COLOR.get(col, col))
+        yy += 3.5
+    S.h = max(S.h, yy + 10, FY - min(fl[1], rl[1]) * scale + 24)
+    S.write(path, meta)
+
+
+def run(mod, out):
+    """Build a generic part script: STEP (+ keep-out), GLB (with cosmetics), params.json, the drawing."""
+    A = mod.PART
+    pid = A["pid"]
+    out = Path(out).expanduser()
+    out.mkdir(parents=True, exist_ok=True)
+    bodies, extra, cosmetic = mod.build()
+    desc = [f"K5 harness reference model: {A['title']} (not a {A['maker']} file)", "Units mm. Frame: " + A["frame"]]
+    desc += [f"{k} = {d.value:g} [{d.basis}] {d.source}" for k, d in mod.P.items()]
+    write_step(Compound(children=bodies, label=pid), out / f"{pid}.step", desc)
+    if extra:
+        write_step(Compound(children=extra, label=f"{pid} keep-out"), out / f"{pid}_keepout.step",
+                   [f"K5 harness: clearance around the {A['title']} (design aid, not a product)"])
+    write_glb(bodies + cosmetic + extra, out / f"{pid}.glb")
+    if hasattr(mod, "terminals"):
+        write_pins(mod, out)
+    meta = meta_for(mod, bodies)
+    for c in meta["checks"]:
+        print(("ok  " if c["ok"] else "BAD ") + f"{c['check']}: model {c['model']} vs drawing {c['drawing']}")
+    auto_drawing(mod, bodies, extra, meta, out / f"{pid}_drawing.svg")
+    (out / f"{pid}.params.json").write_text(json.dumps(meta, indent=1, ensure_ascii=False))
+    bb = Compound(children=bodies).bounding_box()
+    print(f"{pid}: {bb.size.X:.2f} x {bb.size.Y:.2f} x {bb.size.Z:.2f} mm")
+    bad = [c for c in meta["checks"] if not c["ok"]]
+    if bad:
+        raise SystemExit(f"{len(bad)} checks failed")
+
+
+# ------------------------------------------------------------------------------------------ the build's wires
+CALC = Path(__file__).resolve().parents[2]          # docs/wiring/calc-data
+_REG = {}
+
+
+def registry():
+    if not _REG:
+        reg = json.loads((CALC / "k5_registry.json").read_text())
+        wires = {w["id"]: w for w in reg.get("implied", [])}
+        wires.update({w["id"]: w for w in reg["wires"]})
+        _REG.update({"wires": wires, "terminations": reg["terminations"]})
+    return _REG
+
+
+def wire_rows(ids):
+    W = registry()["wires"]
+    return [{"id": w, "label": W.get(w, {}).get("label"), "color": W.get(w, {}).get("color"), "awg": W.get(w, {}).get("awg")}
+            for w in ids]
+
+
+def glb_point(p):
+    """Part frame (mm, Z up) -> the GLB's own frame (metres, glTF Y up: x, z, -y)."""
+    x, y, z = p
+    return [round(x / 1000, 5), round(z / 1000, 5), round(-y / 1000, 5)]
+
+
+def glb_dir(d):
+    x, y, z = d
+    return [x, z, -y]
+
+
+def write_pins(mod, out):
+    """<id>.pins.json for a part whose ends are studs or terminals: mod.terminals() -> [{pin, name, at, dir,
+    endpoint, match (regex on the registry termination's cavity text)}]."""
+    A = mod.PART
+    rows = []
+    terms = registry()["terminations"]
+    for tm in mod.terminals():
+        rx = re.compile(tm["match"], re.I)
+        ids = [x["wire"] for x in terms if x["endpoint"] == tm["endpoint"] and rx.search(str(x.get("cavity", "")))]
+        rows.append({"pin": tm["pin"], "endpoint": tm["endpoint"], "name": tm["name"], "full_name": tm.get("full_name", tm["name"]),
+                     "pin_tip_glb_m": glb_point(tm["at"]), "wire_side_glb_m": glb_point(tm["at"]),
+                     "exit_dir_glb": glb_dir(tm["dir"]), "wires": wire_rows(ids)})
+    (Path(out) / f"{A['pid']}.pins.json").write_text(json.dumps(
+        {"id": A["pid"], "frame": "GLB coordinates: metres, glTF Y-up (part x, z, -y); pin_tip = where the lug or wire lands, "
+                                  "exit_dir = the way the cable leaves",
+         "wires": "docs/wiring/calc-data/k5_registry.json terminations (endpoint + terminal text)", "cavities": rows},
+        indent=1, ensure_ascii=False))
+    return rows

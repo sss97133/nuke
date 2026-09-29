@@ -173,7 +173,8 @@ class M1Unit:
         side, the wire exit, the maker's pin name and the build's wires (registry terminations)."""
         g = self.g
         reg = json.loads((CALC / "k5_registry.json").read_text())
-        wires = {w["id"]: w for w in reg["wires"]}
+        wires = {w["id"]: w for w in reg.get("implied", [])}      # pin tails, grounds and trunks live here
+        wires.update({w["id"]: w for w in reg["wires"]})
         by_cav = {}
         for tm in reg["terminations"]:
             m = re.match(r"^([AB])0*(\d+)$", str(tm.get("cavity", "")))
@@ -185,7 +186,12 @@ class M1Unit:
             if len(parts) >= 3:
                 m = re.match(r"^([AB])0*(\d+)$", parts[0].strip())
                 if m:
-                    names[(m.group(1), int(m.group(2)))] = (parts[1].strip(), parts[2].strip())
+                    nm = parts[1].strip()
+                    chunks = [c for c in re.split(r"\s{3,}", parts[2].strip()) if c]
+                    if len(chunks) >= 2 and len(chunks[0]) <= 3:      # "CAN|Hi   CAN High": the table split "CAN Hi"
+                        nm, chunks = f"{nm} {chunks[0]}", chunks[1:]
+                    full = chunks[0] if chunks else ""
+                    names[(m.group(1), int(m.group(2)))] = (nm, full, "; ".join(chunks[1:]))
         floor = self.HDR_FACE + g("cav_depth")
         tip_y = floor - 8.5
         rear_y = self.HDR_FACE - (g("plug_l") - g("nose_l"))
@@ -193,17 +199,26 @@ class M1Unit:
         for key, ways, cx in (("A", 34, self.A_CX), ("B", 26, self.B_CX)):
             ep = self.s["endpoints"][key]
             for n, row, dx, dz in cavity_layout(ways, g("pin_pitch"), g("row_gap_outer"), g("row_gap_inner")):
-                nm, full = names.get((key, n), ("?", "not in the designations file"))
+                nm, full, oe = names.get((key, n), ("?", "not in the designations file", ""))
                 ws = by_cav.get((ep, key, n), [])
                 rows.append({
                     "pin": f"{key}{n:02d}", "maker_pin": self.s.get("pin_fmt", "{k}{n:02d}").format(k=key, n=n),
                     "endpoint": ep, "cavity": n, "row": row,
-                    "name": nm, "full_name": full,
+                    "name": nm, "full_name": full, **({"oe_note": oe} if oe else {}),
                     "pin_tip_glb_m": _glb((cx + dx, tip_y, self.HDR_Z + dz)),
                     "wire_side_glb_m": _glb((cx + dx, rear_y, self.HDR_Z + dz)),
                     "exit_dir_glb": _glb_dir((0, -1, 0)),
                     "wires": [{"id": w, "label": wires.get(w, {}).get("label"), "color": wires.get(w, {}).get("color"),
                                "awg": wires.get(w, {}).get("awg")} for w in ws]})
+        if self.s.get("stud"):
+            ep = self.s["endpoints"]["stud"]
+            ws = [tm["wire"] for tm in reg["terminations"] if tm["endpoint"] == ep]
+            end = (0.0, self.Y0 + g("stud_y"), self.T + g("stud_len"))
+            rows.append({"pin": "STUD", "maker_pin": "C1 (M6 stud)", "endpoint": ep, "cavity": None, "row": None,
+                         "name": "VBATT+", "full_name": "Battery positive, M6 stud (eyelet and M6 nut)",
+                         "pin_tip_glb_m": _glb(end), "wire_side_glb_m": _glb(end), "exit_dir_glb": _glb_dir((0, 1, 0)),
+                         "wires": [{"id": w, "label": wires.get(w, {}).get("label"), "color": wires.get(w, {}).get("color"),
+                                    "awg": wires.get(w, {}).get("awg")} for w in ws]})
         return rows
 
     def stud_solids(self):
@@ -492,7 +507,7 @@ class M1Unit:
                         f'width="{self.g("latch_w") * sc:.1f}" height="{self.g("latch_proud") * sc:.1f}" fill="#d9dde1" stroke="#10151a" stroke-width="0.4"/>')
             cell.append(f'<text x="{ox[key]:.1f}" y="{y0 - 12:.1f}" font-size="5" text-anchor="middle" font-weight="bold">'
                         f'{esc(self.s["endpoints"][key])} · {ways}-way (latch side up = the front of the unit)</text>')
-            for r in [r for r in rows if r["pin"].startswith(key)]:
+            for r in [r for r in rows if r["pin"].startswith(key) and r["cavity"]]:
                 lay = {n: (dx, dz) for n, _row, dx, dz in cavity_layout(ways)}
                 dx, dz = lay[r["cavity"]]
                 cx, cy = ox[key] + dx * sc, oy - dz * sc

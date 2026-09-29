@@ -61,7 +61,11 @@ def load_parts():
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         built = mod.build()
-        meta = mod.part_meta(built[0])
+        if hasattr(mod, "part_meta"):
+            meta = mod.part_meta(built[0])
+        else:
+            import k5cad
+            meta = k5cad.meta_for(mod, built[0])
         meta["script"] = str(f.relative_to(REPO))
         parts.append(meta)
     return parts, ends
