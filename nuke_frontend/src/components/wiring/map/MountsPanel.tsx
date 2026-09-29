@@ -130,3 +130,23 @@ export function PartPhotos({ codes, cw }: { codes: string; cw: Colorway }) {
     </div>
   );
 }
+
+// ── THE REAL ENGINE: the K5's own photo (IMG_6531, 2026-02-01) with each plug marked where it sits. Visible plugs
+// are picked on the photo; hidden ones (crank, cam, knock, starter, O2, 6L90) are projected from the twin and
+// marked "~" and dashed. Made by docs/wiring/twin/ (photo_match.py, picks_IMG6531.json); the anchors and their
+// sources are in docs/wiring/calc-data/twin_engine_anchors.json.
+export function EnginePhoto({ vehicleId, cw }: { vehicleId?: string; cw: Colorway }) {
+  if (vehicleId !== K5_ID) return null;
+  const src = '/wiring/k5-engine-labelled.jpg';
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 1, color: cw.inkMuted, marginBottom: 4 }}>
+        ON THE REAL ENGINE — EACH PLUG WHERE IT SITS (PHOTO 2026-02-01; DASHED = HIDDEN, ~ = FROM THE TWIN, NOT PICKED ON THE PHOTO)
+      </div>
+      <a href={src} target="_blank" rel="noreferrer" title="Open full size">
+        <img src={src} alt="The K5's LS3 with each plug labelled" width={1600} height={1200} loading="lazy"
+          style={{ display: 'block', width: '100%', height: 'auto', border: frame(cw) }} />
+      </a>
+    </div>
+  );
+}

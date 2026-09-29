@@ -1,0 +1,539 @@
+{
+ "_frame": "twin metres: +x driver, -y front, +z up (measured from the TurboSquid body: Steering_Wheel at x +0.26..+0.67)",
+ "_engine_root": {
+  "Y_BELL": -1.4,
+  "Z_CRANK": 0.72,
+  "method": "photo-matched against IMG_6531 (see TWIN_ENGINE_V3.md)"
+ },
+ "_generated_by": "docs/wiring/twin/build_engine_v3.py",
+ "anchors": {
+  "inj_8": {
+   "xyz_m": [
+    -0.1589,
+    -1.54,
+    1.0759
+   ],
+   "engine_local_mm": [
+    -158.9,
+    -140.0,
+    355.9
+   ],
+   "dave_name": "inj 8",
+   "source": "injector on the Holley EFI rail at cylinder 8 (rails+injectors visible IMG_6530/6531)",
+   "method": "photo: rail/injector layout; station = cylinder station from the 111.76 mm bore spacing",
+   "confidence": "medium"
+  },
+  "inj_6": {
+   "xyz_m": [
+    -0.1589,
+    -1.6518,
+    1.0759
+   ],
+   "engine_local_mm": [
+    -158.9,
+    -251.8,
+    355.9
+   ],
+   "dave_name": "inj 6",
+   "source": "injector on the Holley EFI rail at cylinder 6 (rails+injectors visible IMG_6530/6531)",
+   "method": "photo: rail/injector layout; station = cylinder station from the 111.76 mm bore spacing",
+   "confidence": "medium"
+  },
+  "inj_4": {
+   "xyz_m": [
+    -0.1589,
+    -1.7635,
+    1.0759
+   ],
+   "engine_local_mm": [
+    -158.9,
+    -363.5,
+    355.9
+   ],
+   "dave_name": "inj 4",
+   "source": "injector on the Holley EFI rail at cylinder 4 (rails+injectors visible IMG_6530/6531)",
+   "method": "photo: rail/injector layout; station = cylinder station from the 111.76 mm bore spacing",
+   "confidence": "medium"
+  },
+  "inj_2": {
+   "xyz_m": [
+    -0.1589,
+    -1.8753,
+    1.0759
+   ],
+   "engine_local_mm": [
+    -158.9,
+    -475.3,
+    355.9
+   ],
+   "dave_name": "inj 2",
+   "source": "injector on the Holley EFI rail at cylinder 2 (rails+injectors visible IMG_6530/6531)",
+   "method": "photo: rail/injector layout; station = cylinder station from the 111.76 mm bore spacing",
+   "confidence": "medium"
+  },
+  "inj_7": {
+   "xyz_m": [
+    0.1589,
+    -1.564,
+    1.0759
+   ],
+   "engine_local_mm": [
+    158.9,
+    -164.0,
+    355.9
+   ],
+   "dave_name": "inj 7",
+   "source": "injector on the Holley EFI rail at cylinder 7 (rails+injectors visible IMG_6530/6531)",
+   "method": "photo: rail/injector layout; station = cylinder station from the 111.76 mm bore spacing",
+   "confidence": "medium"
+  },
+  "inj_5": {
+   "xyz_m": [
+    0.1589,
+    -1.6758,
+    1.0759
+   ],
+   "engine_local_mm": [
+    158.9,
+    -275.8,
+    355.9
+   ],
+   "dave_name": "inj 5",
+   "source": "injector on the Holley EFI rail at cylinder 5 (rails+injectors visible IMG_6530/6531)",
+   "method": "photo: rail/injector layout; station = cylinder station from the 111.76 mm bore spacing",
+   "confidence": "medium"
+  },
+  "inj_3": {
+   "xyz_m": [
+    0.1589,
+    -1.7875,
+    1.0759
+   ],
+   "engine_local_mm": [
+    158.9,
+    -387.5,
+    355.9
+   ],
+   "dave_name": "inj 3",
+   "source": "injector on the Holley EFI rail at cylinder 3 (rails+injectors visible IMG_6530/6531)",
+   "method": "photo: rail/injector layout; station = cylinder station from the 111.76 mm bore spacing",
+   "confidence": "medium"
+  },
+  "inj_1": {
+   "xyz_m": [
+    0.1589,
+    -1.8993,
+    1.0759
+   ],
+   "engine_local_mm": [
+    158.9,
+    -499.3,
+    355.9
+   ],
+   "dave_name": "inj 1",
+   "source": "injector on the Holley EFI rail at cylinder 1 (rails+injectors visible IMG_6530/6531)",
+   "method": "photo: rail/injector layout; station = cylinder station from the 111.76 mm bore spacing",
+   "confidence": "medium"
+  },
+  "tps": {
+   "xyz_m": [
+    -0.112,
+    -1.6996,
+    1.1477
+   ],
+   "engine_local_mm": [
+    -112.0,
+    -299.6,
+    427.7
+   ],
+   "dave_name": "TPS",
+   "source": "DBW throttle body GM 12699160 (manifest: purchased; 6-pin Hitachi connector) on the 4-bolt adapter at the 4150 pad (IMG_6531)",
+   "method": "photo: TB position; connector side on the body = estimate",
+   "confidence": "medium"
+  },
+  "map": {
+   "xyz_m": [
+    0.0,
+    -1.5696,
+    1.0627
+   ],
+   "engine_local_mm": [
+    0.0,
+    -169.6,
+    342.7
+   ],
+   "dave_name": "MAP",
+   "source": "Holley 199R10690: 'Vacuum Port Size and Thread - 3/8 NPT' on the manifold; MAP sensor mounting spot on this truck NOT recorded",
+   "method": "unknown: placed at the plenum rear as a placeholder",
+   "confidence": "unknown"
+  },
+  "iat": {
+   "xyz_m": [
+    0.0,
+    -1.7196,
+    1.2947
+   ],
+   "engine_local_mm": [
+    0.0,
+    -319.6,
+    574.7
+   ],
+   "dave_name": "IAT",
+   "source": "manifest: ACDelco 25036751 IAT; air-filter/inlet tract not built yet",
+   "method": "unknown: placeholder above the TB",
+   "confidence": "unknown"
+  },
+  "coil_1": {
+   "xyz_m": [
+    -0.0975,
+    -1.556,
+    1.023
+   ],
+   "engine_local_mm": [
+    -97.5,
+    -156.0,
+    303.0
+   ],
+   "dave_name": "coil 1",
+   "source": "Del-Stributer central coil mount (state \u00a71 locked 'DEL-Stributor, central mount, 8x D510C'); cluster location per Delmo Speed 'Del-Stributer' product page + photos CRInstalled.jpg / CRInstalled2.jpg (delmospeed.com/products/del-stributer) (rear centre, behind the intake, above the bellhousing)",
+   "method": "photo (Delmo product photos): rear-centre cluster; cylinder-to-coil assignment on the bracket UNKNOWN (numbered by position: front row 1-4 driver->passenger, rear row 5-8)",
+   "confidence": "medium-low"
+  },
+  "coil_2": {
+   "xyz_m": [
+    -0.0325,
+    -1.556,
+    1.023
+   ],
+   "engine_local_mm": [
+    -32.5,
+    -156.0,
+    303.0
+   ],
+   "dave_name": "coil 2",
+   "source": "Del-Stributer central coil mount (state \u00a71 locked 'DEL-Stributor, central mount, 8x D510C'); cluster location per Delmo Speed 'Del-Stributer' product page + photos CRInstalled.jpg / CRInstalled2.jpg (delmospeed.com/products/del-stributer) (rear centre, behind the intake, above the bellhousing)",
+   "method": "photo (Delmo product photos): rear-centre cluster; cylinder-to-coil assignment on the bracket UNKNOWN (numbered by position: front row 1-4 driver->passenger, rear row 5-8)",
+   "confidence": "medium-low"
+  },
+  "coil_3": {
+   "xyz_m": [
+    0.0325,
+    -1.556,
+    1.023
+   ],
+   "engine_local_mm": [
+    32.5,
+    -156.0,
+    303.0
+   ],
+   "dave_name": "coil 3",
+   "source": "Del-Stributer central coil mount (state \u00a71 locked 'DEL-Stributor, central mount, 8x D510C'); cluster location per Delmo Speed 'Del-Stributer' product page + photos CRInstalled.jpg / CRInstalled2.jpg (delmospeed.com/products/del-stributer) (rear centre, behind the intake, above the bellhousing)",
+   "method": "photo (Delmo product photos): rear-centre cluster; cylinder-to-coil assignment on the bracket UNKNOWN (numbered by position: front row 1-4 driver->passenger, rear row 5-8)",
+   "confidence": "medium-low"
+  },
+  "coil_4": {
+   "xyz_m": [
+    0.0975,
+    -1.556,
+    1.023
+   ],
+   "engine_local_mm": [
+    97.5,
+    -156.0,
+    303.0
+   ],
+   "dave_name": "coil 4",
+   "source": "Del-Stributer central coil mount (state \u00a71 locked 'DEL-Stributor, central mount, 8x D510C'); cluster location per Delmo Speed 'Del-Stributer' product page + photos CRInstalled.jpg / CRInstalled2.jpg (delmospeed.com/products/del-stributer) (rear centre, behind the intake, above the bellhousing)",
+   "method": "photo (Delmo product photos): rear-centre cluster; cylinder-to-coil assignment on the bracket UNKNOWN (numbered by position: front row 1-4 driver->passenger, rear row 5-8)",
+   "confidence": "medium-low"
+  },
+  "coil_5": {
+   "xyz_m": [
+    -0.0975,
+    -1.464,
+    1.023
+   ],
+   "engine_local_mm": [
+    -97.5,
+    -64.0,
+    303.0
+   ],
+   "dave_name": "coil 5",
+   "source": "Del-Stributer central coil mount (state \u00a71 locked 'DEL-Stributor, central mount, 8x D510C'); cluster location per Delmo Speed 'Del-Stributer' product page + photos CRInstalled.jpg / CRInstalled2.jpg (delmospeed.com/products/del-stributer) (rear centre, behind the intake, above the bellhousing)",
+   "method": "photo (Delmo product photos): rear-centre cluster; cylinder-to-coil assignment on the bracket UNKNOWN (numbered by position: front row 1-4 driver->passenger, rear row 5-8)",
+   "confidence": "medium-low"
+  },
+  "coil_6": {
+   "xyz_m": [
+    -0.0325,
+    -1.464,
+    1.023
+   ],
+   "engine_local_mm": [
+    -32.5,
+    -64.0,
+    303.0
+   ],
+   "dave_name": "coil 6",
+   "source": "Del-Stributer central coil mount (state \u00a71 locked 'DEL-Stributor, central mount, 8x D510C'); cluster location per Delmo Speed 'Del-Stributer' product page + photos CRInstalled.jpg / CRInstalled2.jpg (delmospeed.com/products/del-stributer) (rear centre, behind the intake, above the bellhousing)",
+   "method": "photo (Delmo product photos): rear-centre cluster; cylinder-to-coil assignment on the bracket UNKNOWN (numbered by position: front row 1-4 driver->passenger, rear row 5-8)",
+   "confidence": "medium-low"
+  },
+  "coil_7": {
+   "xyz_m": [
+    0.0325,
+    -1.464,
+    1.023
+   ],
+   "engine_local_mm": [
+    32.5,
+    -64.0,
+    303.0
+   ],
+   "dave_name": "coil 7",
+   "source": "Del-Stributer central coil mount (state \u00a71 locked 'DEL-Stributor, central mount, 8x D510C'); cluster location per Delmo Speed 'Del-Stributer' product page + photos CRInstalled.jpg / CRInstalled2.jpg (delmospeed.com/products/del-stributer) (rear centre, behind the intake, above the bellhousing)",
+   "method": "photo (Delmo product photos): rear-centre cluster; cylinder-to-coil assignment on the bracket UNKNOWN (numbered by position: front row 1-4 driver->passenger, rear row 5-8)",
+   "confidence": "medium-low"
+  },
+  "coil_8": {
+   "xyz_m": [
+    0.0975,
+    -1.464,
+    1.023
+   ],
+   "engine_local_mm": [
+    97.5,
+    -64.0,
+    303.0
+   ],
+   "dave_name": "coil 8",
+   "source": "Del-Stributer central coil mount (state \u00a71 locked 'DEL-Stributor, central mount, 8x D510C'); cluster location per Delmo Speed 'Del-Stributer' product page + photos CRInstalled.jpg / CRInstalled2.jpg (delmospeed.com/products/del-stributer) (rear centre, behind the intake, above the bellhousing)",
+   "method": "photo (Delmo product photos): rear-centre cluster; cylinder-to-coil assignment on the bracket UNKNOWN (numbered by position: front row 1-4 driver->passenger, rear row 5-8)",
+   "confidence": "medium-low"
+  },
+  "alternator": {
+   "xyz_m": [
+    0.2795,
+    -2.005,
+    1.02
+   ],
+   "engine_local_mm": [
+    279.5,
+    -605.0,
+    300.0
+   ],
+   "dave_name": "alternator plug",
+   "source": "Holley 197-302 150 A alternator on the mid-mount, DRIVER side high (IMG_6531/6532); wiring per the alternator's own sheet (Holley instruction 199R11485 'Complete Holley Mid-Mount Accessory Drive Kit' (20-180..20-205))",
+   "method": "photo: side + height; plug on the rear face = estimate",
+   "confidence": "medium"
+  },
+  "ac_clutch": {
+   "xyz_m": [
+    0.25,
+    -2.147,
+    0.72
+   ],
+   "engine_local_mm": [
+    250.0,
+    -747.0,
+    0.0
+   ],
+   "dave_name": "A/C clutch",
+   "source": "Sanden SD7 (eBay order 2026-09-24, state \u00a71) on the Holley mid-mount A/C bracket; position from the Holley kit layout, not installed yet",
+   "method": "estimate: alternator-side low per Holley instruction 199R11485 'Complete Holley Mid-Mount Accessory Drive Kit' (20-180..20-205) p1 render; NOT on the truck yet",
+   "confidence": "low"
+  },
+  "starter": {
+   "xyz_m": [
+    -0.22,
+    -1.44,
+    0.68
+   ],
+   "engine_local_mm": [
+    -220.0,
+    -40.0,
+    -40.0
+   ],
+   "dave_name": "starter",
+   "source": "GM LS starter on the right (passenger) side of the block at the rear (lsenginediy.com 'GM Gen III LS PCM/ECM: Crankshaft and Camshaft Signals Guide': CKP 'in the block above the starter'); manifest DFSR-8715 mini starter, purchased",
+   "method": "published side; solenoid terminal position = estimate",
+   "confidence": "medium"
+  },
+  "crank": {
+   "xyz_m": [
+    -0.162,
+    -1.495,
+    0.755
+   ],
+   "engine_local_mm": [
+    -162.0,
+    -95.0,
+    35.0
+   ],
+   "dave_name": "crank",
+   "source": "Gen IV 58x crank sensor (GM 12615626): 'mounted in the block above the starter' (lsenginediy.com 'GM Gen III LS PCM/ECM: Crankshaft and Camshaft Signals Guide') = right rear of the block. CORRECTS state \u00a74 'CKP AND CMP on front cover'",
+   "method": "published (right rear, above the starter); exact boss station = estimate +/-40 mm",
+   "confidence": "medium"
+  },
+  "cam": {
+   "xyz_m": [
+    0.045,
+    -2.03,
+    0.8848
+   ],
+   "engine_local_mm": [
+    45.0,
+    -630.0,
+    164.8
+   ],
+   "dave_name": "cam",
+   "source": "Gen IV cam sensor (GM 12591720) in the FRONT TIMING COVER: 'All Gen IV 24x and 58x engines have a camshaft position sensor in the front timing cover' (lsenginediy.com 'GM Gen III LS PCM/ECM: Crankshaft and Camshaft Signals Guide')",
+   "method": "published (front cover); clock position on the cover = estimate",
+   "confidence": "medium"
+  },
+  "knock_L": {
+   "xyz_m": [
+    0.158,
+    -1.705,
+    0.765
+   ],
+   "engine_local_mm": [
+    158.0,
+    -305.0,
+    45.0
+   ],
+   "dave_name": "knock L",
+   "source": "manifest: ACDelco 213-1576 / GM 12623730 x2 (Gen IV flat-response knock sensors mount on the block sides)",
+   "method": "side known (Gen IV exterior block bosses); station along the block = estimate",
+   "confidence": "low"
+  },
+  "knock_R": {
+   "xyz_m": [
+    -0.158,
+    -1.705,
+    0.765
+   ],
+   "engine_local_mm": [
+    -158.0,
+    -305.0,
+    45.0
+   ],
+   "dave_name": "knock R",
+   "source": "manifest: ACDelco 213-1576 / GM 12623730 x2 (Gen IV flat-response knock sensors mount on the block sides)",
+   "method": "side known (Gen IV exterior block bosses); station along the block = estimate",
+   "confidence": "low"
+  },
+  "coolant_temp": {
+   "xyz_m": [
+    0.2856,
+    -1.8693,
+    0.84
+   ],
+   "engine_local_mm": [
+    285.6,
+    -469.3,
+    120.0
+   ],
+   "dave_name": "coolant temp",
+   "source": "GM LS ECT in the LEFT (driver) cylinder head, front, below the exhaust ports; citation to add (GM service manual)",
+   "method": "estimate: side + station typical for LS3; not verified on this truck",
+   "confidence": "low"
+  },
+  "oil_psi": {
+   "xyz_m": [
+    0.025,
+    -1.48,
+    0.99
+   ],
+   "engine_local_mm": [
+    25.0,
+    -80.0,
+    270.0
+   ],
+   "dave_name": "oil PSI",
+   "source": "GM LS oil pressure sender at the rear top of the block behind the intake (valley rear); citation to add (GM service manual)",
+   "method": "estimate: typical LS location; the Del-Stributer plate now occupies that area - clearance to check",
+   "confidence": "low"
+  },
+  "o2_L": {
+   "xyz_m": [
+    0.375,
+    -1.31,
+    0.603
+   ],
+   "engine_local_mm": [
+    375.0,
+    90.0,
+    -117.0
+   ],
+   "dave_name": "O2 L",
+   "source": "CANDIDATE: Bosch LSU 4.9 (manifest x2, 'pre-cat') in the pipe after the collector. MoTeC LTCD user manual, Lambda Sensor Installation: 'Place the sensor on an angle between 10 and 90 degrees to the vertical with the tip of the sensor pointing down'; 'Do not place the sensor in a vertical position'; 'Place the sensor at least 1 metre from the exhaust ports to avoid excessive heat (recommended)'; sensor max continuous 850 degC. Bung not photographed.",
+   "method": "candidate: ~1.05 m of pipe from the ports, 45 deg tip-down on the upper side of the pipe; collector location from IMG_6530/6532",
+   "confidence": "candidate"
+  },
+  "o2_R": {
+   "xyz_m": [
+    -0.375,
+    -1.31,
+    0.603
+   ],
+   "engine_local_mm": [
+    -375.0,
+    90.0,
+    -117.0
+   ],
+   "dave_name": "O2 R",
+   "source": "CANDIDATE: Bosch LSU 4.9 (manifest x2, 'pre-cat') in the pipe after the collector. MoTeC LTCD user manual, Lambda Sensor Installation: 'Place the sensor on an angle between 10 and 90 degrees to the vertical with the tip of the sensor pointing down'; 'Do not place the sensor in a vertical position'; 'Place the sensor at least 1 metre from the exhaust ports to avoid excessive heat (recommended)'; sensor max continuous 850 degC. Bung not photographed.",
+   "method": "candidate: ~1.05 m of pipe from the ports, 45 deg tip-down on the upper side of the pipe; collector location from IMG_6530/6532",
+   "confidence": "candidate"
+  },
+  "trans_6L90": {
+   "xyz_m": [
+    -0.135,
+    -0.7,
+    0.75
+   ],
+   "engine_local_mm": [
+    -135.0,
+    700.0,
+    30.0
+   ],
+   "dave_name": "6L90 case",
+   "source": "Holley 199R12431 '6L80/6L90E Transmission Control 558-499' p.? 'Main Transmission Connector - Located on the passenger's rear side of the transmission'",
+   "method": "published side (passenger, rear of the transmission); exact station along the case = estimate",
+   "confidence": "medium"
+  },
+  "ltcd_candidate_A": {
+   "xyz_m": [
+    0.0,
+    -1.44,
+    0.86
+   ],
+   "engine_local_mm": [
+    0.0,
+    -1440.0,
+    860.0
+   ],
+   "dave_name": "LTCD (A)",
+   "source": "CANDIDATE MoTeC LTCD box: engine-side firewall, low centre above the tunnel: reaches both collectors symmetrically, away from the headers. LTCD user manual: mount as far as possible from the exhaust; max ambient 100 degC, max internal 125 degC; holes 32 mm apart. Sensor lead length not found in the manual text = unknown.",
+   "method": "candidate, chosen by reach to both bungs and heat; owner/Dave decide",
+   "confidence": "candidate"
+  },
+  "ltcd_candidate_B": {
+   "xyz_m": [
+    -0.4,
+    -1.38,
+    0.62
+   ],
+   "engine_local_mm": [
+    -400.0,
+    -1380.0,
+    620.0
+   ],
+   "dave_name": "LTCD (B)",
+   "source": "CANDIDATE MoTeC LTCD box: passenger frame rail inner face by the bellhousing: shortest leads, but closer to the passenger collector heat. LTCD user manual: mount as far as possible from the exhaust; max ambient 100 degC, max internal 125 degC; holes 32 mm apart. Sensor lead length not found in the manual text = unknown.",
+   "method": "candidate, chosen by reach to both bungs and heat; owner/Dave decide",
+   "confidence": "candidate"
+  }
+ }
+}
