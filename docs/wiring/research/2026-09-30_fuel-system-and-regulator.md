@@ -271,6 +271,15 @@ Gauges and specs are from the canon: 22 AWG = M22759/16-22, 12–20 AWG = M22759
     M1 goes active ... the PDM is essentially acting as a switch" (M1 to PDM CAN Messaging v1.0 p.8). The package has a "Fuel
     pump switched output" (GPR datasheet p.2).
   - No change, unless the pump is changed (§3).
+- **The tank-top plugs do not seal on these wires (state row 0ai, from the Deutsch datasheet, farnell 628276 printed p.5).**
+  - Pump plug: a DTP 2-way. The DTP E-seal takes 2.46–4.01 mm, and 14 AWG /32 is 2.16 mm (`catalog/parts.yaml` od_mm), so
+    #66 and PUMP_GND miss it even with the E-seal. 12 AWG /32 (2.62 mm) fits, and it also lowers the drop.
+  - Sender plug: a DT 2-way. The DT E-seal takes 1.35–3.05 mm, and the 20 AWG /32 sender wires are 1.27 mm. 18 AWG /32
+    (1.52 mm) fits.
+  - Either fix is the registry owner's catalog pass (state 0ai), not this lane's.
+- **The fuel PSI plug's seals.** AEM 10-2131 Rev C doesn't state the seal range of its "Packard 3-Pin" kit. 22 AWG /16 is
+  1.27–1.37 mm. State row 0p(e) ran the same check on Metri-Pack 150 seals: the white 15324976 (1.3–2.1 mm) is marginal and
+  the blue 15324974 (1.0–1.9 mm) fits. Check the kit's seals before crimping.
 - **FT candidate.**
   - Signal → M130 B6 (AT4, spare; 1k pull-up to SEN_5V_B per MoTeC's M130 pinout), plus a 0 V wire.
   - 2 × 22 AWG M22759/16, through 2 of the 3 spare 61-pin cavities (d, t, u). Only 1 is needed if its 0 V joins #112g on the

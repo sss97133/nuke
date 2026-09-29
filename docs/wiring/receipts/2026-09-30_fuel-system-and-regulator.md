@@ -91,6 +91,11 @@ owner_words: "another point we never touched him was the fuel regulator I ordere
   IMG_1100 shows the H882 lid's wires already leaving through a blue cap into a corrugated loom. Bench read.
 - **The twin's hanger** (`K5H_FuelPump_Sender`, x 0.15) is a placeholder, not photo-matched.
 
+- **The tank-top plugs miss the Deutsch seal ranges (state 0ai, on main):**
+  - 14 AWG /32 in the pump's DTP 2-way: 2.16 mm < 2.46 mm, even with the E-seal. 12 AWG /32, 2.62 mm, fits.
+  - 20 AWG /32 in the sender's DT 2-way: 1.27 mm < 1.35 mm. 18 AWG /32, 1.52 mm, fits.
+  - For the registry owner's catalog pass.
+
 ## Unknowns (each with its close path)
 **Owner:**
 - The fitted fuel line kit: side, type and size (one photo at the tank end).
