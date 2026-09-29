@@ -42,4 +42,5 @@ Every GLB is scanned for credential strings before it is embedded. The build ref
 1. **Decision 1.** Link it to the pieces lane's list of the 13 wires once that list is on file. Until then it links only to the bulkheads and the 61-pin.
 2. **Whole-truck 3D.** Swap in harness-cad's zone GLBs when they land. The Vehicle 3D view reads a single GLB now.
 3. **Library.** Add parts as the pieces lane adds them to the Library part list. About 30 more samples, the Deutsch and bulkhead parts among them, are waiting on audit.
-4. **Retiring pages.** The Parts Library, M130 review and bay sample pages become one-line pointers here. Only the pieces lane touches them, since it published them.
+4. **Before any merge.** This folder sits under `docs/wiring/`, so a receipt per `docs/wiring/RECEIPT_FORMAT.md` has to go with it (`.claude/rules/wiring-receipt.md`). None exists yet, because the branch is not merged.
+5. **Retiring pages.** The Parts Library, M130 review and bay sample pages become one-line pointers here. Only the pieces lane touches them, since it published them.
