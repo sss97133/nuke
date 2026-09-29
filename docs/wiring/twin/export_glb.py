@@ -38,4 +38,18 @@ try:
 except Exception as e:
     print("DRACO unavailable:", e)
     bpy.ops.export_scene.gltf(**kw)
+# Scene custom properties hold add-on settings (the Blender MCP add-on keeps an API key there), and
+# export_extras=True writes them into the GLB. Keep the node extras (anchor provenance); drop scene and top-level extras.
+import json, struct
+def _strip_scene_extras(path):
+    b = open(path, "rb").read()
+    jl = struct.unpack("<I", b[12:16])[0]
+    j = json.loads(b[20:20 + jl]); rest = b[20 + jl:]
+    for s in j.get("scenes", []):
+        s.pop("extras", None)
+    j.pop("extras", None)
+    nj = json.dumps(j, separators=(",", ":")).encode()
+    nj += b" " * ((4 - len(nj) % 4) % 4)
+    open(path, "wb").write(b"glTF" + struct.pack("<II", 2, 20 + len(nj) + len(rest)) + struct.pack("<II", len(nj), 0x4E4F534A) + nj + rest)
+_strip_scene_extras(OUT)
 print("WROTE", OUT, os.path.getsize(OUT), "bytes")
