@@ -309,17 +309,23 @@ ends:
     open:
       - Pick the tee or a cooler-adapter port.
   - id: OILT
-    what: Oil temperature sensor
-    where: 'Not placed: it goes in a port on the oil cooler adapter'
+    what: 'Oil temperature: GM''s oil level and temperature sensor, already in the LS3''s oil pan'
+    where: Passenger side of the oil pan, on a boss just behind and below the right knock sensor
     zone: engine
-    status: open
+    status: fixed_by_engine
     why:
-      - text: The owner's build log lists an oil cooler with no part number, so the adapter and its ports are not known.
-        source: vehicle_observations (K5 build log, 'Oil cooler')
-      - text: The registry names only its plug (GT150 2-way, same family as the coolant sensor).
-        source: docs/wiring/calc-data/catalog/endpoints.yaml OILT
+      - text: The engine as bought carries a tan sensor threaded into a boss on the passenger side of the oil pan; the only sensor on top of the engine is
+          the oil pressure sensor at the rear of the valley cover.
+        source: K5 photos 2024-08-24 (vehicle_images 9365b1d0, zoomed) and 2024-08-25 (vehicle_images 8e79c104, the top seen from behind)
+      - text: Gen IV LS3 pans carry a 3-wire oil level and temperature sensor; its port is M20-1.5.
+        source: ebay.com/itm/153376028423 and nzefi.com GM Gen IV LS2/LS3 oil level & temp sensor connector (fetched 2026-09-29); ICT Billet 551413 plug listing,
+          M20-1.5
+      - text: One forum says the pan sensor reads level only and the car models oil temperature, so the part number decides it.
+        source: camaro5.com/forums/showthread.php?t=333771 (search snippet, 2026-09-29)
     open:
-      - Name the oil cooler and its adapter; the sensor thread follows the port.
+      - 'Read the part number off the sensor body: it settles whether it has a temperature element the M130 can read.'
+      - The registry names a GT150 2-way plug for OILT; the factory sensor takes a 3-way plug. The registry owner decides.
+      - If it reads level only, a separate oil temperature sensor goes in a tee at the top-rear oil pressure port (with the Dakota sender).
   - id: MAP
     what: MAP sensor (Holley 538-24, 1 bar)
     where: Off the engine, bolted by its two ears near the rear of the intake, on a short vacuum hose to the intake's MAP port
