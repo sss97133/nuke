@@ -20,6 +20,7 @@ import {
 import { useWiringFacts, type WiringFact, type PurchaseRecord, type ListingRecord } from '../connector-inspector/useWiringFacts';
 import { optimizeImageUrl } from '../../../lib/imageOptimizer';
 import { WireEvidence } from '../connector-inspector/WireEvidence';
+import { MountsPanel } from './MountsPanel';
 import {
   SECTIONS, useWiringMap, type MapCall, type MapEnd, type MapNode, type MapWire, type Section, type WorkStatus,
 } from './useWiringMap';
@@ -207,6 +208,9 @@ export function WiringMap({ vehicleId }: { vehicleId?: string }) {
                     );
                   })}
                 </svg>
+
+                {/* where each box goes (the K5's mounts list; nothing for other vehicles) */}
+                {!sec && <MountsPanel vehicleId={vehicleId} cw={cw} />}
 
                 {/* open calls: targets too */}
                 {openCalls.length > 0 && (

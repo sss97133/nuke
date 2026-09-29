@@ -1,0 +1,93 @@
+// map/MountsPanel.tsx — WHERE EACH BOX GOES: the ECU, both PDMs, the lambda box, batteries, isolator, DC-DC,
+// the firewall connectors and the service ports, each with its spot, why (every reason with its source), what
+// else it could be, and what is still open. Owner 2026-09-29: "not sure where the ecu or pdms are suggested to
+// be mounted" / "the body bulk head... not sure what that is".
+// Data: /wiring/k5-mounts.json, generated from docs/wiring/calc-data/catalog/mounts.yaml by mounts_v5.py (the
+// generator fails the build on a reason without a source). Only the K5 has one; other vehicles render nothing.
+
+import React, { useEffect, useState } from 'react';
+import { frame, rule, textOn, type Colorway } from '../connector-inspector/colorways';
+
+const K5_ID = 'e08bf694-970f-4cbe-8a74-8715158a0f2e';
+
+interface Reason { text: string; source: string }
+interface Alt { where: string; why_not: string }
+interface Box {
+  id: string; what: string; where: string; zone: string;
+  status: 'decided' | 'proposed' | 'open' | 'flag';
+  why: Reason[]; instead?: Alt[]; open?: string[];
+}
+
+const WORD: Record<Box['status'], string> = { decided: 'DECIDED', proposed: 'PROPOSED', open: 'NEEDS YOU', flag: 'BREAKS A MAKER RULE' };
+
+export function MountsPanel({ vehicleId, cw }: { vehicleId?: string; cw: Colorway }) {
+  const [boxes, setBoxes] = useState<Box[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (vehicleId !== K5_ID) return;
+    let cancelled = false;
+    fetch('/wiring/k5-mounts.json')
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then(d => { if (!cancelled) setBoxes(d.boxes as Box[]); })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, [vehicleId]);
+
+  if (vehicleId !== K5_ID) return null;
+  if (failed) return <div style={{ marginTop: 10, fontSize: 14, color: cw.danger }}>WHERE EACH BOX GOES: COULD NOT LOAD THE LIST</div>;
+  if (!boxes) return null;
+
+  const tone = (s: Box['status']) => (s === 'flag' ? cw.danger : s === 'open' ? cw.warn : s === 'decided' ? cw.ink : cw.accent);
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 1, color: cw.inkMuted, marginBottom: 4 }}>
+        WHERE EACH BOX GOES ({boxes.length}) — CLICK ONE FOR WHY
+      </div>
+      <div style={{ border: frame(cw), background: cw.surface }}>
+        {boxes.map((b, i) => {
+          const on = openId === b.id;
+          const t = tone(b.status);
+          return (
+            <div key={b.id} style={{ borderTop: i ? rule(cw) : 'none' }}>
+              <button onClick={() => setOpenId(on ? null : b.id)} style={{
+                display: 'flex', gap: 8, width: '100%', textAlign: 'left', alignItems: 'baseline', background: on ? cw.bg : 'transparent',
+                color: cw.ink, border: 'none', padding: '6px 8px', cursor: 'pointer', fontFamily: cw.fontBody,
+              }}>
+                <span style={{ flex: '0 0 auto', fontSize: 11, fontWeight: 700, padding: '1px 5px', background: t, color: textOn(t) }}>{WORD[b.status]}</span>
+                <span style={{ flex: '0 0 30%', fontSize: 14, fontWeight: 700 }}>{b.what}</span>
+                <span style={{ flex: 1, fontSize: 14 }}>{b.where}</span>
+              </button>
+              {on && (
+                <div style={{ padding: '2px 8px 10px 8px', fontSize: 13, lineHeight: 1.45 }}>
+                  <div style={{ fontWeight: 700, color: cw.inkMuted, marginTop: 4 }}>WHY</div>
+                  {b.why.map((w, j) => (
+                    <div key={j} style={{ marginTop: 3 }}>
+                      {w.text} <span style={{ color: cw.inkFaint, fontFamily: cw.fontMono, fontSize: 11 }}>[{w.source}]</span>
+                    </div>
+                  ))}
+                  {!!b.instead?.length && (
+                    <>
+                      <div style={{ fontWeight: 700, color: cw.inkMuted, marginTop: 8 }}>OR INSTEAD</div>
+                      {b.instead.map((a, j) => (
+                        <div key={j} style={{ marginTop: 3 }}><b>{a.where}</b>: {a.why_not}</div>
+                      ))}
+                    </>
+                  )}
+                  {!!b.open?.length && (
+                    <>
+                      <div style={{ fontWeight: 700, color: cw.warn, marginTop: 8 }}>STILL OPEN</div>
+                      {b.open.map((o, j) => <div key={j} style={{ marginTop: 3 }}>{o}</div>)}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

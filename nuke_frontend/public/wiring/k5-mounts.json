@@ -1,0 +1,296 @@
+{
+ "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
+ "generated_at": "2026-09-29T05:33Z",
+ "source": "docs/wiring/calc-data/catalog/mounts.yaml",
+ "boxes": [
+  {
+   "id": "M130",
+   "what": "Engine computer (MoTeC M130)",
+   "where": "Cab, passenger side, on the cab face of the firewall behind the glovebox, next to where the 61-pin comes through",
+   "zone": "cab",
+   "status": "proposed",
+   "decision": "k5-m130-location",
+   "why": [
+    {
+     "text": "MoTeC's own limits make it a cab part. It is not a sealed engine-bay box (\"protected location, occasional splash only\"), it tops out at 85 °C, and it should not be bolted rigid to a vibrating panel.",
+     "source": "receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC constraints)"
+    },
+    {
+     "text": "The 61-pin is on the passenger firewall, so the 58 engine wires come through the firewall right beside it. The tails stay short.",
+     "source": "K5_WIRING_STATE.md §1 rows 43 and 50; COMPUTER_PLACEMENT_MEMO.md"
+    },
+    {
+     "text": "The pedal's 6 wires and the dash switches never leave the cab. An engine-bay ECU would add 6 more firewall crossings.",
+     "source": "K5_WIRING_STATE.md §1 row 46"
+    },
+    {
+     "text": "Leave 60–80 mm clear below both plug faces for the Superseal plugs and their boots.",
+     "source": "receipts/2026-06-09_as-built-photo-survey-corrections.md"
+    }
+   ],
+   "instead": [
+    {
+     "where": "Under the dash, centre",
+     "why_not": "The Four-Season duct and the radio fill that space, and every engine wire gets longer."
+    },
+    {
+     "where": "Engine bay",
+     "why_not": "Header heat passes the 85 °C ceiling, it gets splashed, and the pedal adds 6 crossings."
+    }
+   ],
+   "open": [
+    "What is behind the gold panel on the passenger firewall (asked 2026-09-29)? It decides whether the M130's plate can bolt there.",
+    "The bracket needs rubber isolators, not bare sheet metal."
+   ]
+  },
+  {
+   "id": "PDM30",
+   "what": "Body power box (MoTeC PDM30), which feeds the lights, blower, wipers, windows and locks",
+   "where": "Cab, passenger side under the dash, in open air on its own plate below the M130, with an air gap between them",
+   "zone": "cab",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "MoTeC says a PDM \"may get very hot\"; mount it where air moves and never against a hot surface.",
+     "source": "MoTeC PDM manual p.3 (Mounting)"
+    },
+    {
+     "text": "It stays under 110 °C inside (100 °C recommended), which is about 85 °C around it at full load.",
+     "source": "MoTeC PDM manual p.35 (Specifications)"
+    },
+    {
+     "text": "The PDM30 case is magnesium with only a coated circuit board, not a sealed lid. It belongs in the cab.",
+     "source": "MoTeC PDM manual p.35 (Environmental protection); PDM30 datasheet"
+    },
+    {
+     "text": "29 of its 30 outputs feed cab and body loads, and its battery cable crosses the firewall in inches from the passenger corner.",
+     "source": "k5_registry.json (PDM30 outputs); receipts/2026-06-10_battery-corner-rederivation.md"
+    }
+   ],
+   "instead": [
+    {
+     "where": "Passenger kick panel",
+     "why_not": "The Four-Season duct crowds it, and there's no airflow behind the kick-panel trim."
+    },
+    {
+     "where": "Under the passenger seat",
+     "why_not": "Longer runs to every load, and heat builds up under carpet."
+    }
+   ],
+   "open": [
+    "Run it for 30 minutes and log its inside temperature over CAN before you call the spot final."
+   ]
+  },
+  {
+   "id": "PDM15",
+   "what": "Engine power box (MoTeC PDM15), which feeds the fan, injector and coil rails, starter, fuel pump, A/C clutch and lambda box",
+   "where": "The current design puts it in the engine bay. That breaks MoTeC's own spec (see why).",
+   "zone": "engine",
+   "status": "flag",
+   "why": [
+    {
+     "text": "The PDM15 has the same unsealed case as the PDM30 (magnesium, coated board only). MoTeC's sealed PDMs are the PDM16 and PDM32, which have a rubber seal on the lid and the plugs.",
+     "source": "MoTeC PDM manual p.35 (Case; Environmental protection)"
+    },
+    {
+     "text": "A PDM16 would fit the engine job. It has 16 outputs (8 × 20 A + 8 × 8 A), 12 inputs and 100 A total, against the 9 outputs and 2 inputs in use today. It uses Autosport plugs.",
+     "source": "MoTeC PDM manual pp.35–36; K5_WIRING_STATE.md row 0y (PDM15 outputs 9/15, inputs 2/16)"
+    }
+   ],
+   "instead": [
+    {
+     "where": "Cab, beside the PDM30 (recommended)",
+     "why_not": "Its engine feeds (fan, injector rail, coil rail, starter, A/C clutch, lambda box) would cross the firewall on the body pass-through plate. The fuel pump (rear) and the PCS trans computer (cab) get shorter."
+    },
+    {
+     "where": "Engine bay, but as a sealed PDM16",
+     "why_not": "It costs more than a PDM15. Neither box is bought yet, so nothing is wasted either way."
+    }
+   ],
+   "open": [
+    "Pick the PDM15 in the cab or a PDM16 in the bay. Nothing is bought yet (state row 0k); Dave's opinion counts here."
+   ]
+  },
+  {
+   "id": "LTCD",
+   "what": "Lambda box (MoTeC LTCD), which reads both O2 sensors and sends them to the M130 over CAN",
+   "where": "Under the truck, on the inside of a frame rail near the two O2 bungs, a hand-width or more from the pipe",
+   "zone": "chassis",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "MoTeC says mount it \"as far as possible from the exhaust\"; it tops out at 100 °C around it.",
+     "source": "MoTeC LTC manual pp.4–5"
+    },
+    {
+     "text": "The O2 sensors go at least 1 m downstream of the exhaust ports, tipped 10–90° from vertical with the tip down, never straight up and down. That puts the bungs under the cab near the transmission.",
+     "source": "MoTeC LTC manual pp.4–5"
+    },
+    {
+     "text": "Never cut the sensor plug. Its calibration resistor is inside it, so the box has to sit within the sensor lead's reach.",
+     "source": "MoTeC LTC manual pp.4–5"
+    }
+   ],
+   "open": [
+    "The LTCD's lead length (the manual draws it in Appendix C) and where the bungs go (the exhaust isn't built yet)."
+   ]
+  },
+  {
+   "id": "BATTERIES",
+   "what": "Two batteries, the Odyssey for running and the Optima YellowTop for the stereo",
+   "where": "Your working position is the passenger firewall corner",
+   "zone": "engine",
+   "status": "open",
+   "why": [
+    {
+     "text": "Owner's working position.",
+     "source": "K5_WIRING_STATE.md §4 (2026-06-10)"
+    },
+    {
+     "text": "The factory Four-Season A/C box, which is locked to stay, mounts on the passenger firewall on the engine side. Both can't have that corner.",
+     "source": "K5_WIRING_STATE.md §1 row 40"
+    }
+   ],
+   "instead": [
+    {
+     "where": "Front passenger corner at the radiator support (the factory battery spot)",
+     "why_not": "The 2 AWG runs back to the PDM30 and starter get longer."
+    },
+    {
+     "where": "YellowTop in the bed, next to the amp",
+     "why_not": "The amp's 18.4 ft cable loop goes away. The DC-DC charger then has to live back there too."
+    }
+   ],
+   "open": [
+    "Which corner, now that the A/C box is going back in (asked 2026-09-29)?"
+   ]
+  },
+  {
+   "id": "ISOLATOR",
+   "what": "Battery isolator (Blue Sea 7700), the switch that kills the truck, with its dash switch",
+   "where": "Engine bay, on the Odyssey's positive cable as close to the battery as it fits. The dash switch goes in the cab.",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Blue Sea says install it as close as possible to the battery, in a dry, protected spot.",
+     "source": "Blue Sea 7700 instructions p.1 (Mounting)"
+    },
+    {
+     "text": "It's sealed (IP66) and ignition-protected (ISO 8846 / SAE J1171), so the engine bay is allowed.",
+     "source": "Blue Sea 7700 instructions p.1 (Regulatory)"
+    },
+    {
+     "text": "Owner told us to pick the isolator; the 7700 was picked.",
+     "source": "wiring_decisions k5-battery-isolator-decided"
+    }
+   ]
+  },
+  {
+   "id": "DCDC",
+   "what": "Battery-to-battery charger (Victron Orion-Tr 12/12-30), which charges the YellowTop from the Odyssey",
+   "where": "The current design has it by the batteries in the engine bay. Victron says it must stay dry (see why).",
+   "zone": "engine",
+   "status": "flag",
+   "why": [
+    {
+     "text": "Victron says never run it in a wet place. Mount it standing up with the power terminals down, 10 cm clear above and below, near the battery but never directly above it.",
+     "source": "Victron Orion-Tr Smart manual, safety precautions and §4.1 (Mounting)"
+    }
+   ],
+   "instead": [
+    {
+     "where": "Cab, low on the passenger firewall face",
+     "why_not": "Its two cables cross the firewall, but it stays dry."
+    },
+    {
+     "where": "The bed, if the YellowTop moves there",
+     "why_not": "None. It sits beside the battery it charges."
+    }
+   ],
+   "open": [
+    "This follows the battery decision."
+   ]
+  },
+  {
+   "id": "FIREWALL-61",
+   "what": "The 61-pin firewall connector (MIL D38999), which carries engine wires only",
+   "where": "Passenger firewall, at the factory A/C-and-ECU grommet hole (H3)",
+   "zone": "firewall",
+   "status": "decided",
+   "why": [
+    {
+     "text": "One 61-pin, engine signals only; body wires never go through it.",
+     "source": "K5_WIRING_STATE.md §1 rows 43, 50, 53"
+    },
+    {
+     "text": "The factory H3 hole on the passenger side carried the A/C and ECU wires.",
+     "source": "objectTraits.ts factory_holes H3; COMPUTER_PLACEMENT_MEMO.md (fixed nodes)"
+    }
+   ],
+   "open": [
+    "The twin's firewall-connector object is misplaced (in front of the bumper). Its real spot gets measured on the truck."
+   ]
+  },
+  {
+   "id": "BODY-PASS",
+   "what": "Body pass-through (what the book calls \"body bulkhead A, B, C and P\"), where the non-engine wires cross the firewall",
+   "where": "The proposal is one aluminium plate on the passenger firewall beside the 61-pin, holding all four Deutsch plugs, with the rubber cable clamps for the big battery cables next to it",
+   "zone": "firewall",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "Four Deutsch plugs carry the 30 body wires through the firewall. A (12-way): headlights low and high, parking and turn lamps, side markers, washer pump, underhood light. B (12-way): wiper, blower, horn, iBooster wake, isolator dash switch. C (6-way): speed sender. P (4-way, heavy pins): blower high, PCS ignition.",
+     "source": "k5_registry.json endpoints FIREWALL-BODY-A/B/C/P"
+    },
+    {
+     "text": "They exist because the 61-pin is engine-only and its pins take 20–24 AWG wire, while the lamp and motor feeds are 20–12 AWG.",
+     "source": "K5_WIRING_STATE.md §1 rows 43 and 50; state row 0w (body firewall crossing decided)"
+    },
+    {
+     "text": "GM did this job with the fuse-block bulkhead plug on the driver side. One plate here does it with sealed plugs, so the whole front of the truck unplugs from the cab in one place.",
+     "source": "1977 LTSM p.834 fuse block layout (docs/wiring/extracted/p0834_8-fuse-block-layout.png); objectTraits.ts FB"
+    },
+    {
+     "text": "The 2 AWG battery cables don't go through a plug. Each gets its own rubber Blue Sea CableClam.",
+     "source": "k5_registry.json FIREWALL-GROMMET (Blue Sea 1003)"
+    }
+   ],
+   "instead": [
+    {
+     "where": "The factory fuse-block opening on the driver firewall (4 in)",
+     "why_not": "It reuses a factory hole, but the PDM30 and the 61-pin are on the passenger side, so most body wires would cross the cab."
+    }
+   ],
+   "open": [
+    "Plate drawing and exact spot, after the A/C box and gold-panel answers."
+   ]
+  },
+  {
+   "id": "DAKOTA",
+   "what": "Gauge box (Dakota Digital VHX control box)",
+   "where": "Cab, driver side under the dash, within 3 ft of the cluster, both terminal rows reachable",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "It must be within its CAT5 cable's reach of the cluster, and Dakota warns against mounting it opposite ignition parts on the firewall. The coils are on the engine's centre mount, so driver under-dash is clean.",
+     "source": "Dakota VHX manual MAN 650314:P p.4; COMPUTER_PLACEMENT_MEMO.md"
+    }
+   ]
+  },
+  {
+   "id": "SERVICE",
+   "what": "Laptop ports (Ethernet for the M130, the MoTeC UTC plug for the PDMs)",
+   "where": "Cab, under the dash or in the glovebox",
+   "zone": "cab",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "The M130 tunes over Ethernet to a panel RJ45; the PDMs configure through a MoTeC UTC on a 5-pin XLR.",
+     "source": "K5_WIRING_STATE.md row 0k (M1 Tune manual p.10; PDM manual p.48)"
+    }
+   ]
+  }
+ ]
+}
