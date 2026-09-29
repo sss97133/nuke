@@ -181,3 +181,50 @@ export function EnginePhoto({ vehicleId, cw }: { vehicleId?: string; cw: Colorwa
     </div>
   );
 }
+
+
+// ── WHERE ON THE TRUCK: one plug's physical spot, from the ends list in k5-mounts.json (mounts.yaml `ends`,
+// keyed by endpoint id = map node code; every reason sourced, lint in mounts_v5.py). Owner 2026-09-29: "map it
+// all out, all the end points accurately".
+interface EndRec { where: string; zone?: string; status: string; why?: Reason[]; open?: string[]; follows?: string }
+let mountsFile: Promise<{ ends: Record<string, EndRec> }> | null = null;
+const loadEnds = () => {
+  mountsFile ??= fetch('/wiring/k5-mounts.json').then(r => (r.ok ? r.json() : {})).then(d => ({ ends: d.ends ?? {} }))
+    .catch(() => ({ ends: {} }));
+  return mountsFile;
+};
+const END_WORD: Record<string, string> = {
+  fixed_by_engine: 'FIXED BY THE ENGINE / FACTORY', decided: 'DECIDED', proposed: 'PROPOSED', open: 'NOT DECIDED', flag: 'BREAKS A RULE',
+};
+
+export function WhereOnTruck({ code, cw }: { code: string; cw: Colorway }) {
+  const [e, setE] = useState<EndRec | null>(null);
+  const [more, setMore] = useState(false);
+  useEffect(() => { let c = false; loadEnds().then(f => { if (!c) setE(f.ends[code] ?? null); }); return () => { c = true; }; }, [code]);
+  if (!e) return null;
+  const t = e.status === 'flag' ? cw.danger : e.status === 'open' ? cw.warn : e.status === 'proposed' ? cw.accent : cw.ink;
+  return (
+    <div style={{ margin: '6px 0 10px', padding: '6px 8px', border: frame(cw), background: cw.surface }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: cw.inkMuted }}>WHERE ON THE TRUCK</span>
+        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', background: t, color: textOn(t) }}>{END_WORD[e.status] ?? e.status.toUpperCase()}</span>
+      </div>
+      <div style={{ fontSize: 14, marginTop: 3 }}>{e.where}</div>
+      {(!!e.why?.length || !!e.open?.length) && (
+        <button onClick={() => setMore(m => !m)} style={{ marginTop: 4, background: 'transparent', border: 'none', padding: 0,
+          color: cw.accent, fontFamily: cw.fontBody, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+          {more ? 'HIDE WHY' : 'WHY / SOURCES'}
+        </button>
+      )}
+      {more && (
+        <div style={{ fontSize: 12, lineHeight: 1.45, marginTop: 4 }}>
+          {(e.why ?? []).map((w, i) => (
+            <div key={i} style={{ marginTop: 2 }}>{w.text} <span style={{ color: cw.inkFaint, fontFamily: cw.fontMono, fontSize: 10 }}>[{w.source}]</span></div>
+          ))}
+          {!!e.open?.length && <div style={{ marginTop: 4, color: cw.warn, fontWeight: 700 }}>STILL OPEN</div>}
+          {(e.open ?? []).map((o, i) => <div key={i} style={{ marginTop: 2 }}>{o}</div>)}
+        </div>
+      )}
+    </div>
+  );
+}

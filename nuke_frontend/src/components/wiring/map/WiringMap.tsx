@@ -20,7 +20,7 @@ import {
 import { useWiringFacts, type WiringFact, type PurchaseRecord, type ListingRecord } from '../connector-inspector/useWiringFacts';
 import { optimizeImageUrl } from '../../../lib/imageOptimizer';
 import { WireEvidence } from '../connector-inspector/WireEvidence';
-import { DevicePhoto, EnginePhoto, MountsPanel, PartPhotos } from './MountsPanel';
+import { DevicePhoto, EnginePhoto, MountsPanel, PartPhotos, WhereOnTruck } from './MountsPanel';
 import {
   SECTIONS, useWiringMap, type MapCall, type MapEnd, type MapNode, type MapWire, type Section, type WorkStatus,
 } from './useWiringMap';
@@ -346,6 +346,7 @@ function NodeCard({ cw, n, map, byId, facts, onNode, onCall }: {
       <div style={{ fontFamily: cw.fontMono, fontSize: 19, fontWeight: 700, color: cw.accent }}>{n.code}</div>
       <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{n.name}</div>
       <DevicePhoto cw={cw} code={n.code} />
+      <WhereOnTruck cw={cw} code={n.code} />
       <Field cw={cw} label="TYPE">{n.type.toUpperCase()}{n.family && n.family !== 'unknown' ? ` · ${n.family.toUpperCase()}` : ''}</Field>
       <Field cw={cw} label="STATUS">
         <span style={{ color: statusColor(cw, n.workStatus), fontWeight: 700 }}>{WORK_WORD[n.workStatus]}</span>
