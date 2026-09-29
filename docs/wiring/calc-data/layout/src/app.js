@@ -1076,7 +1076,7 @@ function renderManual() {
     <p>${m3d} of the ${M.conns.length} connectors are modelled in 3D and ${drawn} are drawn to size on the plan. A part without its 3D model is not complete.</p>
     ${notes.join('')}</div>`;
   const fig = manualFigure(M);
-  const legend = `<table class="mt"><thead><tr><th style="width:34px">No.</th><th>Component</th><th>Part No.</th><th>Location</th><th style="width:48px">3D</th></tr></thead><tbody>${M.devs.map(d => `<tr data-go="${esc(DEVS[d.dev] && DEVS[d.dev].conns.length > 1 ? 'd:' + d.dev : 'c:' + d.conns[0])}" data-dev="${esc(d.dev)}"><td class="c">${d.no}</td><td>${esc(d.name)}</td><td class="m">${esc(d.pn)}</td><td>${esc(d.where)}</td><td class="c">${d.m3d ? 'YES' : '—'}</td></tr>`).join('')}</tbody></table>`;
+  const legend = `<table class="mt"><thead><tr><th style="width:34px">No.</th><th>Component</th><th>Part No.</th><th>Location</th><th style="width:48px">3D</th></tr></thead><tbody>${M.devs.map(d => `<tr data-go="${esc(DEVS[d.dev] && DEVS[d.dev].conns.length > 1 ? 'd:' + d.dev : 'c:' + d.conns[0])}" data-dev="${esc(d.dev)}"><td class="c">${d.no}</td><td>${esc(d.name)}</td><td class="m">${esc(d.pn || '—')}</td><td>${esc(d.where)}</td><td class="c">${d.m3d ? 'YES' : '—'}</td></tr>`).join('')}</tbody></table>`;
   const p2 = `<h3>COMPONENT LOCATIONS</h3>${fig.svg ? `<div class="mfig">${fig.svg}</div><div class="mcap">Fig. ${n}-1—${esc(y.name)}, ${fig.v === 'bay' ? 'engine compartment from above' : 'plan view from above'}. Front to the left.</div>` : ''}${legend}`;
   const blocks = M.conns.map((ep, k) => {
     const i = byId[ep], all = PINS[ep] || [], shared = !!M.other[ep];
@@ -1336,7 +1336,7 @@ function propsConn(i) {
   const m3 = i.m3d || [];
   let body = sec('Part', photoBlock(i) + '<div style="height:8px"></div>' + kv([
     ['3D model', m3.length ? `<span class="ok">complete</span> · ${m3.map(pid => libByKey[pid] ? `<button type="button" class="linkish mono" data-lib="${esc(pid)}">${esc(pid)}</button>` : `<span class="mono">${esc(pid)}</span>`).join(' ')}` : '<span class="warn">not complete: no 3D model yet</span>', 'part-models/index.json ' + ((D.cov || {}).pm_src || '')],
-    ['Maker', esc(m.maker || ''), 'part_media.yaml'], ['Part number', m.maker_pn ? `<span class="mono">${esc(m.maker_pn)}</span>` : '<span class="warn">unknown</span>', 'part_media.yaml ' + (m.confidence || '')],
+    ['Maker', esc(m.maker || ''), 'part_media.yaml'], ['Part number', m.maker_pn ? `<span class="mono">${esc(m.maker_pn)}</span>` : '—', 'part_media.yaml ' + (m.confidence || '')],
     ['Device', dev && dev.conns.length > 1 ? goLink('d:' + i.dev, dev.name, 'ui') : esc(dev ? dev.name : i.what)],
     ['System', ws.length ? uniq(ws.map(x => (W[x] || {}).sub).filter(Boolean)).map(y => goLink('y:' + y, sysName(y), 'ui')).join(', ') : '<span class="faint">no wires yet</span>'],
     ['Zone', esc(ZONES[i.zone] || i.zone) + (i.reg && i.reg.side ? ` <span class="faint">· ${esc(i.reg.side)} side</span>` : '')],
@@ -1462,7 +1462,7 @@ function propsDev(d) {
   if (!d) return {head: '', body: ''};
   const ws = uniq(d.conns.flatMap(wiresOf));
   const head = `<div class="kind"><span class="lab">Device</span></div><div class="pid">${esc(d.id)}</div><div class="pname">${esc(d.name)}</div>`;
-  let body = sec('Device', kv([['Maker', esc(d.maker || '')], ['Part number', d.pn ? `<span class="mono">${esc(d.pn)}</span>` : ''], ['Home system', d.sys ? goLink('y:' + d.sys, sysName(d.sys), 'ui') : ''], ['Zone', esc(ZONES[d.zone] || d.zone || '')],
+  let body = sec('Device', kv([['Maker', esc(d.maker || '')], ['Part number', d.pn ? `<span class="mono">${esc(d.pn)}</span>` : '—'], ['Home system', d.sys ? goLink('y:' + d.sys, sysName(d.sys), 'ui') : ''], ['Zone', esc(ZONES[d.zone] || d.zone || '')],
     ['Connectors', d.conns.map(c => goLink('c:' + c, c)).join(' ')], d.lib ? ['Library', `<button type="button" class="linkish" data-lib="${esc(d.lib)}">open the true-CAD model</button>`] : null]));
   if (d.id === '61-PIN') body += firewallPlan();
   if ((d.capacity || []).length) body += sec('Capacity', `<table class="tbl"><thead><tr><th>Resource</th><th class="num">Used</th><th class="num">Of</th><th>Spare</th></tr></thead><tbody>${d.capacity.map(c => `<tr><td>${esc(c.what)}<span class="prov">${esc(c.src || '')}</span></td><td class="num">${esc(c.used)}</td><td class="num">${esc(c.cap == null ? '?' : c.cap)}</td><td class="${c.spare === 0 ? 'warn' : ''}">${esc(Array.isArray(c.spare) ? c.spare.join(' ') : c.spare == null ? 'not on file' : c.spare)}${c.spare_ids ? ' <span class="faint">' + esc(c.spare_ids.join(' ')) + '</span>' : ''}</td></tr>`).join('')}</tbody></table>`, {n: d.capacity.length});
@@ -1555,7 +1555,7 @@ TAB.conns = {
     {k: 'th', h: '', ns: 1, td: r => `<td class="th">${thumb(r)}</td>`},
     {k: 'id', h: 'Connector', v: r => r.id, td: r => `<td class="id">${esc(r.id)}</td>`},
     {k: 'what', h: 'Description', v: r => r.what, td: r => `<td class="clip" title="${esc(r.what)}"><span class="cl">${esc(r.what)}</span></td>`},
-    {k: 'pn', h: 'Part number', v: r => (r.media || {}).maker_pn, td: r => `<td class="id sm">${esc((r.media || {}).maker_pn || '')}</td>`},
+    {k: 'pn', h: 'Part number', v: r => (r.media || {}).maker_pn, td: r => `<td class="id sm">${esc((r.media || {}).maker_pn || '—')}</td>`},
     {k: 'm3d', h: '3D', v: r => (r.m3d || []).length ? 0 : 1, td: r => `<td class="sm nw${(r.m3d || []).length ? '' : ' warn'}">${(r.m3d || []).length ? 'complete' : 'not complete'}</td>`},
     {k: 'fam', h: 'Family', v: r => (r.conn || {}).family_word, td: r => `<td class="sm nw">${esc((r.conn || {}).family_word || '')}</td>`},
     {k: 'cav', h: 'Cav. used', v: r => (r.conn || {}).used || 0, td: r => { const c = r.conn || {}; return `<td class="num">${c.used || 0}${c.cav_n != null ? '/' + c.cav_n : ''}</td>`; }},

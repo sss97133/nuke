@@ -295,6 +295,7 @@ def extra_photo(code, rec):
 
 
 # ------------------------------------------------------------------ the ends
+LISTING = re.compile(r"(?i)\b(?:ebay|amazon)\s+(?:item|listing)\s*#?\s*\d{6,}")
 items = []
 by_id = {e["id"]: e for e in ENDS}
 for e in ENDS:
@@ -314,8 +315,13 @@ for e in ENDS:
     # media
     it["media"] = {k: media.get(k) for k in ("what", "maker", "maker_pn", "confidence", "note", "piece", "mates_with", "drawing", "cad",
                                              "datasheet", "instructions") if media.get(k)}
+    if LISTING.search(str(it["media"].get("maker_pn") or "")) or str(it["media"].get("maker_pn") or "").strip().lower() == "unknown":
+        it["media"].pop("maker_pn", None)                  # a listing id points at his purchase; "unknown" is shown as a dash
+    if it["media"].get("maker"):
+        it["media"]["maker"] = re.sub(r"\s*\((?:eBay|Amazon) seller [^)]*\)", "", it["media"]["maker"]).strip() or "unknown"
     if ph.get("url"):
-        it["media"]["photo"] = {"url": ph["url"], "page": ph.get("page"), "fetched": ph.get("fetched"), "src": phx.get("src"),
+        listing = bool(re.search(r"(?:ebay|amazon)\.com/(?:itm|dp)/", str(ph.get("page") or "") + str(ph.get("url") or ""), re.I))
+        it["media"]["photo"] = {"url": None if listing else ph["url"], "page": None if listing else ph.get("page"), "fetched": ph.get("fetched"), "src": phx.get("src"),
                                 "thumb": phx.get("thumb"), "w": phx.get("w"), "h": phx.get("h")}
     if code in sizes_m.PHOTO and not (it["media"].get("photo") or {}).get("src"):
         it["media"]["photo"] = extra_photo(code, sizes_m.PHOTO[code])
@@ -921,7 +927,7 @@ for key, g in groups.items():
     price = best_price(i0)
     stats = sorted({i["buy"]["status"] for i in its})
     subs = [i["sys"] for i in its]
-    bom.append({"g": "dev", "code": g["pn"] or "no part number", "name": i0["what"] if len(its) == 1 else m.get("what") or i0["what"], "maker": m.get("maker"),
+    bom.append({"g": "dev", "code": g["pn"] or "\u2014", "name": i0["what"] if len(its) == 1 else m.get("what") or i0["what"], "maker": m.get("maker"),
                 "qty": len(its), "unit": "each", "price": price, "status": stats[0] if len(stats) == 1 else "mixed: " + ", ".join(stats),
                 "paid": any((i.get("cost") or {}).get("paid") for i in its), "used": [i["id"] for i in its], "sys": max(set(subs), key=subs.count)})
 for code, qty in sorted((REG.get("bom") or {}).get("parts", {}).items(), key=lambda kv: natkey(kv[0])):
@@ -975,7 +981,7 @@ for t in TAPE.get("items") or []:
                        "tol": t.get("tolerance_mm"), "done": res.get("measured") is not None})
     if res.get("measured") is None and t.get("priority") == 1:
         rel = ["c:FIREWALL-CABIN", "c:FIREWALL-ENGINE"] if t["id"] in ("T-01", "T-02", "T-03", "T-04") else []
-        add_open("Measurement", t["id"] + ": " + (t.get("what") or "") + ". Settles: " + (t.get("settles") or ""), "Skylar (tape measure)", rel,
+        add_open("Measurement", t["id"] + ": " + (t.get("what") or "") + ". Settles: " + (t.get("settles") or ""), "System", rel,
                  "docs/wiring/calc-data/cad/tape_list.yaml " + t["id"])
 for b in boxes:
     for o in b.get("open") or []:
@@ -1167,6 +1173,8 @@ def mask(o, money=True):
             return o
         o = ORDER_NO.sub(lambda m: m.group(1) + "\u2022\u2022\u2022", o)
         o = MARKET_ORDER.sub(lambda m: m.group(1) + "\u2022\u2022\u2022", o)
+        o = re.sub(r"(?i)((?:ebay|amazon)\.com/(?:itm|dp)/)[\w-]{6,}", lambda m: m.group(1) + "\u2022\u2022\u2022", o)   # listing links point at his purchases
+        o = re.sub(r"(?i)\b((?:eBay|Amazon) (?:item|listing)\s*#?\s*)\d{6,}", lambda m: m.group(1) + "\u2022\u2022\u2022", o)
         return MONEY.sub("$\u2022\u2022\u2022", o) if money else o
     if isinstance(o, list):
         return [mask(v) for v in o]

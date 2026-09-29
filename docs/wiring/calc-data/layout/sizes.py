@@ -230,17 +230,13 @@ DEVICE_MEMBER = {"FIREWALL-ENGINE": "FIREWALL-CABIN"}
 # what needs Skylar's money or hands (the pieces lane, 2026-09-29: engineering calls are the system's, not his or a builder's)
 DECISIONS_SRC = "pieces lane, 2026-09-29 (money and hands only)"
 DECISIONS = [
-    {"n": 1, "title": "Tape items T-01 to T-04", "who": "Skylar", "need": "hands",
-     "text": "Measure the old fuse-box opening: its shape and size, where it sits, the free space on both faces, and the space under the dash.",
-     "rel": ["c:FIREWALL-CABIN", "c:FIREWALL-ENGINE", "c:M130-A"], "tape": ["T-01", "T-02", "T-03", "T-04"],
-     "rel_note": "They settle the 61-pin plate, the boots and the M130 spot (cad/tape_list.yaml)."},
-    {"n": 2, "title": "Proportioning valve part number", "who": "Skylar", "need": "hands",
+    {"n": 1, "title": "Proportioning valve part number", "who": "Skylar", "need": "hands",
      "text": "Which proportioning valve is on the truck (part number off the valve body).", "rel": ["c:BRAKE-WARN-SW"],
      "rel_note": "Its warning switch is BRAKE-WARN-SW: one wire to a PDM15 input, the valve body as the ground return."},
-    {"n": 3, "title": "Engine-bay power box (PDM32)", "who": "Skylar", "need": "money",
+    {"n": 2, "title": "Engine-bay power box (PDM32)", "who": "Skylar", "need": "money",
      "text": "Buy the sealed PDM32 for the engine bay once the ends it feeds are modelled in 3D. It takes the 13 loads that have no firewall path.",
      "rel": ["c:PDM15-A"], "rel_note": "Firewall plan (docs/wiring/research/2026-09-30_firewall-allocation.md): proposed, recount pending."},
-    {"n": 4, "title": "Rotate the flagged key", "who": "Skylar", "need": "hands", "text": "Rotate the key flagged on 2026-09-29, if it is not done yet.", "rel": [],
+    {"n": 3, "title": "Rotate the flagged key", "who": "Skylar", "need": "hands", "text": "Rotate the key flagged on 2026-09-29, if it is not done yet.", "rel": [],
      "rel_note": "Not a harness record."},
 ]
 

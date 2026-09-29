@@ -7,7 +7,7 @@ The Parts Library, M130 Sample Review and K5 Engine Bay Sample pages are now one
 
 ## Where it stopped
 
-- **Version 13 is built, not published.**
+- **Version 13 is live** (2026-09-29): the two fixes the pieces lane asked for are in (tape items off "Needs you"; listing ids never shown as part numbers).
   - Builder: branch `wiring/layout-ui`, 17e12ff14.
   - Screenshots went to the pieces lane (`shots_ws/` in the lane scratchpad). Its go is still pending.
   - To publish: `python3 build.py`, then publish `site/k5_layout.html` to the URL above with `root=site`, passing every file under `site/`.
