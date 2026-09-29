@@ -135,7 +135,7 @@ STEP-RQ:
   name: Power steps on the PDM30 through one Roboteq SDC2160 dual H-bridge in the cab, no AMP controller
   status: candidate
   alternative_to: STEP-DCMD
-  conflicts_with: [PW, PL, TOP-LIGHT]   # PDM30 OUT3/OUT4 are the spares PW names; OUT21 is the one PL and TOP-LIGHT name
+  conflicts_with: [PW, PL, TOP-LIGHT, COM]   # PDM30 OUT3/OUT4 are the spares PW names (COM also wants OUT3); OUT21 is the one PL and TOP-LIGHT name
   source: >-
     owner 2026-09-29 (above). Roboteq SDC2160 (web_snapshots/www.roboteq.com__sdc2160-detail.md: "Dual Channel, 2 x 15 A
     Continuous, 2 x 20 A Peak (30 s), 60V ... Cooling plate with ABS cover"); SDC21xx datasheet v2.3 (www.roboteq.com__63-sdc21xx-datasheet.md

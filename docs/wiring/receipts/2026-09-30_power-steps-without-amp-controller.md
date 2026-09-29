@@ -47,7 +47,7 @@
     STEP_DOOR_L, STEP_DOOR_R, AMP-STEP-CTRL, AMP-KIT-RING. `depends_on` the bay-PDM decision.
     - Rev 2 (2026-09-30, lead's correction): first written against the PDM15 (OUT8, OUT10, OUT12). The PDM15's case is
       unsealed (PDM manual p.35; mounts.yaml flag), so it can't be the bay box, and it is proposed as a second cab PDM.
-  - `STEP-RQ` (`alternative_to: STEP-DCMD`, `conflicts_with: [PW, PL, TOP-LIGHT]`): PDM30 OUT3 + OUT21 (+ OUT4 per door) plus
+  - `STEP-RQ` (`alternative_to: STEP-DCMD`, `conflicts_with: [PW, PL, TOP-LIGHT, COM]`): PDM30 OUT3 + OUT21 (+ OUT4 per door) plus
     one Roboteq SDC2160 in the cab. 10 planned wires, 2 floor clamps, one MicroBasic script.
   - `STEP-SW`: a step disable switch on PDM30 DIG16 (or a CANKEY button). 2 planned wires.
   - New keys, documented in the block's header: `demand.removes`, `demand.outputs` / `inputs`, `demand.bay_pdm_outputs`,

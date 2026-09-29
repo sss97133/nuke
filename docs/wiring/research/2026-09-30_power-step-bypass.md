@@ -286,8 +286,8 @@ SDC2130's 40 V (datasheet Table 3).
 | OUT4 (per-door option) | A_7 + A_16 | → DIN2 |
 
 - **These are exactly the spares that exist only while PW (OUT3/OUT4) and PL (OUT21) stay unfitted** (registry map; capacity
-  ledger PDM30 20 A 6/8, 8 A 21/22). The fiberglass-top candidate TOP-LIGHT names OUT21 too. Way 2 plus PW plus PL (or
-  TOP-LIGHT) does not fit on the PDM30.
+  ledger PDM30 20 A 6/8, 8 A 21/22). The fiberglass-top candidate TOP-LIGHT names OUT21 too, and the Starlink candidate COM
+  names OUT3. Way 2 plus PW plus PL (or TOP-LIGHT, or COM) does not fit on the PDM30.
 - It fits anyway if the PDM15 becomes the second cab PDM. That is proposed with the bay PDM32 (state 0ah), and the owner
   call is pending. STEP-RQ then runs on its outputs, and the conflict clears. The front loads leaving for the bay PDM32 also
   free PDM30 outputs.
