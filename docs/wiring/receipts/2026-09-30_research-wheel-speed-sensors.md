@@ -81,7 +81,9 @@
   decided; agents never promote a candidate.
   - **WSS-F2** (the recommended path): two front ZF sensors into M130 UDIG5/UDIG6; 7 planned wires. `conflicts_with: [NAV-L10]`
     (pieces audit 2026-09-29): both name M130 B11 (UDIG6); NAV-L10 is nav-comms' GPS-L10 alternate in PR #421, which already
-    carries the mirror entry. PDM15 OUT14 chosen for the feed, clear of step-power's STEP-DCMD claims (OUT8/10/12, per options-rd).
+    carries the mirror entry (merged to main as #421). PDM15 OUT14 feeds the sensors. It is uncontested: step-power's
+    STEP-DCMD moved to the bay-PDM32 candidate (step-power, PR #428), and its PDM32 estimate counts this feed if the bay PDM
+    becomes a PDM32.
   - **WSS-4E** (`alternative_to: WSS-F2`): four corners into a cab E888 over CAN; 15 planned wires.
   - **WSS-PREP** (`alternative_to: WSS-F2`): rings and brackets only, no wires.
 - `calc-data/options_v5.py` (options-rd's pattern from #416, at their suggestion; their lane is closed): `capacity()` now
@@ -100,8 +102,8 @@
 
 ## Measured
 `options_v5.py` was run on a scratch copy of `calc-data/` with the new options.yaml (the committed registry was not written).
-It parses and places all three (tree rebased on origin/main 09c291120):
-- `options: 42 (candidate 38, decided 3, base 1)`.
+It parses and places all three (branch merged with origin/main 248f2cd21, which brings nav-comms #421 and the tape list #427):
+- `options: 52 (candidate 48, decided 3, base 1)`. NAV-L10 and WSS-4E / WSS-PREP are alternates, so they stay out of the sums.
 - Candidate-demand rows:
   - WSS-F2: 7 planned wires.
   - WSS-4E: 15 planned wires, alternate.
@@ -135,7 +137,7 @@ It parses and places all three (tree rebased on origin/main 09c291120):
    - Is an M130 speed input an engine signal under 0ah, or a chassis circuit under row 51?
 3. **Dave:** the sensor supply (PDM15 12 V with 0 V to GND-BANK-ENG, or the MoTeC pattern SEN_5V0_B / SEN_0V at +2 cavities);
    shield or no shield.
-4. **Measure (tape list):**
+4. **Measure (tape list T-16 to T-19, geometry lane #427):**
    - hub-and-disc inboard barrel OD and free length;
    - whether the disc is cast with the hub;
    - rotor-to-knuckle axial space;
@@ -145,13 +147,19 @@ It parses and places all three (tree rebased on origin/main 09c291120):
    - steering lock angles;
    - full-droop and full-bump knuckle positions;
    - tire size.
-5. **Bench:**
+5. **Seal fit at the corner DTM (state 0ai class).**
+   - The DTM seal range is 1.35–3.05 mm (Deutsch DT Series Technical Manual, farnell 628276); M22759/32-20 is 1.27 mm.
+   - Fix is Dave's call:
+     - 20 AWG /16 (1.5 mm), with the owner's OK;
+     - or 18 AWG /32 on 16–18 AWG size-20 contacts, spliced to 20 AWG before the 61-pin.
+   - Check that the DTM range is a single seal. Caliper the ZF lead OD.
+6. **Bench:**
    - gap sweep on the real ring (runout window);
    - scope the ZF edge on the M130's 3k3 pull-up;
    - corner temperature after hard stops (125 °C sensor; Bosch HA-M 160 °C fallback).
-6. **M1 Tune / dealer:** can an E888 digital input be a GPR wheel-speed resource (only WSS-4E)? And the E888 price.
-7. **Machine shop:** quote for D1–D4 (the draft in the research file §4.3 is for Skylar to send or not).
-8. **Substrate corrections to file** (separate receipts, not done here):
+7. **M1 Tune / dealer:** can an E888 digital input be a GPR wheel-speed resource (only WSS-4E)? And the E888 price.
+8. **Machine shop:** quote for D1–D4 (the draft in the research file §4.3 is for Skylar to send or not).
+9. **Substrate corrections to file** (separate receipts, not done here):
    - four "8-lug" photo captions (the photo checked shows 6);
    - state §1 row 32 "iBooster Gen 2";
    - build-manifest rows d224438e (Bosch V4 booster), b47e99a2 (iBooster relay) and 4f357665 (MoTeC 5291 VSS "purchased").

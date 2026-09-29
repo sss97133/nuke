@@ -255,7 +255,7 @@ unknown.
 - steering lock angles;
 - full-droop and full-bump knuckle positions.
 
-These belong on the geometry lane's `calc-data/cad/tape_list.yaml`.
+They are tape items T-16 to T-19 in `calc-data/cad/tape_list.yaml` (geometry lane, #427).
 
 **Draft request for quote (for Skylar; not sent):**
 
@@ -320,6 +320,19 @@ These belong on the geometry lane's `calc-data/cad/tape_list.yaml`.
 | DTM06-3S + WM-3S wedge | Harness side, 3 × socket 0462-201-20141 | $2.39 | `www.customconnectorkits.com__dtm06-3s.md` |
 
 - **Cavity map** (agent assignment, mirrored both sides): 1 supply (ZF brown), 2 ground (blue), 3 signal (black).
+- **Seal fit: OPEN.** This is the state 0ai class of problem.
+  - The Deutsch DT Series Technical Manual gives the DTM seal range as 1.35–3.05 mm ("Seals on .053" to .120 dia.";
+    `web_snapshots/www.farnell.com__628276.md`, feature table).
+  - M22759/32-20 is 1.27 mm (`catalog/parts.yaml` WIRE-OD, from ProWire), so the harness side as listed does not seal.
+  - Fixes (Dave's call):
+    - 20 AWG M22759/16 (1.5 mm), which fits the DTM range, the 20 AWG contacts and the 61-pin #20 contacts. It needs the
+      owner's OK, as the 22 AWG /16 change did on 2026-09-26.
+    - 18 AWG /32 (1.52 mm) on the 16–18 AWG size-20 contacts 0460-010-20141 / 0462-005-20141, spliced to 20 AWG before the
+      61-pin (its #20 contacts take 20–24 AWG).
+  - Check that 1.35–3.05 mm is a single DTM seal, since 0ai found the DT feature-table range spans two.
+  - The ZF's own lead OD is not published: `{unknown, needs: caliper the lead}`.
+- **Strip length** for the size-20 solid contacts: .156–.218 in (3.96–5.54 mm), from the same manual's solid-contacts table.
+  `catalog/families.yaml` dtm still lists it as OPEN.
 - **Tooling:** the crimper is the catalog's DTM entry (`catalog/families.yaml` dtm).
 - **Littelfuse fallback:** the 55505-00-02-B arrives with the DTM04-3P already on its lead.
 
@@ -339,7 +352,7 @@ These belong on the geometry lane's `calc-data/cad/tape_list.yaml`.
 |---|---|---|
 | M130 pins | 52 / 60 | 54 / 60: B10, B11. This uses the last two UDIGs, so a later frequency sensor would have none. (A flex-fuel sensor is the likely one; its input type is in the M1 Flex Fuel User Guide on the GPR page, not read here.) **CONFLICT:** nav-comms' alternate NAV-L10 (MoTeC GPS-L10, PR #421) also names B11 (UDIG6), so WSS-F2 and NAV-L10 cannot both be built; its recommended NAV is CAN-only and takes no pin (`conflicts_with: [NAV-L10]` in options.yaml) |
 | 61-pin | 58 / 61 (spare d, t, u) | 60 / 61: two signal cavities. **Watch:** registry #100 notes it left cavity d for body bulkhead C, which the owner's one-61-pin call (state 0ah) retires |
-| PDM15 8 A outputs | 3 / 7 used (OUT10, OUT12, OUT14, OUT15 free) | 4 / 7: OUT14 feeds both sensors (1 A limit; 2 × 6 mA load). OUT14 keeps clear of OUT8, OUT10 and OUT12, which step-power's STEP-DCMD names (options-rd, 2026-09-29; not on main yet) |
+| PDM15 8 A outputs | 3 / 7 used (OUT10, OUT12, OUT14, OUT15 free) | 4 / 7: OUT14 feeds both sensors (1 A limit; 2 × 6 mA load). Uncontested: step-power's STEP-DCMD moved to the bay-PDM32 candidate (PR #428). If the bay PDM becomes a PDM32 (state 0ah), this feed moves to one of its 8 A outputs; step-power's PDM32 count already includes it |
 | PDM30, PDM15 inputs; body bulkheads | — | No change |
 | GND-BANK-ENG | 24 returns | 26: the two sensor 0 V returns |
 

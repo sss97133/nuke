@@ -611,7 +611,7 @@ DPASS12:
 # The 1977 K5 has a steel half-cab roof over the front seats; the fiberglass top covers the rear only (1977 LTSM PDF p.155:
 # the top is clamped "against the steel cab"). Only what sits on the top crosses TOP-DISC. Lengths: top side = the plug at the
 # lower rear pillar to the part; body side = the part to the PDM30; together they split the registry's 18.4 ft zone estimate
-# for #93/#74 (13 ft body + 5.5 ft top), +15 % pad already in (state §1 row 34). Every length is an estimate until tape item
+# for #93/#74 (13 ft body + 5.5 ft top), +15 % pad already in (state §1 row 33, 'Length pad on cuts'). Every length is an estimate until tape item
 # T-15 (wiring/geometry, PR #417) is taped.
 
 TOP-DISC:
@@ -712,7 +712,7 @@ TOP-LIGHT:
     pdm30_inputs: 0       # switched from a CANKEY button, not a DIG input
     top_cavities: 3       # CHMSL, CARGO, WORK (the return pair belongs to TOP-DISC)
     taps: ["PDM30 OUT5 (#93 CHMSL, brake) and OUT25 (#74 CARGO, courtesy) stay as they are; their wires gain a TOP-DISC break"]
-    limits: ["CONFLICT: PDM30 OUT21 is the only spare 8 A output (options_v5 ledger on main: 20 A 6/8 used, spare OUT3/OUT4 named by PW; 8 A 21/22 used, spare OUT21 named by PL). PL cannot stay on it anyway (its 12 A needs a 20 A output; an 8 A output's setting caps at 10 A, PDM manual p.24), but moving PL puts it on OUT3/OUT4 against PW. Building TOP-LIGHT and PL together needs another body-side output (a second body PDM, the owner's multiple-PDM direction in state §1 row 55; proposal). Owner call",
+    limits: ["CONFLICT: PDM30 OUT21 is the only spare 8 A output (options_v5 ledger on main: 20 A 6/8 used, spare OUT3/OUT4 named by PW; 8 A 21/22 used, spare OUT21 named by PL). PL cannot stay on it anyway (its 12 A needs a 20 A output; an 8 A output's setting caps at 10 A, PDM manual p.24), but moving PL puts it on OUT3/OUT4 against PW. Building TOP-LIGHT and PL together needs another body-side output (a second body PDM, the owner's multiple-PDM direction in state §1 row 54, 'Owner scope calls' 2026-09-24; proposal). Owner call",
              "OUT21 set 4 A: 1.25 x 2.9 A = 3.6 A; the 20 AWG pin lead allows 6.8 A and one #20 contact 6.4 A", "OUT25 stays at 4.73 A (registry); no new top courtesy load goes on it (options-rd PUD limits)"]
     notes: >-
       CHMSL outside on the top's rear header above the tailgate glass; work lamps flush in the header corners; cargo lamp centred on the
@@ -747,7 +747,7 @@ TOP-LIGHT-SIDE:
     pdm30_inputs: 0
     top_cavities: 1
     limits: ["its own output, set 3 A (1.25 x 2.4 A); sharing OUT21 with the work lamps would need 7 A, over the 20 AWG pin lead's 6.8 A",
-             "PROPOSAL, not in the registry: the output has to come from a cab-side PDM that does not exist today. The PDM15 is the engine-bay box (registry PDM15-A/B); moving it to the cab is only an option in mounts.yaml PDM15, and the sealed bay PDM32 idea (state row 0ah) keeps it in the bay. A second body PDM (state §1 row 55, owner's multiple-PDM direction) is the other path. Owner call"]
+             "PROPOSAL, not in the registry: the output has to come from a cab-side PDM that does not exist today. The PDM15 is the engine-bay box (registry PDM15-A/B); moving it to the cab is only an option in mounts.yaml PDM15, and the sealed bay PDM32 idea (state row 0ah) keeps it in the bay. A second body PDM (state §1 row 54, 'Owner scope calls' 2026-09-24, owner's multiple-PDM direction) is the other path. Owner call"]
     notes: "camp light down both sides; the top's side walls carry the sliding quarter windows (photos lane), so the lamps sit on the strip above them. Not buildable until a cab-side output exists (see limits). OPEN: the IP rating (not on the Truck-Lite page)"
     adds:
       - {id: SIDE_P, gauge: 20, spec: M22759/32, from: "PROPOSAL: an 8 A output on a cab-side PDM (none exists in the registry today)", to: "SPL-SIDE-1 (M81824/1-2)", current_a: 2.4, length_ft_est: 1.0, basis: "as WORK_P"}
@@ -817,7 +817,7 @@ TOP-FINISH:
   name: Finish the top's inside — butyl on the flats, a closed-cell thermal layer and removable headliner panels, the top harness in the rib channels behind them
   status: candidate
   source: >-
-    owner 2026-09-29 ("how do we finish the roof doing insulate it or delete it raw"). State §1 row 42 ("K5 insulation = COMPLETE (roof,
+    owner 2026-09-29 ("how do we finish the roof doing insulate it or delete it raw"). State §1 row 41 ("K5 insulation = COMPLETE (roof,
     firewall, floor)") rests on "I've already insulated the vehicle" (receipt 2026-05-23). The photos lane (2026-09-29) found bare moulded
     fiberglass under the top (2021-06-12), bare painted steel under the half-cab roof (2024-10 to 2024-12) and Kilmat butyl only on the
     cargo-tub walls (2026-01-31 and 02-01), so the lock does not cover the top. Materials and prices: Dynamat Xtreme bulk pack 36 sq ft
@@ -832,6 +832,306 @@ TOP-FINISH:
       Behind panels the top harness runs in the rib channels in DR-25 on bonded mounts, with service loops at every lamp and at the pillar;
       left raw, the same bundle is exposed and clipped at least every 18 in (ABYC E-11). The harness goes in before any insulation. OPEN: the
       top's inside area and rib spacing (T-15), its weight, the panel material. Alternatives: research §5.
+    adds: []
+
+
+# ============================================================== GPS, attitude, Wi-Fi and Starlink (nav-comms, 2026-09-29)
+# Owner 2026-09-29 (voice-typed): "what about GPS topology and topology I like knowing that angle position on the vehicle and
+# the other important features like that communication Wi-Fi connection small starling connector Starlink". Research, every
+# number and its source: research/2026-09-30_gps-attitude-starlink.md (web pages snapshotted 2026-09-29 to
+# reference_documents/web_snapshots/, gitignored). None of these is decided. Keys beyond the four demand keys follow the sibling
+# lanes' extension (options-rd: product, taps, limits, adds, alternative_to, requires; top-design: top_cavities); m130_pins is
+# informational (options_v5 does not read it). Every length is an estimate until the mock-up. The steel half-cab roof over the
+# front seats is not part of the removable top (1977 LTSM PDF p.155 "force the removable top against the steel cab", p.157
+# Fig. 2D-78), so nothing in the recommended set (NAV, COM, RTR) crosses TOP-DISC.
+
+NAV:
+  name: GPS and pitch/roll on the M1 CAN trunk (CSS Electronics CANmod.gps), under the dash; its antenna on the steel half-cab roof
+  status: candidate
+  source: >-
+    owner 2026-09-29 ("GPS ... I like knowing that angle position on the vehicle"). CANmod.gps shop page (web_snapshots/
+    www.csselectronics.com__gps-to-can-bus-gnss-imu.md: 300 EUR ex VAT, u-blox NEO-M8U, antenna SMA 3 m magnetic, IP40) and docs
+    01.04.01 (canlogger.csselectronics.com__specification.md: 5.0-26 V, 0.6 W, CAN 5k-1M, -25 to +70 C, 48 x 70 x 24 mm, 75 g;
+    __connector.md: DB9 pin 9 supply, 3 GND, 7 CAN H, 2 CAN L; __termination.md: 120 ohm on by default; __attitude.md: roll,
+    pitch, heading 1 Hz; __dyn_model.md: reference point = rear-axle centre, lever arms in cm). The M130 has one CAN bus and no
+    RS232 (M130 datasheet p.2; M1 hardware tech spec p.6)
+  product: {maker: CSS Electronics, pn: CANmod.gps, price_usd: null, price_date: 2026-09-29,
+            specs: "300 EUR ex VAT; GNSS + 3-axis accel + 3-axis gyro with dead reckoning; roll/pitch/heading, position, speed, altitude at 1 Hz, raw IMU at 100 Hz; 0.6 W; IP40"}
+  wire_patterns: ["^NAV_"]
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    top_cavities: 0
+    taps: ["PDM30 OUT29 (ignition RUN group: #71 Dakota VHX, GSS_PWR; top-design's CANKEY also taps it): module supply", "CAN trunk CAN_HI / CAN_LO: one stub, 500 mm max (MoTeC PDM manual printed p.49)"]
+    limits: ["OUT29 + 0.05 A (0.6 W at 12 V). OUT29 also feeds #71, GSS_PWR and CANKEY: its setting is recomputed at 1.25 x the group total once the VHX, GSS-3000 and keypad currents are known (all unpublished; noted with top-design 2026-09-29)"]
+    notes: >-
+      Mount flat, x-axis forward, on its own rigid bracket (not the M130's rubber-isolated plate) under the dash within 500 mm
+      of the M130-PDM30 trunk; set dynamic model Automotive, sensor fusion on, IMU alignment and the rear-axle lever arms (CSS
+      dyn_model, imu_mount_alignment). Termination switch OFF (it is a stub). Move its CAN IDs off the defaults (attitude
+      defaults to 01) into a free block once the M1 bus ID map exists; turn the raw IMU stream off unless a display uses it.
+      The driver sees pitch and roll through DISP (a MoTeC dash with a custom comms template, or the wireless bridge); without
+      DISP use ATT-CLINO. Whether M1 GPR can log its frames is unknown (Dave / MoTeC). Not shared with a motor or solenoid
+      output (CSS installation, supply quality). OPEN: the lever arms and antenna reach (tape), the M1 bus bit rate and IDs.
+    adds:
+      - {id: NAV_PWR, gauge: 20, spec: M22759/32, from: "PDM30:OUT29 (splice with GSS_PWR)", to: "NAV DB9 pin 9 (Supply 5-24 V)", current_a: 0.05, length_ft_est: 3, basis: "module beside the PDM30 under the dash (mounts.yaml PDM30, open); 0.6 W at 12 V"}
+      - {id: NAV_GND, gauge: 20, spec: M22759/32, from: "NAV DB9 pin 3 (GND)", to: "GND-BANK-CAB", current_a: 0.05, length_ft_est: 3, basis: "the cab bank beside the PDM30; CSS: one ground reference for all CAN nodes"}
+      - {id: NAV_CANH, gauge: 22, spec: "M22759/16 twisted pair", from: "CAN trunk CAN_HI (stub splice)", to: "NAV DB9 pin 7 (CAN 1 H)", current_a: 0, length_ft_est: 1.6, basis: "500 mm stub maximum (MoTeC PDM manual printed p.49), twisted like the trunk"}
+      - {id: NAV_CANL, gauge: 22, spec: "M22759/16 twisted pair", from: "CAN trunk CAN_LO (stub splice)", to: "NAV DB9 pin 2 (CAN 1 L)", current_a: 0, length_ft_est: 1.6, basis: "as NAV_CANH"}
+      - {id: NAV_ANT, gauge: null, spec: "maker's GNSS antenna lead, SMA plug (u-blox antenna supplied)", from: "NAV SMA", to: "GNSS antenna, magnetic base on the steel half-cab roof", current_a: 0, length_ft_est: 9.8, basis: "the supplied lead is 3 m; whether it reaches the roof from under the dash is a tape item"}
+    mass_g_est: "about 19 g of wire (canon ch.16 §1.8 /16 weights, an upper bound for /32); module 75 g (CSS spec page); antenna not published"
+
+NAV-L10:
+  name: GPS into the M130 itself (MoTeC GPS-L10 on UDIG6, B11), logged by the ECU; no attitude
+  status: candidate
+  alternative_to: NAV
+  conflicts_with: [WSS-F2]     # both name M130 B11 (UDIG6); wheel-speed's WSS-F2 takes B10 + B11, the last two spare UDIGs (pieces audit 2026-09-29)
+  source: >-
+    MoTeC GPS-L10 user manual (web_snapshots/www.motec.com.au__GPS-L10%20User%20Manual.md): #41304 (2.8 m) / #41308 (1.5 m);
+    M130 "B11, B14 - Udig 6 or 7 - Revision Q or higher only"; "M1 ECU's require a minimum of level 2 Logging"; 4.0-6.0 V, 38 mA;
+    RS232 38400 baud NMEA RMC + GGA; 10 Hz; built-in antenna, magnetic base, outside on a horizontal surface; DTM 4-pin, mating
+    #68054 (1 Bat-, 2 TX, 3 not connected, 4 5 V). B11 is unused in the registry pinout; B14 is ISO_KILL (state §1 row 57).
+    The M130 ships with Logging Level 1 only (M130 datasheet p.2)
+  product: {maker: MoTeC, pn: "GPS-L10 #41304 (2.8 m lead) or #41308 (1.5 m lead)", price_usd: null, price_date: 2026-09-29,
+            specs: "10 Hz, 66 channels, 48 x 41 x 14 mm, 106 g, -30 to +80 C; price through a MoTeC dealer"}
+  wire_patterns: ["^GPSL10_"]
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    m130_pins: 1          # B11 (UDIG6); informational, options_v5 does not read it
+    taps: ["M130 sensor 5 V (A02 SEN_5V0_A or A09 SEN_5V0_B): GPS supply", "M130 0 V: GPS pin 1"]
+    notes: >-
+      Buy a rev Q or later M130 and the Level 2 logging licence (a paid upgrade: owner). The 5 V comes off an M130 sensor rail:
+      A09 carries pedal track 2 alone and A02 the engine sensors, so a fault on the roof-run lead pulls that rail down (Dave's
+      call, with where pin 1 lands: the manual says "Battery Negative on the logging device", the M1 tech spec p.14 says sensor
+      0 V pins carry no current paths). For pitch and roll on this path add the MoTeC 3 Force #57213 (raw accel/gyro/compass on
+      CAN 0x610-0x612, 5-24 V, 20-40 mA, for MoTeC dashes: web_snapshots/www.motec.com.au__3%20Force%20Combined%20Sensor.md)
+      and a MoTeC dash, or ATT-CLINO.
+    adds:
+      - {id: GPSL10_TX, gauge: 22, spec: M22759/16, from: "GPS-L10 DTM #68054 pin 2 (TX)", to: "M130:B11 (UDIG6)", current_a: 0, length_ft_est: 3, basis: "M130 under the dash to the GPS lead's DTM joint at the pillar base (estimate)"}
+      - {id: GPSL10_5V, gauge: 22, spec: M22759/16, from: "M130 5 V (splice on A02 or A09: Dave)", to: "GPS-L10 DTM pin 4 (5 V)", current_a: 0.038, length_ft_est: 3, basis: "as GPSL10_TX; 38 mA typical (manual)"}
+      - {id: GPSL10_0V, gauge: 22, spec: M22759/16, from: "GPS-L10 DTM pin 1 (Bat-)", to: "M130 0 V or ECU ground (Dave)", current_a: 0.038, length_ft_est: 3, basis: "as GPSL10_TX"}
+    mass_g_est: "about 14 g of wire (canon ch.16 §1.8); GPS-L10 106 g (manual)"
+
+NAV-DAK:
+  name: GPS speed, compass heading and altitude on the Dakota VHX cluster (Dakota Digital GPS-50-2 BIM); no attitude, not on the MoTeC bus
+  status: candidate
+  alternative_to: NAV
+  source: >-
+    Dakota Digital GPS-50-2 page (web_snapshots/www.dakotadigital.com__prd837.md): $250.00, 600041 external antenna (110 in
+    cable) $30.00, 10 Hz, integrated antenna, speed + compass + altimeter + clock on RTX/HDX/VHX/VFD3 with a black plastic
+    control box, 4-3/4 x 2-3/4 x 1 in. Expansion-module list (www.dakotadigital.com__cat646.md): no inclinometer module. VHX
+    manual MAN 650314:P p.13 (AUX I/O is for BIM modules only), p.26 (BIM readings on the message display). Its wiring manual
+    (dakotadigital.com/pdf/GPS-50-2.pdf) answered HTTP 500 on 2026-09-29, so its power needs are unknown
+  product: {maker: Dakota Digital, pn: "GPS-50-2 (+ 600041 external antenna, optional)", price_usd: 250.00, price_date: 2026-09-29,
+            specs: "GPS speed/compass/altitude/clock to the VHX; 4k/8k/16k PPM speed output; power not published on the page"}
+  wire_patterns: ["^DAKGPS_"]
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    taps: ["VHX control box AUX I/O (BIM bus)", "power: unknown until the GPS-50-2 manual is read (likely the VHX's own feeds on OUT29 / DAK_CONST)"]
+    notes: >-
+      The cheapest GPS on the dash, but no pitch/roll (pair with ATT-CLINO) and nothing reaches the M130 or a logger. Its speed
+      output is not used: the speed source is decided (state §3 row 0v: NP205 speedo drive + Dakota SEN-01-5).
+    adds: []
+    mass_g_est: "not published"
+
+ATT-CLINO:
+  name: Stick-on dash clinometer for pitch and roll (Rugged Ridge 13309.01), no wiring
+  status: candidate
+  source: >-
+    eBay listing 176340608229 "Rugged Ridge 13309.01 Clinometer", US $63.13 new, MPN 13309.01 (web_snapshots/
+    www.ebay.com__176340608229.md; a reseller listing, not the maker's page). The same page lists an illuminated 13309.02 with a
+    compass, which would need a lamp feed
+  product: {maker: Rugged Ridge, pn: 13309.01, price_usd: 63.13, price_date: 2026-09-29, specs: "mechanical dial clinometer; size and mounting not on the listing"}
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    notes: "answers 'angle position' with no electronics; the pick when DISP is not built or with NAV-L10 / NAV-DAK. OPEN: size and dash spot"
+    adds: []
+
+COM:
+  name: Starlink Mini on the steel half-cab roof, powered by Starlink's Mini Car Adapter from its own sealed socket on a COMMS output
+  status: candidate
+  conflicts_with: [PW]     # the COMMS output must be a 20 A output; OUT3/OUT4 are the only spare ones and PW names both; see demand.limits CONFLICT
+  source: >-
+    owner 2026-09-29 ("communication Wi-Fi connection small starling connector Starlink"). Starlink Mini specification sheet
+    (web_snapshots/starlink.com__specification_sheet_mini.md; PDF text read 2026-09-29): 298.5 x 259 x 38.5 mm, 1.10 kg, 110 deg,
+    IP67 Type 4 with the DC cable and plug installed, -30 to +50 C, 60 mph+ wind, average 25-40 W, input 12-48 V 60 W, USB PD
+    100 W 20 V/5 A minimum, Wi-Fi 5, one latching Ethernet LAN port. Help articles: "only guarantees performance with the
+    included Starlink power supply and cable" (0b2d5227-...), Mini "Average: 20-40W, Idle: 15W" (18836c7e-...), no PoE
+    (6ee2d80c-...), USB-C cable 5 m, USB-C end indoors only (7c9fb509-...). Accessories guide: Mini Car Adapter for 12-24 V
+    outlets, Mini Mobility Mount (sealed, permanent, metal or fiberglass, 9 deg), Mini Starlink Cable 15 m. Setup guide: a
+    "structurally sound, horizontal surface" and "Tethering should be used in all cases" on vehicles. Roam page: "In-motion use
+    is supported with Roam service plans in select areas". Canon ch.17 §17.1 (limit 1.25 x load, 0.85 x wire); MoTeC PDM manual
+    printed p.24 (10 A cap on 8 A outputs; four stay-alive outputs), printed p.48 (18# 11 A at 80 C), PDF p.4 (low-battery logic)
+  product: {maker: Starlink, pn: "Starlink Mini kit + Mini Car Adapter (with the Mini USB-C Cable) + Mini Mobility Mount", price_usd: null, price_date: 2026-09-29,
+            specs: "dish 1.10 kg; in-motion use needs a Roam plan ($55 / $80 / $175 a month on 2026-09-29); kit and accessory prices not fetched"}
+  wire_patterns: ["^COMMS_", "^SL_"]
+  demand:
+    crossings: 0
+    pdm30_outputs: 1      # a 20 A output (MoTeC's wire table puts 20-16 AWG on 20 A outputs): OUT3 if PW is not fitted (see CONFLICT); until then COM-DASH
+    pdm30_inputs: 0       # on with RUN; the camp latch is a CANKEY button if top-design's CANKEY is built, else a PDM off-delay
+    top_cavities: 0
+    taps: ["PDM30 DIG1 (ignition RUN) in the output's logic", "CANKEY button for the camp latch, if CANKEY is built"]
+    limits: ["CONFLICT: the COMMS output must be a 20 A output, and OUT3/OUT4 are the only spare 20 A outputs (options_v5 ledger on main: 20 A 6/8 used, spare OUT3/OUT4, both named by PW's designed wires; 8 A 21/22 used, spare OUT21 named by PL and TOP-LIGHT). COM on OUT3 means PW is not fitted. Building COM and PW together needs another body-side 20 A output: a second body PDM (the owner's multiple-PDM direction, state §1 'Owner scope calls', 2026-09-24) or the PDM15 moved to the cab (mounts.yaml PDM15, state row 0ag(b)). Owner call", "COMMS output 7 A for Starlink alone (1.25 x 5.0 A, the Mini's 60 W rating at 12 V) or 9 A with RTR (1.25 x 6.6 A = 8.25 A), on a 20 A output: its two pins take 2 x 16 AWG pigtails (PDM manual printed p.48: 20-16 AWG for 20 A outputs) into SPL-COMMS; the 18 AWG branches allow 0.85 x 11 A = 9.35 A (printed p.48, 80 C)", "on an 8 A output MoTeC's 24-20 AWG leads allow at most 0.85 x 8 A = 6.8 A, under even the 7 A Starlink-alone setting: an 8 A output would be a deliberate exception, an 18 AWG lead on the SSC-N contact (16-24 AWG) as the registry already does for #71 on OUT29, with a Superseal seal check (top-design, 2026-09-29)", "drop on the Starlink path 0.23 V (1.6 %) at 5.0 A: paired 16 AWG pigtails, 4 ft feed and 3 ft ground of 18 AWG (6.23 ohm/1000 ft, canon ch.16 §1.8)"]
+    notes: >-
+      Off below a battery-voltage threshold (PDM logic) and kept alive key-off in one of the PDM's four stay-alive outputs, only
+      if the owner wants camp use (threshold and delay: owner/Dave). The Car Adapter's minimum input and loss are not
+      published; measure the draw at the socket. Mount on the steel half-cab roof on the Mobility Mount, tethered, clear of the
+      dome lamp and the clearance lamps; roof size is tape item T-15. The USB-C cable's barrel end is IP67 at the dish and its
+      USB-C end stays inside, so the roof entry is a sealed gland the USB-C end passes (builder). Starlink rates the Mini to
+      50 C; NASA POWER's 2001-2020 July maximum for Las Vegas is 47.6 C (research/2026-09-30_fiberglass-top-disconnect-solar-lighting.md). The Mini's Wi-Fi inside the cab is untested
+      (check with a phone at the mock-up).
+    adds:
+      - {id: COMMS_PT1, gauge: 16, spec: M22759/32, from: "PDM30 COMMS output, first pin (OUT3 if PW is not fitted)", to: "SPL-COMMS (in-line splice beside the PDM30)", current_a: 3.3, length_ft_est: 0.5, basis: "one of the 20 A output's paired pigtails, as the registry's SPL-PDM30-OUT8; equal length"}
+      - {id: COMMS_PT2, gauge: 16, spec: M22759/32, from: "PDM30 COMMS output, second pin", to: "SPL-COMMS", current_a: 3.3, length_ft_est: 0.5, basis: "as COMMS_PT1"}
+      - {id: SL_SOCK_P, gauge: 18, spec: M22759/32, from: "SPL-COMMS", to: "STARLINK-SOCKET + (Blue Sea 1011, as OUTLET-12V)", current_a: 5.0, length_ft_est: 4, basis: "socket under the dash by the pillar the USB-C cable goes up (estimate)"}
+      - {id: SL_SOCK_N, gauge: 18, spec: M22759/32, from: "STARLINK-SOCKET -", to: "GND-BANK-CAB", current_a: 5.0, length_ft_est: 3, basis: "to the cab bank beside the PDM30 (estimate)"}
+      - {id: SL_USBC, gauge: null, spec: "Starlink Mini USB-C Cable, 5 m (maker's, from the Car Adapter kit)", from: "Mini Car Adapter in STARLINK-SOCKET", to: "Starlink Mini barrel input", current_a: 0, length_ft_est: 16.4, basis: "the maker's cable length; roof -> headliner -> pillar -> under the dash; coil the rest"}
+    mass_g_est: "about 29 g of wire (canon ch.16 §1.8); dish 1.10 kg (spec sheet); adapter and mount not published (their packages are 0.43 kg and 0.6 kg)"
+
+COM-DASH:
+  name: Starlink Mini powered from the existing dash 12 V outlet (Car Adapter in OUTLET-12V), key-on only
+  status: candidate
+  alternative_to: COM
+  source: >-
+    Starlink accessories guide (Mini Car Adapter: "any standard automotive 12-24V auxiliary power outlet"); the registry's
+    OUTLET-12V: #72 on PDM30 OUT8, ignition RUN, limit 19 A for a Blue Sea 1011 socket, 15 A max
+    (web_snapshots/www.bluesea.com__Dash_Socket_12V_DC_with_Watertight_Cap.md)
+  product: {maker: Starlink, pn: "Mini Car Adapter (with the Mini USB-C Cable)", price_usd: null, price_date: 2026-09-29, specs: "12-24 V outlet in, USB-C out to the Mini"}
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    taps: ["PDM30 OUT8 (#72, the dash 12 V outlet, ignition RUN): the adapter occupies the outlet"]
+    limits: ["OUT8 stays at 19 A; the adapter draws up to about 5.0 A at the Mini's 60 W rating, plus its own loss (unpublished)"]
+    notes: "works today with no wiring; off with the key unless OUT8 is made a stay-alive output (PDM manual printed p.24); the USB-C cable runs from the dash outlet to the roof"
+    adds: []
+
+COM-ACC:
+  name: Starlink and router run off the YellowTop accessory battery (camp power), fused at the battery, own sealed switch, no PDM
+  status: candidate
+  alternative_to: COM
+  source: >-
+    owner 2026-09-27: the YellowTop is "for other stuff like accessories" (endpoints.yaml ACC-BATT: it feeds only the amplifier;
+    the PDMs run off the Odyssey side). Canon ch.17 §17.2 (fuse within 7 in of the source), §17.1 (1.25 x load, 0.85 x wire),
+    §17.8.5 (direct-wired only past a PDM channel or for infrastructure); canon ch.16 §2.3 (ProWire chart: 16 AWG 12.5 A at
+    35 C rise)
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    limits: ["fuse 10 A within 7 in of the YellowTop + (1.25 x 6.6 A = 8.25 A, next size 10 A); 16 AWG: 0.85 x 12.5 A = 10.6 A"]
+    notes: >-
+      Breaks the ch.17 §17.8.5 partition on purpose: no PDM is fed from the accessory battery, so camp loads on it cannot be
+      PDM-switched. No low-voltage cutoff unless a device is added (none picked). With the YellowTop in the engine bay the feed
+      must reach the cab without the firewall (state row 0ah): ride the amplifier's route (frame rail, floor CableClam at
+      AMP-PASS, which is full at 2 of 2) or tap the AMP-BLOCK, whose MIDI 60 A was sized for the amplifier alone (check the
+      amplifier's peak draw first). If the YellowTop moves behind the seat (asked 2026-09-29), the feed is short and inside.
+      OPEN: YellowTop spot, fuse holder and switch parts, lengths.
+    adds:
+      - {id: COMACC_FEED, gauge: 16, spec: M22759/32, from: "YellowTop + (10 A fuse within 7 in)", to: "COMMS switch (sealed, >= 10 A)", current_a: 6.6, length_ft_est: null, basis: "depends on where the YellowTop lives"}
+      - {id: COMACC_SW, gauge: 16, spec: M22759/32, from: "COMMS switch", to: "SPL-COMMS", current_a: 6.6, length_ft_est: null, basis: "switch spot not set"}
+    mass_g_est: "lengths unknown"
+
+COM-TOP:
+  name: Starlink Mini on the removable top instead, from a 12 V socket inside the top at the rear pillar, fed through TOP-DISC
+  status: candidate
+  alternative_to: COM
+  requires: [TOP-DISC]
+  conflicts_with: [PW]     # same COMMS output as COM (a 20 A output: OUT3 is named by PW); stated here as well as inherited through alternative_to
+  source: >-
+    top-design's TOP-DISC (#420): 26 x #20, "4 of the spares for a top-mounted Starlink DC pair", #20 = 7.5 A with 20 AWG (MILNEC
+    test rating), paralleled #20 pairs per pole, lengths split the 18.4 ft zone as 13 ft body + 5.5 ft top. top-design's check
+    (message 2026-09-29): the pole's weak link is the 2 x 20 AWG tails, 0.85 x 14 A = 11.9 A (ProWire chart 20 AWG 7 A, canon
+    ch.16 §2.3), and one M81824/1-3 (16-12 AWG) cannot step 12 AWG straight to 2 x 20 AWG (about 17 AWG), so each side steps
+    through a 16 AWG stub. Starlink accessories guide: the Mobility Mount is rated for fiberglass; setup guide: a "structurally
+    sound, horizontal surface" on vehicles. The USB-C and Ethernet cables are one piece and cannot cross a connector
+  product: {maker: Starlink, pn: "same as COM, plus a second 12 V socket inside the top", price_usd: null, price_date: 2026-09-29, specs: "as COM"}
+  wire_patterns: ["^SLT_"]
+  demand:
+    crossings: 0
+    pdm30_outputs: 1      # the same COMMS output as COM; it is PDM-protected, not fused
+    pdm30_inputs: 0
+    top_cavities: 4       # 2 x #20 paralleled per pole; top-design has reserved exactly these 4 (TOP-DISC 18 of 26 with it)
+    limits: ["CONFLICT: as COM: it takes the same 20 A COMMS output, OUT3/OUT4 are the only spare 20 A outputs and PW names both (options_v5 ledger on main); with PW it needs a second body PDM or the PDM15 in the cab. Owner call", "PDM output, no fuse: 7 A for Starlink alone (1.25 x 5.0 A) or 9 A with RTR on the same output; never above 11 A, the top pole's 2 x 20 AWG tails at 0.85 x 14 A = 11.9 A", "5.0 A per pole = 2.5 A per #20 contact (7.5 A test rating)", "loop drop at 5.0 A: 0.35 V (2.5 %), with RTR's 1.6 A also on the paired pigtails (canon ch.16 §1.8 resistances; 3 % ceiling ch.16 §2.4)", "the COMMS output is a 20 A output, as in COM (an 8 A output is the same deliberate exception)"]
+    notes: >-
+      Unplug TOP-DISC before the top comes off (top-design). Over the disconnect the router cannot take Starlink by Ethernet; it
+      joins the Mini's Wi-Fi instead. Each side of the joint steps 12 or 14 AWG -> 16 AWG stub (M81824/1-3) -> 2 x 20 AWG
+      (M81824/1-2); bench-check both splice fits. The top's flat area and rib structure under the mount are tape item T-15.
+    adds:
+      - {id: SLT_PT1, gauge: 16, spec: M22759/32, from: "PDM30 COMMS output, first pin (a 20 A output)", to: "SPL-COMMS", current_a: 3.3, length_ft_est: 0.5, basis: "COM's pigtails are not built in this version, so these are its own; paired 16 AWG, MoTeC's range for 20 A outputs (PDM manual printed p.48)"}
+      - {id: SLT_PT2, gauge: 16, spec: M22759/32, from: "PDM30 COMMS output, second pin", to: "SPL-COMMS", current_a: 3.3, length_ft_est: 0.5, basis: "as SLT_PT1"}
+      - {id: SLT_FEED, gauge: 12, spec: M22759/32, from: "SPL-COMMS", to: "SPL-SLT-P-B0 (M81824/1-3)", current_a: 5.0, length_ft_est: 13, basis: "top-design's 13 ft body share of the 18.4 ft zone; 12 AWG for the drop"}
+      - {id: SLT_P_BS, gauge: 16, spec: M22759/32, from: "SPL-SLT-P-B0", to: "SPL-SLT-P-B (M81824/1-2)", current_a: 5.0, length_ft_est: 0.5, basis: "stub into the receptacle backshell: 12 -> 16 on /1-3, 16 -> 2 x 20 on /1-2 (top-design)"}
+      - {id: SLT_P_B1, gauge: 20, spec: M22759/32, from: "SPL-SLT-P-B", to: "TOP-DISC receptacle (Starlink + cavity 1)", current_a: 2.5, length_ft_est: 0.5, basis: "paralleled pair, equal length (canon ch.16 §3.3)"}
+      - {id: SLT_P_B2, gauge: 20, spec: M22759/32, from: "SPL-SLT-P-B", to: "TOP-DISC receptacle (Starlink + cavity 2)", current_a: 2.5, length_ft_est: 0.5, basis: "as SLT_P_B1"}
+      - {id: SLT_P_T1, gauge: 20, spec: M22759/32, from: "TOP-DISC plug (Starlink + cavity 1)", to: "SPL-SLT-P-T (M81824/1-2)", current_a: 2.5, length_ft_est: 0.5, basis: "paralleled pair"}
+      - {id: SLT_P_T2, gauge: 20, spec: M22759/32, from: "TOP-DISC plug (Starlink + cavity 2)", to: "SPL-SLT-P-T", current_a: 2.5, length_ft_est: 0.5, basis: "as SLT_P_T1"}
+      - {id: SLT_P_TS, gauge: 16, spec: M22759/32, from: "SPL-SLT-P-T", to: "SPL-SLT-P-T0 (M81824/1-3)", current_a: 5.0, length_ft_est: 0.5, basis: "stub out of the plug backshell"}
+      - {id: SLT_P_T, gauge: 14, spec: M22759/32, from: "SPL-SLT-P-T0", to: "TOP-SOCKET + (inside the top, rear pillar)", current_a: 5.0, length_ft_est: 2.5, basis: "plug at the lower rear pillar to a socket up the pillar (estimate); 14 AWG for the drop"}
+      - {id: SLT_N_T, gauge: 14, spec: M22759/32, from: "TOP-SOCKET -", to: "SPL-SLT-N-T0 (M81824/1-3)", current_a: 5.0, length_ft_est: 2.5, basis: "as SLT_P_T"}
+      - {id: SLT_N_TS, gauge: 16, spec: M22759/32, from: "SPL-SLT-N-T0", to: "SPL-SLT-N-T (M81824/1-2)", current_a: 5.0, length_ft_est: 0.5, basis: "stub into the plug backshell"}
+      - {id: SLT_N_T1, gauge: 20, spec: M22759/32, from: "SPL-SLT-N-T", to: "TOP-DISC plug (Starlink - cavity 1)", current_a: 2.5, length_ft_est: 0.5, basis: "paralleled pair; its own pair, not top-design's lamp return"}
+      - {id: SLT_N_T2, gauge: 20, spec: M22759/32, from: "SPL-SLT-N-T", to: "TOP-DISC plug (Starlink - cavity 2)", current_a: 2.5, length_ft_est: 0.5, basis: "as SLT_N_T1"}
+      - {id: SLT_N_B1, gauge: 20, spec: M22759/32, from: "TOP-DISC receptacle (Starlink - cavity 1)", to: "SPL-SLT-N-B (M81824/1-2)", current_a: 2.5, length_ft_est: 0.5, basis: "paralleled pair"}
+      - {id: SLT_N_B2, gauge: 20, spec: M22759/32, from: "TOP-DISC receptacle (Starlink - cavity 2)", to: "SPL-SLT-N-B", current_a: 2.5, length_ft_est: 0.5, basis: "as SLT_N_B1"}
+      - {id: SLT_N_BS, gauge: 16, spec: M22759/32, from: "SPL-SLT-N-B", to: "SPL-SLT-N-B0 (M81824/1-3)", current_a: 5.0, length_ft_est: 0.5, basis: "stub out of the receptacle backshell"}
+      - {id: SLT_N_B, gauge: 12, spec: M22759/32, from: "SPL-SLT-N-B0", to: "GND-SPLICE-REAR", current_a: 5.0, length_ft_est: 4, basis: "pillar base to the rear ground bus, as top-design's TOPD_RTN_B; 12 AWG for the drop"}
+    mass_g_est: "about 224 g of wire (canon ch.16 §1.8 /16 weights, an upper bound for /32), most of it the 12 AWG body feed"
+
+RTR:
+  name: Truck router, Peplink MAX BR1 Pro 5G, on the COMMS output; Starlink in by Ethernet; Mobility 42G roof antenna or the stick antennas
+  status: candidate
+  source: >-
+    Peplink BR1 Pro 5G page (web_snapshots/www.peplink.com__max-br1-pro-5g.md: 5G, Wi-Fi 6, integrated GPS; box: 12 V 2 A supply,
+    4 x LTE/5G, 2 x Wi-Fi and 1 x GPS antennas) and comparison (www.peplink.com__routers__series=max_...md: DC 10-30 V, 8 W
+    nominal, 19 W max, ignition sensing, 4-pin Molex Micro-Fit, -40 to +65 C, indoor metal case, 146.8 x 129 x 29.3 mm,
+    1.5 lb). Mobility 42G datasheet (download.peplink.com__peplink_mobility_42g_datasheet.md: 4 cellular + 2 Wi-Fi + 1 GPS,
+    CFD-200 and RG-174 leads, SMA / RP-SMA male, 2 m or 4.8 m, 43 mm hole, 208 mm across, IP68, no ground plane).
+    Starlink accessories guide: Mini Starlink Cable 15 m to third-party routers
+  product: {maker: Peplink, pn: "MAX BR1 Pro 5G (MAX-BR1-PRO-5GN-T-PRM or -5GK-T-PRM) + Mobility 42G ANT-MB-42G-S-B-6 (optional)", price_usd: null, price_date: 2026-09-29,
+            specs: "10-30 V, 19 W max; cellular needs a data plan (owner); prices not on the pages"}
+  wire_patterns: ["^RTR_"]
+  demand:
+    crossings: 0
+    pdm30_outputs: 0      # shares COM's COMMS output (same switch position); without COM it needs its own 8 A output at 2 A (1.25 x 1.6 A)
+    pdm30_inputs: 0
+    taps: ["COM's COMMS output (SPL-COMMS)"]
+    limits: ["+1.6 A on the COMMS output (19 W at 12 V): the group goes 7 A -> 9 A; the branch is 18 AWG because the group's 9 A limit protects it (20 AWG allows 6.8 A)", "rides COM's output, so COM's CONFLICT with PW applies to it; on its own it would need an 8 A output at 2 A (1.25 x 1.6 A), and the only spare 8 A output, OUT21, is named by PL and TOP-LIGHT"]
+    notes: >-
+      One truck network that stays up with the dish off (the wireless display, a logger and phones join it), cellular where the
+      dish can't see sky, Starlink over Ethernet into its WAN (Mini Starlink Cable, not in the Mini kit). Its ignition-sense
+      lead is not needed: the PDM does on/off. OPEN: the Micro-Fit pin order (router manual not fetched), the router's spot
+      (under the dash or behind the seat, out of the sun), the 42G's hole in the steel roof (owner), lead length 2 m vs 4.8 m.
+    adds:
+      - {id: RTR_PWR, gauge: 18, spec: M22759/32, from: "SPL-COMMS", to: "router 4-pin Micro-Fit (+)", current_a: 1.6, length_ft_est: 3, basis: "router under the dash near the PDM30 (estimate)"}
+      - {id: RTR_GND, gauge: 18, spec: M22759/32, from: "router 4-pin Micro-Fit (-)", to: "GND-BANK-CAB", current_a: 1.6, length_ft_est: 3, basis: "as RTR_PWR"}
+      - {id: RTR_WAN, gauge: null, spec: "Mini Starlink Cable 15 m (Ethernet, maker's)", from: "Starlink Mini Ethernet port (Starlink Plug removed)", to: "router WAN", current_a: 0, length_ft_est: 49.2, basis: "the maker's length; coil the rest"}
+      - {id: RTR_ANT, gauge: null, spec: "Mobility 42G leads: 6 x CFD-200 (4 SMA male, 2 RP-SMA male) + 1 x RG-174 (SMA male)", from: "Mobility 42G on the steel half-cab roof (43 mm hole)", to: "router antenna ports", current_a: 0, length_ft_est: 6.5, basis: "the -6 part's 2 m leads; the -16 part has 4.8 m"}
+    mass_g_est: "about 21 g of wire (canon ch.16 §1.8); router 1.5 lb (680 g, HW1-2); 42G not published"
+
+RTR-T:
+  name: Truck router, Teltonika RUTX50 (lower draw), in place of the Peplink
+  status: candidate
+  alternative_to: RTR
+  source: >-
+    Teltonika wiki, RUTX50 power consumption (web_snapshots/wiki.teltonika-networks.com__RUTX50_Power_Consumption.md: averaged
+    4.73 W idle and 16.21 W (1,351 mA) at full load at 12 V; also measured at 9 V and 24 V) and interfaces
+    (wiki.teltonika-networks.com__RUTX50_Interfaces.md: 5 x RJ45, 2 SIM slots, 2.4/5 GHz Wi-Fi, 5G, 1 digital input + 1 digital
+    output on the 4-pin power connector). Its rated input range was not on the pages fetched (unknown)
+  product: {maker: Teltonika, pn: RUTX50, price_usd: null, price_date: 2026-09-29, specs: "16.21 W max at 12 V; input range, temperature range and size not fetched"}
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    taps: ["COM's COMMS output (SPL-COMMS)"]
+    limits: ["+1.35 A on the COMMS output (measured full load at 12 V); the group still sets 9 A"]
+    notes: "OPEN: input voltage range and operating temperature from the datasheet; its 4-pin power connector pin order"
     adds: []
 
 
@@ -865,7 +1165,8 @@ WSS-F2:
     m130_udig: 2            # the last two spare universal digital inputs
     pin61_cavities: 2       # the two signals: 2 of the 3 spare cavities (d, t, u)
     limits: ["CONFLICT: M130 B11 (UDIG6) is also named by NAV-L10 (the MoTeC GPS-L10 alternate, PR #421, on B11 or B14 per its manual; B14 is ISO_KILL). The M130 has two spare UDIGs, B10 and B11, and WSS-F2 takes both, so WSS-F2 and NAV-L10 cannot both be built on this M130. NAV (CAN only) takes no M130 pin and does not conflict. Owner call",
-             "PDM15 OUT14 (8 A) at 1 A, the smallest step (PDM manual p.1 'Outputs are programmable in 1 A steps'); load 2 x 6 mA (ZF p.1). OUT14 so it stays off OUT8, OUT10 and OUT12, which step-power's STEP-DCMD names (options-rd, 2026-09-29; STEP-DCMD is not on main yet)"]
+             "PDM15 OUT14 (8 A) at 1 A, the smallest step (PDM manual p.1 'Outputs are programmable in 1 A steps'); load 2 x 6 mA (ZF p.1). Uncontested: step-power's STEP-DCMD left the PDM15 for the bay-PDM32 candidate (step-power, PR #428, 2026-09-29). If the bay PDM becomes a PDM32 (state 0ah), this feed moves to one of its 8 A outputs; step-power's PDM32 estimate already counts it (+1 8 A at 1 A)",
+             "SEAL: DTM seals take 1.35-3.05 mm insulation (Deutsch DT Series Technical Manual, farnell 628276, feature table) and M22759/32-20 is 1.27 mm (catalog/parts.yaml WIRE-OD, ProWire), so the harness side of each corner DTM does not seal as listed (the state 0ai class of problem). Fixes: 20 AWG M22759/16 (1.5 mm, inside the published DTM range, and it fits the 20 AWG contacts and the 61-pin #20; needs the owner's OK, like the 22 AWG /16 change of 2026-09-26; check that the 1.35-3.05 mm range is one seal, since 0ai found the DT feature-table range spans two) or 18 AWG /32 (1.52 mm) on 16-18 AWG size-20 contacts 0460-010-20141 / 0462-005-20141, spliced to 20 AWG before the 61-pin (#20 contacts take 20-24 AWG). The ZF's own lead OD is not published: caliper it. Dave's call"]
     door_cavities: 0
     notes: >-
       M130 B10 (UDIG5) front left and B11 (UDIG6) front right: 52 -> 54 of 60 pins, and the last two UDIGs. 61-pin 58 -> 60 of 61;
