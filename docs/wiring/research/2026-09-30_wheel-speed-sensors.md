@@ -352,7 +352,7 @@ They are tape items T-16 to T-19 in `calc-data/cad/tape_list.yaml` (geometry lan
 |---|---|---|
 | M130 pins | 52 / 60 | 54 / 60: B10, B11. This uses the last two UDIGs, so a later frequency sensor would have none. (A flex-fuel sensor is the likely one; its input type is in the M1 Flex Fuel User Guide on the GPR page, not read here.) **CONFLICT:** nav-comms' alternate NAV-L10 (MoTeC GPS-L10, PR #421) also names B11 (UDIG6), so WSS-F2 and NAV-L10 cannot both be built; its recommended NAV is CAN-only and takes no pin (`conflicts_with: [NAV-L10]` in options.yaml) |
 | 61-pin | 58 / 61 (spare d, t, u) | 60 / 61: two signal cavities. **Watch:** registry #100 notes it left cavity d for body bulkhead C, which the owner's one-61-pin call (state 0ah) retires |
-| PDM15 8 A outputs | 3 / 7 used (OUT10, OUT12, OUT14, OUT15 free) | 4 / 7: OUT14 feeds both sensors (1 A limit; 2 × 6 mA load). Agreed with step-power: STEP-DCMD (PR #428) takes OUT8, OUT10 and OUT12; OUT15, the last 8 A spare after both, is step-power's optional feed for per-door steps. With both built, the PDM15 has 1 spare output. If a bay PDM32 is picked later (state 0ah), the feed moves there |
+| PDM15 8 A outputs | 3 / 7 used (OUT10, OUT12, OUT14, OUT15 free) | 4 / 7: OUT14 feeds both sensors (1 A limit; 2 × 6 mA load). Uncontested: STEP-DCMD (PR #428, on the registry's PDM15) takes OUT8, OUT10 and OUT12 and wants OUT15 only as an optional second feed. With both built, the PDM15 has 1 spare output (OUT15). If the bay box becomes a sealed PDM32 (state 0ah, pending), these outputs remap in that registry pass |
 | PDM30, PDM15 inputs; body bulkheads | — | No change |
 | GND-BANK-ENG | 24 returns | 26: the two sensor 0 V returns |
 
