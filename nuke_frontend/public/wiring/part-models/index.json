@@ -2,6 +2,93 @@
  "generated": "2026-09-29",
  "source": "docs/wiring/calc-data/catalog/part_models.yaml",
  "parts": {
+  "AC-CLUTCH": {
+   "endpoints": [
+    "AC-CLUTCH"
+   ],
+   "what": "A/C compressor clutch, Sanden 7176 SD7B10: ear mount, PV6 112 mm pulley, 12 V, T1 single lead, 100 cc",
+   "maker": "Sanden",
+   "maker_pn": "7176 (SD7B10, ear mount, PV6 112 mm, T1)",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 150.0,
+    "w": 150.0,
+    "h": 200.0
+   },
+   "frame": "origin on the compressor's axis at the clutch face; +Z forward (out of the clutch), +Y up (the ears), body behind",
+   "axes": {
+    "mount_normal": "+Y",
+    "maker_up": "+Y",
+    "faces": {
+     "clutch": "+Z",
+     "ears": "+Y"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#c2c5c7",
+     "from": "eBay photo https://i.ebayimg.com/images/g/sq8AAOSw1yNoG2vB/s-l1600.jpg (eBay listing photo of a Sanden 7176, fetched 2026-09-29) (cast aluminium body)"
+    },
+    "clutch": {
+     "hex": "#2b2c2d",
+     "from": "eBay photo https://i.ebayimg.com/images/g/sq8AAOSw1yNoG2vB/s-l1600.jpg (eBay listing photo of a Sanden 7176, fetched 2026-09-29) (clutch plate, black)"
+    },
+    "pulley": {
+     "hex": "#c9b98a",
+     "from": "eBay photo https://i.ebayimg.com/images/g/sq8AAOSw1yNoG2vB/s-l1600.jpg (eBay listing photo of a Sanden 7176, fetched 2026-09-29) (pulley, zinc-gold)"
+    }
+   },
+   "attach": [
+    {
+     "n": "t1",
+     "ep": "AC-CLUTCH",
+     "at": [
+      0,
+      49.0,
+      -48.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "flying lead",
+     "note": "T1 single lead, male bullet (clutch coil +)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "ear_0",
+     "at": [
+      0,
+      66.0,
+      -127.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "d": 10.5,
+     "note": "ear bolt through the bracket"
+    },
+    {
+     "n": "ear_1",
+     "at": [
+      0,
+      66.0,
+      -45.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "d": 10.5,
+     "note": "ear bolt through the bracket"
+    }
+   ]
+  },
   "ACC-BATT": {
    "endpoints": [
     "ACC-BATT"
@@ -147,6 +234,165 @@
       -1
      ],
      "note": "stands on its plinth; the hold-down clamps the cover or the plinth (tray not set)"
+    }
+   ]
+  },
+  "ALTERNATOR-SENSE": {
+   "endpoints": [
+    "ALTERNATOR-SENSE"
+   ],
+   "what": "Alternator, Holley 197-302 LT1-style hairpin (natural), on the Holley mid-mount; sense plug via pigtail 197-400",
+   "maker": "Holley",
+   "maker_pn": "197-302 (pigtail 197-400)",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 152.0,
+    "w": 152.0,
+    "h": 190.0
+   },
+   "frame": "origin on the alternator's axis at the front mounting-ear face; +Z forward (the pulley), +Y up",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "pulley": "+Z",
+     "plug": "-Z"
+    }
+   },
+   "colors": {
+    "case": {
+     "hex": "#c9ccce",
+     "from": "owner's photo of the engine bay, vehicle_images 40e5e5f9 (2026-01-31): the Holley alternator on the mid-mount (natural aluminium case)"
+    },
+    "pulley": {
+     "hex": "#2a2b2c",
+     "from": "owner's photo of the engine bay, vehicle_images 40e5e5f9 (2026-01-31): the Holley alternator on the mid-mount (pulley, black)"
+    },
+    "plug": {
+     "hex": "#1d1d1e",
+     "from": "regulator plug: black"
+    },
+    "stud": {
+     "hex": "#b8a372",
+     "from": "B+ stud: drawn brass"
+    }
+   },
+   "attach": [
+    {
+     "n": "sense_plug",
+     "ep": "ALTERNATOR-SENSE",
+     "at": [
+      -30.0,
+      38.0,
+      -172.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "pigtail plug",
+     "note": "197-400 pigtail: L lead (ALT_L)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "ear_front",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 10.5,
+     "note": "M10 x 80 (outside), Holley"
+    },
+    {
+     "n": "ear_rear",
+     "at": [
+      0,
+      0,
+      -132.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 10.5,
+     "note": "M10 x 75 (inside)"
+    }
+   ]
+  },
+  "AMP-STEP-CTRL": {
+   "endpoints": [
+    "AMP-STEP-CTRL"
+   ],
+   "what": "Power step controller (AMP Research PowerStep kit harness + controller; drives both step motors), with one motor and its linkage",
+   "maker": "AMP Research",
+   "maker_pn": "PowerStep (K5 kit)",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 100.0,
+    "w": 65.0,
+    "h": 30.0
+   },
+   "frame": "origin at the centre of the controller's mounting face; +Z out of it; the motor and linkage drawn beside it",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "ctrl": {
+     "hex": "#1d1d1e",
+     "from": "controller: drawn black"
+    },
+    "motor": {
+     "hex": "#2b2c2d",
+     "from": "motor: drawn black"
+    },
+    "arm": {
+     "hex": "#3a3b3c",
+     "from": "linkage: drawn cast black"
+    }
+   },
+   "attach": [
+    {
+     "n": "harness",
+     "ep": "AMP-STEP-CTRL",
+     "at": [
+      -50.0,
+      0,
+      15.0
+     ],
+     "dir": [
+      -1,
+      0,
+      0
+     ],
+     "kind": "kit harness",
+     "note": "kit harness: RED power, BLACK negative, trigger leads to the door circuits"
+    }
+   ],
+   "mount": [
+    {
+     "n": "controller",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "controller mount (spot not picked)"
     }
    ]
   },
@@ -332,6 +578,300 @@
      ],
      "d": 6.0,
      "note": "corner hole under its cap"
+    }
+   ]
+  },
+  "BLOWER-MOTOR": {
+   "endpoints": [
+    "BLOWER-MOTOR"
+   ],
+   "what": "Blower motor, Four Seasons 35587 flanged single-speed 12 V motor, one blade terminal",
+   "maker": "Four Seasons",
+   "maker_pn": "35587",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 180.0,
+    "w": 180.0,
+    "h": 127.0
+   },
+   "frame": "origin at the centre of the flange face on the blower case; +Z into the engine bay (motor can), +Y up (blade down); shaft into the case (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "can": "+Z",
+     "shaft": "-Z",
+     "blade": "-Y"
+    }
+   },
+   "colors": {
+    "flange": {
+     "hex": "#2f3031",
+     "from": "product photo https://static.summitracing.com/global/images/prod/xlarge/FSS-35587_xl.jpg (Summit Racing, fetched 2026-09-29), k-means of the region (flange and can, black paint)"
+    },
+    "can": {
+     "hex": "#2f3031",
+     "from": "product photo https://static.summitracing.com/global/images/prod/xlarge/FSS-35587_xl.jpg (Summit Racing, fetched 2026-09-29), k-means of the region (motor can, black)"
+    },
+    "shaft": {
+     "hex": "#c9c6bd",
+     "from": "product photo https://static.summitracing.com/global/images/prod/xlarge/FSS-35587_xl.jpg (Summit Racing, fetched 2026-09-29), k-means of the region (shaft and nut, zinc)"
+    },
+    "blade": {
+     "hex": "#c7c2b4",
+     "from": "product photo https://static.summitracing.com/global/images/prod/xlarge/FSS-35587_xl.jpg (Summit Racing, fetched 2026-09-29), k-means of the region (blade terminal, tin)"
+    }
+   },
+   "attach": [
+    {
+     "n": "blade",
+     "ep": "BLOWER-MOTOR",
+     "at": [
+      0.0,
+      -52.9,
+      12.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "blade",
+     "note": "+ blade; BLOWER_MOT and BLOWER_HI join ahead of it"
+    }
+   ],
+   "mount": [
+    {
+     "n": "screw_0",
+     "at": [
+      0.0,
+      83.0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "flange screw into the blower case"
+    },
+    {
+     "n": "screw_1",
+     "at": [
+      -48.79,
+      67.15,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "flange screw into the blower case"
+    },
+    {
+     "n": "screw_2",
+     "at": [
+      -78.94,
+      25.65,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "flange screw into the blower case"
+    },
+    {
+     "n": "screw_3",
+     "at": [
+      -78.94,
+      -25.65,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "flange screw into the blower case"
+    },
+    {
+     "n": "screw_4",
+     "at": [
+      -48.79,
+      -67.15,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "flange screw into the blower case"
+    },
+    {
+     "n": "screw_5",
+     "at": [
+      -0.0,
+      -83.0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "flange screw into the blower case"
+    },
+    {
+     "n": "screw_6",
+     "at": [
+      48.79,
+      -67.15,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "flange screw into the blower case"
+    },
+    {
+     "n": "screw_7",
+     "at": [
+      78.94,
+      -25.65,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "flange screw into the blower case"
+    },
+    {
+     "n": "screw_8",
+     "at": [
+      78.94,
+      25.65,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "flange screw into the blower case"
+    },
+    {
+     "n": "screw_9",
+     "at": [
+      48.79,
+      67.15,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "flange screw into the blower case"
+    }
+   ]
+  },
+  "BLOWER-RES": {
+   "endpoints": [
+    "BLOWER-RES"
+   ],
+   "what": "Blower resistor, factory, on the blower-evaporator case: 4 terminals BAT / M1 / M2 / BLO",
+   "maker": "GM (factory)",
+   "maker_pn": "unknown",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 76.0,
+    "w": 56.0,
+    "h": 73.0
+   },
+   "frame": "origin at the centre of the mounting plate on the evaporator case; +Z out of the case (the plug), coils inside (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "plate": {
+     "hex": "#b9bcbe",
+     "from": "plate: drawn zinc"
+    },
+    "coil": {
+     "hex": "#8a5a3a",
+     "from": "coils: drawn nichrome on a ceramic card"
+    },
+    "shroud": {
+     "hex": "#2a2a2b",
+     "from": "terminal shroud: drawn black"
+    }
+   },
+   "attach": [
+    {
+     "n": "plug",
+     "ep": "BLOWER-RES",
+     "at": [
+      0,
+      0,
+      17.5
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "4-way plug",
+     "note": "BAT / M1 / M2 / BLO"
+    }
+   ],
+   "mount": [
+    {
+     "n": "screw_L",
+     "at": [
+      -31.0,
+      0,
+      1.5
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "screw into the evaporator case"
+    },
+    {
+     "n": "screw_R",
+     "at": [
+      31.0,
+      0,
+      1.5
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "screw into the evaporator case"
     }
    ]
   },
@@ -872,6 +1412,252 @@
     }
    ]
   },
+  "E-STOPP": {
+   "endpoints": [
+    "E-STOPP"
+   ],
+   "what": "Electric parking brake, E-Stopp ESK001: actuator on the parking-brake cable + control box, dash button in the kit",
+   "maker": "E-Stopp",
+   "maker_pn": "ESK001 (actuator + control module + button)",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 381.0,
+    "w": 82.6,
+    "h": 50.8
+   },
+   "frame": "origin at the centre of the actuator's mounting face (flanges on the frame rail); +Z up off the rail, +X along the actuator toward its cable end",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "cable": "+X",
+     "leads": "-X"
+    }
+   },
+   "colors": {
+    "tube": {
+     "hex": "#cfd2d4",
+     "from": "kit photo https://static.summitracing.com/global/images/prod/xlarge/esc-esk001_xl.jpg (Summit Racing, fetched 2026-09-29) (actuator tube, aluminium)"
+    },
+    "box": {
+     "hex": "#1c1c1d",
+     "from": "kit photo https://static.summitracing.com/global/images/prod/xlarge/esc-esk001_xl.jpg (Summit Racing, fetched 2026-09-29) (control box, black)"
+    },
+    "button": {
+     "hex": "#d9dbdd",
+     "from": "kit photo https://static.summitracing.com/global/images/prod/xlarge/esc-esk001_xl.jpg (Summit Racing, fetched 2026-09-29) (billet button bezel)"
+    },
+    "led": {
+     "hex": "#2e9a4a",
+     "from": "kit photo https://static.summitracing.com/global/images/prod/xlarge/esc-esk001_xl.jpg (Summit Racing, fetched 2026-09-29) (button LED, green)"
+    },
+    "cable": {
+     "hex": "#161617",
+     "from": "actuator cable: black"
+    }
+   },
+   "attach": [
+    {
+     "n": "control_box",
+     "ep": "E-STOPP",
+     "at": [
+      -66.7,
+      140.0,
+      17.45
+     ],
+     "dir": [
+      -1,
+      0,
+      0
+     ],
+     "kind": "flying leads",
+     "note": "control box leads E / F / G / H and the button harness plug (display position)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange_LF",
+     "at": [
+      -145.0,
+      -32.35,
+      3.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "slotted flange bolt to the frame rail"
+    },
+    {
+     "n": "flange_LB",
+     "at": [
+      -145.0,
+      32.35,
+      3.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "slotted flange bolt to the frame rail"
+    },
+    {
+     "n": "flange_RF",
+     "at": [
+      145.0,
+      -32.35,
+      3.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "slotted flange bolt to the frame rail"
+    },
+    {
+     "n": "flange_RB",
+     "at": [
+      145.0,
+      32.35,
+      3.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "slotted flange bolt to the frame rail"
+    }
+   ]
+  },
+  "FAN": {
+   "endpoints": [
+    "FAN"
+   ],
+   "what": "Radiator fan, SPAL 30107090 16 in drop-in brushless puller, 300 W, 2053 CFM",
+   "maker": "SPAL",
+   "maker_pn": "30107090 (drawn from SPAL's VA97-ABL322P/N-103A drawing)",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 441.5,
+    "w": 441.5,
+    "h": 78.4
+   },
+   "frame": "origin at the centre of the rear lip's face (shroud / radiator side); +Z toward the engine, +Y up",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "motor": "+Z",
+     "lip": "-Z"
+    }
+   },
+   "colors": {
+    "ring": {
+     "hex": "#18181a",
+     "from": "Wizard Cooling photo https://wizardcooling.com/images/M198668289.jpg (Wizard Cooling's 30107090 listing photo, fetched 2026-09-29), k-means of the region (ring and spokes, black)"
+    },
+    "blade": {
+     "hex": "#1f1f21",
+     "from": "Wizard Cooling photo https://wizardcooling.com/images/M198668289.jpg (Wizard Cooling's 30107090 listing photo, fetched 2026-09-29), k-means of the region (blades, black)"
+    },
+    "motor": {
+     "hex": "#232325",
+     "from": "Wizard Cooling photo https://wizardcooling.com/images/M198668289.jpg (Wizard Cooling's 30107090 listing photo, fetched 2026-09-29), k-means of the region (motor, black)"
+    },
+    "plug": {
+     "hex": "#3f86c9",
+     "from": "Wizard Cooling photo https://wizardcooling.com/images/M198668289.jpg (Wizard Cooling's 30107090 listing photo, fetched 2026-09-29), k-means of the region (connector, blue)"
+    },
+    "lead": {
+     "hex": "#141415",
+     "from": "Wizard Cooling photo https://wizardcooling.com/images/M198668289.jpg (Wizard Cooling's 30107090 listing photo, fetched 2026-09-29), k-means of the region (lead sleeve, black)"
+    }
+   },
+   "attach": [
+    {
+     "n": "plug",
+     "ep": "FAN",
+     "at": [
+      60.0,
+      -348.0,
+      48.5
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "connector",
+     "note": "fan connector at the end of the 430 lead: power, ground, PWM"
+    }
+   ],
+   "mount": [
+    {
+     "n": "tab_LB",
+     "at": [
+      -157.75,
+      -157.75,
+      53.5
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 7.5,
+     "note": "tab bolt to the shroud"
+    },
+    {
+     "n": "tab_LT",
+     "at": [
+      -157.75,
+      157.75,
+      53.5
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 7.5,
+     "note": "tab bolt to the shroud"
+    },
+    {
+     "n": "tab_RB",
+     "at": [
+      157.75,
+      -157.75,
+      53.5
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 7.5,
+     "note": "tab bolt to the shroud"
+    },
+    {
+     "n": "tab_RT",
+     "at": [
+      157.75,
+      157.75,
+      53.5
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 7.5,
+     "note": "tab bolt to the shroud"
+    }
+   ]
+  },
   "FOOTWELL-LAMPS": {
    "endpoints": [
     "FOOTWELL-LAMPS"
@@ -1122,6 +1908,210 @@
       -1
      ],
      "note": "flange on the bucket's adjuster ring, retaining ring over it"
+    }
+   ]
+  },
+  "HORN": {
+   "endpoints": [
+    "HORN"
+   ],
+   "what": "Horn, factory, one terminal (connector 12004267), grounds through its bracket",
+   "maker": "GM (factory)",
+   "maker_pn": "unknown",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 110.0,
+    "w": 170.0,
+    "h": 73.0
+   },
+   "frame": "origin at the centre of the bracket's face on the radiator support; +Z out of the support, +Y up",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#1c1c1d",
+     "from": "factory horns are black: drawn black (no photo on file)"
+    },
+    "bracket": {
+     "hex": "#2a2a2b",
+     "from": "bracket: black"
+    },
+    "blade": {
+     "hex": "#c7c2b4",
+     "from": "blade: drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "terminal",
+     "ep": "HORN",
+     "at": [
+      57.0,
+      -75.0,
+      13.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "blade",
+     "note": "#48 (connector 12004267)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "bracket",
+     "at": [
+      0,
+      20.0,
+      3.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 8.5,
+     "note": "bolt to the radiator support (grounds through it)"
+    }
+   ]
+  },
+  "IBOOSTER": {
+   "endpoints": [
+    "IBOOSTER"
+   ],
+   "what": "Brake booster, Bosch iBooster Gen 1 from a Tesla Model S/X (1037123-00-B), with master cylinder and reservoir",
+   "maker": "Bosch (Tesla)",
+   "maker_pn": "1037123-00-B (Gen 1; -00-A same housing)",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 155.0,
+    "w": 320.0,
+    "h": 215.0
+   },
+   "frame": "origin at the centre of the firewall flange's face; +Z along the axis away from the firewall, +Y up, +X to the ECU side; studs and pushrod through the firewall (-Z)",
+   "axes": {
+    "mount_normal": "-Z",
+    "maker_up": "+Y",
+    "faces": {
+     "flange": "-Z",
+     "ecu": "+X",
+     "ports": "+X",
+     "reservoir": "+Y"
+    }
+   },
+   "colors": {
+    "housing": {
+     "hex": "#b9bcbd",
+     "from": "owner's photo vehicle_images 7ba386f0 (iphoto IMG_0255, 2024-08-30), label '(P)1037123-00-A' (cast aluminium housings)"
+    },
+    "ecu": {
+     "hex": "#2c2d2e",
+     "from": "owner's photo vehicle_images 7ba386f0 (iphoto IMG_0255, 2024-08-30), label '(P)1037123-00-A' (ECU cover, black)"
+    },
+    "label": {
+     "hex": "#f2f2f0",
+     "from": "owner's photo vehicle_images 7ba386f0 (iphoto IMG_0255, 2024-08-30), label '(P)1037123-00-A' (ECU label, white)"
+    },
+    "reservoir": {
+     "hex": "#d4d7da",
+     "from": "owner's photo of the booster on the truck, vehicle_images 40e5e5f9 (2026-01-31) (billet reservoirs, polished aluminium)"
+    },
+    "boot": {
+     "hex": "#1d1d1d",
+     "from": "owner's photo vehicle_images 7ba386f0 (iphoto IMG_0255, 2024-08-30), label '(P)1037123-00-A' (pushrod boot, black rubber)"
+    },
+    "steel": {
+     "hex": "#c9ccd0",
+     "from": "owner's photo vehicle_images 7ba386f0 (iphoto IMG_0255, 2024-08-30), label '(P)1037123-00-A' (studs, pushrod, clevis: zinc)"
+    },
+    "plug": {
+     "hex": "#1e1e1f",
+     "from": "controller plug: black (not in the photo's view)"
+    }
+   },
+   "attach": [
+    {
+     "n": "controller",
+     "ep": "IBOOSTER",
+     "at": [
+      91.0,
+      -72.0,
+      120.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "plug",
+     "note": "controller plug (Tulay Gen-1 universal harness: 4 loose leads + CAN candidate)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "stud_LB",
+     "at": [
+      -36.0,
+      -36.0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 8.5,
+     "note": "M8 stud through the firewall (72 x 72 square), nut inside the cab"
+    },
+    {
+     "n": "stud_LT",
+     "at": [
+      -36.0,
+      36.0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 8.5,
+     "note": "M8 stud through the firewall (72 x 72 square), nut inside the cab"
+    },
+    {
+     "n": "stud_RB",
+     "at": [
+      36.0,
+      -36.0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 8.5,
+     "note": "M8 stud through the firewall (72 x 72 square), nut inside the cab"
+    },
+    {
+     "n": "stud_RT",
+     "at": [
+      36.0,
+      36.0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 8.5,
+     "note": "M8 stud through the firewall (72 x 72 square), nut inside the cab"
     }
    ]
   },
@@ -3083,6 +4073,88 @@
     }
    ]
   },
+  "STARTER-S": {
+   "endpoints": [
+    "STARTER-S"
+   ],
+   "what": "Starter motor: S (trigger) terminal here; its B+ stud takes the 2 AWG cranking cable #6",
+   "maker": "GM (not picked)",
+   "maker_pn": "not recorded",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 115.0,
+    "w": 88.0,
+    "h": 220.0
+   },
+   "frame": "origin at the centre of the mounting flange on the block; +Z along the starter away from the flywheel, +Y up",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#4a4c4e",
+     "from": "not in any photo: drawn dark grey"
+    },
+    "sol": {
+     "hex": "#b9bcbf",
+     "from": "solenoid: drawn zinc"
+    },
+    "stud": {
+     "hex": "#b8a372",
+     "from": "studs: drawn brass"
+    }
+   },
+   "attach": [
+    {
+     "n": "S",
+     "ep": "STARTER-S",
+     "at": [
+      -14.0,
+      54.0,
+      121.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "stud",
+     "note": "S trigger terminal (START_TRIG ring)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "bolt_L",
+     "at": [
+      -47.5,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "starter bolt into the block"
+    },
+    {
+     "n": "bolt_R",
+     "at": [
+      47.5,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "starter bolt into the block"
+    }
+   ]
+  },
   "SUB-2": {
    "endpoints": [
     "SUB-2"
@@ -3485,6 +4557,85 @@
     }
    ]
   },
+  "TG-MOTOR-ACI": {
+   "endpoints": [
+    "TG-MOTOR-ACI"
+   ],
+   "what": "Tailgate window motor and regulator, Nu-Relics 17383-1 (1973-91 Blazer/Jimmy/Suburban tailgate), ACI reverse-polarity motor (candidate)",
+   "maker": "Nu-Relics (ACI motor)",
+   "maker_pn": "17383-1 (tailgate regulator + ACI motor)",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 900.0,
+    "w": 50.0,
+    "h": 470.0
+   },
+   "frame": "origin at the centre of the main plate's face on the tailgate inner panel; +Z toward the glass, +Y up, +X to the right seen from behind the truck; the motor at +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "arms": "+Y",
+     "motor": "+X"
+    }
+   },
+   "colors": {
+    "steel": {
+     "hex": "#1d1e20",
+     "from": "Nu-Relics photo https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-1-2.jpg (Nu-Relics, fetched 2026-09-29) (regulator, black)"
+    },
+    "gear": {
+     "hex": "#c3c6c9",
+     "from": "Nu-Relics photo https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-1-2.jpg (Nu-Relics, fetched 2026-09-29) (motor gear housing, silver)"
+    },
+    "can": {
+     "hex": "#1f2021",
+     "from": "Nu-Relics photo https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-1-2.jpg (Nu-Relics, fetched 2026-09-29) (motor can, black)"
+    },
+    "plug": {
+     "hex": "#e0d7b8",
+     "from": "motor plug: natural (not in the photo)"
+    },
+    "roller": {
+     "hex": "#eeeeee",
+     "from": "Nu-Relics photo https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-1-2.jpg (Nu-Relics, fetched 2026-09-29) (rollers)"
+    }
+   },
+   "attach": [
+    {
+     "n": "motor_plug",
+     "ep": "TG-MOTOR-ACI",
+     "at": [
+      405.0,
+      -26.2,
+      16.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "kit plug",
+     "note": "two-pole ACI motor plug (kit option #100)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "plate",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "bolts into the factory tailgate regulator holes"
+    }
+   ]
+  },
   "UNDERDASH-LAMPS": {
    "endpoints": [
     "UNDERDASH-LAMPS"
@@ -3768,6 +4919,597 @@
      ],
      "d": 3.2,
      "note": "Ø3.2 through the case, screw from the logo face"
+    }
+   ]
+  },
+  "WIPER-MOTOR": {
+   "endpoints": [
+    "WIPER-MOTOR",
+    "WASHER-PUMP"
+   ],
+   "what": "Wiper motor (factory 1977 C/K 2-speed, compound wound, park switch, terminal board 1 / 2 / 3, ground strap) with the factory washer pump on its gear box",
+   "maker": "GM (factory)",
+   "maker_pn": "unknown (factory; no part number recorded)",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 130.0,
+    "w": 85.0,
+    "h": 190.0
+   },
+   "frame": "origin at the centre of the gear box's face on the cowl (engine side); +Z out of the cowl into the engine bay, +Y up",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {}
+   },
+   "colors": {
+    "gear": {
+     "hex": "#b7babd",
+     "from": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.803, Fig. 8-16 'Washer Mechanism Mounting on Wiper' and Fig. 8-17 (arrangement only; no dimension printed): cast gear box, drawn aluminium"
+    },
+    "can": {
+     "hex": "#2b2c2d",
+     "from": "motor can: drawn black"
+    },
+    "pump": {
+     "hex": "#e8e3d6",
+     "from": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.803, Fig. 8-16 'Washer Mechanism Mounting on Wiper' and Fig. 8-17 (arrangement only; no dimension printed): washer pump housing, drawn natural nylon"
+    },
+    "board": {
+     "hex": "#6b4a2b",
+     "from": "terminal board: drawn phenolic brown"
+    }
+   },
+   "attach": [
+    {
+     "n": "motor",
+     "ep": "WIPER-MOTOR",
+     "at": [
+      62.0,
+      15.75,
+      33.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "terminal board",
+     "note": "terminals 1 / 2 (centre feed) / 3"
+    },
+    {
+     "n": "washer",
+     "ep": "WASHER-PUMP",
+     "at": [
+      22.0,
+      -10.5,
+      65.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "2-way plug",
+     "note": "washer solenoid (93B feed, 94 switch side)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "bolt_0",
+     "at": [
+      0.0,
+      65.1,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "gear box to the cowl"
+    },
+    {
+     "n": "bolt_1",
+     "at": [
+      -69.8,
+      -32.55,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "gear box to the cowl"
+    },
+    {
+     "n": "bolt_2",
+     "at": [
+      69.8,
+      -32.55,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "gear box to the cowl"
+    }
+   ]
+  },
+  "lock_actuator_DS": {
+   "endpoints": [
+    "lock_actuator_DS"
+   ],
+   "what": "Driver door lock actuator, AutoLoc AUTZT2000 2-wire, 13 lb, 12 V",
+   "maker": "AutoLoc",
+   "maker_pn": "AUTZT2000",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 133.35,
+    "w": 63.5,
+    "h": 19.05
+   },
+   "frame": "origin at the centre of the mounting face (flat side on the door's inner panel); +Z out of it, +X along the plunger (toward the lock rod)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "plunger": "+X",
+     "plug": "-X"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#2b2b2c",
+     "from": "AutoLoc photo https://shop.autoloc.com/cdn/shop/files/2048_abcded99-9b45-4114-983b-9872425e0bc4.jpg (AutoLoc, fetched 2026-09-29) (ABS body, black)"
+    },
+    "tip": {
+     "hex": "#ececec",
+     "from": "AutoLoc photo https://shop.autoloc.com/cdn/shop/files/2048_abcded99-9b45-4114-983b-9872425e0bc4.jpg (AutoLoc, fetched 2026-09-29) (plunger tip, white)"
+    },
+    "plug": {
+     "hex": "#1d1d1e",
+     "from": "harness plug: black"
+    }
+   },
+   "attach": [
+    {
+     "n": "socket",
+     "ep": "lock_actuator_DS",
+     "at": [
+      -82.67,
+      0,
+      9.53
+     ],
+     "dir": [
+      -1,
+      0,
+      0
+     ],
+     "kind": "plug-in harness",
+     "note": "2-wire plug-in harness (polarity sets lock / unlock)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "ear_0",
+     "at": [
+      -49.07,
+      26.25,
+      5.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "mounting ear"
+    },
+    {
+     "n": "ear_1",
+     "at": [
+      8.12,
+      26.25,
+      5.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "mounting ear"
+    },
+    {
+     "n": "ear_2",
+     "at": [
+      -49.07,
+      -26.25,
+      5.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "mounting ear"
+    },
+    {
+     "n": "ear_3",
+     "at": [
+      8.12,
+      -26.25,
+      5.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "mounting ear"
+    }
+   ]
+  },
+  "lock_actuator_PS": {
+   "endpoints": [
+    "lock_actuator_PS"
+   ],
+   "what": "Passenger door lock actuator, AutoLoc AUTZT2000 2-wire, 13 lb, 12 V",
+   "maker": "AutoLoc",
+   "maker_pn": "AUTZT2000",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 133.35,
+    "w": 63.5,
+    "h": 19.05
+   },
+   "frame": "origin at the centre of the mounting face (flat side on the door's inner panel); +Z out of it, +X along the plunger (toward the lock rod)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "plunger": "+X",
+     "plug": "-X"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#2b2b2c",
+     "from": "AutoLoc photo https://shop.autoloc.com/cdn/shop/files/2048_abcded99-9b45-4114-983b-9872425e0bc4.jpg (AutoLoc, fetched 2026-09-29) (ABS body, black)"
+    },
+    "tip": {
+     "hex": "#ececec",
+     "from": "AutoLoc photo https://shop.autoloc.com/cdn/shop/files/2048_abcded99-9b45-4114-983b-9872425e0bc4.jpg (AutoLoc, fetched 2026-09-29) (plunger tip, white)"
+    },
+    "plug": {
+     "hex": "#1d1d1e",
+     "from": "harness plug: black"
+    }
+   },
+   "attach": [
+    {
+     "n": "socket",
+     "ep": "lock_actuator_PS",
+     "at": [
+      -82.67,
+      0,
+      9.53
+     ],
+     "dir": [
+      -1,
+      0,
+      0
+     ],
+     "kind": "plug-in harness",
+     "note": "2-wire plug-in harness (polarity sets lock / unlock)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "ear_0",
+     "at": [
+      -49.07,
+      26.25,
+      5.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "mounting ear"
+    },
+    {
+     "n": "ear_1",
+     "at": [
+      8.12,
+      26.25,
+      5.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "mounting ear"
+    },
+    {
+     "n": "ear_2",
+     "at": [
+      -49.07,
+      -26.25,
+      5.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "mounting ear"
+    },
+    {
+     "n": "ear_3",
+     "at": [
+      8.12,
+      -26.25,
+      5.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.5,
+     "note": "mounting ear"
+    }
+   ]
+  },
+  "rear_window_motor": {
+   "endpoints": [
+    "rear_window_motor"
+   ],
+   "what": "Tailgate window motor, factory electric (base design; the Nu-Relics 17383-1 kit is the candidate replacement)",
+   "maker": "GM (factory)",
+   "maker_pn": "factory tailgate window motor (connector 6288909)",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 216.0,
+    "w": 42.0,
+    "h": 120.0
+   },
+   "frame": "origin at the centre of the motor's mounting plate on the tailgate regulator; +Z out of the plate, +Y up",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "plug": "-X"
+    }
+   },
+   "colors": {
+    "gear": {
+     "hex": "#b8bbbe",
+     "from": "factory motor: cast housing, drawn aluminium (no photo on file)"
+    },
+    "can": {
+     "hex": "#2a2b2c",
+     "from": "motor can: drawn black"
+    },
+    "plug": {
+     "hex": "#2d2d2e",
+     "from": "GM connector 6288909: drawn black"
+    },
+    "plate": {
+     "hex": "#3a3b3c",
+     "from": "mounting plate: drawn painted steel"
+    }
+   },
+   "attach": [
+    {
+     "n": "motor_plug",
+     "ep": "rear_window_motor",
+     "at": [
+      -115.0,
+      -16.2,
+      19.0
+     ],
+     "dir": [
+      -1,
+      0,
+      0
+     ],
+     "kind": "GM connector 6288909",
+     "note": "UP 1 / DN 2 (1978 booklet)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "plate",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "motor attaching screws into the regulator (LTSM p.151)"
+    }
+   ]
+  },
+  "window_motor_DS": {
+   "endpoints": [
+    "window_motor_DS"
+   ],
+   "what": "Driver window motor and regulator, Nu-Relics 17383-2 (1973-91 Blazer/Jimmy front doors), ACI reverse-polarity motor",
+   "maker": "Nu-Relics (ACI motor)",
+   "maker_pn": "17383-2 (regulator + ACI motor)",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 510.0,
+    "w": 60.0,
+    "h": 460.0
+   },
+   "frame": "origin at the centre of the main plate's face on the door inner panel; +Z toward the glass, +Y up, +X toward the door's front",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "arms": "+X",
+     "motor": "-Y"
+    }
+   },
+   "colors": {
+    "steel": {
+     "hex": "#1d1e20",
+     "from": "Nu-Relics photo https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-2-2.jpg (Nu-Relics, fetched 2026-09-29) (regulator plate and arms, black)"
+    },
+    "gear": {
+     "hex": "#c3c6c9",
+     "from": "Nu-Relics photo https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-2-2.jpg (Nu-Relics, fetched 2026-09-29) (motor gear housing, silver)"
+    },
+    "can": {
+     "hex": "#1f2021",
+     "from": "Nu-Relics photo https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-2-2.jpg (Nu-Relics, fetched 2026-09-29) (motor can, black)"
+    },
+    "plug": {
+     "hex": "#e0d7b8",
+     "from": "motor plug: natural (not in the photo)"
+    },
+    "roller": {
+     "hex": "#eeeeee",
+     "from": "Nu-Relics photo https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-2-2.jpg (Nu-Relics, fetched 2026-09-29) (rollers, white nylon)"
+    },
+    "label": {
+     "hex": "#f4d000",
+     "from": "Nu-Relics photo https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-2-2.jpg (Nu-Relics, fetched 2026-09-29) (yellow label)"
+    }
+   },
+   "attach": [
+    {
+     "n": "motor_plug",
+     "ep": "window_motor_DS",
+     "at": [
+      -165.0,
+      -238.2,
+      16.0
+     ],
+     "dir": [
+      -1,
+      0,
+      0
+     ],
+     "kind": "kit plug",
+     "note": "two-pole motor plug (kit terminals + seals)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "plate",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "3-6 bolts into the factory regulator holes (Nu-Relics)"
+    }
+   ]
+  },
+  "window_motor_PS": {
+   "endpoints": [
+    "window_motor_PS"
+   ],
+   "what": "Passenger window motor and regulator, Nu-Relics 17383-2 (1973-91 Blazer/Jimmy front doors), ACI reverse-polarity motor",
+   "maker": "Nu-Relics (ACI motor)",
+   "maker_pn": "17383-2 (regulator + ACI motor)",
+   "shape_basis": "not sourced",
+   "dims_mm": {
+    "l": 510.0,
+    "w": 60.0,
+    "h": 460.0
+   },
+   "frame": "origin at the centre of the main plate's face on the door inner panel; +Z toward the glass, +Y up, +X toward the door's front (mirrored from the left-hand part)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "arms": "+X",
+     "motor": "-Y"
+    }
+   },
+   "colors": {
+    "steel": {
+     "hex": "#1d1e20",
+     "from": "Nu-Relics photo https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-2-2.jpg (Nu-Relics, fetched 2026-09-29) (regulator plate and arms, black)"
+    },
+    "gear": {
+     "hex": "#c3c6c9",
+     "from": "Nu-Relics photo https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-2-2.jpg (Nu-Relics, fetched 2026-09-29) (motor gear housing, silver)"
+    },
+    "can": {
+     "hex": "#1f2021",
+     "from": "Nu-Relics photo https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-2-2.jpg (Nu-Relics, fetched 2026-09-29) (motor can, black)"
+    },
+    "plug": {
+     "hex": "#e0d7b8",
+     "from": "motor plug: natural (not in the photo)"
+    },
+    "roller": {
+     "hex": "#eeeeee",
+     "from": "Nu-Relics photo https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-2-2.jpg (Nu-Relics, fetched 2026-09-29) (rollers, white nylon)"
+    },
+    "label": {
+     "hex": "#f4d000",
+     "from": "Nu-Relics photo https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-2-2.jpg (Nu-Relics, fetched 2026-09-29) (yellow label)"
+    }
+   },
+   "attach": [
+    {
+     "n": "motor_plug",
+     "ep": "window_motor_PS",
+     "at": [
+      165.0,
+      -238.2,
+      16.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "kit plug",
+     "note": "two-pole motor plug (kit terminals + seals)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "plate",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "3-6 bolts into the factory regulator holes (Nu-Relics)"
     }
    ]
   }
