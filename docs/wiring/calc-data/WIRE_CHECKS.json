@@ -8241,6 +8241,33 @@
    }
   },
   {
+   "wire": "BWS_SIG",
+   "kind": "implied",
+   "label": "Brake warning switch (proportioning valve) -> PDM15 DIG2 (brake-circuit imbalance, own dash message over CAN)",
+   "from": [
+    "PDM15",
+    "DIG2"
+   ],
+   "to": [
+    "BRAKE-WARN-SW (switch terminal)",
+    "switch terminal (single; plug and terminal OPEN)"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "PDM15:DIG2 (A19)",
+   "control": null,
+   "subsystem": null,
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM15:DIG2 -> BRAKE-WARN-SW (switch terminal):switch terminal (single; plug and terminal OPEN)"
+    ]
+   }
+  },
+  {
    "wire": "DAK_CONST_FH",
    "kind": "implied",
    "label": "DAK_CONST fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",

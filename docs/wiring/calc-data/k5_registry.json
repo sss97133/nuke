@@ -15,7 +15,7 @@
   "counts": {
    "active": 174,
    "candidate": 243,
-   "implied": 246,
+   "implied": 247,
    "devices": 141
   }
  },
@@ -20306,6 +20306,32 @@
    "option_status": "candidate"
   },
   {
+   "id": "BWS_SIG",
+   "label": "Brake warning switch (proportioning valve) -> PDM15 DIG2 (brake-circuit imbalance, own dash message over CAN)",
+   "status": "implied",
+   "frm": "PDM15:DIG2 (A19)",
+   "to": "BRAKE-WARN-SW (switch terminal)",
+   "awg": 20,
+   "spec": "M22759/32",
+   "sources": [
+    "owner 2026-09-29: 'proportioning valve has a sensor on it a one wire situtation where if it disconnects it triggers the brake light on we can wire that and code that ... its mounted on a cross member under the radiator where all the brake lines go'; 1977 LTSM PDF p.406 'Testing Electrical Circuit of Combination Valve': jumper the switch wire to ground and the warning lamp lights, so the switch grounds through the valve body (one wire). The valve sits in the engine bay, so the engine PDM15 reads it with no firewall crossing (DIG2 A19, pdm15_designations.txt), and the PDM30/dash get it over CAN; switch-to-ground pattern, chapters/17 §17.7.7"
+   ],
+   "length_kind": null,
+   "gauge": "20 AWG",
+   "route": {
+    "sides": [
+     "engine bay"
+    ],
+    "crossing": "none: both ends on one side"
+   },
+   "conflicts": [
+    "decision: color None -> white — state 0f(a): 'One color per size + printed labels' — the cart carries white (-9) per size (M22759/32 22-9, 20-9, 18-9, 16-9, 14-9, 12-9); state 0i: Dave's white 22 AWG + colour-ring codes; chapters/18 step 2 one-colour prototype. VSS_DAK also matches the SEN-01-5 white signal lead (Dakota VHX manual p.8)"
+   ],
+   "color": "white",
+   "option": "BASE",
+   "option_status": "base"
+  },
+  {
    "id": "DAK_CONST_FH",
    "label": "DAK_CONST fuse holder line pigtail (Blue Sea 5065, 12 AWG, supplied) on the stud",
    "status": "implied",
@@ -24088,8 +24114,8 @@
    "source": "K5_WIRING_STATE.md row 33"
   },
   "device_end_coverage": {
-   "mapped": 529,
-   "wire_ends": 559,
+   "mapped": 531,
+   "wire_ends": 561,
    "endpoints_without_pin_map": [
     "AC-HP-SW",
     "AC-LP-SW",
@@ -24171,6 +24197,7 @@
    "IBST_CAN_L",
    "BFL_SIG",
    "BFL_0V",
+   "BWS_SIG",
    "DAK_CONST_FH",
    "PCS_BATT_FH",
    "TRANS_BATT_FH",
@@ -24856,6 +24883,7 @@
     "AC_LP_0V",
     "AC_HP_0V",
     "BFL_SIG",
+    "BWS_SIG",
     "ALT_L",
     "66_PT1",
     "66_PT2",
@@ -24877,6 +24905,7 @@
     "AC_LP_0V": "A28",
     "AC_HP_0V": "A28",
     "BFL_SIG": "A27",
+    "BWS_SIG": "A19",
     "ALT_L": "A2",
     "66_PT1": "A9",
     "66_PT2": "A17",
@@ -31855,6 +31884,40 @@
    "splice_point": null,
    "range_by_wire": null,
    "side": "engine bay"
+  },
+  "BRAKE-WARN-SW": {
+   "device": "brake warning switch on the proportioning (combination) valve: one wire, grounds through the valve body when the front and rear brake circuits lose balance; valve on the front crossmember under the radiator, where the brake lines meet",
+   "where": "engine",
+   "family": "open",
+   "kit": {},
+   "wires": [
+    "BWS_SIG"
+   ],
+   "cavities": {
+    "BWS_SIG": "switch terminal (single; plug and terminal OPEN)"
+   },
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "read on PDM15 DIG2 (engine bay, beside the valve; no firewall crossing) as a switch to ground, sent over CAN so the dash shows its own brake-circuit message apart from the brake-fluid level (BFL); the valve body is the return (1977 LTSM PDF p.406)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [
+    "which valve is on the truck and its part number: read the valve body (the 2024 build log lists a proportioning valve bought; the owner says it carries the one-wire switch)",
+    "switch plug and terminal: read the valve",
+    "switch polarity at the PDM (grounds on imbalance): bench"
+   ],
+   "sources": [
+    "owner 2026-09-29: 'proportioning valve has a sensor on it a one wire situtation where if it disconnects it triggers the brake light on we can wire that and code that ... its mounted on a cross member under the radiator where all the brake lines go'",
+    "1977 Light Truck Service Manual PDF p.406, 'Testing Electrical Circuit of Combination Valve': disconnect the wire from the switch terminal, jumper it to a good ground, ignition on, the warning lamp lights",
+    "owner photo 2021-10-06, vehicle_images 896767b8 (the original firewall-mounted combination valve with its yellow switch connector)",
+    "pdm15_designations.txt (A19 DIG2)"
+   ],
+   "splice_point": null,
+   "range_by_wire": null,
+   "side": "engine bay"
   }
  },
  "terminations": [
@@ -33543,6 +33606,16 @@
    "endpoint": "PDM15-A",
    "where": "engine",
    "cavity": "A17",
+   "factory_circuit": null,
+   "part": "SSC-N",
+   "family": "ssc",
+   "doubled": null
+  },
+  {
+   "wire": "BWS_SIG",
+   "endpoint": "PDM15-A",
+   "where": "engine",
+   "cavity": "A19",
    "factory_circuit": null,
    "part": "SSC-N",
    "family": "ssc",
@@ -41307,6 +41380,16 @@
    "part": "open (connector not picked)",
    "family": "open",
    "doubled": null
+  },
+  {
+   "wire": "BWS_SIG",
+   "endpoint": "BRAKE-WARN-SW",
+   "where": "engine",
+   "cavity": "switch terminal (single; plug and terminal OPEN)",
+   "factory_circuit": null,
+   "part": "open (connector not picked)",
+   "family": "open",
+   "doubled": null
   }
  ],
  "splices": [
@@ -41913,7 +41996,7 @@
    "327583": 1,
    "327638": 3,
    "327639": 3,
-   "4-1437284-3": 44,
+   "4-1437284-3": 43,
    "610TP": 2,
    "638TP": 2,
    "68054": 1,
@@ -41980,7 +42063,7 @@
    "S02-03-R": 4,
    "SSB-26BS-PA66": 3,
    "SSB-34BS-PA66": 3,
-   "SSC-N": 136,
+   "SSC-N": 137,
    "W12P": 2,
    "W12S": 2,
    "W6P": 1,
@@ -43082,11 +43165,11 @@
    "kind": "plug",
    "item": "4-1437284-3",
    "name": "Superseal 1.0 cavity sealing plug",
-   "need": 44,
+   "need": 43,
    "cart": 40,
    "inside": [],
    "vendor": "prowire",
-   "status": "short by 4"
+   "status": "short by 3"
   },
   {
    "kind": "lug",
@@ -43982,13 +44065,13 @@
    "kind": "contact",
    "item": "SSC-N",
    "name": "Superseal 1.0 solid contact, nickel, 16–24 AWG",
-   "need": 136,
+   "need": 137,
    "cart": 150,
    "inside": [
     "2 × M800-KIT-N × 65"
    ],
    "vendor": "prowire",
-   "status": "covered (+14 spare)"
+   "status": "covered (+13 spare)"
   },
   {
    "kind": "wedge",
@@ -44566,10 +44649,10 @@
    {
     "code": "4-1437284-3",
     "name": "Superseal 1.0 cavity sealing plug",
-    "need": 44,
+    "need": 43,
     "cart": 40,
     "vendor": "prowire",
-    "status": "short by 4"
+    "status": "short by 3"
    },
    {
     "code": "610TP",
@@ -53585,6 +53668,15 @@
     "length": "unknown",
     "crosses": false
    },
+   "BWS_SIG": {
+    "L1 plugs": false,
+    "L2 wire": true,
+    "L3 crossing": true,
+    "L4 ends": true,
+    "L5 material": false,
+    "length": "unknown",
+    "crosses": false
+   },
    "DAK_CONST_FH": {
     "L1 plugs": true,
     "L2 wire": true,
@@ -54726,17 +54818,17 @@
     }
    },
    "BASE": {
-    "wires": 330,
+    "wires": 331,
     "L1 plugs": 251,
-    "L2 wire": 327,
-    "L3 crossing": 330,
-    "L4 ends": 316,
+    "L2 wire": 328,
+    "L3 crossing": 331,
+    "L4 ends": 317,
     "L5 material": 2,
     "crossings": 90,
     "length": {
      "estimated": 159,
      "twin": 7,
-     "unknown": 164
+     "unknown": 165
     }
    },
    "BFL": {
@@ -54923,47 +55015,47 @@
     }
    },
    "unsectioned": {
-    "wires": 3,
+    "wires": 4,
     "L1 plugs": 3,
-    "L2 wire": 3,
-    "L3 crossing": 3,
-    "L4 ends": 3,
+    "L2 wire": 4,
+    "L3 crossing": 4,
+    "L4 ends": 4,
     "L5 material": 0,
     "crossings": 0,
     "length": {
-     "unknown": 3
+     "unknown": 4
     }
    }
   },
   "configuration": {
    "buildable (base + decided)": {
-    "wires": 361,
+    "wires": 362,
     "L1 plugs": 270,
-    "L2 wire": 358,
-    "L3 crossing": 361,
-    "L4 ends": 347,
+    "L2 wire": 359,
+    "L3 crossing": 362,
+    "L4 ends": 348,
     "L5 material": 2,
     "crossings": 90,
     "length": {
      "estimated": 173,
      "twin": 7,
-     "unknown": 181
+     "unknown": 182
     }
    }
   },
   "composite": {
    "composite (every option)": {
-    "wires": 393,
+    "wires": 394,
     "L1 plugs": 274,
-    "L2 wire": 385,
-    "L3 crossing": 393,
-    "L4 ends": 377,
+    "L2 wire": 386,
+    "L3 crossing": 394,
+    "L4 ends": 378,
     "L5 material": 2,
     "crossings": 90,
     "length": {
      "estimated": 176,
      "twin": 7,
-     "unknown": 210
+     "unknown": 211
     }
    }
   }
@@ -55213,6 +55305,7 @@
     "VSS_PWR",
     "VSS_GND",
     "VSS_DAK",
+    "BWS_SIG",
     "DAK_CONST_FH",
     "PCS_BATT_FH",
     "TRANS_BATT_FH",
@@ -58868,11 +58961,10 @@
    },
    "PDM15 inputs": {
     "capacity": 16,
-    "used": 2,
-    "spare": 14,
+    "used": 3,
+    "spare": 13,
     "spare_ids": [
      "DIG1",
-     "DIG2",
      "DIG3",
      "DIG6",
      "DIG7",
@@ -60726,7 +60818,7 @@
   "verdict": {
    "body crossings": "Body firewall crossings: candidates would take 2; body bulkheads have 4 spare — fits, but only in the 4-way power connector P (size 12 contacts); signal wires need bulkhead C",
    "PDM30 outputs": "PDM30 outputs: candidates would take 10; 3 spare — does NOT fit; the engine PDM15 has 5 spare outputs for engine-bay loads",
-   "PDM30 inputs": "PDM30 inputs: candidates would take 4; 2 spare — does NOT fit; PDM15 has 14 spare inputs, read over CAN",
+   "PDM30 inputs": "PDM30 inputs: candidates would take 4; 2 spare — does NOT fit; PDM15 has 13 spare inputs, read over CAN",
    "61-pin cavities": "61-pin (engine connector): candidates would take 4 (WSS-F2 2, FT 2); 3 spare (d, t, u) — does NOT fit",
    "M130 pins": "M130 pins: candidates would take 3 (WSS-F2 2, FT 1), 2 of them universal digital inputs; 8 spare, 7 of them I/O (not I/O: B12 BAT_BAK), 2 of them UDIG (B10, B11) — fits, leaving 4 I/O pins and 0 UDIG",
    "PDM15 outputs": "PDM15 outputs: candidates would take 4 (STEP-DCMD 3, WSS-F2 1); 5 spare — fits, leaving 1",

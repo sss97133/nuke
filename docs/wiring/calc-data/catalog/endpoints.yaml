@@ -1817,4 +1817,19 @@ BRAKE-FLUID-LVL:
          "warning lamp output: none assigned"]
   sources: ["web_snapshots/service.tesla.com__GUID-0CE8F156-928A-4338-A693-CF6EEB9055E6.md (step 7: 'disconnect the brake fluid reservoir electrical connector')",
             "pdm15_designations.txt (A27 DIG1, B22 0V)"]
+BRAKE-WARN-SW:
+  where: engine
+  device: "brake warning switch on the proportioning (combination) valve: one wire, grounds through the valve body when the front and rear brake circuits lose balance; valve on the front crossmember under the radiator, where the brake lines meet"
+  family: open
+  kit: {}
+  wires: ["BWS_SIG"]
+  pins: {BWS_SIG: "switch terminal (single; plug and terminal OPEN)"}
+  note: "read on PDM15 DIG2 (engine bay, beside the valve; no firewall crossing) as a switch to ground, sent over CAN so the dash shows its own brake-circuit message apart from the brake-fluid level (BFL); the valve body is the return (1977 LTSM PDF p.406)"
+  open: ["which valve is on the truck and its part number: read the valve body (the 2024 build log lists a proportioning valve bought; the owner says it carries the one-wire switch)",
+         "switch plug and terminal: read the valve",
+         "switch polarity at the PDM (grounds on imbalance): bench"]
+  sources: ["owner 2026-09-29: 'proportioning valve has a sensor on it a one wire situtation where if it disconnects it triggers the brake light on we can wire that and code that ... its mounted on a cross member under the radiator where all the brake lines go'",
+            "1977 Light Truck Service Manual PDF p.406, 'Testing Electrical Circuit of Combination Valve': disconnect the wire from the switch terminal, jumper it to a good ground, ignition on, the warning lamp lights",
+            "owner photo 2021-10-06, vehicle_images 896767b8 (the original firewall-mounted combination valve with its yellow switch connector)",
+            "pdm15_designations.txt (A19 DIG2)"]
 

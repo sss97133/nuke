@@ -6,7 +6,7 @@ Vocabulary: composite design (every option) → configuration (base + decided) �
 
 | code | option | status | decided | wires | source |
 |---|---|---|---|---|---|
-| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 330 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
+| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 331 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
 | AUD | Audio — head unit, 5-channel amplifier, four coax speakers, two 10 in woofers | **decided** | 2026-09-27 | 21 | owner 2026-09-25 ("we are gonna do jbl 10 compact woofers, an amp ... and then the appropriate other speakers" |
 | STEPS | AMP Research power steps | **decided** | 2025-03-01 | 4 | client invoice Inv. 4 (AMP steps line, DB); WIRING_SYSTEM_KNOWLEDGE.md |
 | STEP-DCMD | Power steps on the PDM15 through two Haltech DCMD H-bridges, no AMP controller (recommended; Haltech pick provisional until the bench test) | **candidate** |  | 0 | owner 2026-09-29 (above). Haltech HT-038009 DC Motor Driver (web_snapshots/www.haltech.com__ht-038009-dc-motor |
@@ -74,15 +74,15 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| buildable (base + decided) | 361 | 270 | 358 | 361 | 347 | 2 | 90 | m 0 · e 173 · u 181 |
-| composite (every option) | 393 | 274 | 385 | 393 | 377 | 2 | 90 | m 0 · e 176 · u 210 |
+| buildable (base + decided) | 362 | 270 | 359 | 362 | 348 | 2 | 90 | m 0 · e 173 · u 182 |
+| composite (every option) | 394 | 274 | 386 | 394 | 378 | 2 | 90 | m 0 · e 176 · u 211 |
 
 ### By option
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
 | AUD | 21 | 16 | 21 | 21 | 21 | 0 | 0 | m 0 · e 12 · u 9 |
-| BASE | 330 | 251 | 327 | 330 | 316 | 2 | 90 | m 0 · e 159 · u 164 |
+| BASE | 331 | 251 | 328 | 331 | 317 | 2 | 90 | m 0 · e 159 · u 165 |
 | BFL | 2 | 0 | 2 | 2 | 2 | 0 | 0 | m 0 · e 0 · u 2 |
 | IBST-CAN | 2 | 0 | 2 | 2 | 0 | 0 | 0 | m 0 · e 0 · u 2 |
 | PL | 6 | 0 | 6 | 6 | 6 | 0 | 0 | m 0 · e 1 · u 5 |
@@ -102,7 +102,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | lighting_rear | 23 | 5 | 23 | 23 | 23 | 0 | 0 | m 0 · e 9 · u 14 |
 | power_spine | 39 | 25 | 39 | 39 | 31 | 0 | 8 | m 0 · e 2 · u 32 |
 | powertrain_chassis | 26 | 21 | 26 | 26 | 25 | 0 | 1 | m 0 · e 6 · u 20 |
-| unsectioned | 3 | 3 | 3 | 3 | 3 | 0 | 0 | m 0 · e 0 · u 3 |
+| unsectioned | 4 | 3 | 4 | 4 | 4 | 0 | 0 | m 0 · e 0 · u 4 |
 
 ## Capacity ledger
 
@@ -120,7 +120,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | PDM30 inputs | 16 | 14 | 2 (DIG8, DIG16) | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM15 20 A outputs | 8 | 7 | 1 | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM15 8 A outputs | 7 | 3 | 4 | PDM30 datasheet p.1; PDM user manual comparison table |
-| PDM15 inputs | 16 | 2 | 14 (DIG1, DIG2, DIG3, DIG6, DIG7, DIG8, DIG9, DIG10, DIG11, DIG12, DIG13, DIG14, DIG15, DIG16) | PDM30 datasheet p.1; PDM user manual comparison table |
+| PDM15 inputs | 16 | 3 | 13 (DIG1, DIG3, DIG6, DIG7, DIG8, DIG9, DIG10, DIG11, DIG12, DIG13, DIG14, DIG15, DIG16) | PDM30 datasheet p.1; PDM user manual comparison table |
 | M130 pins | 60 | 52 | 8 (A14, A17, A23, A24, B6, B10, B11, B12) | M130 datasheet; registry pinout (kits_v5) |
 | door pass-through DOOR-L-PASS | 8 | 2 | 6 | catalog/endpoints.yaml wires (DT04-08PA 8-way) |
 | door pass-through DOOR-R-PASS | 8 | 2 | 6 | catalog/endpoints.yaml wires (DT04-08PA 8-way) |
@@ -275,7 +275,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 - **body crossings:** Body firewall crossings: candidates would take 2; body bulkheads have 4 spare — fits, but only in the 4-way power connector P (size 12 contacts); signal wires need bulkhead C
 - **PDM30 outputs:** PDM30 outputs: candidates would take 10; 3 spare — does NOT fit; the engine PDM15 has 5 spare outputs for engine-bay loads
-- **PDM30 inputs:** PDM30 inputs: candidates would take 4; 2 spare — does NOT fit; PDM15 has 14 spare inputs, read over CAN
+- **PDM30 inputs:** PDM30 inputs: candidates would take 4; 2 spare — does NOT fit; PDM15 has 13 spare inputs, read over CAN
 - **61-pin cavities:** 61-pin (engine connector): candidates would take 4 (WSS-F2 2, FT 2); 3 spare (d, t, u) — does NOT fit
 - **M130 pins:** M130 pins: candidates would take 3 (WSS-F2 2, FT 1), 2 of them universal digital inputs; 8 spare, 7 of them I/O (not I/O: B12 BAT_BAK), 2 of them UDIG (B10, B11) — fits, leaving 4 I/O pins and 0 UDIG
 - **PDM15 outputs:** PDM15 outputs: candidates would take 4 (STEP-DCMD 3, WSS-F2 1); 5 spare — fits, leaving 1
