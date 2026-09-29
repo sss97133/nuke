@@ -95,11 +95,32 @@ export function MountsPanel({ vehicleId, cw }: { vehicleId?: string; cw: Colorwa
 // ── THE PIECES: the maker's own photo of each part number on a plug card (owner 2026-09-29: "need to start really
 // seeing the pieces"). Photos are linked from the maker/vendor site, not copied; /wiring/k5-part-photos.json maps
 // part code → image URL. A code with no photo on file says so.
-let photoIndex: Promise<Record<string, { img: string; from: string }>> | null = null;
-const loadPhotos = () => {
-  photoIndex ??= fetch('/wiring/k5-part-photos.json').then(r => (r.ok ? r.json() : { photos: {} })).then(d => d.photos ?? {}).catch(() => ({}));
-  return photoIndex;
+type PhotoRec = { img: string; from: string; what?: string };
+let photoFile: Promise<{ photos: Record<string, PhotoRec>; devices: Record<string, PhotoRec> }> | null = null;
+const loadFile = () => {
+  photoFile ??= fetch('/wiring/k5-part-photos.json').then(r => (r.ok ? r.json() : {}))
+    .then(d => ({ photos: d.photos ?? {}, devices: d.devices ?? {} })).catch(() => ({ photos: {}, devices: {} }));
+  return photoFile;
 };
+const loadPhotos = () => loadFile().then(f => f.photos);
+
+// The box itself (the M130, a PDM, the isolator...) at the top of its plug card, keyed by node code.
+export function DevicePhoto({ code, cw }: { code: string; cw: Colorway }) {
+  const [rec, setRec] = useState<PhotoRec | null>(null);
+  const [dead, setDead] = useState(false);
+  useEffect(() => { let c = false; loadFile().then(f => { if (!c) setRec(f.devices[code] ?? null); }); return () => { c = true; }; }, [code]);
+  if (!rec || dead) return null;
+  return (
+    <a href={rec.img} target="_blank" rel="noreferrer" title={`photo from ${rec.from}`}
+      style={{ display: 'inline-block', border: frame(cw), background: '#fff', marginBottom: 8 }}>
+      <img src={rec.img} alt={rec.what ?? code} width={220} height={150} loading="lazy" referrerPolicy="no-referrer"
+        onError={() => setDead(true)} style={{ display: 'block', width: 220, height: 150, objectFit: 'contain' }} />
+      <div style={{ fontSize: 10, padding: '2px 4px', color: cw.ink, background: cw.surface, borderTop: rule(cw) }}>
+        {(rec.what ?? code).toUpperCase()} · PHOTO: {rec.from}
+      </div>
+    </a>
+  );
+}
 
 export function PartPhotos({ codes, cw }: { codes: string; cw: Colorway }) {
   const [idx, setIdx] = useState<Record<string, { img: string; from: string }> | null>(null);
