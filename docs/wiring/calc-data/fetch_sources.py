@@ -296,6 +296,25 @@ URLS = [
     "https://moteconline.motec.com.au/Package/ViewVariant?PackageVariantId=2081",
     "https://www.motec.com.au/products/GPR?catId=15",
     "https://www.motec.com.au/products/Water%20Temperature%20Sensor",
+    # wheel speed sensors, tone rings, knuckle mounts (research/2026-09-30_wheel-speed-sensors.md)
+    "https://www.motec.com.au/products/GPR",
+    "https://www.motec.com.au/products/E888",
+    "https://assets.motec.com.au/strapi/E888_E816_User_Manual_814183344d.pdf",
+    "https://assets.motec.com.au/strapi/WD_14007_E888_Wiring_Diagram_aa73efe4c4.pdf",
+    "https://assets.motec.com.au/strapi/M1_Launch_Control_User_Guide_4d1e40932b.pdf",
+    "https://motec.zendesk.com/hc/en-gb/articles/14594472064015-Checklist-Wheel-Speed-Setup",
+    "https://motec.zendesk.com/hc/en-gb/community/posts/16900136044559-Driven-wheel-speed",
+    "https://motec.zendesk.com/hc/en-gb/community/posts/16900168693007-M1-Wheel-speed-vehicle-speed-settings",
+    "https://motec.zendesk.com/hc/en-gb/community/posts/16899812108303-M800-wheel-speed-sensors",
+    "https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7165/85_GS10050.pdf",
+    "https://www.digikey.com/en/products/detail/zf-electronics/GS100502/361998",
+    "https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/5657/55505_10-16-15.pdf",
+    "https://www.digikey.com/en/products/detail/littelfuse-inc/55505-00-02-A/1237226",
+    "https://www.bosch-motorsport.com/products/sensors/speed/speed-sensor-hall-effect-ha-m/",
+    "https://www.bosch-motorsport.com/media/catalog_content/downloads_catalog/pdf_catalog/basic_information_speedsensors.pdf",
+    "https://www.bosch-motorsport.com/products/brake/antilock-braking-systems-abs/abs-m5-kit/",
+    "https://www.customconnectorkits.com/products/dtm04-3p",
+    "https://www.customconnectorkits.com/products/dtm06-3s",
 ]
 
 
