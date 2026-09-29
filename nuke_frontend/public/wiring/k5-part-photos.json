@@ -1,13 +1,9 @@
 {
- "note": "Maker and vendor product photos of the exact part numbers, linked from their own sites (not copied). Source list: reference_documents/product_images/sources.json (local, gitignored). Photos whose URL carries a 32-hex cache hash are left out (the secret scanner reads those as tokens). 'devices' maps a map node code to a photo of the box itself ('what' says which). A sibling part is never filed under the code: it would go in a separate 'family' object with a 'note'.",
+ "note": "Maker and vendor product photos of the exact part numbers, linked from their own sites (not copied). Source list: reference_documents/product_images/sources.json (local, gitignored). Photos whose URL carries a 32-hex cache hash are left out (the secret scanner reads those as tokens). 'devices' maps a map node code to a photo of the box itself ('what' says which). A sibling part is never filed under the code: it would go in a separate 'family' object with a 'note'. Look-alikes (a sibling part, a candidate replacement, or a series drawing filed under a part number) are left out; only exact-part photos belong here.",
  "photos": {
   "0413-204-2005": {
    "img": "https://www.buydeutsch.com/cdn/shop/products/0413-204-2005_855cdf91-7b13-451e-a9a5-2687bc1bde70.jpg?v=1597685247",
    "from": "buydeutsch.com"
-  },
-  "0498040.M": {
-   "img": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/524/0498080.M.JPG",
-   "from": "mm.digikey.com"
   },
   "11079-VUS": {
    "img": "https://static.summitracing.com/global/images/prod/xlarge/vta-11079-vus_xl.jpg",
@@ -41,10 +37,6 @@
    "img": "https://www.prowireusa.com/content/59758/15359996.webp",
    "from": "prowireusa.com"
   },
-  "1990084": {
-   "img": "https://cdn.powered-by-nitrosell.com/product_images/2/437/elc-1034.jpg",
-   "from": "cdn.powered-by-nitrosell.com"
-  },
   "202K163-25-0": {
    "img": "https://www.prowireusa.com/content/58610/202K163-25-0.webp",
    "from": "prowireusa.com"
@@ -56,10 +48,6 @@
   "238LTP": {
    "img": "https://www.prowireusa.com/content/117820/238LTP.webp",
    "from": "prowireusa.com"
-  },
-  "30107090": {
-   "img": "https://www.kartek.com/mm5/graphics/00000003/spal-30107101-plus-series-17-inch-curved-blade-brushless-puller-fan-drop-in-mount-sits-inside-shroud_270x202.jpg",
-   "from": "kartek.com"
   },
   "30130628": {
    "img": "https://www.prowireusa.com/content/58775/spal-30130628.webp",
@@ -169,10 +157,6 @@
    "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/030/806/680/D3899926WJ61PN_sml.jpg",
    "from": "mm.digikey.com"
   },
-  "D38999-SERIES": {
-   "img": "https://dmctools.com/media/m39029/connectors/10/images/MIL-DTL-38999-SERIES-1-01.jpg",
-   "from": "dmctools.com"
-  },
   "DT04-08PA": {
    "img": "https://www.customconnectorkits.com/cdn/shop/products/DT04-08PA_Front.jpg?v=1738268451&width=760",
    "from": "customconnectorkits.com"
@@ -260,10 +244,6 @@
   "ICT-GEN4-OILP": {
    "img": "https://www.ictbillet.com/cdn/shop/files/WC0IL40_1.jpg?v=1751970210&width=1000",
    "from": "ictbillet.com"
-  },
-  "JLF-73-87-tail-socket": {
-   "img": "https://jlfabrication.com/cdn/shop/products/s-l1600_4b7e7589-894b-4823-8b9f-d7867851c43c.png?v=1675805521",
-   "from": "jlfabrication.com"
   },
   "K1S": {
    "img": "https://www.prowireusa.com/content/61188/K1S.webp",
@@ -361,10 +341,6 @@
    "img": "https://www.prowireusa.com/content/61708/IMG_9164.webp",
    "from": "prowireusa.com"
   },
-  "UP-111157_1157-socket": {
-   "img": "https://upcarparts.com/cdn/shop/files/111157_01.jpg?v=1735798033&width=1200",
-   "from": "upcarparts.com"
-  },
   "USA1-HL-SW": {
    "img": "https://cdn11.bigcommerce.com/s-5ha9tbdrhc/images/stencil/500x659/products/4929/4601/1973-91-Square_body-Chevy--GMC-Truck-Headlight-Switch-16603__46913.1762446061.jpg?c=1",
    "from": "cdn11.bigcommerce.com"
@@ -453,11 +429,6 @@
    "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/030/806/680/D3899926WJ61PN_sml.jpg",
    "from": "mm.digikey.com",
    "alias_of": "D38999-26WJ61PN"
-  },
-  "D38999/SERIES": {
-   "img": "https://dmctools.com/media/m39029/connectors/10/images/MIL-DTL-38999-SERIES-1-01.jpg",
-   "from": "dmctools.com",
-   "alias_of": "D38999-SERIES"
   },
   "M39029/56-351": {
    "img": "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/100/961/300/1208_M39029%5E56-351_sml.jpg",
