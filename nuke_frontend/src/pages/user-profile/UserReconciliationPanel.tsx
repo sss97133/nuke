@@ -190,16 +190,24 @@ const UserReconciliationPanel: React.FC<Props> = ({ userId, isOwnProfile }) => {
   const [computedAt, setComputedAt] = useState<string | null>(null);
   const [failed, setFailed] = useState<Section[]>([]);
 
+  const [pending, setPending] = useState<Section[]>([]);
+
   useEffect(() => {
     // Owner-only: never even fetch for visitors.
     if (!userId || !isOwnProfile) return;
     let cancelled = false;
-    Promise.all(SECTIONS.map((s) => fetchSection(userId, s))).then((parts) => {
-      if (cancelled) return;
-      setFailed(SECTIONS.filter((_, i) => parts[i] === null));
-      setRows(parts.flatMap((p) => p ?? []));
-      setComputedAt(new Date().toISOString());
-      setLoaded(true);
+    // Each section shows as soon as it answers (measured 2026-09-29 06:14Z: account 0.3 s, books 0.6 s,
+    // vehicles 10.1 s while the BaT loader runs), instead of waiting for the slowest.
+    setPending(SECTIONS);
+    SECTIONS.forEach((s) => {
+      fetchSection(userId, s).then((part) => {
+        if (cancelled) return;
+        if (part === null) setFailed((prev) => [...prev, s]);
+        else setRows((prev) => [...prev.filter((r) => r.section !== s), ...part]);
+        setPending((prev) => prev.filter((x) => x !== s));
+        setComputedAt(new Date().toISOString());
+        setLoaded(true);
+      });
     });
     return () => { cancelled = true; };
   }, [userId, isOwnProfile]);
@@ -223,7 +231,10 @@ const UserReconciliationPanel: React.FC<Props> = ({ userId, isOwnProfile }) => {
     </div>
   );
   if (!loaded) return note('Reconciliation · computing from your records…');
-  if (rows.length === 0) return failed.length ? note(`Reconciliation · could not load (${failed.join(', ')}) · reload to retry`) : null;
+  if (rows.length === 0) {
+    if (pending.length) return note(`Reconciliation · computing from your records… (${pending.join(', ')})`);
+    return failed.length ? note(`Reconciliation · could not load (${failed.join(', ')}) · reload to retry`) : null;
+  }
 
   const errors = breaks.filter((r) => r.severity === 'error').length;
 
@@ -249,7 +260,7 @@ const UserReconciliationPanel: React.FC<Props> = ({ userId, isOwnProfile }) => {
         }}
       >
         <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em' }}>RECONCILIATION</span>
-        <span style={LABEL}>OWNER ONLY · COMPUTED {fmtWhen(computedAt)}{failed.length ? ` · DID NOT LOAD: ${failed.join(', ').toUpperCase()}` : ''}</span>
+        <span style={LABEL}>OWNER ONLY · COMPUTED {fmtWhen(computedAt)}{pending.length ? ` · STILL COMPUTING: ${pending.join(', ').toUpperCase()}` : ''}{failed.length ? ` · DID NOT LOAD: ${failed.join(', ').toUpperCase()}` : ''}</span>
       </div>
 
       {breaks.length > 0 && (
