@@ -859,7 +859,7 @@ NAV:
     pdm30_inputs: 0
     top_cavities: 0
     taps: ["PDM30 OUT29 (ignition RUN group: #71 Dakota VHX, GSS_PWR; top-design's CANKEY also taps it): module supply", "CAN trunk CAN_HI / CAN_LO: one stub, 500 mm max (MoTeC PDM manual printed p.49)"]
-    limits: ["OUT29 + 0.05 A (0.6 W at 12 V); OUT29's own limit is still OPEN (VHX and GSS-3000 currents unpublished)"]
+    limits: ["OUT29 + 0.05 A (0.6 W at 12 V). OUT29 also feeds #71, GSS_PWR and CANKEY: its setting is recomputed at 1.25 x the group total once the VHX, GSS-3000 and keypad currents are known (all unpublished; noted with top-design 2026-09-29)"]
     notes: >-
       Mount flat, x-axis forward, on its own rigid bracket (not the M130's rubber-isolated plate) under the dash within 500 mm
       of the M130-PDM30 trunk; set dynamic model Automotive, sensor fusion on, IMU alignment and the rear-axle lever arms (CSS
@@ -1036,35 +1036,43 @@ COM-TOP:
   alternative_to: COM
   requires: [TOP-DISC]
   source: >-
-    top-design's TOP-DISC (#420): 26 x #20, "4 of the spares for a top-mounted Starlink DC pair",
-    #20 = 7.5 A with 20 AWG (MILNEC test rating), paralleled #20 pairs per pole, lengths split the 18.4 ft zone as 13 ft body +
-    5.5 ft top. Starlink accessories guide: the Mobility Mount is rated for fiberglass; setup guide: a "structurally sound,
-    horizontal surface" on vehicles. The USB-C and Ethernet cables are one piece and cannot cross a connector
+    top-design's TOP-DISC (#420): 26 x #20, "4 of the spares for a top-mounted Starlink DC pair", #20 = 7.5 A with 20 AWG (MILNEC
+    test rating), paralleled #20 pairs per pole, lengths split the 18.4 ft zone as 13 ft body + 5.5 ft top. top-design's check
+    (message 2026-09-29): the pole's weak link is the 2 x 20 AWG tails, 0.85 x 14 A = 11.9 A (ProWire chart 20 AWG 7 A, canon
+    ch.16 §2.3), and one M81824/1-3 (16-12 AWG) cannot step 12 AWG straight to 2 x 20 AWG (about 17 AWG), so each side steps
+    through a 16 AWG stub. Starlink accessories guide: the Mobility Mount is rated for fiberglass; setup guide: a "structurally
+    sound, horizontal surface" on vehicles. The USB-C and Ethernet cables are one piece and cannot cross a connector
   product: {maker: Starlink, pn: "same as COM, plus a second 12 V socket inside the top", price_usd: null, price_date: 2026-09-29, specs: "as COM"}
   wire_patterns: ["^SLT_"]
   demand:
     crossings: 0
-    pdm30_outputs: 1      # the same COMMS output as COM
+    pdm30_outputs: 1      # the same COMMS output as COM; it is PDM-protected, not fused
     pdm30_inputs: 0
-    top_cavities: 4       # 2 x #20 paralleled per pole; top-design has reserved exactly these 4
-    limits: ["5.0 A per pole = 2.5 A per #20 contact; drop 0.39 V (2.8 %) at 5.0 A with 12 AWG body feed, 16 AWG top side, 14 AWG return (canon ch.16 §1.8)"]
+    top_cavities: 4       # 2 x #20 paralleled per pole; top-design has reserved exactly these 4 (TOP-DISC 18 of 26 with it)
+    limits: ["PDM output, no fuse: 7 A for Starlink alone (1.25 x 5.0 A) or 9 A with RTR on the same output; never above 11 A, the top pole's 2 x 20 AWG tails at 0.85 x 14 A = 11.9 A", "5.0 A per pole = 2.5 A per #20 contact (7.5 A test rating)", "loop drop at 5.0 A: 0.41 V (2.9 %) with RTR's 1.6 A also on the 2 ft output lead, 0.39 V (2.8 %) without (canon ch.16 §1.8 resistances; 3 % ceiling ch.16 §2.4)"]
     notes: >-
-      Unplug TOP-DISC before the top comes off (top-design). Over the disconnect the router cannot take Starlink by Ethernet;
-      it joins the Mini's Wi-Fi instead. The top's flat area and rib structure under the mount are tape item T-15.
+      Unplug TOP-DISC before the top comes off (top-design). Over the disconnect the router cannot take Starlink by Ethernet; it
+      joins the Mini's Wi-Fi instead. Each side of the joint steps 12 or 14 AWG -> 16 AWG stub (M81824/1-3) -> 2 x 20 AWG
+      (M81824/1-2); bench-check both splice fits. The top's flat area and rib structure under the mount are tape item T-15.
     adds:
-      - {id: SLT_FEED, gauge: 12, spec: M22759/32, from: "SPL-COMMS", to: "SPL-SLT-P-B (at the TOP-DISC receptacle)", current_a: 5.0, length_ft_est: 13, basis: "top-design's 13 ft body share of the 18.4 ft zone"}
+      - {id: SLT_OUT, gauge: 16, spec: M22759/32, from: "PDM30 COMMS output pin (SSC-N, 16-24 AWG)", to: "SPL-COMMS", current_a: 6.6, length_ft_est: 2, basis: "COM's cab socket is not built in this version, so the output lead is its own; 16 AWG is the largest the pin contact takes"}
+      - {id: SLT_FEED, gauge: 12, spec: M22759/32, from: "SPL-COMMS", to: "SPL-SLT-P-B0 (M81824/1-3)", current_a: 5.0, length_ft_est: 13, basis: "top-design's 13 ft body share of the 18.4 ft zone; 12 AWG for the drop"}
+      - {id: SLT_P_BS, gauge: 16, spec: M22759/32, from: "SPL-SLT-P-B0", to: "SPL-SLT-P-B (M81824/1-2)", current_a: 5.0, length_ft_est: 0.5, basis: "stub into the receptacle backshell: 12 -> 16 on /1-3, 16 -> 2 x 20 on /1-2 (top-design)"}
       - {id: SLT_P_B1, gauge: 20, spec: M22759/32, from: "SPL-SLT-P-B", to: "TOP-DISC receptacle (Starlink + cavity 1)", current_a: 2.5, length_ft_est: 0.5, basis: "paralleled pair, equal length (canon ch.16 §3.3)"}
       - {id: SLT_P_B2, gauge: 20, spec: M22759/32, from: "SPL-SLT-P-B", to: "TOP-DISC receptacle (Starlink + cavity 2)", current_a: 2.5, length_ft_est: 0.5, basis: "as SLT_P_B1"}
-      - {id: SLT_P_T1, gauge: 20, spec: M22759/32, from: "TOP-DISC plug (Starlink + cavity 1)", to: "SPL-SLT-P-T", current_a: 2.5, length_ft_est: 0.5, basis: "paralleled pair"}
+      - {id: SLT_P_T1, gauge: 20, spec: M22759/32, from: "TOP-DISC plug (Starlink + cavity 1)", to: "SPL-SLT-P-T (M81824/1-2)", current_a: 2.5, length_ft_est: 0.5, basis: "paralleled pair"}
       - {id: SLT_P_T2, gauge: 20, spec: M22759/32, from: "TOP-DISC plug (Starlink + cavity 2)", to: "SPL-SLT-P-T", current_a: 2.5, length_ft_est: 0.5, basis: "as SLT_P_T1"}
-      - {id: SLT_P_T, gauge: 16, spec: M22759/32, from: "SPL-SLT-P-T", to: "TOP-SOCKET + (inside the top, rear pillar)", current_a: 5.0, length_ft_est: 3, basis: "plug at the lower rear pillar to a socket up the pillar (estimate)"}
-      - {id: SLT_N_T, gauge: 16, spec: M22759/32, from: "TOP-SOCKET -", to: "SPL-SLT-N-T", current_a: 5.0, length_ft_est: 3, basis: "as SLT_P_T"}
-      - {id: SLT_N_T1, gauge: 20, spec: M22759/32, from: "SPL-SLT-N-T", to: "TOP-DISC plug (Starlink - cavity 1)", current_a: 2.5, length_ft_est: 0.5, basis: "paralleled pair"}
+      - {id: SLT_P_TS, gauge: 16, spec: M22759/32, from: "SPL-SLT-P-T", to: "SPL-SLT-P-T0 (M81824/1-3)", current_a: 5.0, length_ft_est: 0.5, basis: "stub out of the plug backshell"}
+      - {id: SLT_P_T, gauge: 14, spec: M22759/32, from: "SPL-SLT-P-T0", to: "TOP-SOCKET + (inside the top, rear pillar)", current_a: 5.0, length_ft_est: 2.5, basis: "plug at the lower rear pillar to a socket up the pillar (estimate); 14 AWG for the drop"}
+      - {id: SLT_N_T, gauge: 14, spec: M22759/32, from: "TOP-SOCKET -", to: "SPL-SLT-N-T0 (M81824/1-3)", current_a: 5.0, length_ft_est: 2.5, basis: "as SLT_P_T"}
+      - {id: SLT_N_TS, gauge: 16, spec: M22759/32, from: "SPL-SLT-N-T0", to: "SPL-SLT-N-T (M81824/1-2)", current_a: 5.0, length_ft_est: 0.5, basis: "stub into the plug backshell"}
+      - {id: SLT_N_T1, gauge: 20, spec: M22759/32, from: "SPL-SLT-N-T", to: "TOP-DISC plug (Starlink - cavity 1)", current_a: 2.5, length_ft_est: 0.5, basis: "paralleled pair; its own pair, not top-design's lamp return"}
       - {id: SLT_N_T2, gauge: 20, spec: M22759/32, from: "SPL-SLT-N-T", to: "TOP-DISC plug (Starlink - cavity 2)", current_a: 2.5, length_ft_est: 0.5, basis: "as SLT_N_T1"}
-      - {id: SLT_N_B1, gauge: 20, spec: M22759/32, from: "TOP-DISC receptacle (Starlink - cavity 1)", to: "SPL-SLT-N-B", current_a: 2.5, length_ft_est: 0.5, basis: "paralleled pair"}
+      - {id: SLT_N_B1, gauge: 20, spec: M22759/32, from: "TOP-DISC receptacle (Starlink - cavity 1)", to: "SPL-SLT-N-B (M81824/1-2)", current_a: 2.5, length_ft_est: 0.5, basis: "paralleled pair"}
       - {id: SLT_N_B2, gauge: 20, spec: M22759/32, from: "TOP-DISC receptacle (Starlink - cavity 2)", to: "SPL-SLT-N-B", current_a: 2.5, length_ft_est: 0.5, basis: "as SLT_N_B1"}
-      - {id: SLT_N_B, gauge: 14, spec: M22759/32, from: "SPL-SLT-N-B", to: "GND-SPLICE-REAR", current_a: 5.0, length_ft_est: 4, basis: "pillar base to the rear ground bus, as top-design's TOPD_RTN_B"}
-    mass_g_est: "about 190 g of wire (canon ch.16 §1.8), most of it the 12 AWG body feed"
+      - {id: SLT_N_BS, gauge: 16, spec: M22759/32, from: "SPL-SLT-N-B", to: "SPL-SLT-N-B0 (M81824/1-3)", current_a: 5.0, length_ft_est: 0.5, basis: "stub out of the receptacle backshell"}
+      - {id: SLT_N_B, gauge: 12, spec: M22759/32, from: "SPL-SLT-N-B0", to: "GND-SPLICE-REAR", current_a: 5.0, length_ft_est: 4, basis: "pillar base to the rear ground bus, as top-design's TOPD_RTN_B; 12 AWG for the drop"}
+    mass_g_est: "about 230 g of wire (canon ch.16 §1.8 /16 weights, an upper bound for /32), most of it the 12 AWG body feed"
 
 RTR:
   name: Truck router, Peplink MAX BR1 Pro 5G, on the COMMS output; Starlink in by Ethernet; Mobility 42G roof antenna or the stick antennas

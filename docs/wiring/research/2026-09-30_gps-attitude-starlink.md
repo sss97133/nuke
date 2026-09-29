@@ -120,8 +120,9 @@ Also looked at:
 
 - **The roof over the front seats is steel.** The 1977 K5's removable fiberglass top covers the rear only and bolts to the
   steel cab: "force the removable top against the steel cab" (L5 p.155); Fig. 2D-78 (L5 p.157) draws the steel cab roof
-  over the front seats. top-design reads it the same way and adds "bare painted steel under the half-cab roof"
-  (photos lane, via top-design's research, #420).
+  over the front seats. top-design reads it the same way (message 2026-09-29): with the top off, the cab roof's underside is
+  bare painted steel with the dome-lamp wire at its centre (vehicle_images 61df4ea0 and d2c5f364, 2024-10/12), and
+  bce3d70b (2026-01-31) shows a white steel cab roof with the top off, so the DB note "white roof" fits either.
 - **So:** every antenna and the dish go on the steel half-cab roof, outside, and nothing of this design crosses the top's
   disconnect (§3.4). The CANmod.gps antenna's magnetic base holds on steel (W11). The GPS-L10 wants an external horizontal
   surface (W20).
@@ -309,7 +310,11 @@ Whether M1 Tune works through a router's network is **unknown**; MoTeC documents
 
 - **Recommended set: nothing.** The dish and every antenna are on the steel half-cab roof (§1.3, §2.2).
 - **If the dish goes on the top (COM-TOP):** a 12 V socket inside the top at the rear pillar, fed through TOP-DISC on 4
-  cavities, a paralleled pair of #20 per pole. top-design has reserved exactly those 4 spares ("4 of the spares for a
+  cavities, a paralleled pair of #20 per pole. It stays on the PDM output, no fuse: 7 A alone or 9 A with the router on the
+  same output, and never above 11 A, because the pole's weak link is the 2 × 20 AWG tails at 0.85 × 14 A = 11.9 A
+  (top-design's check; ProWire chart 20 AWG 7 A, ch.16 §2.3). One M81824/1-3 (16–12 AWG) cannot step 12 AWG straight to
+  2 × 20 AWG, so each side steps through a 16 AWG stub (/1-3 then /1-2). The loop is 0.41 V (2.9 %) at 5.0 A with 12 AWG
+  in the body, 14 AWG in the top and a 12 AWG return to the rear bus. top-design has reserved exactly those 4 spares ("4 of the spares for a
   top-mounted Starlink DC pair", TOP-DISC `top_cavities`, #420). At 5.0 A per pole that is 2.5 A per
   #20 contact, under the 7.5 A MILNEC test rating top-design cites. The USB-C cable and the Ethernet cable are one-piece
   and can't cross a connector, so on the top the router would reach the Mini over Wi-Fi (the Mini has Wi-Fi: W1).

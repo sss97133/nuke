@@ -86,10 +86,11 @@ totals (options-rd, #416).
 
 - Options: 49 (45 candidate, 3 decided, 1 base). Buildable and composite wire counts are unchanged, because the candidates
   are undesigned and live in `adds`.
-- Planned wires: NAV 5, NAV-L10 3, COM 4, COM-ACC 2, COM-TOP 12, RTR 4.
+- Planned wires: NAV 5, NAV-L10 3, COM 4, COM-ACC 2, COM-TOP 17, RTR 4.
 - Drops (canon ch.16 §1.8 resistances; lengths are estimates):
   - COMMS: 0.33 V (2.4 %) at 6.6 A over 8 ft of 18 AWG
-  - COM-TOP: 0.39 V (2.8 %) at 5.0 A (12 AWG body, 2 × #20 per pole, 16 AWG top side, 14 AWG return)
+  - COM-TOP: 0.41 V (2.9 %) at 5.0 A (12 AWG body, 16 AWG stubs into both backshells, 2 × #20 per pole, 14 AWG top side,
+    12 AWG return; router's 1.6 A counted on the 2 ft output lead)
   - NAV: 0.003 V
 
 ## Coordination
@@ -99,6 +100,10 @@ totals (options-rd, #416).
   - COM-TOP would use the 4 spares top-design reserved ("4 of the spares for a top-mounted Starlink DC pair") as 2 × #20
     per pole.
   - NAV taps OUT29 beside top-design's CANKEY keypad. COM uses a CANKEY button for its camp latch if CANKEY is built.
+- **top-design's three checks (message 2026-09-29), applied to COM-TOP and NAV:**
+  - COM-TOP is PDM-protected, not fused: 7 A alone, 9 A with RTR, never above 11 A (the 2 × 20 AWG tails, 0.85 × 14 A).
+  - The 12 AWG → 2 × 20 AWG step goes through a 16 AWG stub on each side (M81824/1-3, then /1-2). Bench-check both fits.
+  - OUT29's setting is recomputed at 1.25 × the group (#71, GSS_PWR, CANKEY, NAV) once the currents are known.
 - **options-rd:** no output claimed that options-rd uses (OUT23/25/27/28/15/11/13).
 - **The lead's "check before you claim":** OUT21 is left to PL / TOP-LIGHT; OUT3 is named for COMMS only if PW is not fitted.
 
