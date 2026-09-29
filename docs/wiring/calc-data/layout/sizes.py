@@ -227,27 +227,40 @@ DEVICE = {"M130-A": ("M130", "MoTeC M130 engine computer"), "PDM30-A": ("PDM30",
           "FIREWALL-CABIN": ("61-PIN", "61-pin firewall connector pair (D38999 shell 25, insert 61)")}
 DEVICE_MEMBER = {"FIREWALL-ENGINE": "FIREWALL-CABIN"}
 
-# the decisions that need Skylar, as the pieces lane sent them to main; rel = records they touch
-DECISIONS_SRC = "pieces lane, message to main, 2026-09-29 21:20 UTC"
+# what needs Skylar's money or hands (the pieces lane, 2026-09-29: engineering calls are the system's, not his or a builder's)
+DECISIONS_SRC = "pieces lane, 2026-09-29 (money and hands only)"
 DECISIONS = [
-    {"n": 1, "title": "Firewall: wires with no crossing", "who": "Skylar, with Dave",
-     "text": "The 13 wires with no firewall crossing: switches as PDM inputs, so only the CAN pair crosses (the pieces lane recommends this; it fits the "
-             "only-the-61-pin rule), or a second round connector.",
-     "rel": ["c:FIREWALL-BODY-A", "c:FIREWALL-BODY-B", "c:FIREWALL-BODY-P", "c:FIREWALL-CABIN"],
-     "rel_note": "Related records: the dropped body bulkheads A, B and P and the 61-pin. The pieces lane's list of the 13 wire ids is not on file yet."},
-    {"n": 2, "title": "A second body PDM", "who": "Skylar",
-     "text": "The power locks, top lamps, Starlink and side lamps are all waiting on it.", "rel": ["c:PDM30-A"],
-     "rel_note": "Related record: the PDM30, whose spare outputs are used up (catalog/options.yaml conflicts)."},
-    {"n": 3, "title": "Tape items T-01 to T-04", "who": "Skylar (tape measure)",
+    {"n": 1, "title": "Tape items T-01 to T-04", "who": "Skylar", "need": "hands",
      "text": "Measure the old fuse-box opening: its shape and size, where it sits, the free space on both faces, and the space under the dash.",
      "rel": ["c:FIREWALL-CABIN", "c:FIREWALL-ENGINE", "c:M130-A"], "tape": ["T-01", "T-02", "T-03", "T-04"],
      "rel_note": "They settle the 61-pin plate, the boots and the M130 spot (cad/tape_list.yaml)."},
-    {"n": 4, "title": "Proportioning valve part number", "who": "Skylar",
-     "text": "Which proportioning valve is on the truck: read the part number off the valve.", "rel": ["c:BRAKE-WARN-SW"],
-     "rel_note": "Related record: the brake warning switch on the valve (ends.py BRAKE-WARN-SW)."},
-    {"n": 5, "title": "Rotate the flagged key", "who": "Skylar", "text": "Rotate the key flagged on 2026-09-29, if it is not done yet.", "rel": [],
+    {"n": 2, "title": "Proportioning valve part number", "who": "Skylar", "need": "hands",
+     "text": "Which proportioning valve is on the truck (part number off the valve body).", "rel": ["c:BRAKE-WARN-SW"],
+     "rel_note": "Its warning switch is BRAKE-WARN-SW: one wire to a PDM15 input, the valve body as the ground return."},
+    {"n": 3, "title": "Engine-bay power box (PDM32)", "who": "Skylar", "need": "money",
+     "text": "Buy the sealed PDM32 for the engine bay once the ends it feeds are modelled in 3D. It takes the 13 loads that have no firewall path.",
+     "rel": ["c:PDM15-A"], "rel_note": "Firewall plan (docs/wiring/research/2026-09-30_firewall-allocation.md): proposed, recount pending."},
+    {"n": 4, "title": "Rotate the flagged key", "who": "Skylar", "need": "hands", "text": "Rotate the key flagged on 2026-09-29, if it is not done yet.", "rel": [],
      "rel_note": "Not a harness record."},
 ]
+
+# the firewall plan (docs/wiring/research/2026-09-30_firewall-allocation.md, merged in #436): the design state, not a question
+FIREWALL_PLAN = {
+    "label": "proposed, recount pending",
+    "why_label": "It stays proposed until the recount with future add-ons picks between the 61-contact insert (25-61) and the 128-contact one (25-35).",
+    "insert": "D38999/24WJ61SN receptacle and /26WJ61PN plug, insert 25-61 (61 size-20 contacts)",
+    "fill": [["Engine management (M130 to the engine)", 50], ["Dakota gauge senders", 5], ["CAN", 2], ["Fan PWM command", 1],
+             ["Isolator remote switch (ISO_SW_PWR, ISO_CLOSE, ISO_OPEN)", 3]],
+    "total": "61 of 61",
+    "summary": "The 61-pin carries 50 engine-management wires, 5 Dakota gauge senders, 2 CAN wires, the fan PWM command and the isolator switch's 3 wires: 61 of 61.",
+    "upgrade_short": "The upgrade path is the same shell with insert 25-35, 128 contacts.",
+    "upgrade": "Same shell, plate and hole with insert 25-35: 128 size-22D contacts (D38999/24WJ35SN, /26WJ35PN); about 70 cavities stay spare. "
+               "The ETB motor pair (20 AWG) needs its own answer there.",
+    "moved": ["85a", "85b", "86a", "86b", "WIPER_T1", "WIPER_T3", "BLOWER_BAT", "BLOWER_MED", "BLOWER_M2", "ISO_CLOSE", "ISO_OPEN", "ISO_LED", "ISO_SW_PWR"],
+    "moved_text": "The 13 wires with no firewall path become cab switch inputs driving engine-bay PDM outputs over CAN; the bay box is a sealed PDM32. "
+                  "The isolator switch's 3 copper wires take the 61-pin's 3 spares; its state lead (ISO_LED) reaches the dash over CAN.",
+    "source": "docs/wiring/research/2026-09-30_firewall-allocation.md (main, #436)",
+}
 
 # what harness-cad's engine-bay sample found (the K5 Engine Bay Sample page, 2026-09-29), kept here when that page retires
 BAY_SRC = "harness-cad, K5 Engine Bay Sample page (2026-09-29)"

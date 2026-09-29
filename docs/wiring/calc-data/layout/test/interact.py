@@ -37,8 +37,18 @@ async def run():
         await cav[3].click(); await pg.wait_for_timeout(300); print("face pin ->", await cur())
         # library: open, switch to PDM30
         await pg.click("#vtabs button[data-v='lib']"); await pg.wait_for_timeout(3000)
-        await pg.click("#libseg button[data-lib='PDM30']"); await pg.wait_for_timeout(3000)
+        await pg.click("#liblist button[data-lib='PDM30-A']"); await pg.wait_for_timeout(3000)
         print("library title:", await pg.inner_text("#linfo h2"))
+        # manual: a callout selects its device, a tabulation row its wire
+        await pg.click("#vtabs button[data-v='man']"); await pg.wait_for_timeout(700)
+        co = await pg.query_selector("#man .co")
+        if co:
+            await co.click(); await pg.wait_for_timeout(300); print("manual callout ->", await cur())
+        tr = await pg.query_selector("#man .mtab tr[data-go]")
+        if tr:
+            await tr.click(); await pg.wait_for_timeout(300); print("manual tabulation row ->", await cur())
+        await pg.click("#vdbtn"); await pg.wait_for_timeout(200); print("data panel open:", await pg.is_visible("#vdpanel"))
+        await pg.click("#vdbtn"); await pg.wait_for_timeout(200)
         # decision chip and linked wires shortcut
         await pg.click("#decs button:nth-child(3)"); await pg.wait_for_timeout(400); print("decision ->", await cur())
         lk = await pg.query_selector("#pbody [data-linked='wires']")

@@ -748,32 +748,63 @@ def face_xy(cavs):
 
 
 import ast, base64
-PL = []                                          # the Library's parts: the six the pieces lane audited and published (partslib/build.py)
+PL = []                                          # the six parts the pieces lane audited first: their curated facts and mount (partslib/build.py)
 if os.path.exists(PARTSLIB):
     _tree = ast.parse(open(PARTSLIB).read())
     PL = next(ast.literal_eval(n.value) for n in _tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "PARTS")
-for pf in [SAMPLES + p["key"] + "/" + p["id"] + ".pins.json" for p in PL if os.path.exists(SAMPLES + p["key"] + "/" + p["id"] + ".pins.json")]:
+PL_BY = {p["id"]: p for p in PL}
+
+# the part-model index: every modelled end (nuke_frontend/public/wiring/part-models/index.json); the audited batch branch first
+PMI, PMI_SRC = {"parts": {}}, None
+for ref in ("origin/wiring/part-families", "origin/main"):
+    subprocess.run(["git", "-C", REPO, "fetch", "origin", ref.split("/", 1)[1], "--quiet"], capture_output=True)
+    r = subprocess.run(["git", "-C", REPO, "show", ref + ":nuke_frontend/public/wiring/part-models/index.json"], capture_output=True)
+    if r.returncode == 0:
+        PMI, PMI_SRC = json.loads(r.stdout), ref.replace("origin/", "") + " nuke_frontend/public/wiring/part-models/index.json"
+        break
+MODELLED = {}
+for pid, pm in PMI["parts"].items():
+    for e in pm.get("endpoints") or []:
+        MODELLED.setdefault(e, []).append(pid)
+
+
+def sample_file(pid, suffix):
+    g = sorted(glob.glob(SAMPLES + "*/" + pid + suffix))
+    return g[0] if g else None
+
+
+# pins: each end's own pins.json (its assembly, or the device part that carries it), only the half its wires land on
+for ep in sorted(set(EP) | set(MODELLED)):
+    cands = [ep] + [pid for pid in MODELLED.get(ep, []) if (PMI["parts"][pid].get("kind") or "device") != "piece"]
+    pf = next((f for f in (sample_file(c, ".pins.json") for c in cands) if f), None)
+    if not pf:
+        continue
     pj = json.load(open(pf))
-    by_ep = {}
-    for c in pj.get("cavities", []):
-        by_ep.setdefault(c.get("endpoint") or pj["id"], []).append(c)
-    for ep, cavs in by_ep.items():
-        xy = face_xy(cavs)
-        PINSRC[ep] = {"file": os.path.basename(pf), "numbering": pj.get("numbering"), "names": pj.get("names"), "orient": pj.get("orientation_unknown"),
-                      "frame": pj.get("frame")}
-        for c in cavs:
-            full = re.sub(r"^(Hi|Lo)\s+", "", re.sub(r"\s{2,}.*$", "", (c.get("full_name") or "").strip()))
-            pw = sorted(w.get("id") for w in c.get("wires") or [] if w.get("id"))
-            have = PINS.setdefault(ep, {})
-            key = cav_key(c["pin"])
-            if key not in have and pw:             # a stud or post: the registry names it in words, so match it by its wires
-                key = next((k for k, r in have.items() if set(r["w"]) & set(pw)), key)
-            rec = have.setdefault(key, {"c": c["pin"], "w": [], "t": None})
-            if key == cav_key(c["pin"]):
-                rec["c"] = c["pin"]
-            rec.update({"n": c.get("name"), "f": full, "tec": c.get("cavity"), "row": c.get("row"), "xy": xy.get(c["pin"]), "pj": c["pin"]})
-            if pw and sorted(set(rec["w"])) != sorted(set(pw)):
-                rec["pj_w"] = pw                     # pins.json and the registry disagree: shown, not merged
+    cavs = [c for c in pj.get("cavities", []) if (c.get("endpoint") or pj.get("id")) == ep]
+    if not cavs:
+        continue
+    faces = {}
+    for c in cavs:
+        faces.setdefault(tuple(c.get("exit_dir_glb") or ()), []).append(c)
+    use = max(faces.values(), key=lambda g: sum(len(c.get("wires") or []) for c in g))
+    mates = sorted({(c.get("full_name") or c.get("name") or "").split(" cavity")[0] for g in faces.values() if g is not use for c in g} - {""})
+    xy = face_xy(use)
+    PINSRC[ep] = {"file": os.path.basename(pf), "numbering": pj.get("numbering"), "names": pj.get("names"), "orient": pj.get("orientation_unknown"),
+                  "frame": pj.get("frame"), "mate_half": mates}
+    have = PINS.setdefault(ep, {})
+    for c in use:
+        label = re.sub(r"^[RP](\d+)$", r"\1", c["pin"])            # an assembly names its halves R/P; the registry numbers the cavities
+        full = re.sub(r"^(Hi|Lo)\s+", "", re.sub(r"\s{2,}.*$", "", (c.get("full_name") or "").strip()))
+        pw = sorted(w.get("id") for w in c.get("wires") or [] if w.get("id"))
+        key = cav_key(label)
+        if key not in have and pw:                 # a stud or post: the registry names it in words, so match it by its wires
+            key = next((k for k, r in have.items() if set(r["w"]) & set(pw)), key)
+        rec = have.setdefault(key, {"c": label, "w": [], "t": None})
+        if key == cav_key(label):
+            rec["c"] = label
+        rec.update({"n": c.get("name"), "f": full, "tec": c.get("cavity"), "row": c.get("row"), "xy": xy.get(c["pin"]), "pj": c["pin"]})
+        if pw and sorted(set(rec["w"])) != sorted(set(pw)):
+            rec["pj_w"] = pw                         # pins.json and the registry disagree: shown, not merged
 PINS = {ep: sorted(v.values(), key=lambda r: natkey(r["c"])) for ep, v in PINS.items()}
 
 # connectors: structured fields from the registry kit, its terminations, part_media and parts.yaml
@@ -906,16 +937,27 @@ for item, ft in (REG.get("bom") or {}).get("wire_ft", {}).items():
                 "status": d.get("status") or "not in the registry's cart check", "used": []})
 
 # ------------------------------------------------------------------ open items: every question the records hold, with who acts
-def who_of(t, default="unassigned"):
-    if re.search(r"\bDave\b", t):
-        return "Skylar, with Dave"
-    if re.search(r"\basked 20\d\d|\bowner\b|\bSkylar\b|\byou\b", t, re.I):
-        return "Skylar"
-    return default
+HANDS = re.compile(r"\basked 20\d\d|\bowner\b|\bSkylar\b|\byou\b|\bmeasure|\btape\b|\bphoto|\bread (?:it|the)\b.*\b(?:bench|truck|valve|head)|\bbuy\b|\bpurchase", re.I)
+
+
+def who_of(t, default="System"):
+    """Skylar acts where a record needs his money or hands; every engineering call is the system's."""
+    return "Skylar" if HANDS.search(t) else default
+
+
+def no_persona(t):
+    """Drop the sentences that route a call through a person by name; the system makes engineering calls."""
+    parts = re.split(r"(?<=[.;!?])\s+", t)
+    kept = [x for x in parts if not re.search(r"\bDave(?:'s)?\b", x)]
+    return " ".join(kept).strip()
 
 
 OPEN = []
 def add_open(kind, text, who, rel, src, st="open"):
+    text = no_persona(text)
+    if not text or re.fullmatch(r"[\w-]+:\s*", text):
+        return
+    who = "System" if who in ("pieces and harness-cad", "harness-cad", "parts-artist", "layout-ui and parts-artist", "unassigned") else who
     same = next((o for o in OPEN if o["text"] == text), None)
     if same:                                  # one question asked of several ends: one item, all its records
         same["rel"] += [r for r in rel if r not in same["rel"]]
@@ -924,7 +966,7 @@ def add_open(kind, text, who, rel, src, st="open"):
 
 
 for d in sizes_m.DECISIONS:
-    add_open("Decision", d["title"] + ". " + d["text"], d["who"], d["rel"], sizes_m.DECISIONS_SRC)
+    add_open("Needs you", d["title"] + ". " + d["text"], d["who"], d["rel"], sizes_m.DECISIONS_SRC)
     d["open"] = OPEN[-1]["id"]
 TAPE_ITEMS = []
 for t in TAPE.get("items") or []:
@@ -966,59 +1008,77 @@ for i in items:
     if not i.get("drawn") and i.get("why_not") == "size":
         add_open("Coverage", i["id"] + " is not drawn to size: " + (i.get("why_not_text") or "size not read"), "layout-ui and parts-artist",
                  ["c:" + i["id"]], "sizes.py TODO (layout-ui)")
-# ------------------------------------------------------------------ library: the parts-artist's six parts in true CAD (the Parts Library page's content)
+# ------------------------------------------------------------------ library: every part in the part-model index, turned in 3D with its pins
 LIB = []
-if PL:
-    os.makedirs(os.path.join(SITE, "lib"), exist_ok=True)
-    for p in PL:
-        d = SAMPLES + p["key"] + "/" + p["id"]
-        if not os.path.exists(d + ".glb"):
-            continue
-        raw = open(d + ".glb", "rb").read()
-        bad = [s for s in (b"blendermcp", b"api_key", b"apikey", b"sketchfab") if s in raw.lower()]
-        if bad:
-            print("REFUSED: library GLB", p["id"], "carries", bad)
-            continue
-        open(os.path.join(SITE, "lib", p["key"] + ".js"), "w").write(
-            "window.K5_LIB=window.K5_LIB||{};window.K5_LIB[%s]=\"%s\";\n" % (json.dumps(p["key"]), base64.b64encode(raw).decode()))
-        pj = json.load(open(d + ".pins.json"))
-        prm = json.load(open(d + ".params.json")) if os.path.exists(d + ".params.json") else {}
-        imgs = []
-        for kind, w, cap in (("drawing", 1800, "Dimensioned drawing. Blue is printed by the maker, orange is scaled off the print, purple is sized from a photo, red is assumed."),
-                             ("pinout", 1400, "Pinout, wire side, with this build's wires."),
-                             ("vs_photo", 1400, "The model beside the maker's product photo. The maker's label artwork is left off on purpose."),
-                             ("clearance_800", 800, "The mated plugs and backshells, with the plug-and-boot keep-out in orange.")):
-            src = d + "_" + kind + ".png"
-            if kind.startswith("clearance") and not prm.get("keepout"):
-                continue                               # only the parts with a plug keep-out have a clearance study
-            if os.path.exists(src):
-                name = "lib/%s_%s.jpg" % (p["key"].lower(), kind.split("_8")[0])
-                out = os.path.join(SITE, name)
-                if not os.path.exists(out) or os.path.getmtime(out) < os.path.getmtime(src):
-                    im = Image.open(src).convert("RGB")
-                    if im.size[0] > w:
-                        im = im.resize((w, int(im.size[1] * w / im.size[0])), Image.LANCZOS)
-                    im.save(out, quality=84, optimize=True)
-                imgs.append({"src": name, "cap": cap, "kind": kind.split("_8")[0]})
-        cav = []
-        for c in pj.get("cavities", []):
-            full = re.sub(r"^(Hi|Lo)\s+", "", re.sub(r"\s{2,}.*$", "", (c.get("full_name") or "").strip()))
-            cav.append({"pin": c["pin"], "maker": c.get("maker_pin"), "ep": c.get("endpoint"), "name": c.get("name"), "full": full, "at": c.get("wire_side_glb_m"),
-                        "w": [x.get("id") for x in c.get("wires") or [] if x.get("id")]})
-        checks = [{"what": c.get("check"), "model": c.get("model"), "drawing": c.get("drawing"), "tol": c.get("tol"), "ok": c.get("ok")} for c in prm.get("checks") or []]
-        LIB.append({"key": p["key"], "id": p["id"], "tab": p["tab"], "title": p["title"], "pn": p["pn"], "mount": p["mount"], "facts": p["facts"], "open": p["open"],
-                    "js": "lib/%s.js" % p["key"], "bytes": len(raw), "made": datetime.datetime.fromtimestamp(os.path.getmtime(d + ".glb")).strftime("%Y-%m-%d %H:%M"),
-                    "pins": cav, "orient": pj.get("orientation_unknown"), "checks": checks, "unknowns": prm.get("unknowns") or [],
-                    "dims": prm.get("dims_note"), "basis": prm.get("shape_basis"), "maker": prm.get("maker"), "maker_pn": prm.get("maker_pn"),
-                    "ends": prm.get("endpoints") or [p["id"]], "images": imgs, "mated": (prm.get("mated") or {}).get("what"),
-                    "keepout": (prm.get("keepout") or {}).get("what")})
-        for u in prm.get("unknowns") or []:
-            add_open("Part model", p["id"] + ": " + u, "parts-artist", ["c:" + e for e in (prm.get("endpoints") or [p["id"]]) if e in ITEM],
-                     "parts/samples/%s/%s.params.json" % (p["key"], p["id"]))
-LIB_OF = {e: L["key"] for L in LIB for e in L["ends"]}
+os.makedirs(os.path.join(SITE, "lib"), exist_ok=True)
+KIND_WORD = {"assembly": "End assembly", "piece": "Housing or piece", "device": "Device"}
+what_of = lambda v: v.get("what") if isinstance(v, dict) else (v if isinstance(v, str) else None)
+for pid, pm in PMI["parts"].items():
+    gpath = sample_file(pid, ".glb")
+    if not gpath:
+        continue
+    d = gpath[:-4]
+    raw = open(gpath, "rb").read()
+    bad = [x for x in (b"blendermcp", b"api_key", b"apikey", b"sketchfab") if x in raw.lower()]
+    if bad:
+        print("REFUSED: library GLB", pid, "carries", bad)
+        continue
+    js = os.path.join(SITE, "lib", pid + ".js")
+    if not os.path.exists(js) or os.path.getmtime(js) < os.path.getmtime(gpath):
+        open(js, "w").write("window.K5_LIB=window.K5_LIB||{};window.K5_LIB[%s]=\"%s\";\n" % (json.dumps(pid), base64.b64encode(raw).decode()))
+    pj = json.load(open(d + ".pins.json")) if os.path.exists(d + ".pins.json") else {"cavities": []}
+    prm = json.load(open(d + ".params.json")) if os.path.exists(d + ".params.json") else {}
+    cur = PL_BY.get(pid, {})
+    imgs = []
+    for kind, w, cap in (("drawing", 1800, "Dimensioned drawing. Blue is printed by the maker, orange is scaled off the print, purple is sized from a photo, red is assumed."),
+                         ("pinout", 1400, "Pinout, wire side, with this build's wires."),
+                         ("vs_photo", 1400, "The model beside the maker's product photo. The maker's label artwork is left off on purpose."),
+                         ("clearance_800", 800, "The mated plugs and backshells, with the plug-and-boot keep-out in orange.")):
+        src = d + "_" + kind + ".png"
+        if kind.startswith("clearance") and not prm.get("keepout"):
+            continue                                   # only the parts with a plug keep-out have a clearance study
+        if os.path.exists(src):
+            name = "lib/%s_%s.jpg" % (pid.lower(), kind.split("_8")[0])
+            out = os.path.join(SITE, name)
+            if not os.path.exists(out) or os.path.getmtime(out) < os.path.getmtime(src):
+                im = Image.open(src).convert("RGB")
+                if im.size[0] > w:
+                    im = im.resize((w, int(im.size[1] * w / im.size[0])), Image.LANCZOS)
+                im.save(out, quality=84, optimize=True)
+            imgs.append({"src": name, "cap": cap, "kind": kind.split("_8")[0]})
+    cav = []
+    for c in pj.get("cavities", []):
+        full = re.sub(r"^(Hi|Lo)\s+", "", re.sub(r"\s{2,}.*$", "", (c.get("full_name") or "").strip()))
+        cav.append({"pin": c["pin"], "maker": c.get("maker_pin"), "ep": c.get("endpoint"), "name": c.get("name"), "full": full, "at": c.get("wire_side_glb_m"),
+                    "w": [x.get("id") for x in c.get("wires") or [] if x.get("id")]})
+    checks = [{"what": c.get("check"), "model": c.get("model"), "drawing": c.get("drawing"), "tol": c.get("tol"), "ok": c.get("ok")} for c in prm.get("checks") or []]
+    dims = pm.get("dims_mm") or prm.get("dims_mm") or {}
+    kind = pm.get("kind") or "device"
+    LIB.append({"key": pid, "id": pid, "tab": cur.get("tab") or pid, "title": cur.get("title") or pm.get("what") or prm.get("what") or pid,
+                "pn": cur.get("pn") or " ".join(x for x in (pm.get("maker"), pm.get("maker_pn")) if x), "mount": cur.get("mount") or "none",
+                "facts": cur.get("facts") or [], "open": (cur.get("open") or []) + ["Not modelled yet: " + m for m in pm.get("missing") or []],
+                "js": "lib/%s.js" % pid, "bytes": len(raw), "made": datetime.datetime.fromtimestamp(os.path.getmtime(gpath)).strftime("%Y-%m-%d %H:%M"),
+                "pins": cav, "orient": pj.get("orientation_unknown"), "checks": checks, "unknowns": prm.get("unknowns") or [],
+                "dims": prm.get("dims_note") or (" x ".join("%g" % dims[k] for k in ("l", "w", "h") if dims.get(k)) + " mm" if dims else ""),
+                "basis": pm.get("shape_basis") or prm.get("shape_basis"), "maker": pm.get("maker") or prm.get("maker"), "maker_pn": pm.get("maker_pn") or prm.get("maker_pn"),
+                "ends": pm.get("endpoints") or [], "images": imgs, "mated": what_of(prm.get("mated")), "keepout": what_of(prm.get("keepout")),
+                "kind": kind, "kind_word": KIND_WORD.get(kind, kind), "family": pm.get("family"), "missing": pm.get("missing") or [],
+                "color": ((pm.get("colors") or {}).get("housing") or (pm.get("colors") or {}).get("case") or {}).get("hex")})
+    for u in prm.get("unknowns") or []:
+        add_open("Part model", pid + ": " + u, "System", ["c:" + e for e in (pm.get("endpoints") or []) if e in ITEM], "parts/samples/%s/%s.params.json" % (os.path.basename(os.path.dirname(gpath)), pid))
+LIB.sort(key=lambda L: ({"device": 0, "assembly": 1, "piece": 2}.get(L["kind"], 3), natkey(L["id"])))
+# an end's own model: its assembly, or the device part that carries it; pieces are parts of an assembly
+LIB_OF, LIB_OF_KIND = {}, {}
+for L in LIB:
+    for e in L["ends"]:
+        if L["kind"] != "piece" or e not in LIB_OF:
+            if e not in LIB_OF or LIB_OF_KIND.get(e) == "piece":
+                LIB_OF[e] = L["key"]; LIB_OF_KIND[e] = L["kind"]
+
 for i in items:
     if i["id"] in LIB_OF:
         i["lib"] = LIB_OF[i["id"]]
+    i["m3d"] = MODELLED.get(i["id"], [])          # complete = a part in the part-model index carries this end (owner: no 3D, not complete)
 for d in DEVS.values():
     d["lib"] = next((LIB_OF[c] for c in d["conns"] if c in LIB_OF), None)
 OPEN_BY = {}
@@ -1026,7 +1086,54 @@ for o in OPEN:
     for r in o["rel"]:
         OPEN_BY.setdefault(r, []).append(o["id"])
 
-cov = {"ends": len(items), "drawn": sum(1 for i in items if i.get("drawn")), "cad": len(LIB), "segs": len((routes or {}).get("segments", [])),
+# ------------------------------------------------------------------ data on this vehicle: what the database holds for it, and what came in lately
+VID = "e08bf694-970f-4cbe-8a74-8715158a0f2e"
+
+
+def dbq(sql):
+    """Read-only, through the repo's own query script (scripts/data/q.sh); None when the database can't be reached."""
+    try:
+        r = subprocess.run([os.path.join(REPO, "scripts", "data", "q.sh"), sql], capture_output=True, text=True, timeout=120)
+        out = json.loads(r.stdout)
+        return out if isinstance(out, list) else None
+    except Exception:
+        return None
+
+
+LA = "(now() at time zone 'America/Los_Angeles')::date"
+def cnt(table, ts, where):
+    return (f"select '{table}' t, count(*) n, count(*) filter (where ({ts} at time zone 'America/Los_Angeles')::date = {LA}) today, "
+            f"count(*) filter (where {ts} > now() - interval '7 days') week, max({ts}) last from {table} where {where}")
+DESIGN_W = f"design_id in (select id from harness_designs where vehicle_id='{VID}') and is_superseded=false and code is not null"
+OVER_W = f"overlay_id in (select id from vehicle_wiring_overlays where vehicle_id='{VID}') and is_superseded=false"
+rows = dbq(" union all ".join([
+    cnt("vehicle_images", "created_at", f"vehicle_id='{VID}'"), cnt("vehicle_observations", "ingested_at", f"vehicle_id='{VID}'"),
+    cnt("timeline_events", "created_at", f"vehicle_id='{VID}'"), cnt("vehicle_documents", "created_at", f"vehicle_id='{VID}'"),
+    cnt("field_evidence", "created_at", f"vehicle_id='{VID}'"), cnt("work_orders", "created_at", f"vehicle_id='{VID}'"),
+    cnt("harness_endpoints", "created_at", DESIGN_W), cnt("vehicle_custom_circuits", "created_at", OVER_W),
+    cnt("wire_termination_specs", "created_at", f"vehicle_id='{VID}' and is_superseded=false and circuit_id is not null"),
+    cnt("wiring_decisions", "created_at", f"vehicle_id='{VID}' and is_superseded=false and decision_kind is not null")]))
+obs = dbq(f"select kind, count(*) n, count(*) filter (where ingested_at > now() - interval '7 days') week, "
+          f"count(*) filter (where (ingested_at at time zone 'America/Los_Angeles')::date = {LA}) today from vehicle_observations "
+          f"where vehicle_id='{VID}' group by 1 order by 2 desc")
+DB_WORD = {"vehicle_images": "Photos", "vehicle_observations": "Observations", "timeline_events": "Timeline events", "vehicle_documents": "Documents",
+           "field_evidence": "Field evidence", "work_orders": "Work orders", "harness_endpoints": "Wiring ends (map rows)",
+           "vehicle_custom_circuits": "Wires (map rows)", "wire_termination_specs": "Wire ends terminated (map rows)", "wiring_decisions": "Wiring calls"}
+git_date = lambda path: subprocess.run(["git", "-C", REPO, "log", "-1", "--format=%cs", "origin/main", "--", path], capture_output=True, text=True).stdout.strip() or None
+VEHICLE_DATA = None
+if rows:
+    VEHICLE_DATA = {"as_of": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), "tz": "Las Vegas time",
+                    "db": [{"kind": DB_WORD.get(r["t"], r["t"]), "table": r["t"], "n": r["n"], "today": r["today"], "week": r["week"], "last": (r["last"] or "")[:10]} for r in rows],
+                    "obs": [{"kind": o["kind"], "n": o["n"], "week": o["week"], "today": o["today"]} for o in (obs or [])],
+                    "design": [
+                        {"kind": "Parts modelled in 3D", "n": len(PMI["parts"]), "updated": PMI.get("generated"), "src": PMI_SRC},
+                        {"kind": "Route segments", "n": len((routes or {}).get("segments", [])), "updated": stamp.get("routes.json", "")[:10], "src": "routes.json (harness-cad)"},
+                        {"kind": "End positions", "n": len(items), "updated": stamp.get("pos.py", "")[:10], "src": "pos.py (pieces lane)"},
+                        {"kind": "Wires in the registry", "n": len(WIRES), "updated": git_date("docs/wiring/calc-data/k5_registry.json"), "src": "k5_registry.json (main)"}]}
+    VEHICLE_DATA["total"] = sum(r["n"] for r in VEHICLE_DATA["db"] if not r["table"].startswith(("harness_", "vehicle_custom", "wire_term", "wiring_")))
+
+cov = {"ends": len(items), "drawn": sum(1 for i in items if i.get("drawn")), "cad": len(LIB), "m3d": sum(1 for i in items if i["m3d"]),
+       "pm_src": PMI_SRC, "pm_parts": len(PMI["parts"]), "segs": len((routes or {}).get("segments", [])),
        "wires": len(WIRES), "routed": sum(1 for w in WIRES.values() if w.get("segs")), "off": sum(1 for n in (routes or {}).get("nodes", []) if n.get("off")),
        "open": len(OPEN), "decisions": len(sizes_m.DECISIONS)}
 print("workspace: %d systems, %d devices, %d pins on %d connectors, %d wires (%d routed), %d BOM lines, %d open items, %d library parts"
@@ -1037,7 +1144,7 @@ data = {
     "views": VIEWS, "items": items, "wires": WIRES, "context": ctx, "routes": routes, "boxes": boxes, "glb": glb,
     "counts": {"ends": len(items), "drawn": drawn}, "body_margin": BODY_MARGIN, "roll": roll, "carts": carts,
     "sys": sys_list, "devs": DEVS, "pins": PINS, "bom": bom, "open": OPEN, "open_by": OPEN_BY, "tape": TAPE_ITEMS, "lib": LIB, "cov": cov,
-    "dec": sizes_m.DECISIONS, "dec_src": sizes_m.DECISIONS_SRC, "renders": RENDERS, "bay": {"stats": sizes_m.BAY_STATS, "src": sizes_m.BAY_SRC},
+    "dec": sizes_m.DECISIONS, "dec_src": sizes_m.DECISIONS_SRC, "renders": RENDERS, "vdata": VEHICLE_DATA, "fw_plan": sizes_m.FIREWALL_PLAN, "bay": {"stats": sizes_m.BAY_STATS, "src": sizes_m.BAY_SRC},
     "stale_days": sizes_m.STALE_DAYS, "builder_note": sizes_m.BUILDER_NOTE, "referral": sizes_m.REFERRAL,
     "sources": {"ends": "pieces lane: ends.py " + stamp["ends.py"] + ", pos.py " + stamp["pos.py"],
                 "sizes": "footprints.py (pieces), part_models.yaml (parts-artist), sizes.py (layout-ui)",

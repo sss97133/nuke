@@ -4,7 +4,8 @@
   <button type="button" class="btn treebtn" id="treebtn" aria-controls="tree" aria-expanded="false">Project</button>
   <h1>K5 Harness</h1>
   <span class="sub">1977 K5 Blazer · LS3 · MoTeC M130 · PDM30 in the cab · PDM15 in the bay · one 61-pin D38999 through the firewall</span>
-  <span class="r"><span id="built"></span><button type="button" class="btn" id="srcbtn">Sources</button></span>
+  <span class="r"><button type="button" class="vdata" id="vdbtn" aria-expanded="false" hidden></button><button type="button" class="btn" id="srcbtn">Sources</button></span>
+  <div class="vdpanel" id="vdpanel" hidden></div>
 </header>
 
 <section class="strip" aria-label="Summary">
@@ -23,7 +24,8 @@
 
   <section class="centre pane" aria-label="Views">
     <div class="vtabs" role="tablist" id="vtabs">
-      <button type="button" role="tab" data-v="vehicle" aria-selected="true">Vehicle</button>
+      <button type="button" role="tab" data-v="man" aria-selected="true">Manual</button>
+      <button type="button" role="tab" data-v="vehicle" aria-selected="false">Vehicle</button>
       <button type="button" role="tab" data-v="conn" aria-selected="false">Connector</button>
       <button type="button" role="tab" data-v="sch" aria-selected="false">Schematic</button>
       <button type="button" role="tab" data-v="lib" aria-selected="false">Library</button>
@@ -31,7 +33,8 @@
     </div>
     <div class="vtools" id="vtools"></div>
     <div class="stage" id="stage">
-      <div class="view" id="v-vehicle">
+      <div class="view" id="v-man"><div class="man" id="man"></div></div>
+      <div class="view" id="v-vehicle" hidden>
         <div class="vp" id="vp"><div class="world" id="world"><img id="lyr-body" alt=""><img id="lyr-mech" alt=""><svg id="ov" xmlns="http://www.w3.org/2000/svg"></svg></div></div>
         <div class="v3d" id="v3d" hidden><div class="vmsg" id="v3d-msg"></div></div>
         <div class="vren" id="vren" hidden></div>
@@ -42,7 +45,7 @@
       <div class="view" id="v-conn" hidden></div>
       <div class="view" id="v-sch" hidden><div class="sch" id="sch"><svg id="schsvg" xmlns="http://www.w3.org/2000/svg"></svg></div></div>
       <div class="view" id="v-lib" hidden>
-        <div class="lib"><div class="l3" id="l3"><div class="vmsg" id="l3-msg"></div><div class="l3bar"><span class="st" id="l3-st"></span></div></div><div class="linfo" id="linfo"></div></div>
+        <div class="libwrap"><div class="liblist" id="liblist" aria-label="Parts modelled in 3D"></div><div class="lib"><div class="l3" id="l3"><div class="vmsg" id="l3-msg"></div><div class="l3bar"><span class="st" id="l3-st"></span></div></div><div class="linfo" id="linfo"></div></div></div>
       </div>
     </div>
     <div class="sbar"><span id="cursor">&nbsp;</span><span id="scale"></span><span class="cap" id="vcap"></span></div>
