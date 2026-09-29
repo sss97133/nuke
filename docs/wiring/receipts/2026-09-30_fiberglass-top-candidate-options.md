@@ -44,25 +44,26 @@
 The format follows options-rd's PR #416 block (`product`, `requires`, `demand.taps`, `demand.limits`, `demand.adds`) so the two
 blocks merge mechanically. `top_cavities` is informational; neither version of `options_v5.py` sums it.
 
-## Measured (options_v5 dry runs, scratch copies, 2026-09-29)
+## Measured (options_v5, 2026-09-29)
 
-- **main's `options_v5.py` + this block:**
+- **Before PR #416 merged (dry run on main's `options_v5.py` + this block):**
   - 22 options
-  - candidates would take **7 PDM30 outputs against 3 spare** (5 before this block) and 3 PDM30 inputs against 2 (unchanged; these
-    add none)
-  - buildable harness unchanged at 361 wires
-- **PR #416's `options_v5.py` + its block + this block:**
+  - candidates would take 7 PDM30 outputs against 3 spare
+- **After rebasing on #416 + #417 (the run committed here):**
   - 39 options, runs clean
-  - same PDM30 verdict
-  - its alternates line lists only options-rd's alternates; these add none
+  - candidates would take **7 PDM30 outputs against 3 spare** (5 before this block) and **3 PDM30 inputs against 2** (unchanged;
+    these add none)
+  - buildable harness unchanged at 361 wires
+  - the alternates line lists only options-rd's alternates; this block adds none
 - **Sizing:** from the canon rules (research §2.4, §3.2).
   - PV: 16 AWG (1.1–2.3 % of Vmp).
   - MPPT battery pair: 10 AWG on a 20 A fuse.
   - Work-lamp feed: 16 AWG body run (0.38 V, 2.7 %). All-20 AWG fails at 4.0 %.
   - OUT21 set at 4 A; lamp return 16 AWG.
   - Every limit clears the 0.85 × pin-lead and contact ratings.
-- **Not regenerated here:** `OPTIONS.md` and `k5_registry.json`. PR #416 also regenerates them, and two copies would collide. After
-  both PRs merge, run `options_v5.py` once in the usual order: reconcile, then check --wires, then options, then manual.
+- **Regenerated:** `OPTIONS.md` and `k5_registry.json` (options, readiness and capacity) by `options_v5.py`, after #416 merged.
+  The manual (`manual_v5.py`, page 1-5 Specifications) was not rebuilt. Next full run goes in the usual order: reconcile, then
+  check --wires, then options, then manual.
 
 ## Substrate inconsistencies surfaced (not fixed inline)
 
