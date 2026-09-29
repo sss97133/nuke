@@ -529,6 +529,10 @@ def glb_dir(d):
     return [x, z, -y]
 
 
+DOUBLED = {"doubled": True, "doubled_note": "the conductor is folded back on itself in the crimp (registry `doubled`): a "
+                                             "22 AWG wire crimps as 18 AWG, MoTeC C125 manual p.21"}
+
+
 def write_pins(mod, out):
     """<id>.pins.json for a part whose ends are studs or terminals: mod.terminals() -> [{pin, name, at, dir,
     endpoint, match (regex on the registry termination's cavity text), part_prefix (optional: only terminations whose
@@ -539,16 +543,20 @@ def write_pins(mod, out):
     for tm in mod.terminals():
         rx = re.compile(tm["match"], re.I)
         pref = tm.get("part_prefix")
-        ids = [x["wire"] for x in terms if x["endpoint"] == tm["endpoint"] and rx.search(str(x.get("cavity", "")))
-               and (not pref or str(x.get("part") or "").startswith(pref))]
+        hits = [x for x in terms if x["endpoint"] == tm["endpoint"] and rx.search(str(x.get("cavity", "")))
+                and (not pref or str(x.get("part") or "").startswith(pref))]
+        ids = [x["wire"] for x in hits]
+        dbl = {x["wire"] for x in hits if x.get("doubled")}
         if not ids and tm.get("endpoint_cavities"):
             # no termination rows for this end (implied wires, e.g. a candidate option): the registry endpoint's own
             # wire -> cavity map, used only on the half that carries the harness wires
             cav = (registry()["endpoints"].get(tm["endpoint"]) or {}).get("cavities") or {}
             ids = [w for w, c in cav.items() if rx.search(str(c))]
+            dbl = set()
         rows.append({"pin": tm["pin"], "endpoint": tm["endpoint"], "name": tm["name"], "full_name": tm.get("full_name", tm["name"]),
                      "pin_tip_glb_m": glb_point(tm["at"]), "wire_side_glb_m": glb_point(tm["at"]),
-                     "exit_dir_glb": glb_dir(tm["dir"]), "wires": wire_rows(ids)})
+                     "exit_dir_glb": glb_dir(tm["dir"]), "wires": [dict(w, **(DOUBLED if w["id"] in dbl else {}))
+                                                             for w in wire_rows(ids)]})
     (Path(out) / f"{A['pid']}.pins.json").write_text(json.dumps(
         {"id": A["pid"], "frame": "GLB coordinates: metres, glTF Y-up (part x, z, -y); pin_tip = where the lug or wire lands, "
                                   "exit_dir = the way the cable leaves",

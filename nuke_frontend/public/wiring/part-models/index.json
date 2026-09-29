@@ -1691,7 +1691,7 @@
     },
     "cable seals": {
      "hex": "#3b6fb6",
-     "from": "reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf p.66 '150 METRI-PACK CABLE SEALS': 12048087 'Silicone Blue' (no photo on file)"
+     "from": "parts.yaml 15324974 'Metri-Pack 150 cable seal, blue' (no photo on file)"
     }
    },
    "attach": [
@@ -1940,7 +1940,7 @@
     "CMP",
     "MAP"
    ],
-   "what": "Metri-Pack 150 cable seal, blue, 1.29-1.70 mm cable (the catalog's 12048087)",
+   "what": "Metri-Pack 150 cable seal, blue, 1.0-1.9 mm cable",
    "maker": "Delphi (Aptiv)",
    "maker_pn": "15324974",
    "shape_basis": "scaled from photo",
@@ -1962,7 +1962,7 @@
    "colors": {
     "seal": {
      "hex": "#3b6fb6",
-     "from": "reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf p.66 '150 METRI-PACK CABLE SEALS': 12048087 'Silicone Blue' (no photo on file)"
+     "from": "parts.yaml 15324974 'Metri-Pack 150 cable seal, blue' (no photo on file)"
     }
    },
    "attach": [

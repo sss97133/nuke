@@ -102,12 +102,10 @@ TERMINALS = {   # stamped female terminals: box contact, conductor and insulatio
                  "src": f"{PH('12191818')} (reel photo), scaled from the 1.5 mm GT 150 blade"},
 }
 CABLE_SEALS = {
-    "15324974": {"what": "Metri-Pack 150 cable seal, blue, 1.29-1.70 mm cable (the catalog's 12048087)", "od": 4.4, "len": 6.5,
-                 "bore": 1.29,
-                 "colour": ("#3b6fb6", f"{CD}Delphi_150_Metri-Pack_Series.pdf p.66 '150 METRI-PACK CABLE SEALS': 12048087 "
-                                       "'Silicone Blue' (no photo on file)"),
-                 "src": f"{CD}Delphi_150_Metri-Pack_Series.pdf p.66: 12048087 / 12052925 '1.70-1.29' (bore); OD and length "
-                        f"from the white sibling 15324976's photo ({PH('15324976')}), +-15 %"},
+    "15324974": {"what": "Metri-Pack 150 cable seal, blue, 1.0-1.9 mm cable", "od": 4.4, "len": 6.5, "bore": 1.0,
+                 "colour": ("#3b6fb6", "parts.yaml 15324974 'Metri-Pack 150 cable seal, blue' (no photo on file)"),
+                 "src": "reference_documents/web_snapshots/www.connectorid.com__aptiv-15324974.md 'Wire Insul Dia.: 1.0 - 1.9 mm' "
+                        f"(the bore); OD and length from the white sibling 15324976's photo ({PH('15324976')}), +-15 %"},
     "15324976": {"what": "Metri-Pack 150 cable seal, white", "od": 4.6, "len": 6.5, "bore": 1.3,
                  "colour": ("#f1efe9", f"{PH('15324976')}: white; customconnectorkits calls it 'for 16-14 AWG' (ProWire: 20-22)"),
                  "src": f"{PH('15324976')}, scaled from its 1.3-2.1 mm cable range (parts.yaml, ConnectorID)"},
@@ -416,9 +414,11 @@ def assembly_module(end):
     if pn == "12129946":
         notes.append("terminal corrected to 12084200 (0.35-0.50 mm2, the 22 AWG these wires are): Delphi Metri-Pack 150 "
                      "catalog p.12 '150 FEMALE TERMINALS SEALED' (12048074 is 1.0-0.80 mm2, 18-20 AWG); the registry's "
-                     "12110847 is a Metri-Pack 280 tangless terminal (catalog p.30). Cable seal 15324974 (blue, 1.29-1.70 "
-                     "mm, the catalog's 12048087, p.66) fits the 22 AWG M22759/16 jacket (1.27-1.37 mm); the white "
-                     "15324976 (1.60-2.15, the catalog's 12089678) does not")
+                     "12110847 is a Metri-Pack 280 tangless terminal (catalog p.30). Cable seal 15324974 (blue, 1.0-1.9 mm, "
+                     "ConnectorID) covers the 22 AWG M22759/16 jacket (1.27-1.37 mm); the white 15324976 (1.3-2.1 mm, "
+                     "ConnectorID; ProWire p-2061 'used with 20-22 gauge wire') fits but is marginal at the jacket's 1.27 "
+                     "minimum. The catalog's own Metri-Pack 150 seals are 12048087 (blue, 1.29-1.70) and 12089678 (white, "
+                     "1.60-2.15), p.66; no source on file ties those to 15324974 / 15324976")
     if end == "OILT":
         notes.append("no oil-temperature sensor part number is recorded (part_media OILT): drawn as the ECT it shares a family with")
     C = dict(s["colours"])
