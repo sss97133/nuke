@@ -15,7 +15,7 @@
   "counts": {
    "active": 174,
    "candidate": 243,
-   "implied": 239,
+   "implied": 240,
    "devices": 141
   }
  },
@@ -5330,7 +5330,7 @@
     ],
     "crossing": "none: both ends on one side"
    },
-   "pdm_limit": "PDM30 OUT21: OPEN: needs the PCS TCM-2650 ignition current (ZGP harness drawing / guide; the kit may also feed case 9/12 from this lead). PL (candidate) conflict: the locks (AutoLoc AUTZT2000 4.5 A x 2 on one bus) held OUT21 before the PCS moved into the cab; PL needs another output",
+   "pdm_limit": "PDM30 OUT21: CONFLICT: needs 12 A per output, the thinnest conductor allows 10 A (0.85 x 15 A, PDM manual p.48 / ProWire tables) — a heavier wire or pigtail closes it",
    "option": "PL",
    "option_status": "candidate"
   },
@@ -7249,7 +7249,7 @@
    "frm": "Distribution stud (MIDI 40 A)",
    "to": {
     "device": "IBOOSTER",
-    "pin": "4.00 mm² red lead, housing pin 1 (always hot, 40 A)",
+    "pin": "4.00 mm² red lead, housing pin 1 (always hot, 40 A) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]",
     "terminal": "Tulay harness"
    },
    "awg": 6,
@@ -7267,7 +7267,7 @@
     "decision: frm ECU -> Distribution stud (MIDI 40 A) — chapters/17 §17.3 spine table: MIDI 40 A; gauge from cable_decisions.json (6 AWG: a MIDI 40 needs 47 A of cable, 8 AWG bundled is 40 A — cable_sizing_v5.py); the ch.17 table's 8 AWG is superseded; it started at 'ECU'",
     "decision: label Bosch V4 Electric Brake Booste -> iBooster power (direct, MIDI 40 A) — chapters/17 §17.3 spine table: MIDI 40 A; gauge from cable_decisions.json (6 AWG: a MIDI 40 needs 47 A of cable, 8 AWG bundled is 40 A — cable_sizing_v5.py); the ch.17 table's 8 AWG is superseded; it started at 'ECU'",
     "decision: to None -> {'device': 'IBOOSTER', 'pin': '1 (constant 12 V)', 'terminal': 'Tulay harness'} — chapters/17 §17.3 spine table: MIDI 40 A; gauge from cable_decisions.json (6 AWG: a MIDI 40 needs 47 A of cable, 8 AWG bundled is 40 A — cable_sizing_v5.py); the ch.17 table's 8 AWG is superseded; it started at 'ECU'",
-    "pin text from the termination rows (one home for pins, review A3): to.pin '1 (constant 12 V)' -> '4.00 mm² red lead, housing pin 1 (always hot, 40 A)' at IBOOSTER"
+    "pin text from the termination rows (one home for pins, review A3): to.pin '1 (constant 12 V)' -> '4.00 mm² red lead, housing pin 1 (always hot, 40 A) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]' at IBOOSTER"
    ],
    "sources": [
     "output/K5_cut_list_v4_2.txt:148"
@@ -17202,7 +17202,7 @@
    "id": "DAK_CONST",
    "label": "Dakota VHX CONST. POWER (always-hot, fused)",
    "status": "implied",
-   "frm": "PDM30-STUD (3 A inline fuse)",
+   "frm": "PDM30-STUD (5 A inline fuse)",
    "to": "DAKOTA-VHX (CONST. POWER)",
    "awg": 18,
    "spec": "M22759/32",
@@ -17223,7 +17223,11 @@
     "decision: color None -> red — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
    ],
    "color": "red",
-   "protection": "3 A inline fuse at the PDM30 stud (DAKOTA_VHX_ARCHITECTURE.md §2 'CONST. POWER gap'; VHX manual p.6). Holder and fuse part: OPEN — no inline holder is picked (a sealed ATO/ATC in-line holder sized to the wire; pick with the battery terminals)",
+   "protection": "5 A inline fuse at the PDM30 stud (Dakota VHX manual 650314:P p.6: 'The constant +12V supply source should be a fused 5 - 20 amp circuit, the system draws less than 1 amp' and 'Use 18 AWG wire' — the lowest value in the maker's range (the earlier 3 A had no source and sat under it)). Holder: Blue Sea 5065 waterproof in-line ATO/ATC (BLUESEA-5065); fuse: BLUESEA-5239",
+   "protection_parts": {
+    "holder": "BLUESEA-5065",
+    "fuse": "BLUESEA-5239"
+   },
    "option": "BASE",
    "option_status": "base"
   },
@@ -17253,39 +17257,73 @@
     "crossing": "none: both ends on one side"
    },
    "color": "red",
-   "protection": "5 A inline fuse at the PDM30 battery stud (receipts/2026-07-12_6l80e-can-master-ruling.md F3 (PCS TCM-2650 constant 12 V, 5 A)). Holder and fuse part: OPEN — no inline holder is picked (a sealed ATO/ATC in-line holder sized to the wire; pick with the battery terminals)",
+   "protection": "5 A inline fuse at the PDM30 battery stud (PROVISIONAL: receipts/2026-07-12_6l80e-can-master-ruling.md F3 carries Holley 558-499's loose-wire 5 A, which is the TRANSMISSION's solenoid supply (Holley p.3), not a PCS figure. The PCS TCM-2650's own draw / fuse is OPEN: the ZGP TCM-2650 setup guide rev2 (23 pages), the PSI Conversion TCM-2650 page (web_snapshots/www.psiconversion.com__TCM-2650.md) and the Zero Gravity TCM4610 harness page (web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md) give none — ask ZGP/PSI or read the harness drawing). Holder: Blue Sea 5065 waterproof in-line ATO/ATC (BLUESEA-5065); fuse: BLUESEA-5239",
+   "protection_parts": {
+    "holder": "BLUESEA-5065",
+    "fuse": "BLUESEA-5239"
+   },
    "option": "BASE",
    "option_status": "base"
   },
   {
-   "id": "PCS_IGN",
-   "label": "PCS TCM-2650 ignition",
+   "id": "PCS_IGN_PT",
+   "label": "PDM15 OUT13 pin lead to the PCS ignition step-up splice",
    "status": "implied",
-   "frm": "PDM30:OUT21 (B1)",
-   "to": "PCS-HARNESS-4610 (ignition lead)",
+   "frm": "PDM15:OUT13 (A11)",
+   "to": "SPL-PDM15-OUT13",
    "awg": 20,
    "spec": "M22759/32",
-   "control": "PDM30 DIG1 ignition RUN",
+   "control": "ignition RUN over CAN from the PDM30 (DIG1)",
    "sources": [
-    "ZGP TCM2650 setup guide rev2 p.1; the TCM mounts in the cab (the guide gives no mounting location or sealing rating), so its ignition comes from the cab PDM30: PDM15 OUT13 would cross the firewall with no free body bulkhead cavity (A and B full). OUT21 was the only base-free 8 A output (held by the PL candidate): the base transmission takes it and PL needs another output"
-   ],
-   "conflicts": [
-    "decision: to PCS harness IGN -> PCS-HARNESS-4610 (ignition lead) — ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.1 ignition; endpoint PCS-TCM",
-    "pin text from the termination rows (one home for pins, review A3): frm 'PDM30:OUT21' -> 'PDM30:OUT21 (B1)'",
-    "decision: color None -> red — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
+    "MoTeC PDM user manual p.9: 8 A outputs take 24#-20# in the Superseal pin; the run to the cab crosses body bulkhead P, whose size 12 DTP contacts take 14-12 AWG (customconnectorkits DTP04-4P-L012 / 0460-204-12141), so the 20 AWG pin lead steps up to 14 AWG at a stub splice"
    ],
    "subsystem": "TRANS_6L90",
    "subsystem_basis": "6L90 + PCS TCM-2650 interface (receipt 2026-07-12; state 0j(b), §3 0a: the transmission is a 6L90)",
    "length_kind": null,
    "gauge": "20 AWG",
+   "conflicts": [
+    "pin text from the termination rows (one home for pins, review A3): frm 'PDM15:OUT13' -> 'PDM15:OUT13 (A11)'",
+    "decision: color None -> red — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
+   ],
    "route": {
     "sides": [
-     "cab"
+     "engine bay"
     ],
     "crossing": "none: both ends on one side"
    },
    "color": "red",
-   "pdm_limit": "PDM30 OUT21: OPEN: needs the PCS TCM-2650 ignition current (ZGP harness drawing / guide; the kit may also feed case 9/12 from this lead). PL (candidate) conflict: the locks (AutoLoc AUTZT2000 4.5 A x 2 on one bus) held OUT21 before the PCS moved into the cab; PL needs another output",
+   "pdm_limit": "PDM15 OUT13: OPEN: needs the PCS TCM-2650 ignition current (ZGP harness drawing / guide). OPEN until the TCM-4610 drawing: if the kit feeds case 12 (switched ignition, PNK) and case 9 (accessory, YEL) from the PCS ignition lead, their wake current is on this output too",
+   "option": "BASE",
+   "option_status": "base"
+  },
+  {
+   "id": "PCS_IGN",
+   "label": "PCS TCM-2650 ignition (14 AWG through body bulkhead P)",
+   "status": "implied",
+   "frm": "SPL-PDM15-OUT13",
+   "to": "PCS-HARNESS-4610 (ignition lead)",
+   "awg": 14,
+   "spec": "M22759/32",
+   "control": "ignition RUN over CAN from the PDM30 (DIG1), through PCS_IGN_PT",
+   "sources": [
+    "ZGP TCM2650 setup guide rev2 p.1 (ignition); its own output, PDM15 OUT13 (lead round 5: not shared with the PL lock feeds on PDM30 OUT21); the PCS sits in the cab (the guide gives no mounting location or sealing rating), so the feed crosses body bulkhead P cavity 2 (P had 3 spare size 12 cavities, 14-12 AWG: catalog FIREWALL-BODY-P); steps down at a splice if the kit lead is smaller (TCM-4610 drawing)"
+   ],
+   "conflicts": [
+    "decision: to PCS harness IGN -> PCS-HARNESS-4610 (ignition lead) — ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.1 ignition; endpoint PCS-TCM",
+    "decision: color None -> red — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
+   ],
+   "subsystem": "TRANS_6L90",
+   "subsystem_basis": "6L90 + PCS TCM-2650 interface (receipt 2026-07-12; state 0j(b), §3 0a: the transmission is a 6L90)",
+   "length_kind": null,
+   "gauge": "14 AWG",
+   "route": {
+    "sides": [
+     "cab",
+     "engine bay"
+    ],
+    "crossing": "firewall: FIREWALL-BODY-P 2"
+   },
+   "color": "red",
    "option": "BASE",
    "option_status": "base"
   },
@@ -17353,18 +17391,20 @@
    "id": "PCS_BRK",
    "label": "PCS 'Brake Light' digital input <- brake switch",
    "status": "implied",
-   "frm": "CHMSL (+ feed tap: 12 V while braking)",
+   "frm": "SPL-PDM30-OUT5 (brake lamp output tap)",
    "to": "PCS-HARNESS-4610 (brake light input lead)",
    "awg": 22,
    "spec": "M22759/16",
+   "control": "brake switch on PDM30 DIG14 (a tap of OUT5, #93)",
+   "color": "white",
+   "color_basis": "a brake-on SIGNAL tapped off the brake lamp output (a PCS / TCM input), not a power feed: white signal stock (state 0f(a), SIGNAL_RULE)",
    "sources": [
     "ZGP guide p.18"
    ],
    "conflicts": [
-    "decision: frm Brake light switch out -> CHMSL (+ feed tap: 12 V while braking) — ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.18 'Brake Light' digital input (TCC unlock on brake). The factory brake switch now switches 0 V into PDM30 DIG14 and no longer carries 12 V, so the brake-on 12 V comes from the brake lamp output (CHMSL feed); input polarity OPEN until the ZGP drawing",
-    "decision: to PCS digital input -> PCS-HARNESS-4610 (brake light input lead) — ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.18 'Brake Light' digital input (TCC unlock on brake). The factory brake switch now switches 0 V into PDM30 DIG14 and no longer carries 12 V, so the brake-on 12 V comes from the brake lamp output (CHMSL feed); input polarity OPEN until the ZGP drawing",
-    "decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm",
-    "decision: color None -> white — state 0f(a): 'One color per size + printed labels' — the cart carries white (-9) per size (M22759/32 22-9, 20-9, 18-9, 16-9, 14-9, 12-9); state 0i: Dave's white 22 AWG + colour-ring codes; chapters/18 step 2 one-colour prototype. VSS_DAK also matches the SEN-01-5 white signal lead (Dakota VHX manual p.8)"
+    "decision: frm Brake light switch out -> SPL-PDM30-OUT5 (brake lamp output tap) — ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.18 'Brake Light' digital input (TCC unlock on brake). The factory brake switch now switches 0 V into PDM30 DIG14 and no longer carries 12 V, so the brake-on 12 V comes from the brake lamp output: PDM30 OUT5 (#93 to the CHMSL, brake switch on DIG14), tapped at its pigtail splice SPL-PDM30-OUT5 in the cab (lead round 5: shorter than the CHMSL lead, same signal); input polarity OPEN until the ZGP drawing",
+    "decision: to PCS digital input -> PCS-HARNESS-4610 (brake light input lead) — ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.18 'Brake Light' digital input (TCC unlock on brake). The factory brake switch now switches 0 V into PDM30 DIG14 and no longer carries 12 V, so the brake-on 12 V comes from the brake lamp output: PDM30 OUT5 (#93 to the CHMSL, brake switch on DIG14), tapped at its pigtail splice SPL-PDM30-OUT5 in the cab (lead round 5: shorter than the CHMSL lead, same signal); input polarity OPEN until the ZGP drawing",
+    "decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm"
    ],
    "subsystem": "TRANS_6L90",
    "subsystem_basis": "6L90 + PCS TCM-2650 interface (receipt 2026-07-12; state 0j(b), §3 0a: the transmission is a 6L90)",
@@ -17372,18 +17412,16 @@
    "gauge": "22 AWG",
    "route": {
     "sides": [
-     "cab",
-     "outside"
+     "cab"
     ],
-    "crossing": "cab exit: through the body to the outside (path not recorded)"
+    "crossing": "none: both ends on one side"
    },
-   "color": "white",
    "option": "BASE",
    "option_status": "base"
   },
   {
    "id": "PCS_NS",
-   "label": "PCS lever-position ground out -> PDM crank-enable input",
+   "label": "PCS lever-position switched output (neutral) -> PDM crank-enable input",
    "status": "implied",
    "frm": "PCS-HARNESS-4610 (lever-position output lead: neutral)",
    "to": "PDM30:DIG11 (B20) crank enable, relayed to the engine PDM over CAN",
@@ -17395,7 +17433,7 @@
    "conflicts": [
     "decision: frm PCS PWM vs Lever Position -> PCS-HARNESS-4610 (lever-position output lead: neutral) — ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.19-20 ground-only outputs; endpoint PCS-TCM",
     "decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm",
-    "decision: color None -> black — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
+    "decision: color None -> white — state 0f(a): 'One color per size + printed labels' — the cart carries white (-9) per size (M22759/32 22-9, 20-9, 18-9, 16-9, 14-9, 12-9); state 0i: Dave's white 22 AWG + colour-ring codes; chapters/18 step 2 one-colour prototype. VSS_DAK also matches the SEN-01-5 white signal lead (Dakota VHX manual p.8)"
    ],
    "subsystem": "TRANS_6L90",
    "subsystem_basis": "6L90 + PCS TCM-2650 interface (receipt 2026-07-12; state 0j(b), §3 0a: the transmission is a 6L90)",
@@ -17407,13 +17445,13 @@
     ],
     "crossing": "none: both ends on one side"
    },
-   "color": "black",
+   "color": "white",
    "option": "BASE",
    "option_status": "base"
   },
   {
    "id": "PCS_REV",
-   "label": "PCS lever-position ground out -> PDM reverse-lamp input",
+   "label": "PCS lever-position switched output (reverse) -> PDM reverse-lamp input",
    "status": "implied",
    "frm": "PCS-HARNESS-4610 (lever-position output lead: reverse)",
    "to": "PDM30:DIG15 (B17) reverse",
@@ -17425,7 +17463,7 @@
    "conflicts": [
     "decision: frm PCS PWM vs Lever Position -> PCS-HARNESS-4610 (lever-position output lead: reverse) — ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.19-20 ground-only outputs; endpoint PCS-TCM",
     "decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm",
-    "decision: color None -> black — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
+    "decision: color None -> white — state 0f(a): 'One color per size + printed labels' — the cart carries white (-9) per size (M22759/32 22-9, 20-9, 18-9, 16-9, 14-9, 12-9); state 0i: Dave's white 22 AWG + colour-ring codes; chapters/18 step 2 one-colour prototype. VSS_DAK also matches the SEN-01-5 white signal lead (Dakota VHX manual p.8)"
    ],
    "subsystem": "TRANS_6L90",
    "subsystem_basis": "6L90 + PCS TCM-2650 interface (receipt 2026-07-12; state 0j(b), §3 0a: the transmission is a 6L90)",
@@ -17437,7 +17475,7 @@
     ],
     "crossing": "none: both ends on one side"
    },
-   "color": "black",
+   "color": "white",
    "option": "BASE",
    "option_status": "base"
   },
@@ -17466,7 +17504,11 @@
     "decision: color None -> red — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
    ],
    "color": "red",
-   "protection": "7.5 A mini/ATO inline fuse at the PDM30 battery stud (Holley 558-499 p.3: 'a constant battery source capable of supplying 5 amps'; 1.25 x 5 A = 6.25 A -> 7.5 A, under 18 AWG's 9 A at 100 C (MoTeC PDM manual p.48)). Holder and fuse part: OPEN — no inline holder is picked (a sealed ATO/ATC in-line holder sized to the wire; pick with the battery terminals)",
+   "protection": "7.5 A inline fuse at the PDM30 battery stud (Holley 558-499 p.3: 'a constant battery source capable of supplying 5 amps'; 1.25 x 5 A = 6.25 A -> 7.5 A, under 18 AWG's 11 A at 80 C (MoTeC PDM manual p.48, cab)). Holder: Blue Sea 5065 waterproof in-line ATO/ATC (BLUESEA-5065); fuse: BLUESEA-5240",
+   "protection_parts": {
+    "holder": "BLUESEA-5065",
+    "fuse": "BLUESEA-5240"
+   },
    "option": "BASE",
    "option_status": "base"
   },
@@ -17474,12 +17516,12 @@
    "id": "TRANS_GND",
    "label": "6L90 case ground (case cavities 2 + 5)",
    "status": "implied",
-   "frm": "PCS-HARNESS-4610 (case ground lead, cavities 2 + 5)",
-   "to": "GND-BANK-CAB (cab ground bank beside the PDM30)",
+   "frm": "PCS-HARNESS-4610-CASE (case ground lead, cavities 2 + 5)",
+   "to": "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)",
    "awg": 18,
    "spec": "M22759/32",
    "sources": [
-    "EFI Connection 6L80E/6L90E T43 case connector pigtail, GM 15131300 / 19303772 (web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md): cavities 2 and 5 BLK/WHT 18 GA GROUND; Holley 558-499 instructions (reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf) p.3: ground to a good chassis/engine ground; owner 2026-09-27: grounds run in the loom to the banks (state row 56)"
+    "EFI Connection 6L80E/6L90E T43 case connector pigtail, GM 15131300 / 19303772 (web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md): cavities 2 and 5 BLK/WHT 18 GA GROUND; Holley 558-499 instructions (reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf) p.3: ground to a good chassis/engine ground (p.3) -> the engine ground star, from the kit's case-side ground lead along the kit's route (route OPEN at the mock-up); owner 2026-09-27: grounds run in the loom to the banks (state row 56)"
    ],
    "subsystem": "TRANS_6L90",
    "subsystem_basis": "6L90 + PCS TCM-2650 interface (receipt 2026-07-12; state 0j(b), §3 0a: the transmission is a 6L90)",
@@ -17487,9 +17529,10 @@
    "gauge": "18 AWG",
    "route": {
     "sides": [
-     "cab"
+     "engine bay",
+     "outside"
     ],
-    "crossing": "none: both ends on one side"
+    "crossing": "none: engine bay to outside along the frame, no firewall"
    },
    "conflicts": [
     "decision: color None -> black — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
@@ -17530,12 +17573,15 @@
    "id": "TRANS_BRK",
    "label": "6L90 case stop-lamp input (case cavity 6) <- brake lamp tap",
    "status": "implied",
-   "frm": "CHMSL (+ feed tap: 12 V while braking)",
+   "frm": "SPL-PDM30-OUT5 (brake lamp output tap)",
    "to": "PCS-HARNESS-4610 (case stop-lamp lead, cavity 6)",
    "awg": 22,
    "spec": "M22759/16",
+   "control": "brake switch on PDM30 DIG14 (a tap of OUT5, #93)",
+   "color": "white",
+   "color_basis": "a brake-on SIGNAL tapped off the brake lamp output (a PCS / TCM input), not a power feed: white signal stock (state 0f(a), SIGNAL_RULE)",
    "sources": [
-    "EFI Connection 6L80E/6L90E T43 case connector pigtail, GM 15131300 / 19303772 (web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md): cavity 6 WHT 22 GA STOP LAMP SWITCH SIGNAL; Holley 558-499 instructions (reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf) p.3: brake input 'must be installed to a +12v source (as most brake light switches are)'; the factory brake switch now switches 0 V into PDM30 DIG14, so the 12 V comes from the brake lamp output, the same tap as PCS_BRK"
+    "EFI Connection 6L80E/6L90E T43 case connector pigtail, GM 15131300 / 19303772 (web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md): cavity 6 WHT 22 GA STOP LAMP SWITCH SIGNAL; Holley 558-499 instructions (reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf) p.3: brake input 'must be installed to a +12v source (as most brake light switches are)'; the factory brake switch now switches 0 V into PDM30 DIG14, so the 12 V comes from the brake lamp output, PDM30 OUT5 (#93, brake switch on DIG14), tapped at its pigtail splice in the cab (SPL-PDM30-OUT5), the same tap as PCS_BRK: shorter than the CHMSL lead at the back of the truck, same signal"
    ],
    "subsystem": "TRANS_6L90",
    "subsystem_basis": "6L90 + PCS TCM-2650 interface (receipt 2026-07-12; state 0j(b), §3 0a: the transmission is a 6L90)",
@@ -17543,15 +17589,10 @@
    "gauge": "22 AWG",
    "route": {
     "sides": [
-     "cab",
-     "outside"
+     "cab"
     ],
-    "crossing": "cab exit: through the body to the outside (path not recorded)"
+    "crossing": "none: both ends on one side"
    },
-   "conflicts": [
-    "decision: color None -> white — state 0f(a): 'One color per size + printed labels' — the cart carries white (-9) per size (M22759/32 22-9, 20-9, 18-9, 16-9, 14-9, 12-9); state 0i: Dave's white 22 AWG + colour-ring codes; chapters/18 step 2 one-colour prototype. VSS_DAK also matches the SEN-01-5 white signal lead (Dakota VHX manual p.8)"
-   ],
-   "color": "white",
    "option": "BASE",
    "option_status": "base"
   },
@@ -19259,7 +19300,7 @@
     "crossing": "none: both ends on one side"
    },
    "color": "red",
-   "pdm_limit": "PDM30 OUT21: OPEN: needs the PCS TCM-2650 ignition current (ZGP harness drawing / guide; the kit may also feed case 9/12 from this lead). PL (candidate) conflict: the locks (AutoLoc AUTZT2000 4.5 A x 2 on one bus) held OUT21 before the PCS moved into the cab; PL needs another output",
+   "pdm_limit": "PDM30 OUT21: CONFLICT: needs 12 A per output, the thinnest conductor allows 10 A (0.85 x 15 A, PDM manual p.48 / ProWire tables) — a heavier wire or pigtail closes it",
    "option": "PL",
    "option_status": "candidate"
   },
@@ -22151,7 +22192,11 @@
     "decision: color None -> red — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
    ],
    "color": "red",
-   "protection": "10 A inline fuse at the Odyssey + (Blue Sea 7700 instructions 990180170-006 p.2: 'through a 10A (min) circuit protection device'). Holder and fuse part: OPEN — no inline holder is picked (a sealed ATO/ATC in-line holder sized to the wire; pick with the battery terminals)",
+   "protection": "10 A inline fuse at the Odyssey + (Blue Sea 7700 instructions 990180170-006 p.2: 'through a 10A (min) circuit protection device'). Holder: Blue Sea 5065 waterproof in-line ATO/ATC (BLUESEA-5065); fuse: BLUESEA-5241",
+   "protection_parts": {
+    "holder": "BLUESEA-5065",
+    "fuse": "BLUESEA-5241"
+   },
    "option": "BASE",
    "option_status": "base"
   },
@@ -22296,7 +22341,11 @@
     "decision: color None -> red — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
    ],
    "color": "red",
-   "protection": "5 A inline fuse at the Odyssey + (Blue Sea 7700 instructions p.2: pin 2 'through a 2A (min) circuit protection device'; 5 A under the 16 AWG rating). Holder and fuse part: OPEN — no inline holder is picked (a sealed ATO/ATC in-line holder sized to the wire; pick with the battery terminals)",
+   "protection": "5 A inline fuse at the Odyssey + (Blue Sea 7700 instructions p.2: pin 2 'through a 2A (min) circuit protection device'; 5 A under the 16 AWG rating). Holder: Blue Sea 5065 waterproof in-line ATO/ATC (BLUESEA-5065); fuse: BLUESEA-5239",
+   "protection_parts": {
+    "holder": "BLUESEA-5065",
+    "fuse": "BLUESEA-5239"
+   },
    "option": "BASE",
    "option_status": "base"
   },
@@ -22786,7 +22835,11 @@
     "decision: color None -> red — state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / 0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's"
    ],
    "color": "red",
-   "protection": "5 A inline fuse at the distribution stud (fastandquiet Gen-1 pinout: pin 17 'Always Hot Power (5A Fuse)'; Tulay Gen-1 harness 1.50 mm² red, 5 A fuse). Holder and fuse part: OPEN — no inline holder is picked (a sealed ATO/ATC in-line holder sized to the wire; pick with the battery terminals)",
+   "protection": "5 A inline fuse at the distribution stud (fastandquiet Gen-1 pinout (web_snapshots/www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md): 'M 17 - Always Hot Power (5A Fuse)'; Tulay Gen-1 harness (web_snapshots/tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md): 1.50 mm² red, 5 A fuse). Holder: Blue Sea 5065 waterproof in-line ATO/ATC (BLUESEA-5065); fuse: BLUESEA-5239",
+   "protection_parts": {
+    "holder": "BLUESEA-5065",
+    "fuse": "BLUESEA-5239"
+   },
    "option": "BASE",
    "option_status": "base"
   },
@@ -23838,8 +23891,8 @@
    "source": "K5_WIRING_STATE.md row 33"
   },
   "device_end_coverage": {
-   "mapped": 515,
-   "wire_ends": 545,
+   "mapped": 517,
+   "wire_ends": 547,
    "endpoints_without_pin_map": [
     "AC-HP-SW",
     "AC-LP-SW",
@@ -23863,16 +23916,15 @@
    "ISO_KILL",
    "DAK_CONST",
    "PCS_BATT",
+   "PCS_IGN_PT",
    "PCS_IGN",
    "PCS_TPS",
    "PCS_RPM",
-   "PCS_BRK",
    "PCS_NS",
    "PCS_REV",
    "TRANS_BATT",
    "TRANS_GND",
    "PCS_GND",
-   "TRANS_BRK",
    "FUEL_SND_LEAD",
    "FAN_PWM",
    "IGN_RUN_B",
@@ -24036,6 +24088,10 @@
    ],
    "M22759/16 22 AWG brown": [
     "UTC_0V"
+   ],
+   "M22759/16 22 AWG white": [
+    "PCS_BRK",
+    "TRANS_BRK"
    ],
    "M22759/32 12 AWG red": [
     "FAN_LEG1",
@@ -24478,7 +24534,6 @@
     "CAN_HI",
     "CAN_LO",
     "UTC_0V",
-    "PCS_IGN",
     "PCS_NS",
     "PCS_REV",
     "CAN_FW_H",
@@ -24516,7 +24571,6 @@
     "CAN_HI": "B26",
     "CAN_LO": "B25",
     "UTC_0V": "B22",
-    "PCS_IGN": "B1",
     "PCS_NS": "B20",
     "PCS_REV": "B17",
     "CAN_FW_H": "B26",
@@ -24594,6 +24648,7 @@
     "23",
     "105",
     "111",
+    "PCS_IGN_PT",
     "PDM15_GND1",
     "AC_LP_0V",
     "AC_HP_0V",
@@ -24614,6 +24669,7 @@
     "23": "A6",
     "105": "A21",
     "111": "A30",
+    "PCS_IGN_PT": "A11",
     "PDM15_GND1": "A26",
     "AC_LP_0V": "A28",
     "AC_HP_0V": "A28",
@@ -24855,7 +24911,9 @@
    "wires": [
     "93_PT1",
     "93_PT2",
-    "93"
+    "93",
+    "PCS_BRK",
+    "TRANS_BRK"
    ],
    "cavities": null,
    "empty": null,
@@ -26050,15 +26108,11 @@
    "kit": {},
    "wires": [
     "93",
-    "CHMSL_GND",
-    "PCS_BRK",
-    "TRANS_BRK"
+    "CHMSL_GND"
    ],
    "cavities": {
     "93": "+ feed (Oracle 4514-003 power connector; type read on arrival)",
-    "CHMSL_GND": "- ground",
-    "PCS_BRK": "+ feed tap for the PCS brake input (spliced with #93 at the lamp lead)",
-    "TRANS_BRK": "+ feed tap for the 6L90 case stop-lamp input, cavity 6 (spliced with #93 at the lamp lead)"
+    "CHMSL_GND": "- ground"
    },
    "empty": null,
    "doubled": null,
@@ -28036,7 +28090,6 @@
     "stud sizes: starter + alternator 5/16 in is the build book's assumption; isolator studs are 3/8 in-16 (Blue Sea 7700), so 238LTP fits them",
     "lug torque per stud: isolator 140 in-lb max (Blue Sea 7700 instructions p.1-2); the others UNKNOWN (datasheets)",
     "a fused branch lands on its holder's stud, not the 3/8 in distribution stud: MEGA holder 02980900TXN = M8 (2516LTP for 2 AWG), MIDI holder 0498900.TXN = M5 (810TP for 8 AWG, 410LTP for 4 AWG) — stud sizes from the 2026-09-25 cart receipt; the Littelfuse holder datasheets are not on file",
-    "PCS_BATT 5 A fused tap: the holder is not picked (MIDI starts at 30 A, chapters/17 §17.2 item 9); ring PN OPEN (RING-SMALL)",
     "PDM15_BPOS fuse: MEGA 100 A (PDM15 80 A total continuous x 1.25, MoTeC PDM manual p.35; chapters/17 §17.5 item 5) — part number not on file (MEGA-100A)"
    ],
    "sources": [
@@ -28571,16 +28624,17 @@
     "WP-4P": 1,
     "WP-4S": 1,
     "DTP4P-L012-GKT": 1,
-    "114017": 6
+    "114017": 4
    },
    "wires": [
-    "BLOWER_HI"
+    "BLOWER_HI",
+    "PCS_IGN"
    ],
    "cavities": {
-    "BLOWER_HI": "1"
+    "BLOWER_HI": "1",
+    "PCS_IGN": "2"
    },
    "empty": [
-    "2",
     "3",
     "4"
    ],
@@ -28591,11 +28645,11 @@
    ],
    "out_of_range": [],
    "pigtailed": [],
-   "note": "1 of 4 used; cavities 2-4 spare, closed with a 114017 sealing plug in each half (3 in the receptacle, 3 in the plug)",
+   "note": "2 of 4 used (BLOWER_HI, PCS_IGN 14 AWG); cavities 3-4 spare, closed with a 114017 sealing plug in each half",
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
-    "3 spare cavities (body power feeds 12-14 AWG)"
+    "2 spare cavities (body power feeds 12-14 AWG)"
    ],
    "sources": [
     "web_snapshots/www.customconnectorkits.com__dtp04-4p-l012.md ('DTP 4 Way Gray Receptacle Connector with Flange Mount'; 'Accepts size 12 pins'; related 0460-204-12141, DTP06-4S, DTP4P-L012-GKT, WP-4P)",
@@ -28969,7 +29023,7 @@
    "side": "engine bay"
   },
   "BLOWER-RES": {
-   "device": "factory Four-Season blower resistor on the evaporator case — 4 terminals BAT / M1 / M2 / BLO (1978 C60 plug cavities 51 / 63 / 72 / 101; the '3 prongs' of the forum threads is superseded)",
+   "device": "factory Four-Season blower resistor on the evaporator case — 4 terminals BAT / M1 / M2 / BLO (1978 C60 factory circuits 51 / 63 / 72 / 101 — circuit numbers, not cavity names; the '3 prongs' of the forum threads is superseded)",
    "where": "engine",
    "family": "gm_blade",
    "kit": {},
@@ -28980,10 +29034,10 @@
     "BLOWER_MOT"
    ],
    "cavities": {
-    "BLOWER_BAT": "BAT terminal (factory circuit 51; low: BATT-R1-R2-R3)",
-    "BLOWER_MED": "63 (M1: M1-R2-R3-blower)",
-    "BLOWER_M2": "72 (M2: M2-R3-blower)",
-    "BLOWER_MOT": "101 (BLO output; factory: to the blower relay)"
+    "BLOWER_BAT": "BAT (factory circuit 51; low: BATT-R1-R2-R3)",
+    "BLOWER_MED": "M1 (factory circuit 63; M1-R2-R3-blower)",
+    "BLOWER_M2": "M2 (factory circuit 72; M2-R3-blower)",
+    "BLOWER_MOT": "BLO (factory circuit 101; output, factory: to the blower relay)"
    },
    "empty": null,
    "doubled": null,
@@ -28993,7 +29047,7 @@
    ],
    "out_of_range": [],
    "pigtailed": [],
-   "note": "maker's document: factory A/C blower resistor on the evaporator case: FOUR terminals (BAT / M1 / M2 / BLO), 1978 C60 plug cavities 51 / 63 / 72 / 101 · family gm_blade: the 1978 booklet draws GM factory blade connectors here (4-cavity resistor plug 51/72/63/101, 1978 booklet p.16 sheet A-4 'Air Conditioning RPO C-60'); the Packard 56-series identity is the family's (families.yaml), not printed on the drawing",
+   "note": "maker's document: factory A/C blower resistor on the evaporator case: FOUR terminals (BAT / M1 / M2 / BLO), 1978 C60 factory circuits 51 / 63 / 72 / 101 (circuit numbers, not cavity names) · family gm_blade: the 1978 booklet draws GM factory blade connectors here (4-cavity resistor plug 51/72/63/101, 1978 booklet p.16 sheet A-4 'Air Conditioning RPO C-60'); the Packard 56-series identity is the family's (families.yaml), not printed on the drawing",
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
@@ -29062,12 +29116,12 @@
     "IBST_CAN_L"
    ],
    "cavities": {
-    "52": "4.00 mm² red lead, housing pin 1 (always hot, 40 A)",
-    "IBOOST_PERM": "1.50 mm² red lead, housing pin 17 (always hot, 5 A; medium blade)",
-    "IBOOST_WAKE": "0.50 mm² green lead, housing pin 20 (ignition, 5 A)",
-    "IBOOST_GND": "4.00 mm² black lead, housing pin 9 (chassis ground)",
-    "IBST_CAN_H": "housing pin 16, vehicle CAN high (CANDIDATE IBST-CAN): not needed for basic operation and not a Tulay loose lead — a terminal goes into the Tulay-assembled plug: OPEN",
-    "IBST_CAN_L": "housing pin 25, vehicle CAN low (CANDIDATE IBST-CAN): not a Tulay loose lead — OPEN"
+    "52": "4.00 mm² red lead, housing pin 1 (always hot, 40 A) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]",
+    "IBOOST_PERM": "1.50 mm² red lead, housing pin 17 (always hot, 5 A; medium blade) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]",
+    "IBOOST_WAKE": "0.50 mm² green lead, housing pin 20 (ignition, 5 A) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]",
+    "IBOOST_GND": "4.00 mm² black lead, housing pin 9 (chassis ground) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]",
+    "IBST_CAN_H": "housing pin 16, vehicle CAN high (CANDIDATE IBST-CAN): not needed for basic operation and not a Tulay loose lead — a terminal goes into the Tulay-assembled plug: OPEN [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md]",
+    "IBST_CAN_L": "housing pin 25, vehicle CAN low (CANDIDATE IBST-CAN): not a Tulay loose lead — OPEN [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md]"
    },
    "empty": null,
    "doubled": null,
@@ -29126,7 +29180,8 @@
     "FAN_GND",
     "DCDC_GND",
     "AMP_GND",
-    "IBOOST_GND"
+    "IBOOST_GND",
+    "TRANS_GND"
    ],
    "cavities": null,
    "empty": null,
@@ -29893,7 +29948,6 @@
     "TCASE_SW_GND",
     "WIPER_SW_GND",
     "PCS_GND",
-    "TRANS_GND",
     "GND_RET_REAR"
    ],
    "cavities": null,
@@ -30808,12 +30862,11 @@
     "PCS_REV",
     "PCS_GND",
     "TRANS_BATT",
-    "TRANS_GND",
     "TRANS_BRK"
    ],
    "cavities": {
     "PCS_BATT": "12 V battery lead (lead label OPEN until the TCM-4610 drawing)",
-    "PCS_IGN": "ignition lead (lead label OPEN until the TCM-4610 drawing)",
+    "PCS_IGN": "ignition lead (lead label and gauge OPEN until the TCM-4610 drawing; PCS_IGN arrives 14 AWG through bulkhead P and steps down at a splice if the lead is smaller)",
     "PCS_TPS": "analog 1 lead (lead label OPEN until the TCM-4610 drawing)",
     "PCS_RPM": "speed input 3 lead, orange/black (ZGP p.11)",
     "PCS_BRK": "brake light input lead (lead label OPEN until the TCM-4610 drawing)",
@@ -30821,7 +30874,6 @@
     "PCS_REV": "lever-position output lead, reverse (lead label OPEN until the TCM-4610 drawing)",
     "PCS_GND": "PCS ground lead (lead label OPEN until the TCM-4610 drawing)",
     "TRANS_BATT": "case battery lead to cavities 1 + 4 (whether the kit brings it out apart from the PCS battery: OPEN until the TCM-4610 drawing)",
-    "TRANS_GND": "case ground lead to cavities 2 + 5 (OPEN until the TCM-4610 drawing)",
     "TRANS_BRK": "case stop-lamp lead to cavity 6 (whether the kit brings it out: OPEN until the TCM-4610 drawing)"
    },
    "empty": null,
@@ -30835,7 +30887,7 @@
    "open": [
     "kit harness path from the cab to the case connector (floor pass-through, its grommet): the kit's own run, set at the mock-up",
     "TCM-4610 harness drawing: lead labels, which case cavities come out as leads (1+4, 2+5, 3, 6, 7, 16), and whether PCS_BATT also feeds case 1+4 (research §5) — ask ZGP/PSI or read the harness label when it arrives",
-    "PCS_IGN on PDM15 OUT13 also feeds case 9/12 if the kit ties them to its ignition lead: that output's load is OPEN"
+    "OPEN until the TCM-4610 drawing: does the kit feed case 12 / 9 from the PCS ignition lead (then PDM15 OUT13 carries their wake current)"
    ],
    "sources": [
     "web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md ('6l80e 6l90e TCM4610 Harness only'; 'This is the harness only and does not include the controller'; TCM2650-4610)",
@@ -30844,6 +30896,36 @@
    "splice_point": null,
    "range_by_wire": null,
    "side": "cab"
+  },
+  "PCS-HARNESS-4610-CASE": {
+   "device": "PCS TCM-4610 kit harness, case-side ground lead (case cavities 2 + 5) — the kit's run from the cab to the case connector under the truck",
+   "where": "chassis",
+   "family": "kit_terminal",
+   "kit": {},
+   "wires": [
+    "TRANS_GND"
+   ],
+   "cavities": {
+    "TRANS_GND": "case ground lead, cavities 2 + 5 (whether the kit brings it out: OPEN until the TCM-4610 drawing)"
+   },
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": null,
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [
+    "the kit's route from the cab to the case, and where its case-side ground lead leaves it: set at the mock-up"
+   ],
+   "sources": [
+    "reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf p.3 (ground to a good chassis/engine ground)",
+    "web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md (cavities 2, 5 BLK/WHT 18 GA GROUND)"
+   ],
+   "splice_point": null,
+   "range_by_wire": null,
+   "side": "outside"
   },
   "TRANS-CASE": {
    "device": "6L90 external case connector: Kostal 16-cavity, GM 15131300 / 19303772 — the only external connector; solenoids, pressure switches, speed sensors, fluid temperature and the range switch are inside the case on the TEHCM",
@@ -30861,6 +30943,7 @@
    "branch_wires_missing": 0,
    "unknown_wire_ids": [],
    "open": [
+    "OPEN until the TCM-4610 drawing: does the kit feed case 12 (switched ignition) and case 9 (accessory) from the PCS ignition lead — if it does, PCS_IGN's load (PDM15 OUT13) includes them",
     "Dakota SPD / GEAR substitution from case 16 or the PCS outputs: pulses per mile and VHX input acceptance (research §4); #100 stays until then",
     "tap up/down (case 7): shifter buttons not picked"
    ],
@@ -30877,8 +30960,8 @@
     "4": "12 V battery, RED/WHT 18 GA — TRANS_BATT via the kit",
     "2": "ground, BLK/WHT 18 GA — TRANS_GND via the kit",
     "5": "ground, BLK/WHT 18 GA — TRANS_GND via the kit",
-    "12": "12 V switched ignition, PNK 20 GA — inside the kit",
-    "9": "12 V accessory, YEL 20 GA — inside the kit",
+    "12": "12 V switched ignition, PNK 20 GA — wakes the internal TCM; OPEN until the TCM-4610 drawing: does the kit feed case 12 from the PCS ignition lead (then PCS_IGN / PDM15 OUT13 carries it)",
+    "9": "12 V accessory, YEL 20 GA — wakes the internal TCM; OPEN until the TCM-4610 drawing: does the kit feed case 9 from the PCS ignition lead (then PCS_IGN / PDM15 OUT13 carries it)",
     "10": "CAN+ (GMLAN high), TAN/BLK 20 GA — PCS-T43 private bus, inside the kit",
     "14": "CAN+, TAN/BLK 20 GA — inside the kit",
     "15": "CAN+, 120 ohm applied, TAN/BLK 20 GA — inside the kit",
@@ -31171,6 +31254,36 @@
    "sources": [
     "web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md",
     "web_snapshots/www.prowireusa.com__p-1509-hi-temp-ring-term-12-10-3-8.md"
+   ],
+   "splice_point": null,
+   "range_by_wire": null,
+   "side": "engine bay"
+  },
+  "SPL-PDM15-OUT13": {
+   "device": "PCS ignition step-up splice by the PDM15: the 20 AWG OUT13 pin lead (PCS_IGN_PT) and the 14 AWG run through bulkhead P (PCS_IGN) in a stub splice",
+   "where": "engine",
+   "family": "miniseal",
+   "kit": {},
+   "wires": [
+    "PCS_IGN_PT",
+    "PCS_IGN"
+   ],
+   "cavities": null,
+   "empty": null,
+   "doubled": null,
+   "range": [
+    26,
+    12
+   ],
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "stub splice: 20 AWG (1,020 CM) + 14 AWG (4,110 CM) = 5,130 CM, the 16-12 AWG cavity band (ProWire 3137CT)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "MoTeC PDM user manual p.9 (8 A outputs 24#-20#)",
+    "ProWire 3137CT cavities 26-20 / 20-16 / 16-12 AWG"
    ],
    "splice_point": null,
    "range_by_wire": null,
@@ -32529,16 +32642,6 @@
    "doubled": null
   },
   {
-   "wire": "PCS_IGN",
-   "endpoint": "PDM30-B",
-   "where": "cabin",
-   "cavity": "B1",
-   "factory_circuit": null,
-   "part": "SSC-N",
-   "family": "ssc",
-   "doubled": null
-  },
-  {
    "wire": "LOCK_FEED_R",
    "endpoint": "PDM30-B",
    "where": "cabin",
@@ -32892,9 +32995,9 @@
    "wire": "DAK_CONST",
    "endpoint": "PDM30-STUD",
    "where": "cabin",
-   "cavity": "stud, lug 9904",
+   "cavity": "stud, lug 9916",
    "factory_circuit": null,
-   "part": "9904",
+   "part": "9916",
    "family": "lug",
    "doubled": null
   },
@@ -32902,9 +33005,9 @@
    "wire": "PCS_BATT",
    "endpoint": "PDM30-STUD",
    "where": "cabin",
-   "cavity": "stud, lug 9904",
+   "cavity": "stud, lug 9916",
    "factory_circuit": null,
-   "part": "9904",
+   "part": "9916",
    "family": "lug",
    "doubled": null
   },
@@ -32912,9 +33015,9 @@
    "wire": "TRANS_BATT",
    "endpoint": "PDM30-STUD",
    "where": "cabin",
-   "cavity": "stud, lug 9904",
+   "cavity": "stud, lug 9916",
    "factory_circuit": null,
-   "part": "9904",
+   "part": "9916",
    "family": "lug",
    "doubled": null
   },
@@ -32933,6 +33036,16 @@
    "endpoint": "PDM15-A",
    "where": "engine",
    "cavity": "A10",
+   "factory_circuit": null,
+   "part": "SSC-N",
+   "family": "ssc",
+   "doubled": null
+  },
+  {
+   "wire": "PCS_IGN_PT",
+   "endpoint": "PDM15-A",
+   "where": "engine",
+   "cavity": "A11",
    "factory_circuit": null,
    "part": "SSC-N",
    "family": "ssc",
@@ -33323,6 +33436,26 @@
    "endpoint": "SPL-PDM30-OUT5",
    "where": "cabin",
    "cavity": "splice 3",
+   "factory_circuit": null,
+   "part": "rail splice (in the kit)",
+   "family": "miniseal",
+   "doubled": null
+  },
+  {
+   "wire": "PCS_BRK",
+   "endpoint": "SPL-PDM30-OUT5",
+   "where": "cabin",
+   "cavity": "splice 4",
+   "factory_circuit": null,
+   "part": "rail splice (in the kit)",
+   "family": "miniseal",
+   "doubled": null
+  },
+  {
+   "wire": "TRANS_BRK",
+   "endpoint": "SPL-PDM30-OUT5",
+   "where": "cabin",
+   "cavity": "splice 5",
    "factory_circuit": null,
    "part": "rail splice (in the kit)",
    "family": "miniseal",
@@ -34413,26 +34546,6 @@
    "endpoint": "CHMSL",
    "where": "rear",
    "cavity": "- ground",
-   "factory_circuit": null,
-   "part": "open (connector not picked)",
-   "family": "open",
-   "doubled": null
-  },
-  {
-   "wire": "PCS_BRK",
-   "endpoint": "CHMSL",
-   "where": "rear",
-   "cavity": "+ feed tap for the PCS brake input (spliced with #93 at the lamp lead)",
-   "factory_circuit": null,
-   "part": "open (connector not picked)",
-   "family": "open",
-   "doubled": null
-  },
-  {
-   "wire": "TRANS_BRK",
-   "endpoint": "CHMSL",
-   "where": "rear",
-   "cavity": "+ feed tap for the 6L90 case stop-lamp input, cavity 6 (spliced with #93 at the lamp lead)",
    "factory_circuit": null,
    "part": "open (connector not picked)",
    "family": "open",
@@ -36892,9 +37005,9 @@
    "wire": "IBOOST_PERM",
    "endpoint": "PS-STUDS",
    "where": "engine",
-   "cavity": "stud, lug RING-SMALL",
+   "cavity": "stud, lug 9918",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "9918",
    "family": "lug",
    "doubled": null
   },
@@ -37859,6 +37972,16 @@
    "doubled": null
   },
   {
+   "wire": "PCS_IGN",
+   "endpoint": "FIREWALL-BODY-P",
+   "where": "firewall",
+   "cavity": "2",
+   "factory_circuit": null,
+   "part": "0460-204-12141",
+   "family": "dtp",
+   "doubled": null
+  },
+  {
    "wire": "85a",
    "endpoint": "HEADLIGHT-L",
    "where": "engine",
@@ -38122,7 +38245,7 @@
    "wire": "BLOWER_BAT",
    "endpoint": "BLOWER-RES",
    "where": "engine",
-   "cavity": "BAT terminal",
+   "cavity": "BAT",
    "factory_circuit": "factory circuit 51; low: BATT-R1-R2-R3",
    "part": "OPEN: Packard 56-series terminal by gauge",
    "family": "gm_blade",
@@ -38132,8 +38255,8 @@
    "wire": "BLOWER_MED",
    "endpoint": "BLOWER-RES",
    "where": "engine",
-   "cavity": "63 (M1: M1-R2-R3-blower)",
-   "factory_circuit": null,
+   "cavity": "M1",
+   "factory_circuit": "factory circuit 63; M1-R2-R3-blower",
    "part": "OPEN: Packard 56-series terminal by gauge",
    "family": "gm_blade",
    "doubled": null
@@ -38142,8 +38265,8 @@
    "wire": "BLOWER_M2",
    "endpoint": "BLOWER-RES",
    "where": "engine",
-   "cavity": "72 (M2: M2-R3-blower)",
-   "factory_circuit": null,
+   "cavity": "M2",
+   "factory_circuit": "factory circuit 72; M2-R3-blower",
    "part": "OPEN: Packard 56-series terminal by gauge",
    "family": "gm_blade",
    "doubled": null
@@ -38152,8 +38275,8 @@
    "wire": "BLOWER_MOT",
    "endpoint": "BLOWER-RES",
    "where": "engine",
-   "cavity": "101",
-   "factory_circuit": "BLO output; factory: to the blower relay",
+   "cavity": "BLO",
+   "factory_circuit": "factory circuit 101; output, factory: to the blower relay",
    "part": "OPEN: Packard 56-series terminal by gauge",
    "family": "gm_blade",
    "doubled": null
@@ -38192,7 +38315,7 @@
    "wire": "52",
    "endpoint": "IBOOSTER",
    "where": "engine",
-   "cavity": "4.00 mm² red lead, housing pin 1 (always hot, 40 A)",
+   "cavity": "4.00 mm² red lead, housing pin 1 (always hot, 40 A) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]",
    "factory_circuit": null,
    "part": "open (connector not picked)",
    "family": "open",
@@ -38202,7 +38325,7 @@
    "wire": "IBOOST_PERM",
    "endpoint": "IBOOSTER",
    "where": "engine",
-   "cavity": "1.50 mm² red lead, housing pin 17 (always hot, 5 A; medium blade)",
+   "cavity": "1.50 mm² red lead, housing pin 17 (always hot, 5 A; medium blade) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]",
    "factory_circuit": null,
    "part": "open (connector not picked)",
    "family": "open",
@@ -38212,7 +38335,7 @@
    "wire": "IBOOST_WAKE",
    "endpoint": "IBOOSTER",
    "where": "engine",
-   "cavity": "0.50 mm² green lead, housing pin 20 (ignition, 5 A)",
+   "cavity": "0.50 mm² green lead, housing pin 20 (ignition, 5 A) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]",
    "factory_circuit": null,
    "part": "open (connector not picked)",
    "family": "open",
@@ -38222,7 +38345,7 @@
    "wire": "IBOOST_GND",
    "endpoint": "IBOOSTER",
    "where": "engine",
-   "cavity": "4.00 mm² black lead, housing pin 9 (chassis ground)",
+   "cavity": "4.00 mm² black lead, housing pin 9 (chassis ground) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]",
    "factory_circuit": null,
    "part": "open (connector not picked)",
    "family": "open",
@@ -38232,7 +38355,7 @@
    "wire": "IBST_CAN_H",
    "endpoint": "IBOOSTER",
    "where": "engine",
-   "cavity": "housing pin 16, vehicle CAN high (CANDIDATE IBST-CAN): not needed for basic operation and not a Tulay loose lead — a terminal goes into the Tulay-assembled plug: OPEN",
+   "cavity": "housing pin 16, vehicle CAN high (CANDIDATE IBST-CAN): not needed for basic operation and not a Tulay loose lead — a terminal goes into the Tulay-assembled plug: OPEN [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md]",
    "factory_circuit": null,
    "part": "open (connector not picked)",
    "family": "open",
@@ -38242,7 +38365,7 @@
    "wire": "IBST_CAN_L",
    "endpoint": "IBOOSTER",
    "where": "engine",
-   "cavity": "housing pin 25, vehicle CAN low (CANDIDATE IBST-CAN): not a Tulay loose lead — OPEN",
+   "cavity": "housing pin 25, vehicle CAN low (CANDIDATE IBST-CAN): not a Tulay loose lead — OPEN [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md]",
    "factory_circuit": null,
    "part": "open (connector not picked)",
    "family": "open",
@@ -38475,6 +38598,16 @@
    "cavity": "ring 23",
    "factory_circuit": null,
    "part": "638TP",
+   "family": "ring_small",
+   "doubled": null
+  },
+  {
+   "wire": "TRANS_GND",
+   "endpoint": "GND-BANK-ENG",
+   "where": "engine",
+   "cavity": "ring 24",
+   "factory_circuit": null,
+   "part": "9906",
    "family": "ring_small",
    "doubled": null
   },
@@ -39219,20 +39352,10 @@
    "doubled": null
   },
   {
-   "wire": "TRANS_GND",
-   "endpoint": "GND-BANK-CAB",
-   "where": "cabin",
-   "cavity": "ring 21",
-   "factory_circuit": null,
-   "part": "9906",
-   "family": "ring_small",
-   "doubled": null
-  },
-  {
    "wire": "GND_RET_REAR",
    "endpoint": "GND-BANK-CAB",
    "where": "cabin",
-   "cavity": "ring 22",
+   "cavity": "ring 21",
    "factory_circuit": null,
    "part": "9918",
    "family": "ring_small",
@@ -40162,7 +40285,7 @@
    "wire": "PCS_IGN",
    "endpoint": "PCS-HARNESS-4610",
    "where": "cabin",
-   "cavity": "ignition lead (lead label OPEN until the TCM-4610 drawing)",
+   "cavity": "ignition lead (lead label and gauge OPEN until the TCM-4610 drawing; PCS_IGN arrives 14 AWG through bulkhead P and steps down at a splice if the lead is smaller)",
    "factory_circuit": null,
    "part": "kit terminal + seal",
    "family": "kit_terminal",
@@ -40239,20 +40362,20 @@
    "doubled": null
   },
   {
-   "wire": "TRANS_GND",
+   "wire": "TRANS_BRK",
    "endpoint": "PCS-HARNESS-4610",
    "where": "cabin",
-   "cavity": "case ground lead to cavities 2 + 5 (OPEN until the TCM-4610 drawing)",
+   "cavity": "case stop-lamp lead to cavity 6 (whether the kit brings it out: OPEN until the TCM-4610 drawing)",
    "factory_circuit": null,
    "part": "kit terminal + seal",
    "family": "kit_terminal",
    "doubled": null
   },
   {
-   "wire": "TRANS_BRK",
-   "endpoint": "PCS-HARNESS-4610",
-   "where": "cabin",
-   "cavity": "case stop-lamp lead to cavity 6 (whether the kit brings it out: OPEN until the TCM-4610 drawing)",
+   "wire": "TRANS_GND",
+   "endpoint": "PCS-HARNESS-4610-CASE",
+   "where": "chassis",
+   "cavity": "case ground lead, cavities 2 + 5 (whether the kit brings it out: OPEN until the TCM-4610 drawing)",
    "factory_circuit": null,
    "part": "kit terminal + seal",
    "family": "kit_terminal",
@@ -40539,6 +40662,26 @@
    "doubled": null
   },
   {
+   "wire": "PCS_IGN_PT",
+   "endpoint": "SPL-PDM15-OUT13",
+   "where": "engine",
+   "cavity": "splice 1",
+   "factory_circuit": null,
+   "part": "D-609-03",
+   "family": "miniseal",
+   "doubled": null
+  },
+  {
+   "wire": "PCS_IGN",
+   "endpoint": "SPL-PDM15-OUT13",
+   "where": "engine",
+   "cavity": "splice 2",
+   "factory_circuit": null,
+   "part": "D-609-05",
+   "family": "miniseal",
+   "doubled": null
+  },
+  {
    "wire": "64_PT1",
    "endpoint": "SPL-PDM15-OUT7",
    "where": "engine",
@@ -40722,7 +40865,6 @@
    "at": "PDM30-B B1",
    "wires": [
     "38",
-    "PCS_IGN",
     "LOCK_FEED_R"
    ],
    "splice": "D-609-05",
@@ -41185,12 +41327,12 @@
   "parts": {
    "0413-204-2005": 6,
    "0460-202-16141": 42,
-   "0460-204-12141": 11,
+   "0460-204-12141": 12,
    "0462-005-20141": 2,
    "0462-201-16141": 42,
    "0462-201-20141": 2,
-   "0462-203-12141": 11,
-   "114017": 18,
+   "0462-203-12141": 12,
+   "114017": 16,
    "12110847": 13,
    "12191818": 9,
    "15324976": 13,
@@ -41200,7 +41342,7 @@
    "238LTP": 22,
    "2516LTP": 7,
    "30130628": 1,
-   "4-1437284-3": 45,
+   "4-1437284-3": 44,
    "610TP": 2,
    "638TP": 2,
    "68054": 1,
@@ -41209,8 +41351,8 @@
    "68201": 2,
    "838TP": 2,
    "8CYLK-90": 1,
-   "9904": 3,
-   "9918": 4,
+   "9916": 3,
+   "9918": 5,
    "ADHESIVES-KIT": 1,
    "AEM-30-2131-100": 1,
    "AMP-KIT-RING": 1,
@@ -41220,9 +41362,9 @@
    "CAN-TERM-120R": 2,
    "COIL-CONN-LS2/7": 8,
    "CPA-100-3/4-BK": 1,
-   "D-609-03": 53,
+   "D-609-03": 54,
    "D-609-04": 20,
-   "D-609-05": 31,
+   "D-609-05": 32,
    "D38999/24WJ61SN": 1,
    "D38999/26WJ61PN": 1,
    "DL214": 2,
@@ -41259,11 +41401,11 @@
    "MS27488-20-2": 6,
    "NC5FD-L-1": 1,
    "QFS-BKCN-GM": 1,
-   "RING-SMALL": 6,
+   "RING-SMALL": 5,
    "S02-03-R": 4,
    "SSB-26BS-PA66": 3,
    "SSB-34BS-PA66": 3,
-   "SSC-N": 135,
+   "SSC-N": 136,
    "W12P": 2,
    "W12S": 2,
    "W6P": 1,
@@ -41273,7 +41415,11 @@
    "WCTHB50": 1,
    "WP-4P": 3,
    "WP-4S": 3,
-   "WPAPP30": 1
+   "WPAPP30": 1,
+   "BLUESEA-5065": 6,
+   "BLUESEA-5239": 4,
+   "BLUESEA-5240": 1,
+   "BLUESEA-5241": 1
   },
   "wire_ft": {
    "M22759/16 2 AWG black": 8.0,
@@ -41494,7 +41640,7 @@
    "codes": [],
    "need_ft": 68.2,
    "cart_ft": 0,
-   "status": "short by 68.2 ft"
+   "status": "short by 68.2 ft; also PCS_BRK, TRANS_BRK (length not measured yet)"
   },
   {
    "kind": "wire",
@@ -42168,7 +42314,7 @@
    "kind": "contact",
    "item": "0460-204-12141",
    "name": "Deutsch size 12 solid pin, nickel, 14–12 AWG",
-   "need": 11,
+   "need": 12,
    "cart": 0,
    "inside": [],
    "vendor": "customconnectorkits",
@@ -42208,7 +42354,7 @@
    "kind": "contact",
    "item": "0462-203-12141",
    "name": "Deutsch size 12 solid socket, nickel, 14–12 AWG",
-   "need": 11,
+   "need": 12,
    "cart": 0,
    "inside": [],
    "vendor": "customconnectorkits",
@@ -42238,7 +42384,7 @@
    "kind": "plug",
    "item": "114017",
    "name": "Deutsch sealing plug, contact size 16-12 (spare DT and DTP cavities)",
-   "need": 18,
+   "need": 16,
    "cart": 0,
    "inside": [],
    "vendor": null,
@@ -42338,11 +42484,11 @@
    "kind": "plug",
    "item": "4-1437284-3",
    "name": "Superseal 1.0 cavity sealing plug",
-   "need": 45,
+   "need": 44,
    "cart": 40,
    "inside": [],
    "vendor": "prowire",
-   "status": "short by 5"
+   "status": "short by 4"
   },
   {
    "kind": "lug",
@@ -42466,8 +42612,8 @@
   },
   {
    "kind": "lug",
-   "item": "9904",
-   "name": "HI-TEMP RING TERM 22-18 AWG, 1/4 stud",
+   "item": "9916",
+   "name": "HI-TEMP RING TERM 12-10 AWG, 1/4 stud",
    "need": 3,
    "cart": 0,
    "inside": [],
@@ -42478,7 +42624,7 @@
    "kind": "lug",
    "item": "9918",
    "name": "HI-TEMP RING TERM 12-10 AWG, 3/8 in (M9) stud",
-   "need": 4,
+   "need": 5,
    "cart": 0,
    "inside": [],
    "vendor": "prowire",
@@ -42618,11 +42764,11 @@
    "kind": "splice",
    "item": "D-609-03",
    "name": "MiniSeal stub splice, red (26–20 AWG cavity)",
-   "need": 53,
+   "need": 54,
    "cart": 20,
    "inside": [],
    "vendor": "prowire",
-   "status": "short by 33"
+   "status": "short by 34"
   },
   {
    "kind": "splice",
@@ -42638,11 +42784,11 @@
    "kind": "splice",
    "item": "D-609-05",
    "name": "MiniSeal stub splice, yellow (16–12) — rails and ECU pin splices",
-   "need": 31,
+   "need": 32,
    "cart": 20,
    "inside": [],
    "vendor": "prowire",
-   "status": "short by 11"
+   "status": "short by 12"
   },
   {
    "kind": "housing",
@@ -43118,7 +43264,7 @@
    "kind": "lug",
    "item": "RING-SMALL",
    "name": "small ring terminals (starter S, coil and ECU head-ring grounds, ground banks, sender studs)",
-   "need": 6,
+   "need": 5,
    "cart": 0,
    "inside": [],
    "vendor": null,
@@ -43208,13 +43354,13 @@
    "kind": "contact",
    "item": "SSC-N",
    "name": "Superseal 1.0 solid contact, nickel, 16–24 AWG",
-   "need": 135,
+   "need": 136,
    "cart": 150,
    "inside": [
     "2 × M800-KIT-N × 65"
    ],
    "vendor": "prowire",
-   "status": "covered (+15 spare)"
+   "status": "covered (+14 spare)"
   },
   {
    "kind": "wedge",
@@ -43670,7 +43816,7 @@
    {
     "code": "0460-204-12141",
     "name": "Deutsch size 12 solid pin, nickel, 14–12 AWG",
-    "need": 11,
+    "need": 12,
     "cart": 0,
     "vendor": "customconnectorkits",
     "status": "missing — in no cart"
@@ -43694,7 +43840,7 @@
    {
     "code": "0462-203-12141",
     "name": "Deutsch size 12 solid socket, nickel, 14–12 AWG",
-    "need": 11,
+    "need": 12,
     "cart": 0,
     "vendor": "customconnectorkits",
     "status": "missing — in no cart"
@@ -43702,7 +43848,7 @@
    {
     "code": "114017",
     "name": "Deutsch sealing plug, contact size 16-12 (spare DT and DTP cavities)",
-    "need": 18,
+    "need": 16,
     "cart": 0,
     "vendor": null,
     "status": "missing — in no cart"
@@ -43750,10 +43896,10 @@
    {
     "code": "4-1437284-3",
     "name": "Superseal 1.0 cavity sealing plug",
-    "need": 45,
+    "need": 44,
     "cart": 40,
     "vendor": "prowire",
-    "status": "short by 5"
+    "status": "short by 4"
    },
    {
     "code": "610TP",
@@ -43796,8 +43942,8 @@
     "status": "REMOVE — wrong plug for this part (see TB)"
    },
    {
-    "code": "9904",
-    "name": "HI-TEMP RING TERM 22-18 AWG, 1/4 stud",
+    "code": "9916",
+    "name": "HI-TEMP RING TERM 12-10 AWG, 1/4 stud",
     "need": 3,
     "cart": 0,
     "vendor": "prowire",
@@ -43806,7 +43952,7 @@
    {
     "code": "9918",
     "name": "HI-TEMP RING TERM 12-10 AWG, 3/8 in (M9) stud",
-    "need": 4,
+    "need": 5,
     "cart": 0,
     "vendor": "prowire",
     "status": "missing — in no cart"
@@ -43854,18 +44000,18 @@
    {
     "code": "D-609-03",
     "name": "MiniSeal stub splice, red (26–20 AWG cavity)",
-    "need": 53,
+    "need": 54,
     "cart": 20,
     "vendor": "prowire",
-    "status": "short by 33"
+    "status": "short by 34"
    },
    {
     "code": "D-609-05",
     "name": "MiniSeal stub splice, yellow (16–12) — rails and ECU pin splices",
-    "need": 31,
+    "need": 32,
     "cart": 20,
     "vendor": "prowire",
-    "status": "short by 11"
+    "status": "short by 12"
    },
    {
     "code": "DL438",
@@ -49910,6 +50056,17 @@
    "status": "OPEN: needs the Sanden SD7B10 clutch coil current (Sanden spec)"
   },
   {
+   "output": "PDM15 OUT13",
+   "loads": [
+    "PCS_IGN_PT"
+   ],
+   "load_a": null,
+   "source": "needs the PCS TCM-2650 ignition current (ZGP harness drawing / guide). OPEN until the TCM-4610 drawing: if the kit feeds case 12 (switched ignition, PNK) and case 9 (accessory, YEL) from the PCS ignition lead, their wake current is on this output too",
+   "wire_cap_a": 6,
+   "limit_a": null,
+   "status": "OPEN: needs the PCS TCM-2650 ignition current (ZGP harness drawing / guide). OPEN until the TCM-4610 drawing: if the kit feeds case 12 (switched ignition, PNK) and case 9 (accessory, YEL) from the PCS ignition lead, their wake current is on this output too"
+  },
+  {
    "output": "PDM30 OUT1",
    "loads": [
     "TG_FEED"
@@ -50169,14 +50326,15 @@
    "output": "PDM30 OUT21",
    "loads": [
     "38",
-    "LOCK_FEED_R",
-    "PCS_IGN"
+    "LOCK_FEED_R"
    ],
-   "load_a": null,
-   "source": "needs the PCS TCM-2650 ignition current (ZGP harness drawing / guide; the kit may also feed case 9/12 from this lead). PL (candidate) conflict: the locks (AutoLoc AUTZT2000 4.5 A x 2 on one bus) held OUT21 before the PCS moved into the cab; PL needs another output",
-   "wire_cap_a": 8,
+   "load_a": 9.0,
+   "source": "AutoLoc AUTZT2000 'Current absorption :: 4.5amps' x 2 actuators on one bus (web_snapshots/shop.autoloc.com__...md). PL (candidate) capacity conflict: 16 AWG is 15 A at 80 C (PDM manual p.48), 0.85 x 15 = 12.75 A, but OUT21 is an 8 A output whose setting stops at 10 A (p.24). A 20 A output with 14 AWG (22 A at 80 C, p.48) would carry 12 A, but the base build's free 20 A outputs are OUT3 and OUT4 and both belong to PW (candidate): PL can't take one without dropping PW",
+   "wire_cap_a": 15,
    "limit_a": null,
-   "status": "OPEN: needs the PCS TCM-2650 ignition current (ZGP harness drawing / guide; the kit may also feed case 9/12 from this lead). PL (candidate) conflict: the locks (AutoLoc AUTZT2000 4.5 A x 2 on one bus) held OUT21 before the PCS moved into the cab; PL needs another output"
+   "need_a": 12,
+   "max_a": 10,
+   "status": "CONFLICT: needs 12 A per output, the thinnest conductor allows 10 A (0.85 x 15 A, PDM manual p.48 / ProWire tables) — a heavier wire or pigtail closes it"
   },
   {
    "output": "PDM30 OUT22",
@@ -51760,7 +51918,7 @@
     "length": "unknown",
     "crosses": false
    },
-   "PCS_IGN": {
+   "PCS_IGN_PT": {
     "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
@@ -51768,6 +51926,15 @@
     "L5 material": false,
     "length": "unknown",
     "crosses": false
+   },
+   "PCS_IGN": {
+    "L1 plugs": true,
+    "L2 wire": true,
+    "L3 crossing": true,
+    "L4 ends": true,
+    "L5 material": false,
+    "length": "unknown",
+    "crosses": true
    },
    "PCS_TPS": {
     "L1 plugs": true,
@@ -51788,7 +51955,7 @@
     "crosses": false
    },
    "PCS_BRK": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -51842,7 +52009,7 @@
     "crosses": false
    },
    "TRANS_BRK": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -53792,17 +53959,17 @@
     }
    },
    "BASE": {
-    "wires": 323,
-    "L1 plugs": 242,
-    "L2 wire": 320,
-    "L3 crossing": 323,
-    "L4 ends": 309,
+    "wires": 324,
+    "L1 plugs": 245,
+    "L2 wire": 321,
+    "L3 crossing": 324,
+    "L4 ends": 310,
     "L5 material": 2,
-    "crossings": 89,
+    "crossings": 90,
     "length": {
      "estimated": 159,
      "twin": 7,
-     "unknown": 157
+     "unknown": 158
     }
    },
    "BFL": {
@@ -53976,16 +54143,16 @@
     }
    },
    "powertrain_chassis": {
-    "wires": 23,
-    "L1 plugs": 16,
-    "L2 wire": 23,
-    "L3 crossing": 23,
-    "L4 ends": 22,
+    "wires": 24,
+    "L1 plugs": 19,
+    "L2 wire": 24,
+    "L3 crossing": 24,
+    "L4 ends": 23,
     "L5 material": 0,
-    "crossings": 0,
+    "crossings": 1,
     "length": {
      "estimated": 6,
-     "unknown": 17
+     "unknown": 18
     }
    },
    "unsectioned": {
@@ -54003,33 +54170,33 @@
   },
   "configuration": {
    "buildable (base + decided)": {
-    "wires": 354,
-    "L1 plugs": 261,
-    "L2 wire": 351,
-    "L3 crossing": 354,
-    "L4 ends": 340,
+    "wires": 355,
+    "L1 plugs": 264,
+    "L2 wire": 352,
+    "L3 crossing": 355,
+    "L4 ends": 341,
     "L5 material": 2,
-    "crossings": 89,
+    "crossings": 90,
     "length": {
      "estimated": 173,
      "twin": 7,
-     "unknown": 174
+     "unknown": 175
     }
    }
   },
   "composite": {
    "composite (every option)": {
-    "wires": 386,
-    "L1 plugs": 265,
-    "L2 wire": 378,
-    "L3 crossing": 386,
-    "L4 ends": 370,
+    "wires": 387,
+    "L1 plugs": 268,
+    "L2 wire": 379,
+    "L3 crossing": 387,
+    "L4 ends": 371,
     "L5 material": 2,
-    "crossings": 89,
+    "crossings": 90,
     "length": {
      "estimated": 176,
      "twin": 7,
-     "unknown": 203
+     "unknown": 204
     }
    }
   }
@@ -54203,6 +54370,7 @@
     "ISO_KILL",
     "DAK_CONST",
     "PCS_BATT",
+    "PCS_IGN_PT",
     "PCS_IGN",
     "PCS_TPS",
     "PCS_RPM",
@@ -54665,8 +54833,8 @@
    },
    "body bulkhead P": {
     "capacity": 4,
-    "used": 1,
-    "spare": 3,
+    "used": 2,
+    "spare": 2,
     "source": "catalog/endpoints.yaml pins"
    },
    "body bulkhead C": {
@@ -54695,8 +54863,8 @@
    },
    "PDM30 8 A outputs": {
     "capacity": 22,
-    "used": 22,
-    "spare": 0,
+    "used": 21,
+    "spare": 1,
     "source": "PDM30 datasheet p.1; PDM user manual comparison table"
    },
    "PDM30 inputs": {
@@ -54717,8 +54885,8 @@
    },
    "PDM15 8 A outputs": {
     "capacity": 7,
-    "used": 2,
-    "spare": 5,
+    "used": 3,
+    "spare": 4,
     "source": "PDM30 datasheet p.1; PDM user manual comparison table"
    },
    "PDM15 inputs": {
@@ -54751,13 +54919,13 @@
    },
    "ground bank GND-BANK-ENG": {
     "capacity": null,
-    "used": 23,
+    "used": 24,
     "spare": null,
     "source": "catalog/endpoints.yaml wires; stud count not yet set"
    },
    "ground bank GND-BANK-CAB": {
     "capacity": null,
-    "used": 22,
+    "used": 21,
     "spare": null,
     "source": "catalog/endpoints.yaml wires; stud count not yet set"
    },
@@ -54893,7 +55061,7 @@
       "need_ft": 68.2,
       "cart_ft": 0,
       "on_hand_ft": null,
-      "status": "short by 68.2 ft"
+      "status": "short by 68.2 ft; also PCS_BRK, TRANS_BRK (length not measured yet)"
      },
      {
       "item": "M22759/16 22 AWG white/orange",
@@ -55345,11 +55513,15 @@
     "status": "candidate",
     "designed_wires": 6,
     "crossings": 0,
-    "pdm30_outputs": 0,
+    "pdm30_outputs": 1,
     "pdm30_inputs": 0,
     "pdm15_outputs": 0,
-    "takes": [],
-    "setting_conflicts": [],
+    "takes": [
+     "PDM30 OUT21"
+    ],
+    "setting_conflicts": [
+     "PDM30 OUT21: CONFLICT: needs 12 A per output, the thinnest conductor allows 10 A (0.85 x 15 A, PDM manual p.48 / ProWire tables) — a heavier wire or pigtail closes it"
+    ],
     "notes": null
    },
    "TG": {
@@ -55455,8 +55627,8 @@
    }
   },
   "verdict": {
-   "body crossings": "Body firewall crossings: candidates would take 2; body bulkheads have 5 spare — fits, but only in the 4-way power connector P (size 12 contacts); signal wires need bulkhead C",
-   "PDM30 outputs": "PDM30 outputs: candidates would take 4; 2 spare — does NOT fit; the engine PDM15 has 6 spare outputs for engine-bay loads",
+   "body crossings": "Body firewall crossings: candidates would take 2; body bulkheads have 4 spare — fits, but only in the 4-way power connector P (size 12 contacts); signal wires need bulkhead C",
+   "PDM30 outputs": "PDM30 outputs: candidates would take 5; 3 spare — does NOT fit; the engine PDM15 has 5 spare outputs for engine-bay loads",
    "PDM30 inputs": "PDM30 inputs: candidates would take 3; 2 spare — does NOT fit; PDM15 has 14 spare inputs, read over CAN"
   }
  }

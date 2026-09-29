@@ -53,7 +53,7 @@ SHEET_PLAN = [
     ("lighting_rear", "rear-lamps", "Tail, stop, backup, third brake, license and rear markers; cab roof clearance lamps",
      "cab", r"^(Tail_Light_(Left|Right)|Backup_Light_(Left|Right)|CHMSL|LICENSE-LAMP|MARKER-[LR]R|CLEARANCE-[LCR])$"),
     ("powertrain_chassis", "chassis", "Transfer-case switch, speed sender, gear sender and parking brake", "cab",
-     r"^(TCASE-4WD-SW|VSS|VSS-SENDER|GSS-3000|GSS-SENSOR|E-STOPP|PCS-TCM|PCS-HARNESS-4610|TRANS-CASE)$"),
+     r"^(TCASE-4WD-SW|VSS|VSS-SENDER|GSS-3000|GSS-SENSOR|E-STOPP|PCS-TCM|PCS-HARNESS-4610(-[A-Z]+)?|TRANS-CASE)$"),
 ]
 
 # the computers: drawn on every sheet a run reaches them, pins named from the MoTeC designation files

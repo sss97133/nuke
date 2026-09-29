@@ -384,3 +384,22 @@ not judge cab-to-chassis wires at all.
   - OUT21 was the only base-free 8 A output, but the PL candidate held it. PL now needs another output, which is recorded on OUT21.
   - OPEN: the kit harness's path from the cab to the case connector.
 - **The PDM30 battery stud joins the colour rule's power sources,** so PCS_BATT is red.
+
+## Round 10: lead round 5 (fourth reads) (2026-09-28)
+1. **Small inline fuses.** One holder family, Blue Sea 5065 waterproof in-line ATO/ATC: 12 AWG pigtails, 30 A max (snapshot). The fuses are Blue Sea 5237/5239/5240/5241 (ATO/ATC fuses snapshot).
+   - The protection record now carries value, source, holder and fuse part, and the BOM counts them: 6 holders; 5 A fuse × 4; 7.5 A × 1; 10 A × 1.
+   - **DAK_CONST is 5 A, not 3 A.** Dakota VHX manual 650314:P p.6 asks for "a fused 5 - 20 amp circuit", and the old 3 A had no source.
+   - **PCS_BATT stays 5 A, provisional.** That figure is Holley's transmission figure. The PCS's own draw is OPEN: the ZGP guide rev2, the PSI TCM-2650 page and the ZGP harness page give none.
+   - **New rule R15 protected.** A feed landing on a battery stud with no protection record FAILS, and so does an inline fuse with no holder or fuse part. Result: 17 wires pass, 0 fail.
+   - **Stud rings sit on the holder's 12 AWG pigtail.** 9916 at the PDM30 M6 stud; 9918 at the 3/8 in distribution stud. R1 reads the pigtail gauge there.
+2. **PCS_IGN has its own output, PDM15 OUT13.**
+   - PCS_IGN_PT is 20 AWG, the pin range for 8 A outputs (PDM manual p.9). It runs to SPL-PDM15-OUT13, a 20 + 14 AWG stub splice in the 16-12 band.
+   - PCS_IGN continues at 14 AWG through body bulkhead P cavity 2. P had 3 spare size-12 cavities for 14-12 AWG; it now has 2.
+   - OUT21 is back to PL.
+3. **Case cavities 12 and 9** are marked OPEN until the TCM-4610 drawing: does the kit feed them from the PCS ignition lead? The PDM15 OUT13 load note carries the same question.
+4. **TRANS_GND goes to the engine ground star** (Holley p.3), from a new endpoint for the kit's case-side ground lead on the chassis. It runs along the kit's route, which is OPEN until mock-up.
+5. **PCS_NS and PCS_REV** now have "switched output" labels and are white signal stock.
+6. **PCS_BRK and TRANS_BRK** now tap SPL-PDM30-OUT5, the brake lamp output (#93, DIG14), in the cab. They no longer run to the CHMSL at the back of the truck. They are white and carry R11 control from #93.
+7. **BLOWER-RES cavities** are now BAT, M1, M2 and BLO. The factory circuits 51, 63, 72 and 101 move to factory_circuit, and the device text says they are circuit numbers.
+8. **IBOOSTER pin rows** each name the fastandquiet Gen-1 pinout and Tulay Gen-1 snapshot filenames.
+9. **IBOOST_PERM's stud ring** is 9918, not RING-SMALL.

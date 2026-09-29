@@ -270,11 +270,14 @@ IMPLIED = [
      "ECU'; Blue Sea 7700 yellow = LED output, the LED's ground while the switch is closed (instructions p.2); M1 hardware spec "
      "p.9: universal digital input, switchable 3k3 pull-up via diode to +5 V, programmable trigger levels +/-10 V, peak 200 V — "
      "reads the yellow low when closed, high when open; the M1 tune shuts the engine down when it reads open"),
-    ("DAK_CONST", "Dakota VHX CONST. POWER (always-hot, fused)", "PDM30-STUD (3 A inline fuse)", "DAKOTA-VHX (CONST. POWER)", 18, "M22759/32",
+    ("DAK_CONST", "Dakota VHX CONST. POWER (always-hot, fused)", "PDM30-STUD (5 A inline fuse)", "DAKOTA-VHX (CONST. POWER)", 18, "M22759/32",
      "DAKOTA_VHX_ARCHITECTURE.md §2 'CONST. POWER gap'; VHX manual p.6"),
     ("PCS_BATT", "PCS TCM-2650 constant 12V (5A)", "PDM30-STUD (5 A inline fuse)", "PCS harness B+", 18, "M22759/32",
      "receipts/2026-07-12_6l80e-can-master-ruling.md F3"),
-    ("PCS_IGN", "PCS TCM-2650 ignition", "PDM30:OUT21", "PCS harness IGN", 20, "M22759/32", "ZGP TCM2650 setup guide rev2 p.1; the TCM mounts in the cab (the guide gives no mounting location or sealing rating), so its ignition comes from the cab PDM30: PDM15 OUT13 would cross the firewall with no free body bulkhead cavity (A and B full). OUT21 was the only base-free 8 A output (held by the PL candidate): the base transmission takes it and PL needs another output"),
+    ("PCS_IGN_PT", "PDM15 OUT13 pin lead to the PCS ignition step-up splice", "PDM15:OUT13", "SPL-PDM15-OUT13", 20, "M22759/32",
+     "MoTeC PDM user manual p.9: 8 A outputs take 24#-20# in the Superseal pin; the run to the cab crosses body bulkhead P, whose size 12 DTP contacts take 14-12 AWG (customconnectorkits DTP04-4P-L012 / 0460-204-12141), so the 20 AWG pin lead steps up to 14 AWG at a stub splice"),
+    ("PCS_IGN", "PCS TCM-2650 ignition (14 AWG through body bulkhead P)", "SPL-PDM15-OUT13", "PCS harness IGN", 14, "M22759/32",
+     "ZGP TCM2650 setup guide rev2 p.1 (ignition); its own output, PDM15 OUT13 (lead round 5: not shared with the PL lock feeds on PDM30 OUT21); the PCS sits in the cab (the guide gives no mounting location or sealing rating), so the feed crosses body bulkhead P cavity 2 (P had 3 spare size 12 cavities, 14-12 AWG: catalog FIREWALL-BODY-P); steps down at a splice if the kit lead is smaller (TCM-4610 drawing)"),
     ("PCS_TPS", "PCS analog 1 <- pedal track 1 signal tap (signal only)", "M130:B21 / APS track 1 signal", "PCS analog input 1", 22,
      "M22759/32",
      "ZGP guide p.13 + Table 4 (AI1 may piggyback an ECU sensor); the TB 12699160 position line is SENT (digital), so the "
@@ -283,9 +286,9 @@ IMPLIED = [
      "ZGP guide p.12; 6L90 ruling"),
     ("PCS_BRK", "PCS 'Brake Light' digital input <- brake switch", "Brake light switch out", "PCS digital input", 22, "M22759/32",
      "ZGP guide p.18"),
-    ("PCS_NS", "PCS lever-position ground out -> PDM crank-enable input", "PCS PWM vs Lever Position", "PDM30:DIG11 (B20) crank enable, relayed to the engine PDM over CAN", 22, "M22759/32",
+    ("PCS_NS", "PCS lever-position switched output (neutral) -> PDM crank-enable input", "PCS PWM vs Lever Position", "PDM30:DIG11 (B20) crank enable, relayed to the engine PDM over CAN", 22, "M22759/32",
      "ZGP guide p.19-20; receipts/2026-09-26_substrate-correction-1977-neutral-start-switch-on-column.md"),
-    ("PCS_REV", "PCS lever-position ground out -> PDM reverse-lamp input", "PCS PWM vs Lever Position", "PDM30:DIG15 (B17) reverse", 22, "M22759/32",
+    ("PCS_REV", "PCS lever-position switched output (reverse) -> PDM reverse-lamp input", "PCS PWM vs Lever Position", "PDM30:DIG15 (B17) reverse", 22, "M22759/32",
      "ZGP guide p.19-20"),
     # ---- 6L90 case connector (TRANS-CASE) through the PCS TCM-4610 kit harness (lead 2026-09-28)
     ("TRANS_BATT", "6L90 case battery feed (case cavities 1 + 4: TEHCM solenoid supply)", "PDM30-STUD (7.5 A inline fuse)",
@@ -293,15 +296,15 @@ IMPLIED = [
      "Holley 558-499 instructions (reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf) p.3: power 'supplies power to the transmission solenoids ... a constant battery source capable of supplying 5 amps'; "
      "EFI Connection 6L80E/6L90E T43 case connector pigtail, GM 15131300 / 19303772 (web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md): cavities 1 and 4 RED/WHT 18 GA 12V BATTERY. Fuse >= 1.25 x 5 A = 6.25 A -> 7.5 A; 18 AWG carries 9 A at 100 C "
      "(MoTeC PDM manual p.48), over the fuse; from the PDM30 battery stud (always hot, fed from the distribution stud by PDM_BPOS) because the PCS sits in the cab: ZGP TCM-2650 setup guide rev2 (all 23 pages) gives no mounting location and no sealing rating, so the TCM mounts in the cab under the dash beside the PDM30 (lead 2026-09-28); its kit harness's leads are there too. Separate from PCS_BATT (the PCS's own 5 A supply, ruling 2026-07-12 F3)"),
-    ("TRANS_GND", "6L90 case ground (case cavities 2 + 5)", "PCS-HARNESS-4610 (case ground lead, cavities 2 + 5)", GCAB_EARLY, 18, "M22759/32",
-     "EFI Connection 6L80E/6L90E T43 case connector pigtail, GM 15131300 / 19303772 (web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md): cavities 2 and 5 BLK/WHT 18 GA GROUND; Holley 558-499 instructions (reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf) p.3: ground to a good chassis/engine ground; " + "owner 2026-09-27: grounds run in the loom to the banks (state row 56)"),
+    ("TRANS_GND", "6L90 case ground (case cavities 2 + 5)", "PCS-HARNESS-4610-CASE (case ground lead, cavities 2 + 5)", GSTAR_EARLY, 18, "M22759/32",
+     "EFI Connection 6L80E/6L90E T43 case connector pigtail, GM 15131300 / 19303772 (web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md): cavities 2 and 5 BLK/WHT 18 GA GROUND; Holley 558-499 instructions (reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf) p.3: ground to a good chassis/engine ground (p.3) -> the engine ground star, from the kit's case-side ground lead along the kit's route (route OPEN at the mock-up); " + "owner 2026-09-27: grounds run in the loom to the banks (state row 56)"),
     ("PCS_GND", "PCS TCM-2650 ground", "PCS-HARNESS-4610 (PCS ground lead)", GCAB_EARLY, 18, "M22759/32",
      "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.2: "
      "set up '12V Battery, Ignition and Grounds'; sized as its feed PCS_BATT (18 AWG); " + "owner 2026-09-27: grounds run in the loom to the banks (state row 56)"),
-    ("TRANS_BRK", "6L90 case stop-lamp input (case cavity 6) <- brake lamp tap", "CHMSL (+ feed tap: 12 V while braking)",
+    ("TRANS_BRK", "6L90 case stop-lamp input (case cavity 6) <- brake lamp tap", "SPL-PDM30-OUT5 (brake lamp output tap)",
      "PCS-HARNESS-4610 (case stop-lamp lead, cavity 6)", 22, "M22759/16",
      "EFI Connection 6L80E/6L90E T43 case connector pigtail, GM 15131300 / 19303772 (web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md): cavity 6 WHT 22 GA STOP LAMP SWITCH SIGNAL; Holley 558-499 instructions (reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf) p.3: brake input 'must be installed to a +12v source (as most brake light switches "
-     "are)'; the factory brake switch now switches 0 V into PDM30 DIG14, so the 12 V comes from the brake lamp output, the same tap as PCS_BRK"),
+     "are)'; the factory brake switch now switches 0 V into PDM30 DIG14, so the 12 V comes from the brake lamp output, PDM30 OUT5 (#93, brake switch on DIG14), tapped at its pigtail splice in the cab (SPL-PDM30-OUT5), the same tap as PCS_BRK: shorter than the CHMSL lead at the back of the truck, same signal"),
 ]
 PDM_PIGTAIL_NOTE = ("PDM 20 A outputs feeding a wire heavier than 16 AWG land two 16 AWG pigtails, one per pin, equal length "
                     "(registry wires <load>_PT1/_PT2), joined to the load wire in an in-line MiniSeal M81824/1-3 "
@@ -513,7 +516,10 @@ IMPLIED_EXTRA_0927 = {
     "GSS_PWR": {"control": "PDM30 DIG1 ignition RUN (same output as #71)"},
     "ALT_L": {"control": "ignition RUN over CAN from the PDM30 (DIG1); a dead bus drops it with the other engine loads"},
     "START_TRIG": {"control": "PDM15 logic over CAN: START request (PDM30 DIG10) AND PCS neutral (PDM30 DIG11) AND the M130 crank-enable bit"},
-    "PCS_IGN": {"control": "PDM30 DIG1 ignition RUN"},
+    "PCS_IGN_PT": {"control": "ignition RUN over CAN from the PDM30 (DIG1)"},
+    "PCS_BRK": {"control": "brake switch on PDM30 DIG14 (a tap of OUT5, #93)", "color": "white", "color_basis": "a brake-on SIGNAL tapped off the brake lamp output (a PCS / TCM input), not a power feed: white signal stock (state 0f(a), SIGNAL_RULE)"},
+    "TRANS_BRK": {"control": "brake switch on PDM30 DIG14 (a tap of OUT5, #93)", "color": "white", "color_basis": "a brake-on SIGNAL tapped off the brake lamp output (a PCS / TCM input), not a power feed: white signal stock (state 0f(a), SIGNAL_RULE)"},
+    "PCS_IGN": {"control": "ignition RUN over CAN from the PDM30 (DIG1), through PCS_IGN_PT"},
     "TG_FEED": {"control": "PDM30 DIG1 ignition RUN (the factory switches do the switching; the PDM is the fuse)"},
     "TG_KEY_FEED": {"control": "shares TG_FEED (PDM30 OUT1 on DIG1 ignition RUN): the key switch works only key-on — the factory "
                                "fed it always-hot (circuit 60 via the 30 A breaker); owner call whether OUT1 runs always-on"},
@@ -1395,9 +1401,10 @@ IMPLIED_DECISIONS = {
     "PCS_IGN": {"to": "PCS-HARNESS-4610 (ignition lead)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.1 ignition; endpoint PCS-TCM"},
     "PCS_TPS": {"to": "PCS-HARNESS-4610 (analog 1 lead)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.13 + Table 4 (analog 1 may piggyback an ECU sensor); endpoint PCS-TCM"},
     "PCS_RPM": {"to": "PCS-HARNESS-4610 (speed input 3 lead, orange/black)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.12 speed input 3 = RPM, orange/black; endpoint PCS-TCM"},
-    "PCS_BRK": {"frm": "CHMSL (+ feed tap: 12 V while braking)", "to": "PCS-HARNESS-4610 (brake light input lead)",
+    "PCS_BRK": {"frm": "SPL-PDM30-OUT5 (brake lamp output tap)", "to": "PCS-HARNESS-4610 (brake light input lead)",
                  "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.18 'Brake Light' digital input (TCC unlock on brake). The factory brake switch now switches 0 V into "
-                        "PDM30 DIG14 and no longer carries 12 V, so the brake-on 12 V comes from the brake lamp output (CHMSL feed); "
+                        "PDM30 DIG14 and no longer carries 12 V, so the brake-on 12 V comes from the brake lamp output: PDM30 OUT5 (#93 to the CHMSL, "
+                        "brake switch on DIG14), tapped at its pigtail splice SPL-PDM30-OUT5 in the cab (lead round 5: shorter than the CHMSL lead, same signal); "
                         "input polarity OPEN until the ZGP drawing"},
     "PCS_NS": {"frm": "PCS-HARNESS-4610 (lever-position output lead: neutral)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.19-20 ground-only outputs; endpoint PCS-TCM"},
     "PCS_REV": {"frm": "PCS-HARNESS-4610 (lever-position output lead: reverse)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.19-20 ground-only outputs; endpoint PCS-TCM"},
@@ -1712,6 +1719,7 @@ PDM_LOADS = {   # (box, output): (running current A or None, source or what clos
     ("PDM15", 4): (None, "needs the starter solenoid S-terminal pull-in current (starter maker's sheet)"),
     ("PDM15", 5): (5.1, "QFS P367 (HFP-367) web_snapshots/www.highflowfuel.com__fuel-pump-oem-replacement-hfp-367-qfs.md: 'Flow: 145LPH, Draws 5.1 Amps @ 60psi'"),
     ("PDM15", 9): (0.025, "Holley 197-400 pigtail, 560 ohm in line (holley_midmount_fitment.pdf p.15): 14 V / 560 ohm"),
+    ("PDM15", 13): (None, "needs the PCS TCM-2650 ignition current (ZGP harness drawing / guide). OPEN until the TCM-4610 drawing: if the kit feeds case 12 (switched ignition, PNK) and case 9 (accessory, YEL) from the PCS ignition lead, their wake current is on this output too"),
     ("PDM15", 11): (None, "needs the Sanden SD7B10 clutch coil current (Sanden spec)"),
     ("PDM15", 7): (6.1, "LTC manual p.31 + p.37: over 6.1 A cold for two sensors (a lower bound)"),
     ("PDM30", 1): (11.0, "CANDIDATE Nu-Relics 17383-1 ACI motor, 11 A high load (20 A stall); the base factory motor is absent"),
@@ -1734,7 +1742,11 @@ PDM_LOADS = {   # (box, output): (running current A or None, source or what clos
     ("PDM30", 18): (2.95, "Truck-Lite 27270C 2.95 A at 12 V (web_snapshots/www.truck-lite.com__LEDHeadlightBrochure_1.md); paralleled with OUT17 at the dimmer common"),
     ("PDM30", 19): (2.8, "4 x 168 side markers 0.35 A + 3 roof markers at the 194 figure 0.27 A (the LMC 36-0368 LED bulb replaces a 194; the incandescent value is the upper bound) + 67 license 0.59 A (1977 Light Truck Service Manual p.838 lamp bulb data (trade numbers); 168 0.35 A (web_snapshots/normanlamps.com__168.md); 194 0.27 A (web_snapshots/www.autolumination.com__visual_bulb_finder.md); 67 0.59 A (web_snapshots/normanlamps.com__67.md))"),
     ("PDM30", 20): (None, "needs the RetroSound ignition current"),
-    ("PDM30", 21): (None, "needs the PCS TCM-2650 ignition current (ZGP harness drawing / guide; the kit may also feed case 9/12 from this lead). PL (candidate) conflict: the locks (AutoLoc AUTZT2000 4.5 A x 2 on one bus) held OUT21 before the PCS moved into the cab; PL needs another output"),
+    ("PDM30", 21): (9.0, "AutoLoc AUTZT2000 'Current absorption :: 4.5amps' x 2 actuators on one bus (web_snapshots/shop.autoloc.com__...md). "
+                         "PL (candidate) capacity conflict: 16 AWG is 15 A at 80 C (PDM manual p.48), 0.85 x 15 = 12.75 A, but OUT21 is an 8 A "
+                         "output whose setting stops at 10 A (p.24). A 20 A output with 14 AWG (22 A at 80 C, "
+                         "p.48) would carry 12 A, but the base build's free 20 A outputs are OUT3 and OUT4 and both belong to PW (candidate): "
+                         "PL can't take one without dropping PW"),
     ("PDM30", 22): (2.1, "1157 bright filament (1977 Light Truck Service Manual p.838 lamp bulb data (trade numbers); 1157 2.1 A (bright) / 0.59 A (dim) (web_snapshots/www.autolumination.com__visual_bulb_finder.md))"),
     ("PDM30", 23): (None, "needs the RVS mirror display current (rearviewsafety.com gives none)"),
     ("PDM30", 24): (None, "needs the M130 supply current (no consumption figure in the M1 techspec on file)"),
@@ -1802,24 +1814,36 @@ def pdm_settings(reg):
 
 
 
-INLINE_FUSES = {   # every inline fuse gets a protection record (standards review, round 4): value + source; holder and fuse part
-    "DAK_CONST": ("3 A inline fuse at the PDM30 stud", "DAKOTA_VHX_ARCHITECTURE.md §2 'CONST. POWER gap'; VHX manual p.6"),
-    "PCS_BATT": ("5 A inline fuse at the PDM30 battery stud", "receipts/2026-07-12_6l80e-can-master-ruling.md F3 (PCS TCM-2650 constant 12 V, 5 A)"),
-    "IBOOST_PERM": ("5 A inline fuse at the distribution stud", "fastandquiet Gen-1 pinout: pin 17 'Always Hot Power (5A Fuse)'; Tulay Gen-1 harness 1.50 mm² red, 5 A fuse"),
-    "TRANS_BATT": ("7.5 A mini/ATO inline fuse at the PDM30 battery stud", "Holley 558-499 p.3: 'a constant battery source capable of supplying 5 amps'; 1.25 x 5 A = 6.25 A -> 7.5 A, under 18 AWG's 9 A at 100 C (MoTeC PDM manual p.48)"),
-    "ISO_PWR": ("10 A inline fuse at the Odyssey +", "Blue Sea 7700 instructions 990180170-006 p.2: 'through a 10A (min) circuit protection device'"),
-    "ISO_SW_PWR": ("5 A inline fuse at the Odyssey +", "Blue Sea 7700 instructions p.2: pin 2 'through a 2A (min) circuit protection device'; 5 A under the 16 AWG rating"),
-    "3": ("AMP Research kit harness fuse (supplied)", "AMP Research IM75146 step 8: red lead to battery +, fused in the kit harness"),
+INLINE_FUSES = {   # every inline fuse gets a protection record (standards review, round 4; round 5: holder + fuse part)
+    # wire: (value, source, fuse part). One holder family for every small inline fuse in the truck: Blue Sea 5065 waterproof
+    # in-line ATO/ATC holder, 12 AWG pigtails, 30 A max fuse (web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md);
+    # the smaller circuit wire joins its pigtail at a D-609 stub splice sized by combined CM. Fuses: Blue Sea ATO/ATC 5237 3 A, 5239 5 A,
+    # 5240 7.5 A, 5241 10 A (web_snapshots/www.bluesea.com__ATO-ATC%20Fuses.md).
+    "DAK_CONST": ("5 A inline fuse at the PDM30 stud", "Dakota VHX manual 650314:P p.6: 'The constant +12V supply source should be a fused 5 - 20 amp circuit, the system draws less than 1 amp' and 'Use 18 AWG wire' — the lowest value in the maker's range (the earlier 3 A had no source and sat under it)", "BLUESEA-5239"),
+    "PCS_BATT": ("5 A inline fuse at the PDM30 battery stud", "PROVISIONAL: receipts/2026-07-12_6l80e-can-master-ruling.md F3 carries Holley 558-499's loose-wire 5 A, which is the TRANSMISSION's solenoid supply (Holley p.3), not a PCS figure. The PCS TCM-2650's own draw / fuse is OPEN: the ZGP TCM-2650 setup guide rev2 (23 pages), the PSI Conversion TCM-2650 page (web_snapshots/www.psiconversion.com__TCM-2650.md) and the Zero Gravity TCM4610 harness page (web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md) give none — ask ZGP/PSI or read the harness drawing", "BLUESEA-5239"),
+    "TRANS_BATT": ("7.5 A inline fuse at the PDM30 battery stud", "Holley 558-499 p.3: 'a constant battery source capable of supplying 5 amps'; 1.25 x 5 A = 6.25 A -> 7.5 A, under 18 AWG's 11 A at 80 C (MoTeC PDM manual p.48, cab)", "BLUESEA-5240"),
+    "ISO_PWR": ("10 A inline fuse at the Odyssey +", "Blue Sea 7700 instructions 990180170-006 p.2: 'through a 10A (min) circuit protection device'", "BLUESEA-5241"),
+    "ISO_SW_PWR": ("5 A inline fuse at the Odyssey +", "Blue Sea 7700 instructions p.2: pin 2 'through a 2A (min) circuit protection device'; 5 A under the 16 AWG rating", "BLUESEA-5239"),
+    "IBOOST_PERM": ("5 A inline fuse at the distribution stud", "fastandquiet Gen-1 pinout (web_snapshots/www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md): 'M 17 - Always Hot Power (5A Fuse)'; Tulay Gen-1 harness (web_snapshots/tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md): 1.50 mm² red, 5 A fuse", "BLUESEA-5239"),
+    "3": ("AMP Research kit harness fuse (supplied)", "AMP Research IM75146 step 8: red lead to battery +, fused in the kit harness", None),
 }
+INLINE_HOLDER = "BLUESEA-5065"
 
 
-def inline_fuses(rows):
+def inline_fuses(rows, reg=None):
     for w in rows:
         f = INLINE_FUSES.get(str(w["id"]))
-        if f:
-            w["protection"] = (f"{f[0]} ({f[1]}). Holder and fuse part: " + ("in the kit" if w["id"] == "3" else
-                               "OPEN — no inline holder is picked (a sealed ATO/ATC in-line holder sized to the wire; pick with the "
-                               "battery terminals)"))
+        if not f or w.get("retired"):
+            continue
+        if f[2] is None:
+            w["protection"] = f"{f[0]} ({f[1]}). Holder and fuse part: in the kit"
+            continue
+        w["protection"] = f"{f[0]} ({f[1]}). Holder: Blue Sea 5065 waterproof in-line ATO/ATC ({INLINE_HOLDER}); fuse: {f[2]}"
+        w["protection_parts"] = {"holder": INLINE_HOLDER, "fuse": f[2]}
+        if reg is not None:
+            bom = reg.setdefault("bom", {}).setdefault("parts", {})
+            for code in (INLINE_HOLDER, f[2]):
+                bom[code] = bom.get(code, 0) + 1
 
 # endpoint fields the kit build does not carry, copied from the catalog into the registry (review A10: CAN topology as data)
 ENDPOINT_EXTRA = ("topology", "cavities", "empty")
@@ -1981,7 +2005,7 @@ def main():
             w["color_open"] = ("OPEN: conductor colours come from the M27500 cable picked, and none is — ProWire stocks only "
                                "M27500-xxML (e.g. 22ML2T08), Tefzel M27500-22TG2T14 is not sold there (state 0f(b), owner pick); "
                                "close with the picked cable's MIL-DTL-27500 conductor colour code (spec table not on file)")
-    inline_fuses(list(reg["wires"]) + list(reg["implied"]))
+    inline_fuses(list(reg["wires"]) + list(reg["implied"]), reg)
     pdm_settings(reg)
     cat = kits_v5._y("endpoints.yaml")
     for eid, ep in reg["endpoints"].items():

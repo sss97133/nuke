@@ -431,3 +431,10 @@ DTP4P-L012-GKT: {vendor: customconnectorkits, kind: gasket, family: dtp, name: "
 "68055": {vendor: motec, kind: housing, family: dtm, name: "MoTeC #68055 DTM 4-pin (M) connector — used as the IBST-DIAG cap", status: open, note: "kit contents not in the LTC manual", sources: ["reference_documents/component_drawings/motec_ltcd_user_manual.pdf p.32"]}
 CAN-TERM-120R: {kind: resistor, name: "CAN terminator 120 ohm (IBST bus, one at each end)", status: open, note: "part not picked; the value is the research's (the iBooster has no termination)", sources: ["reference_documents/web_snapshots/www.evcreate.com__ibooster-can-bus.md"]}
 
+# ---------------------------------------------------------------- small inline fuses (round 5): one holder family
+BLUESEA-5065: {vendor: bluesea, kind: fuse_holder, status: picked, name: "Blue Sea 5065 waterproof in-line ATO/ATC fuse holder, 12 AWG pigtails, 30 A max fuse", sources: ["reference_documents/web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md"]}
+BLUESEA-5237: {vendor: bluesea, kind: fuse, name: "Blue Sea 5237 ATO/ATC fuse 3 A", sources: ["reference_documents/web_snapshots/www.bluesea.com__ATO-ATC%20Fuses.md"]}
+BLUESEA-5239: {vendor: bluesea, kind: fuse, name: "Blue Sea 5239 ATO/ATC fuse 5 A", sources: ["reference_documents/web_snapshots/www.bluesea.com__ATO-ATC%20Fuses.md"]}
+BLUESEA-5240: {vendor: bluesea, kind: fuse, name: "Blue Sea 5240 ATO/ATC fuse 7.5 A", sources: ["reference_documents/web_snapshots/www.bluesea.com__ATO-ATC%20Fuses.md"]}
+BLUESEA-5241: {vendor: bluesea, kind: fuse, name: "Blue Sea 5241 ATO/ATC fuse 10 A", sources: ["reference_documents/web_snapshots/www.bluesea.com__ATO-ATC%20Fuses.md"]}
+

@@ -2512,6 +2512,10 @@
     "R8 ends": [
      "PASS",
      "Distribution stud (kit harness fuse):None -> AMP-STEP-CTRL:RED power lead (kit harness)"
+    ],
+    "R15 protected": [
+     "PASS",
+     "AMP Research kit harness fuse (supplied) (AMP Research IM75146 step 8: red lead "
     ]
    }
   },
@@ -2964,6 +2968,10 @@
     "R8 ends": [
      "PASS",
      "ACC-BATT (+, MIDI 60 A):None -> AMP-BLOCK:+ in (2 AWG)"
+    ],
+    "R15 protected": [
+     "PASS",
+     "MIDI 60 A"
     ]
    }
   },
@@ -2991,6 +2999,10 @@
     "R8 ends": [
      "PASS",
      "PS-STUDS (distribution stud):None -> PS-STUDS:starter B+ stud"
+    ],
+    "R15 protected": [
+     "PASS",
+     "none"
     ]
    }
   },
@@ -3018,6 +3030,10 @@
     "R8 ends": [
      "PASS",
      "PS-STUDS (alternator B+ stud):None -> PS-STUDS:distribution stud (via MEGA)"
+    ],
+    "R15 protected": [
+     "PASS",
+     "MEGA 200 A"
     ]
    }
   },
@@ -3045,6 +3061,10 @@
     "R8 ends": [
      "PASS",
      "ODYSSEY (+):None -> PS-STUDS:isolator stud A (Blue Sea 7700, 3/8\"-16)"
+    ],
+    "R15 protected": [
+     "PASS",
+     "none"
     ]
    }
   },
@@ -3093,7 +3113,7 @@
    ],
    "to": [
     "IBOOSTER",
-    "4.00 mm\u00b2 red lead, housing pin 1 (always hot, 40 A)"
+    "4.00 mm\u00b2 red lead, housing pin 1 (always hot, 40 A) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]"
    ],
    "sides": [
     "engine bay",
@@ -3106,7 +3126,11 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "Distribution stud (MIDI 40 A):None -> IBOOSTER:4.00 mm\u00b2 red lead, housing pin 1 (always hot, 40 A)"
+     "Distribution stud (MIDI 40 A):None -> IBOOSTER:4.00 mm\u00b2 red lead, housing pin 1 (always hot, 40 A) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]"
+    ],
+    "R15 protected": [
+     "PASS",
+     "MIDI 40 A"
     ]
    }
   },
@@ -4570,6 +4594,10 @@
     "R12 firewall": [
      "PASS",
      "through the grommet"
+    ],
+    "R15 protected": [
+     "PASS",
+     "MEGA 125 A"
     ]
    }
   },
@@ -5201,7 +5229,7 @@
    "kind": "implied",
    "label": "Dakota VHX CONST. POWER (always-hot, fused)",
    "from": [
-    "PDM30-STUD (3 A inline fuse)",
+    "PDM30-STUD (5 A inline fuse)",
     ""
    ],
    "to": [
@@ -5212,14 +5240,18 @@
     "cab",
     "cab"
    ],
-   "from_str": "PDM30-STUD (3 A inline fuse)",
+   "from_str": "PDM30-STUD (5 A inline fuse)",
    "control": null,
    "subsystem": "DASH_CLUSTER_DAKOTA",
    "engine_run": true,
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30-STUD (3 A inline fuse): -> DAKOTA-VHX (CONST. POWER):CONST. POWER"
+     "PDM30-STUD (5 A inline fuse): -> DAKOTA-VHX (CONST. POWER):CONST. POWER"
+    ],
+    "R15 protected": [
+     "PASS",
+     "5 A inline fuse at the PDM30 stud (Dakota VHX manual 650314:P p.6: 'The constant"
     ]
    }
   },
@@ -5247,37 +5279,76 @@
     "R8 ends": [
      "PASS",
      "PDM30-STUD (5 A inline fuse): -> PCS-HARNESS-4610 (12 V battery lead):12 V battery lead (lead label OPEN until the TCM-4610 drawing)"
+    ],
+    "R15 protected": [
+     "PASS",
+     "5 A inline fuse at the PDM30 battery stud (PROVISIONAL: receipts/2026-07-12_6l80"
+    ]
+   }
+  },
+  {
+   "wire": "PCS_IGN_PT",
+   "kind": "implied",
+   "label": "PDM15 OUT13 pin lead to the PCS ignition step-up splice",
+   "from": [
+    "PDM15",
+    "OUT13"
+   ],
+   "to": [
+    "SPL-PDM15-OUT13",
+    "splice 1"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "PDM15:OUT13 (A11)",
+   "control": "ignition RUN over CAN from the PDM30 (DIG1)",
+   "subsystem": "TRANS_6L90",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM15:OUT13 -> SPL-PDM15-OUT13:splice 1"
+    ],
+    "R11 command": [
+     "PASS",
+     "switched by ignition RUN over CAN from the PDM30 (DIG1)"
     ]
    }
   },
   {
    "wire": "PCS_IGN",
    "kind": "implied",
-   "label": "PCS TCM-2650 ignition",
+   "label": "PCS TCM-2650 ignition (14 AWG through body bulkhead P)",
    "from": [
-    "PDM30",
-    "OUT21"
+    "SPL-PDM15-OUT13",
+    ""
    ],
    "to": [
     "PCS-HARNESS-4610 (ignition lead)",
-    "ignition lead (lead label OPEN until the TCM-4610 drawing)"
+    "ignition lead (lead label and gauge OPEN until the TCM-4610 drawing; PCS_IGN arrives 14 AWG through bulkhead P and steps down at a splice if the lead is smaller)"
    ],
    "sides": [
-    "cab",
+    "engine bay",
     "cab"
    ],
-   "from_str": "PDM30:OUT21 (B1)",
-   "control": "PDM30 DIG1 ignition RUN",
+   "from_str": "SPL-PDM15-OUT13",
+   "control": "ignition RUN over CAN from the PDM30 (DIG1), through PCS_IGN_PT",
    "subsystem": "TRANS_6L90",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT21 -> PCS-HARNESS-4610 (ignition lead):ignition lead (lead label OPEN until the TCM-4610 drawing)"
+     "SPL-PDM15-OUT13: -> PCS-HARNESS-4610 (ignition lead):ignition lead (lead label and gauge OPEN until the TCM-4610 drawing; PCS_IGN arrives 14 AWG through bulkhead P and steps down at a splice if the lead is smaller)"
     ],
     "R11 command": [
      "PASS",
-     "switched by PDM30 DIG1 ignition RUN"
+     "switched by ignition RUN over CAN from the PDM30 (DIG1), through PCS_IGN_PT"
+    ],
+    "R12 firewall": [
+     "PASS",
+     "body bulkhead P cavity 2"
     ]
    }
   },
@@ -5348,7 +5419,7 @@
    "kind": "implied",
    "label": "PCS 'Brake Light' digital input <- brake switch",
    "from": [
-    "CHMSL (+ feed tap: 12 V while braking)",
+    "SPL-PDM30-OUT5 (brake lamp output tap)",
     ""
    ],
    "to": [
@@ -5356,24 +5427,28 @@
     "brake light input lead (lead label OPEN until the TCM-4610 drawing)"
    ],
    "sides": [
-    "other",
+    "cab",
     "cab"
    ],
-   "from_str": "CHMSL (+ feed tap: 12 V while braking)",
-   "control": null,
+   "from_str": "SPL-PDM30-OUT5 (brake lamp output tap)",
+   "control": "brake switch on PDM30 DIG14 (a tap of OUT5, #93)",
    "subsystem": "TRANS_6L90",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "CHMSL (+ feed tap: 12 V while braking): -> PCS-HARNESS-4610 (brake light input lead):brake light input lead (lead label OPEN until the TCM-4610 drawing)"
+     "SPL-PDM30-OUT5 (brake lamp output tap): -> PCS-HARNESS-4610 (brake light input lead):brake light input lead (lead label OPEN until the TCM-4610 drawing)"
+    ],
+    "R11 command": [
+     "PASS",
+     "switched by brake switch on PDM30 DIG14 (a tap of OUT5, #93)"
     ]
    }
   },
   {
    "wire": "PCS_NS",
    "kind": "implied",
-   "label": "PCS lever-position ground out -> PDM crank-enable input",
+   "label": "PCS lever-position switched output (neutral) -> PDM crank-enable input",
    "from": [
     "PCS-HARNESS-4610 (lever-position output lead: neutral)",
     ""
@@ -5400,7 +5475,7 @@
   {
    "wire": "PCS_REV",
    "kind": "implied",
-   "label": "PCS lever-position ground out -> PDM reverse-lamp input",
+   "label": "PCS lever-position switched output (reverse) -> PDM reverse-lamp input",
    "from": [
     "PCS-HARNESS-4610 (lever-position output lead: reverse)",
     ""
@@ -5448,6 +5523,10 @@
     "R8 ends": [
      "PASS",
      "PDM30-STUD (7.5 A inline fuse): -> PCS-HARNESS-4610 (case battery lead, cavities 1 + 4):case battery lead to cavities 1 + 4 (whether the kit brings it out apart from the PCS battery: OPEN until the TCM-4610 drawing)"
+    ],
+    "R15 protected": [
+     "PASS",
+     "7.5 A inline fuse at the PDM30 battery stud (Holley 558-499 p.3: 'a constant bat"
     ]
    }
   },
@@ -5456,25 +5535,25 @@
    "kind": "implied",
    "label": "6L90 case ground (case cavities 2 + 5)",
    "from": [
-    "PCS-HARNESS-4610 (case ground lead, cavities 2 + 5)",
+    "PCS-HARNESS-4610-CASE (case ground lead, cavities 2 + 5)",
     ""
    ],
    "to": [
-    "GND-BANK-CAB (cab ground bank beside the PDM30)",
-    "ring 21"
+    "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)",
+    "ring 24"
    ],
    "sides": [
-    "cab",
-    "cab"
+    "other",
+    "engine bay"
    ],
-   "from_str": "PCS-HARNESS-4610 (case ground lead, cavities 2 + 5)",
+   "from_str": "PCS-HARNESS-4610-CASE (case ground lead, cavities 2 + 5)",
    "control": null,
    "subsystem": "TRANS_6L90",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "PCS-HARNESS-4610 (case ground lead, cavities 2 + 5): -> GND-BANK-CAB (cab ground bank beside the PDM30):ring 21"
+     "PCS-HARNESS-4610-CASE (case ground lead, cavities 2 + 5): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):ring 24"
     ]
    }
   },
@@ -5510,7 +5589,7 @@
    "kind": "implied",
    "label": "6L90 case stop-lamp input (case cavity 6) <- brake lamp tap",
    "from": [
-    "CHMSL (+ feed tap: 12 V while braking)",
+    "SPL-PDM30-OUT5 (brake lamp output tap)",
     ""
    ],
    "to": [
@@ -5518,17 +5597,21 @@
     "case stop-lamp lead to cavity 6 (whether the kit brings it out: OPEN until the TCM-4610 drawing)"
    ],
    "sides": [
-    "other",
+    "cab",
     "cab"
    ],
-   "from_str": "CHMSL (+ feed tap: 12 V while braking)",
-   "control": null,
+   "from_str": "SPL-PDM30-OUT5 (brake lamp output tap)",
+   "control": "brake switch on PDM30 DIG14 (a tap of OUT5, #93)",
    "subsystem": "TRANS_6L90",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "CHMSL (+ feed tap: 12 V while braking): -> PCS-HARNESS-4610 (case stop-lamp lead, cavity 6):case stop-lamp lead to cavity 6 (whether the kit brings it out: OPEN until the TCM-4610 drawing)"
+     "SPL-PDM30-OUT5 (brake lamp output tap): -> PCS-HARNESS-4610 (case stop-lamp lead, cavity 6):case stop-lamp lead to cavity 6 (whether the kit brings it out: OPEN until the TCM-4610 drawing)"
+    ],
+    "R11 command": [
+     "PASS",
+     "switched by brake switch on PDM30 DIG14 (a tap of OUT5, #93)"
     ]
    }
   },
@@ -6594,6 +6677,10 @@
     "R8 ends": [
      "PASS",
      "Distribution stud (MEGA 100 A): -> PDM15 battery stud (M6):M6"
+    ],
+    "R15 protected": [
+     "PASS",
+     "MEGA 100 A"
     ]
    }
   },
@@ -9363,7 +9450,7 @@
    ],
    "to": [
     "BLOWER-RES (BAT tap)",
-    "BAT terminal"
+    "BAT"
    ],
    "sides": [
     "cab",
@@ -9376,7 +9463,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "BLOWER-SW (LOW lead): -> BLOWER-RES (BAT tap):BAT terminal"
+     "BLOWER-SW (LOW lead): -> BLOWER-RES (BAT tap):BAT"
     ],
     "R12 firewall": [
      "PASS",
@@ -9394,7 +9481,7 @@
    ],
    "to": [
     "BLOWER-RES (M1 tap)",
-    "63 (M1: M1-R2-R3-blower)"
+    "M1"
    ],
    "sides": [
     "cab",
@@ -9407,7 +9494,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "BLOWER-SW (M1 lead): -> BLOWER-RES (M1 tap):63 (M1: M1-R2-R3-blower)"
+     "BLOWER-SW (M1 lead): -> BLOWER-RES (M1 tap):M1"
     ],
     "R12 firewall": [
      "PASS",
@@ -9425,7 +9512,7 @@
    ],
    "to": [
     "BLOWER-RES (M2 tap)",
-    "72 (M2: M2-R3-blower)"
+    "M2"
    ],
    "sides": [
     "cab",
@@ -9438,7 +9525,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "BLOWER-SW (M2 lead): -> BLOWER-RES (M2 tap):72 (M2: M2-R3-blower)"
+     "BLOWER-SW (M2 lead): -> BLOWER-RES (M2 tap):M2"
     ],
     "R12 firewall": [
      "PASS",
@@ -9920,7 +10007,7 @@
    ],
    "to": [
     "GND-BANK-CAB (cab ground bank beside the PDM30)",
-    "ring 22"
+    "ring 21"
    ],
    "sides": [
     "other",
@@ -9933,7 +10020,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "GND-SPLICE-REAR (rear harness ground bus): -> GND-BANK-CAB (cab ground bank beside the PDM30):ring 22"
+     "GND-SPLICE-REAR (rear harness ground bus): -> GND-BANK-CAB (cab ground bank beside the PDM30):ring 21"
     ]
    }
   },
@@ -9961,6 +10048,10 @@
     "R8 ends": [
      "PASS",
      "PS-STUDS (isolator stud B): -> PS-STUDS (distribution stud):distribution stud"
+    ],
+    "R15 protected": [
+     "PASS",
+     "none"
     ]
    }
   },
@@ -9988,6 +10079,10 @@
     "R8 ends": [
      "PASS",
      "ODYSSEY (+, 10 A fuse): -> ISOLATOR (red, +12 V 24 hr):red (+12 V 24 hr)"
+    ],
+    "R15 protected": [
+     "PASS",
+     "10 A inline fuse at the Odyssey + (Blue Sea 7700 instructions 990180170-006 p.2:"
     ]
    }
   },
@@ -10139,6 +10234,10 @@
     "R12 firewall": [
      "PASS",
      "body bulkhead B cavity 12"
+    ],
+    "R15 protected": [
+     "PASS",
+     "5 A inline fuse at the Odyssey + (Blue Sea 7700 instructions p.2: pin 2 'through"
     ]
    }
   },
@@ -10220,6 +10319,10 @@
     "R8 ends": [
      "PASS",
      "PS-STUDS (distribution stud, MIDI 60 A): -> DCDC (IN +):input + screw terminal"
+    ],
+    "R15 protected": [
+     "PASS",
+     "MIDI 60 A"
     ]
    }
   },
@@ -10247,6 +10350,10 @@
     "R8 ends": [
      "PASS",
      "DCDC (OUT +): -> ACC-BATT (+):+ post"
+    ],
+    "R15 protected": [
+     "PASS",
+     "none"
     ]
    }
   },
@@ -10561,7 +10668,7 @@
    ],
    "to": [
     "IBOOSTER (20, ignition 12 V)",
-    "0.50 mm\u00b2 green lead, housing pin 20 (ignition, 5 A)"
+    "0.50 mm\u00b2 green lead, housing pin 20 (ignition, 5 A) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]"
    ],
    "sides": [
     "cab",
@@ -10574,7 +10681,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:OUT9 -> IBOOSTER (20, ignition 12 V):0.50 mm\u00b2 green lead, housing pin 20 (ignition, 5 A)"
+     "PDM30:OUT9 -> IBOOSTER (20, ignition 12 V):0.50 mm\u00b2 green lead, housing pin 20 (ignition, 5 A) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]"
     ],
     "R11 command": [
      "PASS",
@@ -10596,7 +10703,7 @@
    ],
    "to": [
     "IBOOSTER (17, always-hot 5 A)",
-    "1.50 mm\u00b2 red lead, housing pin 17 (always hot, 5 A; medium blade)"
+    "1.50 mm\u00b2 red lead, housing pin 17 (always hot, 5 A; medium blade) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]"
    ],
    "sides": [
     "engine bay",
@@ -10609,7 +10716,11 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PS-STUDS (distribution stud, 5 A fuse): -> IBOOSTER (17, always-hot 5 A):1.50 mm\u00b2 red lead, housing pin 17 (always hot, 5 A; medium blade)"
+     "PS-STUDS (distribution stud, 5 A fuse): -> IBOOSTER (17, always-hot 5 A):1.50 mm\u00b2 red lead, housing pin 17 (always hot, 5 A; medium blade) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]"
+    ],
+    "R15 protected": [
+     "PASS",
+     "5 A inline fuse at the distribution stud (fastandquiet Gen-1 pinout (web_snapsho"
     ]
    }
   },
@@ -18747,7 +18858,7 @@
   ],
   "Body bulkhead": [
    "PASS",
-   "A 12/12 \u00b7 B 12/12 \u00b7 P 1/4 \u00b7 C 4/6 \u2014 body circuits cross here, never the engine-only 61-pin (state rows 50, 53)"
+   "A 12/12 \u00b7 B 12/12 \u00b7 P 2/4 \u00b7 C 4/6 \u2014 body circuits cross here, never the engine-only 61-pin (state rows 50, 53)"
   ],
   "61-pin cavities": [
    "PASS",

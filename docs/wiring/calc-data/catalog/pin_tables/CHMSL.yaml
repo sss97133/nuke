@@ -13,6 +13,4 @@ CHMSL:
   pins:
     '93': + feed (Oracle 4514-003 power connector; type read on arrival)
     CHMSL_GND: '- ground'
-    PCS_BRK: '+ feed tap for the PCS brake input (spliced with #93 at the lamp lead)'
-    TRANS_BRK: '+ feed tap for the 6L90 case stop-lamp input, cavity 6 (spliced with #93 at the lamp lead)'
   splice_point: true

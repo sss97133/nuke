@@ -45,6 +45,32 @@ def tw(s, size, bold=False):
     return _F[bold].getlength(s) * size / 100.0
 
 
+PURCHASE_WORDS = re.compile(r"\bpurchas\w*|\bbuy\b|\bbought\b|\bcarts?\b|\bordered\b|\bon order\b|\bin stock\b|"
+                            r"\border (?:number|#|no\b)", re.I)
+
+
+def no_purchase(text):
+    """What a page may print of a registry string: never purchase language (state 0aa, review round 5: registry
+    phrasing about orders becomes 'not on file'), never a repo file cited in it (the citation stays in the data)."""
+    t = str(text)
+    if re.search(r"\.(?:md|ya?ml|json|py|csv|txt)\b|web_snapshots/|receipts/", t):
+        t = re.sub(r"\s*\([^()]*(?:\.(?:md|ya?ml|json|py|csv|txt)\b|web_snapshots/|receipts/)[^()]*\)", "", t)
+        t = re.sub(r"\s*(?:web_snapshots|receipts|reference_documents)/\S+", "", t)
+        t = re.sub(r"\s*\S+\.(?:md|ya?ml|json|py|csv|txt)\b", "", t)
+    if not PURCHASE_WORDS.search(t):
+        return t
+    t = re.sub(r"PURCHASE:\s*(.+?)\s+is not on order\b", r"\1: not on file", t, flags=re.I)
+    t = re.sub(r"\s*\([^)]*\b(?:order|Gmail|cart|invoice)\b[^)]*\)", "", t, flags=re.I)
+    t = re.sub(r"\s*[—-]?\s*none in any cart", " — not on file", t, flags=re.I)
+    t = re.sub(r"\bbought complete\b", "supplied complete", t, flags=re.I)
+    t = re.sub(r"\bPURCHASE:\s*", "not on file: ", t, flags=re.I)
+    return t
+
+
+def purchase_faults(boxes):
+    return [f"purchase language printed: '{str(b[4])[:60]}'" for b in boxes if PURCHASE_WORDS.search(str(b[4]))]
+
+
 def wrap_text(s, width, size, bold=False):
     """Words onto lines no wider than width. A word wider than the line is split at a '/', ',' or '-' where it can
     be, else between characters: never cut short, never an ellipsis (review 2026-09-28: truncation hid facts)."""
@@ -69,7 +95,7 @@ def wrap_text(s, width, size, bold=False):
             fixed.append(part)
         return [f for f in fixed if f]
     lines, cur = [], ""
-    for w0 in str(s).split():
+    for w0 in no_purchase(s).split():
         for w_ in pieces(w0):
             t = (cur + " " + w_).strip()
             if tw(t, size, bold) <= width or not cur:
@@ -104,7 +130,7 @@ def source_strings():
             for v in (w.get("label"), w.get("notes"), kits_v5.dave_name(w)):
                 if v:
                     src.add(str(v))
-        _SOURCES = [x for x in src if len(x) > 20]
+        _SOURCES = [x for x in src if len(x) > 20 and "SPL-" not in x]      # splice names print as S-## on purpose
     return _SOURCES
 
 
@@ -163,6 +189,7 @@ class Page:
         self.txt(num_x, M - 12, number, 9, bold=True, anchor=num_anchor)
 
     def txt(self, x, y, s, size, bold=False, anchor="start", length=None, italic=False, href=None):
+        s = no_purchase(s)
         w_ = length or tw(str(s), size, bold)
         x0 = x - (w_ if anchor == "end" else w_ / 2 if anchor == "middle" else 0)
         self.boxes.append((x0, y - size * 0.78, x0 + w_, y + 0.2, str(s), href))
@@ -428,12 +455,10 @@ def gauge(w):
 
 
 def circuit_word(w):
-    """How a circuit is named on a page: this build's circuit number when it is one ('13', '103G', '85a'), else the
-    builder's name for the wire (kits_v5.dave_name) — never a cut-list code like COIL1_SGND (review round 3)."""
-    wid = str((w or {}).get("id") or "")
-    if re.fullmatch(r"\d+[A-Za-z]?", wid):
-        return wid.upper()
-    return kits_v5.dave_name(w) if w else wid
+    """A circuit's identifier as the book prints it in every CKT / CIRCUIT / CABLE column and LABEL line: its number, or
+    its registry id when it has none (INJ_PWR is its circuit id). Dave's plain-words name goes in the function column.
+    (Review round 5: round 4 had blanked the ids; the rule was only never to print a code AS a name.)"""
+    return str((w or {}).get("id") or "").upper()
 
 
 def page_contents(reg, wires, toc, shown, notes):
@@ -448,14 +473,23 @@ def page_contents(reg, wires, toc, shown, notes):
     p.txt(W / 2, p.y, "CONTENTS", 11, bold=True, anchor="middle")
     p.y += 8
     rows = [("General Description", "1-1")] + toc
-    x0, x1 = M + 120, W - M - 120
-    for s, pg in rows:
-        p.y += 13
-        p.txt(x0, p.y, s, 9)
-        p.txt(x1, p.y, pg, 9, anchor="end")
-        dots_from, dots_to = x0 + tw(s, 9) + 6, x1 - tw(pg, 9) - 6
-        p.line(dots_from, p.y - 1, dots_to, p.y - 1, 0.6, dash="1 3")
-    p.y += 28
+    # two columns: the front pages left, the wiring diagrams and DC primary right (every section listed, round 5)
+    split = next((i for i, (s_, _p) in enumerate(rows) if s_ == "Wiring Diagrams"), (len(rows) + 1) // 2)
+    y0 = p.y
+    for col, part in ((0, rows[:split]), (1, rows[split:])):
+        x0, x1 = M + col * (COLW + GUT) + 6, M + col * (COLW + GUT) + COLW - 6
+        yy = y0
+        for s_, pg in part:
+            yy += 11
+            ind = s_.startswith("    ")
+            s_ = s_.strip()
+            size = 7.6 if ind else 8.4
+            xs = x0 + (10 if ind else 0)
+            p.txt(xs, yy, s_, size)
+            p.txt(x1, yy, pg, size, anchor="end")
+            p.line(xs + tw(s_, size) + 5, yy - 1, x1 - tw(pg, size) - 5, yy - 1, 0.6, dash="1 3")
+        p.y = max(p.y, yy)
+    p.y += 20
     p.heading("General Description", 13)
     solved = sum(1 for e in shown if reg["dossiers"].get(e, {}).get("status") == "design-complete")
     blocks = [
@@ -475,7 +509,7 @@ def page_contents(reg, wires, toc, shown, notes):
               f"{solved} of the {len(shown)} plugs in this section are complete down to terminal, seal and crimp tool. "
               f"Under each figure: the plug kit, terminal and seal part numbers, then DESIGN COMPLETE or OPEN with the fact "
               f"still missing. Open items shared by several plugs are the numbered notes below. Nothing in this book says "
-              f"whether a part has been bought; that lives on the truck's map."),
+              f"whether a part is on hand; that lives on the truck's map."),
     ] + readiness_blocks(reg) + [
         ("note", "The M130 mount spot is still open. This section is drawn for a cab mount."),
         ("note", "Lengths printed on the wiring diagram sheets are estimates from the twin and the cut list until measured on the truck; "
@@ -707,9 +741,9 @@ def page_pinout(reg, wires, number, odd, dev, conn, n_pins, title, mating, sourc
         if ws:
             # the first circuit, whole, and how many more share the pin (the table lists every one of them)
             size_ = 5.6
-            while tw(str(ws[0]).upper() if re.fullmatch(r"\d+[A-Za-z]?", str(ws[0])) else "", size_) > cw - 2 and size_ > 3.8:
+            while tw(str(ws[0]).upper(), size_) > cw - 2 and size_ > 3.8:
                 size_ -= 0.3                                # a long id shrinks to fit its cell; it never overprints its neighbour
-            first_ = str(ws[0]).upper() if re.fullmatch(r"\d+[A-Za-z]?", str(ws[0])) else ""   # a code never labels a pin
+            first_ = str(ws[0]).upper()                      # the circuit id labels the pin
             more_ = len(ws) - (1 if first_ else 0)
             lines_ = (wrap_text(first_, cw - 2, size_) if first_ else []) + (
                 [f"+{more_} more" if first_ else f"{more_} circuit{'s' if more_ > 1 else ''}"] if more_ else [])
@@ -865,21 +899,10 @@ def code_ids():
     return _CODE_IDS
 
 
-def code_faults(boxes):
-    """A cell or label that prints a registry code as a circuit (review round 4: COIL1_SGND in the CKT column). A code
-    may appear inside the wire list's own sentences (a label quoting '#TG_FEED splice'), never as the name itself."""
-    ids = code_ids() - {d[0].upper() for d in DESIG.values()}        # a MoTeC pin designation is the maker's word
-    bad = []
-    for b in boxes:
-        t = str(b[4]).strip()
-        t = re.sub(r"^LABEL:\s*", "", t)
-        t = re.sub(r"\s*\((?:\+\d+[^)]*)\)\s*$", "", t)
-        toks = [x.strip() for x in re.split(r",|\s\+\s|→", t) if x.strip()]
-        toks = [re.sub(r"^\d+\s+[A-Z/]+-", "", x) for x in toks]            # '22 WHT-COIL1_SGND' run labels
-        toks = [x.split(" · ")[0].strip() for x in toks]
-        if toks and any(x.upper() in ids for x in toks):
-            bad.append(f"a registry code printed as a circuit name: '{t[:60]}'")
-    return bad
+def id_faults(boxes):
+    """Every wire row and run label carries its circuit id (review round 5): 'LABEL: OPEN' or a blank circuit cell on a
+    wire that has an id fails. Pages record blank cells in page.faults as they build their rows."""
+    return [f"a sleeve label without the circuit id: '{str(b[4])[:50]}'" for b in boxes if str(b[4]).strip() == "LABEL: OPEN"]
 
 
 def legend_faults(text):
@@ -1035,7 +1058,7 @@ def page_firewall(reg, wires, number, odd):
     for cav in sheets.CAV_ORDER:
         wid = cav_wire.get(cav)
         w = wires.get(wid) if wid else None
-        rows.append((cav, (wid.upper() if wid and re.fullmatch(r"\d+[A-Za-z]?", wid) else "—"), gm_colour(f"{gauge(w)} {colour(w)}") if w else "spare",
+        rows.append((cav, (wid.upper() if wid else "—"), gm_colour(f"{gauge(w)} {colour(w)}") if w else "spare",
                      kits_v5.dave_name(w).upper() if w else "", open_word((dev_end.get(wid) or "").upper()) if w else "",
                      open_word((cab_end.get(wid) or "").upper()) if w else ""))
     widths = [24, 62, 72, 124, 150, W - 2 * M - 432]
@@ -1062,7 +1085,7 @@ def page_legend(number, odd):
     def sq(x_, y_):
         p.rect(x_, y_ - 6, 13, 13, sw=0.9, fill="#1f8a3b"); p.rect(x_, y_ - 6 + 13 * 0.4, 13, 13 * 0.2, sw=0, fill="#d3222a")
         p.txt(x_ + 6.5, y_ - 9, "3", 6.5, bold=True, anchor="middle")
-    row(sq, "PIN MAP — one square per cavity, in the order the marking is moulded on the plug, filled in the ordered wire colour; a band across it is the stripe colour. The housing's shape is not drawn unless the maker's drawing is on file.")
+    row(sq, "PIN MAP — one square per cavity, in the order the marking is moulded on the plug, filled in the wire's specified colour; a band across it is the stripe colour. The housing's shape is not drawn unless the maker's drawing is on file.")
     def cav(x_, y_):
         p.el.append(f'<circle cx="{x_ + 8}" cy="{y_}" r="7.6" fill="#7a4a1d" stroke="#000" stroke-width="0.8"/>'); p.txt(x_ + 8, y_ + 2.2, "AA", 6.2, bold=True, anchor="middle")
         p.el[-1] = p.el[-1].replace('<text ', '<text fill="#fff" ', 1)
@@ -1075,7 +1098,7 @@ def page_legend(number, odd):
         p.el.append(f'<polyline points="{x_},{y_} {x_ + 44},{y_}" fill="none" stroke="#f2f2f2" stroke-width="1.4"/>')
         p.el.append(f'<polyline points="{x_},{y_} {x_ + 44},{y_}" fill="none" stroke="#f28c28" stroke-width="0.5"/>')
         p.txt(x_, y_ - 4, "22 WHT/ORN-99R · TOTAL RUN 4.6 FT EST", 4.8)
-    row(run, "RUN — a wire, drawn in its ordered colour with a thin centre line for the stripe; a shielded-cable conductor is black with a white "
+    row(run, "RUN — a wire, drawn in its specified colour with a thin centre line for the stripe; a shielded-cable conductor is black with a white "
              f"centre line; {UNSET_RUN_WORDS}. Label = gauge, colour, circuit, then the run's total length, printed "
              "once per sheet (the same wire labelled again, past a connector, carries no length): EST until measured with a tape on the truck.")
     def dashed(x_, y_):
@@ -1102,7 +1125,7 @@ def page_legend(number, odd):
     row(box, "PLUG BOX — a device seen at its plug: one row per cavity with the moulded mark and the wire's function in the builder's words. The title links to the plug's card on the truck's map (part, proof, photos).")
     p.y = y + 6
     p.columns([("h", "Stamps"),
-               ("p", "DESIGN COMPLETE — every wire end, terminal and seal at this plug is named and cited. OPEN — one fact is missing; it is named. Nothing in this book says whether a part has been bought; that lives on the truck's map."),
+               ("p", "DESIGN COMPLETE — every wire end, terminal and seal at this plug is named and cited. OPEN — one fact is missing; it is named. Nothing in this book says whether a part is on hand; that lives on the truck's map."),
                ("h", "Words"),
                ("p", "Wires are named the way the builder names them: TPS, oil PSI, crank sensor, 0 V for a return, 5 V for a reference; never a cut-list code. Circuit numbers are this build's wire numbers and are the provisional label text until the builder's label list exists.")], top=p.y)
     return p
@@ -1621,7 +1644,7 @@ def page_tabulation(reg, wires, number, odd):
     for wid in ids:
         w = wires.get(wid)
         if w:
-            rows.append((circuit_word(w).upper() if re.fullmatch(r"\d+[A-Za-z]?", wid) else "—",
+            rows.append((circuit_word(w),
                          gm_colour(f"{gauge(w)} {colour(w)}"), kits_v5.dave_name(w).upper()))
     def key(r):
         m = re.match(r"^(\d+)(.*)$", r[0])
@@ -1691,8 +1714,37 @@ def build():
     sheets = [] if "--pages-only" in sys.argv else diagram_v5.build(first_number=len(pages) + 1)
     if sheets:
         toc.append(("Wiring Diagrams", sheets[0][0]))
+        for head_, num_ in diagram_v5.SECTION_STARTS:
+            toc.append(("    " + head_.title().replace(" — ", " — "), num_))
+    # Section 2 — DC primary (batteries, isolator, distribution, grounds, protection, cable schedule): power_v5, built
+    # before the contents page so the contents list every page (review round 5)
+    power = []
+    if "--pages-only" not in sys.argv:
+        import power_v5
+        power = power_v5.build(first_number=len(pages) + len(sheets) + 1)
+        toc.append(("DC Primary and Grounds", power[0][0]))
+        seen_ = set()
+        for num_, t_, _k, _pdf in power:
+            base_ = t_.split(" — ")[0]
+            if base_ not in seen_:
+                seen_.add(base_)
+                toc.append(("    " + base_, num_))
 
     pages[0] = page_contents(reg, wires, toc, [e for e, _, _ in plugs], notes)
+    # every page of the book falls in a contents entry, and every section of it is listed
+    all_nums = [p_.number for p_ in pages] + [s_[0] for s_ in sheets] + [p_[0] for p_ in power]
+    last_ = max(int(n_.split("-")[1]) for n_ in all_nums)
+    toc_nums = sorted(int(n_.split("-")[1]) for _t, n_ in toc)
+    toc_bad = []
+    if toc_nums and (toc_nums[0] > 2 or toc_nums[-1] > last_):
+        toc_bad.append("contents entries do not span the book")
+    for head_, num_ in diagram_v5.SECTION_STARTS:
+        if not any(n_ == num_ for _t, n_ in toc):
+            toc_bad.append(f"diagram section {head_} (from {num_}) not in the contents")
+    if power and not any(n_ == power[0][0] for _t, n_ in toc):
+        toc_bad.append("the DC primary pages are not in the contents")
+    if pages[0].__dict__.get("extra_pages"):
+        toc_bad.append("page 1-1 runs over its page: the contents and description must fit it")
     bad = []
     for p in pages:
         text = " ".join(re.sub(r"<[^>]+>", " ", e) for e in p.el)
@@ -1701,16 +1753,17 @@ def build():
         bad += [f"{p.number}: {b}" for b in layout_faults(p.boxes, W, H, M, footer=(REVISION,))]
         bad += [f"{p.number}: {b}" for b in fragment_faults(p.boxes)]
         bad += [f"{p.number}: {b}" for b in legend_faults(" ".join(str(b_[4]) for b_ in p.boxes))]
-        bad += [f"{p.number}: {b}" for b in code_faults(p.boxes)]
+        bad += [f"{p.number}: {b}" for b in id_faults(p.boxes)]
         bad += [f"{p.number}: {b}" for b in gauge_faults(p.boxes)]
         bad += [f"{p.number}: {b}" for b in word_faults(p.boxes)]
+        bad += [f"{p.number}: {b}" for b in purchase_faults(p.boxes)]
         bad += [f"{p.number}: 'NEEDS CAVITY' printed as text: '{str(b_[4])[:50]}'" for b_ in p.boxes if "NEEDS CAVITY" in str(b_[4])]
         bad += [f"{p.number}: {b}" for b in getattr(p, "faults", [])]
         if any(b[4] == "(continued)" for b in p.boxes):
             body = [b for b in p.boxes if b[1] > M + 16 and b[4] not in ("(continued)", REVISION)]
             if len({round(b[1]) for b in body}) < 8:
                 bad.append(f"{p.number}: continuation page with {len({round(b[1]) for b in body})} lines: fit the content on its page")
-    bad += designation_faults()
+    bad += designation_faults() + toc_bad
     if bad:
         raise SystemExit(f"manual breaks the book's rules ({len(bad)}):\n  " + "\n  ".join(bad[:400]))
     pdfs = []
@@ -1722,13 +1775,7 @@ def build():
         diagram_v5.add_links(stem.with_suffix(".pdf"), link_parts(p.boxes), H)
         pdfs.append(str(stem.with_suffix(".pdf")))
     pdfs += [s_[4] for s_ in sheets]
-    # Section 2 — DC primary (batteries, isolator, distribution, grounds, protection, cable schedule): power_v5
-    power = []
-    if "--pages-only" not in sys.argv:
-        import power_v5
-        power = power_v5.build(first_number=len(pages) + len(sheets) + 1)
-        pdfs += [p_[3] for p_ in power]
-        toc.append(("DC Primary and Grounds", power[0][0]))
+    pdfs += [p_[3] for p_ in power]
     subprocess.run(["pdfunite", *pdfs, str(OUT / "K5_Harness_Manual.pdf")], check=True)
     # outputs this run did not write are stale pages of an earlier numbering (review 2026-09-28: K5_power_45..50
     # PNGs beside the book, in no PDF): delete them, then fail if any file beside the book is not a page of it
