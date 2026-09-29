@@ -99,6 +99,8 @@ def run():
             pig = next((pn for pn in (ep.get("pigtailed") or []) if pn.split(" ")[0] == str(t["wire"])), None)
             if pig:
                 eff = 16            # the contact holds a 16 AWG pigtail; the load wire meets it in the splice
+            if w.get("protection_parts") and (ep.get("family") == "lug" or ep.get("stud")):
+                eff = 12            # round 5: the stud ring sits on the in-line fuse holder's 12 AWG pigtail (Blue Sea 5065: 'Supplied with 12 AWG pigtails')
             name = kits_v5.dave_name(w) if w else str(t["wire"])
             codes = [c for c in str(t.get("part") or "").split(" + ") if c]
             term = next((c for c in codes if (parts.get(c) or {}).get("kind") in ("terminal", "contact")), None)
@@ -235,8 +237,11 @@ def run():
 #   R12 firewall      a wire whose ends sit on opposite sides crosses through a 61-pin cavity or the grommet
 #   R13 locked        no wire or device contradicts a locked decision (K5_WIRING_STATE.md §1; wiring_decisions rows)
 #   R14 agree         the wire record and the plug write-up name the same far end and pin
+#   R15 protected     a feed landing on a battery stud (distribution, PDM30/PDM15 stud, battery post) has a protection record;
+#                     an inline fuse names its holder and fuse part (lead round 5, 2026-09-28)
 # Populations are reported apart: v5 active (the master list), implied (grounds / power spine), April concept.
 
+STUD_RX = re.compile(r"PS-STUDS|PDM30-STUD|PDM30:STUD|PDM15-STUD|PDM15 battery stud|[Dd]istribution stud|ODYSSEY \(\+|Odyssey \+|ACC-BATT \(\+")
 PDM30_RATING_A = {**{f"OUT{n}": 20 for n in range(1, 9)}, **{f"OUT{n}": 8 for n in range(9, 31)}}
 # MoTeC PDM30 datasheet (stored text): "8 x 20 A outputs ... 22 x 8 A outputs"
 SIGNAL_WIRES = {"analog_5v": 3, "analog_temp": 2, "low_side_drive": 2, "logic_coil_drive": 4}   # chapters/05 table
@@ -485,6 +490,17 @@ def run_wires():
                 res["R14 agree"] = ("FAIL", f"record pin '{to.get('pin')}'; write-up has cavity {far[0].get('cavity')} at {far[0]['endpoint']}")
             elif not far and code_of(to.get("device")) in eps and not str(to.get("device")).startswith(("M130",)):
                 res["R14 agree"] = ("OPEN", f"record says {to.get('device')}; its write-up doesn't list this wire")
+        if kind != "april":
+            ft_ = f"{frm} {json.dumps(to) if isinstance(to, dict) else to}"
+            gnd_ = re.search(r"GND|ground", f"{wid} {label}", re.I) or str(frm).startswith("GND-BANK")
+            if STUD_RX.search(ft_) and not gnd_:
+                pr_ = w.get("protection")
+                if not pr_:
+                    res["R15 protected"] = ("FAIL", "lands on a battery stud with no protection record")
+                elif "inline fuse" in str(pr_) and "kit" not in str(pr_) and not ((w.get("protection_parts") or {}).get("holder") and (w.get("protection_parts") or {}).get("fuse")):
+                    res["R15 protected"] = ("FAIL", "inline fuse with no holder or fuse part")
+                else:
+                    res["R15 protected"] = ("PASS", str(pr_)[:80])
         eng_run = (w.get("subsystem") in ENGINE_RUN) if kind != "april" else (w.get("sub") == "engine-harness")
         out.append({"wire": wid, "kind": kind, "label": label, "from": a, "to": b, "sides": (sa, sb),
                     "from_str": (str(frm) if kind != "april" else None), "control": (w.get("control") if kind != "april" else None),

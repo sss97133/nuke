@@ -6,7 +6,7 @@ Vocabulary: composite design (every option) → configuration (base + decided) �
 
 | code | option | status | decided | wires | source |
 |---|---|---|---|---|---|
-| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 323 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
+| BASE | Base truck — engine, power spine, comms, factory body functions | **base** |  | 324 | K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits) |
 | AUD | Audio — head unit, 5-channel amplifier, four coax speakers, two 10 in woofers | **decided** | 2026-09-27 | 21 | owner 2026-09-25 ("we are gonna do jbl 10 compact woofers, an amp ... and then the appropriate other speakers" |
 | STEPS | AMP Research power steps | **decided** | 2025-03-01 | 4 | client invoice Inv. 4 (AMP steps line, DB); WIRING_SYSTEM_KNOWLEDGE.md |
 | RC | Rear camera with mirror display | **decided** | 2026-09-27 | 6 | owner 2026-09-27 ("we also want like rear camera"); receipt 2026-09-27_wires-right-engine-start-doors-camera.m |
@@ -30,15 +30,15 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| buildable (base + decided) | 354 | 261 | 351 | 354 | 340 | 2 | 89 | m 0 · e 173 · u 174 |
-| composite (every option) | 386 | 265 | 378 | 386 | 370 | 2 | 89 | m 0 · e 176 · u 203 |
+| buildable (base + decided) | 355 | 264 | 352 | 355 | 341 | 2 | 90 | m 0 · e 173 · u 175 |
+| composite (every option) | 387 | 268 | 379 | 387 | 371 | 2 | 90 | m 0 · e 176 · u 204 |
 
 ### By option
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
 | AUD | 21 | 16 | 21 | 21 | 21 | 0 | 0 | m 0 · e 12 · u 9 |
-| BASE | 323 | 242 | 320 | 323 | 309 | 2 | 89 | m 0 · e 159 · u 157 |
+| BASE | 324 | 245 | 321 | 324 | 310 | 2 | 90 | m 0 · e 159 · u 158 |
 | BFL | 2 | 0 | 2 | 2 | 2 | 0 | 0 | m 0 · e 0 · u 2 |
 | IBST-CAN | 2 | 0 | 2 | 2 | 0 | 0 | 0 | m 0 · e 0 · u 2 |
 | PL | 6 | 0 | 6 | 6 | 6 | 0 | 0 | m 0 · e 1 · u 5 |
@@ -57,7 +57,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | lighting_front | 29 | 13 | 29 | 29 | 29 | 0 | 10 | m 0 · e 16 · u 13 |
 | lighting_rear | 23 | 5 | 23 | 23 | 23 | 0 | 0 | m 0 · e 9 · u 14 |
 | power_spine | 37 | 23 | 37 | 37 | 29 | 0 | 8 | m 0 · e 2 · u 30 |
-| powertrain_chassis | 23 | 16 | 23 | 23 | 22 | 0 | 0 | m 0 · e 6 · u 17 |
+| powertrain_chassis | 24 | 19 | 24 | 24 | 23 | 0 | 1 | m 0 · e 6 · u 18 |
 | unsectioned | 2 | 2 | 2 | 2 | 2 | 0 | 0 | m 0 · e 0 · u 2 |
 
 ## Capacity ledger
@@ -67,19 +67,19 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | 61-pin (engine only) | 61 | 58 | d, t, u | kits_v5 firewall map; state rows 50, 53 |
 | body bulkhead A | 12 | 12 | 0 | catalog/endpoints.yaml pins |
 | body bulkhead B | 12 | 12 | 0 | catalog/endpoints.yaml pins |
-| body bulkhead P | 4 | 1 | 3 | catalog/endpoints.yaml pins |
+| body bulkhead P | 4 | 2 | 2 | catalog/endpoints.yaml pins |
 | body bulkhead C | 6 | 4 | 2 | catalog/endpoints.yaml pins |
 | power grommet |  | 6 |  | kits_v5 firewall map |
 | pass-through AMP-PASS | 2 | 2 | 0 | catalog/endpoints.yaml; one cable per Blue Sea 1003 CableClam |
 | PDM30 20 A outputs | 8 | 6 | 2 | PDM30 datasheet p.1; PDM user manual comparison table |
-| PDM30 8 A outputs | 22 | 22 | 0 | PDM30 datasheet p.1; PDM user manual comparison table |
+| PDM30 8 A outputs | 22 | 21 | 1 | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM30 inputs | 16 | 14 | 2 (DIG8, DIG16) | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM15 20 A outputs | 8 | 7 | 1 | PDM30 datasheet p.1; PDM user manual comparison table |
-| PDM15 8 A outputs | 7 | 2 | 5 | PDM30 datasheet p.1; PDM user manual comparison table |
+| PDM15 8 A outputs | 7 | 3 | 4 | PDM30 datasheet p.1; PDM user manual comparison table |
 | PDM15 inputs | 16 | 2 | 14 (DIG1, DIG2, DIG3, DIG6, DIG7, DIG8, DIG9, DIG10, DIG11, DIG12, DIG13, DIG14, DIG15, DIG16) | PDM30 datasheet p.1; PDM user manual comparison table |
 | M130 pins | 60 | 52 | 8 | M130 datasheet; registry pinout (kits_v5) |
-| ground bank GND-BANK-ENG |  | 23 |  | catalog/endpoints.yaml wires; stud count not yet set |
-| ground bank GND-BANK-CAB |  | 22 |  | catalog/endpoints.yaml wires; stud count not yet set |
+| ground bank GND-BANK-ENG |  | 24 |  | catalog/endpoints.yaml wires; stud count not yet set |
+| ground bank GND-BANK-CAB |  | 21 |  | catalog/endpoints.yaml wires; stud count not yet set |
 | ground bank GND-SPLICE-REAR |  | 13 |  | catalog/endpoints.yaml wires; stud count not yet set |
 
 ### Wire stock
@@ -103,7 +103,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | M22759/16 22 AWG green/gray | 4.0 | 0 | not recorded | short by 4.0 ft |
 | M22759/16 22 AWG green/white | 9.2 | 0 | not recorded | short by 9.2 ft |
 | M22759/16 22 AWG gray | 39.3 | 0 | not recorded | short by 39.3 ft |
-| M22759/16 22 AWG white | 68.2 | 0 | not recorded | short by 68.2 ft |
+| M22759/16 22 AWG white | 68.2 | 0 | not recorded | short by 68.2 ft; also PCS_BRK, TRANS_BRK (length not measured yet) |
 | M22759/16 22 AWG white/orange | 19.8 | 0 | not recorded | short by 19.8 ft |
 | M22759/16 22 AWG white/blue | 14.6 | 0 | not recorded | short by 14.6 ft |
 | M22759/16 10 AWG black | 21.2 | 30.0 | not recorded | covered |
@@ -171,7 +171,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | option | designed wires | crossings | PDM30 outputs | PDM30 inputs | notes |
 |---|---|---|---|---|---|
 | PW | 14 | 0 | 2 | 0 |  |
-| PL | 6 | 0 | 0 | 0 |  |
+| PL | 6 | 0 | 1 | 0 |  |
 | TG | 8 | 0 | 0 | 0 |  |
 | FC | 0 | 2 | 1 | 0 | camera and display not picked; if the mirror display takes a second input, video only |
 | AS | 0 | 0 | 0 | 2 | receiver module in the cab; needs a constant feed and the PCS neutral input the PDM30 already reads |
@@ -184,6 +184,6 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 ### Verdict
 
-- **body crossings:** Body firewall crossings: candidates would take 2; body bulkheads have 5 spare — fits, but only in the 4-way power connector P (size 12 contacts); signal wires need bulkhead C
-- **PDM30 outputs:** PDM30 outputs: candidates would take 4; 2 spare — does NOT fit; the engine PDM15 has 6 spare outputs for engine-bay loads
+- **body crossings:** Body firewall crossings: candidates would take 2; body bulkheads have 4 spare — fits, but only in the 4-way power connector P (size 12 contacts); signal wires need bulkhead C
+- **PDM30 outputs:** PDM30 outputs: candidates would take 5; 3 spare — does NOT fit; the engine PDM15 has 5 spare outputs for engine-bay loads
 - **PDM30 inputs:** PDM30 inputs: candidates would take 3; 2 spare — does NOT fit; PDM15 has 14 spare inputs, read over CAN

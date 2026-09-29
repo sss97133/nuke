@@ -1,12 +1,12 @@
 IBOOSTER:
   family: open
   pins:
-    '52': 4.00 mm² red lead, housing pin 1 (always hot, 40 A)
-    IBOOST_PERM: 1.50 mm² red lead, housing pin 17 (always hot, 5 A; medium blade)
-    IBOOST_WAKE: 0.50 mm² green lead, housing pin 20 (ignition, 5 A)
-    IBOOST_GND: 4.00 mm² black lead, housing pin 9 (chassis ground)
-    IBST_CAN_H: 'housing pin 16, vehicle CAN high (CANDIDATE IBST-CAN): not needed for basic operation and not a Tulay loose lead — a terminal goes into the Tulay-assembled plug: OPEN'
-    IBST_CAN_L: 'housing pin 25, vehicle CAN low (CANDIDATE IBST-CAN): not a Tulay loose lead — OPEN'
+    '52': '4.00 mm² red lead, housing pin 1 (always hot, 40 A) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]'
+    IBOOST_PERM: '1.50 mm² red lead, housing pin 17 (always hot, 5 A; medium blade) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]'
+    IBOOST_WAKE: '0.50 mm² green lead, housing pin 20 (ignition, 5 A) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]'
+    IBOOST_GND: '4.00 mm² black lead, housing pin 9 (chassis ground) [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md; lead: tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md]'
+    IBST_CAN_H: 'housing pin 16, vehicle CAN high (CANDIDATE IBST-CAN): not needed for basic operation and not a Tulay loose lead — a terminal goes into the Tulay-assembled plug: OPEN [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md]'
+    IBST_CAN_L: 'housing pin 25, vehicle CAN low (CANDIDATE IBST-CAN): not a Tulay loose lead — OPEN [pin: www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md]'
   note: 'Gen 1 (1037123-00-B). The Tulay Gen-1 universal harness has the controller plug and the pedal travel sensor plug assembled, with four loose leads: red 4.00 mm² (pin 1, 40 A), red 1.50 mm² (pin 17, 5 A), green 0.50 mm² (pin 20, ignition 5 A), black 4.00 mm² (pin 9). Pedal travel sensor, inside the harness (Gen 1 mapping, differs from Gen 2): sensor 1 -> controller 2, 2 -> 22, 3 -> 8, 4 -> 23. It must be the Gen-1 harness: the sensor plug mapping differs by generation.'
   open:
   - 'PURCHASE: Tulay Gen-1 universal harness is not on order (no Tulay order in the owner''s Gmail)'

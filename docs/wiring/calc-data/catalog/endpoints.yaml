@@ -60,7 +60,7 @@ PDM30-STUD:
   device: PDM30 battery stud (M6; "eyelet and M6 nut")
   family: lug
   kit: {}
-  lugs: {PDM_BPOS: DL214, DAK_CONST: ["9904"], PCS_BATT: ["9904"], TRANS_BATT: ["9904"]}   # 18 AWG fused taps for the cab-mounted PCS: ProWire 9904   # DAK_CONST 18 AWG through its 3 A inline fuse: ProWire 9904 (22-18 AWG, 1/4 in = M6)
+  lugs: {PDM_BPOS: DL214, DAK_CONST: ["9916"], PCS_BATT: ["9916"], TRANS_BATT: ["9916"]}   # fused taps: the Blue Sea 5065 holder's 12 AWG pigtail on the M6 stud: ProWire 9916 12-10 AWG 1/4   # DAK_CONST 18 AWG through its 3 A inline fuse: ProWire 9904 (22-18 AWG, 1/4 in = M6)
   wires: [PDM_BPOS, DAK_CONST, PCS_BATT, TRANS_BATT]
   sources: ["motec_pdm30_datasheet.pdf ('Mating: eyelet and M6 nut')", "build book DC primary table (DL214 = PDM30 M6)"]
 
@@ -128,7 +128,7 @@ SPL-PDM30-OUT5:
   device: "PDM30 OUT5 pigtail splice — pins A9 + A17 (2 x 20 AWG) joined to the third brake light feed #93 (raised to 20 AWG)"
   family: miniseal
   kit: {M81824/1-2: 1}
-  wires: ["93_PT1", "93_PT2", "93"]
+  wires: ["93_PT1", "93_PT2", "93", "PCS_BRK", "TRANS_BRK"]   # PCS_BRK / TRANS_BRK: brake-lamp signal taps (lead round 5)
   note: "in-line MiniSeal M81824/1-2: both pigtails in one end, the load wire out the other; pigtails cut to the same length"
   open: ["splice spot: within pigtail reach of the PDM30 connector, set at the formboard"]
   sources: ["MoTeC PDM user manual p.44 (20 A Output 5 on A9 with A17)", "MoTeC PDM user manual p.48 (20# to 16# on 20 A outputs)", "ProWire 3137CT cavities 26-20 / 20-16 / 16-12 AWG + Raychem MiniSeal page (M81824/1 in-line series)", "book review 2026-09-28 (every single wire on a paired 20 A output)"]
@@ -934,7 +934,7 @@ PS-STUDS:
     PDM15_BPOS: [2516LTP]  # the cable is 2 AWG (cable_decisions.json): 2516LTP, 2 AWG 5/16 in, on the MEGA M8 stud     # MEGA 100 A holder, M8 stud (the PDM15 end is PDM15-STUD)
     "52": [610TP]  # 6 AWG (cable_decisions.json) on the MIDI M5 stud: ProWire 610TP                 # MIDI 40 A holder, M5 stud
     "3": [AMP-KIT-RING]           # AMP Research kit harness red lead, its own fuse (IM75146 step 8)
-    IBOOST_PERM: [RING-SMALL]     # 5 A fused tap: holder type OPEN
+    IBOOST_PERM: ["9918"]         # the Blue Sea 5065 holder's 12 AWG pigtail on the 3/8 in distribution stud (the #6 lug there is 238LTP, 3/8): ProWire 9918 12-10 AWG 3/8
     GND_RET_CAB: [238LTP, 238LTP]
   wires: ["63", "6", "59", G1, G2, G3, ISO_OUT, ODY_NEG, ACC_NEG, DCDC_IN, GND_RET_CAB, PDM_BPOS, PDM15_BPOS, "52", "3", IBOOST_PERM]
   open:
@@ -942,7 +942,6 @@ PS-STUDS:
     - "stud sizes: starter + alternator 5/16 in is the build book's assumption; isolator studs are 3/8 in-16 (Blue Sea 7700), so 238LTP fits them"
     - "lug torque per stud: isolator 140 in-lb max (Blue Sea 7700 instructions p.1-2); the others UNKNOWN (datasheets)"
     - "a fused branch lands on its holder's stud, not the 3/8 in distribution stud: MEGA holder 02980900TXN = M8 (2516LTP for 2 AWG), MIDI holder 0498900.TXN = M5 (810TP for 8 AWG, 410LTP for 4 AWG) — stud sizes from the 2026-09-25 cart receipt; the Littelfuse holder datasheets are not on file"
-    - "PCS_BATT 5 A fused tap: the holder is not picked (MIDI starts at 30 A, chapters/17 §17.2 item 9); ring PN OPEN (RING-SMALL)"
     - "PDM15_BPOS fuse: MEGA 100 A (PDM15 80 A total continuous x 1.25, MoTeC PDM manual p.35; chapters/17 §17.5 item 5) — part number not on file (MEGA-100A)"
   sources: ["build book 'DC primary' table", "state 0i", "chapters/17"]
 
@@ -1085,12 +1084,12 @@ FIREWALL-BODY-P:
   where: firewall
   device: "body bulkhead P — Deutsch DTP04-4P-L012 flanged 4-way receptacle + WP-4P wedge, DTP06-4S plug + WP-4S wedge, DTP4P-L012-GKT flange gasket; size 12 contacts, 14–12 AWG"
   family: dtp
-  kit: {DTP04-4P-L012: 1, DTP06-4S: 1, WP-4P: 1, WP-4S: 1, DTP4P-L012-GKT: 1, "114017": 6}
-  wires: ["BLOWER_HI"]   # a crossing: the mating half's contact is counted (kits_v5)
-  pins: {"BLOWER_HI": "1"}
-  empty: ["2", "3", "4"]
-  note: "1 of 4 used; cavities 2-4 spare, closed with a 114017 sealing plug in each half (3 in the receptacle, 3 in the plug)"
-  open: ["3 spare cavities (body power feeds 12-14 AWG)"]
+  kit: {DTP04-4P-L012: 1, DTP06-4S: 1, WP-4P: 1, WP-4S: 1, DTP4P-L012-GKT: 1, "114017": 4}
+  wires: ["BLOWER_HI", "PCS_IGN"]   # a crossing: the mating half's contact is counted (kits_v5)
+  pins: {"BLOWER_HI": "1", "PCS_IGN": "2"}
+  empty: ["3", "4"]
+  note: "2 of 4 used (BLOWER_HI, PCS_IGN 14 AWG); cavities 3-4 spare, closed with a 114017 sealing plug in each half"
+  open: ["2 spare cavities (body power feeds 12-14 AWG)"]
   sources: ["web_snapshots/www.customconnectorkits.com__dtp04-4p-l012.md ('DTP 4 Way Gray Receptacle Connector with Flange Mount'; 'Accepts size 12 pins'; related 0460-204-12141, DTP06-4S, DTP4P-L012-GKT, WP-4P)",
             "ProWire DTP04-4P-L012 'DTP 4 way flanged receptacle' + 0460-204-12141 / 0462-203-12141 'size 12, 12-14 AWG' (catalog_parts)",
             "web_snapshots/www.farnell.com__628276.md (Deutsch catalog, Removal Tools/Sealing Plugs: contact size 16-12 -> 114017)"]
@@ -1162,7 +1161,7 @@ WIPER-MOTOR:
   sources: ["1977 Light Truck Service Manual p.802-803, p.810"]
 BLOWER-RES:
   where: engine
-  device: "factory Four-Season blower resistor on the evaporator case — 4 terminals BAT / M1 / M2 / BLO (1978 C60 plug cavities 51 / 63 / 72 / 101; the '3 prongs' of the forum threads is superseded)"
+  device: "factory Four-Season blower resistor on the evaporator case — 4 terminals BAT / M1 / M2 / BLO (1978 C60 factory circuits 51 / 63 / 72 / 101 — circuit numbers, not cavity names; the '3 prongs' of the forum threads is superseded)"
   family: open
   kit: {}
   wires: ["BLOWER_BAT", "BLOWER_MED", "BLOWER_M2", "BLOWER_MOT"]
@@ -1190,7 +1189,7 @@ GND-BANK-ENG:
   device: "ground star: stud bank beside the batteries — both battery negatives, engine block (G1), frame (G2) and every engine-bay return land here; the only place the harness grounds meet the chassis"
   family: ring_small
   kit: {}
-  wires: ["PDM_GND1", "PDM_GND2", "PDM15_GND1", "PDM15_GND2", "LTCD_GND", "PUMP_GND", "HL_L_GND", "HL_R_GND", "PT_LF_GND", "PT_RF_GND", "MK_LF_GND", "MK_RF_GND", "HORN_GND", "WASH_GND", "UH_GND", "WIPER_GND", "BLOWER_GND", "ISO_GND", "STEP_GND", "FAN_GND", "DCDC_GND", "AMP_GND", "IBOOST_GND"]
+  wires: ["PDM_GND1", "PDM_GND2", "PDM15_GND1", "PDM15_GND2", "LTCD_GND", "PUMP_GND", "HL_L_GND", "HL_R_GND", "PT_LF_GND", "PT_RF_GND", "MK_LF_GND", "MK_RF_GND", "HORN_GND", "WASH_GND", "UH_GND", "WIPER_GND", "BLOWER_GND", "ISO_GND", "STEP_GND", "FAN_GND", "DCDC_GND", "AMP_GND", "IBOOST_GND", "TRANS_GND"]
   lugs: {FAN_GND: ["9918"], DCDC_GND: ["638TP"], AMP_GND: ["238LTP"], IBOOST_GND: ["638TP"]}   # heavy returns: their lug on this star (round 4: one termination per end)     # 12 AWG on the 3/8 in star stud: ProWire 9918 hi-temp ring 12-10 AWG, 3/8 in (M9)
   note: "small returns take a ring each; the heavy ones (battery negatives, G1, G2, the cab return, amplifier, iBooster, DC-DC) take lugs and sit on the PS-STUDS list"
   sources: ["owner 2026-09-27: 'dave runs his grounds in the looms ... would be dumb to be grounding to body all the time'",
@@ -1332,7 +1331,7 @@ GND-BANK-CAB:
   device: "cab ground bank beside the PDM30: an insulated stud bus; every cab return lands here and goes back to the ground star through GND_RET_CAB (2 AWG), never through the body"
   family: ring_small
   kit: {}
-  wires: ["123", "WIN_GND_L", "WIN_GND_R", "LOCK_GND_L", "LOCK_GND_R", "TGR_M_GND", "MIRROR_GND", "CL_L_GND", "CL_C_GND", "CL_R_GND", "DOME_GND", "UD_GND", "FW_GND", "USB_GND", "OUT12V_GND", "RADIO_GND", "GSS_GND", "TCASE_SW_GND", "WIPER_SW_GND", "PCS_GND", "TRANS_GND", "GND_RET_REAR"]
+  wires: ["123", "WIN_GND_L", "WIN_GND_R", "LOCK_GND_L", "LOCK_GND_R", "TGR_M_GND", "MIRROR_GND", "CL_L_GND", "CL_C_GND", "CL_R_GND", "DOME_GND", "UD_GND", "FW_GND", "USB_GND", "OUT12V_GND", "RADIO_GND", "GSS_GND", "TCASE_SW_GND", "WIPER_SW_GND", "PCS_GND", "GND_RET_REAR"]
   note: "GND_RET_CAB (2 AWG) leaves this bank on a lug (PS-STUDS list)"
   sources: ["owner 2026-09-27 (grounds in the loom)"]
 
@@ -1536,22 +1535,31 @@ PCS-HARNESS-4610:
   device: "PCS TCM2650-4610 kit harness (Zero Gravity: 'harness only'; for the 6L50E/6L80E/6L90E) — bought complete, TCM plug to the 6L90 case connector; our wires end at its flying leads"
   family: kit_terminal
   kit: {}
-  wires: ["PCS_BATT", "PCS_IGN", "PCS_TPS", "PCS_RPM", "PCS_BRK", "PCS_NS", "PCS_REV", "PCS_GND", "TRANS_BATT", "TRANS_GND", "TRANS_BRK"]
-  pins: {PCS_BATT: "12 V battery lead (lead label OPEN until the TCM-4610 drawing)", PCS_IGN: "ignition lead (lead label OPEN until the TCM-4610 drawing)",
+  wires: ["PCS_BATT", "PCS_IGN", "PCS_TPS", "PCS_RPM", "PCS_BRK", "PCS_NS", "PCS_REV", "PCS_GND", "TRANS_BATT", "TRANS_BRK"]
+  pins: {PCS_BATT: "12 V battery lead (lead label OPEN until the TCM-4610 drawing)", PCS_IGN: "ignition lead (lead label and gauge OPEN until the TCM-4610 drawing; PCS_IGN arrives 14 AWG through bulkhead P and steps down at a splice if the lead is smaller)",
          PCS_TPS: "analog 1 lead (lead label OPEN until the TCM-4610 drawing)", PCS_RPM: "speed input 3 lead, orange/black (ZGP p.11)",
          PCS_BRK: "brake light input lead (lead label OPEN until the TCM-4610 drawing)",
          PCS_NS: "lever-position output lead, neutral (lead label OPEN until the TCM-4610 drawing)",
          PCS_REV: "lever-position output lead, reverse (lead label OPEN until the TCM-4610 drawing)",
          PCS_GND: "PCS ground lead (lead label OPEN until the TCM-4610 drawing)",
          TRANS_BATT: "case battery lead to cavities 1 + 4 (whether the kit brings it out apart from the PCS battery: OPEN until the TCM-4610 drawing)",
-         TRANS_GND: "case ground lead to cavities 2 + 5 (OPEN until the TCM-4610 drawing)",
          TRANS_BRK: "case stop-lamp lead to cavity 6 (whether the kit brings it out: OPEN until the TCM-4610 drawing)"}
   kit_circuits: "inside the kit, drawn not cut by us: the PCS-T43 GMLAN pair (case 10/14/15 CAN+, 8/11/13 CAN-, 120 ohm at 15 and 8), case ignition 12 and accessory 9 (fed from the kit's ignition lead: OPEN until the drawing), and the case-side ends of the leads above"
   open: ["kit harness path from the cab to the case connector (floor pass-through, its grommet): the kit's own run, set at the mock-up",
          "TCM-4610 harness drawing: lead labels, which case cavities come out as leads (1+4, 2+5, 3, 6, 7, 16), and whether PCS_BATT also feeds case 1+4 (research §5) — ask ZGP/PSI or read the harness label when it arrives",
-         "PCS_IGN on PDM15 OUT13 also feeds case 9/12 if the kit ties them to its ignition lead: that output's load is OPEN"]
+         "OPEN until the TCM-4610 drawing: does the kit feed case 12 / 9 from the PCS ignition lead (then PDM15 OUT13 carries their wake current)"]
   sources: ["web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md ('6l80e 6l90e TCM4610 Harness only'; 'This is the harness only and does not include the controller'; TCM2650-4610)",
             "reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf p.2 ('12V Battery, Ignition and Grounds'), p.11, p.18-20"]
+PCS-HARNESS-4610-CASE:
+  where: chassis
+  device: "PCS TCM-4610 kit harness, case-side ground lead (case cavities 2 + 5) — the kit's run from the cab to the case connector under the truck"
+  family: kit_terminal
+  kit: {}
+  wires: ["TRANS_GND"]
+  pins: {TRANS_GND: "case ground lead, cavities 2 + 5 (whether the kit brings it out: OPEN until the TCM-4610 drawing)"}
+  open: ["the kit's route from the cab to the case, and where its case-side ground lead leaves it: set at the mock-up"]
+  sources: ["reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf p.3 (ground to a good chassis/engine ground)",
+            "web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md (cavities 2, 5 BLK/WHT 18 GA GROUND)"]
 TRANS-CASE:
   where: chassis
   device: "6L90 external case connector: Kostal 16-cavity, GM 15131300 / 19303772 — the only external connector; solenoids, pressure switches, speed sensors, fluid temperature and the range switch are inside the case on the TEHCM"
@@ -1563,8 +1571,8 @@ TRANS-CASE:
     "4": "12 V battery, RED/WHT 18 GA — TRANS_BATT via the kit"
     "2": "ground, BLK/WHT 18 GA — TRANS_GND via the kit"
     "5": "ground, BLK/WHT 18 GA — TRANS_GND via the kit"
-    "12": "12 V switched ignition, PNK 20 GA — inside the kit"
-    "9": "12 V accessory, YEL 20 GA — inside the kit"
+    "12": "12 V switched ignition, PNK 20 GA — wakes the internal TCM; OPEN until the TCM-4610 drawing: does the kit feed case 12 from the PCS ignition lead (then PCS_IGN / PDM15 OUT13 carries it)"
+    "9": "12 V accessory, YEL 20 GA — wakes the internal TCM; OPEN until the TCM-4610 drawing: does the kit feed case 9 from the PCS ignition lead (then PCS_IGN / PDM15 OUT13 carries it)"
     "10": "CAN+ (GMLAN high), TAN/BLK 20 GA — PCS-T43 private bus, inside the kit"
     "14": "CAN+, TAN/BLK 20 GA — inside the kit"
     "15": "CAN+, 120 ohm applied, TAN/BLK 20 GA — inside the kit"
@@ -1576,7 +1584,8 @@ TRANS-CASE:
     "3": "park/neutral signal (output, grounded in P/N), ORN/BLK 20 GA — available, not wired (neutral start comes from PCS_NS)"
     "16": "replicated TOS (output-speed) signal, ORN/BLK 22 GA — available, not wired (Dakota SPD substitution OPEN: pulses per mile, input acceptance)"
   note: "our harness does not cut or terminate this plug: the TCM-4610 kit harness carries it; the cavity map is recorded so the kit's leads can be checked against it"
-  open: ["Dakota SPD / GEAR substitution from case 16 or the PCS outputs: pulses per mile and VHX input acceptance (research §4); #100 stays until then",
+  open: ["OPEN until the TCM-4610 drawing: does the kit feed case 12 (switched ignition) and case 9 (accessory) from the PCS ignition lead — if it does, PCS_IGN's load (PDM15 OUT13) includes them",
+         "Dakota SPD / GEAR substitution from case 16 or the PCS outputs: pulses per mile and VHX input acceptance (research §4); #100 stays until then",
          "tap up/down (case 7): shifter buttons not picked"]
   sources: ["web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md (GM connector part numbers 15131300, 19303772; cavity designations table)",
             "reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf p.3 (park/neutral output grounded in P/N; solenoid power 5 A)",
@@ -1673,6 +1682,14 @@ FAN-JUNCTION:
   note: "every lug a ProWire 9918 hi-temp ring (12-10 AWG, 3/8 in); the tail runs outside the loom to the fan (free-air rating)"
   open: ["stud spot near the PDM15 / fan breakout: formboard"]
   sources: ["web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md", "web_snapshots/www.prowireusa.com__p-1509-hi-temp-ring-term-12-10-3-8.md"]
+SPL-PDM15-OUT13:
+  where: engine
+  device: "PCS ignition step-up splice by the PDM15: the 20 AWG OUT13 pin lead (PCS_IGN_PT) and the 14 AWG run through bulkhead P (PCS_IGN) in a stub splice"
+  family: miniseal
+  kit: {}
+  wires: ["PCS_IGN_PT", "PCS_IGN"]
+  note: "stub splice: 20 AWG (1,020 CM) + 14 AWG (4,110 CM) = 5,130 CM, the 16-12 AWG cavity band (ProWire 3137CT)"
+  sources: ["MoTeC PDM user manual p.9 (8 A outputs 24#-20#)", "ProWire 3137CT cavities 26-20 / 20-16 / 16-12 AWG"]
 SPL-PDM15-OUT7:
   where: engine
   device: "PDM15 OUT7 pigtail splice — pins B5 + B11 (2 × 16 AWG) joined to the LTCD feed #64 (16 AWG)"

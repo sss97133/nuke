@@ -100,7 +100,7 @@ def plabel(w):
     col = "" if re.fullmatch(r"[?\s]*", col or "") else col
     numbered = bool(re.fullmatch(r"\d+[A-Za-z]?", str(w["id"])))
     wid = str(w["id"]).upper()
-    head = f"{col}-{wid}" if col and numbered else (wid if numbered else col)   # never a code, never '?-'
+    head = f"{col}-{wid}" if col else wid          # the circuit id always; never '?-'
     return " ".join(x for x in (awg_word(w), head) if x) + f" · {ln}"
 
 
@@ -609,6 +609,13 @@ def sheet_dc_primary(reg, wires, ends, eps_y, parts, number, next_sheet):
 
     s.cur_owner = None
     # ---- notes at the foot
+    inl = OrderedDict()
+    for wid in conn:
+        pp_ = (wires[wid].get("protection_parts") or {})
+        if pp_.get("holder") and pp_.get("fuse"):
+            inl.setdefault((pp_["holder"], pp_["fuse"]), []).append(wid.upper())
+    if inl:
+        s.txt(SM, 680, "IN-LINE FUSES: " + " · ".join(f"{', '.join(v)}: holder {h}, fuse {f_}" for (h, f_), v in inl.items()), 5.6)
     s.txt(SM, 689, "NOTES — OPEN ITEMS ON THIS SHEET (each letter is stamped where it applies)", 6.2, bold=True)
     notes_foot(s, notes.listed(), 698, 5)
     s.txt(SM, SH_ - SM + 10, f"{count['cables']} circuits · {count['fuses']} fuses · {count['grounds']} returns to the banks (drawn in full on sheet {next_sheet}) · "
@@ -653,7 +660,7 @@ def notes_foot(s, items, y0, ncol, size=4.9, lead=6.0):
 
 
 def wrap_words(s, width, size):
-    words, lines, cur = s.split(), [], ""
+    words, lines, cur = manual_v5.no_purchase(s).split(), [], ""
     for w_ in words:
         t = (cur + " " + w_).strip()
         if tw(t, size) <= width or not cur:
@@ -825,7 +832,7 @@ class CPage(manual_v5.Page):
             self.ctxt(cx + w_ / 2, y - 2.4, h_.upper(), size, bold=True, anchor="middle")
             cx += w_
         self.line(x, y + 1.4, x + total, y + 1.4, 0.7)
-        y += 1.4
+        y += 1.4 + max(0.0, size + 1.2 - (lead - 2.4))      # the first row clears the header rule
         for r in rows:
             cells = [manual_v5.wrap_text(str(v), w_ - 4, size) for w_, v in zip(widths, r)]
             y += lead
@@ -874,7 +881,7 @@ for _f, _k in (("pdm30_designations.txt", "PDM30"), ("pdm15_designations.txt", "
 def num(wid):
     """A circuit column: the circuit's number, blank when it has none (the Load / Protects column names it; a registry
     code never prints as a circuit, review round 4)."""
-    return str(wid).upper() if re.fullmatch(r"\d+[A-Za-z]?", str(wid)) else ""
+    return str(wid).upper()
 
 
 def cable_name(w):
@@ -926,6 +933,40 @@ def pdm_outputs(reg, wires, ends):
     return out, missing_term
 
 
+_PDM_SET = None
+
+
+def pdm_setting(box, n):
+    """(limit A or None, source or what closes it) for one output, from the registry's pdm_settings (registry-fixes,
+    round 4): an entry names its output(s) as 'PDM30 OUT13' or 'PDM15 OUT1 + OUT6'."""
+    global _PDM_SET
+    if _PDM_SET is None:
+        _PDM_SET = {}
+        for e in json.load(open(CD / "k5_registry.json")).get("pdm_settings") or []:
+            m = re.match(r"(PDM\d+)\s+(.*)", str(e.get("output") or ""))
+            if not m:
+                continue
+            for o in re.findall(r"OUT(\d+)", m.group(2)):
+                _PDM_SET[(m.group(1), int(o))] = e
+    e = _PDM_SET.get((box, n))
+    if not e:
+        return None, None
+    if e.get("limit_a") is not None and str(e.get("status") or "").lower().startswith("set"):
+        return e["limit_a"], str(e.get("source") or "").split(" (")[0].split(";")[0].strip()
+    return None, re.sub(r"^OPEN:\s*", "", str(e.get("status") or "")).split(" (")[0].strip()
+
+
+def setting_cell(box, n, wires, wids, notes, generic):
+    lim, why = pdm_setting(box, n)
+    if lim is not None:
+        return f"{lim:g} A set · {why}"
+    if why:
+        if why.upper().startswith("CONFLICT"):
+            return f"CONFLICT {notes.tag(why)}"          # the data disagrees with itself: not merely unknown
+        return f"OPEN {notes.tag(why)}"
+    return out_setting(wires, wids) or f"OPEN {generic}"
+
+
 def out_setting(wires, wids):
     """The output's maximum-current setting when a wire row's 'protection' field states one ('… setting, 8 A')."""
     for wid in wids:
@@ -969,9 +1010,27 @@ def pages_distribution(reg, wires, ends, eps_y, parts, first, notes):
                 w = wires[wid]
                 cand = f"CANDIDATE: {w.get('option')} — " if w.get("option_status") == "candidate" else ""
                 rows.append((f"OUT{n}" if i == 0 else "", pins if i == 0 else "", num(wid), cand + (w.get("label") or ""),
-                             awg_word(w), rating if i == 0 else "", (out_setting(wires, wids) or f"OPEN {setting}") if i == 0 else ""))
-        per = 70
-        for k in range(0, len(rows), per):
+                             awg_word(w), rating if i == 0 else "", setting_cell(b, n, wires, wids, notes, setting) if i == 0 else ""))
+        # rows go on pages by their measured height (cells wrap), each page followed by the notes its rows cite
+        def row_h(r):
+            return 7.6 + (max(len(manual_v5.wrap_text(str(v), w_ - 4, 5.6)) for w_, v in zip(widths, r)) - 1) * 6.9
+
+        def letters(rs):
+            return sorted({m_ for r in rs for m_ in re.findall(r"OPEN ([a-z]{1,2})\b", str(r[6]))})
+
+        def notes_h(rs):
+            return sum(8 * len(wrap_words(t, PW - 2 * PM - 14, 6.6)) + 1.5 for t, l in notes.listed() if l in letters(rs)) + 14
+
+        chunks, cur = [], []
+        top_guess = 150
+        for r in rows:
+            if cur and top_guess + 16 + sum(row_h(x) for x in cur + [r]) + notes_h(cur + [r]) > PH - PM - 12:
+                chunks.append(cur)
+                cur = []
+            cur.append(r)
+        if cur:
+            chunks.append(cur)
+        for k, chunk in enumerate(chunks):
             n_ = first + len(pages)
             p = CPage(f"1-{n_}", SECTION, odd=n_ % 2 == 1)
             p.heading("Power Distribution" + (" (cont.)" if k else ""), 13)
@@ -981,13 +1040,22 @@ def pages_distribution(reg, wires, ends, eps_y, parts, first, notes):
                        f"{(f[0] + ' ' + str(f[1]) + ' A') if f and f[1] else 'fuse of OPEN value'}; total output {total} continuous; "
                        f"both battery − pins to the ground star in 20 AWG. {used_base} base{f' + {used_cand} candidate-option' if used_cand else ''} of {len([1 for (b, _n) in out if b == box])} outputs carry a circuit "
                        f"(a candidate-option output is used only if that option is chosen). "
-                       "Outputs are high-side, software-fused. " + pigtail_sentence(box, out, wires))
-            for i, ln in enumerate(wrap_words(lead_in, PW - 2 * PM, 7.2)):
-                p.ctxt(PM, p.y + i * 9, ln, 7.2)
-            p.y += len(wrap_words(lead_in, PW - 2 * PM, 7.2)) * 9 + 2
-            p.y = p.grid(PM, p.y, widths, head, rows[k:k + per], size=5.6, lead=7.6) + 10
-            for i, ln in enumerate(wrap_words(f"{setting}. " + [t for t, l in notes.listed() if l == setting][0], PW - 2 * PM, 6.6)):
-                p.ctxt(PM, p.y + i * 8, ln, 6.6, colour=ORANGE if i == 0 else "#000")
+                       "Outputs are high-side, software-fused; a set limit prints with its source. " + pigtail_sentence(box, out, wires))
+            if k == 0:
+                for i, ln in enumerate(wrap_words(lead_in, PW - 2 * PM, 7.2)):
+                    p.ctxt(PM, p.y + i * 9, ln, 7.2)
+                p.y += len(wrap_words(lead_in, PW - 2 * PM, 7.2)) * 9 + 2
+            p.y = p.grid(PM, p.y, widths, head, chunk, size=5.6, lead=7.6) + 10
+            y_ = p.y
+            for t, l in notes.listed():
+                if l in letters(chunk):
+                    lines = wrap_words(t, PW - 2 * PM - 14, 6.6)
+                    p.ctxt(PM, y_, f"{l}.", 6.6, bold=True, colour=ORANGE)
+                    for ln in lines:
+                        p.ctxt(PM + 12, y_, ln, 6.6)
+                        y_ += 8.0
+                    y_ += 1.5
+            p.y = y_
             pages.append((p, "Power distribution — " + box))
     return pages, missing_term
 
@@ -1028,10 +1096,19 @@ def page_protection(reg, wires, ends, eps_y, parts, number, notes, page=None):
         f_lug, t_lug = ps_lugs(eps_y, wid, w)
         fp = [p_ for p_, _c in [term_part(ends, wid, t["endpoint"]) for t in ends.get(wid, [])]]
         val = f"{kind + ' ' if kind else ''}{amps} A" if amps else f"OPEN {notes.tag(fuse_open_note(wid, kind, parts))}"
-        if amps and (kind, amps) not in fuse_pn:
-            no_pn.append(f"{kind + ' ' if kind else ''}{amps} A ({wid})")
-        pn = fuse_pn.get((kind, amps)) or (f"OPEN {notes.group('fusepn', 'fuse part number not in the parts list for', no_pn[-1])}" if amps else "—")
-        hd = holder.get(kind) or f"OPEN {notes.tag('holders for the small taps at the Odyssey post and the PCS feed are not named')}"
+        # the wire's own protection record first (registry-fixes round 5: protection_parts {holder, fuse}); a kit fuse is
+        # the kit's; only a circuit whose record truly lacks a part is named as missing
+        pp = w.get("protection_parts") or {}
+        kit = bool(re.search(r"\bin the kit\b|kit harness fuse", str(w.get("protection") or ""), re.I))
+        pn = pp.get("fuse") or ("in the kit" if kit else fuse_pn.get((kind, amps)))
+        if not pn:
+            if amps:
+                no_pn.append(f"{kind + ' ' if kind else ''}{amps} A ({wid})")
+                pn = f"OPEN {notes.group('fusepn', 'fuse part number not in the parts list for', no_pn[-1])}"
+            else:
+                pn = "—"
+        hd = pp.get("holder") or ("in the kit" if kit else holder.get(kind)) or \
+            f"OPEN {notes.group('holder', 'fuse holder not named in the parts list for', wid.upper())}"
         def lugcell(lug):
             if lug == "RING-SMALL":
                 return f"OPEN {notes.tag('small ring terminals carry no part number (stud size and gauge not set)')}"
@@ -1135,9 +1212,10 @@ def publish(page, stem, height):
     bad += [f"text over a pin box: '{t_}'" for t_ in diagram_v5.mark_overprints(page)]
     bad += getattr(page, "faults", [])
     bad += manual_v5.fragment_faults(page.boxes)
-    bad += manual_v5.code_faults(page.boxes)
+    bad += manual_v5.id_faults(page.boxes)
     bad += manual_v5.gauge_faults(page.boxes)
     bad += manual_v5.word_faults(page.boxes)
+    bad += manual_v5.purchase_faults(page.boxes)
     if re.search(r"\$\d|\bcart\b|\bbuy\b|\bbought\b|\border(ed)?\b|lined up", text, re.I):
         bad.append("purchase language on the page")
     if bad:
