@@ -210,13 +210,15 @@ parts:
     source: scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3, drawing scale from its printed
       107.5 width
     basis: scaled
-    note: header A width (A and B share the 67.5)
+    note: header A width; with the printed 67.5 span it sets both header centres
+    fit: fit-critical, scaled
   - name: hdr_b_w
     value: 29.2
     source: scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3, drawing scale from its printed
       107.5 width
     basis: scaled
     note: header B width
+    fit: fit-critical, scaled
   - name: hdr_wall
     value: 1.6
     source: not shown on any MoTeC drawing
@@ -430,7 +432,14 @@ parts:
   - The mated plug is drawn seated at the header face; its insertion depth over the header is not dimensioned.
   - Scaled values (orange on the drawing) are read off MoTeC's drawing at its printed scale, not printed numbers.
   - Pin colour is not visible in the photo.
+  cross_checks:
+  - 'Header widths vs TE: the 34- and 26-way plug housings differ by two 3 mm pin columns (38.2 vs 32.2 wide, TE 2-1437285-3
+    sheets 1-2). The scaled headers differ by 5.7 (34.9 vs 29.2), within 0.3 mm of that. Held to the printed 67.5 span with
+    a 6.0 difference they would be 35.05 and 29.05. The ECU-side headers are TE cap assemblies (3-1437285-x, TE sheet 1 table
+    1), whose drawings are not on file.'
   notes:
   - The 18 degree angle on MoTeC's p.3 is the connector housing's side draft (bottom view). The plugs exit straight down;
     research/2026-06-09_design-inputs-recon.md reads it as an '18 degree connector exit'.
+  - MoTeC's label is a raised badge (product photo). It is drawn as a flush panel in a 0.4 mm recess so the printed 38.7 depth
+    holds; the badge thickness is not printed and the artwork is not reproduced.
   script: docs/wiring/calc-data/cad/fab/M130-A.py

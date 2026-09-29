@@ -55,8 +55,9 @@ P = {
     "hdr_z": Dim(21.2, P3, note="header centre from the back face"),
     "hdr_span": Dim(67.5, P3, note="over both headers"),
     # ---- scaled off the p.3 drawing (no printed number)
-    "hdr_a_w": Dim(34.9, SC, "scaled", "header A width (A and B share the 67.5)"),
-    "hdr_b_w": Dim(29.2, SC, "scaled", "header B width"),
+    "hdr_a_w": Dim(34.9, SC, "scaled", "header A width; with the printed 67.5 span it sets both header centres",
+                   "fit-critical, scaled"),
+    "hdr_b_w": Dim(29.2, SC, "scaled", "header B width", "fit-critical, scaled"),
     "hdr_wall": Dim(1.6, "not shown on any MoTeC drawing", "assumed", "shroud wall"),
     "hdr_r": Dim(2.0, SC, "scaled", "header corner radius"),
     "latch_w": Dim(3.2, SC, "scaled", "latch window on each header, front view"),
@@ -305,8 +306,12 @@ def drawing(path, meta, span):
            size=2.3, anchor="start")
     S.text((tx, y + 5.5), "Not modelled: the Key 1 ribs inside the headers (no drawing on file); the 1 mm step in the bottom edge at the headers;",
            size=2.3, anchor="start", color=K.BASIS_COLOR["assumed"])
-    S.text((tx, y + 9), "the maker's label artwork. The mated plug is drawn seated at the header face (insertion depth not dimensioned).",
+    S.text((tx, y + 9), "the raised label badge (photo) is drawn as a flush panel in a 0.4 mm recess so the printed 38.7 holds; its artwork is not reproduced.",
            size=2.3, anchor="start", color=K.BASIS_COLOR["assumed"])
+    S.text((tx, y + 12.5), "The mated plug is drawn seated at the header face (insertion depth not dimensioned).",
+           size=2.3, anchor="start", color=K.BASIS_COLOR["assumed"])
+    S.text((tx, y + 17), "Cross-check: TE's 34- and 26-way housings differ by two 3 mm pin columns (38.2 vs 32.2); the scaled headers differ by 5.7.",
+           size=2.3, anchor="start", color=K.BASIS_COLOR["scaled"])
     S.write(path, {k: v for k, v in meta.items() if not k.startswith("_")})
 
 
@@ -371,8 +376,15 @@ def part_meta(bodies):
                          "The mated plug is drawn seated at the header face; its insertion depth over the header is not dimensioned.",
                          "Scaled values (orange on the drawing) are read off MoTeC's drawing at its printed scale, not printed numbers.",
                          "Pin colour is not visible in the photo."],
+            "cross_checks": [
+                "Header widths vs TE: the 34- and 26-way plug housings differ by two 3 mm pin columns (38.2 vs 32.2 wide, "
+                "TE 2-1437285-3 sheets 1-2). The scaled headers differ by 5.7 (34.9 vs 29.2), within 0.3 mm of that. Held to the "
+                "printed 67.5 span with a 6.0 difference they would be 35.05 and 29.05. The ECU-side headers are TE cap assemblies "
+                "(3-1437285-x, TE sheet 1 table 1), whose drawings are not on file."],
             "notes": ["The 18 degree angle on MoTeC's p.3 is the connector housing's side draft (bottom view). The plugs exit "
-                      "straight down; research/2026-06-09_design-inputs-recon.md reads it as an '18 degree connector exit'."]}
+                      "straight down; research/2026-06-09_design-inputs-recon.md reads it as an '18 degree connector exit'.",
+                      "MoTeC's label is a raised badge (product photo). It is drawn as a flush panel in a 0.4 mm recess so the "
+                      "printed 38.7 depth holds; the badge thickness is not printed and the artwork is not reproduced."]}
 
 
 def main(out):

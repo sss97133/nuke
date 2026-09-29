@@ -28,6 +28,7 @@ class Dim:
     source: str
     basis: str = "maker"
     note: str = ""
+    fit: str = ""        # "fit-critical, scaled": a bracket or cutout depends on it, but the maker didn't print it
 
     def __float__(self):
         return float(self.value)
@@ -49,8 +50,8 @@ def body(shape, label, hexc, alpha=1.0):
 
 
 def params_table(P):
-    return [{"name": k, "value": d.value, "source": d.source, "basis": d.basis, **({"note": d.note} if d.note else {})}
-            for k, d in P.items()]
+    return [{"name": k, "value": d.value, "source": d.source, "basis": d.basis, **({"note": d.note} if d.note else {}),
+             **({"fit": d.fit} if d.fit else {})} for k, d in P.items()]
 
 
 def _step_str(s):
@@ -262,13 +263,18 @@ class Sheet:
         y += row
         for k, d in P.items():
             col = BASIS_COLOR.get(d.basis, "#1a2027")
-            self.text((x, y), k, size=size, anchor="start", color=col)
+            self.text((x, y), k + (" *" if d.fit else ""), size=size, anchor="start", color=col,
+                      weight="bold" if d.fit else "normal")
             self.text((x + 30, y), f"{d.value:g}", size=size, anchor="start", color=col)
             note = f"  ({d.note})" if d.note else ""
             s = (tag(d.source) + note)
             self.text((x + 42, y), s if len(s) < 110 else s[:107] + "...", size=size * 0.92, anchor="start", color="#3b4550")
             y += row
         y += 2
+        if any(d.fit for d in P.values()):
+            self.text((x, y), "*  fit-critical, scaled: a bracket or cutout depends on it, but the maker did not print it."
+                      " Confirm on the part first.", size=size * 0.92, anchor="start", color=BASIS_COLOR["scaled"], weight="bold")
+            y += row
         for t_, _, legend in refs:
             self.text((x, y), f"{t_}  {legend}", size=size * 0.92, anchor="start", color="#3b4550")
             y += row
