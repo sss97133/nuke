@@ -170,6 +170,17 @@ Deno.serve(async (req) => {
         .maybeSingle()
       if (v2?.id) vehicleId = String(v2.id)
     }
+    if (!vehicleId && platformGuess === 'bat') {
+      // live lots carry only listing_url (sync-live-auctions sets it; bat_auction_url and discovery_url are null), so
+      // the live-lot trigger failed here 368 times on 2026-09-29 (bat-data coverage audit). Indexed: idx_vehicles_listing_url.
+      const { data: v3 } = await supabase
+        .from('vehicles')
+        .select('id')
+        .in('listing_url', urlCandidates)
+        .limit(1)
+        .maybeSingle()
+      if (v3?.id) vehicleId = String(v3.id)
+    }
     if (!vehicleId) throw new Error('Missing vehicle_id (and could not resolve by auction_event_id, vehicle_events, or vehicles URLs)')
 
     // ⚠️ FREE MODE: Direct HTML fetch (no Firecrawl due to budget constraints)
@@ -621,11 +632,21 @@ Deno.serve(async (req) => {
     // Store comments (canonical)
     // Do this BEFORE any legacy BaT table writes so we never end up with partial state
     // (e.g. bat_bids written but auction_comments missing).
-    if (comments.length > 0) {
-      console.log(`Attempting to upsert ${comments.length} comments...`)
+    // A comment this vehicle already holds, by BaT's own comment id, is never written again. content_hash carries the
+    // thread position, which shifts as a thread grows, so a re-read wrote the same comments again (36.5% duplicate rows
+    // on the latest 150 settled lots, bat-data coverage audit 2026-09-29). Same rule as extract-bat-core v4.1.
+    const { data: haveRows } = await supabase
+      .from('auction_comments').select('bat_comment_id').eq('vehicle_id', vehicleId).not('bat_comment_id', 'is', null).limit(5000)
+    const haveIds = new Set((haveRows ?? []).map((x: any) => Number(x.bat_comment_id)).filter(Number.isFinite))
+    const freshComments = haveIds.size
+      ? commentsWithIdentities.filter((c: any) => c.bat_comment_id == null || !haveIds.has(Number(c.bat_comment_id)))
+      : commentsWithIdentities
+    if (haveIds.size) console.log(`${commentsWithIdentities.length - freshComments.length} comments already held by BaT id; writing ${freshComments.length}`)
+    if (freshComments.length > 0) {
+      console.log(`Attempting to upsert ${freshComments.length} comments...`)
       const { data: inserted, error } = await supabase
         .from('auction_comments')
-        .upsert(commentsWithIdentities, { onConflict: 'vehicle_id,content_hash' })
+        .upsert(freshComments, { onConflict: 'vehicle_id,content_hash' })
         .select('id')
       
       if (error) {
@@ -645,7 +666,7 @@ Deno.serve(async (req) => {
       }
       console.log(`Successfully saved ${inserted?.length || comments.length} comments`)
     } else {
-      console.warn('No comments to save (comments array is empty)')
+      console.warn(comments.length ? 'No new comments to save (all already held by BaT id)' : 'No comments to save (comments array is empty)')
     }
 
     let batListingId: string | null = null
