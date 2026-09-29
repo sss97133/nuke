@@ -401,3 +401,35 @@ never silently sum); `pg_stat` n_live_tup is badly wrong here — always `count(
    (recommendation: concentrate.)
 2. Explore's headline: the DEAL READ (ask × sold-comp band, per this doc), or the
    GEOGRAPHY MAP (what the built iOS surface currently leads with)?
+
+## Owner notes, 2026-09-29: the auction temperature
+
+Skylar, relayed word for word from the pieces lane's window, on the live-auction hot/cold label: "this is a lame
+metric everyone has. we can calc percentiles and much better with the data we have... prediction market on auction
+then advise on what action to take". Earlier the same day: "we're not measuring hot and cold properly ... you haven't
+analyze the comments you haven't mapped out the [bid] velocity".
+
+**What the label measures today.** `market_pulse_live()` and `heatOf` in `nuke_frontend/src/pages/market/MarketPulse.tsx`
+use price only. The live bid is divided by the typical bid at this time to close (the p50 of comparable sales × the tier's
+bid-curve share). At 1.25× or more it reads hot; at 0.8× or less, cold. There's no activity input.
+
+**The case that showed it (1999 SL500, vehicle f8c68f0e, 2026-09-29 about 22:30Z, 19 h to close):**
+- The price reads cold. The bid was $7,900 against about $9,975 typical (p50 $17,500 of 745 comparable sales × 0.57),
+  or 0.79×. After one more bid, $8,888 read 0.89×.
+- The activity reads warm. Extracted that night (extract-bat-core, one call): 29 bids from 13 bidders.
+- Against 389 past SL500 BaT lots at 19 h or more before close: median 23 bids (p25 13, p75 32) and median 11 bidders.
+
+**What he's asking for:**
+1. **Percentiles, not one cutoff.** Place the live bid in the distribution of comparable lots at the same time to
+   close. Do the same for bids, bidders and comment pace.
+2. **A prediction per live auction.** Forecast the final price from the bid curve plus activity: bids, bidders and
+   comment velocity. Backtest it on sold lots, priced only from sales before each one, as the hot/cold label was.
+3. **Advice on action, by role:** bid, wait or pass for a buyer; hold, promote or relist for a seller. This follows his
+   role-based-views note in the design book (vehicle-profile-computation-surface.md, owner notes 2026-09-29).
+
+**What it needs first (data-audit is counting these):**
+- Live lots' comments and bids pulled on a schedule. Today they arrive only when a lot is re-read.
+- bat_listings rows for the lots the catalog sync missed. Without one, extract-bat-core writes no bat_bids row, as
+  happened with the SL500.
+
+This follows the 2026-07-09 ruling above: data handling is the product, and the prediction comes free with it.
