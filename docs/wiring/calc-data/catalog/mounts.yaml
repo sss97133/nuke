@@ -11,6 +11,7 @@
 boxes:
   - id: M130
     what: Engine computer (MoTeC M130)
+    nodes: [M130-A]
     where: Cab, passenger side, on the cab face of the firewall behind the glovebox, next to where the 61-pin comes through
     zone: cab
     status: proposed
@@ -35,6 +36,7 @@ boxes:
 
   - id: PDM30
     what: Body power box (MoTeC PDM30), which feeds the lights, blower, wipers, windows and locks
+    nodes: [PDM30-A]
     where: Cab, passenger side under the dash, in open air on its own plate below the M130, with an air gap between them
     zone: cab
     status: proposed
@@ -57,6 +59,7 @@ boxes:
 
   - id: PDM15
     what: Engine power box (MoTeC PDM15), which feeds the fan, injector and coil rails, starter, fuel pump, A/C clutch and lambda box
+    nodes: [PDM15-A]
     where: The current design puts it in the engine bay. That breaks MoTeC's own spec (see why).
     zone: engine
     status: flag
@@ -75,6 +78,7 @@ boxes:
 
   - id: LTCD
     what: Lambda box (MoTeC LTCD), which reads both O2 sensors and sends them to the M130 over CAN
+    nodes: [WIDEBAND]
     where: Under the truck, on the inside of a frame rail near the two O2 bungs, a hand-width or more from the pipe
     zone: chassis
     status: proposed
@@ -90,6 +94,7 @@ boxes:
 
   - id: BATTERIES
     what: Two batteries, the Odyssey for running and the Optima YellowTop for the stereo
+    nodes: [ACC-BATT]
     where: Your working position is the passenger firewall corner
     zone: engine
     status: open
@@ -108,6 +113,7 @@ boxes:
 
   - id: ISOLATOR
     what: Battery isolator (Blue Sea 7700), the switch that kills the truck, with its dash switch
+    nodes: [ISOLATOR, ISO-SWITCH]
     where: Engine bay, on the Odyssey's positive cable as close to the battery as it fits. The dash switch goes in the cab.
     zone: engine
     status: decided
@@ -137,6 +143,7 @@ boxes:
 
   - id: FIREWALL-61
     what: The 61-pin firewall connector (MIL D38999), which carries engine wires only
+    parts: [D38999/24WJ61SN, D38999/26WJ61PN, M85049/69-25N]
     where: Passenger firewall, at the factory A/C-and-ECU grommet hole (H3)
     zone: firewall
     status: decided
@@ -150,6 +157,7 @@ boxes:
 
   - id: BODY-PASS
     what: Body pass-through (what the book calls "body bulkhead A, B, C and P"), where the non-engine wires cross the firewall
+    parts: [DT04-12PA-L012, DT04-12PB-L012, DT04-6P-L012, DTP04-4P-L012, BLUESEA-1003]
     where: The proposal is one aluminium plate on the passenger firewall beside the 61-pin, holding all four Deutsch plugs, with the rubber cable clamps for the big battery cables next to it
     zone: firewall
     status: proposed
