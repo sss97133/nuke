@@ -210,7 +210,7 @@ CHECKS = [
     ("slot centres front to back", lambda b: _slots(b)[1][1] - _slots(b)[0][1], 71.5),
     ("slot centre to the plate edge", lambda b: PW / 2 - _slots(b)[1][1], 25.0),
     ("slot centre in from the flange end", lambda b: L / 2 - _slots(b)[-1][0], 6.0),
-    ("heatsink lip beyond the plate (top view 5.2)", lambda b: (b[0].bounding_box().size.Y - PW) / 2, 5.2, 0.3),
+    ("heatsink lip beyond the plate (top view prints 5.2; 132.3 and 121.5 give 5.4)", lambda b: (b[0].bounding_box().size.Y - PW) / 2, 5.2, 0.3),
 ]
 
 if __name__ == "__main__":

@@ -375,8 +375,10 @@ def checks_from(mod, bodies):
     for name, fn, want, *tol in getattr(mod, "CHECKS", []):
         got = fn(bodies)
         tl = tol[0] if tol else 0.05
+        exact = isinstance(want, bool) or not isinstance(want, (int, float))
         out.append({"check": name, "model": round(got, 3) if isinstance(got, float) else got, "drawing": want,
-                    "ok": (abs(got - want) <= tl) if isinstance(want, (int, float)) and not isinstance(want, bool) else got == want})
+                    **({} if exact else {"tol": tl}),
+                    "ok": (got == want) if exact else (abs(got - want) <= tl)})
     return out
 
 
@@ -481,7 +483,8 @@ def run(mod, out):
         write_pins(mod, out)
     meta = meta_for(mod, bodies)
     for c in meta["checks"]:
-        print(("ok  " if c["ok"] else "BAD ") + f"{c['check']}: model {c['model']} vs drawing {c['drawing']}")
+        tol = f" (within ±{c['tol']:g})" if c.get("tol") else ""
+        print(("ok  " if c["ok"] else "BAD ") + f"{c['check']}: model {c['model']} vs drawing {c['drawing']}{tol}")
     auto_drawing(mod, bodies, extra, meta, out / f"{pid}_drawing.svg")
     (out / f"{pid}.params.json").write_text(json.dumps(meta, indent=1, ensure_ascii=False))
     bb = Compound(children=bodies).bounding_box()

@@ -278,14 +278,17 @@ parts:
   - check: length
     model: 254.46
     drawing: 254.46
+    tol: 0.05
     ok: true
   - check: case width (the cover)
     model: 174.9
     drawing: 174.9
+    tol: 0.05
     ok: true
   - check: height to the post tops
     model: 199.16
     drawing: 199.16
+    tol: 0.05
     ok: true
   branding:
     what:
@@ -641,38 +644,47 @@ parts:
   - check: length over the flanges
     model: 186.0
     drawing: 186.0
+    tol: 0.05
     ok: true
   - check: depth over the heatsink lip
     model: 132.3
     drawing: 132.3
+    tol: 0.05
     ok: true
   - check: height
     model: 84.2
     drawing: 84.2
+    tol: 0.05
     ok: true
   - check: slot count
     model: 4
     drawing: 4
+    tol: 0.05
     ok: true
   - check: slot centres across the length
     model: 174.0
     drawing: 174.0
+    tol: 0.05
     ok: true
   - check: slot centres front to back
     model: 71.5
     drawing: 71.5
+    tol: 0.05
     ok: true
   - check: slot centre to the plate edge
     model: 25.0
     drawing: 25.0
+    tol: 0.05
     ok: true
   - check: slot centre in from the flange end
     model: 6.0
     drawing: 6.0
+    tol: 0.05
     ok: true
-  - check: heatsink lip beyond the plate (top view 5.2)
+  - check: heatsink lip beyond the plate (top view prints 5.2; 132.3 and 121.5 give 5.4)
     model: 5.4
     drawing: 5.2
+    tol: 0.3
     ok: true
   branding:
     what:
@@ -1140,14 +1152,17 @@ parts:
   - check: case width (x)
     model: 107.5
     drawing: 107.5
+    tol: 0.05
     ok: true
   - check: case height (y)
     model: 127.5
     drawing: 127.5
+    tol: 0.05
     ok: true
   - check: case depth (z)
     model: 38.7
     drawing: 38.7
+    tol: 0.05
     ok: true
   - check: hole count
     model: 3
@@ -1156,54 +1171,67 @@ parts:
   - check: hole pitch
     model: 97.5
     drawing: 97.5
+    tol: 0.05
     ok: true
   - check: hole rise (lower to top)
     model: 75.0
     drawing: 75.0
+    tol: 0.05
     ok: true
   - check: lower holes above the bottom edge
     model: 47.5
     drawing: 47.5
+    tol: 0.05
     ok: true
   - check: hole centre from the side edge
     model: 5.0
     drawing: 5.0
+    tol: 0.05
     ok: true
   - check: top hole on the centreline
     model: 0.0
     drawing: 0.0
+    tol: 0.05
     ok: true
   - check: header A width
     model: 35.0
     drawing: 35.0
+    tol: 0.05
     ok: true
   - check: header A below the bottom edge
     model: 5.6
     drawing: 5.6
+    tol: 0.05
     ok: true
   - check: header A depth (z, less the latch ramp)
     model: 23.9
     drawing: 23.9
+    tol: 0.05
     ok: true
   - check: header B width
     model: 29.0
     drawing: 29.0
+    tol: 0.05
     ok: true
   - check: header B below the bottom edge
     model: 5.6
     drawing: 5.6
+    tol: 0.05
     ok: true
   - check: header B depth (z, less the latch ramp)
     model: 23.9
     drawing: 23.9
+    tol: 0.05
     ok: true
   - check: span over both headers
     model: 67.5
     drawing: 67.5
+    tol: 0.05
     ok: true
   - check: header centre from the back face
     model: 21.2
     drawing: 21.2
+    tol: 0.05
     ok: true
   - check: pins A
     model: 34
@@ -1578,42 +1606,52 @@ parts:
   - check: length over the rim
     model: 277.0
     drawing: 277.0
+    tol: 0.05
     ok: true
   - check: length at the base
     model: 256.0
     drawing: 256.0
+    tol: 0.05
     ok: true
   - check: width over the side bosses (back of lid to boss face)
     model: 178.0
     drawing: 178.0
+    tol: 0.05
     ok: true
   - check: width over the hold-down ledges
     model: 173.0
     drawing: 173.0
+    tol: 0.05
     ok: true
   - check: height to the post tops
     model: 201.0
     drawing: 201.0
+    tol: 0.05
     ok: true
   - check: post centre spacing
     model: 210.0
     drawing: 210.0
+    tol: 0.05
     ok: true
   - check: post centre to the front edge
     model: 33.0
     drawing: 33.0
+    tol: 0.05
     ok: true
   - check: post centre to the back edge
     model: 134.0
     drawing: 134.0
+    tol: 0.05
     ok: true
   - check: side terminals above the base
     model: 128.0
     drawing: 128.0
+    tol: 0.05
     ok: true
   - check: post height
     model: 18.6
     drawing: 18.6
+    tol: 0.02
     ok: true
   branding:
     what:
@@ -2154,14 +2192,17 @@ parts:
   - check: case width (x)
     model: 107.5
     drawing: 107.5
+    tol: 0.05
     ok: true
   - check: case height (y)
     model: 127.5
     drawing: 127.5
+    tol: 0.05
     ok: true
   - check: case depth (z)
     model: 38.7
     drawing: 38.7
+    tol: 0.05
     ok: true
   - check: hole count
     model: 3
@@ -2170,54 +2211,67 @@ parts:
   - check: hole pitch
     model: 97.5
     drawing: 97.5
+    tol: 0.05
     ok: true
   - check: hole rise (lower to top)
     model: 75.0
     drawing: 75.0
+    tol: 0.05
     ok: true
   - check: lower holes above the bottom edge
     model: 47.5
     drawing: 47.5
+    tol: 0.05
     ok: true
   - check: hole centre from the side edge
     model: 5.0
     drawing: 5.0
+    tol: 0.05
     ok: true
   - check: top hole on the centreline
     model: 0.0
     drawing: 0.0
+    tol: 0.05
     ok: true
   - check: header A width
     model: 35.0
     drawing: 35.0
+    tol: 0.05
     ok: true
   - check: header A below the bottom edge
     model: 5.6
     drawing: 5.6
+    tol: 0.05
     ok: true
   - check: header A depth (z, less the latch ramp)
     model: 23.9
     drawing: 23.9
+    tol: 0.05
     ok: true
   - check: header B width
     model: 29.0
     drawing: 29.0
+    tol: 0.05
     ok: true
   - check: header B below the bottom edge
     model: 5.6
     drawing: 5.6
+    tol: 0.05
     ok: true
   - check: header B depth (z, less the latch ramp)
     model: 23.9
     drawing: 23.9
+    tol: 0.05
     ok: true
   - check: span over both headers
     model: 67.5
     drawing: 67.5
+    tol: 0.05
     ok: true
   - check: header rear edge from the back face
     model: 9.2
     drawing: 9.2
+    tol: 0.05
     ok: true
   - check: pins A
     model: 34
@@ -2230,10 +2284,12 @@ parts:
   - check: stud above the bottom edge
     model: 74.3
     drawing: 74.3
+    tol: 0.05
     ok: true
   - check: stud out from the case front
     model: 17.9
     drawing: 17.9
+    tol: 0.05
     ok: true
   pins:
     file: PDM15-A.pins.json (built with the part)
@@ -2786,14 +2842,17 @@ parts:
   - check: case width (x)
     model: 107.5
     drawing: 107.5
+    tol: 0.05
     ok: true
   - check: case height (y)
     model: 127.5
     drawing: 127.5
+    tol: 0.05
     ok: true
   - check: case depth (z)
     model: 38.7
     drawing: 38.7
+    tol: 0.05
     ok: true
   - check: hole count
     model: 3
@@ -2802,54 +2861,67 @@ parts:
   - check: hole pitch
     model: 97.5
     drawing: 97.5
+    tol: 0.05
     ok: true
   - check: hole rise (lower to top)
     model: 75.0
     drawing: 75.0
+    tol: 0.05
     ok: true
   - check: lower holes above the bottom edge
     model: 47.5
     drawing: 47.5
+    tol: 0.05
     ok: true
   - check: hole centre from the side edge
     model: 5.0
     drawing: 5.0
+    tol: 0.05
     ok: true
   - check: top hole on the centreline
     model: 0.0
     drawing: 0.0
+    tol: 0.05
     ok: true
   - check: header A width
     model: 35.0
     drawing: 35.0
+    tol: 0.05
     ok: true
   - check: header A below the bottom edge
     model: 5.6
     drawing: 5.6
+    tol: 0.05
     ok: true
   - check: header A depth (z, less the latch ramp)
     model: 23.9
     drawing: 23.9
+    tol: 0.05
     ok: true
   - check: header B width
     model: 29.0
     drawing: 29.0
+    tol: 0.05
     ok: true
   - check: header B below the bottom edge
     model: 5.6
     drawing: 5.6
+    tol: 0.05
     ok: true
   - check: header B depth (z, less the latch ramp)
     model: 23.9
     drawing: 23.9
+    tol: 0.05
     ok: true
   - check: span over both headers
     model: 67.5
     drawing: 67.5
+    tol: 0.05
     ok: true
   - check: header rear edge from the back face
     model: 9.2
     drawing: 9.2
+    tol: 0.05
     ok: true
   - check: pins A
     model: 34
@@ -2862,10 +2934,12 @@ parts:
   - check: stud above the bottom edge
     model: 74.3
     drawing: 74.3
+    tol: 0.05
     ok: true
   - check: stud out from the case front
     model: 17.9
     drawing: 17.9
+    tol: 0.05
     ok: true
   pins:
     file: PDM30-A.pins.json (built with the part)

@@ -331,7 +331,7 @@ class M1Unit:
         res = []
 
         def chk(name, got, want, tol=0.05):
-            res.append({"check": name, "model": round(got, 3), "drawing": want, "ok": abs(got - want) <= tol})
+            res.append({"check": name, "model": round(got, 3), "drawing": want, "tol": tol, "ok": abs(got - want) <= tol})
 
         bb = case.bounding_box()
         chk("case width (x)", bb.size.X, pr["case_w"])
