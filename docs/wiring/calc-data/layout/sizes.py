@@ -198,5 +198,73 @@ REFERRAL = "Referral or commission path: not set. That is a business decision fo
 BODY_MARGIN = {"mm": 30, "cls": "body",
                "text": "\u00b130 mm across the truck and along the wheelbase: the twin lane measured the body model against GM's sheet: wheelbase 2.6 mm short of "
                        "2,705 mm, windshield glass 17 mm wider than 1,686 mm, frame rails 25 to 30 mm outboard of the sheet's points "
-                       "(docs/wiring/twin/body_check_v3.json, branch wiring/twin-real-engine, 2026-09-29). Fore-aft ahead of the firewall is not "
-                       "reconciled with the sheet yet, so read spots there with more care"}
+                       "(docs/wiring/twin/body_check_v3.json, branch wiring/twin-real-engine, 2026-09-29). Fore-aft at the firewall the body model is "
+                       "uncertain by about \u00b1100 mm (harness-cad's engine-bay sample, 2026-09-29: the passenger head pokes through it by up to 18 mm); "
+                       "tape items T-05, T-06 and T-14 calibrate it"}
+
+
+# ---------------------------------------------------------------- workspace: names, decisions and findings
+# display names for the registry's subsystem codes (the code stays the id; these are labels)
+SUB_NAME = {"CORE_ENGINE": "Engine management", "LIGHTING_EXTERIOR": "Exterior lighting", "POWER_WINDOWS": "Power windows",
+            "DASH_CLUSTER_DAKOTA": "Instrument cluster (Dakota)", "CHARGING_STARTING": "Charging and starting", "AUDIO": "Audio",
+            "TRANS_6L90": "Transmission (6L90)", "HVAC_AC": "Heating and A/C", "HARNESS_INFRA": "Power distribution and grounds",
+            "BRAKES_IBOOSTER": "Brakes (iBooster)", "COOLING": "Cooling", "ACCESSORY_12V": "12 V accessories",
+            "LIGHTING_INTERIOR": "Interior lighting", "WIPERS_WASHER": "Wipers and washer", "POWER_LOCKS": "Power locks",
+            "CAMERA_REAR": "Rear camera", "EPARKING_BRAKE": "Electric parking brake", "AMP_STEPS": "Power steps",
+            "FUEL": "Fuel", "DOME_COURTESY": "Dome and courtesy lamps"}
+
+# registry plug-family codes, in words
+FAMILY_WORD = {"ssc": "TE Superseal 1.0", "miniseal": "Raychem MiniSeal splice", "kit_terminal": "Maker's plug kit",
+               "gm_blade": "GM blade terminal (Packard 56 / factory plug)", "ev1": "EV1 injector plug", "dt": "Deutsch DT", "dtp": "Deutsch DTP",
+               "dtm": "Deutsch DTM", "lug": "Ring lug on a stud", "ring_small": "Small ring terminal", "mp150": "Delphi Metri-Pack 150",
+               "gt150": "Delphi GT 150", "screw_terminal": "Screw terminal", "d38999_20": "MIL-DTL-38999 Series III, size 20 contacts",
+               "xlr_solder": "XLR, solder cups", "te_amp_plug": "TE AMP plug", "contura": "Carling Contura switch", "open": "Not picked yet",
+               "none": "No plug (wire to wire)"}
+
+# ends that are one physical device with another end (the tree groups them; drawing is unchanged)
+DEVICE = {"M130-A": ("M130", "MoTeC M130 engine computer"), "PDM30-A": ("PDM30", "MoTeC PDM30 power module, cab"),
+          "PDM15-A": ("PDM15", "MoTeC PDM15 power module, engine bay"),
+          "FIREWALL-CABIN": ("61-PIN", "61-pin firewall connector pair (D38999 shell 25, insert 61)")}
+DEVICE_MEMBER = {"FIREWALL-ENGINE": "FIREWALL-CABIN"}
+
+# the decisions that need Skylar, as the pieces lane sent them to main; rel = records they touch
+DECISIONS_SRC = "pieces lane, message to main, 2026-09-29 21:20 UTC"
+DECISIONS = [
+    {"n": 1, "title": "Firewall: wires with no crossing", "who": "Skylar, with Dave",
+     "text": "The 13 wires with no firewall crossing: switches as PDM inputs, so only the CAN pair crosses (the pieces lane recommends this; it fits the "
+             "only-the-61-pin rule), or a second round connector.",
+     "rel": ["c:FIREWALL-BODY-A", "c:FIREWALL-BODY-B", "c:FIREWALL-BODY-P", "c:FIREWALL-CABIN"],
+     "rel_note": "Related records: the dropped body bulkheads A, B and P and the 61-pin. The pieces lane's list of the 13 wire ids is not on file yet."},
+    {"n": 2, "title": "A second body PDM", "who": "Skylar",
+     "text": "The power locks, top lamps, Starlink and side lamps are all waiting on it.", "rel": ["c:PDM30-A"],
+     "rel_note": "Related record: the PDM30, whose spare outputs are used up (catalog/options.yaml conflicts)."},
+    {"n": 3, "title": "Tape items T-01 to T-04", "who": "Skylar (tape measure)",
+     "text": "Measure the old fuse-box opening: its shape and size, where it sits, the free space on both faces, and the space under the dash.",
+     "rel": ["c:FIREWALL-CABIN", "c:FIREWALL-ENGINE", "c:M130-A"], "tape": ["T-01", "T-02", "T-03", "T-04"],
+     "rel_note": "They settle the 61-pin plate, the boots and the M130 spot (cad/tape_list.yaml)."},
+    {"n": 4, "title": "Proportioning valve part number", "who": "Skylar",
+     "text": "Which proportioning valve is on the truck: read the part number off the valve.", "rel": ["c:BRAKE-WARN-SW"],
+     "rel_note": "Related record: the brake warning switch on the valve (ends.py BRAKE-WARN-SW)."},
+    {"n": 5, "title": "Rotate the flagged key", "who": "Skylar", "text": "Rotate the key flagged on 2026-09-29, if it is not done yet.", "rel": [],
+     "rel_note": "Not a harness record."},
+]
+
+# what harness-cad's engine-bay sample found (the K5 Engine Bay Sample page, 2026-09-29), kept here when that page retires
+BAY_SRC = "harness-cad, K5 Engine Bay Sample page (2026-09-29)"
+BAY_FINDINGS = [
+    ("The 61-pin may hit the iBooster: in the model the plate overlaps the booster by about 62 x 48 mm on the engine side. Neither position is "
+     "measured yet; tape items T-01 to T-04 settle it.", ["c:FIREWALL-ENGINE", "c:IBOOSTER"]),
+    ("The body model's firewall is uncertain by about ±100 mm, front to back; the passenger head pokes through it by up to 18 mm. The published "
+     "Mitchell dimensions and tape items T-05, T-06 and T-14 calibrate it.", []),
+    ("A sealed PDM32 in the bay takes 4 AWG at most: its power input is a 1-pin Autosport for 6 or 4 AWG (MoTeC PDM manual p.42), so the 2 AWG bay "
+     "feed would drop to 4 AWG.", ["c:PDM15-A"]),
+    ("Six runs pass within 150 mm of the exhaust: the starter feed, block ground, amp feed and ground, the H3 pair and the engine trunk. Each gets "
+     "DR-25 and heat sleeve, clamped every 12 in.", []),
+    ("The amp cables to the back ride the outside of the driver frame rail, because the exhaust tail runs inside that rail's channel.", []),
+    ("Still drawn as outlines in the bay model: the distribution stud, the ground star and the iBooster, until their sizes are sourced; the coils "
+     "are in a placeholder grid until the DEL-Stributor circle replaces it.", ["c:IBOOSTER"]),
+]
+BAY_STATS = [("Rule checks", "395 pass, 0 fail", "bend radius, exhaust gap, clamp spacing, fan and belt clearance; the power pair through H3 is the labelled exception"),
+             ("DC primary", "15 cables", "ProWire diameters: 2 AWG 9.85 mm, 4 AWG 7.92 mm, 6 AWG 6.35 mm"),
+             ("Engine loom trunk", "54 wires, 12.7 mm", "from the 61-pin down to single 1.3 mm drops"),
+             ("Clamps", "79", "every 18 in or less (ABYC E-11), 12 in near the exhaust")]

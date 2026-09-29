@@ -11,7 +11,7 @@ Inputs (snapshotted into in/ on every build, so a build can be repeated):
   harness-cad  routes.json (when it lands)                               loom routes, clips, splices
 Outputs: site/k5_layout.html (+ site/v/*.webp layers, site/ph/*.jpg photos).
 Axes: twin metres, +x driver, -y forward, +z up; front axle y -1.896, rear axle y 0.807."""
-import datetime, importlib.util, json, math, os, re, shutil, subprocess, sys
+import datetime, glob, importlib.util, json, math, os, re, shutil, subprocess, sys
 import yaml
 from PIL import Image
 
@@ -23,6 +23,8 @@ REPO = "/Users/skylar/nuke"
 PARTS_ARTIST = REPO + "/.claude/worktrees/agent-a5bfbdebd57f21ece/docs/wiring/calc-data/catalog/part_models.yaml"
 HARNESS_CAD = "/Users/skylar/nuke/.claude/worktrees/agent-a0cd58bddb3a59cec/docs/wiring/calc-data/cad/routes.json"
 BAY_GLB = os.path.expanduser("~/k5-harness-pull/renders/v4/sample/bay_sample.glb")   # harness-cad's clean re-export
+SAMPLES = os.path.expanduser("~/k5-harness-pull/parts/samples/")                     # parts-artist: GLB, pins.json, params.json per part
+PARTSLIB = os.path.join(D, "..", "partslib", "build.py")                            # the Parts Library page's part list (facts, open)
 ROUTE_PATHS = [os.path.join(D, "routes.json"), HARNESS_CAD]
 ARGS = sys.argv[1:]
 if "--routes" in ARGS:                                   # test only: build against a given routes file
@@ -59,8 +61,9 @@ for p, out in (("docs/wiring/calc-data/catalog/part_media.yaml", "part_media.yam
                ("docs/wiring/calc-data/twin_engine_anchors.json", "twin_engine_anchors.json")):
     git_show(p, os.path.join(IN, out))
 main_head = subprocess.run(["git", "-C", REPO, "rev-parse", "--short", "origin/main"], capture_output=True, text=True).stdout.strip()
-if os.path.exists(PARTS_ARTIST):
-    shutil.copy(PARTS_ARTIST, os.path.join(IN, "part_models.yaml"))
+if not git_show("docs/wiring/calc-data/catalog/part_models.yaml", os.path.join(IN, "part_models.yaml")) and os.path.exists(PARTS_ARTIST):
+    shutil.copy(PARTS_ARTIST, os.path.join(IN, "part_models.yaml"))      # main first (#431); the parts-artist worktree before it lands
+git_show("docs/wiring/calc-data/cad/tape_list.yaml", os.path.join(IN, "tape_list.yaml"))
 routes_src = next((p for p in ROUTE_PATHS if os.path.exists(p)), None)
 if routes_src:
     shutil.copy(routes_src, os.path.join(IN, "routes.json"))
@@ -445,7 +448,8 @@ if routes_src:
             s2["checks"].append({"rule": c.get("rule"), "result": c.get("result"), "why": c.get("why"), "s": CHECK_SRC.index(src)})
         if not s2.get("length_m"):
             s2["length_m"] = round(sum(math.dist(a, c) for a, c in zip(s["points"], s["points"][1:])), 3)
-        s2["checks_failed"] = sum(1 for c in (s.get("checks") or []) if str(c.get("result", "")).lower() not in ("pass", "ok"))
+        s2["checks_failed"] = sum(1 for c in (s.get("checks") or []) if str(c.get("result", "")).lower() in ("flag", "exception", "fail", "failed"))
+        s2["checks_notrun"] = sum(1 for c in (s.get("checks") or []) if str(c.get("result", "")).lower() == "not run")
         s2["od_basis"] = s.get("od_basis") if s.get("od_basis") not in CHECK_SRC else s.get("od_basis")
         routes["segments"].append(s2)
     for key in ("nodes", "clips"):
@@ -480,7 +484,7 @@ if routes_src:
 glb = None
 if os.path.exists(BAY_GLB):
     raw = open(BAY_GLB, "rb").read()
-    bad = [s for s in (b"blendermcp", b"api_key", b"apikey", b"API_KEY") if s in raw]
+    bad = [s for s in (b"blendermcp", b"api_key", b"apikey", b"sketchfab") if s in raw.lower()]
     if bad:
         print("REFUSED: the bay GLB carries", bad, "- not published")
     else:
@@ -490,6 +494,24 @@ if os.path.exists(BAY_GLB):
         glb = {"src": "3d/bay_sample.js", "from": BAY_GLB.replace(os.path.expanduser("~"), "~"), "bytes": len(raw),
                "made": datetime.datetime.fromtimestamp(os.path.getmtime(BAY_GLB)).strftime("%Y-%m-%d %H:%M"),
                "axes": "glTF (X, Y, Z) = twin (x, z, -y)"}
+
+# ------------------------------------------------------------------ harness-cad's labelled renders of the bay sample (the Engine Bay Sample page's figures)
+RENDERS = []
+for name, cap in (("bay_labelled", "The whole bay, labelled. Red and black are the DC primary; D1 to D15 give each cable's gauge, ends and length. Orange is the "
+                                   "engine loom from the 61-pin; E1 to E16 give each branch's wire count and bundle diameter. Blue marks are sensor plugs, until "
+                                   "their true-size models replace them."),
+                  ("power", "The power corner. The Odyssey is drawn at 276 x 180 x 200 mm and the Blue Sea 7700 isolator from Blue Sea's dimension drawing, "
+                            "with the 2 AWG pairs run side by side."),
+                  ("pin61", "The 61-pin at the old fuse-box hole, on the CNC plate from its CAD file. The engine trunk drops into the back of the connector.")):
+    src = os.path.join(D, "..", "baysample", name + ".jpg")
+    if os.path.exists(src):
+        out = os.path.join(SITE, "v", "r_" + name + ".jpg")
+        if not os.path.exists(out) or os.path.getmtime(out) < os.path.getmtime(src):
+            im = Image.open(src).convert("RGB")
+            if im.size[0] > 1600:
+                im = im.resize((1600, int(im.size[1] * 1600 / im.size[0])), Image.LANCZOS)
+            im.save(out, quality=84, optimize=True)
+        RENDERS.append({"src": "v/r_" + name + ".jpg", "cap": cap, "from": "harness-cad, K5 Engine Bay Sample page (2026-09-29)"})
 
 # ------------------------------------------------------------------ cost, status and who is on it (from the records' own words)
 ASR = yaml.safe_load(open(os.path.join(IN, "suppliers_asr.yaml"))) if os.path.exists(os.path.join(IN, "suppliers_asr.yaml")) else {"items": []}
@@ -647,10 +669,375 @@ boxes = []
 for b in MOUNTS.get("boxes", []):
     boxes.append({k: b.get(k) for k in ("id", "what", "where", "zone", "status", "why", "instead", "open", "nodes", "parts")})
 
+# ------------------------------------------------------------------ workspace model: systems > devices > connectors > pins
+TAPE = yaml.safe_load(open(os.path.join(IN, "tape_list.yaml"))) if os.path.exists(os.path.join(IN, "tape_list.yaml")) else {"items": []}
+natkey = lambda s: [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", str(s))]
+cav_label = lambda c: "" if c is None else str(c).split(" — ")[0].strip()
+cav_key = lambda c: re.sub(r"^([A-Za-z]+)0+(\d)", r"\1\2", cav_label(c))
+PASS = re.compile(r"^(FIREWALL-|SPL-|RAIL-)|PASS")
+REGW = {w["id"]: w for w in REG["wires"]}
+REGW.update({w["id"]: w for w in REG["implied"]})
+TERM = {}
+for t in REG["terminations"]:
+    TERM.setdefault(t["wire"], []).append(t)
+SEG = {s["id"]: s for s in (routes or {}).get("segments", [])}
+
+
+def chain(wid):
+    """The ends a wire runs through, in order: the end its registry 'frm' names, then pass-throughs (splices, the 61-pin, bulkheads), then the rest."""
+    ts = TERM.get(wid, [])
+    frm = str((REGW.get(wid) or {}).get("frm") or "")
+    head = re.split(r"[:\s(]", frm, maxsplit=1)[0]
+    pin = frm.split(":", 1)[1] if ":" in frm else None
+    first = next((t for t in ts if t["endpoint"] == head or (head and t["endpoint"].startswith(head + "-")
+                                                              and (pin is None or cav_key(t["cavity"]) == cav_key(pin)))), ts[0] if ts else None)
+    rest = [t for t in ts if t is not first]
+    cab_first = (EP.get((first or {}).get("endpoint"), {}).get("side") != "engine bay")
+    via = sorted([t for t in rest if PASS.search(t["endpoint"])],
+                 key=lambda t: (0 if t["endpoint"].startswith("SPL-") else 1, ("CABIN" in t["endpoint"]) != cab_first))
+    return ([first] if first else []) + via + [t for t in rest if not PASS.search(t["endpoint"])]
+
+
+for wid, w in WIRES.items():
+    rw = REGW.get(wid) or {}
+    w["ch"] = [[t["endpoint"], cav_label(t["cavity"]), t.get("part")] for t in chain(wid)]
+    w.update({"len_kind": rw.get("length_kind"), "opt": rw.get("option"), "opt_st": rw.get("option_status"), "notes": rw.get("notes"),
+              "src": (rw.get("sources") or [])[:6], "hist": (rw.get("conflicts") or [])[:6], "limit": rw.get("pdm_limit"),
+              "prot": rw.get("protection"), "ctl": rw.get("control"), "basis": rw.get("color_basis")})
+    segs = [SEG[s] for s in w.get("segs", []) if s in SEG]
+    if segs:
+        w["rl"] = round(sum(s.get("length_m") or 0 for s in segs), 3)
+        w["rm"] = round(math.sqrt(sum((s.get("margin_mm") or 0) ** 2 for s in segs)))
+
+# pins: every cavity the registry terminates, plus every cavity the parts-artist's pins.json names (spares included)
+PINS = {}
+for t in REG["terminations"]:
+    rec = PINS.setdefault(t["endpoint"], {}).setdefault(cav_key(t["cavity"]), {"c": cav_label(t["cavity"]), "w": [], "t": t.get("part")})
+    rec["w"].append(t["wire"])
+    if len(str(t["cavity"])) > len(rec["c"]) + 2:
+        rec["note"] = str(t["cavity"])
+    if t.get("factory_circuit"):
+        rec["fc"] = t["factory_circuit"]
+PINSRC = {}
+
+
+def face_xy(cavs):
+    """Wire-side face positions (mm) from pins.json: the plane square to the exit direction, turned so row 1 is on top and cavity 1 on the left."""
+    pts = [c for c in cavs if c.get("wire_side_glb_m") and c.get("exit_dir_glb")]
+    if len(pts) < 2:
+        return {}
+    d = pts[0]["exit_dir_glb"]
+    up = (0, 1, 0) if abs(d[1]) < 0.9 else (0, 0, -1)
+    f = (-d[0], -d[1], -d[2])
+    right = (f[1] * up[2] - f[2] * up[1], f[2] * up[0] - f[0] * up[2], f[0] * up[1] - f[1] * up[0])
+    dot = lambda a, b: sum(x * y for x, y in zip(a, b))
+    xy = {c["pin"]: [dot(c["wire_side_glb_m"], right) * 1000, dot(c["wire_side_glb_m"], up) * 1000] for c in pts}
+    rows = [c for c in pts if c.get("row")]
+    if rows:
+        r1 = [c for c in rows if c["row"] == min(r["row"] for r in rows)]
+        rn = [c for c in rows if c["row"] == max(r["row"] for r in rows)]
+        if sum(xy[c["pin"]][1] for c in r1) / len(r1) < sum(xy[c["pin"]][1] for c in rn) / len(rn):
+            for k in xy:
+                xy[k][1] *= -1
+        r1.sort(key=lambda c: c.get("cavity") or 0)
+        if len(r1) > 1 and xy[r1[0]["pin"]][0] > xy[r1[-1]["pin"]][0]:
+            for k in xy:
+                xy[k][0] *= -1
+    cx = sum(v[0] for v in xy.values()) / len(xy); cy = sum(v[1] for v in xy.values()) / len(xy)
+    return {k: [round(v[0] - cx, 2), round(v[1] - cy, 2)] for k, v in xy.items()}
+
+
+import ast, base64
+PL = []                                          # the Library's parts: the six the pieces lane audited and published (partslib/build.py)
+if os.path.exists(PARTSLIB):
+    _tree = ast.parse(open(PARTSLIB).read())
+    PL = next(ast.literal_eval(n.value) for n in _tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "PARTS")
+for pf in [SAMPLES + p["key"] + "/" + p["id"] + ".pins.json" for p in PL if os.path.exists(SAMPLES + p["key"] + "/" + p["id"] + ".pins.json")]:
+    pj = json.load(open(pf))
+    by_ep = {}
+    for c in pj.get("cavities", []):
+        by_ep.setdefault(c.get("endpoint") or pj["id"], []).append(c)
+    for ep, cavs in by_ep.items():
+        xy = face_xy(cavs)
+        PINSRC[ep] = {"file": os.path.basename(pf), "numbering": pj.get("numbering"), "names": pj.get("names"), "orient": pj.get("orientation_unknown"),
+                      "frame": pj.get("frame")}
+        for c in cavs:
+            full = re.sub(r"^(Hi|Lo)\s+", "", re.sub(r"\s{2,}.*$", "", (c.get("full_name") or "").strip()))
+            pw = sorted(w.get("id") for w in c.get("wires") or [] if w.get("id"))
+            have = PINS.setdefault(ep, {})
+            key = cav_key(c["pin"])
+            if key not in have and pw:             # a stud or post: the registry names it in words, so match it by its wires
+                key = next((k for k, r in have.items() if set(r["w"]) & set(pw)), key)
+            rec = have.setdefault(key, {"c": c["pin"], "w": [], "t": None})
+            if key == cav_key(c["pin"]):
+                rec["c"] = c["pin"]
+            rec.update({"n": c.get("name"), "f": full, "tec": c.get("cavity"), "row": c.get("row"), "xy": xy.get(c["pin"]), "pj": c["pin"]})
+            if pw and sorted(set(rec["w"])) != sorted(set(pw)):
+                rec["pj_w"] = pw                     # pins.json and the registry disagree: shown, not merged
+PINS = {ep: sorted(v.values(), key=lambda r: natkey(r["c"])) for ep, v in PINS.items()}
+
+# connectors: structured fields from the registry kit, its terminations, part_media and parts.yaml
+KIND_FIELD = {"contact": "term", "terminal": "term", "lug": "term", "seal": "seal", "plug": "seal", "wedge": "lock", "tpa": "lock",
+              "backshell": "shell", "boot": "shell", "housing": "housing", "kit": "kit", "splice": "term"}
+USED_BY = {}
+CAPACITY = {}                                   # the registry's capacity table names the 61-pin and the body bulkheads in words
+for name, rec in ((REG.get("capacity") or {}).get("resources") or {}).items():
+    m = re.match(r"body bulkhead ([A-Z])\b", name)
+    eps = ["FIREWALL-CABIN", "FIREWALL-ENGINE"] if name.startswith("61-pin") else (["FIREWALL-BODY-" + m.group(1)] if m else [])
+    for e in eps:
+        if isinstance(rec.get("capacity"), (int, float)):
+            CAPACITY[e] = (int(rec["capacity"]), "k5_registry.json capacity '%s' (%s)" % (name, rec.get("source") or "no source named"))
+for i in items:
+    code = i["id"]
+    r = EP.get(code) or {}
+    fields = {}
+    for kc, qty in (r.get("kit") or {}).items():
+        p = PARTS.get(kc) or {}
+        fields.setdefault(KIND_FIELD.get(p.get("kind"), "kit"), []).append({"code": kc, "qty": qty, "name": p.get("name"), "kind": p.get("kind")})
+        USED_BY.setdefault(kc, set()).add(code)
+    tcount = {}
+    for p in PINS.get(code, []):
+        for part in re.split(r"\s+\+\s+", str(p.get("t") or "")):
+            if part and part != "None":
+                tcount[part] = tcount.get(part, 0) + max(1, len(p["w"]))
+    for part, n in sorted(tcount.items(), key=lambda kv: -kv[1]):
+        pp = PARTS.get(part)
+        if pp:
+            fields.setdefault(KIND_FIELD.get(pp.get("kind"), "term"), []).append({"code": part, "qty": n, "name": pp.get("name"), "kind": pp.get("kind")})
+            USED_BY.setdefault(part, set()).add(code)
+        else:
+            fields.setdefault("term_open", []).append({"text": part, "qty": n})
+    pins = PINS.get(code, [])
+    cc = r.get("cavity_count")
+    if isinstance(cc, (int, float)):
+        cav_n, cav_src = int(cc), "k5_registry.json cavity_count"
+    elif code in CAPACITY:
+        cav_n, cav_src = CAPACITY[code]
+    elif code in PINSRC:
+        cav_n, cav_src = len(pins), PINSRC[code]["file"]
+    else:
+        cav_n, cav_src = None, "no cavity count on file"
+    m = i.get("media") or {}
+    mates = []
+    for x in m.get("mates_with") or []:
+        p = PARTS.get(str(x)) or {}
+        mates.append({"code": str(x), "name": p.get("name"), "end": str(x) if str(x) in EP else None})
+    root = sizes_m.DEVICE_MEMBER.get(code) or SAME_PIECE.get(code) or code
+    i["dev"] = sizes_m.DEVICE[root][0] if root in sizes_m.DEVICE else root
+    i["conn"] = {"family": r.get("family"), "family_word": sizes_m.FAMILY_WORD.get(r.get("family"), r.get("family")), "cav_n": cav_n, "cav_src": cav_src,
+                 "used": sum(1 for p in pins if p["w"]), "fields": fields, "mates": mates, "face": code in PINSRC and any(p.get("xy") for p in pins)}
+    i["pins_src"] = PINSRC.get(code)
+
+# devices and systems
+DEVS = {}
+for i in items:
+    d = DEVS.setdefault(i["dev"], {"id": i["dev"], "conns": [], "name": None})
+    d["conns"].append(i["id"])
+for root, (did, name) in sizes_m.DEVICE.items():
+    if did in DEVS:
+        DEVS[did]["name"] = name
+for d in DEVS.values():
+    first = ITEM[d["conns"][0]]
+    d["name"] = d["name"] or first["what"]
+    d["conns"].sort(key=natkey)
+    subs = [WIRES[w["id"]].get("sub") for c in d["conns"] for w in ITEM[c]["w"] if w["id"] in WIRES]
+    subs = [s for s in subs if s]
+    d["sys"] = max(sorted(set(subs)), key=subs.count) if subs else None
+    d["zone"] = first["zone"]
+    m = first.get("media") or {}
+    d["maker"], d["pn"] = m.get("maker"), m.get("maker_pn")
+for name, rec in ((REG.get("capacity") or {}).get("resources") or {}).items():
+    did = "61-PIN" if name.startswith("61-pin") else name.split(" ")[0]
+    if did in DEVS:                              # outputs, inputs and cavities: used against what the device has
+        DEVS[did].setdefault("capacity", []).append({"what": name, "cap": rec.get("capacity"), "used": rec.get("used"), "spare": rec.get("spare"),
+                                                     "spare_ids": rec.get("spare_ids"), "src": rec.get("source")})
+SYS = {}
+for wid, w in WIRES.items():
+    s = SYS.setdefault(w.get("sub") or "NONE", {"id": w.get("sub") or "NONE", "wires": [], "devs": []})
+    s["wires"].append(wid)
+for d in DEVS.values():
+    SYS.setdefault(d["sys"] or "NONE", {"id": d["sys"] or "NONE", "wires": [], "devs": []})["devs"].append(d["id"])
+for s in SYS.values():
+    s["name"] = sizes_m.SUB_NAME.get(s["id"], "No subsystem in the registry" if s["id"] == "NONE" else s["id"].replace("_", " ").title())
+    s["wires"].sort(key=natkey); s["devs"].sort(key=lambda x: DEVS[x]["name"].lower())
+    s["active"] = sum(1 for x in s["wires"] if WIRES[x]["kind"] == "active")
+    s["ft"] = round(sum(WIRES[x].get("len_ft") or 0 for x in s["wires"]), 1)
+sys_list = sorted(SYS.values(), key=lambda s: (s["id"] == "NONE", -len(s["wires"])))
+
+# ------------------------------------------------------------------ BOM: devices (priced per end), plug hardware and wire (registry)
+DIFF = {str(x.get("item")): x for x in REG.get("diff") or []}
+
+
+def fetched_of(p):
+    """The fetch date a parts.yaml record's sources name, if any."""
+    m = re.search(r"fetched (\d{4}-\d{2}-\d{2})", " ".join(str(x) for x in p.get("sources") or []))
+    return m.group(1) if m else None
+
+
+bom = []
+groups = {}
+for i in items:
+    if i.get("drawn") == "piece" or i["id"] in LOOM:
+        continue
+    m = i.get("media") or {}
+    pn = m.get("maker_pn") if m.get("maker_pn") not in (None, "", "unknown") else None
+    g = groups.setdefault(norm(pn) if pn else "end:" + i["id"], {"pn": pn, "items": []})
+    g["items"].append(i)
+for key, g in groups.items():
+    its = g["items"]
+    i0 = its[0]
+    m = i0.get("media") or {}
+    price = best_price(i0)
+    stats = sorted({i["buy"]["status"] for i in its})
+    subs = [i["sys"] for i in its]
+    bom.append({"g": "dev", "code": g["pn"] or "no part number", "name": i0["what"] if len(its) == 1 else m.get("what") or i0["what"], "maker": m.get("maker"),
+                "qty": len(its), "unit": "each", "price": price, "status": stats[0] if len(stats) == 1 else "mixed: " + ", ".join(stats),
+                "paid": any((i.get("cost") or {}).get("paid") for i in its), "used": [i["id"] for i in its], "sys": max(set(subs), key=subs.count)})
+for code, qty in sorted((REG.get("bom") or {}).get("parts", {}).items(), key=lambda kv: natkey(kv[0])):
+    p = PARTS.get(code) or {}
+    d = DIFF.get(code) or {}
+    bom.append({"g": "hw", "code": code, "name": p.get("name"), "kind": p.get("kind"), "qty": qty, "unit": "each", "vendor": p.get("vendor"),
+                "price": {"usd": p["price"], "unit": "each", "vendor": p.get("vendor"), "src": "parts.yaml (" + "; ".join(str(x) for x in (p.get("sources") or [])[:2]) + ")",
+                          "date": fetched_of(p), "age": age_days(fetched_of(p))} if p.get("price") is not None else None, "cart": d.get("cart"), "status": d.get("status") or "not in the registry's cart check",
+                "used": sorted(USED_BY.get(code, []), key=natkey)})
+for item, ft in (REG.get("bom") or {}).get("wire_ft", {}).items():
+    d = DIFF.get(item) or {}
+    bom.append({"g": "wire", "code": item, "name": item, "qty": ft, "unit": "ft", "cart": d.get("cart_ft"),
+                "status": d.get("status") or "not in the registry's cart check", "used": []})
+
+# ------------------------------------------------------------------ open items: every question the records hold, with who acts
+def who_of(t, default="unassigned"):
+    if re.search(r"\bDave\b", t):
+        return "Skylar, with Dave"
+    if re.search(r"\basked 20\d\d|\bowner\b|\bSkylar\b|\byou\b", t, re.I):
+        return "Skylar"
+    return default
+
+
+OPEN = []
+def add_open(kind, text, who, rel, src, st="open"):
+    same = next((o for o in OPEN if o["text"] == text), None)
+    if same:                                  # one question asked of several ends: one item, all its records
+        same["rel"] += [r for r in rel if r not in same["rel"]]
+        return
+    OPEN.append({"id": "o%d" % (len(OPEN) + 1), "kind": kind, "text": text, "who": who, "rel": list(rel), "src": src, "st": st})
+
+
+for d in sizes_m.DECISIONS:
+    add_open("Decision", d["title"] + ". " + d["text"], d["who"], d["rel"], sizes_m.DECISIONS_SRC)
+    d["open"] = OPEN[-1]["id"]
+TAPE_ITEMS = []
+for t in TAPE.get("items") or []:
+    res = t.get("result") or {}
+    TAPE_ITEMS.append({"id": t.get("id"), "what": t.get("what"), "from_to": t.get("from_to"), "settles": t.get("settles"), "priority": t.get("priority"),
+                       "tol": t.get("tolerance_mm"), "done": res.get("measured") is not None})
+    if res.get("measured") is None and t.get("priority") == 1:
+        rel = ["c:FIREWALL-CABIN", "c:FIREWALL-ENGINE"] if t["id"] in ("T-01", "T-02", "T-03", "T-04") else []
+        add_open("Measurement", t["id"] + ": " + (t.get("what") or "") + ". Settles: " + (t.get("settles") or ""), "Skylar (tape measure)", rel,
+                 "docs/wiring/calc-data/cad/tape_list.yaml " + t["id"])
+for b in boxes:
+    for o in b.get("open") or []:
+        add_open("Placement", b["id"] + ": " + o, who_of(o), ["c:" + n for n in (b.get("nodes") or []) if n in ITEM], "catalog/mounts.yaml box " + b["id"], b.get("status") or "open")
+for i in items:
+    for o in i.get("open") or []:
+        add_open("End", o, who_of(o), ["c:" + i["id"]], "ends.py (pieces lane) " + i["id"])
+    for o in (i.get("reg") or {}).get("open") or []:
+        add_open("Registry", o, who_of(o), ["c:" + i["id"]], "k5_registry.json endpoints." + i["id"])
+    for c in i.get("calls") or []:
+        add_open("Placement", c["text"], "Skylar", ["c:" + i["id"]], c["source"])
+if routes:
+    for n in routes["nodes"]:
+        e = ITEM.get(n.get("ep") or "")
+        if not e or n.get("gap_mm") is None:
+            continue
+        m = e["margin"] if e["margin"].get("mm") is not None else (ITEM.get(e.get("grouped") or "", {}).get("margin") or e["margin"])
+        lim = max(50, m.get("mm") or 0)
+        if n["gap_mm"] > lim:
+            n["off"] = True
+            add_open("Route landing", "%s: harness-cad lands the route %d mm from %s's spot in pos.py; its margin is ±%d mm. One of the two moves."
+                     % (n["id"], n["gap_mm"], e["id"], lim), "pieces and harness-cad", ["c:" + e["id"], "n:" + n["id"]], "routes.json and pos.py")
+    for s in routes["segments"]:
+        if s.get("checks_failed"):
+            add_open("Route check", "%s: %d of %d rule checks not passed." % (s["id"], s["checks_failed"], len(s.get("checks") or [])), "harness-cad",
+                     ["s:" + s["id"]], "routes.json " + s["id"])
+for text, rel in sizes_m.BAY_FINDINGS:
+    add_open("Finding", text, who_of(text, "harness-cad"), rel, sizes_m.BAY_SRC)
+for i in items:
+    if not i.get("drawn") and i.get("why_not") == "size":
+        add_open("Coverage", i["id"] + " is not drawn to size: " + (i.get("why_not_text") or "size not read"), "layout-ui and parts-artist",
+                 ["c:" + i["id"]], "sizes.py TODO (layout-ui)")
+# ------------------------------------------------------------------ library: the parts-artist's six parts in true CAD (the Parts Library page's content)
+LIB = []
+if PL:
+    os.makedirs(os.path.join(SITE, "lib"), exist_ok=True)
+    for p in PL:
+        d = SAMPLES + p["key"] + "/" + p["id"]
+        if not os.path.exists(d + ".glb"):
+            continue
+        raw = open(d + ".glb", "rb").read()
+        bad = [s for s in (b"blendermcp", b"api_key", b"apikey", b"sketchfab") if s in raw.lower()]
+        if bad:
+            print("REFUSED: library GLB", p["id"], "carries", bad)
+            continue
+        open(os.path.join(SITE, "lib", p["key"] + ".js"), "w").write(
+            "window.K5_LIB=window.K5_LIB||{};window.K5_LIB[%s]=\"%s\";\n" % (json.dumps(p["key"]), base64.b64encode(raw).decode()))
+        pj = json.load(open(d + ".pins.json"))
+        prm = json.load(open(d + ".params.json")) if os.path.exists(d + ".params.json") else {}
+        imgs = []
+        for kind, w, cap in (("drawing", 1800, "Dimensioned drawing. Blue is printed by the maker, orange is scaled off the print, purple is sized from a photo, red is assumed."),
+                             ("pinout", 1400, "Pinout, wire side, with this build's wires."),
+                             ("vs_photo", 1400, "The model beside the maker's product photo. The maker's label artwork is left off on purpose."),
+                             ("clearance_800", 800, "The mated plugs and backshells, with the plug-and-boot keep-out in orange.")):
+            src = d + "_" + kind + ".png"
+            if kind.startswith("clearance") and not prm.get("keepout"):
+                continue                               # only the parts with a plug keep-out have a clearance study
+            if os.path.exists(src):
+                name = "lib/%s_%s.jpg" % (p["key"].lower(), kind.split("_8")[0])
+                out = os.path.join(SITE, name)
+                if not os.path.exists(out) or os.path.getmtime(out) < os.path.getmtime(src):
+                    im = Image.open(src).convert("RGB")
+                    if im.size[0] > w:
+                        im = im.resize((w, int(im.size[1] * w / im.size[0])), Image.LANCZOS)
+                    im.save(out, quality=84, optimize=True)
+                imgs.append({"src": name, "cap": cap, "kind": kind.split("_8")[0]})
+        cav = []
+        for c in pj.get("cavities", []):
+            full = re.sub(r"^(Hi|Lo)\s+", "", re.sub(r"\s{2,}.*$", "", (c.get("full_name") or "").strip()))
+            cav.append({"pin": c["pin"], "maker": c.get("maker_pin"), "ep": c.get("endpoint"), "name": c.get("name"), "full": full, "at": c.get("wire_side_glb_m"),
+                        "w": [x.get("id") for x in c.get("wires") or [] if x.get("id")]})
+        checks = [{"what": c.get("check"), "model": c.get("model"), "drawing": c.get("drawing"), "tol": c.get("tol"), "ok": c.get("ok")} for c in prm.get("checks") or []]
+        LIB.append({"key": p["key"], "id": p["id"], "tab": p["tab"], "title": p["title"], "pn": p["pn"], "mount": p["mount"], "facts": p["facts"], "open": p["open"],
+                    "js": "lib/%s.js" % p["key"], "bytes": len(raw), "made": datetime.datetime.fromtimestamp(os.path.getmtime(d + ".glb")).strftime("%Y-%m-%d %H:%M"),
+                    "pins": cav, "orient": pj.get("orientation_unknown"), "checks": checks, "unknowns": prm.get("unknowns") or [],
+                    "dims": prm.get("dims_note"), "basis": prm.get("shape_basis"), "maker": prm.get("maker"), "maker_pn": prm.get("maker_pn"),
+                    "ends": prm.get("endpoints") or [p["id"]], "images": imgs, "mated": (prm.get("mated") or {}).get("what"),
+                    "keepout": (prm.get("keepout") or {}).get("what")})
+        for u in prm.get("unknowns") or []:
+            add_open("Part model", p["id"] + ": " + u, "parts-artist", ["c:" + e for e in (prm.get("endpoints") or [p["id"]]) if e in ITEM],
+                     "parts/samples/%s/%s.params.json" % (p["key"], p["id"]))
+LIB_OF = {e: L["key"] for L in LIB for e in L["ends"]}
+for i in items:
+    if i["id"] in LIB_OF:
+        i["lib"] = LIB_OF[i["id"]]
+for d in DEVS.values():
+    d["lib"] = next((LIB_OF[c] for c in d["conns"] if c in LIB_OF), None)
+OPEN_BY = {}
+for o in OPEN:
+    for r in o["rel"]:
+        OPEN_BY.setdefault(r, []).append(o["id"])
+
+cov = {"ends": len(items), "drawn": sum(1 for i in items if i.get("drawn")), "cad": len(LIB), "segs": len((routes or {}).get("segments", [])),
+       "wires": len(WIRES), "routed": sum(1 for w in WIRES.values() if w.get("segs")), "off": sum(1 for n in (routes or {}).get("nodes", []) if n.get("off")),
+       "open": len(OPEN), "decisions": len(sizes_m.DECISIONS)}
+print("workspace: %d systems, %d devices, %d pins on %d connectors, %d wires (%d routed), %d BOM lines, %d open items, %d library parts"
+      % (len(SYS), len(DEVS), sum(len(v) for v in PINS.values()), len(PINS), len(WIRES), cov["routed"], len(bom), len(OPEN), len(LIB)))
+
 data = {
     "built": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), "main": main_head, "stamp": stamp,
     "views": VIEWS, "items": items, "wires": WIRES, "context": ctx, "routes": routes, "boxes": boxes, "glb": glb,
     "counts": {"ends": len(items), "drawn": drawn}, "body_margin": BODY_MARGIN, "roll": roll, "carts": carts,
+    "sys": sys_list, "devs": DEVS, "pins": PINS, "bom": bom, "open": OPEN, "open_by": OPEN_BY, "tape": TAPE_ITEMS, "lib": LIB, "cov": cov,
+    "dec": sizes_m.DECISIONS, "dec_src": sizes_m.DECISIONS_SRC, "renders": RENDERS, "bay": {"stats": sizes_m.BAY_STATS, "src": sizes_m.BAY_SRC},
     "stale_days": sizes_m.STALE_DAYS, "builder_note": sizes_m.BUILDER_NOTE, "referral": sizes_m.REFERRAL,
     "sources": {"ends": "pieces lane: ends.py " + stamp["ends.py"] + ", pos.py " + stamp["pos.py"],
                 "sizes": "footprints.py (pieces), part_models.yaml (parts-artist), sizes.py (layout-ui)",
@@ -662,6 +1049,7 @@ data = {
                 "prices": "k5_registry.json device text and snapshots; suppliers/affordablestreetrods.yaml; parts.yaml (kit parts)"},
 }
 MONEY = re.compile(r"\$\s?\d[\d,]*(?:\.\d+)?")
+MARKET_ORDER = re.compile(r"(\border\b[^;.)]{0,40}?\b(?:eBay|Amazon)\s+(?:item\s+)?)(\d{9,14})", re.I)   # the listing he bought from, named beside an order
 ORDER_NO = re.compile(r"(\b(?:order|invoice|receipt|confirmation)\s*(?:no\.?|number|num)?\s*[:#]?\s*)((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{2,})", re.I)
 
 
@@ -671,6 +1059,7 @@ def mask(o, money=True):
         if o.startswith("data:"):
             return o
         o = ORDER_NO.sub(lambda m: m.group(1) + "\u2022\u2022\u2022", o)
+        o = MARKET_ORDER.sub(lambda m: m.group(1) + "\u2022\u2022\u2022", o)
         return MONEY.sub("$\u2022\u2022\u2022", o) if money else o
     if isinstance(o, list):
         return [mask(v) for v in o]
@@ -679,7 +1068,7 @@ def mask(o, money=True):
     return o
 
 
-KEEP_PRICES = {"cost", "roll", "carts"}
+KEEP_PRICES = {"cost", "roll", "carts", "price"}
 
 
 def mask_items(o, money=True):
