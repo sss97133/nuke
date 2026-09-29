@@ -1,0 +1,195 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1720" height="1770" viewBox="0 0 1720 1770" font-family="Helvetica, Arial, sans-serif">
+<rect x="0" y="0" width="1720" height="1770" fill="white"/>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#e67e22" stroke-width="2"/></pattern></defs>
+<text x="30.0" y="34.0" font-size="22" text-anchor="start" font-weight="bold" fill="#1b1b1b">K5 fuel system: regulator, plumbing and fuel pressure sensing</text>
+<text x="30.0" y="56.0" font-size="12" text-anchor="start" font-weight="normal" fill="#444">1977 K5 Blazer · LS3 · MoTeC M130 · research/2026-09-30_fuel-system-and-regulator.md · every value is sourced there; PROPOSED = agent layout for the builder to confirm at mock-up</text>
+<text x="30.0" y="90.0" font-size="16" text-anchor="start" font-weight="bold" fill="#1b1b1b">A.  Plumbing schematic (not to scale).  Fuel flows tank → filter → rails → regulator → back to the tank.</text>
+<rect x="30.0" y="110.0" width="360.0" height="400.0" rx="4" fill="#f7f9fb" stroke="#1b1b1b" stroke-width="2"/>
+<text x="45.0" y="132.0" font-size="13" text-anchor="start" font-weight="bold" fill="#1b1b1b">FUEL TANK</text>
+<text x="45.0" y="147.0" font-size="13" text-anchor="start" font-weight="bold" fill="#1b1b1b">31 gal Blazer tank, rear centre, behind the rear axle</text>
+<rect x="55.0" y="170.0" width="280.0" height="300.0" rx="4" fill="white" stroke="#1b1b1b" stroke-width="1.5"/>
+<text x="65.0" y="190.0" font-size="11.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">Quantum QFS-H882 hanger (owned, in the tank)</text>
+<text x="65.0" y="206.0" font-size="11.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">packing slip: H882 "BUILD" + P367 + OET-PX-15.3</text>
+<text x="65.0" y="222.0" font-size="11.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">return style: 8AN feed + 6AN return</text>
+<text x="65.0" y="238.0" font-size="11.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">P367 pump (read as HFP-367):</text>
+<text x="65.0" y="254.0" font-size="11.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">  164 L/h and 4.6 A at 45 psi</text>
+<text x="65.0" y="270.0" font-size="11.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">  145 L/h and 5.1 A at 60 psi</text>
+<text x="65.0" y="286.0" font-size="11.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">check valve built into the pump outlet</text>
+<text x="65.0" y="302.0" font-size="11.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">in-tank strainer: NOT CONFIRMED</text>
+<text x="65.0" y="318.0" font-size="11.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">level sender (wires #98/#117, not here)</text>
+<circle cx="180.0" cy="400.0" r="26" fill="#fdebd0" stroke="#1b1b1b" stroke-width="1.5"/>
+<text x="180.0" y="405.0" font-size="11" text-anchor="middle" font-weight="bold" fill="#1b1b1b">PUMP</text>
+<polyline points="180.0,426.0 180.0,455.0" fill="none" stroke="#1b1b1b" stroke-width="1.5" stroke-linejoin="round"/>
+<text x="186.0" y="462.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#a04000">strainer ?</text>
+<rect x="328.0" y="222.0" width="14.0" height="16.0" rx="4" fill="#c0392b" stroke="#c0392b" stroke-width="1.5"/>
+<text x="346.0" y="218.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#c0392b">8AN feed out</text>
+<rect x="328.0" y="322.0" width="14.0" height="16.0" rx="4" fill="#1f5fa8" stroke="#1f5fa8" stroke-width="1.5"/>
+<text x="346.0" y="318.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#1f5fa8">6AN return in</text>
+<rect x="328.0" y="422.0" width="14.0" height="16.0" rx="4" fill="#95a5a6" stroke="#95a5a6" stroke-width="1.5"/>
+<text x="346.0" y="418.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#95a5a6">vent</text>
+<polyline points="342.0,225.0 355.0,235.0 368.0,225.0 381.0,235.0 394.0,225.0 407.0,235.0 420.0,225.0" fill="none" stroke="#c0392b" stroke-width="3" stroke-linejoin="round"/>
+<text x="381.0" y="252.0" font-size="10.5" text-anchor="middle" font-weight="normal" fill="#c0392b">-8 flex</text>
+<polyline points="420.0,230.0 560.0,230.0" fill="none" stroke="#c0392b" stroke-width="4" stroke-linejoin="round"/>
+<text x="490.0" y="250.0" font-size="11" text-anchor="middle" font-weight="normal" fill="#c0392b">-8 feed on the frame</text>
+<text x="490.0" y="264.0" font-size="10.5" text-anchor="middle" font-weight="normal" fill="#c0392b" font-style="italic">(2024-08 line kit: size + side TO CONFIRM)</text>
+<rect x="560.0" y="208.0" width="120.0" height="44.0" rx="4" fill="#fdedec" stroke="#c0392b" stroke-width="2"/>
+<text x="620.0" y="224.0" font-size="11" text-anchor="middle" font-weight="normal" fill="#1b1b1b">10 µm post-pump</text>
+<text x="620.0" y="238.0" font-size="11" text-anchor="middle" font-weight="normal" fill="#1b1b1b">filter (not owned)</text>
+<polyline points="680.0,230.0 760.0,230.0" fill="none" stroke="#c0392b" stroke-width="4" stroke-linejoin="round"/>
+<polyline points="760.0,225.0 773.3,235.0 786.7,225.0 800.0,235.0 813.3,225.0 826.7,235.0 840.0,225.0" fill="none" stroke="#c0392b" stroke-width="3" stroke-linejoin="round"/>
+<text x="800.0" y="220.0" font-size="11" text-anchor="middle" font-weight="normal" fill="#c0392b">-8 flex (frame→engine)</text>
+<polyline points="840.0,230.0 880.0,230.0 880.0,340.0" fill="none" stroke="#c0392b" stroke-width="4" stroke-linejoin="round"/>
+<rect x="860.0" y="110.0" width="830.0" height="560.0" rx="4" fill="#fbfbf8" stroke="#1b1b1b" stroke-width="2"/>
+<text x="875.0" y="132.0" font-size="13" text-anchor="start" font-weight="bold" fill="#1b1b1b">ENGINE BAY — LS3 top view: REAR (firewall) at left, FRONT at right</text>
+<rect x="868.0" y="322.0" width="28.0" height="36.0" rx="4" fill="#c0392b" stroke="#c0392b" stroke-width="1.5"/>
+<text x="872.0" y="505.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#c0392b">Y block (PROPOSED): Aeromotive 15620, 15674 or 15675</text>
+<text x="872.0" y="519.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#c0392b">(the Y the A1000 instructions name); fit behind the</text>
+<text x="872.0" y="533.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#c0392b">intake at mock-up, or use the fallback layout (§6)</text>
+<rect x="960.0" y="250.0" width="340.0" height="20.0" rx="4" fill="#2c3e50" stroke="#1b1b1b" stroke-width="1.5"/>
+<text x="960.0" y="242.0" font-size="11" text-anchor="start" font-weight="normal" fill="#1b1b1b">RAIL L (driver): Holley 534-209, ORB-8 each end, 5/8 in bore</text>
+<polyline points="1005.0,270.0 1005.0,286.0" fill="none" stroke="#1b1b1b" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="1085.0,270.0 1085.0,286.0" fill="none" stroke="#1b1b1b" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="1165.0,270.0 1165.0,286.0" fill="none" stroke="#1b1b1b" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="1245.0,270.0 1245.0,286.0" fill="none" stroke="#1b1b1b" stroke-width="3" stroke-linejoin="round"/>
+<text x="965.0" y="302.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#444">4 × Siemens Deka FI114961, 60 lb/h at 43.5 psi</text>
+<rect x="960.0" y="410.0" width="340.0" height="20.0" rx="4" fill="#2c3e50" stroke="#1b1b1b" stroke-width="1.5"/>
+<text x="960.0" y="402.0" font-size="11" text-anchor="start" font-weight="normal" fill="#1b1b1b">RAIL R (passenger): Holley 534-209, ORB-8 each end</text>
+<polyline points="1005.0,430.0 1005.0,446.0" fill="none" stroke="#1b1b1b" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="1085.0,430.0 1085.0,446.0" fill="none" stroke="#1b1b1b" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="1165.0,430.0 1165.0,446.0" fill="none" stroke="#1b1b1b" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="1245.0,430.0 1245.0,446.0" fill="none" stroke="#1b1b1b" stroke-width="3" stroke-linejoin="round"/>
+<text x="965.0" y="462.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#444">4 × Siemens Deka FI114961, 60 lb/h at 43.5 psi</text>
+<polyline points="896.0,330.0 930.0,330.0 930.0,260.0 960.0,260.0" fill="none" stroke="#c0392b" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="896.0,350.0 930.0,350.0 930.0,420.0 960.0,420.0" fill="none" stroke="#c0392b" stroke-width="3" stroke-linejoin="round"/>
+<text x="936.0" y="300.0" font-size="11" text-anchor="start" font-weight="normal" fill="#c0392b">-6</text>
+<text x="936.0" y="392.0" font-size="11" text-anchor="start" font-weight="normal" fill="#c0392b">-6</text>
+<text x="962.0" y="318.0" font-size="10" text-anchor="start" font-weight="normal" fill="#444">rear ORB-8 port (Holley -6 adapter)</text>
+<text x="962.0" y="478.0" font-size="10" text-anchor="start" font-weight="normal" fill="#444">rear ORB-8 port (Holley -6 adapter)</text>
+<text x="1298.0" y="318.0" font-size="10" text-anchor="end" font-weight="normal" fill="#444">front ORB-8 port</text>
+<text x="1298.0" y="478.0" font-size="10" text-anchor="end" font-weight="normal" fill="#444">front ORB-8 port</text>
+<polyline points="1300.0,260.0 1340.0,260.0 1340.0,328.0 1370.0,328.0" fill="none" stroke="#c0392b" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="1300.0,420.0 1340.0,420.0 1340.0,352.0 1370.0,352.0" fill="none" stroke="#c0392b" stroke-width="3" stroke-linejoin="round"/>
+<text x="1305.0" y="242.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#c0392b">-6 hoses (Aeromotive 15605 ORB-08→AN-06 at the REG)</text>
+<rect x="1370.0" y="310.0" width="60.0" height="60.0" rx="4" fill="#17202a" stroke="#1b1b1b" stroke-width="2"/>
+<text x="1400.0" y="345.0" font-size="12" text-anchor="middle" font-weight="bold" fill="white">REG</text>
+<text x="1450.0" y="300.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">Aeromotive 13139 (owned)</text>
+<text x="1450.0" y="314.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">A1000 Gen-II EFI regulator</text>
+<text x="1450.0" y="328.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">2 × ORB-08 in/out · ORB-06 return</text>
+<text x="1450.0" y="342.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">1/8 NPT gauge · 1/16 NPT ref</text>
+<text x="1450.0" y="356.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">base 35–75 psi · set 43.5 psi,</text>
+<text x="1450.0" y="370.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">vacuum-referenced 1:1</text>
+<text x="1450.0" y="384.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">front centre of intake valley</text>
+<text x="1450.0" y="398.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">on Aeromotive LS bracket</text>
+<text x="1450.0" y="412.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">13702 ('Center / Intake Valley')</text>
+<polyline points="1400.0,310.0 1400.0,190.0" fill="none" stroke="#6c3483" stroke-width="2" stroke-linejoin="round"/>
+<rect x="1340.0" y="160.0" width="120.0" height="30.0" rx="4" fill="#f5eef8" stroke="#6c3483" stroke-width="2"/>
+<text x="1400.0" y="179.0" font-size="10.5" text-anchor="middle" font-weight="bold" fill="#6c3483">AEM 30-2131-100</text>
+<text x="1334.0" y="166.0" font-size="10.5" text-anchor="end" font-weight="normal" fill="#6c3483">fuel pressure sensor in the REG's 1/8 NPT gauge port</text>
+<text x="1334.0" y="179.0" font-size="10.5" text-anchor="end" font-weight="normal" fill="#6c3483">0–100 psig, 0.5–4.5 V → M130 A16 (#112, #112r, #112g)</text>
+<polyline points="1370.0,362.0 1320.0,362.0 1320.0,600.0" fill="none" stroke="#7f8c8d" stroke-width="2" stroke-linejoin="round" stroke-dasharray="6,4"/>
+<text x="1314.0" y="612.0" font-size="10.5" text-anchor="end" font-weight="normal" fill="#7f8c8d">vacuum ref hose → a manifold vacuum port on the intake</text>
+<polyline points="1400.0,370.0 1400.0,640.0 900.0,640.0" fill="none" stroke="#1f5fa8" stroke-width="4" stroke-linejoin="round"/>
+<text x="1150.0" y="658.0" font-size="11" text-anchor="middle" font-weight="normal" fill="#1f5fa8">-6 return from the REG bottom port (Aeromotive 15606 ORB-06→AN-06), along the top of the engine</text>
+<rect x="1420.0" y="520.0" width="250.0" height="44.0" rx="4" fill="#eafaf1" stroke="#1e8449" stroke-width="2" stroke-dasharray="5,3"/>
+<text x="1545.0" y="537.0" font-size="10.5" text-anchor="middle" font-weight="normal" fill="#1e8449">FT candidate: fuel temperature sensor</text>
+<text x="1545.0" y="551.0" font-size="10.5" text-anchor="middle" font-weight="normal" fill="#1e8449">tee in the -6 return → M130 B6 (AT4)</text>
+<polyline points="1400.0,540.0 1420.0,540.0" fill="none" stroke="#1e8449" stroke-width="2" stroke-linejoin="round" stroke-dasharray="5,3"/>
+<polyline points="900.0,635.0 886.7,645.0 873.3,635.0 860.0,645.0 846.7,635.0 833.3,645.0 820.0,635.0" fill="none" stroke="#1f5fa8" stroke-width="3" stroke-linejoin="round"/>
+<text x="860.0" y="626.0" font-size="10.5" text-anchor="middle" font-weight="normal" fill="#1f5fa8">-6 flex</text>
+<polyline points="820.0,640.0 420.0,640.0 420.0,330.0 342.0,330.0" fill="none" stroke="#1f5fa8" stroke-width="4" stroke-linejoin="round"/>
+<text x="610.0" y="658.0" font-size="11" text-anchor="middle" font-weight="normal" fill="#1f5fa8">-6 return on the frame (same rail as the feed)</text>
+<text x="426.0" y="470.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#1f5fa8">into the 6AN return on the lid</text>
+<polyline points="342.0,430.0 400.0,430.0 400.0,520.0" fill="none" stroke="#95a5a6" stroke-width="2" stroke-linejoin="round" stroke-dasharray="3,3"/>
+<text x="430.0" y="530.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#95a5a6">vent: canister or vent valve — OWNER</text>
+<rect x="30.0" y="700.0" width="1660.0" height="190.0" rx="4" fill="#fcfaff" stroke="#6c3483" stroke-width="1.5"/>
+<text x="45.0" y="722.0" font-size="13" text-anchor="start" font-weight="bold" fill="#6c3483">Wiring that goes with it (registry wires; gauges from canon ch.16 §1.5)</text>
+<text x="45.0" y="746.0" font-size="11.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">Pump +   #66  14 AWG M22759/32 red   PDM15 OUT5 (20 A pair, pigtails A9 + A17), limit 7 A set; load 5.1 A at 60 psi, 4.6 A at 45 psi (Quantum)</text>
+<text x="45.0" y="767.0" font-size="11.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">Pump −   PUMP_GND  14 AWG M22759/32 black   in the loom beside #66 to GND-BANK-ENG (grounds in the loom, state §1 row 56)</text>
+<text x="45.0" y="788.0" font-size="11.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">Pump on/off: the M130 commands the PDM15 output over CAN (MoTeC 'M1 to PDM CAN Messaging' p.8: 'the PDM is essentially acting as a switch')</text>
+<text x="45.0" y="809.0" font-size="11.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">Fuel PSI  #112 signal → M130 A16 (AV3) · #112r 5 V → A02 · #112g 0 V → B16 · 22 AWG M22759/16 · 61-pin cavities y / h / g · plug: AEM 'Packard 3-Pin' (pins in the kit)</text>
+<text x="45.0" y="830.0" font-size="11.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">Candidate FT: signal → M130 B6 (AT4, spare) + 0 V · 22 AWG M22759/16 · 2 of the 3 spare 61-pin cavities (d, t, u) · sensor not picked</text>
+<text x="45.0" y="851.0" font-size="11.5" text-anchor="start" font-weight="normal" fill="#1b1b1b">The regulator itself has no wires.</text>
+<text x="30.0" y="930.0" font-size="16" text-anchor="start" font-weight="bold" fill="#1b1b1b">B.  Top view in the digital twin's axes (metres): +x driver side (up the page), −y forward (left), frame and exhaust from twin v4</text>
+<polyline points="170.0,970.0 170.0,1540.0" fill="none" stroke="#eeeeee" stroke-width="1" stroke-linejoin="round"/>
+<text x="170.0" y="1556.0" font-size="10" text-anchor="middle" font-weight="normal" fill="#888">y -2.5</text>
+<polyline points="320.0,970.0 320.0,1540.0" fill="none" stroke="#eeeeee" stroke-width="1" stroke-linejoin="round"/>
+<text x="320.0" y="1556.0" font-size="10" text-anchor="middle" font-weight="normal" fill="#888">y -2.0</text>
+<polyline points="470.0,970.0 470.0,1540.0" fill="none" stroke="#eeeeee" stroke-width="1" stroke-linejoin="round"/>
+<text x="470.0" y="1556.0" font-size="10" text-anchor="middle" font-weight="normal" fill="#888">y -1.5</text>
+<polyline points="620.0,970.0 620.0,1540.0" fill="none" stroke="#eeeeee" stroke-width="1" stroke-linejoin="round"/>
+<text x="620.0" y="1556.0" font-size="10" text-anchor="middle" font-weight="normal" fill="#888">y -1.0</text>
+<polyline points="770.0,970.0 770.0,1540.0" fill="none" stroke="#eeeeee" stroke-width="1" stroke-linejoin="round"/>
+<text x="770.0" y="1556.0" font-size="10" text-anchor="middle" font-weight="normal" fill="#888">y -0.5</text>
+<polyline points="920.0,970.0 920.0,1540.0" fill="none" stroke="#eeeeee" stroke-width="1" stroke-linejoin="round"/>
+<text x="920.0" y="1556.0" font-size="10" text-anchor="middle" font-weight="normal" fill="#888">y +0.0</text>
+<polyline points="1070.0,970.0 1070.0,1540.0" fill="none" stroke="#eeeeee" stroke-width="1" stroke-linejoin="round"/>
+<text x="1070.0" y="1556.0" font-size="10" text-anchor="middle" font-weight="normal" fill="#888">y +0.5</text>
+<polyline points="1220.0,970.0 1220.0,1540.0" fill="none" stroke="#eeeeee" stroke-width="1" stroke-linejoin="round"/>
+<text x="1220.0" y="1556.0" font-size="10" text-anchor="middle" font-weight="normal" fill="#888">y +1.0</text>
+<polyline points="1370.0,970.0 1370.0,1540.0" fill="none" stroke="#eeeeee" stroke-width="1" stroke-linejoin="round"/>
+<text x="1370.0" y="1556.0" font-size="10" text-anchor="middle" font-weight="normal" fill="#888">y +1.5</text>
+<polyline points="110.0,1495.0 1505.0,1495.0" fill="none" stroke="#eeeeee" stroke-width="1" stroke-linejoin="round"/>
+<text x="104.0" y="1499.0" font-size="10" text-anchor="end" font-weight="normal" fill="#888">x -0.8</text>
+<polyline points="110.0,1375.0 1505.0,1375.0" fill="none" stroke="#eeeeee" stroke-width="1" stroke-linejoin="round"/>
+<text x="104.0" y="1379.0" font-size="10" text-anchor="end" font-weight="normal" fill="#888">x -0.4</text>
+<polyline points="110.0,1255.0 1505.0,1255.0" fill="none" stroke="#eeeeee" stroke-width="1" stroke-linejoin="round"/>
+<text x="104.0" y="1259.0" font-size="10" text-anchor="end" font-weight="normal" fill="#888">x +0.0</text>
+<polyline points="110.0,1135.0 1505.0,1135.0" fill="none" stroke="#eeeeee" stroke-width="1" stroke-linejoin="round"/>
+<text x="104.0" y="1139.0" font-size="10" text-anchor="end" font-weight="normal" fill="#888">x +0.4</text>
+<polyline points="110.0,1015.0 1505.0,1015.0" fill="none" stroke="#eeeeee" stroke-width="1" stroke-linejoin="round"/>
+<text x="104.0" y="1019.0" font-size="10" text-anchor="end" font-weight="normal" fill="#888">x +0.8</text>
+<rect x="140.0" y="1126.0" width="1350.0" height="21.0" rx="2" fill="#d5d8dc" stroke="#555" stroke-width="1"/>
+<rect x="140.0" y="1363.0" width="1350.0" height="21.0" rx="2" fill="#d5d8dc" stroke="#555" stroke-width="1"/>
+<text x="1220.0" y="1114.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#555">frame rail (driver)</text>
+<text x="1220.0" y="1411.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#555">frame rail (passenger)</text>
+<polyline points="351.2,991.0 351.2,1519.0" fill="none" stroke="#34495e" stroke-width="2" stroke-linejoin="round"/>
+<text x="355.2" y="985.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#34495e">front axle y −1.896</text>
+<polyline points="1162.1,991.0 1162.1,1519.0" fill="none" stroke="#34495e" stroke-width="2" stroke-linejoin="round"/>
+<text x="1166.1" y="985.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#34495e">rear axle y 0.807</text>
+<polyline points="482.0,991.0 482.0,1519.0" fill="none" stroke="#34495e" stroke-width="2" stroke-linejoin="round" stroke-dasharray="8,4"/>
+<text x="486.0" y="985.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#34495e">firewall ≈ y −1.46</text>
+<rect x="328.4" y="1152.7" width="144.0" height="42.6" rx="4" fill="#f2f3f4" stroke="#7b7d7d" stroke-width="1.5"/>
+<rect x="335.6" y="1314.7" width="144.0" height="42.6" rx="4" fill="#f2f3f4" stroke="#7b7d7d" stroke-width="1.5"/>
+<rect x="366.5" y="1219.0" width="75.0" height="72.0" rx="4" fill="#fbfcfc" stroke="#7b7d7d" stroke-width="1.5"/>
+<text x="404.0" y="1259.0" font-size="9.5" text-anchor="middle" font-weight="normal" fill="#555">intake</text>
+<rect x="449.6" y="1280.7" width="7.2" height="7.2" rx="1" fill="#d2b4de" stroke="#7d3c98" stroke-width="1"/>
+<rect x="449.6" y="1261.2" width="7.2" height="7.2" rx="1" fill="#d2b4de" stroke="#7d3c98" stroke-width="1"/>
+<rect x="449.6" y="1241.7" width="7.2" height="7.2" rx="1" fill="#d2b4de" stroke="#7d3c98" stroke-width="1"/>
+<rect x="449.6" y="1222.2" width="7.2" height="7.2" rx="1" fill="#d2b4de" stroke="#7d3c98" stroke-width="1"/>
+<rect x="477.2" y="1280.7" width="7.2" height="7.2" rx="1" fill="#d2b4de" stroke="#7d3c98" stroke-width="1"/>
+<rect x="477.2" y="1261.2" width="7.2" height="7.2" rx="1" fill="#d2b4de" stroke="#7d3c98" stroke-width="1"/>
+<rect x="477.2" y="1241.7" width="7.2" height="7.2" rx="1" fill="#d2b4de" stroke="#7d3c98" stroke-width="1"/>
+<rect x="477.2" y="1222.2" width="7.2" height="7.2" rx="1" fill="#d2b4de" stroke="#7d3c98" stroke-width="1"/>
+<text x="500.0" y="1321.0" font-size="9.5" text-anchor="start" font-weight="normal" fill="#7d3c98">DEL-Stributor coils (rear centre)</text>
+<rect x="322.4" y="1204.0" width="156.0" height="6.6" rx="4" fill="#2c3e50" stroke="#1b1b1b" stroke-width="1"/>
+<rect x="329.6" y="1299.4" width="156.0" height="6.6" rx="4" fill="#2c3e50" stroke="#1b1b1b" stroke-width="1"/>
+<rect x="320.0" y="1246.0" width="18.0" height="18.0" rx="4" fill="#17202a" stroke="#1b1b1b" stroke-width="1.5"/>
+<text x="307.0" y="1285.0" font-size="10.5" text-anchor="end" font-weight="bold" fill="#1b1b1b">REG (0, −1.97)</text>
+<text x="307.0" y="1299.0" font-size="10" text-anchor="end" font-weight="normal" fill="#6c3483">AEM in its gauge port</text>
+<rect x="407.0" y="1143.1" width="192.0" height="22.8" rx="4" fill="url(#hatch)" stroke="#e67e22" stroke-width="1"/>
+<rect x="407.0" y="1344.1" width="192.0" height="22.8" rx="4" fill="url(#hatch)" stroke="#e67e22" stroke-width="1"/>
+<text x="614.0" y="1369.0" font-size="10" text-anchor="start" font-weight="normal" fill="#b9770e">exhaust (twin to y −1.07; the rest unknown)</text>
+<rect x="475.0" y="1098.0" width="14" height="14" fill="#f4d03f" stroke="#1b1b1b"/>
+<text x="492.0" y="1097.0" font-size="10" text-anchor="start" font-weight="normal" fill="#1b1b1b">61-pin (0.50, −1.46)</text>
+<rect x="1272.5" y="1127.5" width="165.0" height="255.0" rx="4" fill="#eaf2f8" stroke="#1b1b1b" stroke-width="1.5"/>
+<text x="1355.0" y="1345.0" font-size="11" text-anchor="middle" font-weight="normal" fill="#1b1b1b">tank</text>
+<circle cx="1355.0" cy="1210.0" r="8" fill="#fdebd0" stroke="#1b1b1b" stroke-width="1.5"/>
+<text x="1367.0" y="1200.0" font-size="10" text-anchor="start" font-weight="normal" fill="#1b1b1b">hanger (0.15, 1.45)</text>
+<rect x="966.0" y="1127.0" width="28" height="16" fill="#fdedec" stroke="#c0392b" stroke-width="2"/>
+<text x="980.0" y="1105.0" font-size="10" text-anchor="middle" font-weight="normal" fill="#c0392b">filter (0.40, 0.20) PROPOSED</text>
+<polyline points="1355.0,1210.0 1280.0,1156.0 1220.0,1136.5 545.0,1136.5 500.0,1165.0 479.0,1240.0 470.0,1255.0" fill="none" stroke="#c0392b" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="329.0,1255.0 341.0,1231.0 470.0,1231.0 491.0,1165.0 545.0,1130.5 1220.0,1130.5 1286.0,1147.0 1355.0,1204.0" fill="none" stroke="#1f5fa8" stroke-width="3" stroke-linejoin="round"/>
+<text x="800.0" y="1441.0" font-size="11" text-anchor="middle" font-weight="normal" fill="#1b1b1b">feed (red) and return (blue) are PROPOSED on the driver rail, beside the pump wires; the side is TO CONFIRM</text>
+<rect x="1290.0" y="1594.0" width="400.0" height="136.0" rx="4" fill="white" stroke="#aaa" stroke-width="1"/>
+<polyline points="1302.0,1612.0 1350.0,1612.0" fill="none" stroke="#c0392b" stroke-width="3" stroke-linejoin="round"/>
+<text x="1360.0" y="1616.0" font-size="11" text-anchor="start" font-weight="normal" fill="#1b1b1b">feed, -8 to the rails (-6 legs)</text>
+<polyline points="1302.0,1636.0 1350.0,1636.0" fill="none" stroke="#1f5fa8" stroke-width="3" stroke-linejoin="round"/>
+<text x="1360.0" y="1640.0" font-size="11" text-anchor="start" font-weight="normal" fill="#1b1b1b">return, -6</text>
+<polyline points="1302.0,1660.0 1350.0,1660.0" fill="none" stroke="#7f8c8d" stroke-width="3" stroke-linejoin="round" stroke-dasharray="6,4"/>
+<text x="1360.0" y="1664.0" font-size="11" text-anchor="start" font-weight="normal" fill="#1b1b1b">vacuum reference hose</text>
+<polyline points="1302.0,1684.0 1350.0,1684.0" fill="none" stroke="#6c3483" stroke-width="3" stroke-linejoin="round"/>
+<text x="1360.0" y="1688.0" font-size="11" text-anchor="start" font-weight="normal" fill="#1b1b1b">sensor wiring</text>
+<polyline points="1302.0,1708.0 1350.0,1708.0" fill="none" stroke="#1e8449" stroke-width="3" stroke-linejoin="round" stroke-dasharray="5,3"/>
+<text x="1360.0" y="1712.0" font-size="11" text-anchor="start" font-weight="normal" fill="#1b1b1b">candidate (not decided)</text>
+<text x="30.0" y="1756.0" font-size="10.5" text-anchor="start" font-weight="normal" fill="#555">Sources: Quantum H882 + HFP-367 pages; Aeromotive 13139 page + 13138/13139/13140 instructions; Holley 534-209 page + 199R10582; AEM 10-2131 Rev C; MoTeC GPR datasheet 23072, M1 Flex Fuel guide v1.0, M1-to-PDM guide v1.0; 1977 LTSM p.582; twin v4 (harness-cad). No maker drawing is reproduced.</text>
+</svg>
