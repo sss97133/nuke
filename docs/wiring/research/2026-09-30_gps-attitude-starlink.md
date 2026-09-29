@@ -164,7 +164,8 @@ Through the DISP option (a CAN display stub; wired dash or wireless bridge is th
 One 0.6 W box answers both asks, GPS and pitch/roll, on the CAN trunk the truck already has: no M130 pin, no PDM output,
 no firewall crossing, 4 wires (two of them the CAN stub). Every display path can read it, and so can a logger that sends data to Nuke.
 - The GPS-L10 is MoTeC's own and logs in the M130, but only with the paid Level 2 licence, only on a rev Q or later M130,
-  it takes B11, it has no attitude, and its 5 V comes off an M130 sensor rail (W20). The spare rail A09 (SEN_5V0_B)
+  it takes B11 (which wheel-speed's WSS-F2 candidate also wants, with B10: the last two spare UDIGs), it has no attitude,
+  and its 5 V comes off an M130 sensor rail (W20). The spare rail A09 (SEN_5V0_B)
   carries pedal track 2 alone; a fault on a roof-run GPS lead on either rail pulls that rail down (registry m130_pinout;
   state §1 row 46). That rail question is Dave's.
 - The Dakota GPS-50-2 puts speed, heading and altitude on the VHX but gives no angle and doesn't reach the MoTeC system.

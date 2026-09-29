@@ -880,6 +880,7 @@ NAV-L10:
   name: GPS into the M130 itself (MoTeC GPS-L10 on UDIG6, B11), logged by the ECU; no attitude
   status: candidate
   alternative_to: NAV
+  conflicts_with: [WSS-F2]     # both name M130 B11 (UDIG6); wheel-speed's WSS-F2 takes B10 + B11, the last two spare UDIGs (pieces audit 2026-09-29)
   source: >-
     MoTeC GPS-L10 user manual (web_snapshots/www.motec.com.au__GPS-L10%20User%20Manual.md): #41304 (2.8 m) / #41308 (1.5 m);
     M130 "B11, B14 - Udig 6 or 7 - Revision Q or higher only"; "M1 ECU's require a minimum of level 2 Logging"; 4.0-6.0 V, 38 mA;

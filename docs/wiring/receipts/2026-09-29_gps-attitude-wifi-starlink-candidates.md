@@ -105,6 +105,8 @@ totals (options-rd, #416).
   - The 12 AWG → 2 × 20 AWG step goes through a 16 AWG stub on each side (M81824/1-3, then /1-2). Bench-check both fits.
   - OUT29's setting is recomputed at 1.25 × the group (#71, GSS_PWR, CANKEY, NAV) once the currents are known.
 - **options-rd:** no output claimed that options-rd uses (OUT23/25/27/28/15/11/13).
+- **pieces audit (2026-09-29):** NAV-L10 `conflicts_with: [WSS-F2]`, because wheel-speed's WSS-F2 takes M130 B10 and B11 (the last two
+  spare UDIGs) and NAV-L10 names B11. The recommended NAV (CAN) is clear of it.
 - **The lead's "check before you claim":** OUT21 is left to PL / TOP-LIGHT; OUT3 is named for COMMS only if PW is not fitted.
 
 ## Substrate inconsistencies (flagged, not fixed)
