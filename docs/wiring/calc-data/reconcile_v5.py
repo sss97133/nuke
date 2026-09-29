@@ -710,7 +710,7 @@ IMPLIED += [
     ("WIPER_SW_GND", "Wiper dash switch ground (the motor current returns through the switch)", "WIPER-SW (ground)", GCAB, 16, "M22759/32",
      M77 + " p.803: 'the wiper dash switch is a grounding type switch, and therefore must be securely mounted': in LO and HI the motor current returns through the switch to ground; " + GND_WHY + " — the switch mount gets a ring lead to the cab bank, sized as WIPER_T1"),
     # ---- factory Four-Season blower: switch + resistor stay; the HI blower relay becomes a PDM output (row 54)
-    ("BLOWER_BAT", "Blower switch LOW lead to the resistor BAT terminal (factory circuit 51)", "BLOWER-SW (LOW lead)", "BLOWER-RES (BAT tap)", 16, "M22759/32",
+    ("BLOWER_BAT", "Blower switch LOW lead to the resistor BAT terminal", "BLOWER-SW (LOW lead)", "BLOWER-RES (BAT tap)", 16, "M22759/32",
      M77 + " p.87-88: blower resistor on the evaporator case; 73-87 C/K A/C resistor = 3 prongs, low speeds through the switch "
      "and resistor, high through the relay (gmsquarebody.com threads 38262, 5343)"),
     ("BLOWER_MED", "Blower switch M1 lead to the resistor", "BLOWER-SW (M1 lead)", "BLOWER-RES (M1 tap)", 16, "M22759/32",
@@ -1755,7 +1755,8 @@ PDM_LOADS = {   # (box, output): (running current A or None, source or what clos
     ("PDM30", 2): (None, "needs the 4 Seasons 35587 blower current on HIGH (no published rating: measure)"),
     ("PDM30", 3): (11.0, "Nu-Relics 17383-2 ACI motor 11 A high load, 20 A stall (web_snapshots/www.nu-relics.com__17383-2.md); the master can also run the passenger motor (22 A) — OPEN"),
     ("PDM30", 4): (11.0, "Nu-Relics 17383-2 ACI motor 11 A high load, 20 A stall (web_snapshots/www.nu-relics.com__17383-2.md)"),
-    ("PDM30", 5): (0.5, "ORACLE 4514-003, 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); plus the PCS TCM-2650 brake input (PCS_BRK) and the 6L90 case stop-lamp input (TRANS_BRK): logic inputs, milliamps — current OPEN (ZGP guide rev2 p.18 and Holley 558-499 p.3 give none)"),
+    ("PDM30", 5): (0.5, "#93 CHMSL ORACLE 4514-003 0.5 A + PCS_BRK and TRANS_BRK brake-signal inputs, mA — OPEN; "
+                        "ORACLE 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); the input currents are not in ZGP guide rev2 p.18 or Holley 558-499 p.3"),
     ("PDM30", 6): (None, "needs the 4 Seasons 35587 blower current on LOW/MED through the resistor (measure)"),
     ("PDM30", 7): (None, "needs the E-Stopp ESK001 engage current (estopp.com FAQ gives no figure)"),
     ("PDM30", 8): (15.0, "Blue Sea 1011 dash socket, 15 A max (web_snapshots/www.bluesea.com__Dash_Socket_12V_DC_with_Watertight_Cap.md)"),
@@ -1830,9 +1831,9 @@ def pdm_settings(reg):
                 status = (f"CONFLICT: needs {need} A per output, the thinnest conductor allows {wire_top} A (0.85 x {round(cap, 1)} A, "
                           f"PDM manual p.48 {'100' if col else '80'} C column / ProWire tables) — a heavier wire or pigtail closes it")
             else:
-                status = (f"CONFLICT: needs {need} A per output; the wire allows {wire_top} A (0.85 x {round(cap, 1)} A, PDM manual p.48 "
-                          f"{'100' if col else '80'} C column) but this is an {'8' if hw == 10 else '20'} A output whose setting stops at "
-                          f"{hw} A (PDM manual p.24) — the output's rating binds, not the wire: a 20 A output closes it")
+                status = (f"CONFLICT: needs {need} A; an {'8' if hw == 10 else '20'} A output's setting cap is {hw} A (PDM manual p.24); "
+                          f"a 20 A output would close it. The wire is not the limit: it allows {wire_top} A (0.85 x {round(cap, 1)} A, "
+                          f"PDM manual p.48 {'100' if col else '80'} C column)")
             if (box, n) in CONTACT_CAP and need > CONTACT_CAP[(box, n)][0]:
                 cc = int(CONTACT_CAP[(box, n)][0])      # the contact rating caps the limit (whole amps under it)
                 status, need = "set", cc
@@ -1854,11 +1855,12 @@ def pdm_settings(reg):
 
 
 
-SPLICE_TAPS = {   # signal taps landing in a PDM pigtail splice's lead side (round 6): sized per end, ProWire 3137CT bands
-    # (red 26-20 / blue 20-16 / yellow 16-12): pigtail end 2 x 20 AWG = 2,040 CM; lead end #93 20 AWG + PCS_BRK / TRANS_BRK 22 AWG
-    # = 1,020 + 2 x 640 = 2,300 CM — both ends inside the blue 20-16 band (1,020-2,580 CM), so M81824/1-2 holds
+SPLICE_TAPS = {   # signal taps joined into a PDM pigtail splice (round 7: ONE stub splice, all conductors in one barrel)
+    # SPL-PDM30-OUT5: 93_PT1 + 93_PT2 + #93 (3 x 20 AWG = 3,060 CM) + PCS_BRK + TRANS_BRK (2 x 22 AWG = 1,280 CM) = 4,340 CM,
+    # inside the yellow 16-12 band (2,580-6,530 CM; ProWire 3137CT / Raychem MiniSeal D-609: red 26-20, blue 20-16, yellow 16-12)
     "SPL-PDM30-OUT5": ["PCS_BRK", "TRANS_BRK"],
 }
+SPLICE_TAPS_PART = {"SPL-PDM30-OUT5": "D-609-05"}
 INLINE_FUSES = {   # every inline fuse gets a protection record (standards review, round 4; round 5: holder + fuse part)
     # wire: (value, source, fuse part). One holder family for every small inline fuse in the truck: Blue Sea 5065 waterproof
     # in-line ATO/ATC holder, 12 AWG pigtails, 30 A max fuse (web_snapshots/www.bluesea.com__Waterproof_In-Line_ATO_ATC_Fuse_holder.md);
@@ -2066,7 +2068,13 @@ def main():
         if w["id"].endswith("_PT1"):
             load = w["pigtail_of"]
             legs = [x["id"] for x in pigtails if x["pigtail_of"] == load]
-            taps = SPLICE_TAPS.get(spl, [])     # round 6: taps share the pigtail splice's lead side (one splice, one S-##)
+            taps = SPLICE_TAPS.get(spl, [])     # round 7: a tapped pigtail splice is ONE stub splice, every conductor in one barrel
+            if taps:
+                allw = legs + [load] + taps
+                cm = sum(kits_v5.CMA[x["awg"]] for x in list(wires) + list(implied) if x["id"] in allw)
+                reg["splices"].append({"at": spl, "wires": allw, "splice": SPLICE_TAPS_PART[spl], "type": "stub",
+                                       "equiv_awg": kits_v5.awg_equiv(cm), "cm": cm})
+                continue
             reg["splices"].append({"at": spl, "wires": legs + [load] + taps, "splice": w["splice"],
                                    "type": "in-line", "sides": [legs, [load] + taps],
                                    "equiv_awg": [kits_v5.awg_equiv(len(legs) * kits_v5.CMA[w["awg"]]),

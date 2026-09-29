@@ -2,16 +2,20 @@ ODYSSEY:
   family: open
   pins:
     '63': + post (main cable)
-    ISO_PWR: + post (10 A fused tap)
-    ISO_SW_PWR: + post (5 A fused tap)
+    ISO_PWR_FH: + post (10 A fused tap, 12 AWG holder pigtail)
+    ISO_SW_PWR_FH: + post (5 A fused tap, 12 AWG holder pigtail)
     ODY_NEG: '- post'
   splice_point: true
+  per_end: {part: open (connector not picked)}
+  per_end_wire:
+    ISO_PWR_FH: {part: 'OPEN: ring on the 12 AWG holder pigtail — Odyssey post type (SAE post vs stud) set by the battery model / tray — not picked'}
+    ISO_SW_PWR_FH: {part: 'OPEN: ring on the 12 AWG holder pigtail — Odyssey post type (SAE post vs stud) set by the battery model / tray — not picked'}
   note: 'the + post carries #63 to the isolator plus two small fused taps that must stay live when the truck is isolated: the isolator''s own control power (red,
     10 A) and the dash switch feed (5 A) · maker''s document: Odyssey 34/78-PC1500DT (candidate; tray not set): dual terminals, SAE posts and GM side studs · three
     terminations stack on the + post by design; which terminal (SAE post clamp or GM side stud) each lugs to is not picked'
   open:
   - 'close path: lug per post, not ring_small — lug family; 2 AWG = 238LTP (lug family strip note; 2 x 2 AWG on #63/ODY_NEG per receipts/2026-09-28_dc-primary-cables-sized-from-physics.md);
-    stud size set by the post choice (SAE post clamp vs GM side stud 3/8-16); fused-tap ring lugs for the 16 AWG taps OPEN'
+    stud size set by the post choice (SAE post clamp vs GM side stud 3/8-16); fused-tap rings on the 12 AWG holder pigtails OPEN (post type not picked)'
   - 'battery model set by the tray (registry); post clamp vs side-stud lugs and the fused-tap holders: picked with the battery terminals'
   sources:
   - 'reference_documents/web_snapshots/batterysales.com__34-78-pc1500dt-odyssey.md (''BCI Group Size: 34/78'', ''Terminals: SAE Post / GM Side'')'

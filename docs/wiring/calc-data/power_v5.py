@@ -355,6 +355,10 @@ def sheet_a_wires(reg, wires, eps_y):
     return [w for w in ids if w in wires and not w.endswith("_FH")]
 
 
+AT_WORDS = {"PDM30-STUD": "PDM30 battery stud", "PDM15-STUD": "PDM15 battery stud", "PS-STUDS": "distribution stud",
+            "ODYSSEY": "Odyssey +", "ACC-BATT": "YellowTop +"}
+
+
 def holder_words(wid):
     """'holder BLUESEA-5065 · 12 AWG line pigtail WID_FH, ring 9918 · step splice 327638' from the FUSE-<W> endpoint's
     rows (registry round 6 data), or '' when the wire has no holder node."""
@@ -789,7 +793,8 @@ def sheet_grounds(reg, wires, ends, eps_y, parts, number, prev_sheet):
                 txt, op = part, False
             else:
                 txt, op = f"OPEN {notes.tag(f'{wid}: no end row at the bank')}", True
-            s.txt(bx - 3, y + 6.6, txt, 4.6, anchor="end", colour=ORANGE if op else "#000", italic=op)
+            for k_, ln_ in enumerate(manual_v5.wrap_text(txt, 120, 4.6)):        # wraps under the run, never across
+                s.txt(bx - 3, y + 6.6 + k_ * 5.2, ln_, 4.6, anchor="end", colour=ORANGE if op else "#000", italic=op)
             # the far end: a chassis point for G1/G2, else the device (its own sheet)
             if wid in ("G1", "G2"):
                 s.ground(x0 + 122, y)
@@ -1157,6 +1162,21 @@ def page_protection(reg, wires, ends, eps_y, parts, number, notes, page=None):
         at = {"PS-STUDS": "distribution stud", "Distribution stud": "distribution stud", "ODYSSEY": "Odyssey +",
               "ACC-BATT": "YellowTop +"}.get(at, at)
         f_lug, t_lug = ps_lugs(eps_y, wid, w)
+        fh_rows = _term_rows().get(f"{wid}_FH", [])
+        if fh_rows:
+            # a circuit with an in-line holder: the holder sits where its line pigtail lands (ring at that stud or
+            # post); the load end is the step splice onto the wire (termination rows, review round 7)
+            stud_t = next((t for t in fh_rows if not t["endpoint"].startswith("FUSE-")), None)
+            if stud_t:
+                at = AT_WORDS.get(stud_t["endpoint"], stud_t["endpoint"])
+                f_lug = term_lug(stud_t, eps_y) or stud_t.get("part") or f_lug
+            else:                                       # no stud-end row: where the holder line's own words put it
+                code_ = end_text(wires.get(f"{wid}_FH", {}).get("frm")).split(" (")[0].strip()
+                at = AT_WORDS.get(code_, code_)
+                f_lug = None
+            step_t = next((t for t in _term_rows().get(wid, []) if t["endpoint"].startswith("FUSE-")), None)
+            if step_t:
+                t_lug = step_t.get("part") or t_lug
         fp = [p_ for p_, _c in [term_part(ends, wid, t["endpoint"]) for t in ends.get(wid, [])]]
         val = f"{kind + ' ' if kind else ''}{amps} A" if amps else f"OPEN {notes.tag(fuse_open_note(wid, kind, parts))}"
         if amps and "PROVISIONAL" in str(w.get("protection") or ""):
@@ -1214,6 +1234,7 @@ def page_cable_schedule(reg, wires, ends, eps_y, parts, number):
         p.ctxt(PM, p.y + i * 9, ln, 7.2)
     p.y += len(wrap_words(lead_in, PW - 2 * PM, 7.2)) * 9 + 2
     sleeve = notes.tag("sleeve: DR-25, sized per bundle at the formboard; no size is set per cable")
+    sched_faults = []
     t1, t2 = [], []
     for wid in cables:
         w = wires[wid]
@@ -1250,7 +1271,43 @@ def page_cable_schedule(reg, wires, ends, eps_y, parts, number):
                 return f"OPEN {notes.group('nolug', 'no lug in the stud list at the distribution-stud end', wid)}"
             name = code or words.split("(")[0].strip()
             return f"OPEN {notes.tag(name + ': ' + (why[0] if why else 'terminal part not named'))}"
-        la, lb = far(f_lug, "frm"), far(t_lug, "to")
+        # each end's part from the wire's own termination rows first (review round 7: #21 / FAN_GND named on their
+        # sheet — Yazaki 7116-3250 + seal 7158-3035, 838TP — and 'not named' here)
+        rows_ = _term_rows().get(str(wid), [])
+
+        def row_of(side):
+            txt_ = end_text(w.get(side)).lower()
+            head_ = txt_.split(" (")[0].strip()
+            for t in rows_:                                  # the end's own code first, then looser words
+                if t["endpoint"].lower() == head_:
+                    return t
+            for t in rows_:
+                e_ = t["endpoint"].lower()
+                if e_ in txt_ or (t["endpoint"] == "GND-BANK-ENG" and "ground star" in txt_) or \
+                        re.sub(r"[^a-z]", "", e_) in re.sub(r"[^a-z]", "", head_):
+                    return t
+            return None
+
+        def part_of(t):
+            if not t:
+                return None
+            pt_ = str(t.get("part") or "")
+            if pt_.startswith("kit terminal"):
+                # the kit's own terminal and seal, as the cavity text names them from the plug's kit
+                kit_ = [str(c) for c in ((eps_y.get(t["endpoint"]) or {}).get("kit") or {}) if str(c) in str(t.get("cavity") or "") and f"{c} kit" not in str(t.get("cavity") or "")]
+                return " + ".join(kit_) or None
+            if pt_ and not pt_.startswith("open") and pt_ != "RING-SMALL":
+                return pt_
+            return None
+        t_f, t_t = row_of("frm"), row_of("to")
+        if len(rows_) == 2 and (t_f is None) != (t_t is None):       # two ends, one matched: the other row is the other end
+            other = [t for t in rows_ if t is not (t_f or t_t)][0]
+            t_f, t_t = (t_f, other) if t_f else (other, t_t)
+        rp_f, rp_t = part_of(t_f), part_of(t_t)
+        la, lb = (rp_f or far(f_lug, "frm")), (rp_t or far(t_lug, "to"))
+        for side_, rp_, cell_ in (("from", rp_f, la), ("to", rp_t, lb)):
+            if rp_ and rp_ not in str(cell_):
+                sched_faults.append(f"{wid} {side_} end: the termination rows name {rp_}, the schedule prints {cell_}")
         pos = awg_num(w) <= 8 and not re.search(r"GND|NEG|^G\d", wid)
         boot = "MS25171-3S" if wid in ("59", "PDM_BPOS") else (f"OPEN {notes.tag('stud boots MS25171-3S: Dave boots the alternator B+ and the PDM stud; the other positive stud ends are not assigned')}" if pos else "— (neg.)")
         for c in (la, lb, boot, f"OPEN {sleeve}", spec, length):
@@ -1261,6 +1318,7 @@ def page_cable_schedule(reg, wires, ends, eps_y, parts, number):
     p.y = p.grid(PM, p.y, [110, 104, 104, 22, 76, 100], ["Cable", "From", "To", "AWG", "Spec", "Length"], t1, size=5.6, lead=8.0) + 10
     p.y = p.grid(PM, p.y, [110, 90, 90, 76, 50, 100], ["Cable", "Lug, from end", "Lug, to end", "Boot", "Sleeve", "State"], t2, size=5.6, lead=8.0) + 10
     p.notes_block(notes, p.y)
+    p.faults = sched_faults
     done = sum(1 for r in t2 if r[-1] == "DESIGN COMPLETE")
     return p, len(cables), done, notes
 

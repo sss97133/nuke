@@ -9617,7 +9617,7 @@
   {
    "wire": "BLOWER_BAT",
    "kind": "implied",
-   "label": "Blower switch LOW lead to the resistor BAT terminal (factory circuit 51)",
+   "label": "Blower switch LOW lead to the resistor BAT terminal",
    "from": [
     "BLOWER-SW (LOW lead)",
     ""
@@ -10404,10 +10404,6 @@
     "R12 firewall": [
      "PASS",
      "body bulkhead B cavity 12"
-    ],
-    "R15 protected": [
-     "PASS",
-     "5 A inline fuse at the Odyssey + (Blue Sea 7700 instructions p.2: pin 2 'through"
     ]
    }
   },
@@ -10985,7 +10981,7 @@
    ],
    "to": [
     "SPL-PDM30-OUT5 (pigtail side)",
-    "pigtail end"
+    "splice"
    ],
    "sides": [
     "cab",
@@ -10998,7 +10994,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:A9 -> SPL-PDM30-OUT5 (pigtail side):pigtail end"
+     "PDM30:A9 -> SPL-PDM30-OUT5 (pigtail side):splice"
     ]
    }
   },
@@ -11012,7 +11008,7 @@
    ],
    "to": [
     "SPL-PDM30-OUT5 (pigtail side)",
-    "pigtail end"
+    "splice"
    ],
    "sides": [
     "cab",
@@ -11025,7 +11021,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM30:A17 -> SPL-PDM30-OUT5 (pigtail side):pigtail end"
+     "PDM30:A17 -> SPL-PDM30-OUT5 (pigtail side):splice"
     ]
    }
   },

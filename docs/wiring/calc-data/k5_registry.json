@@ -5072,7 +5072,7 @@
     ],
     "crossing": "cab exit: through the body to the outside (path not recorded)"
    },
-   "pdm_limit": "PDM30 OUT5: 1 A per output (>= 1.25 x 0.5 A; ORACLE 4514-003, 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); plus the PCS TCM-2650 brake input (PCS_BRK) and the 6L90 case stop-lamp input (TRANS_BRK): logic inputs, milliamps — current OPEN (ZGP guide rev2 p.18 and Holley 558-499 p.3 give none))",
+   "pdm_limit": "PDM30 OUT5: 1 A per output (>= 1.25 x 0.5 A; #93 CHMSL ORACLE 4514-003 0.5 A + PCS_BRK and TRANS_BRK brake-signal inputs, mA — OPEN; ORACLE 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); the input currents are not in ZGP guide rev2 p.18 or Holley 558-499 p.3)",
    "option": "BASE",
    "option_status": "base"
   },
@@ -5330,7 +5330,7 @@
     ],
     "crossing": "none: both ends on one side"
    },
-   "pdm_limit": "PDM30 OUT21: CONFLICT: needs 12 A per output; the wire allows 12 A (0.85 x 15 A, PDM manual p.48 80 C column) but this is an 8 A output whose setting stops at 10 A (PDM manual p.24) — the output's rating binds, not the wire: a 20 A output closes it",
+   "pdm_limit": "PDM30 OUT21: CONFLICT: needs 12 A; an 8 A output's setting cap is 10 A (PDM manual p.24); a 20 A output would close it. The wire is not the limit: it allows 12 A (0.85 x 15 A, PDM manual p.48 80 C column)",
    "option": "PL",
    "option_status": "candidate"
   },
@@ -17418,7 +17418,7 @@
     ],
     "crossing": "none: both ends on one side"
    },
-   "pdm_limit": "PDM30 OUT5: 1 A per output (>= 1.25 x 0.5 A; ORACLE 4514-003, 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); plus the PCS TCM-2650 brake input (PCS_BRK) and the 6L90 case stop-lamp input (TRANS_BRK): logic inputs, milliamps — current OPEN (ZGP guide rev2 p.18 and Holley 558-499 p.3 give none))",
+   "pdm_limit": "PDM30 OUT5: 1 A per output (>= 1.25 x 0.5 A; #93 CHMSL ORACLE 4514-003 0.5 A + PCS_BRK and TRANS_BRK brake-signal inputs, mA — OPEN; ORACLE 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); the input currents are not in ZGP guide rev2 p.18 or Holley 558-499 p.3)",
    "option": "BASE",
    "option_status": "base"
   },
@@ -17596,7 +17596,7 @@
     ],
     "crossing": "none: both ends on one side"
    },
-   "pdm_limit": "PDM30 OUT5: 1 A per output (>= 1.25 x 0.5 A; ORACLE 4514-003, 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); plus the PCS TCM-2650 brake input (PCS_BRK) and the 6L90 case stop-lamp input (TRANS_BRK): logic inputs, milliamps — current OPEN (ZGP guide rev2 p.18 and Holley 558-499 p.3 give none))",
+   "pdm_limit": "PDM30 OUT5: 1 A per output (>= 1.25 x 0.5 A; #93 CHMSL ORACLE 4514-003 0.5 A + PCS_BRK and TRANS_BRK brake-signal inputs, mA — OPEN; ORACLE 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); the input currents are not in ZGP guide rev2 p.18 or Holley 558-499 p.3)",
    "option": "BASE",
    "option_status": "base"
   },
@@ -19302,7 +19302,7 @@
     "crossing": "none: both ends on one side"
    },
    "color": "red",
-   "pdm_limit": "PDM30 OUT21: CONFLICT: needs 12 A per output; the wire allows 12 A (0.85 x 15 A, PDM manual p.48 80 C column) but this is an 8 A output whose setting stops at 10 A (PDM manual p.24) — the output's rating binds, not the wire: a 20 A output closes it",
+   "pdm_limit": "PDM30 OUT21: CONFLICT: needs 12 A; an 8 A output's setting cap is 10 A (PDM manual p.24); a 20 A output would close it. The wire is not the limit: it allows 12 A (0.85 x 15 A, PDM manual p.48 80 C column)",
    "option": "PL",
    "option_status": "candidate"
   },
@@ -21759,7 +21759,7 @@
   },
   {
    "id": "BLOWER_BAT",
-   "label": "Blower switch LOW lead to the resistor BAT terminal (factory circuit 51)",
+   "label": "Blower switch LOW lead to the resistor BAT terminal",
    "status": "implied",
    "frm": "BLOWER-SW (LOW lead)",
    "to": "BLOWER-RES (BAT tap)",
@@ -25104,11 +25104,11 @@
    "side": "engine bay"
   },
   "SPL-PDM30-OUT5": {
-   "device": "PDM30 OUT5 pigtail splice — ONE in-line M81824/1-2: pins A9 + A17 (2 x 20 AWG) in one end; the third brake light feed #93 (20 AWG) and the brake-signal taps PCS_BRK and TRANS_BRK (22 AWG each) out the other",
+   "device": "PDM30 OUT5 pigtail splice — ONE MiniSeal stub splice D-609-05, all five conductors in one barrel: pins A9 + A17 (2 x 20 AWG), the third brake light feed #93 (20 AWG) and the brake-signal taps PCS_BRK and TRANS_BRK (22 AWG each) = 4,340 CM, in the yellow 16-12 band (2,580-6,530 CM)",
    "where": "cabin",
    "family": "miniseal",
    "kit": {
-    "M81824/1-2": 1
+    "D-609-05": 1
    },
    "wires": [
     "93_PT1",
@@ -25118,11 +25118,11 @@
     "TRANS_BRK"
    ],
    "cavities": {
-    "93_PT1": "pigtail end",
-    "93_PT2": "pigtail end",
-    "93": "lead end",
-    "PCS_BRK": "lead end",
-    "TRANS_BRK": "lead end"
+    "93_PT1": "splice",
+    "93_PT2": "splice",
+    "93": "splice",
+    "PCS_BRK": "splice",
+    "TRANS_BRK": "splice"
    },
    "empty": null,
    "doubled": null,
@@ -28192,9 +28192,7 @@
    "device": "starter motor — S (trigger) terminal here; its B+ stud takes the 2 AWG cranking cable #6 from the distribution stud (DC primary sheet)",
    "where": "engine",
    "family": "ring_small",
-   "kit": {
-    "RING-SMALL": 1
-   },
+   "kit": {},
    "wires": [
     "START_TRIG"
    ],
@@ -28649,9 +28647,7 @@
    "device": "head ring terminals for the coil a (chassis) and b (signal) grounds",
    "where": "engine",
    "family": "ring_small",
-   "kit": {
-    "RING-SMALL": 4
-   },
+   "kit": {},
    "wires": [
     "COIL1_GND",
     "COIL2_GND",
@@ -28686,7 +28682,7 @@
    "unknown_wire_ids": [],
    "open": [
     "ground point, stud size, lug count: name it (state row 56 banks) — Dave's sheet says only 'head ring terminal'; no stud, bank or count is recorded for the 16 coil grounds or the M130 grounds A10/A11 (review A9)",
-    "ring terminal part numbers: per stud size and gauge (RING-SMALL is OPEN, review B19)"
+    "ring terminal part numbers: by the head's ground boss thread and the gauge (ProWire 99xx), once the thread is read (bench)"
    ],
    "sources": [
     "Dave's M130 sheet: coil a and b to 'head ring terminal'",
@@ -29244,10 +29240,10 @@
     "BLOWER_MOT"
    ],
    "cavities": {
-    "BLOWER_BAT": "BAT (factory circuit 51; low: BATT-R1-R2-R3)",
-    "BLOWER_MED": "M1 (factory circuit 63; M1-R2-R3-blower)",
-    "BLOWER_M2": "M2 (factory circuit 72; M2-R3-blower)",
-    "BLOWER_MOT": "BLO (factory circuit 101; output, factory: to the blower relay)"
+    "BLOWER_BAT": "BAT",
+    "BLOWER_MED": "M1",
+    "BLOWER_M2": "M2",
+    "BLOWER_MOT": "BLO"
    },
    "empty": null,
    "doubled": null,
@@ -30693,14 +30689,14 @@
    "kit": {},
    "wires": [
     "63",
-    "ISO_PWR",
-    "ISO_SW_PWR",
+    "ISO_PWR_FH",
+    "ISO_SW_PWR_FH",
     "ODY_NEG"
    ],
    "cavities": {
     "63": "+ post (main cable)",
-    "ISO_PWR": "+ post (10 A fused tap)",
-    "ISO_SW_PWR": "+ post (5 A fused tap)",
+    "ISO_PWR_FH": "+ post (10 A fused tap, 12 AWG holder pigtail)",
+    "ISO_SW_PWR_FH": "+ post (5 A fused tap, 12 AWG holder pigtail)",
     "ODY_NEG": "- post"
    },
    "empty": null,
@@ -30714,7 +30710,7 @@
    "open": [
     "Odyssey model / group size: set by the tray at the mock-up",
     "fused-tap holders at the + post: picked with the battery terminals",
-    "close path: lug per post, not ring_small — lug family; 2 AWG = 238LTP (lug family strip note; 2 x 2 AWG on #63/ODY_NEG per receipts/2026-09-28_dc-primary-cables-sized-from-physics.md); stud size set by the post choice (SAE post clamp vs GM side stud 3/8-16); fused-tap ring lugs for the 16 AWG taps OPEN",
+    "close path: lug per post, not ring_small — lug family; 2 AWG = 238LTP (lug family strip note; 2 x 2 AWG on #63/ODY_NEG per receipts/2026-09-28_dc-primary-cables-sized-from-physics.md); stud size set by the post choice (SAE post clamp vs GM side stud 3/8-16); fused-tap rings on the 12 AWG holder pigtails OPEN (post type not picked)",
     "battery model set by the tray (registry); post clamp vs side-stud lugs and the fused-tap holders: picked with the battery terminals"
    ],
    "sources": [
@@ -33783,7 +33779,7 @@
    "where": "engine",
    "cavity": "splice 1",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -33793,7 +33789,7 @@
    "where": "engine",
    "cavity": "splice 2",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -33803,7 +33799,7 @@
    "where": "engine",
    "cavity": "splice 3",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -33813,7 +33809,7 @@
    "where": "engine",
    "cavity": "splice 1",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -33823,7 +33819,7 @@
    "where": "engine",
    "cavity": "splice 2",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -33833,7 +33829,7 @@
    "where": "engine",
    "cavity": "splice 3",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -33843,7 +33839,7 @@
    "where": "engine",
    "cavity": "splice 1",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -33853,7 +33849,7 @@
    "where": "engine",
    "cavity": "splice 2",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -33863,7 +33859,7 @@
    "where": "engine",
    "cavity": "splice 3",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -33871,9 +33867,9 @@
    "wire": "93_PT1",
    "endpoint": "SPL-PDM30-OUT5",
    "where": "cabin",
-   "cavity": "pigtail end",
+   "cavity": "splice",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "D-609-05",
    "family": "miniseal",
    "doubled": null
   },
@@ -33881,9 +33877,9 @@
    "wire": "93_PT2",
    "endpoint": "SPL-PDM30-OUT5",
    "where": "cabin",
-   "cavity": "pigtail end",
+   "cavity": "splice",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "D-609-05",
    "family": "miniseal",
    "doubled": null
   },
@@ -33891,9 +33887,9 @@
    "wire": "93",
    "endpoint": "SPL-PDM30-OUT5",
    "where": "cabin",
-   "cavity": "lead end",
+   "cavity": "splice",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "D-609-05",
    "family": "miniseal",
    "doubled": null
   },
@@ -33901,9 +33897,9 @@
    "wire": "PCS_BRK",
    "endpoint": "SPL-PDM30-OUT5",
    "where": "cabin",
-   "cavity": "lead end",
+   "cavity": "splice",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "D-609-05",
    "family": "miniseal",
    "doubled": null
   },
@@ -33911,29 +33907,9 @@
    "wire": "TRANS_BRK",
    "endpoint": "SPL-PDM30-OUT5",
    "where": "cabin",
-   "cavity": "lead end",
+   "cavity": "splice",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
-   "family": "miniseal",
-   "doubled": null
-  },
-  {
-   "wire": "PCS_BRK",
-   "endpoint": "SPL-PDM30-OUT5",
-   "where": "cabin",
-   "cavity": "splice 4",
-   "factory_circuit": null,
-   "part": "rail splice (in the kit)",
-   "family": "miniseal",
-   "doubled": null
-  },
-  {
-   "wire": "TRANS_BRK",
-   "endpoint": "SPL-PDM30-OUT5",
-   "where": "cabin",
-   "cavity": "splice 5",
-   "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "D-609-05",
    "family": "miniseal",
    "doubled": null
   },
@@ -33943,7 +33919,7 @@
    "where": "cabin",
    "cavity": "splice 1",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -33953,7 +33929,7 @@
    "where": "cabin",
    "cavity": "splice 2",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -33963,7 +33939,7 @@
    "where": "cabin",
    "cavity": "splice 3",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -33973,7 +33949,7 @@
    "where": "engine",
    "cavity": "splice 1",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -33983,7 +33959,7 @@
    "where": "engine",
    "cavity": "splice 2",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -33993,7 +33969,7 @@
    "where": "engine",
    "cavity": "splice 3",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34003,7 +33979,7 @@
    "where": "engine",
    "cavity": "splice 1",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34013,7 +33989,7 @@
    "where": "engine",
    "cavity": "splice 2",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34023,7 +33999,7 @@
    "where": "engine",
    "cavity": "splice 3",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34033,7 +34009,7 @@
    "where": "cabin",
    "cavity": "splice 1",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34043,7 +34019,7 @@
    "where": "cabin",
    "cavity": "splice 2",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34053,7 +34029,7 @@
    "where": "cabin",
    "cavity": "splice 3",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34063,7 +34039,7 @@
    "where": "cabin",
    "cavity": "splice 1",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34073,7 +34049,7 @@
    "where": "cabin",
    "cavity": "splice 2",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34083,7 +34059,7 @@
    "where": "cabin",
    "cavity": "splice 3",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34093,7 +34069,7 @@
    "where": "cabin",
    "cavity": "splice 1",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34103,7 +34079,7 @@
    "where": "cabin",
    "cavity": "splice 2",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34113,7 +34089,7 @@
    "where": "cabin",
    "cavity": "splice 3",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34123,7 +34099,7 @@
    "where": "cabin",
    "cavity": "splice 1",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34133,7 +34109,7 @@
    "where": "cabin",
    "cavity": "splice 2",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34143,7 +34119,7 @@
    "where": "cabin",
    "cavity": "splice 3",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34153,7 +34129,7 @@
    "where": "cabin",
    "cavity": "splice 1",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34163,7 +34139,7 @@
    "where": "cabin",
    "cavity": "splice 2",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34173,7 +34149,7 @@
    "where": "cabin",
    "cavity": "splice 3",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34183,7 +34159,7 @@
    "where": "cabin",
    "cavity": "splice 1",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34193,7 +34169,7 @@
    "where": "cabin",
    "cavity": "splice 2",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -34203,7 +34179,7 @@
    "where": "cabin",
    "cavity": "splice 3",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -37293,7 +37269,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the S-terminal stud off the starter (bench)",
    "family": "ring_small",
    "doubled": null
   },
@@ -38023,7 +37999,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38033,7 +38009,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38043,7 +38019,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38053,7 +38029,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38063,7 +38039,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38073,7 +38049,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38083,7 +38059,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38093,7 +38069,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38103,7 +38079,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38113,7 +38089,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38123,7 +38099,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38133,7 +38109,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38143,7 +38119,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38153,7 +38129,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38163,7 +38139,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38173,7 +38149,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38183,7 +38159,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -38193,7 +38169,7 @@
    "where": "engine",
    "cavity": "ring",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — read the head's ground boss thread at the bench (no stud size in the LS3 documents on file: the LS3 EROD install guide says only 'Attach the harness ground eyelets (3 total) to the engine block')",
    "family": "ring_small",
    "doubled": null
   },
@@ -39033,7 +39009,7 @@
    "where": "engine",
    "cavity": "ring 19",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring for the 3/8 in stud, wire gauge unknown (kit lead, gauge per kit (AMP Research IM75146 names none))",
    "family": "ring_small",
    "doubled": null
   },
@@ -40183,7 +40159,7 @@
    "where": "rear",
    "cavity": "ring 1",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — the rear stud bus is not picked, so its stud size is unknown",
    "family": "ring_small",
    "doubled": null
   },
@@ -40193,7 +40169,7 @@
    "where": "rear",
    "cavity": "ring 2",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — the rear stud bus is not picked, so its stud size is unknown",
    "family": "ring_small",
    "doubled": null
   },
@@ -40203,7 +40179,7 @@
    "where": "rear",
    "cavity": "ring 3",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — the rear stud bus is not picked, so its stud size is unknown",
    "family": "ring_small",
    "doubled": null
   },
@@ -40213,7 +40189,7 @@
    "where": "rear",
    "cavity": "ring 4",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — the rear stud bus is not picked, so its stud size is unknown",
    "family": "ring_small",
    "doubled": null
   },
@@ -40223,7 +40199,7 @@
    "where": "rear",
    "cavity": "ring 5",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — the rear stud bus is not picked, so its stud size is unknown",
    "family": "ring_small",
    "doubled": null
   },
@@ -40233,7 +40209,7 @@
    "where": "rear",
    "cavity": "ring 6",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — the rear stud bus is not picked, so its stud size is unknown",
    "family": "ring_small",
    "doubled": null
   },
@@ -40243,7 +40219,7 @@
    "where": "rear",
    "cavity": "ring 7",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — the rear stud bus is not picked, so its stud size is unknown",
    "family": "ring_small",
    "doubled": null
   },
@@ -40253,7 +40229,7 @@
    "where": "rear",
    "cavity": "ring 8",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — the rear stud bus is not picked, so its stud size is unknown",
    "family": "ring_small",
    "doubled": null
   },
@@ -40263,7 +40239,7 @@
    "where": "rear",
    "cavity": "ring 9",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — the rear stud bus is not picked, so its stud size is unknown",
    "family": "ring_small",
    "doubled": null
   },
@@ -40273,7 +40249,7 @@
    "where": "rear",
    "cavity": "ring 10",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — the rear stud bus is not picked, so its stud size is unknown",
    "family": "ring_small",
    "doubled": null
   },
@@ -40283,7 +40259,7 @@
    "where": "rear",
    "cavity": "ring 11",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — the rear stud bus is not picked, so its stud size is unknown",
    "family": "ring_small",
    "doubled": null
   },
@@ -40293,7 +40269,7 @@
    "where": "rear",
    "cavity": "ring 12",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — the rear stud bus is not picked, so its stud size is unknown",
    "family": "ring_small",
    "doubled": null
   },
@@ -40303,7 +40279,7 @@
    "where": "rear",
    "cavity": "ring 13",
    "factory_circuit": null,
-   "part": "RING-SMALL",
+   "part": "OPEN: ring — the rear stud bus is not picked, so its stud size is unknown",
    "family": "ring_small",
    "doubled": null
   },
@@ -40428,22 +40404,22 @@
    "doubled": null
   },
   {
-   "wire": "ISO_PWR",
+   "wire": "ISO_PWR_FH",
    "endpoint": "ODYSSEY",
    "where": "engine",
-   "cavity": "+ post (10 A fused tap)",
+   "cavity": "+ post (10 A fused tap, 12 AWG holder pigtail)",
    "factory_circuit": null,
-   "part": "open (connector not picked)",
+   "part": "OPEN: ring on the 12 AWG holder pigtail — Odyssey post type (SAE post vs stud) set by the battery model / tray — not picked",
    "family": "open",
    "doubled": null
   },
   {
-   "wire": "ISO_SW_PWR",
+   "wire": "ISO_SW_PWR_FH",
    "endpoint": "ODYSSEY",
    "where": "engine",
-   "cavity": "+ post (5 A fused tap)",
+   "cavity": "+ post (5 A fused tap, 12 AWG holder pigtail)",
    "factory_circuit": null,
-   "part": "open (connector not picked)",
+   "part": "OPEN: ring on the 12 AWG holder pigtail — Odyssey post type (SAE post vs stud) set by the battery model / tray — not picked",
    "family": "open",
    "doubled": null
   },
@@ -41053,7 +41029,7 @@
    "where": "rear",
    "cavity": "splice 1",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-2",
    "family": "miniseal",
    "doubled": null
   },
@@ -41063,7 +41039,7 @@
    "where": "rear",
    "cavity": "splice 2",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-2",
    "family": "miniseal",
    "doubled": null
   },
@@ -41073,7 +41049,7 @@
    "where": "rear",
    "cavity": "splice 3",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-2",
    "family": "miniseal",
    "doubled": null
   },
@@ -41083,7 +41059,7 @@
    "where": "engine",
    "cavity": "splice 1",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -41093,7 +41069,7 @@
    "where": "engine",
    "cavity": "splice 2",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -41103,7 +41079,7 @@
    "where": "engine",
    "cavity": "splice 3",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -41283,7 +41259,7 @@
    "where": "engine",
    "cavity": "splice 1",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -41293,7 +41269,7 @@
    "where": "engine",
    "cavity": "splice 2",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -41303,7 +41279,7 @@
    "where": "engine",
    "cavity": "splice 3",
    "factory_circuit": null,
-   "part": "rail splice (in the kit)",
+   "part": "M81824/1-3",
    "family": "miniseal",
    "doubled": null
   },
@@ -41605,23 +41581,10 @@
     "PCS_BRK",
     "TRANS_BRK"
    ],
-   "splice": "M81824/1-2",
-   "type": "in-line",
-   "sides": [
-    [
-     "93_PT1",
-     "93_PT2"
-    ],
-    [
-     "93",
-     "PCS_BRK",
-     "TRANS_BRK"
-    ]
-   ],
-   "equiv_awg": [
-    16,
-    16
-   ]
+   "splice": "D-609-05",
+   "type": "stub",
+   "equiv_awg": 12,
+   "cm": 4344
   },
   {
    "at": "SPL-PDM30-OUT3",
@@ -42002,13 +41965,13 @@
    "M39029/56-351": 58,
    "M39029/58-363": 58,
    "M800-KIT-N": 3,
-   "M81824/1-2": 2,
+   "M81824/1-2": 1,
    "M81824/1-3": 14,
    "M85049/69-25N": 2,
    "MS27488-20-2": 6,
    "NC5FD-L-1": 1,
+   "OPEN: ring on the 12 AWG holder pigtail — Odyssey post type (SAE post vs stud) set by the battery model / tray — not picked": 2,
    "QFS-BKCN-GM": 1,
-   "RING-SMALL": 5,
    "S02-03-R": 4,
    "SSB-26BS-PA66": 3,
    "SSB-34BS-PA66": 3,
@@ -42023,6 +41986,7 @@
    "WP-4P": 3,
    "WP-4S": 3,
    "WPAPP30": 1,
+   "open (connector not picked)": 2,
    "BLUESEA-5239": 4,
    "BLUESEA-5240": 1,
    "BLUESEA-5241": 1
@@ -43423,11 +43387,11 @@
    "kind": "splice",
    "item": "D-609-03",
    "name": "MiniSeal stub splice, red (26–20 AWG cavity)",
-   "need": 54,
+   "need": 53,
    "cart": 20,
    "inside": [],
    "vendor": "prowire",
-   "status": "short by 34"
+   "status": "short by 33"
   },
   {
    "kind": "splice",
@@ -43833,7 +43797,7 @@
    "kind": "splice",
    "item": "M81824/1-2",
    "name": "MiniSeal in-line (butt) splice, blue, with its sealing sleeve — 2 x 20 AWG pigtails to an 18-20 AWG load",
-   "need": 2,
+   "need": 1,
    "cart": 0,
    "inside": [],
    "vendor": "prowire",
@@ -43900,6 +43864,16 @@
    "status": "covered"
   },
   {
+   "kind": "?",
+   "item": "OPEN: ring on the 12 AWG holder pigtail — Odyssey post type (SAE post vs stud) set by the battery model / tray — not picked",
+   "name": "",
+   "need": 2,
+   "cart": 0,
+   "inside": [],
+   "vendor": null,
+   "status": "missing — in no cart"
+  },
+  {
    "kind": "marker",
    "item": "PRO-IDENT-KIT",
    "name": "MIL-STD-681 colour-ring markers, 1/8 in 3:1, 10 colours × 250 (digit code per colour)",
@@ -43918,16 +43892,6 @@
    "inside": [],
    "vendor": "quantum",
    "status": "missing — in no cart"
-  },
-  {
-   "kind": "lug",
-   "item": "RING-SMALL",
-   "name": "small ring terminals (starter S, coil and ECU head-ring grounds, ground banks, sender studs)",
-   "need": 5,
-   "cart": 0,
-   "inside": [],
-   "vendor": null,
-   "status": "open — a pick/photo sets the PN"
   },
   {
    "kind": "sleeve",
@@ -44119,6 +44083,16 @@
    "cart": 0,
    "inside": [],
    "vendor": "ictbillet",
+   "status": "missing — in no cart"
+  },
+  {
+   "kind": "?",
+   "item": "open (connector not picked)",
+   "name": "",
+   "need": 2,
+   "cart": 0,
+   "inside": [],
+   "vendor": null,
    "status": "missing — in no cart"
   }
  ],
@@ -44715,10 +44689,10 @@
    {
     "code": "D-609-03",
     "name": "MiniSeal stub splice, red (26–20 AWG cavity)",
-    "need": 54,
+    "need": 53,
     "cart": 20,
     "vendor": "prowire",
-    "status": "short by 34"
+    "status": "short by 33"
    },
    {
     "code": "D-609-05",
@@ -44891,7 +44865,7 @@
    {
     "code": "M81824/1-2",
     "name": "MiniSeal in-line (butt) splice, blue, with its sealing sleeve — 2 x 20 AWG pigtails to an 18-20 AWG load",
-    "need": 2,
+    "need": 1,
     "cart": 0,
     "vendor": "prowire",
     "status": "missing — in no cart"
@@ -44910,6 +44884,14 @@
     "need": 6,
     "cart": 0,
     "vendor": "prowire",
+    "status": "missing — in no cart"
+   },
+   {
+    "code": "OPEN: ring on the 12 AWG holder pigtail — Odyssey post type (SAE post vs stud) set by the battery model / tray — not picked",
+    "name": "",
+    "need": 2,
+    "cart": 0,
+    "vendor": null,
     "status": "missing — in no cart"
    },
    {
@@ -45006,6 +44988,14 @@
     "need": 1,
     "cart": 0,
     "vendor": "ictbillet",
+    "status": "missing — in no cart"
+   },
+   {
+    "code": "open (connector not picked)",
+    "name": "",
+    "need": 2,
+    "cart": 0,
+    "vendor": null,
     "status": "missing — in no cart"
    }
   ]
@@ -50840,7 +50830,7 @@
     "TRANS_BRK"
    ],
    "load_a": 0.5,
-   "source": "ORACLE 4514-003, 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); plus the PCS TCM-2650 brake input (PCS_BRK) and the 6L90 case stop-lamp input (TRANS_BRK): logic inputs, milliamps — current OPEN (ZGP guide rev2 p.18 and Holley 558-499 p.3 give none)",
+   "source": "#93 CHMSL ORACLE 4514-003 0.5 A + PCS_BRK and TRANS_BRK brake-signal inputs, mA — OPEN; ORACLE 6 W at 12 V (web_snapshots/www.oraclelights.com__...chmsl-module-red.md); the input currents are not in ZGP guide rev2 p.18 or Holley 558-499 p.3",
    "wire_cap_a": 6,
    "limit_a": 1,
    "need_a": 1,
@@ -51052,7 +51042,7 @@
    "limit_a": null,
    "need_a": 12,
    "max_a": 10,
-   "status": "CONFLICT: needs 12 A per output; the wire allows 12 A (0.85 x 15 A, PDM manual p.48 80 C column) but this is an 8 A output whose setting stops at 10 A (PDM manual p.24) — the output's rating binds, not the wire: a 20 A output closes it"
+   "status": "CONFLICT: needs 12 A; an 8 A output's setting cap is 10 A (PDM manual p.24); a 20 A output would close it. The wire is not the limit: it allows 12 A (0.85 x 15 A, PDM manual p.48 80 C column)"
   },
   {
    "output": "PDM30 OUT22",
@@ -53630,7 +53620,7 @@
     "L1 plugs": false,
     "L2 wire": true,
     "L3 crossing": true,
-    "L4 ends": false,
+    "L4 ends": true,
     "L5 material": false,
     "length": "unknown",
     "crosses": false
@@ -53639,7 +53629,7 @@
     "L1 plugs": false,
     "L2 wire": true,
     "L3 crossing": true,
-    "L4 ends": false,
+    "L4 ends": true,
     "L5 material": false,
     "length": "unknown",
     "crosses": false
@@ -54230,7 +54220,7 @@
     "crosses": false
    },
    "ISO_PWR": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -54275,7 +54265,7 @@
     "crosses": true
    },
    "ISO_SW_PWR": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
     "L4 ends": true,
@@ -54732,10 +54722,10 @@
    },
    "BASE": {
     "wires": 330,
-    "L1 plugs": 249,
+    "L1 plugs": 251,
     "L2 wire": 327,
     "L3 crossing": 330,
-    "L4 ends": 314,
+    "L4 ends": 316,
     "L5 material": 2,
     "crossings": 90,
     "length": {
@@ -54902,10 +54892,10 @@
    },
    "power_spine": {
     "wires": 39,
-    "L1 plugs": 23,
+    "L1 plugs": 25,
     "L2 wire": 39,
     "L3 crossing": 39,
-    "L4 ends": 29,
+    "L4 ends": 31,
     "L5 material": 0,
     "crossings": 8,
     "length": {
@@ -54943,10 +54933,10 @@
   "configuration": {
    "buildable (base + decided)": {
     "wires": 361,
-    "L1 plugs": 268,
+    "L1 plugs": 270,
     "L2 wire": 358,
     "L3 crossing": 361,
-    "L4 ends": 345,
+    "L4 ends": 347,
     "L5 material": 2,
     "crossings": 90,
     "length": {
@@ -54959,10 +54949,10 @@
   "composite": {
    "composite (every option)": {
     "wires": 393,
-    "L1 plugs": 272,
+    "L1 plugs": 274,
     "L2 wire": 385,
     "L3 crossing": 393,
-    "L4 ends": 375,
+    "L4 ends": 377,
     "L5 material": 2,
     "crossings": 90,
     "length": {
@@ -56291,7 +56281,7 @@
      "PDM30 OUT21"
     ],
     "setting_conflicts": [
-     "PDM30 OUT21: CONFLICT: needs 12 A per output; the wire allows 12 A (0.85 x 15 A, PDM manual p.48 80 C column) but this is an 8 A output whose setting stops at 10 A (PDM manual p.24) — the output's rating binds, not the wire: a 20 A output closes it"
+     "PDM30 OUT21: CONFLICT: needs 12 A; an 8 A output's setting cap is 10 A (PDM manual p.24); a 20 A output would close it. The wire is not the limit: it allows 12 A (0.85 x 15 A, PDM manual p.48 80 C column)"
     ],
     "notes": null
    },

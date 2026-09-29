@@ -812,6 +812,7 @@ UNSET_RUN_WORDS = "grey hairline with small open circles = colour not set yet"
 UNSET_CAV_WORDS = "grey dotted ring = colour not set yet"
 OPEN_RUN_WORDS = "heavy dashed run tagged OPEN = an end, a cavity or a part not settled: do not build"
 SPARE_WORDS = "hatched, dashed ring = spare cavity"
+WHITE_STOCK_WORDS = "white = the one-colour stock for signal and drive wires; the LABEL identifies each"   # Dave, state 0i
 DARK_FILLS = ("#111", "#7a4a1d", "#2457c5", "#1f8a3b", "#7b3fa0", "#d3222a", "#555", "#8a8a8a")
 
 
@@ -912,6 +913,9 @@ def legend_faults(text):
     bad = []
     if re.search(r"(=|—)\s*colou?r not (yet )?set|colou?r not set yet", t) and UNSET_RUN_WORDS not in t and UNSET_CAV_WORDS not in t:
         bad.append("legend describes 'colour not set' in words other than the style constants")
+    if re.search(r"white\s*=", t, re.I) and "one-colour stock" not in t and "white fill = a white wire" not in t \
+            and "White = the one-colour stock" not in t:
+        bad.append("legend describes white in words other than the style constants")
     if re.search(r"orange (edge|ring)", t):
         bad.append("legend still describes an orange edge or ring")
     if re.search(r"dashed[^.;·]{0,40}(not settled|OPEN)", t) and OPEN_RUN_WORDS not in t and "CANDIDATE" not in t:
@@ -1105,6 +1109,12 @@ def page_legend(number, odd):
         p.el.append(f'<polyline points="{x_},{y_} {x_ + 44},{y_}" fill="none" stroke="#000" stroke-width="{OPEN_WIDTH}" stroke-dasharray="{OPEN_DASH}"/>')
         p.txt(x_ + 22, y_ + 9, "OPEN", 5.4, italic=True, anchor="middle"); p.el[-1] = p.el[-1].replace('<text ', '<text fill="#E67300" ', 1)
     row(dashed, f"{OPEN_RUN_WORDS}. Orange text says which fact closes it.")
+    def white_run(x_, y_):
+        p.el.append(f'<polyline points="{x_},{y_} {x_ + 44},{y_}" fill="none" stroke="#000" stroke-width="2.3"/>')
+        p.el.append(f'<polyline points="{x_},{y_} {x_ + 44},{y_}" fill="none" stroke="#f2f2f2" stroke-width="1.4"/>')
+    row(white_run, f"{WHITE_STOCK_WORDS[0].upper()}{WHITE_STOCK_WORDS[1:]} (the builder's prototype stock: injector and coil drives, "
+                   "blower and wiper leads and sensor signals are white by design).")
+
     def unset_run(x_, y_):
         p.el.append(unset_run_svg([(x_, y_), (x_ + 44, y_)], 1.1))
     row(unset_run, f"{UNSET_RUN_WORDS}: the wire list has no colour for it; nothing else is drawn this way.")
@@ -1776,6 +1786,15 @@ def build():
         pdfs.append(str(stem.with_suffix(".pdf")))
     pdfs += [s_[4] for s_ in sheets]
     pdfs += [p_[3] for p_ in power]
+    # every wire the diagram sheets leave to the DC primary / ground sheets is printed there (round 7: holder lines and
+    # DAK_CONST were left to a sheet that did not draw them)
+    if power and diagram_v5.CTX is not None:
+        ptxt = " ".join(re.sub(r"<[^>]+>", " ", Path(pdf_).with_suffix(".svg").read_text()) for _n, _t, _k, pdf_ in power)
+        drawn_ids = set(re.findall(r"[A-Za-z0-9_]+", ptxt.upper()))
+        lost = [w_ for w_ in diagram_v5.CTX.power_wires if w_.upper() not in drawn_ids and not w_.endswith("_FH")]
+        lost += [w_ for w_ in diagram_v5.CTX.power_wires if w_.endswith("_FH") and w_[:-3].upper() not in drawn_ids]
+        if lost:
+            raise SystemExit(f"wires left to the DC primary / ground sheets but printed on none of them: {', '.join(lost)}")
     subprocess.run(["pdfunite", *pdfs, str(OUT / "K5_Harness_Manual.pdf")], check=True)
     # outputs this run did not write are stale pages of an earlier numbering (review 2026-09-28: K5_power_45..50
     # PNGs beside the book, in no PDF): delete them, then fail if any file beside the book is not a page of it

@@ -115,6 +115,7 @@ def splice_faults(sheet, rows):
 
 LAST_PART_GAUGES = {}
 SPLICE_SEEN = {}                                   # S-## -> {"members": set(), "parts": set(), "sheets": set()} over the book
+KIT_TABLE_SEEN = {}                                # plug -> sheets its kit-internal table printed on
 
 
 def part_gauge_faults(parts):
@@ -122,8 +123,8 @@ def part_gauge_faults(parts):
     bad = []
     for code, gs in LAST_PART_GAUGES.items():
         rng = (parts.get(code) or {}).get("range_awg")
-        if not rng:
-            continue
+        if not rng or (parts.get(code) or {}).get("kind") == "splice":
+            continue          # a splice's range is for the combined area of the wires it joins (kits_v5.splice_for sizes it)
         lo, hi = min(rng), max(rng)
         for g in gs:
             nums = [int(x) for x in re.findall(r"\d+", g)]
@@ -867,7 +868,12 @@ def plan(ctx):
                 home = k
         if home is None:
             home = next((P.JUNCTION_HOME[e] for e in ends if e in P.JUNCTION_HOME), None)
-        if home is None and any((e in P.JUNCTIONS and e not in P.CAB_JUNCTIONS) or e == "FIREWALL-GROMMET" for e in ends):
+        mpt = re.fullmatch(r"(.+)_PT\d+", wid)
+        if home is None and mpt and mpt.group(1) in ctx.wires:
+            # a PDM pigtail rides with its base run: the sheet that owns a plug the base wire lands on
+            home = next((owned[e] for e, _c in ctx.wire_ends(mpt.group(1)) if e in owned), None)
+        if home is None and any((e in P.JUNCTIONS and e not in P.CAB_JUNCTIONS and not e.startswith(("FUSE-", "SPL-")))
+                                or e == "FIREWALL-GROMMET" for e in ends):
             home = "power"
         if home is None:
             sec = SUB2SECTION.get(w.get("subsystem"))
@@ -1618,10 +1624,13 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
     # (1) a plug our harness does not cut but whose cavities the data records (the 6L90 case connector): every
     # cavity printed with its status, so the kit's leads can be checked against it
     kit_rows = []
-    for e_ in sp["devs"]:
+    kit_here = any(re.search(r"\bkit harness\b", str((ctx.eps.get(b.code) or {}).get("device") or "").split(" — ")[0], re.I)
+                   and not b.code.endswith("-CASE") for b in left + right if b.kind == "dev")
+    for e_ in (sp["devs"] if kit_here else []):          # printed once: on the sheet that draws the kit harness itself
         ep_ = ctx.eps.get(e_) or {}
         cm_ = ep_.get("cavity_count") if isinstance(ep_.get("cavity_count"), dict) else None
         if cm_ and not ep_.get("wires"):
+            KIT_TABLE_SEEN.setdefault(e_, set()).add(number)
             for cav_, txt_ in sorted(cm_.items(), key=lambda kv: (int(re.sub(r"\D", "", kv[0]) or 0), kv[0])):
                 kit_rows.append((cav_, "OPEN" if "OPEN" in str(txt_) else "via the kit", str(txt_)))
             s.__dict__["kit_title"] = f"{plug_title(e_, ep_).upper()}: KIT-INTERNAL CAVITIES, NOT CUT BY THIS HARNESS"
@@ -2037,8 +2046,12 @@ def paginate(ctx, sp, owned, budget=H - TOP - M - 14):
     for k in range(1, len(devs) + 1):
         size = math.ceil(len(devs) / k)
         pages = [devs[i:i + size] for i in range(0, len(devs), size)]
-        if all(fits(pg, i == 0) for i, pg in enumerate(pages)):
-            return pages
+        # the sheet's extra wires (runs with no plug of their own here) go on whichever page takes them
+        for j in (range(len(pages)) if sp["extra"] else [0]):
+            if all(fits(pg, i == j) for i, pg in enumerate(pages)):
+                sp["extra_page"] = j
+                return pages
+    sp["extra_page"] = 0
     return [[e] for e in devs] or [[]]
 
 
@@ -2083,11 +2096,12 @@ def build(first_number=6):
     for sp in sheets:
         pg = paginate(ctx, sp, owned)
         for i, devs in enumerate(pg):
-            pages.append((sp, devs, sp["extra"] if i == 0 else [], i, len(pg)))
+            pages.append((sp, devs, sp["extra"] if i == sp.get("extra_page", 0) else [], i, len(pg)))
     # numbering: pass 1 counts the facing pages, pass 2 draws with the final numbers (tags need the owner's number)
     n_facing = [0] * len(pages)
     for attempt in range(3):
         SPLICE_SEEN.clear()                        # the book-wide splice record is of the final numbering only
+        KIT_TABLE_SEEN.clear()
         nums, n = [], first_number
         for k in range(len(pages)):
             nums.append(n)
@@ -2161,6 +2175,7 @@ def build(first_number=6):
             sections.append(sp["section"])
     bad_all += colour_faults()
     bad_all += splice_book_faults()
+    bad_all += [f"the {e} table is printed on {len(v)} sheets ({', '.join(sorted(v))}): print it once" for e, v in KIT_TABLE_SEEN.items() if len(v) > 1]
     seen_ids = {}
     for (e, sid), _w in ctx.rail_recs.items():
         if sid in seen_ids and seen_ids[sid] != e:
