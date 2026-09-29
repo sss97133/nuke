@@ -57,24 +57,20 @@ STEPS:
 # locked-pdm-replaces-relays). Every source, the logic and the failure table: research/2026-09-30_power-step-bypass.md.
 # Keys follow the add-on block's (demand.adds, product, alternative_to, requires), plus:
 #   demand.removes         rows the option retires through a blocks link if the owner picks it (never deleted)
-#   demand.outputs/inputs  the PDM outputs and inputs it takes, by pin where the PDM is allocated (MoTeC PDM manual pp.41-44)
-#   demand.bay_pdm_outputs outputs it takes on the bay PDM (PDM32 candidate, state 0ah); options_v5 counts PDM30 demand only
-#   demand.capacity_note   the bay-PDM count behind that number (an estimate until the bay PDM is allocated)
-#   depends_on             an undecided call the option cannot be built without
+#   demand.outputs/inputs  the PDM outputs and inputs it takes, by pin (MoTeC PDM manual pp.43-44)
+#   demand.pdm15_outputs   bay-PDM (PDM15) outputs it takes (the wheel-speed lane's #426 teaches options_v5 to count it)
 # Motor currents are UNKNOWN (no AMP figure published); every limit and gauge below is written as the rule the bench
 # number must pass. Lengths are ESTIMATES or null with the reason.
 
 STEP-DCMD:
-  name: Power steps on the bay PDM (PDM32 candidate, sealed) through two Haltech DCMD H-bridges, no AMP controller (recommended; Haltech pick provisional until the bench test)
+  name: Power steps on the bay PDM (the PDM15, per the registry) through two Haltech DCMD H-bridges, no AMP controller (recommended; Haltech pick provisional until the bench test)
   status: candidate
-  depends_on: "the bay-PDM decision: a sealed PDM32 in the engine bay carrying the engine and front loads (state row 0ah; mounts.yaml PDM15 and BODY-PASS entries). Not decided"
   source: >-
     owner 2026-09-29 (above). Haltech HT-038009 DC Motor Driver (web_snapshots/www.haltech.com__ht-038009-dc-motor-driver-dcmd.md;
     quick start guide www.haltech.com__ht-038009-dcmd-quick-start-guide.md pp.2-3, 10): "8A Continuous Per Channel, Maximum
     Transient Current 30A", 8-18 V, -40 to +85 C, 16 AWG power/ground/motor and 20 AWG control, "20A for Switched Power",
     "Control is Active State: Low. 0V on Control A = 0V on Motor A" (input thresholds not published). The bay PDM keeps all
-    the logic; each DCMD only follows its two control lines. PDM32: 8 x 20 A + 24 x 8 A outputs, 23 inputs, 120 A, rubber-sealed
-    lid and plugs (MoTeC PDM manual pp.35-36); 8 A outputs on the 26-pin Autosport connector B (p.42)
+    the logic; each DCMD only follows its two control lines
   product: {maker: Haltech, pn: HT-038009, price_usd: 180.00, price_date: 2026-09-29, each: true, qty: 2,
             specs: "one full bridge per unit, 86 x 28 x 55.5 mm, power/ground/controls on a pre-terminated 4-pin DT, motor on a 2-pin DT; case sealing not published"}
   wire_patterns: ["^STEPD_"]
@@ -82,49 +78,36 @@ STEP-DCMD:
     crossings: 0            # no firewall and no body penetration: the motor leads follow the AMP harness route (IM75146 p.6)
     pdm30_outputs: 0
     pdm30_inputs: 0
-    bay_pdm_outputs: 4      # 8 A outputs on the bay PDM32; 6 if a motor runs over 4 A. No 20 A output, no input
+    pdm15_outputs: 3
     outputs:
-      - "bay PDM32 8 A output (P_L): DCMD-L power; its current is the left motor's"
-      - "bay PDM32 8 A output (P_R): DCMD-R power; its current is the right motor's"
-      - "bay PDM32 8 A output (X): Control A of both DCMDs (deploy polarity, set on the bench)"
-      - "bay PDM32 8 A output (Y): Control B of both DCMDs"
-      - "output numbers are assigned with the bay-PDM allocation (connector B, MoTeC PDM manual p.42)"
+      - "PDM15 OUT8 (20 A, B_7 + B_13): bridge power, one pin to each DCMD (same output)"
+      - "PDM15 OUT10 (8 A, A_4): line X to Control A of both DCMDs (deploy polarity, set on the bench)"
+      - "PDM15 OUT12 (8 A, A_8): line Y to Control B of both DCMDs"
     limits:
-      - "P_L / P_R 5 A each: the 8 A output pin takes 24-20 AWG (PDM manual p.48), 20 AWG is 6 A at 100 C, x 0.85 = 5.1 A (ch.17 s17.1 item 3); so <= 4 A running per motor (1.25 x 4 = 5)"
-      - "over 4 A per motor: each feed becomes two paralleled 8 A outputs (same type, same condition, PDM manual pp.6, 22-23), 2 x 5 A = 10 A through an M81824/1-2 into 16 AWG (12 A at 100 C, x 0.85 = 10.2): <= 8 A per motor, the DCMD's continuous rating; 6 outputs in all"
-      - "X / Y: 1 A (control inputs and pull-downs only; outputs programmable in 1 A steps, PDM manual p.1)"
-    capacity_note: >-
-      Estimate, the bay PDM32 is not allocated yet. Its planned loads from the registry: 20 A outputs 8 of 8 (engine: fan x 2 legs,
-      injector rail, coil rail, starter, fuel pump #66, LTCD; front: blower HI), so the steps take none. 8 A outputs 17-19 of 24
-      (engine: ALT_L, A/C clutch; the front loads among the 30 body-bulkhead wires: iBooster wake, wiper, front park, horn, front
-      markers, underhood lamp, washer, both front turns; loads the bay PDM would drive in place of cab switch leads: headlights 2-4,
-      wiper second field 1, blower LOW/M1/M2 3). The wheel-speed candidate asks one more 8 A output for its sensor feed. With this
-      option: 22-24 of 24 (fits, 0-2 spare); with the two-output feeds: 24-26 (fits only at the low end). Moving #66 to an 8 A
-      output (state row 0o) frees a 20 A output
+      - "Bay PDM per the registry; if the bay box becomes a sealed PDM32 (state row 0ah, pending), these outputs remap in that registry pass"
+      - "OUT8 <= 10 A: each 16 AWG branch is 12 A at 100 C (MoTeC PDM manual p.48), x 0.85 = 10.2 A (ch.17 s17.1 item 3), and one branch can carry the whole output; so <= 4 A running per motor (1.25 x 2 x 4 = 10)"
+      - "over 4 A per motor, or a step per door: DCMD-R needs its own feed. OUT15 alone is an 8 A output (20 AWG pin lead, 6 A at 100 C x 0.85 = 5 A), so still <= 4 A; OUT14 is the wheel-speed candidate's (WSS-F2, PR #426). Up to 8 A per motor needs OUT5 freed (#66 fuel pump to an 8 A output, state row 0o) or STEP-RQ"
+      - "OUT10 / OUT12: 1 A (control inputs and pull-downs only; outputs programmable in 1 A steps, PDM manual p.1)"
     door_cavities: 0
     removes: ["3", "STEP_GND", "STEP_DOOR_L", "STEP_DOOR_R", "AMP-STEP-CTRL (endpoint: controller and kit harness)", "AMP-KIT-RING (part)"]
     notes: >-
-      Default: both steps move together (Far From Stock's stated behaviour: "both steps lower when opening either door"). Each
-      bridge has its own feed, so per-door steps need no more outputs (shared X/Y; if the two doors call opposite directions at
-      once, the PDM runs one move, then the other). Door states, RUN, START and STEP-SW reach the bay PDM over CAN from the
-      PDM30 (the path the engine loads use, state 0v); road speed from the M130's M1 General stream (#100 VSS on the NP205
-      speedo drive). End of travel = P_L / P_R current rise (0.2 A resolution on outputs 9-32, PDM manual p.26) plus a 5 s window
-      (the AMP controller's own window, troubleshooting guide p.5). Control high driving the lead to +12 V is inferred; the
-      pull-down value is UNKNOWN (the DCMD pull-up is not published): bench check or Haltech. Every DT mating plug on this
-      harness (the DCMD's 4-pin and 2-pin) needs its E-seal (C015) version: M22759/32 is under the N-seal range, and 20 AWG /32
-      is under even the E-seal minimum, so the control branches into the DT are 18 AWG (state row 0ai; E-seal part numbers not
-      on file). Without a bay PDM the DCMDs move to the cab with the PDM and the motor leads exit the floor as in STEP-RQ
+      Both steps move together (Far From Stock's stated behaviour: "both steps lower when opening either door"). Door states,
+      RUN, START and STEP-SW reach the bay PDM over CAN from the PDM30 (the path the engine loads already use, state 0v); road
+      speed from the M130's M1 General stream (#100 VSS on the NP205 speedo drive). End of travel = OUT8 current rise (the sum
+      of both motors, 0.5 A resolution on outputs 1-8, PDM manual p.26) plus a 5 s window (the AMP controller's own window,
+      troubleshooting guide p.5). Control high driving the lead to +12 V is inferred; the pull-down value is UNKNOWN (the DCMD
+      pull-up is not published): bench check or Haltech. Every DT mating plug on this harness (the DCMD's 4-pin and 2-pin)
+      needs its E-seal (C015) version: M22759/32 is under the N-seal range, and 20 AWG /32 is under even the E-seal minimum,
+      so the control branches into the DT are 18 AWG (state row 0ai; E-seal part numbers not on file)
     adds:
-      - {id: STEPD_PWR_L_PT, gauge: 20, spec: M22759/32, from: "bay PDM32 8 A output P_L (connector B)", to: "SPL-STEPD-PL (M81824/1-2)", current_a: null, length_ft_est: null, basis: "pin pigtail (the 8 A pin takes 24-20 AWG, PDM manual p.48); length at the formboard"}
-      - {id: STEPD_PWR_L, gauge: 16, spec: M22759/32, from: "SPL-STEPD-PL", to: "DCMD-L 4-pin DT, +12 V", current_a: null, length_ft_est: null, basis: "Haltech's 16 AWG power size (quick start guide p.3); motor current unknown; length waits on the bay-PDM spot and the harness-cad polyline"}
-      - {id: STEPD_PWR_R_PT, gauge: 20, spec: M22759/32, from: "bay PDM32 8 A output P_R (connector B)", to: "SPL-STEPD-PR (M81824/1-2)", current_a: null, length_ft_est: null, basis: "as STEPD_PWR_L_PT"}
-      - {id: STEPD_PWR_R, gauge: 16, spec: M22759/32, from: "SPL-STEPD-PR", to: "DCMD-R 4-pin DT, +12 V", current_a: null, length_ft_est: null, basis: "as STEPD_PWR_L"}
+      - {id: STEPD_PWR_L, gauge: 16, spec: M22759/32, from: "PDM15:OUT8 (B_7)", to: "DCMD-L 4-pin DT, +12 V", current_a: null, length_ft_est: null, basis: "Haltech's 16 AWG power size (quick start guide p.3); motor current unknown; length waits on the PDM15 spot (mounts.yaml, open) and the harness-cad polyline"}
+      - {id: STEPD_PWR_R, gauge: 16, spec: M22759/32, from: "PDM15:OUT8 (B_13)", to: "DCMD-R 4-pin DT, +12 V", current_a: null, length_ft_est: null, basis: "as STEPD_PWR_L"}
       - {id: STEPD_GND_L, gauge: 16, spec: M22759/32, from: "DCMD-L 4-pin DT, ground", to: "GND-BANK-ENG", current_a: null, length_ft_est: null, basis: "as STEPD_PWR_L (grounds in the loom, state s1 row 56)"}
       - {id: STEPD_GND_R, gauge: 16, spec: M22759/32, from: "DCMD-R 4-pin DT, ground", to: "GND-BANK-ENG", current_a: null, length_ft_est: null, basis: "as STEPD_GND_L"}
-      - {id: STEPD_X, gauge: 20, spec: M22759/32, from: "bay PDM32 8 A output X (connector B)", to: "SPL-STEPD-X (M81824/1-2)", current_a: null, length_ft_est: null, basis: "control line; current = two DCMD inputs + their pull-downs, value unknown until the bench (far below the output's 1 A step)"}
+      - {id: STEPD_X, gauge: 20, spec: M22759/32, from: "PDM15:OUT10 (A_4)", to: "SPL-STEPD-X (M81824/1-2)", current_a: null, length_ft_est: null, basis: "control line; current = two DCMD inputs + their pull-downs, value unknown until the bench (far below the output's 1 A step)"}
       - {id: STEPD_X_L, gauge: 18, spec: M22759/32, from: "SPL-STEPD-X", to: "DCMD-L Control A (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "18 AWG, not Haltech's 20: 20 AWG /32 (1.27 mm) is under the DT E-seal minimum 1.35 mm, 18 AWG /32 (1.52 mm) seals (state row 0ai); current as STEPD_X"}
       - {id: STEPD_X_R, gauge: 18, spec: M22759/32, from: "SPL-STEPD-X", to: "DCMD-R Control A (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "as STEPD_X_L"}
-      - {id: STEPD_Y, gauge: 20, spec: M22759/32, from: "bay PDM32 8 A output Y (connector B)", to: "SPL-STEPD-Y (M81824/1-2)", current_a: null, length_ft_est: null, basis: "as STEPD_X"}
+      - {id: STEPD_Y, gauge: 20, spec: M22759/32, from: "PDM15:OUT12 (A_8)", to: "SPL-STEPD-Y (M81824/1-2)", current_a: null, length_ft_est: null, basis: "as STEPD_X"}
       - {id: STEPD_Y_L, gauge: 18, spec: M22759/32, from: "SPL-STEPD-Y", to: "DCMD-L Control B (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "as STEPD_X_L"}
       - {id: STEPD_Y_R, gauge: 18, spec: M22759/32, from: "SPL-STEPD-Y", to: "DCMD-R Control B (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "as STEPD_X_L"}
       - {id: STEPD_ML_A, gauge: null, spec: M22759/32, from: "DCMD-L 2-pin DT, Motor A", to: "left motor plug pigtail (kit harness, orange lead), M81824/1-2 or /1-3", current_a: null, length_ft_est: null, basis: "gauge 16/14/12 AWG by the measured running current (research s7: 3 % drop over the run); 16 AWG at the DT (size-16 contact 20-16 AWG, E-seal), spliced up after it; path = AMP harness route down the driver wheel well and along the frame (IM75146 p.6)"}
@@ -163,8 +146,8 @@ STEP-RQ:
     removes: ["3", "STEP_GND", "STEP_DOOR_L", "STEP_DOOR_R", "AMP-STEP-CTRL (endpoint: controller and kit harness)", "AMP-KIT-RING (part)"]
     notes: >-
       Takes the PDM30 spares that exist only while PW (OUT3/OUT4) and PL (OUT21) are unfitted: STEP-RQ + PW + PL do not fit
-      on the PDM30. If the PDM15 becomes the second cab PDM (proposed with the bay PDM32, state 0ah; owner call pending),
-      STEP-RQ runs on its outputs instead and the conflict clears. Door
+      on the PDM30 unless another cab-side PDM appears (the PDM15 in the cab, mounts.yaml; or the front loads moving to a
+      sealed bay PDM32, state 0ah, pending), which is an owner call. Door
       inputs stay local (DIG12/DIG13); speed over CAN (M1 General stream). Needs a short MicroBasic script (DIN to motor
       command; the DIN actions have no run-forward, user manual p.62), an external 1-10 kOhm pull-down on each DIN used (user
       manual p.48, Figure 3-4) and a pull-down on Power Control (value unknown).
