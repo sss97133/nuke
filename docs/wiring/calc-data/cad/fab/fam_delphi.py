@@ -65,7 +65,9 @@ PLUGS = {
         "colours": {"housing": ("#8f9591", f"{PH('12129946')}: grey body; drawing table 'GRA'"),
                     "seal": ("#5b3a6e", f"{PH('12129946')}: purple seal; drawing table seal 12052842 'PPL'"),
                     "lock": ("#e9e0cf", f"{PH('12052845')}: natural (cream) TPA")},
-        "parts": {"seal": "12052842", "tpa": "12052845", "terminal": "12048074", "cable_seal": "15324976"},
+        # every Metri-Pack 150 wire on the K5 is 22 AWG (registry: CKP, CMP, MAP), so the 0.35-0.50 mm2 terminal and
+        # the blue 1.29-1.70 mm cable seal (catalog p.12 / p.66); 12048074 and the white seal are for 18-20 AWG
+        "parts": {"seal": "12052842", "tpa": "12052845", "terminal": "12084200", "cable_seal": "15324974"},
         "type": "102 (grey, the LS crank / MAP key), drawing 12129958 table: body 12129945, seal 12052842, TPA 12052845",
     },
     "15449028": {
@@ -87,6 +89,11 @@ PLUGS = {
     },
 }
 TERMINALS = {   # stamped female terminals: box contact, conductor and insulation crimps (photo +-20 %)
+    "12084200": {"what": "Metri-Pack 150 sealed female terminal, 22 AWG (0.35-0.50 mm2), tin-plated silicon bronze",
+                 "box": (2.6, 1.9, 7.5), "len": 15.0, "plating": ("#c9c6bf", f"{MPCAT}: 'Silicon Bronze / Tin'; tin colour"),
+                 "src": f"{PH('12048074')} (the 18-20 AWG sibling's reel photo inset; same box contact), scaled from the "
+                        f"1.5 mm Metri-Pack 150 blade it takes ({MP} mating information); cable range 0.35-0.50 mm2 "
+                        f"from {CD}Delphi_150_Metri-Pack_Series.pdf p.12 '150 FEMALE TERMINALS SEALED'"},
     "12048074": {"what": "Metri-Pack 150 sealed female terminal, 20-18 AWG (0.8-1.0 mm2), tin-plated silicon bronze",
                  "box": (2.6, 1.9, 7.5), "len": 15.5, "plating": ("#c9c6bf", f"{MPCAT}: 'Silicon Bronze / Tin'; tin colour"),
                  "src": f"{PH('12048074')} (the reel photo's inset), scaled from the 1.5 mm Metri-Pack 150 blade it takes ({MP} mating information)"},
@@ -95,6 +102,12 @@ TERMINALS = {   # stamped female terminals: box contact, conductor and insulatio
                  "src": f"{PH('12191818')} (reel photo), scaled from the 1.5 mm GT 150 blade"},
 }
 CABLE_SEALS = {
+    "15324974": {"what": "Metri-Pack 150 cable seal, blue, 1.29-1.70 mm cable (the catalog's 12048087)", "od": 4.4, "len": 6.5,
+                 "bore": 1.29,
+                 "colour": ("#3b6fb6", f"{CD}Delphi_150_Metri-Pack_Series.pdf p.66 '150 METRI-PACK CABLE SEALS': 12048087 "
+                                       "'Silicone Blue' (no photo on file)"),
+                 "src": f"{CD}Delphi_150_Metri-Pack_Series.pdf p.66: 12048087 / 12052925 '1.70-1.29' (bore); OD and length "
+                        f"from the white sibling 15324976's photo ({PH('15324976')}), +-15 %"},
     "15324976": {"what": "Metri-Pack 150 cable seal, white", "od": 4.6, "len": 6.5, "bore": 1.3,
                  "colour": ("#f1efe9", f"{PH('15324976')}: white; customconnectorkits calls it 'for 16-14 AWG' (ProWire: 20-22)"),
                  "src": f"{PH('15324976')}, scaled from its 1.3-2.1 mm cable range (parts.yaml, ConnectorID)"},
@@ -401,9 +414,11 @@ def assembly_module(end):
         notes.append("the IAT plug (ProWire GT150-AIR-TEMP-KIT) is drawn as the 15449028 GT 150 2-way (sibling: the kit's "
                      "housing part number is not on file)")
     if pn == "12129946":
-        notes.append("the registry names terminal 12110847 for these wires; the kit (ProWire LS-CRANK-CONN-KIT) ships "
-                     "12048074, the Metri-Pack 150 sealed female terminal drawn here (part_media flags 12110847 as a "
-                     "Metri-Pack 280 tangless terminal)")
+        notes.append("terminal corrected to 12084200 (0.35-0.50 mm2, the 22 AWG these wires are): Delphi Metri-Pack 150 "
+                     "catalog p.12 '150 FEMALE TERMINALS SEALED' (12048074 is 1.0-0.80 mm2, 18-20 AWG); the registry's "
+                     "12110847 is a Metri-Pack 280 tangless terminal (catalog p.30). Cable seal 15324974 (blue, 1.29-1.70 "
+                     "mm, the catalog's 12048087, p.66) fits the 22 AWG M22759/16 jacket (1.27-1.37 mm); the white "
+                     "15324976 (1.60-2.15, the catalog's 12089678) does not")
     if end == "OILT":
         notes.append("no oil-temperature sensor part number is recorded (part_media OILT): drawn as the ECT it shares a family with")
     C = dict(s["colours"])
@@ -473,8 +488,10 @@ def piece_module_seal(spn):
 
 def pieces():
     out = [plug_module(pn) for pn in PLUGS]
-    out += [piece_module_terminal(t) for t in TERMINALS]
-    out += [piece_module_seal(c) for c in CABLE_SEALS]
+    used_t = {PLUGS[SENSORS[k]["plug"]]["parts"]["terminal"] for k in SENSOR_ENDS.values()}
+    used_s = {PLUGS[SENSORS[k]["plug"]]["parts"]["cable_seal"] for k in SENSOR_ENDS.values()}
+    out += [piece_module_terminal(t) for t in TERMINALS if t in used_t]
+    out += [piece_module_seal(c) for c in CABLE_SEALS if c in used_s]
     sens_ends = {}
     for e, k in SENSOR_ENDS.items():
         sens_ends.setdefault(k, []).append(e)

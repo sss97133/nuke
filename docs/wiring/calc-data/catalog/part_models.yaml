@@ -18,8 +18,8 @@
 #   attach       where each wire lands: {n, ep (endpoint id), at [mm], dir (the way the wire leaves)}
 #   mount        mounting holes and studs: {n, at, dir (the way the bolt goes in), d}
 generated: '2026-09-29'
-ends_covered: 29
-ends_complete: 26
+ends_covered: 45
+ends_complete: 42
 ends_total: 178
 ends:
   ACC-BATT:
@@ -28,9 +28,9 @@ ends:
     complete: true
   CKP:
     models:
-    - '12048074'
+    - '12084200'
     - '12129946'
-    - '15324976'
+    - '15324974'
     - 213-4573
     - CKP
     complete: true
@@ -44,11 +44,59 @@ ends:
     complete: true
   CMP:
     models:
-    - '12048074'
+    - '12084200'
     - '12129946'
-    - '15324976'
+    - '15324974'
     - 213-3826
     - CMP
+    complete: true
+  COIL-1:
+    models:
+    - '12611424'
+    - COIL-1
+    - COIL-CONN-LS2-7
+    complete: true
+  COIL-2:
+    models:
+    - '12611424'
+    - COIL-2
+    - COIL-CONN-LS2-7
+    complete: true
+  COIL-3:
+    models:
+    - '12611424'
+    - COIL-3
+    - COIL-CONN-LS2-7
+    complete: true
+  COIL-4:
+    models:
+    - '12611424'
+    - COIL-4
+    - COIL-CONN-LS2-7
+    complete: true
+  COIL-5:
+    models:
+    - '12611424'
+    - COIL-5
+    - COIL-CONN-LS2-7
+    complete: true
+  COIL-6:
+    models:
+    - '12611424'
+    - COIL-6
+    - COIL-CONN-LS2-7
+    complete: true
+  COIL-7:
+    models:
+    - '12611424'
+    - COIL-7
+    - COIL-CONN-LS2-7
+    complete: true
+  COIL-8:
+    models:
+    - '12611424'
+    - COIL-8
+    - COIL-CONN-LS2-7
     complete: true
   DCDC:
     models:
@@ -159,6 +207,54 @@ ends:
     - DTM06-4S
     - IBST-DIAG
     complete: true
+  INJ-1:
+    models:
+    - EV1-JPT-2
+    - FI114961
+    - INJ-1
+    complete: true
+  INJ-2:
+    models:
+    - EV1-JPT-2
+    - FI114961
+    - INJ-2
+    complete: true
+  INJ-3:
+    models:
+    - EV1-JPT-2
+    - FI114961
+    - INJ-3
+    complete: true
+  INJ-4:
+    models:
+    - EV1-JPT-2
+    - FI114961
+    - INJ-4
+    complete: true
+  INJ-5:
+    models:
+    - EV1-JPT-2
+    - FI114961
+    - INJ-5
+    complete: true
+  INJ-6:
+    models:
+    - EV1-JPT-2
+    - FI114961
+    - INJ-6
+    complete: true
+  INJ-7:
+    models:
+    - EV1-JPT-2
+    - FI114961
+    - INJ-7
+    complete: true
+  INJ-8:
+    models:
+    - EV1-JPT-2
+    - FI114961
+    - INJ-8
+    complete: true
   M130-A:
     models:
     - M130-A
@@ -169,9 +265,9 @@ ends:
     complete: true
   MAP:
     models:
-    - '12048074'
+    - '12084200'
     - '12129946'
-    - '15324976'
+    - '15324974'
     - 538-24
     - MAP
     complete: true
@@ -3224,9 +3320,9 @@ parts:
       from: 'reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf p.66 (150 female terminals, cable seals):
         ''Silicon Bronze / Tin''; tin colour'
     cable seals:
-      hex: '#f1efe9'
-      from: 'customconnectorkits.com/products/15324976 product photo (fetched 2026-09-29): white; customconnectorkits calls
-        it ''for 16-14 AWG'' (ProWire: 20-22)'
+      hex: '#3b6fb6'
+      from: 'reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf p.66 ''150 METRI-PACK CABLE SEALS'':
+        12048087 ''Silicone Blue'' (no photo on file)'
   attach:
   - n: cavA
     ep: CKP
@@ -3543,20 +3639,20 @@ parts:
     - 0.0
   numbering: cavity letters A-B(-C) as moulded (drawing 12129958 bottom view 'C B A'); A at +X
   script: docs/wiring/calc-data/cad/fab/fam_delphi.py
-- id: '12048074'
+- id: '12084200'
   endpoints:
   - CKP
   - CMP
   - MAP
-  what: Metri-Pack 150 sealed female terminal, 20-18 AWG (0.8-1.0 mm2), tin-plated silicon bronze
+  what: Metri-Pack 150 sealed female terminal, 22 AWG (0.35-0.50 mm2), tin-plated silicon bronze
   maker: Delphi (Aptiv)
-  maker_pn: '12048074'
+  maker_pn: '12084200'
   shape_basis: scaled from photo
   dims_mm:
-    l: 15.5
+    l: 15.0
     w: 2.6
     h: 1.9
-  dims_note: 15.5 long, box 2.6 x 1.9 (photo +-20 %)
+  dims_note: 15 long, box 2.6 x 1.9 (photo +-20 %)
   frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
     wires; +Y the lock side
   axes:
@@ -3577,7 +3673,7 @@ parts:
     at:
     - 0.0
     - 0.0
-    - 15.5
+    - 15.0
     dir:
     - 0
     - 0
@@ -3587,36 +3683,40 @@ parts:
   params:
   - name: box_w
     value: 2.6
-    source: customconnectorkits.com/products/12048074 product photo (fetched 2026-09-29) (the reel photo's inset), scaled
-      from the 1.5 mm Metri-Pack 150 blade it takes (reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf
-      (Delphi drawing 12129958) mating information)
+    source: customconnectorkits.com/products/12048074 product photo (fetched 2026-09-29) (the 18-20 AWG sibling's reel photo
+      inset; same box contact), scaled from the 1.5 mm Metri-Pack 150 blade it takes (reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf
+      (Delphi drawing 12129958) mating information); cable range 0.35-0.50 mm2 from reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf
+      p.12 '150 FEMALE TERMINALS SEALED'
     basis: photo
     note: +-20 %
   - name: box_h
     value: 1.9
-    source: customconnectorkits.com/products/12048074 product photo (fetched 2026-09-29) (the reel photo's inset), scaled
-      from the 1.5 mm Metri-Pack 150 blade it takes (reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf
-      (Delphi drawing 12129958) mating information)
+    source: customconnectorkits.com/products/12048074 product photo (fetched 2026-09-29) (the 18-20 AWG sibling's reel photo
+      inset; same box contact), scaled from the 1.5 mm Metri-Pack 150 blade it takes (reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf
+      (Delphi drawing 12129958) mating information); cable range 0.35-0.50 mm2 from reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf
+      p.12 '150 FEMALE TERMINALS SEALED'
     basis: photo
     note: +-20 %
   - name: box_l
     value: 7.5
-    source: customconnectorkits.com/products/12048074 product photo (fetched 2026-09-29) (the reel photo's inset), scaled
-      from the 1.5 mm Metri-Pack 150 blade it takes (reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf
-      (Delphi drawing 12129958) mating information)
+    source: customconnectorkits.com/products/12048074 product photo (fetched 2026-09-29) (the 18-20 AWG sibling's reel photo
+      inset; same box contact), scaled from the 1.5 mm Metri-Pack 150 blade it takes (reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf
+      (Delphi drawing 12129958) mating information); cable range 0.35-0.50 mm2 from reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf
+      p.12 '150 FEMALE TERMINALS SEALED'
     basis: photo
     note: +-20 %
   - name: length
-    value: 15.5
-    source: customconnectorkits.com/products/12048074 product photo (fetched 2026-09-29) (the reel photo's inset), scaled
-      from the 1.5 mm Metri-Pack 150 blade it takes (reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf
-      (Delphi drawing 12129958) mating information)
+    value: 15.0
+    source: customconnectorkits.com/products/12048074 product photo (fetched 2026-09-29) (the 18-20 AWG sibling's reel photo
+      inset; same box contact), scaled from the 1.5 mm Metri-Pack 150 blade it takes (reference_documents/component_drawings/Delphi_12129958_MP150_3way_female_12129946_12059595.pdf
+      (Delphi drawing 12129958) mating information); cable range 0.35-0.50 mm2 from reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf
+      p.12 '150 FEMALE TERMINALS SEALED'
     basis: photo
     note: +-20 %
   checks:
   - check: length (photo-scaled)
-    model: 15.5
-    drawing: 15.5
+    model: 15.0
+    drawing: 15.0
     tol: 0.02
     ok: true
   branding: {}
@@ -3705,20 +3805,20 @@ parts:
   kind: piece
   family: delphi sealed sensor connectors
   script: docs/wiring/calc-data/cad/fab/fam_delphi.py
-- id: '15324976'
+- id: '15324974'
   endpoints:
   - CKP
   - CMP
   - MAP
-  what: Metri-Pack 150 cable seal, white
+  what: Metri-Pack 150 cable seal, blue, 1.29-1.70 mm cable (the catalog's 12048087)
   maker: Delphi (Aptiv)
-  maker_pn: '15324976'
+  maker_pn: '15324974'
   shape_basis: scaled from photo
   dims_mm:
     l: 6.5
-    w: 4.6
-    h: 4.6
-  dims_note: OD 4.6 x 6.5 long, bore 1.3
+    w: 4.4
+    h: 4.4
+  dims_note: OD 4.4 x 6.5 long, bore 1.29
   frame: origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its
     wires; +Y the lock side
   axes:
@@ -3730,9 +3830,9 @@ parts:
       lock: +Y
   colors:
     seal:
-      hex: '#f1efe9'
-      from: 'customconnectorkits.com/products/15324976 product photo (fetched 2026-09-29): white; customconnectorkits calls
-        it ''for 16-14 AWG'' (ProWire: 20-22)'
+      hex: '#3b6fb6'
+      from: 'reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf p.66 ''150 METRI-PACK CABLE SEALS'':
+        12048087 ''Silicone Blue'' (no photo on file)'
   attach:
   - n: wire
     ep: CKP
@@ -3748,21 +3848,24 @@ parts:
   mount: []
   params:
   - name: od
-    value: 4.6
-    source: customconnectorkits.com/products/15324976 product photo (fetched 2026-09-29), scaled from its 1.3-2.1 mm cable
-      range (parts.yaml, ConnectorID)
+    value: 4.4
+    source: 'reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf p.66: 12048087 / 12052925 ''1.70-1.29''
+      (bore); OD and length from the white sibling 15324976''s photo (customconnectorkits.com/products/15324976 product photo
+      (fetched 2026-09-29)), +-15 %'
     basis: photo
     note: +-15 %
   - name: len
     value: 6.5
-    source: customconnectorkits.com/products/15324976 product photo (fetched 2026-09-29), scaled from its 1.3-2.1 mm cable
-      range (parts.yaml, ConnectorID)
+    source: 'reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf p.66: 12048087 / 12052925 ''1.70-1.29''
+      (bore); OD and length from the white sibling 15324976''s photo (customconnectorkits.com/products/15324976 product photo
+      (fetched 2026-09-29)), +-15 %'
     basis: photo
     note: +-15 %
   - name: bore
-    value: 1.3
-    source: customconnectorkits.com/products/15324976 product photo (fetched 2026-09-29), scaled from its 1.3-2.1 mm cable
-      range (parts.yaml, ConnectorID)
+    value: 1.29
+    source: 'reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf p.66: 12048087 / 12052925 ''1.70-1.29''
+      (bore); OD and length from the white sibling 15324976''s photo (customconnectorkits.com/products/15324976 product photo
+      (fetched 2026-09-29)), +-15 %'
     basis: maker
   checks:
   - check: length (photo-scaled)
@@ -4584,7 +4687,7 @@ parts:
     - 0
     - 0
     - 1
-    kind: Metri-Pack 150 terminal 12048074
+    kind: Metri-Pack 150 terminal 12084200
   - n: cavB
     ep: CKP
     at:
@@ -4595,7 +4698,7 @@ parts:
     - 0
     - 0
     - 1
-    kind: Metri-Pack 150 terminal 12048074
+    kind: Metri-Pack 150 terminal 12084200
   - n: cavC
     ep: CKP
     at:
@@ -4606,7 +4709,7 @@ parts:
     - 0
     - 0
     - 1
-    kind: Metri-Pack 150 terminal 12048074
+    kind: Metri-Pack 150 terminal 12084200
   mount: []
   params:
   - name: shroud_w
@@ -4775,15 +4878,17 @@ parts:
   - Terminals photo-scaled (+-20 %).
   cross_checks: []
   notes:
-  - the registry names terminal 12110847 for these wires; the kit (ProWire LS-CRANK-CONN-KIT) ships 12048074, the Metri-Pack
-    150 sealed female terminal drawn here (part_media flags 12110847 as a Metri-Pack 280 tangless terminal)
+  - 'terminal corrected to 12084200 (0.35-0.50 mm2, the 22 AWG these wires are): Delphi Metri-Pack 150 catalog p.12 ''150
+    FEMALE TERMINALS SEALED'' (12048074 is 1.0-0.80 mm2, 18-20 AWG); the registry''s 12110847 is a Metri-Pack 280 tangless
+    terminal (catalog p.30). Cable seal 15324974 (blue, 1.29-1.70 mm, the catalog''s 12048087, p.66) fits the 22 AWG M22759/16
+    jacket (1.27-1.37 mm); the white 15324976 (1.60-2.15, the catalog''s 12089678) does not'
   kind: assembly
   family: delphi sealed sensor connectors
   pieces:
   - 213-4573
   - '12129946'
-  - '12048074'
-  - '15324976'
+  - '12084200'
+  - '15324974'
   missing: []
   script: docs/wiring/calc-data/cad/fab/fam_delphi.py
 - id: CMP
@@ -4838,7 +4943,7 @@ parts:
     - 0
     - 0
     - 1
-    kind: Metri-Pack 150 terminal 12048074
+    kind: Metri-Pack 150 terminal 12084200
   - n: cavB
     ep: CMP
     at:
@@ -4849,7 +4954,7 @@ parts:
     - 0
     - 0
     - 1
-    kind: Metri-Pack 150 terminal 12048074
+    kind: Metri-Pack 150 terminal 12084200
   - n: cavC
     ep: CMP
     at:
@@ -4860,7 +4965,7 @@ parts:
     - 0
     - 0
     - 1
-    kind: Metri-Pack 150 terminal 12048074
+    kind: Metri-Pack 150 terminal 12084200
   mount: []
   params:
   - name: shroud_w
@@ -5043,15 +5148,17 @@ parts:
   notes:
   - 'the LS cam plug (ProWire LS-CAM-CONN-KIT) is drawn as the 12129946 Metri-Pack 150 3-way: the kit''s housing part number
     is not on file (same family and cavity count; keys may differ)'
-  - the registry names terminal 12110847 for these wires; the kit (ProWire LS-CRANK-CONN-KIT) ships 12048074, the Metri-Pack
-    150 sealed female terminal drawn here (part_media flags 12110847 as a Metri-Pack 280 tangless terminal)
+  - 'terminal corrected to 12084200 (0.35-0.50 mm2, the 22 AWG these wires are): Delphi Metri-Pack 150 catalog p.12 ''150
+    FEMALE TERMINALS SEALED'' (12048074 is 1.0-0.80 mm2, 18-20 AWG); the registry''s 12110847 is a Metri-Pack 280 tangless
+    terminal (catalog p.30). Cable seal 15324974 (blue, 1.29-1.70 mm, the catalog''s 12048087, p.66) fits the 22 AWG M22759/16
+    jacket (1.27-1.37 mm); the white 15324976 (1.60-2.15, the catalog''s 12089678) does not'
   kind: assembly
   family: delphi sealed sensor connectors
   pieces:
   - 213-3826
   - '12129946'
-  - '12048074'
-  - '15324976'
+  - '12084200'
+  - '15324974'
   missing: []
   script: docs/wiring/calc-data/cad/fab/fam_delphi.py
 - id: MAP
@@ -5106,7 +5213,7 @@ parts:
     - 0
     - 0
     - 1
-    kind: Metri-Pack 150 terminal 12048074
+    kind: Metri-Pack 150 terminal 12084200
   - n: cavB
     ep: MAP
     at:
@@ -5117,7 +5224,7 @@ parts:
     - 0
     - 0
     - 1
-    kind: Metri-Pack 150 terminal 12048074
+    kind: Metri-Pack 150 terminal 12084200
   - n: cavC
     ep: MAP
     at:
@@ -5128,7 +5235,7 @@ parts:
     - 0
     - 0
     - 1
-    kind: Metri-Pack 150 terminal 12048074
+    kind: Metri-Pack 150 terminal 12084200
   mount: []
   params:
   - name: shroud_w
@@ -5303,15 +5410,17 @@ parts:
   - Terminals photo-scaled (+-20 %).
   cross_checks: []
   notes:
-  - the registry names terminal 12110847 for these wires; the kit (ProWire LS-CRANK-CONN-KIT) ships 12048074, the Metri-Pack
-    150 sealed female terminal drawn here (part_media flags 12110847 as a Metri-Pack 280 tangless terminal)
+  - 'terminal corrected to 12084200 (0.35-0.50 mm2, the 22 AWG these wires are): Delphi Metri-Pack 150 catalog p.12 ''150
+    FEMALE TERMINALS SEALED'' (12048074 is 1.0-0.80 mm2, 18-20 AWG); the registry''s 12110847 is a Metri-Pack 280 tangless
+    terminal (catalog p.30). Cable seal 15324974 (blue, 1.29-1.70 mm, the catalog''s 12048087, p.66) fits the 22 AWG M22759/16
+    jacket (1.27-1.37 mm); the white 15324976 (1.60-2.15, the catalog''s 12089678) does not'
   kind: assembly
   family: delphi sealed sensor connectors
   pieces:
   - 538-24
   - '12129946'
-  - '12048074'
-  - '15324976'
+  - '12084200'
+  - '15324974'
   missing: []
   script: docs/wiring/calc-data/cad/fab/fam_delphi.py
 - id: CLT-ECU
@@ -16949,3 +17058,3495 @@ parts:
   - MoTeC LTCD 61301 box
   - 2 x Bosch LSU 4.9 sensors and their plugs
   script: docs/wiring/calc-data/cad/fab/fam_deutsch.py
+- id: FI114961
+  endpoints: &id001
+  - INJ-1
+  - INJ-2
+  - INJ-3
+  - INJ-4
+  - INJ-5
+  - INJ-6
+  - INJ-7
+  - INJ-8
+  what: Siemens Deka FI114961 injector, 60 lb/h, 12.5 ohm, EV1, Long (60 mm), 14 mm O-rings
+  maker: Siemens Deka (Continental)
+  maker_pn: FI114961
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 63.4
+    w: 27.5
+    h: 15.0
+  dims_note: 28 x 15 x 63 overall
+  frame: injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    body:
+      hex: '#2a2b2d'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Identification Shell Color: Black''; the injector photo''s
+        black body'
+    orings:
+      hex: '#4a3a5c'
+      from: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+        2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)'
+    tip:
+      hex: '#b9bcbd'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)'
+  attach:
+  - n: ev1
+    ep: INJ-1
+    at:
+    - 21.5
+    - 0.0
+    - 38.0
+    dir:
+    - 1
+    - 0
+    - 0
+    kind: EV1 socket
+  mount: []
+  params:
+  - name: len
+    value: 60.44
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''60.44 mm'' between the O-ring ends'
+    basis: maker
+    note: the product title's '(60mm)', Long Style
+  - name: body_d
+    value: 15.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Body: 15.00 mm'''
+    basis: maker
+  - name: inlet_d
+    value: 13.5
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Fuel Inlet Cup Diameter 13.5 mm'''
+    basis: maker
+  - name: pocket_d
+    value: 14.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Intake Manifold Pocket Diameter 14.0 mm''; siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/
+      (read 2026-09-29) ''14mm Lower O-Ring'''
+    basis: maker
+  - name: oring_d
+    value: 14.0
+    source: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+      2026-09-29): ''14mm Upper O-Ring'', ''14mm Lower O-Ring'' (Viton)'
+    basis: maker
+  - name: body_z0
+    value: 24.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: '+-2: the solenoid body''s lower end'
+  - name: body_z1
+    value: 44.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: +-2
+  - name: sock_z
+    value: 38.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled
+    basis: scaled
+    note: '+-3: the EV1 socket''s axis height'
+  - name: sock_w
+    value: 12.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: sock_h
+    value: 9.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: sock_l
+    value: 14.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: pin_pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'' between the two contacts'
+    basis: maker
+  checks:
+  - check: O-ring end to end (data sheet)
+    model: 60.44
+    drawing: 60.44
+    tol: 0.05
+    ok: true
+  - check: body diameter (data sheet)
+    model: 15.0
+    drawing: 15.0
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns:
+  - The EV1 socket's size and the solenoid body's ends are scaled or photo (+-20 %).
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: injectors and coils
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: EV1-JPT-2
+  endpoints: *id001
+  what: 'EV1 injector plug: TE Junior Power Timer 2-way housing with its locking spring, the kit''s 90-degree boot and two
+    68102 terminals (ProWire 8CYLK-90)'
+  maker: TE Connectivity / ProWire kit
+  maker_pn: 8CYLK-90 (housing drawn to TE 828657)
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 32.5
+    w: 43.0
+    h: 22.0
+  dims_note: 43 x 22 x 32 overall
+  frame: the plug's mating face at x = 0 on the injector's EV1 axis; wires leave +X then +Z
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    plug:
+      hex: '#1d1d1f'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing'
+    clip:
+      hex: '#b8bcc0'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip'
+    boot:
+      hex: '#1a1a1a'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot'
+    terminal:
+      hex: '#c9c6bf'
+      from: ProWire 68102 tin (JPT terminal)
+  attach:
+  - n: cav1
+    ep: INJ-1
+    at:
+    - 34.0
+    - 0.0
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: JPT terminal 68102
+  - n: cav2
+    ep: INJ-1
+    at:
+    - 34.0
+    - 0.0
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: JPT terminal 68102
+  mount: []
+  params:
+  - name: L
+    value: 28.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''28,0'''
+    basis: maker
+  - name: W
+    value: 22.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''22,0'''
+    basis: maker
+  - name: H
+    value: 23.4
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''23,4'' over the locking spring'
+    basis: maker
+  - name: body_h
+    value: 17.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''17,0'''
+    basis: maker
+  - name: inner_h
+    value: 11.2
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''11,2'''
+    basis: maker
+  - name: pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'''
+    basis: maker
+  - name: boot_l
+    value: 30.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the 90-degree boot against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  - name: boot_d
+    value: 9.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the boot''s cable end against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  checks:
+  - check: housing length (TE)
+    model: 28.0
+    drawing: 28.0
+    tol: 0.05
+    ok: true
+  - check: housing width (TE)
+    model: 22.0
+    drawing: 22.0
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'ProWire does not name the kit housing''s maker: drawn to TE''s Junior Power Timer 2-way (828657).'
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: injectors and coils
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: '12611424'
+  endpoints: &id002
+  - COIL-1
+  - COIL-2
+  - COIL-3
+  - COIL-4
+  - COIL-5
+  - COIL-6
+  - COIL-7
+  - COIL-8
+  what: GM 12611424 (ACDelco D510C) ignition coil
+  maker: GM (ACDelco)
+  maker_pn: 12611424 (D510C)
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 118.7
+    w: 62.0
+    h: 36.0
+  dims_note: 62 x 36 x 119 overall
+  frame: +Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along
+    Y
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    coil:
+      hex: '#1d1e20'
+      from: 'GM photo D510C (part_media COIL-1): black coil body'
+    tower:
+      hex: '#1d1e20'
+      from: 'GM photo D510C: black tower'
+  attach:
+  - n: plug
+    ep: COIL-1
+    at:
+    - 34.0
+    - 0.0
+    - -92.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil plug
+  mount: []
+  params:
+  - name: ear_spread
+    value: 73.0
+    source: delmospeed.com DELCB01 'Bolt spread 2 7/8"' (the ruler in docs/wiring/calc-data/cad/delstributor_geometry.yaml
+      coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm))
+    basis: maker
+  - name: axis_off
+    value: 34.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      axis_out_of_ear_line_mm
+    basis: photo
+    note: +-3
+  - name: body_h
+    value: 64.7
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_height_mm
+    basis: photo
+    note: +-3
+  - name: body_in
+    value: 16.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm inner
+    basis: photo
+    note: +-3
+  - name: body_out
+    value: 21.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm outer
+    basis: photo
+    note: +-3
+  - name: body_t
+    value: 36.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_tangential_mm
+    basis: photo
+    note: +-5
+  - name: tower_d
+    value: 17.4
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_od_mm
+    basis: photo
+    note: +-2
+  - name: tower_h
+    value: 31.9
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_tip_above_top_ear_mm
+    basis: photo
+    note: +-2
+  - name: plug_tip
+    value: 92.8
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      plug_tip_below_top_ear_mm
+    basis: photo
+    note: +-3
+  checks:
+  - check: ear bolt spread (Delmo)
+    model: 73.0
+    drawing: 73.0
+    tol: 0.01
+    ok: true
+  - check: tower tip above the top ear
+    model: 31.9
+    drawing: 31.9
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - Every coil number is scaled off Delmo's photos with the 73.0 mm bolt spread (margins in delstributor_geometry.yaml); the
+    plug latch's facing is unknown there.
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: injectors and coils
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: COIL-CONN-LS2-7
+  endpoints: *id002
+  what: 'LS2/LS7 coil 4-way plug (ProWire COIL-CONN-LS2/7): housing, seal, TPA, 4 terminals and cable seals'
+  maker: ProWire USA (kit)
+  maker_pn: COIL-CONN-LS2/7
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 31.4
+    w: 20.4
+    h: 16.6
+  dims_note: 20 x 17 x 31 overall
+  frame: +Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along
+    Y
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    plug:
+      hex: '#1f1f21'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing'
+    seal:
+      hex: '#3a7fd0'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges'
+    tpa:
+      hex: '#8d9091'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA'
+    cable seals:
+      hex: '#f2d23a'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals'
+    terminal:
+      hex: '#c9c6bf'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals'
+  attach:
+  - n: cava
+    ep: COIL-1
+    at:
+    - 40.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil plug terminal
+  - n: cavb
+    ep: COIL-1
+    at:
+    - 36.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil plug terminal
+  - n: cavc
+    ep: COIL-1
+    at:
+    - 32.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil plug terminal
+  - n: cavd
+    ep: COIL-1
+    at:
+    - 28.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil plug terminal
+  mount: []
+  params:
+  - name: W
+    value: 20.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): 4-way housing against
+      the coil''s 36 body (docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918,
+      ruler 73.0 mm))'
+    basis: photo
+    note: +-25 %
+  - name: H
+    value: 14.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: L
+    value: 31.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: pitch
+    value: 4.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): four cavities across
+      the 20 width'
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: 4 cavities
+    model: 4
+    drawing: 4
+    tol: 0.05
+    ok: true
+  branding: {}
+  unknowns:
+  - 'The kit''s housing part number and its dimensions are not on file: sized off ProWire''s photo against the coil (+-25
+    %); the cavity order a-d across the plug is assumed.'
+  cross_checks: []
+  notes: []
+  kind: piece
+  family: injectors and coils
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: INJ-1
+  endpoints:
+  - INJ-1
+  what: 'INJ-1: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated'
+  maker: Siemens Deka / TE
+  maker_pn: FI114961 + EV1-JPT-2
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 65.0
+    w: 57.5
+    h: 22.0
+  dims_note: 58 x 22 x 65 overall
+  frame: injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    body:
+      hex: '#2a2b2d'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Identification Shell Color: Black''; the injector photo''s
+        black body'
+    orings:
+      hex: '#4a3a5c'
+      from: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+        2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)'
+    tip:
+      hex: '#b9bcbd'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)'
+    plug:
+      hex: '#1d1d1f'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing'
+    clip:
+      hex: '#b8bcc0'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip'
+    boot:
+      hex: '#1a1a1a'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot'
+    terminal:
+      hex: '#c9c6bf'
+      from: ProWire 68102 tin (JPT terminal)
+  attach:
+  - n: cav1
+    ep: INJ-1
+    at:
+    - 41.0
+    - -2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 1
+  - n: cav2
+    ep: INJ-1
+    at:
+    - 41.0
+    - 2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 2
+  mount: []
+  params:
+  - name: FI114961.len
+    value: 60.44
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''60.44 mm'' between the O-ring ends'
+    basis: maker
+    note: the product title's '(60mm)', Long Style
+  - name: FI114961.body_d
+    value: 15.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Body: 15.00 mm'''
+    basis: maker
+  - name: FI114961.inlet_d
+    value: 13.5
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Fuel Inlet Cup Diameter 13.5 mm'''
+    basis: maker
+  - name: FI114961.pocket_d
+    value: 14.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Intake Manifold Pocket Diameter 14.0 mm''; siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/
+      (read 2026-09-29) ''14mm Lower O-Ring'''
+    basis: maker
+  - name: FI114961.oring_d
+    value: 14.0
+    source: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+      2026-09-29): ''14mm Upper O-Ring'', ''14mm Lower O-Ring'' (Viton)'
+    basis: maker
+  - name: FI114961.body_z0
+    value: 24.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: '+-2: the solenoid body''s lower end'
+  - name: FI114961.body_z1
+    value: 44.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: +-2
+  - name: FI114961.sock_z
+    value: 38.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled
+    basis: scaled
+    note: '+-3: the EV1 socket''s axis height'
+  - name: FI114961.sock_w
+    value: 12.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_h
+    value: 9.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_l
+    value: 14.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.pin_pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'' between the two contacts'
+    basis: maker
+  - name: EV1.L
+    value: 28.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''28,0'''
+    basis: maker
+  - name: EV1.W
+    value: 22.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''22,0'''
+    basis: maker
+  - name: EV1.H
+    value: 23.4
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''23,4'' over the locking spring'
+    basis: maker
+  - name: EV1.body_h
+    value: 17.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''17,0'''
+    basis: maker
+  - name: EV1.inner_h
+    value: 11.2
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''11,2'''
+    basis: maker
+  - name: EV1.pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'''
+    basis: maker
+  - name: EV1.boot_l
+    value: 30.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the 90-degree boot against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  - name: EV1.boot_d
+    value: 9.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the boot''s cable end against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  checks:
+  - check: plug on the injector's EV1 socket axis
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - the EV1 cavity numbers 1 / 2 are drawn -Y / +Y (not marked on the photos; either way round works for an injector coil)
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - FI114961
+  - EV1-JPT-2
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: INJ-2
+  endpoints:
+  - INJ-2
+  what: 'INJ-2: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated'
+  maker: Siemens Deka / TE
+  maker_pn: FI114961 + EV1-JPT-2
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 65.0
+    w: 57.5
+    h: 22.0
+  dims_note: 58 x 22 x 65 overall
+  frame: injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    body:
+      hex: '#2a2b2d'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Identification Shell Color: Black''; the injector photo''s
+        black body'
+    orings:
+      hex: '#4a3a5c'
+      from: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+        2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)'
+    tip:
+      hex: '#b9bcbd'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)'
+    plug:
+      hex: '#1d1d1f'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing'
+    clip:
+      hex: '#b8bcc0'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip'
+    boot:
+      hex: '#1a1a1a'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot'
+    terminal:
+      hex: '#c9c6bf'
+      from: ProWire 68102 tin (JPT terminal)
+  attach:
+  - n: cav1
+    ep: INJ-2
+    at:
+    - 41.0
+    - -2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 1
+  - n: cav2
+    ep: INJ-2
+    at:
+    - 41.0
+    - 2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 2
+  mount: []
+  params:
+  - name: FI114961.len
+    value: 60.44
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''60.44 mm'' between the O-ring ends'
+    basis: maker
+    note: the product title's '(60mm)', Long Style
+  - name: FI114961.body_d
+    value: 15.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Body: 15.00 mm'''
+    basis: maker
+  - name: FI114961.inlet_d
+    value: 13.5
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Fuel Inlet Cup Diameter 13.5 mm'''
+    basis: maker
+  - name: FI114961.pocket_d
+    value: 14.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Intake Manifold Pocket Diameter 14.0 mm''; siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/
+      (read 2026-09-29) ''14mm Lower O-Ring'''
+    basis: maker
+  - name: FI114961.oring_d
+    value: 14.0
+    source: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+      2026-09-29): ''14mm Upper O-Ring'', ''14mm Lower O-Ring'' (Viton)'
+    basis: maker
+  - name: FI114961.body_z0
+    value: 24.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: '+-2: the solenoid body''s lower end'
+  - name: FI114961.body_z1
+    value: 44.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: +-2
+  - name: FI114961.sock_z
+    value: 38.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled
+    basis: scaled
+    note: '+-3: the EV1 socket''s axis height'
+  - name: FI114961.sock_w
+    value: 12.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_h
+    value: 9.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_l
+    value: 14.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.pin_pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'' between the two contacts'
+    basis: maker
+  - name: EV1.L
+    value: 28.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''28,0'''
+    basis: maker
+  - name: EV1.W
+    value: 22.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''22,0'''
+    basis: maker
+  - name: EV1.H
+    value: 23.4
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''23,4'' over the locking spring'
+    basis: maker
+  - name: EV1.body_h
+    value: 17.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''17,0'''
+    basis: maker
+  - name: EV1.inner_h
+    value: 11.2
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''11,2'''
+    basis: maker
+  - name: EV1.pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'''
+    basis: maker
+  - name: EV1.boot_l
+    value: 30.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the 90-degree boot against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  - name: EV1.boot_d
+    value: 9.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the boot''s cable end against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  checks:
+  - check: plug on the injector's EV1 socket axis
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - the EV1 cavity numbers 1 / 2 are drawn -Y / +Y (not marked on the photos; either way round works for an injector coil)
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - FI114961
+  - EV1-JPT-2
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: INJ-3
+  endpoints:
+  - INJ-3
+  what: 'INJ-3: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated'
+  maker: Siemens Deka / TE
+  maker_pn: FI114961 + EV1-JPT-2
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 65.0
+    w: 57.5
+    h: 22.0
+  dims_note: 58 x 22 x 65 overall
+  frame: injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    body:
+      hex: '#2a2b2d'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Identification Shell Color: Black''; the injector photo''s
+        black body'
+    orings:
+      hex: '#4a3a5c'
+      from: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+        2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)'
+    tip:
+      hex: '#b9bcbd'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)'
+    plug:
+      hex: '#1d1d1f'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing'
+    clip:
+      hex: '#b8bcc0'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip'
+    boot:
+      hex: '#1a1a1a'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot'
+    terminal:
+      hex: '#c9c6bf'
+      from: ProWire 68102 tin (JPT terminal)
+  attach:
+  - n: cav1
+    ep: INJ-3
+    at:
+    - 41.0
+    - -2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 1
+  - n: cav2
+    ep: INJ-3
+    at:
+    - 41.0
+    - 2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 2
+  mount: []
+  params:
+  - name: FI114961.len
+    value: 60.44
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''60.44 mm'' between the O-ring ends'
+    basis: maker
+    note: the product title's '(60mm)', Long Style
+  - name: FI114961.body_d
+    value: 15.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Body: 15.00 mm'''
+    basis: maker
+  - name: FI114961.inlet_d
+    value: 13.5
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Fuel Inlet Cup Diameter 13.5 mm'''
+    basis: maker
+  - name: FI114961.pocket_d
+    value: 14.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Intake Manifold Pocket Diameter 14.0 mm''; siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/
+      (read 2026-09-29) ''14mm Lower O-Ring'''
+    basis: maker
+  - name: FI114961.oring_d
+    value: 14.0
+    source: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+      2026-09-29): ''14mm Upper O-Ring'', ''14mm Lower O-Ring'' (Viton)'
+    basis: maker
+  - name: FI114961.body_z0
+    value: 24.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: '+-2: the solenoid body''s lower end'
+  - name: FI114961.body_z1
+    value: 44.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: +-2
+  - name: FI114961.sock_z
+    value: 38.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled
+    basis: scaled
+    note: '+-3: the EV1 socket''s axis height'
+  - name: FI114961.sock_w
+    value: 12.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_h
+    value: 9.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_l
+    value: 14.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.pin_pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'' between the two contacts'
+    basis: maker
+  - name: EV1.L
+    value: 28.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''28,0'''
+    basis: maker
+  - name: EV1.W
+    value: 22.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''22,0'''
+    basis: maker
+  - name: EV1.H
+    value: 23.4
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''23,4'' over the locking spring'
+    basis: maker
+  - name: EV1.body_h
+    value: 17.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''17,0'''
+    basis: maker
+  - name: EV1.inner_h
+    value: 11.2
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''11,2'''
+    basis: maker
+  - name: EV1.pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'''
+    basis: maker
+  - name: EV1.boot_l
+    value: 30.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the 90-degree boot against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  - name: EV1.boot_d
+    value: 9.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the boot''s cable end against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  checks:
+  - check: plug on the injector's EV1 socket axis
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - the EV1 cavity numbers 1 / 2 are drawn -Y / +Y (not marked on the photos; either way round works for an injector coil)
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - FI114961
+  - EV1-JPT-2
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: INJ-4
+  endpoints:
+  - INJ-4
+  what: 'INJ-4: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated'
+  maker: Siemens Deka / TE
+  maker_pn: FI114961 + EV1-JPT-2
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 65.0
+    w: 57.5
+    h: 22.0
+  dims_note: 58 x 22 x 65 overall
+  frame: injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    body:
+      hex: '#2a2b2d'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Identification Shell Color: Black''; the injector photo''s
+        black body'
+    orings:
+      hex: '#4a3a5c'
+      from: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+        2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)'
+    tip:
+      hex: '#b9bcbd'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)'
+    plug:
+      hex: '#1d1d1f'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing'
+    clip:
+      hex: '#b8bcc0'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip'
+    boot:
+      hex: '#1a1a1a'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot'
+    terminal:
+      hex: '#c9c6bf'
+      from: ProWire 68102 tin (JPT terminal)
+  attach:
+  - n: cav1
+    ep: INJ-4
+    at:
+    - 41.0
+    - -2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 1
+  - n: cav2
+    ep: INJ-4
+    at:
+    - 41.0
+    - 2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 2
+  mount: []
+  params:
+  - name: FI114961.len
+    value: 60.44
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''60.44 mm'' between the O-ring ends'
+    basis: maker
+    note: the product title's '(60mm)', Long Style
+  - name: FI114961.body_d
+    value: 15.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Body: 15.00 mm'''
+    basis: maker
+  - name: FI114961.inlet_d
+    value: 13.5
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Fuel Inlet Cup Diameter 13.5 mm'''
+    basis: maker
+  - name: FI114961.pocket_d
+    value: 14.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Intake Manifold Pocket Diameter 14.0 mm''; siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/
+      (read 2026-09-29) ''14mm Lower O-Ring'''
+    basis: maker
+  - name: FI114961.oring_d
+    value: 14.0
+    source: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+      2026-09-29): ''14mm Upper O-Ring'', ''14mm Lower O-Ring'' (Viton)'
+    basis: maker
+  - name: FI114961.body_z0
+    value: 24.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: '+-2: the solenoid body''s lower end'
+  - name: FI114961.body_z1
+    value: 44.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: +-2
+  - name: FI114961.sock_z
+    value: 38.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled
+    basis: scaled
+    note: '+-3: the EV1 socket''s axis height'
+  - name: FI114961.sock_w
+    value: 12.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_h
+    value: 9.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_l
+    value: 14.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.pin_pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'' between the two contacts'
+    basis: maker
+  - name: EV1.L
+    value: 28.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''28,0'''
+    basis: maker
+  - name: EV1.W
+    value: 22.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''22,0'''
+    basis: maker
+  - name: EV1.H
+    value: 23.4
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''23,4'' over the locking spring'
+    basis: maker
+  - name: EV1.body_h
+    value: 17.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''17,0'''
+    basis: maker
+  - name: EV1.inner_h
+    value: 11.2
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''11,2'''
+    basis: maker
+  - name: EV1.pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'''
+    basis: maker
+  - name: EV1.boot_l
+    value: 30.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the 90-degree boot against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  - name: EV1.boot_d
+    value: 9.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the boot''s cable end against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  checks:
+  - check: plug on the injector's EV1 socket axis
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - the EV1 cavity numbers 1 / 2 are drawn -Y / +Y (not marked on the photos; either way round works for an injector coil)
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - FI114961
+  - EV1-JPT-2
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: INJ-5
+  endpoints:
+  - INJ-5
+  what: 'INJ-5: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated'
+  maker: Siemens Deka / TE
+  maker_pn: FI114961 + EV1-JPT-2
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 65.0
+    w: 57.5
+    h: 22.0
+  dims_note: 58 x 22 x 65 overall
+  frame: injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    body:
+      hex: '#2a2b2d'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Identification Shell Color: Black''; the injector photo''s
+        black body'
+    orings:
+      hex: '#4a3a5c'
+      from: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+        2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)'
+    tip:
+      hex: '#b9bcbd'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)'
+    plug:
+      hex: '#1d1d1f'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing'
+    clip:
+      hex: '#b8bcc0'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip'
+    boot:
+      hex: '#1a1a1a'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot'
+    terminal:
+      hex: '#c9c6bf'
+      from: ProWire 68102 tin (JPT terminal)
+  attach:
+  - n: cav1
+    ep: INJ-5
+    at:
+    - 41.0
+    - -2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 1
+  - n: cav2
+    ep: INJ-5
+    at:
+    - 41.0
+    - 2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 2
+  mount: []
+  params:
+  - name: FI114961.len
+    value: 60.44
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''60.44 mm'' between the O-ring ends'
+    basis: maker
+    note: the product title's '(60mm)', Long Style
+  - name: FI114961.body_d
+    value: 15.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Body: 15.00 mm'''
+    basis: maker
+  - name: FI114961.inlet_d
+    value: 13.5
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Fuel Inlet Cup Diameter 13.5 mm'''
+    basis: maker
+  - name: FI114961.pocket_d
+    value: 14.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Intake Manifold Pocket Diameter 14.0 mm''; siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/
+      (read 2026-09-29) ''14mm Lower O-Ring'''
+    basis: maker
+  - name: FI114961.oring_d
+    value: 14.0
+    source: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+      2026-09-29): ''14mm Upper O-Ring'', ''14mm Lower O-Ring'' (Viton)'
+    basis: maker
+  - name: FI114961.body_z0
+    value: 24.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: '+-2: the solenoid body''s lower end'
+  - name: FI114961.body_z1
+    value: 44.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: +-2
+  - name: FI114961.sock_z
+    value: 38.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled
+    basis: scaled
+    note: '+-3: the EV1 socket''s axis height'
+  - name: FI114961.sock_w
+    value: 12.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_h
+    value: 9.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_l
+    value: 14.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.pin_pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'' between the two contacts'
+    basis: maker
+  - name: EV1.L
+    value: 28.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''28,0'''
+    basis: maker
+  - name: EV1.W
+    value: 22.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''22,0'''
+    basis: maker
+  - name: EV1.H
+    value: 23.4
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''23,4'' over the locking spring'
+    basis: maker
+  - name: EV1.body_h
+    value: 17.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''17,0'''
+    basis: maker
+  - name: EV1.inner_h
+    value: 11.2
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''11,2'''
+    basis: maker
+  - name: EV1.pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'''
+    basis: maker
+  - name: EV1.boot_l
+    value: 30.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the 90-degree boot against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  - name: EV1.boot_d
+    value: 9.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the boot''s cable end against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  checks:
+  - check: plug on the injector's EV1 socket axis
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - the EV1 cavity numbers 1 / 2 are drawn -Y / +Y (not marked on the photos; either way round works for an injector coil)
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - FI114961
+  - EV1-JPT-2
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: INJ-6
+  endpoints:
+  - INJ-6
+  what: 'INJ-6: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated'
+  maker: Siemens Deka / TE
+  maker_pn: FI114961 + EV1-JPT-2
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 65.0
+    w: 57.5
+    h: 22.0
+  dims_note: 58 x 22 x 65 overall
+  frame: injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    body:
+      hex: '#2a2b2d'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Identification Shell Color: Black''; the injector photo''s
+        black body'
+    orings:
+      hex: '#4a3a5c'
+      from: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+        2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)'
+    tip:
+      hex: '#b9bcbd'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)'
+    plug:
+      hex: '#1d1d1f'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing'
+    clip:
+      hex: '#b8bcc0'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip'
+    boot:
+      hex: '#1a1a1a'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot'
+    terminal:
+      hex: '#c9c6bf'
+      from: ProWire 68102 tin (JPT terminal)
+  attach:
+  - n: cav1
+    ep: INJ-6
+    at:
+    - 41.0
+    - -2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 1
+  - n: cav2
+    ep: INJ-6
+    at:
+    - 41.0
+    - 2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 2
+  mount: []
+  params:
+  - name: FI114961.len
+    value: 60.44
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''60.44 mm'' between the O-ring ends'
+    basis: maker
+    note: the product title's '(60mm)', Long Style
+  - name: FI114961.body_d
+    value: 15.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Body: 15.00 mm'''
+    basis: maker
+  - name: FI114961.inlet_d
+    value: 13.5
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Fuel Inlet Cup Diameter 13.5 mm'''
+    basis: maker
+  - name: FI114961.pocket_d
+    value: 14.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Intake Manifold Pocket Diameter 14.0 mm''; siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/
+      (read 2026-09-29) ''14mm Lower O-Ring'''
+    basis: maker
+  - name: FI114961.oring_d
+    value: 14.0
+    source: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+      2026-09-29): ''14mm Upper O-Ring'', ''14mm Lower O-Ring'' (Viton)'
+    basis: maker
+  - name: FI114961.body_z0
+    value: 24.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: '+-2: the solenoid body''s lower end'
+  - name: FI114961.body_z1
+    value: 44.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: +-2
+  - name: FI114961.sock_z
+    value: 38.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled
+    basis: scaled
+    note: '+-3: the EV1 socket''s axis height'
+  - name: FI114961.sock_w
+    value: 12.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_h
+    value: 9.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_l
+    value: 14.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.pin_pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'' between the two contacts'
+    basis: maker
+  - name: EV1.L
+    value: 28.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''28,0'''
+    basis: maker
+  - name: EV1.W
+    value: 22.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''22,0'''
+    basis: maker
+  - name: EV1.H
+    value: 23.4
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''23,4'' over the locking spring'
+    basis: maker
+  - name: EV1.body_h
+    value: 17.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''17,0'''
+    basis: maker
+  - name: EV1.inner_h
+    value: 11.2
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''11,2'''
+    basis: maker
+  - name: EV1.pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'''
+    basis: maker
+  - name: EV1.boot_l
+    value: 30.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the 90-degree boot against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  - name: EV1.boot_d
+    value: 9.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the boot''s cable end against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  checks:
+  - check: plug on the injector's EV1 socket axis
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - the EV1 cavity numbers 1 / 2 are drawn -Y / +Y (not marked on the photos; either way round works for an injector coil)
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - FI114961
+  - EV1-JPT-2
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: INJ-7
+  endpoints:
+  - INJ-7
+  what: 'INJ-7: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated'
+  maker: Siemens Deka / TE
+  maker_pn: FI114961 + EV1-JPT-2
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 65.0
+    w: 57.5
+    h: 22.0
+  dims_note: 58 x 22 x 65 overall
+  frame: injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    body:
+      hex: '#2a2b2d'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Identification Shell Color: Black''; the injector photo''s
+        black body'
+    orings:
+      hex: '#4a3a5c'
+      from: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+        2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)'
+    tip:
+      hex: '#b9bcbd'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)'
+    plug:
+      hex: '#1d1d1f'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing'
+    clip:
+      hex: '#b8bcc0'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip'
+    boot:
+      hex: '#1a1a1a'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot'
+    terminal:
+      hex: '#c9c6bf'
+      from: ProWire 68102 tin (JPT terminal)
+  attach:
+  - n: cav1
+    ep: INJ-7
+    at:
+    - 41.0
+    - -2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 1
+  - n: cav2
+    ep: INJ-7
+    at:
+    - 41.0
+    - 2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 2
+  mount: []
+  params:
+  - name: FI114961.len
+    value: 60.44
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''60.44 mm'' between the O-ring ends'
+    basis: maker
+    note: the product title's '(60mm)', Long Style
+  - name: FI114961.body_d
+    value: 15.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Body: 15.00 mm'''
+    basis: maker
+  - name: FI114961.inlet_d
+    value: 13.5
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Fuel Inlet Cup Diameter 13.5 mm'''
+    basis: maker
+  - name: FI114961.pocket_d
+    value: 14.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Intake Manifold Pocket Diameter 14.0 mm''; siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/
+      (read 2026-09-29) ''14mm Lower O-Ring'''
+    basis: maker
+  - name: FI114961.oring_d
+    value: 14.0
+    source: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+      2026-09-29): ''14mm Upper O-Ring'', ''14mm Lower O-Ring'' (Viton)'
+    basis: maker
+  - name: FI114961.body_z0
+    value: 24.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: '+-2: the solenoid body''s lower end'
+  - name: FI114961.body_z1
+    value: 44.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: +-2
+  - name: FI114961.sock_z
+    value: 38.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled
+    basis: scaled
+    note: '+-3: the EV1 socket''s axis height'
+  - name: FI114961.sock_w
+    value: 12.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_h
+    value: 9.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_l
+    value: 14.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.pin_pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'' between the two contacts'
+    basis: maker
+  - name: EV1.L
+    value: 28.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''28,0'''
+    basis: maker
+  - name: EV1.W
+    value: 22.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''22,0'''
+    basis: maker
+  - name: EV1.H
+    value: 23.4
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''23,4'' over the locking spring'
+    basis: maker
+  - name: EV1.body_h
+    value: 17.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''17,0'''
+    basis: maker
+  - name: EV1.inner_h
+    value: 11.2
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''11,2'''
+    basis: maker
+  - name: EV1.pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'''
+    basis: maker
+  - name: EV1.boot_l
+    value: 30.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the 90-degree boot against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  - name: EV1.boot_d
+    value: 9.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the boot''s cable end against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  checks:
+  - check: plug on the injector's EV1 socket axis
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - the EV1 cavity numbers 1 / 2 are drawn -Y / +Y (not marked on the photos; either way round works for an injector coil)
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - FI114961
+  - EV1-JPT-2
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: INJ-8
+  endpoints:
+  - INJ-8
+  what: 'INJ-8: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated'
+  maker: Siemens Deka / TE
+  maker_pn: FI114961 + EV1-JPT-2
+  shape_basis: datasheet dims
+  dims_mm:
+    l: 65.0
+    w: 57.5
+    h: 22.0
+  dims_note: 58 x 22 x 65 overall
+  frame: injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    body:
+      hex: '#2a2b2d'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Identification Shell Color: Black''; the injector photo''s
+        black body'
+    orings:
+      hex: '#4a3a5c'
+      from: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+        2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)'
+    tip:
+      hex: '#b9bcbd'
+      from: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+        Long Minitimer'', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)'
+    plug:
+      hex: '#1d1d1f'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing'
+    clip:
+      hex: '#b8bcc0'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip'
+    boot:
+      hex: '#1a1a1a'
+      from: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot'
+    terminal:
+      hex: '#c9c6bf'
+      from: ProWire 68102 tin (JPT terminal)
+  attach:
+  - n: cav1
+    ep: INJ-8
+    at:
+    - 41.0
+    - -2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 1
+  - n: cav2
+    ep: INJ-8
+    at:
+    - 41.0
+    - 2.5
+    - 38.0
+    dir:
+    - 0
+    - 0
+    - 1
+    kind: EV1 cavity 2
+  mount: []
+  params:
+  - name: FI114961.len
+    value: 60.44
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''60.44 mm'' between the O-ring ends'
+    basis: maker
+    note: the product title's '(60mm)', Long Style
+  - name: FI114961.body_d
+    value: 15.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Body: 15.00 mm'''
+    basis: maker
+  - name: FI114961.inlet_d
+    value: 13.5
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Fuel Inlet Cup Diameter 13.5 mm'''
+    basis: maker
+  - name: FI114961.pocket_d
+    value: 14.0
+    source: 'siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet ''FI114961 61 lb/hr Deka IV
+      Long Minitimer'', Basic Dimensions; fetched 2026-09-29): ''Intake Manifold Pocket Diameter 14.0 mm''; siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/
+      (read 2026-09-29) ''14mm Lower O-Ring'''
+    basis: maker
+  - name: FI114961.oring_d
+    value: 14.0
+    source: 'siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read
+      2026-09-29): ''14mm Upper O-Ring'', ''14mm Lower O-Ring'' (Viton)'
+    basis: maker
+  - name: FI114961.body_z0
+    value: 24.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: '+-2: the solenoid body''s lower end'
+  - name: FI114961.body_z1
+    value: 44.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled at the printed 60.44
+    basis: scaled
+    note: +-2
+  - name: FI114961.sock_z
+    value: 38.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) figure, scaled
+    basis: scaled
+    note: '+-3: the EV1 socket''s axis height'
+  - name: FI114961.sock_w
+    value: 12.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_h
+    value: 9.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.sock_l
+    value: 14.0
+    source: siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long
+      Minitimer', Basic Dimensions; fetched 2026-09-29) 'Connector' photo against the 15.00 body
+    basis: photo
+    note: +-20 %
+  - name: FI114961.pin_pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'' between the two contacts'
+    basis: maker
+  - name: EV1.L
+    value: 28.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''28,0'''
+    basis: maker
+  - name: EV1.W
+    value: 22.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''22,0'''
+    basis: maker
+  - name: EV1.H
+    value: 23.4
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''23,4'' over the locking spring'
+    basis: maker
+  - name: EV1.body_h
+    value: 17.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''17,0'''
+    basis: maker
+  - name: EV1.inner_h
+    value: 11.2
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''11,2'''
+    basis: maker
+  - name: EV1.pitch
+    value: 5.0
+    source: 'reference_documents/component_drawings/TE_827551_Junior_Timer_2way_housing_catalog_page.pdf p.35 (Tyco / TE,
+      ''For Junior Power Timer, 2 Positions'', 828657): ''5,0'''
+    basis: maker
+  - name: EV1.boot_l
+    value: 30.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the 90-degree boot against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  - name: EV1.boot_d
+    value: 9.0
+    source: 'prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): the boot''s cable end against
+      the 22.0 housing width'
+    basis: photo
+    note: +-20 %
+  checks:
+  - check: plug on the injector's EV1 socket axis
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - the EV1 cavity numbers 1 / 2 are drawn -Y / +Y (not marked on the photos; either way round works for an injector coil)
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - FI114961
+  - EV1-JPT-2
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: COIL-1
+  endpoints:
+  - COIL-1
+  what: 'COIL-1: GM 12611424 coil with its LS2/LS7 4-way plug, mated'
+  maker: GM / ProWire kit
+  maker_pn: 12611424 + COIL-CONN-LS2-7
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 137.1
+    w: 62.0
+    h: 36.0
+  dims_note: 62 x 36 x 137 overall
+  frame: +Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along
+    Y
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    coil:
+      hex: '#1d1e20'
+      from: 'GM photo D510C (part_media COIL-1): black coil body'
+    tower:
+      hex: '#1d1e20'
+      from: 'GM photo D510C: black tower'
+    plug:
+      hex: '#1f1f21'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing'
+    seal:
+      hex: '#3a7fd0'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges'
+    tpa:
+      hex: '#8d9091'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA'
+    cable seals:
+      hex: '#f2d23a'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals'
+    terminal:
+      hex: '#c9c6bf'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals'
+  attach:
+  - n: cava
+    ep: COIL-1
+    at:
+    - 40.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity a
+  - n: cavb
+    ep: COIL-1
+    at:
+    - 36.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity b
+  - n: cavc
+    ep: COIL-1
+    at:
+    - 32.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity c
+  - n: cavd
+    ep: COIL-1
+    at:
+    - 28.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity d
+  mount: []
+  params:
+  - name: 12611424.ear_spread
+    value: 73.0
+    source: delmospeed.com DELCB01 'Bolt spread 2 7/8"' (the ruler in docs/wiring/calc-data/cad/delstributor_geometry.yaml
+      coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm))
+    basis: maker
+  - name: 12611424.axis_off
+    value: 34.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      axis_out_of_ear_line_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_h
+    value: 64.7
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_height_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_in
+    value: 16.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm inner
+    basis: photo
+    note: +-3
+  - name: 12611424.body_out
+    value: 21.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm outer
+    basis: photo
+    note: +-3
+  - name: 12611424.body_t
+    value: 36.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_tangential_mm
+    basis: photo
+    note: +-5
+  - name: 12611424.tower_d
+    value: 17.4
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_od_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.tower_h
+    value: 31.9
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_tip_above_top_ear_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.plug_tip
+    value: 92.8
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      plug_tip_below_top_ear_mm
+    basis: photo
+    note: +-3
+  - name: COIL-CONN.W
+    value: 20.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): 4-way housing against
+      the coil''s 36 body (docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918,
+      ruler 73.0 mm))'
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.H
+    value: 14.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.L
+    value: 31.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.pitch
+    value: 4.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): four cavities across
+      the 20 width'
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: plug seated in the coil's shroud
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'placement on the DEL-Stributor post: delstributor_geometry.yaml coils[] (axis, azimuth, outer face)'
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - '12611424'
+  - COIL-CONN-LS2-7
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: COIL-2
+  endpoints:
+  - COIL-2
+  what: 'COIL-2: GM 12611424 coil with its LS2/LS7 4-way plug, mated'
+  maker: GM / ProWire kit
+  maker_pn: 12611424 + COIL-CONN-LS2-7
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 137.1
+    w: 62.0
+    h: 36.0
+  dims_note: 62 x 36 x 137 overall
+  frame: +Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along
+    Y
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    coil:
+      hex: '#1d1e20'
+      from: 'GM photo D510C (part_media COIL-1): black coil body'
+    tower:
+      hex: '#1d1e20'
+      from: 'GM photo D510C: black tower'
+    plug:
+      hex: '#1f1f21'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing'
+    seal:
+      hex: '#3a7fd0'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges'
+    tpa:
+      hex: '#8d9091'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA'
+    cable seals:
+      hex: '#f2d23a'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals'
+    terminal:
+      hex: '#c9c6bf'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals'
+  attach:
+  - n: cava
+    ep: COIL-2
+    at:
+    - 40.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity a
+  - n: cavb
+    ep: COIL-2
+    at:
+    - 36.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity b
+  - n: cavc
+    ep: COIL-2
+    at:
+    - 32.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity c
+  - n: cavd
+    ep: COIL-2
+    at:
+    - 28.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity d
+  mount: []
+  params:
+  - name: 12611424.ear_spread
+    value: 73.0
+    source: delmospeed.com DELCB01 'Bolt spread 2 7/8"' (the ruler in docs/wiring/calc-data/cad/delstributor_geometry.yaml
+      coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm))
+    basis: maker
+  - name: 12611424.axis_off
+    value: 34.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      axis_out_of_ear_line_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_h
+    value: 64.7
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_height_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_in
+    value: 16.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm inner
+    basis: photo
+    note: +-3
+  - name: 12611424.body_out
+    value: 21.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm outer
+    basis: photo
+    note: +-3
+  - name: 12611424.body_t
+    value: 36.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_tangential_mm
+    basis: photo
+    note: +-5
+  - name: 12611424.tower_d
+    value: 17.4
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_od_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.tower_h
+    value: 31.9
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_tip_above_top_ear_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.plug_tip
+    value: 92.8
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      plug_tip_below_top_ear_mm
+    basis: photo
+    note: +-3
+  - name: COIL-CONN.W
+    value: 20.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): 4-way housing against
+      the coil''s 36 body (docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918,
+      ruler 73.0 mm))'
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.H
+    value: 14.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.L
+    value: 31.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.pitch
+    value: 4.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): four cavities across
+      the 20 width'
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: plug seated in the coil's shroud
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'placement on the DEL-Stributor post: delstributor_geometry.yaml coils[] (axis, azimuth, outer face)'
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - '12611424'
+  - COIL-CONN-LS2-7
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: COIL-3
+  endpoints:
+  - COIL-3
+  what: 'COIL-3: GM 12611424 coil with its LS2/LS7 4-way plug, mated'
+  maker: GM / ProWire kit
+  maker_pn: 12611424 + COIL-CONN-LS2-7
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 137.1
+    w: 62.0
+    h: 36.0
+  dims_note: 62 x 36 x 137 overall
+  frame: +Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along
+    Y
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    coil:
+      hex: '#1d1e20'
+      from: 'GM photo D510C (part_media COIL-1): black coil body'
+    tower:
+      hex: '#1d1e20'
+      from: 'GM photo D510C: black tower'
+    plug:
+      hex: '#1f1f21'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing'
+    seal:
+      hex: '#3a7fd0'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges'
+    tpa:
+      hex: '#8d9091'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA'
+    cable seals:
+      hex: '#f2d23a'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals'
+    terminal:
+      hex: '#c9c6bf'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals'
+  attach:
+  - n: cava
+    ep: COIL-3
+    at:
+    - 40.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity a
+  - n: cavb
+    ep: COIL-3
+    at:
+    - 36.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity b
+  - n: cavc
+    ep: COIL-3
+    at:
+    - 32.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity c
+  - n: cavd
+    ep: COIL-3
+    at:
+    - 28.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity d
+  mount: []
+  params:
+  - name: 12611424.ear_spread
+    value: 73.0
+    source: delmospeed.com DELCB01 'Bolt spread 2 7/8"' (the ruler in docs/wiring/calc-data/cad/delstributor_geometry.yaml
+      coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm))
+    basis: maker
+  - name: 12611424.axis_off
+    value: 34.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      axis_out_of_ear_line_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_h
+    value: 64.7
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_height_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_in
+    value: 16.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm inner
+    basis: photo
+    note: +-3
+  - name: 12611424.body_out
+    value: 21.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm outer
+    basis: photo
+    note: +-3
+  - name: 12611424.body_t
+    value: 36.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_tangential_mm
+    basis: photo
+    note: +-5
+  - name: 12611424.tower_d
+    value: 17.4
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_od_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.tower_h
+    value: 31.9
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_tip_above_top_ear_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.plug_tip
+    value: 92.8
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      plug_tip_below_top_ear_mm
+    basis: photo
+    note: +-3
+  - name: COIL-CONN.W
+    value: 20.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): 4-way housing against
+      the coil''s 36 body (docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918,
+      ruler 73.0 mm))'
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.H
+    value: 14.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.L
+    value: 31.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.pitch
+    value: 4.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): four cavities across
+      the 20 width'
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: plug seated in the coil's shroud
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'placement on the DEL-Stributor post: delstributor_geometry.yaml coils[] (axis, azimuth, outer face)'
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - '12611424'
+  - COIL-CONN-LS2-7
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: COIL-4
+  endpoints:
+  - COIL-4
+  what: 'COIL-4: GM 12611424 coil with its LS2/LS7 4-way plug, mated'
+  maker: GM / ProWire kit
+  maker_pn: 12611424 + COIL-CONN-LS2-7
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 137.1
+    w: 62.0
+    h: 36.0
+  dims_note: 62 x 36 x 137 overall
+  frame: +Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along
+    Y
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    coil:
+      hex: '#1d1e20'
+      from: 'GM photo D510C (part_media COIL-1): black coil body'
+    tower:
+      hex: '#1d1e20'
+      from: 'GM photo D510C: black tower'
+    plug:
+      hex: '#1f1f21'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing'
+    seal:
+      hex: '#3a7fd0'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges'
+    tpa:
+      hex: '#8d9091'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA'
+    cable seals:
+      hex: '#f2d23a'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals'
+    terminal:
+      hex: '#c9c6bf'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals'
+  attach:
+  - n: cava
+    ep: COIL-4
+    at:
+    - 40.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity a
+  - n: cavb
+    ep: COIL-4
+    at:
+    - 36.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity b
+  - n: cavc
+    ep: COIL-4
+    at:
+    - 32.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity c
+  - n: cavd
+    ep: COIL-4
+    at:
+    - 28.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity d
+  mount: []
+  params:
+  - name: 12611424.ear_spread
+    value: 73.0
+    source: delmospeed.com DELCB01 'Bolt spread 2 7/8"' (the ruler in docs/wiring/calc-data/cad/delstributor_geometry.yaml
+      coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm))
+    basis: maker
+  - name: 12611424.axis_off
+    value: 34.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      axis_out_of_ear_line_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_h
+    value: 64.7
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_height_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_in
+    value: 16.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm inner
+    basis: photo
+    note: +-3
+  - name: 12611424.body_out
+    value: 21.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm outer
+    basis: photo
+    note: +-3
+  - name: 12611424.body_t
+    value: 36.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_tangential_mm
+    basis: photo
+    note: +-5
+  - name: 12611424.tower_d
+    value: 17.4
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_od_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.tower_h
+    value: 31.9
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_tip_above_top_ear_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.plug_tip
+    value: 92.8
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      plug_tip_below_top_ear_mm
+    basis: photo
+    note: +-3
+  - name: COIL-CONN.W
+    value: 20.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): 4-way housing against
+      the coil''s 36 body (docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918,
+      ruler 73.0 mm))'
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.H
+    value: 14.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.L
+    value: 31.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.pitch
+    value: 4.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): four cavities across
+      the 20 width'
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: plug seated in the coil's shroud
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'placement on the DEL-Stributor post: delstributor_geometry.yaml coils[] (axis, azimuth, outer face)'
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - '12611424'
+  - COIL-CONN-LS2-7
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: COIL-5
+  endpoints:
+  - COIL-5
+  what: 'COIL-5: GM 12611424 coil with its LS2/LS7 4-way plug, mated'
+  maker: GM / ProWire kit
+  maker_pn: 12611424 + COIL-CONN-LS2-7
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 137.1
+    w: 62.0
+    h: 36.0
+  dims_note: 62 x 36 x 137 overall
+  frame: +Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along
+    Y
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    coil:
+      hex: '#1d1e20'
+      from: 'GM photo D510C (part_media COIL-1): black coil body'
+    tower:
+      hex: '#1d1e20'
+      from: 'GM photo D510C: black tower'
+    plug:
+      hex: '#1f1f21'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing'
+    seal:
+      hex: '#3a7fd0'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges'
+    tpa:
+      hex: '#8d9091'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA'
+    cable seals:
+      hex: '#f2d23a'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals'
+    terminal:
+      hex: '#c9c6bf'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals'
+  attach:
+  - n: cava
+    ep: COIL-5
+    at:
+    - 40.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity a
+  - n: cavb
+    ep: COIL-5
+    at:
+    - 36.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity b
+  - n: cavc
+    ep: COIL-5
+    at:
+    - 32.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity c
+  - n: cavd
+    ep: COIL-5
+    at:
+    - 28.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity d
+  mount: []
+  params:
+  - name: 12611424.ear_spread
+    value: 73.0
+    source: delmospeed.com DELCB01 'Bolt spread 2 7/8"' (the ruler in docs/wiring/calc-data/cad/delstributor_geometry.yaml
+      coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm))
+    basis: maker
+  - name: 12611424.axis_off
+    value: 34.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      axis_out_of_ear_line_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_h
+    value: 64.7
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_height_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_in
+    value: 16.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm inner
+    basis: photo
+    note: +-3
+  - name: 12611424.body_out
+    value: 21.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm outer
+    basis: photo
+    note: +-3
+  - name: 12611424.body_t
+    value: 36.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_tangential_mm
+    basis: photo
+    note: +-5
+  - name: 12611424.tower_d
+    value: 17.4
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_od_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.tower_h
+    value: 31.9
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_tip_above_top_ear_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.plug_tip
+    value: 92.8
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      plug_tip_below_top_ear_mm
+    basis: photo
+    note: +-3
+  - name: COIL-CONN.W
+    value: 20.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): 4-way housing against
+      the coil''s 36 body (docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918,
+      ruler 73.0 mm))'
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.H
+    value: 14.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.L
+    value: 31.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.pitch
+    value: 4.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): four cavities across
+      the 20 width'
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: plug seated in the coil's shroud
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'placement on the DEL-Stributor post: delstributor_geometry.yaml coils[] (axis, azimuth, outer face)'
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - '12611424'
+  - COIL-CONN-LS2-7
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: COIL-6
+  endpoints:
+  - COIL-6
+  what: 'COIL-6: GM 12611424 coil with its LS2/LS7 4-way plug, mated'
+  maker: GM / ProWire kit
+  maker_pn: 12611424 + COIL-CONN-LS2-7
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 137.1
+    w: 62.0
+    h: 36.0
+  dims_note: 62 x 36 x 137 overall
+  frame: +Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along
+    Y
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    coil:
+      hex: '#1d1e20'
+      from: 'GM photo D510C (part_media COIL-1): black coil body'
+    tower:
+      hex: '#1d1e20'
+      from: 'GM photo D510C: black tower'
+    plug:
+      hex: '#1f1f21'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing'
+    seal:
+      hex: '#3a7fd0'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges'
+    tpa:
+      hex: '#8d9091'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA'
+    cable seals:
+      hex: '#f2d23a'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals'
+    terminal:
+      hex: '#c9c6bf'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals'
+  attach:
+  - n: cava
+    ep: COIL-6
+    at:
+    - 40.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity a
+  - n: cavb
+    ep: COIL-6
+    at:
+    - 36.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity b
+  - n: cavc
+    ep: COIL-6
+    at:
+    - 32.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity c
+  - n: cavd
+    ep: COIL-6
+    at:
+    - 28.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity d
+  mount: []
+  params:
+  - name: 12611424.ear_spread
+    value: 73.0
+    source: delmospeed.com DELCB01 'Bolt spread 2 7/8"' (the ruler in docs/wiring/calc-data/cad/delstributor_geometry.yaml
+      coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm))
+    basis: maker
+  - name: 12611424.axis_off
+    value: 34.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      axis_out_of_ear_line_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_h
+    value: 64.7
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_height_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_in
+    value: 16.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm inner
+    basis: photo
+    note: +-3
+  - name: 12611424.body_out
+    value: 21.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm outer
+    basis: photo
+    note: +-3
+  - name: 12611424.body_t
+    value: 36.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_tangential_mm
+    basis: photo
+    note: +-5
+  - name: 12611424.tower_d
+    value: 17.4
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_od_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.tower_h
+    value: 31.9
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_tip_above_top_ear_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.plug_tip
+    value: 92.8
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      plug_tip_below_top_ear_mm
+    basis: photo
+    note: +-3
+  - name: COIL-CONN.W
+    value: 20.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): 4-way housing against
+      the coil''s 36 body (docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918,
+      ruler 73.0 mm))'
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.H
+    value: 14.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.L
+    value: 31.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.pitch
+    value: 4.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): four cavities across
+      the 20 width'
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: plug seated in the coil's shroud
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'placement on the DEL-Stributor post: delstributor_geometry.yaml coils[] (axis, azimuth, outer face)'
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - '12611424'
+  - COIL-CONN-LS2-7
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: COIL-7
+  endpoints:
+  - COIL-7
+  what: 'COIL-7: GM 12611424 coil with its LS2/LS7 4-way plug, mated'
+  maker: GM / ProWire kit
+  maker_pn: 12611424 + COIL-CONN-LS2-7
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 137.1
+    w: 62.0
+    h: 36.0
+  dims_note: 62 x 36 x 137 overall
+  frame: +Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along
+    Y
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    coil:
+      hex: '#1d1e20'
+      from: 'GM photo D510C (part_media COIL-1): black coil body'
+    tower:
+      hex: '#1d1e20'
+      from: 'GM photo D510C: black tower'
+    plug:
+      hex: '#1f1f21'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing'
+    seal:
+      hex: '#3a7fd0'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges'
+    tpa:
+      hex: '#8d9091'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA'
+    cable seals:
+      hex: '#f2d23a'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals'
+    terminal:
+      hex: '#c9c6bf'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals'
+  attach:
+  - n: cava
+    ep: COIL-7
+    at:
+    - 40.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity a
+  - n: cavb
+    ep: COIL-7
+    at:
+    - 36.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity b
+  - n: cavc
+    ep: COIL-7
+    at:
+    - 32.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity c
+  - n: cavd
+    ep: COIL-7
+    at:
+    - 28.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity d
+  mount: []
+  params:
+  - name: 12611424.ear_spread
+    value: 73.0
+    source: delmospeed.com DELCB01 'Bolt spread 2 7/8"' (the ruler in docs/wiring/calc-data/cad/delstributor_geometry.yaml
+      coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm))
+    basis: maker
+  - name: 12611424.axis_off
+    value: 34.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      axis_out_of_ear_line_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_h
+    value: 64.7
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_height_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_in
+    value: 16.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm inner
+    basis: photo
+    note: +-3
+  - name: 12611424.body_out
+    value: 21.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm outer
+    basis: photo
+    note: +-3
+  - name: 12611424.body_t
+    value: 36.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_tangential_mm
+    basis: photo
+    note: +-5
+  - name: 12611424.tower_d
+    value: 17.4
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_od_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.tower_h
+    value: 31.9
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_tip_above_top_ear_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.plug_tip
+    value: 92.8
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      plug_tip_below_top_ear_mm
+    basis: photo
+    note: +-3
+  - name: COIL-CONN.W
+    value: 20.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): 4-way housing against
+      the coil''s 36 body (docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918,
+      ruler 73.0 mm))'
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.H
+    value: 14.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.L
+    value: 31.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.pitch
+    value: 4.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): four cavities across
+      the 20 width'
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: plug seated in the coil's shroud
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'placement on the DEL-Stributor post: delstributor_geometry.yaml coils[] (axis, azimuth, outer face)'
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - '12611424'
+  - COIL-CONN-LS2-7
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py
+- id: COIL-8
+  endpoints:
+  - COIL-8
+  what: 'COIL-8: GM 12611424 coil with its LS2/LS7 4-way plug, mated'
+  maker: GM / ProWire kit
+  maker_pn: 12611424 + COIL-CONN-LS2-7
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 137.1
+    w: 62.0
+    h: 36.0
+  dims_note: 62 x 36 x 137 overall
+  frame: +Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along
+    Y
+  axes:
+    mount_normal: +Z
+    maker_up: +Z
+    faces: {}
+  colors:
+    coil:
+      hex: '#1d1e20'
+      from: 'GM photo D510C (part_media COIL-1): black coil body'
+    tower:
+      hex: '#1d1e20'
+      from: 'GM photo D510C: black tower'
+    plug:
+      hex: '#1f1f21'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing'
+    seal:
+      hex: '#3a7fd0'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges'
+    tpa:
+      hex: '#8d9091'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA'
+    cable seals:
+      hex: '#f2d23a'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals'
+    terminal:
+      hex: '#c9c6bf'
+      from: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals'
+  attach:
+  - n: cava
+    ep: COIL-8
+    at:
+    - 40.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity a
+  - n: cavb
+    ep: COIL-8
+    at:
+    - 36.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity b
+  - n: cavc
+    ep: COIL-8
+    at:
+    - 32.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity c
+  - n: cavd
+    ep: COIL-8
+    at:
+    - 28.0
+    - 0.0
+    - -104.8
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: coil cavity d
+  mount: []
+  params:
+  - name: 12611424.ear_spread
+    value: 73.0
+    source: delmospeed.com DELCB01 'Bolt spread 2 7/8"' (the ruler in docs/wiring/calc-data/cad/delstributor_geometry.yaml
+      coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm))
+    basis: maker
+  - name: 12611424.axis_off
+    value: 34.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      axis_out_of_ear_line_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_h
+    value: 64.7
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_height_mm
+    basis: photo
+    note: +-3
+  - name: 12611424.body_in
+    value: 16.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm inner
+    basis: photo
+    note: +-3
+  - name: 12611424.body_out
+    value: 21.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_radial_mm outer
+    basis: photo
+    note: +-3
+  - name: 12611424.body_t
+    value: 36.0
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      body_tangential_mm
+    basis: photo
+    note: +-5
+  - name: 12611424.tower_d
+    value: 17.4
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_od_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.tower_h
+    value: 31.9
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      tower_tip_above_top_ear_mm
+    basis: photo
+    note: +-2
+  - name: 12611424.plug_tip
+    value: 92.8
+    source: docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918, ruler 73.0 mm)
+      plug_tip_below_top_ear_mm
+    basis: photo
+    note: +-3
+  - name: COIL-CONN.W
+    value: 20.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): 4-way housing against
+      the coil''s 36 body (docs/wiring/calc-data/cad/delstributor_geometry.yaml coil_shape (scaled off Delmo photo IMG_3918,
+      ruler 73.0 mm))'
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.H
+    value: 14.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.L
+    value: 31.0
+    source: prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29)
+    basis: photo
+    note: +-25 %
+  - name: COIL-CONN.pitch
+    value: 4.0
+    source: 'prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): four cavities across
+      the 20 width'
+    basis: photo
+    note: +-25 %
+  checks:
+  - check: plug seated in the coil's shroud
+    model: true
+    drawing: true
+    ok: true
+  branding: {}
+  unknowns: []
+  cross_checks: []
+  notes:
+  - 'placement on the DEL-Stributor post: delstributor_geometry.yaml coils[] (axis, azimuth, outer face)'
+  kind: assembly
+  family: injectors and coils
+  pieces:
+  - '12611424'
+  - COIL-CONN-LS2-7
+  missing: []
+  script: docs/wiring/calc-data/cad/fab/fam_ignition.py

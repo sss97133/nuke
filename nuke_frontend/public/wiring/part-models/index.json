@@ -10,9 +10,9 @@
   },
   "CKP": {
    "models": [
-    "12048074",
+    "12084200",
     "12129946",
-    "15324976",
+    "15324974",
     "213-4573",
     "CKP"
    ],
@@ -30,11 +30,75 @@
   },
   "CMP": {
    "models": [
-    "12048074",
+    "12084200",
     "12129946",
-    "15324976",
+    "15324974",
     "213-3826",
     "CMP"
+   ],
+   "complete": true
+  },
+  "COIL-1": {
+   "models": [
+    "12611424",
+    "COIL-1",
+    "COIL-CONN-LS2-7"
+   ],
+   "complete": true
+  },
+  "COIL-2": {
+   "models": [
+    "12611424",
+    "COIL-2",
+    "COIL-CONN-LS2-7"
+   ],
+   "complete": true
+  },
+  "COIL-3": {
+   "models": [
+    "12611424",
+    "COIL-3",
+    "COIL-CONN-LS2-7"
+   ],
+   "complete": true
+  },
+  "COIL-4": {
+   "models": [
+    "12611424",
+    "COIL-4",
+    "COIL-CONN-LS2-7"
+   ],
+   "complete": true
+  },
+  "COIL-5": {
+   "models": [
+    "12611424",
+    "COIL-5",
+    "COIL-CONN-LS2-7"
+   ],
+   "complete": true
+  },
+  "COIL-6": {
+   "models": [
+    "12611424",
+    "COIL-6",
+    "COIL-CONN-LS2-7"
+   ],
+   "complete": true
+  },
+  "COIL-7": {
+   "models": [
+    "12611424",
+    "COIL-7",
+    "COIL-CONN-LS2-7"
+   ],
+   "complete": true
+  },
+  "COIL-8": {
+   "models": [
+    "12611424",
+    "COIL-8",
+    "COIL-CONN-LS2-7"
    ],
    "complete": true
   },
@@ -175,6 +239,70 @@
    ],
    "complete": true
   },
+  "INJ-1": {
+   "models": [
+    "EV1-JPT-2",
+    "FI114961",
+    "INJ-1"
+   ],
+   "complete": true
+  },
+  "INJ-2": {
+   "models": [
+    "EV1-JPT-2",
+    "FI114961",
+    "INJ-2"
+   ],
+   "complete": true
+  },
+  "INJ-3": {
+   "models": [
+    "EV1-JPT-2",
+    "FI114961",
+    "INJ-3"
+   ],
+   "complete": true
+  },
+  "INJ-4": {
+   "models": [
+    "EV1-JPT-2",
+    "FI114961",
+    "INJ-4"
+   ],
+   "complete": true
+  },
+  "INJ-5": {
+   "models": [
+    "EV1-JPT-2",
+    "FI114961",
+    "INJ-5"
+   ],
+   "complete": true
+  },
+  "INJ-6": {
+   "models": [
+    "EV1-JPT-2",
+    "FI114961",
+    "INJ-6"
+   ],
+   "complete": true
+  },
+  "INJ-7": {
+   "models": [
+    "EV1-JPT-2",
+    "FI114961",
+    "INJ-7"
+   ],
+   "complete": true
+  },
+  "INJ-8": {
+   "models": [
+    "EV1-JPT-2",
+    "FI114961",
+    "INJ-8"
+   ],
+   "complete": true
+  },
   "M130-A": {
    "models": [
     "M130-A"
@@ -189,9 +317,9 @@
   },
   "MAP": {
    "models": [
-    "12048074",
+    "12084200",
     "12129946",
-    "15324976",
+    "15324974",
     "538-24",
     "MAP"
    ],
@@ -1321,8 +1449,8 @@
      "from": "reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf p.66 (150 female terminals, cable seals): 'Silicon Bronze / Tin'; tin colour"
     },
     "cable seals": {
-     "hex": "#f1efe9",
-     "from": "customconnectorkits.com/products/15324976 product photo (fetched 2026-09-29): white; customconnectorkits calls it 'for 16-14 AWG' (ProWire: 20-22)"
+     "hex": "#3b6fb6",
+     "from": "reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf p.66 '150 METRI-PACK CABLE SEALS': 12048087 'Silicone Blue' (no photo on file)"
     }
    },
    "attach": [
@@ -1461,18 +1589,18 @@
    "family": "delphi sealed sensor connectors",
    "mates": "the sensor's shroud"
   },
-  "12048074": {
+  "12084200": {
    "endpoints": [
     "CKP",
     "CMP",
     "MAP"
    ],
-   "what": "Metri-Pack 150 sealed female terminal, 20-18 AWG (0.8-1.0 mm2), tin-plated silicon bronze",
+   "what": "Metri-Pack 150 sealed female terminal, 22 AWG (0.35-0.50 mm2), tin-plated silicon bronze",
    "maker": "Delphi (Aptiv)",
-   "maker_pn": "12048074",
+   "maker_pn": "12084200",
    "shape_basis": "scaled from photo",
    "dims_mm": {
-    "l": 15.5,
+    "l": 15.0,
     "w": 2.6,
     "h": 1.9
    },
@@ -1499,7 +1627,7 @@
      "at": [
       0.0,
       0.0,
-      15.5
+      15.0
      ],
      "dir": [
       0,
@@ -1565,20 +1693,20 @@
    "kind": "piece",
    "family": "delphi sealed sensor connectors"
   },
-  "15324976": {
+  "15324974": {
    "endpoints": [
     "CKP",
     "CMP",
     "MAP"
    ],
-   "what": "Metri-Pack 150 cable seal, white",
+   "what": "Metri-Pack 150 cable seal, blue, 1.29-1.70 mm cable (the catalog's 12048087)",
    "maker": "Delphi (Aptiv)",
-   "maker_pn": "15324976",
+   "maker_pn": "15324974",
    "shape_basis": "scaled from photo",
    "dims_mm": {
     "l": 6.5,
-    "w": 4.6,
-    "h": 4.6
+    "w": 4.4,
+    "h": 4.4
    },
    "frame": "origin at the centre of the sensor shroud's mouth (the plug's seal flange stops there); +Z toward the plug and its wires; +Y the lock side",
    "axes": {
@@ -1592,8 +1720,8 @@
    },
    "colors": {
     "seal": {
-     "hex": "#f1efe9",
-     "from": "customconnectorkits.com/products/15324976 product photo (fetched 2026-09-29): white; customconnectorkits calls it 'for 16-14 AWG' (ProWire: 20-22)"
+     "hex": "#3b6fb6",
+     "from": "reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf p.66 '150 METRI-PACK CABLE SEALS': 12048087 'Silicone Blue' (no photo on file)"
     }
    },
    "attach": [
@@ -2031,7 +2159,7 @@
       0,
       1
      ],
-     "kind": "Metri-Pack 150 terminal 12048074"
+     "kind": "Metri-Pack 150 terminal 12084200"
     },
     {
      "n": "cavB",
@@ -2046,7 +2174,7 @@
       0,
       1
      ],
-     "kind": "Metri-Pack 150 terminal 12048074"
+     "kind": "Metri-Pack 150 terminal 12084200"
     },
     {
      "n": "cavC",
@@ -2061,7 +2189,7 @@
       0,
       1
      ],
-     "kind": "Metri-Pack 150 terminal 12048074"
+     "kind": "Metri-Pack 150 terminal 12084200"
     }
    ],
    "mount": [],
@@ -2070,8 +2198,8 @@
    "pieces": [
     "213-4573",
     "12129946",
-    "12048074",
-    "15324976"
+    "12084200",
+    "15324974"
    ],
    "missing": []
   },
@@ -2138,7 +2266,7 @@
       0,
       1
      ],
-     "kind": "Metri-Pack 150 terminal 12048074"
+     "kind": "Metri-Pack 150 terminal 12084200"
     },
     {
      "n": "cavB",
@@ -2153,7 +2281,7 @@
       0,
       1
      ],
-     "kind": "Metri-Pack 150 terminal 12048074"
+     "kind": "Metri-Pack 150 terminal 12084200"
     },
     {
      "n": "cavC",
@@ -2168,7 +2296,7 @@
       0,
       1
      ],
-     "kind": "Metri-Pack 150 terminal 12048074"
+     "kind": "Metri-Pack 150 terminal 12084200"
     }
    ],
    "mount": [],
@@ -2177,8 +2305,8 @@
    "pieces": [
     "213-3826",
     "12129946",
-    "12048074",
-    "15324976"
+    "12084200",
+    "15324974"
    ],
    "missing": []
   },
@@ -2245,7 +2373,7 @@
       0,
       1
      ],
-     "kind": "Metri-Pack 150 terminal 12048074"
+     "kind": "Metri-Pack 150 terminal 12084200"
     },
     {
      "n": "cavB",
@@ -2260,7 +2388,7 @@
       0,
       1
      ],
-     "kind": "Metri-Pack 150 terminal 12048074"
+     "kind": "Metri-Pack 150 terminal 12084200"
     },
     {
      "n": "cavC",
@@ -2275,7 +2403,7 @@
       0,
       1
      ],
-     "kind": "Metri-Pack 150 terminal 12048074"
+     "kind": "Metri-Pack 150 terminal 12084200"
     }
    ],
    "mount": [],
@@ -2284,8 +2412,8 @@
    "pieces": [
     "538-24",
     "12129946",
-    "12048074",
-    "15324976"
+    "12084200",
+    "15324974"
    ],
    "missing": []
   },
@@ -8946,6 +9074,1998 @@
     "MoTeC LTCD 61301 box",
     "2 x Bosch LSU 4.9 sensors and their plugs"
    ]
+  },
+  "FI114961": {
+   "endpoints": [
+    "INJ-1",
+    "INJ-2",
+    "INJ-3",
+    "INJ-4",
+    "INJ-5",
+    "INJ-6",
+    "INJ-7",
+    "INJ-8"
+   ],
+   "what": "Siemens Deka FI114961 injector, 60 lb/h, 12.5 ohm, EV1, Long (60 mm), 14 mm O-rings",
+   "maker": "Siemens Deka (Continental)",
+   "maker_pn": "FI114961",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 63.4,
+    "w": 27.5,
+    "h": 15.0
+   },
+   "frame": "injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#2a2b2d",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): 'Identification Shell Color: Black'; the injector photo's black body"
+    },
+    "orings": {
+     "hex": "#4a3a5c",
+     "from": "siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read 2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)"
+    },
+    "tip": {
+     "hex": "#b9bcbd",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)"
+    }
+   },
+   "attach": [
+    {
+     "n": "ev1",
+     "ep": "INJ-1",
+     "at": [
+      21.5,
+      0.0,
+      38.0
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "EV1 socket"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "injectors and coils"
+  },
+  "EV1-JPT-2": {
+   "endpoints": [
+    "INJ-1",
+    "INJ-2",
+    "INJ-3",
+    "INJ-4",
+    "INJ-5",
+    "INJ-6",
+    "INJ-7",
+    "INJ-8"
+   ],
+   "what": "EV1 injector plug: TE Junior Power Timer 2-way housing with its locking spring, the kit's 90-degree boot and two 68102 terminals (ProWire 8CYLK-90)",
+   "maker": "TE Connectivity / ProWire kit",
+   "maker_pn": "8CYLK-90 (housing drawn to TE 828657)",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 32.5,
+    "w": 43.0,
+    "h": 22.0
+   },
+   "frame": "the plug's mating face at x = 0 on the injector's EV1 axis; wires leave +X then +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "plug": {
+     "hex": "#1d1d1f",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing"
+    },
+    "clip": {
+     "hex": "#b8bcc0",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip"
+    },
+    "boot": {
+     "hex": "#1a1a1a",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "ProWire 68102 tin (JPT terminal)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "INJ-1",
+     "at": [
+      34.0,
+      0.0,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "JPT terminal 68102"
+    },
+    {
+     "n": "cav2",
+     "ep": "INJ-1",
+     "at": [
+      34.0,
+      0.0,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "JPT terminal 68102"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "injectors and coils"
+  },
+  "12611424": {
+   "endpoints": [
+    "COIL-1",
+    "COIL-2",
+    "COIL-3",
+    "COIL-4",
+    "COIL-5",
+    "COIL-6",
+    "COIL-7",
+    "COIL-8"
+   ],
+   "what": "GM 12611424 (ACDelco D510C) ignition coil",
+   "maker": "GM (ACDelco)",
+   "maker_pn": "12611424 (D510C)",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 118.7,
+    "w": 62.0,
+    "h": 36.0
+   },
+   "frame": "+Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along Y",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "coil": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C (part_media COIL-1): black coil body"
+    },
+    "tower": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C: black tower"
+    }
+   },
+   "attach": [
+    {
+     "n": "plug",
+     "ep": "COIL-1",
+     "at": [
+      34.0,
+      0.0,
+      -92.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil plug"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "injectors and coils"
+  },
+  "COIL-CONN-LS2-7": {
+   "endpoints": [
+    "COIL-1",
+    "COIL-2",
+    "COIL-3",
+    "COIL-4",
+    "COIL-5",
+    "COIL-6",
+    "COIL-7",
+    "COIL-8"
+   ],
+   "what": "LS2/LS7 coil 4-way plug (ProWire COIL-CONN-LS2/7): housing, seal, TPA, 4 terminals and cable seals",
+   "maker": "ProWire USA (kit)",
+   "maker_pn": "COIL-CONN-LS2/7",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 31.4,
+    "w": 20.4,
+    "h": 16.6
+   },
+   "frame": "+Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along Y",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "plug": {
+     "hex": "#1f1f21",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing"
+    },
+    "seal": {
+     "hex": "#3a7fd0",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges"
+    },
+    "tpa": {
+     "hex": "#8d9091",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA"
+    },
+    "cable seals": {
+     "hex": "#f2d23a",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals"
+    }
+   },
+   "attach": [
+    {
+     "n": "cava",
+     "ep": "COIL-1",
+     "at": [
+      40.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil plug terminal"
+    },
+    {
+     "n": "cavb",
+     "ep": "COIL-1",
+     "at": [
+      36.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil plug terminal"
+    },
+    {
+     "n": "cavc",
+     "ep": "COIL-1",
+     "at": [
+      32.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil plug terminal"
+    },
+    {
+     "n": "cavd",
+     "ep": "COIL-1",
+     "at": [
+      28.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil plug terminal"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "injectors and coils"
+  },
+  "INJ-1": {
+   "endpoints": [
+    "INJ-1"
+   ],
+   "what": "INJ-1: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated",
+   "maker": "Siemens Deka / TE",
+   "maker_pn": "FI114961 + EV1-JPT-2",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 65.0,
+    "w": 57.5,
+    "h": 22.0
+   },
+   "frame": "injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#2a2b2d",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): 'Identification Shell Color: Black'; the injector photo's black body"
+    },
+    "orings": {
+     "hex": "#4a3a5c",
+     "from": "siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read 2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)"
+    },
+    "tip": {
+     "hex": "#b9bcbd",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)"
+    },
+    "plug": {
+     "hex": "#1d1d1f",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing"
+    },
+    "clip": {
+     "hex": "#b8bcc0",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip"
+    },
+    "boot": {
+     "hex": "#1a1a1a",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "ProWire 68102 tin (JPT terminal)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "INJ-1",
+     "at": [
+      41.0,
+      -2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 1"
+    },
+    {
+     "n": "cav2",
+     "ep": "INJ-1",
+     "at": [
+      41.0,
+      2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 2"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "FI114961",
+    "EV1-JPT-2"
+   ],
+   "missing": []
+  },
+  "INJ-2": {
+   "endpoints": [
+    "INJ-2"
+   ],
+   "what": "INJ-2: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated",
+   "maker": "Siemens Deka / TE",
+   "maker_pn": "FI114961 + EV1-JPT-2",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 65.0,
+    "w": 57.5,
+    "h": 22.0
+   },
+   "frame": "injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#2a2b2d",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): 'Identification Shell Color: Black'; the injector photo's black body"
+    },
+    "orings": {
+     "hex": "#4a3a5c",
+     "from": "siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read 2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)"
+    },
+    "tip": {
+     "hex": "#b9bcbd",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)"
+    },
+    "plug": {
+     "hex": "#1d1d1f",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing"
+    },
+    "clip": {
+     "hex": "#b8bcc0",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip"
+    },
+    "boot": {
+     "hex": "#1a1a1a",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "ProWire 68102 tin (JPT terminal)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "INJ-2",
+     "at": [
+      41.0,
+      -2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 1"
+    },
+    {
+     "n": "cav2",
+     "ep": "INJ-2",
+     "at": [
+      41.0,
+      2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 2"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "FI114961",
+    "EV1-JPT-2"
+   ],
+   "missing": []
+  },
+  "INJ-3": {
+   "endpoints": [
+    "INJ-3"
+   ],
+   "what": "INJ-3: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated",
+   "maker": "Siemens Deka / TE",
+   "maker_pn": "FI114961 + EV1-JPT-2",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 65.0,
+    "w": 57.5,
+    "h": 22.0
+   },
+   "frame": "injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#2a2b2d",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): 'Identification Shell Color: Black'; the injector photo's black body"
+    },
+    "orings": {
+     "hex": "#4a3a5c",
+     "from": "siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read 2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)"
+    },
+    "tip": {
+     "hex": "#b9bcbd",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)"
+    },
+    "plug": {
+     "hex": "#1d1d1f",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing"
+    },
+    "clip": {
+     "hex": "#b8bcc0",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip"
+    },
+    "boot": {
+     "hex": "#1a1a1a",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "ProWire 68102 tin (JPT terminal)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "INJ-3",
+     "at": [
+      41.0,
+      -2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 1"
+    },
+    {
+     "n": "cav2",
+     "ep": "INJ-3",
+     "at": [
+      41.0,
+      2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 2"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "FI114961",
+    "EV1-JPT-2"
+   ],
+   "missing": []
+  },
+  "INJ-4": {
+   "endpoints": [
+    "INJ-4"
+   ],
+   "what": "INJ-4: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated",
+   "maker": "Siemens Deka / TE",
+   "maker_pn": "FI114961 + EV1-JPT-2",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 65.0,
+    "w": 57.5,
+    "h": 22.0
+   },
+   "frame": "injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#2a2b2d",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): 'Identification Shell Color: Black'; the injector photo's black body"
+    },
+    "orings": {
+     "hex": "#4a3a5c",
+     "from": "siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read 2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)"
+    },
+    "tip": {
+     "hex": "#b9bcbd",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)"
+    },
+    "plug": {
+     "hex": "#1d1d1f",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing"
+    },
+    "clip": {
+     "hex": "#b8bcc0",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip"
+    },
+    "boot": {
+     "hex": "#1a1a1a",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "ProWire 68102 tin (JPT terminal)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "INJ-4",
+     "at": [
+      41.0,
+      -2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 1"
+    },
+    {
+     "n": "cav2",
+     "ep": "INJ-4",
+     "at": [
+      41.0,
+      2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 2"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "FI114961",
+    "EV1-JPT-2"
+   ],
+   "missing": []
+  },
+  "INJ-5": {
+   "endpoints": [
+    "INJ-5"
+   ],
+   "what": "INJ-5: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated",
+   "maker": "Siemens Deka / TE",
+   "maker_pn": "FI114961 + EV1-JPT-2",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 65.0,
+    "w": 57.5,
+    "h": 22.0
+   },
+   "frame": "injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#2a2b2d",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): 'Identification Shell Color: Black'; the injector photo's black body"
+    },
+    "orings": {
+     "hex": "#4a3a5c",
+     "from": "siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read 2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)"
+    },
+    "tip": {
+     "hex": "#b9bcbd",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)"
+    },
+    "plug": {
+     "hex": "#1d1d1f",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing"
+    },
+    "clip": {
+     "hex": "#b8bcc0",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip"
+    },
+    "boot": {
+     "hex": "#1a1a1a",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "ProWire 68102 tin (JPT terminal)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "INJ-5",
+     "at": [
+      41.0,
+      -2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 1"
+    },
+    {
+     "n": "cav2",
+     "ep": "INJ-5",
+     "at": [
+      41.0,
+      2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 2"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "FI114961",
+    "EV1-JPT-2"
+   ],
+   "missing": []
+  },
+  "INJ-6": {
+   "endpoints": [
+    "INJ-6"
+   ],
+   "what": "INJ-6: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated",
+   "maker": "Siemens Deka / TE",
+   "maker_pn": "FI114961 + EV1-JPT-2",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 65.0,
+    "w": 57.5,
+    "h": 22.0
+   },
+   "frame": "injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#2a2b2d",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): 'Identification Shell Color: Black'; the injector photo's black body"
+    },
+    "orings": {
+     "hex": "#4a3a5c",
+     "from": "siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read 2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)"
+    },
+    "tip": {
+     "hex": "#b9bcbd",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)"
+    },
+    "plug": {
+     "hex": "#1d1d1f",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing"
+    },
+    "clip": {
+     "hex": "#b8bcc0",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip"
+    },
+    "boot": {
+     "hex": "#1a1a1a",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "ProWire 68102 tin (JPT terminal)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "INJ-6",
+     "at": [
+      41.0,
+      -2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 1"
+    },
+    {
+     "n": "cav2",
+     "ep": "INJ-6",
+     "at": [
+      41.0,
+      2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 2"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "FI114961",
+    "EV1-JPT-2"
+   ],
+   "missing": []
+  },
+  "INJ-7": {
+   "endpoints": [
+    "INJ-7"
+   ],
+   "what": "INJ-7: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated",
+   "maker": "Siemens Deka / TE",
+   "maker_pn": "FI114961 + EV1-JPT-2",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 65.0,
+    "w": 57.5,
+    "h": 22.0
+   },
+   "frame": "injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#2a2b2d",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): 'Identification Shell Color: Black'; the injector photo's black body"
+    },
+    "orings": {
+     "hex": "#4a3a5c",
+     "from": "siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read 2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)"
+    },
+    "tip": {
+     "hex": "#b9bcbd",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)"
+    },
+    "plug": {
+     "hex": "#1d1d1f",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing"
+    },
+    "clip": {
+     "hex": "#b8bcc0",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip"
+    },
+    "boot": {
+     "hex": "#1a1a1a",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "ProWire 68102 tin (JPT terminal)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "INJ-7",
+     "at": [
+      41.0,
+      -2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 1"
+    },
+    {
+     "n": "cav2",
+     "ep": "INJ-7",
+     "at": [
+      41.0,
+      2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 2"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "FI114961",
+    "EV1-JPT-2"
+   ],
+   "missing": []
+  },
+  "INJ-8": {
+   "endpoints": [
+    "INJ-8"
+   ],
+   "what": "INJ-8: Siemens Deka FI114961 injector with its EV1 plug and 90-degree boot, mated",
+   "maker": "Siemens Deka / TE",
+   "maker_pn": "FI114961 + EV1-JPT-2",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 65.0,
+    "w": 57.5,
+    "h": 22.0
+   },
+   "frame": "injector axis Z, +Z toward the fuel rail, z = 0 at the lower O-ring end; the EV1 socket faces +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "body": {
+     "hex": "#2a2b2d",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): 'Identification Shell Color: Black'; the injector photo's black body"
+    },
+    "orings": {
+     "hex": "#4a3a5c",
+     "from": "siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/ (read 2026-09-29): Viton O-rings (the data sheet photo shows them dark purple-brown)"
+    },
+    "tip": {
+     "hex": "#b9bcbd",
+     "from": "siemensdeka.com/wp-content/uploads/2013/09/FI114961_2.jpg (Continental data sheet 'FI114961 61 lb/hr Deka IV Long Minitimer', Basic Dimensions; fetched 2026-09-29): the stainless nozzle end (photo)"
+    },
+    "plug": {
+     "hex": "#1d1d1f",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black EV1 housing"
+    },
+    "clip": {
+     "hex": "#b8bcc0",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): steel wire clip"
+    },
+    "boot": {
+     "hex": "#1a1a1a",
+     "from": "prowireusa.com/content/57704/8CYLK-90.webp (ProWire kit photo, fetched 2026-09-29): black 90-degree boot"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "ProWire 68102 tin (JPT terminal)"
+    }
+   },
+   "attach": [
+    {
+     "n": "cav1",
+     "ep": "INJ-8",
+     "at": [
+      41.0,
+      -2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 1"
+    },
+    {
+     "n": "cav2",
+     "ep": "INJ-8",
+     "at": [
+      41.0,
+      2.5,
+      38.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "kind": "EV1 cavity 2"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "FI114961",
+    "EV1-JPT-2"
+   ],
+   "missing": []
+  },
+  "COIL-1": {
+   "endpoints": [
+    "COIL-1"
+   ],
+   "what": "COIL-1: GM 12611424 coil with its LS2/LS7 4-way plug, mated",
+   "maker": "GM / ProWire kit",
+   "maker_pn": "12611424 + COIL-CONN-LS2-7",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 137.1,
+    "w": 62.0,
+    "h": 36.0
+   },
+   "frame": "+Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along Y",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "coil": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C (part_media COIL-1): black coil body"
+    },
+    "tower": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C: black tower"
+    },
+    "plug": {
+     "hex": "#1f1f21",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing"
+    },
+    "seal": {
+     "hex": "#3a7fd0",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges"
+    },
+    "tpa": {
+     "hex": "#8d9091",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA"
+    },
+    "cable seals": {
+     "hex": "#f2d23a",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals"
+    }
+   },
+   "attach": [
+    {
+     "n": "cava",
+     "ep": "COIL-1",
+     "at": [
+      40.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity a"
+    },
+    {
+     "n": "cavb",
+     "ep": "COIL-1",
+     "at": [
+      36.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity b"
+    },
+    {
+     "n": "cavc",
+     "ep": "COIL-1",
+     "at": [
+      32.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity c"
+    },
+    {
+     "n": "cavd",
+     "ep": "COIL-1",
+     "at": [
+      28.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity d"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "12611424",
+    "COIL-CONN-LS2-7"
+   ],
+   "missing": []
+  },
+  "COIL-2": {
+   "endpoints": [
+    "COIL-2"
+   ],
+   "what": "COIL-2: GM 12611424 coil with its LS2/LS7 4-way plug, mated",
+   "maker": "GM / ProWire kit",
+   "maker_pn": "12611424 + COIL-CONN-LS2-7",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 137.1,
+    "w": 62.0,
+    "h": 36.0
+   },
+   "frame": "+Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along Y",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "coil": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C (part_media COIL-1): black coil body"
+    },
+    "tower": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C: black tower"
+    },
+    "plug": {
+     "hex": "#1f1f21",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing"
+    },
+    "seal": {
+     "hex": "#3a7fd0",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges"
+    },
+    "tpa": {
+     "hex": "#8d9091",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA"
+    },
+    "cable seals": {
+     "hex": "#f2d23a",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals"
+    }
+   },
+   "attach": [
+    {
+     "n": "cava",
+     "ep": "COIL-2",
+     "at": [
+      40.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity a"
+    },
+    {
+     "n": "cavb",
+     "ep": "COIL-2",
+     "at": [
+      36.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity b"
+    },
+    {
+     "n": "cavc",
+     "ep": "COIL-2",
+     "at": [
+      32.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity c"
+    },
+    {
+     "n": "cavd",
+     "ep": "COIL-2",
+     "at": [
+      28.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity d"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "12611424",
+    "COIL-CONN-LS2-7"
+   ],
+   "missing": []
+  },
+  "COIL-3": {
+   "endpoints": [
+    "COIL-3"
+   ],
+   "what": "COIL-3: GM 12611424 coil with its LS2/LS7 4-way plug, mated",
+   "maker": "GM / ProWire kit",
+   "maker_pn": "12611424 + COIL-CONN-LS2-7",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 137.1,
+    "w": 62.0,
+    "h": 36.0
+   },
+   "frame": "+Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along Y",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "coil": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C (part_media COIL-1): black coil body"
+    },
+    "tower": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C: black tower"
+    },
+    "plug": {
+     "hex": "#1f1f21",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing"
+    },
+    "seal": {
+     "hex": "#3a7fd0",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges"
+    },
+    "tpa": {
+     "hex": "#8d9091",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA"
+    },
+    "cable seals": {
+     "hex": "#f2d23a",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals"
+    }
+   },
+   "attach": [
+    {
+     "n": "cava",
+     "ep": "COIL-3",
+     "at": [
+      40.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity a"
+    },
+    {
+     "n": "cavb",
+     "ep": "COIL-3",
+     "at": [
+      36.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity b"
+    },
+    {
+     "n": "cavc",
+     "ep": "COIL-3",
+     "at": [
+      32.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity c"
+    },
+    {
+     "n": "cavd",
+     "ep": "COIL-3",
+     "at": [
+      28.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity d"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "12611424",
+    "COIL-CONN-LS2-7"
+   ],
+   "missing": []
+  },
+  "COIL-4": {
+   "endpoints": [
+    "COIL-4"
+   ],
+   "what": "COIL-4: GM 12611424 coil with its LS2/LS7 4-way plug, mated",
+   "maker": "GM / ProWire kit",
+   "maker_pn": "12611424 + COIL-CONN-LS2-7",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 137.1,
+    "w": 62.0,
+    "h": 36.0
+   },
+   "frame": "+Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along Y",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "coil": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C (part_media COIL-1): black coil body"
+    },
+    "tower": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C: black tower"
+    },
+    "plug": {
+     "hex": "#1f1f21",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing"
+    },
+    "seal": {
+     "hex": "#3a7fd0",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges"
+    },
+    "tpa": {
+     "hex": "#8d9091",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA"
+    },
+    "cable seals": {
+     "hex": "#f2d23a",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals"
+    }
+   },
+   "attach": [
+    {
+     "n": "cava",
+     "ep": "COIL-4",
+     "at": [
+      40.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity a"
+    },
+    {
+     "n": "cavb",
+     "ep": "COIL-4",
+     "at": [
+      36.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity b"
+    },
+    {
+     "n": "cavc",
+     "ep": "COIL-4",
+     "at": [
+      32.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity c"
+    },
+    {
+     "n": "cavd",
+     "ep": "COIL-4",
+     "at": [
+      28.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity d"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "12611424",
+    "COIL-CONN-LS2-7"
+   ],
+   "missing": []
+  },
+  "COIL-5": {
+   "endpoints": [
+    "COIL-5"
+   ],
+   "what": "COIL-5: GM 12611424 coil with its LS2/LS7 4-way plug, mated",
+   "maker": "GM / ProWire kit",
+   "maker_pn": "12611424 + COIL-CONN-LS2-7",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 137.1,
+    "w": 62.0,
+    "h": 36.0
+   },
+   "frame": "+Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along Y",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "coil": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C (part_media COIL-1): black coil body"
+    },
+    "tower": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C: black tower"
+    },
+    "plug": {
+     "hex": "#1f1f21",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing"
+    },
+    "seal": {
+     "hex": "#3a7fd0",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges"
+    },
+    "tpa": {
+     "hex": "#8d9091",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA"
+    },
+    "cable seals": {
+     "hex": "#f2d23a",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals"
+    }
+   },
+   "attach": [
+    {
+     "n": "cava",
+     "ep": "COIL-5",
+     "at": [
+      40.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity a"
+    },
+    {
+     "n": "cavb",
+     "ep": "COIL-5",
+     "at": [
+      36.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity b"
+    },
+    {
+     "n": "cavc",
+     "ep": "COIL-5",
+     "at": [
+      32.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity c"
+    },
+    {
+     "n": "cavd",
+     "ep": "COIL-5",
+     "at": [
+      28.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity d"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "12611424",
+    "COIL-CONN-LS2-7"
+   ],
+   "missing": []
+  },
+  "COIL-6": {
+   "endpoints": [
+    "COIL-6"
+   ],
+   "what": "COIL-6: GM 12611424 coil with its LS2/LS7 4-way plug, mated",
+   "maker": "GM / ProWire kit",
+   "maker_pn": "12611424 + COIL-CONN-LS2-7",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 137.1,
+    "w": 62.0,
+    "h": 36.0
+   },
+   "frame": "+Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along Y",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "coil": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C (part_media COIL-1): black coil body"
+    },
+    "tower": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C: black tower"
+    },
+    "plug": {
+     "hex": "#1f1f21",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing"
+    },
+    "seal": {
+     "hex": "#3a7fd0",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges"
+    },
+    "tpa": {
+     "hex": "#8d9091",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA"
+    },
+    "cable seals": {
+     "hex": "#f2d23a",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals"
+    }
+   },
+   "attach": [
+    {
+     "n": "cava",
+     "ep": "COIL-6",
+     "at": [
+      40.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity a"
+    },
+    {
+     "n": "cavb",
+     "ep": "COIL-6",
+     "at": [
+      36.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity b"
+    },
+    {
+     "n": "cavc",
+     "ep": "COIL-6",
+     "at": [
+      32.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity c"
+    },
+    {
+     "n": "cavd",
+     "ep": "COIL-6",
+     "at": [
+      28.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity d"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "12611424",
+    "COIL-CONN-LS2-7"
+   ],
+   "missing": []
+  },
+  "COIL-7": {
+   "endpoints": [
+    "COIL-7"
+   ],
+   "what": "COIL-7: GM 12611424 coil with its LS2/LS7 4-way plug, mated",
+   "maker": "GM / ProWire kit",
+   "maker_pn": "12611424 + COIL-CONN-LS2-7",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 137.1,
+    "w": 62.0,
+    "h": 36.0
+   },
+   "frame": "+Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along Y",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "coil": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C (part_media COIL-1): black coil body"
+    },
+    "tower": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C: black tower"
+    },
+    "plug": {
+     "hex": "#1f1f21",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing"
+    },
+    "seal": {
+     "hex": "#3a7fd0",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges"
+    },
+    "tpa": {
+     "hex": "#8d9091",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA"
+    },
+    "cable seals": {
+     "hex": "#f2d23a",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals"
+    }
+   },
+   "attach": [
+    {
+     "n": "cava",
+     "ep": "COIL-7",
+     "at": [
+      40.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity a"
+    },
+    {
+     "n": "cavb",
+     "ep": "COIL-7",
+     "at": [
+      36.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity b"
+    },
+    {
+     "n": "cavc",
+     "ep": "COIL-7",
+     "at": [
+      32.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity c"
+    },
+    {
+     "n": "cavd",
+     "ep": "COIL-7",
+     "at": [
+      28.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity d"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "12611424",
+    "COIL-CONN-LS2-7"
+   ],
+   "missing": []
+  },
+  "COIL-8": {
+   "endpoints": [
+    "COIL-8"
+   ],
+   "what": "COIL-8: GM 12611424 coil with its LS2/LS7 4-way plug, mated",
+   "maker": "GM / ProWire kit",
+   "maker_pn": "12611424 + COIL-CONN-LS2-7",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 137.1,
+    "w": 62.0,
+    "h": 36.0
+   },
+   "frame": "+Z up (tower up, plug down); origin at the upper ear's bolt hole; the coil axis 34 mm out along +X; ear bolts along Y",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {}
+   },
+   "colors": {
+    "coil": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C (part_media COIL-1): black coil body"
+    },
+    "tower": {
+     "hex": "#1d1e20",
+     "from": "GM photo D510C: black tower"
+    },
+    "plug": {
+     "hex": "#1f1f21",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): black housing"
+    },
+    "seal": {
+     "hex": "#3a7fd0",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): blue seal ridges"
+    },
+    "tpa": {
+     "hex": "#8d9091",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): grey TPA"
+    },
+    "cable seals": {
+     "hex": "#f2d23a",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): yellow cable seals"
+    },
+    "terminal": {
+     "hex": "#c9c6bf",
+     "from": "prowireusa.com/content/57659/COIL-CONNLS217.webp (ProWire kit photo, fetched 2026-09-29): tin terminals"
+    }
+   },
+   "attach": [
+    {
+     "n": "cava",
+     "ep": "COIL-8",
+     "at": [
+      40.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity a"
+    },
+    {
+     "n": "cavb",
+     "ep": "COIL-8",
+     "at": [
+      36.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity b"
+    },
+    {
+     "n": "cavc",
+     "ep": "COIL-8",
+     "at": [
+      32.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity c"
+    },
+    {
+     "n": "cavd",
+     "ep": "COIL-8",
+     "at": [
+      28.0,
+      0.0,
+      -104.8
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "coil cavity d"
+    }
+   ],
+   "mount": [],
+   "kind": "assembly",
+   "family": "injectors and coils",
+   "pieces": [
+    "12611424",
+    "COIL-CONN-LS2-7"
+   ],
+   "missing": []
   }
  }
 }
