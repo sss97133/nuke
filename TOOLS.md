@@ -312,6 +312,8 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 | View trial balance | `SELECT * FROM trial_balance` | Shows all accounts with debit/credit totals. Must sum to 0. |
 | Monthly expense ledger | `SELECT * FROM ledger_monthly` | Journal-backed. Replaces old platform_expenses-only view. |
 | View all accounts | `SELECT * FROM balance_sheet` | Shows every account with natural balance. |
+| Pull posted QuickBooks lines into qb_transactions | `quickbooks-connect` action=`pull_transactions&since=YYYY-MM-DD` | Owner or service key. Purchase + Deposit lines by TxnDate, upsert by qb_id. Transfers, credit-card payments and bank-feed items still "For review" are not visible. |
+| Move posted QuickBooks lines to other accounts (owner-approved batch only) | `npm run books:recategorize -- <batch.json> [--apply]` → `quickbooks-connect` action=`recategorize` | Dry run by default. An apply needs the owner's approval block and the dry run's plan_sha256; the function plans again against live QuickBooks and refuses (409) on any change. Never creates accounts, deletes or excludes. Batch and receipts live outside the repo. |
 
 ---
 
