@@ -77,10 +77,10 @@
 
 | | main before | with these options |
 |---|---|---|
-| options | 39 | 42 (38 candidates) |
-| PDM30 outputs the candidates would take | 7 (3 spare) | 7: STEP-DCMD takes none; STEP-RQ is an alternate, shown but not summed |
+| options | 49 | 52 (48 candidates) |
+| PDM30 outputs the candidates would take | 8 (3 spare) | 8: STEP-DCMD takes none; STEP-RQ is an alternate, shown but not summed |
 | PDM30 inputs the candidates would take | 3 (2 spare) | 4 (STEP-SW takes DIG16) |
-| alternates listed | 6 | 7 (+ STEP-RQ) |
+| alternates listed | 12 | 13 (+ STEP-RQ) |
 
 - STEP-DCMD takes nothing on the PDM30 or the PDM15. Its take is on the bay PDM32, which options_v5 doesn't model yet, so
   it is written in `demand.bay_pdm_outputs` / `capacity_note`.
