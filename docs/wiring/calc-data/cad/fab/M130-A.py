@@ -364,6 +364,7 @@ def part_meta(bodies):
             "dims_mm": {"l": W, "w": round(H + K.v(P["hdr_proud"]), 2), "h": D},
             "dims_note": "107.5 wide x 127.5 tall x 38.7 deep; the plug headers stand 5.6 below the bottom edge (133.1 overall)",
             "frame": "origin at the centre of the back (mounting) face; +X right, +Y up in MoTeC's front view; +Z out of the back face; plugs face -Y",
+            "axes": {"mount_normal": "+Z", "maker_up": "+Y", "faces": {"plugs": "-Y", "label": "+Z", "mounting": "-Z"}},
             "colors": {k: {"hex": c[0], "from": c[1]} for k, c in COLORS.items()},
             "attach": attach_points(),
             "mount": [{"n": f"hole_{i}", "at": [x, y, 0], "dir": [0, 0, -1], "d": K.v(P["hole_d"]),

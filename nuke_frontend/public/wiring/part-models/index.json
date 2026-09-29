@@ -17,6 +17,15 @@
     "h": 38.7
    },
    "frame": "origin at the centre of the back (mounting) face; +X right, +Y up in MoTeC's front view; +Z out of the back face; plugs face -Y",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "plugs": "-Y",
+     "label": "+Z",
+     "mounting": "-Z"
+    }
+   },
    "colors": {
     "case": {
      "hex": "#28292a",

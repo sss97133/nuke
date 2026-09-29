@@ -42,6 +42,8 @@ HEADER = """# K5 harness — PART MODELS: every physical piece the harness plugs
 #                  maker = printed by the maker; scaled = measured off the maker's drawing at its printed scale;
 #                  design = our clearance or choice; assumed = in no source (say so, don't hide it)
 #   frame        the part's own axes. Origin at the mounting-face centre; +Z out of the mounting face.
+#   axes         the same, for code: mount_normal (always +Z), maker_up (the axis that is up in the maker's view),
+#                faces (which way the plugs, label and mounting face point). World rotation is the placement's call.
 #   attach       where each wire lands: {n, ep (endpoint id), at [mm], dir (the way the wire leaves)}
 #   mount        mounting holes and studs: {n, at, dir (the way the bolt goes in), d}
 """
@@ -68,7 +70,7 @@ def lint(parts, ends):
     errors = []
     for p in parts:
         pid = p.get("id", "?")
-        for k in ("what", "maker", "maker_pn", "shape_basis", "dims_mm", "frame", "colors", "attach", "params"):
+        for k in ("what", "maker", "maker_pn", "shape_basis", "dims_mm", "frame", "axes", "colors", "attach", "params"):
             if not p.get(k):
                 errors.append(f"{pid}: missing {k}")
         if p.get("shape_basis") not in SHAPE_BASES:
@@ -112,7 +114,7 @@ def main():
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     slim = {"generated": doc["generated"], "source": "docs/wiring/calc-data/catalog/part_models.yaml",
             "parts": {p["id"]: {k: p[k] for k in ("endpoints", "what", "maker", "maker_pn", "shape_basis", "dims_mm", "frame",
-                                                  "colors", "attach", "mount", "keepout") if k in p} for p in parts}}
+                                                  "axes", "colors", "attach", "mount", "keepout") if k in p} for p in parts}}
     OUT_JSON.write_text(json.dumps(slim, indent=1, ensure_ascii=False) + "\n")
     print("wrote", OUT_YAML.relative_to(REPO), "and", OUT_JSON.relative_to(REPO))
 
