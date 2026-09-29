@@ -257,7 +257,7 @@ Run lengths are **estimates**, and two legs of each are the agent's own unmeasur
   service loop (canon ch.18 §4). That is 1.57 m, plus the 15 % body pad (state §1): **6 ft**.
 - Passenger seat: the same, plus the 1746 mm crossing under the dash between the hinge pillars (fr88.body.apillar.A-B):
   **12.5 ft**. A route across the tunnel under the carpet would be shorter but isn't measured.
-- The receipt proposes a tape item (T-16) that replaces these with measured runs.
+- Tape item T-20 (filed from the receipt in PR #424) replaces these with measured runs.
 
 | Circuit | Wire | Why | 3 % drop holds up to |
 |---|---|---|---|

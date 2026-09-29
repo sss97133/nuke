@@ -64,8 +64,10 @@ owner_words: "instead of being extra annoying I think we have one more thing we 
 - Options 41 (37 candidate, 3 decided, 1 base). The buildable and composite wire counts don't change, because neither
   option has registry wires.
 
-## Proposed endpoints (for the pieces lane's `ends:` map; not written to `endpoints.yaml`)
-Positions are the agent's proposal. The builder places them on the truck. Only one of the two plug pairs is built.
+## Proposed endpoints (not written to `endpoints.yaml`)
+Positions are the agent's proposal. The builder places them on the truck. Only one of the two plug pairs is built. The
+`ends:` map in `mounts.yaml` holds registry endpoints only (`mounts_v5.py` lints that every id exists in the registry), so
+these stay here until the registry owner adds them after a decision.
 
 ```yaml
 SEAT-L-PASS-P:            # SEAT-TED
@@ -76,7 +78,7 @@ SEAT-L-PASS-P:            # SEAT-TED
   wires: ["SEAT_L_PWR", "SEAT_L_GND"]
   position: "seat half on the driver seat frame under the cushion, near the rear; floor half P-clipped to the floor under the seat; service loop covers the adjuster's fore-aft travel (unmeasured)"
   sources: ["www.customconnectorkits.com__dtp04-2p.md / __dtp06-2s.md (standard-seal parts; wedges WP-2P / WP-2S, size 12 contacts 14-12 AWG)", "Deutsch datasheet farnell 628276 printed p.5 [PDF p.3] WIRE SEALING RANGE: #12 N-seal 3.40-4.32 mm, E-seal 2.46-4.01 mm; 12 AWG /32 is 2.62 mm (www.prowireusa.com__m22759-32-tefzel-wire.md), so E-seal only", "Deutsch DT family catalog p.23 (C015 modification = 'E' seal)"]
-  open: ["E-seal (C015) part numbers for DTP04-2P / DTP06-2S (vendor page)", "the kit's power-lead gauge (must be 14-12 AWG for the size 12 socket)", "adjuster travel for the loop (tape T-16)"]
+  open: ["E-seal (C015) part numbers for DTP04-2P / DTP06-2S (vendor page)", "the kit's power-lead gauge (must be 14-12 AWG for the size 12 socket)", "adjuster travel for the loop (tape T-20)"]
 SEAT-R-PASS-P:            # SEAT-TED
   where: cabin
   device: "passenger seat disconnect, climate kit power — as SEAT-L-PASS-P"
@@ -84,7 +86,7 @@ SEAT-R-PASS-P:            # SEAT-TED
   kit: {DTP04-2P: 1, DTP06-2S: 1, WP-2P: 1, WP-2S: 1}
   wires: ["SEAT_R_PWR", "SEAT_R_GND"]
   position: "seat half on the passenger seat frame close to the front pivot bracket, so the tip-forward swings the shortest loop; floor half P-clipped clear of the pivot, springs and restraint cable (1987 LDT manual 10A2-5 Fig. 4)"
-  open: ["tip-forward arc at the plug (tape T-16)", "10 AWG feed needs a 10-to-12 AWG transition if the bench current is over 8.3 A"]
+  open: ["tip-forward arc at the plug (tape T-20)", "10 AWG feed needs a 10-to-12 AWG transition if the bench current is over 8.3 A"]
 SEAT-L-PASS:              # SEAT-VENT (alternative)
   where: cabin
   device: "driver seat disconnect, fan kit power — Deutsch DT 2-way, E-seal (C015) version: DT04-2P + W2P (floor side, pins 0460-202-16141), DT06-2S + W2S (seat side, sockets 0462-201-16141), size 16, 20-16 AWG, 10 A test current on 18 AWG"
@@ -104,7 +106,7 @@ SEAT-L-CLIMATE:           # the kit's own control module and TED/blower pair(s),
   device: "Sanctum heat/cool kit (LeatherSeats.com) or a fan kit: control module under the seat, cushion and backrest units in the seat"
   family: open
   kit: {}
-  open: ["kit power-lead gauge and plug", "module mounting spot under the cushion (bench)", "backrest depth for the back unit (tape T-16)"]
+  open: ["kit power-lead gauge and plug", "module mounting spot under the cushion (bench)", "backrest depth for the back unit (tape T-20)"]
 SEAT-R-CLIMATE:           # passenger seat, as SEAT-L-CLIMATE
   where: cabin
   family: open
@@ -114,8 +116,8 @@ SPL-SEAT-VENT:            # 20 AWG pin lead -> two 18 AWG seat legs, at the PDM
 SEAT-SW-L / SEAT-SW-R:    # the kits' own switches, console or seat (owner's call); the kit's switch cable, not our wire
 ```
 
-## Proposed tape item (for `cad/tape_list.yaml`; not written there)
-- **T-16, priority 2: seat runs and seat travel.**
+## Proposed tape item (filed by the pieces lane as T-20 in PR #424; T-16 to T-19 went to wheel speed in #427)
+- **T-20, priority 2: seat runs and seat travel.**
   - (a) Along the route, from the PDM30's spot to under each seat.
   - (b) The driver adjuster's full fore-aft travel.
   - (c) The passenger seat's tip-forward arc, measured at the plug spot.
@@ -175,11 +177,11 @@ SEAT-SW-L / SEAT-SW-R:    # the kits' own switches, console or seat (owner's cal
 | Unknown | Close |
 |---|---|
 | Kit current at each setting and inrush (all kits) | bench: clamp meter on 12–14 V with the covers off (upholsterer's step 8); or LeatherSeats.com (draft in the research file) |
-| TED and blower dimensions; backrest depth | the kit in hand; tape T-16(e) |
+| TED and blower dimensions; backrest depth | the kit in hand; tape T-20(e) |
 | Noise | bench, before the covers go back |
 | Condensation at max cool | bench, 30 min at max cool, check the cold-side duct for water; no maker figure |
 | Plaid insert backing: does it pass air? | the upholsterer (draft); breath test on an offcut |
-| Run lengths, seat travel, tip-forward arc | tape T-16 |
+| Run lengths, seat travel, tip-forward arc | tape T-20 |
 | Which PDM outputs | owner: power windows yes/no; owner and Dave: the second PDM in the cab or the bay |
 | PDM30 100 A and alternator 150 A budgets with the seats | measure blower HIGH and seat currents; rerun the budget |
 | Kit power-lead gauge (DTP socket takes 14–12 AWG) | kit in hand |
