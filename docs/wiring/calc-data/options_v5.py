@@ -182,9 +182,14 @@ def capacity(reg, wires, opts, eps_yaml):
                                         source="PDM30 datasheet p.1; PDM user manual comparison table")
     m130 = reg.get("m130_pinout") or {}
     m_used = m130.get("used", 0) if isinstance(m130, dict) else len(m130)
-    free_pins = [r["pin"] for r in (m130.get("rows") or []) if isinstance(m130, dict) and not r.get("wires")]
-    free_udig = [r["pin"] for r in (m130.get("rows") or []) if isinstance(m130, dict) and not r.get("wires") and "UDIG" in r.get("function", "")]
-    res["M130 pins"] = OrderedDict(capacity=M130_PINS, used=m_used, spare=M130_PINS - m_used, spare_ids=free_pins, spare_udig=free_udig,
+    rows = (m130.get("rows") or []) if isinstance(m130, dict) else []
+    free = [r for r in rows if not r.get("wires")]
+    # a free supply pin (BAT_BAK "Battery Backup", M1 techspec p.17) is not an input or output a sensor or load can use
+    free_io = [r["pin"] for r in free if not re.search(r"\((BAT_|SEN_)", r.get("function", ""))]
+    free_supply = [f"{r['pin']} {m.group(1)}" for r in free for m in [re.search(r"\(((?:BAT_|SEN_)\w*)\)", r.get("function", ""))] if m]
+    free_udig = [r["pin"] for r in free if "UDIG" in r.get("function", "")]
+    res["M130 pins"] = OrderedDict(capacity=M130_PINS, used=m_used, spare=M130_PINS - m_used, spare_ids=[r["pin"] for r in free],
+                                   spare_io=free_io, spare_supply=free_supply, spare_udig=free_udig,
                                    source="M130 datasheet; registry pinout (kits_v5)")
     # door hinge pass-throughs: base + decided wires use a cavity each; candidate wires already designed (PL) are shown on top
     opt_of = {str(w["id"]): w["option"] for w in wires}
@@ -255,10 +260,11 @@ def capacity(reg, wires, opts, eps_yaml):
     m_need, u_need = sum(d["m130_pins"] for d in lead), sum(d["m130_udig"] for d in lead)
     m_res = res["M130 pins"]
     verdict["M130 pins"] = (f"M130 pins: candidates would take {m_need}" + (f" ({takers('m130_pins')})" if m_need else "")
-                            + f", {u_need} of them universal digital inputs; {m_res['spare']} spare, {len(m_res['spare_udig'])} of them UDIG "
-                            + f"({', '.join(m_res['spare_udig'])}) — "
-                            + (f"fits, leaving {m_res['spare'] - m_need} pins and {len(m_res['spare_udig']) - u_need} UDIG"
-                               if m_need <= m_res["spare"] and u_need <= len(m_res["spare_udig"]) else "does NOT fit"))
+                            + f", {u_need} of them universal digital inputs; {m_res['spare']} spare, {len(m_res['spare_io'])} of them I/O "
+                            + (f"(not I/O: {', '.join(m_res['spare_supply'])}), " if m_res["spare_supply"] else "")
+                            + f"{len(m_res['spare_udig'])} of them UDIG ({', '.join(m_res['spare_udig'])}) — "
+                            + (f"fits, leaving {len(m_res['spare_io']) - m_need} I/O pins and {len(m_res['spare_udig']) - u_need} UDIG"
+                               if m_need <= len(m_res["spare_io"]) and u_need <= len(m_res["spare_udig"]) else "does NOT fit"))
     p15_need = sum(d["pdm15_outputs"] for d in lead)
     p15_spare = res["PDM15 20 A outputs"]["spare"] + res["PDM15 8 A outputs"]["spare"]
     verdict["PDM15 outputs"] = (f"PDM15 outputs: candidates would take {p15_need}" + (f" ({takers('pdm15_outputs')})" if p15_need else "")

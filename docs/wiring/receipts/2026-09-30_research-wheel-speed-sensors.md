@@ -90,7 +90,8 @@
   - `m130_pins` / `m130_udig` and `pin61_cavities`;
   - `conflicts_with`.
   - Three verdict lines sum over the lead versions (alternates excluded) against the ledger, with the takers named.
-  - The M130 row lists the spare pin ids and spare UDIGs.
+  - The M130 row lists the spare pin ids, the I/O-usable spares (free supply pins such as BAT_BAK left out), and the spare
+    UDIGs.
   - `OPTIONS.md` gains PDM15, M130 and 61-pin columns.
   - The options.yaml header documents the keys.
 - `calc-data/fetch_sources.py`: 19 source URLs appended so the gitignored snapshots can be refetched. Their stems match the
@@ -110,8 +111,9 @@ It parses and places all three (tree rebased on origin/main 09c291120):
   from the other candidates. The wheel-speed candidates add 0 body-bulkhead crossings and 0 PDM30 outputs or inputs.
 - New verdict lines:
   - `61-pin (engine connector): candidates would take 2 (WSS-F2 2); 3 spare (d, t, u) — fits, leaving 1`
-  - `M130 pins: candidates would take 2 (WSS-F2 2), 2 of them universal digital inputs; 8 spare, 2 of them UDIG (B10, B11) —
-    fits, leaving 6 pins and 0 UDIG`
+  - `M130 pins: candidates would take 2 (WSS-F2 2), 2 of them universal digital inputs; 8 spare, 7 of them I/O (not I/O:
+    B12 BAT_BAK), 2 of them UDIG (B10, B11) — fits, leaving 5 I/O pins and 0 UDIG`. B12 is "Battery Backup", a supply pin
+    (M1 techspec p.17), so options-rd's review took it out of the usable count.
   - `PDM15 outputs: candidates would take 1 (WSS-F2 1); 5 spare — fits, leaving 4`
 
 ## Capacity (the recommended path WSS-F2, from the registry `capacity` of the 2026-09-28 run)
