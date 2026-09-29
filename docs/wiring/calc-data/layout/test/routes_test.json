@@ -1,0 +1,12 @@
+{"meta": {"note": "LOCAL TEST FIXTURE ONLY - never published; exercises the route drawing code"},
+ "segments": [
+  {"id": "T-SEG-1", "bundle": "TEST BUNDLE", "from_node": "T-N1", "to_node": "T-N2", "points": [[0.50, -1.43, 0.90], [0.40, -1.40, 0.95], [0.30, -1.40, 0.95]], "wires": ["4a", "4b", "84"], "od_mm": 12, "covering": "test covering", "length_m": null, "margin_mm": 150, "basis": "test fixture"},
+  {"id": "T-SEG-2", "bundle": "TEST BUNDLE", "from_node": "T-N2", "to_node": "T-N3", "points": [[0.30, -1.40, 0.95], [0.10, -1.38, 0.88]], "wires": ["4a"], "od_mm": 8, "covering": "test covering", "length_m": 0.21, "margin_mm": 150, "basis": "test fixture"}
+ ],
+ "nodes": [
+  {"id": "T-N1", "kind": "connector", "pos": [0.50, -1.43, 0.90], "pn": "test", "wires": ["4a"], "note": "test"},
+  {"id": "T-N2", "kind": "splice", "pos": [0.30, -1.40, 0.95], "pn": "test", "wires": ["4a"], "note": "test"},
+  {"id": "T-N3", "kind": "breakout", "pos": [0.10, -1.38, 0.88], "pn": "test", "wires": ["4a"], "note": "test"}
+ ],
+ "clips": [{"id": "T-C1", "segment": "T-SEG-1", "pos": [0.40, -1.40, 0.95], "pn": "test clip", "type": "test", "note": "test"}]
+}

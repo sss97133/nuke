@@ -1,0 +1,96 @@
+
+<header class="bar">
+  <div class="title">
+    <h1>K5 Harness Layout</h1>
+    <span class="sub">1977 K5 Blazer · LS3 · MoTeC M130 · PDM30 in the cab · PDM15 in the bay · one 61-pin D38999 through the firewall</span>
+  </div>
+  <div class="kpis">
+    <span class="kpi" id="k-drawn"></span>
+    <span class="kpi" id="k-routes"></span>
+    <span class="legend" id="legend" aria-label="Status"></span>
+  </div>
+</header>
+
+<main class="work" id="work">
+  <section class="pane canvas-pane" aria-label="Drawing">
+    <div class="tools">
+      <div class="seg" id="views" role="group" aria-label="View">
+        <button type="button" data-view="top" aria-pressed="true">Top</button>
+        <button type="button" data-view="side" aria-pressed="false">Driver side</button>
+        <button type="button" data-view="bay" aria-pressed="false">Engine bay</button>
+        <button type="button" data-view="3d" aria-pressed="false" id="v3d-btn">3D bay</button>
+      </div>
+      <div class="grp" id="layers" role="group" aria-label="Layers">
+        <label class="chk"><input type="checkbox" id="ly-parts" checked> Parts</label>
+        <label class="chk" id="ly-routes-l"><input type="checkbox" id="ly-routes" checked> Routes</label>
+        <label class="chk" id="ly-clips-l"><input type="checkbox" id="ly-clips" checked> Clips and splices</label>
+        <label class="chk"><input type="checkbox" id="ly-labels"> Labels</label>
+      </div>
+      <div class="grp">
+        <label class="sld">Body <input type="range" id="op-body" min="0" max="100" value="45" aria-label="Body model opacity"><output id="op-body-o">45%</output></label>
+        <label class="sld">Engine <input type="range" id="op-mech" min="0" max="100" value="70" aria-label="Engine and driveline opacity"><output id="op-mech-o">70%</output></label>
+      </div>
+      <div class="seg" id="colorby" role="group" aria-label="Colour parts by">
+        <button type="button" data-c="product" aria-pressed="true">Product colour</button>
+        <button type="button" data-c="status" aria-pressed="false">Status</button>
+      </div>
+      <div class="grp zoomg" role="group" aria-label="Zoom">
+        <button type="button" class="ibtn" id="z-out" aria-label="Zoom out">&minus;</button>
+        <button type="button" class="ibtn" id="z-fit">Fit</button>
+        <button type="button" class="ibtn" id="z-in" aria-label="Zoom in">+</button>
+        <button type="button" class="ibtn" id="z-sel" title="Frame the selected end (F)">Frame</button>
+      </div>
+    </div>
+    <div class="vp" id="vp">
+      <div class="world" id="world">
+        <img class="lyr" id="lyr-body" alt="" draggable="false">
+        <img class="lyr" id="lyr-mech" alt="" draggable="false">
+        <svg id="ov" xmlns="http://www.w3.org/2000/svg" aria-label="Wiring ends drawn to size"></svg>
+      </div>
+      <div class="v3d" id="v3d" hidden><div class="v3d-msg" id="v3d-msg"></div></div>
+      <div class="tip" id="tip" hidden></div>
+    </div>
+    <div class="status"><span id="cursor">&nbsp;</span><span id="scale"></span><span class="cap"><span id="viewcap"></span> Solid outline: size from the maker. Dashed: size from the twin or the body model.</span></div>
+  </section>
+
+  <section class="pane dock" aria-label="Tables">
+    <div class="tabs" role="tablist" id="tabs">
+      <button type="button" role="tab" data-tab="ends" aria-selected="true">Every end<span class="n" id="n-ends"></span></button>
+      <button type="button" role="tab" data-tab="notdrawn" aria-selected="false">Not drawn yet<span class="n" id="n-notdrawn"></span></button>
+      <button type="button" role="tab" data-tab="parts" aria-selected="false">Parts to size<span class="n" id="n-parts"></span></button>
+      <button type="button" role="tab" data-tab="routes" aria-selected="false">Routes<span class="n" id="n-routes"></span></button>
+      <button type="button" role="tab" data-tab="cost" aria-selected="false">Cost<span class="n" id="n-cost"></span></button>
+      <button type="button" role="tab" data-tab="work" aria-selected="false">Who is on it</button>
+      <button type="button" role="tab" data-tab="notes" aria-selected="false">Notes<span class="n" id="n-notes"></span></button>
+    </div>
+    <div class="filters" id="filters">
+      <input type="search" id="f-q" placeholder="Find an id, part or number" aria-label="Find">
+      <select id="f-zone" aria-label="Zone"></select>
+      <select id="f-sys" aria-label="System"></select>
+      <select id="f-status" aria-label="Status"></select>
+      <select id="f-drawn" aria-label="Drawn"></select>
+      <span class="count" id="f-count"></span>
+    </div>
+    <div class="gridwrap" id="gridwrap"><table class="grid" id="grid"></table></div>
+  </section>
+
+  <aside class="pane insp" id="insp" aria-label="Selected end"><div class="insp-body" id="insp-body" aria-live="polite"></div><div class="insp-foot" id="insp-foot"></div></aside>
+</main>
+
+<section class="below">
+  <h2>Layout calls</h2>
+  <div class="calls" id="calls"></div>
+
+  <h2>Margins of error</h2>
+  <p class="prose">Nothing here is tape-measured yet. Each end carries a margin that comes from how its spot was found. Wiring always carries slack, so the owner's working margin for laying it out is 150 to 300 mm (6 to 12 in); where a spot is known better, the tighter number is shown.</p>
+  <div style="overflow-x:auto"><table class="cls" id="margins"></table></div>
+
+  <h2>Where this page's data comes from</h2>
+  <div style="overflow-x:auto"><table class="cls" id="sources"></table></div>
+  <p class="prose">The page is built by a script from these files; nothing is typed into it by hand. Parts are drawn at true size in their product colour where a size has been read. A part whose size is not read yet is not drawn: it is listed under "Not drawn yet", and selecting it shows a dashed crosshair at its spot with its margin. Stations are inches behind the front axle; lateral is inches off the centreline, positive toward the driver side; height is inches above the ground. The "Ask about this part" box sends only this page's data for the selected end to Claude, on the viewer's own Claude plan; claude.ai asks for consent the first time, and no API key is involved. Notes to the build agents are saved with the end, the view, the time and who wrote them; the agents read them from the page's store.</p>
+</section>
+
+<script type="application/json" id="data">__DATA__</script>
+<script>
+__APPJS__
+</script>
