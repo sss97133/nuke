@@ -1,0 +1,137 @@
+{
+ "generated": "2026-09-29",
+ "source": "docs/wiring/calc-data/catalog/part_models.yaml",
+ "parts": {
+  "M130-A": {
+   "endpoints": [
+    "M130-A",
+    "M130-B"
+   ],
+   "what": "Engine computer, MoTeC M130",
+   "maker": "MoTeC",
+   "maker_pn": "13130",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 107.5,
+    "w": 133.1,
+    "h": 38.7
+   },
+   "frame": "origin at the centre of the back (mounting) face; +X right, +Y up in MoTeC's front view; +Z out of the back face; plugs face -Y",
+   "colors": {
+    "case": {
+     "hex": "#28292a",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_m130_052880dbeb.webp (fetched 2026-09-29), k-means of the region (upper case, 95%)"
+    },
+    "housing": {
+     "hex": "#2b2b28",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_m130_052880dbeb.webp (fetched 2026-09-29), k-means of the region (connector housing, 65%)"
+    },
+    "label": {
+     "hex": "#121416",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_m130_052880dbeb.webp (fetched 2026-09-29), k-means of the region (label panel, 57%); the maker's branding is not reproduced"
+    },
+    "header": {
+     "hex": "#2e3032",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_m130_052880dbeb.webp (fetched 2026-09-29), k-means of the region (plug headers, 86%)"
+    },
+    "pins": {
+     "hex": "#b9b4a8",
+     "from": "not visible in the photo; drawn as tin-plated brass (colour not sourced)"
+    },
+    "keepout": {
+     "hex": "#f0a030",
+     "from": "design aid, not a product colour"
+    },
+    "plug": {
+     "hex": "#5d6670",
+     "from": "design aid (envelope of TE's plug), not a product colour"
+    }
+   },
+   "attach": [
+    {
+     "n": "plug",
+     "ep": "M130-A",
+     "at": [
+      -16.3,
+      -69.35,
+      21.2
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "note": "34-way plug face; the plug and its boot hang straight down (keep-out 60-80 mm)"
+    },
+    {
+     "n": "plug",
+     "ep": "M130-B",
+     "at": [
+      19.15,
+      -69.35,
+      21.2
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "note": "26-way plug face"
+    }
+   ],
+   "mount": [
+    {
+     "n": "hole_0",
+     "at": [
+      0.0,
+      58.75,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 5.2,
+     "note": "M5 or 3/16 in; washer or head 13 max"
+    },
+    {
+     "n": "hole_1",
+     "at": [
+      -48.75,
+      -16.25,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 5.2,
+     "note": "M5 or 3/16 in; washer or head 13 max"
+    },
+    {
+     "n": "hole_2",
+     "at": [
+      48.75,
+      -16.25,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 5.2,
+     "note": "M5 or 3/16 in; washer or head 13 max"
+    }
+   ],
+   "keepout": {
+    "what": "plug + boot + wire bend below both plug faces",
+    "min_mm": 60.0,
+    "budget_mm": 80.0,
+    "source": "receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md: 60-80 mm below the connector face for the plug and boot"
+   }
+  }
+ }
+}
