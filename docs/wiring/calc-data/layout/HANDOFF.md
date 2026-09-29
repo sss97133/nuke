@@ -1,6 +1,6 @@
 # K5 Harness Layout: the workspace builder
 
-Live: https://claude.ai/artifact/QVLCDvWkF2XJ6DABBodakh, version 11 (2026-09-29). It is private to the owner.
+Live: https://claude.ai/artifact/QVLCDvWkF2XJ6DABBodakh, version 12 (2026-09-29). It is private to the owner.
 Lane: layout-ui. The page is built from sourced files only; nothing is typed into it by hand.
 
 ## What the page is

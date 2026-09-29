@@ -189,14 +189,15 @@ const TREE = {sys: [], bun: []};
       const pins = d[ep] = d[ep] || new Set(); pins.add(c);
     }));
     const dnodes = Object.keys(devs).sort((a, b) => natCmp(devName(a), devName(b))).map(dev => ({
-      id: 'd:' + dev, key: 'y:' + y.id + '/d:' + dev, label: devName(dev), kind: 'dev', count: Object.keys(devs[dev]).length,
+      id: 'd:' + dev, key: 'y:' + y.id + '/d:' + dev, label: devName(dev), kind: 'dev', count: Object.keys(devs[dev]).length, hay: [dev, (DEVS[dev] || {}).pn, (DEVS[dev] || {}).maker].join(' '),
       kids: Object.keys(devs[dev]).sort(natCmp).map(ep => ({
         id: 'c:' + ep, key: 'y:' + y.id + '/d:' + dev + '/c:' + ep, ti: ep, label: byId[ep] ? byId[ep].what : 'not in the ends list', kind: 'conn',
+        hay: byId[ep] ? [((byId[ep].conn || {}).family_word), (byId[ep].media || {}).maker_pn, (byId[ep].media || {}).maker].join(' ') : '',
         count: devs[dev][ep].size,
         kids: [...devs[dev][ep]].sort(natCmp).map(c => {
           const p = pinByKey[ep + '|' + c] || {w: []};
           const ws = p.w.filter(x => (W[x] || {}).sub === y.id || y.id === 'NONE');
-          return {id: 'p:' + ep + '|' + c, key: 'y:' + y.id + '/c:' + ep + '/p:' + c, ti: c, label: [p.n, ws.join(' ')].filter(Boolean).join(' · '), kind: 'pin'};
+          return {id: 'p:' + ep + '|' + c, key: 'y:' + y.id + '/c:' + ep + '/p:' + c, ti: c, label: [p.n, ws.join(' ')].filter(Boolean).join(' · '), kind: 'pin', hay: [ep, p.f, p.t].join(' ')};
         })
       }))
     }));
@@ -218,7 +219,7 @@ function treeRows() {
   const roots = TREE[S.treeMode] || [];
   const out = [];
   if (q) {
-    const hit = n => ((n.ti || '') + ' ' + n.label).toLowerCase().includes(q);
+    const hit = n => ((n.ti || '') + ' ' + n.label + ' ' + (n.hay || '')).toLowerCase().includes(q);
     const walk = (n, depth, trail) => {
       const self = hit(n), sub = [];
       (n.kids || []).forEach(k => walk(k, depth + 1, trail.concat([n])).forEach(r => sub.push(r)));
@@ -1323,7 +1324,7 @@ TAB.wires = {
   ], rowCls: r => r.kind === 'implied' ? 'imp' : ''};
 TAB.pins = {
   rows: () => { const out = []; Object.entries(PINS).sort((a, b) => natCmp(a[0], b[0])).forEach(([ep, ps]) => ps.forEach(p => out.push(Object.assign({ep}, p)))); return out; },
-  sel: r => 'p:' + r.ep + '|' + r.c, rel: r => S.R.p.has(r.ep + '|' + r.c) && (kindOf(S.sel) !== 'y' || r.w.some(x => S.R.w.has(x))),
+  sel: r => 'p:' + r.ep + '|' + r.c, pri: r => S.sel === 'p:' + r.ep + '|' + r.c || (kindOf(S.sel) === 'c' && valOf(S.sel) === r.ep), rel: r => S.R.p.has(r.ep + '|' + r.c) && (kindOf(S.sel) !== 'y' || r.w.some(x => S.R.w.has(x))),
   chips: [['', 'All'], ['used', 'Carrying a wire'], ['spare', 'Spare']], chip: (r, c) => !c || (c === 'spare' ? !r.w.length : r.w.length > 0),
   hay: r => [r.ep, r.c, r.n, r.f, r.w.join(' '), r.t].join(' '),
   cols: [
