@@ -11,7 +11,7 @@
  */
 
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { requireOwnerOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
@@ -46,6 +46,10 @@ Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
+  // Sends mail from Nuke's role addresses, including to the founder: the owner or the service key only, because "signed in" is anyone while
+  // sign-up is open (2026-09-29).
+  const notOwner = await requireOwnerOrService(req);
+  if (notOwner) return notOwner;
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 200,

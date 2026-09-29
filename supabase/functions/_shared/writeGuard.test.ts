@@ -5,7 +5,7 @@
  */
 
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { authenticateWriter, decodeJwt, requireWriteAuth, type WriteGuardDeps } from "./writeGuard.ts";
+import { authenticateWriter, decodeJwt, requireOwnerOrService, requireWriteAuth, type WriteGuardDeps } from "./writeGuard.ts";
 
 const SECRET = "test-jwt-secret-that-is-long-enough-for-hmac";
 const SERVICE_KEY_IN_ENV = "service-key-string-as-injected-by-the-platform";
@@ -173,4 +173,43 @@ Deno.test("decodeJwt rejects non-JWT shapes", () => {
   assertEquals(decodeJwt("a.b"), null);
   assertEquals(decodeJwt(""), null);
   assertEquals(decodeJwt("x.y.z"), null);
+});
+
+// ── requireOwnerOrService (2026-09-29) ─────────────────────────────────────────────
+const OWNER = "0b9f107a-0000-4000-8000-000000000001";
+const ownerLookup = (owner: string | null, status = 200): typeof fetch => ((input: RequestInfo | URL) => {
+  const u = String(input);
+  if (u.includes("/rest/v1/parent_company")) {
+    return Promise.resolve(new Response(JSON.stringify(owner ? [{ owner_user_id: owner }] : []), { status }));
+  }
+  return Promise.resolve(new Response("", { status: 401 }));
+}) as typeof fetch;
+
+Deno.test("owner-only: service key passes", async () => {
+  const res = await requireOwnerOrService(req({ authorization: `Bearer ${SERVICE_KEY_IN_ENV}` }), { deps: deps({ fetch: ownerLookup(OWNER) }) });
+  assertEquals(res, null);
+});
+
+Deno.test("owner-only: the owner's own sign-in passes", async () => {
+  const token = await hs256({ role: "authenticated", sub: OWNER, exp: NOW + 600 });
+  const res = await requireOwnerOrService(req({ authorization: `Bearer ${token}` }), { deps: deps({ fetch: ownerLookup(OWNER) }) });
+  assertEquals(res, null);
+});
+
+Deno.test("owner-only: any other signed-in user → 403", async () => {
+  const token = await hs256({ role: "authenticated", sub: "someone-else", exp: NOW + 600 });
+  const res = await requireOwnerOrService(req({ authorization: `Bearer ${token}` }), { deps: deps({ fetch: ownerLookup(OWNER) }) });
+  assertEquals(res?.status, 403);
+  assertEquals((await res!.json()).reason, "owner only");
+});
+
+Deno.test("owner-only: owner lookup fails → the owner is refused too (fails closed)", async () => {
+  const token = await hs256({ role: "authenticated", sub: OWNER, exp: NOW + 600 });
+  const res = await requireOwnerOrService(req({ authorization: `Bearer ${token}` }), { deps: deps({ fetch: ownerLookup(OWNER, 500) }) });
+  assertEquals(res?.status, 403);
+});
+
+Deno.test("owner-only: no token → 403; OPTIONS → not judged", async () => {
+  assertEquals((await requireOwnerOrService(req(), { deps: deps({ fetch: ownerLookup(OWNER) }) }))?.status, 403);
+  assertEquals(await requireOwnerOrService(req({}, "OPTIONS"), { deps: deps() }), null);
 });

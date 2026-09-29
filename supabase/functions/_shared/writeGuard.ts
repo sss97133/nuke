@@ -369,3 +369,43 @@ export async function requireWriteAuth(req: Request, opts: WriteGuardOptions = {
   console.warn(`[writeGuard] refused ${req.method} ${path} from ${ip}: ${verdict.reason}`);
   return writeAuthResponse(verdict, opts.headers);
 }
+
+/**
+ * For functions that act AS the platform owner: send mail as Nuke, read the owner's books.
+ * "Signed in" is not enough there, because sign-up is open and auto-confirmed. Call it after
+ * requireWriteAuth. Returns null for the service key or the company owner
+ * (parent_company.owner_user_id), otherwise a 403 to send back. It fails closed: if the owner
+ * can't be looked up, only the service key passes. OPTIONS is never judged. 2026-09-29.
+ */
+export async function requireOwnerOrService(req: Request, opts: WriteGuardOptions = {}): Promise<Response | null> {
+  if (req.method === "OPTIONS") return null;
+  const verdict = await authenticateWriter(req, opts);
+  if (verdict.ok && verdict.caller.kind === "service_role") return null;
+  const callerId = verdict.ok && (verdict.caller.kind === "user" || verdict.caller.kind === "api_key")
+    ? verdict.caller.userId
+    : null;
+  let ownerId: string | null = null;
+  if (callerId) {
+    const deps = withDefaults(opts.deps);
+    const url = deps.env("SUPABASE_URL");
+    const key = deps.env("SUPABASE_SERVICE_ROLE_KEY") ?? deps.env("SERVICE_ROLE_KEY");
+    try {
+      const r = await deps.fetch(`${url}/rest/v1/parent_company?legal_name=eq.NUKE%20LTD&select=owner_user_id&limit=1`, {
+        headers: { apikey: key ?? "", Authorization: `Bearer ${key ?? ""}` },
+      });
+      if (r.ok) {
+        const rows = await r.json();
+        ownerId = Array.isArray(rows) && typeof rows[0]?.owner_user_id === "string" ? rows[0].owner_user_id : null;
+      }
+    } catch {
+      ownerId = null;
+    }
+  }
+  if (callerId && ownerId && callerId === ownerId) return null;
+  const path = (() => { try { return new URL(req.url).pathname; } catch { return "?"; } })();
+  console.warn(`[writeGuard] owner-only refused ${req.method} ${path}: ${callerId ? "not the owner" : "no user"}`);
+  return new Response(JSON.stringify({ error: "forbidden", reason: "owner only" }), {
+    status: 403,
+    headers: { ...CORS, ...(opts.headers ?? {}), "Content-Type": "application/json" },
+  });
+}
