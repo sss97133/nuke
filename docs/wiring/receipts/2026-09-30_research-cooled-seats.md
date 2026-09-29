@@ -70,13 +70,13 @@ Positions are the agent's proposal. The builder places them on the truck. Only o
 ```yaml
 SEAT-L-PASS-P:            # SEAT-TED
   where: cabin
-  device: "driver seat disconnect, climate kit power — Deutsch DTP 2-way: DTP04-2P + WP-2P (floor/harness side, pins 0460-204-12141), DTP06-2S + WP-2S (seat side, sockets 0462-203-12141), size 12, 14-12 AWG, 25 A per contact"
+  device: "driver seat disconnect, climate kit power — Deutsch DTP 2-way, E-seal (C015) version: DTP04-2P + WP-2P (floor/harness side, pins 0460-204-12141), DTP06-2S + WP-2S (seat side, sockets 0462-203-12141), size 12, 14-12 AWG, 25 A per contact on 12 AWG"
   family: dtp
   kit: {DTP04-2P: 1, DTP06-2S: 1, WP-2P: 1, WP-2S: 1}
   wires: ["SEAT_L_PWR", "SEAT_L_GND"]
   position: "seat half on the driver seat frame under the cushion, near the rear; floor half P-clipped to the floor under the seat; service loop covers the adjuster's fore-aft travel (unmeasured)"
-  sources: ["www.customconnectorkits.com__dtp04-2p.md / __dtp06-2s.md (wedges WP-2P / WP-2S, size 12 contacts 14-12 AWG)", "www.farnell.com__628276.md (DTP 25 A; seals 2.46-4.32 mm; 12 AWG /32 is 2.62 mm, www.prowireusa.com__m22759-32-tefzel-wire.md)"]
-  open: ["the kit's power-lead gauge (must be 14-12 AWG for the size 12 socket)", "adjuster travel for the loop (tape T-16)"]
+  sources: ["www.customconnectorkits.com__dtp04-2p.md / __dtp06-2s.md (standard-seal parts; wedges WP-2P / WP-2S, size 12 contacts 14-12 AWG)", "Deutsch datasheet farnell 628276 printed p.5 [PDF p.3] WIRE SEALING RANGE: #12 N-seal 3.40-4.32 mm, E-seal 2.46-4.01 mm; 12 AWG /32 is 2.62 mm (www.prowireusa.com__m22759-32-tefzel-wire.md), so E-seal only", "Deutsch DT family catalog p.23 (C015 modification = 'E' seal)"]
+  open: ["E-seal (C015) part numbers for DTP04-2P / DTP06-2S (vendor page)", "the kit's power-lead gauge (must be 14-12 AWG for the size 12 socket)", "adjuster travel for the loop (tape T-16)"]
 SEAT-R-PASS-P:            # SEAT-TED
   where: cabin
   device: "passenger seat disconnect, climate kit power — as SEAT-L-PASS-P"
@@ -87,11 +87,12 @@ SEAT-R-PASS-P:            # SEAT-TED
   open: ["tip-forward arc at the plug (tape T-16)", "10 AWG feed needs a 10-to-12 AWG transition if the bench current is over 8.3 A"]
 SEAT-L-PASS:              # SEAT-VENT (alternative)
   where: cabin
-  device: "driver seat disconnect, fan kit power — Deutsch DT 2-way: DT04-2P + W2P (floor side, pins 0460-202-16141), DT06-2S + W2S (seat side, sockets 0462-201-16141), size 16, 20-16 AWG, 13 A"
+  device: "driver seat disconnect, fan kit power — Deutsch DT 2-way, E-seal (C015) version: DT04-2P + W2P (floor side, pins 0460-202-16141), DT06-2S + W2S (seat side, sockets 0462-201-16141), size 16, 20-16 AWG, 10 A test current on 18 AWG"
   family: dt
   kit: {DT04-2P: 1, DT06-2S: 1, W2P: 1, W2S: 1}
   wires: ["VENT_L_PWR", "VENT_L_GND"]
-  sources: ["catalog/parts.yaml DT04-2P / DT06-2S", "www.farnell.com__628276.md (DT 13 A; seals 1.35-3.68 mm; 18 AWG /32 is 1.52 mm)"]
+  sources: ["catalog/parts.yaml DT04-2P / DT06-2S (standard-seal parts)", "Deutsch datasheet farnell 628276 printed p.5 [PDF p.3]: #16 N-seal 2.24-3.68 mm, E-seal 1.35-3.05 mm; 18 AWG /32 is 1.52 mm, so E-seal only"]
+  open: ["E-seal (C015) part numbers for DT04-2P / DT06-2S (vendor page)"]
 SEAT-R-PASS:              # SEAT-VENT (alternative)
   where: cabin
   device: "passenger seat disconnect, fan kit power — as SEAT-L-PASS"
@@ -125,18 +126,27 @@ SEAT-SW-L / SEAT-SW-R:    # the kits' own switches, console or seat (owner's cal
   - Tolerance: 25 mm for lengths, 5 mm for depths.
 
 ## Substrate inconsistencies found (not fixed here; each needs its own substrate_correction)
-1. **The door window pass-throughs' 14 AWG won't seal in DTP.**
-   - The Deutsch catalog gives DTP seals as closing on 2.46–4.32 mm insulation (`www.farnell.com__628276.md`).
-   - ProWire lists M22759/32-14 at 2.16 mm nominal (`www.prowireusa.com__m22759-32-tefzel-wire.md`). The canon lists /16-14
-     at 2.31–2.41 mm (ch.16 §1.8). Both are under the minimum.
-   - The PW candidate runs 14 AWG /32 through DOOR-L-PASS-P and DOOR-R-PASS-P: #34, WIN_GND_L, WIN_R_UP, WIN_R_DN, #35,
-     WIN_GND_R.
-   - 12 AWG /32 (2.62 mm) seals. Only one source for the seal range is on file, so check a sample in a DTP seal.
-2. The lamp research quotes the DT seal as 1.35–3.05 mm from the same catalog. On that page, 1.35–3.05 mm is the DTM row.
-   DT is 1.35–3.68 mm. The minimum is the same, so no lamp conclusion changes.
-3. `.claude/rules/wiring-receipt.md` points to `docs/wiring/RECEIPT_FORMAT.md` and `HARNESS_RULES.md`. Neither is in the
+1. **Standard Deutsch seals don't close on this build's M22759/32 wire.**
+   - Deutsch's "WIRE SEALING RANGE" table (datasheet https://www.farnell.com/datasheets/628276.pdf, printed p.5 [PDF p.3],
+     snapshot `www.farnell.com__628276.md`) gives each contact size a standard N-seal and a reduced E-seal:
+     - #20: N-seal 1.35–3.05 mm.
+     - #16 (DT): N-seal 2.24–3.68 mm, E-seal 1.35–3.05 mm.
+     - #12 (DTP): N-seal 3.40–4.32 mm, E-seal 2.46–4.01 mm.
+   - The E-seal is the "C015 modification ... reduced diameter insert cavity allowing for a proper seal with smaller wire
+     insulation" (Deutsch DT family catalog p.23, `reference_documents/component_drawings/DEUTSCH_DT_DTM_DTP_Catalog.pdf`).
+   - The build's /32 ODs (parts.yaml WIRE-OD, ProWire nominal) are 20 AWG 1.27, 18 AWG 1.52, 16 AWG 1.73, 14 AWG 2.16 and
+     12 AWG 2.62 mm. Every one is under the N-seal minimum for its contact size.
+   - So the catalog's DT and DTP housings need the E-seal (C015) versions wherever /32 wire enters them. The housings in
+     question: DT04-2P, DT06-2S, DT04-08PA, DT06-08SA, DT04-12PA-L012, DT06-12SA, DTP04-4P, DTP06-4S and the others in
+     parts.yaml. Two cases don't seal even in the E-seal:
+     - 20 AWG /32 at 1.27 mm is under the 1.35 mm #16 E-seal minimum. The lamp research already asks for a measurement.
+     - 14 AWG /32 at 2.16 mm in a DTP is under the 2.46 mm #12 E-seal minimum. That is the PW candidate's door window
+       lines in DOOR-L-PASS-P and DOOR-R-PASS-P: #34, WIN_GND_L, WIN_R_UP, WIN_R_DN, #35 and WIN_GND_R.
+   - The front-page summary of the same datasheet ("DT ... Seals on .053” to .145 dia.", "DTP ... .097” to .170", PDF p.2)
+     spans both seals. The lamp research's "1.35–3.05 mm" for DT is the #16 E-seal (and #20) range, not the standard DT seal.
+2. `.claude/rules/wiring-receipt.md` points to `docs/wiring/RECEIPT_FORMAT.md` and `HARNESS_RULES.md`. Neither is in the
    repo (git ls-files). This receipt follows the recent receipts' front matter.
-4. For the reconciliation lane (no database write here):
+3. For the reconciliation lane (no database write here):
    - Three rows filed on the K5 on 2026-02-04 (a146c0c7-4fbe-4f36-9b50-906713d31485,
      dc97c39a-8aa2-45a5-9416-7cb264890a91, 46a5e207-6835-46a7-873f-be95a9363f46) show a light-blue regular-cab pickup
      with a brown bench and black door panel. That is not this maroon Blazer with plaid buckets.

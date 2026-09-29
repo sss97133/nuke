@@ -861,9 +861,11 @@ SEAT-TED:
       cab PDM15 (its one spare 20 A output, plus two 8 A outputs in parallel, manual p.6) or two 20 A loads move off the PDM30.
       A bay PDM can't feed them (one 61-pin, #20 contacts). The outputs switch on only with RUN (PDM30 DIG1), not START (DIG10),
       and M130 engine RPM over CAN above cranking speed (M1 General 0x640; PDM manual p.38 RPM example). The kit's relay and fuse
-      are left out: the PDM output is both. OPEN: the plaid inserts' backing must pass air; the passenger feed's gauge waits on
-      the bench current (12 AWG holds 3 % drop to 8.3 A on the estimated run); the backrest's depth for the back TED; the PDM30
-      100 A and alternator 150 A budgets with the seats' 30 A
+      are left out: the PDM output is both. The DTP seat plugs must be the E-seal (C015) version: 12 AWG /32 is 2.62 mm, and
+      the standard #12 seal starts at 3.40 mm (E-seal 2.46-4.01 mm; Deutsch datasheet farnell 628276 printed p.5). OPEN: E-seal
+      part numbers; the plaid inserts' backing must pass air; the passenger feed's gauge waits on the bench current (12 AWG
+      holds 3 % drop to 8.3 A on the estimated run); the backrest's depth for the back TED; the PDM30 100 A and alternator
+      150 A budgets with the seats' 30 A
     adds:
       - {id: SEAT_L_PT1, gauge: 16, spec: M22759/32, from: "PDM 20 A output, pin 1 (PDM30:OUT3 pin A5 without PW; else the cab PDM15's spare 20 A output)", to: "SPL-SEAT-L (M81824/1-3)", current_a: null, length_ft_est: 0.5, basis: "20 A outputs take 20-16 AWG per pin (MoTeC PDM manual p.6); 2 x 16 AWG pigtails per 20 A output, the build's pattern (state 0ac); 7.5 A each at the 15 A limit, 16# 15 A x 0.85 = 12.75 A (manual p.48)"}
       - {id: SEAT_L_PT2, gauge: 16, spec: M22759/32, from: "PDM 20 A output, pin 2 (PDM30:OUT3 pin A14 without PW)", to: "SPL-SEAT-L (M81824/1-3)", current_a: null, length_ft_est: 0.5, basis: "as SEAT_L_PT1"}
@@ -898,8 +900,9 @@ SEAT-VENT:
       the air is only as cool as the cab: there is no active cooling. The PDM30's only spare 8 A output is OUT21, which PL takes;
       otherwise a cab PDM15 8 A output, or a PDM32 in place of the PDM30 (two more 8 A outputs, manual p.1). Same engine-running
       condition as SEAT-TED. The kit's own switch sets the fan speed, because the PDM can't: "Motor speed control is currently not
-      supported" (PDM manual p.28). OPEN: the plaid backing must pass air; per-seat current (18 AWG holds 3 % drop to 5.6 A
-      driver, 2.7 A passenger)
+      supported" (PDM manual p.28). The DT seat plugs must be the E-seal (C015) version: 18 AWG /32 is 1.52 mm, and the
+      standard #16 seal starts at 2.24 mm (E-seal 1.35-3.05 mm; Deutsch datasheet farnell 628276 printed p.5). OPEN: E-seal part
+      numbers; the plaid backing must pass air; per-seat current (18 AWG holds 3 % drop to 5.6 A driver, 2.7 A passenger)
     adds:
       - {id: VENT_PT, gauge: 20, spec: M22759/32, from: "PDM 8 A output (PDM30:OUT21 without PL; else a cab PDM15 8 A output)", to: "SPL-SEAT-VENT", current_a: null, length_ft_est: 0.5, basis: "8 A outputs take 24-20 AWG (MoTeC PDM manual p.6); 20# 8 A at 80 C (p.48) x 0.85 = 6.8 A; a pigtail is under the 24 in bundling threshold (canon ch.16 s2.2)"}
       - {id: VENT_L_PWR, gauge: 18, spec: M22759/32, from: "SPL-SEAT-VENT", to: "SEAT-L-PASS pin 1 (DT04-2P, floor side)", current_a: null, length_ft_est: 6, basis: "route and length as SEAT_L_PWR; 18 AWG for drop: 3 % holds to 5.6 A on the 12 ft loop (6.23 ohm/kft, ProWire M22759/32 table)"}

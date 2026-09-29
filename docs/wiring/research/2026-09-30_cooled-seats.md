@@ -272,14 +272,32 @@ bench. That is the "calculate first, cut last" order (state §2).
 
 ### Seat disconnect, sealed, from families already in the build
 
-- **Thermoelectric: Deutsch DTP 2-way.**
+- **The seal decides the housing version.** Deutsch's "WIRE SEALING RANGE" table gives two seals per contact size (Deutsch
+  DT/DTM/DTP datasheet, https://www.farnell.com/datasheets/628276.pdf printed p.5 [PDF p.3], snapshot
+  `www.farnell.com__628276.md`):
+
+  | Contact size | N-seal (standard) | E-seal (reduced) |
+  |---|---|---|
+  | #16 (DT) | .088–.145 in (2.24–3.68 mm) | .053–.120 in (1.35–3.05 mm) |
+  | #12 (DTP) | .134–.170 in (3.40–4.32 mm) | .097–.158 in (2.46–4.01 mm) |
+
+  - The E-seal is the "C015 modification", which "offers a reduced diameter insert cavity allowing for a proper seal with
+    smaller wire insulation" and "is also referred to as an 'E' seal" (Deutsch DT family catalog p.23 [PDF p.7],
+    `reference_documents/component_drawings/DEUTSCH_DT_DTM_DTP_Catalog.pdf`).
+  - The same datasheet's front-page summary ("DTP ... Seals on .097” to .170 dia. (2.46mm to 4.32mm)", PDF p.2) spans both
+    seals, so it can't be read as one housing's range.
+  - The part numbers in the catalog and below are the standard (N-seal) parts. The E-seal part numbers are not on file
+    (OPEN: vendor page).
+- **Thermoelectric: Deutsch DTP 2-way, E-seal version.**
   - Floor/harness side: DTP04-2P with wedge WP-2P and size-12 pins 0460-204-12141. Seat side: DTP06-2S with WP-2S and
     sockets 0462-203-12141 (`www.customconnectorkits.com__dtp04-2p.md`, `__dtp06-2s.md`; $4.29 and $3.29 each,
-    2026-09-29).
-  - Rated 25 A per contact (Deutsch catalog, `www.farnell.com__628276.md`).
-  - Its seals close on 2.46–4.32 mm insulation. 12 AWG /32 is 2.62 mm nominal, so it seals.
-- **Fans: Deutsch DT 2-way.** DT04-2P with W2P, DT06-2S with W2S, size-16 contacts 0460-202-16141 and 0462-201-16141
-  (20–16 AWG, 13 A). 18 AWG /32 is 1.52 mm, inside the DT seal's 1.35–3.68 mm.
+    2026-09-29, standard seal).
+  - Rated 25 A per contact on 12 AWG (datasheet p.5, contact table).
+  - 12 AWG /32 is 2.62 mm nominal (ProWire table). That is inside the E-seal (2.46–4.01 mm) and under the standard seal's
+    3.40 mm minimum, so the seat plugs must be the E-seal version.
+- **Fans: Deutsch DT 2-way, E-seal version.** DT04-2P with W2P, DT06-2S with W2S, size-16 contacts 0460-202-16141 and
+  0462-201-16141 (20–16 AWG; 10 A test current on 18 AWG, datasheet p.5). 18 AWG /32 is 1.52 mm: inside the E-seal
+  (1.35–3.05 mm), under the standard seal's 2.24 mm.
 - **Which side gets pins:** pins on the harness side and sockets on the seat side follow the door pass-throughs in
   `endpoints.yaml`. With the engine-running interlock, the harness side is dead whenever the engine is off. Pins versus
   sockets on the live side stays the builder's call, as in the lamp research.
