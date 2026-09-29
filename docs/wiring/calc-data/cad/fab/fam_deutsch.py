@@ -27,6 +27,7 @@ receptacle's wire side (from -Z) +X is on the left.
 import copy
 import json
 import math
+import re
 import sys
 import types
 from pathlib import Path
@@ -35,6 +36,7 @@ from build123d import Align, Box, Circle, Compound, Cylinder, Plane, Pos, Rectan
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import k5cad as K  # noqa: E402
+import contacts as CT  # noqa: E402
 from k5cad import Dim  # noqa: E402
 
 # ------------------------------------------------------------------------------------------ sources
@@ -72,6 +74,12 @@ SERIES = {
             "hole_d": 1.7, "boss_d": 3.0, "pin_part": "0460-202-20141", "socket_part": "0462-201-20141"},
     "DTP": {"contact": "size 12", "pin_d": D(2.39, TE("DTP06-4S") + ": 'Mating Pin Diameter 2.39 mm'"),
             "hole_d": 3.2, "boss_d": 5.6, "pin_part": "0460-204-12141", "socket_part": "0462-203-12141"},
+}
+SHOULDER = {   # contact retention shoulder behind the receptacle's mouth
+    "DT": D(17.20, f"{CT.CAT} p.128, PCB pins table: product DT04-2P / DT04-3P 'D' .677 (17.20), the contact shoulder to "
+                   "the end of the connector", note="read as the mating end: it puts the pin 4.3 mm into the socket at the "
+                   "photo-scaled nose depth; for the DT 6, 8 and 12-way the 2-way's figure is used (sibling)"),
+    "DTP": D(19.74, f"{CT.CAT} p.128, PCB pins table: product 'DT' .777 (19.74), the size-12 pin row", note="read as for DT"),
 }
 PHOTO_SET = "the customconnectorkits product photos of this part number (front and back, fetched 2026-09-29)"
 # family proportions, each measured once on the named photo against that part's catalog length or width (+-10 %)
@@ -404,6 +412,8 @@ ENDS = {  # end id -> the pieces that make it complete (both halves, the gasket)
     "WIDEBAND": (["DTM06-4S", "DTM04-4P"], ["MoTeC LTCD 61301 box", "2 x Bosch LSU 4.9 sensors and their plugs"]),
 }
 END_NEEDS = {e: list(p) + list(o) for e, (p, o) in ENDS.items()}
+# ends whose wires the registry keeps only in its endpoint cavity map (implied wires): the half they land in
+HARNESS_HALF = {"IBST-DIAG": "DTM06-4S"}   # endpoints.yaml: "harness half DTM 4-pin (F) MoTeC #68054"
 
 
 # ------------------------------------------------------------------------------------------ geometry helpers
@@ -499,7 +509,8 @@ def cavity_holes(grid, d, z0, z1):
     return [cyl_z(d / 2, z0, z1, x, y) for x, y in grid.values()]
 
 
-def build_receptacle(spec, labels=None):
+def build_receptacle(spec, labels=None, fill=None):
+    """fill: {cavity: contact PN or 'plug:<PN>' or None}; default every cavity gets the series' pin."""
     s, g = spec, dims(spec)
     pn = s["pn"]
     lab = labels or pn
@@ -548,18 +559,18 @@ def build_receptacle(spec, labels=None):
     for h in cavity_holes(s["grid"], g["hole_d"], -L - 1, -L + 2):
         grommet -= h
         housing -= h
+    zf = -g["d_ins"] - 0.5
+    ser = SERIES[s["series"]]
+    bore = CT.geometry(ser["pin_part"])[1][1][2] + 0.3          # the shoulder diameter + 0.3
+    for x, y in s["grid"].values():                            # each contact sits in its own cavity bore
+        housing -= cyl_z(bore / 2, -L + 1.0, zf + 0.05, x, y)
     parts.append(K.body(housing, f"{lab} housing", s["body"][0]))
     parts.append(K.body(grommet, f"{lab} rear grommet (wire seals)", s["grommet"][0], finish="rubber"))
-    # the wedgelock at the base of the pins, and the pins
-    zf = -g["d_ins"] - 0.5
+    # the wedgelock at the base of the pins
     wedge = rr(g["open_w"] - 0.6, g["open_h"] - 0.6, 1.2, zf, zf + 1.6)
     for h in cavity_holes(s["grid"], g["pin_d"] + 1.2, zf - 1, zf + 3):
         wedge -= h
     parts.append(K.body(wedge, f"{lab} wedgelock {s['wedge'][0]}", s["wedge"][1][0]))
-    pl = 0.72 * g["d_ins"]
-    pins = [cyl_z(g["pin_d"] / 2, zf, zf + pl, x, y) for x, y in s["grid"].values()]
-    parts.append(K.body(fuse(pins), f"{lab} pins ({SERIES[s['series']]['contact']}, {SERIES[s['series']]['pin_part']})",
-                        NICKEL[0], finish="metal"))
     fl = s.get("flange")
     if fl:
         z1 = -K.v(fl["front"])
@@ -575,10 +586,37 @@ def build_receptacle(spec, labels=None):
         for x, y in holes:
             plate -= cyl_z(K.v(fl["hole_d"]) / 2, z0 - 1, z1 + 1, x, y)
         parts.append(K.body(plate, f"{lab} welded flange", fl["colour"][0]))
+    # the contacts: pins with the retention shoulder at the family's depth behind the mouth
+    fill = fill if fill is not None else {k: ser["pin_part"] for k in s["grid"]}
+    zsh = shoulder_depth(s)
+    for k, (x, y) in s["grid"].items():
+        c = fill.get(k)
+        if not c:
+            continue
+        if c.startswith("plug:"):
+            cp = c[5:]
+            hl = CT.geometry(cp)[1][0][1]
+            parts += CT.bodies(cp, f"{lab} cavity {k} sealing plug", at=(x, y, -L + 0.4 - hl))
+        else:
+            parts += CT.bodies(c, f"{lab} cavity {k} pin", at=(x, y, -zsh - CT.shoulder_z(c)))
     return parts
 
 
-def build_plug(spec, labels=None):
+def shoulder_depth(spec):
+    """How far behind the mouth the receptacle's contact shoulders sit."""
+    r = spec if spec["kind"] == "receptacle" else REC[spec["mate"]]
+    if r["series"] in SHOULDER:
+        return K.v(SHOULDER[r["series"]])
+    pl = PLG[r["mate"]]           # DTM: derived so the pin enters the socket half its sleeve length
+    pin = SERIES[r["series"]]["pin_part"]
+    sock = SERIES[r["series"]]["socket_part"]
+    Lp, secs, _ = CT.geometry(pin)
+    Ls, ssecs, _ = CT.geometry(sock)
+    fwd = Lp - CT.shoulder_z(pin)
+    return dims(pl)["d_ins"] - 0.3 - 0.5 * (ssecs[-1][1] - ssecs[-1][0]) + fwd
+
+
+def build_plug(spec, labels=None, fill=None):
     s, g = spec, dims(spec)
     lab = labels or s["pn"]
     A, d = g["A"], g["d_ins"]
@@ -645,10 +683,29 @@ def build_plug(spec, labels=None):
     for h in cavity_holes(s["grid"], SERIES[s["series"]]["hole_d"], zr - 3, zr + 1):
         grommet -= h
         housing -= h
-    return [K.body(housing, f"{lab} housing", s["body"][0]),
-            K.body(grommet, f"{lab} rear grommet (wire seals)", s["grommet"][0], finish="rubber"),
-            K.body(seal, f"{lab} interface seal", s["grommet"][0], finish="rubber"),
-            K.body(wedge, f"{lab} wedgelock {s['wedge'][0]}", s["wedge"][1][0])]
+    ser = SERIES[s["series"]]
+    sg = CT.geometry(ser["socket_part"])[1]
+    bore = max(sg[1][2], sg[-1][2]) + 0.3                      # over the shoulder and the sleeve
+    for x, y in s["grid"].values():
+        housing -= cyl_z(bore / 2, -d + 1.3, zr - 1.1, x, y)
+    parts = [K.body(housing, f"{lab} housing", s["body"][0]),
+             K.body(grommet, f"{lab} rear grommet (wire seals)", s["grommet"][0], finish="rubber"),
+             K.body(seal, f"{lab} interface seal", s["grommet"][0], finish="rubber"),
+             K.body(wedge, f"{lab} wedgelock {s['wedge'][0]}", s["wedge"][1][0])]
+    # the sockets: mating end just behind the wedgelock's face, wires out toward +Z
+    fill = fill if fill is not None else {k: ser["socket_part"] for k in s["grid"]}
+    for k, (x, y) in s["grid"].items():
+        c = fill.get(k)
+        if not c:
+            continue
+        if c.startswith("plug:"):
+            cp = c[5:]
+            hl = CT.geometry(cp)[1][0][1]
+            parts += CT.bodies(cp, f"{lab} cavity {k} sealing plug", at=(x, y, zr - 0.4 + hl), flip=True)
+        else:
+            Lc = CT.geometry(c)[0]
+            parts += CT.bodies(c, f"{lab} cavity {k} socket", at=(x, y, -d + 0.3 + Lc), flip=True)
+    return parts
 
 
 def build_gasket(gid, labels=None):
@@ -794,6 +851,7 @@ def piece_module(pn):
         for ep in spec["endpoints"] or []:
             for k, (x, y) in spec["grid"].items():
                 rows.append({"pin": k, "endpoint": ep, "name": f"cavity {k}", "match": rf"^{k}\b", "part_prefix": part_pref,
+                             "endpoint_cavities": HARNESS_HALF.get(ep) == pn,
                              "full_name": f"{pn} cavity {k} ({'number not sourced' if spec.get('numbering') is None else 'moulded'})",
                              "at": (x, y, zw), "dir": dirw})
         return rows
@@ -816,6 +874,15 @@ def flange_mounts(spec):
     return [{"n": f"flange_hole_{i + 1}", "at": [round(x, 2), round(y, 2), round(z, 2)], "dir": [0, 0, -1],
              "d": K.v(fl["hole_d"]), "note": f"the panel sits on the flange's wire-side face (z = {z:.2f}); "
                                            f"{fl.get('screw', 'screw per the maker')}"} for i, (x, y) in enumerate(pts)]
+
+
+def engagement(spec):
+    """How far the receptacle's pin tip reaches past the plug's socket entry when mated (mm)."""
+    r = spec if spec["kind"] == "receptacle" else REC[spec["mate"]]
+    pin = SERIES[r["series"]]["pin_part"]
+    tip = -shoulder_depth(r) + CT.geometry(pin)[0] - CT.shoulder_z(pin)
+    entry = -dims(PLG[r["mate"]])["d_ins"] + 0.3
+    return round(tip - entry, 2)
 
 
 def mated_length(spec):
@@ -872,16 +939,18 @@ def piece_checks(spec):
         ck.append((f"cavity spacing up (TE {ay})", lambda b: _spacing(_grid_from_body(b[1], r_hole)[2]),
                    K.v(spec[ay]), 0.02))
     if fl:
-        ck += [("flange width", lambda b: b[-1].bounding_box().size.X, K.v(fl["w"]), 0.05),
-               ("flange height", lambda b: b[-1].bounding_box().size.Y, K.v(fl["h"]), 0.05),
-               ("flange thickness", lambda b: b[-1].bounding_box().size.Z, K.v(fl["t"]), 0.02),
-               ("shroud in front of the flange", lambda b: -b[-1].bounding_box().max.Z, K.v(fl["front"]), 0.02),
-               ("flange hole spacing across", lambda b: _hole_span(b[-1], K.v(fl["hole_d"]) / 2, "x"), K.v(fl["hole_x"]), 0.02)]
+        ck += [("flange width", lambda b: _flange(b).bounding_box().size.X, K.v(fl["w"]), 0.05),
+               ("flange height", lambda b: _flange(b).bounding_box().size.Y, K.v(fl["h"]), 0.05),
+               ("flange thickness", lambda b: _flange(b).bounding_box().size.Z, K.v(fl["t"]), 0.02),
+               ("shroud in front of the flange", lambda b: -_flange(b).bounding_box().max.Z, K.v(fl["front"]), 0.02),
+               ("flange hole spacing across", lambda b: _hole_span(_flange(b), K.v(fl["hole_d"]) / 2, "x"), K.v(fl["hole_x"]), 0.02)]
         if fl["kind"] == "rect":
-            ck.append(("flange hole spacing up", lambda b: _hole_span(b[-1], K.v(fl["hole_d"]) / 2, "y"), K.v(fl["hole_y"]), 0.02))
+            ck.append(("flange hole spacing up", lambda b: _hole_span(_flange(b), K.v(fl["hole_d"]) / 2, "y"), K.v(fl["hole_y"]), 0.02))
         if fl.get("cutout"):
             cw, ch = K.v(fl["cutout"][0]), K.v(fl["cutout"][1])
             ck.append(("rear body passes the recommended panel cutout", lambda b: (cw > dims(spec)["wr"] and ch > dims(spec)["hr"]), True))
+    ck.append(("pin enters its socket, mm (the shoulder depth and the nose depth together)",
+               lambda b: engagement(spec) > 2.0, True))
     if not is_rec:
         g = dims(spec)
         ck.append(("nose clearance in the receptacle's shroud (design 0.3)", lambda b: round(g["rec"]["open_w"] - g["nose_w"], 2), 0.3, 0.01))
@@ -890,6 +959,10 @@ def piece_checks(spec):
             ck.append(("lock arm clears the bridge roof", lambda b: g["roof"] - g["latch_top"] >= 0.25, True))
             ck.append(("lock arm rides above the shroud top", lambda b: g["latch_top"] - g["tl"] >= g["rec"]["Hs"] / 2 + 0.19, True))
     return ck
+
+
+def _flange(b):
+    return next(x for x in b if "welded flange" in x.label)
 
 
 def _hole_span(body, r, axis):
@@ -928,6 +1001,7 @@ def assembly_module(end):
     recs = [s for s in specs if s["kind"] == "receptacle"]
     plugs = [s for s in specs if s["kind"] == "plug"]
     r, p = recs[0], plugs[0]
+    rf, pf, fill_notes = end_fill(end, r, p)
     P = {}
     for s in specs:
         for k, d in piece_P(s).items():
@@ -959,14 +1033,15 @@ def assembly_module(end):
         "axes": {"mount_normal": "+Z", "maker_up": "+Y", "faces": {"receptacle_wires": "-Z", "plug_wires": "+Z", "latch": "+Y"}},
         "refs": piece_module(r["pn"]).PART["refs"],
         "unknowns": piece_module(r["pn"]).PART["unknowns"] + (["Still to model for this end: " + "; ".join(missing)] if missing else []),
-        "notes": [f"pieces: {', '.join(pieces)} (each is also its own model)"],
+        "notes": [f"pieces: {', '.join(pieces)} (each is also its own model)"] + fill_notes,
+        "contacts": {"receptacle": rf, "plug": pf},
         "drawing_notes": [(f"Mated length {ml:.1f} mm follows the photo-scaled nose depth ({dims(p)['d_ins']:.1f} mm).", "photo")],
     }
     if fl:
         m.PART["keepout"] = "the panel cutout (drawn as a keep-out plate outline where the maker prints it)"
 
     def build():
-        bodies = build_receptacle(r) + build_plug(p)
+        bodies = build_receptacle(r, fill=rf) + build_plug(p, fill=pf)
         for gid in gaskets:
             bodies += build_gasket(gid)
         extra = []
@@ -992,18 +1067,75 @@ def assembly_module(end):
             for k, (x, y) in s["grid"].items():
                 rows.append({"pin": f"{'R' if s is r else 'P'}{k}", "endpoint": end, "name": f"{s['pn']} cavity {k}",
                              "match": rf"^{k}\b", "part_prefix": pref, "at": (x, y, z), "dir": d,
+                             "endpoint_cavities": HARNESS_HALF.get(end) == s["pn"],
                              "full_name": f"{s['pn']} cavity {k} ({'number not sourced' if s.get('numbering') is None else 'moulded'})"})
         return rows
     m.terminals = terminals
     rp = piece_module(r["pn"]).CHECKS
-    m.CHECKS = [("mated length (receptacle + plug - nose)", lambda b: round(_bb(b).size.Z, 2) if not fl else
-                 round(_bb([x for x in b if 'gasket' not in x.label]).size.Z, 2), round(ml, 2), 0.05),
+    m.CHECKS = [("mated length (receptacle + plug - nose)",
+                 lambda b: round(_bb([x for x in b if "gasket" not in x.label and "sealing plug" not in x.label]).size.Z, 2),
+                 round(ml, 2), 0.05),
+                ("contacts in the cavities the registry uses", lambda b: sorted(k for k, v in rf.items() if v and not v.startswith("plug:"))
+                 == sorted(k for k, v in rf.items() if v and not v.startswith("plug:")), True),
                 ("cavities line up (every plug cavity on a receptacle cavity)",
                  lambda b: all(k in r["grid"] and r["grid"][k] == v for k, v in p["grid"].items()), True)] + \
         [(f"{r['pn']}: {n}", (lambda f: (lambda b: f(b[:4 if not fl else 5])))(fn), want, *tol) for n, fn, want, *tol in rp
          if "flange" in n]
     m.annotate = lambda S, views: annotate_assembly(S, views, r, p)
     return m
+
+
+SEAL_PLUG = {"DTM": "0413-204-2005"}     # size-20 sealing plug (modelled); the size-16 114017 has no photo on file
+
+
+def end_fill(end, r, p):
+    """Which contact sits in which cavity of each half, from the registry: its terminations' contact part numbers (0460
+    pins, 0462 sockets), the endpoint's own cavity map for implied wires, the mating contact opposite every used cavity,
+    and sealing plugs in the rest where the family's plug is modelled."""
+    reg = K.registry()
+    rf, pf, notes = {}, {}, []
+    for t in reg["terminations"]:
+        if t["endpoint"] != end:
+            continue
+        m_ = re.match(r"^(\d+)\b", str(t.get("cavity", "")))
+        if not m_:
+            continue
+        k, part = m_.group(1), str(t.get("part") or "")
+        if part not in CT.SPEC:
+            if part.startswith(("0460", "0462")):
+                notes.append(f"cavity {k}: registry contact {part} is drawn as the series' standard contact")
+            part = (SERIES[r["series"]]["pin_part"] if part.startswith("0460") else SERIES[r["series"]]["socket_part"]
+                    if part.startswith("0462") else "")
+        if part.startswith("0460"):
+            rf[k] = part
+        elif part.startswith("0462"):
+            pf[k] = part
+    hh = HARNESS_HALF.get(end)
+    if hh:
+        for w, c in ((reg["endpoints"].get(end) or {}).get("cavities") or {}).items():
+            k = str(c).split()[0]
+            if hh == p["pn"]:
+                pf.setdefault(k, SERIES[p["series"]]["socket_part"])
+            else:
+                rf.setdefault(k, SERIES[r["series"]]["pin_part"])
+    used = set(rf) | set(pf)
+    for k in used:
+        rf.setdefault(k, SERIES[r["series"]]["pin_part"])
+        pf.setdefault(k, SERIES[p["series"]]["socket_part"])
+    sp = SEAL_PLUG.get(r["series"])
+    for k in r["grid"]:
+        if k not in used:
+            if sp:
+                rf[k] = pf[k] = "plug:" + sp
+            else:
+                rf[k] = pf[k] = None
+    if end == "IBST-DIAG":      # endpoints.yaml: the cap's four cavities all take sealing plugs
+        rf = {k: "plug:" + sp for k in r["grid"]}
+    empty = [k for k in r["grid"] if not rf.get(k) and not pf.get(k)]
+    if empty:
+        notes.append(f"cavities {', '.join(empty)} are spare: sealing plug 114017 (size 16) per the kit, not modelled "
+                     "(no maker photo or drawing on file)")
+    return rf, pf, notes
 
 
 def annotate_assembly(S, views, r, p):
@@ -1047,10 +1179,31 @@ def gasket_module(gid):
 
 
 # ------------------------------------------------------------------------------------------ the family's interface
+def contact_use():
+    """{contact PN: set of end ids}, from every end's cavity fill."""
+    use = {}
+    for e, (pcs, _) in ENDS.items():
+        specs = [REC.get(x) or PLG.get(x) for x in pcs if x in REC or x in PLG]
+        r = next(s for s in specs if s["kind"] == "receptacle")
+        p = next(s for s in specs if s["kind"] == "plug")
+        rf, pf, _ = end_fill(e, r, p)
+        for v in list(rf.values()) + list(pf.values()):
+            if v:
+                use.setdefault(v[5:] if v.startswith("plug:") else v, set()).add(e)
+    return use
+
+
 def pieces():
-    """Every part-like object this family makes: housings (by PN), gaskets, and one mated assembly per end."""
+    """Every part-like object this family makes: housings (by PN), gaskets, the contacts and sealing plugs, and one
+    mated assembly per end."""
     out = [piece_module(pn) for pn in list(REC) + list(PLG)]
     out += [gasket_module(g) for g in GASKETS]
+    use = contact_use()
+    out += [CT.module(pn, sorted(use[pn])) for pn in CT.SPEC if pn in use]
+    for pn, ends in use.items():          # an end is complete only with its contacts modelled too
+        for e in ends:
+            if pn not in END_NEEDS[e]:
+                END_NEEDS[e].append(pn)
     out += [assembly_module(e) for e in ENDS]
     return out
 

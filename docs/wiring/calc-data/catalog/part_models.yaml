@@ -32,30 +32,40 @@ ends:
     complete: true
   DOOR-L-PASS:
     models:
+    - 0460-202-16141
+    - 0462-201-16141
     - DOOR-L-PASS
     - DT04-08PA
     - DT06-08SA
     complete: true
   DOOR-L-PASS-P:
     models:
+    - 0460-204-12141
+    - 0462-203-12141
     - DOOR-L-PASS-P
     - DTP04-4P
     - DTP06-4S
     complete: true
   DOOR-R-PASS:
     models:
+    - 0460-202-16141
+    - 0462-201-16141
     - DOOR-R-PASS
     - DT04-08PA
     - DT06-08SA
     complete: true
   DOOR-R-PASS-P:
     models:
+    - 0460-204-12141
+    - 0462-203-12141
     - DOOR-R-PASS-P
     - DTP04-4P
     - DTP06-4S
     complete: true
   FIREWALL-BODY-A:
     models:
+    - 0460-202-16141
+    - 0462-201-16141
     - DT04-12PA-L012
     - DT06-12SA
     - DT12-L012-GKT
@@ -63,6 +73,8 @@ ends:
     complete: true
   FIREWALL-BODY-B:
     models:
+    - 0460-202-16141
+    - 0462-201-16141
     - DT04-12PB-L012
     - DT06-12SB
     - DT12-L012-GKT
@@ -70,12 +82,16 @@ ends:
     complete: true
   FIREWALL-BODY-C:
     models:
+    - 0460-202-16141
+    - 0462-201-16141
     - DT04-6P-L012
     - DT06-6S
     - FIREWALL-BODY-C
     complete: true
   FIREWALL-BODY-P:
     models:
+    - 0460-204-12141
+    - 0462-203-12141
     - DTP04-4P-L012
     - DTP06-4S
     - DTP4P-L012-GKT
@@ -83,6 +99,8 @@ ends:
     complete: true
   FUEL-LEVEL:
     models:
+    - 0460-202-16141
+    - 0462-201-16141
     - DT04-2P
     - DT06-2S
     - FUEL-LEVEL
@@ -92,6 +110,8 @@ ends:
     - QFS-H882 hanger and level sender
   FUEL-PUMP:
     models:
+    - 0460-204-12141
+    - 0462-203-12141
     - DTP04-2P
     - DTP06-2S
     - FUEL-PUMP
@@ -101,6 +121,8 @@ ends:
     - QFS-H882 hanger and P367 pump
   IBST-DIAG:
     models:
+    - 0413-204-2005
+    - 0462-201-20141
     - DTM04-4P
     - DTM06-4S
     - IBST-DIAG
@@ -143,6 +165,9 @@ ends:
     complete: true
   WIDEBAND:
     models:
+    - 0460-202-20141
+    - 0462-005-20141
+    - 0462-201-20141
     - DTM04-4P
     - DTM06-4S
     - WIDEBAND
@@ -3271,6 +3296,10 @@ parts:
     drawing: 5.46
     tol: 0.02
     ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
+    ok: true
   branding: {}
   unknowns:
   - 'Cavity numbers: not legible on the maker photos and not printed on the TE pages on file; the positions are drawn (pitch
@@ -3629,6 +3658,10 @@ parts:
     drawing: 45.01
     tol: 0.02
     ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
+    ok: true
   branding: {}
   unknowns:
   - Shroud length, bridge / lock arm, seal ring and nose depth are photo proportions (+-10-15 %); the mated length follows
@@ -3887,6 +3920,10 @@ parts:
     model: 9.12
     drawing: 9.12
     tol: 0.02
+    ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
     ok: true
   branding: {}
   unknowns:
@@ -4337,6 +4374,10 @@ parts:
     tol: 0.02
     ok: true
   - check: rear body passes the recommended panel cutout
+    model: true
+    drawing: true
+    ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
     model: true
     drawing: true
     ok: true
@@ -4805,6 +4846,10 @@ parts:
     model: true
     drawing: true
     ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
+    ok: true
   branding: {}
   unknowns:
   - Shroud length, bridge / lock arm, seal ring and nose depth are photo proportions (+-10-15 %); the mated length follows
@@ -5017,6 +5062,10 @@ parts:
     model: 6.7
     drawing: 6.71
     tol: 0.02
+    ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
     ok: true
   branding: {}
   unknowns:
@@ -5245,6 +5294,10 @@ parts:
     model: 6.7
     drawing: 6.7
     tol: 0.02
+    ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
     ok: true
   branding: {}
   unknowns:
@@ -5560,6 +5613,10 @@ parts:
     drawing: 40.64
     tol: 0.02
     ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
+    ok: true
   branding: {}
   unknowns:
   - Shroud length, bridge / lock arm, seal ring and nose depth are photo proportions (+-10-15 %); the mated length follows
@@ -5779,6 +5836,10 @@ parts:
     drawing: 3.81
     tol: 0.02
     ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
+    ok: true
   branding: {}
   unknowns:
   - 'Cavity numbers: not legible on the maker photos and not printed on the TE pages on file; the positions are drawn (pitch
@@ -5942,6 +6003,10 @@ parts:
     model: 3.81
     drawing: 3.81
     tol: 0.02
+    ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
     ok: true
   branding: {}
   unknowns:
@@ -6115,6 +6180,10 @@ parts:
     model: 5.46
     drawing: 5.46
     tol: 0.02
+    ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
     ok: true
   - check: nose clearance in the receptacle's shroud (design 0.3)
     model: 0.3
@@ -6356,6 +6425,10 @@ parts:
     model: 4.45
     drawing: 4.45
     tol: 0.02
+    ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
     ok: true
   - check: nose clearance in the receptacle's shroud (design 0.3)
     model: 0.3
@@ -6627,6 +6700,10 @@ parts:
     model: 9.12
     drawing: 9.12
     tol: 0.02
+    ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
     ok: true
   - check: nose clearance in the receptacle's shroud (design 0.3)
     model: 0.3
@@ -6939,6 +7016,10 @@ parts:
     model: 9.12
     drawing: 9.12
     tol: 0.02
+    ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
     ok: true
   - check: nose clearance in the receptacle's shroud (design 0.3)
     model: 0.3
@@ -7263,6 +7344,10 @@ parts:
     drawing: 9.12
     tol: 0.02
     ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
+    ok: true
   - check: nose clearance in the receptacle's shroud (design 0.3)
     model: 0.3
     drawing: 0.3
@@ -7468,6 +7553,10 @@ parts:
     model: 6.7
     drawing: 6.7
     tol: 0.02
+    ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
     ok: true
   - check: nose clearance in the receptacle's shroud (design 0.3)
     model: 0.3
@@ -7687,6 +7776,10 @@ parts:
     model: 6.7
     drawing: 6.7
     tol: 0.02
+    ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
     ok: true
   - check: nose clearance in the receptacle's shroud (design 0.3)
     model: 0.3
@@ -7909,6 +8002,10 @@ parts:
     drawing: 3.81
     tol: 0.02
     ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
+    ok: true
   - check: nose clearance in the receptacle's shroud (design 0.3)
     model: 0.3
     drawing: 0.3
@@ -8073,6 +8170,10 @@ parts:
     model: 3.81
     drawing: 3.81
     tol: 0.02
+    ok: true
+  - check: pin enters its socket, mm (the shoulder depth and the nose depth together)
+    model: true
+    drawing: true
     ok: true
   - check: nose clearance in the receptacle's shroud (design 0.3)
     model: 0.3
@@ -8407,6 +8508,886 @@ parts:
   kind: piece
   family: deutsch gasket
   mates: DTP04-4P-L012
+  script: docs/wiring/calc-data/cad/fab/fam_deutsch.py
+- id: 0460-202-16141
+  endpoints:
+  - DOOR-L-PASS
+  - DOOR-R-PASS
+  - FIREWALL-BODY-A
+  - FIREWALL-BODY-B
+  - FIREWALL-BODY-C
+  - FUEL-LEVEL
+  what: Deutsch size 16 solid pin contact, 20-16 AWG, nickel
+  maker: TE Connectivity (Deutsch)
+  maker_pn: 0460-202-16141
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 18.39
+    w: 3.48
+    h: 3.48
+  dims_note: 18.39 long overall (photo, +-7 %); barrel dia 2.69, shoulder dia 3.48, body dia 2.6, pin dia 1.59
+  frame: the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wire: -Z
+      mating: +Z
+  colors:
+    plating:
+      hex: '#c9bab0'
+      from: 'customconnectorkits.com/products/0460-202-16141 product photo (fetched 2026-09-29): dominant colour (k-means);
+        TE: ''Interface Plating Nickel (Ni)'''
+  attach:
+  - n: wire
+    ep: DOOR-L-PASS
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: crimp barrel (wire end)
+  mount: []
+  params:
+  - name: length
+    value: 18.39
+    source: 'customconnectorkits.com/products/0460-202-16141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.59 mm (te.com/en/product-0460-202-16141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1.59 mm''),
+      lengths x 1.064 for the camera tilt'
+    basis: photo
+    note: +-7 %
+  - name: barrel_d
+    value: 2.69
+    source: 'customconnectorkits.com/products/0460-202-16141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.59 mm (te.com/en/product-0460-202-16141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1.59 mm''),
+      lengths x 1.064 for the camera tilt'
+    basis: photo
+    note: +-5 %
+  - name: barrel_len
+    value: 5.88
+    source: 'customconnectorkits.com/products/0460-202-16141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.59 mm (te.com/en/product-0460-202-16141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1.59 mm''),
+      lengths x 1.064 for the camera tilt'
+    basis: photo
+    note: +-10 %
+  - name: shoulder_d
+    value: 3.48
+    source: 'customconnectorkits.com/products/0460-202-16141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.59 mm (te.com/en/product-0460-202-16141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1.59 mm''),
+      lengths x 1.064 for the camera tilt'
+    basis: photo
+    note: +-5 %
+  - name: shoulder_len
+    value: 2.03
+    source: 'customconnectorkits.com/products/0460-202-16141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.59 mm (te.com/en/product-0460-202-16141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1.59 mm''),
+      lengths x 1.064 for the camera tilt'
+    basis: photo
+    note: +-10 %
+  - name: body_d
+    value: 2.6
+    source: 'customconnectorkits.com/products/0460-202-16141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.59 mm (te.com/en/product-0460-202-16141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1.59 mm''),
+      lengths x 1.064 for the camera tilt'
+    basis: photo
+    note: +-5 %
+  - name: body_len
+    value: 2.76
+    source: 'customconnectorkits.com/products/0460-202-16141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.59 mm (te.com/en/product-0460-202-16141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1.59 mm''),
+      lengths x 1.064 for the camera tilt'
+    basis: photo
+    note: +-10 %
+  - name: pin_d
+    value: 1.59
+    source: 'te.com/en/product-0460-202-16141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1.59 mm'''
+    basis: maker
+  - name: pin_len
+    value: 7.72
+    source: 'customconnectorkits.com/products/0460-202-16141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.59 mm (te.com/en/product-0460-202-16141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1.59 mm''),
+      lengths x 1.064 for the camera tilt'
+    basis: photo
+    note: +-10 %
+  - name: strip_len
+    value: 7.92
+    source: Deutsch contacts catalog (TE), customconnectorkits.com/cdn/shop/files/DEUTSCH_Contacts_Catalog.pdf (read 2026-09-29)
+      p.125 'Recommended Strip Length' 6.35-7.92 mm
+    basis: maker
+    note: the barrel takes the stripped conductor up to the inspection hole
+  checks:
+  - check: overall length (photo-scaled)
+    model: 18.39
+    drawing: 18.39
+    tol: 0.02
+    ok: true
+  - check: pin diameter (TE)
+    model: 1.59
+    drawing: 1.59
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Lengths and diameters are photo-scaled (+-5-10 %): TE''s contact drawings were not on file.'
+  cross_checks: []
+  notes:
+  - wire range 20-16 AWG, strip length 6.35-7.92 mm (catalog p.125)
+  kind: piece
+  family: deutsch contact
+  script: docs/wiring/calc-data/cad/fab/fam_deutsch.py
+- id: 0462-201-16141
+  endpoints:
+  - DOOR-L-PASS
+  - DOOR-R-PASS
+  - FIREWALL-BODY-A
+  - FIREWALL-BODY-B
+  - FIREWALL-BODY-C
+  - FUEL-LEVEL
+  what: Deutsch size 16 solid socket contact, 20-16 AWG, nickel, with its protective sleeve
+  maker: TE Connectivity (Deutsch)
+  maker_pn: 0462-201-16141
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 17.63
+    w: 3.44
+    h: 3.44
+  dims_note: 17.63 long overall (photo, +-7 %); barrel dia 2.69, shoulder dia 3.44, sleeve dia 2.84
+  frame: the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wire: -Z
+      mating: +Z
+  colors:
+    plating:
+      hex: '#c2b9b4'
+      from: 'customconnectorkits.com/products/0462-201-16141 product photo (fetched 2026-09-29): dominant colour (k-means);
+        TE: ''Interface Plating Nickel (Ni)'''
+  attach:
+  - n: wire
+    ep: DOOR-L-PASS
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: crimp barrel (wire end)
+  mount: []
+  params:
+  - name: length
+    value: 17.63
+    source: customconnectorkits.com/products/0462-201-16141 product photo (fetched 2026-09-29), scaled from the 0460-202-16141
+      barrel (2.69 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-7 %
+  - name: barrel_d
+    value: 2.69
+    source: customconnectorkits.com/products/0462-201-16141 product photo (fetched 2026-09-29), scaled from the 0460-202-16141
+      barrel (2.69 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-5 %
+  - name: barrel_len
+    value: 5.82
+    source: customconnectorkits.com/products/0462-201-16141 product photo (fetched 2026-09-29), scaled from the 0460-202-16141
+      barrel (2.69 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-10 %
+  - name: shoulder_d
+    value: 3.44
+    source: customconnectorkits.com/products/0462-201-16141 product photo (fetched 2026-09-29), scaled from the 0460-202-16141
+      barrel (2.69 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-5 %
+  - name: shoulder_len
+    value: 1.94
+    source: customconnectorkits.com/products/0462-201-16141 product photo (fetched 2026-09-29), scaled from the 0460-202-16141
+      barrel (2.69 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-10 %
+  - name: sleeve_d
+    value: 2.84
+    source: customconnectorkits.com/products/0462-201-16141 product photo (fetched 2026-09-29), scaled from the 0460-202-16141
+      barrel (2.69 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-5 %
+  - name: sleeve_len
+    value: 9.87
+    source: customconnectorkits.com/products/0462-201-16141 product photo (fetched 2026-09-29), scaled from the 0460-202-16141
+      barrel (2.69 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-10 %
+  - name: strip_len
+    value: 7.92
+    source: Deutsch contacts catalog (TE), customconnectorkits.com/cdn/shop/files/DEUTSCH_Contacts_Catalog.pdf (read 2026-09-29)
+      p.125 'Recommended Strip Length' 6.35-7.92 mm
+    basis: maker
+    note: the barrel takes the stripped conductor up to the inspection hole
+  checks:
+  - check: overall length (photo-scaled)
+    model: 17.63
+    drawing: 17.63
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Lengths and diameters are photo-scaled (+-5-10 %): TE''s contact drawings were not on file.'
+  cross_checks: []
+  notes:
+  - wire range 20-16 AWG, strip length 6.35-7.92 mm (catalog p.125)
+  kind: piece
+  family: deutsch contact
+  script: docs/wiring/calc-data/cad/fab/fam_deutsch.py
+- id: 0460-202-20141
+  endpoints:
+  - WIDEBAND
+  what: Deutsch size 20 solid pin contact, 20 AWG, nickel
+  maker: TE Connectivity (Deutsch)
+  maker_pn: 0460-202-20141
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 14.78
+    w: 2.56
+    h: 2.56
+  dims_note: 14.78 long overall (photo, +-7 %); barrel dia 1.99, shoulder dia 2.56, body dia 1.92, pin dia 1
+  frame: the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wire: -Z
+      mating: +Z
+  colors:
+    plating:
+      hex: '#cec5c0'
+      from: 'customconnectorkits.com/products/0460-202-20141 product photo (fetched 2026-09-29): dominant colour (k-means);
+        TE: ''Interface Plating Nickel (Ni)'''
+  attach:
+  - n: wire
+    ep: WIDEBAND
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: crimp barrel (wire end)
+  mount: []
+  params:
+  - name: length
+    value: 14.78
+    source: 'customconnectorkits.com/products/0460-202-20141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.0 mm (te.com/en/product-0460-202-20141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-7 %
+  - name: barrel_d
+    value: 1.99
+    source: 'customconnectorkits.com/products/0460-202-20141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.0 mm (te.com/en/product-0460-202-20141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-5 %
+  - name: barrel_len
+    value: 3.69
+    source: 'customconnectorkits.com/products/0460-202-20141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.0 mm (te.com/en/product-0460-202-20141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-10 %
+  - name: shoulder_d
+    value: 2.56
+    source: 'customconnectorkits.com/products/0460-202-20141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.0 mm (te.com/en/product-0460-202-20141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-5 %
+  - name: shoulder_len
+    value: 1.34
+    source: 'customconnectorkits.com/products/0460-202-20141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.0 mm (te.com/en/product-0460-202-20141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-10 %
+  - name: body_d
+    value: 1.92
+    source: 'customconnectorkits.com/products/0460-202-20141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.0 mm (te.com/en/product-0460-202-20141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-5 %
+  - name: body_len
+    value: 2.51
+    source: 'customconnectorkits.com/products/0460-202-20141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.0 mm (te.com/en/product-0460-202-20141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-10 %
+  - name: pin_d
+    value: 1.0
+    source: 'te.com/en/product-0460-202-20141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1 mm'''
+    basis: maker
+  - name: pin_len
+    value: 7.24
+    source: 'customconnectorkits.com/products/0460-202-20141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      1.0 mm (te.com/en/product-0460-202-20141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 1 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-10 %
+  - name: strip_len
+    value: 5.54
+    source: Deutsch contacts catalog (TE), customconnectorkits.com/cdn/shop/files/DEUTSCH_Contacts_Catalog.pdf (read 2026-09-29)
+      p.125 'Recommended Strip Length' 3.96-5.54 mm
+    basis: maker
+    note: the barrel takes the stripped conductor up to the inspection hole
+  checks:
+  - check: overall length (photo-scaled)
+    model: 14.78
+    drawing: 14.78
+    tol: 0.02
+    ok: true
+  - check: pin diameter (TE)
+    model: 1.0
+    drawing: 1.0
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Lengths and diameters are photo-scaled (+-5-10 %): TE''s contact drawings were not on file.'
+  cross_checks: []
+  notes:
+  - wire range 20 AWG, strip length 3.96-5.54 mm (catalog p.125)
+  kind: piece
+  family: deutsch contact
+  script: docs/wiring/calc-data/cad/fab/fam_deutsch.py
+- id: 0462-201-20141
+  endpoints:
+  - IBST-DIAG
+  - WIDEBAND
+  what: Deutsch size 20 solid socket contact, 20 AWG, nickel, with its protective sleeve
+  maker: TE Connectivity (Deutsch)
+  maker_pn: 0462-201-20141
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 14.24
+    w: 2.61
+    h: 2.61
+  dims_note: 14.24 long overall (photo, +-7 %); barrel dia 1.99, shoulder dia 2.61, sleeve dia 1.9
+  frame: the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wire: -Z
+      mating: +Z
+  colors:
+    plating:
+      hex: '#c7bfbc'
+      from: 'customconnectorkits.com/products/0462-201-20141 product photo (fetched 2026-09-29): dominant colour (k-means);
+        TE: ''Interface Plating Nickel (Ni)'''
+  attach:
+  - n: wire
+    ep: IBST-DIAG
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: crimp barrel (wire end)
+  mount: []
+  params:
+  - name: length
+    value: 14.24
+    source: customconnectorkits.com/products/0462-201-20141 product photo (fetched 2026-09-29), scaled from the 0460-202-20141
+      barrel (1.99 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-7 %
+  - name: barrel_d
+    value: 1.99
+    source: customconnectorkits.com/products/0462-201-20141 product photo (fetched 2026-09-29), scaled from the 0460-202-20141
+      barrel (1.99 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-5 %
+  - name: barrel_len
+    value: 3.7
+    source: customconnectorkits.com/products/0462-201-20141 product photo (fetched 2026-09-29), scaled from the 0460-202-20141
+      barrel (1.99 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-10 %
+  - name: shoulder_d
+    value: 2.61
+    source: customconnectorkits.com/products/0462-201-20141 product photo (fetched 2026-09-29), scaled from the 0460-202-20141
+      barrel (1.99 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-5 %
+  - name: shoulder_len
+    value: 1.43
+    source: customconnectorkits.com/products/0462-201-20141 product photo (fetched 2026-09-29), scaled from the 0460-202-20141
+      barrel (1.99 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-10 %
+  - name: sleeve_d
+    value: 1.9
+    source: customconnectorkits.com/products/0462-201-20141 product photo (fetched 2026-09-29), scaled from the 0460-202-20141
+      barrel (1.99 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-5 %
+  - name: sleeve_len
+    value: 9.11
+    source: customconnectorkits.com/products/0462-201-20141 product photo (fetched 2026-09-29), scaled from the 0460-202-20141
+      barrel (1.99 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-10 %
+  - name: strip_len
+    value: 5.54
+    source: Deutsch contacts catalog (TE), customconnectorkits.com/cdn/shop/files/DEUTSCH_Contacts_Catalog.pdf (read 2026-09-29)
+      p.125 'Recommended Strip Length' 3.96-5.54 mm
+    basis: maker
+    note: the barrel takes the stripped conductor up to the inspection hole
+  checks:
+  - check: overall length (photo-scaled)
+    model: 14.24
+    drawing: 14.24
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Lengths and diameters are photo-scaled (+-5-10 %): TE''s contact drawings were not on file.'
+  cross_checks: []
+  notes:
+  - wire range 20 AWG, strip length 3.96-5.54 mm (catalog p.125)
+  kind: piece
+  family: deutsch contact
+  script: docs/wiring/calc-data/cad/fab/fam_deutsch.py
+- id: 0462-005-20141
+  endpoints:
+  - WIDEBAND
+  what: Deutsch size 20 solid socket contact, 18-16 AWG, nickel, with its protective sleeve
+  maker: TE Connectivity (Deutsch)
+  maker_pn: 0462-005-20141
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 14.3
+    w: 2.58
+    h: 2.58
+  dims_note: 14.3 long overall (photo, +-7 %); barrel dia 1.92, shoulder dia 2.58, sleeve dia 1.9
+  frame: the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wire: -Z
+      mating: +Z
+  colors:
+    plating:
+      hex: '#ae9f98'
+      from: 'customconnectorkits.com/products/0462-005-20141 product photo (fetched 2026-09-29): dominant colour (k-means);
+        TE: ''Interface Plating Nickel (Ni)'''
+    band:
+      hex: '#7e656b'
+      from: 'customconnectorkits.com/products/0462-005-20141 product photo (fetched 2026-09-29): the coloured band on the
+        barrel'
+  attach:
+  - n: wire
+    ep: WIDEBAND
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: crimp barrel (wire end)
+  mount: []
+  params:
+  - name: length
+    value: 14.3
+    source: customconnectorkits.com/products/0462-005-20141 product photo (fetched 2026-09-29), scaled from the 0462-201-20141
+      sleeve (1.90 mm, the same size-20 mating end), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-7 %
+  - name: barrel_d
+    value: 1.92
+    source: customconnectorkits.com/products/0462-005-20141 product photo (fetched 2026-09-29), scaled from the 0462-201-20141
+      sleeve (1.90 mm, the same size-20 mating end), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-5 %
+  - name: barrel_len
+    value: 3.72
+    source: customconnectorkits.com/products/0462-005-20141 product photo (fetched 2026-09-29), scaled from the 0462-201-20141
+      sleeve (1.90 mm, the same size-20 mating end), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-10 %
+  - name: shoulder_d
+    value: 2.58
+    source: customconnectorkits.com/products/0462-005-20141 product photo (fetched 2026-09-29), scaled from the 0462-201-20141
+      sleeve (1.90 mm, the same size-20 mating end), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-5 %
+  - name: shoulder_len
+    value: 1.43
+    source: customconnectorkits.com/products/0462-005-20141 product photo (fetched 2026-09-29), scaled from the 0462-201-20141
+      sleeve (1.90 mm, the same size-20 mating end), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-10 %
+  - name: sleeve_d
+    value: 1.9
+    source: customconnectorkits.com/products/0462-005-20141 product photo (fetched 2026-09-29), scaled from the 0462-201-20141
+      sleeve (1.90 mm, the same size-20 mating end), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-5 %
+  - name: sleeve_len
+    value: 9.15
+    source: customconnectorkits.com/products/0462-005-20141 product photo (fetched 2026-09-29), scaled from the 0462-201-20141
+      sleeve (1.90 mm, the same size-20 mating end), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-10 %
+  - name: strip_len
+    value: 5.54
+    source: Deutsch contacts catalog (TE), customconnectorkits.com/cdn/shop/files/DEUTSCH_Contacts_Catalog.pdf (read 2026-09-29)
+      p.125 'Recommended Strip Length' 3.96-5.54 mm
+    basis: maker
+    note: the barrel takes the stripped conductor up to the inspection hole
+  checks:
+  - check: overall length (photo-scaled)
+    model: 14.3
+    drawing: 14.3
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Lengths and diameters are photo-scaled (+-5-10 %): TE''s contact drawings were not on file.'
+  cross_checks: []
+  notes:
+  - wire range 18-16 AWG, strip length 3.96-5.54 mm (catalog p.125)
+  kind: piece
+  family: deutsch contact
+  script: docs/wiring/calc-data/cad/fab/fam_deutsch.py
+- id: 0460-204-12141
+  endpoints:
+  - DOOR-L-PASS-P
+  - DOOR-R-PASS-P
+  - FIREWALL-BODY-P
+  - FUEL-PUMP
+  what: Deutsch size 12 solid pin contact, 14-12 AWG, nickel
+  maker: TE Connectivity (Deutsch)
+  maker_pn: 0460-204-12141
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 19.28
+    w: 4.95
+    h: 4.95
+  dims_note: 19.28 long overall (photo, +-7 %); barrel dia 4.11, shoulder dia 4.95, body dia 3.87, pin dia 2.4
+  frame: the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wire: -Z
+      mating: +Z
+  colors:
+    plating:
+      hex: '#d2c7c0'
+      from: 'customconnectorkits.com/products/0460-204-12141 product photo (fetched 2026-09-29): dominant colour (k-means);
+        TE: ''Interface Plating Nickel (Ni)'''
+  attach:
+  - n: wire
+    ep: DOOR-L-PASS-P
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: crimp barrel (wire end)
+  mount: []
+  params:
+  - name: length
+    value: 19.28
+    source: 'customconnectorkits.com/products/0460-204-12141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      2.4 mm (te.com/en/product-0460-204-12141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 2.4 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-7 %
+  - name: barrel_d
+    value: 4.11
+    source: 'customconnectorkits.com/products/0460-204-12141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      2.4 mm (te.com/en/product-0460-204-12141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 2.4 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-5 %
+  - name: barrel_len
+    value: 5.98
+    source: 'customconnectorkits.com/products/0460-204-12141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      2.4 mm (te.com/en/product-0460-204-12141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 2.4 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-10 %
+  - name: shoulder_d
+    value: 4.95
+    source: 'customconnectorkits.com/products/0460-204-12141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      2.4 mm (te.com/en/product-0460-204-12141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 2.4 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-5 %
+  - name: shoulder_len
+    value: 2.5
+    source: 'customconnectorkits.com/products/0460-204-12141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      2.4 mm (te.com/en/product-0460-204-12141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 2.4 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-10 %
+  - name: body_d
+    value: 3.87
+    source: 'customconnectorkits.com/products/0460-204-12141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      2.4 mm (te.com/en/product-0460-204-12141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 2.4 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-5 %
+  - name: body_len
+    value: 2.51
+    source: 'customconnectorkits.com/products/0460-204-12141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      2.4 mm (te.com/en/product-0460-204-12141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 2.4 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-10 %
+  - name: pin_d
+    value: 2.4
+    source: 'te.com/en/product-0460-204-12141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 2.4 mm'''
+    basis: maker
+  - name: pin_len
+    value: 8.29
+    source: 'customconnectorkits.com/products/0460-204-12141 product photo (fetched 2026-09-29), scaled from the pin diameter
+      2.4 mm (te.com/en/product-0460-204-12141.html (TE product page, read 2026-09-29): ''Mating Pin Diameter 2.4 mm''), lengths
+      x 1.064 for the camera tilt'
+    basis: photo
+    note: +-10 %
+  - name: strip_len
+    value: 7.21
+    source: Deutsch contacts catalog (TE), customconnectorkits.com/cdn/shop/files/DEUTSCH_Contacts_Catalog.pdf (read 2026-09-29)
+      p.125 'Recommended Strip Length' 5.64-7.21 mm
+    basis: maker
+    note: the barrel takes the stripped conductor up to the inspection hole
+  checks:
+  - check: overall length (photo-scaled)
+    model: 19.28
+    drawing: 19.28
+    tol: 0.02
+    ok: true
+  - check: pin diameter (TE)
+    model: 2.4
+    drawing: 2.4
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Lengths and diameters are photo-scaled (+-5-10 %): TE''s contact drawings were not on file.'
+  cross_checks: []
+  notes:
+  - wire range 14-12 AWG, strip length 5.64-7.21 mm (catalog p.125)
+  kind: piece
+  family: deutsch contact
+  script: docs/wiring/calc-data/cad/fab/fam_deutsch.py
+- id: 0462-203-12141
+  endpoints:
+  - DOOR-L-PASS-P
+  - DOOR-R-PASS-P
+  - FIREWALL-BODY-P
+  - FUEL-PUMP
+  what: Deutsch size 12 solid socket contact, 14-12 AWG, nickel, with its protective sleeve
+  maker: TE Connectivity (Deutsch)
+  maker_pn: 0462-203-12141
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 19.3
+    w: 4.96
+    h: 4.96
+  dims_note: 19.3 long overall (photo, +-7 %); barrel dia 4.11, shoulder dia 4.96, sleeve dia 4.13
+  frame: the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wire: -Z
+      mating: +Z
+  colors:
+    plating:
+      hex: '#baafa8'
+      from: 'customconnectorkits.com/products/0462-203-12141 product photo (fetched 2026-09-29): dominant colour (k-means);
+        TE: ''Interface Plating Nickel (Ni)'''
+  attach:
+  - n: wire
+    ep: DOOR-L-PASS-P
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: crimp barrel (wire end)
+  mount: []
+  params:
+  - name: length
+    value: 19.3
+    source: customconnectorkits.com/products/0462-203-12141 product photo (fetched 2026-09-29), scaled from the 0460-204-12141
+      barrel (4.11 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-7 %
+  - name: barrel_d
+    value: 4.11
+    source: customconnectorkits.com/products/0462-203-12141 product photo (fetched 2026-09-29), scaled from the 0460-204-12141
+      barrel (4.11 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-5 %
+  - name: barrel_len
+    value: 6.18
+    source: customconnectorkits.com/products/0462-203-12141 product photo (fetched 2026-09-29), scaled from the 0460-204-12141
+      barrel (4.11 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-10 %
+  - name: shoulder_d
+    value: 4.96
+    source: customconnectorkits.com/products/0462-203-12141 product photo (fetched 2026-09-29), scaled from the 0460-204-12141
+      barrel (4.11 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-5 %
+  - name: shoulder_len
+    value: 2.51
+    source: customconnectorkits.com/products/0462-203-12141 product photo (fetched 2026-09-29), scaled from the 0460-204-12141
+      barrel (4.11 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-10 %
+  - name: sleeve_d
+    value: 4.13
+    source: customconnectorkits.com/products/0462-203-12141 product photo (fetched 2026-09-29), scaled from the 0460-204-12141
+      barrel (4.11 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-5 %
+  - name: sleeve_len
+    value: 10.61
+    source: customconnectorkits.com/products/0462-203-12141 product photo (fetched 2026-09-29), scaled from the 0460-204-12141
+      barrel (4.11 mm, the Common Contact System's one barrel per wire range), lengths x 1.064 for the camera tilt
+    basis: photo
+    note: +-10 %
+  - name: strip_len
+    value: 7.21
+    source: Deutsch contacts catalog (TE), customconnectorkits.com/cdn/shop/files/DEUTSCH_Contacts_Catalog.pdf (read 2026-09-29)
+      p.125 'Recommended Strip Length' 5.64-7.21 mm
+    basis: maker
+    note: the barrel takes the stripped conductor up to the inspection hole
+  checks:
+  - check: overall length (photo-scaled)
+    model: 19.3
+    drawing: 19.3
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Lengths and diameters are photo-scaled (+-5-10 %): TE''s contact drawings were not on file.'
+  cross_checks: []
+  notes:
+  - wire range 14-12 AWG, strip length 5.64-7.21 mm (catalog p.125)
+  kind: piece
+  family: deutsch contact
+  script: docs/wiring/calc-data/cad/fab/fam_deutsch.py
+- id: 0413-204-2005
+  endpoints:
+  - IBST-DIAG
+  what: Deutsch size 20 cavity sealing plug (red)
+  maker: TE Connectivity (Deutsch)
+  maker_pn: 0413-204-2005
+  shape_basis: scaled from photo
+  dims_mm:
+    l: 15.75
+    w: 2.83
+    h: 2.83
+  dims_note: 15.75 long overall (photo, +-7 %); head dia 2.83, stem dia 1.99
+  frame: the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      wire: -Z
+      mating: +Z
+  colors:
+    plating:
+      hex: '#e2414a'
+      from: 'customconnectorkits.com/products/0413-204-2005 product photo (fetched 2026-09-29): dominant colour (k-means);
+        the red size-20 sealing plug'
+  attach:
+  - n: wire
+    ep: IBST-DIAG
+    at:
+    - 0.0
+    - 0.0
+    - 0.0
+    dir:
+    - 0
+    - 0
+    - -1
+    kind: sealing plug head
+  mount: []
+  params:
+  - name: length
+    value: 15.75
+    source: 'customconnectorkits.com/products/0413-204-2005 product photo (fetched 2026-09-29), scaled from the size-20 barrel
+      (1.99 mm: the plug''s stem fills a contact''s place in the seal), lengths x 1.064 for the camera tilt'
+    basis: photo
+    note: +-7 %
+  - name: head_d
+    value: 2.83
+    source: 'customconnectorkits.com/products/0413-204-2005 product photo (fetched 2026-09-29), scaled from the size-20 barrel
+      (1.99 mm: the plug''s stem fills a contact''s place in the seal), lengths x 1.064 for the camera tilt'
+    basis: photo
+    note: +-5 %
+  - name: head_len
+    value: 3.94
+    source: 'customconnectorkits.com/products/0413-204-2005 product photo (fetched 2026-09-29), scaled from the size-20 barrel
+      (1.99 mm: the plug''s stem fills a contact''s place in the seal), lengths x 1.064 for the camera tilt'
+    basis: photo
+    note: +-10 %
+  - name: stem_d
+    value: 1.99
+    source: 'customconnectorkits.com/products/0413-204-2005 product photo (fetched 2026-09-29), scaled from the size-20 barrel
+      (1.99 mm: the plug''s stem fills a contact''s place in the seal), lengths x 1.064 for the camera tilt'
+    basis: photo
+    note: +-5 %
+  - name: stem_len
+    value: 11.81
+    source: 'customconnectorkits.com/products/0413-204-2005 product photo (fetched 2026-09-29), scaled from the size-20 barrel
+      (1.99 mm: the plug''s stem fills a contact''s place in the seal), lengths x 1.064 for the camera tilt'
+    basis: photo
+    note: +-10 %
+  checks:
+  - check: overall length (photo-scaled)
+    model: 15.75
+    drawing: 15.75
+    tol: 0.02
+    ok: true
+  branding: {}
+  unknowns:
+  - 'Lengths and diameters are photo-scaled (+-5-10 %): TE''s contact drawings were not on file.'
+  cross_checks: []
+  notes:
+  - wire range sealing plug
+  kind: piece
+  family: deutsch contact
   script: docs/wiring/calc-data/cad/fab/fam_deutsch.py
 - id: FIREWALL-BODY-A
   endpoints:
@@ -8990,6 +9971,10 @@ parts:
     model: 64.48
     drawing: 64.48
     tol: 0.05
+    ok: true
+  - check: contacts in the cavities the registry uses
+    model: true
+    drawing: true
     ok: true
   - check: cavities line up (every plug cavity on a receptacle cavity)
     model: true
@@ -9621,6 +10606,10 @@ parts:
     drawing: 64.48
     tol: 0.05
     ok: true
+  - check: contacts in the cavities the registry uses
+    model: true
+    drawing: true
+    ok: true
   - check: cavities line up (every plug cavity on a receptacle cavity)
     model: true
     drawing: true
@@ -10089,6 +11078,10 @@ parts:
     drawing: 64.48
     tol: 0.05
     ok: true
+  - check: contacts in the cavities the registry uses
+    model: true
+    drawing: true
+    ok: true
   - check: cavities line up (every plug cavity on a receptacle cavity)
     model: true
     drawing: true
@@ -10131,6 +11124,7 @@ parts:
   cross_checks: []
   notes:
   - 'pieces: DT04-6P-L012, DT06-6S (each is also its own model)'
+  - 'cavities 5, 6 are spare: sealing plug 114017 (size 16) per the kit, not modelled (no maker photo or drawing on file)'
   kind: assembly
   family: deutsch dt
   pieces:
@@ -10516,6 +11510,10 @@ parts:
     drawing: 68.06
     tol: 0.05
     ok: true
+  - check: contacts in the cavities the registry uses
+    model: true
+    drawing: true
+    ok: true
   - check: cavities line up (every plug cavity on a receptacle cavity)
     model: true
     drawing: true
@@ -10553,6 +11551,7 @@ parts:
   cross_checks: []
   notes:
   - 'pieces: DTP04-4P-L012, DTP06-4S, DTP4P-L012-GKT (each is also its own model)'
+  - 'cavities 3, 4 are spare: sealing plug 114017 (size 16) per the kit, not modelled (no maker photo or drawing on file)'
   kind: assembly
   family: deutsch dtp
   pieces:
@@ -10918,6 +11917,10 @@ parts:
     drawing: 64.22
     tol: 0.05
     ok: true
+  - check: contacts in the cavities the registry uses
+    model: true
+    drawing: true
+    ok: true
   - check: cavities line up (every plug cavity on a receptacle cavity)
     model: true
     drawing: true
@@ -10929,6 +11932,7 @@ parts:
   cross_checks: []
   notes:
   - 'pieces: DT04-08PA, DT06-08SA (each is also its own model)'
+  - 'cavities 7, 8 are spare: sealing plug 114017 (size 16) per the kit, not modelled (no maker photo or drawing on file)'
   kind: assembly
   family: deutsch dt
   pieces:
@@ -11293,6 +12297,10 @@ parts:
     drawing: 64.22
     tol: 0.05
     ok: true
+  - check: contacts in the cavities the registry uses
+    model: true
+    drawing: true
+    ok: true
   - check: cavities line up (every plug cavity on a receptacle cavity)
     model: true
     drawing: true
@@ -11304,6 +12312,7 @@ parts:
   cross_checks: []
   notes:
   - 'pieces: DT04-08PA, DT06-08SA (each is also its own model)'
+  - 'cavities 7, 8 are spare: sealing plug 114017 (size 16) per the kit, not modelled (no maker photo or drawing on file)'
   kind: assembly
   family: deutsch dt
   pieces:
@@ -11603,6 +12612,10 @@ parts:
     model: 68.06
     drawing: 68.06
     tol: 0.05
+    ok: true
+  - check: contacts in the cavities the registry uses
+    model: true
+    drawing: true
     ok: true
   - check: cavities line up (every plug cavity on a receptacle cavity)
     model: true
@@ -11915,6 +12928,10 @@ parts:
     drawing: 68.06
     tol: 0.05
     ok: true
+  - check: contacts in the cavities the registry uses
+    model: true
+    drawing: true
+    ok: true
   - check: cavities line up (every plug cavity on a receptacle cavity)
     model: true
     drawing: true
@@ -12214,6 +13231,10 @@ parts:
     drawing: 61.76
     tol: 0.05
     ok: true
+  - check: contacts in the cavities the registry uses
+    model: true
+    drawing: true
+    ok: true
   - check: cavities line up (every plug cavity on a receptacle cavity)
     model: true
     drawing: true
@@ -12462,6 +13483,10 @@ parts:
     model: 60.42
     drawing: 60.42
     tol: 0.05
+    ok: true
+  - check: contacts in the cavities the registry uses
+    model: true
+    drawing: true
     ok: true
   - check: cavities line up (every plug cavity on a receptacle cavity)
     model: true
@@ -12714,6 +13739,10 @@ parts:
     model: 68.06
     drawing: 68.06
     tol: 0.05
+    ok: true
+  - check: contacts in the cavities the registry uses
+    model: true
+    drawing: true
     ok: true
   - check: cavities line up (every plug cavity on a receptacle cavity)
     model: true
@@ -13018,6 +14047,10 @@ parts:
     model: 61.76
     drawing: 61.76
     tol: 0.05
+    ok: true
+  - check: contacts in the cavities the registry uses
+    model: true
+    drawing: true
     ok: true
   - check: cavities line up (every plug cavity on a receptacle cavity)
     model: true

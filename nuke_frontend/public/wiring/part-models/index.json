@@ -16,6 +16,8 @@
   },
   "DOOR-L-PASS": {
    "models": [
+    "0460-202-16141",
+    "0462-201-16141",
     "DOOR-L-PASS",
     "DT04-08PA",
     "DT06-08SA"
@@ -24,6 +26,8 @@
   },
   "DOOR-L-PASS-P": {
    "models": [
+    "0460-204-12141",
+    "0462-203-12141",
     "DOOR-L-PASS-P",
     "DTP04-4P",
     "DTP06-4S"
@@ -32,6 +36,8 @@
   },
   "DOOR-R-PASS": {
    "models": [
+    "0460-202-16141",
+    "0462-201-16141",
     "DOOR-R-PASS",
     "DT04-08PA",
     "DT06-08SA"
@@ -40,6 +46,8 @@
   },
   "DOOR-R-PASS-P": {
    "models": [
+    "0460-204-12141",
+    "0462-203-12141",
     "DOOR-R-PASS-P",
     "DTP04-4P",
     "DTP06-4S"
@@ -48,6 +56,8 @@
   },
   "FIREWALL-BODY-A": {
    "models": [
+    "0460-202-16141",
+    "0462-201-16141",
     "DT04-12PA-L012",
     "DT06-12SA",
     "DT12-L012-GKT",
@@ -57,6 +67,8 @@
   },
   "FIREWALL-BODY-B": {
    "models": [
+    "0460-202-16141",
+    "0462-201-16141",
     "DT04-12PB-L012",
     "DT06-12SB",
     "DT12-L012-GKT",
@@ -66,6 +78,8 @@
   },
   "FIREWALL-BODY-C": {
    "models": [
+    "0460-202-16141",
+    "0462-201-16141",
     "DT04-6P-L012",
     "DT06-6S",
     "FIREWALL-BODY-C"
@@ -74,6 +88,8 @@
   },
   "FIREWALL-BODY-P": {
    "models": [
+    "0460-204-12141",
+    "0462-203-12141",
     "DTP04-4P-L012",
     "DTP06-4S",
     "DTP4P-L012-GKT",
@@ -83,6 +99,8 @@
   },
   "FUEL-LEVEL": {
    "models": [
+    "0460-202-16141",
+    "0462-201-16141",
     "DT04-2P",
     "DT06-2S",
     "FUEL-LEVEL"
@@ -95,6 +113,8 @@
   },
   "FUEL-PUMP": {
    "models": [
+    "0460-204-12141",
+    "0462-203-12141",
     "DTP04-2P",
     "DTP06-2S",
     "FUEL-PUMP"
@@ -107,6 +127,8 @@
   },
   "IBST-DIAG": {
    "models": [
+    "0413-204-2005",
+    "0462-201-20141",
     "DTM04-4P",
     "DTM06-4S",
     "IBST-DIAG"
@@ -169,6 +191,9 @@
   },
   "WIDEBAND": {
    "models": [
+    "0460-202-20141",
+    "0462-005-20141",
+    "0462-201-20141",
     "DTM04-4P",
     "DTM06-4S",
     "WIDEBAND"
@@ -4067,6 +4092,419 @@
    "kind": "piece",
    "family": "deutsch gasket",
    "mates": "DTP04-4P-L012"
+  },
+  "0460-202-16141": {
+   "endpoints": [
+    "DOOR-L-PASS",
+    "DOOR-R-PASS",
+    "FIREWALL-BODY-A",
+    "FIREWALL-BODY-B",
+    "FIREWALL-BODY-C",
+    "FUEL-LEVEL"
+   ],
+   "what": "Deutsch size 16 solid pin contact, 20-16 AWG, nickel",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "0460-202-16141",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 18.39,
+    "w": 3.48,
+    "h": 3.48
+   },
+   "frame": "the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wire": "-Z",
+     "mating": "+Z"
+    }
+   },
+   "colors": {
+    "plating": {
+     "hex": "#c9bab0",
+     "from": "customconnectorkits.com/products/0460-202-16141 product photo (fetched 2026-09-29): dominant colour (k-means); TE: 'Interface Plating Nickel (Ni)'"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "crimp barrel (wire end)"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch contact"
+  },
+  "0462-201-16141": {
+   "endpoints": [
+    "DOOR-L-PASS",
+    "DOOR-R-PASS",
+    "FIREWALL-BODY-A",
+    "FIREWALL-BODY-B",
+    "FIREWALL-BODY-C",
+    "FUEL-LEVEL"
+   ],
+   "what": "Deutsch size 16 solid socket contact, 20-16 AWG, nickel, with its protective sleeve",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "0462-201-16141",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 17.63,
+    "w": 3.44,
+    "h": 3.44
+   },
+   "frame": "the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wire": "-Z",
+     "mating": "+Z"
+    }
+   },
+   "colors": {
+    "plating": {
+     "hex": "#c2b9b4",
+     "from": "customconnectorkits.com/products/0462-201-16141 product photo (fetched 2026-09-29): dominant colour (k-means); TE: 'Interface Plating Nickel (Ni)'"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "DOOR-L-PASS",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "crimp barrel (wire end)"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch contact"
+  },
+  "0460-202-20141": {
+   "endpoints": [
+    "WIDEBAND"
+   ],
+   "what": "Deutsch size 20 solid pin contact, 20 AWG, nickel",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "0460-202-20141",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 14.78,
+    "w": 2.56,
+    "h": 2.56
+   },
+   "frame": "the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wire": "-Z",
+     "mating": "+Z"
+    }
+   },
+   "colors": {
+    "plating": {
+     "hex": "#cec5c0",
+     "from": "customconnectorkits.com/products/0460-202-20141 product photo (fetched 2026-09-29): dominant colour (k-means); TE: 'Interface Plating Nickel (Ni)'"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "WIDEBAND",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "crimp barrel (wire end)"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch contact"
+  },
+  "0462-201-20141": {
+   "endpoints": [
+    "IBST-DIAG",
+    "WIDEBAND"
+   ],
+   "what": "Deutsch size 20 solid socket contact, 20 AWG, nickel, with its protective sleeve",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "0462-201-20141",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 14.24,
+    "w": 2.61,
+    "h": 2.61
+   },
+   "frame": "the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wire": "-Z",
+     "mating": "+Z"
+    }
+   },
+   "colors": {
+    "plating": {
+     "hex": "#c7bfbc",
+     "from": "customconnectorkits.com/products/0462-201-20141 product photo (fetched 2026-09-29): dominant colour (k-means); TE: 'Interface Plating Nickel (Ni)'"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "IBST-DIAG",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "crimp barrel (wire end)"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch contact"
+  },
+  "0462-005-20141": {
+   "endpoints": [
+    "WIDEBAND"
+   ],
+   "what": "Deutsch size 20 solid socket contact, 18-16 AWG, nickel, with its protective sleeve",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "0462-005-20141",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 14.3,
+    "w": 2.58,
+    "h": 2.58
+   },
+   "frame": "the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wire": "-Z",
+     "mating": "+Z"
+    }
+   },
+   "colors": {
+    "plating": {
+     "hex": "#ae9f98",
+     "from": "customconnectorkits.com/products/0462-005-20141 product photo (fetched 2026-09-29): dominant colour (k-means); TE: 'Interface Plating Nickel (Ni)'"
+    },
+    "band": {
+     "hex": "#7e656b",
+     "from": "customconnectorkits.com/products/0462-005-20141 product photo (fetched 2026-09-29): the coloured band on the barrel"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "WIDEBAND",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "crimp barrel (wire end)"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch contact"
+  },
+  "0460-204-12141": {
+   "endpoints": [
+    "DOOR-L-PASS-P",
+    "DOOR-R-PASS-P",
+    "FIREWALL-BODY-P",
+    "FUEL-PUMP"
+   ],
+   "what": "Deutsch size 12 solid pin contact, 14-12 AWG, nickel",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "0460-204-12141",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 19.28,
+    "w": 4.95,
+    "h": 4.95
+   },
+   "frame": "the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wire": "-Z",
+     "mating": "+Z"
+    }
+   },
+   "colors": {
+    "plating": {
+     "hex": "#d2c7c0",
+     "from": "customconnectorkits.com/products/0460-204-12141 product photo (fetched 2026-09-29): dominant colour (k-means); TE: 'Interface Plating Nickel (Ni)'"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "crimp barrel (wire end)"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch contact"
+  },
+  "0462-203-12141": {
+   "endpoints": [
+    "DOOR-L-PASS-P",
+    "DOOR-R-PASS-P",
+    "FIREWALL-BODY-P",
+    "FUEL-PUMP"
+   ],
+   "what": "Deutsch size 12 solid socket contact, 14-12 AWG, nickel, with its protective sleeve",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "0462-203-12141",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 19.3,
+    "w": 4.96,
+    "h": 4.96
+   },
+   "frame": "the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wire": "-Z",
+     "mating": "+Z"
+    }
+   },
+   "colors": {
+    "plating": {
+     "hex": "#baafa8",
+     "from": "customconnectorkits.com/products/0462-203-12141 product photo (fetched 2026-09-29): dominant colour (k-means); TE: 'Interface Plating Nickel (Ni)'"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "DOOR-L-PASS-P",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "crimp barrel (wire end)"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch contact"
+  },
+  "0413-204-2005": {
+   "endpoints": [
+    "IBST-DIAG"
+   ],
+   "what": "Deutsch size 20 cavity sealing plug (red)",
+   "maker": "TE Connectivity (Deutsch)",
+   "maker_pn": "0413-204-2005",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 15.75,
+    "w": 2.83,
+    "h": 2.83
+   },
+   "frame": "the contact's axis is +Z, the wire (barrel) end at z = 0, the mating end toward +Z",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "wire": "-Z",
+     "mating": "+Z"
+    }
+   },
+   "colors": {
+    "plating": {
+     "hex": "#e2414a",
+     "from": "customconnectorkits.com/products/0413-204-2005 product photo (fetched 2026-09-29): dominant colour (k-means); the red size-20 sealing plug"
+    }
+   },
+   "attach": [
+    {
+     "n": "wire",
+     "ep": "IBST-DIAG",
+     "at": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "sealing plug head"
+    }
+   ],
+   "mount": [],
+   "kind": "piece",
+   "family": "deutsch contact"
   },
   "FIREWALL-BODY-A": {
    "endpoints": [

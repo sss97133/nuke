@@ -508,7 +508,7 @@ def registry():
         reg = json.loads((CALC / "k5_registry.json").read_text())
         wires = {w["id"]: w for w in reg.get("implied", [])}
         wires.update({w["id"]: w for w in reg["wires"]})
-        _REG.update({"wires": wires, "terminations": reg["terminations"]})
+        _REG.update({"wires": wires, "terminations": reg["terminations"], "endpoints": reg.get("endpoints", {})})
     return _REG
 
 
@@ -541,6 +541,11 @@ def write_pins(mod, out):
         pref = tm.get("part_prefix")
         ids = [x["wire"] for x in terms if x["endpoint"] == tm["endpoint"] and rx.search(str(x.get("cavity", "")))
                and (not pref or str(x.get("part") or "").startswith(pref))]
+        if not ids and tm.get("endpoint_cavities"):
+            # no termination rows for this end (implied wires, e.g. a candidate option): the registry endpoint's own
+            # wire -> cavity map, used only on the half that carries the harness wires
+            cav = (registry()["endpoints"].get(tm["endpoint"]) or {}).get("cavities") or {}
+            ids = [w for w, c in cav.items() if rx.search(str(c))]
         rows.append({"pin": tm["pin"], "endpoint": tm["endpoint"], "name": tm["name"], "full_name": tm.get("full_name", tm["name"]),
                      "pin_tip_glb_m": glb_point(tm["at"]), "wire_side_glb_m": glb_point(tm["at"]),
                      "exit_dir_glb": glb_dir(tm["dir"]), "wires": wire_rows(ids)})
