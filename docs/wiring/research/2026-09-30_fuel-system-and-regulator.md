@@ -235,8 +235,9 @@ Axes: +x driver, −y forward, +z up, metres. Front axle y −1.896, rear axle y
 
 | Item | x | y | z | Basis |
 |---|---|---|---|---|
-| Regulator, as built | 0.000 | −1.970 | 1.015 | twin `E3_FuelPressReg_asbuilt` (from IMG_6531) |
-| Fuel PSI sensor in the regulator's gauge port, pointing forward | 0.000 | −2.00 → −2.06 | 1.03 | regulator front face + AEM 2.15 in body (AEM drawing); orientation set at mock-up for clearance to the water-pump manifold |
+| Regulator, as built | 0.000 | −1.970 | ≈1.03 (bottom ≈0.97, stud top ≈1.09) | Centre from twin `E3_FuelPressReg_asbuilt` (from IMG_6531). Aeromotive publishes no dimensions. **Estimate, ±15 %:** about 120 mm tall with the adjuster stud; cap Ø ≈ 55 mm; lower block ≈ 75 mm wide × 56 mm tall. Scaled from Aeromotive's product-page photos by the ORB-08 port (3/4-16 thread, 19.05 mm). IMG_6531 agrees against the M8 flange bolts beside it. Measure the part in hand. The twin's 60 × 60 × 70 mm box is short |
+| Regulator ports (maker photos) | — | — | — | 2 × ORB-08 on the lower block's left and right faces, axes ±x, ≈ 25 mm above the bottom. ORB-06 return on the bottom face, axis −z. The 1/16 NPT vacuum nipple on the +x side at the cap base (≈ 66 mm above the bottom). The stock bracket is on the back face (+y) |
+| Fuel PSI sensor port: the regulator's 1/8 NPT gauge port | 0.000 | −2.008 (port) → −2.052 (plug face) | 0.983 | The port is centred on the front (logo) face, ≈ 13 mm above the bottom (maker's front photo, same scale). **Thread axis −y**, so the sensor points forward. AEM drawing: 2.15 in overall with 0.40 in of thread (10-2131 Rev C), so about 44 mm sticks out. The Packard plug is at the tip. If the water-pump manifold is in the way at mock-up, the regulator turns 90° on its bracket |
 | Rail L (driver): front port / rear port | 0.159 | −1.992 / −1.472 | 1.084 | twin `E3_FuelRail_L` |
 | Rail R (passenger): front port / rear port | −0.159 | −1.968 / −1.448 | 1.084 | twin `E3_FuelRail_R` |
 | Y block, PROPOSED | 0.00 | −1.50 | 1.15 | behind the intake between the rails' rear ends; fit at mock-up |
@@ -256,7 +257,7 @@ Axes: +x driver, −y forward, +z up, metres. Front axle y −1.896, rear axle y
 Gauges and specs are from the canon: 22 AWG = M22759/16-22, 12–20 AWG = M22759/32 (chapters/16 §1.5).
 - **Fuel PSI (#112 signal → M130 A16 AV3; #112r 5 V → A02; #112g 0 V → B16).** 22 AWG M22759/16, 61-pin cavities y / h / g,
   plug: the AEM "Packard 3-Pin" with pins in the kit.
-  - Unchanged, except the device end now has a place: the regulator's gauge port at (0.00, −2.00, 1.03).
+  - Unchanged, except the device end now has a place: the regulator's gauge port at (0.000, −2.008, 0.983), thread axis −y (§7).
   - Rough twin path from the 61-pin along the driver rail: about 1.1 m, 4.4 ft with the 20 % engine pad. That is consistent
     with the cut-list 4.6 ft estimate; harness-cad measures it (its `ENG-FUELP` branch joint is at (0.03, −1.985, 1.12)).
   - Pin letters are still open (read the AEM drawing before crimping).
