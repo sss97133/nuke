@@ -16,19 +16,19 @@ status: Skylar verbal (owner statements in the Gemini thread + Claude session 20
 
 ---
 
-## 1. ORDERED — eBay, paid 2026-09-24 (Google Pay, buyer `1508nuke`, ship to 707 Yucca St, Boulder City NV)
+## 1. ORDERED — eBay, paid 2026-09-24 (payment method, buyer account and ship-to are on the order records in the database)
 
 | eBay order | Seller | Item (listing title, abridged) | eBay item | Price |
 |---|---|---|---|---|
-| 10-15210-67139 | autopartstd | 4 Seasons A/C Evaporator Core Front, 1976-1977 K5 Blazer | 146144798182 | $128.84 |
-| 10-15210-67140 | jcwhitney | GPD 1411597 "A/C Accumulator" for Blazer/Suburban/K5/C10 | 124110356073 | $31.49 |
-| 10-15210-67141 | autopartsupreme | A/C Orifice Tube 4 Seasons 38904 | 298251803285 | $25.22 |
-| 10-15210-67142 | kmcautoparts | HVAC Blower Motor 4 Seasons 35587 | 406732859496 | $23.02 |
-| 10-15210-67143 | joe888ca | Continental Elite Gatorback 4060672, 6PK1710 serpentine belt | 257506270992 | $22.94 |
-| 10-15210-67144 | autoepar | 6.5 ft #6/#8/#10 A/C hoses + beadlock fittings | 357798902699 | $139.99 |
-| 10-15210-67145 | automotive_budget | Sanden 7176 compressor w/ clutch, 6GR, SD7B10 swing mount, new | 151435180305 | $279.00 |
-| 10-15210-67146 | autopartsgeek3 | 1975-1980 K5 Blazer A/C condenser 52132SGMC | 195899928289 | $133.99 |
-| 10-15210-67147 | bold_auto_parts | A/C accumulator, C/K/Suburban/Blazer/Jimmy V6 V8 | 256476771126 | $35.95 |
+| order record obs:9572dcde | autopartstd | 4 Seasons A/C Evaporator Core Front, 1976-1977 K5 Blazer | 146144798182 | $••• |
+| order record obs:b75409fa | jcwhitney | GPD 1411597 "A/C Accumulator" for Blazer/Suburban/K5/C10 | 124110356073 | $••• |
+| order record obs:488accb3 | autopartsupreme | A/C Orifice Tube 4 Seasons 38904 | 298251803285 | $••• |
+| order record obs:9a3db162 | kmcautoparts | HVAC Blower Motor 4 Seasons 35587 | 406732859496 | $••• |
+| order record obs:0000e47f | joe888ca | Continental Elite Gatorback 4060672, 6PK1710 serpentine belt | 257506270992 | $••• |
+| order record obs:9a306524 | autoepar | 6.5 ft #6/#8/#10 A/C hoses + beadlock fittings | 357798902699 | $••• |
+| order record obs:2042a1ca | automotive_budget | Sanden 7176 compressor w/ clutch, 6GR, SD7B10 swing mount, new | 151435180305 | $••• |
+| order record obs:7c54d147 | autopartsgeek3 | 1975-1980 K5 Blazer A/C condenser 52132SGMC | 195899928289 | $••• |
+| order record obs:cffe853f | bold_auto_parts | A/C accumulator, C/K/Suburban/Blazer/Jimmy V6 V8 | 256476771126 | $••• |
 
 Items $820.44 + shipping $11.00 + tax $68.71 = **$900.15** (sums check to the confirmation).
 

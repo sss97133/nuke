@@ -446,7 +446,7 @@ Kit: 68201 ×1 [1]
 12. decision: frm M130:B15 -> M130:B16 — Dave's sheet keeps B15 for crank/cam only ('Ref Sync 0 volt'); knock return joins the B16 group
 13. ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5; ProWire 3137CT (MiniSeal cavities)
 
-## APS — DBW pedal bought 2025-04-02 (eBay order 26-12889-28142): '72-98 C10 Square Body OBS LS Swap DBW' pedal — GM Gen III truck pedal (OE 15751307 family), 9-cavity plug with 6 wired; the third sensor's 3 cavities stay empty · 2 items open
+## APS — DBW pedal bought 2025-04-02 (eBay order order record obs:273ef61a): '72-98 C10 Square Body OBS LS Swap DBW' pedal — GM Gen III truck pedal (OE 15751307 family), 9-cavity plug with 6 wired; the third sensor's 3 cavities stay empty · 2 items open
 
 Kit: WPAPP30 ×1 (on the cart change) [1]
 

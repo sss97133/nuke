@@ -169,6 +169,49 @@ items:
     compare_to: "gm77.body.top.lower-holes-width (63 in between the lower bolt holes); twin Exterior_Roof (1881 mm long, 1855 mm wide, model only)."
     result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
 
+  # ---- Wheel-speed candidates (asked by the wheel-speed lane, 2026-09-29). Source for the design these feed:
+  # docs/wiring/research/2026-09-30_wheel-speed-sensors.md s.3.1, 3.3, 4.1-4.3 (branch wiring/wheel-speed).
+  # A candidate option, not decided: these size the tone ring and bracket so a machine shop can quote.
+
+  - id: T-16
+    priority: 2
+    what: Front hub-and-disc and knuckle, each side (Dana 44, 1977 K10), for a pressed tone ring and a sensor bracket
+    from_to: "(a) Inboard hub barrel, outside diameter, and its free length behind the rotor. (b) Is the disc cast with the hub or bolted to it (yes/no, photo). (c) Axial space from the rotor's inboard face to the knuckle and to the dust shield. (d) Spindle nuts: count, thread size, and the bolt-circle diameter. (e) Caliper support-bracket bolts: count and centre-to-centre spacing."
+    how: Wheel and caliper off; hub-and-disc off if the barrel can't be reached. Calipers, not a tape.
+    settles: "The ring size and tooth count. It needs at least 24 teeth at ZF's 12.5 mm pitch, which means a tip diameter of 95.5 mm or more; each 4 mm of diameter is one tooth. Also the bracket's bolt holes (spindle nuts or caliper-bracket bolts) and whether a ring and bracket fit behind the rotor."
+    tolerance_mm: 0.5
+    compare_to: "Nothing published for the barrel. The 1977 LTSM gives the spindle-nut torque (25 ft-lb K10/K20, PDF p.307) and hub end play (.001-.010 in, pp.305-306), not the sizes."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-17
+    priority: 2
+    what: Front brake hose and knuckle travel, each side
+    from_to: "(a) Brake-hose frame bracket (the U-clip) to the caliper, the hose's free length, and where the bracket sits on the rail. (b) Steering lock angle, left and right (degrees, or tie-rod travel). (c) Knuckle position at full droop and full bump, measured from the hose's frame bracket."
+    how: Tape and an angle finder; jack for droop, strap or bump stop for bump. Turn lock to lock at both ends of travel.
+    settles: "The sensor lead's free span from knuckle to frame, run with the brake hose. Its connector sits at the frame end, never on the knuckle. The hose must never be twisted (1977 LTSM PDF pp.414, 417), and GM keeps brake pipes .75 in from moving parts (PDF p.398)."
+    tolerance_mm: 10
+    compare_to: "Nothing published."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-18
+    priority: 2
+    what: Tire size
+    from_to: "The size printed on the sidewall, all four tyres."
+    how: Read it off the sidewall; one photo.
+    settles: "The signal frequency, f = teeth x speed / (pi x tyre diameter). The research page works an 800 mm example because the real tyre is unknown."
+    tolerance_mm: null
+    tolerance_note: Exact; it is printed on the tyre.
+    compare_to: "Nothing on file."
+    result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}
+
+  - id: T-19
+    priority: 3
+    what: Rear axle, only if four-wheel sensing is picked
+    from_to: "(a) Differential cover bolt count: 12 means the 8-7/8 in axle, 10 the 8-1/2. (b) Axle flange outside diameter. (c) Outline of the rear caliper bracket plate: trace it on paper with a rule, or photo it square-on with a rule."
+    how: Count; calipers; paper trace.
+    settles: The rear ring (under the stud heads or on the shaft) and the sensor tab on the existing caliper bracket. The recommended path has no rear sensors (the NP205 sender already gives rear drive speed), so this waits on that call.
+    tolerance_mm: 1
+    compare_to: "The installed finned cover shows 11 bolts in view (photo 5aefc0bd, 2023-11-28, per the wheel-speed page), which points to 12 in total."
   - id: T-20
     priority: 2
     what: Seat runs and seat travel (asked by the seat-climate lane, for cooled seats; numbered after the wheel-speed items T-16 to T-19 in PR #427)
