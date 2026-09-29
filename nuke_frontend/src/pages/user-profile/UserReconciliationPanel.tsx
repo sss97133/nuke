@@ -55,12 +55,13 @@ interface Props {
 
 const SECTIONS: Section[] = ['vehicles', 'account', 'books'];
 
-const fetchSection = async (userId: string, section: Section): Promise<ReconRow[]> => {
+// null = both attempts failed (said on the panel, never hidden).
+const fetchSection = async (userId: string, section: Section): Promise<ReconRow[] | null> => {
   for (let attempt = 0; attempt < 2; attempt++) {
     const { data, error } = await supabase.rpc('get_user_reconciliation', { p_user_id: userId, p_section: section });
     if (!error) return (data || []) as ReconRow[];
   }
-  return [];
+  return null;
 };
 
 const fmtN = (n: number | null): string => (n == null ? 'unknown' : Number(n).toLocaleString('en-US'));
@@ -187,6 +188,7 @@ const UserReconciliationPanel: React.FC<Props> = ({ userId, isOwnProfile }) => {
   const [rows, setRows] = useState<ReconRow[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [computedAt, setComputedAt] = useState<string | null>(null);
+  const [failed, setFailed] = useState<Section[]>([]);
 
   useEffect(() => {
     // Owner-only: never even fetch for visitors.
@@ -194,7 +196,8 @@ const UserReconciliationPanel: React.FC<Props> = ({ userId, isOwnProfile }) => {
     let cancelled = false;
     Promise.all(SECTIONS.map((s) => fetchSection(userId, s))).then((parts) => {
       if (cancelled) return;
-      setRows(parts.flat());
+      setFailed(SECTIONS.filter((_, i) => parts[i] === null));
+      setRows(parts.flatMap((p) => p ?? []));
       setComputedAt(new Date().toISOString());
       setLoaded(true);
     });
@@ -212,8 +215,15 @@ const UserReconciliationPanel: React.FC<Props> = ({ userId, isOwnProfile }) => {
   }, [rows]);
 
   if (!isOwnProfile) return null;
-  if (!loaded) return null;
-  if (rows.length === 0) return null;
+  // The owner sees that it is working (a cold cache takes ~10 s) and sees a failure, instead of nothing.
+  const note = (text: string) => (
+    <div style={{ border: '2px solid var(--up-ink)', padding: '8px 12px', marginBottom: '8px', fontFamily: 'var(--up-font-sans)',
+      fontSize: '9px', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--up-ink)', background: 'var(--up-surface)' }}>
+      {text}
+    </div>
+  );
+  if (!loaded) return note('Reconciliation · computing from your records…');
+  if (rows.length === 0) return failed.length ? note(`Reconciliation · could not load (${failed.join(', ')}) · reload to retry`) : null;
 
   const errors = breaks.filter((r) => r.severity === 'error').length;
 
@@ -239,7 +249,7 @@ const UserReconciliationPanel: React.FC<Props> = ({ userId, isOwnProfile }) => {
         }}
       >
         <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em' }}>RECONCILIATION</span>
-        <span style={LABEL}>OWNER ONLY · COMPUTED {fmtWhen(computedAt)}</span>
+        <span style={LABEL}>OWNER ONLY · COMPUTED {fmtWhen(computedAt)}{failed.length ? ` · DID NOT LOAD: ${failed.join(', ').toUpperCase()}` : ''}</span>
       </div>
 
       {breaks.length > 0 && (
