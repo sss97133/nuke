@@ -23,6 +23,11 @@
 #   mass_g_est     wire mass from ProWire's M22759/32 table (20 AWG 6.40 kg/km = 1.95 g/ft) plus any device mass the maker publishes
 # alternative_to   another version of the same add-on. Only one is built, so options_v5 leaves it out of the capacity totals
 # requires         an option it cannot be built without
+# conflicts_with   another candidate that names the same pin or output; the CONFLICT line in demand.limits says which
+# Engine-side demand options_v5 reads (2026-09-30, wheel-speed lane):
+#   pdm15_outputs  engine PDM15 outputs it would take (otherwise counted from designed wires only)
+#   m130_pins      M130 pins it would take; m130_udig = how many of them must be universal digital inputs (UDIG)
+#   pin61_cavities cavities it would take in the engine-only 61-pin firewall connector
 
 BASE:
   name: Base truck — engine, power spine, comms, factory body functions
@@ -836,12 +841,13 @@ TOP-FINISH:
 # and the knuckle mounts. Research, prices and every source: research/2026-09-30_wheel-speed-sensors.md (web pages snapshotted
 # 2026-09-29 to reference_documents/web_snapshots/, gitignored). Nothing on the truck needs wheel speeds: the iBooster runs
 # standalone on its pedal sensor, the PCS needs only engine RPM, the Dakota reads the NP205 sender. They buy traction and launch
-# control in 2WD and slip logging. None of these is decided. options_v5 has no demand keys for M130 pins, 61-pin cavities or
-# PDM15 outputs, so those numbers are in each entry's notes.
+# control in 2WD and slip logging. None of these is decided. Their M130, 61-pin and PDM15 demand is in the keys above, so
+# options_v5 shows it in the verdict next to the other candidates.
 
 WSS-F2:
   name: Front wheel speed sensors, two ZF GS100502 on machined tone rings, into M130 UDIG5 / UDIG6 (traction and launch control in 2WD)
   status: candidate
+  conflicts_with: [NAV-L10]     # both name M130 B11 (UDIG6); see demand.limits CONFLICT
   source: >-
     owner 2026-09-29 (above). MoTeC M1 Launch Control User Guide v1.0 p.3: "A minimum of two sensors (one each of Driven Wheel and
     Non-Driven Wheel Speed) is recommended"; the driven one is the NP205 sender #100 on M130 B08, which MoTeC's own GPR example
@@ -851,15 +857,20 @@ WSS-F2:
   product: {maker: ZF, pn: GS100502, price_usd: 33.80, price_date: 2026-09-29, each: true,
             specs: "Hall, open-collector sinking 20 mA max, 5-24 V at 6 mA max, 1.5 mm air gap, near zero to 15 kHz, M12x1 aluminium body 65.5 mm, 20 AWG x 1 m leads, -40 to 125 C, IP67 (ZF GS1005-GS1007 datasheet, 2016-07-06); DigiKey qty 1, 1,300 in stock"}
   demand:
-    crossings: 0            # no body bulkhead; the two signals take 2 of the 3 spare 61-pin cavities (d, t, u), see notes
+    crossings: 0            # no body bulkhead
     pdm30_outputs: 0
     pdm30_inputs: 0
-    limits: ["new PDM15 8 A output at 1 A, the smallest step (PDM manual p.1 'Outputs are programmable in 1 A steps'); load 2 x 6 mA (ZF p.1)"]
+    pdm15_outputs: 1        # OUT14 (8 A) at 1 A, the sensor feed
+    m130_pins: 2            # B10 (UDIG5), B11 (UDIG6)
+    m130_udig: 2            # the last two spare universal digital inputs
+    pin61_cavities: 2       # the two signals: 2 of the 3 spare cavities (d, t, u)
+    limits: ["CONFLICT: M130 B11 (UDIG6) is also named by NAV-L10 (the MoTeC GPS-L10 alternate, PR #421, on B11 or B14 per its manual; B14 is ISO_KILL). The M130 has two spare UDIGs, B10 and B11, and WSS-F2 takes both, so WSS-F2 and NAV-L10 cannot both be built on this M130. NAV (CAN only) takes no M130 pin and does not conflict. Owner call",
+             "PDM15 OUT14 (8 A) at 1 A, the smallest step (PDM manual p.1 'Outputs are programmable in 1 A steps'); load 2 x 6 mA (ZF p.1). OUT14 so it stays off OUT8, OUT10 and OUT12, which step-power's STEP-DCMD names (options-rd, 2026-09-29; STEP-DCMD is not on main yet)"]
     door_cavities: 0
     notes: >-
       M130 B10 (UDIG5) front left and B11 (UDIG6) front right: 52 -> 54 of 60 pins, and the last two UDIGs. 61-pin 58 -> 60 of 61;
-      registry #100 may take cavity d back when body bulkhead C goes under the 0ah call, which would fill it. One PDM15 8 A output
-      (OUT10, OUT12, OUT14 or OUT15 are free) feeds both sensors, and their 0 V goes to GND-BANK-ENG, so only the two signals
+      registry #100 may take cavity d back when body bulkhead C goes under the 0ah call, which would fill it. PDM15 OUT14 (8 A)
+      feeds both sensors, and their 0 V goes to GND-BANK-ENG, so only the two signals
       cross (Dave's call against the MoTeC-pattern SEN_5V0_B / SEN_0V supply, which takes 2 more cavities). Mechanical: two
       low-carbon steel tone rings pressed on registers turned on the inboard barrels of the front hub-and-discs (1977 LTSM
       pp.305-306). Teeth are at least ZF's 5.0 mm high, 2.5 mm wide, 10 mm apart (12.5 mm pitch, count = floor(pi x tip dia /
@@ -870,7 +881,7 @@ WSS-F2:
     adds:
       - {id: WSS_FL_SIG, gauge: 20, spec: M22759/32, from: "WSS-FL DTM06-3S cavity 3 (ZF black, output)", to: "M130:B10 (UDIG5) through a spare 61-pin cavity", current_a: 0, length_ft_est: null, basis: "not derived: the front hub, the frame hose bracket and the 61-pin plate are not all placed in the twin yet"}
       - {id: WSS_FR_SIG, gauge: 20, spec: M22759/32, from: "WSS-FR DTM06-3S cavity 3 (ZF black, output)", to: "M130:B11 (UDIG6) through a spare 61-pin cavity", current_a: 0, length_ft_est: null, basis: "as WSS_FL_SIG"}
-      - {id: WSS_F_PWR, gauge: 20, spec: M22759/32, from: "PDM15 8 A output (OUT10, 12, 14 or 15), 1 A limit", to: "SPL-WSS-F (front sensor feed splice)", current_a: 0.012, length_ft_est: null, basis: "2 x 6 mA max (ZF datasheet p.1); length as WSS_FL_SIG"}
+      - {id: WSS_F_PWR, gauge: 20, spec: M22759/32, from: "PDM15:OUT14 (8 A), 1 A limit", to: "SPL-WSS-F (front sensor feed splice)", current_a: 0.012, length_ft_est: null, basis: "2 x 6 mA max (ZF datasheet p.1); length as WSS_FL_SIG"}
       - {id: WSS_FL_PWR, gauge: 20, spec: M22759/32, from: "SPL-WSS-F", to: "WSS-FL DTM06-3S cavity 1 (ZF brown, supply)", current_a: 0.006, length_ft_est: null, basis: "as WSS_FL_SIG"}
       - {id: WSS_FR_PWR, gauge: 20, spec: M22759/32, from: "SPL-WSS-F", to: "WSS-FR DTM06-3S cavity 1 (ZF brown, supply)", current_a: 0.006, length_ft_est: null, basis: "as WSS_FL_SIG"}
       - {id: WSS_FL_GND, gauge: 20, spec: M22759/32, from: "WSS-FL DTM06-3S cavity 2 (ZF blue, ground)", to: "GND-BANK-ENG", current_a: 0.006, length_ft_est: null, basis: "as WSS_FL_SIG"}
@@ -892,6 +903,9 @@ WSS-4E:
     crossings: 0
     pdm30_outputs: 0
     pdm30_inputs: 0
+    pdm15_outputs: 1        # OUT14 at 1 A, the front sensor feed (as WSS-F2)
+    m130_pins: 0            # the E888 is read over CAN
+    pin61_cavities: 2       # the two front signals, as WSS-F2
     taps: ["PDM30 OUT24 (the M130 feed, RUN): E888 12 V"]
     limits: ["OUT24 group: + 0.15 A for the E888 (manual p.15), sensors excluded"]
     door_cavities: 0
@@ -914,7 +928,7 @@ WSS-4E:
       - {id: WSS4_RR_SIG, gauge: 20, spec: M22759/32, from: "WSS-RR DTM06-3S cavity 3", to: "E888 B18 (DIG4) through the rear crossing", current_a: 0, length_ft_est: null, basis: "as WSS4_RL_SIG"}
       - {id: WSS4_R_PWR, gauge: 20, spec: M22759/32, from: "E888 +8 V aux (A16 or B22)", to: "SPL-WSS-R, then the RL and RR DTM cavity 1", current_a: 0.012, length_ft_est: null, basis: "2 x 6 mA max (ZF p.1)"}
       - {id: WSS4_R_GND, gauge: 20, spec: M22759/32, from: "SPL-WSS-R ground (RL and RR DTM cavity 2)", to: "E888 0 V (A15 or B21)", current_a: 0.012, length_ft_est: null, basis: "as WSS4_R_PWR"}
-      - {id: WSS4_F_PWR, gauge: 20, spec: M22759/32, from: "PDM15 8 A output (OUT10, 12, 14 or 15), 1 A limit", to: "SPL-WSS-F (front sensor feed splice)", current_a: 0.012, length_ft_est: null, basis: "as WSS-F2 WSS_F_PWR"}
+      - {id: WSS4_F_PWR, gauge: 20, spec: M22759/32, from: "PDM15:OUT14 (8 A), 1 A limit", to: "SPL-WSS-F (front sensor feed splice)", current_a: 0.012, length_ft_est: null, basis: "as WSS-F2 WSS_F_PWR"}
       - {id: WSS4_FL_PWR, gauge: 20, spec: M22759/32, from: "SPL-WSS-F", to: "WSS-FL DTM06-3S cavity 1", current_a: 0.006, length_ft_est: null, basis: "as WSS-F2"}
       - {id: WSS4_FR_PWR, gauge: 20, spec: M22759/32, from: "SPL-WSS-F", to: "WSS-FR DTM06-3S cavity 1", current_a: 0.006, length_ft_est: null, basis: "as WSS-F2"}
       - {id: WSS4_FL_GND, gauge: 20, spec: M22759/32, from: "WSS-FL DTM06-3S cavity 2", to: "GND-BANK-ENG", current_a: 0.006, length_ft_est: null, basis: "as WSS-F2"}

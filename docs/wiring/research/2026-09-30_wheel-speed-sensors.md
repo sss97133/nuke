@@ -35,6 +35,9 @@ are marked as forum posts: one person's report, not a maker's specification. Not
   - slip logging.
 - They add nothing to the brakes until an ABS is fitted, and an ABS would bring its own sensors.
 - They are worth fitting only if Skylar wants traction or launch control.
+  - **The price in harness capacity:** 2 of the 61-pin's last 3 spare cavities (d, t, u), the M130's last two universal
+    digital inputs (B10, B11; B11 is also what the NAV-L10 GPS alternate wants), and one PDM15 output.
+  - That is a big ask for an optional feature.
 - If he does, two front sensors are MoTeC's minimum: one driven wheel and one non-driven wheel. The NP205 sender (#100 on M130
   B08/UDIG3) already measures the driven rear. MoTeC's own GPR example M130 pinout names B08 UDIG3 "Wheel Speed Rear Drive
   Sensor" (GPR page, M130 connector B table), which is exactly the job #100 does now.
@@ -334,9 +337,9 @@ These belong on the geometry lane's `calc-data/cad/tape_list.yaml`.
 
 | Resource | Now | With WSS-F2 |
 |---|---|---|
-| M130 pins | 52 / 60 | 54 / 60: B10, B11. This uses the last two UDIGs, so a later frequency sensor would have none. (A flex-fuel sensor is the likely one; its input type is in the M1 Flex Fuel User Guide on the GPR page, not read here) |
+| M130 pins | 52 / 60 | 54 / 60: B10, B11. This uses the last two UDIGs, so a later frequency sensor would have none. (A flex-fuel sensor is the likely one; its input type is in the M1 Flex Fuel User Guide on the GPR page, not read here.) **CONFLICT:** nav-comms' alternate NAV-L10 (MoTeC GPS-L10, PR #421) also names B11 (UDIG6), so WSS-F2 and NAV-L10 cannot both be built; its recommended NAV is CAN-only and takes no pin (`conflicts_with: [NAV-L10]` in options.yaml) |
 | 61-pin | 58 / 61 (spare d, t, u) | 60 / 61: two signal cavities. **Watch:** registry #100 notes it left cavity d for body bulkhead C, which the owner's one-61-pin call (state 0ah) retires |
-| PDM15 8 A outputs | 3 / 7 used (OUT10, OUT12, OUT14, OUT15 free) | 4 / 7: one output feeds both sensors (1 A limit; 2 × 6 mA load) |
+| PDM15 8 A outputs | 3 / 7 used (OUT10, OUT12, OUT14, OUT15 free) | 4 / 7: OUT14 feeds both sensors (1 A limit; 2 × 6 mA load). OUT14 keeps clear of OUT8, OUT10 and OUT12, which step-power's STEP-DCMD names (options-rd, 2026-09-29; not on main yet) |
 | PDM30, PDM15 inputs; body bulkheads | — | No change |
 | GND-BANK-ENG | 24 returns | 26: the two sensor 0 V returns |
 
@@ -365,6 +368,8 @@ These belong on the geometry lane's `calc-data/cad/tape_list.yaml`.
   - The machine shop (quote).
 - **Capacity.** Two M130 pins, two 61-pin cavities and one PDM15 output.
 
+- **Conflict.** `conflicts_with: [NAV-L10]`: both name M130 B11 (UDIG6).
+
 **Kept as toggles:**
 - **WSS-4E** (`alternative_to: WSS-F2`): four corners into a cab-mounted E888.
   - Four-wheel slip.
@@ -386,7 +391,10 @@ These belong on the geometry lane's `calc-data/cad/tape_list.yaml`.
 
 ## 7. Open questions only Skylar (or Dave) can answer
 
-1. **Worth it?** Is traction or launch control wanted on this truck at all? If not, stop at nothing, or at WSS-PREP.
+1. **Worth it?** Is traction or launch control wanted on this truck at all?
+   - The cost: 2 of the 61-pin's last 3 spare cavities (d, t, u), the M130's last two UDIGs (B10, B11), and one PDM15 output.
+   - It rules out the GPS-L10-on-B11 alternate (NAV-L10).
+   - If not wanted, stop at nothing, or at WSS-PREP.
 2. **Two 61-pin cavities.** OK to spend two of the 61-pin's last spares on it? And is an M130 speed input an engine signal for
    the 61-pin under the 0ah call, or a chassis circuit under state row 51?
 3. **Tire size** off the sidewall. It sets the M1 wheel circumference and the frequency arithmetic.

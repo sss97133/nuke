@@ -2,7 +2,8 @@
 
 - **Date:** 2026-09-30 (prepared 2026-09-29; web sources read 2026-09-29)
 - **Change type:** research (`docs/wiring/research/2026-09-30_wheel-speed-sensors.md`) + candidate options
-  (`calc-data/catalog/options.yaml`: WSS-F2, WSS-4E, WSS-PREP) + source list (`calc-data/fetch_sources.py`)
+  (`calc-data/catalog/options.yaml`: WSS-F2, WSS-4E, WSS-PREP) + toolchain (`calc-data/options_v5.py`: engine-side demand keys
+  and verdict lines) + source list (`calc-data/fetch_sources.py`)
 - **Follows:** `receipts/2026-09-28_options-capacity-readiness.md` (the options format and capacity ledger);
   `research/2026-09-28_ibooster-gen2-wiring.md` (Gen 1 correction)
 - **Ask (owner, 2026-09-29, relayed by the lead):** "no a super lame question with the brakes and stuff we need to deal with
@@ -78,9 +79,20 @@
   - recommendation, open questions, substrate inconsistencies.
 - `calc-data/catalog/options.yaml`: three candidates in the #416 format (`product`, `demand.adds`, `alternative_to`). None
   decided; agents never promote a candidate.
-  - **WSS-F2** (the recommended path): two front ZF sensors into M130 UDIG5/UDIG6; 7 planned wires.
+  - **WSS-F2** (the recommended path): two front ZF sensors into M130 UDIG5/UDIG6; 7 planned wires. `conflicts_with: [NAV-L10]`
+    (pieces audit 2026-09-29): both name M130 B11 (UDIG6); NAV-L10 is nav-comms' GPS-L10 alternate in PR #421, which already
+    carries the mirror entry. PDM15 OUT14 chosen for the feed, clear of step-power's STEP-DCMD claims (OUT8/10/12, per options-rd).
   - **WSS-4E** (`alternative_to: WSS-F2`): four corners into a cab E888 over CAN; 15 planned wires.
   - **WSS-PREP** (`alternative_to: WSS-F2`): rings and brackets only, no wires.
+- `calc-data/options_v5.py` (options-rd's pattern from #416, at their suggestion; their lane is closed): `capacity()` now
+  reads, per undesigned candidate:
+  - `demand.pdm15_outputs` (the designed-wire count stays the default);
+  - `m130_pins` / `m130_udig` and `pin61_cavities`;
+  - `conflicts_with`.
+  - Three verdict lines sum over the lead versions (alternates excluded) against the ledger, with the takers named.
+  - The M130 row lists the spare pin ids and spare UDIGs.
+  - `OPTIONS.md` gains PDM15, M130 and 61-pin columns.
+  - The options.yaml header documents the keys.
 - `calc-data/fetch_sources.py`: 19 source URLs appended so the gitignored snapshots can be refetched. Their stems match the
   snapshots already saved on 2026-09-29.
 - Not changed: `k5_registry.json` (the lead's) and `OPTIONS.md` (generated from the registry). No database writes.
@@ -96,6 +108,11 @@ It parses and places all three (tree rebased on origin/main 09c291120):
 - `alternates: ... WSS-4E, WSS-PREP`.
 - The verdicts (body crossings 2, PDM30 outputs 7 against 3 spare, PDM30 inputs 3 against 2 spare, door pass-throughs) come
   from the other candidates. The wheel-speed candidates add 0 body-bulkhead crossings and 0 PDM30 outputs or inputs.
+- New verdict lines:
+  - `61-pin (engine connector): candidates would take 2 (WSS-F2 2); 3 spare (d, t, u) — fits, leaving 1`
+  - `M130 pins: candidates would take 2 (WSS-F2 2), 2 of them universal digital inputs; 8 spare, 2 of them UDIG (B10, B11) —
+    fits, leaving 6 pins and 0 UDIG`
+  - `PDM15 outputs: candidates would take 1 (WSS-F2 1); 5 spare — fits, leaving 4`
 
 ## Capacity (the recommended path WSS-F2, from the registry `capacity` of the 2026-09-28 run)
 | Resource | Now | WSS-F2 |
@@ -105,11 +122,12 @@ It parses and places all three (tree rebased on origin/main 09c291120):
 | PDM15 8 A outputs | 3 / 7 (OUT10, 12, 14, 15 free) | 4 / 7 (one feed at 1 A) |
 | PDM30 outputs and inputs, PDM15 inputs, body bulkheads | — | no change |
 
-- **Toolchain gap:** options_v5 has no demand keys for M130 pins, 61-pin cavities or PDM15 outputs, so these numbers live in
-  the options' `notes`. Candidate for the options toolchain owner.
+- These now print in the options_v5 verdict (above) beside the other candidates, so Skylar sees the 61-pin cost next to the
+  traction-control question.
 
 ## Open (named close paths)
-1. **Owner:** is traction or launch control wanted at all? If not, WSS-PREP or nothing.
+1. **Owner:** is traction or launch control wanted at all, at 2 of the 61-pin's last 3 spares, the M130's last two UDIGs and
+   one PDM15 output? It also rules out NAV-L10 (GPS-L10 on B11). If not, WSS-PREP or nothing.
 2. **Owner / lead:** two 61-pin cavities for WSS-F2.
    - Registry #100 may take cavity d back when body bulkhead C is retired under 0ah.
    - Is an M130 speed input an engine signal under 0ah, or a chassis circuit under row 51?
