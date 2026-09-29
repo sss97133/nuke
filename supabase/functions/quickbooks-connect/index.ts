@@ -6,7 +6,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { authenticateWriter, requireWriteAuth } from '../_shared/writeGuard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,6 +36,27 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
+
+  // The connected QuickBooks company is the owner's own books, and "signed in" means anyone (sign-up is
+  // open and auto-confirmed). So past the write guard, only the service key or the company owner's own
+  // sign-in may call any action (financials, company_info, pull_transactions, the OAuth steps). 2026-09-29.
+  const verdict = await authenticateWriter(req);
+  if (!verdict.ok || verdict.caller.kind !== 'service_role') {
+    const callerId = verdict.ok && (verdict.caller.kind === 'user' || verdict.caller.kind === 'api_key')
+      ? verdict.caller.userId
+      : null;
+    const { data: owner } = await supabase
+      .from('parent_company')
+      .select('owner_user_id')
+      .eq('legal_name', 'NUKE LTD')
+      .maybeSingle();
+    if (!callerId || !owner?.owner_user_id || callerId !== owner.owner_user_id) {
+      return new Response(JSON.stringify({ error: 'forbidden', reason: 'owner only' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  }
 
   try {
     const url = new URL(req.url);
