@@ -929,7 +929,7 @@ NAV-DAK:
     taps: ["VHX control box AUX I/O (BIM bus)", "power: unknown until the GPS-50-2 manual is read (likely the VHX's own feeds on OUT29 / DAK_CONST)"]
     notes: >-
       The cheapest GPS on the dash, but no pitch/roll (pair with ATT-CLINO) and nothing reaches the M130 or a logger. Its speed
-      output is not used: the speed source is decided (state §1 row 0v: NP205 speedo drive + Dakota SEN-01-5).
+      output is not used: the speed source is decided (state §3 row 0v: NP205 speedo drive + Dakota SEN-01-5).
     adds: []
     mass_g_est: "not published"
 
