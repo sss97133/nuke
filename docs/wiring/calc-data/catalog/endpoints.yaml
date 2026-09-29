@@ -1145,11 +1145,11 @@ HORN:
   wires: ["48", "HORN_GND"]
 WASHER-PUMP:
   where: engine
-  device: "Hella 8TW 004 223-031 12 V washer pump in the Hella 8TW 003 248-001 1.5 l tank (pin table WASHER-PUMP)"
+  device: "factory washer pump on the wiper motor gear box, ratchet solenoid on 2-way connector 12004622 (owner correction 2026-09-29; pin table WASHER-PUMP)"
   family: open
   kit: {}
   wires: ["50", "WASH_GND"]
-  sources: ["reference_documents/web_snapshots/www.hella.com__BI_Washer-pumps-and-water-tanks_2026.md"]
+  sources: ["1977 Light Truck Service Manual p.803 Fig. 8-16 (Washer Mechanism Mounting on Wiper)", "ST-352-78 1978 C-K booklet fold-out A-1 (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png): WASH SOL, connector 12004622, circuits 94 and 93B", "owner 2026-09-29: the factory wiper has the washer pump built in; retired: Hella 8TW 004 223-031 pump and tank (web_snapshots/www.hella.com__BI_Washer-pumps-and-water-tanks_2026.md)"]
 UNDERHOOD-LAMP:
   where: engine
   device: "underhood lamp"
