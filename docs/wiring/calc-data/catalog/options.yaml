@@ -830,12 +830,12 @@ TOP-FINISH:
     adds: []
 
 FT:
-  name: Fuel temperature sensor in the return at the regulator, to M130 AT4
+  name: Fuel temperature sensor in the return at the regulator, to M130 AT4 (B6)
   status: candidate
   source: >-
     lead 2026-09-29 (owner asked how fuel is measured); research/2026-09-30_fuel-system-and-regulator.md §4: the M1 works out
           injector pulse width from "Fuel Pressure and Fuel Temperature" and corrects fuel density with a "Coefficient of Thermal
-          Expansion" (MoTeC M1 Flex Fuel User Guide v1.0 p.5, web_snapshots/assets.motec.com.au__M1_Flex_Fuel_User_Guide_249c316b37.md);
+          Expansion" (MoTeC M1 Flex Fuel User Guide v1.0 p.3, p.5, web_snapshots/assets.motec.com.au__M1_Flex_Fuel_User_Guide_249c316b37.md);
           MoTeC's GPR M130 pinout gives an AT input "Fuel Temperature Sensor" as its example use (web_snapshots/www.motec.com.au__GPR.md,
           connector B). Not asked for by the owner
   subsystems: []
@@ -844,13 +844,44 @@ FT:
     crossings: 0        # engine-bay sensor to the cab M130 through the engine 61-pin, not a body bulkhead
     pdm30_outputs: 0
     pdm30_inputs: 0
+    m130_pins: 1        # B6 (AT4), an analogue temperature input, not a UDIG; its 0 V joins the B16 splice
+    m130_udig: 0
+    pin61_cavities: 2   # signal + 0 V; 1 if the 0 V joins #112g on the engine side
+    limits: ["61-pin: 3 spare cavities (d, t, u). WSS-F2 (wheel-speed lane) would take 2, so with WSS-F2 built FT fits only with its 0 V joined to #112g on the engine side (61 of 61, none left). Dave's call on the engine-side 0 V join"]
     notes: >-
       M130 B6 (AT4, spare; 1k pull-up to SEN_5V_B per MoTeC's M130 GPR pinout); signal + 0 V in 22 AWG M22759/16 (canon ch.16
-      §1.5) through 2 of the 3 spare 61-pin cavities (d, t, u), or 1 if its 0 V joins #112g on the engine side (Dave's call);
-      sensor not picked: MoTeC #55001 = Bosch 0 280 130 026 (M12 x 1.5, M1 predefined calibration, plug MoTeC #64004; MoTeC
-      lists it as a water sensor, fuel service not stated) or the GM 13577379 flex-fuel sensor on UDIG5/6 (temperature and
-      ethanol on one input, Flex Fuel guide p.7-8); fitting: a tee in the -6 return at the regulator
+      §1.5); sensor not picked: MoTeC #55001 = Bosch 0 280 130 026 (M12 x 1.5, M1 predefined calibration, plug MoTeC #64004;
+      MoTeC lists it as a water sensor, fuel service not stated); fitting: a tee in the -6 return at the regulator. The flex-fuel
+      sensor version is FT-FLEX
     adds:
       - {id: FT_SIG, gauge: 22, spec: M22759/16, from: "M130:B6 (AT4)", to: "FT sensor signal", current_a: 0.005, length_ft_est: 4.6, basis: "same ends as #112 fuel PSI signal (cut list v4.2 zone estimate 4.6 ft); current <= 5 V / 1k pull-up (MoTeC M130 GPR pinout)"}
       - {id: FT_0V, gauge: 22, spec: M22759/16, from: "M130:B16 (SEN_0V_B, Dave's sheet: analog sensor 0 V)", to: "FT sensor 0 V", current_a: 0.005, length_ft_est: 4.6, basis: "as FT_SIG; the A09/B16 vs A02/B16 letter pairing is Dave's adjudication (state 0ab)"}
 
+FT-FLEX:
+  name: Fuel temperature and ethanol content from a GM 13577379 flex-fuel sensor in the return, to an M130 UDIG
+  status: candidate
+  alternative_to: FT
+  conflicts_with: [WSS-F2, NAV-L10]     # all name M130 B10/B11 (UDIG5/UDIG6); see demand.limits CONFLICT
+  source: >-
+    research/2026-09-30_fuel-system-and-regulator.md §4; MoTeC M1 Flex Fuel User Guide v1.0 p.6-8: a digital composition sensor on a
+          "UDIG X Hybrid A" input; "The common flex fuel sensors will also provide fuel temperature as part of its digital reading. Only
+          one digital input is needed to get both the composition and temperature readings" (p.7); GM 1357 7379 translation table (p.8).
+          Pieces audit 2026-09-29: the UDIG path collides with WSS-F2 and NAV-L10. Not asked for by the owner
+  subsystems: []
+  wire_patterns: ["^FTF_"]
+  product: {maker: GM, pn: "13577379", price_usd: null, price_date: 2026-09-29, each: true,
+            specs: "digital composition + temperature on one output (MoTeC Flex Fuel guide p.7); supply voltage, plug and hose ports not in our sources"}
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    m130_pins: 1        # one UDIG: B10 (UDIG5) or B11 (UDIG6)
+    m130_udig: 1
+    pin61_cavities: 2   # signal + 0 V; its supply (voltage not in our sources) may add one
+    limits: ["CONFLICT: M130 B10 (UDIG5) and B11 (UDIG6) are the last two spare UDIGs (registry pinout). WSS-F2 (wheel-speed lane) takes both and NAV-L10 (nav-comms lane) takes B11, so FT-FLEX cannot be built with WSS-F2, and only on B10 with NAV-L10. FT (thermistor on AT4, B6) takes no UDIG and does not conflict. Owner call"]
+    notes: >-
+      Worth it over FT only if the truck will ever run ethanol blends: the M1 blends two fuels from the composition reading (Flex Fuel
+      guide p.3). Hose ports need adapters to the -6 return; supply voltage and plug are open (GM data not in our sources)
+    adds:
+      - {id: FTF_SIG, gauge: 22, spec: M22759/16, from: "M130:B10 (UDIG5)", to: "GM 13577379 signal", current_a: 0, length_ft_est: 4.6, basis: "same ends as #112 fuel PSI signal (cut list v4.2 zone estimate 4.6 ft); signal current not published"}
+      - {id: FTF_0V, gauge: 22, spec: M22759/16, from: "M130:B16 (SEN_0V_B)", to: "GM 13577379 ground", current_a: 0, length_ft_est: 4.6, basis: "as FTF_SIG"}

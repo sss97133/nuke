@@ -34,9 +34,9 @@ registry file was edited and nothing was written to the database.
 
 | Part | Exact part | Facts that matter here | Evidence |
 |---|---|---|---|
-| Regulator | **Aeromotive 13139**, A1000 Gen-II EFI | (2) ORB-08 inlet/outlet ports and (1) ORB-06 return port; 1/8″ NPT dedicated gauge port; 1:1 vacuum/boost reference; "Engineered for A1000 class and smaller pumps"; bracket included | Owner's order line "A1000 Gen-II EFI fuel pressure regulator – ORB-8" (Gmail; the photographed sales order is obs `65bff82a`). Aeromotive's table: 13138 = ORB-06, **13139 = ORB-08**, 13140 = ORB-10 (`aeromotiveinc.com__new-a1000-gen-ii-efi-regulator.md`). On the engine: IMG_6531, 2026-01-31, images `95eafee3`/`55340f05` (black Aeromotive body with the "A" logo, a brass plug in the front face, the reference nipple on the side) |
+| Regulator | **Aeromotive 13139**, A1000 Gen-II EFI | (2) ORB-08 inlet/outlet ports and (1) ORB-06 return port; 1/8″ NPT dedicated gauge port; 1:1 vacuum/boost reference; "Engineered for A1000 class and smaller pumps"; bracket included | Owner's order line "AEROMOTIVE A1000 GEN-II EFI FUEL PRESSURE REGUALTOR - ORB-8" (sic; Gmail message `195fd83460285297`, the order confirmation; the photographed sales order is obs `65bff82a`). Aeromotive's table: 13138 = ORB-06, **13139 = ORB-08**, 13140 = ORB-10 (`aeromotiveinc.com__new-a1000-gen-ii-efi-regulator.md`). On the engine: IMG_6531, 2026-01-31, images `95eafee3`/`55340f05` (black Aeromotive body with the "A" logo, a brass plug in the front face, the reference nipple on the side) |
 | | instructions | base range "35-75 PSI"; ORB ports use "NO THREAD SEALANT"; the 1/8″ NPT gauge port "does requires thread sealant"; 1/16″ NPT reference port, "If unused, please do not plug"; "Max Fuel Flow Range: Up to 150 GPH" | Aeromotive 13138/13139/13140 installation instructions p.2 (the "Download PDF" link on the product page; text copy `aeromotiveinc.com__13138-13139-13140-installation-instructions.md`) |
-| Second regulator | YESHMA universal EFI regulator kit with a 0–100 psi gauge and 6AN fittings | not on the engine; not used in this design | owner's records (Gmail) |
+| Second regulator | YESHMA universal EFI regulator kit with a 0–100 psi gauge and 6AN fittings | not on the engine; not used in this design | owner's records (Gmail message `18e158df2d586e87`) |
 | Tank hanger | **Quantum QFS-H882** "BUILD" + P367 + OET-PX-15.3 (packing-slip note; what OET-PX-15.3 is: unknown) | "8AN/6AN hanger"; supply 8AN, return 6AN (Quantum's answer, 04/27/2026); "Integrated check valve built into fuel pump outlet"; for the "31 Gallon Blazer/ Suburban Rear Center Mounted Tank"; "Submersible high pressure rubber hose included". The returnless versions are the "w/ Filter Regulator" options; this build lists none | `www.highflowfuel.com__ls-swap-fuel-pump-hanger-for-1973-1991-blazer-…-qfs-h882-qfs.md`; packing slip photo `vehicle_documents 208ab00c`; in the tank: IMG_1100, 2024-09-30 (images `38e5267c`, `9c8c5f05`): the lid carries two tubes ending in AN male flares plus two plain tubes; IMG_1062 (`a29b4be2`): tubes point forward |
 | Pump | **P367**, read as Quantum HFP-367 (registry, 2026-09-26 device ends) | 164 L/h and 4.6 A at 45 psi; 145 L/h and 5.1 A at 60 psi; test voltage not stated | `www.highflowfuel.com__fuel-pump-oem-replacement-hfp-367-qfs.md` |
 | Fuel rails | **Holley 534-209** "Hi-Flow" rails for LS1/LS2/LS3/LS6/L99 factory intakes | "machined to accept -8 (3/4-16) O-ring fittings" at both ends of each rail; "(4) -6 to 3/4-16 O-ring adapters" included; 5/8″ passage; brackets 49R3142 for LS2/LS3/L99; "534-212 - Bracket kit, required when upgrading to (EV1/Bosch style) performance injectors on LS2, LS3, or L99"; step 16: "Add a grounding strap for each fuel rail" | `www.holley.com__534-209.md`; Holley 199R10582 p.1, p.3, p.4 (`documents.holley.com__199r10582rev4.md`); Holley shipment in the DB (receipt items, 534-209); IMG_6531: both front ports open (O-ring threads visible), rear ends fitted with black caps or fittings (not readable) |
@@ -143,11 +143,14 @@ and corrects for it, so it does not need GM's number.
   - In a return system the fuel circulates through the hot engine bay and back. Aeromotive notes that recirculation leaves
     "less time for fuel cool down" as the tank empties (library: Aeromotive A1000 11101 installation p.6).
   - Cost: M130 B6 (AT4, spare), two wires and a tee in the return.
-  - Recorded as candidate **FT** in `calc-data/catalog/options.yaml`. The sensor is not picked. Two sourced paths:
-    - MoTeC #55001 = Bosch 0 280 130 026: M12 × 1.5, M1 predefined calibration, plug MoTeC #64004
-      (`www.motec.com.au__Water%20Temperature%20Sensor.md`). MoTeC lists it for water; fuel service is not stated.
-    - The GM 13577379 flex-fuel sensor on a spare UDIG. It gives temperature and ethanol content on one input (Flex Fuel
-      guide p.7–8).
+  - Recorded as two candidates in `calc-data/catalog/options.yaml`; neither sensor is picked:
+    - **FT**, a thermistor on B6 (AT4). The sourced part is MoTeC #55001 = Bosch 0 280 130 026: M12 × 1.5, M1 predefined
+      calibration, plug MoTeC #64004 (`www.motec.com.au__Water%20Temperature%20Sensor.md`). MoTeC lists it for water; fuel
+      service is not stated. It takes no digital input.
+    - **FT-FLEX** (`alternative_to: FT`), the GM 13577379 flex-fuel sensor. It gives temperature and ethanol content on one
+      digital input (Flex Fuel guide p.7–8). It needs a UDIG, and B10 and B11 are the last two spare. Two other lanes'
+      candidates want them: WSS-F2 (wheel-speed) takes both, NAV-L10 (nav-comms) takes B11. So it carries `conflicts_with:
+      [WSS-F2, NAV-L10]` (pieces audit, 2026-09-29).
 
 ## 5. Where the regulator mounts (the "block" question)
 
@@ -272,6 +275,8 @@ Gauges and specs are from the canon: 22 AWG = M22759/16-22, 12–20 AWG = M22759
   - Signal → M130 B6 (AT4, spare; 1k pull-up to SEN_5V_B per MoTeC's M130 pinout), plus a 0 V wire.
   - 2 × 22 AWG M22759/16, through 2 of the 3 spare 61-pin cavities (d, t, u). Only 1 is needed if its 0 V joins #112g on the
     engine side (Dave's call).
+  - If wheel-speed's WSS-F2 is also built, it takes 2 of those 3 cavities. FT then fits only with the shared 0 V, which fills
+    the 61-pin to 61 of 61.
   - Nothing is designed until the owner decides.
 - **Rail ground straps.** Holley says to add one per rail, from an intake bolt to a rail mounting bolt (199R10582 p.4,
   step 16). They are bonding straps on the engine, not harness wires. Part not picked.

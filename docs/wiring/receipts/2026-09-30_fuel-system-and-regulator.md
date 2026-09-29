@@ -31,10 +31,15 @@ owner_words: "another point we never touched him was the fuel regulator I ordere
   - the open items.
 - **`research/2026-09-30_fuel-system-plumbing.svg`**: panel A is the plumbing schematic; panel B is a top view in twin
   coordinates (frame, exhaust, engine, rails and regulator taken from twin v4).
-- **`calc-data/catalog/options.yaml`**: new candidate **FT**, a fuel temperature sensor in the return at the regulator, to M130
-  B6 (AT4).
-  - Demand: 0 body crossings, 0 PDM30 outputs or inputs. Its 61-pin and M130 needs are in its notes.
-  - The sensor is not picked.
+- **`calc-data/catalog/options.yaml`**: two new candidates.
+  - **FT**: a fuel temperature thermistor in the return at the regulator, to M130 B6 (AT4). Demand: 0 body crossings; 0
+    PDM30 outputs or inputs; `m130_pins` 1, `m130_udig` 0, `pin61_cavities` 2 (wheel-speed lane's engine-side keys).
+    `limits` records its 61-pin interaction with WSS-F2.
+  - **FT-FLEX**: the GM 13577379 flex-fuel sensor on a UDIG, `alternative_to: FT`, `conflicts_with: [WSS-F2, NAV-L10]`. Per
+    the pieces audit, B10/B11 are the last two spare UDIGs: WSS-F2 takes both and NAV-L10 takes B11.
+  - Neither sensor is picked.
+  - Parsed by both main's and wheel-speed's `options_v5.py` on a scratch copy. With wheel-speed's version, FT reads
+    "61-pin ... would take 2 (FT 2); 3 spare (d, t, u) — fits, leaving 1", and FT-FLEX is listed as an alternate.
   - Checked by running `options_v5.py` on a scratch copy of `calc-data`: FT parses and appears in the candidate demand. It was
     **not run in the repo**, because it rewrites `k5_registry.json`, and this lane does not edit the registry.
 - **`calc-data/fetch_sources.py`**: 9 source URLs added (Aeromotive regulator page and LS bracket, Holley 534-209, MoTeC GPR
@@ -45,9 +50,11 @@ owner_words: "another point we never touched him was the fuel regulator I ordere
 
 ## Findings
 1. **The regulator is Aeromotive 13139.**
-   - The order line reads "ORB-8". Aeromotive's table maps ORB-08 to 13139.
+   - The order line reads "AEROMOTIVE A1000 GEN-II EFI FUEL PRESSURE REGUALTOR - ORB-8" (sic). It is in Gmail message
+     `195fd83460285297`, the order confirmation; no order number is recorded here. Aeromotive's table maps ORB-08 to 13139.
+   - The pieces lane's audit found the same identity.
    - The 2026-01-31 photo shows an Aeromotive Gen-II body at the front centre of the intake valley.
-   - A second, universal YESHMA kit is also on record; it is not on the engine.
+   - A second, universal YESHMA kit is also on record (Gmail message `18e158df2d586e87`); it is not on the engine.
 2. **The system is return style.** The Quantum H882 "BUILD" has an 8AN feed and a 6AN return and no filter-regulator. The
    Aeromotive is its regulator.
 3. **Fuel flow is calculated by the M130, not measured.**
@@ -64,7 +71,8 @@ owner_words: "another point we never touched him was the fuel regulator I ordere
    - At 60 psi it gives 38.3 gal/h: under both.
    - It is well under Holley's 255 L/h for its LS kits.
    - Recommendation: run 43.5 psi and read pressure at full throttle. A bigger pump is the owner's money call.
-7. **Flow meter: no.** It needs supply and return meters and takes the last two UDIGs. **Fuel temperature: candidate FT.**
+7. **Flow meter: no.** It needs supply and return meters and takes the last two UDIGs. **Fuel temperature: candidate FT**
+   (AT4, no conflict). The flex-sensor version, FT-FLEX, conflicts with WSS-F2 and NAV-L10 on the UDIGs.
 
 ## Substrate inconsistencies surfaced (not fixed inline)
 - **State row 0ag(h)** says the Aeromotive regulator sits in the DEL-Stributor's rear-centre spot (IMG_6531). The photo puts
