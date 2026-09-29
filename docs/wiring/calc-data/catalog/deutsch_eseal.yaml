@@ -1,0 +1,439 @@
+# K5 harness — DEUTSCH E-SEAL (C015) part numbers for every DT / DTP housing in the catalog
+#
+# Research input, read 2026-09-29. Nothing here is consumed by reconcile_v5.py yet: parts.yaml, endpoints.yaml and the
+# registry are unchanged. It answers one question per housing: what is the "E-seal" version, what wire does its seal take.
+#
+# What an E-seal is: Deutsch DT family catalog p.23 (reference_documents/component_drawings/DEUTSCH_DT_DTM_DTP_Catalog.pdf,
+#   PDF page 7): "The C015 modification offers a reduced diameter insert cavity allowing for a proper seal with smaller wire
+#   insulation. The C015 modification is also referred to as an 'E' seal." The same page lists the welded-flange
+#   modifications (BL04, BL08, CL03, L012, LE14 ...). The catalog page prints no part numbers and no seal range;
+#   every PN and range below is from a TE product page or a distributor page (its url is on the entry).
+#
+# Naming, as found (not assumed):
+#   plain housings: standard PN + "-C015"  (DT06-2S -> DT06-2S-C015; DTP04-4P -> DTP04-4P-C015).
+#   flange receptacles: the "-L012" (welded flange) housings have NO "-L012-C015" PN. TE lists the E-seal welded flange under
+#   its own modification code CL03 (DT04-12PA-CL03, DT04-12PB-CL03, DT04-12PC-CL03), for the 12-way only. TE has no CL03 for
+#   the 6-way DT or the 4-way DTP receptacle (404 on te.com), so those two flange housings have no E-seal PN we could find.
+#   CL03 is a different flange code from L012; whether its footprint is the same is not stated on the TE page. Compare the
+#   TE drawings before swapping it into a firewall cutout.
+#
+# Our wire (state row 0ai; M22759/32 finished OD): 20 AWG 1.27 mm, 18 AWG 1.52, 16 AWG 1.73, 14 AWG 2.16, 12 AWG 2.62.
+# Each entry says which of those the seal takes (seal_range_mm is TE's "Compatible Insulation Diameter Range").
+# The contact is a second gate: DT size 16 contacts take 20-16 AWG, DTP size 12 contacts 14-12 AWG (families.yaml), so
+# "usable_awg" is the seal range AND the contact range.
+#
+# The finding that matters: 20 AWG M22759/32 (1.27 mm) is under the E-seal minimum (1.35 mm; 1.4 on the CL03 flange
+# parts) by 0.08-0.13 mm, and under the standard DT seal minimum (2.23 mm) by nearly 1 mm. No DT E-seal PN takes 20 AWG at
+# this OD. 18 and 16 AWG are the only gauges that pass both the E-seal and the size 16 contact. DTP: the E-seal (2.5-4.0 mm)
+# takes 12 AWG only; 14 AWG (2.16 mm) is under it, and the standard DTP seal (3.4-4.9 mm) takes neither.
+#
+# DTM: no E-seal PN exists that we could find (te.com 404 for DTM06-4S-C015 and DTM04-4P-C015). The standard DTM housings
+# already list 1.3-3.0 mm (DTM06-4S) and 1.35-3.05 mm (DTM04-4P), which is the DT E-seal range, so the size 20 side needs no
+# "E" version. 20 AWG (1.27 mm) is 0.03 mm under the DTM06-4S minimum and 0.08 mm under the DTM04-4P minimum.
+#
+# Unknown stays unknown: a null is a PN or a number not found, with the checks made in `not_found`.
+# Prices are the qty-1 price on the vendor page on price_date (USD), not a quote. price_usd is the lowest qty-1 price among
+# the vendors listed in in_stock_at; when nothing has stock it is the list price and in_stock_at is empty.
+#
+# How the pages were read (be careful with these): te.com and digikey.com were read through the WebFetch tool, which returns
+# a model's summary of the page, not raw HTML. Two TE ranges (DT04-12PA-CL03, DT04-12PB-CL03) were re-read with a verbatim
+# quote and matched. DigiKey stock was re-read on the product page (not the search page) for every part except
+# DT04-12PA-CL03 and DT04-12PB-CL03, whose product links did not open; their stock is what the keyword search page showed,
+# read twice. customconnectorkits.com and buydeutsch.com are Shopify stores read through their product .js endpoints
+# (available: true/false, price). prowireusa.com was checked only by its own SKU path; a 404 there does not prove ProWire
+# lacks the part (it lists some parts under a p-####-name.html path).
+# Requests: 10 s between requests to one host; ProWire 20 s; no accounts; nothing downloaded.
+
+read_on: 2026-09-29
+price_date: 2026-09-29
+
+catalog:
+  file: reference_documents/component_drawings/DEUTSCH_DT_DTM_DTP_Catalog.pdf   # local, not committed
+  page: "23 (PDF page 7) — DT Family, Special Modifications: C015 Modification"
+
+wire:                      # M22759/32 finished OD, mm (state row 0ai)
+  20: 1.27
+  18: 1.52
+  16: 1.73
+  14: 2.16
+  12: 2.62
+
+families:
+  DT:
+    contact_size: 16
+    contact_awg: [20, 16]                        # families.yaml dt
+    standard_seal_range_mm: [2.23, 3.68]         # te.com DT06-2S
+    standard_seal_takes_awg: [12]                # 2.62 mm is the only one of ours inside; a 12 AWG wire does not crimp in a size 16 contact
+    eseal_seal_range_mm: [1.35, 3.05]            # te.com C015 pages (DT06-2S-C015, DT04-2P-C015, DT04-08PA-C015, DT06-08SA-C015, DT06-12SA-C015, DT06-12SB-C015, DT06-6S-C015, DT04-6P-C015, DT04-12PB-CL03)
+    eseal_flange_cl03_range_mm: [1.4, 3.8]       # te.com DT04-12PA-CL03 and DT04-12PC-CL03 (DT04-12PB-CL03 reads 1.35-3.05)
+  DTP:
+    contact_size: 12
+    contact_awg: [14, 12]                        # families.yaml dtp
+    standard_seal_range_mm: [3.4, 4.9]           # te.com DTP06-4S
+    standard_seal_takes_awg: []
+    eseal_seal_range_mm: [2.5, 4.0]              # te.com DTP04-2P-C015, DTP06-2S-C015, DTP04-4P-C015, DTP06-4S-C015
+  DTM:
+    contact_size: 20
+    eseal: none found
+    standard_seal_range_mm: {DTM06-4S: [1.3, 3.0], DTM04-4P: [1.35, 3.05]}   # te.com
+
+parts:
+
+  # ---------------------------------------------------------------- DT, 2-way (DOOR / fuel-level and sender plugs)
+  DT06-2S:
+    eseal_pn: DT06-2S-C015
+    seal_range_mm: [1.35, 3.05]
+    takes_awg: [18, 16, 14, 12]
+    not_taken_awg: [20]
+    usable_awg: [18, 16]
+    source: te.com product page DT06-2S-C015 ("PLG, 2P, GRY, E"; seal code E Seal; standard DT06-2S reads 2.23-3.68 mm)
+    page_or_url: https://www.te.com/en/product-DT06-2S-C015.html
+    in_stock_at: [digikey.com, customconnectorkits.com, buydeutsch.com]
+    price_usd: 0.69
+    price_date: 2026-09-29
+    offers:
+      - {vendor: digikey.com, vendor_pn: 1734-1410-ND, price_usd: 0.85, stock: "3,873", url: "https://www.digikey.com/en/products/detail/te-connectivity-deutsch-ict-connectors/DT06-2S-C015/7219851"}
+      - {vendor: customconnectorkits.com, price_usd: 0.69, stock: "available (no count)", url: "https://www.customconnectorkits.com/products/dt06-2s-c015"}
+      - {vendor: buydeutsch.com, price_usd: 1.01, stock: "available (no count)", url: "https://www.buydeutsch.com/products/dt06-2s-c015"}
+
+  DT04-2P:
+    eseal_pn: DT04-2P-C015
+    seal_range_mm: [1.35, 3.05]
+    takes_awg: [18, 16, 14, 12]
+    not_taken_awg: [20]
+    usable_awg: [18, 16]
+    source: te.com product page DT04-2P-C015 (2-position receptacle, gray; seal code E Seal)
+    page_or_url: https://www.te.com/en/product-DT04-2P-C015.html
+    in_stock_at: [digikey.com, customconnectorkits.com, buydeutsch.com, prowireusa.com]
+    price_usd: 0.74
+    price_date: 2026-09-29
+    offers:
+      - {vendor: digikey.com, vendor_pn: 1734-1365-ND, price_usd: 0.74, stock: "5,813", url: "https://www.digikey.com/en/products/detail/te-connectivity-deutsch-connectors/DT04-2P-C015/7219904"}
+      - {vendor: customconnectorkits.com, price_usd: 0.99, stock: "available (no count)", url: "https://www.customconnectorkits.com/products/dt04-2p-c015"}
+      - {vendor: buydeutsch.com, price_usd: 1.15, stock: "available (no count)", url: "https://www.buydeutsch.com/products/dt04-2p-c015"}
+      - {vendor: prowireusa.com, price_usd: 0.987, stock: "141 each", url: "https://www.prowireusa.com/DT04-2P-C015"}
+
+  # ---------------------------------------------------------------- DT, 6-way (body bulkhead C)
+  DT06-6S:
+    eseal_pn: DT06-6S-C015
+    seal_range_mm: [1.35, 3.05]
+    takes_awg: [18, 16, 14, 12]
+    not_taken_awg: [20]
+    usable_awg: [18, 16]
+    source: te.com product page DT06-6S-C015 (6-position plug, gray, 4.44 mm centerline; seal code E Seal)
+    page_or_url: https://www.te.com/en/product-DT06-6S-C015.html
+    in_stock_at: [digikey.com]
+    price_usd: 2.82
+    price_date: 2026-09-29
+    offers:
+      - {vendor: digikey.com, vendor_pn: 1734-1443-ND, price_usd: 2.82, stock: "1,944", url: "https://www.digikey.com/en/products/detail/te-connectivity-deutsch-ict-connectors/DT06-6S-C015/7220006"}
+
+  DT04-6P-L012:
+    eseal_pn: null            # no flange E-seal PN found: te.com 404 for DT04-6P-CL03; CCK and BuyDeutsch 404 for DT04-6P-L012-C015 and DT04-6P-CL03
+    seal_range_mm: null
+    takes_awg: null
+    not_taken_awg: null
+    usable_awg: null
+    source: te.com product pages; the flange receptacle has no E-seal version we could find
+    page_or_url: null
+    in_stock_at: []
+    price_usd: null
+    price_date: 2026-09-29
+    alternative:
+      pn: DT04-6P-C015          # the same 6-way receptacle without the flange (free-hanging, in-line); it mates DT06-6S-C015
+      seal_range_mm: [1.35, 3.05]
+      page_or_url: https://www.te.com/en/product-DT04-6P-C015.html
+      note: not a flange part; price and stock not looked up (not in the K5 kit)
+    note: "To seal thin-wall wire on the 6-way firewall receptacle, ask the factory (catalog p.23: for additional modifications, consult the factory) or use the unflanged DT04-6P-C015 with another mount."
+
+  # ---------------------------------------------------------------- DT, 8-way (door lock and speaker pass-through)
+  DT04-08PA:
+    eseal_pn: DT04-08PA-C015
+    seal_range_mm: [1.35, 3.05]
+    takes_awg: [18, 16, 14, 12]
+    not_taken_awg: [20]
+    usable_awg: [18, 16]
+    source: te.com product page DT04-08PA-C015 (8-position receptacle for male terminals; seal code E Seal)
+    page_or_url: https://www.te.com/en/product-DT04-08PA-C015.html
+    in_stock_at: [customconnectorkits.com]      # DigiKey lists it with 0 on hand and a 13-week lead time
+    price_usd: 3.59
+    price_date: 2026-09-29
+    offers:
+      - {vendor: customconnectorkits.com, price_usd: 3.59, stock: "available (no count)", url: "https://www.customconnectorkits.com/products/dt04-08pa-c015"}
+      - {vendor: digikey.com, vendor_pn: 1734-1531-ND, price_usd: 3.48, stock: "0 (13-week lead time)", url: "https://www.digikey.com/en/products/detail/te-connectivity-deutsch-ict-connectors/DT04-08PA-C015/7219877"}
+
+  DT06-08SA:
+    eseal_pn: DT06-08SA-C015
+    seal_range_mm: [1.35, 3.05]
+    takes_awg: [18, 16, 14, 12]
+    not_taken_awg: [20]
+    usable_awg: [18, 16]
+    source: te.com product page DT06-08SA-C015 (8-position plug, gray, 4.44 mm centerline; seal code E Seal)
+    page_or_url: https://www.te.com/en/product-DT06-08SA-C015.html
+    in_stock_at: [digikey.com]
+    price_usd: 4.63
+    price_date: 2026-09-29
+    offers:
+      - {vendor: digikey.com, vendor_pn: 1734-1397-ND, price_usd: 4.63, stock: "651", url: "https://www.digikey.com/en/products/detail/te-connectivity-deutsch-connectors/DT06-08SA-C015/7219744"}
+
+  # ---------------------------------------------------------------- DT, 12-way (body bulkheads A, B and the spare C)
+  DT04-12PA-L012:
+    eseal_pn: DT04-12PA-CL03
+    seal_range_mm: [1.4, 3.8]
+    takes_awg: [18, 16, 14, 12]
+    not_taken_awg: [20]
+    usable_awg: [18, 16]
+    source: 'te.com product page DT04-12PA-CL03 (Connector Modification: Welded Flange, panel mount, seal code E Seal, 12-way receptacle). Range read twice.'
+    page_or_url: https://www.te.com/en/product-DT04-12PA-CL03.html
+    in_stock_at: [digikey.com]
+    price_usd: 6.52
+    price_date: 2026-09-29
+    offers:
+      - {vendor: digikey.com, vendor_pn: 1734-DT04-12PA-CL03-ND, price_usd: 6.52, stock: "952 (keyword-search listing; product link did not open)", url: "https://www.digikey.com/en/products/detail/te-connectivity-deutsch-connectors/DT04-12PA-CL03/1734-DT04-12PA-CL03-ND"}
+    note: "CL03 is a different welded-flange code from L012; compare the drawings before it replaces L012 in the firewall cutout. Not at customconnectorkits.com or buydeutsch.com (404)."
+
+  DT06-12SA:
+    eseal_pn: DT06-12SA-C015
+    seal_range_mm: [1.35, 3.05]
+    takes_awg: [18, 16, 14, 12]
+    not_taken_awg: [20]
+    usable_awg: [18, 16]
+    source: te.com product page DT06-12SA-C015 (12-position plug; seal code E Seal)
+    page_or_url: https://www.te.com/en/product-DT06-12SA-C015.html
+    in_stock_at: [customconnectorkits.com, digikey.com]
+    price_usd: 4.29
+    price_date: 2026-09-29
+    offers:
+      - {vendor: customconnectorkits.com, price_usd: 4.29, stock: "available (no count)", url: "https://www.customconnectorkits.com/products/dt06-12sa-c015"}
+      - {vendor: digikey.com, vendor_pn: 1734-1594-ND, price_usd: 4.78, stock: "788", url: "https://www.digikey.com/en/products/detail/te-connectivity-deutsch-ict-connectors/DT06-12SA-C015/7220255"}
+
+  DT04-12PB-L012:
+    eseal_pn: DT04-12PB-CL03
+    seal_range_mm: [1.35, 3.05]
+    takes_awg: [18, 16, 14, 12]
+    not_taken_awg: [20]
+    usable_awg: [18, 16]
+    source: te.com product page DT04-12PB-CL03 ("REC, 12P, BLK, E, FLANGE, B"; Panel Mount; seal code E Seal). Range read twice.
+    page_or_url: https://www.te.com/en/product-DT04-12PB-CL03.html
+    in_stock_at: [digikey.com]
+    price_usd: 8.62
+    price_date: 2026-09-29
+    offers:
+      - {vendor: digikey.com, vendor_pn: 1734-1555-ND, price_usd: 8.62, stock: "158 (keyword-search listing; product link did not open)", url: "https://www.digikey.com/en/products/detail/te-connectivity-deutsch-connectors/DT04-12PB-CL03/1734-1555-ND"}
+    note: "CL03 is a different welded-flange code from L012; compare the drawings before it replaces L012. Not at customconnectorkits.com or buydeutsch.com (404)."
+
+  DT06-12SB:
+    eseal_pn: DT06-12SB-C015
+    seal_range_mm: [1.35, 3.05]
+    takes_awg: [18, 16, 14, 12]
+    not_taken_awg: [20]
+    usable_awg: [18, 16]
+    source: te.com product page DT06-12SB-C015 (12-position plug, black; seal code E Seal)
+    page_or_url: https://www.te.com/en/product-DT06-12SB-C015.html
+    in_stock_at: [digikey.com]
+    price_usd: 5.83
+    price_date: 2026-09-29
+    offers:
+      - {vendor: digikey.com, vendor_pn: 1734-1607-ND, price_usd: 5.83, stock: "1,348", url: "https://www.digikey.com/en/products/detail/te-connectivity-deutsch-ict-connectors/DT06-12SB-C015/7219930"}
+
+  DT04-12PC-L012:            # the C-key third bulkhead named in endpoints.yaml FIREWALL-BODY-B `open`; its mating plug is not in our catalog
+    eseal_pn: DT04-12PC-CL03
+    seal_range_mm: [1.4, 3.8]
+    takes_awg: [18, 16, 14, 12]
+    not_taken_awg: [20]
+    usable_awg: [18, 16]
+    source: te.com product page DT04-12PC-CL03 ("REC, 12P, GRN, E, FLANGE, C"; keying code C; seal code E Seal)
+    page_or_url: https://www.te.com/en/product-DT04-12PC-CL03.html
+    in_stock_at: []
+    price_usd: null
+    price_date: 2026-09-29
+    offers:
+      - {vendor: digikey.com, vendor_pn: 1734-DT04-12PC-CL03-ND, price_usd: null, stock: "not normally stocked; 13-week lead time; $8.4886 each at quantity 200, no qty-1 price shown", url: "https://www.digikey.com/en/products/detail/te-connectivity-deutsch-connectors/DT04-12PC-CL03/1734-DT04-12PC-CL03-ND"}
+
+  # ---------------------------------------------------------------- DTP, 2-way (fuel pump pair above the tank lid)
+  DTP04-2P:
+    eseal_pn: DTP04-2P-C015
+    seal_range_mm: [2.5, 4.0]
+    takes_awg: [12]
+    not_taken_awg: [20, 18, 16, 14]
+    usable_awg: [12]
+    source: te.com product page DTP04-2P-C015 (2-position receptacle, size 12 contacts; seal code E Seal)
+    page_or_url: https://www.te.com/en/product-DTP04-2P-C015.html
+    in_stock_at: []           # DigiKey: 0 on hand, 468 expected 2026-10-15, 82 estimated 2027-01-05
+    price_usd: 5.35
+    price_date: 2026-09-29
+    offers:
+      - {vendor: digikey.com, vendor_pn: 1734-1664-ND, price_usd: 5.35, stock: "0; 468 expected 15-Oct-2026; 82 estimated 05-Jan-2027", url: "https://www.digikey.com/en/products/detail/te-connectivity-deutsch-ict-connectors/DTP04-2P-C015/7219856"}
+    note: "Not at customconnectorkits.com or buydeutsch.com (404)."
+
+  DTP06-2S:
+    eseal_pn: DTP06-2S-C015
+    seal_range_mm: [2.5, 4.0]
+    takes_awg: [12]
+    not_taken_awg: [20, 18, 16, 14]
+    usable_awg: [12]
+    source: te.com product page DTP06-2S-C015 (2-position plug, size 12 contacts; seal code E Seal)
+    page_or_url: https://www.te.com/en/product-DTP06-2S-C015.html
+    in_stock_at: []           # DigiKey: 0 on hand, 1,200 estimated 2027-01-11
+    price_usd: 3.72
+    price_date: 2026-09-29
+    offers:
+      - {vendor: digikey.com, vendor_pn: 1734-1667-ND, price_usd: 3.72, stock: "0; 1,200 estimated 11-Jan-2027", url: "https://www.digikey.com/en/products/detail/te-connectivity-deutsch-ict-connectors/DTP06-2S-C015/7219995"}
+      - {vendor: digikey.com (Powell Electronics listing 29578705), price_usd: 20.09, stock: "not shown", url: "https://www.digikey.com/en/products/detail/powell-electronics/DTP06-2S-C015/29578705"}
+    note: "Not at customconnectorkits.com or buydeutsch.com (404)."
+
+  # ---------------------------------------------------------------- DTP, 4-way (body bulkhead P and the door window pass-through)
+  DTP04-4P:
+    eseal_pn: DTP04-4P-C015
+    seal_range_mm: [2.5, 4.0]
+    takes_awg: [12]
+    not_taken_awg: [20, 18, 16, 14]
+    usable_awg: [12]
+    source: te.com product page DTP04-4P-C015 (4-position receptacle, size 12 contacts; seal code E Seal)
+    page_or_url: https://www.te.com/en/product-DTP04-4P-C015.html
+    in_stock_at: [digikey.com, buydeutsch.com]
+    price_usd: 8.27
+    price_date: 2026-09-29
+    offers:
+      - {vendor: digikey.com, vendor_pn: 1734-1665-ND, price_usd: 8.27, stock: "191", url: "https://www.digikey.com/en/products/detail/te-connectivity-deutsch-connectors/DTP04-4P-C015/7219992"}
+      - {vendor: buydeutsch.com, price_usd: 13.91, stock: "available (no count)", url: "https://www.buydeutsch.com/products/dtp04-4p-c015"}
+
+  DTP06-4S:
+    eseal_pn: DTP06-4S-C015
+    seal_range_mm: [2.5, 4.0]
+    takes_awg: [12]
+    not_taken_awg: [20, 18, 16, 14]
+    usable_awg: [12]
+    source: te.com product page DTP06-4S-C015 (4-position plug, size 12 contacts; seal code E Seal; standard DTP06-4S reads 3.4-4.9 mm)
+    page_or_url: https://www.te.com/en/product-DTP06-4S-C015.html
+    in_stock_at: [customconnectorkits.com, digikey.com, buydeutsch.com]
+    price_usd: 5.29
+    price_date: 2026-09-29
+    offers:
+      - {vendor: customconnectorkits.com, price_usd: 5.29, stock: "available (no count)", url: "https://www.customconnectorkits.com/products/dtp06-4s-c015"}
+      - {vendor: digikey.com, vendor_pn: 1734-1669-ND, price_usd: 6.79, stock: "169", url: "https://www.digikey.com/en/products/detail/te-connectivity-deutsch-connectors/DTP06-4S-C015/7219996"}
+      - {vendor: buydeutsch.com, price_usd: 7.34, stock: "available (no count)", url: "https://www.buydeutsch.com/products/dtp06-4s-c015"}
+
+  DTP04-4P-L012:
+    eseal_pn: null            # no flange E-seal PN found: te.com 404 for DTP04-4P-CL03; CCK and BuyDeutsch 404 for DTP04-4P-L012-C015 and DTP04-4P-CL03
+    seal_range_mm: null
+    takes_awg: null
+    not_taken_awg: null
+    usable_awg: null
+    source: te.com product pages; the flange receptacle has no E-seal version we could find
+    page_or_url: null
+    in_stock_at: []
+    price_usd: null
+    price_date: 2026-09-29
+    alternative:
+      pn: DTP04-4P-C015         # the same 4-way receptacle without the flange
+      seal_range_mm: [2.5, 4.0]
+      page_or_url: https://www.te.com/en/product-DTP04-4P-C015.html
+      note: not a flange part (prices above)
+    note: "DTP has no E-seal for 14 AWG at this OD in any case (2.16 mm is under the 2.5 mm minimum). The 4-way flange bulkhead carries BLOWER_HI and PCS_IGN (14 AWG)."
+
+  # ---------------------------------------------------------------- DTM (MoTeC LTCD / IBST-DIAG plugs; no E-seal PN found)
+  DTM06-4S:                   # MoTeC #68054, DTM 4-pin (F)
+    eseal_pn: null            # te.com 404 for DTM06-4S-C015
+    seal_range_mm: null
+    takes_awg: null
+    not_taken_awg: null
+    usable_awg: null
+    source: te.com product page DTM06-4S (standard seal range 1.3-3.0 mm, contact size 20)
+    page_or_url: https://www.te.com/en/product-DTM06-4S.html
+    in_stock_at: []
+    price_usd: null
+    price_date: 2026-09-29
+    standard_seal_range_mm: [1.3, 3.0]
+    standard_takes_awg: [18, 16, 14, 12]
+    standard_not_taken_awg: [20]          # 1.27 mm, 0.03 mm under
+    note: "The standard DTM seal already reaches down to the DT E-seal size, so DTM has no C015 version."
+
+  DTM04-4P:                   # MoTeC #68055, DTM 4-pin (M), the IBST-DIAG cap
+    eseal_pn: null            # te.com 404 for DTM04-4P-C015
+    seal_range_mm: null
+    takes_awg: null
+    not_taken_awg: null
+    usable_awg: null
+    source: te.com product page DTM04-4P (standard seal range 1.35-3.05 mm, contact size 20)
+    page_or_url: https://www.te.com/en/product-DTM04-4P.html
+    in_stock_at: []
+    price_usd: null
+    price_date: 2026-09-29
+    standard_seal_range_mm: [1.35, 3.05]
+    standard_takes_awg: [18, 16, 14, 12]
+    standard_not_taken_awg: [20]          # 1.27 mm, 0.08 mm under
+    note: "As DTM06-4S."
+
+not_found:                    # checked and absent, so the next reader does not repeat them
+  te.com_404:
+    - DT04-6P-CL03
+    - DTP04-4P-CL03
+    - DTM06-4S-C015
+    - DTM04-4P-C015
+  te.com_500:
+    - DT04-12PA-L012-C015     # the server errored; treat as no such page
+  customconnectorkits.com_404:
+    - DT06-6S-C015
+    - DT04-6P-C015
+    - DT04-6P-L012-C015
+    - DT06-08SA-C015
+    - DT04-12PA-L012-C015
+    - DT06-12SB-C015
+    - DT04-12PB-C015
+    - DT04-12PB-L012-C015
+    - DT04-12PC-L012-C015
+    - DTP06-2S-C015
+    - DTP04-2P-C015
+    - DTP04-4P-C015
+    - DTP04-4P-L012-C015
+    - DTM06-4S-C015
+    - DTM04-4P-C015
+    - DTM06-2S-C015
+    - DTM04-2P-C015
+    - DT04-12PA-CL03
+    - DT04-12PB-CL03
+    - DT04-12PC-CL03
+    - DT04-6P-CL03
+    - DTP04-4P-CL03
+  buydeutsch.com_404:
+    - DT06-6S-C015
+    - DT04-6P-C015
+    - DT04-6P-L012-C015
+    - DT06-08SA-C015
+    - DT04-08PA-C015
+    - DT06-12SA-C015
+    - DT04-12PA-C015
+    - DT04-12PA-L012-C015
+    - DT06-12SB-C015
+    - DT04-12PB-C015
+    - DT04-12PB-L012-C015
+    - DT04-12PC-L012-C015
+    - DTP06-2S-C015
+    - DTP04-2P-C015
+    - DTP04-4P-L012-C015
+    - DTM06-4S-C015
+    - DTM04-4P-C015
+    - DTM06-2S-C015
+    - DTM04-2P-C015
+    - DT04-12PA-CL03
+    - DT04-12PB-CL03
+    - DT04-12PC-CL03
+    - DT04-6P-CL03
+    - DTP04-4P-CL03
+  prowireusa.com_404_at_sku_path:      # path check only; not proof ProWire lacks them
+    - DT06-2S-C015
+    - DT06-08SA-C015
+    - DT04-08PA-C015
+    - DT06-12SA-C015
+    - DT06-12SB-C015
+    - DT04-12PB-CL03
+    - DT04-12PA-CL03
+    - DT06-6S-C015
+    - DTP04-4P-C015
+    - DTP06-4S-C015
+  not_checked:
+    - mouser.com
+    - newark.com
+    - waytekwire.com
+    - tti.com
