@@ -36,7 +36,7 @@ The step up from consumer is better connectors (sealed, vibration-resistant) and
 
 This is where Desert Performance operates. The K5 Blazer build is at this tier. DR-25 provides chemical resistance, abrasion protection, and a professional finished appearance. DTM connectors handle vibration and thermal cycling far better than Weatherpack. The wire may be Tefzel — thinner insulation, lighter weight, dramatically better chemical and abrasion resistance than TXL.
 
-The custom engine harness ($3,000) and chassis harness ($3,000) from Desert Performance's Barton invoice are professional-tier builds.
+The custom engine harness and chassis harness on Desert Performance's reference invoice are professional-tier builds.
 
 ### Ultra ($15,000 - $30,000+)
 **Who:** F1 teams, Le Mans prototypes, concours-level hot rods

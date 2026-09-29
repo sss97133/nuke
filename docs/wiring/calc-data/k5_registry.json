@@ -29380,13 +29380,13 @@
     "feed source for #52 and IBOOST_PERM: isolator decision A (Odyssey +, battery side) or B (distribution stud, as designed) — research §4, owner/Dave"
    ],
    "sources": [
-    "owner's Gmail: Calimotive Auto Recycling order #1011, confirmed 2023-11-09 for 1037123-00-B ('listed with revision -A but we will ship out a revision B'), delivered 2023-11-13",
+    "the salvage-yard order (record obs:a7276b88), confirmed 2023-11-09 for 1037123-00-B ('listed with revision -A but we will ship out a revision B'), delivered 2023-11-13",
     "K5 photo 40e5e5f9 (2026-01-31): controller label 'P/N 1?37123-0?-B ... iBooster'",
     "chapters/17 §17.3 (pin 1 constant 40 A, pin 20 ignition 5 A)",
     "reference_documents/web_snapshots/www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md (L 1 Always Hot 40A; L 9 Chassis Ground; M 17 Always Hot 5A; S 20 Ignition 5A; S 16/25 Vehicle CAN-High/Low, S 18/10 Yaw CAN, \"not needed for basic operations\"; pedal sensor 1-4 -> ECU 2, 22, 8, 23)",
     "reference_documents/web_snapshots/tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md (4.00 mm² red 40A; 1.50 mm² red 5A; 0.50 mm² green ignition 5A; 4.00 mm² black ground)",
     "reference_documents/web_snapshots/openinverter.org__Bosch_iBooster.md (1037123-00-A/B = Model S/X Gen 1; ECU signal terminals Bosch 1928498705 (0.35-0.5 mm²) or 1928498805 (0.5-1.0 mm²))",
-    "owner's Gmail: Calimotive order #1011, 1037123-00-B, confirmed 2023-11-09, delivered 2023-11-13; K5 photo 40e5e5f9 label"
+    "the salvage-yard order (record obs:a7276b88), 1037123-00-B, confirmed 2023-11-09, delivered 2023-11-13; K5 photo 40e5e5f9 label"
    ],
    "splice_point": null,
    "range_by_wire": null,
@@ -31064,7 +31064,7 @@
    "side": "outside"
   },
   "PCS-TCM": {
-   "device": "PCS TCM-2650 transmission controller — owned (Zero Gravity order 9501); the TCM-4610 kit harness plugs into it (PCS-HARNESS-4610)",
+   "device": "PCS TCM-2650 transmission controller — owned (Zero Gravity order, delivered 2024-09-12; no database record yet); the TCM-4610 kit harness plugs into it (PCS-HARNESS-4610)",
    "where": "cabin",
    "family": "open",
    "kit": {},

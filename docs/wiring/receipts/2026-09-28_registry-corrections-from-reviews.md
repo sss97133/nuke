@@ -370,7 +370,7 @@ not judge cab-to-chassis wires at all.
 
 ## Round 9: iBooster is Gen 1; the PCS mounts in the cab (2026-09-28)
 - **IBOOSTER is the Gen 1 Tesla Model S/X unit, 1037123-00-B.**
-  - Sources: the owner's Gmail, Calimotive order #1011, confirmed 2023-11-09 ("we will ship out a revision B") and delivered 2023-11-13; and the label in K5 photo 40e5e5f9.
+  - Sources: the salvage-yard order (record obs:a7276b88), confirmed 2023-11-09 ("we will ship out a revision B") and delivered 2023-11-13; and the label in K5 photo 40e5e5f9.
   - The harness is Tulay's Gen-1 universal harness. It is NOT on order, so its purchase is OPEN.
   - Pins follow the fastandquiet Gen-1 pinout: 1 always hot 40 A, 9 ground, 17 always hot 5 A, 20 ignition 5 A.
   - The pedal-sensor mapping is 1→2, 2→22, 3→8, 4→23, inside the Gen-1 harness.

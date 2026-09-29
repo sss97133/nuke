@@ -34,7 +34,7 @@
   - 61-pin: 59/61 (spares c, u). It gained the 3 Dakota sender wires below.
   - Power grommet: ECU_GND1/2, PDM_GND1/2, PDM_BPOS.
 - The 12 still open:
-  - 7 PCS TCM-2650 wires: the harness drawing and the TCM's mount are unknown (ZGP drawing, order #9501).
+  - 7 PCS TCM-2650 wires: the harness drawing and the TCM's mount are unknown (ZGP drawing, with the Zero Gravity order).
   - 3 power-spine write-ups: PDM_BPOS and PDM_GND1/2 have no stud lug in the write-ups yet.
   - #COIL_GND: the rail may duplicate the per-coil head rings.
   - FUEL_SND_GND: the Quantum hanger's connector is a bench read.

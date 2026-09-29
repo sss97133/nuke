@@ -228,7 +228,7 @@ URLS = [
     "https://openinverter.org/forum/viewtopic.php?t=2762",
     "https://www.diyelectriccar.com/threads/not-all-gen2-ibooster-appear-equal.211462/",
     "https://sghinnovations.com/product/ibooster-controller-ecu/",
-    # our unit is Tesla Model S Gen 1 (1037123-00-B, Calimotive order #1011, 2023-11-09)
+    # our unit is Tesla Model S Gen 1 (1037123-00-B, record obs:a7276b88, 2023-11-09)
     "https://www.fastandquiet.com/downloadable/bosch-ibooster-gen-1-pinout.PDF",
     "https://tulayswirewerks.com/product/bosch-ibooster-gen-1-universal-wire-harness/",
     "https://raw.githubusercontent.com/commaai/opendbc/master/opendbc/dbc/tesla_can.dbc",

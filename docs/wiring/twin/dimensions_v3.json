@@ -176,7 +176,7 @@
  "tb_adapter_h": {
   "value": 25.0,
   "unit": "mm",
-  "source": "IMG_6531/6530/6532 (2026-01-31, vehicle_images) scaled against the 111.76 mm bore spacing: 4-bolt adapter plate (Delmo Speed order 70079)",
+  "source": "IMG_6531/6530/6532 (2026-01-31, vehicle_images) scaled against the 111.76 mm bore spacing: 4-bolt adapter plate (Delmo Speed order, record obs:a58db14b)",
   "confidence": "photo"
  },
  "rail_od": {
