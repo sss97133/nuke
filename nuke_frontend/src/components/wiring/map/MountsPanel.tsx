@@ -103,6 +103,7 @@ const loadPhotos = () => {
 
 export function PartPhotos({ codes, cw }: { codes: string; cw: Colorway }) {
   const [idx, setIdx] = useState<Record<string, { img: string; from: string }> | null>(null);
+  const [dead, setDead] = useState<Set<string>>(new Set());   // a linked photo that fails to load reads as none
   useEffect(() => { let c = false; loadPhotos().then(p => { if (!c) setIdx(p); }); return () => { c = true; }; }, []);
   if (!idx) return null;
   const list = codes.split(',').map(s => s.trim()).filter(Boolean);
@@ -110,12 +111,13 @@ export function PartPhotos({ codes, cw }: { codes: string; cw: Colorway }) {
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '4px 0 8px' }}>
       {list.map(c => {
-        const p = idx[c];
+        const p = dead.has(c) ? undefined : idx[c];
         return (
           <div key={c} style={{ width: 92, border: frame(cw), background: '#fff' }}>
             {p ? (
               <a href={p.img} target="_blank" rel="noreferrer" title={`${c} — photo from ${p.from}`}>
                 <img src={p.img} alt={c} width={88} height={66} loading="lazy" referrerPolicy="no-referrer"
+                  onError={() => setDead(prev => new Set(prev).add(c))}
                   style={{ display: 'block', width: 88, height: 66, objectFit: 'contain', margin: 2 }} />
               </a>
             ) : (
