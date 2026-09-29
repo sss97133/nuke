@@ -37,7 +37,7 @@
     },
     "label": {
      "hex": "#121416",
-     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_m130_052880dbeb.webp (fetched 2026-09-29), k-means of the region (label panel, 57%); the maker's branding is not reproduced"
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_m130_052880dbeb.webp (fetched 2026-09-29), k-means of the region (label panel, 57%)"
     },
     "header": {
      "hex": "#2e3032",
@@ -46,6 +46,18 @@
     "pins": {
      "hex": "#b9b4a8",
      "from": "not visible in the photo; drawn as tin-plated brass (colour not sourced)"
+    },
+    "numbers": {
+     "hex": "#6a6e72",
+     "from": "cavity numbers are moulded in the housing colour; drawn lighter so they read (cosmetic)"
+    },
+    "brand_red": {
+     "hex": "#9f1718",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_m130_052880dbeb.webp (fetched 2026-09-29), k-means of the region (label frame and underline, 22% of the label region)"
+    },
+    "brand_white": {
+     "hex": "#e4e0dd",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_m130_052880dbeb.webp (fetched 2026-09-29), k-means of the region (label lettering, 34% of the label region)"
     },
     "keepout": {
      "hex": "#f0a030",
@@ -65,7 +77,7 @@
      "n": "plug",
      "ep": "M130-A",
      "at": [
-      -16.3,
+      -16.25,
       -98.65,
       21.2
      ],
@@ -80,7 +92,7 @@
      "n": "plug",
      "ep": "M130-B",
      "at": [
-      19.15,
+      19.25,
       -98.65,
       21.2
      ],
@@ -90,6 +102,370 @@
       0
      ],
      "note": "26-way: wires leave the ProWire backshell's boot collar straight down; the boot (straight / 70 / 90 degrees) is HELD, so the final bend is open (keep-out 60-80 mm)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "hole_0",
+     "at": [
+      0.0,
+      58.75,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 5.2,
+     "note": "M5 or 3/16 in; washer or head 13 max"
+    },
+    {
+     "n": "hole_1",
+     "at": [
+      -48.75,
+      -16.25,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 5.2,
+     "note": "M5 or 3/16 in; washer or head 13 max"
+    },
+    {
+     "n": "hole_2",
+     "at": [
+      48.75,
+      -16.25,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 5.2,
+     "note": "M5 or 3/16 in; washer or head 13 max"
+    }
+   ],
+   "keepout": {
+    "what": "plug + boot + wire bend below both plug faces",
+    "min_mm": 60.0,
+    "budget_mm": 80.0,
+    "source": "receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md: 60-80 mm below the connector face for the plug and boot"
+   }
+  },
+  "PDM15-A": {
+   "endpoints": [
+    "PDM15-A",
+    "PDM15-B",
+    "PDM15-STUD"
+   ],
+   "what": "Engine power box, MoTeC PDM15",
+   "maker": "MoTeC",
+   "maker_pn": "14104",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 107.5,
+    "w": 133.1,
+    "h": 38.7
+   },
+   "frame": "origin at the centre of the back (mounting) face; +X right, +Y up in MoTeC's front view; +Z out of the back face; plugs face -Y; the M6 stud stands out of the flat case front",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "plugs": "-Y",
+     "label": "+Z",
+     "mounting": "-Z",
+     "stud": "+Z"
+    }
+   },
+   "colors": {
+    "case": {
+     "hex": "#2a2a2a",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp (fetched 2026-09-29), k-means of the region (upper case)"
+    },
+    "housing": {
+     "hex": "#30312e",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp (fetched 2026-09-29), k-means of the region (connector housing)"
+    },
+    "label": {
+     "hex": "#161716",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp (fetched 2026-09-29), k-means of the region (label panel)"
+    },
+    "header": {
+     "hex": "#2e3032",
+     "from": "MoTeC product photo large_m130 (plug headers; the same headers)"
+    },
+    "pins": {
+     "hex": "#b9b4a8",
+     "from": "not visible in the photo; drawn as tin-plated brass (colour not sourced)"
+    },
+    "stud": {
+     "hex": "#bab1a8",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp (fetched 2026-09-29), k-means of the region (the stud's nut: zinc-plated steel look)"
+    },
+    "numbers": {
+     "hex": "#6a6e72",
+     "from": "cavity numbers are moulded in the housing colour; drawn lighter so they read (cosmetic)"
+    },
+    "brand_red": {
+     "hex": "#9f1718",
+     "from": "MoTeC product photo large_m130 (label frame; the PDM photos show the same red frame)"
+    },
+    "brand_white": {
+     "hex": "#e4e0dd",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp (fetched 2026-09-29), k-means of the region (label lettering)"
+    },
+    "batt_disc": {
+     "hex": "#383230",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp (fetched 2026-09-29), k-means of the region (the black '+BATT' ring under the stud)"
+    },
+    "keepout": {
+     "hex": "#f0a030",
+     "from": "design aid, not a product colour"
+    },
+    "plug": {
+     "hex": "#2a2c2e",
+     "from": "TE Superseal 1.0 housings are black thermoplastic polyester (TE sheet 1 note 2, 'COLOR:BLACK')"
+    },
+    "backshell": {
+     "hex": "#1f2123",
+     "from": "ProWire product photos: black thermoplastic (PBT per ProWire's title)"
+    }
+   },
+   "attach": [
+    {
+     "n": "plug",
+     "ep": "PDM15-A",
+     "at": [
+      -16.25,
+      -98.65,
+      21.15
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "note": "34-way: wires leave the ProWire backshell's boot collar straight down; the boot (straight / 70 / 90 degrees) is HELD, so the final bend is open (keep-out 60-80 mm)"
+    },
+    {
+     "n": "plug",
+     "ep": "PDM15-B",
+     "at": [
+      19.25,
+      -98.65,
+      21.15
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "note": "26-way: wires leave the ProWire backshell's boot collar straight down; the boot (straight / 70 / 90 degrees) is HELD, so the final bend is open (keep-out 60-80 mm)"
+    },
+    {
+     "n": "stud",
+     "ep": "PDM15-STUD",
+     "at": [
+      0.0,
+      10.55,
+      33.4
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "stud",
+     "note": "M6 stud, eyelet and M6 nut (PDM manual p.47 draws the power cable leaving upward)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "hole_0",
+     "at": [
+      0.0,
+      58.75,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 5.2,
+     "note": "M5 or 3/16 in; washer or head 13 max"
+    },
+    {
+     "n": "hole_1",
+     "at": [
+      -48.75,
+      -16.25,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 5.2,
+     "note": "M5 or 3/16 in; washer or head 13 max"
+    },
+    {
+     "n": "hole_2",
+     "at": [
+      48.75,
+      -16.25,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 5.2,
+     "note": "M5 or 3/16 in; washer or head 13 max"
+    }
+   ],
+   "keepout": {
+    "what": "plug + boot + wire bend below both plug faces",
+    "min_mm": 60.0,
+    "budget_mm": 80.0,
+    "source": "receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md: 60-80 mm below the connector face for the plug and boot"
+   }
+  },
+  "PDM30-A": {
+   "endpoints": [
+    "PDM30-A",
+    "PDM30-B",
+    "PDM30-STUD"
+   ],
+   "what": "Body power box, MoTeC PDM30",
+   "maker": "MoTeC",
+   "maker_pn": "14103",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 107.5,
+    "w": 133.1,
+    "h": 38.7
+   },
+   "frame": "origin at the centre of the back (mounting) face; +X right, +Y up in MoTeC's front view; +Z out of the back face; plugs face -Y; the M6 stud stands out of the flat case front",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "plugs": "-Y",
+     "label": "+Z",
+     "mounting": "-Z",
+     "stud": "+Z"
+    }
+   },
+   "colors": {
+    "case": {
+     "hex": "#2a2a2a",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp (fetched 2026-09-29), k-means of the region (upper case)"
+    },
+    "housing": {
+     "hex": "#30312e",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp (fetched 2026-09-29), k-means of the region (connector housing)"
+    },
+    "label": {
+     "hex": "#161716",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp (fetched 2026-09-29), k-means of the region (label panel)"
+    },
+    "header": {
+     "hex": "#2e3032",
+     "from": "MoTeC product photo large_m130 (plug headers; the same headers)"
+    },
+    "pins": {
+     "hex": "#b9b4a8",
+     "from": "not visible in the photo; drawn as tin-plated brass (colour not sourced)"
+    },
+    "stud": {
+     "hex": "#bab1a8",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp (fetched 2026-09-29), k-means of the region (the stud's nut: zinc-plated steel look)"
+    },
+    "numbers": {
+     "hex": "#6a6e72",
+     "from": "cavity numbers are moulded in the housing colour; drawn lighter so they read (cosmetic)"
+    },
+    "brand_red": {
+     "hex": "#9f1718",
+     "from": "MoTeC product photo large_m130 (label frame; the PDM photos show the same red frame)"
+    },
+    "brand_white": {
+     "hex": "#e4e0dd",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp (fetched 2026-09-29), k-means of the region (label lettering)"
+    },
+    "batt_disc": {
+     "hex": "#383230",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp (fetched 2026-09-29), k-means of the region (the black '+BATT' ring under the stud)"
+    },
+    "keepout": {
+     "hex": "#f0a030",
+     "from": "design aid, not a product colour"
+    },
+    "plug": {
+     "hex": "#2a2c2e",
+     "from": "TE Superseal 1.0 housings are black thermoplastic polyester (TE sheet 1 note 2, 'COLOR:BLACK')"
+    },
+    "backshell": {
+     "hex": "#1f2123",
+     "from": "ProWire product photos: black thermoplastic (PBT per ProWire's title)"
+    }
+   },
+   "attach": [
+    {
+     "n": "plug",
+     "ep": "PDM30-A",
+     "at": [
+      -16.25,
+      -98.65,
+      21.15
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "note": "34-way: wires leave the ProWire backshell's boot collar straight down; the boot (straight / 70 / 90 degrees) is HELD, so the final bend is open (keep-out 60-80 mm)"
+    },
+    {
+     "n": "plug",
+     "ep": "PDM30-B",
+     "at": [
+      19.25,
+      -98.65,
+      21.15
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "note": "26-way: wires leave the ProWire backshell's boot collar straight down; the boot (straight / 70 / 90 degrees) is HELD, so the final bend is open (keep-out 60-80 mm)"
+    },
+    {
+     "n": "stud",
+     "ep": "PDM30-STUD",
+     "at": [
+      0.0,
+      10.55,
+      33.4
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "stud",
+     "note": "M6 stud, eyelet and M6 nut (PDM manual p.47 draws the power cable leaving upward)"
     }
    ],
    "mount": [

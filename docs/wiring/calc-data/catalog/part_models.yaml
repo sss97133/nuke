@@ -53,7 +53,7 @@ parts:
     label:
       hex: '#121416'
       from: MoTeC product photo https://assets.motec.com.au/strapi/large_m130_052880dbeb.webp (fetched 2026-09-29), k-means
-        of the region (label panel, 57%); the maker's branding is not reproduced
+        of the region (label panel, 57%)
     header:
       hex: '#2e3032'
       from: MoTeC product photo https://assets.motec.com.au/strapi/large_m130_052880dbeb.webp (fetched 2026-09-29), k-means
@@ -61,6 +61,17 @@ parts:
     pins:
       hex: '#b9b4a8'
       from: not visible in the photo; drawn as tin-plated brass (colour not sourced)
+    numbers:
+      hex: '#6a6e72'
+      from: cavity numbers are moulded in the housing colour; drawn lighter so they read (cosmetic)
+    brand_red:
+      hex: '#9f1718'
+      from: MoTeC product photo https://assets.motec.com.au/strapi/large_m130_052880dbeb.webp (fetched 2026-09-29), k-means
+        of the region (label frame and underline, 22% of the label region)
+    brand_white:
+      hex: '#e4e0dd'
+      from: MoTeC product photo https://assets.motec.com.au/strapi/large_m130_052880dbeb.webp (fetched 2026-09-29), k-means
+        of the region (label lettering, 34% of the label region)
     keepout:
       hex: '#f0a030'
       from: design aid, not a product colour
@@ -74,7 +85,7 @@ parts:
   - n: plug
     ep: M130-A
     at:
-    - -16.3
+    - -16.25
     - -98.65
     - 21.2
     dir:
@@ -86,7 +97,7 @@ parts:
   - n: plug
     ep: M130-B
     at:
-    - 19.15
+    - 19.25
     - -98.65
     - 21.2
     dir:
@@ -227,16 +238,16 @@ parts:
     basis: maker
     note: over both headers
   - name: hdr_a_w
-    value: 34.9
-    source: scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3, drawing scale from its printed
-      107.5 width
+    value: 35.0
+    source: scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 at 600 dpi (107.5 printed width
+      = 2212 px); the PDM manual p.47 drawing measures the same (34.98 / 28.92) and TE's housings differ by two 3 mm pin columns
     basis: scaled
     note: header A width; with the printed 67.5 span it sets both header centres
     fit: fit-critical, scaled
   - name: hdr_b_w
-    value: 29.2
-    source: scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3, drawing scale from its printed
-      107.5 width
+    value: 29.0
+    source: scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 at 600 dpi (107.5 printed width
+      = 2212 px); the PDM manual p.47 drawing measures the same (34.98 / 28.92) and TE's housings differ by two 3 mm pin columns
     basis: scaled
     note: header B width
     fit: fit-critical, scaled
@@ -488,8 +499,8 @@ parts:
     drawing: 0.0
     ok: true
   - check: header A width
-    model: 34.9
-    drawing: 34.9
+    model: 35.0
+    drawing: 35.0
     ok: true
   - check: header A below the bottom edge
     model: 5.6
@@ -500,8 +511,8 @@ parts:
     drawing: 23.9
     ok: true
   - check: header B width
-    model: 29.2
-    drawing: 29.2
+    model: 29.0
+    drawing: 29.0
     ok: true
   - check: header B below the bottom edge
     model: 5.6
@@ -527,21 +538,1306 @@ parts:
     model: 26
     drawing: 26
     ok: true
+  pins:
+    file: M130-A.pins.json (built with the part)
+    numbering: 'reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheet 1 (34-way) and sheet 2 (26-way), the numbered view placed right of the side view: third-angle (the sheet''s projection
+      symbol), so it is the wire side. Rows 1-9 / 10-17 / 18-25 / 26-34 (26-way: 1-7 / 8-13 / 14-19 / 20-26), cavity 1 top-left
+      with the polarity-marked lock on top'
+    names: docs/wiring/calc-data/m130_designations.txt (MoTeC datasheet 13130 pp.4-5; M1 ECU Hardware pp.16-17)
+    orientation_unknown: 'Which way the plug''s polarity side faces is not printed by MoTeC: the model puts TE''s polarity-marked
+      lock on the header''s latch side (the front of the unit), which puts A01 and B01 front-left looking up. Check A01 against
+      the moulded numbers before a pin is trusted.'
+  branding:
+    what:
+    - red frame around the maker mark
+    - maker mark 'MoTeC' (Arial Bold Italic stand-in)
+    - model 'M130'
+    - red underline
+    - '''ENGINE MANAGEMENT'''
+    - '''SYSTEM'''
+    basis: 'branding, redrawn from photo: text and shapes sized off the maker''s product photo; fonts are stand-ins; cosmetic,
+      never used for fit; no maker artwork used'
+    source: MoTeC product photo large_m130
   unknowns:
   - The Key 1 rib geometry inside the headers is not in any drawing on file; the latch side is modelled.
+  - Which way the plug's polarity side faces (so where A01 sits) is not printed by MoTeC; the model's choice is marked.
   - The plug is drawn fully seated (its 13.7 mm nose inside the header); TE does not dimension the mated stack.
   - 'The ProWire backshells are sized off ProWire''s photos (no printed dimensions): basis photo, fit not guaranteed.'
   - The boot (straight / 70 / 90 degrees) is HELD, so the model stops at the backshell's exit collar.
   - Scaled values (orange on the drawing) are read off MoTeC's drawing at its printed scale, not printed numbers.
   - Pin colour is not visible in the photo.
   cross_checks:
-  - 'Header widths vs TE: the 34- and 26-way plug housings differ by two 3 mm pin columns (38.2 vs 32.2 wide, TE 2-1437285-3
-    sheets 1-2). The scaled headers differ by 5.7 (34.9 vs 29.2), within 0.3 mm of that. Held to the printed 67.5 span with
-    a 6.0 difference they would be 35.05 and 29.05. The ECU-side headers are TE cap assemblies (3-1437285-x, TE sheet 1 table
-    1), whose drawings are not on file.'
+  - 'Header widths: re-measured at 600 dpi on MoTeC p.3 (35.01 / 29.01) and on the PDM manual p.47 drawing of the same case
+    (34.98 / 28.92); TE''s 34- and 26-way housings differ by two 3 mm pin columns (38.2 vs 32.2), and 35.0 - 29.0 = 6.0. The
+    ECU-side headers are TE cap assemblies (3-1437285-x, TE sheet 1 table 1), whose drawings are not on file.'
   notes:
   - The 18 degree angle on MoTeC's p.3 is the connector housing's side draft (bottom view). The plugs exit straight down;
     research/2026-06-09_design-inputs-recon.md reads it as an '18 degree connector exit'.
   - MoTeC's label is a raised badge (product photo). It is drawn as a flush panel in a 0.4 mm recess so the printed 38.7 depth
-    holds; the badge thickness is not printed and the artwork is not reproduced.
+    holds; its lettering is redrawn from the photo as cosmetic text, not MoTeC's artwork.
   script: docs/wiring/calc-data/cad/fab/M130-A.py
+- id: PDM15-A
+  endpoints:
+  - PDM15-A
+  - PDM15-B
+  - PDM15-STUD
+  what: Engine power box, MoTeC PDM15
+  maker: MoTeC
+  maker_pn: '14104'
+  shape_basis: maker drawing
+  dims_mm:
+    l: 107.5
+    w: 133.1
+    h: 38.7
+  dims_note: 107.5 wide x 127.5 tall x 38.7 deep (the M130's case); headers 5.6 below the bottom edge (133.1 overall, the
+    manual's 133); the M6 stud stands 17.9 out of the flat case front
+  frame: origin at the centre of the back (mounting) face; +X right, +Y up in MoTeC's front view; +Z out of the back face;
+    plugs face -Y; the M6 stud stands out of the flat case front
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      plugs: -Y
+      label: +Z
+      mounting: -Z
+      stud: +Z
+  colors:
+    case:
+      hex: '#2a2a2a'
+      from: MoTeC product photo https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp (fetched 2026-09-29), k-means
+        of the region (upper case)
+    housing:
+      hex: '#30312e'
+      from: MoTeC product photo https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp (fetched 2026-09-29), k-means
+        of the region (connector housing)
+    label:
+      hex: '#161716'
+      from: MoTeC product photo https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp (fetched 2026-09-29), k-means
+        of the region (label panel)
+    header:
+      hex: '#2e3032'
+      from: MoTeC product photo large_m130 (plug headers; the same headers)
+    pins:
+      hex: '#b9b4a8'
+      from: not visible in the photo; drawn as tin-plated brass (colour not sourced)
+    stud:
+      hex: '#bab1a8'
+      from: 'MoTeC product photo https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp (fetched 2026-09-29), k-means
+        of the region (the stud''s nut: zinc-plated steel look)'
+    numbers:
+      hex: '#6a6e72'
+      from: cavity numbers are moulded in the housing colour; drawn lighter so they read (cosmetic)
+    brand_red:
+      hex: '#9f1718'
+      from: MoTeC product photo large_m130 (label frame; the PDM photos show the same red frame)
+    brand_white:
+      hex: '#e4e0dd'
+      from: MoTeC product photo https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp (fetched 2026-09-29), k-means
+        of the region (label lettering)
+    batt_disc:
+      hex: '#383230'
+      from: MoTeC product photo https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp (fetched 2026-09-29), k-means
+        of the region (the black '+BATT' ring under the stud)
+    keepout:
+      hex: '#f0a030'
+      from: design aid, not a product colour
+    plug:
+      hex: '#2a2c2e'
+      from: TE Superseal 1.0 housings are black thermoplastic polyester (TE sheet 1 note 2, 'COLOR:BLACK')
+    backshell:
+      hex: '#1f2123'
+      from: 'ProWire product photos: black thermoplastic (PBT per ProWire''s title)'
+  attach:
+  - n: plug
+    ep: PDM15-A
+    at:
+    - -16.25
+    - -98.65
+    - 21.15
+    dir:
+    - 0
+    - -1
+    - 0
+    note: '34-way: wires leave the ProWire backshell''s boot collar straight down; the boot (straight / 70 / 90 degrees) is
+      HELD, so the final bend is open (keep-out 60-80 mm)'
+  - n: plug
+    ep: PDM15-B
+    at:
+    - 19.25
+    - -98.65
+    - 21.15
+    dir:
+    - 0
+    - -1
+    - 0
+    note: '26-way: wires leave the ProWire backshell''s boot collar straight down; the boot (straight / 70 / 90 degrees) is
+      HELD, so the final bend is open (keep-out 60-80 mm)'
+  - n: stud
+    ep: PDM15-STUD
+    at:
+    - 0.0
+    - 10.55
+    - 33.4
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: stud
+    note: M6 stud, eyelet and M6 nut (PDM manual p.47 draws the power cable leaving upward)
+  mount:
+  - n: hole_0
+    at:
+    - 0.0
+    - 58.75
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 5.2
+    note: M5 or 3/16 in; washer or head 13 max
+  - n: hole_1
+    at:
+    - -48.75
+    - -16.25
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 5.2
+    note: M5 or 3/16 in; washer or head 13 max
+  - n: hole_2
+    at:
+    - 48.75
+    - -16.25
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 5.2
+    note: M5 or 3/16 in; washer or head 13 max
+  mated:
+    what: TE Superseal 1.0 plugs 2-1437285-3 (34) and -2 (26) with ProWire SSB-34BS-PA66 / SSB-26BS-PA66 backshells
+    sources:
+    - reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+    - ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (prowireusa.com/content/36373..36376, fetched 2026-09-29), sized
+      against the plug's rear body; ProWire prints no dimensions
+  keepout:
+    what: plug + boot + wire bend below both plug faces
+    min_mm: 60.0
+    budget_mm: 80.0
+    source: 'receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md:
+      60-80 mm below the connector face for the plug and boot'
+  params:
+  - name: case_w
+    value: 107.5
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+  - name: case_h
+    value: 127.5
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+  - name: depth
+    value: 38.7
+    source: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.35 (Specifications: case size, case,
+      weight) gives 39 (rounded)'
+    basis: maker
+  - name: corner_r
+    value: 5.5
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+  - name: plate_t
+    value: 15.5
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: thickness of the flat upper case
+  - name: housing_h
+    value: 41.0
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: height of the lower connector housing above the bottom edge
+  - name: draft_deg
+    value: 18.0
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: side draft of the connector housing (bottom view)
+  - name: hole_d
+    value: 5.2
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: 3 holes, to suit M5 or 3/16 in
+  - name: washer_max
+    value: 13.0
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: max washer or head diameter
+  - name: hole_edge
+    value: 5.0
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+  - name: hole_pitch
+    value: 97.5
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+  - name: hole_low
+    value: 47.5
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: lower holes above the bottom edge
+  - name: hole_rise
+    value: 75.0
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: top hole above the lower holes
+  - name: hdr_proud
+    value: 5.6
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: headers stand this far below the bottom edge
+  - name: hdr_depth
+    value: 23.9
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+  - name: hdr_back
+    value: 9.2
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: header rear edge from the back face (so centre 21.15)
+  - name: hdr_span
+    value: 67.5
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: over both headers
+  - name: stud_y
+    value: 74.3
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: M6 battery stud centre above the bottom edge, on the centreline
+  - name: stud_len
+    value: 17.9
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: stud out from the flat case front
+  - name: stud_d
+    value: 6.0
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30) ('M6 Stud')
+    basis: maker
+  - name: hdr_a_w
+    value: 35.0
+    source: scaled off reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions,
+      PDM15 and PDM30) at 600 dpi (107.5 printed width = 1528 px)
+    basis: scaled
+    note: header A width (34.98 measured); with the 67.5 span it sets both header centres
+    fit: fit-critical, scaled
+  - name: hdr_b_w
+    value: 29.0
+    source: scaled off reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions,
+      PDM15 and PDM30) at 600 dpi (107.5 printed width = 1528 px)
+    basis: scaled
+    note: header B width (28.92 measured)
+    fit: fit-critical, scaled
+  - name: hdr_wall
+    value: 1.6
+    source: not shown on any MoTeC drawing
+    basis: assumed
+    note: shroud wall
+  - name: hdr_r
+    value: 2.0
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+    note: header corner radius
+  - name: latch_w
+    value: 3.2
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+    note: latch window on each header
+  - name: latch_proud
+    value: 2.8
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+    note: latch ramp
+  - name: front_flat_h
+    value: 26.6
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: slope_top_h
+    value: 38.9
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: slope_front_h
+    value: 30.2
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: slope_r
+    value: 5.0
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: draft_start
+    value: 12.0
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: front_edge_r
+    value: 4.0
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: plate_fillet
+    value: 3.0
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: label_w
+    value: 77.9
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+    note: label recess on the housing front
+  - name: label_h
+    value: 17.9
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: label_y
+    value: 14.8
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+    note: label centre above the bottom edge
+  - name: label_depth
+    value: 0.4
+    source: not shown on any MoTeC drawing
+    basis: assumed
+  - name: stud_base_af
+    value: 14.0
+    source: scaled off reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions,
+      PDM15 and PDM30), side view of the stud, scale from its printed 17.9
+    basis: scaled
+    note: black insulating hex base across flats (16 across corners in the side view; black in the photo)
+  - name: stud_base_t
+    value: 6.5
+    source: scaled off reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions,
+      PDM15 and PDM30), side view of the stud, scale from its printed 17.9
+    basis: scaled
+    note: hex base height
+  - name: nut_af
+    value: 10.0
+    source: scaled off reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions,
+      PDM15 and PDM30), side view of the stud, scale from its printed 17.9
+    basis: scaled
+    note: M6 nut across flats (11.5 across corners in the side view)
+  - name: nut_t
+    value: 5.0
+    source: scaled off reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions,
+      PDM15 and PDM30), side view of the stud, scale from its printed 17.9
+    basis: scaled
+    note: nut height
+  - name: pin_pitch
+    value: 3.0
+    source: 'reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      p.1 and p.2 (face view: 3 mm pitch, rows offset 1.5)'
+    basis: maker
+  - name: row_gap_outer
+    value: 3.5
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      p.1 and p.2 (rows 3.5 / 4 / 3.5)
+    basis: maker
+  - name: row_gap_inner
+    value: 4.0
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      p.1 and p.2
+    basis: maker
+  - name: cav_depth
+    value: 13.8
+    source: 'inferred: TE''s plug nose (reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheets 1-2, scaled 13.7) seats fully inside the header; MoTeC does not draw the header internals'
+    basis: scaled
+    note: header cavity depth above the header face
+  - name: keepout_min
+    value: 60.0
+    source: 'receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md:
+      60-80 mm below the connector face for the plug and boot'
+    basis: design
+  - name: keepout
+    value: 80.0
+    source: 'receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md:
+      60-80 mm below the connector face for the plug and boot'
+    basis: design
+  - name: plug34_w
+    value: 38.2
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheet 1 (34-way, 2-1437285-3)
+    basis: maker
+  - name: plug26_w
+    value: 32.2
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheet 2 (26-way, 2-1437285-2)
+    basis: maker
+  - name: nose34_w
+    value: 29.4
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheet 1, SECT B
+    basis: maker
+  - name: nose26_w
+    value: 23.4
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheet 2, SECT B
+    basis: maker
+  - name: nose_h
+    value: 18.3
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheets 1-2, side view
+    basis: maker
+  - name: plug_h
+    value: 38.0
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheets 1-2 (overall, over the lock arm and the flange)
+    basis: maker
+  - name: plug_l
+    value: 32.15
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheets 1-2 (mating face to rear)
+    basis: maker
+  - name: nose_l
+    value: 13.7
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+    note: 'mating face to the flange: this length sits inside the header'
+  - name: flange_l
+    value: 7.3
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+  - name: flange_up
+    value: 13.6
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+    note: flange edge on the lock side, from the pin-field centre
+  - name: rear_h
+    value: 24.1
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+    note: rear body height
+  - name: rear_w_off
+    value: 3.3
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+    note: 'rear body is narrower than the overall width by this (34-way: 34.9)'
+  - name: lock_w
+    value: 12.0
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+    note: lock arm width along the rows
+  - name: bs_wall
+    value: 1.8
+    source: ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (prowireusa.com/content/36373..36376, fetched 2026-09-29),
+      sized against the plug's rear body; ProWire prints no dimensions
+    basis: photo
+  - name: bs_l
+    value: 14.0
+    source: ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (prowireusa.com/content/36373..36376, fetched 2026-09-29),
+      sized against the plug's rear body; ProWire prints no dimensions
+    basis: photo
+    note: backshell length along the wires, clip body
+  - name: bs_collar_l
+    value: 7.0
+    source: ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (prowireusa.com/content/36373..36376, fetched 2026-09-29),
+      sized against the plug's rear body; ProWire prints no dimensions
+    basis: photo
+    note: boot collar length
+  - name: bs_collar_h
+    value: 12.0
+    source: ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (prowireusa.com/content/36373..36376, fetched 2026-09-29),
+      sized against the plug's rear body; ProWire prints no dimensions
+    basis: photo
+    note: boot collar (flat oval) height; its length follows the rear body
+  checks:
+  - check: case width (x)
+    model: 107.5
+    drawing: 107.5
+    ok: true
+  - check: case height (y)
+    model: 127.5
+    drawing: 127.5
+    ok: true
+  - check: case depth (z)
+    model: 38.7
+    drawing: 38.7
+    ok: true
+  - check: hole count
+    model: 3
+    drawing: 3
+    ok: true
+  - check: hole pitch
+    model: 97.5
+    drawing: 97.5
+    ok: true
+  - check: hole rise (lower to top)
+    model: 75.0
+    drawing: 75.0
+    ok: true
+  - check: lower holes above the bottom edge
+    model: 47.5
+    drawing: 47.5
+    ok: true
+  - check: hole centre from the side edge
+    model: 5.0
+    drawing: 5.0
+    ok: true
+  - check: top hole on the centreline
+    model: 0.0
+    drawing: 0.0
+    ok: true
+  - check: header A width
+    model: 35.0
+    drawing: 35.0
+    ok: true
+  - check: header A below the bottom edge
+    model: 5.6
+    drawing: 5.6
+    ok: true
+  - check: header A depth (z, less the latch ramp)
+    model: 23.9
+    drawing: 23.9
+    ok: true
+  - check: header B width
+    model: 29.0
+    drawing: 29.0
+    ok: true
+  - check: header B below the bottom edge
+    model: 5.6
+    drawing: 5.6
+    ok: true
+  - check: header B depth (z, less the latch ramp)
+    model: 23.9
+    drawing: 23.9
+    ok: true
+  - check: span over both headers
+    model: 67.5
+    drawing: 67.5
+    ok: true
+  - check: header rear edge from the back face
+    model: 9.2
+    drawing: 9.2
+    ok: true
+  - check: pins A
+    model: 34
+    drawing: 34
+    ok: true
+  - check: pins B
+    model: 26
+    drawing: 26
+    ok: true
+  - check: stud above the bottom edge
+    model: 74.3
+    drawing: 74.3
+    ok: true
+  - check: stud out from the case front
+    model: 17.9
+    drawing: 17.9
+    ok: true
+  pins:
+    file: PDM15-A.pins.json (built with the part)
+    numbering: 'reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheet 1 (34-way) and sheet 2 (26-way), the numbered view placed right of the side view: third-angle (the sheet''s projection
+      symbol), so it is the wire side. Rows 1-9 / 10-17 / 18-25 / 26-34 (26-way: 1-7 / 8-13 / 14-19 / 20-26), cavity 1 top-left
+      with the polarity-marked lock on top'
+    names: docs/wiring/calc-data/pdm15_designations.txt (MoTeC PDM manual pinout, p.42)
+    orientation_unknown: 'Which way the plug''s polarity side faces is not printed by MoTeC: the model puts TE''s polarity-marked
+      lock on the header''s latch side (the front of the unit), which puts A1 and B1 front-left looking up. Check A1 against
+      the moulded numbers before a pin is trusted.'
+  branding:
+    what:
+    - red frame around the maker mark
+    - maker mark 'MoTeC' (Arial Bold Italic stand-in)
+    - model 'PDM15'
+    - '''Power Distribution'''
+    - '''Module'''
+    - black '+BATT' ring under the stud
+    - '''+BATT'' lettering around the stud'
+    - thin white ring at the edge of the '+BATT' disc
+    basis: 'branding, redrawn from photo: text and shapes sized off the maker''s product photo; fonts are stand-ins; cosmetic,
+      never used for fit; no maker artwork used'
+    source: MoTeC product photo large_pdm15
+  unknowns:
+  - The Key 1 rib geometry inside the headers is not in any drawing on file; the latch side is modelled.
+  - Which way the plug's polarity side faces (so where A1 sits) is not printed by MoTeC; the model's choice is marked.
+  - The stud's hex base and nut sizes are scaled off the side view; the insulating cap is not modelled.
+  - The plug is drawn fully seated; TE does not dimension the mated stack.
+  - The ProWire backshells are sized off ProWire's photos (no printed dimensions).
+  - The boot (straight / 70 / 90 degrees) is HELD, so the model stops at the backshell's exit collar.
+  cross_checks:
+  - 'Header widths measured at 600 dpi on p.47: 34.98 / 28.92 (M130 p.3: 35.01 / 29.01); TE''s 34- and 26-way housings differ
+    by two 3 mm pin columns. The p.35 table''s 133 mm is 127.5 + the 5.6 mm headers.'
+  notes:
+  - 'PDM15 vs PDM30: same case, headers and stud (p.47 draws both). Inside: PDM15 has 15 outputs and 80 A total, PDM30 30
+    outputs and 100 A; 260 g vs 270 g (p.35). Both are magnesium with only a coated board, not sealed (p.35).'
+  - MoTeC's p.47 sketch shows the battery cable ('4 Power Connection') leaving the stud upward; the attach point points +Y.
+  script: docs/wiring/calc-data/cad/fab/PDM15-A.py
+- id: PDM30-A
+  endpoints:
+  - PDM30-A
+  - PDM30-B
+  - PDM30-STUD
+  what: Body power box, MoTeC PDM30
+  maker: MoTeC
+  maker_pn: '14103'
+  shape_basis: maker drawing
+  dims_mm:
+    l: 107.5
+    w: 133.1
+    h: 38.7
+  dims_note: 107.5 wide x 127.5 tall x 38.7 deep (the M130's case); headers 5.6 below the bottom edge (133.1 overall, the
+    manual's 133); the M6 stud stands 17.9 out of the flat case front
+  frame: origin at the centre of the back (mounting) face; +X right, +Y up in MoTeC's front view; +Z out of the back face;
+    plugs face -Y; the M6 stud stands out of the flat case front
+  axes:
+    mount_normal: +Z
+    maker_up: +Y
+    faces:
+      plugs: -Y
+      label: +Z
+      mounting: -Z
+      stud: +Z
+  colors:
+    case:
+      hex: '#2a2a2a'
+      from: MoTeC product photo https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp (fetched 2026-09-29), k-means
+        of the region (upper case)
+    housing:
+      hex: '#30312e'
+      from: MoTeC product photo https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp (fetched 2026-09-29), k-means
+        of the region (connector housing)
+    label:
+      hex: '#161716'
+      from: MoTeC product photo https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp (fetched 2026-09-29), k-means
+        of the region (label panel)
+    header:
+      hex: '#2e3032'
+      from: MoTeC product photo large_m130 (plug headers; the same headers)
+    pins:
+      hex: '#b9b4a8'
+      from: not visible in the photo; drawn as tin-plated brass (colour not sourced)
+    stud:
+      hex: '#bab1a8'
+      from: 'MoTeC product photo https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp (fetched 2026-09-29), k-means
+        of the region (the stud''s nut: zinc-plated steel look)'
+    numbers:
+      hex: '#6a6e72'
+      from: cavity numbers are moulded in the housing colour; drawn lighter so they read (cosmetic)
+    brand_red:
+      hex: '#9f1718'
+      from: MoTeC product photo large_m130 (label frame; the PDM photos show the same red frame)
+    brand_white:
+      hex: '#e4e0dd'
+      from: MoTeC product photo https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp (fetched 2026-09-29), k-means
+        of the region (label lettering)
+    batt_disc:
+      hex: '#383230'
+      from: MoTeC product photo https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp (fetched 2026-09-29), k-means
+        of the region (the black '+BATT' ring under the stud)
+    keepout:
+      hex: '#f0a030'
+      from: design aid, not a product colour
+    plug:
+      hex: '#2a2c2e'
+      from: TE Superseal 1.0 housings are black thermoplastic polyester (TE sheet 1 note 2, 'COLOR:BLACK')
+    backshell:
+      hex: '#1f2123'
+      from: 'ProWire product photos: black thermoplastic (PBT per ProWire''s title)'
+  attach:
+  - n: plug
+    ep: PDM30-A
+    at:
+    - -16.25
+    - -98.65
+    - 21.15
+    dir:
+    - 0
+    - -1
+    - 0
+    note: '34-way: wires leave the ProWire backshell''s boot collar straight down; the boot (straight / 70 / 90 degrees) is
+      HELD, so the final bend is open (keep-out 60-80 mm)'
+  - n: plug
+    ep: PDM30-B
+    at:
+    - 19.25
+    - -98.65
+    - 21.15
+    dir:
+    - 0
+    - -1
+    - 0
+    note: '26-way: wires leave the ProWire backshell''s boot collar straight down; the boot (straight / 70 / 90 degrees) is
+      HELD, so the final bend is open (keep-out 60-80 mm)'
+  - n: stud
+    ep: PDM30-STUD
+    at:
+    - 0.0
+    - 10.55
+    - 33.4
+    dir:
+    - 0
+    - 1
+    - 0
+    kind: stud
+    note: M6 stud, eyelet and M6 nut (PDM manual p.47 draws the power cable leaving upward)
+  mount:
+  - n: hole_0
+    at:
+    - 0.0
+    - 58.75
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 5.2
+    note: M5 or 3/16 in; washer or head 13 max
+  - n: hole_1
+    at:
+    - -48.75
+    - -16.25
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 5.2
+    note: M5 or 3/16 in; washer or head 13 max
+  - n: hole_2
+    at:
+    - 48.75
+    - -16.25
+    - 0
+    dir:
+    - 0
+    - 0
+    - -1
+    d: 5.2
+    note: M5 or 3/16 in; washer or head 13 max
+  mated:
+    what: TE Superseal 1.0 plugs 2-1437285-3 (34) and -2 (26) with ProWire SSB-34BS-PA66 / SSB-26BS-PA66 backshells
+    sources:
+    - reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+    - ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (prowireusa.com/content/36373..36376, fetched 2026-09-29), sized
+      against the plug's rear body; ProWire prints no dimensions
+  keepout:
+    what: plug + boot + wire bend below both plug faces
+    min_mm: 60.0
+    budget_mm: 80.0
+    source: 'receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md:
+      60-80 mm below the connector face for the plug and boot'
+  params:
+  - name: case_w
+    value: 107.5
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+  - name: case_h
+    value: 127.5
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+  - name: depth
+    value: 38.7
+    source: 'reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30); reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.35 (Specifications: case size, case,
+      weight) gives 39 (rounded)'
+    basis: maker
+  - name: corner_r
+    value: 5.5
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+  - name: plate_t
+    value: 15.5
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: thickness of the flat upper case
+  - name: housing_h
+    value: 41.0
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: height of the lower connector housing above the bottom edge
+  - name: draft_deg
+    value: 18.0
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: side draft of the connector housing (bottom view)
+  - name: hole_d
+    value: 5.2
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: 3 holes, to suit M5 or 3/16 in
+  - name: washer_max
+    value: 13.0
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: max washer or head diameter
+  - name: hole_edge
+    value: 5.0
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+  - name: hole_pitch
+    value: 97.5
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+  - name: hole_low
+    value: 47.5
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: lower holes above the bottom edge
+  - name: hole_rise
+    value: 75.0
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: top hole above the lower holes
+  - name: hdr_proud
+    value: 5.6
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: headers stand this far below the bottom edge
+  - name: hdr_depth
+    value: 23.9
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+  - name: hdr_back
+    value: 9.2
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: header rear edge from the back face (so centre 21.15)
+  - name: hdr_span
+    value: 67.5
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: over both headers
+  - name: stud_y
+    value: 74.3
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: M6 battery stud centre above the bottom edge, on the centreline
+  - name: stud_len
+    value: 17.9
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30)
+    basis: maker
+    note: stud out from the flat case front
+  - name: stud_d
+    value: 6.0
+    source: reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions, PDM15 and
+      PDM30) ('M6 Stud')
+    basis: maker
+  - name: hdr_a_w
+    value: 35.0
+    source: scaled off reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions,
+      PDM15 and PDM30) at 600 dpi (107.5 printed width = 1528 px)
+    basis: scaled
+    note: header A width (34.98 measured); with the 67.5 span it sets both header centres
+    fit: fit-critical, scaled
+  - name: hdr_b_w
+    value: 29.0
+    source: scaled off reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions,
+      PDM15 and PDM30) at 600 dpi (107.5 printed width = 1528 px)
+    basis: scaled
+    note: header B width (28.92 measured)
+    fit: fit-critical, scaled
+  - name: hdr_wall
+    value: 1.6
+    source: not shown on any MoTeC drawing
+    basis: assumed
+    note: shroud wall
+  - name: hdr_r
+    value: 2.0
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+    note: header corner radius
+  - name: latch_w
+    value: 3.2
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+    note: latch window on each header
+  - name: latch_proud
+    value: 2.8
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+    note: latch ramp
+  - name: front_flat_h
+    value: 26.6
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: slope_top_h
+    value: 38.9
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: slope_front_h
+    value: 30.2
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: slope_r
+    value: 5.0
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: draft_start
+    value: 12.0
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: front_edge_r
+    value: 4.0
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: plate_fillet
+    value: 3.0
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: label_w
+    value: 77.9
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+    note: label recess on the housing front
+  - name: label_h
+    value: 17.9
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+  - name: label_y
+    value: 14.8
+    source: 'scaled off reference_documents/component_drawings/motec_m130_datasheet.pdf p.3 (the same case: reference_documents/component_drawings/motec_pdm_user_manual.pdf
+      p.47 draws it identically), scale from the printed 107.5 width'
+    basis: scaled
+    note: label centre above the bottom edge
+  - name: label_depth
+    value: 0.4
+    source: not shown on any MoTeC drawing
+    basis: assumed
+  - name: stud_base_af
+    value: 14.0
+    source: scaled off reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions,
+      PDM15 and PDM30), side view of the stud, scale from its printed 17.9
+    basis: scaled
+    note: black insulating hex base across flats (16 across corners in the side view; black in the photo)
+  - name: stud_base_t
+    value: 6.5
+    source: scaled off reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions,
+      PDM15 and PDM30), side view of the stud, scale from its printed 17.9
+    basis: scaled
+    note: hex base height
+  - name: nut_af
+    value: 10.0
+    source: scaled off reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions,
+      PDM15 and PDM30), side view of the stud, scale from its printed 17.9
+    basis: scaled
+    note: M6 nut across flats (11.5 across corners in the side view)
+  - name: nut_t
+    value: 5.0
+    source: scaled off reference_documents/component_drawings/motec_pdm_user_manual.pdf printed p.47 (Mounting Dimensions,
+      PDM15 and PDM30), side view of the stud, scale from its printed 17.9
+    basis: scaled
+    note: nut height
+  - name: pin_pitch
+    value: 3.0
+    source: 'reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      p.1 and p.2 (face view: 3 mm pitch, rows offset 1.5)'
+    basis: maker
+  - name: row_gap_outer
+    value: 3.5
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      p.1 and p.2 (rows 3.5 / 4 / 3.5)
+    basis: maker
+  - name: row_gap_inner
+    value: 4.0
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      p.1 and p.2
+    basis: maker
+  - name: cav_depth
+    value: 13.8
+    source: 'inferred: TE''s plug nose (reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheets 1-2, scaled 13.7) seats fully inside the header; MoTeC does not draw the header internals'
+    basis: scaled
+    note: header cavity depth above the header face
+  - name: keepout_min
+    value: 60.0
+    source: 'receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md:
+      60-80 mm below the connector face for the plug and boot'
+    basis: design
+  - name: keepout
+    value: 80.0
+    source: 'receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md:
+      60-80 mm below the connector face for the plug and boot'
+    basis: design
+  - name: plug34_w
+    value: 38.2
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheet 1 (34-way, 2-1437285-3)
+    basis: maker
+  - name: plug26_w
+    value: 32.2
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheet 2 (26-way, 2-1437285-2)
+    basis: maker
+  - name: nose34_w
+    value: 29.4
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheet 1, SECT B
+    basis: maker
+  - name: nose26_w
+    value: 23.4
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheet 2, SECT B
+    basis: maker
+  - name: nose_h
+    value: 18.3
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheets 1-2, side view
+    basis: maker
+  - name: plug_h
+    value: 38.0
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheets 1-2 (overall, over the lock arm and the flange)
+    basis: maker
+  - name: plug_l
+    value: 32.15
+    source: reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheets 1-2 (mating face to rear)
+    basis: maker
+  - name: nose_l
+    value: 13.7
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+    note: 'mating face to the flange: this length sits inside the header'
+  - name: flange_l
+    value: 7.3
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+  - name: flange_up
+    value: 13.6
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+    note: flange edge on the lock side, from the pin-field centre
+  - name: rear_h
+    value: 24.1
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+    note: rear body height
+  - name: rear_w_off
+    value: 3.3
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+    note: 'rear body is narrower than the overall width by this (34-way: 34.9)'
+  - name: lock_w
+    value: 12.0
+    source: scaled off reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf,
+      sheet scale from its printed 32.15 length and 38 height
+    basis: scaled
+    note: lock arm width along the rows
+  - name: bs_wall
+    value: 1.8
+    source: ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (prowireusa.com/content/36373..36376, fetched 2026-09-29),
+      sized against the plug's rear body; ProWire prints no dimensions
+    basis: photo
+  - name: bs_l
+    value: 14.0
+    source: ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (prowireusa.com/content/36373..36376, fetched 2026-09-29),
+      sized against the plug's rear body; ProWire prints no dimensions
+    basis: photo
+    note: backshell length along the wires, clip body
+  - name: bs_collar_l
+    value: 7.0
+    source: ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (prowireusa.com/content/36373..36376, fetched 2026-09-29),
+      sized against the plug's rear body; ProWire prints no dimensions
+    basis: photo
+    note: boot collar length
+  - name: bs_collar_h
+    value: 12.0
+    source: ProWire SSB-34BS-PA66 / SSB-26BS-PA66 product photos (prowireusa.com/content/36373..36376, fetched 2026-09-29),
+      sized against the plug's rear body; ProWire prints no dimensions
+    basis: photo
+    note: boot collar (flat oval) height; its length follows the rear body
+  checks:
+  - check: case width (x)
+    model: 107.5
+    drawing: 107.5
+    ok: true
+  - check: case height (y)
+    model: 127.5
+    drawing: 127.5
+    ok: true
+  - check: case depth (z)
+    model: 38.7
+    drawing: 38.7
+    ok: true
+  - check: hole count
+    model: 3
+    drawing: 3
+    ok: true
+  - check: hole pitch
+    model: 97.5
+    drawing: 97.5
+    ok: true
+  - check: hole rise (lower to top)
+    model: 75.0
+    drawing: 75.0
+    ok: true
+  - check: lower holes above the bottom edge
+    model: 47.5
+    drawing: 47.5
+    ok: true
+  - check: hole centre from the side edge
+    model: 5.0
+    drawing: 5.0
+    ok: true
+  - check: top hole on the centreline
+    model: 0.0
+    drawing: 0.0
+    ok: true
+  - check: header A width
+    model: 35.0
+    drawing: 35.0
+    ok: true
+  - check: header A below the bottom edge
+    model: 5.6
+    drawing: 5.6
+    ok: true
+  - check: header A depth (z, less the latch ramp)
+    model: 23.9
+    drawing: 23.9
+    ok: true
+  - check: header B width
+    model: 29.0
+    drawing: 29.0
+    ok: true
+  - check: header B below the bottom edge
+    model: 5.6
+    drawing: 5.6
+    ok: true
+  - check: header B depth (z, less the latch ramp)
+    model: 23.9
+    drawing: 23.9
+    ok: true
+  - check: span over both headers
+    model: 67.5
+    drawing: 67.5
+    ok: true
+  - check: header rear edge from the back face
+    model: 9.2
+    drawing: 9.2
+    ok: true
+  - check: pins A
+    model: 34
+    drawing: 34
+    ok: true
+  - check: pins B
+    model: 26
+    drawing: 26
+    ok: true
+  - check: stud above the bottom edge
+    model: 74.3
+    drawing: 74.3
+    ok: true
+  - check: stud out from the case front
+    model: 17.9
+    drawing: 17.9
+    ok: true
+  pins:
+    file: PDM30-A.pins.json (built with the part)
+    numbering: 'reference_documents/component_drawings/te_C-2-1437285-3_superseal_1.0_plug_housing_34_26_customer_drawing.pdf
+      sheet 1 (34-way) and sheet 2 (26-way), the numbered view placed right of the side view: third-angle (the sheet''s projection
+      symbol), so it is the wire side. Rows 1-9 / 10-17 / 18-25 / 26-34 (26-way: 1-7 / 8-13 / 14-19 / 20-26), cavity 1 top-left
+      with the polarity-marked lock on top'
+    names: docs/wiring/calc-data/pdm30_designations.txt (MoTeC PDM manual pinout, p.44)
+    orientation_unknown: 'Which way the plug''s polarity side faces is not printed by MoTeC: the model puts TE''s polarity-marked
+      lock on the header''s latch side (the front of the unit), which puts A1 and B1 front-left looking up. Check A1 against
+      the moulded numbers before a pin is trusted.'
+  branding:
+    what:
+    - red frame around the maker mark
+    - maker mark 'MoTeC' (Arial Bold Italic stand-in)
+    - model 'PDM30'
+    - '''Power Distribution'''
+    - '''Module'''
+    - black '+BATT' ring under the stud
+    - '''+BATT'' lettering around the stud'
+    - thin white ring at the edge of the '+BATT' disc
+    basis: 'branding, redrawn from photo: text and shapes sized off the maker''s product photo; fonts are stand-ins; cosmetic,
+      never used for fit; no maker artwork used'
+    source: MoTeC product photo large_pdm30
+  unknowns:
+  - The Key 1 rib geometry inside the headers is not in any drawing on file; the latch side is modelled.
+  - Which way the plug's polarity side faces (so where A1 sits) is not printed by MoTeC; the model's choice is marked.
+  - The stud's hex base and nut sizes are scaled off the side view; the insulating cap is not modelled.
+  - The plug is drawn fully seated; TE does not dimension the mated stack.
+  - The ProWire backshells are sized off ProWire's photos (no printed dimensions).
+  - The boot (straight / 70 / 90 degrees) is HELD, so the model stops at the backshell's exit collar.
+  cross_checks:
+  - 'Header widths measured at 600 dpi on p.47: 34.98 / 28.92 (M130 p.3: 35.01 / 29.01); TE''s 34- and 26-way housings differ
+    by two 3 mm pin columns. The p.35 table''s 133 mm is 127.5 + the 5.6 mm headers.'
+  notes:
+  - 'PDM30 vs PDM15: same case, headers and stud (p.47 draws both). Inside: PDM15 has 15 outputs and 80 A total, PDM30 30
+    outputs and 100 A; 260 g vs 270 g (p.35). Both are magnesium with only a coated board, not sealed (p.35).'
+  - MoTeC's p.47 sketch shows the battery cable ('4 Power Connection') leaving the stud upward; the attach point points +Y.
+  script: docs/wiring/calc-data/cad/fab/PDM30-A.py

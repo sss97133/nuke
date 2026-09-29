@@ -45,10 +45,35 @@ def hex_color(h, alpha=1.0):
     return Color(int(h[0:2], 16) / 255, int(h[2:4], 16) / 255, int(h[4:6], 16) / 255, alpha)
 
 
-def body(shape, label, hexc, alpha=1.0):
+FINISHES = {  # glTF metallicFactor, roughnessFactor. glTF defaults to fully metallic, so every material gets one.
+    "plastic": (0.0, 0.55), "rubber": (0.0, 0.85), "gloss": (0.0, 0.3), "paint": (0.0, 0.45), "print": (0.0, 0.4),
+    "metal": (1.0, 0.35), "cast": (0.6, 0.6), "chrome": (1.0, 0.12), "lens": (0.0, 0.1), "aid": (0.0, 0.8),
+}
+FINISH_BY_LABEL = {}
+
+
+def body(shape, label, hexc, alpha=1.0, finish=None):
     shape.label = label
     shape.color = hex_color(hexc, alpha)
+    FINISH_BY_LABEL[label] = finish or ("aid" if alpha < 1.0 else "plastic")
     return shape
+
+
+def text_solid(s, size, at, plane="xy", depth=0.1, font="Arial", style="regular", font_path=None, align="center"):
+    """Raised lettering as a solid: `at` is the text's anchor in the part frame; plane 'xy' faces +Z, 'xz-' faces -Y."""
+    from build123d import Align, FontStyle, Plane, Pos, Text, extrude
+    fs = {"regular": FontStyle.REGULAR, "bold": FontStyle.BOLD, "italic": FontStyle.ITALIC,
+          "bolditalic": FontStyle.BOLDITALIC}[style]
+    al = {"center": (Align.CENTER, Align.CENTER), "left": (Align.MIN, Align.CENTER), "right": (Align.MAX, Align.CENTER)}[align]
+    kw = {"font_path": font_path} if font_path else {"font": font, "font_style": fs}
+    sk = Text(s, font_size=size, align=al, **kw)
+    if plane == "xy":
+        solid = extrude(sk, amount=depth)
+        return Pos(*at) * solid
+    if plane == "xz-":            # on a face whose outward normal is -Y, readable from below with +X right, +Z up
+        solid = extrude(Plane.XZ * sk, amount=depth)
+        return Pos(at[0], at[1], at[2]) * solid
+    raise ValueError(plane)
 
 
 def params_table(P):
@@ -91,6 +116,33 @@ def write_glb(bodies, path, linear=0.25, angular=0.45):
     BRepTools.Clean_s(comp.wrapped)
     if not ok:
         raise RuntimeError(f"glTF export failed: {path}")
+    _set_finishes(path, {b.label: FINISH_BY_LABEL.get(b.label, "plastic") for b in bodies})
+
+
+def _set_finishes(path, finish_of):
+    """Write metallicFactor / roughnessFactor on every material (OCC leaves them out, and glTF then means metal)."""
+    import struct
+    raw = Path(path).read_bytes()
+    jl = struct.unpack("<I", raw[12:16])[0]
+    j = json.loads(raw[20:20 + jl])
+    rest = raw[20 + jl:]
+    users = {}
+    for n in j.get("nodes", []):
+        if "mesh" in n:
+            for pr in j["meshes"][n["mesh"]]["primitives"]:
+                if "material" in pr:
+                    users.setdefault(pr["material"], []).append(n.get("name", ""))
+    for i, m in enumerate(j.get("materials", [])):
+        names = users.get(i, [])
+        fin = next((finish_of[nm] for nm in names if nm in finish_of), "plastic")
+        met, rough = FINISHES[fin]
+        pbr = m.setdefault("pbrMetallicRoughness", {})
+        pbr["metallicFactor"], pbr["roughnessFactor"] = met, rough
+        m["name"] = f"{fin} {m.get('name', i)}"
+    js = json.dumps(j, separators=(",", ":")).encode()
+    js += b" " * ((4 - len(js) % 4) % 4)
+    total = 12 + 8 + len(js) + len(rest)
+    Path(path).write_bytes(struct.pack("<4sII", b"glTF", 2, total) + struct.pack("<I4s", len(js), b"JSON") + js + rest)
 
 
 # ------------------------------------------------------------------------------------------ the drawing
