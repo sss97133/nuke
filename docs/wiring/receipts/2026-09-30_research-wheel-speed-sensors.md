@@ -81,9 +81,9 @@
   decided; agents never promote a candidate.
   - **WSS-F2** (the recommended path): two front ZF sensors into M130 UDIG5/UDIG6; 7 planned wires. `conflicts_with: [NAV-L10]`
     (pieces audit 2026-09-29): both name M130 B11 (UDIG6); NAV-L10 is nav-comms' GPS-L10 alternate in PR #421, which already
-    carries the mirror entry (merged to main as #421). PDM15 OUT14 feeds the sensors. It is uncontested: step-power's
-    STEP-DCMD moved to the bay-PDM32 candidate (step-power, PR #428), and its PDM32 estimate counts this feed if the bay PDM
-    becomes a PDM32.
+    carries the mirror entry (merged to main as #421). PDM15 OUT14 feeds the sensors, agreed with step-power:
+    STEP-DCMD (PR #428) claims OUT8, OUT10 and OUT12 with `demand.pdm15_outputs: 3`, and OUT15 stays step-power's optional
+    per-door feed. Once both merge, the PDM15 verdict reads 4 of 5 spare taken.
   - **WSS-4E** (`alternative_to: WSS-F2`): four corners into a cab E888 over CAN; 15 planned wires.
   - **WSS-PREP** (`alternative_to: WSS-F2`): rings and brackets only, no wires.
 - `calc-data/options_v5.py` (options-rd's pattern from #416, at their suggestion; their lane is closed): `capacity()` now
