@@ -240,11 +240,11 @@ piece of the wiring and youd know the answer and it be fact based". He then sent
 
   | Part | Order date | eBay order | Total |
   |---|---|---|---|
-  | Throttle body 12699160 | 2024-08-26 | 07-11995-48794 | $93.59 |
-  | 8× Siemens Deka FI114961 injectors | 2024-08-26 | 14-11988-18331 | $260.10 |
-  | 8× GM 12611424 coils | 2024-08-26 | 14-11988-18335 | $208.99 |
-  | Square-body LS-swap DBW pedal | 2025-04-02 | 26-12889-28142 | $79.30 |
-  | QFS-H882-367 hanger + sending unit | 2024-09-25 | 14-12112-99974 | $280.67 |
+  | Throttle body 12699160 | 2024-08-26 | order record obs:9a9e1387 | $••• |
+  | 8× Siemens Deka FI114961 injectors | 2024-08-26 | order record obs:f86d4da6 | $••• |
+  | 8× GM 12611424 coils | 2024-08-26 | order record obs:a7ed8806 | $••• |
+  | Square-body LS-swap DBW pedal | 2025-04-02 | order record obs:273ef61a | $••• |
+  | QFS-H882-367 hanger + sending unit | 2024-09-25 | order record obs:0739da53 | $••• |
 
   - The live cards read "BOUGHT · THE OWNER'S WORDS". Installed stays unproven.
   - **Finding:** the pedal he bought is not the GM 10379038 that the APS pin map was drawn from. Read the pedal's

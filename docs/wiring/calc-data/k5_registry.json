@@ -28310,7 +28310,7 @@
    "side": "engine bay"
   },
   "APS": {
-   "device": "DBW pedal bought 2025-04-02 (eBay order 26-12889-28142): '72-98 C10 Square Body OBS LS Swap DBW' pedal — GM Gen III truck pedal (OE 15751307 family), 9-cavity plug with 6 wired; the third sensor's 3 cavities stay empty",
+   "device": "DBW pedal bought 2025-04-02 (eBay order order record obs:273ef61a): '72-98 C10 Square Body OBS LS Swap DBW' pedal — GM Gen III truck pedal (OE 15751307 family), 9-cavity plug with 6 wired; the third sensor's 3 cavities stay empty",
    "where": "cabin",
    "family": "miniseal",
    "kit": {
@@ -49539,12 +49539,12 @@
    ]
   },
   "APS": {
-   "device": "DBW pedal bought 2025-04-02 (eBay order 26-12889-28142): '72-98 C10 Square Body OBS LS Swap DBW' pedal — GM Gen III truck pedal (OE 15751307 family), 9-cavity plug with 6 wired; the third sensor's 3 cavities stay empty",
+   "device": "DBW pedal bought 2025-04-02 (eBay order order record obs:273ef61a): '72-98 C10 Square Body OBS LS Swap DBW' pedal — GM Gen III truck pedal (OE 15751307 family), 9-cavity plug with 6 wired; the third sensor's 3 cavities stay empty",
    "status": "2 open",
    "rows": [
     {
      "field": "device",
-     "value": "DBW pedal bought 2025-04-02 (eBay order 26-12889-28142): '72-98 C10 Square Body OBS LS Swap DBW' pedal — GM Gen III truck pedal (OE 15751307 family), 9-cavity plug with 6 wired; the third sensor's 3 cavities stay empty",
+     "value": "DBW pedal bought 2025-04-02 (eBay order order record obs:273ef61a): '72-98 C10 Square Body OBS LS Swap DBW' pedal — GM Gen III truck pedal (OE 15751307 family), 9-cavity plug with 6 wired; the third sensor's 3 cavities stay empty",
      "source": "eBay listing for the bought pedal: '72-98 C10 Square Body OBS LS Swap DBW', now sold as APS130 — 'Standard Ignition 9 Terminal Accelerator Pedal Position Sensor APS130' (O'Reilly title, web search 2026-09-27)",
      "state": "cited"
     },
