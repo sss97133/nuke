@@ -1,46 +1,98 @@
 # K5 Harness Layout: the workspace builder
 
-Live: https://claude.ai/artifact/QVLCDvWkF2XJ6DABBodakh, version 12 (2026-09-29). It is private to the owner.
-Lane: layout-ui. The page is built from sourced files only; nothing is typed into it by hand.
+**Live:** https://claude.ai/artifact/QVLCDvWkF2XJ6DABBodakh, version 12 (2026-09-29), private to the owner.
+The Parts Library, M130 Sample Review and K5 Engine Bay Sample pages are now one-line pointers to it.
 
-## What the page is
+**Lane:** layout-ui. **Paused 2026-09-29:** the slot went to the BaT data audit. The pieces lane resumes this lane, first in line.
 
-It is one engineering workspace, and everything in it cross-probes. Select anything and it lights up in every pane.
+## Where it stopped
 
-- **Left: the project tree.** Systems are the registry's subsystems. Under each system come its devices, then connectors, then pins. The tree can also switch to bundles, then segments, then wires.
-- **Centre: one view at a time.**
-  - Vehicle: top, side and bay in 2D, the 3D bay GLB, and harness-cad's labelled renders.
-  - Connector: the connector face from `pins.json`.
-  - Schematic: a per-circuit block diagram generated from the registry terminations.
-  - Library: the six parts in true CAD, which is the content of the Parts Library page.
-- **Right: structured properties.** Where each value came from sits behind the Sources toggle.
-- **Bottom: linked tables.** Wire list, pin list, connectors, BOM with the cost layer, open items and notes.
-- **Top strip.** First the decisions that need the owner, then coverage.
-- **Kept from earlier versions:** the Ask box (`sample`), notes (`db` and `user`), masking (`$•••`, `order •••`), margins, and parts drawn to size with no dots.
+- **Version 13 is built, not published.**
+  - Builder: branch `wiring/layout-ui`, 17e12ff14.
+  - Screenshots went to the pieces lane (`shots_ws/` in the lane scratchpad). Its go is still pending.
+  - To publish: `python3 build.py`, then publish `site/k5_layout.html` to the URL above with `root=site`, passing every file under `site/`.
+- **What v13 adds over v12:**
+  - Manual view (first tab): each system laid out as a GM service-manual section.
+  - Library and 3D completion from `nuke_frontend/public/wiring/part-models/index.json`, read from the audited branch first, then main. That is 47 parts; 23 of 179 ends are modelled.
+  - Pins scoped to each end's own pins.json, only the half its wires land on.
+  - A quiet "data on this vehicle" panel (read-only database counts, taken at build time).
+  - A "needs you" strip with money and hands items only.
+  - The firewall plan from #436 as the design state, labelled "proposed, recount pending".
+  - Results, not process: no agent names, proposal pills or check counts in the main view.
+  - Nuke design-book styling: Arial, Courier New, 2 px borders, square corners.
 
-## Build
+## Design notes: the service-manual model (owner, 2026-09-29)
+
+- **No page budget.** Each system gets everything a technician needs, at whatever length that takes.
+- **Every page is pertinent and well made:** figure, callouts, tables and procedure, with no filler.
+- **Built so far:**
+  - contents;
+  - a general description built only from the data;
+  - Fig. n-1 with numbered callouts;
+  - the component legend;
+  - connector identification: end view, then a CAV/CKT/WIRE/FUNCTION/TO table;
+  - the circuit tabulation.
+- **Still to add:** procedure pages. These are the service steps for each system, from the records: build, test and diagnosis. Where no record exists yet, the procedure is left out rather than written up.
+- **One click-through pattern, everywhere:** a click selects. The selection is filled; what links to it is outlined.
+- **Photos** show only when they are the exact part.
+
+## The nuke.ag port: approved, waiting for a slot
+
+The lead approved the scope on 2026-09-29. The port goes into the MAP tab only. Don't code until the pieces lane gives the slot.
+
+**Scope:**
+- `nuke_frontend/src/components/wiring/map/WiringMap.tsx`: its layout becomes tree, one centre view, properties, linked tables.
+- New files beside it:
+  - WorkspaceTree.tsx
+  - WorkspaceTables.tsx
+  - WorkspaceProps.tsx
+  - useWorkspaceSelection.ts
+  - ZoneModels3D.tsx
+  - SchematicBlock.tsx
+  - PartLibrary.tsx
+  - faceFromRows.ts
+- Reused as they are: useWiringMap, useWiringFacts, MountsPanel, PartPhotos, DevicePhoto, WhereOnTruck, ConnectorFaces, FaceSkin, planGeometry, colorways.
+- Public files:
+  - `public/models/k5-harness-v4-{bay,cab,rear}.glb`: each under 10 MB and scanned for credential strings.
+  - `public/wiring/k5-routes.json` and `public/wiring/k5-positions.json`, written from main by `export_site.py` in this folder.
+
+**The lead's answers:**
+1. **Rows:** reloaded from main at 8dea1962a.
+   - 229 live K5 nodes, BRAKE-WARN-SW included; 7 wires inserted; 44 option rows.
+   - Ends for the new wires are held until `wire_termination_specs.wire_number` is nullable. Show those wires with ends pending. Never fabricate ends.
+2. **Positions:** ship k5-positions.json now. TODO: move positions into harness_endpoints in the next registry pass.
+3. **Tree:** the rows' 8 harness sections.
+4. **3D:** open on the 2D plan and fetch each zone GLB on click, bay first.
+
+**The owner's condition:** "the only thing a real other human may see is the results not the in process slop".
+- The "needs you" strip, open items, decisions and sources show only to the logged-in owner. Use the profile's existing owner check; don't invent one.
+- Logged out, the page shows results only: tree, views, wire and pin lists, coverage.
+- Public JSON carries no prices. Free text from the rows is masked when drawn.
+
+**Done means:**
+- typecheck and build clean;
+- a wiring receipt for this folder (`.claude/rules/wiring-receipt.md`);
+- local screenshots of every view plus phone, logged in and logged out.
+
+Then the lead merges and checks it live, logged out.
+
+## Build and check
 
 ```
 python3 build.py            # snapshots inputs into in/, writes site/k5_layout.html plus site/{v,ph,3d,lib}/
-python3 shot_ws.py shots_ws # headless screenshots of every view and the phone layout
+python3 shot_ws.py shots_ws # headless screenshots: manual, every view, dark, phone, data panel
 python3 test/interact.py    # clicks through every pane and reports page errors
 ```
 
-After building, publish `site/k5_layout.html` to the URL above. Use `root=site` and pass every file under `site/` except the page itself.
+**Inputs:**
+- pieces lane: ends.py, pos.py, footprints.py, anchors.json.
+- main: k5_registry.json, part_media.yaml, mounts.yaml, parts.yaml, tape_list.yaml, the suppliers files.
+- part-model index: the audited branch first, then main.
+- harness-cad: routes.json and the bay GLB.
+- parts-artist: the samples (GLB, pins.json, params.json).
+- this lane: sizes.py, which holds the names, the needs-you items, the firewall plan and the bay findings.
 
-Inputs:
-- From the pieces lane: `ends.py`, `pos.py`, `footprints.py`, `anchors.json`.
-- From main: `k5_registry.json`, `part_media.yaml`, `mounts.yaml`, `part_models.yaml`, `parts.yaml`, `tape_list.yaml` and the suppliers files.
-- From harness-cad: `routes.json` and the bay GLB.
-- From the parts-artist: the samples, which are GLB, `pins.json` and `params.json`. Only the parts listed in the Parts Library's part list are read.
-- From this lane: `sizes.py`, which holds the sourced envelopes, names, the decisions and the bay findings.
-
-Every GLB is scanned for credential strings before it is embedded. The build refuses any GLB that contains one.
-
-## Next
-
-1. **Decision 1.** Link it to the pieces lane's list of the 13 wires once that list is on file. Until then it links only to the bulkheads and the 61-pin.
-2. **Whole-truck 3D.** Swap in harness-cad's zone GLBs when they land. The Vehicle 3D view reads a single GLB now.
-3. **Library.** Add parts as the pieces lane adds them to the Library part list. About 30 more samples, the Deutsch and bulkhead parts among them, are waiting on audit.
-4. **Before any merge.** This folder sits under `docs/wiring/`, so a receipt per `docs/wiring/RECEIPT_FORMAT.md` has to go with it (`.claude/rules/wiring-receipt.md`). None exists yet, because the branch is not merged.
-5. **Retiring pages.** The Parts Library, M130 review and bay sample pages become one-line pointers here. Only the pieces lane touches them, since it published them.
+**Guards on every build:**
+- Every GLB is scanned for credential strings.
+- Order numbers, and marketplace listing numbers named beside an order, are masked.
+- Prices stay only in the cost fields.
