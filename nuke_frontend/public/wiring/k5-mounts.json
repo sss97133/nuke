@@ -1,6 +1,6 @@
 {
  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
- "generated_at": "2026-09-29T15:30Z",
+ "generated_at": "2026-09-29T15:54Z",
  "source": "docs/wiring/calc-data/catalog/mounts.yaml",
  "boxes": [
   {
@@ -344,5 +344,2901 @@
     "A question for Dave. The connector and its spot aren't picked."
    ]
   }
- ]
+ ],
+ "ends": {
+  "CKP": {
+   "id": "CKP",
+   "what": "Crank sensor (58x, grey plug)",
+   "where": "Passenger side of the block, behind the starter",
+   "zone": "engine",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "\"The sensor is a 3 pin plug located behind the starter on the passenger side of the block. ... 58x engines have a GREY connector.\"",
+     "source": "reference_documents/component_drawings/Swap_Specialties_LS_Installation_Instructions.pdf p.5"
+    },
+    {
+     "text": "GM's 6.0L (Gen IV) sensor sheet shows the crankshaft sensor on the engine's right-hand view.",
+     "source": "reference_documents/component_drawings/NHTSA_GM_6.0L_Sensor_Locations.pdf p.2, Fig. 2"
+    }
+   ]
+  },
+  "CMP": {
+   "id": "CMP",
+   "what": "Cam sensor",
+   "where": "Front of the engine, driver side of the timing cover, mid to upper",
+   "zone": "engine",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "\"On 58x engines the factory location is in the front of the block on the mid to upper driver side timing chain cover.\"",
+     "source": "reference_documents/component_drawings/Swap_Specialties_LS_Installation_Instructions.pdf p.5"
+    },
+    {
+     "text": "GM's 6.0L sensor sheet shows the camshaft sensor on the engine's left-hand view.",
+     "source": "reference_documents/component_drawings/NHTSA_GM_6.0L_Sensor_Locations.pdf p.1, Fig. 1"
+    }
+   ]
+  },
+  "KNOCK-1": {
+   "id": "KNOCK-1",
+   "what": "Knock sensor, bank 1",
+   "where": "Driver side of the block (bank 1: cylinders 1, 3, 5, 7)",
+   "zone": "engine",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "\"Gen 4 58x Located on Side of Block\".",
+     "source": "reference_documents/component_drawings/Swap_Specialties_LS_Installation_Instructions.pdf p.4"
+    },
+    {
+     "text": "GM's 6.0L sensor sheet shows a knock sensor on this side.",
+     "source": "reference_documents/component_drawings/NHTSA_GM_6.0L_Sensor_Locations.pdf p.1, Fig. 1 (left-hand view)"
+    },
+    {
+     "text": "Bank 1 is cylinders 1, 3, 5, 7.",
+     "source": "reference_documents/component_drawings/Swap_Specialties_LS_Installation_Instructions.pdf p.4 (O2 bank 1 = cylinders 1, 3, 5, 7)"
+    },
+    {
+     "text": "GM numbers a V8's cylinders from the front: 1, 3, 5 and 7 on the left (driver) bank, 2, 4, 6 and 8 on the right.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.518"
+    }
+   ]
+  },
+  "KNOCK-2": {
+   "id": "KNOCK-2",
+   "what": "Knock sensor, bank 2",
+   "where": "Passenger side of the block (bank 2: cylinders 2, 4, 6, 8)",
+   "zone": "engine",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "\"Gen 4 58x Located on Side of Block\".",
+     "source": "reference_documents/component_drawings/Swap_Specialties_LS_Installation_Instructions.pdf p.4"
+    },
+    {
+     "text": "GM's 6.0L sensor sheet shows a knock sensor on this side.",
+     "source": "reference_documents/component_drawings/NHTSA_GM_6.0L_Sensor_Locations.pdf p.2, Fig. 2 (right-hand view)"
+    },
+    {
+     "text": "Bank 2 is cylinders 2, 4, 6, 8.",
+     "source": "reference_documents/component_drawings/Swap_Specialties_LS_Installation_Instructions.pdf p.4 (O2 bank 1 = cylinders 1, 3, 5, 7)"
+    },
+    {
+     "text": "GM numbers a V8's cylinders from the front: 1, 3, 5 and 7 on the left (driver) bank, 2, 4, 6 and 8 on the right.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.518"
+    }
+   ]
+  },
+  "CLT-ECU": {
+   "id": "CLT-ECU",
+   "what": "Coolant temperature sensor for the M130",
+   "where": "Front of the driver-side cylinder head",
+   "zone": "engine",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "\"The ECT sensor is located in the front of the driver side cylinder head ... the same location on all LS style engines.\"",
+     "source": "reference_documents/component_drawings/Swap_Specialties_LS_Installation_Instructions.pdf p.6"
+    },
+    {
+     "text": "GM's 6.0L sensor sheet shows the coolant temperature sensor on the engine's left-hand view.",
+     "source": "reference_documents/component_drawings/NHTSA_GM_6.0L_Sensor_Locations.pdf p.1, Fig. 1"
+    }
+   ]
+  },
+  "DAK-CTS": {
+   "id": "DAK-CTS",
+   "what": "Dakota temperature sender (SEN-04-5)",
+   "where": "Rear of the passenger-side cylinder head, in its spare port",
+   "zone": "engine",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "\"There is a port in the back of the Passenger head you can use for your Temp Gauge!\" It keeps the gauge sender off the M130's sensor.",
+     "source": "reference_documents/component_drawings/Swap_Specialties_LS_Installation_Instructions.pdf p.6"
+    },
+    {
+     "text": "The sender is 1/8 NPT, two-wire.",
+     "source": "reference_documents/component_drawings/dakota_digital_vhx_manual.pdf p.9 (650314:P)"
+    }
+   ],
+   "open": [
+    "The port's thread against the sender's 1/8 NPT (adapter or not): read it on the head."
+   ]
+  },
+  "OILP-ECU": {
+   "id": "OILP-ECU",
+   "what": "Oil pressure sensor for the M130 (Gen IV round 3-pin)",
+   "where": "Upper rear of the engine, in the factory oil pressure port",
+   "zone": "engine",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "\"... the existing oil pressure sensor location at the upper rear of the engine ...\"",
+     "source": "reference_documents/component_drawings/LS3_EROD_Installation_Guide.pdf p.7"
+    },
+    {
+     "text": "GM's 6.0L sensor sheet shows the oil pressure sensor on the engine's right-hand view.",
+     "source": "reference_documents/component_drawings/NHTSA_GM_6.0L_Sensor_Locations.pdf p.2, Fig. 2"
+    }
+   ]
+  },
+  "DAK-OILP": {
+   "id": "DAK-OILP",
+   "what": "Dakota oil pressure sender (SEN-03-8)",
+   "where": "Not placed: a tee at the factory oil pressure port, or a port on the oil cooler adapter",
+   "zone": "engine",
+   "status": "open",
+   "why": [
+    {
+     "text": "The factory port is at the upper rear of the engine and already holds the M130's sensor.",
+     "source": "reference_documents/component_drawings/LS3_EROD_Installation_Guide.pdf p.7"
+    },
+    {
+     "text": "The Dakota gauge needs its own sender.",
+     "source": "reference_documents/component_drawings/dakota_digital_vhx_manual.pdf p.9 (650314:P)"
+    }
+   ],
+   "open": [
+    "Pick the tee or a cooler-adapter port."
+   ]
+  },
+  "OILT": {
+   "id": "OILT",
+   "what": "Oil temperature sensor",
+   "where": "Not placed: it goes in a port on the oil cooler adapter",
+   "zone": "engine",
+   "status": "open",
+   "why": [
+    {
+     "text": "The owner's build log lists an oil cooler with no part number, so the adapter and its ports are not known.",
+     "source": "vehicle_observations (K5 build log, 'Oil cooler')"
+    },
+    {
+     "text": "The registry names only its plug (GT150 2-way, same family as the coolant sensor).",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml OILT"
+    }
+   ],
+   "open": [
+    "Name the oil cooler and its adapter; the sensor thread follows the port."
+   ]
+  },
+  "MAP": {
+   "id": "MAP",
+   "what": "MAP sensor (Holley 538-24, 1 bar)",
+   "where": "Off the engine, bolted by its two ears near the rear of the intake, on a short vacuum hose to the intake's MAP port",
+   "zone": "engine",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "Holley recommends the 538-24 for both its LS intake families.",
+     "source": "Holley 199R10689 (300-129/130) and 199R10690 (300-131/132/136/137)"
+    },
+    {
+     "text": "The 300-129 has a 1/8 NPT MAP port; the 300-131/136 sheet lists only a 3/8 NPT vacuum port.",
+     "source": "Holley 199R10689 and 199R10690, Dimensions"
+    },
+    {
+     "text": "MoTeC's Delco MAP drawing gives the pins: A 0 V, B signal, C +5 V.",
+     "source": "MoTeC WD 53000-53003 (drawing X18)"
+    }
+   ],
+   "open": [
+    "Which Holley intake is on the engine (state 0ag(g)) sets the port and the hose barb.",
+    "The bracket spot: read it at the mock-up."
+   ]
+  },
+  "IAT": {
+   "id": "IAT",
+   "what": "Intake air temperature sensor (GM 12160244)",
+   "where": "In the air inlet tube ahead of the throttle body, pushed into a GM 24504388 grommet",
+   "zone": "engine",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "The GM 24504388 grommet \"is used with the LS1 Camaro/Firebird air boxes. An excellent solution for engine swaps when a custom air intake is used.\"",
+     "source": "eficonnection.com, Grommet GM# 24504388"
+    },
+    {
+     "text": "12160244 is the sensor that fits the registry's GT150 plug (15449027).",
+     "source": "docs/wiring/calc-data/catalog/part_media.yaml IAT"
+    }
+   ],
+   "open": [
+    "The inlet tube is not built: the hole goes in it once it is."
+   ]
+  },
+  "TB": {
+   "id": "TB",
+   "what": "Throttle body (GM 12699160)",
+   "where": "On the intake's carburettor flange, through the Delmo 4-bolt adapter",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Delmo Speed shipped an \"LS3 4-Bolt Throttle Body Adapter\" in October 2024.",
+     "source": "vehicle_observations parts_purchase (Delmo Speed, 2024-10-02)"
+    },
+    {
+     "text": "The 2026-02-01 photo shows the throttle body set on the intake for the mock-up; it is not bolted down.",
+     "source": "vehicle_observations device proof TB (2026-09-27)"
+    }
+   ],
+   "open": [
+    "The mounting bolts were never found (owner)."
+   ]
+  },
+  "INJ-1": {
+   "id": "INJ-1",
+   "what": "Injector 1 (Siemens Deka FI114961)",
+   "where": "Intake runner for cylinder 1, driver bank, under the fuel rail",
+   "zone": "engine",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "GM numbers a V8's cylinders from the front: 1, 3, 5 and 7 on the left (driver) bank, 2, 4, 6 and 8 on the right.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.518"
+    },
+    {
+     "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
+     "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    }
+   ],
+   "open": [
+    "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
+   ]
+  },
+  "INJ-2": {
+   "id": "INJ-2",
+   "what": "Injector 2 (Siemens Deka FI114961)",
+   "where": "Intake runner for cylinder 2, passenger bank, under the fuel rail",
+   "zone": "engine",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "GM numbers a V8's cylinders from the front: 1, 3, 5 and 7 on the left (driver) bank, 2, 4, 6 and 8 on the right.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.518"
+    },
+    {
+     "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
+     "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    }
+   ],
+   "open": [
+    "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
+   ]
+  },
+  "INJ-3": {
+   "id": "INJ-3",
+   "what": "Injector 3 (Siemens Deka FI114961)",
+   "where": "Intake runner for cylinder 3, driver bank, under the fuel rail",
+   "zone": "engine",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "GM numbers a V8's cylinders from the front: 1, 3, 5 and 7 on the left (driver) bank, 2, 4, 6 and 8 on the right.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.518"
+    },
+    {
+     "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
+     "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    }
+   ],
+   "open": [
+    "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
+   ]
+  },
+  "INJ-4": {
+   "id": "INJ-4",
+   "what": "Injector 4 (Siemens Deka FI114961)",
+   "where": "Intake runner for cylinder 4, passenger bank, under the fuel rail",
+   "zone": "engine",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "GM numbers a V8's cylinders from the front: 1, 3, 5 and 7 on the left (driver) bank, 2, 4, 6 and 8 on the right.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.518"
+    },
+    {
+     "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
+     "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    }
+   ],
+   "open": [
+    "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
+   ]
+  },
+  "INJ-5": {
+   "id": "INJ-5",
+   "what": "Injector 5 (Siemens Deka FI114961)",
+   "where": "Intake runner for cylinder 5, driver bank, under the fuel rail",
+   "zone": "engine",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "GM numbers a V8's cylinders from the front: 1, 3, 5 and 7 on the left (driver) bank, 2, 4, 6 and 8 on the right.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.518"
+    },
+    {
+     "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
+     "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    }
+   ],
+   "open": [
+    "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
+   ]
+  },
+  "INJ-6": {
+   "id": "INJ-6",
+   "what": "Injector 6 (Siemens Deka FI114961)",
+   "where": "Intake runner for cylinder 6, passenger bank, under the fuel rail",
+   "zone": "engine",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "GM numbers a V8's cylinders from the front: 1, 3, 5 and 7 on the left (driver) bank, 2, 4, 6 and 8 on the right.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.518"
+    },
+    {
+     "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
+     "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    }
+   ],
+   "open": [
+    "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
+   ]
+  },
+  "INJ-7": {
+   "id": "INJ-7",
+   "what": "Injector 7 (Siemens Deka FI114961)",
+   "where": "Intake runner for cylinder 7, driver bank, under the fuel rail",
+   "zone": "engine",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "GM numbers a V8's cylinders from the front: 1, 3, 5 and 7 on the left (driver) bank, 2, 4, 6 and 8 on the right.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.518"
+    },
+    {
+     "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
+     "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    }
+   ],
+   "open": [
+    "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
+   ]
+  },
+  "INJ-8": {
+   "id": "INJ-8",
+   "what": "Injector 8 (Siemens Deka FI114961)",
+   "where": "Intake runner for cylinder 8, passenger bank, under the fuel rail",
+   "zone": "engine",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "GM numbers a V8's cylinders from the front: 1, 3, 5 and 7 on the left (driver) bank, 2, 4, 6 and 8 on the right.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.518"
+    },
+    {
+     "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
+     "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    }
+   ],
+   "open": [
+    "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
+   ]
+  },
+  "COIL-1": {
+   "id": "COIL-1",
+   "what": "Ignition coil 1 (ACDelco D510C)",
+   "where": "On the DEL-Stributor bracket at the rear centre of the intake, with the other seven",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Coil bracket: DEL-Stributor, central mount, 8 x D510C (locked).",
+     "source": "docs/wiring/K5_WIRING_STATE.md §1 row 30"
+    },
+    {
+     "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
+     "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    }
+   ],
+   "open": [
+    "Which coil sits where in the cluster: read it off the bracket."
+   ]
+  },
+  "COIL-2": {
+   "id": "COIL-2",
+   "what": "Ignition coil 2 (ACDelco D510C)",
+   "where": "On the DEL-Stributor bracket at the rear centre of the intake, with the other seven",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Coil bracket: DEL-Stributor, central mount, 8 x D510C (locked).",
+     "source": "docs/wiring/K5_WIRING_STATE.md §1 row 30"
+    },
+    {
+     "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
+     "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    }
+   ],
+   "open": [
+    "Which coil sits where in the cluster: read it off the bracket."
+   ]
+  },
+  "COIL-3": {
+   "id": "COIL-3",
+   "what": "Ignition coil 3 (ACDelco D510C)",
+   "where": "On the DEL-Stributor bracket at the rear centre of the intake, with the other seven",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Coil bracket: DEL-Stributor, central mount, 8 x D510C (locked).",
+     "source": "docs/wiring/K5_WIRING_STATE.md §1 row 30"
+    },
+    {
+     "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
+     "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    }
+   ],
+   "open": [
+    "Which coil sits where in the cluster: read it off the bracket."
+   ]
+  },
+  "COIL-4": {
+   "id": "COIL-4",
+   "what": "Ignition coil 4 (ACDelco D510C)",
+   "where": "On the DEL-Stributor bracket at the rear centre of the intake, with the other seven",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Coil bracket: DEL-Stributor, central mount, 8 x D510C (locked).",
+     "source": "docs/wiring/K5_WIRING_STATE.md §1 row 30"
+    },
+    {
+     "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
+     "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    }
+   ],
+   "open": [
+    "Which coil sits where in the cluster: read it off the bracket."
+   ]
+  },
+  "COIL-5": {
+   "id": "COIL-5",
+   "what": "Ignition coil 5 (ACDelco D510C)",
+   "where": "On the DEL-Stributor bracket at the rear centre of the intake, with the other seven",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Coil bracket: DEL-Stributor, central mount, 8 x D510C (locked).",
+     "source": "docs/wiring/K5_WIRING_STATE.md §1 row 30"
+    },
+    {
+     "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
+     "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    }
+   ],
+   "open": [
+    "Which coil sits where in the cluster: read it off the bracket."
+   ]
+  },
+  "COIL-6": {
+   "id": "COIL-6",
+   "what": "Ignition coil 6 (ACDelco D510C)",
+   "where": "On the DEL-Stributor bracket at the rear centre of the intake, with the other seven",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Coil bracket: DEL-Stributor, central mount, 8 x D510C (locked).",
+     "source": "docs/wiring/K5_WIRING_STATE.md §1 row 30"
+    },
+    {
+     "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
+     "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    }
+   ],
+   "open": [
+    "Which coil sits where in the cluster: read it off the bracket."
+   ]
+  },
+  "COIL-7": {
+   "id": "COIL-7",
+   "what": "Ignition coil 7 (ACDelco D510C)",
+   "where": "On the DEL-Stributor bracket at the rear centre of the intake, with the other seven",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Coil bracket: DEL-Stributor, central mount, 8 x D510C (locked).",
+     "source": "docs/wiring/K5_WIRING_STATE.md §1 row 30"
+    },
+    {
+     "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
+     "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    }
+   ],
+   "open": [
+    "Which coil sits where in the cluster: read it off the bracket."
+   ]
+  },
+  "COIL-8": {
+   "id": "COIL-8",
+   "what": "Ignition coil 8 (ACDelco D510C)",
+   "where": "On the DEL-Stributor bracket at the rear centre of the intake, with the other seven",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Coil bracket: DEL-Stributor, central mount, 8 x D510C (locked).",
+     "source": "docs/wiring/K5_WIRING_STATE.md §1 row 30"
+    },
+    {
+     "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
+     "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    }
+   ],
+   "open": [
+    "Which coil sits where in the cluster: read it off the bracket."
+   ]
+  },
+  "RAIL-COIL_PWR": {
+   "id": "RAIL-COIL_PWR",
+   "what": "Coil power rail (16 AWG, daisy-chained)",
+   "where": "Along the coil cluster on the DEL-Stributor bracket",
+   "zone": "engine",
+   "status": "proposed",
+   "follows": "COIL-1",
+   "why": [
+    {
+     "text": "It is daisy-chained to the 8 coil power pins.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml RAIL-COIL_PWR"
+    }
+   ]
+  },
+  "RAIL-INJ_PWR": {
+   "id": "RAIL-INJ_PWR",
+   "what": "Injector power rail (16 AWG, daisy-chained)",
+   "where": "Along the fuel rails, one tap per injector",
+   "zone": "engine",
+   "status": "proposed",
+   "follows": "INJ-1",
+   "why": [
+    {
+     "text": "It is daisy-chained at the fuel rail to the 8 injector pin 1s.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml RAIL-INJ_PWR"
+    }
+   ]
+  },
+  "COIL-GROUND-RINGS": {
+   "id": "COIL-GROUND-RINGS",
+   "what": "Ring terminals for the coil grounds",
+   "where": "Back of the cylinder heads, one bolt position on each",
+   "zone": "engine",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "\"This eyelet needs to be fastened to the back of the cylinder head.\"",
+     "source": "reference_documents/component_drawings/Swap_Specialties_LS_Installation_Instructions.pdf p.4"
+    },
+    {
+     "text": "Dave's sheet runs the coil a and b grounds to a head ring terminal.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml COIL-GROUND-RINGS"
+    }
+   ],
+   "open": [
+    "The bolt and thread at the head set the ring size (RING-SMALL is open)."
+   ]
+  },
+  "FUELP": {
+   "id": "FUELP",
+   "what": "Fuel pressure sensor (AEM 30-2131-100, 1/8 NPT)",
+   "where": "Not placed: a 1/8 NPT port on the fuel rail or the regulator",
+   "zone": "engine",
+   "status": "open",
+   "why": [
+    {
+     "text": "The sensor is 1/8 NPT.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml FUELP"
+    },
+    {
+     "text": "The spot behind the intake that the DEL-Stributor needs holds the Aeromotive regulator in photo IMG_6531.",
+     "source": "docs/wiring/K5_WIRING_STATE.md 0ag(h)"
+    }
+   ],
+   "open": [
+    "Where the regulator ends up decides the port."
+   ]
+  },
+  "ALTERNATOR-SENSE": {
+   "id": "ALTERNATOR-SENSE",
+   "what": "Alternator (Holley 197-302), sense plug",
+   "where": "Driver side of the engine, on the Holley mid-mount bracket",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "\"The Holley driver's side bracket uses standard alternators with 5.46\" bolt spacing.\"",
+     "source": "reference_documents/component_drawings/holley_midmount_fitment.pdf p.15"
+    },
+    {
+     "text": "Mounted on the Holley mid-mount drive with the belt on.",
+     "source": "vehicle_observations device proof ALTERNATOR-SENSE"
+    }
+   ]
+  },
+  "STARTER-S": {
+   "id": "STARTER-S",
+   "what": "Starter (trigger terminal)",
+   "where": "Passenger side of the block",
+   "zone": "engine",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "The crank sensor sits \"behind the starter on the passenger side of the block\", which puts the starter on the passenger side.",
+     "source": "reference_documents/component_drawings/Swap_Specialties_LS_Installation_Instructions.pdf p.5"
+    }
+   ],
+   "open": [
+    "The starter model is not recorded."
+   ]
+  },
+  "AC-CLUTCH": {
+   "id": "AC-CLUTCH",
+   "what": "A/C compressor clutch (Sanden SD7)",
+   "where": "Passenger side of the engine, on the Holley mid-mount A/C bracket",
+   "zone": "engine",
+   "status": "open",
+   "why": [
+    {
+     "text": "Holley's mid-mount A/C bracket is the passenger's side bracket.",
+     "source": "reference_documents/component_drawings/holley_midmount_fitment.pdf p.7, p.10"
+    },
+    {
+     "text": "The Holley mid-mount A/C bracket is in a box in the truck (kit mix-up being resolved).",
+     "source": "docs/wiring/K5_WIRING_STATE.md §1 row 52"
+    }
+   ],
+   "open": [
+    "The bracket is not on the engine yet; its fit with the SD7 is unconfirmed."
+   ]
+  },
+  "AC-HP-SW": {
+   "id": "AC-HP-SW",
+   "what": "A/C high-pressure switch",
+   "where": "On the A/C liquid line",
+   "zone": "engine",
+   "status": "open",
+   "why": [
+    {
+     "text": "It is the liquid-line switch.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml AC-HP-SW"
+    }
+   ],
+   "open": [
+    "The A/C lines are not plumbed: the spot follows them."
+   ]
+  },
+  "AC-LP-SW": {
+   "id": "AC-LP-SW",
+   "what": "A/C low-pressure switch",
+   "where": "On the accumulator",
+   "zone": "engine",
+   "status": "open",
+   "why": [
+    {
+     "text": "It is the accumulator switch.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml AC-LP-SW"
+    }
+   ],
+   "open": [
+    "The accumulator's spot is not set."
+   ]
+  },
+  "FAN": {
+   "id": "FAN",
+   "what": "Radiator fan (SPAL 30107090, 16 in brushless puller)",
+   "where": "On the engine side of the radiator core",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "It is a drop-in puller for the radiator.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml FAN"
+    }
+   ]
+  },
+  "FAN-JUNCTION": {
+   "id": "FAN-JUNCTION",
+   "what": "Fan feed junction (Blue Sea 2103 PowerPost)",
+   "where": "Near the engine power box, where the fan leads break out",
+   "zone": "engine",
+   "status": "open",
+   "follows": "PDM15",
+   "why": [
+    {
+     "text": "It joins the two 12 AWG feed legs from the engine power box to the fan's one terminal.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml FAN-JUNCTION"
+    }
+   ],
+   "open": [
+    "It follows the engine power box, which is flagged."
+   ]
+  },
+  "IBOOSTER": {
+   "id": "IBOOSTER",
+   "what": "Brake booster (Bosch iBooster Gen 1)",
+   "where": "Driver side of the firewall, on the factory booster pad",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Installed: driver firewall, factory pad, adapter and custom master cylinder, twin reservoirs.",
+     "source": "docs/wiring/K5_WIRING_STATE.md §4 (iBooster footprint, confirmed 2026-06-09)"
+    }
+   ]
+  },
+  "IBST-DIAG": {
+   "id": "IBST-DIAG",
+   "what": "iBooster diagnostic port (DTM 4-way)",
+   "where": "Beside the booster, reachable with the hood up",
+   "zone": "engine",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "A sealed port near the booster for a USB CAN logger.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml IBST-DIAG"
+    }
+   ]
+  },
+  "BRAKE-FLUID-LVL": {
+   "id": "BRAKE-FLUID-LVL",
+   "what": "Brake-fluid level sensor (candidate)",
+   "where": "In the iBooster's fluid reservoir",
+   "zone": "engine",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "The sensor is part of the booster's reservoir.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml BRAKE-FLUID-LVL"
+    }
+   ],
+   "open": [
+    "It is an option, not decided."
+   ]
+  },
+  "WIDEBAND": {
+   "id": "WIDEBAND",
+   "what": "Lambda controller (MoTeC LTCD) and two sensors",
+   "where": "Under the truck, on the inside of a frame rail near the two O2 bungs",
+   "zone": "underbody",
+   "status": "proposed",
+   "follows": "LTCD",
+   "why": [
+    {
+     "text": "See the LTCD box.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) LTCD"
+    }
+   ],
+   "open": [
+    "The exhaust is not built, so the bungs are not placed."
+   ]
+  },
+  "HEADLIGHT-L": {
+   "id": "HEADLIGHT-L",
+   "what": "Left headlight (Truck-Lite 27270C, 7 in round)",
+   "where": "Front, left headlamp bucket; the plug is at the back of the lamp, engine side",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Front lighting, C-K models: the headlamp in its bezel.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.785, Fig. 8-3"
+    },
+    {
+     "text": "\"Disconnect wiring harness connector located at rear of unit in engine compartment.\"",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786"
+    }
+   ]
+  },
+  "HEADLIGHT-R": {
+   "id": "HEADLIGHT-R",
+   "what": "Right headlight (Truck-Lite 27270C)",
+   "where": "Front, right headlamp bucket; the plug is at the back of the lamp, engine side",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Front lighting, C-K models: the headlamp in its bezel.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.785, Fig. 8-3"
+    },
+    {
+     "text": "\"Disconnect wiring harness connector located at rear of unit in engine compartment.\"",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786"
+    }
+   ]
+  },
+  "PARK-TURN-LF": {
+   "id": "PARK-TURN-LF",
+   "what": "Left front park/turn lamp (1157)",
+   "where": "Front, left, the rectangular parking lamp below the headlamp",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Front lighting, C-K models: the parking lamp sits below the headlamp.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.785, Fig. 8-3"
+    },
+    {
+     "text": "Parking lamp: \"Remove two screws and parking lamp lens ... Remove housing stud nuts and remove housing with pigtail.\"",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786"
+    }
+   ]
+  },
+  "MARKER-LF": {
+   "id": "MARKER-LF",
+   "what": "Left front side marker",
+   "where": "Front fender, left side, the side marker lamp",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Front lighting, C-K models: the side marker on the fender.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.785, Fig. 8-3"
+    },
+    {
+     "text": "Front side marker lamp replacement.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786"
+    }
+   ]
+  },
+  "PARK-TURN-RF": {
+   "id": "PARK-TURN-RF",
+   "what": "Right front park/turn lamp (1157)",
+   "where": "Front, right, the rectangular parking lamp below the headlamp",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Front lighting, C-K models: the parking lamp sits below the headlamp.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.785, Fig. 8-3"
+    },
+    {
+     "text": "Parking lamp: \"Remove two screws and parking lamp lens ... Remove housing stud nuts and remove housing with pigtail.\"",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786"
+    }
+   ]
+  },
+  "MARKER-RF": {
+   "id": "MARKER-RF",
+   "what": "Right front side marker",
+   "where": "Front fender, right side, the side marker lamp",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Front lighting, C-K models: the side marker on the fender.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.785, Fig. 8-3"
+    },
+    {
+     "text": "Front side marker lamp replacement.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786"
+    }
+   ]
+  },
+  "HORN": {
+   "id": "HORN",
+   "what": "Horn (factory)",
+   "where": "On the radiator support",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The front sheet metal comes off \"with radiator, battery, horn and voltage regulator attached\".",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.121"
+    }
+   ],
+   "open": [
+    "Which side of the support: read it on the truck."
+   ]
+  },
+  "WIPER-MOTOR": {
+   "id": "WIPER-MOTOR",
+   "what": "Wiper motor (factory 2-speed)",
+   "where": "On the cowl, engine side of the firewall, at the factory wiper hole",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The factory 2-speed wiper motor, its terminal board and park switch.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.802-803, p.810"
+    },
+    {
+     "text": "The factory wiper motor hole is under the cowl.",
+     "source": "nuke_frontend/src/components/wiring/objectTraits.ts factory_holes WP"
+    }
+   ]
+  },
+  "WASHER-PUMP": {
+   "id": "WASHER-PUMP",
+   "what": "Washer pump (Hella 8TW 004 223-031) in its tank",
+   "where": "Not placed: the Hella tank's spot is not picked",
+   "zone": "engine",
+   "status": "open",
+   "why": [
+    {
+     "text": "The factory pump rode on the wiper motor; this build uses a Hella pump in a Hella tank.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.803, Fig. 8-16; docs/wiring/calc-data/catalog/endpoints.yaml WASHER-PUMP"
+    }
+   ],
+   "open": [
+    "Pick the tank spot (inner fender or core support)."
+   ]
+  },
+  "BLOWER-MOTOR": {
+   "id": "BLOWER-MOTOR",
+   "what": "Blower motor (4 Seasons 35587)",
+   "where": "In the Four-Season blower-evaporator case, engine side of the passenger firewall",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The factory Four-Season housing is kept.",
+     "source": "docs/wiring/K5_WIRING_STATE.md §1 row 40"
+    },
+    {
+     "text": "The retained A/C box mounts at the passenger firewall corner.",
+     "source": "docs/wiring/receipts/2026-09-29_where-each-box-goes.md, finding 3"
+    }
+   ]
+  },
+  "BLOWER-RES": {
+   "id": "BLOWER-RES",
+   "what": "Blower resistor (factory)",
+   "where": "On the blower-evaporator case, engine side of the passenger firewall",
+   "zone": "engine",
+   "status": "decided",
+   "why": [
+    {
+     "text": "\"The blower motor resistor is located in the blower ... case\"; the relay is \"on the blower side of the blower-evaporator case\".",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.87-88"
+    },
+    {
+     "text": "The retained A/C box mounts at the passenger firewall corner.",
+     "source": "docs/wiring/receipts/2026-09-29_where-each-box-goes.md, finding 3"
+    }
+   ]
+  },
+  "UNDERHOOD-LAMP": {
+   "id": "UNDERHOOD-LAMP",
+   "what": "Underhood lamp",
+   "where": "Not placed: the factory spot was not found in the 1977 manual text",
+   "zone": "engine",
+   "status": "open",
+   "why": [
+    {
+     "text": "The registry has a factory underhood lamp with one feed lead and a 93 bulb.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml UNDERHOOD-LAMP"
+    }
+   ],
+   "open": [
+    "Read the factory spot on the truck, or pick one under the hood."
+   ]
+  },
+  "ODYSSEY": {
+   "id": "ODYSSEY",
+   "what": "Running battery (Odyssey AGM)",
+   "where": "Engine bay, in the battery corner (the working position is the passenger firewall corner)",
+   "zone": "engine",
+   "status": "open",
+   "follows": "BATTERIES",
+   "why": [
+    {
+     "text": "See the BATTERIES box.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) BATTERIES"
+    }
+   ],
+   "open": [
+    "The battery corner conflicts with the Four-Season box: see the BATTERIES box."
+   ]
+  },
+  "ACC-BATT": {
+   "id": "ACC-BATT",
+   "what": "Accessory battery (Optima YellowTop)",
+   "where": "Engine bay, in the battery corner (the working position is the passenger firewall corner)",
+   "zone": "engine",
+   "status": "open",
+   "follows": "BATTERIES",
+   "why": [
+    {
+     "text": "See the BATTERIES box.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) BATTERIES"
+    }
+   ],
+   "open": [
+    "The battery corner conflicts with the Four-Season box: see the BATTERIES box."
+   ]
+  },
+  "ISOLATOR": {
+   "id": "ISOLATOR",
+   "what": "Battery isolator (Blue Sea 7700)",
+   "where": "Engine bay, on the Odyssey's positive cable as close to the battery as it fits",
+   "zone": "engine",
+   "status": "decided",
+   "follows": "ISOLATOR",
+   "why": [
+    {
+     "text": "See the ISOLATOR box.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) ISOLATOR"
+    }
+   ]
+  },
+  "DCDC": {
+   "id": "DCDC",
+   "what": "DC-DC charger (Victron Orion-Tr 12/12-30)",
+   "where": "By the batteries in the current design, which breaks Victron's rule",
+   "zone": "engine",
+   "status": "flag",
+   "follows": "DCDC",
+   "why": [
+    {
+     "text": "See the DCDC box.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) DCDC"
+    }
+   ],
+   "open": [
+    "Victron: keep it dry. See the DCDC box."
+   ]
+  },
+  "GND-BANK-ENG": {
+   "id": "GND-BANK-ENG",
+   "what": "Engine ground star (stud bank)",
+   "where": "Beside the batteries",
+   "zone": "engine",
+   "status": "open",
+   "follows": "BATTERIES",
+   "why": [
+    {
+     "text": "The ground star is a stud bank beside the batteries: both battery negatives, the block and the frame land on it.",
+     "source": "docs/wiring/K5_WIRING_STATE.md §1 (grounds run in the loom, 2026-09-27)"
+    }
+   ],
+   "open": [
+    "It follows the batteries, which are open."
+   ]
+  },
+  "PS-STUDS": {
+   "id": "PS-STUDS",
+   "what": "DC primary cable ends",
+   "where": "At the batteries, the isolator, the distribution stud, the starter, the alternator, the block, the frame and the power boxes",
+   "zone": "engine",
+   "status": "open",
+   "follows": "BATTERIES",
+   "why": [
+    {
+     "text": "The DC primary table lists each cable end.",
+     "source": "build book 'DC primary' table; docs/wiring/K5_WIRING_STATE.md 0i"
+    }
+   ],
+   "open": [
+    "They follow the batteries and the power boxes."
+   ]
+  },
+  "FUSE-IBOOST_PERM": {
+   "id": "FUSE-IBOOST_PERM",
+   "what": "In-line fuse, iBooster permanent feed",
+   "where": "At the battery end of its feed, in the battery corner",
+   "zone": "engine",
+   "status": "proposed",
+   "follows": "BATTERIES",
+   "why": [
+    {
+     "text": "A fuse goes at the source end of the wire it protects.",
+     "source": "docs/wiring/research/2026-06-10_power_spine_builders_study.md §2"
+    }
+   ],
+   "open": [
+    "It follows the batteries."
+   ]
+  },
+  "FUSE-ISO_PWR": {
+   "id": "FUSE-ISO_PWR",
+   "what": "In-line fuse, isolator power",
+   "where": "At the battery end of its feed, in the battery corner",
+   "zone": "engine",
+   "status": "proposed",
+   "follows": "BATTERIES",
+   "why": [
+    {
+     "text": "A fuse goes at the source end of the wire it protects.",
+     "source": "docs/wiring/research/2026-06-10_power_spine_builders_study.md §2"
+    }
+   ],
+   "open": [
+    "It follows the batteries."
+   ]
+  },
+  "FUSE-ISO_SW_PWR": {
+   "id": "FUSE-ISO_SW_PWR",
+   "what": "In-line fuse, isolator switch power",
+   "where": "At the battery end of its feed, in the battery corner",
+   "zone": "engine",
+   "status": "proposed",
+   "follows": "BATTERIES",
+   "why": [
+    {
+     "text": "A fuse goes at the source end of the wire it protects.",
+     "source": "docs/wiring/research/2026-06-10_power_spine_builders_study.md §2"
+    }
+   ],
+   "open": [
+    "It follows the batteries."
+   ]
+  },
+  "PDM15-A": {
+   "id": "PDM15-A",
+   "what": "Engine power box (MoTeC PDM15), plug A",
+   "where": "In the engine bay in the current design, which breaks MoTeC's spec",
+   "zone": "engine",
+   "status": "flag",
+   "follows": "PDM15",
+   "why": [
+    {
+     "text": "See the PDM15 box: the PDM15 case is not sealed.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) PDM15"
+    }
+   ],
+   "open": [
+    "A sealed PDM16 or PDM32 in the bay, or the box moves to the cab."
+   ]
+  },
+  "PDM15-B": {
+   "id": "PDM15-B",
+   "what": "Engine power box (MoTeC PDM15), plug B",
+   "where": "In the engine bay in the current design, which breaks MoTeC's spec",
+   "zone": "engine",
+   "status": "flag",
+   "follows": "PDM15",
+   "why": [
+    {
+     "text": "See the PDM15 box: the PDM15 case is not sealed.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) PDM15"
+    }
+   ],
+   "open": [
+    "A sealed PDM16 or PDM32 in the bay, or the box moves to the cab."
+   ]
+  },
+  "PDM15-STUD": {
+   "id": "PDM15-STUD",
+   "what": "Engine power box (MoTeC PDM15), battery stud",
+   "where": "In the engine bay in the current design, which breaks MoTeC's spec",
+   "zone": "engine",
+   "status": "flag",
+   "follows": "PDM15",
+   "why": [
+    {
+     "text": "See the PDM15 box: the PDM15 case is not sealed.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) PDM15"
+    }
+   ],
+   "open": [
+    "A sealed PDM16 or PDM32 in the bay, or the box moves to the cab."
+   ]
+  },
+  "SPL-PDM15-OUT1": {
+   "id": "SPL-PDM15-OUT1",
+   "what": "Pigtail splice at the engine power box (OUT1)",
+   "where": "At the engine power box's plug",
+   "zone": "engine",
+   "status": "open",
+   "follows": "PDM15",
+   "why": [
+    {
+     "text": "The splice sits a hand-width from the plug it serves.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT1"
+    }
+   ],
+   "open": [
+    "It moves with the engine power box."
+   ]
+  },
+  "SPL-PDM15-OUT2": {
+   "id": "SPL-PDM15-OUT2",
+   "what": "Pigtail splice at the engine power box (OUT2)",
+   "where": "At the engine power box's plug",
+   "zone": "engine",
+   "status": "open",
+   "follows": "PDM15",
+   "why": [
+    {
+     "text": "The splice sits a hand-width from the plug it serves.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT2"
+    }
+   ],
+   "open": [
+    "It moves with the engine power box."
+   ]
+  },
+  "SPL-PDM15-OUT3": {
+   "id": "SPL-PDM15-OUT3",
+   "what": "Pigtail splice at the engine power box (OUT3)",
+   "where": "At the engine power box's plug",
+   "zone": "engine",
+   "status": "open",
+   "follows": "PDM15",
+   "why": [
+    {
+     "text": "The splice sits a hand-width from the plug it serves.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT3"
+    }
+   ],
+   "open": [
+    "It moves with the engine power box."
+   ]
+  },
+  "SPL-PDM15-OUT4": {
+   "id": "SPL-PDM15-OUT4",
+   "what": "Pigtail splice at the engine power box (OUT4)",
+   "where": "At the engine power box's plug",
+   "zone": "engine",
+   "status": "open",
+   "follows": "PDM15",
+   "why": [
+    {
+     "text": "The splice sits a hand-width from the plug it serves.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT4"
+    }
+   ],
+   "open": [
+    "It moves with the engine power box."
+   ]
+  },
+  "SPL-PDM15-OUT5": {
+   "id": "SPL-PDM15-OUT5",
+   "what": "Pigtail splice at the engine power box (OUT5)",
+   "where": "At the engine power box's plug",
+   "zone": "engine",
+   "status": "open",
+   "follows": "PDM15",
+   "why": [
+    {
+     "text": "The splice sits a hand-width from the plug it serves.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT5"
+    }
+   ],
+   "open": [
+    "It moves with the engine power box."
+   ]
+  },
+  "SPL-PDM15-OUT6": {
+   "id": "SPL-PDM15-OUT6",
+   "what": "Pigtail splice at the engine power box (OUT6)",
+   "where": "At the engine power box's plug",
+   "zone": "engine",
+   "status": "open",
+   "follows": "PDM15",
+   "why": [
+    {
+     "text": "The splice sits a hand-width from the plug it serves.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT6"
+    }
+   ],
+   "open": [
+    "It moves with the engine power box."
+   ]
+  },
+  "SPL-PDM15-OUT7": {
+   "id": "SPL-PDM15-OUT7",
+   "what": "Pigtail splice at the engine power box (OUT7)",
+   "where": "At the engine power box's plug",
+   "zone": "engine",
+   "status": "open",
+   "follows": "PDM15",
+   "why": [
+    {
+     "text": "The splice sits a hand-width from the plug it serves.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT7"
+    }
+   ],
+   "open": [
+    "It moves with the engine power box."
+   ]
+  },
+  "SPL-PDM15-OUT13": {
+   "id": "SPL-PDM15-OUT13",
+   "what": "Pigtail splice at the engine power box (OUT13)",
+   "where": "At the engine power box's plug",
+   "zone": "engine",
+   "status": "open",
+   "follows": "PDM15",
+   "why": [
+    {
+     "text": "The splice sits a hand-width from the plug it serves.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT13"
+    }
+   ],
+   "open": [
+    "It moves with the engine power box."
+   ]
+  },
+  "FIREWALL-ENGINE": {
+   "id": "FIREWALL-ENGINE",
+   "what": "61-pin firewall connector, engine side (plug, pins)",
+   "where": "Driver side, in the original fuse-box hole, on a CNC'd adapter plate",
+   "zone": "firewall",
+   "status": "decided",
+   "follows": "FIREWALL-61",
+   "why": [
+    {
+     "text": "See the FIREWALL-61 box (owner call 2026-09-29).",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) FIREWALL-61"
+    },
+    {
+     "text": "The original fuse block punch-out is a 4 in hole at the driver kick panel.",
+     "source": "nuke_frontend/src/components/wiring/objectTraits.ts factory_holes FB"
+    }
+   ]
+  },
+  "FIREWALL-CABIN": {
+   "id": "FIREWALL-CABIN",
+   "what": "61-pin firewall connector, cab side (receptacle, sockets)",
+   "where": "Driver side, in the original fuse-box hole, on a CNC'd adapter plate",
+   "zone": "firewall",
+   "status": "decided",
+   "follows": "FIREWALL-61",
+   "why": [
+    {
+     "text": "See the FIREWALL-61 box (owner call 2026-09-29).",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) FIREWALL-61"
+    },
+    {
+     "text": "The original fuse block punch-out is a 4 in hole at the driver kick panel.",
+     "source": "nuke_frontend/src/components/wiring/objectTraits.ts factory_holes FB"
+    }
+   ]
+  },
+  "FIREWALL-BODY-A": {
+   "id": "FIREWALL-BODY-A",
+   "what": "Deutsch body bulkhead A",
+   "where": "Not used: nothing but the 61-pin goes through the firewall",
+   "zone": "firewall",
+   "status": "flag",
+   "follows": "BODY-PASS",
+   "why": [
+    {
+     "text": "See the BODY-PASS box (Dave's rule, 2026-09-29).",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) BODY-PASS"
+    }
+   ],
+   "open": [
+    "Its wires need a new path: the engine power box, the 61-pin, or a round bulkhead."
+   ]
+  },
+  "FIREWALL-BODY-B": {
+   "id": "FIREWALL-BODY-B",
+   "what": "Deutsch body bulkhead B",
+   "where": "Not used: nothing but the 61-pin goes through the firewall",
+   "zone": "firewall",
+   "status": "flag",
+   "follows": "BODY-PASS",
+   "why": [
+    {
+     "text": "See the BODY-PASS box (Dave's rule, 2026-09-29).",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) BODY-PASS"
+    }
+   ],
+   "open": [
+    "Its wires need a new path: the engine power box, the 61-pin, or a round bulkhead."
+   ]
+  },
+  "FIREWALL-BODY-P": {
+   "id": "FIREWALL-BODY-P",
+   "what": "Deutsch body bulkhead P",
+   "where": "Not used: nothing but the 61-pin goes through the firewall",
+   "zone": "firewall",
+   "status": "flag",
+   "follows": "BODY-PASS",
+   "why": [
+    {
+     "text": "See the BODY-PASS box (Dave's rule, 2026-09-29).",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) BODY-PASS"
+    }
+   ],
+   "open": [
+    "Its wires need a new path: the engine power box, the 61-pin, or a round bulkhead."
+   ]
+  },
+  "FIREWALL-BODY-C": {
+   "id": "FIREWALL-BODY-C",
+   "what": "Speed sender cab exit (Deutsch DT 6-way)",
+   "where": "Floor or kick panel near the transfer case",
+   "zone": "firewall",
+   "status": "open",
+   "follows": "REAR-CONN",
+   "why": [
+    {
+     "text": "It is the speed sender's cab exit; the hole is set at the mock-up.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml FIREWALL-BODY-C"
+    }
+   ],
+   "open": [
+    "The owner allows round bulkheads only; this is a rectangular DT. It could join the rear connector."
+   ]
+  },
+  "FIREWALL-GROMMET": {
+   "id": "FIREWALL-GROMMET",
+   "what": "Power pass-through (battery feed and ground cables)",
+   "where": "Firewall, beside the batteries",
+   "zone": "firewall",
+   "status": "open",
+   "why": [
+    {
+     "text": "These cables are too big for the 61-pin: its #20 contacts take 20-24 AWG.",
+     "source": "docs/wiring/K5_WIRING_STATE.md §1 row 43"
+    },
+    {
+     "text": "One CableClam per 2 AWG cable today.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml FIREWALL-GROMMET"
+    }
+   ],
+   "open": [
+    "Nothing but the 61-pin goes through the firewall (Dave), so the big cables need a ruled exception or another path."
+   ]
+  },
+  "M130-A": {
+   "id": "M130-A",
+   "what": "Engine computer (MoTeC M130), plug A",
+   "where": "Cab side, close to the 61-pin",
+   "zone": "cab",
+   "status": "open",
+   "follows": "M130",
+   "why": [
+    {
+     "text": "See the M130 box.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) M130"
+    }
+   ],
+   "open": [
+    "The spot follows the M130 box."
+   ]
+  },
+  "M130-B": {
+   "id": "M130-B",
+   "what": "Engine computer (MoTeC M130), plug B",
+   "where": "Cab side, close to the 61-pin",
+   "zone": "cab",
+   "status": "open",
+   "follows": "M130",
+   "why": [
+    {
+     "text": "See the M130 box.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) M130"
+    }
+   ],
+   "open": [
+    "The spot follows the M130 box."
+   ]
+  },
+  "PDM30-A": {
+   "id": "PDM30-A",
+   "what": "Body power box (MoTeC PDM30), plug A",
+   "where": "Cab, in open air on its own plate near the M130",
+   "zone": "cab",
+   "status": "open",
+   "follows": "PDM30",
+   "why": [
+    {
+     "text": "See the PDM30 box.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) PDM30"
+    }
+   ],
+   "open": [
+    "The spot follows the PDM30 box."
+   ]
+  },
+  "PDM30-B": {
+   "id": "PDM30-B",
+   "what": "Body power box (MoTeC PDM30), plug B",
+   "where": "Cab, in open air on its own plate near the M130",
+   "zone": "cab",
+   "status": "open",
+   "follows": "PDM30",
+   "why": [
+    {
+     "text": "See the PDM30 box.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) PDM30"
+    }
+   ],
+   "open": [
+    "The spot follows the PDM30 box."
+   ]
+  },
+  "PDM30-STUD": {
+   "id": "PDM30-STUD",
+   "what": "Body power box (MoTeC PDM30), battery stud",
+   "where": "Cab, in open air on its own plate near the M130",
+   "zone": "cab",
+   "status": "open",
+   "follows": "PDM30",
+   "why": [
+    {
+     "text": "See the PDM30 box.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) PDM30"
+    }
+   ],
+   "open": [
+    "The spot follows the PDM30 box."
+   ]
+  },
+  "SPL-PDM30-OUT1": {
+   "id": "SPL-PDM30-OUT1",
+   "what": "Pigtail splice at the body power box (OUT1)",
+   "where": "At the PDM30's plug",
+   "zone": "cab",
+   "status": "open",
+   "follows": "PDM30",
+   "why": [
+    {
+     "text": "The splice joins the paired output pins to one feed at the PDM30.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT1"
+    }
+   ],
+   "open": [
+    "It moves with the PDM30."
+   ]
+  },
+  "SPL-PDM30-OUT2": {
+   "id": "SPL-PDM30-OUT2",
+   "what": "Pigtail splice at the body power box (OUT2)",
+   "where": "At the PDM30's plug",
+   "zone": "cab",
+   "status": "open",
+   "follows": "PDM30",
+   "why": [
+    {
+     "text": "The splice joins the paired output pins to one feed at the PDM30.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT2"
+    }
+   ],
+   "open": [
+    "It moves with the PDM30."
+   ]
+  },
+  "SPL-PDM30-OUT3": {
+   "id": "SPL-PDM30-OUT3",
+   "what": "Pigtail splice at the body power box (OUT3)",
+   "where": "At the PDM30's plug",
+   "zone": "cab",
+   "status": "open",
+   "follows": "PDM30",
+   "why": [
+    {
+     "text": "The splice joins the paired output pins to one feed at the PDM30.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT3"
+    }
+   ],
+   "open": [
+    "It moves with the PDM30."
+   ]
+  },
+  "SPL-PDM30-OUT4": {
+   "id": "SPL-PDM30-OUT4",
+   "what": "Pigtail splice at the body power box (OUT4)",
+   "where": "At the PDM30's plug",
+   "zone": "cab",
+   "status": "open",
+   "follows": "PDM30",
+   "why": [
+    {
+     "text": "The splice joins the paired output pins to one feed at the PDM30.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT4"
+    }
+   ],
+   "open": [
+    "It moves with the PDM30."
+   ]
+  },
+  "SPL-PDM30-OUT5": {
+   "id": "SPL-PDM30-OUT5",
+   "what": "Pigtail splice at the body power box (OUT5)",
+   "where": "At the PDM30's plug",
+   "zone": "cab",
+   "status": "open",
+   "follows": "PDM30",
+   "why": [
+    {
+     "text": "The splice joins the paired output pins to one feed at the PDM30.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT5"
+    }
+   ],
+   "open": [
+    "It moves with the PDM30."
+   ]
+  },
+  "SPL-PDM30-OUT6": {
+   "id": "SPL-PDM30-OUT6",
+   "what": "Pigtail splice at the body power box (OUT6)",
+   "where": "At the PDM30's plug",
+   "zone": "cab",
+   "status": "open",
+   "follows": "PDM30",
+   "why": [
+    {
+     "text": "The splice joins the paired output pins to one feed at the PDM30.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT6"
+    }
+   ],
+   "open": [
+    "It moves with the PDM30."
+   ]
+  },
+  "SPL-PDM30-OUT7": {
+   "id": "SPL-PDM30-OUT7",
+   "what": "Pigtail splice at the body power box (OUT7)",
+   "where": "At the PDM30's plug",
+   "zone": "cab",
+   "status": "open",
+   "follows": "PDM30",
+   "why": [
+    {
+     "text": "The splice joins the paired output pins to one feed at the PDM30.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT7"
+    }
+   ],
+   "open": [
+    "It moves with the PDM30."
+   ]
+  },
+  "SPL-PDM30-OUT8": {
+   "id": "SPL-PDM30-OUT8",
+   "what": "Pigtail splice at the body power box (OUT8)",
+   "where": "At the PDM30's plug",
+   "zone": "cab",
+   "status": "open",
+   "follows": "PDM30",
+   "why": [
+    {
+     "text": "The splice joins the paired output pins to one feed at the PDM30.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT8"
+    }
+   ],
+   "open": [
+    "It moves with the PDM30."
+   ]
+  },
+  "GND-BANK-CAB": {
+   "id": "GND-BANK-CAB",
+   "what": "Cab ground bank (insulated stud bus)",
+   "where": "Beside the PDM30",
+   "zone": "cab",
+   "status": "open",
+   "follows": "PDM30",
+   "why": [
+    {
+     "text": "Every cab return lands here and goes back to the ground star.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml GND-BANK-CAB; docs/wiring/K5_WIRING_STATE.md §1 (grounds in the loom)"
+    }
+   ],
+   "open": [
+    "It follows the PDM30."
+   ]
+  },
+  "FUSE-DAK_CONST": {
+   "id": "FUSE-DAK_CONST",
+   "what": "In-line fuse, DAK_CONST",
+   "where": "At the source end of its feed",
+   "zone": "cab",
+   "status": "proposed",
+   "follows": "PDM30",
+   "why": [
+    {
+     "text": "A fuse goes at the source end of the wire it protects.",
+     "source": "docs/wiring/research/2026-06-10_power_spine_builders_study.md §2"
+    }
+   ],
+   "open": [
+    "The source end follows the power box that feeds it."
+   ]
+  },
+  "FUSE-PCS_BATT": {
+   "id": "FUSE-PCS_BATT",
+   "what": "In-line fuse, PCS_BATT",
+   "where": "At the source end of its feed",
+   "zone": "cab",
+   "status": "proposed",
+   "follows": "PDM30",
+   "why": [
+    {
+     "text": "A fuse goes at the source end of the wire it protects.",
+     "source": "docs/wiring/research/2026-06-10_power_spine_builders_study.md §2"
+    }
+   ],
+   "open": [
+    "The source end follows the power box that feeds it."
+   ]
+  },
+  "FUSE-TRANS_BATT": {
+   "id": "FUSE-TRANS_BATT",
+   "what": "In-line fuse, TRANS_BATT",
+   "where": "At the source end of its feed",
+   "zone": "cab",
+   "status": "proposed",
+   "follows": "PDM30",
+   "why": [
+    {
+     "text": "A fuse goes at the source end of the wire it protects.",
+     "source": "docs/wiring/research/2026-06-10_power_spine_builders_study.md §2"
+    }
+   ],
+   "open": [
+    "The source end follows the power box that feeds it."
+   ]
+  },
+  "PORT-ETH": {
+   "id": "PORT-ETH",
+   "what": "M130 laptop port (panel RJ45)",
+   "where": "Cab, under the dash or in the glovebox",
+   "zone": "cab",
+   "status": "proposed",
+   "follows": "SERVICE",
+   "why": [
+    {
+     "text": "See the SERVICE box.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) SERVICE"
+    }
+   ]
+  },
+  "PORT-UTC": {
+   "id": "PORT-UTC",
+   "what": "PDM config port (5-pin XLR)",
+   "where": "Cab, under the dash or in the glovebox",
+   "zone": "cab",
+   "status": "proposed",
+   "follows": "SERVICE",
+   "why": [
+    {
+     "text": "See the SERVICE box.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) SERVICE"
+    }
+   ]
+  },
+  "CAN-BUS": {
+   "id": "CAN-BUS",
+   "what": "CAN bus trunk",
+   "where": "M130 to PDM30 to the 61-pin to the engine power box to the LTCD, with the UTC stub",
+   "zone": "cab",
+   "status": "open",
+   "follows": "M130",
+   "why": [
+    {
+     "text": "The trunk order and the 100 ohm ends.",
+     "source": "MoTeC PDM user manual p.49-50; docs/wiring/calc-data/catalog/endpoints.yaml CAN-BUS"
+    }
+   ],
+   "open": [
+    "It follows the boxes it links."
+   ]
+  },
+  "SPL-ISO-YEL": {
+   "id": "SPL-ISO-YEL",
+   "what": "Isolator switch lamp-wire splice",
+   "where": "Behind the isolator's dash switch",
+   "zone": "cab",
+   "status": "proposed",
+   "follows": "ISOLATOR",
+   "why": [
+    {
+     "text": "The M130 shutdown tap joins the switch's yellow wire here.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-ISO-YEL"
+    }
+   ]
+  },
+  "ISO-SWITCH": {
+   "id": "ISO-SWITCH",
+   "what": "Isolator dash switch (Blue Sea 2145)",
+   "where": "Cab, on the dash",
+   "zone": "cab",
+   "status": "decided",
+   "follows": "ISOLATOR",
+   "why": [
+    {
+     "text": "See the ISOLATOR box: the dash switch goes in the cab.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) ISOLATOR"
+    }
+   ],
+   "open": [
+    "The exact dash spot is not picked."
+   ]
+  },
+  "APS": {
+   "id": "APS",
+   "what": "Accelerator pedal (DBW)",
+   "where": "Driver footwell, on the firewall where the factory pedal was",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The pedal bought is sold as '72-98 C10 Square Body OBS LS Swap DBW', a bolt-in for this body.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml APS (eBay listing)"
+    }
+   ]
+  },
+  "BRAKE-SW": {
+   "id": "BRAKE-SW",
+   "what": "Brake light switch (factory)",
+   "where": "At the brake pedal, on the pedal bracket",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The stoplamp switch is adjusted at the brake pedal.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.408, Fig. 5-13"
+    },
+    {
+     "text": "Stoplamp switch: see Section 5 (Brakes).",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.790"
+    }
+   ]
+  },
+  "FLOOR-DIMMER": {
+   "id": "FLOOR-DIMMER",
+   "what": "Headlamp dimmer switch (factory floor switch)",
+   "where": "On the floor under the upper left corner of the floor mat, at the driver's left foot",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Headlamp beam selector switch: \"Fold back upper left corner of the floor mat and remove two screws retaining switch to the floor pan.\"",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.787"
+    },
+    {
+     "text": "Dimmer switch diagnosis and wiring.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.779-780"
+    }
+   ]
+  },
+  "HL-SW": {
+   "id": "HL-SW",
+   "what": "Headlight switch (factory push-pull)",
+   "where": "Instrument panel, behind the cluster, knob through the dash",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Light switch removal: \"Reaching up behind instrument cluster, depress shaft retaining button and remove switch knob and rod.\"",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.787"
+    }
+   ]
+  },
+  "TURN-SW": {
+   "id": "TURN-SW",
+   "what": "Turn and hazard switch (factory)",
+   "where": "In the steering column; its plug is at the column connector under the dash",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The turn signal switch is in the steering column, wired through the column connector.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.783-784"
+    },
+    {
+     "text": "The hazard switch is a push-pull \"on the right side of the steering column\".",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.802"
+    }
+   ]
+  },
+  "HORN-SW": {
+   "id": "HORN-SW",
+   "what": "Horn button (factory)",
+   "where": "Steering wheel centre, grounding through the column",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The horn button cap on the steering wheel.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.227-228"
+    }
+   ]
+  },
+  "IGN-SWITCH": {
+   "id": "IGN-SWITCH",
+   "what": "Ignition switch (factory)",
+   "where": "On top of the steering column jacket, near the front of the dash",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "\"The ignition switch is mounted on top of the column ... jacket near the front of the dash\" (C and K Series).",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.241"
+    }
+   ]
+  },
+  "WIPER-SW": {
+   "id": "WIPER-SW",
+   "what": "Wiper and washer switch (factory)",
+   "where": "Instrument panel",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The factory wiper/washer dash switch grounds through its mounting.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.803"
+    }
+   ]
+  },
+  "BLOWER-SW": {
+   "id": "BLOWER-SW",
+   "what": "Blower switch (factory Four-Season control head)",
+   "where": "Instrument panel, in the heater and A/C control head",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The Four-Season system's blower switch and control.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.87-88"
+    },
+    {
+     "text": "The factory Four-Season housing is kept.",
+     "source": "docs/wiring/K5_WIRING_STATE.md §1 row 40"
+    }
+   ]
+  },
+  "DAKOTA-VHX": {
+   "id": "DAKOTA-VHX",
+   "what": "Gauge control box (Dakota VHX)",
+   "where": "Cab, driver side under the dash, within 3 ft of the cluster",
+   "zone": "cab",
+   "status": "decided",
+   "follows": "DAKOTA",
+   "why": [
+    {
+     "text": "See the DAKOTA box.",
+     "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) DAKOTA"
+    },
+    {
+     "text": "\"Mount the control box within reach of the supplied networking cable (approximately three (3) feet).\"",
+     "source": "reference_documents/component_drawings/dakota_digital_vhx_manual.pdf p.4"
+    }
+   ]
+  },
+  "RADIO": {
+   "id": "RADIO",
+   "what": "Radio (RetroSound Motor 2B)",
+   "where": "Instrument panel, in the factory radio opening",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The RetroSound unit is made for 1973-87 C/K trucks.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml RADIO"
+    }
+   ]
+  },
+  "GSS-3000": {
+   "id": "GSS-3000",
+   "what": "Gear shift sender decoder (Dakota GSS-3000)",
+   "where": "Under the dash",
+   "zone": "cab",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "The decoder goes under the dash; its sensor sits on the transmission.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml GSS-3000 (Dakota GSS-3000 MAN# 650715:G)"
+    }
+   ]
+  },
+  "PCS-TCM": {
+   "id": "PCS-TCM",
+   "what": "Transmission controller (PCS TCM-2650)",
+   "where": "Cab, under the dash (spot not picked)",
+   "zone": "cab",
+   "status": "open",
+   "why": [
+    {
+     "text": "The kit harness runs from the controller in the cab to the case connector.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml PCS-HARNESS-4610-CASE"
+    }
+   ],
+   "open": [
+    "Pick the spot, dry and away from heat."
+   ]
+  },
+  "PCS-HARNESS-4610": {
+   "id": "PCS-HARNESS-4610",
+   "what": "Transmission controller harness (PCS TCM-4610 kit)",
+   "where": "From the controller in the cab to the 6L90 case connector",
+   "zone": "cab",
+   "status": "open",
+   "follows": "PCS-TCM",
+   "why": [
+    {
+     "text": "The kit harness plugs into the controller and runs to the case.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml PCS-HARNESS-4610"
+    }
+   ],
+   "open": [
+    "It follows the controller."
+   ]
+  },
+  "MIRROR-MON": {
+   "id": "MIRROR-MON",
+   "what": "Mirror monitor (Rear View Safety kit)",
+   "where": "Windshield, in place of the rear-view mirror",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The kit's replacement rear-view mirror carries the display.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml MIRROR-MON"
+    }
+   ]
+  },
+  "OUTLET-12V": {
+   "id": "OUTLET-12V",
+   "what": "12 V outlet",
+   "where": "Not placed: dash or console",
+   "zone": "cab",
+   "status": "open",
+   "why": [
+    {
+     "text": "The registry has the outlet but no spot.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml OUTLET-12V"
+    }
+   ],
+   "open": [
+    "Pick the spot."
+   ]
+  },
+  "USB-PORT": {
+   "id": "USB-PORT",
+   "what": "USB charging port",
+   "where": "Not placed: dash or console",
+   "zone": "cab",
+   "status": "open",
+   "why": [
+    {
+     "text": "The registry has the outlet but no spot.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml USB-PORT"
+    }
+   ],
+   "open": [
+    "Pick the spot."
+   ]
+  },
+  "CLEARANCE-L": {
+   "id": "CLEARANCE-L",
+   "what": "Roof clearance lamp, left",
+   "where": "Cab roof, left",
+   "zone": "cab",
+   "status": "open",
+   "why": [
+    {
+     "text": "The registry has three cab-roof clearance lamps.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml CLEARANCE-L"
+    },
+    {
+     "text": "Clearance and identification lamp installations are in the factory figures.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.787 (\"Refer to Figures 8-7 through 8-10 for clearance, license plate and identification lamp installations\")"
+    }
+   ],
+   "open": [
+    "The K5 has a removable top: where on it the lamps sit is not set."
+   ]
+  },
+  "CLEARANCE-C": {
+   "id": "CLEARANCE-C",
+   "what": "Roof clearance lamp, centre",
+   "where": "Cab roof, centre",
+   "zone": "cab",
+   "status": "open",
+   "why": [
+    {
+     "text": "The registry has three cab-roof clearance lamps.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml CLEARANCE-C"
+    },
+    {
+     "text": "Clearance and identification lamp installations are in the factory figures.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.787 (\"Refer to Figures 8-7 through 8-10 for clearance, license plate and identification lamp installations\")"
+    }
+   ],
+   "open": [
+    "The K5 has a removable top: where on it the lamps sit is not set."
+   ]
+  },
+  "CLEARANCE-R": {
+   "id": "CLEARANCE-R",
+   "what": "Roof clearance lamp, right",
+   "where": "Cab roof, right",
+   "zone": "cab",
+   "status": "open",
+   "why": [
+    {
+     "text": "The registry has three cab-roof clearance lamps.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml CLEARANCE-R"
+    },
+    {
+     "text": "Clearance and identification lamp installations are in the factory figures.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.787 (\"Refer to Figures 8-7 through 8-10 for clearance, license plate and identification lamp installations\")"
+    }
+   ],
+   "open": [
+    "The K5 has a removable top: where on it the lamps sit is not set."
+   ]
+  },
+  "DOME-LAMP": {
+   "id": "DOME-LAMP",
+   "what": "Dome lamp",
+   "where": "Roof, inside",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The dome and courtesy lamp circuits switch on the ground side.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.833"
+    }
+   ]
+  },
+  "DOOR-JAMB-L": {
+   "id": "DOOR-JAMB-L",
+   "what": "Door jamb switch, driver (factory pin switch)",
+   "where": "In the driver front door jamb",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The jamb switches are in the ground side of the dome and courtesy lamp circuits.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.833"
+    }
+   ]
+  },
+  "DOOR-JAMB-R": {
+   "id": "DOOR-JAMB-R",
+   "what": "Door jamb switch, passenger (factory pin switch)",
+   "where": "In the passenger front door jamb",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The jamb switches are in the ground side of the dome and courtesy lamp circuits.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.833"
+    }
+   ]
+  },
+  "FOOTWELL-LAMPS": {
+   "id": "FOOTWELL-LAMPS",
+   "what": "Footwell lamps (Lumitec Mini Rail2)",
+   "where": "Under the dash, one in each footwell",
+   "zone": "cab",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "An owner-chosen LED strip.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml FOOTWELL-LAMPS"
+    }
+   ]
+  },
+  "UNDERDASH-LAMPS": {
+   "id": "UNDERDASH-LAMPS",
+   "what": "Under-dash lamps (Lumitec Mini Rail2)",
+   "where": "Under the dash",
+   "zone": "cab",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "An owner-chosen LED strip.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml UNDERDASH-LAMPS"
+    }
+   ]
+  },
+  "TG-SW-DASH": {
+   "id": "TG-SW-DASH",
+   "what": "Tailgate window switch (factory dash switch)",
+   "where": "Instrument panel",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Power rear window: the dash switch.",
+     "source": "reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf p.16, sheet A-4"
+    }
+   ]
+  },
+  "TG-SW-MASTER": {
+   "id": "TG-SW-MASTER",
+   "what": "Tailgate window master switch (Nu-Relics #121)",
+   "where": "Instrument panel",
+   "zone": "cab",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The Nu-Relics reverse-polarity dash switch (option #121).",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml TG-SW-MASTER"
+    }
+   ]
+  },
+  "DOOR-L-PASS": {
+   "id": "DOOR-L-PASS",
+   "what": "Driver door pass-through (locks and speaker, DT 8-way)",
+   "where": "At the driver door's hinge side, body to door",
+   "zone": "doors",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "The DT 8-way that carries the locks and the speaker across the hinge.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml DOOR-L-PASS"
+    }
+   ]
+  },
+  "DOOR-L-PASS-P": {
+   "id": "DOOR-L-PASS-P",
+   "what": "Driver door pass-through (window power, DTP 4-way)",
+   "where": "At the driver door's hinge side, body to door",
+   "zone": "doors",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "The DTP 4-way that carries the window power across the hinge.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml DOOR-L-PASS-P"
+    }
+   ]
+  },
+  "LOCK-SW-L": {
+   "id": "LOCK-SW-L",
+   "what": "Driver lock rocker",
+   "where": "In the driver door panel",
+   "zone": "doors",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The Nu-Relics door switch panel.",
+     "source": "nu-relics.com 17383-2; docs/wiring/calc-data/catalog/endpoints.yaml WIN-SW-L"
+    }
+   ]
+  },
+  "WIN-SW-L": {
+   "id": "WIN-SW-L",
+   "what": "Driver window switch panel (Nu-Relics 17383-2)",
+   "where": "In the driver door panel",
+   "zone": "doors",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The Nu-Relics door switch panel.",
+     "source": "nu-relics.com 17383-2"
+    }
+   ]
+  },
+  "lock_actuator_DS": {
+   "id": "lock_actuator_DS",
+   "what": "Driver door lock actuator (AutoLoc AUTZT2000)",
+   "where": "Inside the driver door, on the lock rod",
+   "zone": "doors",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The AutoLoc 2-wire actuator.",
+     "source": "autoloc.com AUTZT2000"
+    }
+   ]
+  },
+  "window_motor_DS": {
+   "id": "window_motor_DS",
+   "what": "Driver window motor (Nu-Relics 17383-2)",
+   "where": "Inside the driver door, on the regulator",
+   "zone": "doors",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The Nu-Relics regulator and motor.",
+     "source": "nu-relics.com 17383-2"
+    }
+   ]
+  },
+  "SPK-FL": {
+   "id": "SPK-FL",
+   "what": "Driver door speaker (JL Audio C2-650X)",
+   "where": "In the driver door",
+   "zone": "doors",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "The registry puts the front speakers in the doors.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPK-FL"
+    }
+   ]
+  },
+  "DOOR-R-PASS": {
+   "id": "DOOR-R-PASS",
+   "what": "Passenger door pass-through (locks and speaker, DT 8-way)",
+   "where": "At the passenger door's hinge side, body to door",
+   "zone": "doors",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "The DT 8-way that carries the locks and the speaker across the hinge.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml DOOR-R-PASS"
+    }
+   ]
+  },
+  "DOOR-R-PASS-P": {
+   "id": "DOOR-R-PASS-P",
+   "what": "Passenger door pass-through (window power, DTP 4-way)",
+   "where": "At the passenger door's hinge side, body to door",
+   "zone": "doors",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "The DTP 4-way that carries the window power across the hinge.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml DOOR-R-PASS-P"
+    }
+   ]
+  },
+  "LOCK-SW-R": {
+   "id": "LOCK-SW-R",
+   "what": "Passenger lock rocker",
+   "where": "In the passenger door panel",
+   "zone": "doors",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The Nu-Relics door switch panel.",
+     "source": "nu-relics.com 17383-2; docs/wiring/calc-data/catalog/endpoints.yaml WIN-SW-R"
+    }
+   ]
+  },
+  "WIN-SW-R": {
+   "id": "WIN-SW-R",
+   "what": "Passenger window switch panel (Nu-Relics 17383-2)",
+   "where": "In the passenger door panel",
+   "zone": "doors",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The Nu-Relics door switch panel.",
+     "source": "nu-relics.com 17383-2"
+    }
+   ]
+  },
+  "lock_actuator_PS": {
+   "id": "lock_actuator_PS",
+   "what": "Passenger door lock actuator (AutoLoc AUTZT2000)",
+   "where": "Inside the passenger door, on the lock rod",
+   "zone": "doors",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The AutoLoc 2-wire actuator.",
+     "source": "autoloc.com AUTZT2000"
+    }
+   ]
+  },
+  "window_motor_PS": {
+   "id": "window_motor_PS",
+   "what": "Passenger window motor (Nu-Relics 17383-2)",
+   "where": "Inside the passenger door, on the regulator",
+   "zone": "doors",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The Nu-Relics regulator and motor.",
+     "source": "nu-relics.com 17383-2"
+    }
+   ]
+  },
+  "SPK-FR": {
+   "id": "SPK-FR",
+   "what": "Passenger door speaker (JL Audio C2-650X)",
+   "where": "In the passenger door",
+   "zone": "doors",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "The registry puts the front speakers in the doors.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPK-FR"
+    }
+   ]
+  },
+  "Tail_Light_Left": {
+   "id": "Tail_Light_Left",
+   "what": "Left tail lamp (1157)",
+   "where": "Rear corner, left: the tail combination lamp (grey plug)",
+   "zone": "rear",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Rear lighting, C-K 06-14 models: tail combination lamp (gray), back-up lamp (white), marker lamp (cream).",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6"
+    }
+   ]
+  },
+  "Backup_Light_Left": {
+   "id": "Backup_Light_Left",
+   "what": "Left backup lamp",
+   "where": "Rear corner, left: the back-up lamp (white plug)",
+   "zone": "rear",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Rear lighting, C-K 06-14 models: back-up lamp (white).",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6"
+    }
+   ]
+  },
+  "MARKER-LR": {
+   "id": "MARKER-LR",
+   "what": "Left rear side marker",
+   "where": "Rear quarter, left: the marker lamp (cream plug)",
+   "zone": "rear",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Rear lighting, C-K 06-14 models: marker lamp (cream).",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6"
+    }
+   ]
+  },
+  "Tail_Light_Right": {
+   "id": "Tail_Light_Right",
+   "what": "Right tail lamp (1157)",
+   "where": "Rear corner, right: the tail combination lamp (grey plug)",
+   "zone": "rear",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Rear lighting, C-K 06-14 models: tail combination lamp (gray), back-up lamp (white), marker lamp (cream).",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6"
+    }
+   ]
+  },
+  "Backup_Light_Right": {
+   "id": "Backup_Light_Right",
+   "what": "Right backup lamp",
+   "where": "Rear corner, right: the back-up lamp (white plug)",
+   "zone": "rear",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Rear lighting, C-K 06-14 models: back-up lamp (white).",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6"
+    }
+   ]
+  },
+  "MARKER-RR": {
+   "id": "MARKER-RR",
+   "what": "Right rear side marker",
+   "where": "Rear quarter, right: the marker lamp (cream plug)",
+   "zone": "rear",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Rear lighting, C-K 06-14 models: marker lamp (cream).",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6"
+    }
+   ]
+  },
+  "LICENSE-LAMP": {
+   "id": "LICENSE-LAMP",
+   "what": "License plate lamp (factory)",
+   "where": "At the rear license plate",
+   "zone": "rear",
+   "status": "decided",
+   "why": [
+    {
+     "text": "License plate lamp installations are in the factory figures.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.787"
+    }
+   ],
+   "open": [
+    "Read on the truck whether the plate sits on the bumper or the tailgate."
+   ]
+  },
+  "Backup_Camera": {
+   "id": "Backup_Camera",
+   "what": "Backup camera (Rear View Safety RVS-7180355-IR)",
+   "where": "At the rear license plate",
+   "zone": "rear",
+   "status": "decided",
+   "why": [
+    {
+     "text": "A license-plate camera.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml Backup_Camera"
+    }
+   ]
+  },
+  "CHMSL": {
+   "id": "CHMSL",
+   "what": "Third brake light (ORACLE 4514-003, 7 in)",
+   "where": "Not placed: top of the tailgate or rear edge of the top",
+   "zone": "rear",
+   "status": "open",
+   "why": [
+    {
+     "text": "The registry has the lamp but no spot.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml CHMSL"
+    }
+   ],
+   "open": [
+    "Pick the spot."
+   ]
+  },
+  "CARGO-LAMP": {
+   "id": "CARGO-LAMP",
+   "what": "Cargo lamp (Truck-Lite 80251C)",
+   "where": "Not placed: cargo area",
+   "zone": "rear",
+   "status": "open",
+   "why": [
+    {
+     "text": "The registry has the lamp but no spot.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml CARGO-LAMP"
+    }
+   ],
+   "open": [
+    "Pick the spot."
+   ]
+  },
+  "FUEL-PUMP": {
+   "id": "FUEL-PUMP",
+   "what": "Fuel pump (QFS-H882 hanger, P367 pump)",
+   "where": "In the fuel tank, on the hanger",
+   "zone": "rear",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The pump is on the Quantum hanger that replaces the tank unit.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml FUEL-PUMP"
+    },
+    {
+     "text": "The factory tank unit comes out of the tank through its cam-ring opening.",
+     "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.533"
+    }
+   ]
+  },
+  "FUEL-LEVEL": {
+   "id": "FUEL-LEVEL",
+   "what": "Fuel level sender (on the QFS-H882 hanger)",
+   "where": "In the fuel tank, on the hanger",
+   "zone": "rear",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The sender is part of the hanger.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml FUEL-LEVEL"
+    }
+   ]
+  },
+  "SPL-FUEL-SND": {
+   "id": "SPL-FUEL-SND",
+   "what": "Fuel sender signal splice",
+   "where": "Above the tank lid",
+   "zone": "rear",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "The M130 and Dakota taps join the sender lead here.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-FUEL-SND"
+    }
+   ]
+  },
+  "VSS-SENDER": {
+   "id": "VSS-SENDER",
+   "what": "Speed sender (Dakota SEN-01-5)",
+   "where": "On the NP205 transfer case's speedometer drive",
+   "zone": "underbody",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "The sender threads on the speedometer drive (7/8-18 GM thread).",
+     "source": "reference_documents/component_drawings/dakota_digital_vhx_manual.pdf p.8; docs/wiring/calc-data/catalog/endpoints.yaml VSS-SENDER"
+    }
+   ]
+  },
+  "TG-SW-KEY": {
+   "id": "TG-SW-KEY",
+   "what": "Tailgate key switch (factory 8900713)",
+   "where": "In the tailgate, at the key lock",
+   "zone": "rear",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Power rear window: the key switch in the tailgate.",
+     "source": "reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf p.16, sheet A-4"
+    }
+   ]
+  },
+  "TG-SW-KEY-REV": {
+   "id": "TG-SW-KEY-REV",
+   "what": "Tailgate key switch as the second reversing switch",
+   "where": "In the tailgate, at the key lock",
+   "zone": "rear",
+   "status": "decided",
+   "follows": "TG-SW-KEY",
+   "why": [
+    {
+     "text": "Power rear window: the key switch.",
+     "source": "reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf p.16, sheet A-4"
+    }
+   ]
+  },
+  "TG-CUTOUT": {
+   "id": "TG-CUTOUT",
+   "what": "Tailgate-closed cutout switch",
+   "where": "At the tailgate",
+   "zone": "rear",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Power rear window: the tailgate cutout switch in the window-up line.",
+     "source": "reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf p.16, sheet A-4"
+    }
+   ]
+  },
+  "TG-MOTOR-ACI": {
+   "id": "TG-MOTOR-ACI",
+   "what": "Tailgate window motor (Nu-Relics 17383-1, ACI)",
+   "where": "Inside the tailgate, on the window regulator",
+   "zone": "rear",
+   "status": "decided",
+   "why": [
+    {
+     "text": "The Nu-Relics tailgate regulator with the ACI motor.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml TG-MOTOR-ACI"
+    }
+   ]
+  },
+  "rear_window_motor": {
+   "id": "rear_window_motor",
+   "what": "Tailgate window motor (factory position)",
+   "where": "Inside the tailgate, on the window regulator",
+   "zone": "rear",
+   "status": "decided",
+   "why": [
+    {
+     "text": "Power rear window: the motor in the tailgate.",
+     "source": "reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf p.16, sheet A-4"
+    }
+   ]
+  },
+  "AMP": {
+   "id": "AMP",
+   "what": "Amplifier (JL Audio VX700/5i)",
+   "where": "Rear cargo area (spot not picked)",
+   "zone": "rear",
+   "status": "open",
+   "why": [
+    {
+     "text": "The registry has it in the rear but no spot.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml AMP"
+    }
+   ],
+   "open": [
+    "The audio layout is not designed."
+   ]
+  },
+  "AMP-BLOCK": {
+   "id": "AMP-BLOCK",
+   "what": "Amplifier power block",
+   "where": "Rear cargo area (spot not picked)",
+   "zone": "rear",
+   "status": "open",
+   "why": [
+    {
+     "text": "The registry has it in the rear but no spot.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml AMP-BLOCK"
+    }
+   ],
+   "open": [
+    "The audio layout is not designed."
+   ]
+  },
+  "SPK-RL": {
+   "id": "SPK-RL",
+   "what": "Left rear speaker",
+   "where": "Rear cargo area (spot not picked)",
+   "zone": "rear",
+   "status": "open",
+   "why": [
+    {
+     "text": "The registry has it in the rear but no spot.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPK-RL"
+    }
+   ],
+   "open": [
+    "The audio layout is not designed."
+   ]
+  },
+  "SPK-RR": {
+   "id": "SPK-RR",
+   "what": "Right rear speaker",
+   "where": "Rear cargo area (spot not picked)",
+   "zone": "rear",
+   "status": "open",
+   "why": [
+    {
+     "text": "The registry has it in the rear but no spot.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPK-RR"
+    }
+   ],
+   "open": [
+    "The audio layout is not designed."
+   ]
+  },
+  "SUB": {
+   "id": "SUB",
+   "what": "Woofer 1 (JBL Club 102SL)",
+   "where": "Rear cargo area (spot not picked)",
+   "zone": "rear",
+   "status": "open",
+   "why": [
+    {
+     "text": "The registry has it in the rear but no spot.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SUB"
+    }
+   ],
+   "open": [
+    "The audio layout is not designed."
+   ]
+  },
+  "SUB-2": {
+   "id": "SUB-2",
+   "what": "Woofer 2 (JBL Club 102SL)",
+   "where": "Rear cargo area (spot not picked)",
+   "zone": "rear",
+   "status": "open",
+   "why": [
+    {
+     "text": "The registry has it in the rear but no spot.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml SUB-2"
+    }
+   ],
+   "open": [
+    "The audio layout is not designed."
+   ]
+  },
+  "GND-SPLICE-REAR": {
+   "id": "GND-SPLICE-REAR",
+   "what": "Rear ground bus",
+   "where": "Inside the rear body, where the rear harness branches",
+   "zone": "rear",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "The rear returns land here and go back to the cab bank.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml GND-SPLICE-REAR"
+    }
+   ]
+  },
+  "AMP-PASS": {
+   "id": "AMP-PASS",
+   "what": "Amplifier cable pass-through (one CableClam per 2 AWG cable)",
+   "where": "Rear floor, near the amplifier",
+   "zone": "rear",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "The amplifier's 2 AWG feed and ground run from the engine bay to the bed.",
+     "source": "docs/wiring/calc-data/cable_decisions.json #32, AMP_GND"
+    },
+    {
+     "text": "Runs to the back of the truck go along the frame rail: \"the frame is the stiffest, coolest, most protected real estate on the truck.\"",
+     "source": "docs/wiring/research/2026-06-10_power_spine_builders_study.md §1.2"
+    }
+   ],
+   "open": [
+    "The owner allows round bulkheads only; a cable clamp for 2 AWG power is a separate question."
+   ]
+  },
+  "AMP-STEP-CTRL": {
+   "id": "AMP-STEP-CTRL",
+   "what": "Power step controller (AMP Research kit)",
+   "where": "Not placed: under the body near a step motor",
+   "zone": "underbody",
+   "status": "open",
+   "why": [
+    {
+     "text": "The guide on file is for the 2011-14 Silverado kit, which ties the controller \"to the motor support arm next to the battery\".",
+     "source": "reference_documents/component_drawings/amp_research_75146_install.pdf p.6"
+    }
+   ],
+   "open": [
+    "The K5 kit's own guide is not on file."
+   ]
+  },
+  "E-STOPP": {
+   "id": "E-STOPP",
+   "what": "Electric parking brake (E-Stopp ESK001)",
+   "where": "Under the body on the parking-brake cable; dash button in the cab",
+   "zone": "underbody",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "The actuator pulls the parking-brake cable; the kit includes a dash button.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml E-STOPP"
+    }
+   ],
+   "open": [
+    "The spot on the cable is set at the mock-up."
+   ]
+  },
+  "GSS-SENSOR": {
+   "id": "GSS-SENSOR",
+   "what": "Gear position sensor (GSS-3000)",
+   "where": "On the transmission's detent shaft: a plate on the pan, a rod to the shift arm",
+   "zone": "underbody",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "The sensor mounts on the detent shaft.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml GSS-SENSOR (Dakota GSS-3000)"
+    }
+   ]
+  },
+  "PCS-HARNESS-4610-CASE": {
+   "id": "PCS-HARNESS-4610-CASE",
+   "what": "Transmission harness case ground",
+   "where": "At the 6L90 case",
+   "zone": "underbody",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "The kit's case ground lead lands on the case.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml PCS-HARNESS-4610-CASE (Holley 558-499 p.3)"
+    }
+   ]
+  },
+  "TCASE-4WD-SW": {
+   "id": "TCASE-4WD-SW",
+   "what": "4WD indicator switch (fabricated plunger switch)",
+   "where": "At the transfer-case shift lever, on a bracket",
+   "zone": "underbody",
+   "status": "proposed",
+   "why": [
+    {
+     "text": "A sealed plunger switch on a bracket at the shift lever (owner 2026-09-27).",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml TCASE-4WD-SW"
+    }
+   ]
+  },
+  "TRANS-CASE": {
+   "id": "TRANS-CASE",
+   "what": "6L90 case connector (Kostal 16-way)",
+   "where": "On the 6L90 case: its only external connector",
+   "zone": "underbody",
+   "status": "fixed_by_engine",
+   "why": [
+    {
+     "text": "The 6L90's only external connector carries the solenoids and sensors.",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml TRANS-CASE"
+    }
+   ]
+  }
+ }
 }
