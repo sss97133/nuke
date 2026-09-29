@@ -17,5 +17,5 @@ WIDEBAND:
   per_end_wire:
     '64': {part: 0462-005-20141}
     LTCD_GND: {part: 0462-005-20141}
-  contact_note: 'DEUTSCH Contacts Catalog p.125 (PDF p.7) ''Solid Contacts - Common Contact System'': 0462-201-20** = 20 AWG, 0462-005-20** = 16-18 AWG, both 7.5 A: the 18 AWG feed and ground take 0462-005-20141, the CAN pair (now 20 AWG) 0462-201-20141'
+  contact_note: 'DEUTSCH Contacts Catalog p.125 (PDF p.7) ''Solid Contacts - Common Contact System'': 0462-201-20** = 20 AWG, 0462-005-20** = 16-18 AWG, both 7.5 A: the 16 AWG feed and ground take 0462-005-20141, the CAN pair (now 20 AWG) 0462-201-20141'
 

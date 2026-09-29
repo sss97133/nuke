@@ -17,7 +17,7 @@ BASE:
   name: Base truck — engine, power spine, comms, factory body functions
   status: base
   source: K5_WIRING_STATE.md §1 (locked decisions); 1977 Light Truck Service Manual + ST-352-78 (factory circuits)
-  subsystems: [CORE_ENGINE, HARNESS_INFRA, CHARGING_STARTING, FUEL, COOLING, TRANS_6L80E, BRAKES_IBOOSTER,
+  subsystems: [CORE_ENGINE, HARNESS_INFRA, CHARGING_STARTING, FUEL, COOLING, TRANS_6L90, BRAKES_IBOOSTER,
                LIGHTING_EXTERIOR, LIGHTING_INTERIOR, DOME_COURTESY, WIPERS_WASHER, HVAC_AC, DASH_CLUSTER_DAKOTA,
                ACCESSORY_12V, EPARKING_BRAKE]
   wire_patterns: ["^TG_"]          # the factory electric tailgate window is a base function, not the door-window option
@@ -63,6 +63,16 @@ PL:
   source: agent pick under delegation 2026-09-27 (endpoints.yaml doors block); the owner has not called locks
   subsystems: [POWER_LOCKS]
   wire_patterns: ["^LOCK_"]
+
+TG:
+  name: Tailgate power window, Nu-Relics 17383-1 #100 with reversing switches
+  status: candidate
+  source: >-
+    lead 2026-09-28: the owner has no tailgate regulator; Nu-Relics 17383-1 option #100 (motor plug + terminals, no switches)
+          driven by reversing dash + keyed switches in series like the doors, no relay (state row 54)
+          (web_snapshots/www.nu-relics.com__17383-1.md); not bought
+  subsystems: []
+  wire_patterns: ["^TGR_"]
 
 FC:
   name: Front camera
@@ -115,3 +125,34 @@ DISP:
     pdm30_outputs: 1    # one switched 12 V feed for the dash or bridge
     pdm30_inputs: 0
     notes: "the CAN stub is the only harness consequence; the device choice (wired dash vs wireless bridge) is the owner's"
+
+PCS-CAN:
+  name: PCS CAN out to the M130 / Dakota (gear, fluid temperature on the dash)
+  status: candidate
+  source: >-
+    lead 2026-09-28; research/2026-09-28_6l90-transmission-electrical.md §4: the PCS speaks J1939, GMLAN and PCS CAN, receive and transmit
+          selectable (ZGP TCM-2650 setup guide rev2 p.6, p.21). Not wired: the locked ruling keeps the PCS-T43 link a private two-node bus off the
+          M130 trunk (receipts/2026-07-12_6l80e-can-master-ruling.md). A third CAN link or the M130 on that bus needs an M130 J1939/GMLAN receive
+          template and changes the ruling: owner decision
+  subsystems: []
+  wire_patterns: ["^PCSCAN_"]
+
+IBST-CAN:
+  name: iBooster CAN read-only logging bus, step 2
+  status: candidate
+  source: >-
+    lead 2026-09-28; research/2026-09-28_ibooster-gen2-wiring.md A4-A5: a twisted pair from the booster's vehicle CAN pins 16/25
+          (Gen 1 unit 1037123-00-B: web_snapshots/www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md) to a sealed diagnostic port, 120 ohm at each end,
+          its own 500 kbps bus (web_snapshots/www.evcreate.com__ibooster-can-bus.md), never on the M1 trunk; read only, nothing transmitted
+  subsystems: []
+  wire_patterns: ["^IBST_"]
+
+BFL:
+  name: Brake-fluid level warning (reservoir sensor to PDM15 DIG1)
+  status: candidate
+  source: >-
+    lead 2026-09-28; research/2026-09-28_ibooster-gen2-wiring.md §6: the reservoir level sensor is not wired in the registry; a low-fluid
+          lamp is an option (Tesla service step 7 names the reservoir connector); PDM15 DIG1 is spare on the booster's side of the firewall
+  subsystems: []
+  wire_patterns: ["^BFL_"]
+

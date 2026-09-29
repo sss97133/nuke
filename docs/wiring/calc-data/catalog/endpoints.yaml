@@ -60,8 +60,8 @@ PDM30-STUD:
   device: PDM30 battery stud (M6; "eyelet and M6 nut")
   family: lug
   kit: {}
-  lugs: {PDM_BPOS: DL214}
-  wires: [PDM_BPOS]
+  lugs: {PDM_BPOS: DL214, DAK_CONST: ["9904"], PCS_BATT: ["9904"], TRANS_BATT: ["9904"]}   # 18 AWG fused taps for the cab-mounted PCS: ProWire 9904   # DAK_CONST 18 AWG through its 3 A inline fuse: ProWire 9904 (22-18 AWG, 1/4 in = M6)
+  wires: [PDM_BPOS, DAK_CONST, PCS_BATT, TRANS_BATT]
   sources: ["motec_pdm30_datasheet.pdf ('Mating: eyelet and M6 nut')", "build book DC primary table (DL214 = PDM30 M6)"]
 
 PDM15-A:
@@ -276,16 +276,16 @@ DOOR-L-PASS-P:
   where: cabin
   device: "driver door pass-through, window power — Deutsch DTP 4-way: DTP04-4P + WP-4P (body side), DTP06-4S + WP-4S (door side), size 12 solid contacts 0460-204-12141 / 0462-203-12141 (14–12 AWG)"
   family: dtp
-  kit: {}
+  kit: {DTP04-4P: 1, DTP06-4S: 1, WP-4P: 1, WP-4S: 1}   # 4 of 4 used
   wires: ["34", "WIN_GND_L", "WIN_R_UP", "WIN_R_DN"]
   note: "physics, not preference: the ACI window motor draws 11 A at high load and 20 A at stall (Nu-Relics 17383-2 page, 'New ACI Motor AMP Draws'); 16 AWG carries 15 A at 80 °C (MoTeC PDM manual wiring table, PDF p.51) so its limit ceiling 0.85 x 15 = 12.8 A is under the 1.25 x 11 = 13.8 A floor (ch.17 §17.2.3); 14 AWG carries 22 A -> ceiling 18.7 A, floor 13.8 A: PDM30 OUT3 current limit 15 A. 14 AWG needs a size 12 contact, which the DT 12-way does not take (size 16, 20–16 AWG)"
   sources: ["Nu-Relics 17383-2 page (motor amp draws; harness fused 30 A)", "MoTeC PDM user manual wiring table (PDF p.51): 16# 15 A / 14# 22 A single wire free air 80 °C", "KSV 4-Way Mated Deutsch DTP Connector Kit page (DTP04-4P, DTP06-4S, WP-4P, WP-4S, size 12 contacts 14–12 AWG)", "customconnectorkits DTP04-4P page (accepts size 12 pins; mates DTP06-4S)", "canon ch.17 §17.2.3 (fuse >= 125 % load, <= 85 % cable)"]
   open: ["door boot/conduit: measure the hinge pillar gap (bench)", "PDM30 OUT3 current limit 15 A: set in PDM Manager, confirm the stall retry behaviour on the bench"]
 DOOR-L-PASS:
   where: cabin
-  device: "driver door pass-through, locks and speaker — Deutsch DT 8-way: DT04-08PA + W8P (body side), DT06-08SA + W8S (door side), size 16 solid contacts 0460-202-16141 / 0462-201-16141 (20–16 AWG); cavities 7–8 spare, plugged 0413-204-2005"
+  device: "driver door pass-through, locks and speaker — Deutsch DT 8-way: DT04-08PA + W8P (body side), DT06-08SA + W8S (door side), size 16 solid contacts 0460-202-16141 / 0462-201-16141 (20–16 AWG); cavities 7–8 spare, plugged 114017 in each half"
   family: dt
-  kit: {}
+  kit: {DT04-08PA: 1, DT06-08SA: 1, W8P: 1, W8S: 1, "114017": 4}   # cavities 7-8 spare, one plug per cavity per half
   wires: ["38", "LOCK_GND_L", "LOCK_BUS_A", "LOCK_BUS_B", "26a", "26b"]
   sources: ["customconnectorkits DT04-08PA page (accepts size 16 pins; wedge W8P; mates DT06-08SA)", "customconnectorkits 0460-202-16141 page (size 16 contact, 20–16 AWG)"]
   open: ["door boot/conduit: measure the hinge pillar gap (bench)"]
@@ -293,16 +293,16 @@ DOOR-R-PASS-P:
   where: cabin
   device: "passenger door pass-through, window power — Deutsch DTP 4-way: DTP04-4P + WP-4P (body side), DTP06-4S + WP-4S (door side), size 12 solid contacts 0460-204-12141 / 0462-203-12141 (14–12 AWG)"
   family: dtp
-  kit: {}
+  kit: {DTP04-4P: 1, DTP06-4S: 1, WP-4P: 1, WP-4S: 1}   # 4 of 4 used
   wires: ["35", "WIN_GND_R", "WIN_R_UP", "WIN_R_DN"]
   note: "same sizing as DOOR-L-PASS-P: one ACI motor per line, 11 A high load / 20 A stall; 14 AWG, size 12 contacts; PDM30 OUT4 current limit 15 A"
   sources: ["see DOOR-L-PASS-P"]
   open: ["door boot/conduit: measure the hinge pillar gap (bench)"]
 DOOR-R-PASS:
   where: cabin
-  device: "passenger door pass-through, locks and speaker — Deutsch DT 8-way: DT04-08PA + W8P (body side), DT06-08SA + W8S (door side), size 16 solid contacts (20–16 AWG); cavities 7–8 spare, plugged 0413-204-2005"
+  device: "passenger door pass-through, locks and speaker — Deutsch DT 8-way: DT04-08PA + W8P (body side), DT06-08SA + W8S (door side), size 16 solid contacts (20–16 AWG); cavities 7–8 spare, plugged 114017 in each half"
   family: dt
-  kit: {}
+  kit: {DT04-08PA: 1, DT06-08SA: 1, W8P: 1, W8S: 1, "114017": 4}   # cavities 7-8 spare, one plug per cavity per half
   wires: ["LOCK_FEED_R", "LOCK_GND_R", "LOCK_BUS_A", "LOCK_BUS_B", "27a", "27b"]
   sources: ["see DOOR-L-PASS"]
 TG-SW-DASH:
@@ -497,7 +497,7 @@ TB:
   family: te_amp_plug
   kit: {WCTHB50: 1}
   crimper: TE_AMP_CRIMPER
-  pins: {4b: "1", 4a: "2", 4c: "3", 4f: "4", 4e: "5"}
+  pins: {4b: "1 — pin order OPEN until a GM end view of 12699160 is cited", 4a: "2 — pin order OPEN until a GM end view of 12699160 is cited", 4c: "3 — pin order OPEN until a GM end view of 12699160 is cited", 4f: "4 — pin order OPEN until a GM end view of 12699160 is cited", 4e: "5 — pin order OPEN until a GM end view of 12699160 is cited"}
   empty: ["6"]
   doubled: [4c, 4e, 4f]
   note: "pin 1 motor +, 2 motor -, 3 SENT position, 4 low reference, 5 +5 V, 6 not used; TPS2 (#4d) retired; #4c moves to B09 (UDIG4)"
@@ -744,7 +744,7 @@ CKP:
   kit: {LS-CRANK-CONN-KIT: 1}
   per_end: {part: "12110847", seal: "15324976"}
   crimper: MP150_CRIMPER
-  pins: {"99": "1", 99g: "2", 99r: "3"}
+  pins: {"99": "1 — OPEN until a GM end view of the crank sensor is cited (Dave's sheet)", 99g: "2 — OPEN until a GM end view of the crank sensor is cited (Dave's sheet)", 99r: "3 — OPEN until a GM end view of the crank sensor is cited (Dave's sheet)"}
   note: "1 signal (B1), 2 0 V (B15, white/blue), 3 6.3 V (B19, white/orange) — Dave's sheet"
   sources:
     - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
@@ -758,7 +758,7 @@ CMP:
   kit: {LS-CAM-CONN-KIT: 1}
   per_end: {part: "12110847", seal: "15324976"}
   crimper: MP150_CRIMPER
-  pins: {101r: "1", 101g: "2", "101": "3"}
+  pins: {101r: "1 — OPEN until a GM end view of the cam sensor is cited (Dave's sheet)", 101g: "2 — OPEN until a GM end view of the cam sensor is cited (Dave's sheet)", "101": "3 — OPEN until a GM end view of the cam sensor is cited (Dave's sheet)"}
   note: "1 6.3 V (B19), 2 0 V (B15), 3 signal (B2) — Dave's sheet"
   sources:
     - "Dave's M130 sheet (Desert Performance, M130 ECU Overland Bronco.xlsx): sensor connection pins"
@@ -802,7 +802,7 @@ MAP:
   kit: {LS-CRANK-CONN-KIT: 1}
   per_end: {part: "12110847", seal: "15324976"}
   crimper: MP150_CRIMPER
-  pins: {108g: "1", "108": "2", 108r: "3"}
+  pins: {108g: "1 — OPEN until a GM end view of the MAP sensor is cited (Dave's sheet)", "108": "2 — OPEN until a GM end view of the MAP sensor is cited (Dave's sheet)", 108r: "3 — OPEN until a GM end view of the MAP sensor is cited (Dave's sheet)"}
   note: "1 0 V, 2 signal, 3 5 V"
   replaces_cart: ["68104"]   # Bosch 3-pin MAP plug — not this sensor
   sources:
@@ -934,12 +934,9 @@ PS-STUDS:
     PDM15_BPOS: [2516LTP]  # the cable is 2 AWG (cable_decisions.json): 2516LTP, 2 AWG 5/16 in, on the MEGA M8 stud     # MEGA 100 A holder, M8 stud (the PDM15 end is PDM15-STUD)
     "52": [610TP]  # 6 AWG (cable_decisions.json) on the MIDI M5 stud: ProWire 610TP                 # MIDI 40 A holder, M5 stud
     "3": [AMP-KIT-RING]           # AMP Research kit harness red lead, its own fuse (IM75146 step 8)
-    PCS_BATT: [RING-SMALL]        # 5 A fused tap: holder type OPEN
-    DCDC_GND: [638TP]  # 6 AWG on the 3/8 in ground star: ProWire 638TP (was 838TP, 8 AWG)
-    AMP_GND: [238LTP]  # 2 AWG (cable_decisions.json) on the 3/8 in ground star: 238LTP (was DL438, 4 AWG)
-    IBOOST_GND: [638TP]  # 6 AWG like its feed #52 (cable_decisions.json): ProWire 638TP
+    IBOOST_PERM: [RING-SMALL]     # 5 A fused tap: holder type OPEN
     GND_RET_CAB: [238LTP, 238LTP]
-  wires: ["63", "6", "59", G1, G2, G3, ISO_OUT, ODY_NEG, ACC_NEG, DCDC_IN, DCDC_GND, AMP_GND, IBOOST_GND, GND_RET_CAB, PDM_BPOS, PDM15_BPOS, "52", "3", PCS_BATT]
+  wires: ["63", "6", "59", G1, G2, G3, ISO_OUT, ODY_NEG, ACC_NEG, DCDC_IN, GND_RET_CAB, PDM_BPOS, PDM15_BPOS, "52", "3", IBOOST_PERM]
   open:
     - "topology is Dave's DC primary (battery → isolator → stud → branches) but the registry still carries the v4 runs #63/#6/#59 — the power-spine chapter re-draws them"
     - "stud sizes: starter + alternator 5/16 in is the build book's assumption; isolator studs are 3/8 in-16 (Blue Sea 7700), so 238LTP fits them"
@@ -1062,32 +1059,41 @@ COIL-GROUND-RINGS:
 # ---------------- body firewall crossing (agent pick, replaceable: wiring_decisions k5-body-firewall-crossing-decided)
 FIREWALL-BODY-A:
   where: firewall
-  device: "body bulkhead A — Deutsch DT04-12PA-L012 flanged 12-way receptacle (A key), DT06-12SA plug; size 16 contacts, 16–20 AWG"
-  family: open
-  kit: {}
+  device: "body bulkhead A — Deutsch DT04-12PA-L012 flanged 12-way receptacle (gray, A key) + W12P wedge, DT06-12SA plug (gray, A key) + W12S wedge, DT12-L012-GKT flange gasket; size 16 contacts, 20–16 AWG"
+  family: dt
+  kit: {DT04-12PA-L012: 1, DT06-12SA: 1, W12P: 1, W12S: 1, DT12-L012-GKT: 1}
+  wires: ["85a", "85b", "86a", "86b", "83", "84", "80", "82", "87", "88", "50", "73"]   # a crossing: the mating half's contact is counted (kits_v5)
   pins: {"85a": "1", "85b": "2", "86a": "3", "86b": "4", "83": "5", "84": "6", "80": "7", "82": "8", "87": "9", "88": "10",
          "50": "11", "73": "12"}
-  open: ["DT 12-way flanged housing + W12P/W12S wedges + size 16 contacts: not in the saved ProWire catalog — KSV sells the DT04-12PA-L012 kit (nickel contacts, 20–16 AWG); confirm and cart",
-         "hole: the factory bulkhead opening (driver side) or a plate beside the 61-pin — set at the firewall mock-up"]
-  sources: ["ksvlooms.com 12-way DT04-12PA-L012 flanged receptacle kit (nickel pins 20-16 AWG)",
-            "buydeutsch.com DT04-12PA-L012 (12-pin receptacle, A key, flange)"]
+  note: "12 of 12 used: no spare cavity, no cavity plug. Contacts come per wire end from the dt family: a 0460-202-16141 pin on the receptacle side, a 0462-201-16141 socket on the plug side."
+  open: ["hole: the factory bulkhead opening (driver side) or a plate beside the 61-pin — set at the firewall mock-up"]
+  sources: ["web_snapshots/www.customconnectorkits.com__dt04-12pa-l012.md ('DT 12 Way Gray Receptacle Connector with Flange Mount, A Key'; 'Accepts size 16 pins. A key. Flange permits connector to be mounted to firewall. Gaskets available'; related DT06-12SA, W12P, DT12-L012-GKT)",
+            "web_snapshots/www.customconnectorkits.com__dt06-12sa.md ('DT 12 Way Gray Plug Connector, A Key'; 'Accepts size 16 sockets')", "web_snapshots/www.customconnectorkits.com__w12p.md", "web_snapshots/www.customconnectorkits.com__w12s.md", "web_snapshots/www.customconnectorkits.com__dt12-l012-gkt.md"]
 FIREWALL-BODY-B:
   where: firewall
-  device: "body bulkhead B — second DT 12-way flanged receptacle, keyed apart from A (B key, DT04-12PB-L012 / DT06-12SB)"
-  family: open
-  kit: {}
+  device: "body bulkhead B — Deutsch DT04-12PB-L012 flanged 12-way receptacle (black, B key) + W12P wedge, DT06-12SB plug (black, B key) + W12S wedge, DT12-L012-GKT flange gasket; keyed apart from A so the two cannot cross-mate"
+  family: dt
+  kit: {DT04-12PB-L012: 1, DT06-12SB: 1, W12P: 1, W12S: 1, DT12-L012-GKT: 1}
+  wires: ["WIPER_T1", "WIPER_T3", "BLOWER_BAT", "BLOWER_MED", "IBOOST_WAKE", "48", "49", "BLOWER_M2", "ISO_CLOSE", "ISO_OPEN", "ISO_LED", "ISO_SW_PWR"]   # a crossing: the mating half's contact is counted (kits_v5)
   pins: {"WIPER_T1": "1", "WIPER_T3": "2", "BLOWER_BAT": "3", "BLOWER_MED": "4", "IBOOST_WAKE": "5", "48": "6", "49": "7",
          "BLOWER_M2": "8", "ISO_CLOSE": "9", "ISO_OPEN": "10", "ISO_LED": "11", "ISO_SW_PWR": "12"}
-  open: ["B-key part number: confirm the listing (A and B must not cross-mate)",
-         "B is full (12 of 12): the next body wire through the firewall takes a third DT 12-way (C key, DT04-12PC-L012)"]
+  note: "12 of 12 used: no cavity plug. B key (black) vs A key (gray): the key variant pages name each plug's own key"
+  open: ["B is full (12 of 12): the next body wire through the firewall takes a third DT 12-way (C key, DT04-12PC-L012)"]
+  sources: ["web_snapshots/www.customconnectorkits.com__dt04-12pb-l012.md ('DT 12 Way Black Receptacle Connector with Flange Mount, B Key'; 'Accepts size 16 pins. B key.'; related DT06-12SB, W12P)",
+            "web_snapshots/www.customconnectorkits.com__dt06-12sb.md ('DT 12 Way Black Plug Connector, B Key'; 'Accepts size 16 sockets. B key.'; related W12S)", "web_snapshots/www.customconnectorkits.com__w12p.md", "web_snapshots/www.customconnectorkits.com__w12s.md", "web_snapshots/www.customconnectorkits.com__dt12-l012-gkt.md"]
 FIREWALL-BODY-P:
   where: firewall
-  device: "body bulkhead P — Deutsch DTP04-4P-L012 flanged 4-way receptacle, DTP06-4S plug; size 12 contacts, 12–14 AWG"
-  family: open
-  kit: {}
+  device: "body bulkhead P — Deutsch DTP04-4P-L012 flanged 4-way receptacle + WP-4P wedge, DTP06-4S plug + WP-4S wedge, DTP4P-L012-GKT flange gasket; size 12 contacts, 14–12 AWG"
+  family: dtp
+  kit: {DTP04-4P-L012: 1, DTP06-4S: 1, WP-4P: 1, WP-4S: 1, DTP4P-L012-GKT: 1, "114017": 6}
+  wires: ["BLOWER_HI"]   # a crossing: the mating half's contact is counted (kits_v5)
   pins: {"BLOWER_HI": "1"}
+  empty: ["2", "3", "4"]
+  note: "1 of 4 used; cavities 2-4 spare, closed with a 114017 sealing plug in each half (3 in the receptacle, 3 in the plug)"
   open: ["3 spare cavities (body power feeds 12-14 AWG)"]
-  sources: ["ProWire DTP04-4P-L012 'DTP 4 way flanged receptacle' + 0460-204-12141 / 0462-203-12141 'size 12, 12-14 AWG' (catalog_parts)"]
+  sources: ["web_snapshots/www.customconnectorkits.com__dtp04-4p-l012.md ('DTP 4 Way Gray Receptacle Connector with Flange Mount'; 'Accepts size 12 pins'; related 0460-204-12141, DTP06-4S, DTP4P-L012-GKT, WP-4P)",
+            "ProWire DTP04-4P-L012 'DTP 4 way flanged receptacle' + 0460-204-12141 / 0462-203-12141 'size 12, 12-14 AWG' (catalog_parts)",
+            "web_snapshots/www.farnell.com__628276.md (Deutsch catalog, Removal Tools/Sealing Plugs: contact size 16-12 -> 114017)"]
 
 # ---------------- front lamps, horn, washer, wiper, blower, iBooster (engine side of the firewall)
 HEADLIGHT-L:
@@ -1136,16 +1142,11 @@ HORN:
   wires: ["48", "HORN_GND"]
 WASHER-PUMP:
   where: engine
-  device: "12 V electric washer pump in the washer jar — lined up: USA1 Industries 1985-87 square-body washer jar kit (SKU 20530, $56.90) + 1985-87 washer pump (SKU 20151, $19.95)"
+  device: "Hella 8TW 004 223-031 12 V washer pump in the Hella 8TW 003 248-001 1.5 l tank (pin table WASHER-PUMP)"
   family: open
   kit: {}
   wires: ["50", "WASH_GND"]
-  note: "the 1977 pump is cam-driven off the wiper motor (1977 manual Fig. 8-16, p.803/828); an electric pump in the jar is the square-body fix (gmsquarebody consensus thread: 'a universal in-line pump or the later style that pops into the reservoir'). Two wires: #50 from PDM30 OUT26 and its ground in the loom."
-  open: ["the USA1 pump listing does not say electric: confirm before carting (fallback: a universal 12 V in-line pump)",
-         "confirm the 85-87 jar sits on the 1977 inner-fender mounts at the mock-up"]
-  sources: ["web_snapshots/www.usa1industries.com__1985-87-square-body-chevy-gmc-truck-washer-jar-kit.md",
-            "web_snapshots/www.usa1industries.com__1985-87-square-body-chevy-gmc-truck-windshield-wiper-washer-pump.md",
-            "web_snapshots/www.gmsquarebody.com__general-concensus-on-fixing-the-windshield-washer-pump.26964.md"]
+  sources: ["reference_documents/web_snapshots/www.hella.com__BI_Washer-pumps-and-water-tanks_2026.md"]
 UNDERHOOD-LAMP:
   where: engine
   device: "underhood lamp"
@@ -1157,8 +1158,8 @@ WIPER-MOTOR:
   device: "factory 2-speed wiper motor on the cowl (terminal board 1 / center feed / 3; park switch inside; ground strap)"
   family: open
   kit: {}
-  pins: {"49": "center (feed)", "WIPER_T1": "1", "WIPER_T3": "3", "WIPER_GND": "strap"}
-  sources: ["1977 Light Truck Service Manual p.802-803, p.815"]
+  pins: {"49": "terminal 2 (center, feed)", "WIPER_T1": "terminal 1", "WIPER_T3": "terminal 3", "WIPER_GND": "ground strap"}
+  sources: ["1977 Light Truck Service Manual p.802-803, p.810"]
 BLOWER-RES:
   where: engine
   device: "factory Four-Season blower resistor on the evaporator case — 4 terminals BAT / M1 / M2 / BLO (1978 C60 plug cavities 51 / 63 / 72 / 101; the '3 prongs' of the forum threads is superseded)"
@@ -1175,19 +1176,22 @@ BLOWER-MOTOR:
   wires: ["BLOWER_MOT", "BLOWER_HI", "BLOWER_GND"]
 IBOOSTER:
   where: engine
-  device: "Bosch iBooster Gen 2 (Tesla) with the Tulay connector — installed on the driver firewall (state)"
+  device: "Bosch iBooster Gen 1, Tesla Model S/X 1037123-00-B (72 x 72 flange) — installed on the driver firewall (state); harness: Tulay Gen-1 universal harness (NOT on order)"
   family: open
   kit: {}
-  pins: {"52": "1 (constant 12 V)", "IBOOST_WAKE": "20 (ignition 12 V)", "IBOOST_GND": "ground"}
-  open: ["pigtail unterminated (state): Tulay harness pin-out for ground and wake read at the bench"]
-  sources: ["chapters/17 §17.3 (pin 1 constant 40 A, pin 20 ignition 5 A)"]
+  pins: {"52": "1 (always hot, 40 A)", "IBOOST_PERM": "17 (always hot, 5 A)", "IBOOST_WAKE": "20 (ignition 12 V)", "IBOOST_GND": "9 (chassis ground)"}
+  open: ["pigtail unterminated (state): Tulay Gen-1 harness lead colours read at the bench"]
+  sources: ["owner's Gmail: Calimotive Auto Recycling order #1011, confirmed 2023-11-09 for 1037123-00-B ('listed with revision -A but we will ship out a revision B'), delivered 2023-11-13",
+            "K5 photo 40e5e5f9 (2026-01-31): controller label 'P/N 1?37123-0?-B ... iBooster'",
+            "chapters/17 §17.3 (pin 1 constant 40 A, pin 20 ignition 5 A)"]
 GND-BANK-ENG:
   where: engine
+  stud: "3/8"     # the star takes 3/8 in lugs (238LTP on ODY_NEG, G1, AMP_GND; PS-STUDS lugs); rings ProWire 9906/9912/9918 by gauge
   device: "ground star: stud bank beside the batteries — both battery negatives, engine block (G1), frame (G2) and every engine-bay return land here; the only place the harness grounds meet the chassis"
   family: ring_small
   kit: {}
-  wires: ["PDM_GND1", "PDM_GND2", "PDM15_GND1", "PDM15_GND2", "LTCD_GND", "PUMP_GND", "HL_L_GND", "HL_R_GND", "PT_LF_GND", "PT_RF_GND", "MK_LF_GND", "MK_RF_GND", "HORN_GND", "WASH_GND", "UH_GND", "WIPER_GND", "BLOWER_GND", "ISO_GND", "STEP_GND", "FAN_GND"]
-  lugs: {FAN_GND: ["9918"]}     # 12 AWG on the 3/8 in star stud: ProWire 9918 hi-temp ring 12-10 AWG, 3/8 in (M9)
+  wires: ["PDM_GND1", "PDM_GND2", "PDM15_GND1", "PDM15_GND2", "LTCD_GND", "PUMP_GND", "HL_L_GND", "HL_R_GND", "PT_LF_GND", "PT_RF_GND", "MK_LF_GND", "MK_RF_GND", "HORN_GND", "WASH_GND", "UH_GND", "WIPER_GND", "BLOWER_GND", "ISO_GND", "STEP_GND", "FAN_GND", "DCDC_GND", "AMP_GND", "IBOOST_GND"]
+  lugs: {FAN_GND: ["9918"], DCDC_GND: ["638TP"], AMP_GND: ["238LTP"], IBOOST_GND: ["638TP"]}   # heavy returns: their lug on this star (round 4: one termination per end)     # 12 AWG on the 3/8 in star stud: ProWire 9918 hi-temp ring 12-10 AWG, 3/8 in (M9)
   note: "small returns take a ring each; the heavy ones (battery negatives, G1, G2, the cab return, amplifier, iBooster, DC-DC) take lugs and sit on the PS-STUDS list"
   sources: ["owner 2026-09-27: 'dave runs his grounds in the looms ... would be dumb to be grounding to body all the time'",
             "state 0i: Dave's DC primary ground-stud bank", "chapters/17 §17.4.7: PDM Batt- to battery negative"]
@@ -1228,7 +1232,7 @@ WIPER-SW:
   device: "factory wiper/washer dash switch (grounding type, grounds through its mounting)"
   family: open
   kit: {}
-  wires: ["46", "WIPER_T1", "WIPER_T3"]
+  wires: ["46", "WIPER_T1", "WIPER_T3", "WIPER_SW_GND"]
   sources: ["1977 Light Truck Service Manual p.803"]
 BLOWER-SW:
   where: cabin
@@ -1323,11 +1327,12 @@ SPK-FR:
   kit: {}
   wires: ["27a", "27b"]
 GND-BANK-CAB:
+  stud: "3/8"     # GND_RET_CAB lands here on 238LTP (3/8 in; PS-STUDS lugs), so the bank's stud is 3/8 in
   where: cabin
   device: "cab ground bank beside the PDM30: an insulated stud bus; every cab return lands here and goes back to the ground star through GND_RET_CAB (2 AWG), never through the body"
   family: ring_small
   kit: {}
-  wires: ["123", "WIN_GND_L", "WIN_GND_R", "LOCK_GND_L", "LOCK_GND_R", "TGR_M_GND", "MIRROR_GND", "CL_L_GND", "CL_C_GND", "CL_R_GND", "DOME_GND", "UD_GND", "FW_GND", "USB_GND", "OUT12V_GND", "RADIO_GND", "GSS_GND", "TCASE_SW_GND", "GND_RET_REAR"]
+  wires: ["123", "WIN_GND_L", "WIN_GND_R", "LOCK_GND_L", "LOCK_GND_R", "TGR_M_GND", "MIRROR_GND", "CL_L_GND", "CL_C_GND", "CL_R_GND", "DOME_GND", "UD_GND", "FW_GND", "USB_GND", "OUT12V_GND", "RADIO_GND", "GSS_GND", "TCASE_SW_GND", "WIPER_SW_GND", "PCS_GND", "TRANS_GND", "GND_RET_REAR"]
   note: "GND_RET_CAB (2 AWG) leaves this bank on a lug (PS-STUDS list)"
   sources: ["owner 2026-09-27 (grounds in the loom)"]
 
@@ -1517,18 +1522,65 @@ GSS-SENSOR:
 
 # ---------------- PCS TCM-2650 (book review 2026-09-28: its seven wires ended nowhere)
 PCS-TCM:
-  where: unknown
-  device: "PCS TCM-2650 transmission controller (ZGP harness) — owned (Zero Gravity order 9501)"
+  where: cabin
+  mount: "under the dash beside the PDM30: the ZGP TCM-2650 setup guide rev2 (all 23 pages) gives no mounting location and no environmental or sealing rating (lead rule 2026-09-28)"
+  device: "PCS TCM-2650 transmission controller — owned (Zero Gravity order 9501); the TCM-4610 kit harness plugs into it (PCS-HARNESS-4610)"
   family: open
   kit: {}
-  pins: {PCS_BATT: "12 V battery (TCM pin unknown until the ZGP harness drawing)", PCS_IGN: "ignition (TCM pin unknown until the ZGP harness drawing)",
-         PCS_TPS: "analog 1 (TCM pin unknown until the ZGP harness drawing)", PCS_RPM: "speed input 3, orange/black (TCM pin unknown until the ZGP harness drawing)",
-         PCS_BRK: "brake light digital input (TCM pin unknown until the ZGP harness drawing)",
-         PCS_NS: "PWM vs Lever Position output, neutral (TCM pin unknown until the ZGP harness drawing)",
-         PCS_REV: "PWM vs Lever Position output, reverse (TCM pin unknown until the ZGP harness drawing)"}
-  open: ["TCM plug and pin numbers: awaiting the ZGP harness drawing (the setup guide rev2 has none; Jim emailed, state 0y)",
-         "mount position: not on file — it sets the TCM's side of the firewall"]
+  wires: []
+  note: "none of our wires lands on the TCM: the vehicle-side wires end at the TCM-4610 harness leads (PCS-HARNESS-4610)"
+  open: ["TCM plug and pin numbers: awaiting the ZGP harness drawing (the setup guide rev2 has none; Jim emailed, state 0y)"]
   sources: ["reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf p.1, p.12, p.13, p.18, p.19-20"]
+PCS-HARNESS-4610:
+  where: cabin
+  device: "PCS TCM2650-4610 kit harness (Zero Gravity: 'harness only'; for the 6L50E/6L80E/6L90E) — bought complete, TCM plug to the 6L90 case connector; our wires end at its flying leads"
+  family: kit_terminal
+  kit: {}
+  wires: ["PCS_BATT", "PCS_IGN", "PCS_TPS", "PCS_RPM", "PCS_BRK", "PCS_NS", "PCS_REV", "PCS_GND", "TRANS_BATT", "TRANS_GND", "TRANS_BRK"]
+  pins: {PCS_BATT: "12 V battery lead (lead label OPEN until the TCM-4610 drawing)", PCS_IGN: "ignition lead (lead label OPEN until the TCM-4610 drawing)",
+         PCS_TPS: "analog 1 lead (lead label OPEN until the TCM-4610 drawing)", PCS_RPM: "speed input 3 lead, orange/black (ZGP p.11)",
+         PCS_BRK: "brake light input lead (lead label OPEN until the TCM-4610 drawing)",
+         PCS_NS: "lever-position output lead, neutral (lead label OPEN until the TCM-4610 drawing)",
+         PCS_REV: "lever-position output lead, reverse (lead label OPEN until the TCM-4610 drawing)",
+         PCS_GND: "PCS ground lead (lead label OPEN until the TCM-4610 drawing)",
+         TRANS_BATT: "case battery lead to cavities 1 + 4 (whether the kit brings it out apart from the PCS battery: OPEN until the TCM-4610 drawing)",
+         TRANS_GND: "case ground lead to cavities 2 + 5 (OPEN until the TCM-4610 drawing)",
+         TRANS_BRK: "case stop-lamp lead to cavity 6 (whether the kit brings it out: OPEN until the TCM-4610 drawing)"}
+  kit_circuits: "inside the kit, drawn not cut by us: the PCS-T43 GMLAN pair (case 10/14/15 CAN+, 8/11/13 CAN-, 120 ohm at 15 and 8), case ignition 12 and accessory 9 (fed from the kit's ignition lead: OPEN until the drawing), and the case-side ends of the leads above"
+  open: ["kit harness path from the cab to the case connector (floor pass-through, its grommet): the kit's own run, set at the mock-up",
+         "TCM-4610 harness drawing: lead labels, which case cavities come out as leads (1+4, 2+5, 3, 6, 7, 16), and whether PCS_BATT also feeds case 1+4 (research §5) — ask ZGP/PSI or read the harness label when it arrives",
+         "PCS_IGN on PDM15 OUT13 also feeds case 9/12 if the kit ties them to its ignition lead: that output's load is OPEN"]
+  sources: ["web_snapshots/www.zerogravityperformance.com__tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness.md ('6l80e 6l90e TCM4610 Harness only'; 'This is the harness only and does not include the controller'; TCM2650-4610)",
+            "reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf p.2 ('12V Battery, Ignition and Grounds'), p.11, p.18-20"]
+TRANS-CASE:
+  where: chassis
+  device: "6L90 external case connector: Kostal 16-cavity, GM 15131300 / 19303772 — the only external connector; solenoids, pressure switches, speed sensors, fluid temperature and the range switch are inside the case on the TEHCM"
+  family: kit_terminal
+  kit: {}
+  wires: []
+  cavities:
+    "1": "12 V battery, RED/WHT 18 GA — TRANS_BATT via the kit"
+    "4": "12 V battery, RED/WHT 18 GA — TRANS_BATT via the kit"
+    "2": "ground, BLK/WHT 18 GA — TRANS_GND via the kit"
+    "5": "ground, BLK/WHT 18 GA — TRANS_GND via the kit"
+    "12": "12 V switched ignition, PNK 20 GA — inside the kit"
+    "9": "12 V accessory, YEL 20 GA — inside the kit"
+    "10": "CAN+ (GMLAN high), TAN/BLK 20 GA — PCS-T43 private bus, inside the kit"
+    "14": "CAN+, TAN/BLK 20 GA — inside the kit"
+    "15": "CAN+, 120 ohm applied, TAN/BLK 20 GA — inside the kit"
+    "8": "CAN-, 120 ohm applied, TAN 20 GA — inside the kit"
+    "11": "CAN-, TAN 20 GA — inside the kit"
+    "13": "CAN-, TAN 20 GA — inside the kit"
+    "6": "stop lamp switch signal, WHT 22 GA — TRANS_BRK via the kit"
+    "7": "tap up/down signal, PPL 22 GA — not wired: OPEN (shifter buttons not picked)"
+    "3": "park/neutral signal (output, grounded in P/N), ORN/BLK 20 GA — available, not wired (neutral start comes from PCS_NS)"
+    "16": "replicated TOS (output-speed) signal, ORN/BLK 22 GA — available, not wired (Dakota SPD substitution OPEN: pulses per mile, input acceptance)"
+  note: "our harness does not cut or terminate this plug: the TCM-4610 kit harness carries it; the cavity map is recorded so the kit's leads can be checked against it"
+  open: ["Dakota SPD / GEAR substitution from case 16 or the PCS outputs: pulses per mile and VHX input acceptance (research §4); #100 stays until then",
+         "tap up/down (case 7): shifter buttons not picked"]
+  sources: ["web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md (GM connector part numbers 15131300, 19303772; cavity designations table)",
+            "reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf p.3 (park/neutral output grounded in P/N; solenoid power 5 A)",
+            "reference_documents/component_drawings/Moveras_31AS_6L80_Installation_Manual_Rev1.6.pdf p.4 (internal TCM)"]
 
 # ---------------- tailgate window kit, CANDIDATE (owner has no regulator; not bought): factory switches stay, relay to the motor
 TG-RELAY:
@@ -1576,18 +1628,20 @@ FIREWALL-BODY-C:
   where: firewall
   device: "body bulkhead C — Deutsch DT04-6P-L012 flanged 6-way receptacle + W6P wedge, DT06-6S plug + W6S wedge; size 16 contacts, 14-20 AWG, 13 A (the speed sender's cab exit)"
   family: dt
-  kit: {DT04-6P-L012: 1, DT06-6S: 1, W6P: 1, W6S: 1, 0413-204-2005: 2}
+  kit: {DT04-6P-L012: 1, DT06-6S: 1, W6P: 1, W6S: 1, "114017": 4}
+  wires: ["100", "VSS_DAK", "VSS_PWR", "VSS_GND"]   # a crossing: the mating half's contact is counted (kits_v5)
   pins: {"100": "1", VSS_DAK: "2", VSS_PWR: "3", VSS_GND: "4"}
   empty: ["5", "6"]
   route: "cab exit: body bulkhead C (Deutsch DT 6-way) to the frame rail and the NP205 speedometer drive"
-  note: "4 of 6 used; cavities 5 and 6 spare, each closed with a 0413-204-2005 cavity plug (families.yaml dt)"
+  note: "4 of 6 used; cavities 5 and 6 spare, each closed with a 114017 sealing plug in each half (web_snapshots/www.farnell.com__628276.md (Deutsch catalog, Sealing Plugs: contact size 16-12 -> 114017; size 20 -> 0413-204-2005))"
   open: ["hole: floor or kick panel near the transfer case, set at the mock-up (bench)"]
   sources: ["web_snapshots/www.prowireusa.com__p-2900-dt-6-way-flanged-receptacle.md ('Wire Range: 14-20 AWG', 'Contact Size: 16 (each terminal is rated for 13.0 amps)', mating DT06-6S, wedgelock W6P)", "web_snapshots/www.customconnectorkits.com__dt04-6p-l012.md (W6P, DT06-6S)"]
 AMP-PASS:
   where: firewall
   device: "floor / rear-body pass-through near the amplifier: one Blue Sea 1003 CableClam per 2 AWG cable (#32, AMP_GND)"
   family: none
-  kit: {BLUESEA-1003: 2}
+  kit: {}
+  per_end: {part: BLUESEA-1003}
   wires: ["32", "AMP_GND"]
   route: "engine bay → frame rail (outside) → floor pass-through (AMP-PASS, CableClam) → amp"
   note: "M22759/16-2 is 0.388 in OD, under the CableClam's 0.56 in maximum cable diameter"
@@ -1599,7 +1653,7 @@ SPL-FUEL-SND:
   family: miniseal
   kit: {M81824/1-2: 1}
   wires: ["98", "117", "FUEL_SND_LEAD"]
-  note: "numbered splice SPL-FUEL-SND-1; in-line blue (2 x 20 AWG = 2,040 CM, 16 AWG equivalent; 20 AWG lead) — while both wires exist (see the #98/#117 adjudication)"
+  note: "its S-## id comes from the one splice numbering (diagram_v5); in-line blue (2 x 20 AWG = 2,040 CM, 16 AWG equivalent; 20 AWG lead) — while both wires exist (see the #98/#117 adjudication)"
   sources: ["ProWire 3137CT cavities 26-20 / 20-16 / 16-12 AWG", "ProWire Raychem MiniSeal page (M81824/1-2)"]
 SPL-PDM15-OUT6:
   where: engine
@@ -1619,4 +1673,42 @@ FAN-JUNCTION:
   note: "every lug a ProWire 9918 hi-temp ring (12-10 AWG, 3/8 in); the tail runs outside the loom to the fan (free-air rating)"
   open: ["stud spot near the PDM15 / fan breakout: formboard"]
   sources: ["web_snapshots/www.bluesea.com__PowerPost_Plus_-_3_8in-16_Stud.md", "web_snapshots/www.prowireusa.com__p-1509-hi-temp-ring-term-12-10-3-8.md"]
+SPL-PDM15-OUT7:
+  where: engine
+  device: "PDM15 OUT7 pigtail splice — pins B5 + B11 (2 × 16 AWG) joined to the LTCD feed #64 (16 AWG)"
+  family: miniseal
+  kit: {M81824/1-3: 1}
+  wires: ["64_PT1", "64_PT2", "64"]
+  note: "in-line MiniSeal M81824/1-3: 2 × 2,580 = 5,160 CM in, 16 AWG out"
+  sources: ["MoTeC PDM user manual p.43 (20 A Output 7 on B5 with B11)", "ProWire 3137CT cavities 16-12 AWG"]
+
+# ---------------- iBooster candidates (IBST-CAN, BFL) — research/2026-09-28_ibooster-gen2-wiring.md §6 and A4
+IBST-DIAG:
+  where: engine
+  device: "sealed Deutsch DTM 4-way diagnostic port near the booster for a USB CAN logger: harness half DTM 4-pin (F) MoTeC #68054 (size 20 sockets); capped with the mating DTM 4-pin (M) #68055 when no logger is on (CANDIDATE, option IBST-CAN)"
+  family: dtm
+  kit: {"68054": 1, "68055": 1, "0413-204-2005": 6, CAN-TERM-120R: 2}
+  wires: ["IBST_CAN_H", "IBST_CAN_L"]
+  pins: {IBST_CAN_H: "1", IBST_CAN_L: "2"}
+  empty: ["3", "4"]
+  note: "its own 500 kbps bus, never joined to the M1 trunk. 120 ohm at both ends: one across cavities 1-2 behind this port, one across the pair at the booster end (the booster has none). A logger plugged in must have its own terminator off. Cavities 3-4 of the harness half and all 4 of the cap take size-20 sealing plugs 0413-204-2005 (Deutsch catalog table: size 20)."
+  open: ["the #68054 / #68055 kit contents (wedge, contacts): not in the LTC manual (same as WIDEBAND)",
+         "120 ohm terminator part: not picked (value from the research: the booster has no termination)",
+         "mount spot near the booster: set at the mock-up"]
+  sources: ["reference_documents/component_drawings/motec_ltcd_user_manual.pdf p.32 ('Power/CAN Connector DTM 4pin (M) (#68055) Mating connector: DTM 4pin (F) (#68054)')",
+            "web_snapshots/www.evcreate.com__ibooster-can-bus.md ('Both channels have no termination and run at 500 kbps')",
+            "web_snapshots/www.farnell.com__628276.md (Deutsch catalog, Sealing Plugs: size 20 -> 0413-204-2005)"]
+BRAKE-FLUID-LVL:
+  where: engine
+  device: "brake-fluid reservoir level sensor on the iBooster's reservoir (CANDIDATE, option BFL)"
+  family: open
+  kit: {}
+  wires: ["BFL_SIG", "BFL_0V"]
+  pins: {BFL_SIG: "signal lead (connector and pin OPEN)", BFL_0V: "return lead (connector and pin OPEN)"}
+  note: "switched into PDM15 DIG1 against the PDM15 0V (engine bay, no firewall crossing; PDM30 DIG8 was free but in the cab, and body bulkheads A/B are full), read over CAN; the warning lamp is PDM logic on an output (none assigned). The Dakota BRAKE (-) input is taken by the E-Stopp green wire."
+  open: ["reservoir sensor connector part number and pinout: read the unit (research §6 open)",
+         "sensor type (normally open or closed at low level) and the DIG8 polarity: bench",
+         "warning lamp output: none assigned"]
+  sources: ["web_snapshots/service.tesla.com__GUID-0CE8F156-928A-4338-A693-CF6EEB9055E6.md (step 7: 'disconnect the brake fluid reservoir electrical connector')",
+            "pdm15_designations.txt (A27 DIG1, B22 0V)"]
 

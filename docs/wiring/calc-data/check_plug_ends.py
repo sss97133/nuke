@@ -102,9 +102,14 @@ def run():
             name = kits_v5.dave_name(w) if w else str(t["wire"])
             codes = [c for c in str(t.get("part") or "").split(" + ") if c]
             term = next((c for c in codes if (parts.get(c) or {}).get("kind") in ("terminal", "contact")), None)
+            lugc = next((c for c in codes if (parts.get(c) or {}).get("kind") == "lug"), None)   # round 4: a named lug sets its own gauge
             res = {}
             # R1 range
             rng = (parts.get(term) or {}).get("range_awg") if term else None
+            if not rng and lugc:
+                mg = re.search(r"(\d+)(?:-(\d+))? AWG", str((parts.get(lugc) or {}).get("name") or ""))
+                if mg:
+                    rng = [int(mg.group(1)), int(mg.group(2) or mg.group(1))]
             rng = rng or (ep.get("range_by_wire") or {}).get(str(t["wire"])) or ep.get("range") or fam.get("wire_range_awg")
             # range_by_wire: a maker gives a range per cavity (JL VX700/5i power plug: power/ground 4 AWG, remote 18-10 AWG)
             if not isinstance(eff, int):
@@ -144,6 +149,8 @@ def run():
             elif not_cavity:
                 # the plug's own write-up says this pin text is a description, not a cavity (2026-09-28: E-Stopp #126)
                 res["R2 cavity"] = ("OPEN", f"'{cv}' is not a cavity (the plug's open item says so) — cavity not read yet")
+            elif stud_family and str(cv).startswith("stud"):
+                res["R2 cavity"] = ("PASS", f"on the stud ({cv}) — lugs share a stud by design")
             elif stud_family and str(cv) in ("ring", "lug") and cav_count[str(cv)] > 1:
                 res["R2 cavity"] = ("OPEN", f"{cav_count[str(cv)]} wires share '{cv}' — which ring/stud each lands on isn't recorded"
                                             + (f" (plan: {ep.get('note')})" if ep.get("note") else ""))
@@ -597,6 +604,16 @@ def main():
     clean = sum(1 for x in res if all(st == "PASS" for st, _ in x["rules"].values()))
     fails = [x for x in res if any(st == "FAIL" for st, _ in x["rules"].values())]
     print(f"wire ends: {ends} · every rule PASS: {clean} · any FAIL: {len(fails)} · rest OPEN somewhere: {ends - clean - len(fails)}")
+    # round 4 lint: every endpoint part code has a parts.yaml row (explicit kit / OPEN markers aside), so the parts lists print it
+    reg_ = json.load(open(CD / "k5_registry.json")); parts_ = y("parts.yaml")
+    marker = re.compile(r"^(open \(|OPEN|rail splice|kit terminal$|seal$|D-609 \(gauge unknown\)|RING-SMALL$)")
+    codes_ = set()
+    for ep_ in reg_["endpoints"].values():
+        codes_ |= {str(c) for c in (ep_.get("kit") or {})}
+    for t_ in reg_["terminations"]:
+        codes_ |= {c for c in str(t_.get("part") or "").split(" + ") if c}
+    missing_ = sorted(c for c in codes_ if c not in parts_ and not marker.match(c))
+    print(f"parts lint: {'PASS' if not missing_ else 'FAIL'} — {len(missing_)} endpoint part codes with no parts.yaml row" + (f": {missing_}" if missing_ else ""))
     lead_ends = [x for x in res if str(x.get("part") or "").startswith("D-609")]
     print(f"device-lead MiniSeal splices: {len({(x['endpoint'], str(x['cavity'])) for x in lead_ends})} for {len(lead_ends)} wire ends "
           f"(a lead shared by several wires is one splice)")

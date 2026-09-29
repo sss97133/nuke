@@ -1,8 +1,15 @@
 WASHER-PUMP:
   family: open
-  note: 'the 1977 pump is cam-driven off the wiper motor (1977 manual Fig. 8-16, p.803/828); an electric pump in the jar is the square-body fix (gmsquarebody consensus
-    thread: ''a universal in-line pump or the later style that pops into the reservoir''). Two wires: #50 from PDM30 OUT26 and its ground in the loom.'
+  device: "Hella 8TW 004 223-031 12 V mono washer pump (2 bar, 1 l/min, housing 35 mm) in the Hella 8TW 003 248-001 1.5 l tank with bracket (pump holder 35 mm, bore 11 mm); mate Hella 8JD 008 151-021"
+  mate: "Hella 8JD 008 151-021 (flat connector 6.3 x 0.8 mm)"
+  pins: {"50": "pin 1 (+)", "WASH_GND": "pin 2 (-)"}
+  note: 'the 1977 pump is driven by the wiper motor and triggered by a ratchet solenoid (1977 manual Fig. 8-16 p.803; p.814). The 1985-87 C/K pump is electric in the bottom of the jar, 2 wires: white = power from the wiper fuse, pink = ground through the washer switch (1987 manual 8A-34). Here the PDM switches the feed (OUT26 on #50, commanded by the washer contact on DIG9 through #46) and the ground runs in the loom.'
+  retired_alternative: 'USA1 Industries 20530 jar kit + 20151 pump (the 1985-87 GM-style jar pump): retired 2026-09-28. The listing publishes no plug and no current (snapshot); the Hella pump publishes its plug and pin assignment.'
   open:
-  - 'pump terminals: the USA1 1985-87 pump page carries no electrical data (snapshot) — read the pump in hand or pick a 12 V pump with a published plug'
+  - 'pump current: Hella publishes voltage, pressure, flow and plug, not current. Bench it before setting OUT26 (current None).'
+  - 'fit of the 1.5 l tank on the 1977 inner fender and whether 8TW 003 248-001 ships with the pump fitted: read the part at mock-up'
   sources:
+  - 'reference_documents/web_snapshots/www.hella.com__BI_Washer-pumps-and-water-tanks_2026.md (Hella product information: program overview 8TW 004 223-031 12 V 2 bar 1 l/min mono, flat connector 6.3 x 0.8 mm, mating connector 8JD 008 151-021; pin assignment pin 1 +, pin 2 -; water tank 003248001 12 V 1.5 l with bracket and 1 pump, pump holder 35 mm)'
+  - '1987 Light Duty Truck Service Manual (reference_documents/k5_factory_docs/1987_Light_Duty_Truck_Service_Manual.pdf) p.8A-34 (PDF p.1103): washer motor in the bottom of the reservoir; two wires, white = power from the fuse box (shared with the wiper), pink = ground through the washer switch'
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.803 Fig. 8-16 and p.814'
   - reference_documents/web_snapshots/www.usa1industries.com__1985-87-square-body-chevy-gmc-truck-windshield-wiper-washer-pump.md

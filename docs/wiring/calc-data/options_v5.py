@@ -158,6 +158,14 @@ def capacity(reg, wires, opts, eps_yaml):
         res[f"body bulkhead {e[-1]}"] = OrderedDict(capacity=n, used=len(pins), spare=n - len(pins),
                                                     source="catalog/endpoints.yaml pins")
     res["power grommet"] = OrderedDict(capacity=None, used=len(fw.get("grommet", [])), spare=None, source="kits_v5 firewall map")
+    # round 4: cable pass-throughs, one cable per Blue Sea 1003 CableClam (max cable 0.56 in; web_snapshots/www.bluesea.com__CableClam_1.40in.md)
+    for e, ep in eps_yaml.items():
+        clam = (ep.get("per_end") or {}).get("part") == "BLUESEA-1003" or "BLUESEA-1003" in (ep.get("kit") or {})
+        if clam and not e.startswith("FIREWALL-GROMMET"):
+            n_ = len(ep.get("wires") or []) if (ep.get("per_end") or {}).get("part") == "BLUESEA-1003" else int((ep.get("kit") or {})["BLUESEA-1003"])
+            used_ = len(ep.get("wires") or [])
+            res[f"pass-through {e}"] = OrderedDict(capacity=n_, used=used_, spare=n_ - used_,
+                                                   source="catalog/endpoints.yaml; one cable per Blue Sea 1003 CableClam")
     for d, cap in PDM_CAP.items():
         used_out = sorted(pdm[d]["out"])
         used20 = [o for o in used_out if o <= 8]

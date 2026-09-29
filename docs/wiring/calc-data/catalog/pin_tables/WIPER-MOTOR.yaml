@@ -1,11 +1,18 @@
 WIPER-MOTOR:
   family: gm_blade
-  note: 'terminal board: center = feed from the ignition; 1 = series field + armature to the dash switch (ground); 3 = shunt field to the dash switch; housing grounds
-    through the strap · family gm_blade: the 1978 booklet draws GM factory blade connectors here (wiper terminal board harness plug, 1977 manual p.803 ''terminal
-    board''); the Packard 56-series identity is the family''s (families.yaml), not printed on the drawing'
+  device: "factory 1977 C/K 2-speed wiper motor on the cowl: compound-wound 12 V DC motor, gear box with park switch, internal circuit breaker on the brush plate, terminal board 1 / 2 (center feed) / 3, ground strap; the factory washer pump rides on it"
+  pins: {"49": "terminal 2 (center, feed)", "WIPER_T1": "terminal 1", "WIPER_T3": "terminal 3", "WIPER_GND": "ground strap"}
+  note: 'terminal board: 2 (center) = feed; 1 = series field + armature to the dash switch (ground); 3 = shunt field to the dash switch; the 20 ohm resistor on the back of the board bridges 1 and 3 for HI; the park switch (normally closed, opened by the gear cam) holds 1 to ground after OFF so the motor parks in LO off the feed.
+    Currents: 2.0-3.0 A and 3.5-5.0 A are the manual''s bench trouble-chart readings with the wiper detached; 20+ A is the stall reading. The internal breaker protects the motor from overheating; OUT12 protects the wires.
+    Pulse (delay) wipers used the same motor with an external control unit (p.804). Not added (the owner''s plan has no delay). The PDM cannot make a delay by pulsing the center feed: park runs from that feed, so cutting it stops the blades mid-sweep. A PDM delay would need the park switch read on a PDM input to hold the feed until park; not designed.
+    The factory washer pump on the gear box (Fig. 8-16) is left unwired: its ratchet solenoid is never energised, and the lock-out tang on the piston actuating plate keeps it from pumping (p.814 lists a broken lock-out tang as the cause of pumping all the time). The electric pump in the jar (WASHER-PUMP) replaces it.'
   open:
-  - 'harness plug on the terminal board (part, blade size): not in the 1977 manual text — read the motor'
+  - 'harness plug on the terminal board (GM part, blade size): not in the 1977 manual text. The 1978 booklet''s motor 12004622 is the 1978 rectangular motor, not this one. Close with the 1977 ST-352-77 booklet or by reading the motor in hand.'
+  - 'on-truck running current with linkage and wet glass: clamp-meter it at mock-up (the manual gives bench figures only)'
   sources:
-  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.803: ''current passes through the ignition switch
-    to the center terminal of the wiper terminal board''; ''wiper terminal No. 1 ... to the dash switch to ground''; ''wiper terminal No. 3''; ''the wiper motor is
-    connected to the chassis through a ground strap'''
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.802: compound-wound 12 V DC motor, gear reduction and parking switch in one die-cast housing; internal circuit breaker on the brush plate protects the motor from overheating'
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.803: current passes through the ignition switch to the center terminal of the wiper terminal board; the dash switch is a grounding type; LO grounds terminals 1 and 3; HI opens 3 and runs the shunt through the 20 ohm resistor to 1; OFF parks through the park switch in LO; ground strap; Fig. 8-16 washer pump on the wiper motor'
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.804: pulse type wipers use the same wiper motor, controlled by an external control unit'
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.810: 12 volts at center terminal (No. 2) of the wiper connector; trouble chart (wiper detached): ammeter 2.0-3.0 A; 20+ A = stall'
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.812: trouble chart: current draw normal 3.5-5.0 A'
+  - '1977 Light Truck Service Manual (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.814: washer diagnosis: feed wire to pump solenoid coil; grounded wire from pump solenoid to switch = pumps continuously; lock-out tang on piston actuating plate'

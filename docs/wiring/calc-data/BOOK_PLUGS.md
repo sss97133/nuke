@@ -49,11 +49,11 @@ Kit: WCTHB50 ×1: **BUY NOW**, to add to the ICT Billet order
 
 | Wire | Size, colour | Throttle-body pin | 61-pin | Other end |
 |---|---|---|---|---|
-| throttle motor + | 20 AWG white/brown | 1 | B | M130 A18 |
-| throttle motor − | 20 AWG white/red | 2 | C | M130 A01 |
-| TPS signal (SENT) | 22 AWG green/brown, doubled over at the terminal | 3 | FF | M130 B09 |
-| TPS 0 V | 22 AWG brown, doubled over at the terminal | 4 | f | M130 B16 (spliced) |
-| TPS 5 V | 22 AWG orange, doubled over at the terminal | 5 | e | M130 A02 (spliced) |
+| throttle motor + | 20 AWG white/brown | 1 — pin order OPEN until a GM end view of 12699160 is cited | B | M130 A18 |
+| throttle motor − | 20 AWG white/red | 2 — pin order OPEN until a GM end view of 12699160 is cited | C | M130 A01 |
+| TPS signal (SENT) | 22 AWG green/brown, doubled over at the terminal | 3 — pin order OPEN until a GM end view of 12699160 is cited | FF | M130 B09 |
+| TPS 0 V | 22 AWG brown, doubled over at the terminal | 4 — pin order OPEN until a GM end view of 12699160 is cited | f | M130 B16 (spliced) |
+| TPS 5 V | 22 AWG orange, doubled over at the terminal | 5 — pin order OPEN until a GM end view of 12699160 is cited | e | M130 A02 (spliced) |
 
 **LATER** — pin order: cite a GM end view of 12699160 before terminating (review A2; state row 29 and 0s: the order is borrowed from other GM SENT bodies)
 
@@ -101,9 +101,9 @@ Kit: LS-CRANK-CONN-KIT ×1: **BUY NOW**, in the ProWire cart, 1 more to add
 
 | Wire | Size, colour | Sensor pin | 61-pin | Other end |
 |---|---|---|---|---|
-| crank signal | 22 AWG shielded cable | 1 | x | M130 B01 |
-| crank 0 V | 22 AWG shielded cable | 2 | JJ | M130 B15 (spliced) |
-| crank 6.3 V | 22 AWG white/orange | 3 | NN | M130 B19 (spliced) |
+| crank signal | 22 AWG shielded cable | 1 — OPEN until a GM end view of the crank sensor is cited (Dave's sheet) | x | M130 B01 |
+| crank 0 V | 22 AWG shielded cable | 2 — OPEN until a GM end view of the crank sensor is cited (Dave's sheet) | JJ | M130 B15 (spliced) |
+| crank 6.3 V | 22 AWG white/orange | 3 — OPEN until a GM end view of the crank sensor is cited (Dave's sheet) | NN | M130 B19 (spliced) |
 
 **LATER** — bench check: if 22 AWG slides loose in the white seal (15324976, 1.3–2.1 mm), use the blue 15324974 (1.0–1.9 mm) — its fit with terminal 12110847 is not confirmed yet
 
@@ -115,9 +115,9 @@ Kit: LS-CAM-CONN-KIT ×1: **BUY NOW**, in the ProWire cart
 
 | Wire | Size, colour | Sensor pin | 61-pin | Other end |
 |---|---|---|---|---|
-| cam 6.3 V | 22 AWG white/orange | 1 | Z | M130 B19 (spliced) |
-| cam 0 V | 22 AWG shielded cable | 2 | HH | M130 B15 (spliced) |
-| cam signal | 22 AWG shielded cable | 3 | v | M130 B02 |
+| cam 6.3 V | 22 AWG white/orange | 1 — OPEN until a GM end view of the cam sensor is cited (Dave's sheet) | Z | M130 B19 (spliced) |
+| cam 0 V | 22 AWG shielded cable | 2 — OPEN until a GM end view of the cam sensor is cited (Dave's sheet) | HH | M130 B15 (spliced) |
+| cam signal | 22 AWG shielded cable | 3 — OPEN until a GM end view of the cam sensor is cited (Dave's sheet) | v | M130 B02 |
 
 **LATER** — bench check: if 22 AWG slides loose in the white seal (15324976, 1.3–2.1 mm), use the blue 15324974 (1.0–1.9 mm) — its fit with terminal 12110847 is not confirmed yet
 
@@ -146,9 +146,9 @@ Kit: LS-CRANK-CONN-KIT ×1: **BUY NOW**, in the ProWire cart, 1 more to add
 
 | Wire | Size, colour | Sensor pin | 61-pin | Other end |
 |---|---|---|---|---|
-| MAP 0 V | 22 AWG brown | 1 | q | M130 B16 (spliced) |
-| MAP signal | 22 AWG green/red | 2 | CC | M130 A15 |
-| MAP 5 V | 22 AWG orange | 3 | r | M130 A02 (spliced) |
+| MAP 0 V | 22 AWG brown | 1 — OPEN until a GM end view of the MAP sensor is cited (Dave's sheet) | q | M130 B16 (spliced) |
+| MAP signal | 22 AWG green/red | 2 — OPEN until a GM end view of the MAP sensor is cited (Dave's sheet) | CC | M130 A15 |
+| MAP 5 V | 22 AWG orange | 3 — OPEN until a GM end view of the MAP sensor is cited (Dave's sheet) | r | M130 A02 (spliced) |
 
 **YOUR PICK** — the MAP sensor itself: a GM Gen IV 1-bar MAP (the plug above fits it)
 

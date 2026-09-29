@@ -145,14 +145,14 @@ te_amp_plug:
 # ---- families added 2026-09-28 (pin-table pass: the plugs existed, their families did not)
 dt:
   label: Deutsch DT (door pass-throughs DOOR-L/R-PASS; body bulkheads A and B) — size 16 solid contacts
-  per_end: {pin: 0460-202-16141, socket: 0462-201-16141, wedge_pin: W12P, wedge_socket: W12S, cavity_plug: 0413-204-2005}
+  per_end: {pin: 0460-202-16141, socket: 0462-201-16141, wedge_pin: W12P, wedge_socket: W12S, cavity_plug: "114017"}   # Deutsch catalog sealing plugs: size 16-12 -> 114017, size 20 -> 0413-204-2005 (web_snapshots/www.farnell.com__628276.md (Deutsch catalog, Sealing Plugs: contact size 16-12 -> 114017; size 20 -> 0413-204-2005))
   wire_range_awg: [20, 16]          # Deutsch size 16 solid contacts 0460-202-16141 / 0462-201-16141: 20–16 AWG — source: web_snapshots/www.customconnectorkits.com__0460-202-16141.md ("20-16 AWG", "13A", "4 way indent crimper")
   steps:
     - {do: strip, tool: STRIP_26_16, value: "OPEN: strip length — Deutsch DT contact datasheet (≈ 6 mm typical)"}
     - {do: crimp, tool: HDT-48-00, value: "solid-barrel 4-indent; selector by contact size 16", source: "Deutsch HDT-48-00 hand crimp tool (size 16 selector)"}
     - {do: pull test, tool: PULL_GAUGE, value: "20 AWG ≥ 13 lbf · 18 ≥ 20 · 16 ≥ 30", source: "ch.18 §7"}
     - {do: insert, tool: hand, value: "push until the retention finger clicks; fit the wedge (W12P plug / W12S receptacle)", source: "Deutsch DT assembly instructions"}
-    - {do: plug empty cavities, part: 0413-204-2005, value: "one per spare cavity"}
+    - {do: plug empty cavities, part: "114017", value: "one per spare cavity in each half"}
 
 dtp:
   label: Deutsch DTP (body bulkhead P) — size 12 contacts

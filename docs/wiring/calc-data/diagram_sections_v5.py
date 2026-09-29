@@ -36,7 +36,7 @@ SHEET_PLAN = [
      r"^(HEADLIGHT-[LR]|PARK-TURN-[LR]F|MARKER-[LR]F|HORN|UNDERHOOD-LAMP)$"),
     ("body_convenience", "front-body", "Wiper motor, washer pump and blower (engine side of the firewall)", "engine",
      r"^(WIPER-MOTOR|WASHER-PUMP|BLOWER-MOTOR|BLOWER-RES)$"),
-    ("powertrain_chassis", "booster", "Brake booster", "engine", r"^IBOOSTER$"),
+    ("powertrain_chassis", "booster", "Brake booster", "engine", r"^(IBOOSTER|IBST-DIAG|BRAKE-FLUID-LVL)$"),
     ("dash_cabin", "switches", "Ignition, isolator, light, turn, brake and horn switches", "cab",
      r"^(IGN-SWITCH|ISO-SWITCH|SPL-ISO-YEL|HL-SW|FLOOR-DIMMER|TURN-SW|BRAKE-SW|HORN-SW)$"),
     ("dash_cabin", "dash", "Wiper and blower switches, gas pedal, radio, outlet and USB port", "cab",
@@ -53,7 +53,7 @@ SHEET_PLAN = [
     ("lighting_rear", "rear-lamps", "Tail, stop, backup, third brake, license and rear markers; cab roof clearance lamps",
      "cab", r"^(Tail_Light_(Left|Right)|Backup_Light_(Left|Right)|CHMSL|LICENSE-LAMP|MARKER-[LR]R|CLEARANCE-[LCR])$"),
     ("powertrain_chassis", "chassis", "Transfer-case switch, speed sender, gear sender and parking brake", "cab",
-     r"^(TCASE-4WD-SW|VSS|VSS-SENDER|GSS-3000|GSS-SENSOR|E-STOPP|PCS-TCM)$"),
+     r"^(TCASE-4WD-SW|VSS|VSS-SENDER|GSS-3000|GSS-SENSOR|E-STOPP|PCS-TCM|PCS-HARNESS-4610|TRANS-CASE)$"),
 ]
 
 # the computers: drawn on every sheet a run reaches them, pins named from the MoTeC designation files

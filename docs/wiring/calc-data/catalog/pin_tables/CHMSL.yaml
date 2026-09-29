@@ -10,3 +10,9 @@ CHMSL:
   - reference_documents/web_snapshots/www.truck-lite.com__61500r.md
   - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2
   device: ORACLE 4514-003 Linear Universal LED third brake module, red, 7 in, 6 W at 12-24 V (0.5 A at 12 V), IP68
+  pins:
+    '93': + feed (Oracle 4514-003 power connector; type read on arrival)
+    CHMSL_GND: '- ground'
+    PCS_BRK: '+ feed tap for the PCS brake input (spliced with #93 at the lamp lead)'
+    TRANS_BRK: '+ feed tap for the 6L90 case stop-lamp input, cavity 6 (spliced with #93 at the lamp lead)'
+  splice_point: true

@@ -2,8 +2,8 @@ DOOR-R-PASS:
   family: dt
   pins: {LOCK_FEED_R: '1', LOCK_GND_R: '2', LOCK_BUS_A: '3', LOCK_BUS_B: '4', 27a: '5', 27b: '6'}
   empty: 2
-  note: 'DESIGN CHOICE, not a maker fact: same order as DOOR-L-PASS; cavities 7 and 8 plugged (0413-204-2005)'
-  kit: {}
+  note: 'DESIGN CHOICE, not a maker fact: same order as DOOR-L-PASS; cavities 7 and 8 plugged (114017 in each half, Deutsch catalog sealing-plug table: size 16-12)'
+  kit: {DT04-08PA: 1, DT06-08SA: 1, W8P: 1, W8S: 1, "114017": 4}
   mate: DT06-08SA + W8S (door side, sockets) to DT04-08PA + W8P (body side, pins)
   sources:
   - see DOOR-L-PASS

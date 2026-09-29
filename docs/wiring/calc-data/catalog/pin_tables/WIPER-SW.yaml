@@ -2,11 +2,13 @@ WIPER-SW:
   family: gm_blade
   kit: {}
   mate: OPEN
+  wires: ["46", "WIPER_T1", "WIPER_T3", "WIPER_SW_GND"]
+  pins: {"WIPER_T1": "terminal-1 lead (cavity OPEN)", "WIPER_T3": "terminal-3 lead (cavity OPEN)", "46": "washer contact (cavity OPEN)", "WIPER_SW_GND": "switch mounting (ground lug under a mount screw; not a cavity)"}
+  note: 'grounding-type switch: OFF opens 1 and 3 (park runs off the motor feed), LO grounds 1 and 3, HI grounds 1 only; the washer contact grounds (it grounded the factory pump solenoid, p.814) and now grounds PDM30 DIG9. The motor current returns through the switch body, so the mount gets WIPER_SW_GND in the loom (state row 56) instead of the dash metal.'
   open:
-  - 'switch cavities for motor terminal 1, terminal 3 and the washer contact: the 1977 manual (p.803-804) describes the circuit by motor terminals only; the 1978 booklet''s switch connector 12004706 (A-F)
-    serves the 1978 rectangular motor 12004622, not the ''77 round motor with terminal board 1/2/3 — needs the 1977 ST-352-77 booklet view or the bench'
+  - 'switch cavities for motor terminal 1, terminal 3 and the washer contact: the 1977 manual (p.803-804) describes the circuit by motor terminals only; the 1978 booklet''s switch connector 12004706 (A-F) serves the 1978 rectangular motor 12004622, not the ''77 round motor with terminal board 1/2/3. Close with the 1977 ST-352-77 booklet view or at the bench.'
+  - 'mount screw size for the WIPER_SW_GND ring: read the switch bracket'
   sources:
-  - 1977 Light Truck Service Manual Section 8 (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.803-804 (grounding-type dash switch; LO grounds terminals 1 and 3, HI grounds terminal
-    1)
-  - ST-352 1978 C/K wiring booklet fold-out A-1 'Cab, Engine and Chassis Wiring' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the '77
-    K5) (1978 wiper/wash switch 12004706 — different motor, not used)
+  - 1977 Light Truck Service Manual Section 8 (reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf) p.803-804 (grounding-type dash switch, 'must be securely mounted'; LO grounds terminals 1 and 3, HI grounds terminal 1)
+  - 1977 Light Truck Service Manual p.814 (washer diagnosis; grounded wire from pump solenoid to switch)
+  - ST-352 1978 C/K wiring booklet fold-out A-1 'Cab, Engine and Chassis Wiring' (reference_documents/wiring_diagram_booklets/pages/1978_CK_A1_cab_engine_chassis_main.png; closest year on file to the '77 K5) (1978 wiper/wash switch 12004706; different motor, not used)

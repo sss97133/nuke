@@ -31,7 +31,8 @@ from manual_v5 import gm_colour, tw, FONT, wrap_text   # noqa: E402
 import diagram_sections_v5 as P                        # noqa: E402
 import manual_v5                                       # noqa: E402
 
-OUT = CD.parent / "output" / "manual"
+OUT = Path(__import__("os").environ.get("K5_BOOK_OUT") or CD.parent / "output" / "manual")   # K5_BOOK_OUT: build elsewhere
+FIGS = CD.parent / "output" / "manual" / "figures"                   # the twin figures stay where figures_v5 wrote them
 W, H, M = 1224, 792, 36                                # tabloid landscape, points
 ROW = 12.0                                             # one wire row: run label above the run, circuit label below
 MAP_URL = "https://nuke.ag/vehicle/e08bf694-970f-4cbe-8a74-8715158a0f2e/wiring?tab=map&node="   # the plug's card on the truck's map
@@ -59,7 +60,7 @@ def wire_colours(w):
 
 SHIELD_RUN = ("#111111", "#ffffff")
 UNSET_RUN = "#fffffe"
-UNSET_GREY = "#a6a6a6"                          # not a wire colour (grey wire = #8a8a8a)
+UNSET_GREY = manual_v5.UNSET_GREY
 
 
 CAND_DASH = "7 2 1.2 2"                         # dash-dot: a candidate option's run
@@ -70,12 +71,64 @@ def is_candidate(wid):
     return w.get("option_status") == "candidate"
 
 
+def open_tag_faults(sheet):
+    """An OPEN (heavy-dashed) run must carry 'OPEN' in a label of its own on the sheet (review round 4)."""
+    dashed = {o for o, _d, dash in getattr(sheet, "strokes", []) if o is not None and dash == manual_v5.OPEN_DASH}
+    tagged = {b[6] for b in sheet.boxes if len(b) > 6 and b[6] and "OPEN" in str(b[4])}
+    return [f"OPEN run {o} has no OPEN tag" for o in sorted(dashed - tagged)]
+
+
+def cavity_rect(s, x, y, w, h, fill, lit, wid):
+    """A bulkhead cavity: the wire's colour; a wire with no colour set gets the colour-unset style (grey dotted edge,
+    manual_v5.UNSET_CAV_WORDS) — never a solid white box (review round 4: VSS_DAK in bulkhead C cavity 2)."""
+    if lit and fill == UNSET_RUN:
+        s.rect(x, y, w, h, sw=1.1, fill="#fff", colour=manual_v5.UNSET_STROKE, dash="0.6 1.3")
+        s.__dict__.setdefault("cav_log", []).append((wid, "unset"))
+        return
+    s.rect(x, y, w, h, sw=0.5, fill=fill, colour="#000" if lit else "#bbb")
+    if lit:
+        s.__dict__.setdefault("cav_log", []).append((wid, fill))
+
+
+def cavity_fill_faults(sheet):
+    """A lit cavity for a wire with no colour must use the colour-unset style, never a solid white fill."""
+    return [f"cavity of colour-unset wire {w} filled solid ({f})" for w, f in getattr(sheet, "cav_log", [])
+            if w and wire_colours(CTX.wires.get(w, {}))[0] == UNSET_RUN and f != "unset"]
+
+
+def option_is_alternative(ctx, opt):
+    """True when an option's wires replace base wires (their words or their plugs say 'replaces', 'in place of',
+    'alternative'); an additive option (power windows, locks) replaces nothing."""
+    rx = re.compile(r"in place of|replac\w*|alternative", re.I)
+    o = (ctx.reg.get("options") or {}).get(opt) or {}
+    if rx.search(str(o.get("name") or "")):
+        return True
+    for w in ctx.wires.values():
+        if w.get("option") != opt:
+            continue
+        txt = " ".join(str(w.get(k) or "") for k in ("label", "notes"))
+        txt += " ".join(str((ctx.eps.get(t["endpoint"]) or {}).get("device") or "") for t in ctx.ends.get(str(w["id"]), []))
+        if rx.search(txt):
+            return True
+    return False
+
+
+def candidate_key(ctx, opt):
+    """The sheet key for one candidate option, worded by what the option does (review round 4)."""
+    name = ((ctx.reg.get("options") or {}).get(opt) or {}).get("name", opt).split(" (")[0]
+    if option_is_alternative(ctx, opt):
+        return (f"DASH-DOT RUN TAGGED CANDIDATE: {opt} ({name}) = an alternative not yet decided: only one of these and the "
+                f"base wires they replace is built.")
+    return f"DASH-DOT RUN TAGGED CANDIDATE: {opt} ({name}) = built only if option {opt} is chosen."
+
+
 def candidate_faults(sheet):
     """A candidate wire drawn in the base style, or a sheet with candidates and no key (review round 3)."""
     bad = [f"candidate wire {o} drawn in the base style" for o, _d, dash in getattr(sheet, "strokes", [])
            if is_candidate(o) and dash != CAND_DASH]
-    if getattr(sheet, "cands", None) and not any("CANDIDATE" in str(b[4]) and "only one" in str(b[4]) for b in sheet.boxes):
-        bad.append("candidate wires on the sheet with no 'only one is built' key")
+    for o in sorted({CTX.wires[w_].get("option") for w_ in getattr(sheet, "cands", set())}):
+        if not any(str(b[4]) == candidate_key(CTX, o) for b in sheet.boxes):
+            bad.append(f"candidate option {o} on the sheet without its key")
     return bad
 
 
@@ -127,7 +180,7 @@ TITLES = {"CKP": "crank sensor", "CMP": "cam sensor", "MAP": "MAP sensor", "CLT-
           "ALTERNATOR-SENSE": "alternator (L terminal)", "STARTER-S": "starter solenoid S", "FAN": "radiator fan",
           "AC-CLUTCH": "A/C compressor clutch", "AC-HP-SW": "A/C high-pressure switch", "AC-LP-SW": "A/C low-pressure switch",
           "ODYSSEY": "running battery (Odyssey)", "ACC-BATT": "accessory battery (YellowTop)", "ISOLATOR": "battery isolator",
-          "DCDC": "DC-DC charger", "IBOOSTER": "brake booster (iBooster)", "CAN-BUS": "CAN bus trunk",
+          "DCDC": "DC-DC charger", "IBOOSTER": "brake booster: Bosch iBooster Gen 1, Tesla 1037123-00-B", "CAN-BUS": "CAN bus trunk",
           "PORT-ETH": "M130 laptop port (RJ45)", "PORT-UTC": "PDM30 laptop port (XLR)", "FIREWALL-GROMMET": "firewall grommet",
           "FIREWALL-BODY-A": "body bulkhead A", "FIREWALL-BODY-B": "body bulkhead B", "FIREWALL-BODY-P": "body bulkhead P",
           "FIREWALL-BODY-C": "body bulkhead C", "AMP-PASS": "floor pass-through at the amplifier",
@@ -232,14 +285,15 @@ class Sheet:
         d = f' stroke-dasharray="{dash}"' if dash else ""
         P_ = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
         drawn = []
+        if dash == manual_v5.OPEN_DASH:
+            w = max(w, manual_v5.OPEN_WIDTH)      # OPEN: the heavy dash (manual_v5 style constants)
         if colour == UNSET_RUN:
-            # colour not set: a thin grey line with a black dotted overlay — never a wire colour (review round 3, N1:
-            # the orange edge read as the 5 V feed colour)
-            self.el.append(f'<polyline points="{P_}" fill="none" stroke="{UNSET_GREY}" stroke-width="{max(w * 0.55, 0.5):.2f}" '
-                           f'stroke-linejoin="round"{d}/>')
-            self.el.append(f'<polyline points="{P_}" fill="none" stroke="#000" stroke-width="{max(w * 0.55, 0.5):.2f}" '
-                           f'stroke-dasharray="0.5 1.6" stroke-linecap="round"/>')
-            drawn = [UNSET_GREY, "#000"]
+            # colour not set: grey hairline with small open circles (manual_v5.unset_run_svg); an OPEN one is dashed too
+            svg_ = manual_v5.unset_run_svg(pts, w)
+            if dash:
+                svg_ = svg_.replace('stroke-linejoin="round"/>', f'stroke-linejoin="round" stroke-dasharray="{dash}"/>', 1)
+            self.el.append(svg_)
+            drawn = [UNSET_GREY]
         else:
             if colour != "#000":                 # a coloured run: thin black edge so white wire shows on white paper
                 self.el.append(f'<polyline points="{P_}" fill="none" stroke="#000" stroke-width="{w + 0.9}" stroke-linejoin="round"{d}/>')
@@ -446,9 +500,15 @@ def length_repeats(sheet):
     return [w for w, n in c.items() if n > 1]
 
 
+def cname(ctx, wid):
+    """A circuit as printed: its number, else the builder's name for it — never a code (review round 4)."""
+    return manual_v5.circuit_word(ctx.wires.get(str(wid)) or {"id": str(wid)})
+
+
 def circuit_label(w):
-    """The printed sleeve text until Dave names the circuits: the circuit id (review B17)."""
-    return f"LABEL: {str(w['id']).upper()}"
+    """The printed sleeve text: the circuit number; a wire with no number has no sleeve text until Dave names it."""
+    wid = str(w["id"])
+    return f"LABEL: {wid.upper()}" if re.fullmatch(r"\d+[A-Za-z]?", wid) else "LABEL: OPEN"
 
 
 def plug_part_lines(reg, e, parts):
@@ -491,9 +551,23 @@ def sheet_parts(reg, eps_on_sheet, parts, junction_wires=None):
             r[3] += n
             if plug_title(e, ep) not in r[4]:
                 r[4].append(plug_title(e, ep))
+    # the gauge a part is used on here comes from the wire list, never from the part's catalogue note (review round 4:
+    # the LTCD contact note said 18 AWG while the run is 16)
+    gauges = defaultdict(set)
+    wires_ = {str(w["id"]): w for w in reg["wires"] + reg["implied"]}
+    for t in reg["terminations"]:
+        if t["endpoint"] in eps_on_sheet:
+            for code in str(t.get("part") or "").split(" + "):
+                w = wires_.get(str(t["wire"]))
+                if code in rows and w and isinstance(w.get("awg"), int):
+                    gauges[code].add(manual_v5.gauge_word(w))
     out = []
     for code, name, kind, q, used in rows.values():
         qs = str(int(round(q))) if abs(q - round(q)) < 1e-6 and q >= 1 else f"{math.ceil(q)} (1 kit serves {frac.get(code, 1)} plugs)"
+        name = re.sub(r"\s*\((?:[^()]*?\s)?\d+\s*AWG\)", "", str(name))      # a single-gauge usage claim in the note
+        name = re.sub(r"\s*\(\d+\s*AWG[^()]*\)", "", name)
+        if gauges.get(code):
+            name += " — here on " + ", ".join(sorted(gauges[code], key=lambda g: (len(g), g))) + " AWG"
         out.append((code, name, kind, qs, used))
     return out
 
@@ -701,7 +775,7 @@ def plan(ctx):
     return sheets, owned
 
 
-SUB2SECTION = {"CORE_ENGINE": "engine", "TRANS_6L80E": "powertrain_chassis", "FUEL": "body_convenience",
+SUB2SECTION = {"CORE_ENGINE": "engine", "TRANS_6L90": "powertrain_chassis", "FUEL": "body_convenience",
                "CHARGING_STARTING": "power_spine", "HARNESS_INFRA": "power_spine", "COOLING": "engine",
                "EPARKING_BRAKE": "powertrain_chassis", "DASH_CLUSTER_DAKOTA": "dash_cabin", "LIGHTING_EXTERIOR": "dash_cabin",
                "LIGHTING_INTERIOR": "body_convenience", "POWER_WINDOWS": "body_convenience", "POWER_LOCKS": "body_convenience",
@@ -783,6 +857,10 @@ def assemble(ctx, sp, devs, extra, owned, num_of):
             right.append(b)
         else:
             left.append(dev_box(ctx, e, ws, wends))
+    # a plug with no run of this harness (the kit harness's own TCM and case connectors) draws no empty box: the sheet's
+    # KIT HARNESS note names it
+    left = [b for b in left if b.rows]
+    right = [b for b in right if b.rows]
     for e in P.ENGINE_COMPUTERS:
         if e in L_c:
             left.append(comp_box(ctx, e, L_c[e], "right"))
@@ -825,6 +903,11 @@ def dev_box(ctx, e, ws, wends):
     at.sort(key=lambda p: (sort_key(p[1] if p[1] is not None else f"?{p[0]}"), p[0]))
     for wid, cav in at:
         text = kits_v5.dave_name(ws[wid])
+        mk, note = manual_v5.split_cavity(cav) if cav is not None else ("?", "cavity not assigned")
+        if note:
+            # an unsettled cavity: the pin box prints its mark (or '?') as an OPEN stamp; the words go to the OPEN list
+            rows.append({"cav": cav, "text": text, "wires": [wid], "mark": mk if len(mk) <= 4 else "?", "mark_open": note})
+            continue
         if cav is not None and cav_mark(cav) == "○" and words(cav).lower() not in text.lower():
             text = f"{words(cav)}: {text}"
         rows.append({"cav": cav, "text": text, "wires": [wid], "mark": cav_mark(cav)})
@@ -894,7 +977,9 @@ def dest_text(ctx, e, cav, owned, num_of):
 
 
 def tag_box(ctx, items, owned, num_of, pins):
-    rows = [{"cav": None, "text": f"{wid.upper()} {dest_text(ctx, e, cav, owned, num_of)}", "wires": [wid], "mark": ""}
+    # a numbered circuit leads its tag; an unnumbered one is named by its own run label, so its tag is the destination
+    rows = [{"cav": None, "text": (f"{wid.upper()} " if re.fullmatch(r"\d+[A-Za-z]?", wid) else "")
+             + dest_text(ctx, e, cav, owned, num_of), "wires": [wid], "mark": ""}
             for wid, e, cav in items]
     return Box("tag", "", "TO OTHER SHEETS", rows, pins=pins)
 
@@ -951,7 +1036,7 @@ def draw_column_box(s, b):
             fill = "#fff"
             if lit and r["wires"]:
                 fill = wire_colours(CTX.wires[r["wires"][0]])[0]
-            s.rect(b.x + 3, yy - 4.2, b.w - 6, 8.4, sw=0.5, fill=fill if lit else "#fff", colour="#000" if lit else "#bbb")
+            cavity_rect(s, b.x + 3, yy - 4.2, b.w - 6, 8.4, fill if lit else "#fff", lit, r["wires"][0] if lit and r["wires"] else None)
             s.txt(b.x + b.w / 2, yy + 2.2, r["mark"], 5.4, bold=bool(lit), anchor="middle",
                   colour=("#fff" if lit and fill in DARK else "#000") if lit else "#bbb")
             for k, ftxt in enumerate(r.get("far") or []):
@@ -969,8 +1054,9 @@ def draw_column_box(s, b):
         # so the text is anchored from the other edge and still reads left to right from the mark)
         mark_x = b.x + b.w - 3 - mw if b.pins == "right" else b.x + 3
         if r["mark"]:
-            s.rect(mark_x, yy - 3.4, mw, 6.8, sw=0.6, fill="#fff", mark=True)
-            s.txt(mark_x + mw / 2, yy + 2.2, r["mark"], 5.2, bold=True, anchor="middle")
+            op = bool(r.get("mark_open"))           # OPEN stamp style: orange box and mark (manual_v5 style constants)
+            s.rect(mark_x, yy - 3.4, mw, 6.8, sw=0.9 if op else 0.6, fill="#fff", mark=True, colour=ORANGE if op else "#000")
+            s.txt(mark_x + mw / 2, yy + 2.2, r["mark"], 5.2, bold=True, anchor="middle", colour=ORANGE if op else "#000")
         for k, ln in enumerate(b.lines(i)):
             ty = yy + 2.2 + k * Box.SUB
             if b.pins == "right":
@@ -1001,8 +1087,8 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
     eng = model["eng"]
     ws, wends, cls = model["ws"], model["wends"], model["cls"]
     head = P.SECTION_HEAD.get(sp["section"], sp["section"].upper())
-    sub = (f"{len(page_devs)} plugs · {len(ws)} circuits · label = gauge colour-circuit · length; LABEL = sleeve text · "
-           f"dashed = an end or a cavity not settled · plug boxes are pin maps, not the plug's shape"
+    sub = (f"{sum(1 for b in model['left'] + model['right'] if b.kind == 'dev')} plugs · {len(ws)} circuits · label = gauge colour-circuit · length; LABEL = sleeve text · "
+           f"{manual_v5.OPEN_RUN_WORDS} · {manual_v5.UNSET_RUN_WORDS} · plug boxes are pin maps, not the plug's shape"
            + ("; the 61-pin is drawn to its insert arrangement" if any(k == "face" for k, _ in model["x"]) else ""))
     s = Sheet(number, title, sub, head)
     s.mx = bool(model["eng"])                  # engine layout drawn cab-left, engine-right: the book's one orientation
@@ -1013,7 +1099,7 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
     def need(bs):
         return max([tw(r["text"], 5.4) + max(9, tw(r.get("mark") or "", 5.2, True) + 3) + 22
                     for b in bs if b.kind != "strip" for r in b.rows] + [BOX_W])
-    wL = min(need(left), 240 if not eng else 200)
+    wL = min(need(left), 290 if not eng else 200)
     for b in left:
         b.w = wL
     L_x = M + 10
@@ -1130,6 +1216,8 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
     for wid_, v in xout.items():
         left_leg[round(v[1] * 2) / 2].add(wid_)
 
+    JOG_X = 26                                  # clear of a pin's splice dot and its S-## tag
+
     def jog(wid_, y_):
         near = {w_ for yy, ws_ in left_leg.items() if abs(yy - y_) < 2.0 for w_ in ws_} - {wid_}
         near = {w_ for w_ in near if not ctx.pin_mates(w_, wid_)}
@@ -1147,13 +1235,13 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
         Lp = [p for p in pts[wid] if p[2] == "L"]
         Rp = [p for p in pts[wid] if p[2] == "R"]
         n_points = len(Lp) + len(Rp) + (1 if wid in xin else 0)
-        dashed = "3 2" if (unsettled or n_points < 2 or not ends) else None
+        dashed = manual_v5.OPEN_DASH if (unsettled or n_points < 2 or not ends) else None
         if dashed:
             open_runs += 1
         lw = 1.1
         draw = lambda P_: s.line(P_, lw, dashed, colour=base, stripe=stripe, owner=wid)
         if not Lp and not Rp and wid not in xin:
-            open_notes.append((wid.upper(), "no end rows at all", endpoint_words(w)))
+            open_notes.append((cname(ctx, wid), "no end rows at all", endpoint_words(w)))
             continue
         if eng and wid in xin:
             # engine side: left-stack pins -> lane A -> crossing; cab side: crossing -> lane C -> right-stack pins
@@ -1181,7 +1269,7 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
                 for x_, y_, *_ in Rp:
                     j = jog(wid, y_)
                     if j:
-                        draw([(xc, y_ + j), (x_ - 10, y_ + j), (x_ - 10, y_), (x_, y_)])
+                        draw([(xc, y_ + j), (x_ - JOG_X, y_ + j), (x_ - JOG_X, y_), (x_, y_)])
                     else:
                         draw([(xc, y_), (x_, y_)])
                     ys.append(y_ + j)
@@ -1195,7 +1283,7 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
             else:
                 draw([(xr, yr), (xr + 10, yr)])
             # the cab side carries the same label
-            s.txt(xr + 4, yr - 1.4, wire_label(w, length=False), LBL, owner=wid)
+            s.txt(xr + 4, yr - 1.4, wire_label(w, length=False) + (" · OPEN" if dashed else ""), LBL, owner=wid)
         elif eng and Lp and Rp and ctx.crossing(w)[0] is not False:
             # no crossing cavity: over the top of the sheet, dashed, stamped
             xa = laneA[0] + (iA % nA) * stepA + 1
@@ -1211,9 +1299,9 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
                 draw([(xc, y_), (x_, y_)])
             if not dashed:
                 open_runs += 1
-                dashed = "3 2"
+                dashed = manual_v5.OPEN_DASH
             need, cr = ctx.crossing(w)
-            open_notes.append((wid.upper(), f"crossing: {cr}" if cr else "crosses the firewall with no crossing cavity", endpoint_words(w)))
+            open_notes.append((cname(ctx, wid), f"crossing: {cr}" if cr else "crosses the firewall with no crossing cavity", endpoint_words(w)))
         else:
             allp = Lp + Rp
             need, cr = ctx.crossing(w)
@@ -1221,10 +1309,10 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
                 sides = {ctx.side(e) for e, _ in ends if e not in P.CROSSINGS} - {"x", "outside"}
                 need = len(sides) == 2
             if not eng and need and not any(e in P.CROSSINGS for e, _ in ends):
-                open_notes.append((wid.upper(), f"crossing: {cr}" if cr else "crosses the firewall with no crossing cavity",
+                open_notes.append((cname(ctx, wid), f"crossing: {cr}" if cr else "crosses the firewall with no crossing cavity",
                                    endpoint_words(w)))
                 if not dashed:
-                    dashed = "3 2"
+                    dashed = manual_v5.OPEN_DASH
                     open_runs += 1
                     draw = lambda P_: s.line(P_, lw, dashed, colour=base, stripe=stripe, owner=wid)
             if len(allp) >= 2:
@@ -1240,7 +1328,7 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
                     if j:
                         # a right-hand leg at another wire's left-leg height: off that line, back onto the pin
                         # just before the box (the two never read as one wire; review round 3, N6)
-                        draw([(xa, y_ + j), (x_ - 10, y_ + j), (x_ - 10, y_), (x_, y_)])
+                        draw([(xa, y_ + j), (x_ - JOG_X, y_ + j), (x_ - JOG_X, y_), (x_, y_)])
                     else:
                         draw([(x_, y_), (xa, y_)])
                     ys.append(y_ + j)
@@ -1255,7 +1343,7 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
                 x_, y_, where, r, b = allp[0]
                 d = 10 if where == "L" else -10
                 draw([(x_, y_), (x_ + d, y_)])
-                open_notes.append((wid.upper(), "one end drawn; the other end has no end row", endpoint_words(w)))
+                open_notes.append((cname(ctx, wid), "one end drawn; the other end has no end row", endpoint_words(w)))
                 if not dashed:
                     open_runs += 1
         # labels: at every plug end in the left stack, else at the first left-stack end, else at the first right-stack end
@@ -1270,13 +1358,13 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
         for x_, y_, _w, r_, b_ in anc:
             x_ = b_.x + b_.w + (14 if b_.kind == "comp" else 0)     # clear of a splice dot at a computer pin
             s.txt(x_ + 4, y_ - 1.4, wire_label(w, length=first_label(s, wid), sheet=s), LBL, owner=wid)
-            s.txt(x_ + 4, y_ + 4.6, circuit_label(w), LBL2, colour="#333", owner=wid)
+            s.txt(x_ + 4, y_ + 4.6, circuit_label(w) + (" · OPEN" if dashed else ""), LBL2, colour="#333", owner=wid)
         rp_ = sorted([p for p in Rp if notpig(p) and free_pt(p)], key=lambda p: (p[4].kind != "dev", len(p[3]["wires"])))
         if not anc and rp_:
             x_, y_ = rp_[0][0], rp_[0][1]
             taken.add((rp_[0][4].code, rp_[0][3].get("cav"), y_))
             s.txt(x_ - 18, y_ - 1.4, wire_label(w, length=first_label(s, wid), sheet=s), LBL, anchor="end", owner=wid)
-            s.txt(x_ - 18, y_ + 4.6, circuit_label(w), LBL2, colour="#333", anchor="end", owner=wid)
+            s.txt(x_ - 18, y_ + 4.6, circuit_label(w) + (" · OPEN" if dashed else ""), LBL2, colour="#333", anchor="end", owner=wid)
     # shields: dashed oval around the cable's conductors near the plug; the drain leaves the oval (its run is drawn
     # with the others from the oval's point)
     for b in left:
@@ -1310,10 +1398,10 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
             for k_, sid_ in enumerate([x["id"] for x in sps] or ["S-?"]):
                 s.txt(px + dx, py + 6.2 + k_ * 4.6, sid_, 4.2, bold=True, anchor="middle", colour="#000" if sps else ORANGE)
             for x in sps:
-                splice_rows[x["id"]] = (x["id"], f"{b.code} {r['cav']}", ", ".join(str(q).upper() for q in x["wires"]),
+                splice_rows[x["id"]] = (x["id"], f"{b.code} {r['cav']}", "; ".join(cname(ctx, q) for q in x["wires"]),
                                         str(x.get("splice") or "OPEN"), "formboard: OPEN")
             if not sps:
-                splice_rows[f"?{b.code}{r['cav']}"] = ("S-?", f"{b.code} {r['cav']}", ", ".join(q.upper() for q in r["wires"]),
+                splice_rows[f"?{b.code}{r['cav']}"] = ("S-?", f"{b.code} {r['cav']}", "; ".join(cname(ctx, q) for q in r["wires"]),
                                                         "OPEN: not in the splice list", "formboard: OPEN")
     # in-line splices: each pigtail labelled at its computer pin with the splice id
     for b in right + left:
@@ -1339,11 +1427,11 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
                 if sid and sid not in splice_rows:
                     joined = ctx.rail_recs.get((b.code, sid), [])
                     splice_rows[sid] = (sid, f"{plug_title(b.code, ctx.eps.get(b.code, {})).lower()}",
-                                        ", ".join(q.upper() for q in joined) + " + the rail", "D-609-05",
+                                        "; ".join(cname(ctx, q) for q in joined) + " + the rail", "D-609-05",
                                         "formboard: order along the rail OPEN")
     for wid, rec in model["merged"].items():
-        pts_ = [str(x).upper() for x in rec["sides"][0]]
-        splice_rows[rec["id"]] = (rec["id"], "in-line", f"{' + '.join(pts_)} → {wid.upper()}", str(rec.get("splice") or "OPEN"),
+        pts_ = [cname(ctx, x) for x in rec["sides"][0]]
+        splice_rows[rec["id"]] = (rec["id"], "in-line", f"{' + '.join(pts_)} → {cname(ctx, wid)}", str(rec.get("splice") or "OPEN"),
                                   "formboard: OPEN")
     s.mx = False                               # the CAN topology strip and the tables are drawn in true positions
     if sp["key"] == "data":
@@ -1351,7 +1439,14 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
     # ---- tables: parts, splices, ends not recorded, shield rule
     lowest = max([b.y + b.span() for b in left + right] + [TOP] + [face["bottom"] if face else TOP] +
                  [b.y + b.h + 20 for k, b in model["x"] if k == "strip"])
-    eps_on = [b.code for b in left + right if b.kind in ("dev", "jun") and b.code]
+    eps_on = [b.code for b in left + right if b.kind in ("dev", "jun", "strip") and b.code]
+    eps_on += [it.code for k_, it in model["x"] if k_ == "strip" and getattr(it, "code", None) and it.code not in eps_on]
+    for code_ in [c for c in eps_on if c in STRIP_FAMILY or c == "AMP-PASS"]:
+        ep_ = ctx.eps.get(code_) or {}
+        has = bool(ep_.get("kit")) or any(str(t.get("part") or "") and not str(t.get("part")).startswith("open")
+                                          for t in ctx.reg["terminations"] if t["endpoint"] == code_)
+        if not has:
+            open_notes.append((plug_title(code_, ep_), "housing, wedge and contacts not in the parts list", "connector not picked"))
     jw = {b.code: {w_ for r in b.rows for w_ in r["wires"]} for b in left + right if b.kind == "jun"}
     plist = sheet_parts(ctx.reg, eps_on, ctx.parts, jw)
     shield_line = None
@@ -1360,11 +1455,20 @@ def render(ctx, sp, page_devs, extra, number, title, owned, num_of):
         if getattr(s, "sleeves", False):
             shield_line += " · hollow ring on a drain at the ECU pin = its solder sleeve (S02-03-R)"
     s.mx = False                               # tables and footnotes read left to right in true positions
+    foot = []
+    # a kit harness bought complete: its own circuits are the kit's, not cut by this harness (review round 4, PCS 4610)
+    drawn_devs = [b.code for b in left + right if b.kind == "dev"]
+    for e in drawn_devs:
+        dev_ = str((ctx.eps.get(e) or {}).get("device") or "")
+        if re.search(r"\bkit harness\b", dev_.split(" — ")[0], re.I):
+            mates = [plug_title(m_, ctx.eps[m_]) for m_ in sp["devs"] if m_ != e and not (ctx.eps[m_].get("wires"))]
+            foot.append(f"KIT HARNESS: {plug_title(e, ctx.eps[e])} is bought complete; its own circuits"
+                        + (f" (to the {', the '.join(mates)})" if mates else "") + " are the kit's, not cut by this harness. "
+                        "This book's wires land on its leads, as drawn.")
     if getattr(s, "cands", None):
-        opts = sorted({ctx.wires[w_].get("option") for w_ in s.cands})
-        names = "; ".join(f"{o} = {(ctx.reg.get('options', {}).get(o) or {}).get('name', o).split(' (')[0]}" for o in opts)
-        s.txt(M, H - M - 12, f"DASH-DOT RUN TAGGED CANDIDATE = an option not yet decided ({names}): only one of the candidate "
-              f"wires and the base wires they replace is built.", 5.6, bold=True)
+        foot += [candidate_key(ctx, o) for o in sorted({ctx.wires[w_].get("option") for w_ in s.cands})]
+    for k_, ln_ in enumerate(foot):
+        s.txt(M, H - M - 12 - 7.5 * (len(foot) - 1 - k_), ln_, 5.6, bold=True)
     facing = place_tables(s, ctx, number, title, head, lowest, plist, list(splice_rows.values()), open_notes, shield_line)
     s.footer = [f"{len(ws)} circuits drawn from the wire list · {open_runs} stamped OPEN (an end or a cavity not settled) · "
                 f"cavity marks are the moulded letters; positions are indicative · lengths are estimates until measured on the truck"]
@@ -1407,7 +1511,7 @@ def draw_strip_engine(s, b):
         yy = b.pin(i)[1]
         lit = r.get("lit")
         fill = wire_colours(CTX.wires[r["wires"][0]])[0] if lit and r["wires"] else "#fff"
-        s.rect(b.x + 3, yy - 4.2, b.w - 6, 8.4, sw=0.5, fill=fill, colour="#000" if lit else "#bbb")
+        cavity_rect(s, b.x + 3, yy - 4.2, b.w - 6, 8.4, fill, lit, r["wires"][0] if lit and r["wires"] else None)
         s.txt(b.x + b.w / 2, yy + 2.2, r["mark"], 5.4, bold=bool(lit), anchor="middle",
               colour=("#fff" if fill in DARK else "#000") if lit else "#bbb")
 
@@ -1447,7 +1551,11 @@ def draw_face(s, ctx, items, x_left, ws, avoid=()):
         Y = bulk_cy + (py_ - cy0) * scale
         if cav in lit:
             base_, stripe_ = wire_colours(ws[lit[cav]])
-            s.el.append(f'<circle cx="{s.X(X):.1f}" cy="{Y:.1f}" r="6.4" fill="{base_}" stroke="#000" stroke-width="0.9"/>')
+            unset_ = base_ == UNSET_RUN
+            s.el.append(f'<circle cx="{s.X(X):.1f}" cy="{Y:.1f}" r="6.4" fill="#fff" stroke="{manual_v5.UNSET_STROKE}" stroke-width="1.1" '
+                        f'stroke-dasharray="0.6 1.3"/>' if unset_ else
+                        f'<circle cx="{s.X(X):.1f}" cy="{Y:.1f}" r="6.4" fill="{base_}" stroke="#000" stroke-width="0.9"/>')
+            s.__dict__.setdefault("cav_log", []).append((lit[cav], "unset" if unset_ else base_))
             if stripe_:
                 cid = f"clip_{tag_id(cav)}_{len(s.el)}"
                 s.el.append(f'<clipPath id="{cid}"><circle cx="{s.X(X):.1f}" cy="{Y:.1f}" r="6.4"/></clipPath>'
@@ -1594,7 +1702,7 @@ def place_tables(s, ctx, number, title, head, lowest, plist, splices, open_notes
     if open_notes:
         blocks.append(("ENDS NOT RECORDED (OPEN)", [70, 170, 300], ["Circuit", "What is missing", "As the wire list gives it"],
                        [(a, b, c) for a, b, c in open_notes]))
-    floor = H - M - 22                         # leaves room for the shield rule and the candidate key at the foot
+    floor = H - M - 30                         # leaves room for the shield rule and the key lines at the foot
     rest = []
 
     def gaps(x0, x1):
@@ -1821,6 +1929,13 @@ def build(first_number=6):
             bad += run_colour_faults(sh, ctx.wires)
             bad += manual_v5.fragment_faults(sh.boxes)
             bad += candidate_faults(sh)
+            bad += open_tag_faults(sh)
+            bad += cavity_fill_faults(sh)
+            bad += manual_v5.code_faults(sh.boxes)
+            bad += manual_v5.gauge_faults(sh.boxes)
+            bad += manual_v5.word_faults(sh.boxes)
+            bad += [f"'NEEDS CAVITY' printed as text: '{str(b_[4])[:50]}'" for b_ in sh.boxes if "NEEDS CAVITY" in str(b_[4])]
+            bad += manual_v5.legend_faults(" ".join(str(b_[4]) for b_ in sh.boxes))
             bad += [f"off-sheet tag points nowhere: '{b_[4][:60]}'" for b_ in sh.boxes if "on no sheet" in str(b_[4])]
             bad += [f"runs {a} and {b_} share a vertical at x {x:.0f} near a pin" for a, b_, x in shared_verticals(sh)]
             bad += [f"runs {a} and {b_} run end to end at y {y:.0f} (they read as one wire)"
