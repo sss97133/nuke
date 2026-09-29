@@ -118,22 +118,32 @@ publish, and has a 5 s window. That behaviour is what the MoTeC side has to repr
    - No motor bridge (`www.ecumaster.com__PMU_Manual.md`).
 
 **What's left is a solid-state H-bridge commanded by PDM outputs.** Two real products follow. Commanding a bridge over
-the MoTeC CAN trunk was considered and not used. A step controller on the bus the engine PDM depends on could stop the
+the MoTeC CAN trunk was considered and not used. A step controller on the bus the engine loads depend on could stop the
 engine if it failed ("a dead bus shuts engine loads off", state row 0v). Discrete lines keep the steps off that bus.
 
 ---
 
-## 5. Way 1 — `STEP-DCMD`: engine PDM + two Haltech DCMD bridges (recommended)
+## 5. Way 1 — `STEP-DCMD`: the bay PDM (PDM32 candidate) + two Haltech DCMD bridges (recommended)
 
 **Part.** Haltech HT-038009 "DC Motor Driver – DCMD", $180.00 each (`www.haltech.com__ht-038009-dc-motor-driver-dcmd.md`,
-2026-09-29). Two are needed, one per motor.
+2026-09-29). Two are needed, one per motor. **The pick is provisional until the bench test (§11)** confirms the motor
+currents fit it and a pulled-down input drives it.
+
+**Which PDM.** The bay PDM, a sealed PDM32 carrying the engine and front loads. That is a candidate, not a decision:
+- The PDM15 can't stay in the bay. Its case is magnesium with a coated board only; the PDM16/PDM32 have "Rubber seal on lid
+  and connectors" (PDM manual p.35 [page-0038]; mounts.yaml PDM15 entry).
+- Dave's one-connector rule moves the front loads to a bay PDM, "about 22–27 outputs, which is a PDM32" (state row 0ah;
+  receipt 2026-09-29_owner-calls-one-61pin-at-fusebox-hole).
+- The PDM15 is then proposed as a second cab PDM (owner call pending).
+- **STEP-DCMD depends on that bay-PDM decision.** The PDM32 has 8 × 20 A and 24 × 8 A outputs, 23 inputs and 120 A total
+  (pp.35–36). Its 8 A outputs are on the 26-pin Autosport connector B (p.42 [page-0044]).
 
 **Specs** (Haltech quick start guide, `www.haltech.com__ht-038009-dcmd-quick-start-guide.md`, pp.2–3 and p.10):
 
 | Item | Value |
 |---|---|
 | Channels | "Two independent channels", which make one "8A full bridge DC Motor Driver" |
-| Current | "8A Continuous Per Channel, Maximum Transient Current 30A" |
+| Current | "8A Continuous Per Channel, Maximum Transient Current 30A" (p.3) |
 | Operating voltage | 8 V to 18 V DC |
 | Ambient | −40 °C to +85 °C |
 | Size | 86 × 28 × 55.5 mm |
@@ -147,6 +157,7 @@ engine if it failed ("a dead bus shuts engine loads off", state row 0v). Discret
 - Each channel follows its input: control low puts that motor lead at 0 V (Haltech's words). Control high putting it at
   +12 V is **inferred** (Haltech states only the low case, and says a push-pull stepper or DBW output can drive it); the
   bench check below confirms it.
+- **Input logic levels: not published.** Haltech gives no threshold voltages, input impedance or pull-up value → unknown.
 
 **How the PDM drives it:**
 - A PDM output can only go high or float. So each control line gets a **pull-down resistor to ground**: output off reads
@@ -164,54 +175,64 @@ engine if it failed ("a dead bus shuts engine loads off", state row 0v). Discret
 - The Deutsch DT family is already in the build (`catalog/parts.yaml`: DT06-2S / DT04-2P with size-16 contacts, 20–16 AWG).
 
 **Where it sits:**
-- In the engine bay beside the engine PDM, one bridge per side, low near each front wheel-well opening. This is a
-  proposed spot: the splash zone, not the spray zone. The builder places it.
+- In the engine bay beside the bay PDM, one bridge per side, low near each front wheel-well opening. This is a proposed
+  spot: the splash zone, not the spray zone. The builder places it.
 - Haltech doesn't publish a sealing rating for the case → **unknown**. The connectors are sealed Deutsch.
 - The motor leads then take the path AMP's own harness takes: "Route long end of wire harness above engine and down
   through drivers side wheel well ... Route short end down passengers side ... Route wire harness along the frame and back
   towards rear linkage" (IM75146 p.6).
 - **No firewall crossing and no body penetration.** The two trigger-wire floor exits the AMP design needed (STEP_DOOR_L/R,
   "cab exit: through the body to the outside (path not recorded)") disappear.
-- **Dependency:** this assumes an engine PDM in the bay (today's design, PDM15 in a sealed box). mounts.yaml flags that spot
-  (PDM15 case not sealed; manual p.35). If the engine PDM moves into the cab, the two bridges move with it and the motor
-  leads exit the floor as in Way 2.
+- If there is no bay PDM in the end, the two bridges move into the cab with the PDM and the motor leads exit the floor as in
+  Way 2.
 
-**Engine PDM outputs** (PDM15 pinout, manual p.43 [page-0046]):
+**Bay PDM outputs.** Four 8 A outputs, all on connector B. Output numbers are assigned with the bay-PDM allocation.
 
-| Output | Pins | Job |
-|---|---|---|
-| OUT8 (20 A) | B_7 + B_13 | Bridge power. One pin feeds DCMD-L and the other feeds DCMD-R; they are the same output |
-| OUT10 (8 A) | A_4 | Line X, to Control A on both bridges |
-| OUT12 (8 A) | A_8 | Line Y, to Control B on both bridges |
+| Output | Job |
+|---|---|
+| P_L (8 A) | DCMD-L power. Its current is the left motor's |
+| P_R (8 A) | DCMD-R power. Its current is the right motor's |
+| X (8 A) | Control A on both bridges |
+| Y (8 A) | Control B on both bridges |
 
-- Both steps move together, which is FFS's stated behaviour.
-- Per-door steps need a separate feed for each bridge. The PDM15 has no second spare 20 A output (registry: OUT1–7 used).
-  The options are OUT14 + OUT15 paralleled for DCMD-R (below, uses every PDM15 spare), a larger bay PDM (PDM32), or freeing
-  OUT5. Registry `#66` fuel pump sits on OUT5, a 20 A output, while state row 0o says "#66 14 AWG from a PDM 8 A output".
-  That is a substrate disagreement, flagged, not fixed here.
+- **Both steps move together by default** (FFS's stated behaviour).
+- Each bridge has its own feed, so per-door steps need no extra output. X/Y are shared: if the two doors call opposite
+  directions at once, the PDM runs one move and then the other.
+- **No 20 A output:** the bay PDM32's eight are all planned (capacity below).
 
 **Current measurement:**
-- The PDM reads OUT8.Current at 0.5 A resolution (outputs 1–8; manual p.26 [page-0029]). That is the sum of both motors.
-- End of travel is judged on the sum plus a timer (§8).
+- The PDM reads P_L.Current and P_R.Current at 0.2 A resolution (outputs 9–32; manual p.26 [page-0029]), one motor each.
+- End of travel is judged per side on that current, plus a timer (§8).
 - **The bridge limits nothing.** Stall force is the motor's own until the PDM reacts, the same as AMP's stock controller.
 - **The PDM's sampling and logic rate is not in the manual → unknown.** Measure the stop latency on the bench log.
 
 **Fusing and PDM limits** (canon: limit ≥ 1.25 × load and ≤ 0.85 × the wire's rating, ch.17 §17.1 item 3; PDM manual
 p.48 [page-0051] ratings at 100 °C, the engine bay):
-- The DCMD's power pin is in its 4-pin DT (the Deutsch DT family takes size-16 contacts, 20–16 AWG, per `catalog/parts.yaml`),
-  and Haltech says 16 AWG. So each branch is 16 AWG,
-  rated 12 A, and the OUT8 limit is **≤ 10 A** (0.85 × 12 = 10.2). Both branches hang on one output, so the limit has to
-  protect either branch carrying it all.
-- That allows **≤ 4 A running per motor** (1.25 × 2 × 4 = 10).
-- **Above 4 A per motor, feed each bridge from its own output.**
-  - DCMD-L stays on OUT8 (10 A). Its two pins' 16 AWG pigtails join in an M81824/1-3 into the 16 AWG feed, as the
-    registry's paired-output pigtails (state 0ac).
-  - DCMD-R goes on OUT14 + OUT15 paralleled: 5 A each (20 AWG pin leads, 6 A × 0.85), joined by an M81824/1-2 into 16 AWG.
-  - That allows up to 8 A per motor, which is also the DCMD's continuous rating, and gives per-side current and per-door
-    steps. It uses all five PDM15 spares.
+- An 8 A output's pin takes 24–20 AWG (p.48). So each feed leaves the PDM on a 20 AWG pigtail and joins Haltech's 16 AWG
+  power lead in an M81824/1-2 (the registry's pigtail method, state 0ac).
+- 20 AWG is 6 A at 100 °C, × 0.85 = 5.1, so the P_L / P_R limit is **5 A**. That allows **≤ 4 A running per motor**
+  (1.25 × 4 = 5).
+- **Over 4 A per motor, each feed becomes two paralleled 8 A outputs.** They must be the same type and driven by the same
+  condition (pp.6, 22–23): 2 × 5 A = 10 A through the same M81824/1-2 into 16 AWG (12 A × 0.85 = 10.2). That allows
+  ≤ 8 A per motor, which is also the DCMD's continuous rating. Six outputs in all.
 - Above 8 A per motor, take Way 2.
-- OUT10 and OUT12 carry only the control inputs and pull-downs: 1 A limit, the PDM's smallest step (p.1 [page-0004],
-  "Outputs are programmable in 1 A steps").
+- X and Y carry only the control inputs and pull-downs: 1 A limit, the PDM's smallest step (p.1 [page-0004], "Outputs are
+  programmable in 1 A steps").
+
+**Bay PDM32 capacity.** This is an estimate: the bay PDM is not allocated yet. Counts are from the registry's PDM15 and
+PDM30 output maps and the 30 wires that crossed the dropped body bulkheads.
+
+| PDM32 outputs | Planned loads | Count |
+|---|---|---|
+| 20 A (8) | engine: fan legs 1 and 2 (today PDM15 OUT1/OUT6), injector rail, coil rail, starter trigger, fuel pump #66, LTCD #64 (PDM15 OUT2–5, OUT7); front: blower HI (PDM30 OUT2) | **8 of 8** |
+| 8 A (24) | engine: ALT_L, A/C clutch #23 (PDM15 OUT9, OUT11); front loads among the body-bulkhead wires: iBooster wake, wiper #49, front park #83/#84, horn #48, front markers #87/#88, underhood lamp #73, washer #50, turn LF #80, turn RF #82 (PDM30 OUT9, 12, 13, 14, 19, 25, 26, 27, 28); loads the bay PDM would drive in place of cab switch leads: headlights low/high (#85a/b, #86a/b; 2–4 outputs), wiper second field (WIPER_T1/T3; 1), blower LOW/M1/M2 (BLOWER_BAT/MED/M2; 3, currents unknown) | **17–19 of 24** |
+| 8 A, other candidates | wheel-speed sensor feed (branch `wiring/wheel-speed`, one 8 A output at 1 A) | +1 |
+| 8 A, with STEP-DCMD | 4 (6 with the two-output feeds) | **22–24 of 24** (24–26 with two-output feeds: fits only at the low end) |
+
+- The PCS TCM feed (PDM15 OUT13 today) stays with a cab PDM: the PCS is in the cab.
+- **Substrate disagreement, flagged, not fixed:** registry `#66` fuel pump is on a 20 A output (PDM15 OUT5), while state row
+  0o says "#66 14 AWG from a PDM 8 A output". If 0o is right, one PDM32 20 A output is free. A single 20 A pin (connector
+  D, p.42) could then feed both bridges.
 
 ## 6. Way 2 — `STEP-RQ`: PDM30 + one Roboteq SDC2160 dual bridge
 
@@ -267,8 +288,9 @@ SDC2130's 40 V (datasheet Table 3).
 - **These are exactly the spares that exist only while PW (OUT3/OUT4) and PL (OUT21) stay unfitted** (registry map; capacity
   ledger PDM30 20 A 6/8, 8 A 21/22). The fiberglass-top candidate TOP-LIGHT names OUT21 too. Way 2 plus PW plus PL (or
   TOP-LIGHT) does not fit on the PDM30.
-- Fits anyway if the PDM15 moves to the cab (mounts.yaml recommendation: its spares are then in the cab), or if the front
-  loads go to a bay PDM32 (state 0ah), which frees PDM30 outputs.
+- It fits anyway if the PDM15 becomes the second cab PDM. That is proposed with the bay PDM32 (state 0ah), and the owner
+  call is pending. STEP-RQ then runs on its outputs, and the conflict clears. The front loads leaving for the bay PDM32 also
+  free PDM30 outputs.
 
 **Door inputs** stay local: DIG12/DIG13 on the same PDM30. No CAN dependency for the triggers.
 
@@ -302,7 +324,7 @@ for 20–16 AWG, /1-3 for 16–12 AWG (`catalog/parts.yaml`). The motor then sti
 
 ---
 
-## 8. The logic, as the PDM runs it (Way 1 on the engine PDM; Way 2 differences after)
+## 8. The logic, as the PDM runs it (Way 1 on the bay PDM; Way 2 differences after)
 
 **What the PDM can do** (manual):
 - inputs with trigger levels and trigger times ("A trigger time of 0.1 second will normally reject switch bounce", p.19
@@ -320,7 +342,7 @@ for 20–16 AWG, /1-3 for 16–12 AWG (`catalog/parts.yaml`). The motor then sti
 - **The operator parameters** (Pulse length, edge selection) are set in PDM Manager. The user manual names the operators
   but doesn't define their fields → confirm in PDM Manager.
 
-**Inputs (engine PDM, over CAN).** Each gets its own CAN channel with its own timeout value:
+**Inputs (bay PDM, over CAN).** Each gets its own CAN channel with its own timeout value:
 
 | Channel | From | Value if the message times out |
 |---|---|---|
@@ -349,17 +371,19 @@ for 20–16 AWG, /1-3 for 16–12 AWG (`catalog/parts.yaml`). The motor then sti
 | `Step.Dir` (1 = out) | WantOut OR (Delay AND Allow) OR (HoldOut AND Allow) |
 | `Step.Window` | Pulse **T_max ≤ 5 s** on any change of Dir (AMP's drive window, guide p.5), and once at power-up to stow (how the PDM starts a pulse at power-up: confirm in PDM Manager) |
 | `Step.Blank` | Pulse **t_blank** on Dir change. Motor start-up current is "3 to 5 times the steady state current and it dies out in less than a second" (p.28 [page-0031]). Set t_blank from the bench log |
-| `Step.Stalled` | Window AND NOT Blank AND OUT8.Current > **I_stop**, held for **t_confirm** |
-| `Step.Done` | Set by Stalled, reset by a Dir change |
-| `Step.Early` | Stalled while Pulse **t_min** (shorter than normal travel) is still true. On a retract: set HoldOut, which reverses to out and releases the pinch. That matches AMP's foot-hold behaviour. On a deploy: stop, and the step retracts at the next door close |
-| `Step.Fault` | Counter: N consecutive windows that end without Done, or N Early events. Latched → Global Error (lamp optional). Cleared by Master Retry (p.18) |
+| `Step.StalledL`, `Step.StalledR` | Window AND NOT Blank AND P_L.Current (P_R.Current) > **I_stop**, held for **t_confirm**, one per side |
+| `Step.DoneL`, `Step.DoneR` | Set by that side's Stalled, reset by a Dir change |
+| `Step.Early` | A side Stalled while Pulse **t_min** (shorter than normal travel) is still true. On a retract: set HoldOut, which reverses to out and releases the pinch. That matches AMP's foot-hold behaviour. On a deploy: stop, and the step retracts at the next door close |
+| `Step.Fault` | Counter: N consecutive windows that end without both Done, or N Early events. Latched → Global Error (lamp optional). Cleared by Master Retry (p.18) |
 
-**Outputs:**
-- OUT8 = Window AND NOT Done.
-- OUT10 (X) = Window AND NOT Done AND Dir.
-- OUT12 (Y) = Window AND NOT Done AND NOT Dir.
+**Outputs** (8 A outputs on the bay PDM32; numbers assigned with the bay-PDM allocation):
+- P_L = Window AND NOT DoneL. P_R = Window AND NOT DoneR.
+- X = Window AND NOT (DoneL AND DoneR) AND Dir.
+- Y = Window AND NOT (DoneL AND DoneR) AND NOT Dir.
+- Per-door steps: P_L / P_R also AND their own door's request. If the two sides need opposite directions at once, a
+  Set/Reset holds the second move until the first is Done.
 - Which of X/Y deploys depends on the motor's lead order. Set it on the bench.
-- Retries on OUT8: 0.
+- Retries on P_L / P_R: 0.
 
 **Numbers still to set:**
 - S_max: **the owner's number**.
@@ -392,7 +416,7 @@ for 20–16 AWG, /1-3 for 16–12 AWG (`catalog/parts.yaml`). The motor then sti
 | M130 off, key off | RUN = 0 → parked → steps work (no speed needed) |
 | Door switch stuck "open" (wire grounded) | steps deploy whenever parked; the speed rule keeps them stowed when moving |
 | Door switch open-circuit | never deploys (safe) |
-| Bridge feed (OUT8 / OUT3) fails off | no motion; steps stay where they are. An open load is not a PDM fault ("Fault Shutdown occurs when the output voltage is lower than expected", p.23), so it only shows as a step that doesn't move |
+| Bridge feed (P_L / P_R, or OUT3 in Way 2) fails off | no motion; steps stay where they are. An open load is not a PDM fault ("Fault Shutdown occurs when the output voltage is lower than expected", p.23), so it only shows as a step that doesn't move |
 | A control output stuck on during a move | both leads high → braked → no Done → Window times out → Fault counter → Global Error |
 | Pull-down resistor open (Way 1) | that input floats high → that direction can't run. Fails to move, never runs away |
 | Bridge shorted | the PDM output's short-circuit / fault shutdown; retries 0 → Global Error |
@@ -408,21 +432,23 @@ for 20–16 AWG, /1-3 for 16–12 AWG (`catalog/parts.yaml`). The motor then sti
 |---|---|---|
 | PDM30 outputs | none | OUT3 + OUT21 (+ OUT4 per door) |
 | PDM30 inputs | + DIG16 with STEP-SW | + DIG16 with STEP-SW |
-| Engine PDM (PDM15) outputs | OUT8, OUT10, OUT12 (+ OUT14/15 paralleled for a feed per bridge) | none |
+| Bay PDM (PDM32 candidate) outputs | 4 × 8 A (6 if a motor runs over 4 A); no 20 A output; no input | none |
 | M130 pins | none | none |
 | M130 configuration | M1 General transmit on (vehicle speed) | same |
-| CAN messages | engine PDM receives: PDM30 input states (already needed for RUN/START) + M1 General speed | PDM30 receives: M1 General speed |
+| CAN messages | bay PDM receives: PDM30 input states (already needed for RUN/START) + M1 General speed | PDM30 receives: M1 General speed |
 | New CAN nodes | none | none |
 | New programmable device | none | the Roboteq (configuration + script) |
 | Firewall / 61-pin | none | none |
 | Body penetrations | none (the two trigger-wire exits go away) | 2 floor exits for motor leads (they replace the 2 trigger-wire exits) |
 | Removed | wire 3 (the kit's red lead and its fuse at the distribution stud), STEP_GND, STEP_DOOR_L, STEP_DOOR_R, endpoint AMP-STEP-CTRL (controller + kit harness, except about 6 in of each motor plug kept as a pigtail), part AMP-KIT-RING, and the splice at each jamb switch | same |
-| Added | 14 wires, 2 control splices + 4 motor-end splices (to the kit's motor-plug pigtails), 4 pull-down resistors (list in options.yaml) | 10 wires (+1 per door), 1 feed splice + 4 motor-end splices, 2 pull-downs (DIN1, Power Control; +1 per door), 2 floor clamps, 1 script |
+| Added | 16 wires, 2 feed splices + 2 control splices + 4 motor-end splices (to the kit's motor-plug pigtails), 4 pull-down resistors (list in options.yaml) | 10 wires (+1 per door), 1 feed splice + 4 motor-end splices, 2 pull-downs (DIN1, Power Control; +1 per door), 2 floor clamps, 1 script |
 | Parts cost (list, 2026-09-29) | 2 × $180.00 | $350.00 |
 
 **Capacity verdict** (ledger on main):
-- Way 1 takes PDM15 20 A outputs 7/8 → 8/8 and 8 A outputs 3/7 → 5/7 (7/7 with a feed per bridge). The PDM30 is
-  untouched.
+- **Way 1** puts no load on the PDM30 or the PDM15. On the bay PDM32 (estimate, §5) it takes 4 of the 24 8 A outputs:
+  - 8 A outputs go 18–20 → 22–24 of 24, counting the wheel-speed candidate. With the two-output feeds, 24–26.
+  - 20 A outputs stay 8 of 8.
+  - **It depends on the bay-PDM decision.**
 - Way 2 takes the PDM30 to 20 A 7/8 (8/8 per door) and 8 A 22/22. The PDM30 then has no output left for PW or PL.
 - Both remove one branch from the distribution stud and one return from the ground star. The AMP harness no longer lands
   on the batteries.
@@ -432,12 +458,14 @@ for 20–16 AWG, /1-3 for 16–12 AWG (`catalog/parts.yaml`). The motor then sti
 **Way 1, `STEP-DCMD`**, for four reasons:
 - The MoTeC PDM stays the only brain. The DCMD has no software and just follows its two inputs.
 - Nothing crosses the firewall or the floor: the motor leads run where AMP's own harness runs.
-- It uses the engine PDM's spares, not the PDM30's last outputs that PW and PL need.
+- It uses the bay PDM32's 8 A outputs (22–24 of 24 with it, estimate), not the PDM30's last outputs that PW and PL need.
+  **It depends on the bay-PDM decision** (state 0ah).
 - It is an engine-bay motorsport part (−40 to +85 °C, Deutsch connectors) at 2 × $180.
 
 **It is gated on one bench session:**
 - The motor's running and stall currents. Each DCMD channel is rated 8 A continuous. Running current also sets the feed:
-  ≤ 4 A per motor on the shared OUT8, ≤ 8 A with a feed per bridge (OUT8 + OUT14/15), and the lead gauge (§7).
+  ≤ 4 A per motor on one 8 A output, ≤ 8 A on two paralleled, and the lead gauge (§7). **The Haltech pick is provisional
+  until then.**
 - Whether a DCMD input with a pull-down follows a PDM-style output.
 
 **Take Way 2 if** the motor runs above 8 A, or the DCMD won't follow a pulled-down input, or the owner wants the pinch force
@@ -446,7 +474,7 @@ The Roboteq limits current and stops each motor itself, at the cost of PDM30 out
 
 **Questions only Skylar can answer:**
 1. One door drops both steps (FFS's behaviour), or each door drops its own step (AMP's stock behaviour)? Per-door costs
-   OUT14 + OUT15 on the PDM15 in Way 1 (its last two spares), or OUT4 on the PDM30 in Way 2.
+   no extra output in Way 1 (a feed per bridge already), and OUT4 on the PDM30 in Way 2.
 2. The road speed above which the steps must stay stowed.
 3. A dash switch that holds the steps stowed (STEP-SW, PDM30 DIG16, or a CANKEY button): yes or no?
 4. The label on the FFS/AMP carton or motor (kit part number; Siemens or Brose housing), or a photo of a motor and its plug.
@@ -461,7 +489,7 @@ The Roboteq limits current and stops each motor itself, at the cost of PDM30 out
 - *To AMP Research tech support (1-888-983-2204, IM75146 p.1):* "For the PowerStep motor in a Far From Stock 73-87 K5 kit
   (AMP part number to follow from the carton): what are the motor's running and stall currents at 12 V, the motor
   connector's housing part number, and the current threshold the controller uses to stop at end of travel?"
-- *To Dave:* "No relays is locked, so the AMP steps' reversing has to be solid-state. Proposal: the engine PDM drives two
-  Haltech DCMD bridges (power on a 20 A output, direction on two 8 A outputs with pull-downs), end of travel on PDM output
-  current plus a 5 s window, door and speed over CAN. The alternative is a Roboteq SDC2160 in the cab on PDM30 outputs. Any
+- *To Dave:* "No relays is locked, so the AMP steps' reversing has to be solid-state. Proposal: the bay PDM (the sealed
+  PDM32 candidate) drives two Haltech DCMD bridges. Each bridge gets its own 8 A output for power, plus two shared 8 A
+  direction outputs with pull-downs. End of travel on each feed's current plus a 5 s window; door and speed over CAN. The alternative is a Roboteq SDC2160 in the cab on PDM30 outputs. Any
   objection, or a bridge you'd rather use?"
