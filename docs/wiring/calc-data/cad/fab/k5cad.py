@@ -436,7 +436,7 @@ def auto_drawing(mod, bodies, extra, meta, path):
     FX = 30 + (-fl[0]) * scale + 10
     FY = 40 + th_ * scale + 25 + fh[1] * scale
     RX = FX + fh[0] * scale + 35 + (-rl[0]) * scale
-    TY = FY - fh[1] * scale - 22 - th[1] * scale
+    TY = FY - fh[1] * scale - 22 + tl[1] * scale      # the top view's lower edge sits 22 above the front view
     S = Sheet(480, 272, A["pid"])
     front = S.view("front", solid + mated, (FX, FY), hidden=False, viewset=vs, scale=scale)
     right = S.view("right", solid + mated + ko, (RX, FY), hidden=True, viewset=vs, scale=scale)

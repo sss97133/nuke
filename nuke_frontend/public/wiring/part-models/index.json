@@ -150,6 +150,542 @@
     }
    ]
   },
+  "AMP": {
+   "endpoints": [
+    "AMP"
+   ],
+   "what": "Amplifier, JL Audio VX700/5i 5-channel class D with DSP (75 W x 4 at 4 ohm + 300 W x 1 at 2 ohm)",
+   "maker": "JL Audio",
+   "maker_pn": "VX700/5i",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 250.0,
+    "w": 168.0,
+    "h": 54.0
+   },
+   "frame": "origin at the centre of the base; +Z up, +X along the 250 length, the connection panel faces -Y, power at -X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Z",
+    "faces": {
+     "connections": "-Y",
+     "badge": "+Z"
+    }
+   },
+   "colors": {
+    "shell": {
+     "hex": "#5b5e63",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2021/30/136/g13698640-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (anodised shell, gunmetal)"
+    },
+    "panel": {
+     "hex": "#1d1f22",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2021/30/136/g13698640-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (brushed top panel, black)"
+    },
+    "badge": {
+     "hex": "#b9bcc0",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2021/30/136/g13698640-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (badge, brushed silver)"
+    },
+    "badge_mark": {
+     "hex": "#2a2c30",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2021/30/136/g13698640-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (badge logo, dark)"
+    },
+    "cap": {
+     "hex": "#1a1a1b",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2021/30/136/g13698640-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (corner caps, black)"
+    },
+    "conn": {
+     "hex": "#8a8e93",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2021/30/136/g13698640-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (plug housings, grey)"
+    },
+    "conn_dark": {
+     "hex": "#1b1b1c",
+     "from": "connection panel face: black in the manual's view"
+    },
+    "metal": {
+     "hex": "#c9ccd0",
+     "from": "set screws and contacts: drawn zinc"
+    }
+   },
+   "attach": [
+    {
+     "n": "power",
+     "ep": "AMP",
+     "at": [
+      -78.9,
+      -92.0,
+      32.5
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "set-screw plug",
+     "note": "(1) +12 VDC / Ground / Remote"
+    },
+    {
+     "n": "analog_in",
+     "ep": "AMP",
+     "at": [
+      -3.2,
+      -81.0,
+      34.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "harness",
+     "note": "(2) analog input harness: 6 RCA inputs"
+    },
+    {
+     "n": "speaker_out",
+     "ep": "AMP",
+     "at": [
+      56.0,
+      -81.0,
+      31.5
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "harness",
+     "note": "(3) speaker output harness, channels A-D"
+    },
+    {
+     "n": "sub_out",
+     "ep": "AMP",
+     "at": [
+      74.8,
+      -81.0,
+      30.5
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "harness",
+     "note": "(4) subwoofer output harness (two pairs in parallel)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "hole_LF",
+     "at": [
+      -111.0,
+      -70.5,
+      54.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 6.0,
+     "note": "corner hole under its cap"
+    },
+    {
+     "n": "hole_LB",
+     "at": [
+      -111.0,
+      70.5,
+      54.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 6.0,
+     "note": "corner hole under its cap"
+    },
+    {
+     "n": "hole_RF",
+     "at": [
+      111.0,
+      -70.5,
+      54.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 6.0,
+     "note": "corner hole under its cap"
+    },
+    {
+     "n": "hole_RB",
+     "at": [
+      111.0,
+      70.5,
+      54.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 6.0,
+     "note": "corner hole under its cap"
+    }
+   ]
+  },
+  "Backup_Camera": {
+   "endpoints": [
+    "Backup_Camera"
+   ],
+   "what": "Backup camera, Rear View Safety RVS-7180355-IR license-plate bar camera with IR night vision",
+   "maker": "Rear View Safety",
+   "maker_pn": "RVS-7180355-IR (camera)",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 190.5,
+    "w": 25.4,
+    "h": 31.4
+   },
+   "frame": "origin at the centre of the bar's back (on the plate's top edge / the tailgate); +Z rearward (the view), +Y up",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "cable": "-Z"
+    }
+   },
+   "colors": {
+    "bar": {
+     "hex": "#333436",
+     "from": "Rear View Safety photo https://www.rearviewsafety.com/pub/media/catalog/product/r/v/rvs-0355-ir_main_2.jpg (Rear View Safety, fetched 2026-09-29), k-means (bar, black, 70%)"
+    },
+    "lens": {
+     "hex": "#101114",
+     "from": "Rear View Safety photo https://www.rearviewsafety.com/pub/media/catalog/product/r/v/rvs-0355-ir_main_2.jpg (Rear View Safety, fetched 2026-09-29) (lens, black glass)"
+    },
+    "led": {
+     "hex": "#b9bcbf",
+     "from": "Rear View Safety photo https://www.rearviewsafety.com/pub/media/catalog/product/r/v/rvs-0355-ir_main_2.jpg (Rear View Safety, fetched 2026-09-29) (IR LED rims, silver)"
+    },
+    "cable": {
+     "hex": "#1b1b1c",
+     "from": "camera pigtail: black"
+    }
+   },
+   "attach": [
+    {
+     "n": "pigtail",
+     "ep": "Backup_Camera",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "pigtail",
+     "note": "camera pigtail out of the back (to the kit's 33 ft cable)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "hole_L",
+     "at": [
+      -86.0,
+      0,
+      25.4
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "license-plate screw through the bar's end"
+    },
+    {
+     "n": "hole_R",
+     "at": [
+      86.0,
+      0,
+      25.4
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "license-plate screw through the bar's end"
+    }
+   ]
+  },
+  "CARGO-LAMP": {
+   "endpoints": [
+    "CARGO-LAMP"
+   ],
+   "what": "Cargo lamp, Truck-Lite 80251C 80 Series 10-LED dome, 2 A, white powder-coat aluminium, hardwired stripped leads",
+   "maker": "Truck-Lite",
+   "maker_pn": "80251C",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 462.03,
+    "w": 146.05,
+    "h": 27.43
+   },
+   "frame": "origin at the centre of the bracket plate's back (on the ceiling); +Z out of the ceiling toward the cargo floor (the light), +Y along the 146 height; the body in its pocket behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "leads": "-Z"
+    }
+   },
+   "colors": {
+    "plate": {
+     "hex": "#d6e1e3",
+     "from": "Truck-Lite photo https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/80251C/spinset_01_01_80251C.jpg (Truck-Lite, fetched 2026-09-29), k-means (bracket, white powder coat, 80%)"
+    },
+    "body": {
+     "hex": "#d6e1e3",
+     "from": "reference_documents/web_snapshots/www.truck-lite.com__80251c-1.md (Truck-Lite 80251C page, fetched 2026-09-28; re-read 2026-09-29): 'Aluminum with White Powder Coat Finish'"
+    },
+    "gasket": {
+     "hex": "#45474a",
+     "from": "Truck-Lite photo https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/80251C/spinset_01_01_80251C.jpg (Truck-Lite, fetched 2026-09-29) (gasket frame, black)"
+    },
+    "lens": {
+     "hex": "#c3cccf",
+     "from": "Truck-Lite photo https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/80251C/spinset_01_01_80251C.jpg (Truck-Lite, fetched 2026-09-29) (clear lens, 72%)"
+    },
+    "screw": {
+     "hex": "#b8bcc0",
+     "from": "lens screws: drawn zinc"
+    }
+   },
+   "attach": [
+    {
+     "n": "leads",
+     "ep": "CARGO-LAMP",
+     "at": [
+      173.45,
+      0,
+      -22.43
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "stripped leads",
+     "note": "2 hardwired leads, stripped ends (splice D-609-03)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "slot_LB",
+     "at": [
+      -81.0,
+      -60.6,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "bracket slot"
+    },
+    {
+     "n": "slot_LT",
+     "at": [
+      -81.0,
+      60.6,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "bracket slot"
+    },
+    {
+     "n": "slot_RB",
+     "at": [
+      81.0,
+      -60.6,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "bracket slot"
+    },
+    {
+     "n": "slot_RT",
+     "at": [
+      81.0,
+      60.6,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "bracket slot"
+    },
+    {
+     "n": "end_LB",
+     "at": [
+      -222.6,
+      -42.0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "end slot"
+    },
+    {
+     "n": "end_LT",
+     "at": [
+      -222.6,
+      42.0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "end slot"
+    },
+    {
+     "n": "end_RB",
+     "at": [
+      222.6,
+      -42.0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "end slot"
+    },
+    {
+     "n": "end_RT",
+     "at": [
+      222.6,
+      42.0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "end slot"
+    }
+   ]
+  },
+  "CHMSL": {
+   "endpoints": [
+    "CHMSL"
+   ],
+   "what": "Third brake light, ORACLE 4514-003 Linear Universal LED CHMSL module, red, 7 in, 6 W at 12-24 V, IP68",
+   "maker": "ORACLE Lighting",
+   "maker_pn": "4514-003",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 197.8,
+    "w": 12.0,
+    "h": 8.0
+   },
+   "frame": "origin at the centre of the mounting face (screw tabs or VHB tape); +Z out toward the light, +X along the 7 in",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "lead": "+X"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#141414",
+     "from": "ORACLE photo https://www.oraclelights.com/cdn/shop/files/4514-003_A_Primary_0cff9a94-4dc5-4af4-9078-fe02f1d1d6f8.webp (ORACLE, fetched 2026-09-29) (module body, black)"
+    },
+    "lens": {
+     "hex": "#d8262b",
+     "from": "ORACLE photo https://www.oraclelights.com/cdn/shop/files/4514-003_A_Primary_0cff9a94-4dc5-4af4-9078-fe02f1d1d6f8.webp (ORACLE, fetched 2026-09-29) (red lens / LEDs, lit)"
+    },
+    "plug": {
+     "hex": "#1d1d1e",
+     "from": "power connector: black (not described)"
+    }
+   },
+   "attach": [
+    {
+     "n": "power",
+     "ep": "CHMSL",
+     "at": [
+      246.15,
+      0.0,
+      -12.93
+     ],
+     "dir": [
+      1,
+      0,
+      0
+     ],
+     "kind": "connector",
+     "note": "power connector at the end of the module's lead (type read on arrival)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "tab_L",
+     "at": [
+      -93.9,
+      0,
+      1.5
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "screw tab"
+    },
+    {
+     "n": "tab_R",
+     "at": [
+      93.9,
+      0,
+      1.5
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "screw tab"
+    }
+   ]
+  },
   "DCDC": {
    "endpoints": [
     "DCDC"
@@ -336,6 +872,605 @@
     }
    ]
   },
+  "FOOTWELL-LAMPS": {
+   "endpoints": [
+    "FOOTWELL-LAMPS"
+   ],
+   "what": "Footwell lamp, Lumitec Mini Rail2 101241 warm white LED, 360 mA at 12 V, 95 lm, 10-30 V, IP65, leads",
+   "maker": "Lumitec",
+   "maker_pn": "101241 (Mini Rail2, warm white)",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 149.9,
+    "w": 28.2,
+    "h": 15.3
+   },
+   "frame": "origin at the centre of the mounting face (the back, on the dash underside); +Z toward the light, +X along the rail",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "lead": "-X"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#757877",
+     "from": "Lumitec photo https://www.lumiteclighting.com/media/catalog/product/r/a/rail2_mini_3.png (Lumitec, fetched 2026-09-29), k-means (aluminium body, 86%)"
+    },
+    "cap": {
+     "hex": "#dbdbdd",
+     "from": "Lumitec photo https://www.lumiteclighting.com/media/catalog/product/r/a/rail2_mini_3.png (Lumitec, fetched 2026-09-29), k-means (end caps, white, 72%)"
+    },
+    "lens": {
+     "hex": "#f1f3f3",
+     "from": "diffuser lens: white (photo)"
+    }
+   },
+   "attach": [
+    {
+     "n": "leads",
+     "ep": "FOOTWELL-LAMPS",
+     "at": [
+      -74.95,
+      0,
+      6.12
+     ],
+     "dir": [
+      -1,
+      0,
+      0
+     ],
+     "kind": "flying leads",
+     "note": "2 leads from the end cap (splice)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "hole_L",
+     "at": [
+      -63.95,
+      0,
+      15.3
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.0,
+     "note": "screw through the end cap"
+    },
+    {
+     "n": "hole_R",
+     "at": [
+      63.95,
+      0,
+      15.3
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.0,
+     "note": "screw through the end cap"
+    }
+   ]
+  },
+  "HEADLIGHT-L": {
+   "endpoints": [
+    "HEADLIGHT-L"
+   ],
+   "what": "Left headlight, Truck-Lite 27270C 7 in round LED, low / high + ground on an H4 plug",
+   "maker": "Truck-Lite",
+   "maker_pn": "27270C",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 178.0,
+    "w": 178.0,
+    "h": 108.4
+   },
+   "frame": "origin at the centre of the flange's back (on the headlamp bucket's ring); +Z forward (the light), +Y up; heat sink and plug behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "plug": "-Z"
+    }
+   },
+   "colors": {
+    "sink": {
+     "hex": "#332d2b",
+     "from": "Truck-Lite side photo https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/27270C/spinset_01_07_27270C.jpg (Truck-Lite side photo, fetched 2026-09-29), k-means (heat sink, black, 67%)"
+    },
+    "bezel": {
+     "hex": "#c5c5ca",
+     "from": "Truck-Lite front photo https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/27270C/spinset_01_01_27270C.jpg (Truck-Lite front photo, fetched 2026-09-29), k-means (bezel ring, 63%)"
+    },
+    "lens": {
+     "hex": "#e9eef2",
+     "from": "clear polycarbonate lens (brochure): drawn clear"
+    },
+    "reflector": {
+     "hex": "#9da3a8",
+     "from": "Truck-Lite front photo https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/27270C/spinset_01_01_27270C.jpg (Truck-Lite front photo, fetched 2026-09-29) (reflector, silver)"
+    },
+    "led_bar": {
+     "hex": "#1e1e20",
+     "from": "Truck-Lite front photo https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/27270C/spinset_01_01_27270C.jpg (Truck-Lite front photo, fetched 2026-09-29) (LED bar across the middle, black)"
+    },
+    "plug": {
+     "hex": "#1c1c1d",
+     "from": "Truck-Lite side photo https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/27270C/spinset_01_07_27270C.jpg (Truck-Lite side photo, fetched 2026-09-29) (H4 plug, black)"
+    }
+   },
+   "attach": [
+    {
+     "n": "h4",
+     "ep": "HEADLIGHT-L",
+     "at": [
+      0,
+      -18.0,
+      -74.1
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "H4 plug",
+     "note": "LOW 85a, HIGH 85b, GND HL_L_GND (blade order open)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "flange on the bucket's adjuster ring, retaining ring over it"
+    }
+   ]
+  },
+  "HEADLIGHT-R": {
+   "endpoints": [
+    "HEADLIGHT-R"
+   ],
+   "what": "Right headlight, Truck-Lite 27270C 7 in round LED, low / high + ground on an H4 plug",
+   "maker": "Truck-Lite",
+   "maker_pn": "27270C",
+   "shape_basis": "scaled from photo",
+   "dims_mm": {
+    "l": 178.0,
+    "w": 178.0,
+    "h": 108.4
+   },
+   "frame": "origin at the centre of the flange's back (on the headlamp bucket's ring); +Z forward (the light), +Y up; heat sink and plug behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "plug": "-Z"
+    }
+   },
+   "colors": {
+    "sink": {
+     "hex": "#332d2b",
+     "from": "Truck-Lite side photo https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/27270C/spinset_01_07_27270C.jpg (Truck-Lite side photo, fetched 2026-09-29), k-means (heat sink, black, 67%)"
+    },
+    "bezel": {
+     "hex": "#c5c5ca",
+     "from": "Truck-Lite front photo https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/27270C/spinset_01_01_27270C.jpg (Truck-Lite front photo, fetched 2026-09-29), k-means (bezel ring, 63%)"
+    },
+    "lens": {
+     "hex": "#e9eef2",
+     "from": "clear polycarbonate lens (brochure): drawn clear"
+    },
+    "reflector": {
+     "hex": "#9da3a8",
+     "from": "Truck-Lite front photo https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/27270C/spinset_01_01_27270C.jpg (Truck-Lite front photo, fetched 2026-09-29) (reflector, silver)"
+    },
+    "led_bar": {
+     "hex": "#1e1e20",
+     "from": "Truck-Lite front photo https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/27270C/spinset_01_01_27270C.jpg (Truck-Lite front photo, fetched 2026-09-29) (LED bar across the middle, black)"
+    },
+    "plug": {
+     "hex": "#1c1c1d",
+     "from": "Truck-Lite side photo https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/27270C/spinset_01_07_27270C.jpg (Truck-Lite side photo, fetched 2026-09-29) (H4 plug, black)"
+    }
+   },
+   "attach": [
+    {
+     "n": "h4",
+     "ep": "HEADLIGHT-R",
+     "at": [
+      0,
+      -18.0,
+      -74.1
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "H4 plug",
+     "note": "LOW 86a, HIGH 86b, GND HL_R_GND (blade order open)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "flange",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "flange on the bucket's adjuster ring, retaining ring over it"
+    }
+   ]
+  },
+  "ISO-SWITCH": {
+   "endpoints": [
+    "ISO-SWITCH"
+   ],
+   "what": "Isolator dash switch, Blue Sea 2145 momentary SPDT (ON)-OFF-(ON) Contura with LED, included with the 7700",
+   "maker": "Blue Sea Systems",
+   "maker_pn": "2145",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 25.65,
+    "w": 49.91,
+    "h": 53.78
+   },
+   "frame": "origin at the centre of the bezel's back face on the dash panel; +Z toward the driver, +Y up (red 'ON' half up), housing and pins behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "rocker": "+Z",
+     "pins": "-Z"
+    }
+   },
+   "colors": {
+    "bezel": {
+     "hex": "#1f1f21",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/2145.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (bezel, black)"
+    },
+    "rocker_top": {
+     "hex": "#c0282d",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/2145.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (upper rocker, red)"
+    },
+    "rocker_bot": {
+     "hex": "#2a2a2c",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/2145.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (lower rocker, black)"
+    },
+    "housing": {
+     "hex": "#232325",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/2145.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (housing behind the panel)"
+    },
+    "tab": {
+     "hex": "#c8c3b6",
+     "from": "tin-plated tab: not sampled (thin in the photo); drawn tin"
+    },
+    "mark_white": {
+     "hex": "#f1f1f1",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/2145.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (white marks on the rocker)"
+    },
+    "lens": {
+     "hex": "#f4f4f2",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/2145.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (LED lens strip, white)"
+    }
+   },
+   "attach": [
+    {
+     "n": "pin_8",
+     "ep": "ISO-SWITCH",
+     "at": [
+      5.0,
+      14.4,
+      -38.68
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "0.250 tab",
+     "note": "LED power (+8)"
+    },
+    {
+     "n": "pin_7",
+     "ep": "ISO-SWITCH",
+     "at": [
+      -5.0,
+      14.4,
+      -38.68
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "0.250 tab",
+     "note": "LED ground (-7)"
+    },
+    {
+     "n": "pin_1",
+     "ep": "ISO-SWITCH",
+     "at": [
+      5.0,
+      8.3,
+      -38.68
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "0.250 tab",
+     "note": "OPEN (1)"
+    },
+    {
+     "n": "pin_2",
+     "ep": "ISO-SWITCH",
+     "at": [
+      5.0,
+      0.0,
+      -38.68
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "0.250 tab",
+     "note": "common (2)"
+    },
+    {
+     "n": "pin_3",
+     "ep": "ISO-SWITCH",
+     "at": [
+      5.0,
+      -8.3,
+      -38.68
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "0.250 tab",
+     "note": "CLOSE (3)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "cutout",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "snaps into a 21.08 x 36.83 panel cut-out; the bezel's back face seats on the panel"
+    }
+   ]
+  },
+  "ISOLATOR": {
+   "endpoints": [
+    "ISOLATOR"
+   ],
+   "what": "Battery isolator, Blue Sea 7700 ML-RBS remote battery switch with manual control, 12 V, 500 A continuous",
+   "maker": "Blue Sea Systems",
+   "maker_pn": "7700 (ML-RBS, manual control)",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 95.25,
+    "w": 51.56,
+    "h": 138.94
+   },
+   "frame": "origin at the centre of the four holes on the flat back; +Z out of the back, +Y up (knob up, studs down), stud A at -X, B at +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "studs": "-Y",
+     "knob": "+Y",
+     "leads": "-Y",
+     "label": "+Z"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#575458",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/7700.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (housing, 73%)"
+    },
+    "knob": {
+     "hex": "#feef95",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/7700.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (manual knob, yellow, 44%; the photo's lit face)"
+    },
+    "stud": {
+     "hex": "#b8a372",
+     "from": "tinned copper stud: not sampled (small in the photo); drawn brass-tin"
+    },
+    "nut": {
+     "hex": "#c9ccd0",
+     "from": "stud nut: not in the drawing; drawn zinc"
+    },
+    "boot": {
+     "hex": "#232527",
+     "from": "lead boot and cable jacket: black in the photo (not sampled, thin)"
+    },
+    "label": {
+     "hex": "#f2f3f3",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/7700.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (front label: near-white, dropped by the k-means as background)"
+    },
+    "mark": {
+     "hex": "#0974b0",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/7700.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (label lettering, blue, 51%)"
+    },
+    "plate": {
+     "hex": "#030303",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/7700.jpg (Blue Sea, fetched 2026-09-29), k-means of the region ('ENGINE' plate, black, 94%)"
+    },
+    "plate_text": {
+     "hex": "#f2f3f3",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/7700.jpg (Blue Sea, fetched 2026-09-29), k-means of the region ('ENGINE' lettering, white)"
+    },
+    "red": {
+     "hex": "#c4161c",
+     "from": "reference_documents/component_drawings/BlueSea_7700_ML-RBS_Instructions_990180170-006.pdf p.2, wiring diagram and control circuit connections: red +VDC 24 HR"
+    },
+    "black": {
+     "hex": "#1b1b1b",
+     "from": "reference_documents/component_drawings/BlueSea_7700_ML-RBS_Instructions_990180170-006.pdf p.2, wiring diagram and control circuit connections: black GROUND"
+    },
+    "brown": {
+     "hex": "#6b3a1e",
+     "from": "reference_documents/component_drawings/BlueSea_7700_ML-RBS_Instructions_990180170-006.pdf p.2, wiring diagram and control circuit connections: brown +VDC TO CLOSE"
+    },
+    "orange": {
+     "hex": "#ee7b16",
+     "from": "reference_documents/component_drawings/BlueSea_7700_ML-RBS_Instructions_990180170-006.pdf p.2, wiring diagram and control circuit connections: orange +VDC TO OPEN"
+    },
+    "yellow": {
+     "hex": "#f2c511",
+     "from": "reference_documents/component_drawings/BlueSea_7700_ML-RBS_Instructions_990180170-006.pdf p.2, wiring diagram and control circuit connections: yellow LED OUTPUT"
+    }
+   },
+   "attach": [
+    {
+     "n": "stud_A",
+     "ep": "ISOLATOR",
+     "at": [
+      -24.13,
+      -49.81,
+      26.16
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "stud",
+     "note": "stud A, 3/8-16, lug seats here; nut 140 in-lb max"
+    },
+    {
+     "n": "stud_B",
+     "ep": "ISOLATOR",
+     "at": [
+      24.13,
+      -49.81,
+      26.16
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "stud",
+     "note": "stud B, 3/8-16, lug seats here; nut 140 in-lb max"
+    },
+    {
+     "n": "leads",
+     "ep": "ISOLATOR",
+     "at": [
+      0,
+      -63.7,
+      41.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "flying leads",
+     "note": "five tinned control leads (red, black, brown, orange, yellow) out of the boot"
+    }
+   ],
+   "mount": [
+    {
+     "n": "hole_LB",
+     "at": [
+      -38.1,
+      -57.15,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 5.0,
+     "note": "through hole in the ear, back face on the bracket"
+    },
+    {
+     "n": "hole_LT",
+     "at": [
+      -38.1,
+      57.15,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 5.0,
+     "note": "through hole in the ear, back face on the bracket"
+    },
+    {
+     "n": "hole_RB",
+     "at": [
+      38.1,
+      -57.15,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 5.0,
+     "note": "through hole in the ear, back face on the bracket"
+    },
+    {
+     "n": "hole_RT",
+     "at": [
+      38.1,
+      57.15,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 5.0,
+     "note": "through hole in the ear, back face on the bracket"
+    }
+   ]
+  },
   "M130-A": {
    "endpoints": [
     "M130-A",
@@ -492,6 +1627,81 @@
     "source": "receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md: 60-80 mm below the connector face for the plug and boot"
    }
   },
+  "MIRROR-MON": {
+   "endpoints": [
+    "MIRROR-MON"
+   ],
+   "what": "Mirror monitor, Rear View Safety replacement rear-view mirror with a 4.3 in display (RVS-7180355-IR kit); camera in reverse",
+   "maker": "Rear View Safety",
+   "maker_pn": "RVS-7180355-IR (mirror monitor, G-Series)",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 268.0,
+    "w": 25.4,
+    "h": 80.0
+   },
+   "frame": "origin at the centre of the mirror's back (at the mount arm); +Z toward the driver (the glass), +Y up",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "glass": "+Z",
+     "arm": "-Z"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#454546",
+     "from": "Rear View Safety photo https://www.rearviewsafety.com/pub/media/catalog/product/r/e/replacement-mirror-monitor-rvs-718-main_2.jpg (Rear View Safety, fetched 2026-09-29), k-means (housing, black, 65%)"
+    },
+    "glass": {
+     "hex": "#2a2f33",
+     "from": "Rear View Safety photo https://www.rearviewsafety.com/pub/media/catalog/product/r/e/replacement-mirror-monitor-rvs-718-main_2.jpg (Rear View Safety, fetched 2026-09-29) (mirror glass, dark)"
+    },
+    "screen": {
+     "hex": "#3b6a8f",
+     "from": "Rear View Safety photo https://www.rearviewsafety.com/pub/media/catalog/product/r/e/replacement-mirror-monitor-rvs-718-main_2.jpg (Rear View Safety, fetched 2026-09-29) (display, lit)"
+    },
+    "button": {
+     "hex": "#1c1c1d",
+     "from": "buttons: black"
+    }
+   },
+   "attach": [
+    {
+     "n": "harness",
+     "ep": "MIRROR-MON",
+     "at": [
+      0,
+      12.0,
+      -35.0
+     ],
+     "dir": [
+      0,
+      1,
+      0
+     ],
+     "kind": "harness",
+     "note": "power harness (red / black / green) and the camera RCA, out of the mount arm"
+    }
+   ],
+   "mount": [
+    {
+     "n": "arm",
+     "at": [
+      0,
+      12.0,
+      -35.0
+     ],
+     "dir": [
+      0,
+      0,
+      1
+     ],
+     "note": "mount arm onto the windshield button"
+    }
+   ]
+  },
   "ODYSSEY": {
    "endpoints": [
     "ODYSSEY"
@@ -647,6 +1857,128 @@
       -1
      ],
      "note": "hold-down ledge along the +Y side, flush with the lid's back edge"
+    }
+   ]
+  },
+  "OUTLET-12V": {
+   "endpoints": [
+    "OUTLET-12V"
+   ],
+   "what": "12 V outlet, Blue Sea 1011 12 V DC dash socket with watertight cap, 15 A, 1-1/8 in hole",
+   "maker": "Blue Sea Systems",
+   "maker_pn": "1011",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 59.8,
+    "w": 42.3,
+    "h": 62.8
+   },
+   "frame": "origin at the centre of the flange's back face on the panel; +Z toward the user, +Y up (cap strap up), body behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "socket": "+Z",
+     "blades": "-Z"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#232324",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/1011.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (flange and body, black)"
+    },
+    "cap": {
+     "hex": "#2a2a2b",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/1011.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (cap, black)"
+    },
+    "blade": {
+     "hex": "#c7c2b4",
+     "from": "tin-plated blades: not sampled; drawn tin"
+    },
+    "mark": {
+     "hex": "#e8e8e8",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/1011.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (ring lettering, white)"
+    }
+   },
+   "attach": [
+    {
+     "n": "pos",
+     "ep": "OUTLET-12V",
+     "at": [
+      0,
+      0,
+      -47.3
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "0.250 blade",
+     "note": "+ centre blade (#72 via its lead)"
+    },
+    {
+     "n": "neg",
+     "ep": "OUTLET-12V",
+     "at": [
+      11.0,
+      0,
+      -47.3
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "0.250 blade",
+     "note": "- outer blade (OUT12V_GND via its lead)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "cutout",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 28.58,
+     "note": "1-1/8 in hole, nut behind the panel"
+    },
+    {
+     "n": "screw_L",
+     "at": [
+      -23.9,
+      0,
+      4.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.0,
+     "note": "flange screw hole"
+    },
+    {
+     "n": "screw_R",
+     "at": [
+      23.9,
+      0,
+      4.9
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.0,
+     "note": "flange screw hole"
     }
    ]
   },
@@ -1013,6 +2345,1431 @@
     "budget_mm": 80.0,
     "source": "receipts/2026-06-09_as-built-photo-survey-corrections.md (MoTeC environment constraints) and research/2026-06-09_design-inputs-recon.md: 60-80 mm below the connector face for the plug and boot"
    }
+  },
+  "RADIO": {
+   "endpoints": [
+    "RADIO"
+   ],
+   "what": "Radio, RetroSound RetroRadio Motor-2B for 1973-87 Chevy C/K trucks: power plug A, front / rear / sub RCA pre-outs, amp turn-on lead",
+   "maker": "RetroSound (Retro Manufacturing)",
+   "maker_pn": "Motor-2B, 1973-87 C/K kit (face not picked)",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 169.0,
+    "w": 50.3,
+    "h": 159.9
+   },
+   "frame": "origin at the centre of the brackets' front face on the back of the dash; +Z toward the driver, +Y up; face in front, motor behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "face": "+Z",
+     "plugs": "-Z"
+    }
+   },
+   "colors": {
+    "motor": {
+     "hex": "#b9bcbf",
+     "from": "Retro Manufacturing product photo https://cdn.shopify.com/s/files/1/0932/8664/products/B-116-03-73_a3f66b26-a268-4a22-b316-45189a60fd9e.jpg (Retro Manufacturing, fetched 2026-09-29), k-means of the region (motor case, zinc-silver)"
+    },
+    "bezel": {
+     "hex": "#d7d9db",
+     "from": "Retro Manufacturing product photo https://cdn.shopify.com/s/files/1/0932/8664/products/B-116-03-73_a3f66b26-a268-4a22-b316-45189a60fd9e.jpg (Retro Manufacturing, fetched 2026-09-29), k-means of the region (chrome face bezel)"
+    },
+    "window": {
+     "hex": "#161718",
+     "from": "Retro Manufacturing product photo https://cdn.shopify.com/s/files/1/0932/8664/products/B-116-03-73_a3f66b26-a268-4a22-b316-45189a60fd9e.jpg (Retro Manufacturing, fetched 2026-09-29), k-means of the region (display window, black)"
+    },
+    "button": {
+     "hex": "#1c1c1e",
+     "from": "Retro Manufacturing product photo https://cdn.shopify.com/s/files/1/0932/8664/products/B-116-03-73_a3f66b26-a268-4a22-b316-45189a60fd9e.jpg (Retro Manufacturing, fetched 2026-09-29), k-means of the region (push buttons, black)"
+    },
+    "knob": {
+     "hex": "#d0d3d6",
+     "from": "Retro Manufacturing product photo https://cdn.shopify.com/s/files/1/0932/8664/products/B-116-03-73_a3f66b26-a268-4a22-b316-45189a60fd9e.jpg (Retro Manufacturing, fetched 2026-09-29), k-means of the region (chrome knobs)"
+    },
+    "bracket": {
+     "hex": "#18181a",
+     "from": "Retro Manufacturing product photo https://cdn.shopify.com/s/files/1/0932/8664/products/B-116-03-73_a3f66b26-a268-4a22-b316-45189a60fd9e.jpg (Retro Manufacturing, fetched 2026-09-29), k-means of the region (InfiniMount brackets, black)"
+    },
+    "plug": {
+     "hex": "#1d1d1f",
+     "from": "power harness plug: black (not in the photo)"
+    },
+    "rca": {
+     "hex": "#b8a270",
+     "from": "RCA jacks: drawn gold"
+    },
+    "display": {
+     "hex": "#e8eef0",
+     "from": "Retro Manufacturing product photo https://cdn.shopify.com/s/files/1/0932/8664/products/B-116-03-73_a3f66b26-a268-4a22-b316-45189a60fd9e.jpg (Retro Manufacturing, fetched 2026-09-29), k-means of the region (display segments, white)"
+    }
+   },
+   "attach": [
+    {
+     "n": "power_A",
+     "ep": "RADIO",
+     "at": [
+      -20.0,
+      -2.0,
+      -123.2
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "plug",
+     "note": "power harness plug A: red IGN (#31), yellow constant, black ground, blue/white amp turn-on"
+    },
+    {
+     "n": "rca",
+     "ep": "RADIO",
+     "at": [
+      24.0,
+      3.0,
+      -119.2
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "RCA jacks",
+     "note": "front, rear and sub pre-outs (plug-in)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "shaft_L",
+     "at": [
+      -62.5,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "knob shaft through the dash's shaft hole; nut on the front"
+    },
+    {
+     "n": "shaft_R",
+     "at": [
+      62.5,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "knob shaft through the dash's shaft hole; nut on the front"
+    }
+   ]
+  },
+  "SPK-FL": {
+   "endpoints": [
+    "SPK-FL"
+   ],
+   "what": "Driver door speaker, JL Audio C2-650X 6.5 in (165 mm) 2-way coaxial, 4 ohm",
+   "maker": "JL Audio",
+   "maker_pn": "C2-650X",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 165.0,
+    "w": 165.0,
+    "h": 73.5
+   },
+   "frame": "origin at the centre of the mounting face (frame back on the panel); +Z toward the listener, +Y up (terminals down), basket and motor behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "cone": "+Z",
+     "terminals": "-Y"
+    }
+   },
+   "colors": {
+    "frame": {
+     "hex": "#1c1c1e",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (frame, black)"
+    },
+    "basket": {
+     "hex": "#232325",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (basket, black)"
+    },
+    "surround": {
+     "hex": "#141415",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (butyl surround, black)"
+    },
+    "cone": {
+     "hex": "#1a1a1b",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (cone, black)"
+    },
+    "tweeter": {
+     "hex": "#2b2b2d",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (tweeter housing)"
+    },
+    "trim": {
+     "hex": "#c6c9cc",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (silver trim ring)"
+    },
+    "terminal": {
+     "hex": "#c9c6bd",
+     "from": "tabs: drawn tin"
+    },
+    "label": {
+     "hex": "#5d4f9c",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (magnet cover label, purple)"
+    }
+   },
+   "attach": [
+    {
+     "n": "pos",
+     "ep": "SPK-FL",
+     "at": [
+      -5.0,
+      -70.0,
+      -12.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "5.2 mm tab",
+     "note": "+ (26a)"
+    },
+    {
+     "n": "neg",
+     "ep": "SPK-FL",
+     "at": [
+      5.0,
+      -70.0,
+      -12.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "2.8 mm tab",
+     "note": "- (26b)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "screw_0",
+     "at": [
+      54.09,
+      54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    },
+    {
+     "n": "screw_1",
+     "at": [
+      -54.09,
+      54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    },
+    {
+     "n": "screw_2",
+     "at": [
+      -54.09,
+      -54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    },
+    {
+     "n": "screw_3",
+     "at": [
+      54.09,
+      -54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    }
+   ]
+  },
+  "SPK-FR": {
+   "endpoints": [
+    "SPK-FR"
+   ],
+   "what": "Passenger door speaker, JL Audio C2-650X 6.5 in (165 mm) 2-way coaxial, 4 ohm",
+   "maker": "JL Audio",
+   "maker_pn": "C2-650X",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 165.0,
+    "w": 165.0,
+    "h": 73.5
+   },
+   "frame": "origin at the centre of the mounting face (frame back on the panel); +Z toward the listener, +Y up (terminals down), basket and motor behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "cone": "+Z",
+     "terminals": "-Y"
+    }
+   },
+   "colors": {
+    "frame": {
+     "hex": "#1c1c1e",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (frame, black)"
+    },
+    "basket": {
+     "hex": "#232325",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (basket, black)"
+    },
+    "surround": {
+     "hex": "#141415",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (butyl surround, black)"
+    },
+    "cone": {
+     "hex": "#1a1a1b",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (cone, black)"
+    },
+    "tweeter": {
+     "hex": "#2b2b2d",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (tweeter housing)"
+    },
+    "trim": {
+     "hex": "#c6c9cc",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (silver trim ring)"
+    },
+    "terminal": {
+     "hex": "#c9c6bd",
+     "from": "tabs: drawn tin"
+    },
+    "label": {
+     "hex": "#5d4f9c",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (magnet cover label, purple)"
+    }
+   },
+   "attach": [
+    {
+     "n": "pos",
+     "ep": "SPK-FR",
+     "at": [
+      -5.0,
+      -70.0,
+      -12.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "5.2 mm tab",
+     "note": "+ (27a)"
+    },
+    {
+     "n": "neg",
+     "ep": "SPK-FR",
+     "at": [
+      5.0,
+      -70.0,
+      -12.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "2.8 mm tab",
+     "note": "- (27b)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "screw_0",
+     "at": [
+      54.09,
+      54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    },
+    {
+     "n": "screw_1",
+     "at": [
+      -54.09,
+      54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    },
+    {
+     "n": "screw_2",
+     "at": [
+      -54.09,
+      -54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    },
+    {
+     "n": "screw_3",
+     "at": [
+      54.09,
+      -54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    }
+   ]
+  },
+  "SPK-RL": {
+   "endpoints": [
+    "SPK-RL"
+   ],
+   "what": "Left rear speaker, JL Audio C2-650X 6.5 in (165 mm) 2-way coaxial, 4 ohm",
+   "maker": "JL Audio",
+   "maker_pn": "C2-650X",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 165.0,
+    "w": 165.0,
+    "h": 73.5
+   },
+   "frame": "origin at the centre of the mounting face (frame back on the panel); +Z toward the listener, +Y up (terminals down), basket and motor behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "cone": "+Z",
+     "terminals": "-Y"
+    }
+   },
+   "colors": {
+    "frame": {
+     "hex": "#1c1c1e",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (frame, black)"
+    },
+    "basket": {
+     "hex": "#232325",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (basket, black)"
+    },
+    "surround": {
+     "hex": "#141415",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (butyl surround, black)"
+    },
+    "cone": {
+     "hex": "#1a1a1b",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (cone, black)"
+    },
+    "tweeter": {
+     "hex": "#2b2b2d",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (tweeter housing)"
+    },
+    "trim": {
+     "hex": "#c6c9cc",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (silver trim ring)"
+    },
+    "terminal": {
+     "hex": "#c9c6bd",
+     "from": "tabs: drawn tin"
+    },
+    "label": {
+     "hex": "#5d4f9c",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (magnet cover label, purple)"
+    }
+   },
+   "attach": [
+    {
+     "n": "pos",
+     "ep": "SPK-RL",
+     "at": [
+      -5.0,
+      -70.0,
+      -12.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "5.2 mm tab",
+     "note": "+ (28a)"
+    },
+    {
+     "n": "neg",
+     "ep": "SPK-RL",
+     "at": [
+      5.0,
+      -70.0,
+      -12.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "2.8 mm tab",
+     "note": "- (28b)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "screw_0",
+     "at": [
+      54.09,
+      54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    },
+    {
+     "n": "screw_1",
+     "at": [
+      -54.09,
+      54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    },
+    {
+     "n": "screw_2",
+     "at": [
+      -54.09,
+      -54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    },
+    {
+     "n": "screw_3",
+     "at": [
+      54.09,
+      -54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    }
+   ]
+  },
+  "SPK-RR": {
+   "endpoints": [
+    "SPK-RR"
+   ],
+   "what": "Right rear speaker, JL Audio C2-650X 6.5 in (165 mm) 2-way coaxial, 4 ohm",
+   "maker": "JL Audio",
+   "maker_pn": "C2-650X",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 165.0,
+    "w": 165.0,
+    "h": 73.5
+   },
+   "frame": "origin at the centre of the mounting face (frame back on the panel); +Z toward the listener, +Y up (terminals down), basket and motor behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "cone": "+Z",
+     "terminals": "-Y"
+    }
+   },
+   "colors": {
+    "frame": {
+     "hex": "#1c1c1e",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (frame, black)"
+    },
+    "basket": {
+     "hex": "#232325",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (basket, black)"
+    },
+    "surround": {
+     "hex": "#141415",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (butyl surround, black)"
+    },
+    "cone": {
+     "hex": "#1a1a1b",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (cone, black)"
+    },
+    "tweeter": {
+     "hex": "#2b2b2d",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (tweeter housing)"
+    },
+    "trim": {
+     "hex": "#c6c9cc",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (silver trim ring)"
+    },
+    "terminal": {
+     "hex": "#c9c6bd",
+     "from": "tabs: drawn tin"
+    },
+    "label": {
+     "hex": "#5d4f9c",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg (Crutchfield, fetched 2026-09-29), k-means of the region (magnet cover label, purple)"
+    }
+   },
+   "attach": [
+    {
+     "n": "pos",
+     "ep": "SPK-RR",
+     "at": [
+      -5.0,
+      -70.0,
+      -12.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "5.2 mm tab",
+     "note": "+ (29a)"
+    },
+    {
+     "n": "neg",
+     "ep": "SPK-RR",
+     "at": [
+      5.0,
+      -70.0,
+      -12.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "2.8 mm tab",
+     "note": "- (29b)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "screw_0",
+     "at": [
+      54.09,
+      54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    },
+    {
+     "n": "screw_1",
+     "at": [
+      -54.09,
+      54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    },
+    {
+     "n": "screw_2",
+     "at": [
+      -54.09,
+      -54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    },
+    {
+     "n": "screw_3",
+     "at": [
+      54.09,
+      -54.09,
+      4.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.2,
+     "note": "#8 sheet-metal screw through the frame"
+    }
+   ]
+  },
+  "SUB-2": {
+   "endpoints": [
+    "SUB-2"
+   ],
+   "what": "Woofer 2 of 2, JBL Club 102SL 10 in shallow-mount, SSI switch at 4 ohm",
+   "maker": "JBL (Harman)",
+   "maker_pn": "Club 102SL (JBLSUBCB102SL)",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 266.7,
+    "w": 266.7,
+    "h": 99.85
+   },
+   "frame": "origin at the centre of the mounting face (frame back on the baffle); +Z out of the baffle, +Y up (terminals down), motor behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "cone": "+Z",
+     "terminals": "-Y"
+    }
+   },
+   "colors": {
+    "frame": {
+     "hex": "#1d1d1f",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (frame, black)"
+    },
+    "basket": {
+     "hex": "#2e2f31",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (steel basket, textured black-grey)"
+    },
+    "surround": {
+     "hex": "#18181a",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (rubber surround, black)"
+    },
+    "cone": {
+     "hex": "#232426",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (aluminium cone, black anodised)"
+    },
+    "terminal": {
+     "hex": "#c9c6bd",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (push-terminal posts, nickel)"
+    },
+    "accent": {
+     "hex": "#e8651d",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (orange ring)"
+    },
+    "graphic": {
+     "hex": "#6d6f73",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (cone graphic, grey)"
+    }
+   },
+   "attach": [
+    {
+     "n": "pos",
+     "ep": "SUB-2",
+     "at": [
+      -8.0,
+      -120.0,
+      -24.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "push terminal",
+     "note": "+ spring terminal (bare wire)"
+    },
+    {
+     "n": "neg",
+     "ep": "SUB-2",
+     "at": [
+      8.0,
+      -120.0,
+      -24.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "push terminal",
+     "note": "- spring terminal (bare wire)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "screw_0",
+     "at": [
+      88.39,
+      88.39,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    },
+    {
+     "n": "screw_1",
+     "at": [
+      0.0,
+      125.0,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    },
+    {
+     "n": "screw_2",
+     "at": [
+      -88.39,
+      88.39,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    },
+    {
+     "n": "screw_3",
+     "at": [
+      -125.0,
+      0.0,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    },
+    {
+     "n": "screw_4",
+     "at": [
+      -88.39,
+      -88.39,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    },
+    {
+     "n": "screw_5",
+     "at": [
+      -0.0,
+      -125.0,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    },
+    {
+     "n": "screw_6",
+     "at": [
+      88.39,
+      -88.39,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    },
+    {
+     "n": "screw_7",
+     "at": [
+      125.0,
+      -0.0,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    }
+   ]
+  },
+  "SUB": {
+   "endpoints": [
+    "SUB"
+   ],
+   "what": "Woofer 1 of 2, JBL Club 102SL 10 in shallow-mount, SSI switch at 4 ohm",
+   "maker": "JBL (Harman)",
+   "maker_pn": "Club 102SL (JBLSUBCB102SL)",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 266.7,
+    "w": 266.7,
+    "h": 99.85
+   },
+   "frame": "origin at the centre of the mounting face (frame back on the baffle); +Z out of the baffle, +Y up (terminals down), motor behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "cone": "+Z",
+     "terminals": "-Y"
+    }
+   },
+   "colors": {
+    "frame": {
+     "hex": "#1d1d1f",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (frame, black)"
+    },
+    "basket": {
+     "hex": "#2e2f31",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (steel basket, textured black-grey)"
+    },
+    "surround": {
+     "hex": "#18181a",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (rubber surround, black)"
+    },
+    "cone": {
+     "hex": "#232426",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (aluminium cone, black anodised)"
+    },
+    "terminal": {
+     "hex": "#c9c6bd",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (push-terminal posts, nickel)"
+    },
+    "accent": {
+     "hex": "#e8651d",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (orange ring)"
+    },
+    "graphic": {
+     "hex": "#6d6f73",
+     "from": "Crutchfield product photo https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg (Crutchfield, fetched 2026-09-29), k-means of the region (cone graphic, grey)"
+    }
+   },
+   "attach": [
+    {
+     "n": "pos",
+     "ep": "SUB",
+     "at": [
+      -8.0,
+      -120.0,
+      -24.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "push terminal",
+     "note": "+ spring terminal (bare wire)"
+    },
+    {
+     "n": "neg",
+     "ep": "SUB",
+     "at": [
+      8.0,
+      -120.0,
+      -24.0
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "push terminal",
+     "note": "- spring terminal (bare wire)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "screw_0",
+     "at": [
+      88.39,
+      88.39,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    },
+    {
+     "n": "screw_1",
+     "at": [
+      0.0,
+      125.0,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    },
+    {
+     "n": "screw_2",
+     "at": [
+      -88.39,
+      88.39,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    },
+    {
+     "n": "screw_3",
+     "at": [
+      -125.0,
+      0.0,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    },
+    {
+     "n": "screw_4",
+     "at": [
+      -88.39,
+      -88.39,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    },
+    {
+     "n": "screw_5",
+     "at": [
+      -0.0,
+      -125.0,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    },
+    {
+     "n": "screw_6",
+     "at": [
+      88.39,
+      -88.39,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    },
+    {
+     "n": "screw_7",
+     "at": [
+      125.0,
+      -0.0,
+      6.0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "note": "frame screw"
+    }
+   ]
+  },
+  "UNDERDASH-LAMPS": {
+   "endpoints": [
+    "UNDERDASH-LAMPS"
+   ],
+   "what": "Under-dash lamp, Lumitec Mini Rail2 101241 warm white LED, 360 mA at 12 V, 95 lm, 10-30 V, IP65, leads",
+   "maker": "Lumitec",
+   "maker_pn": "101241 (Mini Rail2, warm white)",
+   "shape_basis": "datasheet dims",
+   "dims_mm": {
+    "l": 149.9,
+    "w": 28.2,
+    "h": 15.3
+   },
+   "frame": "origin at the centre of the mounting face (the back, on the dash underside); +Z toward the light, +X along the rail",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "lens": "+Z",
+     "lead": "-X"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#757877",
+     "from": "Lumitec photo https://www.lumiteclighting.com/media/catalog/product/r/a/rail2_mini_3.png (Lumitec, fetched 2026-09-29), k-means (aluminium body, 86%)"
+    },
+    "cap": {
+     "hex": "#dbdbdd",
+     "from": "Lumitec photo https://www.lumiteclighting.com/media/catalog/product/r/a/rail2_mini_3.png (Lumitec, fetched 2026-09-29), k-means (end caps, white, 72%)"
+    },
+    "lens": {
+     "hex": "#f1f3f3",
+     "from": "diffuser lens: white (photo)"
+    }
+   },
+   "attach": [
+    {
+     "n": "leads",
+     "ep": "UNDERDASH-LAMPS",
+     "at": [
+      -74.95,
+      0,
+      6.12
+     ],
+     "dir": [
+      -1,
+      0,
+      0
+     ],
+     "kind": "flying leads",
+     "note": "2 leads from the end cap (splice)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "hole_L",
+     "at": [
+      -63.95,
+      0,
+      15.3
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.0,
+     "note": "screw through the end cap"
+    },
+    {
+     "n": "hole_R",
+     "at": [
+      63.95,
+      0,
+      15.3
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 4.0,
+     "note": "screw through the end cap"
+    }
+   ]
+  },
+  "USB-PORT": {
+   "endpoints": [
+    "USB-PORT"
+   ],
+   "what": "USB charging port, Blue Sea 1045 dual USB charger, 4.8 A total at 5 V, 9-32 V in, IP45 with cap, 1-1/8 in hole",
+   "maker": "Blue Sea Systems",
+   "maker_pn": "1045",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 40.0,
+    "w": 40.0,
+    "h": 60.0
+   },
+   "frame": "origin at the centre of the face flange's back on the panel; +Z toward the user, +Y up (cap hinge up), body behind (-Z)",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "ports": "+Z",
+     "blades": "-Z"
+    }
+   },
+   "colors": {
+    "body": {
+     "hex": "#262627",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/1045.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (face, body and cap, black)"
+    },
+    "port": {
+     "hex": "#0d0d0e",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/1045.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (USB openings)"
+    },
+    "tongue": {
+     "hex": "#e0e0dc",
+     "from": "Blue Sea product photo https://dh778tpvmt77t.cloudfront.net/images/products/1045.jpg (Blue Sea, fetched 2026-09-29), k-means of the region (USB contact tongues, white)"
+    },
+    "blade": {
+     "hex": "#c7c2b4",
+     "from": "tin-plated blades: not sampled; drawn tin"
+    }
+   },
+   "attach": [
+    {
+     "n": "pos",
+     "ep": "USB-PORT",
+     "at": [
+      -6.3,
+      0,
+      -46.4
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "0.250 blade",
+     "note": "+ blade (#70 via its lead)"
+    },
+    {
+     "n": "neg",
+     "ep": "USB-PORT",
+     "at": [
+      6.3,
+      0,
+      -46.4
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "kind": "0.250 blade",
+     "note": "- blade (USB_GND via its lead)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "hole",
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 28.6,
+     "note": "Ø28.6 hole, castellated nut behind"
+    }
+   ]
+  },
+  "WIDEBAND": {
+   "endpoints": [
+    "WIDEBAND"
+   ],
+   "what": "Lambda controller MoTeC LTCD (61301) with two Bosch LSU 4.9 wideband sensors (bought with the M130 via Dave)",
+   "maker": "MoTeC (sensors: Bosch)",
+   "maker_pn": "61301 LTCD + 2 x Bosch LSU 4.9",
+   "shape_basis": "maker drawing",
+   "dims_mm": {
+    "l": 38.0,
+    "w": 23.5,
+    "h": 26.0
+   },
+   "frame": "origin at the centre of the LTCD's back; +Z toward the logo face, +Y up (looms leave the bottom), sensors drawn at +X",
+   "axes": {
+    "mount_normal": "+Z",
+    "maker_up": "+Y",
+    "faces": {
+     "logo": "+Z",
+     "looms": "-Y"
+    }
+   },
+   "colors": {
+    "box": {
+     "hex": "#1d1d1f",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_LTCD_7c7a5eed0a.webp (MoTeC, fetched 2026-09-29), k-means of the region (case, black)"
+    },
+    "loom": {
+     "hex": "#121213",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_LTCD_7c7a5eed0a.webp (MoTeC, fetched 2026-09-29), k-means of the region (loom sleeve, black)"
+    },
+    "plug": {
+     "hex": "#262628",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_LTCD_7c7a5eed0a.webp (MoTeC, fetched 2026-09-29), k-means of the region (LSU plugs, black)"
+    },
+    "dtm": {
+     "hex": "#8f9396",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_LTCD_7c7a5eed0a.webp (MoTeC, fetched 2026-09-29), k-means of the region (Power/CAN DTM plug, grey)"
+    },
+    "mark": {
+     "hex": "#f1f1f1",
+     "from": "MoTeC product photo https://assets.motec.com.au/strapi/large_LTCD_7c7a5eed0a.webp (MoTeC, fetched 2026-09-29), k-means of the region (logo and 'LTCD 4.9', white)"
+    },
+    "steel": {
+     "hex": "#a7a9ab",
+     "from": "stainless probe and hex: not in the MoTeC photo; drawn steel"
+    },
+    "lsu_body": {
+     "hex": "#77797c",
+     "from": "sensor housing: not in the MoTeC photo; drawn steel grey"
+    },
+    "lsu_sleeve": {
+     "hex": "#c9c2b3",
+     "from": "fibre-glass / silicone sleeve (https://www.bosch-motorsport.com/media/catalog_content/downloads_catalog/pdf_catalog/data_sheet_69034379_lambda_sensor_lsu_4-9.pdf (Bosch Motorsport data sheet, fetched 2026-09-29) 'Sleeve fiber glass / silicone coated'): drawn natural"
+    }
+   },
+   "attach": [
+    {
+     "n": "power_can",
+     "ep": "WIDEBAND",
+     "at": [
+      31.0,
+      -187.0,
+      11.75
+     ],
+     "dir": [
+      0,
+      -1,
+      0
+     ],
+     "kind": "plug",
+     "note": "DTM 4-pin male on the LTCD loom; the harness brings the DTM06-4S (#68054)"
+    }
+   ],
+   "mount": [
+    {
+     "n": "hole_L",
+     "at": [
+      -16.0,
+      10.0,
+      23.5
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 3.2,
+     "note": "Ø3.2 through the case, screw from the logo face"
+    },
+    {
+     "n": "hole_R",
+     "at": [
+      16.0,
+      10.0,
+      23.5
+     ],
+     "dir": [
+      0,
+      0,
+      -1
+     ],
+     "d": 3.2,
+     "note": "Ø3.2 through the case, screw from the logo face"
+    }
+   ]
   }
  }
 }
