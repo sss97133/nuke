@@ -58,7 +58,7 @@ locked floor-dimmer topology (#85a/b, #86a/b).
 
 | Old row | Now |
 |---|---|
-| TB "on the truck" | not installed (owner's words; mounts via the Delmo 4-bolt adapter, order #70079) |
+| TB "on the truck" | not installed (owner's words; mounts via the Delmo 4-bolt adapter, order record obs:a58db14b) |
 | Injector rails "on the truck" | withdrawn (a mock-up photo is not install proof) |
 | Coils "not on the truck" | withdrawn (the coils sit on the DEL-Stributor mount) |
 | Alternator "on the truck" | mounted on the Holley drive, not wired |

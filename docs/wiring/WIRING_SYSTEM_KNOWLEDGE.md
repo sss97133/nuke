@@ -52,10 +52,10 @@ Every data point must come from a real source — a service manual, a product da
 - Inv. 3 (09/2024): Desert Performance wiring, trans, interior, engine peripherals, fuel/exhaust, brakes (amounts in the DB)
 - Inv. 4 (03/2025): labor, Desert Performance wiring, AMP steps, windows, wheels, tires, LED lighting, Delmo handles, machined pieces, CVF hinges (amounts in the DB)
 
-### Reference Invoice (Desert Performance → Howard Barton, different vehicle)
-- Invoice #1190 (03/2019): $23,970 — complete Motec M130+PDM30 build on custom coupe
-- Contains real Motec pricing: M130 $3,500, PDM30 $3,140, LTCD $844, GT101 $80ea, D510 $75ea, RBD-190 $300
-- Labor rate: $65/hr, 50 hours install + programming, $750 dyno
+### Reference Invoice (Desert Performance, another customer's vehicle)
+- A March 2019 invoice: $••• — complete Motec M130+PDM30 build on custom coupe
+- Contains real Motec dealer pricing for the M130, PDM30, LTCD, GT101, D510 and RBD-190 (amounts private, $•••)
+- Labor rate, install and programming hours, and dyno time (amounts private, $•••)
 
 ---
 

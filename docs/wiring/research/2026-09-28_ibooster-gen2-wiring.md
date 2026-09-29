@@ -2,7 +2,7 @@
 
 > **CORRECTION: our unit is a Gen 1, not a Gen 2.**
 > - **Order:** the owner asked Calimotive Auto Recycling for **1037123-00-B** on 2023-11-08. Calimotive replied
->   that it is "listed with revision -A but we will ship out a revision B". Order #1011 was confirmed 2023-11-09 and
+>   that it is "listed with revision -A but we will ship out a revision B". The order (record obs:a7276b88) was confirmed 2023-11-09 and
 >   UPS delivered it 2023-11-13 (owner's Gmail).
 > - **Photo:** the controller label in K5 photo `40e5e5f9` (2026-01-31) reads "P/N 1?37123-0?-B … iBooster". It is
 >   blurry but consistent.

@@ -63,7 +63,7 @@ against 2 spare — they do not fit on the cab PDM. The engine PDM15 has 6 spare
 Body signal crossings need bulkhead C (A and B are 12/12; P is the size-12 power connector).
 
 ## Also this session
-- PCS TCM-2650 ZGP setup guide rev 2 (23 pp.) fetched from the Zero Gravity Dropbox (order #9501 email 2024-09-11) and saved
+- PCS TCM-2650 ZGP setup guide rev 2 (23 pp.) fetched from the Zero Gravity Dropbox (the Zero Gravity order email, 2024-09-11) and saved
   as `reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf`. It has no
   4WD/low-range input and no harness pin drawing. Emailed Jim Miller (ZGP) for the harness drawing, a low-range flag, and the
   CAN broadcast (Gmail, 2026-09-28).

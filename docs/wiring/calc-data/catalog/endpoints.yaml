@@ -1184,7 +1184,7 @@ IBOOSTER:
   kit: {}
   pins: {"52": "1 (always hot, 40 A)", "IBOOST_PERM": "17 (always hot, 5 A)", "IBOOST_WAKE": "20 (ignition 12 V)", "IBOOST_GND": "9 (chassis ground)"}
   open: ["pigtail unterminated (state): Tulay Gen-1 harness lead colours read at the bench"]
-  sources: ["owner's Gmail: Calimotive Auto Recycling order #1011, confirmed 2023-11-09 for 1037123-00-B ('listed with revision -A but we will ship out a revision B'), delivered 2023-11-13",
+  sources: ["the salvage-yard order (record obs:a7276b88), confirmed 2023-11-09 for 1037123-00-B ('listed with revision -A but we will ship out a revision B'), delivered 2023-11-13",
             "K5 photo 40e5e5f9 (2026-01-31): controller label 'P/N 1?37123-0?-B ... iBooster'",
             "chapters/17 §17.3 (pin 1 constant 40 A, pin 20 ignition 5 A)"]
 GND-BANK-ENG:
@@ -1528,7 +1528,7 @@ GSS-SENSOR:
 PCS-TCM:
   where: cabin
   mount: "under the dash beside the PDM30: the ZGP TCM-2650 setup guide rev2 (all 23 pages) gives no mounting location and no environmental or sealing rating (lead rule 2026-09-28)"
-  device: "PCS TCM-2650 transmission controller — owned (Zero Gravity order 9501); the TCM-4610 kit harness plugs into it (PCS-HARNESS-4610)"
+  device: "PCS TCM-2650 transmission controller — owned (Zero Gravity order, delivered 2024-09-12; no database record yet); the TCM-4610 kit harness plugs into it (PCS-HARNESS-4610)"
   family: open
   kit: {}
   wires: []

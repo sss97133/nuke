@@ -20,7 +20,7 @@ status: FILED (prior receipts left untouched; this receipt supersedes the two cl
 - 1978 ST-352 circuit tabulation (`reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf` p8): circuit #5 Yellow = "Neutral Safety Start Sw. or Start Relay Feed."
 
 ## Why it matters now (6L90 + PCS TCM-2650)
-The column switch tracks the **column lever**, not the 6L90's manual valve. Whether its P/N/R windows line up with the 6L90 detents depends on the shift-cable adapter, which is unverified. The PCS TCM-2650 can output neutral-safety and reverse-light **grounds from the transmission's own lever position**. Source: ZGP "TCM2650 GM 6L 8L Configurable Tuning Instructions" rev 2, p19–20, "PWM vs. Lever Position ... typically used for Neutral safety and Reverse Lights. This outputs a ground only." This doc is in the vendor Dropbox sent with Zero Gravity order #9501 (Gmail 2024-09-11).
+The column switch tracks the **column lever**, not the 6L90's manual valve. Whether its P/N/R windows line up with the 6L90 detents depends on the shift-cable adapter, which is unverified. The PCS TCM-2650 can output neutral-safety and reverse-light **grounds from the transmission's own lever position**. Source: ZGP "TCM2650 GM 6L 8L Configurable Tuning Instructions" rev 2, p19–20, "PWM vs. Lever Position ... typically used for Neutral safety and Reverse Lights. This outputs a ground only." This doc is in the vendor Dropbox sent with the Zero Gravity order (Gmail 2024-09-11).
 
 ## Proposal (owner/Dave call, not applied)
 Delete the column NSS function. Crank-enable and reverse lamps come from the PCS lever-position outputs into PDM30 inputs. The column switch can stay in place, unwired, or be removed.

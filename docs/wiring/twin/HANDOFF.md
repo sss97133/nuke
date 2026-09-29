@@ -14,7 +14,7 @@ dimension-built LS3 + the parts that are actually on the truck in the 2026-01-31
 | Holley LS3 street single-plane intake + 8 runners + port flanges | pad 5.42 in above the valley flange, 4150 flange, port 2.50×1.15 in (Holley 199R10690); valley flange height derived (225 mm) | published heights, derived base |
 | Delmo 4-bolt adapter + GM/Hitachi 12699160 DBW throttle body (92 mm bore, vertical) | manifest (purchased); stack height photo-fitted | photo |
 | Holley EFI rails + 8 injectors in the intake bosses | photo; rail offset photo-fitted | photo |
-| Del-Stributer plate + 8× D510C coils, rear centre above the bellhousing | Delmo order #5068 (bought 2025-11-03); Delmo install photos | photo (Delmo), assignment unknown |
+| Del-Stributer plate + 8× D510C coils, rear centre above the bellhousing | Delmo order (bought 2025-11-03; no database record yet); Delmo install photos | photo (Delmo), assignment unknown |
 | Holley mid-mount: water-pump manifold, damper, crank/WP pulleys, alternator (driver, high), Type II PS pump (passenger, low), tensioner, idler, belt; SD7 compressor as *planned* (driver, low) | Holley 199R11485 kit contents; sides from the truck photos; sizes photo-scaled | photo |
 | Starter (passenger rear, low) | GM LS layout; manifest DFSR-8715 | published side |
 | Mid-length headers, collectors, tail pipes, O2 bungs (*candidate*) | photo; bung per MoTeC LTCD manual (10–90° to vertical tip-down, ≥1 m from the ports) | candidate |

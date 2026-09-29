@@ -62,22 +62,22 @@ These are one-man shops. No API, no catalog feed, no inventory system. You call 
 
 Real prices from real invoices, stored in `invoice_learned_pricing` (49 entries).
 
-### Desert Performance Invoice #1190 (Mar 2019)
-Complete Motec M130+PDM30 build on a custom coupe. Total: $23,970. Key prices:
+### Desert Performance reference invoice (Mar 2019)
+Complete Motec M130+PDM30 build on a custom coupe. Total: $•••. Key prices (a third party's invoice: amounts private, $•••; redaction 2026-09-29):
 
 | Item | Price | Notes |
 |------|-------|-------|
-| Motec M130 ECU with GPR firmware | $3,500 | Standalone ECU |
-| Motec PDM30 | $3,140 | 30-channel power distribution |
-| Motec LTCD wideband interface | $844 | Dual LSU4.9 lambda controller |
-| Motec RBD-190 remote battery disconnect | $300 | 190A rated |
-| Motec GT101 speed sensor | $80 ea (×4) | Hall effect |
-| Motec 8-button keypad | $575 | Custom labeled |
-| Custom engine harness (61-pin disconnect) | $3,000 | Desert Perf labor+materials |
-| Chassis harness | $3,000 | Desert Perf labor+materials |
-| Denso D510 coils | $75 ea (×8) | LS coil-on-plug |
-| Installation + programming | $65/hr (×50 hrs) | $3,250 total |
-| Dyno + road tuning | $750 | Flat rate |
+| Motec M130 ECU with GPR firmware | $••• | Standalone ECU |
+| Motec PDM30 | $••• | 30-channel power distribution |
+| Motec LTCD wideband interface | $••• | Dual LSU4.9 lambda controller |
+| Motec RBD-190 remote battery disconnect | $••• | 190A rated |
+| Motec GT101 speed sensor | $••• ea (×4) | Hall effect |
+| Motec 8-button keypad | $••• | Custom labeled |
+| Custom engine harness (61-pin disconnect) | $••• | Desert Perf labor+materials |
+| Chassis harness | $••• | Desert Perf labor+materials |
+| Denso D510 coils | $••• ea (×8) | LS coil-on-plug |
+| Installation + programming | $•••/hr (×50 hrs) | $••• total |
+| Dyno + road tuning | $••• | Flat rate |
 
 ### NUKE LTD Invoices (K5 Blazer Build)
 | Invoice | Date | Total | Key Items |

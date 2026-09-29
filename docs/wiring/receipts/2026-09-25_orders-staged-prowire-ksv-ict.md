@@ -26,7 +26,7 @@ The line lists live in the doc and in `K5_WIRING_STATE.md` §3 0f(e).
 Lesson → memory `feedback_script_vendor_sites_throttled.md`: resolve from the DB and bulk listings first; serial requests 8–15 s apart; stop on the first 403/429; cache.
 
 ## Substrate inconsistency surfaced (not fixed inline)
-38 `vehicle_build_manifest` rows on e08bf694 cite Desert Performance invoice #1190 as purchase proof. #1190 is the 2019 Howard Barton coupe invoice (appendix-c; Gmail "Barton Coupe wiring invoice" 2024-12-24). → state §3 0g. It needs a `substrate_correction` pass. Owner-facing: the doc's "Not proven yet" list.
+38 `vehicle_build_manifest` rows on e08bf694 cite a 2019 Desert Performance invoice as purchase proof. that invoice is for another customer's coupe (appendix-c; Gmail, 2024-12-24). → state §3 0g. It needs a `substrate_correction` pass. Owner-facing: the doc's "Not proven yet" list.
 
 ## Unknowns (block nothing in the carts)
 - Pedal socket 6 vs 9 pins (photo).

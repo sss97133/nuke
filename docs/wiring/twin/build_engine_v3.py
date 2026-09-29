@@ -75,7 +75,7 @@ DIMS = {
     "tb_bore":          (92.0,   "vehicle_build_manifest 'Electronic Throttle Body GM/Hitachi 12699160, L8T 6.6L truck, ~92 mm bore' (purchased)", "published"),
     "tb_body_od":       (125.0,  PHOTO + ": TB body vs the 4150 pad", "photo"),
     "tb_height":        (127.0,  PHOTO + " + photo_match.py fit (+42 mm over the first estimate)", "photo"),
-    "tb_adapter_h":     (25.0,   PHOTO + ": 4-bolt adapter plate (Delmo Speed order 70079)", "photo"),
+    "tb_adapter_h":     (25.0,   PHOTO + ": 4-bolt adapter plate (Delmo Speed order, record obs:a58db14b)", "photo"),
     "rail_od":          (22.0,   PHOTO + ": Holley EFI black rails", "photo"),
     "rail_offset_r":    (-40.0,  "photo_match.py bounded fit: rails 40 mm closer to the ports than the first estimate (at the fit bound)", "photo"),
     "rail_offset_s":    (-5.0,   "photo_match.py bounded fit", "photo"),
