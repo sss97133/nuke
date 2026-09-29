@@ -285,6 +285,17 @@ URLS = [
     "https://www.classicparts.com/1973-84-Windshield-Washer-Hose-Kit/productinfo/67-865/",
     "https://www.ebay.com/itm/192684099994",
     "https://ck5.com/forums/threads/tech-detailed-wiper-wiring-diagram.174785/",
+    # fuel system and regulator (research 2026-09-30_fuel-system-and-regulator.md); the regulator and rail instruction PDFs
+    # sit behind hashed links on these two product pages, so their text copies are saved by hand (research doc, sources)
+    "https://aeromotiveinc.com/products/new-a1000-gen-ii-efi-regulator",
+    "https://www.holley.com/products/fuel_systems/fuel_rails/parts/534-209",
+    "https://aeromotiveinc.com/products/bracket-for-aeromotive-13138-13139-and-13140-ls-fuel-regulators",
+    "https://www.milspecwiring.com/assets/images/GPR_M1_Package.pdf",
+    "https://assets.motec.com.au/strapi/M1_Flex_Fuel_User_Guide_249c316b37.pdf",
+    "https://assets.motec.com.au/strapi/M1_To_PDM_CAN_Messaging_fd06806969.pdf",
+    "https://moteconline.motec.com.au/Package/ViewVariant?PackageVariantId=2081",
+    "https://www.motec.com.au/products/GPR?catId=15",
+    "https://www.motec.com.au/products/Water%20Temperature%20Sensor",
     # cooled front seats: thermoelectric and fan kits, the seat plug (research/2026-09-30_cooled-seats.md, fetched 2026-09-29)
     "https://leatherseats.com/shop/seat-comfort/seat-heater-cooler-unit/",
     "https://leatherseats.com/leatherseats-101/sanctum-heater-cooler-installation-guide/",

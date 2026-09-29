@@ -47,3 +47,5 @@
 - Retiring the 11 R13 rows and the 28 endless registry wires.
 - The vendor order references still in endpoints.yaml, and in the registry text copied from it (a scrap-yard order, a TCM
   order, an eBay item): replace them with database ids.
+
+- Lead, merging onto main after #435 (2026-09-29): the book requires every plug to be drawn on a sheet, and BRAKE-WARN-SW was on none. It was added to the brake booster sheet (`diagram_sections_v5.py` SHEET_PLAN, now "Brake booster, fluid level and brake warning switch"). The chain was rerun: 179 endpoints, 947 wire ends, and the book has no rule faults (20 pages + 31 diagram sheets + 7 DC primary pages).

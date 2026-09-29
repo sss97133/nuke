@@ -55471,7 +55471,7 @@
    "history": null
   },
   "STEP-DCMD": {
-   "name": "Power steps on the bay PDM (the PDM15, per the registry) through two Haltech DCMD H-bridges, no AMP controller (recommended; Haltech pick provisional until the bench test)",
+   "name": "Power steps on the PDM15 through two Haltech DCMD H-bridges, no AMP controller (recommended; Haltech pick provisional until the bench test)",
    "status": "candidate",
    "decided": null,
    "source": "owner 2026-09-29 (above). Haltech HT-038009 DC Motor Driver (web_snapshots/www.haltech.com__ht-038009-dc-motor-driver-dcmd.md; quick start guide www.haltech.com__ht-038009-dcmd-quick-start-guide.md pp.2-3, 10): \"8A Continuous Per Channel, Maximum Transient Current 30A\", 8-18 V, -40 to +85 C, 16 AWG power/ground/motor and 20 AWG control, \"20A for Switched Power\", \"Control is Active State: Low. 0V on Control A = 0V on Motor A\" (input thresholds not published). The bay PDM keeps all the logic; each DCMD only follows its two control lines",
@@ -58788,6 +58788,93 @@
    },
    "history": null,
    "alternative_to": "SEAT-TED"
+  },
+  "FT": {
+   "name": "Fuel temperature sensor in the return at the regulator, to M130 AT4 (B6)",
+   "status": "candidate",
+   "decided": null,
+   "source": "lead 2026-09-29 (owner asked how fuel is measured); research/2026-09-30_fuel-system-and-regulator.md §4: the M1 works out\n      injector pulse width from \"Fuel Pressure and Fuel Temperature\" and corrects fuel density with a \"Coefficient of Thermal\n      Expansion\" (MoTeC M1 Flex Fuel User Guide v1.0 p.3, p.5, web_snapshots/assets.motec.com.au__M1_Flex_Fuel_User_Guide_249c316b37.md);\n      MoTeC's GPR M130 pinout gives an AT input \"Fuel Temperature Sensor\" as its example use (web_snapshots/www.motec.com.au__GPR.md,\n      connector B). Not asked for by the owner",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "m130_pins": 1,
+    "m130_udig": 0,
+    "pin61_cavities": 2,
+    "limits": [
+     "61-pin: 3 spare cavities (d, t, u). WSS-F2 (wheel-speed lane) would take 2, so with WSS-F2 built FT fits only with its 0 V joined to #112g on the engine side (61 of 61, none left). Dave's call on the engine-side 0 V join"
+    ],
+    "notes": "M130 B6 (AT4, spare; 1k pull-up to SEN_5V_B per MoTeC's M130 GPR pinout); signal + 0 V in 22 AWG M22759/16 (canon ch.16 §1.5); sensor not picked: MoTeC #55001 = Bosch 0 280 130 026 (M12 x 1.5, M1 predefined calibration, plug MoTeC #64004; MoTeC lists it as a water sensor, fuel service not stated); fitting: a tee in the -6 return at the regulator. The flex-fuel sensor version is FT-FLEX",
+    "adds": [
+     {
+      "id": "FT_SIG",
+      "gauge": 22,
+      "spec": "M22759/16",
+      "from": "M130:B6 (AT4)",
+      "to": "FT sensor signal",
+      "current_a": 0.005,
+      "length_ft_est": 4.6,
+      "basis": "same ends as #112 fuel PSI signal (cut list v4.2 zone estimate 4.6 ft); current <= 5 V / 1k pull-up (MoTeC M130 GPR pinout)"
+     },
+     {
+      "id": "FT_0V",
+      "gauge": 22,
+      "spec": "M22759/16",
+      "from": "M130:B16 (SEN_0V_B, Dave's sheet: analog sensor 0 V)",
+      "to": "FT sensor 0 V",
+      "current_a": 0.005,
+      "length_ft_est": 4.6,
+      "basis": "as FT_SIG; the A09/B16 vs A02/B16 letter pairing is Dave's adjudication (state 0ab)"
+     }
+    ]
+   },
+   "history": null
+  },
+  "FT-FLEX": {
+   "name": "Fuel temperature and ethanol content from a GM 13577379 flex-fuel sensor in the return, to an M130 UDIG",
+   "status": "candidate",
+   "decided": null,
+   "source": "research/2026-09-30_fuel-system-and-regulator.md §4; MoTeC M1 Flex Fuel User Guide v1.0 p.6-8: a digital composition sensor on a\n      \"UDIG X Hybrid A\" input; \"The common flex fuel sensors will also provide fuel temperature as part of its digital reading. Only\n      one digital input is needed to get both the composition and temperature readings\" (p.7); GM 1357 7379 translation table (p.8).\n      Pieces audit 2026-09-29: the UDIG path collides with WSS-F2 and NAV-L10. Not asked for by the owner",
+   "subsystems": [],
+   "wires": [],
+   "demand": {
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "m130_pins": 1,
+    "m130_udig": 1,
+    "pin61_cavities": 2,
+    "limits": [
+     "CONFLICT: M130 B10 (UDIG5) and B11 (UDIG6) are the last two spare UDIGs (registry pinout). WSS-F2 (wheel-speed lane) takes both and NAV-L10 (nav-comms lane) takes B11, so FT-FLEX cannot be built with WSS-F2, and only on B10 with NAV-L10. FT (thermistor on AT4, B6) takes no UDIG and does not conflict. Owner call"
+    ],
+    "notes": "Worth it over FT only if the truck will ever run ethanol blends: the M1 blends two fuels from the composition reading (Flex Fuel guide p.3). Hose ports need adapters to the -6 return; supply voltage and plug are open (GM data not in our sources)",
+    "adds": [
+     {
+      "id": "FTF_SIG",
+      "gauge": 22,
+      "spec": "M22759/16",
+      "from": "M130:B10 (UDIG5)",
+      "to": "GM 13577379 signal",
+      "current_a": 0,
+      "length_ft_est": 4.6,
+      "basis": "same ends as #112 fuel PSI signal (cut list v4.2 zone estimate 4.6 ft); signal current not published"
+     },
+     {
+      "id": "FTF_0V",
+      "gauge": 22,
+      "spec": "M22759/16",
+      "from": "M130:B16 (SEN_0V_B)",
+      "to": "GM 13577379 ground",
+      "current_a": 0,
+      "length_ft_est": 4.6,
+      "basis": "as FTF_SIG"
+     }
+    ]
+   },
+   "history": null,
+   "alternative_to": "FT"
   }
  },
  "capacity": {
@@ -60683,17 +60770,60 @@
     "taps": [],
     "alternative_to": "SEAT-TED",
     "requires": null
+   },
+   "FT": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "m130_pins": 1,
+    "m130_udig": 0,
+    "pin61_cavities": 2,
+    "conflicts_with": null,
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "M130 B6 (AT4, spare; 1k pull-up to SEN_5V_B per MoTeC's M130 GPR pinout); signal + 0 V in 22 AWG M22759/16 (canon ch.16 §1.5); sensor not picked: MoTeC #55001 = Bosch 0 280 130 026 (M12 x 1.5, M1 predefined calibration, plug MoTeC #64004; MoTeC lists it as a water sensor, fuel service not stated); fitting: a tee in the -6 return at the regulator. The flex-fuel sensor version is FT-FLEX",
+    "planned_wires": 2,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": null,
+    "requires": null
+   },
+   "FT-FLEX": {
+    "status": "candidate",
+    "designed_wires": 0,
+    "crossings": 0,
+    "pdm30_outputs": 0,
+    "pdm30_inputs": 0,
+    "pdm15_outputs": 0,
+    "m130_pins": 1,
+    "m130_udig": 1,
+    "pin61_cavities": 2,
+    "conflicts_with": [
+     "WSS-F2",
+     "NAV-L10"
+    ],
+    "takes": [],
+    "setting_conflicts": [],
+    "notes": "Worth it over FT only if the truck will ever run ethanol blends: the M1 blends two fuels from the composition reading (Flex Fuel guide p.3). Hose ports need adapters to the -6 return; supply voltage and plug are open (GM data not in our sources)",
+    "planned_wires": 2,
+    "door_cavities": 0,
+    "taps": [],
+    "alternative_to": "FT",
+    "requires": null
    }
   },
   "verdict": {
    "body crossings": "Body firewall crossings: candidates would take 2; body bulkheads have 4 spare — fits, but only in the 4-way power connector P (size 12 contacts); signal wires need bulkhead C",
    "PDM30 outputs": "PDM30 outputs: candidates would take 10; 3 spare — does NOT fit; the engine PDM15 has 5 spare outputs for engine-bay loads",
    "PDM30 inputs": "PDM30 inputs: candidates would take 4; 2 spare — does NOT fit; PDM15 has 13 spare inputs, read over CAN",
-   "61-pin cavities": "61-pin (engine connector): candidates would take 2 (WSS-F2 2); 3 spare (d, t, u) — fits, leaving 1",
-   "M130 pins": "M130 pins: candidates would take 2 (WSS-F2 2), 2 of them universal digital inputs; 8 spare, 7 of them I/O (not I/O: B12 BAT_BAK), 2 of them UDIG (B10, B11) — fits, leaving 5 I/O pins and 0 UDIG",
+   "61-pin cavities": "61-pin (engine connector): candidates would take 4 (WSS-F2 2, FT 2); 3 spare (d, t, u) — does NOT fit",
+   "M130 pins": "M130 pins: candidates would take 3 (WSS-F2 2, FT 1), 2 of them universal digital inputs; 8 spare, 7 of them I/O (not I/O: B12 BAT_BAK), 2 of them UDIG (B10, B11) — fits, leaving 4 I/O pins and 0 UDIG",
    "PDM15 outputs": "PDM15 outputs: candidates would take 4 (STEP-DCMD 3, WSS-F2 1); 5 spare — fits, leaving 1",
    "door pass-throughs": "Door pass-throughs (DT 8-way, each door): base + decided use 2 of 8; designed candidate wires take 4 (PL); undesigned candidates would take 4 per door — fits only without PL; a DT 12-way (DT04-12PA / DT06-12SA) gives 4 more cavities; with DPASS12 each door has 12: 2 + 4 + 4 = 10 — fits",
-   "alternates": "Alternate versions not counted above (one version of an add-on is built): STEP-RQ, MCAM-BIL, BSM-SD2, MTS-SOG, PUD-MIR, MIRD-FV, MIRD-360, NAV-L10, NAV-DAK, COM-DASH, COM-ACC, COM-TOP, RTR-T, WSS-4E, WSS-PREP, SEAT-VENT"
+   "alternates": "Alternate versions not counted above (one version of an add-on is built): STEP-RQ, MCAM-BIL, BSM-SD2, MTS-SOG, PUD-MIR, MIRD-FV, MIRD-360, NAV-L10, NAV-DAK, COM-DASH, COM-ACC, COM-TOP, RTR-T, WSS-4E, WSS-PREP, SEAT-VENT, FT-FLEX"
   }
  }
 }
