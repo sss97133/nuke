@@ -212,4 +212,12 @@ items:
     settles: The rear ring (under the stud heads or on the shaft) and the sensor tab on the existing caliper bracket. The recommended path has no rear sensors (the NP205 sender already gives rear drive speed), so this waits on that call.
     tolerance_mm: 1
     compare_to: "The installed finned cover shows 11 bolts in view (photo 5aefc0bd, 2023-11-28, per the wheel-speed page), which points to 12 in total."
+  - id: T-20
+    priority: 2
+    what: Seat runs and seat travel (asked by the seat-climate lane, for cooled seats; numbered after the wheel-speed items T-16 to T-19 in PR #427)
+    from_to: "(a) Along the route, from the PDM30's spot to under each seat. (b) The driver seat adjuster's full fore-aft travel. (c) The passenger seat's tip-forward arc, measured at the plug spot near the front pivot bracket. (d) Clearance from under each cushion to the floor, at both ends of travel. (e) The backrest's inside depth between the foam and the vinyl back."
+    how: "Cloth tape along the route for (a); tape for (b) to (d); a thin rule pushed in at the back seam for (e)."
+    settles: "Seat feed lengths and the passenger feed's gauge (volt drop), the service loops at the seat disconnects (SEAT-L/R-PASS-P), and whether a thermoelectric unit fits in the backrest (docs/wiring/research/2026-09-30_cooled-seats.md, PR #422)."
+    tolerance_mm: 5
+    compare_to: "Nothing published. Lengths need +/-25 mm; the depths in (d) and (e) need +/-5 mm, which sets the tolerance here."
     result: {measured: null, unit: null, by: null, date: null, photo: null, notes: null}

@@ -23,6 +23,11 @@
 #   mass_g_est     wire mass from ProWire's M22759/32 table (20 AWG 6.40 kg/km = 1.95 g/ft) plus any device mass the maker publishes
 # alternative_to   another version of the same add-on. Only one is built, so options_v5 leaves it out of the capacity totals
 # requires         an option it cannot be built without
+# conflicts_with   another candidate that names the same pin or output; the CONFLICT line in demand.limits says which
+# Engine-side demand options_v5 reads (2026-09-30, wheel-speed lane):
+#   pdm15_outputs  engine PDM15 outputs it would take (otherwise counted from designed wires only)
+#   m130_pins      M130 pins it would take; m130_udig = how many of them must be universal digital inputs (UDIG)
+#   pin61_cavities cavities it would take in the engine-only 61-pin firewall connector
 
 BASE:
   name: Base truck — engine, power spine, comms, factory body functions
@@ -48,6 +53,143 @@ STEPS:
   decided: 2025-03-01
   source: client invoice Inv. 4 (AMP steps line, DB); WIRING_SYSTEM_KNOWLEDGE.md
   subsystems: [AMP_STEPS]
+
+# ------------------------------------------------ power steps without the AMP controller (candidates, 2026-09-30)
+# Owner 2026-09-29: "I don't like seeing a power step we're gonna have to just bypass them figure out how to power
+# differently which that has a lot of implications obviously computer". The AMP motors and linkages stay (STEPS above);
+# these candidates replace the AMP controller and its kit harness with MoTeC logic and a solid-state bridge (a PDM
+# output is high-side only, MoTeC PDM manual p.6 and p.22; relays are locked out, wiring_decisions
+# locked-pdm-replaces-relays). Every source, the logic and the failure table: research/2026-09-30_power-step-bypass.md.
+# Keys follow the add-on block's (demand.adds, product, alternative_to, requires), plus:
+#   demand.removes         rows the option retires through a blocks link if the owner picks it (never deleted)
+#   demand.outputs/inputs  the PDM outputs and inputs it takes, by pin (MoTeC PDM manual pp.43-44)
+#   demand.pdm15_outputs   bay-PDM (PDM15) outputs it takes (the wheel-speed lane's #426 teaches options_v5 to count it)
+# Motor currents are UNKNOWN (no AMP figure published); every limit and gauge below is written as the rule the bench
+# number must pass. Lengths are ESTIMATES or null with the reason.
+
+STEP-DCMD:
+  name: Power steps on the bay PDM (the PDM15, per the registry) through two Haltech DCMD H-bridges, no AMP controller (recommended; Haltech pick provisional until the bench test)
+  status: candidate
+  source: >-
+    owner 2026-09-29 (above). Haltech HT-038009 DC Motor Driver (web_snapshots/www.haltech.com__ht-038009-dc-motor-driver-dcmd.md;
+    quick start guide www.haltech.com__ht-038009-dcmd-quick-start-guide.md pp.2-3, 10): "8A Continuous Per Channel, Maximum
+    Transient Current 30A", 8-18 V, -40 to +85 C, 16 AWG power/ground/motor and 20 AWG control, "20A for Switched Power",
+    "Control is Active State: Low. 0V on Control A = 0V on Motor A" (input thresholds not published). The bay PDM keeps all
+    the logic; each DCMD only follows its two control lines
+  product: {maker: Haltech, pn: HT-038009, price_usd: 180.00, price_date: 2026-09-29, each: true, qty: 2,
+            specs: "one full bridge per unit, 86 x 28 x 55.5 mm, power/ground/controls on a pre-terminated 4-pin DT, motor on a 2-pin DT; case sealing not published"}
+  wire_patterns: ["^STEPD_"]
+  demand:
+    crossings: 0            # no firewall and no body penetration: the motor leads follow the AMP harness route (IM75146 p.6)
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    pdm15_outputs: 3
+    outputs:
+      - "PDM15 OUT8 (20 A, B_7 + B_13): bridge power, one pin to each DCMD (same output)"
+      - "PDM15 OUT10 (8 A, A_4): line X to Control A of both DCMDs (deploy polarity, set on the bench)"
+      - "PDM15 OUT12 (8 A, A_8): line Y to Control B of both DCMDs"
+    limits:
+      - "Bay PDM per the registry; if the bay box becomes a sealed PDM32 (state row 0ah, pending), these outputs remap in that registry pass"
+      - "OUT8 <= 10 A: each 16 AWG branch is 12 A at 100 C (MoTeC PDM manual p.48), x 0.85 = 10.2 A (ch.17 s17.1 item 3), and one branch can carry the whole output; so <= 4 A running per motor (1.25 x 2 x 4 = 10)"
+      - "over 4 A per motor, or a step per door: DCMD-R needs its own feed. OUT15 alone is an 8 A output (20 AWG pin lead, 6 A at 100 C x 0.85 = 5 A), so still <= 4 A; OUT14 is the wheel-speed candidate's (WSS-F2, PR #426). Up to 8 A per motor needs OUT5 freed (#66 fuel pump to an 8 A output, state row 0o) or STEP-RQ"
+      - "OUT10 / OUT12: 1 A (control inputs and pull-downs only; outputs programmable in 1 A steps, PDM manual p.1)"
+    door_cavities: 0
+    removes: ["3", "STEP_GND", "STEP_DOOR_L", "STEP_DOOR_R", "AMP-STEP-CTRL (endpoint: controller and kit harness)", "AMP-KIT-RING (part)"]
+    notes: >-
+      Both steps move together (Far From Stock's stated behaviour: "both steps lower when opening either door"). Door states,
+      RUN, START and STEP-SW reach the bay PDM over CAN from the PDM30 (the path the engine loads already use, state 0v); road
+      speed from the M130's M1 General stream (#100 VSS on the NP205 speedo drive). End of travel = OUT8 current rise (the sum
+      of both motors, 0.5 A resolution on outputs 1-8, PDM manual p.26) plus a 5 s window (the AMP controller's own window,
+      troubleshooting guide p.5). Control high driving the lead to +12 V is inferred; the pull-down value is UNKNOWN (the DCMD
+      pull-up is not published): bench check or Haltech. Every DT mating plug on this harness (the DCMD's 4-pin and 2-pin)
+      needs its E-seal (C015) version: M22759/32 is under the N-seal range, and 20 AWG /32 is under even the E-seal minimum,
+      so the control branches into the DT are 18 AWG (state row 0ai; E-seal part numbers not on file)
+    adds:
+      - {id: STEPD_PWR_L, gauge: 16, spec: M22759/32, from: "PDM15:OUT8 (B_7)", to: "DCMD-L 4-pin DT, +12 V", current_a: null, length_ft_est: null, basis: "Haltech's 16 AWG power size (quick start guide p.3); motor current unknown; length waits on the PDM15 spot (mounts.yaml, open) and the harness-cad polyline"}
+      - {id: STEPD_PWR_R, gauge: 16, spec: M22759/32, from: "PDM15:OUT8 (B_13)", to: "DCMD-R 4-pin DT, +12 V", current_a: null, length_ft_est: null, basis: "as STEPD_PWR_L"}
+      - {id: STEPD_GND_L, gauge: 16, spec: M22759/32, from: "DCMD-L 4-pin DT, ground", to: "GND-BANK-ENG", current_a: null, length_ft_est: null, basis: "as STEPD_PWR_L (grounds in the loom, state s1 row 56)"}
+      - {id: STEPD_GND_R, gauge: 16, spec: M22759/32, from: "DCMD-R 4-pin DT, ground", to: "GND-BANK-ENG", current_a: null, length_ft_est: null, basis: "as STEPD_GND_L"}
+      - {id: STEPD_X, gauge: 20, spec: M22759/32, from: "PDM15:OUT10 (A_4)", to: "SPL-STEPD-X (M81824/1-2)", current_a: null, length_ft_est: null, basis: "control line; current = two DCMD inputs + their pull-downs, value unknown until the bench (far below the output's 1 A step)"}
+      - {id: STEPD_X_L, gauge: 18, spec: M22759/32, from: "SPL-STEPD-X", to: "DCMD-L Control A (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "18 AWG, not Haltech's 20: 20 AWG /32 (1.27 mm) is under the DT E-seal minimum 1.35 mm, 18 AWG /32 (1.52 mm) seals (state row 0ai); current as STEPD_X"}
+      - {id: STEPD_X_R, gauge: 18, spec: M22759/32, from: "SPL-STEPD-X", to: "DCMD-R Control A (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "as STEPD_X_L"}
+      - {id: STEPD_Y, gauge: 20, spec: M22759/32, from: "PDM15:OUT12 (A_8)", to: "SPL-STEPD-Y (M81824/1-2)", current_a: null, length_ft_est: null, basis: "as STEPD_X"}
+      - {id: STEPD_Y_L, gauge: 18, spec: M22759/32, from: "SPL-STEPD-Y", to: "DCMD-L Control B (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "as STEPD_X_L"}
+      - {id: STEPD_Y_R, gauge: 18, spec: M22759/32, from: "SPL-STEPD-Y", to: "DCMD-R Control B (pull-down to its ground at the plug)", current_a: null, length_ft_est: null, basis: "as STEPD_X_L"}
+      - {id: STEPD_ML_A, gauge: null, spec: M22759/32, from: "DCMD-L 2-pin DT, Motor A", to: "left motor plug pigtail (kit harness, orange lead), M81824/1-2 or /1-3", current_a: null, length_ft_est: null, basis: "gauge 16/14/12 AWG by the measured running current (research s7: 3 % drop over the run); 16 AWG at the DT (size-16 contact 20-16 AWG, E-seal), spliced up after it; path = AMP harness route down the driver wheel well and along the frame (IM75146 p.6)"}
+      - {id: STEPD_ML_B, gauge: null, spec: M22759/32, from: "DCMD-L 2-pin DT, Motor B", to: "left motor plug pigtail (white lead)", current_a: null, length_ft_est: null, basis: "as STEPD_ML_A"}
+      - {id: STEPD_MR_A, gauge: null, spec: M22759/32, from: "DCMD-R 2-pin DT, Motor A", to: "right motor plug pigtail (orange/black lead)", current_a: null, length_ft_est: null, basis: "as STEPD_ML_A, passenger side"}
+      - {id: STEPD_MR_B, gauge: null, spec: M22759/32, from: "DCMD-R 2-pin DT, Motor B", to: "right motor plug pigtail (white/black lead)", current_a: null, length_ft_est: null, basis: "as STEPD_ML_A, passenger side"}
+    mass_g_est: "not estimated (lengths and gauges wait on the bench and the twin); DCMD mass not published"
+
+STEP-RQ:
+  name: Power steps on the PDM30 through one Roboteq SDC2160 dual H-bridge in the cab, no AMP controller
+  status: candidate
+  alternative_to: STEP-DCMD
+  conflicts_with: [PW, PL, TOP-LIGHT, COM]   # PDM30 OUT3/OUT4 are the spares PW names (COM also wants OUT3); OUT21 is the one PL and TOP-LIGHT name
+  source: >-
+    owner 2026-09-29 (above). Roboteq SDC2160 (web_snapshots/www.roboteq.com__sdc2160-detail.md: "Dual Channel, 2 x 15 A
+    Continuous, 2 x 20 A Peak (30 s), 60V ... Cooling plate with ABS cover"); SDC21xx datasheet v2.3 (www.roboteq.com__63-sdc21xx-datasheet.md
+    Tables 3-9): current limit 1-20 A, stall detection 1-20 A / 1-65000 ms, digital input '1' = 3-30 V, board -40 to 85 C,
+    humidity non-condensing (cab only), 12 AWG max terminals; user manual v2.1 p.91 amps-threshold Safety Stop "until the
+    direction is reversed" (stops each motor at each end); pp.22-23 Power Control must be grounded to turn it off
+  product: {maker: Roboteq, pn: SDC2160, price_usd: 350.00, price_date: 2026-09-29, each: true, qty: 1,
+            specs: "73 x 73 x 30 mm, 120 g, idle 50-100 mA, not CE compliant; SDC2130 is the 35 V version"}
+  wire_patterns: ["^STEPR_"]
+  demand:
+    crossings: 0            # firewall; the motor leads leave the cab through two floor clamps (below), not the firewall
+    pdm30_outputs: 2        # 3 with a step per door (OUT4 -> DIN2)
+    pdm30_inputs: 0
+    outputs:
+      - "PDM30 OUT3 (20 A, A_5 + A_14): controller VMot and Power Control"
+      - "PDM30 OUT21 (8 A, B_1): direction -> DIN1 (DB15 pin 4)"
+      - "per-door option: PDM30 OUT4 (20 A, A_7 + A_16): direction right -> DIN2 (DB15 pin 8)"
+    limits:
+      - "OUT3 <= 17 A: 12 AWG leg ProWire bundled 20 A x 0.85 (ch.16 s2.3, ch.17 s17.1 item 3); so <= 6.8 A running per motor (1.25 x 2 x 6.8 = 17); the controller's own current limit (1-20 A per channel) set from the bench"
+      - "OUT21 / OUT4: 1 A, the smallest setting (DIN input 53 kOhm, datasheet Table 5)"
+    floor_exits: 2          # sealed cable clamps near each door, Blue Sea 1003 as AMP-PASS (owner: round only; milspec preferred; part open)
+    door_cavities: 0
+    removes: ["3", "STEP_GND", "STEP_DOOR_L", "STEP_DOOR_R", "AMP-STEP-CTRL (endpoint: controller and kit harness)", "AMP-KIT-RING (part)"]
+    notes: >-
+      Takes the PDM30 spares that exist only while PW (OUT3/OUT4) and PL (OUT21) are unfitted: STEP-RQ + PW + PL do not fit
+      on the PDM30 unless another cab-side PDM appears (the PDM15 in the cab, mounts.yaml; or the front loads moving to a
+      sealed bay PDM32, state 0ah, pending), which is an owner call. Door
+      inputs stay local (DIG12/DIG13); speed over CAN (M1 General stream). Needs a short MicroBasic script (DIN to motor
+      command; the DIN actions have no run-forward, user manual p.62), an external 1-10 kOhm pull-down on each DIN used (user
+      manual p.48, Figure 3-4) and a pull-down on Power Control (value unknown).
+      The I/O connector grounds are not wired to a ground bank (datasheet note 5)
+    adds:
+      - {id: STEPR_PWR_P1, gauge: 16, spec: M22759/32, from: "PDM30:OUT3 (A_5)", to: "SPL-STEPR-PWR (M81824/1-3)", current_a: null, length_ft_est: null, basis: "PDM 20 A output pigtail, 2 x 16 AWG per paired output (state 0ac); length set at the formboard, as the registry pigtails"}
+      - {id: STEPR_PWR_P2, gauge: 16, spec: M22759/32, from: "PDM30:OUT3 (A_14)", to: "SPL-STEPR-PWR (M81824/1-3)", current_a: null, length_ft_est: null, basis: "as STEPR_PWR_P1"}
+      - {id: STEPR_PWR, gauge: 12, spec: M22759/32, from: "SPL-STEPR-PWR", to: "Roboteq VMot terminal", current_a: null, length_ft_est: null, basis: "controller beside the PDM30, spot open (not on the PDM30's own plate: board limit 85 C)"}
+      - {id: STEPR_PWRCTL, gauge: 20, spec: M22759/32, from: "Roboteq VMot terminal", to: "Roboteq Power Control (pull-down to its GND terminal)", current_a: null, length_ft_est: null, basis: "jumper at the controller; current = Power Control input + pull-down, value unknown; length at the formboard"}
+      - {id: STEPR_GND, gauge: 12, spec: M22759/32, from: "Roboteq GND terminal", to: "GND-BANK-CAB", current_a: null, length_ft_est: null, basis: "as STEPR_PWR"}
+      - {id: STEPR_DIR, gauge: 20, spec: M22759/32, from: "PDM30:OUT21 (B_1)", to: "Roboteq DB15 pin 4 (DIN1), 1-10 kOhm pull-down to DB15 GND", current_a: null, length_ft_est: null, basis: "DIN 53 kOhm (datasheet Table 5) plus the external pull-down (1-10 kOhm: 1.4-14 mA at 14 V, user manual p.48); length as STEPR_PWR"}
+      - {id: STEPR_ML_A, gauge: null, spec: M22759/32, from: "Roboteq M1+", to: "left motor plug pigtail (orange lead), M81824/1-2 or /1-3", current_a: null, length_ft_est: 11.5, basis: "ESTIMATE: cut list v4.2 zone estimate for PDM30 -> AMP step motor (#1, output/K5_cut_list_v4_2.txt:104); gauge by the measured running current (research s7)"}
+      - {id: STEPR_ML_B, gauge: null, spec: M22759/32, from: "Roboteq M1-", to: "left motor plug pigtail (white lead)", current_a: null, length_ft_est: 11.5, basis: "as STEPR_ML_A"}
+      - {id: STEPR_MR_A, gauge: null, spec: M22759/32, from: "Roboteq M2+", to: "right motor plug pigtail (orange/black lead)", current_a: null, length_ft_est: 11.5, basis: "ESTIMATE: cut list v4.2 zone estimate for PDM30 -> AMP step motor (#2, output/K5_cut_list_v4_2.txt:105)"}
+      - {id: STEPR_MR_B, gauge: null, spec: M22759/32, from: "Roboteq M2-", to: "right motor plug pigtail (white/black lead)", current_a: null, length_ft_est: 11.5, basis: "as STEPR_MR_A"}
+    mass_g_est: "120 g controller (datasheet Table 9); wire not estimated (gauge waits on the bench)"
+
+STEP-SW:
+  name: Step disable switch on the dash (steps stow and stay stowed), PDM30 DIG16
+  status: candidate
+  requires_one_of: [STEP-DCMD, STEP-RQ]
+  source: >-
+    agent 2026-09-30 (research/2026-09-30_power-step-bypass.md s8): holds the steps stowed off-road or while someone works
+    under the rocker. Hold-out for washing needs no switch: the AMP foot-on-step trick (troubleshooting guide p.6) is kept in
+    the logic. PDM30 inputs switch to 0 V with a 10 k pull-up (MoTeC PDM manual p.5); DIG8 is left for LO4
+  wire_patterns: ["^STEPSW_"]
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 1
+    inputs: ["PDM30 DIG16 (B_24); switch common to PDM30 0V (A_28), as the factory switches (state 0w)"]
+    notes: >-
+      switch part open: match the dash switch family picked for the other dash switches. DIG16 is also wanted by AS and LO4
+      (options_v5 ledger); if CANKEY is fitted, a keypad button does this job with no PDM input and this option's wires drop out
+    adds:
+      - {id: STEPSW_SIG, gauge: 20, spec: M22759/32, from: "step disable switch", to: "PDM30:DIG16 (B_24)", current_a: 0.0014, length_ft_est: 3.5, basis: "ESTIMATE: cut list v4.2 zone estimate for a dash switch -> PDM30 input (as #45, #46); current 14 V / 10 kOhm pull-up (PDM manual p.5)"}
+      - {id: STEPSW_0V, gauge: 20, spec: M22759/32, from: "step disable switch common", to: "PDM30 0V (A_28)", current_a: 0.0014, length_ft_est: 3.5, basis: "as STEPSW_SIG"}
 
 RC:
   name: Rear camera with mirror display
@@ -1136,6 +1278,124 @@ RTR-T:
     limits: ["+1.35 A on the COMMS output (measured full load at 12 V); the group still sets 9 A"]
     notes: "OPEN: input voltage range and operating temperature from the datasheet; its 4-pin power connector pin order"
     adds: []
+
+
+# ============================================================== wheel speed sensors, tone rings, knuckle mounts (2026-09-30)
+# Owner 2026-09-29: "we need to deal with TPS sensors and then the other side of the sensor which we have to figure out how to
+# install that machine or whatever machining part of the axle the knuckle". Read as wheel speed sensors, the tone rings they read
+# and the knuckle mounts. Research, prices and every source: research/2026-09-30_wheel-speed-sensors.md (web pages snapshotted
+# 2026-09-29 to reference_documents/web_snapshots/, gitignored). Nothing on the truck needs wheel speeds: the iBooster runs
+# standalone on its pedal sensor, the PCS needs only engine RPM, the Dakota reads the NP205 sender. They buy traction and launch
+# control in 2WD and slip logging. None of these is decided. Their M130, 61-pin and PDM15 demand is in the keys above, so
+# options_v5 shows it in the verdict next to the other candidates.
+
+WSS-F2:
+  name: Front wheel speed sensors, two ZF GS100502 on machined tone rings, into M130 UDIG5 / UDIG6 (traction and launch control in 2WD)
+  status: candidate
+  conflicts_with: [NAV-L10]     # both name M130 B11 (UDIG6); see demand.limits CONFLICT
+  source: >-
+    owner 2026-09-29 (above). MoTeC M1 Launch Control User Guide v1.0 p.3: "A minimum of two sensors (one each of Driven Wheel and
+    Non-Driven Wheel Speed) is recommended"; the driven one is the NP205 sender #100 on M130 B08, which MoTeC's own GPR example
+    pinout names "Wheel Speed Rear Drive Sensor" (web_snapshots/www.motec.com.au__GPR.md). UDIG as the wheel-speed resource: MoTeC
+    help centre "Checklist Wheel Speed Setup" (motec.zendesk.com__14594472064015-Checklist-Wheel-Speed-Setup.md) and M1 hardware
+    techspec p.9 ("Can be used for REF/SYNC, CAM position, wheel speed")
+  product: {maker: ZF, pn: GS100502, price_usd: 33.80, price_date: 2026-09-29, each: true,
+            specs: "Hall, open-collector sinking 20 mA max, 5-24 V at 6 mA max, 1.5 mm air gap, near zero to 15 kHz, M12x1 aluminium body 65.5 mm, 20 AWG x 1 m leads, -40 to 125 C, IP67 (ZF GS1005-GS1007 datasheet, 2016-07-06); DigiKey qty 1, 1,300 in stock"}
+  demand:
+    crossings: 0            # no body bulkhead
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    pdm15_outputs: 1        # OUT14 (8 A) at 1 A, the sensor feed
+    m130_pins: 2            # B10 (UDIG5), B11 (UDIG6)
+    m130_udig: 2            # the last two spare universal digital inputs
+    pin61_cavities: 2       # the two signals: 2 of the 3 spare cavities (d, t, u)
+    limits: ["CONFLICT: M130 B11 (UDIG6) is also named by NAV-L10 (the MoTeC GPS-L10 alternate, PR #421, on B11 or B14 per its manual; B14 is ISO_KILL). The M130 has two spare UDIGs, B10 and B11, and WSS-F2 takes both, so WSS-F2 and NAV-L10 cannot both be built on this M130. NAV (CAN only) takes no M130 pin and does not conflict. Owner call",
+             "PDM15 OUT14 (8 A) at 1 A, the smallest step (PDM manual p.1 'Outputs are programmable in 1 A steps'); load 2 x 6 mA (ZF p.1). OUT14 is uncontested: STEP-DCMD (PR #428, on the registry's PDM15) takes OUT8, OUT10 and OUT12 (demand.pdm15_outputs: 3) and wants OUT15 only as an optional second feed; nothing here plans on OUT15. If the bay box becomes a sealed PDM32 (state 0ah, pending), these outputs remap in that registry pass",
+             "SEAL: DTM seals take 1.35-3.05 mm insulation (Deutsch DT Series Technical Manual, farnell 628276, feature table) and M22759/32-20 is 1.27 mm (catalog/parts.yaml WIRE-OD, ProWire), so the harness side of each corner DTM does not seal as listed (the state 0ai class of problem). Fixes: 20 AWG M22759/16 (1.5 mm, inside the published DTM range, and it fits the 20 AWG contacts and the 61-pin #20; needs the owner's OK, like the 22 AWG /16 change of 2026-09-26; check that the 1.35-3.05 mm range is one seal, since 0ai found the DT feature-table range spans two) or 18 AWG /32 (1.52 mm) on 16-18 AWG size-20 contacts 0460-010-20141 / 0462-005-20141, spliced to 20 AWG before the 61-pin (#20 contacts take 20-24 AWG). The ZF's own lead OD is not published: caliper it. Dave's call"]
+    door_cavities: 0
+    notes: >-
+      M130 B10 (UDIG5) front left and B11 (UDIG6) front right: 52 -> 54 of 60 pins, and the last two UDIGs. 61-pin 58 -> 60 of 61;
+      registry #100 may take cavity d back when body bulkhead C goes under the 0ah call, which would fill it. PDM15 OUT14 (8 A)
+      feeds both sensors, and their 0 V goes to GND-BANK-ENG, so only the two signals
+      cross (Dave's call against the MoTeC-pattern SEN_5V0_B / SEN_0V supply, which takes 2 more cavities). Mechanical: two
+      low-carbon steel tone rings pressed on registers turned on the inboard barrels of the front hub-and-discs (1977 LTSM
+      pp.305-306). Teeth are at least ZF's 5.0 mm high, 2.5 mm wide, 10 mm apart (12.5 mm pitch, count = floor(pi x tip dia /
+      12.5), at least 24 per MoTeC, 48 preferred). Two bolt-on brackets go under two spindle nuts (25 ft-lb K10/K20, LTSM
+      p.307) or the caliper support-bracket bolts. Each corner has a DTM04-3P / DTM06-3S at the frame, inside the rail channel.
+      OPEN: hub barrel OD, tire size, corner temperature (125 C sensor; Bosch HA-M at 160 C is the fallback), machine-shop
+      quote, and 61-pin cavity approval
+    adds:
+      - {id: WSS_FL_SIG, gauge: 20, spec: M22759/32, from: "WSS-FL DTM06-3S cavity 3 (ZF black, output)", to: "M130:B10 (UDIG5) through a spare 61-pin cavity", current_a: 0, length_ft_est: null, basis: "not derived: the front hub, the frame hose bracket and the 61-pin plate are not all placed in the twin yet"}
+      - {id: WSS_FR_SIG, gauge: 20, spec: M22759/32, from: "WSS-FR DTM06-3S cavity 3 (ZF black, output)", to: "M130:B11 (UDIG6) through a spare 61-pin cavity", current_a: 0, length_ft_est: null, basis: "as WSS_FL_SIG"}
+      - {id: WSS_F_PWR, gauge: 20, spec: M22759/32, from: "PDM15:OUT14 (8 A), 1 A limit", to: "SPL-WSS-F (front sensor feed splice)", current_a: 0.012, length_ft_est: null, basis: "2 x 6 mA max (ZF datasheet p.1); length as WSS_FL_SIG"}
+      - {id: WSS_FL_PWR, gauge: 20, spec: M22759/32, from: "SPL-WSS-F", to: "WSS-FL DTM06-3S cavity 1 (ZF brown, supply)", current_a: 0.006, length_ft_est: null, basis: "as WSS_FL_SIG"}
+      - {id: WSS_FR_PWR, gauge: 20, spec: M22759/32, from: "SPL-WSS-F", to: "WSS-FR DTM06-3S cavity 1 (ZF brown, supply)", current_a: 0.006, length_ft_est: null, basis: "as WSS_FL_SIG"}
+      - {id: WSS_FL_GND, gauge: 20, spec: M22759/32, from: "WSS-FL DTM06-3S cavity 2 (ZF blue, ground)", to: "GND-BANK-ENG", current_a: 0.006, length_ft_est: null, basis: "as WSS_FL_SIG"}
+      - {id: WSS_FR_GND, gauge: 20, spec: M22759/32, from: "WSS-FR DTM06-3S cavity 2 (ZF blue, ground)", to: "GND-BANK-ENG", current_a: 0.006, length_ft_est: null, basis: "as WSS_FL_SIG"}
+    mass_g_est: "not estimated: lengths unknown (20 AWG /32 is 1.95 g/ft, header); the ZF sensor mass is not published"
+
+WSS-4E:
+  name: Four wheel speed sensors (ZF GS100502) into a MoTeC E888 expander in the cab, read by the M130 over CAN
+  status: candidate
+  alternative_to: WSS-F2
+  source: >-
+    M1 Launch Control User Guide p.3 ("with four wheel speed sensors the preferred option"). E888 #14007 page ("4 x digital inputs
+    with frequency measurement", web_snapshots/www.motec.com.au__E888.md). E888/E816 manual (16 Dec 2005): p.15 (-10 to 70 C,
+    9-22 V, 150 mA, no CAN terminator on board) and p.17 (DIG1-4 Schmitt trigger, 1 Hz-6 kHz, 2700 ohm pull-up). GPR page:
+    "Support of MoTeC devices: ADR, E8XX, PDM, SLM, VCS" and "Wheel Speed sensors front/rear left/right, wired or CAN input"
+  product: {maker: MoTeC, pn: "E888 #14007 + 4 x ZF GS100502", price_usd: null, price_date: 2026-09-29,
+            specs: "E888 price not published (MoTeC dealer quote); ZF GS100502 33.80 each (DigiKey, 2026-09-29)"}
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    pdm15_outputs: 1        # OUT14 at 1 A, the front sensor feed (as WSS-F2)
+    m130_pins: 0            # the E888 is read over CAN
+    pin61_cavities: 2       # the two front signals, as WSS-F2
+    taps: ["PDM30 OUT24 (the M130 feed, RUN): E888 12 V"]
+    limits: ["OUT24 group: + 0.15 A for the E888 (manual p.15), sensors excluded"]
+    door_cavities: 0
+    notes: >-
+      The E888's -10 to 70 C rating keeps it out of the engine bay, so it sits in the cab beside the M130 on a CAN stub of 500 mm
+      or less (PDM manual p.49). The fronts cross the 61-pin exactly as in WSS-F2 (2 cavities, PDM15 feed, GND-BANK-ENG). The rears
+      cross at the rear bulkhead the 0ah call allows: 4 contacts (2 signals, the E888 +8 V aux feed and its 0 V). The rear rings
+      are a ring under the wheel-stud heads or one pressed on the C-lock shafts (LTSM pp.365-366), sensor tabs on the existing
+      disc-conversion caliper brackets. Rear axle likely GM 12-bolt 8-7/8 (photo 5aefc0bd shows 11 cover bolts; count to confirm).
+      OPEN: whether GPR lets an E888 digital input be a wheel-speed resource (M1 Tune 1.5 or a dealer), the E888 price, the +8 V
+      aux supply rating, and a rear ring design from the shop
+    adds:
+      - {id: E888_PWR, gauge: 20, spec: M22759/32, from: "PDM30:OUT24 (splice with ECU_PWR)", to: "E888 12 V (A17; B8, B9 also, per wiring diagram A17)", current_a: 0.15, length_ft_est: null, basis: "E888 beside the M130 (spot open, mounts.yaml M130)"}
+      - {id: E888_GND, gauge: 20, spec: M22759/32, from: "E888 GND (A10; A11, B15, B16 also)", to: "GND-BANK-CAB", current_a: 0.15, length_ft_est: null, basis: "as E888_PWR"}
+      - {id: E888_CAN_H, gauge: 22, spec: M22759/16 twisted, from: "CAN trunk stub (M130 to PDM30 segment)", to: "E888 B23 (CAN HI)", current_a: 0, length_ft_est: 1.6, basis: "the 500 mm (20 in) stub ceiling: devices join the trunk 'with up to 500 mm (20 in) of twisted wire' (PDM manual p.49)"}
+      - {id: E888_CAN_L, gauge: 22, spec: M22759/16 twisted, from: "CAN trunk stub (M130 to PDM30 segment)", to: "E888 B24 (CAN LO)", current_a: 0, length_ft_est: 1.6, basis: "as E888_CAN_H"}
+      - {id: WSS4_FL_SIG, gauge: 20, spec: M22759/32, from: "WSS-FL DTM06-3S cavity 3", to: "E888 B11 (DIG1) through a spare 61-pin cavity", current_a: 0, length_ft_est: null, basis: "as WSS-F2 WSS_FL_SIG"}
+      - {id: WSS4_FR_SIG, gauge: 20, spec: M22759/32, from: "WSS-FR DTM06-3S cavity 3", to: "E888 B10 (DIG2) through a spare 61-pin cavity", current_a: 0, length_ft_est: null, basis: "as WSS4_FL_SIG"}
+      - {id: WSS4_RL_SIG, gauge: 20, spec: M22759/32, from: "WSS-RL DTM06-3S cavity 3", to: "E888 B19 (DIG3) through the rear crossing", current_a: 0, length_ft_est: null, basis: "rear crossing not designed (0ah)"}
+      - {id: WSS4_RR_SIG, gauge: 20, spec: M22759/32, from: "WSS-RR DTM06-3S cavity 3", to: "E888 B18 (DIG4) through the rear crossing", current_a: 0, length_ft_est: null, basis: "as WSS4_RL_SIG"}
+      - {id: WSS4_R_PWR, gauge: 20, spec: M22759/32, from: "E888 +8 V aux (A16 or B22)", to: "SPL-WSS-R, then the RL and RR DTM cavity 1", current_a: 0.012, length_ft_est: null, basis: "2 x 6 mA max (ZF p.1)"}
+      - {id: WSS4_R_GND, gauge: 20, spec: M22759/32, from: "SPL-WSS-R ground (RL and RR DTM cavity 2)", to: "E888 0 V (A15 or B21)", current_a: 0.012, length_ft_est: null, basis: "as WSS4_R_PWR"}
+      - {id: WSS4_F_PWR, gauge: 20, spec: M22759/32, from: "PDM15:OUT14 (8 A), 1 A limit", to: "SPL-WSS-F (front sensor feed splice)", current_a: 0.012, length_ft_est: null, basis: "as WSS-F2 WSS_F_PWR"}
+      - {id: WSS4_FL_PWR, gauge: 20, spec: M22759/32, from: "SPL-WSS-F", to: "WSS-FL DTM06-3S cavity 1", current_a: 0.006, length_ft_est: null, basis: "as WSS-F2"}
+      - {id: WSS4_FR_PWR, gauge: 20, spec: M22759/32, from: "SPL-WSS-F", to: "WSS-FR DTM06-3S cavity 1", current_a: 0.006, length_ft_est: null, basis: "as WSS-F2"}
+      - {id: WSS4_FL_GND, gauge: 20, spec: M22759/32, from: "WSS-FL DTM06-3S cavity 2", to: "GND-BANK-ENG", current_a: 0.006, length_ft_est: null, basis: "as WSS-F2"}
+      - {id: WSS4_FR_GND, gauge: 20, spec: M22759/32, from: "WSS-FR DTM06-3S cavity 2", to: "GND-BANK-ENG", current_a: 0.006, length_ft_est: null, basis: "as WSS-F2"}
+    mass_g_est: "not estimated: lengths unknown; E888 310 g (manual p.15)"
+
+WSS-PREP:
+  name: Wheel-speed provision only, front tone rings and sensor brackets machined and fitted, no sensors or wires
+  status: candidate
+  alternative_to: WSS-F2
+  source: >-
+    research/2026-09-30_wheel-speed-sensors.md s6: the machining (rings pressed on the front hub-and-disc barrels, brackets at the
+    knuckles) is the long-lead half of WSS-F2 and needs the hubs off; sensors and wires can follow if the 61-pin can spare two
+    cavities. MoTeC help-centre reply: "It's always a good idea to make provisions in your wiring harness for wheel speed
+    sensors" (forum, motec.zendesk.com__16900136044559-Driven-wheel-speed.md)
+  demand:
+    crossings: 0
+    pdm30_outputs: 0
+    pdm30_inputs: 0
+    door_cavities: 0
+    notes: "mechanical only: machine-shop drawings D1-D4 in the research file; no harness change, so it takes nothing from the ledger. OPEN: the same measurements as WSS-F2 (hub barrel OD, spindle-nut pattern, axial space behind the rotor)"
 SEAT-TED:
   name: Cooled and heated front buckets, thermoelectric, one Sanctum heat/cool kit per seat (LeatherSeats.com)
   status: candidate

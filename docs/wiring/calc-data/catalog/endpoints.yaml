@@ -951,7 +951,7 @@ PS-STUDS:
 # ============================================================== cabin: pedal, gauges, switches
 APS:
   where: cabin
-  device: "DBW pedal bought 2025-04-02 (eBay order 26-12889-28142): '72-98 C10 Square Body OBS LS Swap DBW' pedal — GM Gen III truck pedal (OE 15751307 family), 9-cavity plug with 6 wired; the third sensor's 3 cavities stay empty"
+  device: "DBW pedal bought 2025-04-02 (eBay order order record obs:273ef61a): '72-98 C10 Square Body OBS LS Swap DBW' pedal — GM Gen III truck pedal (OE 15751307 family), 9-cavity plug with 6 wired; the third sensor's 3 cavities stay empty"
   family: miniseal
   kit: {WPAPP30: 1}
   per_end: {part: D-609-03}
