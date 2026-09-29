@@ -41,7 +41,7 @@ SRC_APRIL = "April 2026 whole-truck plan (candidate, unreviewed)"
 NOW = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 SUB2SECTION = {
-    "CORE_ENGINE": "engine", "TRANS_6L80E": "powertrain_chassis", "FUEL": "powertrain_chassis",
+    "CORE_ENGINE": "engine", "TRANS_6L90": "powertrain_chassis", "FUEL": "powertrain_chassis",
     "CHARGING_STARTING": "power_spine", "HARNESS_INFRA": "power_spine",
     "LIGHTING_INTERIOR": "body_convenience", "POWER_WINDOWS": "body_convenience", "WIPERS_WASHER": "body_convenience",
     "AUDIO": "body_convenience", "DASH_CLUSTER_DAKOTA": "dash_cabin", "HVAC_AC": "dash_cabin",
@@ -98,7 +98,7 @@ ANCHORS = {
     "STEER_COL": ((0.50, -1.20, 0.95), "steering column"),
     "DASH_CLUSTER": ((0.62, -1.24, 1.05), "headlight-switch dash region"),
     "FUEL_TANK": ((0.15, 1.45, 0.62), "tank sender/pump"),
-    "TUNNEL_6L80E": ((0.17, -0.95, 0.62), "6L80E switches via tunnel grommet"),
+    "TUNNEL_6L90": ((0.17, -0.95, 0.62), "6L90 switches via tunnel grommet"),
     "O2_L": ((0.36, -1.00, 0.53), "driver exhaust bung"),
     "TAIL_CLUSTER": ((0.0, 1.78, 0.985), "tail lights"),
 }
@@ -108,7 +108,7 @@ NODE_ANCHOR = {
     "FIREWALL-ENGINE": "FWG_MAIN", "FIREWALL-CABIN": "FWG_MAIN",
     "CKP": "CKP", "CMP": "CMP", "KNOCK-1": "KS1", "KNOCK-2": "KS2", "MAP": "MAP_SENSOR", "TB": "THROTTLE_BODY",
     "COIL-1": "COIL1", "COIL-2": "COIL2", "APS": "BRAKE_SW", "IGN-SWITCH": "STEER_COL", "DAKOTA-VHX": "DASH_CLUSTER",
-    "FUEL-PUMP": "FUEL_TANK", "FUEL-LEVEL": "FUEL_TANK", "VSS": "TUNNEL_6L80E", "WIDEBAND": "O2_L",
+    "FUEL-PUMP": "FUEL_TANK", "FUEL-LEVEL": "FUEL_TANK", "VSS": "TUNNEL_6L90", "WIDEBAND": "O2_L",
 }
 # coils 3-8 sit in the same DEL-Stributor cluster as coils 1-2 (odd with 1, even with 2): approximate, and said so
 for n in range(3, 9):

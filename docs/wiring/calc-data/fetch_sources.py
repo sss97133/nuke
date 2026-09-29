@@ -202,6 +202,36 @@ URLS = [
     "https://www.lmctruck.com/lighting/tail-light/cc-1973-87-tail-light-fleetside",
     "https://www.diodedynamics.com/1156-hp11-backup-led-bulbs.html",
     "https://dynamicappearance.com/shop-by-bulb/41mm-578-212-2/",
+    # iBooster Gen 2 deep dive (research 2026-09-28_ibooster-gen2-wiring.md)
+    "https://openinverter.org/wiki/Bosch_iBooster",
+    "https://www.fastandquiet.com/downloadable/bosch-ibooster-gen-2-pinout.PDF",
+    "https://tulayswirewerks.com/product/bosch-ibooster-gen-2-connector-kit/",
+    "https://www.evcreate.com/installing-the-ibooster/",
+    "https://irate4x4.com/threads/ibooster-electric-brake-booster.394316/page-15",
+    "https://www.bosch-mobility.com/en/solutions/driving-safety/ibooster/",
+    "https://irate4x4.com/threads/ibooster-electric-brake-booster.394316/page-17",
+    "https://openinverter.org/forum/viewtopic.php?t=5925",
+    "https://www.bosch-mobility.com/en/solutions/driving-safety/brake-booster/",
+    "https://www.evcreate.com/ibooster-can-bus/",
+    "https://service.tesla.com/docs/ModelY/ServiceManual/en-us/GUID-0CE8F156-928A-4338-A693-CF6EEB9055E6.html",
+    "https://www.evcreate.com/ibooster-donor-vehicles/",
+    "https://www.bosch-mobility.com/media/global/solutions/passenger-cars-and-light-commercial-vehicles/driving-safety-systems/brake-booster/ibooster/summary-ibooster.pdf",
+    # 6L90 transmission case connector and the PCS TCM-2650 (research/2026-09-28_6l90-transmission-electrical.md)
+    "https://www.eficonnection.com/home/product/6l80e-6l90e-t43-tcm-transmission-connector-pigtail",
+    "https://www.zerogravityperformance.com/product/tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness/",
+    "https://www.psiconversion.com/products/pcm-programming/transmissioncontrollers/TCM-2650.html",
+    "https://monstertransmission.com/blogs/news/6l80-6l90-tehcm-guide-common-failures-year-differences-tag-id-reference",
+    # iBooster controller reverse-engineering (query URLs are snapshotted with the query in the filename)
+    "https://sghinnovations.com/product/ibooster-controller-ecu-gen2/",
+    "https://openinverter.org/forum/viewtopic.php?p=82361",
+    "https://raw.githubusercontent.com/joshwardell/model3dbc/master/Model3CAN.dbc",
+    "https://openinverter.org/forum/viewtopic.php?t=2762",
+    "https://www.diyelectriccar.com/threads/not-all-gen2-ibooster-appear-equal.211462/",
+    "https://sghinnovations.com/product/ibooster-controller-ecu/",
+    # our unit is Tesla Model S Gen 1 (1037123-00-B, Calimotive order #1011, 2023-11-09)
+    "https://www.fastandquiet.com/downloadable/bosch-ibooster-gen-1-pinout.PDF",
+    "https://tulayswirewerks.com/product/bosch-ibooster-gen-1-universal-wire-harness/",
+    "https://raw.githubusercontent.com/commaai/opendbc/master/opendbc/dbc/tesla_can.dbc",
 ]
 
 

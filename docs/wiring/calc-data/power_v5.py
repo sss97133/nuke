@@ -30,7 +30,8 @@ import manual_v5                                        # noqa: E402
 from diagram_v5 import wire_colours, tag_id, ORANGE, MAP_URL   # noqa: E402,F401
 from manual_v5 import gm_colour, tw, FONT, PRODUCT_IMAGES      # noqa: E402
 
-OUT = CD.parent / "output" / "manual"
+OUT = Path(__import__("os").environ.get("K5_BOOK_OUT") or CD.parent / "output" / "manual")   # K5_BOOK_OUT: build elsewhere
+FIGS = CD.parent / "output" / "manual" / "figures"                   # the twin figures stay where figures_v5 wrote them
 SW_, SH_, SM = diagram_v5.W, diagram_v5.H, diagram_v5.M        # tabloid landscape
 PW, PH, PM = manual_v5.W, manual_v5.H, manual_v5.M              # US letter
 SECTION = "DC Primary"
@@ -105,8 +106,9 @@ def plabel(w):
 
 def awg_word(w):
     """The gauge as printed: a kit's own lead says so; a missing gauge is OPEN, never 'None'."""
-    if w.get("gauge") or w.get("awg"):
-        return manual_v5.gauge_word(w)             # the wire list's gauge field: one cable, one gauge on every page
+    g = manual_v5.gauge_word(w)                    # the wire list's gauge field: one cable, one gauge on every page
+    if g != "?":
+        return g
     return "KIT LEAD" if "kit" in str(w.get("spec") or "").lower() else "AWG OPEN"
 
 
@@ -315,6 +317,9 @@ def sheet_a_wires(reg, wires, eps_y):
                  "STARTER-S", "ALTERNATOR-SENSE"):
         ep = reg["endpoints"].get(code) or eps_y.get(code) or {}
         for wid in (ep.get("wires") or []) if isinstance(ep.get("wires"), list) else []:
+            w = wires.get(str(wid)) or {}
+            if code in ("PDM30-STUD", "PDM15-STUD") and None in (resolve(end_text(w.get("frm"))), resolve(end_text(w.get("to")))):
+                continue      # a small tap off a PDM stud to a plug of another sheet (DAK_CONST): drawn on that plug's sheet
             ids[str(wid)] = 1
         for wid in (ep.get("pins") or {}):
             ids[str(wid)] = 1
@@ -340,11 +345,12 @@ LAYOUT_A = {
     ("DIST", "ISO_OUT"): (142, "IN", "L"), ("DIST", "6"): (164, "1", "R"), ("DIST", "59"): (186, "2", "R"),
     ("DIST", "PDM15_BPOS"): (208, "3", "R"), ("DIST", "52"): (230, "4", "R"), ("DIST", "PCS_BATT"): (252, "5", "R"),
     ("DIST", "PDM_BPOS"): (274, "6", "R"), ("DIST", "DCDC_IN"): (296, "7", "R"), ("DIST", "3"): (318, "8", "R"),
+    ("DIST", "IBOOST_PERM"): (340, "9", "R"),
     ("STEP", "3"): (576, "RED", "L"),
     ("START", "6"): (164, "B+", "L"), ("START", "START_TRIG"): (186, "S", "R"),
     ("ALT", "59"): (224, "B+", "L"), ("ALT", "ALT_L"): (246, "L", "R"),
     ("PDM15", "PDM15_BPOS"): (284, "C1", "L"), ("PDM15", "ALT_L"): (306, "A2", "R"), ("PDM15", "START_TRIG"): (328, "A7+A16", "R"),
-    ("IBOOST", "52"): (366, "1", "L"), ("PCS", "PCS_BATT"): (402, "B+", "L"),
+    ("IBOOST", "52"): (366, "1", "L"), ("IBOOST", "IBOOST_PERM"): (384, "17", "L"), ("PCS", "PCS_BATT"): (410, "B+", "L"),
     ("PDM30", "PDM_BPOS"): (438, "C1", "L"), ("PDM30", "ECU_PWR"): (460, "B6", "R"),
     ("DCDC", "DCDC_IN"): (498, "IN+", "L"), ("DCDC", "DCDC_OUT"): (520, "OUT+", "L"), ("DCDC", "DCDC_GND"): (542, "−", "L"),
     ("ACC", "DCDC_OUT"): (520, "+", "R"), ("ACC", "32"): (542, "+", "R"), ("ACC", "ACC_NEG"): (564, "−", "R"),
@@ -411,10 +417,10 @@ def sheet_dc_primary(reg, wires, ends, eps_y, parts, number, next_sheet):
                 "ISO_CLOSE": "+12 V to close", "ISO_OPEN": "+12 V to open", "ISO_LED": "LED output"},
         "DIST": {"ISO_OUT": "from isolator B", "6": "starter", "59": "alternator", "PDM15_BPOS": "engine PDM15",
                  "52": "iBooster", "PCS_BATT": "PCS TCM", "PDM_BPOS": "body PDM30", "DCDC_IN": "DC-DC charger",
-                 "3": "power steps"},
+                 "3": "power steps", "IBOOST_PERM": "iBooster (2nd feed)"},
         "START": {"6": "battery stud", "START_TRIG": "solenoid S"}, "ALT": {"59": "B+ stud", "ALT_L": "L lead (197-400)"},
         "PDM15": {"PDM15_BPOS": "battery +", "ALT_L": "OUT9", "START_TRIG": "OUT4"},
-        "IBOOST": {"52": "constant 12 V"}, "PCS": {"PCS_BATT": "constant 12 V"},
+        "IBOOST": {"52": "constant 12 V", "IBOOST_PERM": "second always-hot, 5 A"}, "PCS": {"PCS_BATT": "constant 12 V"},
         "PDM30": {"PDM_BPOS": "battery +", "ECU_PWR": "OUT24, on in RUN"}, "STEP": {"3": "red lead, +12 V"},
         "DCDC": {"DCDC_IN": "input +", "DCDC_OUT": "output +", "DCDC_GND": "negative"}, "AMP": {"32": "power"},
         "M130": {"ECU_PWR": "battery +", "ISO_KILL": "UDIG7 shutdown", "ECU_GND1": "battery − 1", "ECU_GND2": "battery − 2"},
@@ -475,7 +481,7 @@ def sheet_dc_primary(reg, wires, ends, eps_y, parts, number, next_sheet):
 
     # ---- runs
     count = {"cables": 0, "fuses": 0, "grounds": 0}
-    lane_x = {"59": 842, "PDM15_BPOS": 826, "52": 810, "PCS_BATT": 794, "PDM_BPOS": 778, "DCDC_IN": 762, "3": 746,
+    lane_x = {"59": 842, "PDM15_BPOS": 826, "52": 810, "PCS_BATT": 794, "PDM_BPOS": 778, "DCDC_IN": 762, "3": 746, "IBOOST_PERM": 730,
               "ISO_CLOSE": 470, "ISO_OPEN": 458, "ISO_LED": 446, "ISO_PWR": 236, "ALT_L": 1012, "START_TRIG": 1030, "ISO_KILL": 1058}
     for wid, nodes in conn.items():
         w = wires[wid]
@@ -865,6 +871,17 @@ for _f, _k in (("pdm30_designations.txt", "PDM30"), ("pdm15_designations.txt", "
             PDM_DESIG.setdefault((_k, int(_p[1][3:])), []).append(_p[0].strip())
 
 
+def num(wid):
+    """A circuit column: the circuit's number, blank when it has none (the Load / Protects column names it; a registry
+    code never prints as a circuit, review round 4)."""
+    return str(wid).upper() if re.fullmatch(r"\d+[A-Za-z]?", str(wid)) else ""
+
+
+def cable_name(w):
+    """The cable schedule's first column: the circuit number, else the builder's name for the cable."""
+    return manual_v5.circuit_word(w)
+
+
 def pigtail_sentence(box, out, wires):
     """What the paired 20 A outputs actually take, counted from this PDM's own rows (review round 3, N4: the header said
     'two 16 AWG pigtails' while the fan's are four 18 AWG and #93's 20 AWG)."""
@@ -933,7 +950,7 @@ def pages_distribution(reg, wires, ends, eps_y, parts, first, notes):
     head = ["Output", "Pins", "Circuit", "Load", "AWG", "Rating", "Setting"]
     for box, title, feed, total in (("PDM30", "Body PDM30 (cab)", "PDM_BPOS", "100 A"), ("PDM15", "Engine PDM15 (engine bay)", "PDM15_BPOS", "80 A")):
         rows = []
-        used = 0
+        used = used_base = used_cand = 0
         for (b, n), wids in out.items():
             if b != box:
                 continue
@@ -943,9 +960,15 @@ def pages_distribution(reg, wires, ends, eps_y, parts, first, notes):
                 rows.append((f"OUT{n}", pins, "—", "spare", "—", rating, "—"))
                 continue
             used += 1
+            base_here = any(wires[w_].get("option_status") != "candidate" for w_ in wids)
+            if base_here:
+                used_base += 1
+            else:
+                used_cand += 1
             for i, wid in enumerate(wids):
                 w = wires[wid]
-                rows.append((f"OUT{n}" if i == 0 else "", pins if i == 0 else "", wid.upper(), w.get("label") or "",
+                cand = f"CANDIDATE: {w.get('option')} — " if w.get("option_status") == "candidate" else ""
+                rows.append((f"OUT{n}" if i == 0 else "", pins if i == 0 else "", num(wid), cand + (w.get("label") or ""),
                              awg_word(w), rating if i == 0 else "", (out_setting(wires, wids) or f"OPEN {setting}") if i == 0 else ""))
         per = 70
         for k in range(0, len(rows), per):
@@ -956,12 +979,13 @@ def pages_distribution(reg, wires, ends, eps_y, parts, first, notes):
             f = fuse_of(fw) if fw else None
             lead_in = (f"{title}: battery feed {awg_word(fw)} AWG from the distribution stud through a "
                        f"{(f[0] + ' ' + str(f[1]) + ' A') if f and f[1] else 'fuse of OPEN value'}; total output {total} continuous; "
-                       f"both battery − pins to the ground star in 20 AWG. {used} of {len([1 for (b, _n) in out if b == box])} outputs carry a circuit. "
+                       f"both battery − pins to the ground star in 20 AWG. {used_base} base{f' + {used_cand} candidate-option' if used_cand else ''} of {len([1 for (b, _n) in out if b == box])} outputs carry a circuit "
+                       f"(a candidate-option output is used only if that option is chosen). "
                        "Outputs are high-side, software-fused. " + pigtail_sentence(box, out, wires))
             for i, ln in enumerate(wrap_words(lead_in, PW - 2 * PM, 7.2)):
                 p.ctxt(PM, p.y + i * 9, ln, 7.2)
             p.y += len(wrap_words(lead_in, PW - 2 * PM, 7.2)) * 9 + 2
-            p.y = p.grid(PM, p.y, widths, head, rows[k:k + per], size=5.8, lead=8.0) + 10
+            p.y = p.grid(PM, p.y, widths, head, rows[k:k + per], size=5.6, lead=7.6) + 10
             for i, ln in enumerate(wrap_words(f"{setting}. " + [t for t, l in notes.listed() if l == setting][0], PW - 2 * PM, 6.6)):
                 p.ctxt(PM, p.y + i * 8, ln, 6.6, colour=ORANGE if i == 0 else "#000")
             pages.append((p, "Power distribution — " + box))
@@ -1013,7 +1037,7 @@ def page_protection(reg, wires, ends, eps_y, parts, number, notes, page=None):
                 return f"OPEN {notes.tag('small ring terminals carry no part number (stud size and gauge not set)')}"
             return lug or f"OPEN {notes.tag('lug or terminal at this end not in the stud list or the termination rows')}"
         la, lb = lugcell(f_lug), lugcell(t_lug)
-        rows.append((val, pn, hd, at, wid.upper(), w.get("label") or "", awg_word(w).replace("KIT LEAD", "kit"), la, lb))
+        rows.append((val, pn, hd, at, num(wid), w.get("label") or "", awg_word(w).replace("KIT LEAD", "kit"), la, lb))
     rows.sort(key=lambda r: (0 if r[0].startswith("MEGA") else 1 if r[0].startswith("MIDI") else 2, r[4]))
     widths = [42, 50, 48, 56, 52, 152, 20, 48, 48]
     p.y = p.grid(PM, p.y, widths, ["Fuse", "Fuse PN", "Holder", "At", "Circuit", "Protects", "AWG", "Lug, from", "Lug, to"], rows, size=5.6, lead=8.2) + 12
@@ -1029,7 +1053,7 @@ def page_protection(reg, wires, ends, eps_y, parts, number, notes, page=None):
         why = {"63": "battery post to isolator stud A: the only unprotected cable; keep it shortest, sheathed and clamped",
                "ISO_OUT": "isolator stud B to the distribution stud: upstream of every fuse; sheathed and clamped",
                "6": "cranking-motor exemption: a fuse that survives cranking cannot protect it; the isolator kills it"}[wid]
-        unf.append((wid.upper(), w.get("label"), awg_word(w), f_lug or "OPEN", t_lug or "OPEN", why))
+        unf.append((num(wid), w.get("label"), awg_word(w), f_lug or "OPEN", t_lug or "OPEN", why))
     p.y = p.grid(PM, p.y, [40, 110, 22, 44, 44, 256], ["Circuit", "Cable", "AWG", "Lug, from", "Lug, to", "Why no fuse"], unf, size=5.6, lead=8.2) + 12
     return p, len(rows), len(unf)
 
@@ -1057,7 +1081,7 @@ def page_cable_schedule(reg, wires, ends, eps_y, parts, number):
         frm = re.sub(r"\s*\(ground star[^)]*\)", " (ground star)", end_text(w.get("frm")))
         to = re.sub(r"\s*\(ground star[^)]*\)", " (ground star)", end_text(w.get("to")))
         spec = str(w.get("spec") or "OPEN")
-        t1.append((wid.upper(), clean(frm.replace("PS-STUDS", "stud")), clean(to.replace("PS-STUDS", "stud")), awg_word(w), spec, length))
+        t1.append((cable_name(w), clean(frm.replace("PS-STUDS", "stud")), clean(to.replace("PS-STUDS", "stud")), awg_word(w), spec, length))
         f_lug, t_lug = ps_lugs(eps_y, wid, w)
         state = []
         def far(lug, side):
@@ -1090,9 +1114,9 @@ def page_cable_schedule(reg, wires, ends, eps_y, parts, number):
             if str(c).startswith("OPEN"):
                 state.append(str(c).split()[1])
         st = "DESIGN COMPLETE" if not state else "OPEN " + ",".join(dict.fromkeys(state))
-        t2.append((wid.upper(), la, lb, boot, f"OPEN {sleeve}", st))
-    p.y = p.grid(PM, p.y, [50, 132, 132, 22, 88, 92], ["Cable", "From", "To", "AWG", "Spec", "Length"], t1, size=5.6, lead=8.0) + 10
-    p.y = p.grid(PM, p.y, [50, 104, 104, 88, 50, 120], ["Cable", "Lug, from end", "Lug, to end", "Boot", "Sleeve", "State"], t2, size=5.6, lead=8.0) + 10
+        t2.append((cable_name(w), la, lb, boot, f"OPEN {sleeve}", st))
+    p.y = p.grid(PM, p.y, [110, 104, 104, 22, 76, 100], ["Cable", "From", "To", "AWG", "Spec", "Length"], t1, size=5.6, lead=8.0) + 10
+    p.y = p.grid(PM, p.y, [110, 90, 90, 76, 50, 100], ["Cable", "Lug, from end", "Lug, to end", "Boot", "Sleeve", "State"], t2, size=5.6, lead=8.0) + 10
     p.notes_block(notes, p.y)
     done = sum(1 for r in t2 if r[-1] == "DESIGN COMPLETE")
     return p, len(cables), done, notes
@@ -1111,6 +1135,9 @@ def publish(page, stem, height):
     bad += [f"text over a pin box: '{t_}'" for t_ in diagram_v5.mark_overprints(page)]
     bad += getattr(page, "faults", [])
     bad += manual_v5.fragment_faults(page.boxes)
+    bad += manual_v5.code_faults(page.boxes)
+    bad += manual_v5.gauge_faults(page.boxes)
+    bad += manual_v5.word_faults(page.boxes)
     if re.search(r"\$\d|\bcart\b|\bbuy\b|\bbought\b|\border(ed)?\b|lined up", text, re.I):
         bad.append("purchase language on the page")
     if bad:

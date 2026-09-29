@@ -87,6 +87,20 @@ def _y(name):
     return data
 
 
+RING_STUDS = ["#6", "#8", "#10", "1/4", "5/16", "3/8"]
+RING_BASE = {(22, 18): 9901, (16, 14): 9907, (12, 10): 9913}   # ProWire hi-temp ring terminals, stud order #6 #8 #10 1/4 5/16 3/8
+                                                                 # (web_snapshots/www.prowireusa.com__high-temp-ring-terminals.md)
+
+
+def ring_pn(awg, stud):
+    if not isinstance(awg, int) or stud not in RING_STUDS:
+        return None
+    for (small, big), base in RING_BASE.items():
+        if big <= awg <= small:
+            return str(base + RING_STUDS.index(stud))
+    return None
+
+
 def awg_equiv(cma):
     """Smallest standard AWG whose area covers `cma` (for combined-wire splice sizing)."""
     for g in sorted(CMA, reverse=True):
@@ -215,6 +229,26 @@ def attach(reg):
                    "63": "battery -> isolator: both in the engine bay (chapters/17 §17.3)",
                    "52": "distribution stud -> iBooster: both on the engine side of the firewall"}
     grommet = [w for w in grommet if w not in GROMMET_OFF]
+    # round 4: a grommet wire whose recorded ends all sit in the engine bay does not cross the firewall
+    where_of = defaultdict(set)
+    for eid_, ep_ in eps.items():
+        if eid_.startswith("FIREWALL") or ep_.get("retired"):
+            continue
+        ids_ = list((ep_.get("pins") or {}).keys()) + [x for x in (ep_.get("wires") if isinstance(ep_.get("wires"), list) else [])]
+        for x in ids_:
+            where_of[str(x)].add(ep_.get("where"))
+    for x in wires:
+        f_ = str(wires[x].get("frm") or "")
+        for end_ in (f_, wires[x].get("to")):     # an end named by text (e.g. "GND-BANK-CAB (...)") counts too
+            t_ = end_.get("device") if isinstance(end_, dict) else str(end_ or "")
+            b_ = re.split(r"\s\(|:|\s->|\s\+", str(t_ or ""))[0].strip()
+            if b_ in eps and not b_.startswith("FIREWALL"):
+                where_of[x].add(eps[b_].get("where"))
+        if f_.startswith(("M130:", "PDM30:")):
+            where_of[x].add("cabin")
+        elif f_.startswith(("PDM15:", "SPL-PDM15-")):
+            where_of[x].add("engine")
+    grommet = [w for w in grommet if not (where_of[w] and where_of[w] <= {"engine"})]
 
     # ------------------------------------------------ ECU/PDM pin maps
     pin_re = re.compile(r"^(M130|PDM30|PDM15):([AB])(\d{1,2})\b")
@@ -243,6 +277,10 @@ def attach(reg):
         m = pin_re.match(str(tt).strip())
         if m and "/" not in str(tt):
             got.append((m.group(1), m.group(2), int(m.group(3))))
+        else:
+            m = re.match(r"^(PDM30|PDM15):(DIG\d+|OUT\d+)\b", str(tt).strip())
+            if m:
+                got += [(m.group(1), c, p) for c, p in out_pins.get(m.group(2), [])]
         return got
 
     # ------------------------------------------------ dead endpoints leave the registry
@@ -377,13 +415,16 @@ def attach(reg):
         elif fid == "ring_small":
             # a named ground stud (G-*) takes one ring per wire, stacked; other ring endpoints keep their shared rings
             lug = ep.get("lugs") or {}          # a named ring for a wire (round 3: FAN_GND 12 AWG on ProWire 9918)
-            per_end = [{"wires": [w], "part": " + ".join(lug[w]) if isinstance(lug.get(w), list) else (lug.get(w) or "RING-SMALL"),
+            stud = ep.get("stud")               # round 4: the ring follows the stud and the gauge
+            ring = lambda w: (ring_pn(wires[w].get("awg"), stud) if stud else None) or "RING-SMALL"
+            per_end = [{"wires": [w], "part": " + ".join(lug[w]) if isinstance(lug.get(w), list) else (lug.get(w) or ring(w)),
                         "cavity": f"ring {i}" if eid.startswith(("G-", "GND-")) else "ring"} for i, w in enumerate(wl, 1)]
         elif fid in ("kit_terminal", "te_amp_plug"):
             per_end = [{"wires": [w], "part": "kit terminal + seal", "cavity": cav_of.get(w)} for w in wl]
         elif fid == "lug":
-            per_end = [{"wires": [w], "part": " + ".join(ep["lugs"].get(w, []) if isinstance(ep["lugs"].get(w), list)
-                                                         else [ep["lugs"].get(w, "?")])} for w in wl]
+            # round 4: a stud end names its stud and lug, so no page prints 'terminal OPEN' for a lugged cable
+            lugw = lambda w: ep["lugs"].get(w, []) if isinstance(ep["lugs"].get(w), list) else [ep["lugs"].get(w, "?")]
+            per_end = [{"wires": [w], "part": " + ".join(lugw(w)), "cavity": "stud, lug " + " + ".join(lugw(w))} for w in wl]
         elif fid == "miniseal":
             by_g = fam.get("per_end", {}).get("splice_by_gauge", {})
             def _splice(awg):
@@ -433,7 +474,12 @@ def attach(reg):
 
         for pe in per_end:
             for w in pe["wires"]:
-                terms.append(OrderedDict(wire=w, endpoint=eid, where=ep.get("where"), cavity=pe.get("cavity"),
+                # round 4: a factory circuit number is a reference, not our cavity name ('51' read as wire #51)
+                cv_, fac_ = pe.get("cavity"), None
+                m_ = re.search(r"\s*\(([^()]*\b(?:factory|circuit \d)[^()]*)\)", str(cv_ or ""))
+                if m_:
+                    fac_, cv_ = m_.group(1).strip(), (str(cv_)[:m_.start()] + str(cv_)[m_.end():]).strip()
+                terms.append(OrderedDict(wire=w, endpoint=eid, where=ep.get("where"), cavity=cv_, factory_circuit=fac_,
                                          part=pe["part"], family=fid,
                                          doubled=(w in doubled) or None))
         for code in (ep.get("replaces_cart") or []):

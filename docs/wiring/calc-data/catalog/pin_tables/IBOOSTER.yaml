@@ -1,15 +1,21 @@
 IBOOSTER:
   family: open
   pins:
-    '52': red lead, housing pin 1 (always hot, 40 A)
-    IBOOST_WAKE: green lead, housing pin 20 (ignition, 5 A)
-    IBOOST_GND: black lead, housing pin 9 (GND)
-  note: 'maker''s document: Bosch iBooster Gen 2 with the Tulay Gen-2 universal harness: loose leads red 4.00 mm² (pin 1, always hot), green 0.50 mm² (pin 20, ignition),
-    black 4.00 mm² (pin 9, chassis ground)'
+    '52': 4.00 mm² red lead, housing pin 1 (always hot, 40 A)
+    IBOOST_PERM: 1.50 mm² red lead, housing pin 17 (always hot, 5 A; medium blade)
+    IBOOST_WAKE: 0.50 mm² green lead, housing pin 20 (ignition, 5 A)
+    IBOOST_GND: 4.00 mm² black lead, housing pin 9 (chassis ground)
+    IBST_CAN_H: 'housing pin 16, vehicle CAN high (CANDIDATE IBST-CAN): not needed for basic operation and not a Tulay loose lead — a terminal goes into the Tulay-assembled plug: OPEN'
+    IBST_CAN_L: 'housing pin 25, vehicle CAN low (CANDIDATE IBST-CAN): not a Tulay loose lead — OPEN'
+  note: 'Gen 1 (1037123-00-B). The Tulay Gen-1 universal harness has the controller plug and the pedal travel sensor plug assembled, with four loose leads: red 4.00 mm² (pin 1, 40 A), red 1.50 mm² (pin 17, 5 A), green 0.50 mm² (pin 20, ignition 5 A), black 4.00 mm² (pin 9). Pedal travel sensor, inside the harness (Gen 1 mapping, differs from Gen 2): sensor 1 -> controller 2, 2 -> 22, 3 -> 8, 4 -> 23. It must be the Gen-1 harness: the sensor plug mapping differs by generation.'
   open:
-  - 'join of the 8 AWG #52 / IBOOST_GND to the 4.00 mm² Tulay leads: past a D-609-05 (16-12) — butt splice part OPEN'
-  - 'IBOOST_WAKE (20 AWG) to the 0.50 mm² green lead: D-609-03 fits by gauge; confirm at the bench'
+  - 'PURCHASE: Tulay Gen-1 universal harness is not on order (no Tulay order in the owner''s Gmail)'
+  - 'IBST-CAN (candidate): pins 16/25 on the booster plug, not Tulay loose leads; terminal 1928498705 for 22 AWG, and the 120 ohm across the pair at this end'
+  - 'join of the 6 AWG #52 / IBOOST_GND to the 4.00 mm² Tulay leads: past a D-609-05 (16-12) — butt splice part OPEN'
+  - 'IBOOST_PERM (16 AWG) to the 1.50 mm² red lead and IBOOST_WAKE (20 AWG) to the 0.50 mm² green lead: D-609 by combined gauge; confirm at the bench'
+  - 'feed source for #52 and IBOOST_PERM: isolator decision A (Odyssey +, battery side) or B (distribution stud, as designed) — research §4, owner/Dave'
   sources:
-  - 'reference_documents/web_snapshots/tulayswirewerks.com__bosch-ibooster-gen-2-universal-wire-harness.md (loose wires: ''4.00 mm² – Red – Always Hot Power'', ''0.50
-    mm² – Green – Ignition Switched Power'', ''4.00 mm² – Black – Chassis Ground'')'
-  - 'reference_documents/web_snapshots/www.evcreate.com__wiring-the-ibooster.md (GEN2: 1 = 12V+ permanent 40A fused, 9 = GND, 20 = 12V+ ignition 5A fused)'
+  - 'reference_documents/web_snapshots/www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md (L 1 Always Hot 40A; L 9 Chassis Ground; M 17 Always Hot 5A; S 20 Ignition 5A; S 16/25 Vehicle CAN-High/Low, S 18/10 Yaw CAN, "not needed for basic operations"; pedal sensor 1-4 -> ECU 2, 22, 8, 23)'
+  - 'reference_documents/web_snapshots/tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md (4.00 mm² red 40A; 1.50 mm² red 5A; 0.50 mm² green ignition 5A; 4.00 mm² black ground)'
+  - 'reference_documents/web_snapshots/openinverter.org__Bosch_iBooster.md (1037123-00-A/B = Model S/X Gen 1; ECU signal terminals Bosch 1928498705 (0.35-0.5 mm²) or 1928498805 (0.5-1.0 mm²))'
+  - 'owner''s Gmail: Calimotive order #1011, 1037123-00-B, confirmed 2023-11-09, delivered 2023-11-13; K5 photo 40e5e5f9 label'

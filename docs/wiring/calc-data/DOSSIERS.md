@@ -69,9 +69,9 @@ Kit: LS-CRANK-CONN-KIT ×1 [1]
 
 | Wire | Spec | ECU / PDM end | Firewall | Device end |
 |---|---|---|---|---|
-| #99 Crank Position Sensor · v4.2 L37 | 22 AWG M27500 2C cable | M130 B01 · SSC-N · AFM8 + K1S sel 6 [8] | cavity x: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [9] | 1 · 12110847 + 15324976 [11] |
-| #99g CKP Sensor Ground (conductor 2 of #99 shielded 2C cable) · v4.2 L229 | 22 AWG M27500 2C cable | M130 B15 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [12] | cavity JJ: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [9] | 2 · 12110847 + 15324976 [11] |
-| #99r CKP 6.3V Supply · v4.2 L230 | 22 AWG M22759/16 white/orange [13] | M130 B19 · SSC-N · AFM8 + K1S sel 6 · splice D-609-04 [12] | cavity NN: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [9] | 3 · 12110847 + 15324976 [11] |
+| #99 Crank Position Sensor · v4.2 L37 | 22 AWG M27500 2C cable | M130 B01 · SSC-N · AFM8 + K1S sel 6 [8] | cavity x: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [9] | cavity 1 — OPEN until a GM end view of the crank sensor is cited (Dave's sheet): 12110847 + 15324976 [11] |
+| #99g CKP Sensor Ground (conductor 2 of #99 shielded 2C cable) · v4.2 L229 | 22 AWG M27500 2C cable | M130 B15 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [12] | cavity JJ: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [9] | cavity 2 — OPEN until a GM end view of the crank sensor is cited (Dave's sheet): 12110847 + 15324976 [11] |
+| #99r CKP 6.3V Supply · v4.2 L230 | 22 AWG M22759/16 white/orange [13] | M130 B19 · SSC-N · AFM8 + K1S sel 6 · splice D-609-04 [12] | cavity NN: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [9] | cavity 3 — OPEN until a GM end view of the crank sensor is cited (Dave's sheet): 12110847 + 15324976 [11] |
 
 **Tools:** Metri-Pack 150/280 sealed crimp tool (12155975) — to buy [2] · Ideal Stripmaster 45-1987 (Tefzel blades) + wire stop L-5270 — to buy [3] · pull gauge / spring scale, ≥ 50 lbf — confirm you own it [4]
 
@@ -101,9 +101,9 @@ Kit: LS-CAM-CONN-KIT ×1 [1]
 
 | Wire | Spec | ECU / PDM end | Firewall | Device end |
 |---|---|---|---|---|
-| #101r CMP 6.3V Supply · v4.2 L233 | 22 AWG M22759/16 white/orange [8] | M130 B19 · SSC-N · AFM8 + K1S sel 6 · splice D-609-04 [9] | cavity Z: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | 1 · 12110847 + 15324976 [12] |
-| #101g CMP Sensor Ground (conductor 2 of #101 shielded 2C) · v4.2 L232 | 22 AWG M27500 2C cable [13] | M130 B15 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [9] | cavity HH: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | 2 · 12110847 + 15324976 [12] |
-| #101 Cam Position Sensor · v4.2 L38 | 22 AWG M27500 2C cable | M130 B02 · SSC-N · AFM8 + K1S sel 6 [14] | cavity v: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | 3 · 12110847 + 15324976 [12] |
+| #101r CMP 6.3V Supply · v4.2 L233 | 22 AWG M22759/16 white/orange [8] | M130 B19 · SSC-N · AFM8 + K1S sel 6 · splice D-609-04 [9] | cavity Z: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | cavity 1 — OPEN until a GM end view of the cam sensor is cited (Dave's sheet): 12110847 + 15324976 [12] |
+| #101g CMP Sensor Ground (conductor 2 of #101 shielded 2C) · v4.2 L232 | 22 AWG M27500 2C cable [13] | M130 B15 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [9] | cavity HH: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | cavity 2 — OPEN until a GM end view of the cam sensor is cited (Dave's sheet): 12110847 + 15324976 [12] |
+| #101 Cam Position Sensor · v4.2 L38 | 22 AWG M27500 2C cable | M130 B02 · SSC-N · AFM8 + K1S sel 6 [14] | cavity v: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | cavity 3 — OPEN until a GM end view of the cam sensor is cited (Dave's sheet): 12110847 + 15324976 [12] |
 
 **Tools:** Metri-Pack 150/280 sealed crimp tool (12155975) — to buy [2] · Ideal Stripmaster 45-1987 (Tefzel blades) + wire stop L-5270 — to buy [3] · pull gauge / spring scale, ≥ 50 lbf — confirm you own it [4]
 
@@ -316,11 +316,11 @@ Kit: WCTHB50 ×1 (on the cart change) [1]
 
 | Wire | Spec | ECU / PDM end | Firewall | Device end |
 |---|---|---|---|---|
-| #4b ETB TAC Motor 1 · v4.2 L15 | 20 AWG M22759/32 white/brown [8] | M130 A18 · SSC-N · AFM8 + K1S sel 7 [9] | cavity B: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | 1 · kit terminal + seal [12] |
-| #4a ETB TAC Motor 2 · v4.2 L14 | 20 AWG M22759/32 white/red [13] | M130 A01 · SSC-N · AFM8 + K1S sel 7 [9] | cavity C: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | 2 · kit terminal + seal [12] |
-| #4c ETB TPS1 Signal · v4.2 L16 | 22 AWG M22759/16 green/brown [14] | M130 B09 · SSC-N · AFM8 + K1S sel 6 [9] | cavity FF: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | 3 · kit terminal + seal — doubled over (MoTeC) [12] |
-| #4f ETB Signal Ground · v4.2 L19 | 22 AWG M22759/16 brown [15] | M130 B16 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [16] | cavity f: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | 4 · kit terminal + seal — doubled over (MoTeC) [12] |
-| #4e ETB 5V Reference · v4.2 L18 | 22 AWG M22759/16 orange [17] | M130 A02 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [16] | cavity e: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | 5 · kit terminal + seal — doubled over (MoTeC) [12] |
+| #4b ETB TAC Motor 1 · v4.2 L15 | 20 AWG M22759/32 white/brown [8] | M130 A18 · SSC-N · AFM8 + K1S sel 7 [9] | cavity B: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | cavity 1 — pin order OPEN until a GM end view of 12699160 is cited: kit terminal + seal [12] |
+| #4a ETB TAC Motor 2 · v4.2 L14 | 20 AWG M22759/32 white/red [13] | M130 A01 · SSC-N · AFM8 + K1S sel 7 [9] | cavity C: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | cavity 2 — pin order OPEN until a GM end view of 12699160 is cited: kit terminal + seal [12] |
+| #4c ETB TPS1 Signal · v4.2 L16 | 22 AWG M22759/16 green/brown [14] | M130 B09 · SSC-N · AFM8 + K1S sel 6 [9] | cavity FF: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | cavity 3 — pin order OPEN until a GM end view of 12699160 is cited: kit terminal + seal — doubled over (MoTeC) [12] |
+| #4f ETB Signal Ground · v4.2 L19 | 22 AWG M22759/16 brown [15] | M130 B16 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [16] | cavity f: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | cavity 4 — pin order OPEN until a GM end view of 12699160 is cited: kit terminal + seal — doubled over (MoTeC) [12] |
+| #4e ETB 5V Reference · v4.2 L18 | 22 AWG M22759/16 orange [17] | M130 A02 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [16] | cavity e: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | cavity 5 — pin order OPEN until a GM end view of 12699160 is cited: kit terminal + seal — doubled over (MoTeC) [12] |
 
 **Tools:** TE AMP hand crimper for the Gen V throttle-body terminals — to buy [2] (open: model not named) · Ideal Stripmaster 45-1987 (Tefzel blades) + wire stop L-5270 — to buy [3] · pull gauge / spring scale, ≥ 50 lbf — confirm you own it [4]
 
@@ -488,9 +488,9 @@ Kit: LS-CRANK-CONN-KIT ×1 [1]
 
 | Wire | Spec | ECU / PDM end | Firewall | Device end |
 |---|---|---|---|---|
-| #108g MAP Sensor Ground · v4.2 L221 | 22 AWG M22759/16 brown [8] | M130 B16 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [9] | cavity q: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | 1 · 12110847 + 15324976 [12] |
-| #108 MAP Sensor · v4.2 L42 | 22 AWG M22759/16 green/red [13] | M130 A15 · SSC-N · AFM8 + K1S sel 6 [14] | cavity CC: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | 2 · 12110847 + 15324976 [12] |
-| #108r MAP 5V Reference · v4.2 L222 | 22 AWG M22759/16 orange [15] | M130 A02 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [9] | cavity r: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | 3 · 12110847 + 15324976 [12] |
+| #108g MAP Sensor Ground · v4.2 L221 | 22 AWG M22759/16 brown [8] | M130 B16 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [9] | cavity q: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | cavity 1 — OPEN until a GM end view of the MAP sensor is cited (Dave's sheet): 12110847 + 15324976 [12] |
+| #108 MAP Sensor · v4.2 L42 | 22 AWG M22759/16 green/red [13] | M130 A15 · SSC-N · AFM8 + K1S sel 6 [14] | cavity CC: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | cavity 2 — OPEN until a GM end view of the MAP sensor is cited (Dave's sheet): 12110847 + 15324976 [12] |
+| #108r MAP 5V Reference · v4.2 L222 | 22 AWG M22759/16 orange [15] | M130 A02 · SSC-N · AFM8 + K1S sel 6 · splice D-609-05 [9] | cavity r: M39029/56-351 (cabin) + /58-363 (engine), AFM8 + K43, insert/remove M81969/14-10 [10] | cavity 3 — OPEN until a GM end view of the MAP sensor is cited (Dave's sheet): 12110847 + 15324976 [12] |
 
 **Tools:** Metri-Pack 150/280 sealed crimp tool (12155975) — to buy [2] · Ideal Stripmaster 45-1987 (Tefzel blades) + wire stop L-5270 — to buy [3] · pull gauge / spring scale, ≥ 50 lbf — confirm you own it [4]
 

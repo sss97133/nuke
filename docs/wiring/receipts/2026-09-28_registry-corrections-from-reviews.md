@@ -310,3 +310,77 @@ not judge cab-to-chassis wires at all.
 - Source PDFs were read in place from `/Users/skylar/nuke/reference_documents/component_drawings/` and extracted to the
   session scratchpad: the PDM, LTCD, M1 techspec and Dakota VHX manuals.
 - `reconcile_v5.py` still reads `/Users/skylar/k5-harness-pull/devices.json`, read-only, outside both checkouts.
+
+## Round 5: tilt ignition switch; wiper and washer deep dive (2026-09-28)
+- **IGN-SWITCH** is OER 1990096, the 9-blade switch for the tilt column. The OER 1990084 non-tilt alternative is retired. Source: owner, 2026-09-28, "the column is TILT".
+- **Wiper motor, from the 1977 LTSM Sec. 8.**
+  - p.802: a compound-wound motor with a park switch and an internal circuit breaker on the brush plate.
+  - p.803: the ignition feed lands on center terminal 2. The grounding-type dash switch grounds 1 and 3 for LO and 1 only for HI; HI runs through the 20 ohm resistor. After OFF, the park switch runs the motor in LO off the feed until the cam opens it.
+  - p.810: 20+ A is the stall current.
+  - p.812: the bench trouble chart gives 3.5–5.0 A as the normal draw.
+  - p.804: pulse wipers used the same motor with an external control unit.
+- **The PDM feed is right.** The switch still selects speed and park still runs from the feed.
+  - OUT12 limit is 7 A. The load is 5.0 A from p.812, so 1.25 × 5.0 = 6.25 A. The ceiling is 0.85 × 11 A = 9 A for 18 AWG (PDM manual p.48).
+  - A stall at 20+ A trips the filtered over-current (PDM manual p.23–24). The motor's own breaker backs it up.
+  - The on-truck draw is OPEN: clamp-meter it at mock-up.
+  - WIPER_T1 carries the armature current and stays 16 AWG, at or above the 18 AWG feed. WIPER_T3 carries shunt current only and stays 18 AWG. OUT12 protects both.
+- **New wire WIPER_SW_GND** (16 AWG, switch mount to GND-BANK-CAB). The motor current returns through the grounding-type switch (p.803). Grounds run in the loom (state row 56).
+- **Washer.**
+  - The factory '77 pump is driven by the wiper motor and triggered by a ratchet solenoid that the switch grounds (Fig. 8-16; p.814). It is left unwired, and the lock-out tang keeps it idle (p.814).
+  - The 1985–87 jar pump is a 2-wire electric pump: white is the feed, pink the switched ground (1987 LDT manual 8A-34).
+  - Picked: the Hella 8TW 004 223-031 pump in the 8TW 003 248-001 1.5 l tank, mating connector 8JD 008 151-021. Pin 1 is +, pin 2 is − (Hella product information, snapshot saved).
+  - The USA1 20151 pump is retired: its listing publishes no plug and no current.
+  - OPEN: the pump current, since Hella publishes none (bench it), and the tank's fit on the inner fender.
+- **Intermittent wipers are not added.** Pulsing the feed would stop the blades mid-sweep. A PDM delay would need the park switch on a PDM input.
+
+## Round 6: parts rows and kits for body bulkheads A, B, P (2026-09-28)
+- **A:** DT04-12PA-L012 receptacle (gray, A key) with W12P, DT06-12SA plug with W12S, and a DT12-L012-GKT gasket. **B:** DT04-12PB-L012 (black, B key) with W12P, DT06-12SB with W12S, and a DT12-L012-GKT gasket. Both are full at 12 of 12, so neither takes a cavity plug. Sources: the customconnectorkits pages for each part, snapshots saved.
+- **P:** DTP04-4P-L012 with WP-4P, DTP06-4S with WP-4S, a DTP4P-L012-GKT gasket, and six 114017 sealing plugs, three per half for cavities 2 to 4. The 114017 comes from the Deutsch catalog's size 16-12 sealing plug row (web_snapshots/www.farnell.com__628276.md).
+- **Mating-half contacts:** A, B, P and C gained a `wires` list, so kits_v5 counts the other half's contact. Before this, C also left its sockets out.
+- **BOM contact totals:** size 16 has 42 pins and 42 sockets. Size 12 has 11 pins and 11 sockets.
+- **OPEN:** the DTP4P-L012-GKT page was not saved, because customconnectorkits returned 429 and I stopped fetching from that host.
+- **OPEN:** C's 0413-204-2005 plugs conflict with the Deutsch table, which lists that part for size 20 contacts.
+
+## Round 7: the 6L90 case connector and the PCS kit harness (2026-09-28)
+- **TRANS-CASE (new endpoint, chassis):** the Kostal 16-cavity case connector, GM 15131300 / 19303772. Its full cavity map comes from the EFI Connection pigtail page (snapshot), with each cavity marked as fed through the kit, inside the kit, available, or OPEN. We do not cut or terminate this plug.
+- **PCS-HARNESS-4610 (new endpoint, kit_terminal):** the Zero Gravity "TCM4610 Harness only" (snapshot). It sits between PCS-TCM and the case.
+  - The seven vehicle-side PCS wires now end at its leads. The lead labels are OPEN until the harness drawing.
+  - The GMLAN pair and case cavities 9 and 12 are recorded as inside the kit.
+  - PCS-TCM keeps no wires of ours.
+- **New wire TRANS_BATT:** 18 AWG from the distribution stud to case cavities 1 and 4, on a 7.5 A inline fuse. Holley 558-499 p.3 asks for "a constant battery source capable of supplying 5 amps", and 1.25 × 5 A = 6.25 A. 18 AWG carries 9 A at 100 °C (MoTeC PDM manual p.48). It is separate from PCS_BATT, the PCS's own 5 A supply under the 07-12 ruling.
+- **New wires TRANS_GND and PCS_GND:** each 18 AWG to the engine ground star. TRANS_GND serves case cavities 2 and 5. ZGP p.2 lists "12V Battery, Ignition and Grounds", and grounds run in the loom per state row 56.
+- **New wire TRANS_BRK:** 22 AWG from case cavity 6 to the brake lamp feed tap at the CHMSL, the same source as PCS_BRK.
+- **Case cavities not wired:** tap up/down (7) is OPEN until shifter buttons are picked. Park/neutral (3) and output speed (16) are recorded as available outputs. The Dakota SPD/GEAR substitution stays OPEN.
+- **#58 retirement reason:** now cites the 07-12 ruling and state §3 0a. OUT23 is free of it and carries MIRROR_PWR. **#125:** the GMLAN pair lives inside the kit.
+- **New option candidate PCS-CAN.** It is not wired, because it would break the locked two-node private bus. It is an owner decision.
+
+## Round 8: cavity plugs by contact size; door pass-through kits; iBooster candidates (2026-09-28)
+- **Cavity plugs:** the Deutsch catalog sealing-plug table (web_snapshots/www.farnell.com__628276.md) gives 114017 for size 16-12 and 0413-204-2005 for size 20.
+  - Bulkhead C and both DT 8-way door pass-throughs take 114017, one per spare cavity in each half. The dt family default is now 114017, and the C OPEN is closed.
+  - 0413-204-2005 now appears only on the size-20 DTM port, IBST-DIAG. Its parts row is renamed as the size-20 plug.
+- **Door pass-through kits:** they were empty, so their housings never reached the parts list. The DT 8-way kit is DT04-08PA, DT06-08SA, W8P, W8S and four 114017. The DTP 4-way kit is DTP04-4P, DTP06-4S, WP-4P and WP-4S. These parts rows already existed.
+  - Parts list now: 114017 × 18 (C 4, doors 8, P 6), DT04-08PA × 2, DTP04-4P × 2.
+- **Candidate IBST-CAN, iBooster step 2 (read-only):** IBST_CAN_H/L is a 22 AWG M22759/16 twisted pair from booster pins 16 and 25 to IBST-DIAG.
+  - Sources: fastandquiet Gen 2 pinout; CANW, one twist per 50 mm (PDM manual p.50); coloured yellow/green like the trunk.
+  - IBST-DIAG is a DTM 4-way: MoTeC #68054 on the harness half, capped by #68055 (LTC manual p.32). It carries two 120 Ω terminators, because the booster has no termination and runs at 500 kbps (evcreate). The bus is never joined to the M1 trunk.
+  - OPEN: pins 16 and 25 are blind-plugged and not in the Tulay harness. The Bosch terminal 1928498705 is on file (openinverter). The terminator part and the #68054/#68055 kit contents are also OPEN.
+- **Candidate BFL, brake-fluid level:** BFL_SIG and BFL_0V are 20 AWG from the reservoir sensor to the engine PDM15 (DIG1 A27, 0V B22).
+  - PDM30 DIG8 is free but sits in the cab. That crossing failed R12, because bulkheads A and B are full and C is the floor exit.
+  - OPEN: the sensor connector, the sensor type and polarity, and the lamp output.
+
+## Round 9: iBooster is Gen 1; the PCS mounts in the cab (2026-09-28)
+- **IBOOSTER is the Gen 1 Tesla Model S/X unit, 1037123-00-B.**
+  - Sources: the owner's Gmail, Calimotive order #1011, confirmed 2023-11-09 ("we will ship out a revision B") and delivered 2023-11-13; and the label in K5 photo 40e5e5f9.
+  - The harness is Tulay's Gen-1 universal harness. It is NOT on order, so its purchase is OPEN.
+  - Pins follow the fastandquiet Gen-1 pinout: 1 always hot 40 A, 9 ground, 17 always hot 5 A, 20 ignition 5 A.
+  - The pedal-sensor mapping is 1→2, 2→22, 3→8, 4→23, inside the Gen-1 harness.
+- **New wire IBOOST_PERM:** 16 AWG to pin 17, the Tulay 1.50 mm² red lead, on a 5 A inline fuse at the distribution stud.
+  - #52 and IBOOST_PERM both record the isolator choice: A is the Odyssey + post; B is the distribution stud, as designed and the default. It is an owner/Dave call.
+  - IBST-CAN now cites the Gen-1 pinout, where vehicle CAN is on pins 16/25.
+- **The PCS goes in the cab.** The ZGP TCM-2650 setup guide rev2 has no mounting location and no sealing rating in any of its 23 pages. Under the lead's rule, PCS-TCM and its kit leads are in the cab, under the dash beside the PDM30.
+  - PCS_BATT (5 A) and TRANS_BATT (7.5 A) now come from the PDM30 battery stud, on 9904 rings. That stud is always hot, fed from the distribution stud by PDM_BPOS. This avoids a firewall crossing, because bulkheads A and B are full.
+  - PCS_GND and TRANS_GND now go to the cab ground bank.
+  - PCS_IGN moved from PDM15 OUT13 to PDM30 OUT21. From the engine PDM it would cross the firewall with no path, which failed R12.
+  - OUT21 was the only base-free 8 A output, but the PL candidate held it. PL now needs another output, which is recorded on OUT21.
+  - OPEN: the kit harness's path from the cab to the case connector.
+- **The PDM30 battery stud joins the colour rule's power sources,** so PCS_BATT is red.

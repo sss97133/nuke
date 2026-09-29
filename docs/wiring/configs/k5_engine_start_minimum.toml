@@ -9,7 +9,7 @@
 [toggles]
 BRAKES_IBOOSTER = false
 EPARKING_BRAKE = false
-TRANS_6L80E = false
+TRANS_6L90 = false
 LIGHTING_EXTERIOR = false
 LIGHTING_INTERIOR = false
 DOME_COURTESY = false

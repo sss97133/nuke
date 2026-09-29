@@ -272,9 +272,9 @@ IMPLIED = [
      "reads the yellow low when closed, high when open; the M1 tune shuts the engine down when it reads open"),
     ("DAK_CONST", "Dakota VHX CONST. POWER (always-hot, fused)", "PDM30-STUD (3 A inline fuse)", "DAKOTA-VHX (CONST. POWER)", 18, "M22759/32",
      "DAKOTA_VHX_ARCHITECTURE.md §2 'CONST. POWER gap'; VHX manual p.6"),
-    ("PCS_BATT", "PCS TCM-2650 constant 12V (5A)", "PS-STUDS (distribution stud, 5 A fuse)", "PCS harness B+", 18, "M22759/32",
+    ("PCS_BATT", "PCS TCM-2650 constant 12V (5A)", "PDM30-STUD (5 A inline fuse)", "PCS harness B+", 18, "M22759/32",
      "receipts/2026-07-12_6l80e-can-master-ruling.md F3"),
-    ("PCS_IGN", "PCS TCM-2650 ignition", "PDM15:OUT13", "PCS harness IGN", 20, "M22759/32", "ZGP TCM2650 setup guide rev2 p.1"),
+    ("PCS_IGN", "PCS TCM-2650 ignition", "PDM30:OUT21", "PCS harness IGN", 20, "M22759/32", "ZGP TCM2650 setup guide rev2 p.1; the TCM mounts in the cab (the guide gives no mounting location or sealing rating), so its ignition comes from the cab PDM30: PDM15 OUT13 would cross the firewall with no free body bulkhead cavity (A and B full). OUT21 was the only base-free 8 A output (held by the PL candidate): the base transmission takes it and PL needs another output"),
     ("PCS_TPS", "PCS analog 1 <- pedal track 1 signal tap (signal only)", "M130:B21 / APS track 1 signal", "PCS analog input 1", 22,
      "M22759/32",
      "ZGP guide p.13 + Table 4 (AI1 may piggyback an ECU sensor); the TB 12699160 position line is SENT (digital), so the "
@@ -287,6 +287,21 @@ IMPLIED = [
      "ZGP guide p.19-20; receipts/2026-09-26_substrate-correction-1977-neutral-start-switch-on-column.md"),
     ("PCS_REV", "PCS lever-position ground out -> PDM reverse-lamp input", "PCS PWM vs Lever Position", "PDM30:DIG15 (B17) reverse", 22, "M22759/32",
      "ZGP guide p.19-20"),
+    # ---- 6L90 case connector (TRANS-CASE) through the PCS TCM-4610 kit harness (lead 2026-09-28)
+    ("TRANS_BATT", "6L90 case battery feed (case cavities 1 + 4: TEHCM solenoid supply)", "PDM30-STUD (7.5 A inline fuse)",
+     "PCS-HARNESS-4610 (case battery lead, cavities 1 + 4)", 18, "M22759/32",
+     "Holley 558-499 instructions (reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf) p.3: power 'supplies power to the transmission solenoids ... a constant battery source capable of supplying 5 amps'; "
+     "EFI Connection 6L80E/6L90E T43 case connector pigtail, GM 15131300 / 19303772 (web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md): cavities 1 and 4 RED/WHT 18 GA 12V BATTERY. Fuse >= 1.25 x 5 A = 6.25 A -> 7.5 A; 18 AWG carries 9 A at 100 C "
+     "(MoTeC PDM manual p.48), over the fuse; from the PDM30 battery stud (always hot, fed from the distribution stud by PDM_BPOS) because the PCS sits in the cab: ZGP TCM-2650 setup guide rev2 (all 23 pages) gives no mounting location and no sealing rating, so the TCM mounts in the cab under the dash beside the PDM30 (lead 2026-09-28); its kit harness's leads are there too. Separate from PCS_BATT (the PCS's own 5 A supply, ruling 2026-07-12 F3)"),
+    ("TRANS_GND", "6L90 case ground (case cavities 2 + 5)", "PCS-HARNESS-4610 (case ground lead, cavities 2 + 5)", GCAB_EARLY, 18, "M22759/32",
+     "EFI Connection 6L80E/6L90E T43 case connector pigtail, GM 15131300 / 19303772 (web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md): cavities 2 and 5 BLK/WHT 18 GA GROUND; Holley 558-499 instructions (reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf) p.3: ground to a good chassis/engine ground; " + "owner 2026-09-27: grounds run in the loom to the banks (state row 56)"),
+    ("PCS_GND", "PCS TCM-2650 ground", "PCS-HARNESS-4610 (PCS ground lead)", GCAB_EARLY, 18, "M22759/32",
+     "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.2: "
+     "set up '12V Battery, Ignition and Grounds'; sized as its feed PCS_BATT (18 AWG); " + "owner 2026-09-27: grounds run in the loom to the banks (state row 56)"),
+    ("TRANS_BRK", "6L90 case stop-lamp input (case cavity 6) <- brake lamp tap", "CHMSL (+ feed tap: 12 V while braking)",
+     "PCS-HARNESS-4610 (case stop-lamp lead, cavity 6)", 22, "M22759/16",
+     "EFI Connection 6L80E/6L90E T43 case connector pigtail, GM 15131300 / 19303772 (web_snapshots/www.eficonnection.com__6l80e-6l90e-t43-tcm-transmission-connector-pigtail.md): cavity 6 WHT 22 GA STOP LAMP SWITCH SIGNAL; Holley 558-499 instructions (reference_documents/component_drawings/Holley_6L80_6L90_Transmission_Control_558-499.pdf) p.3: brake input 'must be installed to a +12v source (as most brake light switches "
+     "are)'; the factory brake switch now switches 0 V into PDM30 DIG14, so the 12 V comes from the brake lamp output, the same tap as PCS_BRK"),
 ]
 PDM_PIGTAIL_NOTE = ("PDM 20 A outputs feeding a wire heavier than 16 AWG land two 16 AWG pigtails, one per pin, equal length "
                     "(registry wires <load>_PT1/_PT2), joined to the load wire in an in-line MiniSeal M81824/1-3 "
@@ -331,9 +346,11 @@ BRANCH_EXTRA["FAN_PWM"] = {"length_ft": 4.6, "length_basis": "cut list v4.2 zone
 IMPLIED += [("FAN_GND", "Radiator fan ground (SPAL 30107090 black) in the loom to the ground star", "FAN (ground)", GSTAR_EARLY, 12,
              "M22759/32", SPALD + "; the fan had no ground wire in the registry; grounds run in the loom (state row 56)")]
 BRANCH_EXTRA["FAN_GND"] = {"color": "black", "length_ft": 2.2, "length_basis": "follows #21 (twin: battery -> K5H_RadFan_1, x 1.2 pad)"}
-IMPLIED += [("PUMP_GND", "Fuel pump ground: hanger ground terminal to a frame stud near the tank", "FUEL-PUMP (hanger ground)",
+IMPLIED += [("PUMP_GND", "Fuel pump ground: hanger ground terminal, in the loom beside #66, to the engine-bay ground star", "FUEL-PUMP (hanger ground)",
              GSTAR_EARLY, 14, "M22759/32", "QFS P367 5.1 A (highflowfuel.com); matches the #66 feed gauge; returns in the loom with "
-             "#66 to the ground star (owner 2026-09-27: grounds in the loom)")]
+             "#66 to the ground star: chapters/17 §17.4 item 1 (star grounding, one reference at the battery negative), state row 56 "
+             "(grounds in the loom), Dakota VHX manual p.11 (the pump 'externally grounded to the vehicle chassis' — the star is the "
+             "chassis point, G2). Not the rear bus: the feed runs engine bay -> frame, and its return rides beside it")]
 BRANCH_EXTRA["PUMP_GND"] = {"color": "black", "length_ft": 18.4,
                             "length_basis": "follows #66: the ground returns in the loom beside the feed from the tank to the "
                                             "engine-bay ground star (owner 2026-09-27: grounds in the loom), so it is the feed's "
@@ -496,7 +513,7 @@ IMPLIED_EXTRA_0927 = {
     "GSS_PWR": {"control": "PDM30 DIG1 ignition RUN (same output as #71)"},
     "ALT_L": {"control": "ignition RUN over CAN from the PDM30 (DIG1); a dead bus drops it with the other engine loads"},
     "START_TRIG": {"control": "PDM15 logic over CAN: START request (PDM30 DIG10) AND PCS neutral (PDM30 DIG11) AND the M130 crank-enable bit"},
-    "PCS_IGN": {"control": "ignition RUN over CAN from the PDM30 (DIG1)"},
+    "PCS_IGN": {"control": "PDM30 DIG1 ignition RUN"},
     "TG_FEED": {"control": "PDM30 DIG1 ignition RUN (the factory switches do the switching; the PDM is the fuse)"},
     "TG_KEY_FEED": {"control": "shares TG_FEED (PDM30 OUT1 on DIG1 ignition RUN): the key switch works only key-on — the factory "
                                "fed it always-hot (circuit 60 via the 30 A breaker); owner call whether OUT1 runs always-on"},
@@ -569,6 +586,27 @@ def _gnd(wid, label, dev, stud, awg=20):
     return (wid, label, f"{dev} (ground)", stud, awg, "M22759/32", GND_WHY)
 
 
+# ---- IBST-CAN (candidate, step 2 of the iBooster research): read-only logging bus, its own 500 kbps pair, never on the M1 trunk
+IBST_WHY = ("web_snapshots/www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md (our unit is Gen 1, 1037123-00-B): 'S 16 - Vehicle CAN-High', 'S 25 - Vehicle CAN-Low', not needed for basic operation; web_snapshots/www.evcreate.com__ibooster-can-bus.md: 'The iBooster is a dual "
+            "CAN device. Both channels have no termination and run at 500 kbps' -> 120 ohm at each end; its own bus: the M130 has one "
+            "CAN bus (M1 hardware techspec p.6) carrying the trunk, the LTC ships at 1 Mbps (LTC manual p.8) and every device on a bus "
+            "shares one bitrate (PDM manual p.24); " + CANW)
+IMPLIED += [
+    ("IBST_CAN_H", "iBooster vehicle CAN High (pin 16) -> IBST-DIAG port (read-only logging bus)", "IBOOSTER (pin 16, vehicle CAN high)",
+     "IBST-DIAG (1, CAN High)", 22, "M22759/16 twisted", IBST_WHY),
+    ("IBST_CAN_L", "iBooster vehicle CAN Low (pin 25) -> IBST-DIAG port (read-only logging bus)", "IBOOSTER (pin 25, vehicle CAN low)",
+     "IBST-DIAG (2, CAN Low)", 22, "M22759/16 twisted", IBST_WHY),
+    # ---- BFL (candidate): brake-fluid reservoir level sensor to a spare engine-PDM input (no firewall crossing)
+    ("BFL_SIG", "Brake-fluid level sensor -> PDM15 DIG1 (low-fluid warning, read over CAN)", "PDM15:DIG1 (A27)", "BRAKE-FLUID-LVL (signal lead)", 20,
+     "M22759/32", "Tesla Model Y booster service procedure step 7 'disconnect the brake fluid reservoir electrical connector' "
+     "(web_snapshots/service.tesla.com__GUID-0CE8F156-928A-4338-A693-CF6EEB9055E6.md). PDM30 DIG8 is spare but sits in the cab: "
+     "the pair would cross the firewall, and body bulkheads A and B are full (C is the floor exit). The engine PDM15 is on the "
+     "booster's side with spare inputs (DIG1 A27, pdm15_designations.txt), read by the PDM30 over CAN; switch-to-0V pattern, chapters/17 §17.7.7"),
+    ("BFL_0V", "Brake-fluid level sensor return -> PDM15 0V", "PDM15:B22", "BRAKE-FLUID-LVL (return lead)", 20, "M22759/32",
+     SW0V + "; PDM15 B22 = 0V (pdm15_designations.txt)"),
+]
+
+
 IMPLIED += [
     # ---- lamp and device grounds (the April cut list carried none)
     _gnd("HL_L_GND", "Left headlight ground", "HEADLIGHT-L", GFL, 16),
@@ -612,7 +650,7 @@ IMPLIED += [
      "AMP (+12 VDC, power plug set screw)", 4, "M22759/16", AMPWHY),
     ("AMP_GND_TAIL", "Amplifier ground tail: amp power plug to the reducing block (4 AWG, JL's required size)", "AMP (Ground, power plug set screw)",
      "AMP-BLOCK (- out, 4 AWG)", 4, "M22759/16", AMPWHY),
-    ("IBOOST_GND", "iBooster ground to battery negative", "IBOOSTER (ground, Tulay harness)", GSTAR_EARLY, 8, "M22759/16",
+    ("IBOOST_GND", "iBooster ground to the ground star (GND-BANK-ENG)", "IBOOSTER (ground, Tulay harness)", GSTAR_EARLY, 8, "M22759/16",
      IBOOST + "; chapters/17 §17.3: battery-iBooster is a spine cable, its ground returns to the star"),
     # ---- factory switches as PDM30 inputs (switch-to-ground; the switch carries a signal, not load current)
     ("HL_SW_PARK", "Headlight switch PARK output -> PDM30 DIG2", "PDM30:DIG2", "HL-SW (park/tail terminal)", 22, "M22759/16",
@@ -631,11 +669,13 @@ IMPLIED += [
     ("HORN_SW", "Horn button -> PDM30 DIG6 (the button grounds through the column)", "PDM30:DIG6", "HORN-SW (column horn contact)",
      22, "M22759/16", PLAN_CH + " DIG6 A31"),
     # ---- factory wiper circuit kept whole: grounding-type dash switch, the PDM output is the fused ignition feed
-    ("WIPER_T1", "Wiper switch to motor terminal 1 (series field + armature to ground)", "WIPER-SW (terminal 1 lead)",
+    ("WIPER_T1", "Wiper switch to motor terminal 1 (series field + armature)", "WIPER-SW (terminal 1 lead)",
      "WIPER-MOTOR (terminal 1)", 16, "M22759/32",
-     M77 + " p.803: the wiper dash switch is a grounding type; LO and HI complete terminal 1 to ground at the switch"),
+     M77 + " p.803: the wiper dash switch is a grounding type; LO and HI complete terminal 1 to ground at the switch. Terminal 1 carries the series field + armature current, the whole motor current less the shunt branch (p.803), so it is sized at or above the #49 feed (18 AWG); OUT12's limit protects it (every ampere enters at the center terminal)"),
     ("WIPER_T3", "Wiper switch to motor terminal 3 (shunt field)", "WIPER-SW (terminal 3 lead)", "WIPER-MOTOR (terminal 3)", 18,
-     "M22759/32", M77 + " p.803: LO grounds the shunt field via terminal 3; OFF ties 3 to 1 through the park switch"),
+     "M22759/32", M77 + " p.803: LO grounds the shunt field via terminal 3; HI opens it at the switch and the shunt current runs through the 20 ohm resistor to terminal 1; OFF ties 3 to 1 through the park switch. Shunt-field current only; OUT12's limit (at most 0.85 x 11 A for 18 AWG, PDM manual p.48) protects it"),
+    ("WIPER_SW_GND", "Wiper dash switch ground (the motor current returns through the switch)", "WIPER-SW (ground)", GCAB, 16, "M22759/32",
+     M77 + " p.803: 'the wiper dash switch is a grounding type switch, and therefore must be securely mounted': in LO and HI the motor current returns through the switch to ground; " + GND_WHY + " — the switch mount gets a ring lead to the cab bank, sized as WIPER_T1"),
     # ---- factory Four-Season blower: switch + resistor stay; the HI blower relay becomes a PDM output (row 54)
     ("BLOWER_BAT", "Blower switch LOW lead to the resistor BAT terminal (factory circuit 51)", "BLOWER-SW (LOW lead)", "BLOWER-RES (BAT tap)", 16, "M22759/32",
      M77 + " p.87-88: blower resistor on the evaporator case; 73-87 C/K A/C resistor = 3 prongs, low speeds through the switch "
@@ -754,11 +794,15 @@ IMPLIED += [
     # ---- iBooster wake and E-Stopp ignition safety from spare PDM30 outputs
     ("IBOOST_WAKE", "iBooster ignition 12 V (pin 20) from the body PDM", "PDM30:OUT9", "IBOOSTER (20, ignition 12 V)", 20,
      "M22759/32", IBOOST + "; PDM30 OUT9 (8 A, set to 5 A) freed when the step motors moved behind their own controller"),
+    ("IBOOST_PERM", "iBooster Gen 1 second always-hot (pin 17, 5 A)", "PS-STUDS (distribution stud, 5 A fuse)", "IBOOSTER (17, always-hot 5 A)", 16,
+     "M22759/32", "web_snapshots/www.fastandquiet.com__bosch-ibooster-gen-1-pinout.PDF.md: 'M 17 - Always Hot Power (5A Fuse)'; web_snapshots/tulayswirewerks.com__bosch-ibooster-gen-1-universal-wire-harness.md: '1.50 mm² – Red (FLRYW) – Always Hot Power (recommended to use a 5A "
+     "Fuse)'; 16 AWG matches the 1.50 mm² lead and carries 9 A at 100 C over the 5 A fuse (MoTeC PDM manual p.48)"),
     ("ESTOPP_IGN", "E-Stopp safety-to-ignition (wire F, blue)", "PDM30:OUT10", "E-STOPP (F, blue)", 20, "M22759/32",
      ESTOPP + "; PDM30 OUT10 freed from the right step motor"),
 ]
 IMPLIED_EXTRA_0927.update({
     "BLOWER_HI": {"control": "blower switch HI contact on PDM30 DIG7"},
+    "DAK_BRAKE": {"color": "green", "color_basis": "the E-Stopp lead it continues is wire E, green (ESK001 wiring diagram); a switched-ground SIGNAL, so not black (black = ground in this book, state 0f(a))"},
     "RADIO_CONST": {"control": "always on (the PDM30 stays awake key-off: hazards and locks need it)"},
     "IBOOST_WAKE": {"control": "PDM30 DIG1 ignition RUN"},
     "ESTOPP_IGN": {"control": "PDM30 DIG1 ignition RUN"},
@@ -911,10 +955,13 @@ D0927 = {
     "23": {"frm": "PDM15:OUT11", "to": {"device": "AC-CLUTCH", "pin": "clutch lead", "terminal": "open"},
            "control": "CAN: M130 A/C request, interlocked by the PDM15 low/high pressure switch inputs",
            "why": "compressor ordered 2026-09-24 (state §1 A/C hard parts); clutch is an engine-bay load; " + AGENT},
-    "64": {"frm": "PDM15:OUT12", "label": "LTCD power (+12 V)", "awg": 16, "spec": "M22759/32",
+    "64": {"frm": "PDM15:OUT7", "label": "LTCD power (+12 V)", "awg": 16, "spec": "M22759/32",
            "conflict": ("decision: awg 18 -> 16 — OUT12 needs ceil(1.25 x 6.1 A) = 8 A; 18# is 9 A at 100 C (PDM manual p.48), 0.85 x 9 = "
                         "7.65 A < 8; 16# is 12 A at 100 C, 0.85 x 12 = 10.2 A >= 8. The DTM socket 0462-005-20141 takes 16-18 AWG (DEUTSCH "
-                        "Contacts Catalog p.125) — but it is rated 7.5 A, under the 8 A setting (see pdm_settings)"),
+                        "Contacts Catalog p.125) — but it is rated 7.5 A. Round 4: moved to the free 20 A output PDM15 OUT7 (B5 + B11): "
+                        "MoTeC recommends 24# to 20# on 8 A outputs and 20# to 16# on 20 A outputs (PDM manual p.6, p.48), and the LTCD "
+                        "draws over 3 A per sensor cold (LTC manual p.37); 2 x 16 AWG pigtails into M81824/1-3, the 16 AWG feed out; "
+                        "limit 7 A, under the 7.5 A socket (the 125 % rule's 8 A yields to the contact rating)"),
            "protection": ("PDM15 OUT12 maximum-current setting 7 A: the DTM size-20 socket is rated 7.5 A (DEUTSCH Contacts Catalog "
                           "p.125, 'Solid Contacts - Common Contact System'), under the 8 A output; the LTCD's cold draw is > 6.1 A "
                           "(LTC manual p.31 + p.37, a lower bound) — if a cold start trips 7 A, the feed needs a second contact"),
@@ -1118,15 +1165,15 @@ D0927B = {
            "why": "Dakota VHX manual p.5-6: DIM (+) night dimming input — 'connect to tail light circuit'; it started at 'ECU'"},
     # ---- horn, washer, wiper, underhood (front body loads)
     "48": {"to": {"device": "HORN", "pin": "+", "terminal": "horn blade"}, "control": "horn button on PDM30 DIG6"},
-    "50": {"to": {"device": "WASHER-PUMP", "pin": "+", "terminal": "pump lead"}, "control": "washer switch on PDM30 DIG9 (#46)"},
+    "50": {"to": {"device": "WASHER-PUMP", "pin": "pin 1 (+)", "terminal": "Hella 8JD 008 151-021 plug"}, "control": "washer switch on PDM30 DIG9 (#46)"},
     "46": {"frm": "PDM30:DIG9", "label": "Wiper switch washer contact -> PDM30 DIG9",
            "to": {"device": "WIPER-SW", "pin": "washer contact", "terminal": "factory switch"},
-           "why": "channel plan DIG9 A33; the factory switch grounds through its mounting (1977 manual p.803)"},
+           "why": "channel plan DIG9 A33; the factory switch grounds through its mounting (1977 manual p.803). 1977 manual p.814 washer diagnosis: 'grounded wire from pump solenoid to switch' makes the washer pump continuously, so the factory washer contact grounds the pump solenoid; the same contact now grounds DIG9 and the PDM runs the electric pump on OUT26 (#50)"},
     "49": {"to": {"device": "WIPER-MOTOR", "pin": "terminal board center (feed)", "terminal": "factory"},
            "control": "PDM30 DIG1 ignition RUN (the factory dash switch picks the speed)",
            "why": "1977 manual p.803: the ignition switch feeds the wiper's center terminal and the dash switch grounds terminals "
                   "1 and 3 — the factory circuit stays whole (WIPER_T1/T3), the PDM output is the fused feed; DIG7/DIG8 wiper "
-                  "inputs of the channel plan are not needed"},
+                  "inputs of the channel plan are not needed. Park runs from this feed (p.803: after OFF the motor runs in LO through the park switch until the cam opens it), so OUT12 stays on with ignition RUN; pulsing it would stop the blades mid-sweep"},
     "73": {"to": {"device": "UNDERHOOD-LAMP", "pin": "+", "terminal": "lamp lead"}, "control": "courtesy group: door jambs DIG12/DIG13"},
     # ---- blower: factory switch + resistor, HI from its own output
     "51": {"to": {"device": "BLOWER-SW", "pin": "feed", "terminal": "factory control head"},
@@ -1198,7 +1245,8 @@ D0927B = {
     "52": {"frm": "Distribution stud (MIDI 40 A)", "label": "iBooster power (direct, MIDI 40 A)", "awg": 6, "spec": "M22759/16",
            "to": {"device": "IBOOSTER", "pin": "1 (constant 12 V)", "terminal": "Tulay harness"},
            "why": "chapters/17 §17.3 spine table: MIDI 40 A; gauge from cable_decisions.json (6 AWG: a MIDI 40 needs 47 A of cable, "
-                  "8 AWG bundled is 40 A — cable_sizing_v5.py); the ch.17 table's 8 AWG is superseded; it started at 'ECU'"},
+                  "8 AWG bundled is 40 A — cable_sizing_v5.py); the ch.17 table's 8 AWG is superseded; it started at 'ECU'",
+           "note": "source OPEN (isolator decision, research/2026-09-28_ibooster-gen2-wiring.md §4): A = Odyssey + post, battery side of the Blue Sea 7700, fused at the post; B = the distribution stud downstream of the isolator (as designed, the default until the owner/Dave call)"},
     "54": {"to": {"device": "E-STOPP", "pin": "G (red, +12 V)", "terminal": "kit lead"},
            "control": "always on (E-Stopp wire G is a battery feed; the brake has to set key-off)"},
     # ---- the v4 DC-primary runs: their ends are the power-spine studs (chapters/17 §17.3), not 'ECU'
@@ -1217,8 +1265,8 @@ D0927B = {
     "59": {"frm": "PS-STUDS (alternator B+ stud)", "to": {"device": "PS-STUDS", "pin": "distribution stud (via MEGA)", "terminal": "238LTP"},
            "why": "chapters/17 §17.3: MEGA -> alternator branch off the distribution stud"},
     # ---- dead ends
-    "58": {"retired": "the PCS TCM-2650 takes ignition from the engine PDM (PCS_IGN, PDM15 OUT13); the T43-era feed is dead"},
-    "125": {"retired": "Holley T43 CAN stub: the T43 path is dead (6L90 + PCS TCM-2650, receipt 2026-07-12)"},
+    "58": {"retired": "Holley 558-499 T43 module superseded by the PCS TCM-2650 (receipts/2026-07-12_6l80e-can-master-ruling.md; state §3 0a: the transmission is a 6L90, the ruling survives): the PCS takes ignition from the engine PDM (PCS_IGN, PDM15 OUT13); PDM30 OUT23 is free of it (now MIRROR_PWR)"},
+    "125": {"retired": "Holley T43 CAN stub: the T43 path is dead (6L90 + PCS TCM-2650, receipt 2026-07-12). The PCS-T43 GMLAN pair (case cavities 8/10/11/13/14/15) is inside the TCM-4610 kit harness: drawn, not cut by us"},
     "122": {"retired": "BRAKE (-) on the Dakota is the brake-system / parking-brake WARNING input (VHX manual p.6); a tap of "
                        "the pedal switch (#53) would light it on every stop. Nothing on this truck reports parking-brake-set "
                        "(the E-Stopp ESK001 diagram has no status wire) or low fluid yet — the input stays unused until one does"},
@@ -1233,6 +1281,14 @@ for _k in ("50", "73", "80", "82", "83", "84", "87", "88"):
     _e = D0927B.setdefault(_k, {})
     _e["awg"] = 20
     _e["why"] = (_e["why"] + " | " + _UP20) if _e.get("why") else _UP20
+# round 4: courtesy group OUT25 needs a 6 A limit (1.25 x 4.73 A); 22# allows 0.85 x 6 = 5.1 A, 20# allows 0.85 x 8 = 6.8 A at 80 C
+# (MoTeC PDM manual p.48, cab) — the 22 AWG branches go to 20 AWG
+_UP20C = ("OUT25 courtesy group limit 6 A = ceil(1.25 x 4.73 A); 22# is 6 A at 80 C (PDM manual p.48), 0.85 x 6 = 5.1 A < 6; 20# is 8 A, "
+          "0.85 x 8 = 6.8 A >= 6 (round 4); 20 AWG is M22759/32 (state §1)")
+for _k in ("68", "69", "74"):
+    _e = D0927B.setdefault(_k, {})
+    _e.update(awg=20, spec="M22759/32")
+    _e["why"] = (_e["why"] + " | " + _UP20C) if _e.get("why") else _UP20C
 for _k, _v in D0927B.items():
     _d = DECISIONS.setdefault(_k, {})
     if "why" in _d and "why" in _v:
@@ -1243,7 +1299,8 @@ for _k, _v in D0927B.items():
 # decision that added them — the recalc engine and the app toggle on this field, so every wire needs one.
 SUBSYSTEM_RULES = [
     (r"^(11[4-9]|12[0-4]|DAK_CONST)$", "DASH_CLUSTER_DAKOTA", "Dakota VHX dual-sender wires (receipt 2026-05-14 acceptance)"),
-    (r"^(125|PCS_.*)$", "TRANS_6L80E", "6L90 + PCS TCM-2650 interface (receipt 2026-07-12; state 0j(b)); key keeps its 6L80E name"),
+    (r"^(IBST_.*|BFL_.*)$", "BRAKES_IBOOSTER", "iBooster CAN logging and brake-fluid level candidates (2026-09-28)"),
+    (r"^(125|PCS_.*|TRANS_.*)$", "TRANS_6L90", "6L90 + PCS TCM-2650 interface (receipt 2026-07-12; state 0j(b), §3 0a: the transmission is a 6L90)"),
     (r"^126$", "EPARKING_BRAKE", "E-Stopp dash trigger (receipt 2026-05-14 acceptance)"),
     (r"^8[56][ab]$", "LIGHTING_EXTERIOR", "high-beam floor dimmer legs (receipt 2026-05-14 high-beam)"),
     (r"^(ECU_PWR|ECU_GND[12]|APS_.*|ETH_.*|COIL\d+_.*|INJ\d+_PWR)$", "CORE_ENGINE",
@@ -1331,18 +1388,19 @@ IMPLIED_DECISIONS = {
     "VSS_PWR": {"awg": 20, "spec": "M22759/32", "why": "crosses the body bulkhead FIREWALL-BODY-C, a Deutsch DT04-6P-L012 ('Wire Range: 14-20 AWG', size 16, 13 A — web_snapshots/www.prowireusa.com__p-2900-dt-6-way-flanged-receptacle.md): 22 AWG is under its floor, so 20 AWG M22759/32 (round 3)"},
     "VSS_GND": {"awg": 20, "spec": "M22759/32", "why": "crosses the body bulkhead FIREWALL-BODY-C, a Deutsch DT04-6P-L012 ('Wire Range: 14-20 AWG', size 16, 13 A — web_snapshots/www.prowireusa.com__p-2900-dt-6-way-flanged-receptacle.md): 22 AWG is under its floor, so 20 AWG M22759/32 (round 3)"},
     "VSS_DAK": {"awg": 20, "spec": "M22759/32", "why": "crosses the body bulkhead FIREWALL-BODY-C, a Deutsch DT04-6P-L012 ('Wire Range: 14-20 AWG', size 16, 13 A — web_snapshots/www.prowireusa.com__p-2900-dt-6-way-flanged-receptacle.md): 22 AWG is under its floor, so 20 AWG M22759/32 (round 3)"},
+    "IBOOST_PERM": {"note": "source OPEN (isolator decision, research/2026-09-28_ibooster-gen2-wiring.md §4): A = Odyssey + post, battery side of the Blue Sea 7700, fused at the post; B = the distribution stud downstream of the isolator (as designed, the default until the owner/Dave call)"},
     "FAN_GND": {"note": "BUILD: route the fan feed apart from its ground and outside the loom from the breakout to the fan (free-air rating, ProWire singles table) | OPEN — needs: hot-soak air temperature at the fan motor, thermocouple, engine at operating temp after shutdown (bench/first start). Above 90 C, the close path is 10 AWG (50 A free air, ProWire singles table) with the fan plug's 12 ga terminal fed by a short 12 AWG tail"},
     # ---- 8: the PCS TCM-2650 as an endpoint (its harness plug waits on the ZGP drawing; the pins say so)
-    "PCS_BATT": {"to": "PCS-TCM (12 V battery)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.1 constant 12 V; endpoint PCS-TCM (book review 2026-09-28)"},
-    "PCS_IGN": {"to": "PCS-TCM (ignition)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.1 ignition; endpoint PCS-TCM"},
-    "PCS_TPS": {"to": "PCS-TCM (analog 1)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.13 + Table 4 (analog 1 may piggyback an ECU sensor); endpoint PCS-TCM"},
-    "PCS_RPM": {"to": "PCS-TCM (speed input 3, orange/black)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.12 speed input 3 = RPM, orange/black; endpoint PCS-TCM"},
-    "PCS_BRK": {"frm": "CHMSL (+ feed tap: 12 V while braking)", "to": "PCS-TCM (brake light input)",
+    "PCS_BATT": {"to": "PCS-HARNESS-4610 (12 V battery lead)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.1 constant 12 V; endpoint PCS-TCM (book review 2026-09-28)"},
+    "PCS_IGN": {"to": "PCS-HARNESS-4610 (ignition lead)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.1 ignition; endpoint PCS-TCM"},
+    "PCS_TPS": {"to": "PCS-HARNESS-4610 (analog 1 lead)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.13 + Table 4 (analog 1 may piggyback an ECU sensor); endpoint PCS-TCM"},
+    "PCS_RPM": {"to": "PCS-HARNESS-4610 (speed input 3 lead, orange/black)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.12 speed input 3 = RPM, orange/black; endpoint PCS-TCM"},
+    "PCS_BRK": {"frm": "CHMSL (+ feed tap: 12 V while braking)", "to": "PCS-HARNESS-4610 (brake light input lead)",
                  "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.18 'Brake Light' digital input (TCC unlock on brake). The factory brake switch now switches 0 V into "
                         "PDM30 DIG14 and no longer carries 12 V, so the brake-on 12 V comes from the brake lamp output (CHMSL feed); "
                         "input polarity OPEN until the ZGP drawing"},
-    "PCS_NS": {"frm": "PCS-TCM (PWM vs Lever Position output: neutral)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.19-20 ground-only outputs; endpoint PCS-TCM"},
-    "PCS_REV": {"frm": "PCS-TCM (PWM vs Lever Position output: reverse)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.19-20 ground-only outputs; endpoint PCS-TCM"},
+    "PCS_NS": {"frm": "PCS-HARNESS-4610 (lever-position output lead: neutral)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.19-20 ground-only outputs; endpoint PCS-TCM"},
+    "PCS_REV": {"frm": "PCS-HARNESS-4610 (lever-position output lead: reverse)", "why": "ZGP TCM-2650 setup guide rev2 (reference_documents/component_drawings/PCS_TCM-2650_ZGP_6speed_setup_configurable_tuning_rev2.pdf) p.19-20 ground-only outputs; endpoint PCS-TCM"},
     # ---- 4: the LTCD CAN pair on DTM size-20 sockets (20 AWG only)
     "CAN_LTCD_H": {"awg": 20, "spec": "M22759/32 twisted", "why": "DEUTSCH Contacts Catalog p.125 'Solid Contacts - Common Contact "
                    "System': size-20 socket 0462-201-20** takes 20 AWG (0.50 mm2) only; 22 AWG is under it. 20 AWG twisted still meets "
@@ -1601,6 +1659,9 @@ def routes(reg):
 # ---- round 3 (builder's second review): colours for every power/ground wire, and a current limit per PDM output
 COLOUR_RULE = ("state 0f(a): 'One color per size + printed labels (red/black at ECU/PDM power/ground)'; MIL colour digits 2 red / "
                "0 black (chapters/16 §1.7). Canon ch.16 has no power/ground colour rule of its own; this is the state's")
+SIGNAL_RULE = ("state 0f(a): 'One color per size + printed labels' — the cart carries white (-9) per size (M22759/32 22-9, 20-9, 18-9, "
+               "16-9, 14-9, 12-9); state 0i: Dave's white 22 AWG + colour-ring codes; chapters/18 step 2 one-colour prototype. VSS_DAK also "
+               "matches the SEN-01-5 white signal lead (Dakota VHX manual p.8)")
 CAN_COLOUR = "Dave's M130 sheet colours: yellow CAN-H, green CAN-L (the CAN_FW / UTC rows; receipts/2026-09-25_orders-staged-prowire-ksv-ict.md, 13:00 addendum)"
 ETH_COLOUR = {"ETH_TX+": "green/white", "ETH_TX-": "green", "ETH_RX+": "orange/white", "ETH_RX-": "orange"}   # m130_designations.txt B23-B26
 
@@ -1610,8 +1671,8 @@ def colours(rows):
         if w.get("retired"):
             continue
         new, why = None, None
-        if w["id"] in ("CAN_HI", "CAN_LO") and not w.get("color"):
-            new, why = ("yellow" if w["id"] == "CAN_HI" else "green"), CAN_COLOUR
+        if w["id"] in ("CAN_HI", "CAN_LO", "IBST_CAN_H", "IBST_CAN_L") and not w.get("color"):
+            new, why = ("yellow" if w["id"] in ("CAN_HI", "IBST_CAN_H") else "green"), CAN_COLOUR
         elif w["id"] in ETH_COLOUR and not w.get("color"):
             new, why = ETH_COLOUR[w["id"]], "m130_designations.txt B23-B26 (the M1 techspec colours printed on the M130 pinout)"
         elif not w.get("color") and isinstance(w.get("awg"), int):
@@ -1620,9 +1681,14 @@ def colours(rows):
                 pass                                  # a switch input to a PDM: a signal, not a power or ground wire
             elif re.search(r"GND|ground|negative|\(-\)|\bRET\b|\b0 ?V\b", txt, re.I) or re.search(r"^PDM(30|15):(A28|B22)\b", frm):
                 new, why = "black", COLOUR_RULE
-            elif re.search(r"^PDM(30|15):OUT|^SPL-PDM|^PS-STUDS|[Dd]istribution stud|ODYSSEY \(\+|ACC-BATT \(\+|DCDC \(OUT", frm) \
+            elif re.search(r"^PDM(30|15):OUT|^SPL-PDM|^PS-STUDS|^PDM30-STUD|[Dd]istribution stud|ODYSSEY \(\+|ACC-BATT \(\+|DCDC \(OUT", frm) \
                     or re.search(r"feed|\+12|power|battery|BPOS", txt, re.I):
                 new, why = "red", COLOUR_RULE
+        if not new and not w.get("color") and isinstance(w.get("awg"), int):
+            if w.get("pigtail_of"):
+                new, why = "red", COLOUR_RULE + " (a PDM output pigtail is a power feed)"
+            else:        # a signal, switch or motor line: the one-colour-per-size white stock (round 4: no colourless wire in a cavity)
+                new, why = "white", SIGNAL_RULE
         if new:
             w.setdefault("conflicts", []).append(f"decision: color None -> {new} — {why}")
             w["color"] = new
@@ -1631,7 +1697,7 @@ def colours(rows):
 P48 = {24: (4.5, 4), 22: (6, 5), 20: (8, 6), 18: (11, 9), 16: (15, 12), 14: (22, 18)}   # PDM manual p.48: A at 80 C / 100 C
 PW_BUNDLED = {12: 20, 10: 30, 8: 40}          # ProWire Tefzel chart, bundled in heat-shrink, 35 C rise
 PW_SINGLE_PAIR = {12: 38 * 0.85, 10: 50 * 0.85}   # ProWire singles table, 60 C difference, x 0.85 for two conductors (feed + ground)
-CONTACT_CAP = {("PDM15", 12): (7.5, "DTM size-20 socket 0462-005-20141, 7.5 A (DEUTSCH Contacts Catalog p.125)")}
+CONTACT_CAP = {("PDM15", 7): (7.5, "DTM size-20 socket 0462-005-20141, 7.5 A (DEUTSCH Contacts Catalog p.125)")}
 FAN_OPTIONS = ("fan analysis (round 3): the rule needs 16 A per output on OUT1+OUT6 and the 18 AWG pigtails allow 15 A (0.85 x 18 A at 100 C). "
                "(a) 16 AWG pigtails, two splices of 2 x 16 = 5,160 CM -> a 12 AWG leg each (fits M81824/1-3), then the two 12 AWG legs "
                "(13,060 CM) must join: the 3137CT yellow cavity is 16-12 AWG (6,530 CM max), ProWire's MiniSeal band calls yellow 12-10 "
@@ -1647,8 +1713,7 @@ PDM_LOADS = {   # (box, output): (running current A or None, source or what clos
     ("PDM15", 5): (5.1, "QFS P367 (HFP-367) web_snapshots/www.highflowfuel.com__fuel-pump-oem-replacement-hfp-367-qfs.md: 'Flow: 145LPH, Draws 5.1 Amps @ 60psi'"),
     ("PDM15", 9): (0.025, "Holley 197-400 pigtail, 560 ohm in line (holley_midmount_fitment.pdf p.15): 14 V / 560 ohm"),
     ("PDM15", 11): (None, "needs the Sanden SD7B10 clutch coil current (Sanden spec)"),
-    ("PDM15", 12): (6.1, "LTC manual p.31 + p.37: over 6.1 A cold for two sensors (a lower bound)"),
-    ("PDM15", 13): (None, "needs the PCS TCM-2650 ignition current (ZGP harness drawing / guide)"),
+    ("PDM15", 7): (6.1, "LTC manual p.31 + p.37: over 6.1 A cold for two sensors (a lower bound)"),
     ("PDM30", 1): (11.0, "CANDIDATE Nu-Relics 17383-1 ACI motor, 11 A high load (20 A stall); the base factory motor is absent"),
     ("PDM30", 2): (None, "needs the 4 Seasons 35587 blower current on HIGH (no published rating: measure)"),
     ("PDM30", 3): (11.0, "Nu-Relics 17383-2 ACI motor 11 A high load, 20 A stall (web_snapshots/www.nu-relics.com__17383-2.md); the master can also run the passenger motor (22 A) — OPEN"),
@@ -1660,27 +1725,23 @@ PDM_LOADS = {   # (box, output): (running current A or None, source or what clos
     ("PDM30", 9): (None, "needs the iBooster pin 20 current (Bosch; the OEM 5 A fuse is not the draw)"),
     ("PDM30", 10): (None, "needs the E-Stopp F (safety-to-ignition) current"),
     ("PDM30", 11): (None, "needs the RetroSound memory (constant) current"),
-    ("PDM30", 12): (None, "needs the factory 2-speed wiper motor current (1977 LTSM)"),
-    ("PDM30", 13): (None, "needs the tail/park lamp currents (1157 low filaments, 1977 LTSM p.838 gives candlepower only)"),
+    ("PDM30", 12): (5.0, "1977 Light Truck Service Manual p.812 wiper trouble chart: 'Current Draw Normal (3.5 — 5.0 amps.)' (the upper figure; a bench reading, wiper detached: the on-truck draw with linkage and wet glass is a clamp-meter measurement at mock-up). p.810: 'Ammeter Reading — 20+ Amps ... will stall wiper' is the stall current: over the 8 A output, so a jammed blade trips OUT12 through the filtered over-current (PDM manual p.23-24: inrush is ridden through, a sustained overload shuts down), backed by the motor's internal circuit breaker (p.802). The limit also protects WIPER_T1, WIPER_T3 and WIPER_SW_GND: every ampere enters at the center terminal (p.803)"),
+    ("PDM30", 13): (2.36, "4 x 1157 dim filament 0.59 A (2 tail + 2 front park; 1977 Light Truck Service Manual p.838 lamp bulb data (trade numbers); 1157 2.1 A (bright) / 0.59 A (dim) (web_snapshots/www.autolumination.com__visual_bulb_finder.md)); the Dakota DIM (+) is a sense input, not counted"),
     ("PDM30", 14): (None, "needs the horn current"),
-    ("PDM30", 15): (None, "needs the reverse group currents (RVS camera, 1156 backup lamps)"),
-    ("PDM30", 16): (None, "needs the 1157 stop/turn filament current"),
-    ("PDM30", 17): (None, "needs the Truck-Lite 27270C current (the saved vendor pages carry none)"),
-    ("PDM30", 18): (None, "needs the Truck-Lite 27270C current (the saved vendor pages carry none)"),
-    ("PDM30", 19): (None, "needs the marker/clearance/license lamp currents (LMC LED bulbs, 168/67)"),
+    ("PDM30", 15): (None, "needs the RVS camera current (not on its page); the 2 x 1156 backup lamps are 4.2 A (1156 2.1 A (web_snapshots/www.autolumination.com__visual_bulb_finder.md))"),
+    ("PDM30", 16): (2.1, "1157 bright filament (1977 Light Truck Service Manual p.838 lamp bulb data (trade numbers); 1157 2.1 A (bright) / 0.59 A (dim) (web_snapshots/www.autolumination.com__visual_bulb_finder.md))"),
+    ("PDM30", 17): (2.95, "Truck-Lite 27270C 1.45-2.95 A, 12-24 V (web_snapshots/www.truck-lite.com__LEDHeadlightBrochure_1.md): 2.95 A at 12 V per lamp; OUT17 and OUT18 are paralleled at the dimmer common (receipt 2026-05-14), one lamp's share each"),
+    ("PDM30", 18): (2.95, "Truck-Lite 27270C 2.95 A at 12 V (web_snapshots/www.truck-lite.com__LEDHeadlightBrochure_1.md); paralleled with OUT17 at the dimmer common"),
+    ("PDM30", 19): (2.8, "4 x 168 side markers 0.35 A + 3 roof markers at the 194 figure 0.27 A (the LMC 36-0368 LED bulb replaces a 194; the incandescent value is the upper bound) + 67 license 0.59 A (1977 Light Truck Service Manual p.838 lamp bulb data (trade numbers); 168 0.35 A (web_snapshots/normanlamps.com__168.md); 194 0.27 A (web_snapshots/www.autolumination.com__visual_bulb_finder.md); 67 0.59 A (web_snapshots/normanlamps.com__67.md))"),
     ("PDM30", 20): (None, "needs the RetroSound ignition current"),
-    ("PDM30", 21): (9.0, "AutoLoc AUTZT2000 'Current absorption :: 4.5amps' x 2 actuators on one bus (web_snapshots/shop.autoloc.com__...md). "
-                         "PL (candidate) capacity conflict: 16 AWG is 15 A at 80 C (PDM manual p.48), 0.85 x 15 = 12.75 A, but OUT21 is an 8 A "
-                         "output whose setting stops at 10 A (p.24). A 20 A output with 14 AWG (22 A at 80 C, "
-                         "p.48) would carry 12 A, but the base build's free 20 A outputs are OUT3 and OUT4 and both belong to PW (candidate): "
-                         "PL can't take one without dropping PW"),
-    ("PDM30", 22): (None, "needs the 1157 stop/turn filament current"),
+    ("PDM30", 21): (None, "needs the PCS TCM-2650 ignition current (ZGP harness drawing / guide; the kit may also feed case 9/12 from this lead). PL (candidate) conflict: the locks (AutoLoc AUTZT2000 4.5 A x 2 on one bus) held OUT21 before the PCS moved into the cab; PL needs another output"),
+    ("PDM30", 22): (2.1, "1157 bright filament (1977 Light Truck Service Manual p.838 lamp bulb data (trade numbers); 1157 2.1 A (bright) / 0.59 A (dim) (web_snapshots/www.autolumination.com__visual_bulb_finder.md))"),
     ("PDM30", 23): (None, "needs the RVS mirror display current (rearviewsafety.com gives none)"),
     ("PDM30", 24): (None, "needs the M130 supply current (no consumption figure in the M1 techspec on file)"),
-    ("PDM30", 25): (None, "needs the dome lamp current (Lumitec 101241 0.36 A x 2 and Truck-Lite 80251C 2 A are cited; the dome and underhood 93 are not)"),
-    ("PDM30", 26): (None, "needs the washer pump current (USA1 20151)"),
-    ("PDM30", 27): (None, "needs the 1157 turn filament current"),
-    ("PDM30", 28): (None, "needs the 1157 turn filament current"),
+    ("PDM30", 25): (4.73, "dome 211-2 0.97 A + underhood 93 1.04 A (1977 Light Truck Service Manual p.838 lamp bulb data (trade numbers); 211-2 0.97 A (web_snapshots/www.autolumination.com__visual_bulb_finder.md); 93 1.04 A (web_snapshots/lightingsupply.com__standard-93.md)) + Lumitec 101241 0.36 A x 2 + Truck-Lite 80251C 2 A (vendor pages)"),
+    ("PDM30", 26): (None, "needs the Hella 8TW 004 223-031 pump current: Hella's product information (web_snapshots/www.hella.com__BI_Washer-pumps-and-water-tanks_2026.md) gives 12 V, 2 bar, 1 l/min and the plug, not the current: bench it"),
+    ("PDM30", 27): (2.1, "1157 bright filament front turn (1977 Light Truck Service Manual p.838 lamp bulb data (trade numbers); 1157 2.1 A (bright) / 0.59 A (dim) (web_snapshots/www.autolumination.com__visual_bulb_finder.md)); the Dakota turn input is a sense input"),
+    ("PDM30", 28): (2.1, "1157 bright filament front turn (1977 Light Truck Service Manual p.838 lamp bulb data (trade numbers); 1157 2.1 A (bright) / 0.59 A (dim) (web_snapshots/www.autolumination.com__visual_bulb_finder.md)); the Dakota turn input is a sense input"),
     ("PDM30", 29): (None, "needs the Dakota VHX and GSS-3000 currents (manuals give none)"),
     ("PDM30", 30): (None, "needs the Blue Sea 1045 input current (4.8 A out at 5 V; input not published)"),
 }
@@ -1721,10 +1782,12 @@ def pdm_settings(reg):
             status = ("set" if need <= top else f"CONFLICT: needs {need} A per output, the thinnest conductor allows "
                       f"{top} A (0.85 x {round(cap, 1)} A, PDM manual p.48 / ProWire tables) — a heavier wire or pigtail closes it")
             if (box, n) in CONTACT_CAP and need > CONTACT_CAP[(box, n)][0]:
-                status = f"CONFLICT: needs {need} A; the wire allows {top} A but the contact is rated {CONTACT_CAP[(box, n)][0]} A ({CONTACT_CAP[(box, n)][1]})"
+                cc = int(CONTACT_CAP[(box, n)][0])      # the contact rating caps the limit (whole amps under it)
+                status, need = "set", cc
+                src = src + f"; limit {cc} A = under the {CONTACT_CAP[(box, n)][0]} A contact ({CONTACT_CAP[(box, n)][1]}), the 125 % rule's value yields to it; OPEN: the LTCD cold-start current, measured on the bench with both heaters cold"
             if (box, n) == ("PDM15", 1):
                 status, need = "set", 16          # the fan junction closes it: the arithmetic is on FAN_LEG1/2 and #21
-            if (box, n) == ("PDM15", 12) and status != "set":
+            if (box, n) == ("PDM15", 7) and status != "set":
                 status += (" — MoTeC names no fuse or supply rating for the LTC/LTCD (LTC manual p.31: 110 mA plus the heater, "
                            "0.5-1 A typical, up to 2 A on startup; p.37: 'Each sensor can draw over 3 Amps when cold'); the saved "
                            "'motec_ltcd_datasheet.pdf' is a web page, not a datasheet. Close: measure the LTCD cold-start current on the "
@@ -1737,6 +1800,26 @@ def pdm_settings(reg):
                                                        else row["status"])
     reg["pdm_settings"] = rows
 
+
+
+INLINE_FUSES = {   # every inline fuse gets a protection record (standards review, round 4): value + source; holder and fuse part
+    "DAK_CONST": ("3 A inline fuse at the PDM30 stud", "DAKOTA_VHX_ARCHITECTURE.md §2 'CONST. POWER gap'; VHX manual p.6"),
+    "PCS_BATT": ("5 A inline fuse at the PDM30 battery stud", "receipts/2026-07-12_6l80e-can-master-ruling.md F3 (PCS TCM-2650 constant 12 V, 5 A)"),
+    "IBOOST_PERM": ("5 A inline fuse at the distribution stud", "fastandquiet Gen-1 pinout: pin 17 'Always Hot Power (5A Fuse)'; Tulay Gen-1 harness 1.50 mm² red, 5 A fuse"),
+    "TRANS_BATT": ("7.5 A mini/ATO inline fuse at the PDM30 battery stud", "Holley 558-499 p.3: 'a constant battery source capable of supplying 5 amps'; 1.25 x 5 A = 6.25 A -> 7.5 A, under 18 AWG's 9 A at 100 C (MoTeC PDM manual p.48)"),
+    "ISO_PWR": ("10 A inline fuse at the Odyssey +", "Blue Sea 7700 instructions 990180170-006 p.2: 'through a 10A (min) circuit protection device'"),
+    "ISO_SW_PWR": ("5 A inline fuse at the Odyssey +", "Blue Sea 7700 instructions p.2: pin 2 'through a 2A (min) circuit protection device'; 5 A under the 16 AWG rating"),
+    "3": ("AMP Research kit harness fuse (supplied)", "AMP Research IM75146 step 8: red lead to battery +, fused in the kit harness"),
+}
+
+
+def inline_fuses(rows):
+    for w in rows:
+        f = INLINE_FUSES.get(str(w["id"]))
+        if f:
+            w["protection"] = (f"{f[0]} ({f[1]}). Holder and fuse part: " + ("in the kit" if w["id"] == "3" else
+                               "OPEN — no inline holder is picked (a sealed ATO/ATC in-line holder sized to the wire; pick with the "
+                               "battery terminals)"))
 
 # endpoint fields the kit build does not carry, copied from the catalog into the registry (review A10: CAN topology as data)
 ENDPOINT_EXTRA = ("topology", "cavities", "empty")
@@ -1851,6 +1934,13 @@ def main():
         w["length_kind"] = length_kind(w)
         if isinstance(w.get("awg"), int):          # one printed gauge per cable, parallel conductors included
             w["gauge"] = (f"{w['parallel']} x {w['awg']} AWG" if (w.get("parallel") or 1) > 1 else f"{w['awg']} AWG")
+        else:                                      # round 4: no wire prints '?' — a kit lead or a cable says what it is
+            sp = str(w.get("spec") or "")
+            w["gauge"] = ("kit lead, gauge per kit (AMP Research IM75146 names none)" if sp == "kit harness" else
+                          "kit coax, RCA video (Rear View Safety kit cable)" if "coax" in sp else
+                          "shielded RCA cable (audio line level)" if "RCA" in sp else
+                          "Dakota GSS-3000 supplied 10 ft sensor cable (the manual names no gauge)" if w["id"].startswith("GSS_SENS") else
+                          sp or "OPEN: gauge not recorded")
 
     reg = OrderedDict(
         meta=OrderedDict(
@@ -1878,18 +1968,27 @@ def main():
                                     "which reads as wire #51, the 12 AWG blower feed (standards review, round 3)")}
     routes(reg)
     colours(list(reg["wires"]) + list(reg["implied"]))
+    M27500_COL = ("M27500 'preferred method' colour coding (no colour-code letter in M27500-22TG2T14 or 22ML2T08): 'Colors are stripes "
+                  "on white insulation (wire #1 has no stripe)', Table A-1 wire 1 White, wire 2 Blue — WireMasters M27500 anatomy guide "
+                  "(web_snapshots/www.wiremasters.com__m27500-anatomy-guide.md); 22TG2T14 'Color Code: STRIPES' (web_snapshots/"
+                  "www.wiremasters.com__m27500-22tg2t14.md). Holds for either cable state 0f(b) names")
     for w in list(reg["wires"]) + list(reg["implied"]):
         if "M27500" in str(w.get("spec")) and not w.get("retired"):
+            new = "white/blue" if str(w["id"]).lower().endswith("g") else "white"
+            w.setdefault("conflicts", []).append(f"decision: color {w.get('color')} -> {new} (conductor {'2' if new != 'white' else '1'}) — {M27500_COL}")
+            w["color"] = new
+            continue
             w["color_open"] = ("OPEN: conductor colours come from the M27500 cable picked, and none is — ProWire stocks only "
                                "M27500-xxML (e.g. 22ML2T08), Tefzel M27500-22TG2T14 is not sold there (state 0f(b), owner pick); "
                                "close with the picked cable's MIL-DTL-27500 conductor colour code (spec table not on file)")
+    inline_fuses(list(reg["wires"]) + list(reg["implied"]))
     pdm_settings(reg)
     cat = kits_v5._y("endpoints.yaml")
     for eid, ep in reg["endpoints"].items():
         for k in ENDPOINT_EXTRA:
             if k in (cat.get(eid) or {}) and not ep.get(k if k != "cavities" else "cavity_count"):
                 ep[k if k != "cavities" else "cavity_count"] = cat[eid][k]
-    reg["splices"].append({"at": "SPL-FUEL-SND", "id": "SPL-FUEL-SND-1", "wires": ["98", "117", "FUEL_SND_LEAD"], "splice": "M81824/1-2",
+    reg["splices"].append({"at": "SPL-FUEL-SND", "wires": ["98", "117", "FUEL_SND_LEAD"], "splice": "M81824/1-2",
                            "type": "in-line", "sides": [["98", "117"], ["FUEL_SND_LEAD"]], "equiv_awg": [16, 20]})
     for w in pigtails:                      # the in-line pigtail joins, beside the ECU pin splices (review A1)
         spl = str(w["to"]).split(" ")[0]

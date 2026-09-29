@@ -234,7 +234,7 @@
     "firewall",
     "dash"
    ],
-   "cross_dependency": "Brake Light Switch (#53, ECU digital input) also feeds LIGHTING_EXTERIOR brake lamps and TRANS_6L80E torque-converter unlock \u2014 keep #53 if either of those is on, even with iBooster off."
+   "cross_dependency": "Brake Light Switch (#53, ECU digital input) also feeds LIGHTING_EXTERIOR brake lamps and TRANS_6L90 torque-converter unlock \u2014 keep #53 if either of those is on, even with iBooster off."
   },
   "EPARKING_BRAKE": {
    "toggleable": true,
@@ -261,7 +261,7 @@
     "E-Stopp Dash Switch and Actuator legs have no own cut-list IDs \u2014 only the #54 controller feed exists"
    ]
   },
-  "TRANS_6L80E": {
+  "TRANS_6L90": {
    "toggleable": true,
    "swap_axis": "trans_type (manual swap drops controller #58 + NSS; reverse switch + t-case indicator survive any swap)",
    "devices": [
