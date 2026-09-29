@@ -431,3 +431,21 @@ not judge cab-to-chassis wires at all.
 - **C. SPL-PDM15-OUT13** is now one TE PIDG 327583 step-down splice, 22-18 AWG to 16-14 AWG, joining the 20 AWG pin lead to the 14 AWG run. No MiniSeal barrel covers both gauges.
 - **D. OUT21 now says which limit binds.** 16 AWG on the 80 °C column is 15 A, so the wire allows 12 A, which covers the 12 A need. The binding limit is the 8 A output, whose setting stops at 10 A (PDM manual p.24). A 20 A output closes it; the PL/PW trade stands. pdm_settings now separates the wire limit from the output rating in its CONFLICT text.
 - **Text fixes:** the kit is named "TCM-4610". PCS_BATT's printed value is "5 A PROVISIONAL inline fuse", on both the feed and its line pigtail.
+
+## Round 12: lead round 7 cleanup (2026-09-28)
+1. **S-24 (SPL-PDM30-OUT5) is one MiniSeal stub splice, D-609-05.** All five conductors go in one barrel: 3 × 20 + 2 × 22 AWG = 4,340 CM, inside the yellow 16-12 band of 2,580-6,530 CM (ProWire 3137CT / Raychem D-609). This supersedes round 11's in-line M81824/1-2.
+   - A kitted non-rail splice now prints its kit part, D-609-xx or M81824/1-x. Only the RAIL-* endpoints print "rail splice (in the kit)".
+2. **OUT21 status text now leads with the binding limit:** "CONFLICT: needs 12 A; an 8 A output's setting cap is 10 A (PDM manual p.24); a 20 A output would close it". The wire note follows.
+3. **OUT5's printed source now opens with all three loads:** "#93 CHMSL ORACLE 4514-003 0.5 A + PCS_BRK and TRANS_BRK brake-signal inputs, mA — OPEN". Loads = [93, PCS_BRK, TRANS_BRK].
+4. **"factory circuit 51" now lives only in the BAT termination's factory_circuit field.**
+   - The BLOWER_BAT wire label dropped "(factory circuit 51)".
+   - The BLOWER-RES pins are the bare terminal names BAT/M1/M2/BLO.
+   - The circuit numbers moved to a factory_circuits map, which kits_v5 reads.
+5. **Head ground stud:** there is no stud size in the documents on file. library_search found no matches for "ground stud" / "head ground". The LS3 EROD guide says only "Attach the harness ground eyelets (3 total) to the engine block". COIL-GROUND-RINGS stays OPEN: "read the head's ground boss thread at the bench".
+6. **RING-SMALL is gone from the terminations and the BOM.** Every remaining ring is OPEN with its reason:
+   - COIL-GROUND-RINGS: head ground boss thread (bench).
+   - STARTER-S: read the S stud (bench).
+   - GND-SPLICE-REAR: the stud bus is not picked.
+   - STEP_GND: the 3/8 in star is known, but the kit lead's gauge is not.
+   No end has a known stud and a known gauge without a ring.
+7. **The amp posts already carry their lugs on the termination rows:** AMP-BLOCK #32 and AMP_GND on 238LTP; AMP_PWR_TAIL and AMP_GND_TAIL on DL438.

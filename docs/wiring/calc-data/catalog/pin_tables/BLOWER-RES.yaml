@@ -1,10 +1,15 @@
 BLOWER-RES:
   family: gm_blade
+  factory_circuits:
+    BLOWER_BAT: 'factory circuit 51; low: BATT-R1-R2-R3'
+    BLOWER_MED: 'factory circuit 63; M1-R2-R3-blower'
+    BLOWER_M2: 'factory circuit 72; M2-R3-blower'
+    BLOWER_MOT: 'factory circuit 101; output, factory: to the blower relay'
   pins:
-    BLOWER_BAT: 'BAT (factory circuit 51; low: BATT-R1-R2-R3)'
-    BLOWER_MED: 'M1 (factory circuit 63; M1-R2-R3-blower)'
-    BLOWER_M2: 'M2 (factory circuit 72; M2-R3-blower)'
-    BLOWER_MOT: 'BLO (factory circuit 101; output, factory: to the blower relay)'
+    BLOWER_BAT: BAT
+    BLOWER_MED: M1
+    BLOWER_M2: M2
+    BLOWER_MOT: BLO
   note: 'maker''s document: factory A/C blower resistor on the evaporator case: FOUR terminals (BAT / M1 / M2 / BLO), 1978 C60 factory circuits 51 / 63 / 72 / 101 (circuit numbers, not cavity names) ·
     family gm_blade: the 1978 booklet draws GM factory blade connectors here (4-cavity resistor plug 51/72/63/101, 1978 booklet p.16 sheet A-4 ''Air Conditioning
     RPO C-60''); the Packard 56-series identity is the family''s (families.yaml), not printed on the drawing'

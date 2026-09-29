@@ -421,7 +421,9 @@ def attach(reg):
             # a named ground stud (G-*) takes one ring per wire, stacked; other ring endpoints keep their shared rings
             lug = ep.get("lugs") or {}          # a named ring for a wire (round 3: FAN_GND 12 AWG on ProWire 9918)
             stud = ep.get("stud")               # round 4: the ring follows the stud and the gauge
-            ring = lambda w: (ring_pn(wires[w].get("awg"), stud) if stud else None) or "RING-SMALL"
+            ring = lambda w: ((ring_pn(wires[w].get("awg"), stud) if stud else None) or
+                              (f"OPEN: ring for the {stud} in stud, wire gauge unknown ({wires[w].get('gauge') or 'no gauge'})" if stud
+                               else (ep.get("stud_open") or "OPEN: ring — stud size unknown")))
             per_end = [{"wires": [w], "part": " + ".join(lug[w]) if isinstance(lug.get(w), list) else (lug.get(w) or ring(w)),
                         "cavity": f"ring {i}" if eid.startswith(("G-", "GND-")) else "ring"} for i, w in enumerate(wl, 1)]
         elif fid in ("kit_terminal", "te_amp_plug"):
@@ -453,7 +455,9 @@ def attach(reg):
                 groups.setdefault(cav_of.get(w) or f"_{w}", []).append(w)
             per_end = []
             for i, (cv, ws) in enumerate(groups.items(), 1):
-                code = "rail splice (in the kit)" if rail else _splice(_equiv(ws))
+                kit_spl = next((k for k in (ep.get("kit") or {}) if str(k).startswith(("D-609", "M81824"))), None)
+                code = (kit_spl if (rail and kit_spl and not eid.startswith("RAIL-")) else   # round 7: a kitted splice prints its part
+                        "rail splice (in the kit)" if rail else _splice(_equiv(ws)))
                 if not rail and not code.startswith("D-609 ("):
                     need[code] += 1
                 for w in ws:
@@ -484,6 +488,7 @@ def attach(reg):
                 m_ = re.search(r"\s*\(([^()]*\b(?:factory|circuit \d)[^()]*)\)", str(cv_ or ""))
                 if m_:
                     fac_, cv_ = m_.group(1).strip(), (str(cv_)[:m_.start()] + str(cv_)[m_.end():]).strip()
+                fac_ = (ep.get("factory_circuits") or {}).get(w) or fac_    # round 7: the number lives only in factory_circuit
                 terms.append(OrderedDict(wire=w, endpoint=eid, where=ep.get("where"), cavity=cv_, factory_circuit=fac_,
                                          part=pe["part"], family=fid,
                                          doubled=(w in doubled) or None))
