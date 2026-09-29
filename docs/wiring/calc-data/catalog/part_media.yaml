@@ -1,0 +1,3004 @@
+# K5 harness — PART MEDIA: a photo, drawing and 3D model link for every piece (curated; PIECES lane, 2026-09-29)
+#
+# One entry per parts.yaml code (entry: part) and per registry endpoint (entry: device). URLs only: no image, PDF or CAD
+# file is committed (public repo; the makers' and vendors' terms apply to their files).
+#
+#   what        plain name of the physical piece
+#   maker       who makes it (the vendor in brackets when the photo is a vendor's)
+#   maker_pn    the maker's part number, exact ("unknown" when the registry does not name one)
+#   photo       {url, page, fetched}: a direct image of that part number, the page it came from, the date it was fetched
+#   drawing     {url, page}: maker drawing or datasheet
+#   cad         {url, format, license_note}: 3D model that downloads without an account
+#   datasheet / instructions   extra maker PDFs where both a drawing and a datasheet exist
+#   mates_with  codes it plugs into or onto (part codes, or endpoint ids for a device)
+#   piece       for an endpoint whose physical piece is a catalogued part: that part's code (same media)
+#   confidence  exact_pn: the image is of this part number (its file name, label or the maker's page for it)
+#               same_family_photo: a sibling, a candidate replacement, or an unlabelled family image — the note says which
+#               unknown: no photo that can be defended
+#   note        one line on the source or on what the photo is not
+#
+# Hosts that answer scripted requests with 403 but open in a browser: te.com (images, DocumentDelivery drawings and
+# models), odysseybattery.com. Every other photo URL here answered 200/206 to a plain request on 2026-09-29, or was read
+# off a page fetched that day. See PART_MEDIA_REPORT.md for counts and gaps.
+
+# ====================================================================== PARTS (parts.yaml keys, parts.yaml order)
+M800-KIT-N:
+  entry: part
+  what: "ProWire M800 plug kit: TE Superseal 1.0 34-way + 26-way Key 1 housings with 65 SSC-N solid contacts"
+  maker: ProWire USA (kit of TE Superseal 1.0 housings)
+  maker_pn: M800-KIT-N
+  photo: {url: "https://www.prowireusa.com/content/58361/M800-KIT-N_.webp", page: "https://www.prowireusa.com/M800-KIT-N", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=2-1437285-3&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=4-1437290-0", page: "https://www.te.com/en/product-4-1437290-0.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_4-1437290-0&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=4-1437290-0", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use; this is the 34-way housing 4-1437290-0 (26-way 3-1437290-7: https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_3-1437290-7&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=3-1437290-7)"}
+  mates_with: [M130-A, M130-B, PDM30-A, PDM30-B, PDM15-A, PDM15-B, SSC-N, SSB-34BS-PA66, SSB-26BS-PA66, "4-1437284-3"]
+  confidence: exact_pn
+  note: "the housings are TE Superseal 1.0 Key 1: 34-way 4-1437290-0 and 26-way 3-1437290-7 (te.com: 34/26 positions, keying code 1, housing for female terminals); drawing 2-1437285-3 covers both; MoTeC sells the same pair as #65044/#65045"
+SSC-N:
+  entry: part
+  what: "ProWire SuperSealSystem solid contact for TE Superseal 1.0 housings, nickel, 16-24 AWG"
+  maker: ProWire USA
+  maker_pn: SSC-N
+  photo: {url: "https://www.prowireusa.com/content/58337/SSC-N.webp", page: "https://www.prowireusa.com/SSC-N", fetched: "2026-09-28"}
+  mates_with: [M800-KIT-N, "4-1437284-3"]
+  confidence: exact_pn
+  note: "ProWire's own patent-pending contact (crimps with any size-20 DTM/MIL tool); not a TE part number"
+"4-1437284-3":
+  entry: part
+  what: TE Superseal 1.0 cavity sealing plug (natural)
+  maker: TE Connectivity (AMP)
+  maker_pn: "4-1437284-3"
+  photo: {url: "https://www.prowireusa.com/content/58996/4-1437284-3.webp", page: "https://www.prowireusa.com/p-3096-super-seal-10-sealing-plug.html", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=4-1437284-3&DocType=Customer%20Drawing&DocLang=Japanese&DocFormat=pdf&PartCntxt=4-1437284-3", page: "https://www.te.com/en/product-4-1437284-3.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_4-1437284-3&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=4-1437284-3", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [M800-KIT-N]
+  confidence: exact_pn
+  note: "TE's customer drawing for this part is in Japanese only; ProWire's page credits Aptiv (Delphi) by mistake — it is a TE part"
+SSB-34BS-PA66:
+  entry: part
+  what: ProWire SuperSealSystem 34-way Superseal 1.0 thermoplastic backshell
+  maker: ProWire USA
+  maker_pn: SSB-34BS-PA66
+  photo: {url: "https://www.prowireusa.com/content/58572/SSB-34BS-PA66.webp", page: "https://www.prowireusa.com/34-WAY-SUPERSEAL-BACKSHELL", fetched: "2026-09-28"}
+  mates_with: [M800-KIT-N]
+  confidence: exact_pn
+  note: "designed for ProWire's SSB rubber boots; Raychem boots need the billet backshell"
+SSB-26BS-PA66:
+  entry: part
+  what: ProWire SuperSealSystem 26-way Superseal 1.0 thermoplastic backshell
+  maker: ProWire USA
+  maker_pn: SSB-26BS-PA66
+  photo: {url: "https://www.prowireusa.com/content/58575/SSB-26BS-PA66.webp", page: "https://www.prowireusa.com/26-WAY-SUPERSEAL-BACKSHELL", fetched: "2026-09-28"}
+  mates_with: [M800-KIT-N]
+  confidence: exact_pn
+  note: "designed for ProWire's SSB rubber boots; Raychem boots need the billet backshell"
+D38999/24WJ61SN:
+  entry: part
+  what: "MIL-DTL-38999 Series III jam-nut receptacle, shell 25, insert 61 x #20, sockets"
+  maker: Amphenol Aerospace (to MIL-DTL-38999)
+  maker_pn: D38999/24WJ61SN
+  photo: {url: "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/003/222/406/D3899924WJ61SN_sml(200x200).jpg", page: "https://www.digikey.com/en/products/result?keywords=D38999%2F24WJ61SN", fetched: "2026-09-28"}
+  mates_with: [D38999/26WJ61PN, M39029/56-351, M85049/69-25N]
+  confidence: exact_pn
+  note: DigiKey product photo (bought on eBay)
+D38999/26WJ61PN:
+  entry: part
+  what: "MIL-DTL-38999 Series III straight plug, shell 25, insert 61 x #20, pins"
+  maker: Amphenol Aerospace (to MIL-DTL-38999)
+  maker_pn: D38999/26WJ61PN
+  photo: {url: "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/030/806/680/D3899926WJ61PN_sml.jpg", page: "https://www.digikey.com/en/products/result?keywords=D38999%2F26WJ61PN", fetched: "2026-09-28"}
+  mates_with: [D38999/24WJ61SN, M39029/58-363, M85049/69-25N]
+  confidence: exact_pn
+  note: DigiKey product photo (bought on eBay)
+M39029/56-351:
+  entry: part
+  what: "MIL-DTL-38999 size 20 socket contact, crimp, 20-24 AWG (cabin-side receptacle)"
+  maker: Amphenol Aerospace (to M39029/56)
+  maker_pn: M39029/56-351
+  photo: {url: "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/100/961/300/1208_M39029%5E56-351_sml.jpg", page: "https://www.digikey.com/en/products/detail/amphenol-aerospace-operations/M39029-56-351/2172799", fetched: "2026-09-28"}
+  mates_with: [D38999/24WJ61SN, M39029/58-363]
+  confidence: exact_pn
+  note: DigiKey product photo
+M39029/58-363:
+  entry: part
+  what: "MIL-DTL-38999 size 20 pin contact, crimp, 20-24 AWG (engine-side plug)"
+  maker: Amphenol Aerospace (to M39029/58)
+  maker_pn: M39029/58-363
+  photo: {url: "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/100/957/750/1208_M39029%5E58-363_sml%28200x200%29.jpg", page: "https://www.digikey.com/en/products/detail/amphenol-aerospace-operations/M39029-58-363/2172809", fetched: "2026-09-28"}
+  mates_with: [D38999/26WJ61PN, M39029/56-351]
+  confidence: exact_pn
+  note: DigiKey product photo
+MS27488-20-2:
+  entry: part
+  what: "MIL sealing plug for size-20 contact cavities, type 2"
+  maker: to MIL spec MS27488 (sold by ProWire)
+  maker_pn: MS27488-20-2
+  photo: {url: "https://www.prowireusa.com/content/59290/MS27488-20-2.webp", page: "https://www.prowireusa.com/p-3511-size-20-mil-spec-sealing-plug-type-2.html", fetched: "2026-09-28"}
+  mates_with: [D38999/24WJ61SN, D38999/26WJ61PN]
+  confidence: exact_pn
+M85049/69-25N:
+  entry: part
+  what: "MIL M85049/69 accessory adapter, shell 25 (heat-shrink boot seat)"
+  maker: Amphenol PCD
+  maker_pn: M85049/69-25N
+  photo: {url: "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/100/936/020/M8504969-25N_sml.jpg", page: "https://www.digikey.com/en/products/detail/amphenol-pcd/M85049-69-25N/5623517", fetched: "2026-09-28"}
+  drawing: {url: "https://www.amphenolpcd.com/wp-content/uploads/2024/03/M85049_69-Shrink-Boot.pdf", page: "https://www.amphenolpcd.com/"}
+  mates_with: [D38999/24WJ61SN, D38999/26WJ61PN, "202K163-25-0"]
+  confidence: exact_pn
+  note: DigiKey product photo
+"202K163-25-0":
+  entry: part
+  what: "Raychem 202K163 straight lipped heat-shrink boot, size 25 (43 mm unshrunk)"
+  maker: TE Connectivity (Raychem)
+  maker_pn: "202K163-25-0"
+  photo: {url: "https://www.prowireusa.com/content/58610/202K163-25-0.webp", page: "https://www.prowireusa.com/Raychem-202K163-25-0", fetched: "2026-09-28"}
+  mates_with: [M85049/69-25N]
+  confidence: exact_pn
+ADHESIVES-KIT:
+  entry: part
+  what: Resin Technology RT125 epoxy with dispenser and 10 mixers (boot-to-adapter bond)
+  maker: Resin Technology (kit sold by ProWire)
+  maker_pn: ADHESIVES-KIT
+  photo: {url: "https://www.prowireusa.com/content/57327/ADHESIVES_KIT.webp", page: "https://www.prowireusa.com/p-2360-epoxy-dispenser-10-pc-mixer-kit.html", fetched: "2026-09-28"}
+  mates_with: ["202K163-25-0", M85049/69-25N]
+  confidence: exact_pn
+"68212":
+  entry: part
+  what: "GM LS2/LS7 6-way DBW throttle-body connector kit (housing, 6 terminals, 6 seals, TPA, axial lock)"
+  maker: ProWire USA (kit)
+  maker_pn: "68212"
+  photo: {url: "https://www.prowireusa.com/content/57666/68212.webp", page: "https://www.prowireusa.com/68212", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "the registry's throttle body is the Gen V 12699160 on the ICT WCTHB50 kit; 68212 is the LS2/LS7 6-way kit"
+COIL-CONN-LS2/7:
+  entry: part
+  what: "GM LS2/LS7 coil connector kit (4-way housing, seals, terminals, TPA)"
+  maker: ProWire USA (kit)
+  maker_pn: COIL-CONN-LS2/7
+  photo: {url: "https://www.prowireusa.com/content/57659/COIL-CONNLS217.webp", page: "https://www.prowireusa.com/p-2069-gm-coil-connector-kit-d585-d581-ls2-7.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+LS-CRANK-CONN-KIT:
+  entry: part
+  what: "GM LS crank / MAP 3-way Metri-Pack 150 connector kit (Delphi 12129946 housing, 12052845 TPA, 15324976 seals, 12048074 terminals)"
+  maker: ProWire USA (kit)
+  maker_pn: LS-CRANK-CONN-KIT
+  photo: {url: "https://www.prowireusa.com/content/57671/LS-CRANK-CONN-KIT.webp", page: "https://www.prowireusa.com/p-2077-ls-crank-map-sensor-connector-kit.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "kit component list from the ProWire page: 12129946 housing, 12052845 TPA, 15324976 seals, 12048074 terminals"
+LS-CAM-CONN-KIT:
+  entry: part
+  what: GM Gen IV LS cam sensor 3-way Metri-Pack connector kit
+  maker: ProWire USA (kit)
+  maker_pn: LS-CAM-CONN-KIT
+  photo: {url: "https://www.prowireusa.com/content/57673/LS-CAM-CONN-KIT.webp", page: "https://www.prowireusa.com/p-2076-ls-camshaft-sensor-connector-kit.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+"68201":
+  entry: part
+  what: "GM LS2/LS7 2-way knock sensor connector kit (housing, TPA, CPA, seals, terminals)"
+  maker: ProWire USA (kit)
+  maker_pn: "68201"
+  photo: {url: "https://www.prowireusa.com/content/57642/68201.webp", page: "https://www.prowireusa.com/68201", fetched: "2026-09-28"}
+  mates_with: [KNOCK-1, KNOCK-2]
+  confidence: exact_pn
+"68104":
+  entry: part
+  what: ProWire 3-way Bosch Kompakt MAP sensor connector kit
+  maker: ProWire USA (kit)
+  maker_pn: "68104"
+  photo: {url: "https://www.prowireusa.com/content/59914/68104.webp", page: "https://www.prowireusa.com/68104", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: for a Bosch-style 3-pin MAP; parts.yaml marks it not needed once the MAP is the Metri-Pack Gen IV sensor
+"8CYLK-90":
+  entry: part
+  what: "8-cylinder EV1 injector connector kit with 90° boots (housings with clips, boots, markers; no terminals)"
+  maker: ProWire USA (kit)
+  maker_pn: "8CYLK-90"
+  photo: {url: "https://www.prowireusa.com/content/57704/8CYLK-90.webp", page: "https://www.prowireusa.com/p-3718-8-cyl-injector-connector-kit-w-90-boots.html", fetched: "2026-09-28"}
+  mates_with: ["68102"]
+  confidence: exact_pn
+"68102":
+  entry: part
+  what: "Junior Power Timer 2.8 mm female terminal, 20-16 AWG (EV1 injector plug)"
+  maker: TE Connectivity (sold as ProWire 68102)
+  maker_pn: "68102"
+  photo: {url: "https://www.prowireusa.com/content/60582/68102.webp", page: "https://www.prowireusa.com/p-3769-20-16-ga-jpt-timer-terminal.html", fetched: "2026-09-28"}
+  mates_with: ["8CYLK-90"]
+  confidence: exact_pn
+  note: "68102 is ProWire's item number; not the MoTeC #68102 DTP kit"
+WCTHB50:
+  entry: part
+  what: ICT Billet LT Gen 5 throttle body connector component kit (5-wire SENT throttle bodies)
+  maker: ICT Billet
+  maker_pn: WCTHB50
+  photo: {url: "https://www.ictbillet.com/cdn/shop/files/WCTHB50_1.jpg?v=1751968122&width=1000", page: "https://www.ictbillet.com/products/lt-gen-v-throttle-body-connector-component-kit", fetched: "2026-09-28"}
+  mates_with: [TB]
+  confidence: exact_pn
+"12110847":
+  entry: part
+  what: "Aptiv (Delphi) sealed female terminal, 1.0-0.80 mm² (as listed: 'female terminal 18-22 AWG')"
+  maker: Aptiv (Delphi)
+  maker_pn: "12110847"
+  photo: {url: "https://www.prowireusa.com/content/59818/12110847.webp", page: "https://www.prowireusa.com/p-506-12110847-female-terminal-18-22-awg.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "FLAG: Delphi's own Metri-Pack catalog (reference_documents/component_drawings/Delphi_150_Metri-Pack_Series.pdf, '280 TANGLESS FEMALE TERMINALS SEALED') lists 12110847 as a Metri-Pack 280 tangless terminal, 1.0-0.80 mm², and Custom Connector Kits sells it as 'Metri-Pack 280 ... Tangless Sealed Female Terminal'; parts.yaml files it as a Metri-Pack 150 terminal, and ProWire's own LS crank/MAP kit uses 12048074 (MP150 female 20-16) in the 12129946 housing — check before crimping"
+"15324976":
+  entry: part
+  what: "Aptiv (Delphi) Metri-Pack 150 cable seal, white (loose PN 12089678)"
+  maker: Aptiv (Delphi)
+  maker_pn: "15324976"
+  photo: {url: "https://www.prowireusa.com/content/57702/15324976.webp", page: "https://www.prowireusa.com/p-2061-delphi-15324976-cable-seal-white-metri-pack-150-series.html", fetched: "2026-09-28"}
+  mates_with: [LS-CRANK-CONN-KIT, LS-CAM-CONN-KIT, "68201"]
+  confidence: exact_pn
+  note: "seal range disagrees by source: ConnectorID 1.3-2.1 mm, Delphi MP150 catalog (12089678 white) 2.15-1.60 mm, Custom Connector Kits '16-14 AWG'; 22 AWG M22759/32 is 1.09 mm OD, below every one of them"
+"15324974":
+  entry: part
+  what: "Aptiv Metri-Pack 150 cable seal, blue (loose PN 12048087)"
+  maker: Aptiv (Delphi)
+  maker_pn: "15324974"
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/15324974.jpg?v=1738272397", page: "https://www.customconnectorkits.com/products/15324974", fetched: "2026-09-29"}
+  mates_with: [LS-CRANK-CONN-KIT, LS-CAM-CONN-KIT, "68201"]
+  confidence: exact_pn
+  note: "Delphi MP150 catalog: 12048087 blue = 1.29-1.70 mm cable; Custom Connector Kits '24-20 AWG'; 22 AWG M22759/32 (1.09 mm) is still under it"
+WPAPP30:
+  entry: part
+  what: "ICT Billet LS Gen 3 truck DBW pedal pigtail (OEM Delphi housing, seals, terminals on 6 in TXL leads)"
+  maker: ICT Billet
+  maker_pn: WPAPP30
+  photo: {url: "https://www.ictbillet.com/cdn/shop/files/WPAPP30.jpg?v=1751969926&width=1000", page: "https://www.ictbillet.com/products/ls-gen-3-truck-dbw-pedal-position-sensor-pigtail", fetched: "2026-09-28"}
+  mates_with: [APS]
+  confidence: exact_pn
+"15326829":
+  entry: part
+  what: Aptiv GT150 6-way female housing (drive-by-wire pedal)
+  maker: Aptiv (Delphi)
+  maker_pn: "15326829"
+  photo: {url: "https://www.prowireusa.com/content/60698/15326829.webp", page: "https://www.prowireusa.com/p-3845-gt150-6-way-female-housing-dbw.html", fetched: "2026-09-28"}
+  mates_with: ["15317363", "12191818", "15366021"]
+  confidence: exact_pn
+"15317363":
+  entry: part
+  what: Aptiv GT150 6-way TPA (for 15326829)
+  maker: Aptiv (Delphi)
+  maker_pn: "15317363"
+  photo: {url: "https://www.prowireusa.com/content/60697/15317363.webp", page: "https://www.prowireusa.com/p-3846-gt150-6-way-tpa-dbw.html", fetched: "2026-09-28"}
+  mates_with: ["15326829"]
+  confidence: exact_pn
+GT150-AIR-TEMP-KIT:
+  entry: part
+  what: GT150 2-way air-temperature sensor connector kit
+  maker: ProWire USA (kit)
+  maker_pn: GT150-AIR-TEMP-KIT
+  photo: {url: "https://www.prowireusa.com/content/57561/GT150-AIR-TEMP-KIT.webp", page: "https://www.prowireusa.com/GT150-AIR-TEMP-KIT", fetched: "2026-09-28"}
+  mates_with: [IAT]
+  confidence: exact_pn
+GT150-WTR-TEMP-KIT:
+  entry: part
+  what: GT150 2-way liquid temperature sensor connector kit (LS coolant temp)
+  maker: ProWire USA (kit)
+  maker_pn: GT150-WTR-TEMP-KIT
+  photo: {url: "https://www.prowireusa.com/content/57648/GT150-WTR-TEMP-KIT.webp", page: "https://www.prowireusa.com/p-1753-liquid-temp-sensor-conn-kit.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+"12191818":
+  entry: part
+  what: "Aptiv (Delphi) GT 150 female terminal, 22-20 AWG"
+  maker: Aptiv (Delphi)
+  maker_pn: "12191818"
+  photo: {url: "https://www.prowireusa.com/content/60241/12191818.webp", page: "https://www.prowireusa.com/p-2268-female-gt-150-terminal-20-22-ga.html", fetched: "2026-09-28"}
+  mates_with: ["15326829", GT150-AIR-TEMP-KIT, GT150-WTR-TEMP-KIT, ICT-GEN4-OILP]
+  confidence: exact_pn
+"15366021":
+  entry: part
+  what: "Aptiv GT 150 cable seal, white, 22-20 AWG (1.2-1.9 mm insulation)"
+  maker: Aptiv (Delphi)
+  maker_pn: "15366021"
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/15366021_1200__46423.1649712378.1200.1200.jpg?v=1686739472", page: "https://www.customconnectorkits.com/products/15366021", fetched: "2026-09-29"}
+  mates_with: ["15326829", GT150-AIR-TEMP-KIT, GT150-WTR-TEMP-KIT, ICT-GEN4-OILP]
+  confidence: exact_pn
+ICT-GEN4-OILP:
+  entry: part
+  what: ICT Billet LS Gen 4 (LS3) 3-wire round oil-pressure connector component kit
+  maker: ICT Billet
+  maker_pn: WC0IL40
+  photo: {url: "https://www.ictbillet.com/cdn/shop/files/WC0IL40_1.jpg?v=1751970210", page: "https://www.ictbillet.com/products/oil-ls3-wire-component-kit", fetched: "2026-09-27"}
+  mates_with: [OILP-ECU, "12191818", "15366021"]
+  confidence: exact_pn
+  note: "ICT's SKU for this kit is WC0IL40 (image name and page alt)"
+"238LTP":
+  entry: part
+  what: "2 AWG tinned seamless lug, 3/8 in (M9) stud"
+  maker: ASK (sold by ProWire USA)
+  maker_pn: "238LTP"
+  photo: {url: "https://www.prowireusa.com/content/117820/238LTP.webp", page: "https://www.prowireusa.com/238LTP", fetched: "2026-09-28"}
+  confidence: exact_pn
+"2516LTP":
+  entry: part
+  what: "2 AWG tinned seamless lug, 5/16 in (M8) stud (MEGA holder studs)"
+  maker: ASK (sold by ProWire USA)
+  maker_pn: "2516LTP"
+  photo: {url: "https://www.prowireusa.com/content/117922/2516LTP.webp", page: "https://www.prowireusa.com/2516LTP", fetched: "2026-09-29"}
+  mates_with: ["02980900TXN"]
+  confidence: exact_pn
+DL214:
+  entry: part
+  what: "2 AWG tinned lug, 1/4 in (M6) stud (PDM30 / PDM15 battery studs)"
+  maker: ASK (sold by ProWire USA)
+  maker_pn: DL214
+  photo: {url: "https://www.prowireusa.com/content/118182/DL214.webp", page: "https://www.prowireusa.com/DL214", fetched: "2026-09-29"}
+  mates_with: [PDM30-STUD, PDM15-STUD]
+  confidence: exact_pn
+DL438:
+  entry: part
+  what: "4 AWG tinned lug, 3/8 in (M9) stud"
+  maker: ASK (sold by ProWire USA)
+  maker_pn: DL438
+  photo: {url: "https://www.prowireusa.com/content/118270/DL438.webp", page: "https://www.prowireusa.com/DL438", fetched: "2026-09-29"}
+  confidence: exact_pn
+"838TP":
+  entry: part
+  what: "8 AWG tinned lug, 3/8 in (M9) stud"
+  maker: ASK (sold by ProWire USA)
+  maker_pn: "838TP"
+  photo: {url: "https://www.prowireusa.com/content/117882/838TP.webp", page: "https://www.prowireusa.com/838TP", fetched: "2026-09-29"}
+  confidence: exact_pn
+"810TP":
+  entry: part
+  what: "8 AWG tinned lug, #10 (M5) stud (MIDI holder studs)"
+  maker: ASK (sold by ProWire USA)
+  maker_pn: "810TP"
+  photo: {url: "https://www.prowireusa.com/content/117944/810TP.webp", page: "https://www.prowireusa.com/810TP", fetched: "2026-09-29"}
+  mates_with: ["0498900.TXN"]
+  confidence: exact_pn
+"410LTP":
+  entry: part
+  what: "4 AWG tinned lug, #10 (M5) stud (MIDI holder studs, amplifier)"
+  maker: ASK (sold by ProWire USA)
+  maker_pn: "410LTP"
+  photo: {url: "https://www.prowireusa.com/content/117892/410LTP.webp", page: "https://www.prowireusa.com/410LTP", fetched: "2026-09-29"}
+  mates_with: ["0498900.TXN"]
+  confidence: exact_pn
+CPA-100-3/4-RED:
+  entry: part
+  what: "DSG-Canusa CPA-100 3:1 adhesive-lined heat-shrink, 3/4 in, red"
+  maker: DSG-Canusa
+  maker_pn: CPA-100-3/4-RED
+  photo: {url: "https://www.prowireusa.com/content/102674/CPA-100-3-4-RD.webp", page: "https://www.prowireusa.com/p-655-3-4-dia-adhesive-lined-heat-shrink-tubing-red.html", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "image and item page from ProWire's CPA-100 listing (https://www.prowireusa.com/dsg-cpa-100-adhesive-lined-shrink.html)"
+CPA-100-1/2-RED:
+  entry: part
+  what: "DSG-Canusa CPA-100 3:1 adhesive-lined heat-shrink, 1/2 in, red"
+  maker: DSG-Canusa
+  maker_pn: CPA-100-1/2-RED
+  photo: {url: "https://www.prowireusa.com/content/102614/CPA-100-1-2-RD.webp", page: "https://www.prowireusa.com/p-654-1-2-dia-adhesive-lined-heat-shrink-tubing-red.html", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "image and item page from ProWire's CPA-100 listing (https://www.prowireusa.com/dsg-cpa-100-adhesive-lined-shrink.html)"
+CPA-100-3/8-RED:
+  entry: part
+  what: "DSG-Canusa CPA-100 3:1 adhesive-lined heat-shrink, 3/8 in, red"
+  maker: DSG-Canusa
+  maker_pn: CPA-100-3/8-RED
+  photo: {url: "https://www.prowireusa.com/content/102695/CPA-100-3-8-RD.webp", page: "https://www.prowireusa.com/p-653-3-8-dia-adhesive-lined-heat-shrink-tubing-red.html", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "image and item page from ProWire's CPA-100 listing (https://www.prowireusa.com/dsg-cpa-100-adhesive-lined-shrink.html)"
+CPA-100-3/4-BK:
+  entry: part
+  what: "DSG-Canusa CPA-100 3:1 adhesive-lined heat-shrink, 3/4 in, black"
+  maker: DSG-Canusa
+  maker_pn: CPA-100-3/4-BK
+  photo: {url: "https://www.prowireusa.com/content/62105/CPA-100-3-4-BK.webp", page: "https://www.prowireusa.com/p-487-3-4-dia-adhesive-lined-heat-shrink-tubing-black.html", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "image and item page from ProWire's CPA-100 listing (https://www.prowireusa.com/dsg-cpa-100-adhesive-lined-shrink.html)"
+MS25171-3S:
+  entry: part
+  what: "MS25171-3S silicone insulating boot (terminal nipple), 7/16 in, white"
+  maker: to MIL spec MS25171 (Amazon 6-pack)
+  maker_pn: MS25171-3S
+  photo: {url: "https://store.vansaircraft.com/media/catalog/product/m/s/ms25171-3s.jpg", page: "https://store.vansaircraft.com/ms25171-3s-nipple-boot-large-ms25171-3s.html", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "Van's Aircraft photo of the MS25171-3S; the 6-pack was bought on Amazon (ASIN B097NP9CLX)"
+Blue Sea 2019:
+  entry: part
+  what: "Blue Sea PowerBar dual busbar, two 3/8 in-16 studs with insulators"
+  maker: Blue Sea Systems
+  maker_pn: "2019"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/2019.jpg", page: "https://www.bluesea.com/products/2019", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/2019.jpg", page: "https://www.bluesea.com/products/2019"}
+  confidence: exact_pn
+"02980900TXN":
+  entry: part
+  what: "Littelfuse MEGA 298 bolt-down fuse holder with cover (M8 studs), pack of 10"
+  maker: Littelfuse
+  maker_pn: "02980900TXN"
+  photo: {url: "https://cdn2.webdamdb.com/1280_E6lXuOxkWMk31kTQ.jpg", page: "https://www.littelfuse.com/products/fuses-overcurrent-protection/fuse-holders-fuse-blocks-accessories/fuse-holders/bolt-down-single-fuse-holders/mega-298-bolt-down/02980900txn", fetched: "2026-09-29"}
+  drawing: {url: "https://www.littelfuse.com/assetdocs/mega-298-bolt-down-datasheet?assetguid=5df9af12-7ee8-466f-8944-664a7902e1ce", page: "https://www.littelfuse.com/products/fuses-overcurrent-protection/fuse-holders-fuse-blocks-accessories/fuse-holders/bolt-down-single-fuse-holders/mega-298-bolt-down/02980900txn"}
+  mates_with: ["0298125.ZXEH", "0298175.ZXEH", "0298200.ZXEH", "2516LTP"]
+  confidence: exact_pn
+  note: "Littelfuse's image labelled 02980900TXN; drawing is the MEGA 298 bolt-down datasheet"
+"0498900.TXN":
+  entry: part
+  what: "Littelfuse MIDI 498 bolt-down fuse holder with cover (M5 studs), pack of 10"
+  maker: Littelfuse
+  maker_pn: "0498900.TXN"
+  photo: {url: "https://cdn2.webdamdb.com/1280_oEqSFMr86jH41c12.jpg", page: "https://www.littelfuse.com/products/fuses-overcurrent-protection/fuse-holders-fuse-blocks-accessories/fuse-holders/bolt-down-single-fuse-holders/midi-498/0498900-txn", fetched: "2026-09-29"}
+  drawing: {url: "https://www.littelfuse.com/assetdocs/midi-498-datasheet?assetguid=5a3ddf39-419e-44c6-91bf-270e6a6d560b", page: "https://www.littelfuse.com/products/fuses-overcurrent-protection/fuse-holders-fuse-blocks-accessories/fuse-holders/bolt-down-single-fuse-holders/midi-498/0498900-txn"}
+  mates_with: ["0498040.M", "810TP", "410LTP"]
+  confidence: exact_pn
+  note: "Littelfuse's product image for 0498900.TXN (the asset itself is labelled 04980903-BP, the retail-packed holder); the page also has a 2D print of 04980900ZXT: https://www.littelfuse.com/assetdocs/04980900zxt-2d-print?assetguid=ca3cf5b6-3f02-4783-9eeb-478e772e02a5"
+MEGA-100A:
+  entry: part
+  what: "MEGA fuse, 100 A (PDM15 feed)"
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: no Littelfuse part number on file (the carted MEGAs are 0298125/175/200.ZXEH)
+MIDI-60A:
+  entry: part
+  what: "MIDI fuse, 60 A (amplifier feed at the YellowTop)"
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: no Littelfuse part number on file (the carted MIDI is 0498040.M)
+LUG-4AWG-M6:
+  entry: part
+  what: "4 AWG lug, M6 (1/4 in) stud"
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: "retired: PDM15_BPOS went to 2 AWG, DL214 at the stud"
+LUG-4AWG-M8:
+  entry: part
+  what: "4 AWG lug, M8 (5/16 in) stud"
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: "retired: PDM15_BPOS went to 2 AWG, 2516LTP at the MEGA stud"
+AMP-KIT-RING:
+  entry: part
+  what: ring on the AMP Research kit harness red lead (battery +)
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: comes on the AMP Research kit harness; its stud fit is read on arrival
+"0298125.ZXEH":
+  entry: part
+  what: "Littelfuse MEGA 298 bolt-down fuse, 125 A, 32 V, M8"
+  maker: Littelfuse
+  maker_pn: "0298125.ZXEH"
+  photo: {url: "https://cdn2.webdamdb.com/1280_Ys9ewu5zWz986U5G.jpg", page: "https://www.littelfuse.com/products/fuses-overcurrent-protection/fuses/automotive-fuses/bolt-down-fuses/mega/298/0298125-zxeh", fetched: "2026-09-29"}
+  drawing: {url: "https://www.littelfuse.com/assetdocs/littelfuse-datasheet-mega-32v?assetguid=9fe0cd60-17bf-4fd7-b18d-977d32179af9", page: "https://www.littelfuse.com/products/fuses-overcurrent-protection/fuses/automotive-fuses/bolt-down-fuses/mega/298/0298125-zxeh"}
+  mates_with: ["02980900TXN"]
+  confidence: exact_pn
+  note: "Littelfuse's image labelled MEGA_M8_2H_125A (the page's lead image is the 300 A one)"
+"0298175.ZXEH":
+  entry: part
+  what: "Littelfuse MEGA 298 bolt-down fuse, 175 A, 32 V, M8"
+  maker: Littelfuse
+  maker_pn: "0298175.ZXEH"
+  photo: {url: "https://cdn2.webdamdb.com/1280_QOyDHe2X1xm02gmS.jpg", page: "https://www.littelfuse.com/products/fuses-overcurrent-protection/fuses/automotive-fuses/bolt-down-fuses/mega/298/0298125-zxeh", fetched: "2026-09-29"}
+  drawing: {url: "https://www.littelfuse.com/assetdocs/littelfuse-datasheet-mega-32v?assetguid=9fe0cd60-17bf-4fd7-b18d-977d32179af9", page: "https://www.littelfuse.com/products/fuses-overcurrent-protection/fuses/automotive-fuses/bolt-down-fuses/mega/298/0298125-zxeh"}
+  mates_with: ["02980900TXN"]
+  confidence: exact_pn
+  note: "Littelfuse's image labelled MEGA_M8_2H_175A, from the 298 series gallery"
+"0298200.ZXEH":
+  entry: part
+  what: "Littelfuse MEGA 298 bolt-down fuse, 200 A, 32 V, M8"
+  maker: Littelfuse
+  maker_pn: "0298200.ZXEH"
+  photo: {url: "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/602/0298200.ZXEH.JPG", page: "https://www.digikey.com/en/products/detail/littelfuse-inc/0298200-ZXEH/553442", fetched: "2026-09-29"}
+  drawing: {url: "https://www.littelfuse.com/assetdocs/littelfuse-datasheet-mega-32v?assetguid=9fe0cd60-17bf-4fd7-b18d-977d32179af9", page: "https://www.littelfuse.com/products/fuses-overcurrent-protection/fuses/automotive-fuses/bolt-down-fuses/mega/298/0298125-zxeh"}
+  mates_with: ["02980900TXN"]
+  confidence: exact_pn
+  note: "DigiKey's product photo"
+"0498040.M":
+  entry: part
+  what: "Littelfuse MIDI 498 bolt-down fuse, 40 A, 32 V, M5"
+  maker: Littelfuse
+  maker_pn: "0498040.M"
+  photo: {url: "https://cdn2.webdamdb.com/1280_QQ01yT27xAm11Q5w.jpg", page: "https://www.littelfuse.com/products/fuses-overcurrent-protection/fuses/automotive-fuses/bolt-down-fuses/midi/498/0498040-m", fetched: "2026-09-29"}
+  drawing: {url: "https://www.littelfuse.com/assetdocs/midi-32v-bolt-down-series-data-sheet?assetguid=b55e8034-180d-40f6-a0a7-bebc2d4a94f5", page: "https://www.littelfuse.com/products/fuses-overcurrent-protection/fuses/automotive-fuses/bolt-down-fuses/midi/498/0498040-m"}
+  mates_with: ["0498900.TXN"]
+  confidence: exact_pn
+  note: "Littelfuse's image labelled MIDI_2H_M5_40A; the photo on file (DigiKey 0498080.M) was the 80 A fuse. Littelfuse also offers STEP models for the 498 MIDI family on this page (signed download links)"
+MOROSO-74102:
+  entry: part
+  what: Moroso super-duty battery disconnect switch with alternator studs (retired pick)
+  maker: Moroso
+  maker_pn: "74102"
+  photo: {url: "https://eadn-wc01-7779730.nxedge.io/cdn/media/catalog/product/7/4/74102_part.jpg", page: "https://www.moroso.com/battery-disconnect-switch74102/", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "retired: superseded by the Blue Sea 7700"
+LUG-2AWG-1/2:
+  entry: part
+  what: "2 AWG lug, 1/2 in stud (Moroso isolator)"
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: retired with the Moroso 74102
+BLUESEA-7700:
+  entry: part
+  what: "Blue Sea ML-RBS remote battery switch with manual control, 12 V DC, 500 A (studs A/B 3/8 in-16)"
+  maker: Blue Sea Systems
+  maker_pn: "7700"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/7700.jpg", page: "https://www.bluesea.com/products/7700/ML-RBS_Remote_Battery_Switch_with_Manual_Control_-_12V_DC_500A", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/7700_7702_7622_7623.jpg", page: "https://www.bluesea.com/products/7700/ML-RBS_Remote_Battery_Switch_with_Manual_Control_-_12V_DC_500A"}
+  instructions: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/instructions/990180170-006.pdf"
+  mates_with: ["238LTP"]
+  confidence: exact_pn
+  note: Blue Sea publishes a dimensioned drawing and instructions; no 3D model on bluesea.com
+RING-SMALL:
+  entry: part
+  what: "small ring terminals (starter S, head ring grounds, rear bus, PCS fused tap)"
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: "open: part number follows the stud size, which is read at the bench"
+D-609-03:
+  entry: part
+  what: "Raychem (TE) MiniSeal crimp stub splice, red (26-20 AWG)"
+  maker: TE Connectivity (Raychem)
+  maker_pn: D-609-03
+  photo: {url: "https://www.prowireusa.com/content/59742/D-609-03.webp", page: "https://www.prowireusa.com/p-1924-mini-seal-crimp-stub-splice-red.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+D-609-04:
+  entry: part
+  what: "Raychem (TE) MiniSeal crimp stub splice, blue (20-16 AWG)"
+  maker: TE Connectivity (Raychem)
+  maker_pn: D-609-04
+  photo: {url: "https://www.prowireusa.com/content/59741/D-609-04.webp", page: "https://www.prowireusa.com/p-1925-mini-seal-crimp-stub-splice-blue.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+D-609-05:
+  entry: part
+  what: "Raychem (TE) MiniSeal crimp stub splice, yellow (16-12 AWG)"
+  maker: TE Connectivity (Raychem)
+  maker_pn: D-609-05
+  photo: {url: "https://www.prowireusa.com/content/59740/D-609-05.webp", page: "https://www.prowireusa.com/p-1926-mini-seal-crimp-stub-splice-yellow.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+M81824/1-2:
+  entry: part
+  what: "Raychem MiniSeal in-line crimp splice, blue, with sealing sleeve (D-436-37)"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-2
+  photo: {url: "https://www.prowireusa.com/content/57537/M81824_1-2.webp", page: "https://www.prowireusa.com/p-1528-raychem-mini-seal-splice-blue.html", fetched: "2026-09-29"}
+  confidence: exact_pn
+"210LTP":
+  entry: part
+  what: "2 AWG tinned eyelet, #10 (M5) stud"
+  maker: ASK (sold by ProWire USA)
+  maker_pn: "210LTP"
+  photo: {url: "https://www.prowireusa.com/content/117800/210LTP.webp", page: "https://www.prowireusa.com/210LTP", fetched: "2026-09-28"}
+  confidence: exact_pn
+"610TP":
+  entry: part
+  what: "6 AWG tinned eyelet, #10 (M5) stud"
+  maker: ASK (sold by ProWire USA)
+  maker_pn: "610TP"
+  photo: {url: "https://www.prowireusa.com/content/118048/610TP.webp", page: "https://www.prowireusa.com/610TP", fetched: "2026-09-28"}
+  confidence: exact_pn
+"638TP":
+  entry: part
+  what: "6 AWG tinned eyelet, 3/8 in (M9) stud"
+  maker: ASK (sold by ProWire USA)
+  maker_pn: "638TP"
+  photo: {url: "https://www.prowireusa.com/content/117850/638TP.webp", page: "https://www.prowireusa.com/638TP", fetched: "2026-09-28"}
+  confidence: exact_pn
+"0462-201-20141":
+  entry: part
+  what: "DEUTSCH size 20 solid socket, nickel, 20 AWG (DTM; MoTeC #68054 plug)"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: "0462-201-20141"
+  photo: {url: "https://www.prowireusa.com/content/57349/0462-201-20141.webp", page: "https://www.prowireusa.com/p-81-deutsch-0462-201-20141-contact-22-18-ga.html", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=0462-201-20XX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=0462-201-20141", page: "https://www.te.com/en/product-0462-201-20141.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_0462-201-20141&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=0462-201-20141", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: ["68054", WIDEBAND]
+  confidence: same_family_photo
+  note: "vendor photo of a contact sold under this number: ProWire lists it 'by Tristar' and Custom Connector Kits' image is labelled 'Aftermarket Equivalent'; TE's own image refuses scripted fetches; drawing is TE's family drawing for the series"
+"0462-005-20141":
+  entry: part
+  what: "DEUTSCH size 20 solid socket, nickel, 18-16 AWG (DTM; LTCD feed and ground)"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: "0462-005-20141"
+  photo: {url: "https://www.prowireusa.com/content/57446/0462-005-20141.webp", page: "https://www.prowireusa.com/p-701-deutsch-0462-005-20141-contact-18-16-ga.html", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=0462-005-20XX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=0462-005-20141", page: "https://www.te.com/en/product-0462-005-20141.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_0462-005-20141&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=0462-005-20141", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: ["68054", WIDEBAND]
+  confidence: same_family_photo
+  note: "vendor photo of a contact sold under this number: ProWire lists it 'by Tristar' and Custom Connector Kits' image is labelled 'Aftermarket Equivalent'; TE's own image refuses scripted fetches; drawing is TE's family drawing for the series"
+M81824/1-3:
+  entry: part
+  what: "Raychem MiniSeal in-line crimp splice, yellow, with sealing sleeve (D-436-38)"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-3
+  photo: {url: "https://www.prowireusa.com/content/60321/M81824_1-3.webp", page: "https://www.prowireusa.com/p-1529-raychem-mini-seal-splice-yellow.html", fetched: "2026-09-29"}
+  confidence: exact_pn
+S02-03-R:
+  entry: part
+  what: Raychem SolderSleeve shield terminator with 22 AWG lead (M83519/2-3)
+  maker: TE Connectivity (Raychem)
+  maker_pn: S02-03-R
+  photo: {url: "https://www.prowireusa.com/content/59648/S02-07-R.webp", page: "https://www.prowireusa.com/p-4154-M83519-2-3-shield-terminator.html", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=S02-XX-R&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=450705-000", page: "https://www.te.com/en/product-450705-000.html"}
+  confidence: same_family_photo
+  note: "ProWire's S02-03-R page shows an S02-07-R (same series, other size); TE lists S02-03-R as 450705-000 with the S02-XX-R family drawing, no 3D model"
+PRO-IDENT-KIT:
+  entry: part
+  what: "ProWire 1/8 in 3:1 colour-ring marker kit, 10 colours (MIL-STD-681 digit code)"
+  maker: ProWire USA
+  maker_pn: PRO-IDENT-KIT
+  photo: {url: "https://www.prowireusa.com/content/22990/PRO-IDENT-KIT-1.jpg", page: "https://www.prowireusa.com/PRO-IDENT-KIT", fetched: "2026-09-29"}
+  confidence: exact_pn
+DR-25-3/16-0:
+  entry: part
+  what: "Raychem DR-25 heat-shrink tubing, 3/16 in, black (sold per ft)"
+  maker: TE Connectivity (Raychem)
+  maker_pn: DR-25-3/16-0
+  photo: {url: "https://www.prowireusa.com/content/57319/DR-25-3-16-0-SP.webp", page: "https://www.prowireusa.com/p-132-dr-25-3-16-0-sp-raychem-te.html", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "ProWire's photo shows the DR-25 spool for this size"
+DR-25-1/4-0:
+  entry: part
+  what: "Raychem DR-25 heat-shrink tubing, 1/4 in, black (sold per ft)"
+  maker: TE Connectivity (Raychem)
+  maker_pn: DR-25-1/4-0
+  photo: {url: "https://www.prowireusa.com/content/59303/DR-25-1-4-0-SP.webp", page: "https://www.prowireusa.com/p-133-dr-25-1-4-0-sp-raychem-te.html", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "ProWire's photo shows the DR-25 spool for this size"
+DR-25-3/8-0:
+  entry: part
+  what: "Raychem DR-25 heat-shrink tubing, 3/8 in, black (sold per ft)"
+  maker: TE Connectivity (Raychem)
+  maker_pn: DR-25-3/8-0
+  photo: {url: "https://www.prowireusa.com/content/57682/DR-25-3-8-25-0-SP.webp", page: "https://www.prowireusa.com/p-134-dr-25-3-8-0-sp-raychem-te.html", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "ProWire's photo shows the DR-25 spool for this size"
+DR-25-1/2-0:
+  entry: part
+  what: "Raychem DR-25 heat-shrink tubing, 1/2 in, black (sold per ft)"
+  maker: TE Connectivity (Raychem)
+  maker_pn: DR-25-1/2-0
+  photo: {url: "https://www.prowireusa.com/content/59745/DR-25-1-2-0-SP.webp", page: "https://www.prowireusa.com/p-135-dr-25-1-2-0-sp-raychem-te.html", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "ProWire's photo shows the DR-25 spool for this size"
+DR-25-3/4-0:
+  entry: part
+  what: "Raychem DR-25 heat-shrink tubing, 3/4 in, black (sold per ft)"
+  maker: TE Connectivity (Raychem)
+  maker_pn: DR-25-3/4-0
+  photo: {url: "https://www.prowireusa.com/content/59815/DR-25-3-4-0-SP.webp", page: "https://www.prowireusa.com/p-136-dr-25-3-4-0-sp-raychem-te.html", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "ProWire's photo shows the DR-25 spool for this size"
+DR-25-1-0:
+  entry: part
+  what: "Raychem DR-25 heat-shrink tubing, 1 in, black (sold per ft)"
+  maker: TE Connectivity (Raychem)
+  maker_pn: DR-25-1-0
+  photo: {url: "https://www.prowireusa.com/content/57322/DR-25-1-0-SP.webp", page: "https://www.prowireusa.com/p-137-dr-25-1-0-sp-raychem-te.html", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "ProWire's photo shows the DR-25 spool for this size"
+SCL-1875-1:
+  entry: part
+  what: "Raychem SCL adhesive-lined shrink, 3/16 in, 1 in cuts (pack of 50)"
+  maker: "TE Connectivity (Raychem), cut by ProWire"
+  maker_pn: SCL-1875-1
+  photo: {url: "https://www.prowireusa.com/content/130962/SCL-1875-1.webp", page: "https://www.prowireusa.com/SCL-1875-1", fetched: "2026-09-29"}
+  confidence: exact_pn
+SCL-250-1250:
+  entry: part
+  what: "Raychem SCL adhesive-lined shrink, 1/4 in, 1-1/4 in cuts (pack of 50)"
+  maker: "TE Connectivity (Raychem), cut by ProWire"
+  maker_pn: SCL-250-1250
+  photo: {url: "https://www.prowireusa.com/content/130893/SCL-250-1250.webp", page: "https://www.prowireusa.com/SCL-250-1250", fetched: "2026-09-29"}
+  confidence: exact_pn
+SCL-375-1250:
+  entry: part
+  what: "Raychem SCL adhesive-lined shrink, 3/8 in, 1-1/4 in cuts (pack of 25)"
+  maker: "TE Connectivity (Raychem), cut by ProWire"
+  maker_pn: SCL-375-1250
+  photo: {url: "https://www.prowireusa.com/content/130921/SCL-375-1250.webp", page: "https://www.prowireusa.com/SCL-375-1250", fetched: "2026-09-29"}
+  confidence: exact_pn
+SCL-500-1250:
+  entry: part
+  what: "Raychem SCL adhesive-lined shrink, 1/2 in, 1-1/4 in cuts (pack of 30)"
+  maker: "TE Connectivity (Raychem), cut by ProWire"
+  maker_pn: SCL-500-1250
+  photo: {url: "https://www.prowireusa.com/content/130937/SCL-500-1250.webp", page: "https://www.prowireusa.com/SCL-500-1250", fetched: "2026-09-29"}
+  confidence: exact_pn
+SCL-1/2-0-STK:
+  entry: part
+  what: "Raychem SCL adhesive-lined shrink, 1/2 in, 4 ft stick"
+  maker: TE Connectivity (Raychem)
+  maker_pn: SCL-1/2-0-STK
+  photo: {url: "https://www.prowireusa.com/content/58864/SCL-1-2-0.webp", page: "https://www.prowireusa.com/te-connectivity-raychem-scl-1-2-0-stk", fetched: "2026-09-29"}
+  confidence: exact_pn
+NC5FD-L-1:
+  entry: part
+  what: "Neutrik XLR 5-pole female chassis connector, latching, solder cups (PDM30 UTC port)"
+  maker: Neutrik
+  maker_pn: NC5FD-L-1
+  photo: {url: "https://www.neutrik.com/uploads/media/400x/02/522-nc5fd-l-1.jpg?v=1-0", page: "https://www.neutrik.com/en/product/nc5fd-l-1", fetched: "2026-09-29"}
+  drawing: {url: "https://www.neutrik.com/media/8402/download/nc5fd-l-1-3.pdf?v=1", page: "https://www.neutrik.com/en/product/nc5fd-l-1"}
+  mates_with: [MOTEC-UTC-61059]
+  confidence: exact_pn
+  note: Neutrik also publishes a 2D DXF (media/11850/download/nc5fd-l-1-4.dxf); no 3D model on the product page
+M-RJ45-CABLE:
+  entry: part
+  what: "panel-mount Ethernet cable (RJ45 bulkhead), 1 m"
+  maker: MoTeC (sold by ProWire USA)
+  maker_pn: M-RJ45-CABLE
+  photo: {url: "https://www.prowireusa.com/content/59737/M-RJ45-CABLE.webp", page: "https://www.prowireusa.com/p-563-panel-mount-ethernet-cable.html", fetched: "2026-09-29"}
+  mates_with: [PORT-ETH]
+  confidence: exact_pn
+  note: "ProWire lists this panel-mount Ethernet cable 'by MoTec'"
+MOTEC-UTC-61059:
+  entry: part
+  what: MoTeC UTC USB-to-CAN adapter with USB cable
+  maker: MoTeC
+  maker_pn: "61059"
+  photo: {url: "https://assets.motec.com.au/strapi/61059_ed89b4fcab.webp", page: "https://calibratedperformance.com.au/products/m-61059", fetched: "2026-09-29"}
+  mates_with: [NC5FD-L-1]
+  confidence: exact_pn
+  note: "MoTeC's own image (its asset server; found through the MoTeC dealer Calibrated Performance, item M-61059)"
+CAN-TERM-100R:
+  entry: part
+  what: "CAN terminator, 100 ohm 0.25 W axial resistor (one at each end of the M1 trunk)"
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: "to buy: resistor part number not picked"
+M81969/14-10:
+  entry: part
+  what: "MIL M81969/14-10 plastic insertion/removal tool, size 20 (MIL-C-38999)"
+  maker: Daniels Manufacturing (DMC)
+  maker_pn: M81969/14-10
+  photo: {url: "https://dmctools.com/media/catalog/product/m/8/m81969_14-10_images_m81969-14-10.jpg?optimize=high&bg-color=255,255,255&fit=bounds&height=270&width=270&canvas=270:270", page: "https://dmctools.com/m39029/contact/196", fetched: "2026-09-28"}
+  confidence: exact_pn
+M22520/2-01:
+  entry: part
+  what: DMC AFM8 miniature 8-indent crimp frame (M22520/2-01)
+  maker: Daniels Manufacturing (DMC)
+  maker_pn: M22520/2-01
+  photo: {url: "https://www.prowireusa.com/content/61185/M225202-01.webp", page: "https://www.prowireusa.com/M22520-2-01-afm8-crimp-frame", fetched: "2026-09-28"}
+  mates_with: [M22520/2-10]
+  confidence: exact_pn
+M22520/2-10:
+  entry: part
+  what: DMC K43 positioner for the AFM8 (M22520/2-10)
+  maker: Daniels Manufacturing (DMC)
+  maker_pn: M22520/2-10
+  photo: {url: "https://dmctools.com/media/catalog/product/k/4/k43_images_k43.jpg?optimize=high&bg-color=255,255,255&fit=bounds&height=1200&width=1800&canvas=1800:1200", page: "https://dmctools.com/k43", fetched: "2026-09-28"}
+  mates_with: [M22520/2-01]
+  confidence: exact_pn
+WIRE-OD:
+  entry: part
+  what: "reference table: wire outside diameters (M22759/16 and /32) used to size seals and shrink"
+  maker: ProWire USA (data)
+  maker_pn: n/a
+  confidence: unknown
+  note: "data, not a physical piece; source: ProWire M22759/16 and /32 tables"
+"0460-202-16141":
+  entry: part
+  what: "DEUTSCH size 16 solid pin, nickel, 20-16 AWG"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: "0460-202-16141"
+  photo: {url: "https://www.prowireusa.com/content/58362/0460-202-16141.webp", page: "https://www.prowireusa.com/p-70-deutsch-0460-202-16141-contact-20-16-ga.html", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=0460-202-16XX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=0460-202-16141", page: "https://www.te.com/en/product-0460-202-16141.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_0460-202-16141&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=0460-202-16141", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT04-2P, DT04-08PA, DT04-6P-L012, DT04-12PA-L012, DT04-12PB-L012, "0462-201-16141"]
+  confidence: same_family_photo
+  note: "vendor photo of a contact sold under this number: ProWire lists it 'by Tristar' and Custom Connector Kits' image is labelled 'Aftermarket Equivalent'; TE's own image refuses scripted fetches; drawing is TE's family drawing for the series"
+"0462-201-16141":
+  entry: part
+  what: "DEUTSCH size 16 solid socket, nickel, 20-16 AWG"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: "0462-201-16141"
+  photo: {url: "https://www.prowireusa.com/content/58363/0462-201-16141.webp", page: "https://www.prowireusa.com/p-79-deutsch-0462-201-16141-contact-20-16-ga.html", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=0462-201-16XX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=0462-201-16141", page: "https://www.te.com/en/product-0462-201-16141.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_0462-201-16141&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=0462-201-16141", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT06-2S, DT06-08SA, DT06-6S, DT06-12SA, DT06-12SB, "0460-202-16141"]
+  confidence: same_family_photo
+  note: "vendor photo of a contact sold under this number: ProWire lists it 'by Tristar' and Custom Connector Kits' image is labelled 'Aftermarket Equivalent'; TE's own image refuses scripted fetches; drawing is TE's family drawing for the series"
+"0460-204-12141":
+  entry: part
+  what: "DEUTSCH size 12 solid pin, nickel, 14-12 AWG"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: "0460-204-12141"
+  photo: {url: "https://www.prowireusa.com/content/59823/0460-204-12141.webp", page: "https://www.prowireusa.com/p-75-deutsch-0460-204-12141-contact-14-12-ga.html", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=0460-204-12XX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=0460-204-12141", page: "https://www.te.com/en/product-0460-204-12141.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_0460-204-12141&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=0460-204-12141", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DTP04-2P, DTP04-4P, DTP04-4P-L012, "0462-203-12141"]
+  confidence: same_family_photo
+  note: "vendor photo of a contact sold under this number: ProWire lists it 'by Tristar' and Custom Connector Kits' image is labelled 'Aftermarket Equivalent'; TE's own image refuses scripted fetches; drawing is TE's family drawing for the series"
+"0462-203-12141":
+  entry: part
+  what: "DEUTSCH size 12 solid socket, nickel, 14-12 AWG"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: "0462-203-12141"
+  photo: {url: "https://www.prowireusa.com/content/192629/0462-203-12141.png", page: "https://www.prowireusa.com/p-85-deutsch-0462-203-12141-contact-14-12-ga.html", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=0462-203-12XX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=0462-203-12141", page: "https://www.te.com/en/product-0462-203-12141.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_0462-203-12141&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=0462-203-12141", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DTP06-2S, DTP06-4S, "0460-204-12141"]
+  confidence: same_family_photo
+  note: "vendor photo of a contact sold under this number: ProWire lists it 'by Tristar' and Custom Connector Kits' image is labelled 'Aftermarket Equivalent'; TE's own image refuses scripted fetches; drawing is TE's family drawing for the series"
+DTP04-4P:
+  entry: part
+  what: "DEUTSCH DTP 4-way receptacle (size 12 pins), gray"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DTP04-4P
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DTP04-4P_Front.jpg?v=1738272991", page: "https://www.customconnectorkits.com/products/dtp04-4p", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DTP04-4P-XXXX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DTP04-4P", page: "https://www.te.com/en/product-DTP04-4P.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DTP04-4P&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DTP04-4P", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DTP06-4S, WP-4P, "0460-204-12141"]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+DTP06-4S:
+  entry: part
+  what: "DEUTSCH DTP 4-way plug (size 12 sockets), gray"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DTP06-4S
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DTP06-4S_Front.jpg?v=1738273213", page: "https://www.customconnectorkits.com/products/dtp06-4s", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DTP06-4S-XXXX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DTP06-4S", page: "https://www.te.com/en/product-DTP06-4S.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DTP06-4S&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DTP06-4S", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DTP04-4P, DTP04-4P-L012, WP-4S, "0462-203-12141"]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+WP-4P:
+  entry: part
+  what: "DEUTSCH DTP 4-way receptacle wedgelock, orange"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: WP-4P
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/WP-4P.jpg?v=1738273165", page: "https://www.customconnectorkits.com/products/wp-4p", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=WP-4P&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=WP-4P", page: "https://www.te.com/en/product-WP-4P.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_WP-4P&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=WP-4P", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DTP04-4P, DTP04-4P-L012]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+WP-4S:
+  entry: part
+  what: "DEUTSCH DTP 4-way plug wedgelock, orange"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: WP-4S
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/WP-4S.jpg?v=1738273261", page: "https://www.customconnectorkits.com/products/wp-4s", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=WP-4S&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=WP-4S", page: "https://www.te.com/en/product-WP-4S.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_WP-4S&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=WP-4S", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DTP06-4S]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+DT04-08PA:
+  entry: part
+  what: "DEUTSCH DT 8-way receptacle (pins), gray, A key"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT04-08PA
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT04-08PA_Front.jpg?v=1738268451", page: "https://www.customconnectorkits.com/products/dt04-08pa", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT04-08PX-XXXX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT04-08PA", page: "https://www.te.com/en/product-DT04-08PA.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT04-08PA&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT04-08PA", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT06-08SA, W8P, "0460-202-16141", "114017"]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+DT06-08SA:
+  entry: part
+  what: "DEUTSCH DT 8-way plug (sockets), gray, A key"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT06-08SA
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT06-08SA_Front.jpg?v=1738268504", page: "https://www.customconnectorkits.com/products/dt06-08sa", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT06-08SX-XXXX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT06-08SA", page: "https://www.te.com/en/product-DT06-08SA.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT06-08SA&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT06-08SA", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT04-08PA, W8S, "0462-201-16141", "114017"]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+W8P:
+  entry: part
+  what: "DEUTSCH DT 8-way receptacle wedgelock, green"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: W8P
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/W8P.jpg?v=1738268358", page: "https://www.customconnectorkits.com/products/w8p", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=W8P&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=W8P", page: "https://www.te.com/en/product-W8P.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_W8P&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=W8P", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT04-08PA]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+W8S:
+  entry: part
+  what: "DEUTSCH DT 8-way plug wedgelock, orange"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: W8S
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/W8S.jpg?v=1738268393", page: "https://www.customconnectorkits.com/products/w8s", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=W8S&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=W8S", page: "https://www.te.com/en/product-W8S.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_W8S&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=W8S", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT06-08SA]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+"0413-204-2005":
+  entry: part
+  what: "DEUTSCH sealing plug for size-20 cavities, red (DTM)"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: "0413-204-2005"
+  photo: {url: "https://www.prowireusa.com/content/60813/0413-204-2005.webp", page: "https://www.prowireusa.com/p-1253-dtm-size-20-cavity-sealing-plug.html", fetched: "2026-09-29"}
+  mates_with: ["68054", "68055"]
+  confidence: exact_pn
+AEM-30-2131-100:
+  entry: part
+  what: "AEM 100 psig brass pressure sensor kit, 0.5-4.5 V, 1/8 NPT, Packard 3-pin plug and pins included"
+  maker: AEM Electronics
+  maker_pn: "30-2131-100"
+  photo: {url: "https://static.summitracing.com/global/images/prod/xlarge/avm-30-2131-100_xl.jpg", page: "https://www.summitracing.com/parts/avm-30-2131-100", fetched: "2026-09-29"}
+  drawing: {url: "https://documents.aemelectronics.com/techlibrary_30-2131-100_sensor_data.pdf", page: "https://www.aemelectronics.com/products/sensors/pressure_sensors/parts/30-2131-100"}
+  instructions: "https://documents.aemelectronics.com/ebf9109d7d01bb4b636f2da0b8eccda4eb4fb343.pdf"
+  mates_with: [FUELP]
+  confidence: exact_pn
+  note: "FLAG: AEM titles 30-2131-100 '100 PSIg Brass Sensor Kit' and 30-2130-100 '100 PSIg Stainless Sensor Kit'; the registry's '316L wetted' describes the 30-2130-100. Photo is Summit's (file named for 30-2131-100); AEM's own image (https://www.aemelectronics.com/products/sensors/pressure_sensors/parts/30-2131-100) sits under a hashed file name"
+"30130628":
+  entry: part
+  what: "SPAL brushless fan connector kit (2 x 12 ga power terminals, 2 x 20-18 ga control, 1 seal plug)"
+  maker: SPAL
+  maker_pn: "30130628"
+  photo: {url: "https://www.prowireusa.com/content/58775/spal-30130628.webp", page: "https://www.prowireusa.com/SPAL-BRUSHLESS-FAN-CONNECTOR-KIT-30130628", fetched: "2026-09-28"}
+  mates_with: [FAN]
+  confidence: exact_pn
+BLUESEA-1003:
+  entry: part
+  what: "Blue Sea CableClam 1.40 in cable entry, one cable up to 0.56 in"
+  maker: Blue Sea Systems
+  maker_pn: "1003"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/1003.jpg", page: "https://www.bluesea.com/products/1003/CableClam_1.40in", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/1003.pdf", page: "https://www.bluesea.com/products/1003/CableClam_1.40in"}
+  instructions: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/instructions/1001-1003_Instructions.pdf"
+  confidence: exact_pn
+  note: "photo on file (BS-1003) was a West Marine copy; this is the maker's"
+BLUESEA-2103:
+  entry: part
+  what: "Blue Sea PowerPost Plus, 3/8 in-16 stud, 150 A, insulated base"
+  maker: Blue Sea Systems
+  maker_pn: "2103"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/2103.jpg", page: "https://www.bluesea.com/products/2103/PowerPost_Plus_-_3_8in-16_Stud", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/2101-2103.jpg", page: "https://www.bluesea.com/products/2103/PowerPost_Plus_-_3_8in-16_Stud"}
+  confidence: exact_pn
+  note: "drawing covers PowerPost Plus 2101-2103; photo on file (BS-2103) was a Thorne Bros copy, this is the maker's"
+QFS-BKCN-GM:
+  entry: part
+  what: "Quantum Fuel Systems 4-terminal fuel-tank bulkhead connector, 14 A per terminal, Viton O-ring"
+  maker: Quantum Fuel Systems
+  maker_pn: QFS-BKCN-GM
+  photo: {url: "https://cdn11.bigcommerce.com/s-f5wn3qdqza/images/stencil/2560w/products/43679/592535/qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm__58527.1748480105.jpg?c=1", page: "https://www.highflowfuel.com/qfs-performance-bulkhead-connector-fitting-qfs-bkcn-gm/", fetched: "2026-09-28"}
+  confidence: exact_pn
+DTP06-2S:
+  entry: part
+  what: "DEUTSCH DTP 2-way plug (size 12 sockets), gray"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DTP06-2S
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DTP06-2S_Front.jpg?v=1738273115", page: "https://www.customconnectorkits.com/products/dtp06-2s", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DTP06-2S&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DTP06-2S", page: "https://www.te.com/en/product-DTP06-2S.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DTP06-2S&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DTP06-2S", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DTP04-2P, "0462-203-12141"]
+  confidence: exact_pn
+  note: "needs wedgelock WP-2S, which is not in parts.yaml; photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+DTP04-2P:
+  entry: part
+  what: "DEUTSCH DTP 2-way receptacle (size 12 pins), gray"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DTP04-2P
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DTP04-2P_Front.jpg?v=1738273032", page: "https://www.customconnectorkits.com/products/dtp04-2p", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DTP04-2P-XXXX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DTP04-2P", page: "https://www.te.com/en/product-DTP04-2P.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DTP04-2P&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DTP04-2P", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DTP06-2S, "0460-204-12141"]
+  confidence: exact_pn
+  note: "needs wedgelock WP-2P, which is not in parts.yaml; photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+DT06-2S:
+  entry: part
+  what: "DEUTSCH DT 2-way plug (sockets), gray"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT06-2S
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT06-2S_Front.jpg?v=1738267636", page: "https://www.customconnectorkits.com/products/dt06-2s", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT06-2S-XXXX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT06-2S", page: "https://www.te.com/en/product-DT06-2S.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT06-2S&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT06-2S", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT04-2P, "0462-201-16141"]
+  confidence: exact_pn
+  note: "needs wedgelock W2S, which is not in parts.yaml; photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+DT04-2P:
+  entry: part
+  what: "DEUTSCH DT 2-way receptacle (pins), gray"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT04-2P
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT04-2P_Front.jpg?v=1738267776", page: "https://www.customconnectorkits.com/products/dt04-2p", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT04-2P-XXXX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT04-2P", page: "https://www.te.com/en/product-DT04-2P.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT04-2P&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT04-2P", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT06-2S, "0460-202-16141"]
+  confidence: exact_pn
+  note: "needs wedgelock W2P, which is not in parts.yaml; photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+"9918":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 12-10 AWG, 3/8 in stud"
+  maker: ProWire USA
+  maker_pn: "9918"
+  photo: {url: "https://www.prowireusa.com/content/59106/9918.webp", page: "https://www.prowireusa.com/p-1509-hi-temp-ring-term-12-10-3-8.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+DT04-6P-L012:
+  entry: part
+  what: "DEUTSCH DT 6-way flanged receptacle (pins), gray"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT04-6P-L012
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT04-6P-L012_front__10708.1669401186.1200.1200.jpg?v=1686744338", page: "https://www.customconnectorkits.com/products/dt04-6p-l012", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT04-6P-L012&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT04-6P-L012", page: "https://www.te.com/en/product-DT04-6P-L012.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT04-6P-L012&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT04-6P-L012", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT06-6S, W6P, "0460-202-16141", "114017"]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+DT06-6S:
+  entry: part
+  what: "DEUTSCH DT 6-way plug (sockets), gray"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT06-6S
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT06-6S_Front.jpg?v=1738268335", page: "https://www.customconnectorkits.com/products/dt06-6s", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT06-6S-XXXX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT06-6S", page: "https://www.te.com/en/product-DT06-6S.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT06-6S&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT06-6S", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT04-6P-L012, W6S, "0462-201-16141", "114017"]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+W6P:
+  entry: part
+  what: "DEUTSCH DT 6-way receptacle wedgelock, green"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: W6P
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/W6P.jpg?v=1738268276", page: "https://www.customconnectorkits.com/products/w6p", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=W6P&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=W6P", page: "https://www.te.com/en/product-W6P.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_W6P&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=W6P", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT04-6P-L012]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+W6S:
+  entry: part
+  what: "DEUTSCH DT 6-way plug wedgelock, orange"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: W6S
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/W6S.jpg?v=1738268245", page: "https://www.customconnectorkits.com/products/w6s", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=W6S&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=W6S", page: "https://www.te.com/en/product-W6S.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_W6S&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=W6S", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT06-6S]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+"9901":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 22-18 AWG, #6 stud"
+  maker: ProWire USA
+  maker_pn: "9901"
+  photo: {url: "https://www.prowireusa.com/content/60292/9901.webp", page: "https://www.prowireusa.com/p-1492-hi-temp-ring-term-22-18-6.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9902":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 22-18 AWG, #8 stud"
+  maker: ProWire USA
+  maker_pn: "9902"
+  photo: {url: "https://www.prowireusa.com/content/60290/9902.webp", page: "https://www.prowireusa.com/p-1493-hi-temp-ring-term-22-18-8.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9903":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 22-18 AWG, #10 stud"
+  maker: ProWire USA
+  maker_pn: "9903"
+  photo: {url: "https://www.prowireusa.com/content/60939/9903.webp", page: "https://www.prowireusa.com/p-1494-hi-temp-ring-term-22-18-10.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9904":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 22-18 AWG, 1/4 in stud"
+  maker: ProWire USA
+  maker_pn: "9904"
+  photo: {url: "https://www.prowireusa.com/content/57270/9904.webp", page: "https://www.prowireusa.com/p-1495-hi-temp-ring-term-22-18-1-4.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9905":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 22-18 AWG, 5/16 in stud"
+  maker: ProWire USA
+  maker_pn: "9905"
+  photo: {url: "https://www.prowireusa.com/content/57271/9905.webp", page: "https://www.prowireusa.com/p-1496-hi-temp-ring-term-22-18-5-16.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9906":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 22-18 AWG, 3/8 in stud"
+  maker: ProWire USA
+  maker_pn: "9906"
+  photo: {url: "https://www.prowireusa.com/content/57269/9906.webp", page: "https://www.prowireusa.com/p-1497-hi-temp-ring-term-22-18-3-8.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9907":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 16-14 AWG, #6 stud"
+  maker: ProWire USA
+  maker_pn: "9907"
+  photo: {url: "https://www.prowireusa.com/content/60294/9907.webp", page: "https://www.prowireusa.com/p-1498-hi-temp-ring-term-16-14-6.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9908":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 16-14 AWG, #8 stud"
+  maker: ProWire USA
+  maker_pn: "9908"
+  photo: {url: "https://www.prowireusa.com/content/60293/9908.webp", page: "https://www.prowireusa.com/p-1499-hi-temp-ring-term-16-14-8.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9909":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 16-14 AWG, #10 stud"
+  maker: ProWire USA
+  maker_pn: "9909"
+  photo: {url: "https://www.prowireusa.com/content/60961/9909.webp", page: "https://www.prowireusa.com/p-1500-hi-temp-ring-term-16-14-10.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9910":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 16-14 AWG, 1/4 in stud"
+  maker: ProWire USA
+  maker_pn: "9910"
+  photo: {url: "https://www.prowireusa.com/content/58229/9910.webp", page: "https://www.prowireusa.com/p-1501-hi-temp-ring-term-16-14-1-4.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9911":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 16-14 AWG, 5/16 in stud"
+  maker: ProWire USA
+  maker_pn: "9911"
+  photo: {url: "https://www.prowireusa.com/content/61040/9911.webp", page: "https://www.prowireusa.com/p-1502-hi-temp-ring-term-16-14-5-16.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9912":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 16-14 AWG, 3/8 in stud"
+  maker: ProWire USA
+  maker_pn: "9912"
+  photo: {url: "https://www.prowireusa.com/content/59104/9912.webp", page: "https://www.prowireusa.com/p-1503-hi-temp-ring-term-16-14-3-8.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9913":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 12-10 AWG, #6 stud"
+  maker: ProWire USA
+  maker_pn: "9913"
+  photo: {url: "https://www.prowireusa.com/content/60295/9913.webp", page: "https://www.prowireusa.com/p-1504-hi-temp-ring-term-12-10-6.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9914":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 12-10 AWG, #8 stud"
+  maker: ProWire USA
+  maker_pn: "9914"
+  photo: {url: "https://www.prowireusa.com/content/60291/9914.webp", page: "https://www.prowireusa.com/p-1505-hi-temp-ring-term-12-10-8.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9915":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 12-10 AWG, #10 stud"
+  maker: ProWire USA
+  maker_pn: "9915"
+  photo: {url: "https://www.prowireusa.com/content/60304/9915.webp", page: "https://www.prowireusa.com/p-1506-hi-temp-ring-term-12-10-10.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9916":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 12-10 AWG, 1/4 in stud"
+  maker: ProWire USA
+  maker_pn: "9916"
+  photo: {url: "https://www.prowireusa.com/content/58230/9916.webp", page: "https://www.prowireusa.com/p-1507-hi-temp-ring-term-12-10-1-4.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+"9917":
+  entry: part
+  what: "ProWire hi-temp ring terminal, 12-10 AWG, 5/16 in stud"
+  maker: ProWire USA
+  maker_pn: "9917"
+  photo: {url: "https://www.prowireusa.com/content/60298/9917.webp", page: "https://www.prowireusa.com/p-1508-hi-temp-ring-term-12-10-5-16.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "image from ProWire's hi-temp ring terminal listing (https://www.prowireusa.com/high-temp-ring-terminals.html)"
+DT04-12PA-L012:
+  entry: part
+  what: "DEUTSCH DT 12-way flanged receptacle (pins), gray, A key"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT04-12PA-L012
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT04-12PA-L012_Front.jpg?v=1739397832", page: "https://www.customconnectorkits.com/products/dt04-12pa-l012", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT04-12PX-L012&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT04-12PA-L012", page: "https://www.te.com/en/product-DT04-12PA-L012.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT04-12PA-L012&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT04-12PA-L012", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT06-12SA, W12P, DT12-L012-GKT, "0460-202-16141"]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+DT06-12SA:
+  entry: part
+  what: "DEUTSCH DT 12-way plug (sockets), gray, A key"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT06-12SA
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT06-12SA_Front.jpg?v=1738268725", page: "https://www.customconnectorkits.com/products/dt06-12sa", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT06-12SX-XXXX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT06-12SA", page: "https://www.te.com/en/product-DT06-12SA.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT06-12SA&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT06-12SA", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT04-12PA-L012, W12S, "0462-201-16141"]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+DT04-12PB-L012:
+  entry: part
+  what: "DEUTSCH DT 12-way flanged receptacle (pins), black, B key"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT04-12PB-L012
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT04-12PB-L012_front__46111.1633825473.1200.1200.jpg?v=1686740560", page: "https://www.customconnectorkits.com/products/dt04-12pb-l012", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT04-12PX-L012&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT04-12PB-L012", page: "https://www.te.com/en/product-DT04-12PB-L012.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT04-12PB-L012&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT04-12PB-L012", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT06-12SB, W12P, DT12-L012-GKT, "0460-202-16141"]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+DT06-12SB:
+  entry: part
+  what: "DEUTSCH DT 12-way plug (sockets), black, B key"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT06-12SB
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT06-125B_Front.jpg?v=1743116187", page: "https://www.customconnectorkits.com/products/dt06-12sb", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT06-12SX-XXXX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT06-12SB", page: "https://www.te.com/en/product-DT06-12SB.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT06-12SB&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT06-12SB", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT04-12PB-L012, W12S, "0462-201-16141"]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+W12P:
+  entry: part
+  what: "DEUTSCH DT 12-way receptacle wedgelock, green"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: W12P
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/W12P.jpg?v=1738268554", page: "https://www.customconnectorkits.com/products/w12p", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=W12P&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=W12P", page: "https://www.te.com/en/product-W12P.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_W12P&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=W12P", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT04-12PA-L012, DT04-12PB-L012]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+W12S:
+  entry: part
+  what: "DEUTSCH DT 12-way plug wedgelock, orange"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: W12S
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/W12S.jpg?v=1738268691", page: "https://www.customconnectorkits.com/products/w12s", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=W12S&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=W12S", page: "https://www.te.com/en/product-W12S.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_W12S&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=W12S", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT06-12SA, DT06-12SB]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+DT12-L012-GKT:
+  entry: part
+  what: DEUTSCH DT gasket for 12-way flanged receptacles (seals the flange to the panel)
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT12-L012-GKT
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT12-L012-GKT__26192.1674678810.1200.1200.jpg?v=1686744420", page: "https://www.customconnectorkits.com/products/dt12-l012-gkt", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT12-L012-GKT&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT12-L012-GKT", page: "https://www.te.com/en/product-DT12-L012-GKT.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT12-L012-GKT&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT12-L012-GKT", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT04-12PA-L012, DT04-12PB-L012]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+DTP04-4P-L012:
+  entry: part
+  what: "DEUTSCH DTP 4-way flanged receptacle (size 12 pins), gray"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DTP04-4P-L012
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DTP04-4P-L012_Front.jpg?v=1739397879", page: "https://www.customconnectorkits.com/products/dtp04-4p-l012", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DTP04-4P-L012&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DTP04-4P-L012", page: "https://www.te.com/en/product-DTP04-4P-L012.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DTP04-4P-L012&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DTP04-4P-L012", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DTP06-4S, WP-4P, DTP4P-L012-GKT, "0460-204-12141"]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+DTP4P-L012-GKT:
+  entry: part
+  what: DEUTSCH DTP gasket for 4-way flanged receptacles
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DTP4P-L012-GKT
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DTP4P-L012-GKT-__45965.1674678783.1200.1200.jpg?v=1686744417", page: "https://www.customconnectorkits.com/products/dtp4p-l012-gkt", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DTP4P-L012-GKT&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DTP4P-L012-GKT", page: "https://www.te.com/en/product-DTP4P-L012-GKT.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DTP4P-L012-GKT&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DTP4P-L012-GKT", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DTP04-4P-L012]
+  confidence: exact_pn
+  note: "photo: Custom Connector Kits' listing of the genuine DEUTSCH part (te.com's own image refuses scripted fetches)"
+"114017":
+  entry: part
+  what: DEUTSCH sealing plug for size 16-12 cavities (DT and DTP)
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: "114017"
+  photo: {url: "https://www.prowireusa.com/content/60979/114017.webp", page: "https://www.prowireusa.com/p-1254-dt-dtp-size-16-12-cavity-sealing-plug.html", fetched: "2026-09-29"}
+  mates_with: [DT04-08PA, DT06-08SA, DT04-6P-L012, DT06-6S, DTP04-4P-L012, DTP06-4S]
+  confidence: exact_pn
+"68054":
+  entry: part
+  what: "MoTeC #68054 DTM 4-pin female connector kit (size 20 sockets)"
+  maker: MoTeC
+  maker_pn: "68054"
+  photo: {url: "https://assets.motec.com.au/strapi/68054_6b5edbd77e.webp", page: "https://www.motec.com.au/products/category/Wiring/Connectors?id=28", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DTM06-4S&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DTM06-4S", page: "https://www.te.com/en/product-DTM06-4S.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DTM06-4S&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DTM06-4S", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use; model is the DEUTSCH DTM06-4S housing"}
+  mates_with: ["68055", WIDEBAND, "0462-201-20141", "0462-005-20141", "0413-204-2005"]
+  confidence: exact_pn
+  note: "photo is MoTeC's image on its asset server; MoTeC kit; the housings are DEUTSCH DTM 4-way (DTM06-4S / DTM04-4P per the MoTeC LTC manual's (F)/(M))"
+"68055":
+  entry: part
+  what: "MoTeC #68055 DTM 4-pin male connector kit (IBST-DIAG cap)"
+  maker: MoTeC
+  maker_pn: "68055"
+  photo: {url: "https://assets.motec.com.au/strapi/68055_72a69e1961.webp", page: "https://www.motec.com.au/products/category/Wiring/Connectors?id=28", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DTM04-4P&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DTM04-4P", page: "https://www.te.com/en/product-DTM04-4P.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DTM04-4P&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DTM04-4P", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use; model is the DEUTSCH DTM04-4P housing"}
+  mates_with: ["68054", "0413-204-2005"]
+  confidence: exact_pn
+  note: "photo is MoTeC's image on its asset server; MoTeC kit; the housings are DEUTSCH DTM 4-way (DTM06-4S / DTM04-4P per the MoTeC LTC manual's (F)/(M))"
+CAN-TERM-120R:
+  entry: part
+  what: "CAN terminator, 120 ohm (iBooster bus)"
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: "open: part not picked"
+BLUESEA-5065:
+  entry: part
+  what: "Blue Sea waterproof in-line ATO/ATC fuse holder, 12 AWG pigtails, 30 A max"
+  maker: Blue Sea Systems
+  maker_pn: "5065"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/5065.jpg", page: "https://www.bluesea.com/products/5065/Waterproof_In-Line_ATO_ATC_Fuse_holder", fetched: "2026-09-29"}
+  mates_with: [BLUESEA-5237, BLUESEA-5239, BLUESEA-5240, BLUESEA-5241]
+  confidence: exact_pn
+  note: no drawing listed on the Blue Sea page
+BLUESEA-5237:
+  entry: part
+  what: "Blue Sea ATO/ATC blade fuse, 3 A"
+  maker: Blue Sea Systems
+  maker_pn: "5237"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/5237.jpg", page: "https://www.bluesea.com/products/5237", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/5235-5245.jpg", page: "https://www.bluesea.com/products/5237"}
+  mates_with: [BLUESEA-5065]
+  confidence: exact_pn
+  note: dimensioned drawing covers the 5235-5245 ATO/ATC range
+BLUESEA-5239:
+  entry: part
+  what: "Blue Sea ATO/ATC blade fuse, 5 A"
+  maker: Blue Sea Systems
+  maker_pn: "5239"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/5239.jpg", page: "https://www.bluesea.com/products/5239", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/5235-5245.jpg", page: "https://www.bluesea.com/products/5237"}
+  mates_with: [BLUESEA-5065]
+  confidence: exact_pn
+  note: dimensioned drawing covers the 5235-5245 ATO/ATC range
+BLUESEA-5240:
+  entry: part
+  what: "Blue Sea ATO/ATC blade fuse, 7.5 A"
+  maker: Blue Sea Systems
+  maker_pn: "5240"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/5240.jpg", page: "https://www.bluesea.com/products/5240", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/5235-5245.jpg", page: "https://www.bluesea.com/products/5237"}
+  mates_with: [BLUESEA-5065]
+  confidence: exact_pn
+  note: dimensioned drawing covers the 5235-5245 ATO/ATC range
+BLUESEA-5241:
+  entry: part
+  what: "Blue Sea ATO/ATC blade fuse, 10 A"
+  maker: Blue Sea Systems
+  maker_pn: "5241"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/5241.jpg", page: "https://www.bluesea.com/products/5241", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/5235-5245.jpg", page: "https://www.bluesea.com/products/5237"}
+  mates_with: [BLUESEA-5065]
+  confidence: exact_pn
+  note: dimensioned drawing covers the 5235-5245 ATO/ATC range
+"7116-3250":
+  entry: part
+  what: "Yazaki 375 L female terminal, 10-8 AWG (SPAL brushless 4-way housing, large cavity)"
+  maker: Yazaki
+  maker_pn: "7116-3250"
+  photo: {url: "https://www.prowireusa.com/content/61841/7116-3250.webp", page: "https://www.prowireusa.com/7116-3250.html", fetched: "2026-09-29"}
+  mates_with: ["30130628", FAN]
+  confidence: exact_pn
+"7158-3035":
+  entry: part
+  what: "Yazaki large white wire seal, 10-8 AWG (SPAL brushless housing)"
+  maker: Yazaki
+  maker_pn: "7158-3035"
+  photo: {url: "https://www.prowireusa.com/content/61843/7158-3035.webp", page: "https://www.prowireusa.com/7158-3035", fetched: "2026-09-29"}
+  mates_with: ["30130628", FAN]
+  confidence: exact_pn
+"327583":
+  entry: part
+  what: "TE PIDG step-down butt splice, 22-18 AWG to 16-14 AWG, blue"
+  maker: TE Connectivity (AMP)
+  maker_pn: "327583"
+  photo: {url: "https://www.te.com/content/dam/te-com/catalog/part/000/320/562/320562-t1.jpg/jcr:content/renditions/product-high-res.png", page: "https://www.te.com/en/product-327583.html", fetched: "2026-09-28"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=327583&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=327583", page: "https://www.te.com/en/product-327583.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_327583&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=327583", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  confidence: same_family_photo
+  note: "te.com shows the 320562 PIDG butt splice image on the 327583 page (a sibling in the same family); te.com image: opens in a browser, refuses scripted fetches"
+"327638":
+  entry: part
+  what: "TE PIDG step-down butt splice, 16-14 AWG to 12-10 AWG, yellow"
+  maker: TE Connectivity (AMP)
+  maker_pn: "327638"
+  photo: {url: "https://www.te.com/content/dam/te-com/catalog/part/000/327/638/327638-t1.jpg/jcr:content/renditions/product-high-res.png", page: "https://www.te.com/en/product-327638.html", fetched: "2026-09-28"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=327638&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=327638", page: "https://www.te.com/en/product-327638.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_327638&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=327638", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  confidence: exact_pn
+  note: "te.com image: opens in a browser, refuses scripted fetches"
+"327639":
+  entry: part
+  what: "TE PIDG step-down butt splice, 22-18 AWG to 12-10 AWG, yellow"
+  maker: TE Connectivity (AMP)
+  maker_pn: "327639"
+  photo: {url: "https://www.te.com/content/dam/te-com/catalog/part/000/327/639/327639-t1.jpg/jcr:content/renditions/product-high-res.png", page: "https://www.te.com/en/product-327639.html", fetched: "2026-09-28"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=327639&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=327639", page: "https://www.te.com/en/product-327639.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_327639&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=327639", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  confidence: exact_pn
+  note: "te.com image: opens in a browser, refuses scripted fetches"
+
+# ====================================================================== DEVICES (registry endpoint ids, registry order)
+M130-A:
+  entry: device
+  what: "MoTeC M130 engine control unit, connector A (34-way Superseal 1.0, Key 1)"
+  maker: MoTeC
+  maker_pn: "13130"
+  photo: {url: "https://assets.motec.com.au/strapi/large_m130_052880dbeb.webp", page: "https://www.motec.com.au/products/M130", fetched: "2026-09-29"}
+  drawing: {url: "https://assets.motec.com.au/strapi/131xx_2plastic_E760_dimensions_26a186790d.svg", page: "https://www.motec.com.au/products/M130"}
+  datasheet: "https://assets.motec.com.au/strapi/CDS_13130_M130_ECU_41b5a13fb7.pdf"
+  mates_with: [M800-KIT-N]
+  confidence: exact_pn
+  note: MoTeC publishes dimension drawings (SVG) and datasheets but no 3D model on motec.com.au
+M130-B:
+  entry: device
+  what: "MoTeC M130 engine control unit, connector B (26-way Superseal 1.0, Key 1)"
+  maker: MoTeC
+  maker_pn: "13130"
+  photo: {url: "https://assets.motec.com.au/strapi/large_m130_052880dbeb.webp", page: "https://www.motec.com.au/products/M130", fetched: "2026-09-29"}
+  drawing: {url: "https://assets.motec.com.au/strapi/131xx_2plastic_E760_dimensions_26a186790d.svg", page: "https://www.motec.com.au/products/M130"}
+  datasheet: "https://assets.motec.com.au/strapi/CDS_13130_M130_ECU_41b5a13fb7.pdf"
+  mates_with: [M800-KIT-N]
+  piece: M130-A
+  confidence: exact_pn
+PDM30-A:
+  entry: device
+  what: "MoTeC PDM30 power distribution module (cab), connector A (34-way Superseal 1.0)"
+  maker: MoTeC
+  maker_pn: "14103"
+  photo: {url: "https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp", page: "https://www.motec.com.au/products/PDM30", fetched: "2026-09-29"}
+  drawing: {url: "https://assets.motec.com.au/strapi/14103_14104_dimensions_81910055f1.svg", page: "https://www.motec.com.au/products/PDM30"}
+  datasheet: "https://assets.motec.com.au/strapi/cds14103_pdm30_a2fb1410b6.pdf"
+  mates_with: [M800-KIT-N]
+  confidence: exact_pn
+PDM30-B:
+  entry: device
+  what: "MoTeC PDM30 power distribution module (cab), connector B (26-way Superseal 1.0)"
+  maker: MoTeC
+  maker_pn: "14103"
+  photo: {url: "https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp", page: "https://www.motec.com.au/products/PDM30", fetched: "2026-09-29"}
+  drawing: {url: "https://assets.motec.com.au/strapi/14103_14104_dimensions_81910055f1.svg", page: "https://www.motec.com.au/products/PDM30"}
+  datasheet: "https://assets.motec.com.au/strapi/cds14103_pdm30_a2fb1410b6.pdf"
+  mates_with: [M800-KIT-N]
+  piece: PDM30-A
+  confidence: exact_pn
+PDM30-STUD:
+  entry: device
+  what: "MoTeC PDM30 battery positive stud (M6, eyelet and M6 nut)"
+  maker: MoTeC
+  maker_pn: "14103"
+  photo: {url: "https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp", page: "https://www.motec.com.au/products/PDM30", fetched: "2026-09-29"}
+  drawing: {url: "https://assets.motec.com.au/strapi/14103_14104_dimensions_81910055f1.svg", page: "https://www.motec.com.au/products/PDM30"}
+  datasheet: "https://assets.motec.com.au/strapi/cds14103_pdm30_a2fb1410b6.pdf"
+  mates_with: [DL214, "9916"]
+  piece: PDM30-A
+  confidence: exact_pn
+  note: the stud is part of the PDM30 case; the photo is the whole module
+PDM15-A:
+  entry: device
+  what: "MoTeC PDM15 power distribution module (engine bay), connector A (34-way Superseal 1.0)"
+  maker: MoTeC
+  maker_pn: "14104"
+  photo: {url: "https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp", page: "https://www.motec.com.au/products/PDM15", fetched: "2026-09-29"}
+  drawing: {url: "https://assets.motec.com.au/strapi/14103_14104_dimensions_22bfe9e78a.svg", page: "https://www.motec.com.au/products/PDM15"}
+  datasheet: "https://assets.motec.com.au/strapi/cds14104_pdm15_eb1b9e92ed.pdf"
+  mates_with: [M800-KIT-N]
+  confidence: exact_pn
+PDM15-B:
+  entry: device
+  what: "MoTeC PDM15 power distribution module (engine bay), connector B (26-way Superseal 1.0)"
+  maker: MoTeC
+  maker_pn: "14104"
+  photo: {url: "https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp", page: "https://www.motec.com.au/products/PDM15", fetched: "2026-09-29"}
+  drawing: {url: "https://assets.motec.com.au/strapi/14103_14104_dimensions_22bfe9e78a.svg", page: "https://www.motec.com.au/products/PDM15"}
+  datasheet: "https://assets.motec.com.au/strapi/cds14104_pdm15_eb1b9e92ed.pdf"
+  mates_with: [M800-KIT-N]
+  piece: PDM15-A
+  confidence: exact_pn
+PDM15-STUD:
+  entry: device
+  what: "MoTeC PDM15 battery positive stud (M6, eyelet and M6 nut)"
+  maker: MoTeC
+  maker_pn: "14104"
+  photo: {url: "https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp", page: "https://www.motec.com.au/products/PDM15", fetched: "2026-09-29"}
+  drawing: {url: "https://assets.motec.com.au/strapi/14103_14104_dimensions_22bfe9e78a.svg", page: "https://www.motec.com.au/products/PDM15"}
+  datasheet: "https://assets.motec.com.au/strapi/cds14104_pdm15_eb1b9e92ed.pdf"
+  mates_with: [DL214]
+  piece: PDM15-A
+  confidence: exact_pn
+  note: the stud is part of the PDM15 case; the photo is the whole module
+SPL-PDM15-OUT2:
+  entry: device
+  what: "PDM15 OUT2 pigtail splice: Raychem MiniSeal in-line splice M81824/1-3 (yellow), two 16 AWG pigtails in, the load wire out"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-3
+  photo: {url: "https://www.prowireusa.com/content/60321/M81824_1-3.webp", page: "https://www.prowireusa.com/p-1529-raychem-mini-seal-splice-yellow.html", fetched: "2026-09-29"}
+  piece: M81824/1-3
+  confidence: exact_pn
+SPL-PDM15-OUT3:
+  entry: device
+  what: "PDM15 OUT3 pigtail splice: Raychem MiniSeal in-line splice M81824/1-3 (yellow), two 16 AWG pigtails in, the load wire out"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-3
+  photo: {url: "https://www.prowireusa.com/content/60321/M81824_1-3.webp", page: "https://www.prowireusa.com/p-1529-raychem-mini-seal-splice-yellow.html", fetched: "2026-09-29"}
+  piece: M81824/1-3
+  confidence: exact_pn
+SPL-PDM15-OUT5:
+  entry: device
+  what: "PDM15 OUT5 pigtail splice: Raychem MiniSeal in-line splice M81824/1-3 (yellow), two 16 AWG pigtails in, the load wire out"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-3
+  photo: {url: "https://www.prowireusa.com/content/60321/M81824_1-3.webp", page: "https://www.prowireusa.com/p-1529-raychem-mini-seal-splice-yellow.html", fetched: "2026-09-29"}
+  piece: M81824/1-3
+  confidence: exact_pn
+SPL-PDM30-OUT5:
+  entry: device
+  what: "PDM30 OUT5 pigtail splice: one Raychem MiniSeal stub splice D-609-05 (yellow), all five conductors in one barrel"
+  maker: TE Connectivity (Raychem)
+  maker_pn: D-609-05
+  photo: {url: "https://www.prowireusa.com/content/59740/D-609-05.webp", page: "https://www.prowireusa.com/p-1926-mini-seal-crimp-stub-splice-yellow.html", fetched: "2026-09-28"}
+  piece: D-609-05
+  confidence: exact_pn
+SPL-PDM30-OUT7:
+  entry: device
+  what: "PDM30 OUT7 pigtail splice: Raychem MiniSeal in-line splice M81824/1-3 (yellow), two 16 AWG pigtails in, the load wire out"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-3
+  photo: {url: "https://www.prowireusa.com/content/60321/M81824_1-3.webp", page: "https://www.prowireusa.com/p-1529-raychem-mini-seal-splice-yellow.html", fetched: "2026-09-29"}
+  piece: M81824/1-3
+  confidence: exact_pn
+SPL-PDM15-OUT1:
+  entry: device
+  what: "PDM15 OUT1 pigtail splice: Raychem MiniSeal in-line splice M81824/1-3 (yellow), two 16 AWG pigtails in, the load wire out"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-3
+  photo: {url: "https://www.prowireusa.com/content/60321/M81824_1-3.webp", page: "https://www.prowireusa.com/p-1529-raychem-mini-seal-splice-yellow.html", fetched: "2026-09-29"}
+  piece: M81824/1-3
+  confidence: exact_pn
+SPL-PDM15-OUT4:
+  entry: device
+  what: "PDM15 OUT4 pigtail splice: Raychem MiniSeal in-line splice M81824/1-3 (yellow), two 16 AWG pigtails in, the load wire out"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-3
+  photo: {url: "https://www.prowireusa.com/content/60321/M81824_1-3.webp", page: "https://www.prowireusa.com/p-1529-raychem-mini-seal-splice-yellow.html", fetched: "2026-09-29"}
+  piece: M81824/1-3
+  confidence: exact_pn
+SPL-PDM30-OUT1:
+  entry: device
+  what: "PDM30 OUT1 pigtail splice: Raychem MiniSeal in-line splice M81824/1-3 (yellow), two 16 AWG pigtails in, the load wire out"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-3
+  photo: {url: "https://www.prowireusa.com/content/60321/M81824_1-3.webp", page: "https://www.prowireusa.com/p-1529-raychem-mini-seal-splice-yellow.html", fetched: "2026-09-29"}
+  piece: M81824/1-3
+  confidence: exact_pn
+SPL-PDM30-OUT2:
+  entry: device
+  what: "PDM30 OUT2 pigtail splice: Raychem MiniSeal in-line splice M81824/1-3 (yellow), two 16 AWG pigtails in, the load wire out"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-3
+  photo: {url: "https://www.prowireusa.com/content/60321/M81824_1-3.webp", page: "https://www.prowireusa.com/p-1529-raychem-mini-seal-splice-yellow.html", fetched: "2026-09-29"}
+  piece: M81824/1-3
+  confidence: exact_pn
+SPL-PDM30-OUT3:
+  entry: device
+  what: "PDM30 OUT3 pigtail splice: Raychem MiniSeal in-line splice M81824/1-3 (yellow), two 16 AWG pigtails in, the load wire out"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-3
+  photo: {url: "https://www.prowireusa.com/content/60321/M81824_1-3.webp", page: "https://www.prowireusa.com/p-1529-raychem-mini-seal-splice-yellow.html", fetched: "2026-09-29"}
+  piece: M81824/1-3
+  confidence: exact_pn
+SPL-PDM30-OUT4:
+  entry: device
+  what: "PDM30 OUT4 pigtail splice: Raychem MiniSeal in-line splice M81824/1-3 (yellow), two 16 AWG pigtails in, the load wire out"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-3
+  photo: {url: "https://www.prowireusa.com/content/60321/M81824_1-3.webp", page: "https://www.prowireusa.com/p-1529-raychem-mini-seal-splice-yellow.html", fetched: "2026-09-29"}
+  piece: M81824/1-3
+  confidence: exact_pn
+SPL-PDM30-OUT6:
+  entry: device
+  what: "PDM30 OUT6 pigtail splice: Raychem MiniSeal in-line splice M81824/1-3 (yellow), two 16 AWG pigtails in, the load wire out"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-3
+  photo: {url: "https://www.prowireusa.com/content/60321/M81824_1-3.webp", page: "https://www.prowireusa.com/p-1529-raychem-mini-seal-splice-yellow.html", fetched: "2026-09-29"}
+  piece: M81824/1-3
+  confidence: exact_pn
+SPL-PDM30-OUT8:
+  entry: device
+  what: "PDM30 OUT8 pigtail splice: Raychem MiniSeal in-line splice M81824/1-3 (yellow), two 16 AWG pigtails in, the load wire out"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-3
+  photo: {url: "https://www.prowireusa.com/content/60321/M81824_1-3.webp", page: "https://www.prowireusa.com/p-1529-raychem-mini-seal-splice-yellow.html", fetched: "2026-09-29"}
+  piece: M81824/1-3
+  confidence: exact_pn
+WIN-SW-L:
+  entry: device
+  what: "driver door switch panel: Nu-Relics standard chrome reverse-polarity switches with harness, door placement (window master for both windows)"
+  maker: Nu-Relics
+  maker_pn: "201"
+  photo: {url: "https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/201-2.jpg", page: "https://www.nu-relics.com/Chrome-Switches-Door-Placement-2-windows-p/201.htm", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "the registry names the 17383-2 chrome switches; on the 17383-2 page the chrome door-placement switch option is #201"
+WIN-SW-R:
+  entry: device
+  what: "passenger door window switch (in series with the master): Nu-Relics #201 chrome switch set, door placement"
+  maker: Nu-Relics
+  maker_pn: "201"
+  photo: {url: "https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/201-2.jpg", page: "https://www.nu-relics.com/Chrome-Switches-Door-Placement-2-windows-p/201.htm", fetched: "2026-09-29"}
+  piece: WIN-SW-L
+  confidence: exact_pn
+  note: "the registry names the 17383-2 chrome switches; on the 17383-2 page the chrome door-placement switch option is #201"
+window_motor_DS:
+  entry: device
+  what: "driver window regulator with ACI reverse-polarity motor (Nu-Relics 17383-2 kit, 1973-91 Blazer/Jimmy front doors)"
+  maker: Nu-Relics
+  maker_pn: "17383-2"
+  photo: {url: "https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-2-2.jpg", page: "https://www.nu-relics.com/73-87-Chevy-Truck-Regulators-p/17383-2.htm", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "kit photo: both regulators with their motors"
+window_motor_PS:
+  entry: device
+  what: passenger window regulator with ACI reverse-polarity motor (Nu-Relics 17383-2 kit)
+  maker: Nu-Relics
+  maker_pn: "17383-2"
+  photo: {url: "https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-2-2.jpg", page: "https://www.nu-relics.com/73-87-Chevy-Truck-Regulators-p/17383-2.htm", fetched: "2026-09-29"}
+  piece: window_motor_DS
+  confidence: exact_pn
+  note: "kit photo: both regulators with their motors"
+LOCK-SW-L:
+  entry: device
+  what: "driver door lock rocker (reversing, rests to ground)"
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: "the lock rocker is not named by maker or part number in the registry (pin table LOCK-SW-L: 'pick the rocker')"
+LOCK-SW-R:
+  entry: device
+  what: "passenger door lock rocker (reversing, rests to ground)"
+  maker: unknown
+  maker_pn: unknown
+  piece: LOCK-SW-L
+  confidence: unknown
+  note: "the lock rocker is not named by maker or part number in the registry (pin table LOCK-SW-L: 'pick the rocker')"
+lock_actuator_DS:
+  entry: device
+  what: "AutoLoc compact 2-wire door lock actuator, 13 lb, 12 V"
+  maker: AutoLoc
+  maker_pn: AUTZT2000
+  photo: {url: "https://shop.autoloc.com/cdn/shop/files/2048_abcded99-9b45-4114-983b-9872425e0bc4.jpg?v=1739641298", page: "https://shop.autoloc.com/products/compact-2-wire-car-door-lock-actuator-heavy-duty-12-volt-motor-13-lbs-power-12v", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: photo on file (AUTZT2000)
+lock_actuator_PS:
+  entry: device
+  what: "passenger door lock actuator, AutoLoc AUTZT2000"
+  maker: AutoLoc
+  maker_pn: AUTZT2000
+  photo: {url: "https://shop.autoloc.com/cdn/shop/files/2048_abcded99-9b45-4114-983b-9872425e0bc4.jpg?v=1739641298", page: "https://shop.autoloc.com/products/compact-2-wire-car-door-lock-actuator-heavy-duty-12-volt-motor-13-lbs-power-12v", fetched: "2026-09-28"}
+  piece: lock_actuator_DS
+  confidence: exact_pn
+  note: photo on file (AUTZT2000)
+DOOR-L-PASS-P:
+  entry: device
+  what: "driver door pass-through, window power: DEUTSCH DTP 4-way (DTP04-4P + WP-4P body side, DTP06-4S + WP-4S door side)"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DTP04-4P
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DTP04-4P_Front.jpg?v=1738272991", page: "https://www.customconnectorkits.com/products/dtp04-4p", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DTP04-4P-XXXX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DTP04-4P", page: "https://www.te.com/en/product-DTP04-4P.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DTP04-4P&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DTP04-4P", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DTP06-4S, WP-4P, WP-4S, "0460-204-12141", "0462-203-12141"]
+  piece: DTP04-4P
+  confidence: exact_pn
+  note: photo is the body-side receptacle DTP04-4P; the mating plug and wedges are listed in mates_with
+DOOR-L-PASS:
+  entry: device
+  what: "driver door pass-through, locks and speaker: DEUTSCH DT 8-way (DT04-08PA + W8P body side, DT06-08SA + W8S door side)"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT04-08PA
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT04-08PA_Front.jpg?v=1738268451", page: "https://www.customconnectorkits.com/products/dt04-08pa", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT04-08PX-XXXX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT04-08PA", page: "https://www.te.com/en/product-DT04-08PA.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT04-08PA&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT04-08PA", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT06-08SA, W8P, W8S, "0460-202-16141", "0462-201-16141", "114017"]
+  piece: DT04-08PA
+  confidence: exact_pn
+  note: photo is the body-side receptacle DT04-08PA; the mating plug and wedges are listed in mates_with
+DOOR-R-PASS-P:
+  entry: device
+  what: "passenger door pass-through, window power: DEUTSCH DTP 4-way (DTP04-4P + WP-4P body side, DTP06-4S + WP-4S door side)"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DTP04-4P
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DTP04-4P_Front.jpg?v=1738272991", page: "https://www.customconnectorkits.com/products/dtp04-4p", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DTP04-4P-XXXX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DTP04-4P", page: "https://www.te.com/en/product-DTP04-4P.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DTP04-4P&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DTP04-4P", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DTP06-4S, WP-4P, WP-4S, "0460-204-12141", "0462-203-12141"]
+  piece: DTP04-4P
+  confidence: exact_pn
+  note: photo is the body-side receptacle DTP04-4P; the mating plug and wedges are listed in mates_with
+DOOR-R-PASS:
+  entry: device
+  what: "passenger door pass-through, locks and speaker: DEUTSCH DT 8-way (DT04-08PA + W8P body side, DT06-08SA + W8S door side)"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT04-08PA
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT04-08PA_Front.jpg?v=1738268451", page: "https://www.customconnectorkits.com/products/dt04-08pa", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT04-08PX-XXXX&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT04-08PA", page: "https://www.te.com/en/product-DT04-08PA.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT04-08PA&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT04-08PA", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT06-08SA, W8P, W8S, "0460-202-16141", "0462-201-16141", "114017"]
+  piece: DT04-08PA
+  confidence: exact_pn
+  note: photo is the body-side receptacle DT04-08PA; the mating plug and wedges are listed in mates_with
+TG-SW-DASH:
+  entry: device
+  what: "Motor City K5 dash tailgate window switch (6 blades, loose blade terminals)"
+  maker: Motor City K5
+  maker_pn: MCK5REARWINDOWSWITCH
+  photo: {url: "https://www.motorcityk5.com/images/F22904.jpg", page: "https://www.motorcityk5.com/i-13220-rear-power-tailgate-window-switch-on-dash-73-91-blazer.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: photo on file
+TG-SW-KEY:
+  entry: device
+  what: "factory tailgate key switch (GM 8900713), in parallel with the dash switch"
+  maker: GM (factory)
+  maker_pn: "8900713"
+  confidence: unknown
+  note: no photo of GM 8900713 found yet
+TG-CUTOUT:
+  entry: device
+  what: "tailgate-closed cutout switch, normally open (GM connector 2977647)"
+  maker: GM (factory)
+  maker_pn: unknown
+  confidence: unknown
+  note: switch part number not recorded (the registry names only the connector)
+rear_window_motor:
+  entry: device
+  what: factory electric tailgate window motor
+  maker: GM (factory)
+  maker_pn: unknown
+  confidence: unknown
+  note: part number not recorded; the candidate replacement is Nu-Relics 17383-1 (TG-MOTOR-ACI)
+Backup_Camera:
+  entry: device
+  what: Rear View Safety license-plate backup camera with night vision (the camera of kit RVS-7180355-IR)
+  maker: Rear View Safety
+  maker_pn: RVS-7180355-IR
+  photo: {url: "https://www.rearviewsafety.com/pub/media/catalog/product/r/v/rvs-0355-ir_main_2.jpg", page: "https://www.rearviewsafety.com/license-plate-backup-camera-system-rvs-7180355-ir.html", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "photo is the kit's camera (RVS-0355-IR); the kit photo is https://www.rearviewsafety.com/pub/media/catalog/product/7/1/7180355-ir-main-720x720.jpg"
+MIRROR-MON:
+  entry: device
+  what: Rear View Safety replacement rearview mirror with display (the monitor of kit RVS-7180355-IR)
+  maker: Rear View Safety
+  maker_pn: RVS-7180355-IR
+  photo: {url: "https://www.rearviewsafety.com/pub/media/catalog/product/r/e/replacement-mirror-monitor-rvs-718-main_2.jpg", page: "https://www.rearviewsafety.com/license-plate-backup-camera-system-rvs-7180355-ir.html", fetched: "2026-09-29"}
+  drawing: {url: "https://www.rearviewsafety.com/pub/media/catalog/product/7/1/718dimensions_3.jpg", page: "https://www.rearviewsafety.com/license-plate-backup-camera-system-rvs-7180355-ir.html"}
+  confidence: exact_pn
+  note: "photo is the kit's RVS-718 mirror monitor; drawing is RVS's dimension image for the 718 mirror"
+Tail_Light_Left:
+  entry: device
+  what: "left tail/stop/turn lamp: factory GM socket 8911029 (3 leads) with an 1157 bulb"
+  maker: GM (factory)
+  maker_pn: "8911029"
+  photo: {url: "https://upcarparts.com/cdn/shop/files/111157_01.jpg?v=1735798033&width=1200", page: "https://upcarparts.com/products/3-wire-tail-light-turn-signal-socket-1973-1991-chevrolet-gmc-trucks", fetched: "2026-09-28"}
+  confidence: same_family_photo
+  note: "photo is the candidate replacement, United Pacific 111157 3-wire 1157 twist socket for 73-91 C/K ('replaces OE 8914822, 8903202'); the factory 8911029 socket is not photographed; LED pick Diode Dynamics 1157 XP80 red DD0016"
+Tail_Light_Right:
+  entry: device
+  what: "right tail/stop/turn lamp: factory GM socket 8911029 (3 leads) with an 1157 bulb"
+  maker: GM (factory)
+  maker_pn: "8911029"
+  photo: {url: "https://upcarparts.com/cdn/shop/files/111157_01.jpg?v=1735798033&width=1200", page: "https://upcarparts.com/products/3-wire-tail-light-turn-signal-socket-1973-1991-chevrolet-gmc-trucks", fetched: "2026-09-28"}
+  piece: Tail_Light_Left
+  confidence: same_family_photo
+  note: "photo is the candidate replacement, United Pacific 111157 3-wire 1157 twist socket for 73-91 C/K ('replaces OE 8914822, 8903202'); the factory 8911029 socket is not photographed; LED pick Diode Dynamics 1157 XP80 red DD0016"
+Backup_Light_Left:
+  entry: device
+  what: "left backup lamp: factory GM socket 8911027 (2 leads) with an 1156 bulb"
+  maker: GM (factory)
+  maker_pn: "8911027"
+  photo: {url: "https://dxv0kh7euhy9z.cloudfront.net/catalog/product/d/d/dd0369p_1156_xpr_white_pair_b.jpg", page: "https://www.diodedynamics.com/1156-xpr-backup-led-bulbs.html", fetched: "2026-09-29"}
+  confidence: same_family_photo
+  note: "photo is the LED pick for this lamp (Diode Dynamics 1156 XPR cool white, DD0369), not the socket; the 2-wire replacement socket is not picked"
+Backup_Light_Right:
+  entry: device
+  what: "right backup lamp: factory GM socket 8911027 (2 leads) with an 1156 bulb"
+  maker: GM (factory)
+  maker_pn: "8911027"
+  photo: {url: "https://dxv0kh7euhy9z.cloudfront.net/catalog/product/d/d/dd0369p_1156_xpr_white_pair_b.jpg", page: "https://www.diodedynamics.com/1156-xpr-backup-led-bulbs.html", fetched: "2026-09-29"}
+  piece: Backup_Light_Left
+  confidence: same_family_photo
+  note: "photo is the LED pick for this lamp (Diode Dynamics 1156 XPR cool white, DD0369), not the socket; the 2-wire replacement socket is not picked"
+CHMSL:
+  entry: device
+  what: "ORACLE Linear Universal LED third brake light module, red, 7 in, IP68"
+  maker: ORACLE Lighting
+  maker_pn: "4514-003"
+  photo: {url: "https://www.oraclelights.com/cdn/shop/files/4514-003_A_Primary_0cff9a94-4dc5-4af4-9078-fe02f1d1d6f8.webp?v=1769554854&width=900", page: "https://www.oraclelights.com/products/linear-universal-led-3rd-brake-light-chmsl-module-red", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: photo on file
+BRAKE-SW:
+  entry: device
+  what: factory brake light switch at the pedal (GM connector 2984235)
+  maker: GM (factory)
+  maker_pn: unknown
+  confidence: unknown
+  note: switch part number not recorded (the registry names only the connector)
+VSS-SENDER:
+  entry: device
+  what: "Dakota Digital speed sender for the speedometer drive (7/8-18 GM thread, 16k PPM, 3 wires)"
+  maker: Dakota Digital
+  maker_pn: SEN-01-5
+  photo: {url: "https://static.summitracing.com/global/images/prod/xlarge/dak-sen-01-5_xl.jpg", page: "https://www.summitracing.com/parts/dak-sen-01-5", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "Summit Racing's product image (file named for the part number)"
+AC-CLUTCH:
+  entry: device
+  what: "Sanden 7176 (SD7B10) A/C compressor clutch, 6-groove, single-lead coil (T1 male bullet)"
+  maker: Sanden
+  maker_pn: "7176"
+  photo: {url: "https://i.ebayimg.com/images/g/sq8AAOSw1yNoG2vB/s-l1600.jpg", page: "https://www.ebay.com/itm/151435180305", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "the seller's photo of the listing the owner bought (order record in the database); the piece at the plug is the clutch coil lead"
+AC-LP-SW:
+  entry: device
+  what: "GM A/C clutch cycling switch, accumulator-mounted (ACDelco 15-5720)"
+  maker: GM (ACDelco)
+  maker_pn: "15035084"
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/15-5720_Primary.jpg", page: "https://parts.chevrolet.com/product/gm-genuine-parts-air-conditioning-clutch-cycling-switch-15035084", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "photo on file: GM's image for ACDelco 15-5720, the ACDelco number of GM 15035084"
+AC-HP-SW:
+  entry: device
+  what: "Vintage Air binary pressure switch, 30 psi low / 406 psi high cut-out, 3/8-24 male"
+  maker: Vintage Air
+  maker_pn: "11079-VUS"
+  photo: {url: "https://static.summitracing.com/global/images/prod/xlarge/vta-11079-vus_xl.jpg", page: "https://www.summitracing.com/parts/vta-11079-vus", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: photo on file (Summit Racing product image)
+PORT-ETH:
+  entry: device
+  what: "M130 laptop port: panel-mount RJ45 Ethernet cable, 1 m (crossover at the loom side)"
+  maker: ProWire USA
+  maker_pn: M-RJ45-CABLE
+  photo: {url: "https://www.prowireusa.com/content/59737/M-RJ45-CABLE.webp", page: "https://www.prowireusa.com/p-563-panel-mount-ethernet-cable.html", fetched: "2026-05-11"}
+  mates_with: [PORT-ETH]
+  piece: M-RJ45-CABLE
+  confidence: exact_pn
+  note: "photo from ProWire's catalogue row (catalog_parts, 2026-05-11 scrape)"
+CAN-BUS:
+  entry: device
+  what: "M1 CAN bus trunk (M130 - PDM30 - 61-pin - PDM15 - LTCD, UTC stub): two 100 ohm 0.25 W terminators"
+  maker: unknown
+  maker_pn: unknown
+  mates_with: [CAN-TERM-100R]
+  confidence: unknown
+  note: "a bus, not one piece; its only parts are the two CAN-TERM-100R resistors, whose part number is not picked"
+PORT-UTC:
+  entry: device
+  what: "PDM30 config port: Neutrik NC5FD-L-1 5-pin female XLR for the MoTeC UTC"
+  maker: Neutrik
+  maker_pn: NC5FD-L-1
+  photo: {url: "https://www.neutrik.com/uploads/media/400x/02/522-nc5fd-l-1.jpg?v=1-0", page: "https://www.neutrik.com/en/product/nc5fd-l-1", fetched: "2026-09-29"}
+  drawing: {url: "https://www.neutrik.com/media/8402/download/nc5fd-l-1-3.pdf?v=1", page: "https://www.neutrik.com/en/product/nc5fd-l-1"}
+  mates_with: [MOTEC-UTC-61059]
+  piece: NC5FD-L-1
+  confidence: exact_pn
+  note: Neutrik also publishes a 2D DXF (media/11850/download/nc5fd-l-1-4.dxf); no 3D model on the product page
+FIREWALL-CABIN:
+  entry: device
+  what: "firewall 61-pin, cabin side: D38999/24WJ61SN jam-nut receptacle (sockets)"
+  maker: Amphenol Aerospace (to MIL-DTL-38999)
+  maker_pn: D38999/24WJ61SN
+  photo: {url: "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/003/222/406/D3899924WJ61SN_sml(200x200).jpg", page: "https://www.digikey.com/en/products/result?keywords=D38999%2F24WJ61SN", fetched: "2026-09-28"}
+  mates_with: [D38999/26WJ61PN, M39029/56-351, M85049/69-25N, "202K163-25-0"]
+  piece: D38999/24WJ61SN
+  confidence: exact_pn
+  note: DigiKey product photo (bought on eBay)
+FIREWALL-ENGINE:
+  entry: device
+  what: "firewall 61-pin, engine side: D38999/26WJ61PN plug (pins)"
+  maker: Amphenol Aerospace (to MIL-DTL-38999)
+  maker_pn: D38999/26WJ61PN
+  photo: {url: "https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/030/806/680/D3899926WJ61PN_sml.jpg", page: "https://www.digikey.com/en/products/result?keywords=D38999%2F26WJ61PN", fetched: "2026-09-28"}
+  mates_with: [D38999/24WJ61SN, M39029/58-363, M85049/69-25N, "202K163-25-0"]
+  piece: D38999/26WJ61PN
+  confidence: exact_pn
+  note: DigiKey product photo (bought on eBay)
+FIREWALL-GROMMET:
+  entry: device
+  what: "firewall pass-through: Blue Sea 1003 CableClam, one per 2 AWG cable"
+  maker: Blue Sea Systems
+  maker_pn: "1003"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/1003.jpg", page: "https://www.bluesea.com/products/1003/CableClam_1.40in", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/1003.pdf", page: "https://www.bluesea.com/products/1003/CableClam_1.40in"}
+  instructions: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/instructions/1001-1003_Instructions.pdf"
+  piece: BLUESEA-1003
+  confidence: exact_pn
+  note: "photo on file (BS-1003) was a West Marine copy; this is the maker's"
+TB:
+  entry: device
+  what: "GM Gen V truck electronic throttle body, SENT position sensor, 5-wire plug"
+  maker: GM (ACDelco)
+  maker_pn: "12699160"
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/12699160_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=12699160", fetched: "2026-09-29"}
+  mates_with: [WCTHB50]
+  confidence: exact_pn
+  note: "photo from GM's parts catalogue image server"
+COIL-1:
+  entry: device
+  what: "LS ignition coil 1 (ACDelco D510C / GM 12611424), DEL-Stributor cluster"
+  maker: ACDelco (GM)
+  maker_pn: D510C
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/D510C_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=D510C", fetched: "2026-09-29"}
+  mates_with: [COIL-CONN-LS2/7]
+  confidence: exact_pn
+  note: "GM 12611424 = ACDelco D510C; photo is GM's image for D510C"
+COIL-2:
+  entry: device
+  what: "LS ignition coil 2 (ACDelco D510C / GM 12611424), DEL-Stributor cluster"
+  maker: ACDelco (GM)
+  maker_pn: D510C
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/D510C_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=D510C", fetched: "2026-09-29"}
+  mates_with: [COIL-CONN-LS2/7]
+  piece: COIL-1
+  confidence: exact_pn
+  note: "GM 12611424 = ACDelco D510C; photo is GM's image for D510C"
+COIL-3:
+  entry: device
+  what: "LS ignition coil 3 (ACDelco D510C / GM 12611424), DEL-Stributor cluster"
+  maker: ACDelco (GM)
+  maker_pn: D510C
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/D510C_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=D510C", fetched: "2026-09-29"}
+  mates_with: [COIL-CONN-LS2/7]
+  piece: COIL-1
+  confidence: exact_pn
+  note: "GM 12611424 = ACDelco D510C; photo is GM's image for D510C"
+COIL-4:
+  entry: device
+  what: "LS ignition coil 4 (ACDelco D510C / GM 12611424), DEL-Stributor cluster"
+  maker: ACDelco (GM)
+  maker_pn: D510C
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/D510C_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=D510C", fetched: "2026-09-29"}
+  mates_with: [COIL-CONN-LS2/7]
+  piece: COIL-1
+  confidence: exact_pn
+  note: "GM 12611424 = ACDelco D510C; photo is GM's image for D510C"
+COIL-5:
+  entry: device
+  what: "LS ignition coil 5 (ACDelco D510C / GM 12611424), DEL-Stributor cluster"
+  maker: ACDelco (GM)
+  maker_pn: D510C
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/D510C_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=D510C", fetched: "2026-09-29"}
+  mates_with: [COIL-CONN-LS2/7]
+  piece: COIL-1
+  confidence: exact_pn
+  note: "GM 12611424 = ACDelco D510C; photo is GM's image for D510C"
+COIL-6:
+  entry: device
+  what: "LS ignition coil 6 (ACDelco D510C / GM 12611424), DEL-Stributor cluster"
+  maker: ACDelco (GM)
+  maker_pn: D510C
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/D510C_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=D510C", fetched: "2026-09-29"}
+  mates_with: [COIL-CONN-LS2/7]
+  piece: COIL-1
+  confidence: exact_pn
+  note: "GM 12611424 = ACDelco D510C; photo is GM's image for D510C"
+COIL-7:
+  entry: device
+  what: "LS ignition coil 7 (ACDelco D510C / GM 12611424), DEL-Stributor cluster"
+  maker: ACDelco (GM)
+  maker_pn: D510C
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/D510C_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=D510C", fetched: "2026-09-29"}
+  mates_with: [COIL-CONN-LS2/7]
+  piece: COIL-1
+  confidence: exact_pn
+  note: "GM 12611424 = ACDelco D510C; photo is GM's image for D510C"
+COIL-8:
+  entry: device
+  what: "LS ignition coil 8 (ACDelco D510C / GM 12611424), DEL-Stributor cluster"
+  maker: ACDelco (GM)
+  maker_pn: D510C
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/D510C_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=D510C", fetched: "2026-09-29"}
+  mates_with: [COIL-CONN-LS2/7]
+  piece: COIL-1
+  confidence: exact_pn
+  note: "GM 12611424 = ACDelco D510C; photo is GM's image for D510C"
+INJ-1:
+  entry: device
+  what: "injector 1: Siemens Deka FI114961, 60 lb/h, EV1, 12.5 ohm"
+  maker: Siemens Deka (Continental)
+  maker_pn: FI114961
+  photo: {url: "https://siemensdeka.com/wp-content/uploads/2012/08/FI114961-2-scaled.jpg", page: "https://siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/", fetched: "2026-09-27"}
+  mates_with: ["8CYLK-90", "68102"]
+  confidence: exact_pn
+INJ-2:
+  entry: device
+  what: "injector 2: Siemens Deka FI114961, 60 lb/h, EV1, 12.5 ohm"
+  maker: Siemens Deka (Continental)
+  maker_pn: FI114961
+  photo: {url: "https://siemensdeka.com/wp-content/uploads/2012/08/FI114961-2-scaled.jpg", page: "https://siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/", fetched: "2026-09-27"}
+  mates_with: ["8CYLK-90", "68102"]
+  piece: INJ-1
+  confidence: exact_pn
+INJ-3:
+  entry: device
+  what: "injector 3: Siemens Deka FI114961, 60 lb/h, EV1, 12.5 ohm"
+  maker: Siemens Deka (Continental)
+  maker_pn: FI114961
+  photo: {url: "https://siemensdeka.com/wp-content/uploads/2012/08/FI114961-2-scaled.jpg", page: "https://siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/", fetched: "2026-09-27"}
+  mates_with: ["8CYLK-90", "68102"]
+  piece: INJ-1
+  confidence: exact_pn
+INJ-4:
+  entry: device
+  what: "injector 4: Siemens Deka FI114961, 60 lb/h, EV1, 12.5 ohm"
+  maker: Siemens Deka (Continental)
+  maker_pn: FI114961
+  photo: {url: "https://siemensdeka.com/wp-content/uploads/2012/08/FI114961-2-scaled.jpg", page: "https://siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/", fetched: "2026-09-27"}
+  mates_with: ["8CYLK-90", "68102"]
+  piece: INJ-1
+  confidence: exact_pn
+INJ-5:
+  entry: device
+  what: "injector 5: Siemens Deka FI114961, 60 lb/h, EV1, 12.5 ohm"
+  maker: Siemens Deka (Continental)
+  maker_pn: FI114961
+  photo: {url: "https://siemensdeka.com/wp-content/uploads/2012/08/FI114961-2-scaled.jpg", page: "https://siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/", fetched: "2026-09-27"}
+  mates_with: ["8CYLK-90", "68102"]
+  piece: INJ-1
+  confidence: exact_pn
+INJ-6:
+  entry: device
+  what: "injector 6: Siemens Deka FI114961, 60 lb/h, EV1, 12.5 ohm"
+  maker: Siemens Deka (Continental)
+  maker_pn: FI114961
+  photo: {url: "https://siemensdeka.com/wp-content/uploads/2012/08/FI114961-2-scaled.jpg", page: "https://siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/", fetched: "2026-09-27"}
+  mates_with: ["8CYLK-90", "68102"]
+  piece: INJ-1
+  confidence: exact_pn
+INJ-7:
+  entry: device
+  what: "injector 7: Siemens Deka FI114961, 60 lb/h, EV1, 12.5 ohm"
+  maker: Siemens Deka (Continental)
+  maker_pn: FI114961
+  photo: {url: "https://siemensdeka.com/wp-content/uploads/2012/08/FI114961-2-scaled.jpg", page: "https://siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/", fetched: "2026-09-27"}
+  mates_with: ["8CYLK-90", "68102"]
+  piece: INJ-1
+  confidence: exact_pn
+INJ-8:
+  entry: device
+  what: "injector 8: Siemens Deka FI114961, 60 lb/h, EV1, 12.5 ohm"
+  maker: Siemens Deka (Continental)
+  maker_pn: FI114961
+  photo: {url: "https://siemensdeka.com/wp-content/uploads/2012/08/FI114961-2-scaled.jpg", page: "https://siemensdeka.com/product/60lbh-siemens-deka-high-impedance-long-style-with-ev1-connector-fi114961-60mm/", fetched: "2026-09-27"}
+  mates_with: ["8CYLK-90", "68102"]
+  piece: INJ-1
+  confidence: exact_pn
+CKP:
+  entry: device
+  what: "LS Gen IV 58X crankshaft position sensor (front cover, Hall)"
+  maker: ACDelco (GM)
+  maker_pn: "213-4573"
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/213-4573_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=213-4573", fetched: "2026-09-29"}
+  mates_with: [LS-CRANK-CONN-KIT]
+  confidence: exact_pn
+  note: "GM 12615626 = ACDelco 213-4573 (chapter 08); photo is GM's image for 213-4573"
+CMP:
+  entry: device
+  what: "LS Gen IV camshaft position sensor (front timing cover, Hall)"
+  maker: ACDelco (GM)
+  maker_pn: "213-3826"
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/213-3826_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=213-3826", fetched: "2026-09-29"}
+  mates_with: [LS-CAM-CONN-KIT]
+  confidence: exact_pn
+  note: "GM 12591720 = ACDelco 213-3826 (chapter 08); photo is GM's image for 213-3826"
+KNOCK-1:
+  entry: device
+  what: "LS Gen IV flat-response knock sensor, bank 1"
+  maker: GM
+  maker_pn: "12623730"
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/12623730_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=12623730", fetched: "2026-09-29"}
+  mates_with: ["68201"]
+  confidence: exact_pn
+  note: "ACDelco 213-1576 (chapter 08); photo is GM's image for 12623730"
+KNOCK-2:
+  entry: device
+  what: "LS Gen IV flat-response knock sensor, bank 2 (GM 12623730)"
+  maker: GM
+  maker_pn: "12623730"
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/12623730_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=12623730", fetched: "2026-09-29"}
+  mates_with: ["68201"]
+  piece: KNOCK-1
+  confidence: exact_pn
+  note: "ACDelco 213-1576 (chapter 08); photo is GM's image for 12623730"
+MAP:
+  entry: device
+  what: "MAP sensor: GM Gen IV LS 1-bar on the LS crank/MAP Metri-Pack plug"
+  maker: GM
+  maker_pn: unknown
+  mates_with: [LS-CRANK-CONN-KIT]
+  confidence: unknown
+  note: "FLAG: the registry names the MAP only by its plug; chapter 08 names GM 55573248 (superseding 12592525), which takes a Bosch-style plug (ProWire 68104), and 12592525 is itself a 3-bar LSA/LS9 sensor — pick the sensor before the plug"
+IAT:
+  entry: device
+  what: "intake air temperature sensor: GM thermistor on a GT150 2-way plug (GT150-AIR-TEMP-KIT)"
+  maker: GM
+  maker_pn: unknown
+  mates_with: [GT150-AIR-TEMP-KIT]
+  confidence: unknown
+  note: "FLAG: chapter 08 names GM 25036751 = ACDelco 213-190, a brass 3/8 NPT sensor with a Metri-Pack 150 2-way plug (GM image https://ecommerce-assets.ext.gm.com/assets/products/images/213-190_Primary.jpg), which the registry's GT150 kit (Delphi 15449027) does not fit; ACDelco 213-243 (GM 12160244) is a plastic IAT with a GT150-style plug (https://ecommerce-assets.ext.gm.com/assets/products/images/213-243_Primary.jpg) — pick the sensor, then the plug"
+CLT-ECU:
+  entry: device
+  what: "LS engine coolant temperature sensor for the M130 (GT150 2-way, M12 x 1.5)"
+  maker: ACDelco (GM)
+  maker_pn: "213-4514"
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/213-4514_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=213-4514", fetched: "2026-09-29"}
+  mates_with: [GT150-WTR-TEMP-KIT]
+  confidence: exact_pn
+  note: GM 19236568 = ACDelco 213-4514 (chapter 08)
+OILT:
+  entry: device
+  what: "oil temperature sensor: GM GT150 2-way thermistor, same family as the ECT"
+  maker: GM (family)
+  maker_pn: unknown
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/213-4514_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=213-4514", fetched: "2026-09-29"}
+  mates_with: [GT150-WTR-TEMP-KIT]
+  confidence: same_family_photo
+  note: no oil-temp sensor part number is recorded; the photo is the ECT (ACDelco 213-4514) it shares a family with
+OILP-ECU:
+  entry: device
+  what: "LS3 Gen IV oil pressure sensor, 3-wire large round connector (2009+)"
+  maker: GM
+  maker_pn: "12673134"
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/12673134_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=12673134", fetched: "2026-09-29"}
+  mates_with: [ICT-GEN4-OILP]
+  confidence: exact_pn
+  note: "ACDelco D1846A (chapter 08); photo is GM's image for 12673134"
+FUELP:
+  entry: device
+  what: "fuel pressure sensor: AEM 30-2131-100, 0-100 psig, 0.5-4.5 V, 5 V supply, 1/8 NPT"
+  maker: AEM Electronics
+  maker_pn: "30-2131-100"
+  photo: {url: "https://static.summitracing.com/global/images/prod/xlarge/avm-30-2131-100_xl.jpg", page: "https://www.summitracing.com/parts/avm-30-2131-100", fetched: "2026-09-29"}
+  drawing: {url: "https://documents.aemelectronics.com/techlibrary_30-2131-100_sensor_data.pdf", page: "https://www.aemelectronics.com/products/sensors/pressure_sensors/parts/30-2131-100"}
+  instructions: "https://documents.aemelectronics.com/ebf9109d7d01bb4b636f2da0b8eccda4eb4fb343.pdf"
+  mates_with: [FUELP]
+  piece: AEM-30-2131-100
+  confidence: exact_pn
+  note: "FLAG: AEM titles 30-2131-100 '100 PSIg Brass Sensor Kit' and 30-2130-100 '100 PSIg Stainless Sensor Kit'; the registry's '316L wetted' describes the 30-2130-100. The photo on file (30-2131-100.jpg) is AEM's 30-2130-100 image"
+DAK-CTS:
+  entry: device
+  what: "Dakota Digital 100-300 °F temperature sender, 1/8 NPT, two-wire harness"
+  maker: Dakota Digital
+  maker_pn: SEN-04-5
+  photo: {url: "https://static.summitracing.com/global/images/prod/xlarge/dak-sen-04-5_xl.jpg", page: "https://www.summitracing.com/parts/dak-sen-04-5", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "Summit Racing's product image (file named for the part number)"
+DAK-OILP:
+  entry: device
+  what: "Dakota Digital 0-100 psi solid-state oil pressure sensor, 1/8 NPT"
+  maker: Dakota Digital
+  maker_pn: SEN-03-8
+  photo: {url: "https://static.summitracing.com/global/images/prod/xlarge/dak-sen-03-8_xl.jpg", page: "https://www.summitracing.com/parts/dak-sen-03-8", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "Summit Racing's product image (file named for the part number)"
+WIDEBAND:
+  entry: device
+  what: MoTeC LTCD dual lambda-to-CAN module (with 2 x Bosch LSU 4.9 sensors)
+  maker: MoTeC
+  maker_pn: "61301"
+  photo: {url: "https://assets.motec.com.au/strapi/large_LTCD_7c7a5eed0a.webp", page: "https://www.motec.com.au/products/LTCD", fetched: "2026-09-29"}
+  drawing: {url: "https://assets.motec.com.au/strapi/61301_ltcd_dimensions_230fa1e2c4.svg", page: "https://www.motec.com.au/products/LTCD"}
+  datasheet: "https://assets.motec.com.au/strapi/CDS_61301_LTCD_6b68d1c9d3.pdf"
+  mates_with: ["68054"]
+  confidence: exact_pn
+  note: "photo is the LTCD box; the two LSU 4.9 sensors plug into its connectors A/B (sensor part number not recorded); Bosch LSU 4.9: https://www.bosch-motorsport.com/content/downloads/Raceparts/en-GB/51865867208058251.html (datasheet https://www.bosch-motorsport.com/content/downloads/Raceparts/Resources/pdf/Data%20Sheet_69034379_Lambda_Sensor_LSU_4.9.pdf)"
+ALTERNATOR-SENSE:
+  entry: device
+  what: "Holley 197-302 premium alternator, natural finish (mid-mount kit), with pigtail 197-400"
+  maker: Holley
+  maker_pn: "197-302"
+  confidence: unknown
+  note: "Holley's page https://www.holley.com/products/electrical/alternators/parts/197-302 has the photo, but its file name is a 40-hex id the repo's secret scanner rejects, and Summit has no 197-302 image; no hash-free photo found"
+STARTER-S:
+  entry: device
+  what: starter motor S (trigger) terminal
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: starter model not recorded
+FAN:
+  entry: device
+  what: "SPAL 16 in drop-in brushless puller fan, 300 W, 2053 CFM"
+  maker: SPAL
+  maker_pn: "30107090"
+  photo: {url: "https://wizardcooling.com/images/M198668289.jpg", page: "https://wizardcooling.com/i-30504347-16-brushless-fan-300-watts-drop-in-style.html", fetched: "2026-09-29"}
+  mates_with: ["30130628", "7116-3250", "7158-3035"]
+  confidence: same_family_photo
+  note: "Wizard Cooling's photo on its 30107090 listing reads 'ABL506P' on the motor label, which may be the 500 W motor; the photo on file (kartek) is the 30107101; no maker photo of 30107090 found"
+PS-STUDS:
+  entry: device
+  what: "DC primary cable ends: 2 AWG lugs 238LTP (photo) and 2516LTP, 4 AWG DL438, 8 AWG 838TP, 6 AWG 610TP, under CPA-100-3/4-BK"
+  maker: ASK (sold by ProWire USA)
+  maker_pn: "238LTP"
+  photo: {url: "https://www.prowireusa.com/content/117820/238LTP.webp", page: "https://www.prowireusa.com/238LTP", fetched: "2026-09-28"}
+  mates_with: ["2516LTP", DL438, "838TP", "610TP", CPA-100-3/4-BK]
+  piece: "238LTP"
+  confidence: exact_pn
+  note: many lugs on one list; the photo is the 238LTP that most of the heavy runs use
+APS:
+  entry: device
+  what: "drive-by-wire accelerator pedal for 1972-98 C10 LS swaps (GM Gen III truck pedal pattern, 9-cavity plug, 6 wired)"
+  maker: unknown (eBay seller autohand)
+  maker_pn: eBay item 285903658629
+  photo: {url: "https://i.ebayimg.com/images/g/zycAAOSwI2lmXXQv/s-l1600.jpg", page: "https://www.ebay.com/itm/285903658629", fetched: "2026-09-29"}
+  mates_with: [WPAPP30]
+  confidence: exact_pn
+  note: "the seller's photo of the listing the owner bought (order record in the database); the listing's interchange field names GM 15751307 and ACC-1049; the pedal's own OE number is still to be read at the bench"
+DAKOTA-VHX:
+  entry: device
+  what: Dakota Digital VHX control box (ships in the VHX-73C-PU kit for 1973-87 Chevy trucks)
+  maker: Dakota Digital
+  maker_pn: VHX-73C-PU
+  photo: {url: "https://static.summitracing.com/global/images/prod/xlarge/dak-vhx-73c-pu_xl.jpg", page: "https://www.summitracing.com/parts/dak-vhx-73c-pucr", fetched: "2026-09-29"}
+  drawing: {url: "https://www.dakotadigital.com/pdf/VHX-73c-pu.PDF", page: "https://www.dakotadigital.com/pdf/VHX-73c-pu.PDF"}
+  confidence: same_family_photo
+  note: "Summit's VHX-73C-PU image shows the back of the gauge cluster, not the control box; drawing link is Dakota's installation manual 650371E (from the search index; dakotadigital.com did not answer a scripted request)"
+IGN-SWITCH:
+  entry: device
+  what: OER 9-blade GM-pattern ignition switch for the tilt column
+  maker: OER
+  maker_pn: "1990096"
+  photo: {url: "https://cdn.classicindustries.com/assets/images/ProductImg/pdp/1/1990096.JPG", page: "https://www.oerparts.com/product/1990096.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "OER's own product page image (served from Classic Industries' CDN)"
+FUEL-PUMP:
+  entry: device
+  what: Quantum Fuel Systems LS-swap fuel pump hanger for 1973-91 Blazer/Jimmy (QFS-H882) with the P367 pump
+  maker: Quantum Fuel Systems
+  maker_pn: QFS-H882
+  photo: {url: "https://cdn11.bigcommerce.com/s-f5wn3qdqza/images/stencil/2560w/products/43676/663874/qfs-ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs__62292.1777427078.jpg?c=1", page: "https://www.highflowfuel.com/ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs/", fetched: "2026-09-28"}
+  mates_with: [QFS-BKCN-GM, DTP06-2S, DTP04-2P]
+  confidence: exact_pn
+  note: "bought on eBay (order record in the database); the pump alone (HFP-367) is on https://www.highflowfuel.com/fuel-pump-oem-replacement-hfp-367-qfs/"
+FUEL-LEVEL:
+  entry: device
+  what: "fuel level sender on the Quantum QFS-H882 hanger, out through the QFS-BKCN-GM bulkhead to a DEUTSCH DT 2-way"
+  maker: Quantum Fuel Systems
+  maker_pn: QFS-H882
+  photo: {url: "https://cdn11.bigcommerce.com/s-f5wn3qdqza/images/stencil/2560w/products/43676/663874/qfs-ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs__62292.1777427078.jpg?c=1", page: "https://www.highflowfuel.com/ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs/", fetched: "2026-09-28"}
+  mates_with: [QFS-BKCN-GM, DT06-2S, DT04-2P]
+  piece: FUEL-PUMP
+  confidence: exact_pn
+  note: the sender is part of the QFS-H882 hanger; photo is the hanger
+RAIL-COIL_PWR:
+  entry: device
+  what: "COIL_PWR 16 AWG rail daisy-chained to the 8 coil feed pins: seven Raychem MiniSeal stub splices D-609-05"
+  maker: TE Connectivity (Raychem)
+  maker_pn: D-609-05
+  photo: {url: "https://www.prowireusa.com/content/59740/D-609-05.webp", page: "https://www.prowireusa.com/p-1926-mini-seal-crimp-stub-splice-yellow.html", fetched: "2026-09-28"}
+  piece: D-609-05
+  confidence: exact_pn
+RAIL-INJ_PWR:
+  entry: device
+  what: "INJ_PWR 16 AWG rail daisy-chained to the 8 injector pin 1s: seven Raychem MiniSeal stub splices D-609-05"
+  maker: TE Connectivity (Raychem)
+  maker_pn: D-609-05
+  photo: {url: "https://www.prowireusa.com/content/59740/D-609-05.webp", page: "https://www.prowireusa.com/p-1926-mini-seal-crimp-stub-splice-yellow.html", fetched: "2026-09-28"}
+  piece: D-609-05
+  confidence: exact_pn
+COIL-GROUND-RINGS:
+  entry: device
+  what: head ring terminals for the coil chassis and signal grounds (and the M130 grounds A10/A11)
+  maker: unknown
+  maker_pn: unknown
+  mates_with: [RING-SMALL]
+  confidence: unknown
+  note: "ring part numbers wait on the head's ground-boss thread (RING-SMALL is open)"
+FIREWALL-BODY-A:
+  entry: device
+  what: "body bulkhead A: DEUTSCH DT 12-way flanged receptacle, gray, A key (DT04-12PA-L012 + W12P + DT12-L012-GKT; plug DT06-12SA + W12S)"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT04-12PA-L012
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT04-12PA-L012_Front.jpg?v=1739397832", page: "https://www.customconnectorkits.com/products/dt04-12pa-l012", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT04-12PX-L012&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT04-12PA-L012", page: "https://www.te.com/en/product-DT04-12PA-L012.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT04-12PA-L012&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT04-12PA-L012", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT06-12SA, W12P, W12S, DT12-L012-GKT, "0460-202-16141", "0462-201-16141"]
+  piece: DT04-12PA-L012
+  confidence: exact_pn
+  note: photo is the body-side receptacle DT04-12PA-L012; the mating plug and wedges are listed in mates_with
+FIREWALL-BODY-B:
+  entry: device
+  what: "body bulkhead B: DEUTSCH DT 12-way flanged receptacle, black, B key (DT04-12PB-L012 + W12P + DT12-L012-GKT; plug DT06-12SB + W12S)"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT04-12PB-L012
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT04-12PB-L012_front__46111.1633825473.1200.1200.jpg?v=1686740560", page: "https://www.customconnectorkits.com/products/dt04-12pb-l012", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT04-12PX-L012&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT04-12PB-L012", page: "https://www.te.com/en/product-DT04-12PB-L012.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT04-12PB-L012&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT04-12PB-L012", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT06-12SB, W12P, W12S, DT12-L012-GKT, "0460-202-16141", "0462-201-16141"]
+  piece: DT04-12PB-L012
+  confidence: exact_pn
+  note: photo is the body-side receptacle DT04-12PB-L012; the mating plug and wedges are listed in mates_with
+FIREWALL-BODY-P:
+  entry: device
+  what: "body bulkhead P: DEUTSCH DTP 4-way flanged receptacle (DTP04-4P-L012 + WP-4P + DTP4P-L012-GKT; plug DTP06-4S + WP-4S)"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DTP04-4P-L012
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DTP04-4P-L012_Front.jpg?v=1739397879", page: "https://www.customconnectorkits.com/products/dtp04-4p-l012", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DTP04-4P-L012&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DTP04-4P-L012", page: "https://www.te.com/en/product-DTP04-4P-L012.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DTP04-4P-L012&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DTP04-4P-L012", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DTP06-4S, WP-4P, WP-4S, DTP4P-L012-GKT, "0460-204-12141", "0462-203-12141", "114017"]
+  piece: DTP04-4P-L012
+  confidence: exact_pn
+  note: photo is the body-side receptacle DTP04-4P-L012; the mating plug and wedges are listed in mates_with
+HEADLIGHT-L:
+  entry: device
+  what: "Truck-Lite 27270C 7 in round LED headlight, high/low, hardwired H4 plug"
+  maker: Truck-Lite
+  maker_pn: "27270C"
+  photo: {url: "https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/27270C/spinset_01_01_27270C.jpg", page: "https://mpparts.com/part/truck-lite-27270c-7in-round-led-headlight-27270c", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "Truck-Lite's own 360-spin image for 27270C; no live 27270C product page or drawing found on truck-lite.com"
+HEADLIGHT-R:
+  entry: device
+  what: "right headlight: Truck-Lite 27270C 7 in round LED"
+  maker: Truck-Lite
+  maker_pn: "27270C"
+  photo: {url: "https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/27270C/spinset_01_01_27270C.jpg", page: "https://mpparts.com/part/truck-lite-27270c-7in-round-led-headlight-27270c", fetched: "2026-09-29"}
+  piece: HEADLIGHT-L
+  confidence: exact_pn
+  note: "Truck-Lite's own 360-spin image for 27270C; no live 27270C product page or drawing found on truck-lite.com"
+PARK-TURN-LF:
+  entry: device
+  what: "left front park/turn lamp: factory GM socket 8911486 (3 leads) with an 1157NA bulb"
+  maker: GM (factory)
+  maker_pn: "8911486"
+  photo: {url: "https://jlfabrication.com/cdn/shop/products/s-l1600_4b7e7589-894b-4823-8b9f-d7867851c43c.png?v=1675805521", page: "https://jlfabrication.com/products/73-87-chevy-gmc-truck-tail-light-socket-park-light-round-headlight-with-pigtail", fetched: "2026-09-28"}
+  confidence: same_family_photo
+  note: photo is the candidate replacement JL Fabrication 3-wire socket (fits 73-80 round-headlight park lamps); LED pick Diode Dynamics 1157 XP80 amber DD0015
+PARK-TURN-RF:
+  entry: device
+  what: "right front park/turn lamp: factory GM socket 8911486 (3 leads) with an 1157NA bulb"
+  maker: GM (factory)
+  maker_pn: "8911486"
+  photo: {url: "https://jlfabrication.com/cdn/shop/products/s-l1600_4b7e7589-894b-4823-8b9f-d7867851c43c.png?v=1675805521", page: "https://jlfabrication.com/products/73-87-chevy-gmc-truck-tail-light-socket-park-light-round-headlight-with-pigtail", fetched: "2026-09-28"}
+  piece: PARK-TURN-LF
+  confidence: same_family_photo
+  note: photo is the candidate replacement JL Fabrication 3-wire socket (fits 73-80 round-headlight park lamps); LED pick Diode Dynamics 1157 XP80 amber DD0015
+MARKER-LF:
+  entry: device
+  what: "left front side marker: factory GM socket 6294015 (2 leads) with a 168 bulb"
+  maker: GM (factory)
+  maker_pn: "6294015"
+  photo: {url: "https://cdn11.bigcommerce.com/s-5ha9tbdrhc/images/stencil/2560w/products/5858/8158/21095__94327.1754916601.jpg?c=1", page: "https://www.usa1industries.com/1973-87-square-body-chevy-gmc-truck-side-marker-lamp-socket-w-pigtail/", fetched: "2026-09-28"}
+  confidence: same_family_photo
+  note: "photo is the candidate replacement USA1 Industries 21095 1973-87 side marker socket with pigtail; LED pick Diode Dynamics 194 HP5 (amber front, red rear)"
+MARKER-RF:
+  entry: device
+  what: "right front side marker: factory GM socket 6294015 (2 leads) with a 168 bulb"
+  maker: GM (factory)
+  maker_pn: "6294015"
+  photo: {url: "https://cdn11.bigcommerce.com/s-5ha9tbdrhc/images/stencil/2560w/products/5858/8158/21095__94327.1754916601.jpg?c=1", page: "https://www.usa1industries.com/1973-87-square-body-chevy-gmc-truck-side-marker-lamp-socket-w-pigtail/", fetched: "2026-09-28"}
+  piece: MARKER-LF
+  confidence: same_family_photo
+  note: "photo is the candidate replacement USA1 Industries 21095 1973-87 side marker socket with pigtail; LED pick Diode Dynamics 194 HP5 (amber front, red rear)"
+HORN:
+  entry: device
+  what: factory horn on the core support (GM 1-way connector 12004267)
+  maker: GM (factory)
+  maker_pn: unknown
+  confidence: unknown
+  note: horn part number not recorded (the registry names only the connector)
+WASHER-PUMP:
+  entry: device
+  what: "Hella 12 V mono washer pump, 2 bar, 1 l/min, 35 mm housing (in the Hella 8TW 003 248-001 tank)"
+  maker: Hella
+  maker_pn: "8TW 004 223-031"
+  drawing: {url: "https://www.hella.com/forvia-us/assets/documents/BI_Washer-pumps-and-water-tanks_2026.pdf", page: "https://www.hella.com/forvia-us/assets/documents/BI_Washer-pumps-and-water-tanks_2026.pdf"}
+  confidence: unknown
+  note: "no photo fetched yet (retailer pages refuse scripts); drawing link is Hella's washer pumps and tanks product information"
+UNDERHOOD-LAMP:
+  entry: device
+  what: "underhood lamp and switch assembly: factory, one feed lead, 93 bulb"
+  maker: GM (factory)
+  maker_pn: unknown
+  confidence: unknown
+  note: no part number recorded; LED pick Diode Dynamics 1156 HP11 cool white (not photographed)
+WIPER-MOTOR:
+  entry: device
+  what: factory 1977 C/K two-speed wiper motor with the washer pump on it
+  maker: GM (factory)
+  maker_pn: unknown
+  confidence: unknown
+  note: motor part number not recorded
+BLOWER-RES:
+  entry: device
+  what: factory Four-Season blower resistor on the evaporator case (BAT / M1 / M2 / BLO)
+  maker: GM (factory)
+  maker_pn: unknown
+  confidence: unknown
+  note: part number not recorded
+BLOWER-MOTOR:
+  entry: device
+  what: Four Seasons single-shaft blower motor
+  maker: Four Seasons (SMP)
+  maker_pn: "35587"
+  photo: {url: "https://static.summitracing.com/global/images/prod/xlarge/FSS-35587_xl.jpg", page: "https://www.summitracing.com/parts/fss-35587", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "Summit Racing's product image (file named for the part number)"
+IBOOSTER:
+  entry: device
+  what: "Bosch iBooster Gen 1 electromechanical brake booster, Tesla Model S/X 1037123-00-B"
+  maker: Bosch (for Tesla)
+  maker_pn: "1037123-00-B"
+  photo: {url: "https://www.evcreate.com/wp-content/uploads/2020/07/Tesla_1037123-00-B-1.jpg", page: "https://www.evcreate.com/shop/brakes-wheels/tesla-ibooster-1037123-00-b/", fetched: "2026-09-29"}
+  confidence: exact_pn
+  note: "EVcreate's photo of a 1037123-00-B (not the owner's unit)"
+GND-BANK-ENG:
+  entry: device
+  what: "engine-bay ground star: stud bank beside the batteries (both battery negatives, block G1, frame G2, every engine-bay return)"
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: "the stud bank product is not named in the registry (parts.yaml's power_spine pool holds a Blue Sea 2019 PowerBar, tied to no endpoint)"
+FLOOR-DIMMER:
+  entry: device
+  what: factory floor dimmer switch
+  maker: GM (factory)
+  maker_pn: unknown
+  confidence: unknown
+  note: part number not recorded
+HL-SW:
+  entry: device
+  what: "USA1 Industries 1973-87 square-body headlight switch, factory style"
+  maker: USA1 Industries
+  maker_pn: "16603"
+  photo: {url: "https://cdn11.bigcommerce.com/s-5ha9tbdrhc/images/stencil/1280x1280/products/4929/4601/1973-91-Square_body-Chevy--GMC-Truck-Headlight-Switch-16603__46913.1762446061.jpg?c=1", page: "https://www.usa1industries.com/1973-87-square-body-chevy-gmc-truck-headlight-switch/", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: USA1 SKU 16603 (image file name and page)
+TURN-SW:
+  entry: device
+  what: factory column turn/hazard switch
+  maker: GM (factory)
+  maker_pn: unknown
+  confidence: unknown
+  note: part number not recorded
+HORN-SW:
+  entry: device
+  what: factory horn button (grounds through the column)
+  maker: GM (factory)
+  maker_pn: unknown
+  confidence: unknown
+  note: part number not recorded
+WIPER-SW:
+  entry: device
+  what: factory wiper/washer dash switch (grounds through its mounting)
+  maker: GM (factory)
+  maker_pn: unknown
+  confidence: unknown
+  note: part number not recorded
+BLOWER-SW:
+  entry: device
+  what: factory Four-Season blower switch in the control head
+  maker: GM (factory)
+  maker_pn: unknown
+  confidence: unknown
+  note: part number not recorded
+DOOR-JAMB-L:
+  entry: device
+  what: "driver door jamb pin switch (factory, grounds through the body)"
+  maker: GM (factory)
+  maker_pn: unknown
+  confidence: unknown
+  note: part number not recorded
+DOOR-JAMB-R:
+  entry: device
+  what: "passenger door jamb pin switch (factory, grounds through the body)"
+  maker: GM (factory)
+  maker_pn: unknown
+  confidence: unknown
+  note: part number not recorded
+DOME-LAMP:
+  entry: device
+  what: "dome lamp, Blazer RPO C8B (terminals 2977080) or cab-only socket 8911223"
+  maker: GM (factory)
+  maker_pn: unknown
+  photo: {url: "https://dxv0kh7euhy9z.cloudfront.net/catalog/product/4/1/41mm_hp6_cool_pair.jpg", page: "https://www.diodedynamics.com/41mm-hp6-led-bulbs.html", fetched: "2026-09-29"}
+  confidence: same_family_photo
+  note: "photo is the LED festoon family for the pick (Diode Dynamics 41 mm HP6); the image is the cool-white pair, the pick is warm white DD0354"
+UNDERDASH-LAMPS:
+  entry: device
+  what: "Lumitec Mini Rail2 LED utility light, warm white, 10-30 V, IP65 (leads)"
+  maker: Lumitec
+  maker_pn: "101241"
+  photo: {url: "https://www.lumiteclighting.com/media/catalog/product/r/a/rail2_mini_3.png", page: "https://www.lumiteclighting.com/mini-rail2-led-utility-light-2.html", fetched: "2026-09-29"}
+  confidence: same_family_photo
+  note: "Lumitec's Mini Rail2 product image; the warm-white 101241 shares the housing but the image is not labelled with the part number"
+FOOTWELL-LAMPS:
+  entry: device
+  what: "footwell lamps: Lumitec Mini Rail2 101241 warm white LED (leads)"
+  maker: Lumitec
+  maker_pn: "101241"
+  photo: {url: "https://www.lumiteclighting.com/media/catalog/product/r/a/rail2_mini_3.png", page: "https://www.lumiteclighting.com/mini-rail2-led-utility-light-2.html", fetched: "2026-09-29"}
+  piece: UNDERDASH-LAMPS
+  confidence: same_family_photo
+  note: "Lumitec's Mini Rail2 product image; the warm-white 101241 shares the housing but the image is not labelled with the part number"
+CLEARANCE-L:
+  entry: device
+  what: LMC 1973-87 roof marker lamp (36-4481 amber lens + 36-4482 pad + 36-0368 amber LED 194)
+  maker: LMC Truck
+  maker_pn: "36-4481"
+  photo: {url: "https://lmcnopstorage.blob.core.windows.net/nopprodimages/0002980_1973-91-roof-marker-lamp.png", page: "https://www.lmctruck.com/lighting/cab-roof/cc-1973-87-roof-marker-lamp", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: photo on file (LMC roof marker lamp page)
+CLEARANCE-C:
+  entry: device
+  what: "center roof marker: LMC 36-4481 lens + 36-4482 pad + 36-0368 amber LED 194"
+  maker: LMC Truck
+  maker_pn: "36-4481"
+  photo: {url: "https://lmcnopstorage.blob.core.windows.net/nopprodimages/0002980_1973-91-roof-marker-lamp.png", page: "https://www.lmctruck.com/lighting/cab-roof/cc-1973-87-roof-marker-lamp", fetched: "2026-09-28"}
+  piece: CLEARANCE-L
+  confidence: exact_pn
+  note: photo on file (LMC roof marker lamp page)
+CLEARANCE-R:
+  entry: device
+  what: "right roof marker: LMC 36-4481 lens + 36-4482 pad + 36-0368 amber LED 194"
+  maker: LMC Truck
+  maker_pn: "36-4481"
+  photo: {url: "https://lmcnopstorage.blob.core.windows.net/nopprodimages/0002980_1973-91-roof-marker-lamp.png", page: "https://www.lmctruck.com/lighting/cab-roof/cc-1973-87-roof-marker-lamp", fetched: "2026-09-28"}
+  piece: CLEARANCE-L
+  confidence: exact_pn
+  note: photo on file (LMC roof marker lamp page)
+USB-PORT:
+  entry: device
+  what: "Blue Sea 12/24 V dual USB charger socket, 4.8 A, with cap"
+  maker: Blue Sea Systems
+  maker_pn: "1045"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/1045.jpg", page: "https://www.bluesea.com/products/1045/12_24V_DC_Dual_USB_Charger_4.8A_with_Intelligent_Device_Recognition", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/1045_12-24VDC_Socket_Dual_USB_4.8A_dim_drawing_rev1.pdf", page: "https://www.bluesea.com/products/1045/12_24V_DC_Dual_USB_Charger_4.8A_with_Intelligent_Device_Recognition"}
+  confidence: exact_pn
+  note: "photo on file (BS-1045) was a Powerwerx copy; this is the maker's"
+OUTLET-12V:
+  entry: device
+  what: "Blue Sea 12 V DC dash socket with watertight cap, 15 A"
+  maker: Blue Sea Systems
+  maker_pn: "1011"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/1011.jpg", page: "https://www.bluesea.com/products/1011/Dash_Socket_12V_DC_with_Watertight_Cap", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/Socket.jpg", page: "https://www.bluesea.com/products/1011/Dash_Socket_12V_DC_with_Watertight_Cap"}
+  confidence: exact_pn
+  note: "photo on file (BS-1011) was a Fisheries Supply copy; this is the maker's"
+RADIO:
+  entry: device
+  what: "RetroSound RetroRadio for 1973-87 Chevrolet C/K trucks, Motor-2 (M2) radio"
+  maker: RetroSound (Retro Manufacturing)
+  maker_pn: HB-M2 (face not picked)
+  photo: {url: "https://cdn.shopify.com/s/files/1/0932/8664/products/B-116-03-73_a3f66b26-a268-4a22-b316-45189a60fd9e.jpg?v=1741101152", page: "https://www.retromanufacturing.com/products/1973-87-chevrolet-c-k-series-trucks-retroradio", fetched: "2026-09-29"}
+  confidence: same_family_photo
+  note: "Retro Manufacturing's Motor-2 variants for this truck are SKUs HB/HC/HBC/HCB-M2-<face>-<knobs>; the photo is the black 116-03-73 face variant (the face and knob option is not recorded)"
+SPK-FL:
+  entry: device
+  what: JL Audio C2-650X 6.5 in 2-way coaxial speaker (driver door)
+  maker: JL Audio
+  maker_pn: C2-650X
+  photo: {url: "https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg", page: "https://www.crutchfield.com/p_136C2650X/JL-Audio-C2-650X.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "Crutchfield's product photo"
+SPK-FR:
+  entry: device
+  what: JL Audio C2-650X 6.5 in 2-way coaxial speaker (passenger door)
+  maker: JL Audio
+  maker_pn: C2-650X
+  photo: {url: "https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg", page: "https://www.crutchfield.com/p_136C2650X/JL-Audio-C2-650X.html", fetched: "2026-09-28"}
+  piece: SPK-FL
+  confidence: exact_pn
+  note: "Crutchfield's product photo"
+GND-BANK-CAB:
+  entry: device
+  what: "cab ground bank beside the PDM30: insulated stud bus, returns to the ground star through GND_RET_CAB (2 AWG)"
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: "the stud bank product is not named in the registry (parts.yaml's power_spine pool holds a Blue Sea 2019 PowerBar, tied to no endpoint)"
+LICENSE-LAMP:
+  entry: device
+  what: "license plate lamp: factory lamp, one feed lead (connector 2977721), 67 bulb, grounds through its housing"
+  maker: GM (factory)
+  maker_pn: unknown
+  confidence: unknown
+  note: no lamp or socket part number recorded; LED pick Diode Dynamics 1156 HP11 (not photographed)
+CARGO-LAMP:
+  entry: device
+  what: "Truck-Lite 80 Series 10-diode LED dome lamp, hardwired leads, die-cast aluminium"
+  maker: Truck-Lite
+  maker_pn: "80251C"
+  photo: {url: "https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/80251C/spinset_01_01_80251C.jpg", page: "https://www.truck-lite.com/80251c-1.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: photo on file
+MARKER-LR:
+  entry: device
+  what: "left rear side marker: factory GM socket 6294015 (2 leads) with a 168 bulb"
+  maker: GM (factory)
+  maker_pn: "6294015"
+  photo: {url: "https://cdn11.bigcommerce.com/s-5ha9tbdrhc/images/stencil/2560w/products/5858/8158/21095__94327.1754916601.jpg?c=1", page: "https://www.usa1industries.com/1973-87-square-body-chevy-gmc-truck-side-marker-lamp-socket-w-pigtail/", fetched: "2026-09-28"}
+  piece: MARKER-LF
+  confidence: same_family_photo
+  note: "photo is the candidate replacement USA1 Industries 21095 1973-87 side marker socket with pigtail; LED pick Diode Dynamics 194 HP5 (amber front, red rear)"
+MARKER-RR:
+  entry: device
+  what: "right rear side marker: factory GM socket 6294015 (2 leads) with a 168 bulb"
+  maker: GM (factory)
+  maker_pn: "6294015"
+  photo: {url: "https://cdn11.bigcommerce.com/s-5ha9tbdrhc/images/stencil/2560w/products/5858/8158/21095__94327.1754916601.jpg?c=1", page: "https://www.usa1industries.com/1973-87-square-body-chevy-gmc-truck-side-marker-lamp-socket-w-pigtail/", fetched: "2026-09-28"}
+  piece: MARKER-LF
+  confidence: same_family_photo
+  note: "photo is the candidate replacement USA1 Industries 21095 1973-87 side marker socket with pigtail; LED pick Diode Dynamics 194 HP5 (amber front, red rear)"
+AMP:
+  entry: device
+  what: JL Audio VX700/5i 5-channel amplifier with DSP (75 W x 4 + 300 W sub)
+  maker: JL Audio
+  maker_pn: VX700/5i
+  photo: {url: "https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2021/30/136/g13698640-M.jpg", page: "https://www.crutchfield.com/p_13698640/JL-Audio-VX700-5i.html", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "Crutchfield's product photo"
+SPK-RL:
+  entry: device
+  what: JL Audio C2-650X 6.5 in 2-way coaxial speaker (left rear)
+  maker: JL Audio
+  maker_pn: C2-650X
+  photo: {url: "https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg", page: "https://www.crutchfield.com/p_136C2650X/JL-Audio-C2-650X.html", fetched: "2026-09-28"}
+  piece: SPK-FL
+  confidence: exact_pn
+  note: "Crutchfield's product photo"
+SPK-RR:
+  entry: device
+  what: JL Audio C2-650X 6.5 in 2-way coaxial speaker (right rear)
+  maker: JL Audio
+  maker_pn: C2-650X
+  photo: {url: "https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg", page: "https://www.crutchfield.com/p_136C2650X/JL-Audio-C2-650X.html", fetched: "2026-09-28"}
+  piece: SPK-FL
+  confidence: exact_pn
+  note: "Crutchfield's product photo"
+SUB:
+  entry: device
+  what: "JBL Club 102SL 10 in shallow-mount subwoofer (woofer 1 of 2, set to 4 ohm)"
+  maker: JBL (Harman)
+  maker_pn: Club 102SL
+  photo: {url: "https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg", page: "https://www.crutchfield.com/p_109CL102SL/JBL-Club-102SL.html", fetched: "2026-09-28"}
+  drawing: {url: "https://pdf.crutchfieldonline.com/Manuals/109/109CL102SL.PDF", page: "https://www.crutchfield.com/p_109CL102SL/JBL-Club-102SL.html"}
+  confidence: exact_pn
+  note: "Crutchfield's product photo; drawing link is the owner's manual PDF Crutchfield hosts"
+SUB-2:
+  entry: device
+  what: "JBL Club 102SL 10 in shallow-mount subwoofer (woofer 2 of 2, in parallel with woofer 1)"
+  maker: JBL (Harman)
+  maker_pn: Club 102SL
+  photo: {url: "https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg", page: "https://www.crutchfield.com/p_109CL102SL/JBL-Club-102SL.html", fetched: "2026-09-28"}
+  drawing: {url: "https://pdf.crutchfieldonline.com/Manuals/109/109CL102SL.PDF", page: "https://www.crutchfield.com/p_109CL102SL/JBL-Club-102SL.html"}
+  piece: SUB
+  confidence: exact_pn
+  note: "Crutchfield's product photo; drawing link is the owner's manual PDF Crutchfield hosts"
+GND-SPLICE-REAR:
+  entry: device
+  what: "rear ground bus where the rear harness branches: insulated stud bus, returns through GND_RET_REAR"
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: "the stud bank product is not named in the registry (parts.yaml's power_spine pool holds a Blue Sea 2019 PowerBar, tied to no endpoint)"
+AMP-STEP-CTRL:
+  entry: device
+  what: AMP Research PowerStep kit harness and controller
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: "the K5 kit's part number is not recorded (the guide on file is the 2011-14 Silverado kit, IM75146)"
+E-STOPP:
+  entry: device
+  what: "E-Stopp ESK001 electric parking brake kit: actuator, control box, lighted push button"
+  maker: E-Stopp
+  maker_pn: ESK001
+  photo: {url: "https://static.summitracing.com/global/images/prod/xlarge/esc-esk001_xl.jpg", page: "https://www.summitracing.com/parts/esc-esk001", fetched: "2026-09-29"}
+  drawing: {url: "https://cdn.shopify.com/s/files/1/0890/5841/0810/files/E-Stopp_ESK1_Instructions.pdf?v=1776284228", page: "https://estopp.com/products/esk1-sil"}
+  confidence: exact_pn
+  note: "Summit's image for ESK001; E-Stopp now lists the kit as ESK1 (silver button, red LED = ESK1-SIL-SIL-RED): https://cdn.shopify.com/s/files/1/0890/5841/0810/files/ESK1-SIL-SIL-RED.jpg"
+TCASE-4WD-SW:
+  entry: device
+  what: "Torque King weather-proof NP205 transfer-case indicator switch (normally ON, 15/16 hex)"
+  maker: Torque King
+  maker_pn: QU30048
+  photo: {url: "https://torqueking.com/cdn/shop/files/qu30048__08146_8788__76476.1707875361.1280.1280.jpg?v=1786090930", page: "https://torqueking.com/product/30048/qu30048-weather-proof-np205c-transfer-case-indicator-switch/", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: photo on file; QU90002 pigtail not photographed
+ODYSSEY:
+  entry: device
+  what: "Odyssey Extreme ODX-AGM34 78 battery (34/78-PC1500DT, dual SAE posts + GM side studs) — the candidate"
+  maker: Odyssey (EnerSys)
+  maker_pn: "34/78-PC1500DT"
+  photo: {url: "https://www.odysseybattery.com/wp-content/uploads/sites/2/ODX-AGM-34-78-right-angle-top.png", page: "https://www.odysseybattery.com/products/odx-agm34-78-battery-34-78-pc1500/", fetched: "2026-09-29"}
+  mates_with: ["238LTP"]
+  confidence: exact_pn
+  note: "Odyssey's current name for 34/78-PC1500DT is ODX-AGM34 78; the model is the candidate (set by the tray); odysseybattery.com images open in a browser but refuse scripted fetches"
+AMP-BLOCK:
+  entry: device
+  what: "amplifier power block: two Blue Sea 2103 PowerPost Plus (one +, one -), 3/8 in-16 studs"
+  maker: Blue Sea Systems
+  maker_pn: "2103"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/2103.jpg", page: "https://www.bluesea.com/products/2103/PowerPost_Plus_-_3_8in-16_Stud", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/2101-2103.jpg", page: "https://www.bluesea.com/products/2103/PowerPost_Plus_-_3_8in-16_Stud"}
+  piece: BLUESEA-2103
+  confidence: exact_pn
+  note: "drawing covers PowerPost Plus 2101-2103; photo on file (BS-2103) was a Thorne Bros copy, this is the maker's"
+ACC-BATT:
+  entry: device
+  what: Optima YellowTop D34/78 dual-purpose AGM battery (8014-045) — the candidate
+  maker: Optima (Clarios)
+  maker_pn: "8014-045"
+  photo: {url: "https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png?w=1500&h=1500&position=c&color=ffffff00&quality=80&u=n3xatz", page: "https://www.optimabatteries.com/products/yellowtop-d34-78", fetched: "2026-09-29"}
+  mates_with: ["210LTP", DL438]
+  confidence: exact_pn
+  note: "Optima's own image for the YellowTop D34/78 (8014-045); the model is the candidate (set by the tray)"
+ISOLATOR:
+  entry: device
+  what: Blue Sea 7700 ML-RBS remote battery switch on the Odyssey positive (studs A/B 3/8 in-16)
+  maker: Blue Sea Systems
+  maker_pn: "7700"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/7700.jpg", page: "https://www.bluesea.com/products/7700/ML-RBS_Remote_Battery_Switch_with_Manual_Control_-_12V_DC_500A", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/7700_7702_7622_7623.jpg", page: "https://www.bluesea.com/products/7700/ML-RBS_Remote_Battery_Switch_with_Manual_Control_-_12V_DC_500A"}
+  instructions: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/instructions/990180170-006.pdf"
+  mates_with: ["238LTP"]
+  piece: BLUESEA-7700
+  confidence: exact_pn
+  note: Blue Sea publishes a dimensioned drawing and instructions; no 3D model on bluesea.com
+ISO-SWITCH:
+  entry: device
+  what: Blue Sea SPDT (ON)-OFF-(ON) remote-control Contura switch (ships with the 7700)
+  maker: Blue Sea Systems
+  maker_pn: "2145"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/2145.jpg", page: "https://www.bluesea.com/products/2145", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/pin_out_drawing/2145-2146.jpg", page: "https://www.bluesea.com/products/2145"}
+  confidence: exact_pn
+  note: "drawing is Blue Sea's pin-out drawing for 2145/2146"
+SPL-ISO-YEL:
+  entry: device
+  what: "stub splice on the isolator switch's yellow wire (16 AWG) with the 22 AWG M130 shutdown tap"
+  maker: TE Connectivity (Raychem)
+  maker_pn: D-609-04
+  photo: {url: "https://www.prowireusa.com/content/59741/D-609-04.webp", page: "https://www.prowireusa.com/p-1925-mini-seal-crimp-stub-splice-blue.html", fetched: "2026-09-28"}
+  piece: D-609-04
+  confidence: same_family_photo
+  note: the registry leaves the MiniSeal size open (16 + 22 AWG by total CMA); the photo is the D-609-04 (20-16 AWG) candidate
+DCDC:
+  entry: device
+  what: Victron Orion-Tr Smart 12/12-30A (360 W) non-isolated DC-DC charger
+  maker: Victron Energy
+  maker_pn: ORI121236140
+  photo: {url: "https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png", page: "https://www.victronenergy.com/dc-dc-converters/orion-tr-smart-non-isolated", fetched: "2026-09-29"}
+  drawing: {url: "https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated_dimensions.pdf", page: "https://www.victronenergy.com/dc-dc-converters/orion-tr-smart-non-isolated"}
+  cad: {url: "https://www.victronenergy.com/upload/documents/Orion-Tr-Smart-12V-24V-360W-400W-Non-Isolated.stp", format: step, license_note: Victron publishes the STEP file on the product page as a free download (no account); one model covers the 12V/24V 360-400 W non-isolated housings}
+  datasheet: "https://www.victronenergy.com/upload/documents/Datasheet-Orion-Tr-Smart-DC-DC-chargers-non-isolated-360-400W-EN-.pdf"
+  confidence: exact_pn
+  note: screw terminals take bare fine-strand wire (no lug at the unit); the STEP and dimension PDF are shared by the 360-400 W non-isolated family
+GSS-3000:
+  entry: device
+  what: "Dakota Digital GSS-3000 universal gear-shift sender (decoder module + detent-shaft sensor, 10 ft cable)"
+  maker: Dakota Digital
+  maker_pn: GSS-3000
+  photo: {url: "https://static.summitracing.com/global/images/prod/xlarge/dak-gss-3000_xl.jpg", page: "https://www.summitracing.com/parts/dak-gss-3000", fetched: "2026-09-28"}
+  drawing: {url: "https://www.dakotadigital.com/pdf/GSS-3000.pdf", page: "https://www.dakotadigital.com/pdf/GSS-3000.pdf"}
+  confidence: exact_pn
+  note: "drawing link is Dakota's GSS-3000 instruction sheet (PDF)"
+GSS-SENSOR:
+  entry: device
+  what: "GSS-3000 sensor on the transmission detent shaft (mounting plate on the pan, rod to the shift arm)"
+  maker: Dakota Digital
+  maker_pn: GSS-3000
+  photo: {url: "https://static.summitracing.com/global/images/prod/xlarge/dak-gss-3000_xl.jpg", page: "https://www.summitracing.com/parts/dak-gss-3000", fetched: "2026-09-28"}
+  drawing: {url: "https://www.dakotadigital.com/pdf/GSS-3000.pdf", page: "https://www.dakotadigital.com/pdf/GSS-3000.pdf"}
+  piece: GSS-3000
+  confidence: exact_pn
+  note: the sensor ships in the GSS-3000 kit; photo is the kit
+PCS-TCM:
+  entry: device
+  what: PCS (Powertrain Control Solutions) TCM-2650 transmission controller for GM 6L80/6L90
+  maker: Powertrain Control Solutions (PCS)
+  maker_pn: TCM-2650
+  photo: {url: "https://www.zerogravityperformance.com/wp-content/uploads/2017/02/tcm2650_hanress.jpg", page: "https://www.zerogravityperformance.com/product/tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness/", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "Zero Gravity's photo (the seller) of the TCM-2650 with its harness; PSI's page https://www.psiconversion.com/products/pcm-programming/transmissioncontrollers/TCM-2650.html shows the same shot"
+PCS-HARNESS-4610:
+  entry: device
+  what: "PCS TCM-4610 kit harness for 6L50E/6L80E/6L90E (TCM plug to the case connector, flying leads)"
+  maker: Powertrain Control Solutions (PCS)
+  maker_pn: TCM-4610
+  photo: {url: "https://www.zerogravityperformance.com/wp-content/uploads/2017/02/tcm2650_hanress.jpg", page: "https://www.zerogravityperformance.com/product/tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness/", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: "Zero Gravity's listing photo for the TCM4610 harness (the harness shown with a TCM-2650)"
+PCS-HARNESS-4610-CASE:
+  entry: device
+  what: "PCS TCM-4610 kit harness, case-side ground lead (case cavities 2 + 5)"
+  maker: Powertrain Control Solutions (PCS)
+  maker_pn: TCM-4610
+  photo: {url: "https://www.zerogravityperformance.com/wp-content/uploads/2017/02/tcm2650_hanress.jpg", page: "https://www.zerogravityperformance.com/product/tcm-2650-gm-6l50e-6l80e-6l90e-transmission-harness/", fetched: "2026-09-28"}
+  piece: PCS-HARNESS-4610
+  confidence: exact_pn
+  note: "Zero Gravity's listing photo for the TCM4610 harness (the harness shown with a TCM-2650)"
+TRANS-CASE:
+  entry: device
+  what: "6L90 external case connector (TEHCM pass-through), Kostal 16-cavity; GM 19303772 is the harness-side round connector kit that mates it"
+  maker: GM
+  maker_pn: "19303772"
+  photo: {url: "https://ecommerce-assets.ext.gm.com/assets/products/images/19303772_Primary.jpg", page: "https://parts.chevrolet.com/search?searchTerm=19303772", fetched: "2026-09-29"}
+  mates_with: [PCS-HARNESS-4610]
+  confidence: exact_pn
+  note: "GM's catalogue image for 19303772: the harness-side connector body with lever lock and loose seals (the PCS TCM-4610 harness carries this plug); the registry also names GM 15131300, which has no image on GM's server"
+TG-MOTOR-ACI:
+  entry: device
+  what: Nu-Relics 1973-91 Blazer/Jimmy tailgate regulator with new ACI reverse-polarity motor (candidate)
+  maker: Nu-Relics
+  maker_pn: "17383-1"
+  photo: {url: "https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-1-2.jpg", page: "https://www.nu-relics.com/73-91-Chevy-Blazer-Jimmy-Tailgate-Regulator-p/17383-1.htm", fetched: "2026-09-28"}
+  confidence: exact_pn
+  note: photo on file (NU-RELICS-17383-1 / NR-17383-1)
+TG-SW-MASTER:
+  entry: device
+  what: "tailgate window master switch at the dash: Nu-Relics standard chrome reverse-polarity single switch (option #121 on the 17383-1 page, candidate)"
+  maker: Nu-Relics
+  maker_pn: "121"
+  confidence: unknown
+  note: "no photo of the #121 single switch found yet"
+TG-SW-KEY-REV:
+  entry: device
+  what: "tailgate key switch used as the second reversing switch in series (candidate), GM 8900713"
+  maker: GM (factory)
+  maker_pn: "8900713"
+  piece: TG-SW-KEY
+  confidence: unknown
+  note: no photo of GM 8900713 found yet
+FIREWALL-BODY-C:
+  entry: device
+  what: "body bulkhead C: DEUTSCH DT 6-way flanged receptacle (DT04-6P-L012 + W6P; plug DT06-6S + W6S)"
+  maker: TE Connectivity (DEUTSCH)
+  maker_pn: DT04-6P-L012
+  photo: {url: "https://cdn.shopify.com/s/files/1/0761/5116/1150/products/DT04-6P-L012_front__10708.1669401186.1200.1200.jpg?v=1686744338", page: "https://www.customconnectorkits.com/products/dt04-6p-l012", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DT04-6P-L012&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DT04-6P-L012", page: "https://www.te.com/en/product-DT04-6P-L012.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DT04-6P-L012&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DT04-6P-L012", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [DT06-6S, W6P, W6S, "0460-202-16141", "0462-201-16141", "114017"]
+  piece: DT04-6P-L012
+  confidence: exact_pn
+  note: photo is the body-side receptacle DT04-6P-L012; the mating plug and wedges are listed in mates_with
+AMP-PASS:
+  entry: device
+  what: "floor / rear-body pass-through: Blue Sea 1003 CableClam, one per 2 AWG cable"
+  maker: Blue Sea Systems
+  maker_pn: "1003"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/1003.jpg", page: "https://www.bluesea.com/products/1003/CableClam_1.40in", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/1003.pdf", page: "https://www.bluesea.com/products/1003/CableClam_1.40in"}
+  instructions: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/instructions/1001-1003_Instructions.pdf"
+  piece: BLUESEA-1003
+  confidence: exact_pn
+  note: "photo on file (BS-1003) was a West Marine copy; this is the maker's"
+SPL-FUEL-SND:
+  entry: device
+  what: "fuel sender signal splice above the tank lid: Raychem MiniSeal in-line splice M81824/1-2 (blue)"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-2
+  photo: {url: "https://www.prowireusa.com/content/57537/M81824_1-2.webp", page: "https://www.prowireusa.com/p-1528-raychem-mini-seal-splice-blue.html", fetched: "2026-09-29"}
+  piece: M81824/1-2
+  confidence: exact_pn
+SPL-PDM15-OUT6:
+  entry: device
+  what: "PDM15 OUT6 pigtail splice: Raychem MiniSeal in-line splice M81824/1-3 (yellow), two 16 AWG pigtails in, the load wire out"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-3
+  photo: {url: "https://www.prowireusa.com/content/60321/M81824_1-3.webp", page: "https://www.prowireusa.com/p-1529-raychem-mini-seal-splice-yellow.html", fetched: "2026-09-29"}
+  piece: M81824/1-3
+  confidence: exact_pn
+FAN-JUNCTION:
+  entry: device
+  what: "fan feed junction: one Blue Sea 2103 PowerPost Plus, 3/8 in-16 stud, 150 A"
+  maker: Blue Sea Systems
+  maker_pn: "2103"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/2103.jpg", page: "https://www.bluesea.com/products/2103/PowerPost_Plus_-_3_8in-16_Stud", fetched: "2026-09-29"}
+  drawing: {url: "https://d2pyqm2yd3fw2i.cloudfront.net/files/resources/dimensioned_drawing/2101-2103.jpg", page: "https://www.bluesea.com/products/2103/PowerPost_Plus_-_3_8in-16_Stud"}
+  piece: BLUESEA-2103
+  confidence: exact_pn
+  note: "drawing covers PowerPost Plus 2101-2103; photo on file (BS-2103) was a Thorne Bros copy, this is the maker's"
+FUSE-DAK_CONST:
+  entry: device
+  what: "in-line fuse for DAK_CONST: Blue Sea 5065 waterproof ATO/ATC holder with a 5 A fuse (5239)"
+  maker: Blue Sea Systems
+  maker_pn: "5065"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/5065.jpg", page: "https://www.bluesea.com/products/5065/Waterproof_In-Line_ATO_ATC_Fuse_holder", fetched: "2026-09-29"}
+  mates_with: [BLUESEA-5239]
+  piece: BLUESEA-5065
+  confidence: exact_pn
+  note: no drawing listed on the Blue Sea page
+FUSE-PCS_BATT:
+  entry: device
+  what: "in-line fuse for PCS_BATT: Blue Sea 5065 waterproof ATO/ATC holder with a 5 (provisional) A fuse (5239)"
+  maker: Blue Sea Systems
+  maker_pn: "5065"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/5065.jpg", page: "https://www.bluesea.com/products/5065/Waterproof_In-Line_ATO_ATC_Fuse_holder", fetched: "2026-09-29"}
+  mates_with: [BLUESEA-5239]
+  piece: BLUESEA-5065
+  confidence: exact_pn
+  note: no drawing listed on the Blue Sea page
+FUSE-TRANS_BATT:
+  entry: device
+  what: "in-line fuse for TRANS_BATT: Blue Sea 5065 waterproof ATO/ATC holder with a 7.5 A fuse (5240)"
+  maker: Blue Sea Systems
+  maker_pn: "5065"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/5065.jpg", page: "https://www.bluesea.com/products/5065/Waterproof_In-Line_ATO_ATC_Fuse_holder", fetched: "2026-09-29"}
+  mates_with: [BLUESEA-5240]
+  piece: BLUESEA-5065
+  confidence: exact_pn
+  note: no drawing listed on the Blue Sea page
+FUSE-IBOOST_PERM:
+  entry: device
+  what: "in-line fuse for IBOOST_PERM: Blue Sea 5065 waterproof ATO/ATC holder with a 5 A fuse (5239)"
+  maker: Blue Sea Systems
+  maker_pn: "5065"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/5065.jpg", page: "https://www.bluesea.com/products/5065/Waterproof_In-Line_ATO_ATC_Fuse_holder", fetched: "2026-09-29"}
+  mates_with: [BLUESEA-5239]
+  piece: BLUESEA-5065
+  confidence: exact_pn
+  note: no drawing listed on the Blue Sea page
+FUSE-ISO_PWR:
+  entry: device
+  what: "in-line fuse for ISO_PWR: Blue Sea 5065 waterproof ATO/ATC holder with a 10 A fuse (5241)"
+  maker: Blue Sea Systems
+  maker_pn: "5065"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/5065.jpg", page: "https://www.bluesea.com/products/5065/Waterproof_In-Line_ATO_ATC_Fuse_holder", fetched: "2026-09-29"}
+  mates_with: [BLUESEA-5241]
+  piece: BLUESEA-5065
+  confidence: exact_pn
+  note: no drawing listed on the Blue Sea page
+FUSE-ISO_SW_PWR:
+  entry: device
+  what: "in-line fuse for ISO_SW_PWR: Blue Sea 5065 waterproof ATO/ATC holder with a 5 A fuse (5239)"
+  maker: Blue Sea Systems
+  maker_pn: "5065"
+  photo: {url: "https://dh778tpvmt77t.cloudfront.net/images/products/5065.jpg", page: "https://www.bluesea.com/products/5065/Waterproof_In-Line_ATO_ATC_Fuse_holder", fetched: "2026-09-29"}
+  mates_with: [BLUESEA-5239]
+  piece: BLUESEA-5065
+  confidence: exact_pn
+  note: no drawing listed on the Blue Sea page
+SPL-PDM15-OUT13:
+  entry: device
+  what: "PCS ignition step splice by the PDM15: TE PIDG step-down butt splice 327583 (22-18 to 16-14 AWG) under CPA-100-3/8-RED"
+  maker: TE Connectivity (AMP)
+  maker_pn: "327583"
+  photo: {url: "https://www.te.com/content/dam/te-com/catalog/part/000/320/562/320562-t1.jpg/jcr:content/renditions/product-high-res.png", page: "https://www.te.com/en/product-327583.html", fetched: "2026-09-28"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=327583&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=327583", page: "https://www.te.com/en/product-327583.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_327583&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=327583", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use"}
+  mates_with: [CPA-100-3/8-RED]
+  piece: "327583"
+  confidence: same_family_photo
+  note: "te.com shows the 320562 PIDG butt splice image on the 327583 page (a sibling in the same family); te.com image: opens in a browser, refuses scripted fetches"
+SPL-PDM15-OUT7:
+  entry: device
+  what: "PDM15 OUT7 pigtail splice: Raychem MiniSeal in-line splice M81824/1-3 (yellow), two 16 AWG pigtails in, the load wire out"
+  maker: TE Connectivity (Raychem) / Sumitomo
+  maker_pn: M81824/1-3
+  photo: {url: "https://www.prowireusa.com/content/60321/M81824_1-3.webp", page: "https://www.prowireusa.com/p-1529-raychem-mini-seal-splice-yellow.html", fetched: "2026-09-29"}
+  piece: M81824/1-3
+  confidence: exact_pn
+IBST-DIAG:
+  entry: device
+  what: "iBooster CAN diagnostic port: MoTeC #68054 DTM 4-pin (F) on the harness, capped with #68055 (M) (candidate)"
+  maker: MoTeC
+  maker_pn: "68054"
+  photo: {url: "https://assets.motec.com.au/strapi/68054_6b5edbd77e.webp", page: "https://www.motec.com.au/products/category/Wiring/Connectors?id=28", fetched: "2026-09-29"}
+  drawing: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=DTM06-4S&DocType=Customer%20Drawing&DocLang=English&DocFormat=pdf&PartCntxt=DTM06-4S", page: "https://www.te.com/en/product-DTM06-4S.html"}
+  cad: {url: "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=CVM_DTM06-4S&DocType=Customer%20View%20Model&DocLang=English&DocFormat=3d_stp.zip&PartCntxt=DTM06-4S", format: step, license_note: "TE Connectivity customer view model, free download from the te.com product page (no account); TE site terms of use; model is the DEUTSCH DTM06-4S housing"}
+  mates_with: ["68055", "0413-204-2005", "0462-201-20141"]
+  piece: "68054"
+  confidence: exact_pn
+  note: "photo is MoTeC's catalogue image (catalog_parts row, 2026-05-11 scrape); MoTeC kit; the housings are DEUTSCH DTM 4-way (DTM06-4S / DTM04-4P per the MoTeC LTC manual's (F)/(M))"
+BRAKE-FLUID-LVL:
+  entry: device
+  what: brake-fluid reservoir level sensor on the iBooster reservoir (candidate)
+  maker: unknown
+  maker_pn: unknown
+  confidence: unknown
+  note: sensor part number not recorded (read the unit)
