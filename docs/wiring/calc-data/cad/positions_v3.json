@@ -1,0 +1,1640 @@
+{
+"CKP": {
+"xyz": [
+-0.162,
+-1.495,
+0.755
+],
+"basis": "twin v3 engine anchor",
+"cat": "sensor"
+},
+"CMP": {
+"xyz": [
+0.045,
+-2.03,
+0.885
+],
+"basis": "twin v3 engine anchor",
+"cat": "sensor"
+},
+"KNOCK-1": {
+"xyz": [
+0.158,
+-1.705,
+0.765
+],
+"basis": "twin v3 engine anchor",
+"cat": "sensor"
+},
+"KNOCK-2": {
+"xyz": [
+-0.158,
+-1.705,
+0.765
+],
+"basis": "twin v3 engine anchor",
+"cat": "sensor"
+},
+"CLT-ECU": {
+"xyz": [
+0.286,
+-1.869,
+0.84
+],
+"basis": "twin v3 engine anchor",
+"cat": "sensor"
+},
+"DAK-CTS": {
+"xyz": [
+-0.286,
+-1.44,
+0.84
+],
+"basis": "placed from the sourced spot (rear of the passenger head)",
+"cat": "sensor"
+},
+"OILP-ECU": {
+"xyz": [
+0.025,
+-1.48,
+0.99
+],
+"basis": "twin v3 engine anchor",
+"cat": "sensor"
+},
+"DAK-OILP": {
+"xyz": [
+0.075,
+-1.45,
+0.99
+],
+"basis": "candidate spot (not decided) (a tee at the oil pressure port)",
+"cat": "sensor"
+},
+"OILT": {
+"xyz": [
+-0.17,
+-1.67,
+0.62
+],
+"basis": "placed from the sourced spot (2024-08-24 photo: passenger side of the pan, just behind and below the right knock sensor at y -1.705; +/-50 mm)",
+"cat": "sensor"
+},
+"MAP": {
+"xyz": [
+0.14,
+-1.5,
+1.16
+],
+"basis": "placed from the sourced spot (on a bracket near the rear of the intake)",
+"cat": "sensor"
+},
+"IAT": {
+"xyz": [
+0.0,
+-2.02,
+1.24
+],
+"basis": "placed from the sourced spot (in the inlet tube ahead of the throttle body)",
+"cat": "sensor"
+},
+"TB": {
+"xyz": [
+-0.112,
+-1.7,
+1.148
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"INJ-1": {
+"xyz": [
+0.159,
+-1.899,
+1.076
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"COIL-1": {
+"xyz": [
+-0.097,
+-1.556,
+1.023
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"INJ-2": {
+"xyz": [
+-0.159,
+-1.875,
+1.076
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"COIL-2": {
+"xyz": [
+-0.032,
+-1.556,
+1.023
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"INJ-3": {
+"xyz": [
+0.159,
+-1.788,
+1.076
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"COIL-3": {
+"xyz": [
+0.032,
+-1.556,
+1.023
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"INJ-4": {
+"xyz": [
+-0.159,
+-1.764,
+1.076
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"COIL-4": {
+"xyz": [
+0.097,
+-1.556,
+1.023
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"INJ-5": {
+"xyz": [
+0.159,
+-1.676,
+1.076
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"COIL-5": {
+"xyz": [
+-0.097,
+-1.464,
+1.023
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"INJ-6": {
+"xyz": [
+-0.159,
+-1.652,
+1.076
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"COIL-6": {
+"xyz": [
+-0.032,
+-1.464,
+1.023
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"INJ-7": {
+"xyz": [
+0.159,
+-1.564,
+1.076
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"COIL-7": {
+"xyz": [
+0.032,
+-1.464,
+1.023
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"INJ-8": {
+"xyz": [
+-0.159,
+-1.54,
+1.076
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"COIL-8": {
+"xyz": [
+0.097,
+-1.464,
+1.023
+],
+"basis": "twin v3 engine anchor",
+"cat": "actuator"
+},
+"FUELP": {
+"xyz": [
+0.0,
+-1.4,
+1.12
+],
+"basis": "candidate spot (not decided) (rail or regulator port)",
+"cat": "sensor"
+},
+"COIL-GROUND-RINGS": {
+"xyz": [
+0.0,
+-1.42,
+1.02
+],
+"basis": "placed from the sourced spot (back of the heads)",
+"cat": "power"
+},
+"ALTERNATOR-SENSE": {
+"xyz": [
+0.28,
+-2.005,
+1.02
+],
+"basis": "twin v3 engine anchor",
+"cat": "power"
+},
+"STARTER-S": {
+"xyz": [
+-0.22,
+-1.44,
+0.68
+],
+"basis": "twin v3 engine anchor",
+"cat": "power"
+},
+"AC-CLUTCH": {
+"xyz": [
+-0.26,
+-2.1,
+0.8
+],
+"basis": "placed from the sourced spot (Holley's A/C bracket is the passenger side; the twin anchor has it on the driver side)",
+"cat": "actuator"
+},
+"AC-HP-SW": {
+"xyz": [
+-0.55,
+-2.3,
+1.0
+],
+"basis": "candidate spot (not decided) (liquid line, not plumbed)",
+"cat": "sensor"
+},
+"AC-LP-SW": {
+"xyz": [
+-0.62,
+-1.75,
+1.05
+],
+"basis": "candidate spot (not decided) (accumulator, not placed)",
+"cat": "sensor"
+},
+"FAN": {
+"xyz": [
+0.0,
+-2.36,
+0.95
+],
+"basis": "1978 Blazer body model (radiator core)",
+"cat": "actuator"
+},
+"IBOOSTER": {
+"xyz": [
+0.4,
+-1.52,
+1.05
+],
+"basis": "placed from the sourced spot (driver firewall; twin object K5H_iBooster)",
+"cat": "actuator"
+},
+"IBST-DIAG": {
+"xyz": [
+0.55,
+-1.56,
+1.14
+],
+"basis": "candidate spot (not decided)",
+"cat": "connector"
+},
+"BRAKE-FLUID-LVL": {
+"xyz": [
+0.4,
+-1.62,
+1.18
+],
+"basis": "placed from the sourced spot (in the booster's reservoir)",
+"cat": "sensor"
+},
+"WIDEBAND": {
+"xyz": [
+-0.4,
+-1.38,
+0.62
+],
+"basis": "twin v3 engine anchor (LTCD candidate B)",
+"cat": "module"
+},
+"HORN": {
+"xyz": [
+0.55,
+-2.5,
+0.9
+],
+"basis": "placed from the sourced spot (radiator support; which side is not read)",
+"cat": "actuator"
+},
+"WIPER-MOTOR": {
+"xyz": [
+0.0,
+-1.47,
+1.3
+],
+"basis": "placed from the sourced spot (factory wiper hole, under the cowl)",
+"cat": "actuator"
+},
+"WASHER-PUMP": {
+"xyz": [
+0.72,
+-2.15,
+1.0
+],
+"basis": "candidate spot (not decided) (driver inner fender)",
+"cat": "actuator"
+},
+"BLOWER-MOTOR": {
+"xyz": [
+-0.55,
+-1.56,
+1.1
+],
+"basis": "placed from the sourced spot (Four-Season case, passenger firewall)",
+"cat": "actuator"
+},
+"BLOWER-RES": {
+"xyz": [
+-0.42,
+-1.52,
+1.18
+],
+"basis": "placed from the sourced spot (on the Four-Season case)",
+"cat": "actuator"
+},
+"UNDERHOOD-LAMP": {
+"xyz": [
+0.0,
+-2.0,
+1.3
+],
+"basis": "candidate spot (not decided) (under the hood)",
+"cat": "lamp"
+},
+"HEADLIGHT-L": {
+"xyz": [
+0.73,
+-2.52,
+1.05
+],
+"basis": "1978 Blazer body model",
+"cat": "lamp"
+},
+"HEADLIGHT-R": {
+"xyz": [
+-0.73,
+-2.52,
+1.05
+],
+"basis": "1978 Blazer body model",
+"cat": "lamp"
+},
+"PARK-TURN-LF": {
+"xyz": [
+0.75,
+-2.555,
+0.853
+],
+"basis": "1978 Blazer body model",
+"cat": "lamp"
+},
+"PARK-TURN-RF": {
+"xyz": [
+-0.75,
+-2.555,
+0.853
+],
+"basis": "1978 Blazer body model",
+"cat": "lamp"
+},
+"MARKER-LF": {
+"xyz": [
+0.986,
+-2.386,
+0.92
+],
+"basis": "1978 Blazer body model",
+"cat": "lamp"
+},
+"MARKER-RF": {
+"xyz": [
+-0.986,
+-2.386,
+0.92
+],
+"basis": "1978 Blazer body model",
+"cat": "lamp"
+},
+"ODYSSEY": {
+"xyz": [
+-0.62,
+-2.26,
+0.95
+],
+"basis": "candidate: GM's battery tray spot (1977 manual p.122), right side at the radiator support",
+"cat": "power"
+},
+"ACC-BATT": {
+"xyz": [
+0.62,
+-2.26,
+0.95
+],
+"basis": "candidate: GM's battery tray spot (1977 manual p.122), the auxiliary left-side spot",
+"cat": "power"
+},
+"ISOLATOR": {
+"xyz": [
+-0.5,
+-2.18,
+1.06
+],
+"basis": "placed from the sourced spot (on the Odyssey positive)",
+"cat": "power"
+},
+"PS-STUDS": {
+"xyz": [
+-0.5,
+-2.04,
+1.02
+],
+"basis": "candidate spot (not decided) (the distribution stud behind the Odyssey)",
+"cat": "power"
+},
+"GND-BANK-ENG": {
+"xyz": [
+-0.68,
+-2.04,
+0.86
+],
+"basis": "candidate spot (not decided) (beside the batteries)",
+"cat": "power"
+},
+"DCDC": {
+"xyz": [
+0.66,
+-2.0,
+1.06
+],
+"basis": "candidate spot (not decided) (driver inner fender behind the YellowTop it charges: flagged, Victron says keep it dry)",
+"cat": "power"
+},
+"PDM15-A": {
+"xyz": [
+-0.68,
+-1.9,
+1.02
+],
+"basis": "candidate spot (not decided) (engine power box on the passenger inner fender, by the batteries)",
+"cat": "module"
+},
+"FIREWALL-ENGINE": {
+"xyz": [
+0.5,
+-1.49,
+0.9
+],
+"basis": "placed from the sourced spot (fuse-box hole, engine side)",
+"cat": "connector"
+},
+"FIREWALL-CABIN": {
+"xyz": [
+0.5,
+-1.43,
+0.9
+],
+"basis": "placed from the sourced spot (fuse-box hole, cab side)",
+"cat": "connector"
+},
+"FIREWALL-GROMMET": {
+"xyz": [
+-0.35,
+-1.46,
+0.92
+],
+"basis": "candidate spot (not decided) (factory hole H3, passenger side: the big-cable exception)",
+"cat": "connector"
+},
+"M130-A": {
+"xyz": [
+0.3,
+-1.4,
+0.95
+],
+"basis": "candidate spot (not decided) (cab face of the firewall, inboard of the 61-pin)",
+"cat": "module"
+},
+"PDM30-A": {
+"xyz": [
+0.1,
+-1.38,
+0.88
+],
+"basis": "candidate spot (not decided) (beside the M130, air gap between them)",
+"cat": "module"
+},
+"APS": {
+"xyz": [
+0.3,
+-1.36,
+0.82
+],
+"basis": "placed from the sourced spot (driver footwell)",
+"cat": "sensor"
+},
+"BRAKE-SW": {
+"xyz": [
+0.44,
+-1.3,
+0.98
+],
+"basis": "placed from the sourced spot (brake pedal bracket)",
+"cat": "switch"
+},
+"FLOOR-DIMMER": {
+"xyz": [
+0.66,
+-1.26,
+0.68
+],
+"basis": "placed from the sourced spot (floor, driver's left foot)",
+"cat": "switch"
+},
+"HL-SW": {
+"xyz": [
+0.74,
+-1.02,
+1.18
+],
+"basis": "placed from the sourced spot (instrument panel, left of the cluster)",
+"cat": "switch"
+},
+"WIPER-SW": {
+"xyz": [
+0.7,
+-1.02,
+1.12
+],
+"basis": "placed from the sourced spot (instrument panel)",
+"cat": "switch"
+},
+"TURN-SW": {
+"xyz": [
+0.465,
+-0.95,
+1.27
+],
+"basis": "1978 Blazer body model (in the column under the wheel)",
+"cat": "switch"
+},
+"HORN-SW": {
+"xyz": [
+0.465,
+-0.78,
+1.34
+],
+"basis": "1978 Blazer body model (wheel centre)",
+"cat": "switch"
+},
+"IGN-SWITCH": {
+"xyz": [
+0.465,
+-1.24,
+1.06
+],
+"basis": "placed from the sourced spot (top of the column jacket, near the front of the dash)",
+"cat": "switch"
+},
+"BLOWER-SW": {
+"xyz": [
+0.1,
+-1.03,
+1.22
+],
+"basis": "placed from the sourced spot (control head)",
+"cat": "switch"
+},
+"RADIO": {
+"xyz": [
+0.0,
+-1.03,
+1.12
+],
+"basis": "placed from the sourced spot (factory radio opening)",
+"cat": "module"
+},
+"DAKOTA-VHX": {
+"xyz": [
+0.6,
+-1.16,
+1.0
+],
+"basis": "placed from the sourced spot (driver side under the dash, within 3 ft of the cluster)",
+"cat": "module"
+},
+"GSS-3000": {
+"xyz": [
+0.2,
+-1.16,
+0.96
+],
+"basis": "placed from the sourced spot (under the dash)",
+"cat": "module"
+},
+"PCS-TCM": {
+"xyz": [
+-0.3,
+-1.16,
+0.92
+],
+"basis": "candidate spot (not decided) (under the dash, passenger side)",
+"cat": "module"
+},
+"PCS-HARNESS-4610": {
+"xyz": [
+-0.2,
+-1.2,
+0.85
+],
+"basis": "candidate spot (not decided)",
+"cat": "connector"
+},
+"MIRROR-MON": {
+"xyz": [
+0.0,
+-0.95,
+1.78
+],
+"basis": "1978 Blazer body model (windshield header)",
+"cat": "module"
+},
+"OUTLET-12V": {
+"xyz": [
+-0.06,
+-0.92,
+0.95
+],
+"basis": "candidate spot (not decided) (dash or console)",
+"cat": "power"
+},
+"USB-PORT": {
+"xyz": [
+0.06,
+-0.92,
+0.95
+],
+"basis": "candidate spot (not decided) (dash or console)",
+"cat": "power"
+},
+"ISO-SWITCH": {
+"xyz": [
+0.28,
+-1.03,
+1.05
+],
+"basis": "candidate spot (not decided) (dash)",
+"cat": "switch"
+},
+"TG-SW-DASH": {
+"xyz": [
+0.38,
+-1.03,
+1.02
+],
+"basis": "placed from the sourced spot (instrument panel)",
+"cat": "switch"
+},
+"TG-SW-MASTER": {
+"xyz": [
+0.44,
+-1.03,
+1.02
+],
+"basis": "placed from the sourced spot (instrument panel)",
+"cat": "switch"
+},
+"PORT-ETH": {
+"xyz": [
+-0.5,
+-1.06,
+1.12
+],
+"basis": "candidate spot (not decided) (glovebox)",
+"cat": "connector"
+},
+"PORT-UTC": {
+"xyz": [
+-0.56,
+-1.06,
+1.12
+],
+"basis": "candidate spot (not decided) (glovebox)",
+"cat": "connector"
+},
+"GND-BANK-CAB": {
+"xyz": [
+0.0,
+-1.32,
+0.84
+],
+"basis": "candidate spot (not decided) (beside the PDM30)",
+"cat": "power"
+},
+"DOME-LAMP": {
+"xyz": [
+0.0,
+-0.4,
+1.88
+],
+"basis": "1978 Blazer body model (cab roof)",
+"cat": "lamp"
+},
+"CLEARANCE-L": {
+"xyz": [
+0.55,
+-0.86,
+1.9
+],
+"basis": "candidate spot (not decided) (roof front edge)",
+"cat": "lamp"
+},
+"CLEARANCE-C": {
+"xyz": [
+0.0,
+-0.86,
+1.9
+],
+"basis": "candidate spot (not decided) (roof front edge)",
+"cat": "lamp"
+},
+"CLEARANCE-R": {
+"xyz": [
+-0.55,
+-0.86,
+1.9
+],
+"basis": "candidate spot (not decided) (roof front edge)",
+"cat": "lamp"
+},
+"FOOTWELL-LAMPS": {
+"xyz": [
+0.55,
+-1.22,
+0.92
+],
+"basis": "candidate spot (not decided)",
+"cat": "lamp"
+},
+"UNDERDASH-LAMPS": {
+"xyz": [
+-0.4,
+-1.2,
+0.98
+],
+"basis": "candidate spot (not decided)",
+"cat": "lamp"
+},
+"DOOR-JAMB-L": {
+"xyz": [
+0.82,
+-1.15,
+0.86
+],
+"basis": "placed from the sourced spot (front door jamb)",
+"cat": "switch"
+},
+"DOOR-L-PASS": {
+"xyz": [
+0.86,
+-1.12,
+1.02
+],
+"basis": "candidate spot (not decided) (hinge side)",
+"cat": "connector"
+},
+"DOOR-L-PASS-P": {
+"xyz": [
+0.86,
+-1.12,
+0.92
+],
+"basis": "candidate spot (not decided) (hinge side)",
+"cat": "connector"
+},
+"SPK-FL": {
+"xyz": [
+0.86,
+-0.95,
+0.8
+],
+"basis": "candidate spot (not decided) (door panel, low front)",
+"cat": "audio"
+},
+"WIN-SW-L": {
+"xyz": [
+0.8,
+-0.55,
+1.06
+],
+"basis": "placed from the sourced spot (door panel)",
+"cat": "switch"
+},
+"LOCK-SW-L": {
+"xyz": [
+0.8,
+-0.47,
+1.06
+],
+"basis": "placed from the sourced spot (door panel)",
+"cat": "switch"
+},
+"window_motor_DS": {
+"xyz": [
+0.87,
+-0.62,
+1.0
+],
+"basis": "placed from the sourced spot (inside the door)",
+"cat": "actuator"
+},
+"lock_actuator_DS": {
+"xyz": [
+0.87,
+-0.2,
+1.05
+],
+"basis": "placed from the sourced spot (inside the door, at the latch)",
+"cat": "actuator"
+},
+"DOOR-JAMB-R": {
+"xyz": [
+-0.82,
+-1.15,
+0.86
+],
+"basis": "placed from the sourced spot (front door jamb)",
+"cat": "switch"
+},
+"DOOR-R-PASS": {
+"xyz": [
+-0.86,
+-1.12,
+1.02
+],
+"basis": "candidate spot (not decided) (hinge side)",
+"cat": "connector"
+},
+"DOOR-R-PASS-P": {
+"xyz": [
+-0.86,
+-1.12,
+0.92
+],
+"basis": "candidate spot (not decided) (hinge side)",
+"cat": "connector"
+},
+"SPK-FR": {
+"xyz": [
+-0.86,
+-0.95,
+0.8
+],
+"basis": "candidate spot (not decided) (door panel, low front)",
+"cat": "audio"
+},
+"WIN-SW-R": {
+"xyz": [
+-0.8,
+-0.55,
+1.06
+],
+"basis": "placed from the sourced spot (door panel)",
+"cat": "switch"
+},
+"LOCK-SW-R": {
+"xyz": [
+-0.8,
+-0.47,
+1.06
+],
+"basis": "placed from the sourced spot (door panel)",
+"cat": "switch"
+},
+"window_motor_PS": {
+"xyz": [
+-0.87,
+-0.62,
+1.0
+],
+"basis": "placed from the sourced spot (inside the door)",
+"cat": "actuator"
+},
+"lock_actuator_PS": {
+"xyz": [
+-0.87,
+-0.2,
+1.05
+],
+"basis": "placed from the sourced spot (inside the door, at the latch)",
+"cat": "actuator"
+},
+"Tail_Light_Left": {
+"xyz": [
+0.95,
+1.78,
+1.0
+],
+"basis": "1978 Blazer body model",
+"cat": "lamp"
+},
+"Backup_Light_Left": {
+"xyz": [
+0.95,
+1.78,
+0.92
+],
+"basis": "1978 Blazer body model (lower lens of the tail lamp)",
+"cat": "lamp"
+},
+"MARKER-LR": {
+"xyz": [
+0.997,
+1.6,
+0.97
+],
+"basis": "1978 Blazer body model (rear quarter)",
+"cat": "lamp"
+},
+"Tail_Light_Right": {
+"xyz": [
+-0.95,
+1.78,
+1.0
+],
+"basis": "1978 Blazer body model",
+"cat": "lamp"
+},
+"Backup_Light_Right": {
+"xyz": [
+-0.95,
+1.78,
+0.92
+],
+"basis": "1978 Blazer body model (lower lens of the tail lamp)",
+"cat": "lamp"
+},
+"MARKER-RR": {
+"xyz": [
+-0.997,
+1.6,
+0.97
+],
+"basis": "1978 Blazer body model (rear quarter)",
+"cat": "lamp"
+},
+"LICENSE-LAMP": {
+"xyz": [
+0.0,
+1.96,
+0.68
+],
+"basis": "candidate spot (not decided) (plate on the bumper or the tailgate: not read)",
+"cat": "lamp"
+},
+"Backup_Camera": {
+"xyz": [
+0.0,
+1.96,
+0.74
+],
+"basis": "candidate spot (not decided) (at the plate)",
+"cat": "sensor"
+},
+"CHMSL": {
+"xyz": [
+0.0,
+1.8,
+1.86
+],
+"basis": "candidate spot (not decided) (rear edge of the top)",
+"cat": "lamp"
+},
+"CARGO-LAMP": {
+"xyz": [
+0.0,
+1.3,
+1.86
+],
+"basis": "candidate spot (not decided) (cargo roof)",
+"cat": "lamp"
+},
+"TG-SW-KEY": {
+"xyz": [
+0.0,
+1.87,
+1.1
+],
+"basis": "placed from the sourced spot (tailgate key lock)",
+"cat": "switch"
+},
+"TG-SW-KEY-REV": {
+"xyz": [
+0.04,
+1.87,
+1.1
+],
+"basis": "placed from the sourced spot",
+"cat": "switch"
+},
+"TG-CUTOUT": {
+"xyz": [
+0.8,
+1.86,
+0.74
+],
+"basis": "placed from the sourced spot (tailgate edge)",
+"cat": "switch"
+},
+"TG-MOTOR-ACI": {
+"xyz": [
+0.0,
+1.84,
+0.95
+],
+"basis": "placed from the sourced spot (inside the tailgate)",
+"cat": "actuator"
+},
+"rear_window_motor": {
+"xyz": [
+-0.04,
+1.84,
+0.95
+],
+"basis": "placed from the sourced spot",
+"cat": "actuator"
+},
+"SUB": {
+"xyz": [
+0.8,
+1.48,
+1.0
+],
+"basis": "placed from the sourced spot (owner: behind the rear wheel well, in the side panel, on a built structure)",
+"cat": "audio"
+},
+"SUB-2": {
+"xyz": [
+-0.8,
+1.48,
+1.0
+],
+"basis": "placed from the sourced spot (owner: behind the rear wheel well, in the side panel; the factory spare carrier sits here)",
+"cat": "audio"
+},
+"AMP": {
+"xyz": [
+0.78,
+1.2,
+1.18
+],
+"basis": "candidate spot (not decided) (above the left wheel well, sharing the left sub's structure)",
+"cat": "audio"
+},
+"AMP-BLOCK": {
+"xyz": [
+0.72,
+1.32,
+1.18
+],
+"basis": "candidate spot (not decided) (beside the amp)",
+"cat": "power"
+},
+"AMP-PASS": {
+"xyz": [
+0.55,
+1.3,
+0.7
+],
+"basis": "candidate spot (not decided) (rear floor over the frame rail)",
+"cat": "connector"
+},
+"SPK-RL": {
+"xyz": [
+0.84,
+0.1,
+1.12
+],
+"basis": "candidate spot (not decided) (rear side panel beside the rear seat)",
+"cat": "audio"
+},
+"SPK-RR": {
+"xyz": [
+-0.84,
+0.1,
+1.12
+],
+"basis": "candidate spot (not decided) (rear side panel beside the rear seat)",
+"cat": "audio"
+},
+"GND-SPLICE-REAR": {
+"xyz": [
+0.55,
+1.5,
+0.74
+],
+"basis": "candidate spot (not decided) (inside the rear body)",
+"cat": "power"
+},
+"FUEL-PUMP": {
+"xyz": [
+0.1,
+1.3,
+0.83
+],
+"basis": "placed from the sourced spot (hanger in the top of the body model's own tank: y 0.95-1.71, z 0.51-0.83)",
+"cat": "actuator"
+},
+"FUEL-LEVEL": {
+"xyz": [
+0.03,
+1.3,
+0.83
+],
+"basis": "placed from the sourced spot (on the hanger in the top of the tank)",
+"cat": "sensor"
+},
+"SPL-FUEL-SND": {
+"xyz": [
+0.1,
+1.24,
+0.86
+],
+"basis": "placed from the sourced spot (above the tank lid)",
+"cat": "connector"
+},
+"VSS-SENDER": {
+"xyz": [
+0.0,
+-0.66,
+0.55
+],
+"basis": "placed from the sourced spot (NP205 speedometer drive; twin object K5H_VSS)",
+"cat": "sensor"
+},
+"TCASE-4WD-SW": {
+"xyz": [
+0.2,
+-0.55,
+0.76
+],
+"basis": "candidate spot (not decided) (at the shift lever)",
+"cat": "switch"
+},
+"TRANS-CASE": {
+"xyz": [
+-0.135,
+-0.7,
+0.75
+],
+"basis": "twin v3 engine anchor (6L90 case)",
+"cat": "connector"
+},
+"PCS-HARNESS-4610-CASE": {
+"xyz": [
+-0.1,
+-0.8,
+0.6
+],
+"basis": "placed from the sourced spot",
+"cat": "connector"
+},
+"GSS-SENSOR": {
+"xyz": [
+0.15,
+-0.95,
+0.55
+],
+"basis": "candidate spot (not decided) (detent shaft)",
+"cat": "sensor"
+},
+"E-STOPP": {
+"xyz": [
+0.3,
+0.95,
+0.62
+],
+"basis": "placed from the sourced spot (on the parking-brake cable; twin object K5H_EStopp_Actuator)",
+"cat": "actuator"
+},
+"AMP-STEP-CTRL": {
+"xyz": [
+0.8,
+-0.6,
+0.45
+],
+"basis": "candidate spot (not decided) (by a step motor)",
+"cat": "module"
+},
+"RAIL-COIL_PWR": {
+"xyz": [
+-0.097,
+-1.556,
+1.023
+],
+"basis": "grouped with COIL-1",
+"cat": "harness",
+"grouped": "COIL-1"
+},
+"RAIL-INJ_PWR": {
+"xyz": [
+0.159,
+-1.899,
+1.076
+],
+"basis": "grouped with INJ-1",
+"cat": "harness",
+"grouped": "INJ-1"
+},
+"FAN-JUNCTION": {
+"xyz": [
+-0.68,
+-1.9,
+1.02
+],
+"basis": "grouped with PDM15-A",
+"cat": "harness",
+"grouped": "PDM15-A"
+},
+"FUSE-IBOOST_PERM": {
+"xyz": [
+-0.62,
+-2.26,
+0.95
+],
+"basis": "grouped with ODYSSEY",
+"cat": "harness",
+"grouped": "ODYSSEY"
+},
+"FUSE-ISO_PWR": {
+"xyz": [
+-0.62,
+-2.26,
+0.95
+],
+"basis": "grouped with ODYSSEY",
+"cat": "harness",
+"grouped": "ODYSSEY"
+},
+"FUSE-ISO_SW_PWR": {
+"xyz": [
+-0.62,
+-2.26,
+0.95
+],
+"basis": "grouped with ODYSSEY",
+"cat": "harness",
+"grouped": "ODYSSEY"
+},
+"PDM15-B": {
+"xyz": [
+-0.68,
+-1.9,
+1.02
+],
+"basis": "grouped with PDM15-A",
+"cat": "harness",
+"grouped": "PDM15-A"
+},
+"PDM15-STUD": {
+"xyz": [
+-0.68,
+-1.9,
+1.02
+],
+"basis": "grouped with PDM15-A",
+"cat": "harness",
+"grouped": "PDM15-A"
+},
+"SPL-PDM15-OUT1": {
+"xyz": [
+-0.68,
+-1.9,
+1.02
+],
+"basis": "grouped with PDM15-A",
+"cat": "harness",
+"grouped": "PDM15-A"
+},
+"SPL-PDM15-OUT2": {
+"xyz": [
+-0.68,
+-1.9,
+1.02
+],
+"basis": "grouped with PDM15-A",
+"cat": "harness",
+"grouped": "PDM15-A"
+},
+"SPL-PDM15-OUT3": {
+"xyz": [
+-0.68,
+-1.9,
+1.02
+],
+"basis": "grouped with PDM15-A",
+"cat": "harness",
+"grouped": "PDM15-A"
+},
+"SPL-PDM15-OUT4": {
+"xyz": [
+-0.68,
+-1.9,
+1.02
+],
+"basis": "grouped with PDM15-A",
+"cat": "harness",
+"grouped": "PDM15-A"
+},
+"SPL-PDM15-OUT5": {
+"xyz": [
+-0.68,
+-1.9,
+1.02
+],
+"basis": "grouped with PDM15-A",
+"cat": "harness",
+"grouped": "PDM15-A"
+},
+"SPL-PDM15-OUT6": {
+"xyz": [
+-0.68,
+-1.9,
+1.02
+],
+"basis": "grouped with PDM15-A",
+"cat": "harness",
+"grouped": "PDM15-A"
+},
+"SPL-PDM15-OUT7": {
+"xyz": [
+-0.68,
+-1.9,
+1.02
+],
+"basis": "grouped with PDM15-A",
+"cat": "harness",
+"grouped": "PDM15-A"
+},
+"SPL-PDM15-OUT13": {
+"xyz": [
+-0.68,
+-1.9,
+1.02
+],
+"basis": "grouped with PDM15-A",
+"cat": "harness",
+"grouped": "PDM15-A"
+},
+"FIREWALL-BODY-A": {
+"xyz": [
+0.5,
+-1.49,
+0.9
+],
+"basis": "grouped with FIREWALL-ENGINE",
+"cat": "harness",
+"grouped": "FIREWALL-ENGINE"
+},
+"FIREWALL-BODY-B": {
+"xyz": [
+0.5,
+-1.49,
+0.9
+],
+"basis": "grouped with FIREWALL-ENGINE",
+"cat": "harness",
+"grouped": "FIREWALL-ENGINE"
+},
+"FIREWALL-BODY-P": {
+"xyz": [
+0.5,
+-1.49,
+0.9
+],
+"basis": "grouped with FIREWALL-ENGINE",
+"cat": "harness",
+"grouped": "FIREWALL-ENGINE"
+},
+"FIREWALL-BODY-C": {
+"xyz": [
+0.55,
+1.3,
+0.7
+],
+"basis": "grouped with AMP-PASS",
+"cat": "harness",
+"grouped": "AMP-PASS"
+},
+"M130-B": {
+"xyz": [
+0.3,
+-1.4,
+0.95
+],
+"basis": "grouped with M130-A",
+"cat": "harness",
+"grouped": "M130-A"
+},
+"PDM30-B": {
+"xyz": [
+0.1,
+-1.38,
+0.88
+],
+"basis": "grouped with PDM30-A",
+"cat": "harness",
+"grouped": "PDM30-A"
+},
+"PDM30-STUD": {
+"xyz": [
+0.1,
+-1.38,
+0.88
+],
+"basis": "grouped with PDM30-A",
+"cat": "harness",
+"grouped": "PDM30-A"
+},
+"SPL-PDM30-OUT1": {
+"xyz": [
+0.1,
+-1.38,
+0.88
+],
+"basis": "grouped with PDM30-A",
+"cat": "harness",
+"grouped": "PDM30-A"
+},
+"SPL-PDM30-OUT2": {
+"xyz": [
+0.1,
+-1.38,
+0.88
+],
+"basis": "grouped with PDM30-A",
+"cat": "harness",
+"grouped": "PDM30-A"
+},
+"SPL-PDM30-OUT3": {
+"xyz": [
+0.1,
+-1.38,
+0.88
+],
+"basis": "grouped with PDM30-A",
+"cat": "harness",
+"grouped": "PDM30-A"
+},
+"SPL-PDM30-OUT4": {
+"xyz": [
+0.1,
+-1.38,
+0.88
+],
+"basis": "grouped with PDM30-A",
+"cat": "harness",
+"grouped": "PDM30-A"
+},
+"SPL-PDM30-OUT5": {
+"xyz": [
+0.1,
+-1.38,
+0.88
+],
+"basis": "grouped with PDM30-A",
+"cat": "harness",
+"grouped": "PDM30-A"
+},
+"SPL-PDM30-OUT6": {
+"xyz": [
+0.1,
+-1.38,
+0.88
+],
+"basis": "grouped with PDM30-A",
+"cat": "harness",
+"grouped": "PDM30-A"
+},
+"SPL-PDM30-OUT7": {
+"xyz": [
+0.1,
+-1.38,
+0.88
+],
+"basis": "grouped with PDM30-A",
+"cat": "harness",
+"grouped": "PDM30-A"
+},
+"SPL-PDM30-OUT8": {
+"xyz": [
+0.1,
+-1.38,
+0.88
+],
+"basis": "grouped with PDM30-A",
+"cat": "harness",
+"grouped": "PDM30-A"
+},
+"FUSE-DAK_CONST": {
+"xyz": [
+0.1,
+-1.38,
+0.88
+],
+"basis": "grouped with PDM30-A",
+"cat": "harness",
+"grouped": "PDM30-A"
+},
+"FUSE-PCS_BATT": {
+"xyz": [
+0.1,
+-1.38,
+0.88
+],
+"basis": "grouped with PDM30-A",
+"cat": "harness",
+"grouped": "PDM30-A"
+},
+"FUSE-TRANS_BATT": {
+"xyz": [
+0.1,
+-1.38,
+0.88
+],
+"basis": "grouped with PDM30-A",
+"cat": "harness",
+"grouped": "PDM30-A"
+},
+"CAN-BUS": {
+"xyz": [
+0.3,
+-1.4,
+0.95
+],
+"basis": "grouped with M130-A",
+"cat": "harness",
+"grouped": "M130-A"
+},
+"SPL-ISO-YEL": {
+"xyz": [
+-0.5,
+-2.18,
+1.06
+],
+"basis": "grouped with ISOLATOR",
+"cat": "harness",
+"grouped": "ISOLATOR"
+}
+}

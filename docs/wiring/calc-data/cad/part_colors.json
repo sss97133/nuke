@@ -1,0 +1,843 @@
+{
+ "generated_by": "harness-cad from the layout pass (colors.py k-means of each part's product photo; fp_photos.json photo picks), 2026-09-29",
+ "note": "hex colours measured from the maker's product photo at the URL; the photos themselves are not stored here",
+ "parts": {
+  "AC-CLUTCH": {
+   "clusters": [
+    {
+     "hex": "#807a72",
+     "share": 0.41
+    },
+    {
+     "hex": "#bdc2c0",
+     "share": 0.39
+    },
+    {
+     "hex": "#20b6e8",
+     "share": 0.21
+    }
+   ],
+   "photo": "https://i.ebayimg.com/images/g/sq8AAOSw1yNoG2vB/s-l1600.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "7176"
+  },
+  "ACC-BATT": {
+   "clusters": [
+    {
+     "hex": "#92a5a9",
+     "share": 0.43
+    },
+    {
+     "hex": "#515552",
+     "share": 0.4
+    },
+    {
+     "hex": "#cf8c2a",
+     "share": 0.17
+    }
+   ],
+   "photo": "https://clariosdigitallibrary.widen.net/content/xh7uzu0tla/png/OPTIMA_YT_D34-78_Front_Global.png?w=1500&h=1500&position=c&color=ffffff00&quality=80&u=n3xatz",
+   "photo_match": "exact_pn",
+   "maker_pn": "8014-045"
+  },
+  "ALTERNATOR-SENSE": {
+   "photo": null,
+   "photo_match": "unknown",
+   "maker_pn": "197-302"
+  },
+  "AMP": {
+   "clusters": [
+    {
+     "hex": "#858991",
+     "share": 0.41
+    },
+    {
+     "hex": "#55575e",
+     "share": 0.36
+    },
+    {
+     "hex": "#ccced3",
+     "share": 0.23
+    }
+   ],
+   "photo": "https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2021/30/136/g13698640-M.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "VX700/5i"
+  },
+  "AMP-STEP-CTRL": {
+   "photo": null,
+   "photo_match": "unknown",
+   "maker_pn": "unknown"
+  },
+  "APS": {
+   "clusters": [
+    {
+     "hex": "#708392",
+     "share": 0.39
+    },
+    {
+     "hex": "#313131",
+     "share": 0.35
+    },
+    {
+     "hex": "#bbc9d3",
+     "share": 0.26
+    }
+   ],
+   "photo": "https://i.ebayimg.com/images/g/zycAAOSwI2lmXXQv/s-l1600.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "eBay item 285903658629"
+  },
+  "Backup_Camera": {
+   "clusters": [
+    {
+     "hex": "#252729",
+     "share": 0.42
+    },
+    {
+     "hex": "#535455",
+     "share": 0.38
+    },
+    {
+     "hex": "#bab9b8",
+     "share": 0.2
+    }
+   ],
+   "photo": "https://www.rearviewsafety.com/pub/media/catalog/product/r/v/rvs-0355-ir_main_2.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "RVS-7180355-IR"
+  },
+  "CARGO-LAMP": {
+   "clusters": [
+    {
+     "hex": "#b9c2c5",
+     "share": 0.52
+    },
+    {
+     "hex": "#e0eaec",
+     "share": 0.36
+    },
+    {
+     "hex": "#606466",
+     "share": 0.12
+    }
+   ],
+   "photo": "https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/80251C/spinset_01_01_80251C.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "80251C"
+  },
+  "CHMSL": {
+   "clusters": [
+    {
+     "hex": "#1b1314",
+     "share": 0.67
+    },
+    {
+     "hex": "#893532",
+     "share": 0.2
+    },
+    {
+     "hex": "#b5a586",
+     "share": 0.14
+    }
+   ],
+   "photo": "https://www.oraclelights.com/cdn/shop/files/4514-003_A_Primary_0cff9a94-4dc5-4af4-9078-fe02f1d1d6f8.webp?v=1769554854&width=900",
+   "photo_match": "exact_pn",
+   "maker_pn": "4514-003"
+  },
+  "CKP": {
+   "clusters": [
+    {
+     "hex": "#3e4555",
+     "share": 0.49
+    },
+    {
+     "hex": "#6e7885",
+     "share": 0.29
+    },
+    {
+     "hex": "#c3c5cc",
+     "share": 0.22
+    }
+   ],
+   "photo": "https://ecommerce-assets.ext.gm.com/assets/products/images/213-4573_Primary.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "213-4573"
+  },
+  "CLT-ECU": {
+   "clusters": [
+    {
+     "hex": "#4c483e",
+     "share": 0.48
+    },
+    {
+     "hex": "#d9c8a9",
+     "share": 0.27
+    },
+    {
+     "hex": "#988666",
+     "share": 0.25
+    }
+   ],
+   "photo": "https://ecommerce-assets.ext.gm.com/assets/products/images/213-4514_Primary.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "213-4514"
+  },
+  "CMP": {
+   "clusters": [
+    {
+     "hex": "#a1a1a1",
+     "share": 0.52
+    },
+    {
+     "hex": "#cdcdcd",
+     "share": 0.37
+    },
+    {
+     "hex": "#494949",
+     "share": 0.11
+    }
+   ],
+   "photo": "https://ecommerce-assets.ext.gm.com/assets/products/images/213-3826_Primary.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "213-3826"
+  },
+  "COIL-1": {
+   "clusters": [
+    {
+     "hex": "#353535",
+     "share": 0.5
+    },
+    {
+     "hex": "#606161",
+     "share": 0.34
+    },
+    {
+     "hex": "#b2b2b3",
+     "share": 0.16
+    }
+   ],
+   "photo": "https://ecommerce-assets.ext.gm.com/assets/products/images/D510C_Primary.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "D510C"
+  },
+  "DAKOTA-VHX": {
+   "clusters": [
+    {
+     "hex": "#4e4f50",
+     "share": 0.74
+    },
+    {
+     "hex": "#bebebb",
+     "share": 0.14
+    },
+    {
+     "hex": "#2f302f",
+     "share": 0.13
+    }
+   ],
+   "photo": "https://static.summitracing.com/global/images/prod/xlarge/dak-vhx-73c-pu_xl.jpg",
+   "photo_match": "same_family_photo",
+   "maker_pn": "VHX-73C-PU"
+  },
+  "DCDC": {
+   "clusters": [
+    {
+     "hex": "#3194d5",
+     "share": 0.66
+    },
+    {
+     "hex": "#262b2a",
+     "share": 0.28
+    },
+    {
+     "hex": "#a39579",
+     "share": 0.06
+    }
+   ],
+   "photo": "https://www.victronenergy.com/upload/documents/ORI121236140_Orion-Tr%20Smart%2012-12-30A%20%28360W%29%20Non-isolated%20DC-DC%20charger%20%28front-angle%29.png",
+   "photo_match": "exact_pn",
+   "maker_pn": "ORI121236140"
+  },
+  "E-STOPP": {
+   "clusters": [
+    {
+     "hex": "#cccdcf",
+     "share": 0.6
+    },
+    {
+     "hex": "#958486",
+     "share": 0.21
+    },
+    {
+     "hex": "#342f32",
+     "share": 0.19
+    }
+   ],
+   "photo": "https://static.summitracing.com/global/images/prod/xlarge/esc-esk001_xl.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "ESK001"
+  },
+  "FAN": {
+   "clusters": [
+    {
+     "hex": "#212223",
+     "share": 0.61
+    },
+    {
+     "hex": "#bdc1c6",
+     "share": 0.21
+    },
+    {
+     "hex": "#6c6d6e",
+     "share": 0.18
+    }
+   ],
+   "photo": "https://wizardcooling.com/images/M198668289.jpg",
+   "photo_match": "same_family_photo",
+   "maker_pn": "30107090"
+  },
+  "FOOTWELL-LAMPS": {
+   "clusters": [
+    {
+     "hex": "#a1a2a2",
+     "share": 0.44
+    },
+    {
+     "hex": "#757978",
+     "share": 0.32
+    },
+    {
+     "hex": "#c9c9cd",
+     "share": 0.24
+    }
+   ],
+   "photo": "https://www.lumiteclighting.com/media/catalog/product/r/a/rail2_mini_3.png",
+   "photo_match": "same_family_photo",
+   "maker_pn": "101241"
+  },
+  "FUEL-PUMP": {
+   "clusters": [
+    {
+     "hex": "#3c464a",
+     "share": 0.37
+    },
+    {
+     "hex": "#929688",
+     "share": 0.35
+    },
+    {
+     "hex": "#d5d6d2",
+     "share": 0.28
+    }
+   ],
+   "photo": "https://cdn11.bigcommerce.com/s-f5wn3qdqza/images/stencil/2560w/products/43676/663874/qfs-ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs__62292.1777427078.jpg?c=1",
+   "photo_match": "exact_pn",
+   "maker_pn": "QFS-H882"
+  },
+  "FUELP": {
+   "clusters": [
+    {
+     "hex": "#bc9d48",
+     "share": 0.49
+    },
+    {
+     "hex": "#94762c",
+     "share": 0.38
+    },
+    {
+     "hex": "#e5d8a4",
+     "share": 0.13
+    }
+   ],
+   "photo": "https://static.summitracing.com/global/images/prod/xlarge/avm-30-2131-100_xl.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "30-2131-100"
+  },
+  "GSS-3000": {
+   "clusters": [
+    {
+     "hex": "#1e1e20",
+     "share": 0.54
+    },
+    {
+     "hex": "#4b5553",
+     "share": 0.27
+    },
+    {
+     "hex": "#90a49a",
+     "share": 0.19
+    }
+   ],
+   "photo": "https://static.summitracing.com/global/images/prod/xlarge/dak-gss-3000_xl.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "GSS-3000"
+  },
+  "HEADLIGHT-L": {
+   "clusters": [
+    {
+     "hex": "#403d3c",
+     "share": 0.43
+    },
+    {
+     "hex": "#747373",
+     "share": 0.35
+    },
+    {
+     "hex": "#b4b5b7",
+     "share": 0.22
+    }
+   ],
+   "photo": "https://www.truck-lite.com/media/trucklite/TL_Spin_Folders/27270C/spinset_01_01_27270C.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "27270C"
+  },
+  "IAT": {
+   "clusters": [
+    {
+     "hex": "#272726",
+     "share": 0.61
+    },
+    {
+     "hex": "#545453",
+     "share": 0.28
+    },
+    {
+     "hex": "#b6b6b4",
+     "share": 0.11
+    }
+   ],
+   "photo": "https://ecommerce-assets.ext.gm.com/assets/products/images/213-243_Primary.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "213-243"
+  },
+  "IBOOSTER": {
+   "clusters": [
+    {
+     "hex": "#878275",
+     "share": 0.43
+    },
+    {
+     "hex": "#c6bbac",
+     "share": 0.34
+    },
+    {
+     "hex": "#3e3f3c",
+     "share": 0.23
+    }
+   ],
+   "photo": "https://www.evcreate.com/wp-content/uploads/2020/07/Tesla_1037123-00-B-1.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "1037123-00-B"
+  },
+  "INJ-1": {
+   "clusters": [
+    {
+     "hex": "#a9a6ab",
+     "share": 0.58
+    },
+    {
+     "hex": "#dad9da",
+     "share": 0.33
+    },
+    {
+     "hex": "#3c2537",
+     "share": 0.09
+    }
+   ],
+   "photo": "https://siemensdeka.com/wp-content/uploads/2012/08/FI114961-2-scaled.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "FI114961"
+  },
+  "ISO-SWITCH": {
+   "clusters": [
+    {
+     "hex": "#543b39",
+     "share": 0.62
+    },
+    {
+     "hex": "#636363",
+     "share": 0.3
+    },
+    {
+     "hex": "#bcb0af",
+     "share": 0.08
+    }
+   ],
+   "photo": "https://dh778tpvmt77t.cloudfront.net/images/products/2145.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "2145"
+  },
+  "ISOLATOR": {
+   "clusters": [
+    {
+     "hex": "#464144",
+     "share": 0.44
+    },
+    {
+     "hex": "#817573",
+     "share": 0.3
+    },
+    {
+     "hex": "#d2d0bb",
+     "share": 0.26
+    }
+   ],
+   "photo": "https://dh778tpvmt77t.cloudfront.net/images/products/7700.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "7700"
+  },
+  "KNOCK-1": {
+   "clusters": [
+    {
+     "hex": "#181818",
+     "share": 0.74
+    },
+    {
+     "hex": "#656563",
+     "share": 0.2
+    },
+    {
+     "hex": "#c1c1c1",
+     "share": 0.06
+    }
+   ],
+   "photo": "https://ecommerce-assets.ext.gm.com/assets/products/images/12623730_Primary.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "12623730"
+  },
+  "M130-A": {
+   "clusters": [
+    {
+     "hex": "#292829",
+     "share": 0.81
+    },
+    {
+     "hex": "#454442",
+     "share": 0.15
+    },
+    {
+     "hex": "#767372",
+     "share": 0.04
+    }
+   ],
+   "photo": "https://assets.motec.com.au/strapi/large_m130_052880dbeb.webp",
+   "photo_match": "exact_pn",
+   "maker_pn": "13130"
+  },
+  "MAP": {
+   "clusters": [
+    {
+     "hex": "#bcbcbc",
+     "share": 0.58
+    },
+    {
+     "hex": "#868686",
+     "share": 0.27
+    },
+    {
+     "hex": "#3e3e3e",
+     "share": 0.16
+    }
+   ],
+   "photo": "https://static.summitracing.com/global/images/prod/xlarge/hly-538-24_xl.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "538-24"
+  },
+  "MIRROR-MON": {
+   "clusters": [
+    {
+     "hex": "#42413f",
+     "share": 0.49
+    },
+    {
+     "hex": "#78797a",
+     "share": 0.39
+    },
+    {
+     "hex": "#c8cdd2",
+     "share": 0.12
+    }
+   ],
+   "photo": "https://www.rearviewsafety.com/pub/media/catalog/product/r/e/replacement-mirror-monitor-rvs-718-main_2.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "RVS-7180355-IR"
+  },
+  "ODYSSEY": {
+   "photo": "https://www.odysseybattery.com/wp-content/uploads/sites/2/ODX-AGM-34-78-right-angle-top.png",
+   "photo_match": "exact_pn",
+   "maker_pn": "34/78-PC1500DT"
+  },
+  "OILP-ECU": {
+   "clusters": [
+    {
+     "hex": "#4f5052",
+     "share": 0.5
+    },
+    {
+     "hex": "#d6d7db",
+     "share": 0.36
+    },
+    {
+     "hex": "#959699",
+     "share": 0.14
+    }
+   ],
+   "photo": "https://ecommerce-assets.ext.gm.com/assets/products/images/12673134_Primary.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "12673134"
+  },
+  "PCS-TCM": {
+   "clusters": [
+    {
+     "hex": "#bebcbc",
+     "share": 0.63
+    },
+    {
+     "hex": "#111412",
+     "share": 0.31
+    },
+    {
+     "hex": "#696562",
+     "share": 0.06
+    }
+   ],
+   "photo": "https://www.zerogravityperformance.com/wp-content/uploads/2017/02/tcm2650_hanress.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "TCM-2650"
+  },
+  "PDM15-A": {
+   "clusters": [
+    {
+     "hex": "#2a2929",
+     "share": 0.78
+    },
+    {
+     "hex": "#454240",
+     "share": 0.18
+    },
+    {
+     "hex": "#7b7977",
+     "share": 0.04
+    }
+   ],
+   "photo": "https://assets.motec.com.au/strapi/large_pdm15_ca7836f587.webp",
+   "photo_match": "exact_pn",
+   "maker_pn": "14104"
+  },
+  "PDM30-A": {
+   "clusters": [
+    {
+     "hex": "#2a2929",
+     "share": 0.78
+    },
+    {
+     "hex": "#464240",
+     "share": 0.18
+    },
+    {
+     "hex": "#7b7978",
+     "share": 0.04
+    }
+   ],
+   "photo": "https://assets.motec.com.au/strapi/large_pdm30_c01f1c1cac.webp",
+   "photo_match": "exact_pn",
+   "maker_pn": "14103"
+  },
+  "RADIO": {
+   "clusters": [
+    {
+     "hex": "#d0d1d1",
+     "share": 0.38
+    },
+    {
+     "hex": "#8b8c8c",
+     "share": 0.31
+    },
+    {
+     "hex": "#2f2f2e",
+     "share": 0.31
+    }
+   ],
+   "photo": "https://cdn.shopify.com/s/files/1/0932/8664/products/B-116-03-73_a3f66b26-a268-4a22-b316-45189a60fd9e.jpg?v=1741101152",
+   "photo_match": "same_family_photo",
+   "maker_pn": "HB-M2 (face not picked)"
+  },
+  "SPK-FL": {
+   "clusters": [
+    {
+     "hex": "#2c2c2c",
+     "share": 0.57
+    },
+    {
+     "hex": "#605f61",
+     "share": 0.27
+    },
+    {
+     "hex": "#bdbdbd",
+     "share": 0.16
+    }
+   ],
+   "photo": "https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/20081/136/x136C2650X-f.jpeg",
+   "photo_match": "exact_pn",
+   "maker_pn": "C2-650X"
+  },
+  "SUB": {
+   "clusters": [
+    {
+     "hex": "#353337",
+     "share": 0.51
+    },
+    {
+     "hex": "#5a595f",
+     "share": 0.44
+    },
+    {
+     "hex": "#c8c4c8",
+     "share": 0.05
+    }
+   ],
+   "photo": "https://images.crutchfieldonline.com/ImageHandler/trim/869/652/products/2024/26/109/g109CL102SL-M.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "Club 102SL"
+  },
+  "TB": {
+   "clusters": [
+    {
+     "hex": "#cbc5b4",
+     "share": 0.41
+    },
+    {
+     "hex": "#8d8778",
+     "share": 0.34
+    },
+    {
+     "hex": "#353434",
+     "share": 0.25
+    }
+   ],
+   "photo": "https://ecommerce-assets.ext.gm.com/assets/products/images/12699160_Primary.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "12699160"
+  },
+  "TCASE-4WD-SW": {
+   "clusters": [
+    {
+     "hex": "#d3be7b",
+     "share": 0.51
+    },
+    {
+     "hex": "#55482d",
+     "share": 0.28
+    },
+    {
+     "hex": "#b86019",
+     "share": 0.21
+    }
+   ],
+   "photo": "https://torqueking.com/cdn/shop/files/qu30048__08146_8788__76476.1707875361.1280.1280.jpg?v=1786090930",
+   "photo_match": "exact_pn",
+   "maker_pn": "QU30048"
+  },
+  "TG-MOTOR-ACI": {
+   "clusters": [
+    {
+     "hex": "#28282b",
+     "share": 0.58
+    },
+    {
+     "hex": "#5d5b4c",
+     "share": 0.22
+    },
+    {
+     "hex": "#bcbaad",
+     "share": 0.2
+    }
+   ],
+   "photo": "https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-1-2.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "17383-1"
+  },
+  "Tail_Light_Left": {
+   "clusters": [
+    {
+     "hex": "#d5cfbf",
+     "share": 0.45
+    },
+    {
+     "hex": "#38322a",
+     "share": 0.34
+    },
+    {
+     "hex": "#a88c44",
+     "share": 0.21
+    }
+   ],
+   "photo": "https://upcarparts.com/cdn/shop/files/111157_01.jpg?v=1735798033&width=1200",
+   "photo_match": "same_family_photo",
+   "maker_pn": "8911029"
+  },
+  "WASHER-PUMP": {
+   "photo": null,
+   "photo_match": "unknown",
+   "maker_pn": "8TW 004 223-031"
+  },
+  "WIDEBAND": {
+   "clusters": [
+    {
+     "hex": "#2a2b2c",
+     "share": 0.51
+    },
+    {
+     "hex": "#3e3f41",
+     "share": 0.4
+    },
+    {
+     "hex": "#848480",
+     "share": 0.1
+    }
+   ],
+   "photo": "https://assets.motec.com.au/strapi/large_LTCD_7c7a5eed0a.webp",
+   "photo_match": "exact_pn",
+   "maker_pn": "61301"
+  },
+  "lock_actuator_DS": {
+   "clusters": [
+    {
+     "hex": "#383e3f",
+     "share": 0.54
+    },
+    {
+     "hex": "#73767a",
+     "share": 0.24
+    },
+    {
+     "hex": "#c0c3c4",
+     "share": 0.22
+    }
+   ],
+   "photo": "https://shop.autoloc.com/cdn/shop/files/2048_abcded99-9b45-4114-983b-9872425e0bc4.jpg?v=1739641298",
+   "photo_match": "exact_pn",
+   "maker_pn": "AUTZT2000"
+  },
+  "window_motor_DS": {
+   "clusters": [
+    {
+     "hex": "#282726",
+     "share": 0.5
+    },
+    {
+     "hex": "#7a7668",
+     "share": 0.26
+    },
+    {
+     "hex": "#c5c4c2",
+     "share": 0.24
+    }
+   ],
+   "photo": "https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-2-2.jpg",
+   "photo_match": "exact_pn",
+   "maker_pn": "17383-2"
+  }
+ }
+}

@@ -1,0 +1,5657 @@
+generated_by: docs/wiring/twin/harness_full.py
+frame: 'twin metres: +x driver, -y front, +z up'
+parts:
+- id: FW61-PLATE
+  endpoint: FIREWALL-ENGINE
+  status: 'decided (owner 2026-09-29: the 61-pin at the original fuse-box hole on a CNC''d plate)'
+  model: stand-in (parts lane CAD parameters)
+  kind: plate
+  size_mm:
+  - 135
+  - 3.175
+  - 135
+  centre:
+  - 0.5
+  - -1.4610875
+  - 0.9
+  aabb:
+  - - 0.4325
+    - -1.4627
+    - 0.8325
+  - - 0.5675
+    - -1.4595
+    - 0.9675
+  colour: '#b9bcbf'
+  colour_basis: 5052-H32 aluminium (fw61_adapter_plate.py THICK note), drawn as bare aluminium
+  sources:
+  - 'docs/wiring/calc-data/cad/fab/fw61_adapter_plate.py (parts lane, branch wiring/cad-fw61-plate): SIDE 135 mm, THICK 1/8 in, cutout 1.760 in with a 1.710 in flat
+    (Milnec TX37 shell 25), M6 holes 13 mm from the edge, gasket 1.5 mm'
+  - 'objectTraits.ts Exterior_Body_Blazer factory_holes FB [+0.50, -1.00, 0.90], 4.0 in: x and z kept; y moved onto the v3 firewall face (the trait''s y -1.00 is
+    the dash face in v3)'
+  wires_landing: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: flag
+    why: '104 mm from the twin''s headers/collectors/tails; within 150 mm: heat shield or move'
+- id: FIREWALL-ENGINE
+  endpoint: FIREWALL-ENGINE
+  status: decided
+  model: dashed (plug and receptacle lengths not sourced)
+  kind: stack
+  colour: '#5b5d3f'
+  colour_basis: finish letter W = cadmium olive drab (letter key on the Amphenol M85049/69 sheet; the D38999 class table is not in the substrate)
+  mounts_where: Driver side, in the original fuse-box hole, on a CNC'd adapter plate
+  zone: firewall
+  sources:
+  - 'registry endpoint FIREWALL-ENGINE: D38999/26WJ61PN plug, engine loom side (pins)'
+  - K5_WIRING_STATE.md s1 row 43 (D38999/24WJ61SN + /26WJ61PN, insert 25-61)
+  wires_landing: []
+  checks: []
+- id: FIREWALL-CABIN
+  endpoint: FIREWALL-CABIN
+  status: decided
+  model: dashed (length not sourced)
+  kind: stack
+  colour: '#5b5d3f'
+  colour_basis: as FIREWALL-ENGINE
+  mounts_where: Driver side, in the original fuse-box hole, on a CNC'd adapter plate
+  zone: firewall
+  sources:
+  - registry endpoint FIREWALL-CABIN
+  wires_landing: []
+  checks: []
+- id: ODYSSEY
+  endpoint: ODYSSEY
+  what: Odyssey 34/78-PC1500DT, the running battery
+  status: proposed
+  model: parts-lane model (docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art))
+  kind: glb
+  dims_mm:
+    l: 277.0
+    w: 178.0
+    h: 201.0
+  centre:
+  - -0.6
+  - -2.3
+  - 1.1105
+  origin:
+  - -0.6
+  - -2.3
+  - 1.01
+  rot:
+  - - 0
+    - 1
+    - 0
+  - - -1
+    - 0
+    - 0
+  - - 0
+    - 0
+    - 1
+  aabb:
+  - - -0.689
+    - -2.4385
+    - 1.01
+  - - -0.511
+    - -2.1615
+    - 1.211
+  colour_basis: the parts lane's model colours (docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art))
+  position_basis: 'PROPOSED: GM''s right battery tray spot (1977 LTSM p.122), long side fore-aft, side terminals and posts inboard, + forward; tray height not published
+    (base drawn at z 1.01)'
+  mounts_where: Engine bay, in the battery corner (the working position is the passenger firewall corner)
+  zone: engine
+  sources:
+  - 'docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art): maker drawing; 277 long over the rim (256 at the base); 173 over the hold-down ledges,
+    159 the body, 178 over the side bosses; 184 to the lid, 201 to the post tops'
+  ports:
+    ODYSSEY.pos_post:
+      at:
+      - -0.5495
+      - -2.405
+      - 1.211
+      dir:
+      - 0.0
+      - 0.0
+      - 1.0
+    ODYSSEY.neg_post:
+      at:
+      - -0.5495
+      - -2.195
+      - 1.211
+      dir:
+      - 0.0
+      - 0.0
+      - 1.0
+    ODYSSEY.pos_side:
+      at:
+      - -0.5055
+      - -2.405
+      - 1.138
+      dir:
+      - 1.0
+      - 0.0
+      - 0.0
+    ODYSSEY.neg_side:
+      at:
+      - -0.5055
+      - -2.195
+      - 1.138
+      dir:
+      - 1.0
+      - 0.0
+      - 0.0
+  wires_landing:
+  - '63'
+  - ISO_PWR_FH
+  - ISO_SW_PWR_FH
+  - ODY_NEG
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Under_Main_Blazer (6 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+- id: ACC-BATT
+  endpoint: ACC-BATT
+  what: Optima YellowTop D34/78, the accessory battery
+  status: proposed
+  model: parts-lane model (docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art))
+  kind: glb
+  dims_mm:
+    l: 254.46
+    w: 174.9
+    h: 199.16
+  centre:
+  - 0.6
+  - -2.3
+  - 1.1096
+  origin:
+  - 0.6
+  - -2.3
+  - 1.01
+  rot:
+  - - 0
+    - -1
+    - 0
+  - - 1
+    - 0
+    - 0
+  - - 0
+    - 0
+    - 1
+  aabb:
+  - - 0.5125
+    - -2.4272
+    - 1.01
+  - - 0.6875
+    - -2.1728
+    - 1.2092
+  colour_basis: the parts lane's model colours (docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art))
+  position_basis: 'PROPOSED: GM''s auxiliary left battery spot (1977 LTSM p.122), long side fore-aft, posts inboard; with the YellowTop''s layout that puts + at the
+    rear; base drawn at z 1.01'
+  mounts_where: Engine bay, in the battery corner (the working position is the passenger firewall corner)
+  zone: engine
+  sources:
+  - 'docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art): datasheet dims; 254.46 x 174.90 x 199.16 to the post tops (Optima); the side terminal
+    bosses stand 8 mm proud of the case front in the model (not in any source)'
+  ports:
+    ACC-BATT.pos_post:
+      at:
+      - 0.5549
+      - -2.231
+      - 1.2092
+      dir:
+      - 0.0
+      - 0.0
+      - 1.0
+    ACC-BATT.neg_post:
+      at:
+      - 0.5549
+      - -2.3686
+      - 1.2092
+      dir:
+      - 0.0
+      - 0.0
+      - 1.0
+    ACC-BATT.pos_side:
+      at:
+      - 0.5045
+      - -2.2595
+      - 1.148
+      dir:
+      - -1.0
+      - 0.0
+      - 0.0
+    ACC-BATT.neg_side:
+      at:
+      - 0.5045
+      - -2.345
+      - 1.148
+      dir:
+      - -1.0
+      - 0.0
+      - 0.0
+  wires_landing:
+  - '32'
+  - ACC_NEG
+  - DCDC_OUT
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Under_Main_Blazer (4 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+- id: ISOLATOR
+  endpoint: ISOLATOR
+  status: decided part (state s1 row 57); spot proposed
+  model: stand-in
+  kind: isolator
+  size_mm:
+  - 95.25
+  - 51.56
+  - 138.94
+  centre:
+  - -0.43
+  - -2.42922
+  - 1.06947
+  aabb:
+  - - -0.4776
+    - -2.455
+    - 1.0
+  - - -0.3824
+    - -2.4034
+    - 1.1389
+  colour: '#464144'
+  colour_basis: 'Blue Sea product photo k-means (dh778tpvmt77t.cloudfront.net/images/products/7700.jpg): body #464144'
+  mounts_where: Engine bay, on the Odyssey's positive cable as close to the battery as it fits
+  zone: engine
+  sources:
+  - 'Blue Sea dimension drawing 7700_7702_7622_7623.jpg (bluesea.com, fetched 2026-09-29): 3.750 x 5.470 x 2.030 in; two studs at the bottom, 1.900 in apart, 1.030
+    in off the mounting face'
+  - 'web_snapshots/www.bluesea.com__ML-RBS_Remote_Battery_Switch_with_Manual_Control_-_12V_DC_500A.md: 3/8-16 studs, 0.875 in long'
+  - 'mounts.yaml ISOLATOR: engine bay, on the Odyssey''s positive cable as close to the battery as it fits'
+  wires_landing:
+  - '63'
+  - ISO_CLOSE
+  - ISO_GND
+  - ISO_LED
+  - ISO_OPEN
+  - ISO_OUT
+  - ISO_PWR
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: PDM15-A
+  endpoint: PDM15-A
+  what: Engine power box, drawn as the proposed sealed MoTeC PDM32 (180 x 60 x 28 mm); the registry still lists a PDM15 (107 x 133 x 39 mm, unsealed)
+  status: proposed (the PDM model is an open owner/Dave call)
+  model: stand-in
+  kind: box
+  size_mm:
+  - 60
+  - 180
+  - 28
+  centre:
+  - -0.68
+  - -1.9
+  - 1.075
+  aabb:
+  - - -0.71
+    - -1.99
+    - 1.061
+  - - -0.65
+    - -1.81
+    - 1.089
+  colour: '#2a2929'
+  colour_basis: 'PDM32 colour not read (machined aluminium case per the manual); drawn MoTeC-dark like the PDM15 photo #2a2929'
+  mounts_where: In the engine bay in the current design, which breaks MoTeC's spec
+  zone: engine
+  sources:
+  - 'MoTeC PDM user manual p.35 (library text component_drawings__motec_pdm_user_manual/page-0038.txt): PDM32 length 180, width 60, height 28 mm; machined aluminium;
+    rubber seal on lid and connectors'
+  - 'mounts.yaml PDM15 (flag: unsealed case in the bay); state row 0ah (sealed bay PDM32 candidate for the front loads)'
+  - 'main lane 2026-09-29: sealed bay PDM on the passenger inner fender, PROPOSED'
+  wires_landing:
+  - PDM15_BPOS
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: PS-STUDS
+  endpoint: PS-STUDS
+  what: Distribution stud with the MEGA 200 / 125 / 100 and MIDI 40 holders
+  status: open (mounts.yaml PS-STUDS)
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 60
+  - 120
+  - 50
+  centre:
+  - -0.48
+  - -2.08
+  - 1.04
+  aabb:
+  - - -0.51
+    - -2.14
+    - 1.015
+  - - -0.45
+    - -2.02
+    - 1.065
+  colour: '#d23b2f'
+  colour_basis: Dave's red covered two-stud block (state row 0i photo evidence); holder colours not read
+  mounts_where: At the batteries, the isolator, the distribution stud, the starter, the alternator, the block, the frame and the power boxes
+  zone: engine
+  sources:
+  - 'registry PS-STUDS; cable_decisions.json fuses (MEGA 200 #59, MEGA 125 PDM_BPOS, MEGA 100 PDM15_BPOS, MIDI 40 #52)'
+  - state row 0i (Blue Sea 2019 match, 2 x 3/8 in studs)
+  wires_landing:
+  - '3'
+  - '52'
+  - '59'
+  - '6'
+  - DCDC_IN
+  - IBOOST_PERM_FH
+  - ISO_OUT
+  - PDM15_BPOS
+  - PDM_BPOS
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 226 mm from the twin's headers/collectors/tails
+- id: GND-BANK-ENG
+  endpoint: GND-BANK-ENG
+  what: 'Engine ground star: both battery negatives, block G1, frame G2, bay returns'
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 50
+  - 100
+  - 40
+  centre:
+  - -0.48
+  - -2.06
+  - 0.915
+  aabb:
+  - - -0.505
+    - -2.11
+    - 0.895
+  - - -0.455
+    - -2.01
+    - 0.935
+  colour: '#1c1c1c'
+  colour_basis: not read
+  mounts_where: Beside the batteries
+  zone: engine
+  sources:
+  - registry GND-BANK-ENG; state s1 row 56 (grounds run in the loom to banks)
+  wires_landing:
+  - ACC_NEG
+  - AMP_GND
+  - BLOWER_GND
+  - DCDC_GND
+  - FAN_GND
+  - G1
+  - G2
+  - GND_RET_CAB
+  - HL_L_GND
+  - HL_R_GND
+  - HORN_GND
+  - IBOOST_GND
+  - ISO_GND
+  - LTCD_GND
+  - MK_LF_GND
+  - MK_RF_GND
+  - ODY_NEG
+  - PDM15_GND1
+  - PDM15_GND2
+  - PDM_GND1
+  - PDM_GND2
+  - PT_LF_GND
+  - PT_RF_GND
+  - PUMP_GND
+  - STEP_GND
+  - TRANS_GND
+  - UH_GND
+  - WASH_GND
+  - WIPER_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 172 mm from the twin's headers/collectors/tails
+- id: IBOOSTER
+  endpoint: IBOOSTER
+  what: Bosch iBooster Gen 2 on the driver firewall (twin v2 object K5H_iBooster)
+  status: decided (installed)
+  model: 'dashed (size not read: twin v2 box)'
+  kind: box
+  size_mm:
+  - 190
+  - 240
+  - 260
+  centre:
+  - 0.4
+  - -1.52
+  - 1.05
+  aabb:
+  - - 0.305
+    - -1.64
+    - 0.92
+  - - 0.495
+    - -1.4
+    - 1.18
+  colour: '#878275'
+  colour_basis: EVcreate photo of a 1037123-00-B (footprints.py)
+  mounts_where: Driver side of the firewall, on the factory booster pad
+  zone: engine
+  sources:
+  - twin object K5H_iBooster box x 0.305..0.495, y -1.64..-1.40, z 0.92..1.18 (v2, the unit's own size not read)
+  - 'state s4: installed on the driver firewall factory pad'
+  wires_landing:
+  - '52'
+  - IBOOST_GND
+  - IBOOST_PERM
+  - IBOOST_WAKE
+  - IBST_CAN_H
+  - IBST_CAN_L
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Interior_Main (76 pts), Under_Main_Blazer (75 pts), Dash_Main (40 pts) - re-check at the mock-up (or the twin is off there:
+      tapes)'
+  - rule: clear of neighbouring parts
+    source: part envelopes in this scene
+    result: flag
+    why: envelope overlaps FW61-PLATE, BRAKE-FLUID-LVL
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: flag
+    why: '40 mm from the twin''s headers/collectors/tails; within 150 mm: heat shield or move'
+- id: FIREWALL-GROMMET
+  endpoint: FIREWALL-GROMMET
+  what: 'Factory hole H3 (passenger): the exception under review for the cab power box''s 2 AWG feed and ground'
+  status: exception under review
+  model: marker
+  kind: ring
+  size_mm:
+  - 38.1
+  - 6
+  - 38.1
+  centre:
+  - -0.35
+  - -1.466
+  - 0.9
+  aabb:
+  - - -0.369
+    - -1.469
+    - 0.881
+  - - -0.3309
+    - -1.463
+    - 0.9191
+  colour: '#f2c318'
+  colour_basis: marker colour (not a part colour)
+  mounts_where: Firewall, beside the batteries
+  zone: firewall
+  sources:
+  - 'objectTraits.ts factory_holes H3 [-0.35, -1.02, 0.90], 1.5 in, ''A/C + ECU (passenger)'': x and z kept; y moved onto the v3 firewall face'
+  - 'owner calls 2026-09-29 (receipts/2026-09-29_owner-calls-one-61pin-at-fusebox-hole.md, state row 0ah): only the 61-pin crosses the firewall, at the fuse-box hole;
+    the cab power box''s 2 AWG feed and ground at H3 is the one exception under review'
+  wires_landing: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: flag
+    why: '41 mm from the twin''s headers/collectors/tails; within 150 mm: heat shield or move'
+- id: CKP
+  endpoint: CKP
+  what: Crank sensor (58x, grey plug)
+  status: fixed_by_engine
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - -0.162
+  - -1.495
+  - 0.755
+  aabb:
+  - - -0.177
+    - -1.51
+    - 0.735
+  - - -0.147
+    - -1.48
+    - 0.775
+  colour: '#3e4555'
+  colour_basis: product photo k-means (https://ecommerce-assets.ext.gm.com/assets/products/images/213-4573_Primary.jpg)
+  position_basis: twin v3 engine anchor
+  mounts_where: Passenger side of the block, behind the starter
+  zone: engine
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - 27a
+  - 27b
+  - '35'
+  - '43'
+  - '99'
+  - 99g
+  - 99r
+  - LOCK_BUS_A
+  - LOCK_BUS_B
+  - LOCK_FEED_R
+  - LOCK_GND_R
+  - STEP_DOOR_R
+  - WIN_GND_R
+  - WIN_R_DN
+  - WIN_R_UP
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: flag
+    why: '87 mm from the twin''s headers/collectors/tails; within 150 mm: heat shield or move'
+- id: CMP
+  endpoint: CMP
+  what: Cam sensor
+  status: fixed_by_engine
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - 0.045
+  - -2.03
+  - 0.885
+  aabb:
+  - - 0.03
+    - -2.045
+    - 0.865
+  - - 0.06
+    - -2.015
+    - 0.905
+  colour: '#a1a1a1'
+  colour_basis: product photo k-means (https://ecommerce-assets.ext.gm.com/assets/products/images/213-3826_Primary.jpg)
+  position_basis: twin v3 engine anchor
+  mounts_where: Front of the engine, driver side of the timing cover, mid to upper
+  zone: engine
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '101'
+  - 101g
+  - 101r
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 211 mm from the twin's headers/collectors/tails
+- id: KNOCK-1
+  endpoint: KNOCK-1
+  what: Knock sensor, bank 1
+  status: fixed_by_engine
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - 0.158
+  - -1.705
+  - 0.765
+  aabb:
+  - - 0.143
+    - -1.72
+    - 0.745
+  - - 0.173
+    - -1.69
+    - 0.785
+  colour: '#181818'
+  colour_basis: product photo k-means (https://ecommerce-assets.ext.gm.com/assets/products/images/12623730_Primary.jpg)
+  position_basis: twin v3 engine anchor
+  mounts_where: 'Driver side of the block (bank 1: cylinders 1, 3, 5, 7)'
+  zone: engine
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: flag
+    why: '86 mm from the twin''s headers/collectors/tails; within 150 mm: heat shield or move'
+- id: KNOCK-2
+  endpoint: KNOCK-2
+  what: Knock sensor, bank 2
+  status: fixed_by_engine
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - -0.158
+  - -1.705
+  - 0.765
+  aabb:
+  - - -0.173
+    - -1.72
+    - 0.745
+  - - -0.143
+    - -1.69
+    - 0.785
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: twin v3 engine anchor
+  mounts_where: 'Passenger side of the block (bank 2: cylinders 2, 4, 6, 8)'
+  zone: engine
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '104'
+  - 104g
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: flag
+    why: '86 mm from the twin''s headers/collectors/tails; within 150 mm: heat shield or move'
+- id: CLT-ECU
+  endpoint: CLT-ECU
+  what: Coolant temperature sensor for the M130
+  status: fixed_by_engine
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - 0.182
+  - -1.994
+  - 0.965
+  aabb:
+  - - 0.167
+    - -2.009
+    - 0.945
+  - - 0.197
+    - -1.979
+    - 0.985
+  colour: '#4c483e'
+  colour_basis: product photo k-means (https://ecommerce-assets.ext.gm.com/assets/products/images/213-4514_Primary.jpg)
+  position_basis: 'Swap Specialties p.6: front of the driver head. The twin anchor (0.286, -1.869, 0.84) sat inside the #1 header flange; moved onto the head''s front
+    face (twin E3_Head_L front y -1.992)'
+  mounts_where: Front of the driver-side cylinder head
+  zone: engine
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '110'
+  - 110g
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: flag
+    why: '132 mm from the twin''s headers/collectors/tails; within 150 mm: heat shield or move'
+- id: DAK-CTS
+  endpoint: DAK-CTS
+  what: Dakota temperature sender (SEN-04-5)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - -0.286
+  - -1.44
+  - 0.84
+  aabb:
+  - - -0.301
+    - -1.455
+    - 0.82
+  - - -0.271
+    - -1.425
+    - 0.86
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (rear of the passenger head)
+  mounts_where: Rear of the passenger-side cylinder head, in its spare port
+  zone: engine
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '114'
+  - DAK_CTS_RET
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Under_Main_Blazer (2 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: flag
+    why: '50 mm from the twin''s headers/collectors/tails; within 150 mm: heat shield or move'
+- id: OILP-ECU
+  endpoint: OILP-ECU
+  what: Oil pressure sensor for the M130 (Gen IV round 3-pin)
+  status: fixed_by_engine
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - 0.025
+  - -1.48
+  - 0.99
+  aabb:
+  - - 0.01
+    - -1.495
+    - 0.97
+  - - 0.04
+    - -1.465
+    - 1.01
+  colour: '#4f5052'
+  colour_basis: product photo k-means (https://ecommerce-assets.ext.gm.com/assets/products/images/12673134_Primary.jpg)
+  position_basis: twin v3 engine anchor
+  mounts_where: Upper rear of the engine, in the factory oil pressure port
+  zone: engine
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '102'
+  - 102g
+  - 102r
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 259 mm from the twin's headers/collectors/tails
+- id: DAK-OILP
+  endpoint: DAK-OILP
+  what: Dakota oil pressure sender (SEN-03-8)
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - 0.075
+  - -1.48
+  - 0.99
+  aabb:
+  - - 0.06
+    - -1.495
+    - 0.97
+  - - 0.09
+    - -1.465
+    - 1.01
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: positions_v3 put it 10 mm behind the twin firewall face; kept at the tee's height on the engine side
+  mounts_where: 'Not placed: a tee at the factory oil pressure port, or a port on the oil cooler adapter'
+  zone: engine
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '115'
+  - DAK_OILP_5V
+  - DAK_OILP_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 220 mm from the twin's headers/collectors/tails
+- id: OILT
+  endpoint: OILT
+  what: Oil temperature sensor
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - -0.17
+  - -1.67
+  - 0.622
+  aabb:
+  - - -0.185
+    - -1.685
+    - 0.602
+  - - -0.155
+    - -1.655
+    - 0.642
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 'pieces lane 2026-09-29: GM oil level and temperature sensor in the pan, passenger side, behind and below knock 2, +-50 mm (vehicle_images 9365b1d0)'
+  mounts_where: 'Not placed: it goes in a port on the oil cooler adapter'
+  zone: engine
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '113'
+  - 113g
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: flag
+    why: '126 mm from the twin''s headers/collectors/tails; within 150 mm: heat shield or move'
+- id: MAP
+  endpoint: MAP
+  what: MAP sensor (Holley 538-24, 1 bar)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - 0.14
+  - -1.5
+  - 1.16
+  aabb:
+  - - 0.125
+    - -1.515
+    - 1.14
+  - - 0.155
+    - -1.485
+    - 1.18
+  colour: '#bcbcbc'
+  colour_basis: product photo k-means (https://static.summitracing.com/global/images/prod/xlarge/hly-538-24_xl.jpg)
+  position_basis: placed from the sourced spot (on a bracket near the rear of the intake)
+  mounts_where: Off the engine, bolted by its two ears near the rear of the intake, on a short vacuum hose to the intake's MAP port
+  zone: engine
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: IAT
+  endpoint: IAT
+  what: Intake air temperature sensor (GM 12160244)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - 0.0
+  - -2.02
+  - 1.24
+  aabb:
+  - - -0.015
+    - -2.035
+    - 1.22
+  - - 0.015
+    - -2.005
+    - 1.26
+  colour: '#272726'
+  colour_basis: product photo k-means (https://ecommerce-assets.ext.gm.com/assets/products/images/213-243_Primary.jpg)
+  position_basis: placed from the sourced spot (in the inlet tube ahead of the throttle body)
+  mounts_where: In the air inlet tube ahead of the throttle body, pushed into a GM 24504388 grommet
+  zone: engine
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '109'
+  - 109g
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: TB
+  endpoint: TB
+  what: Throttle body (GM 12699160)
+  status: decided
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - -0.112
+  - -1.7
+  - 1.148
+  colour: '#cbc5b4'
+  colour_basis: GM catalogue photo of 12699160
+  position_basis: twin v3 engine anchor
+  mounts_where: On the intake's carburettor flange, through the Delmo 4-bolt adapter
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - 4a
+  - 4b
+  - 4c
+  - 4e
+  - 4f
+  checks: []
+- id: INJ-1
+  endpoint: INJ-1
+  what: Injector 1 (Siemens Deka FI114961)
+  status: fixed_by_engine
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - 0.159
+  - -1.899
+  - 1.076
+  colour: '#a9a6ab'
+  colour_basis: Siemens Deka photo of FI114961
+  position_basis: twin v3 engine anchor
+  mounts_where: Intake runner for cylinder 1, driver bank, under the fuel rail
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '13'
+  - INJ1_PWR
+  checks: []
+- id: INJ-2
+  endpoint: INJ-2
+  what: Injector 2 (Siemens Deka FI114961)
+  status: fixed_by_engine
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - -0.159
+  - -1.875
+  - 1.076
+  colour: '#a9a6ab'
+  colour_basis: Siemens Deka photo of FI114961
+  position_basis: twin v3 engine anchor
+  mounts_where: Intake runner for cylinder 2, passenger bank, under the fuel rail
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '14'
+  - INJ2_PWR
+  checks: []
+- id: INJ-3
+  endpoint: INJ-3
+  what: Injector 3 (Siemens Deka FI114961)
+  status: fixed_by_engine
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - 0.159
+  - -1.788
+  - 1.076
+  colour: '#a9a6ab'
+  colour_basis: Siemens Deka photo of FI114961
+  position_basis: twin v3 engine anchor
+  mounts_where: Intake runner for cylinder 3, driver bank, under the fuel rail
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '15'
+  - INJ3_PWR
+  checks: []
+- id: INJ-4
+  endpoint: INJ-4
+  what: Injector 4 (Siemens Deka FI114961)
+  status: fixed_by_engine
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - -0.159
+  - -1.764
+  - 1.076
+  colour: '#a9a6ab'
+  colour_basis: Siemens Deka photo of FI114961
+  position_basis: twin v3 engine anchor
+  mounts_where: Intake runner for cylinder 4, passenger bank, under the fuel rail
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '16'
+  - INJ4_PWR
+  checks: []
+- id: INJ-5
+  endpoint: INJ-5
+  what: Injector 5 (Siemens Deka FI114961)
+  status: fixed_by_engine
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - 0.159
+  - -1.676
+  - 1.076
+  colour: '#a9a6ab'
+  colour_basis: Siemens Deka photo of FI114961
+  position_basis: twin v3 engine anchor
+  mounts_where: Intake runner for cylinder 5, driver bank, under the fuel rail
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '17'
+  - INJ5_PWR
+  checks: []
+- id: INJ-6
+  endpoint: INJ-6
+  what: Injector 6 (Siemens Deka FI114961)
+  status: fixed_by_engine
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - -0.159
+  - -1.652
+  - 1.076
+  colour: '#a9a6ab'
+  colour_basis: Siemens Deka photo of FI114961
+  position_basis: twin v3 engine anchor
+  mounts_where: Intake runner for cylinder 6, passenger bank, under the fuel rail
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '18'
+  - INJ6_PWR
+  checks: []
+- id: INJ-7
+  endpoint: INJ-7
+  what: Injector 7 (Siemens Deka FI114961)
+  status: fixed_by_engine
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - 0.159
+  - -1.564
+  - 1.076
+  colour: '#a9a6ab'
+  colour_basis: Siemens Deka photo of FI114961
+  position_basis: twin v3 engine anchor
+  mounts_where: Intake runner for cylinder 7, driver bank, under the fuel rail
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '19'
+  - INJ7_PWR
+  checks: []
+- id: INJ-8
+  endpoint: INJ-8
+  what: Injector 8 (Siemens Deka FI114961)
+  status: fixed_by_engine
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - -0.159
+  - -1.54
+  - 1.076
+  colour: '#a9a6ab'
+  colour_basis: Siemens Deka photo of FI114961
+  position_basis: twin v3 engine anchor
+  mounts_where: Intake runner for cylinder 8, passenger bank, under the fuel rail
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '20'
+  - INJ8_PWR
+  checks: []
+- id: COIL-1
+  endpoint: COIL-1
+  what: Ignition coil 1 (ACDelco D510C)
+  status: decided
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - -0.097
+  - -1.556
+  - 1.023
+  colour: '#353535'
+  colour_basis: GM catalogue photo of D510C
+  position_basis: twin v3 engine anchor
+  mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '24'
+  - COIL1_GND
+  - COIL1_PWR
+  - COIL1_SGND
+  checks: []
+- id: COIL-2
+  endpoint: COIL-2
+  what: Ignition coil 2 (ACDelco D510C)
+  status: decided
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - -0.032
+  - -1.556
+  - 1.023
+  colour: '#353535'
+  colour_basis: GM catalogue photo of D510C
+  position_basis: twin v3 engine anchor
+  mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '9'
+  - COIL2_GND
+  - COIL2_PWR
+  - COIL2_SGND
+  checks: []
+- id: COIL-3
+  endpoint: COIL-3
+  what: Ignition coil 3 (ACDelco D510C)
+  status: decided
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - 0.032
+  - -1.556
+  - 1.023
+  colour: '#353535'
+  colour_basis: GM catalogue photo of D510C
+  position_basis: twin v3 engine anchor
+  mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '5'
+  - COIL3_GND
+  - COIL3_PWR
+  - COIL3_SGND
+  checks: []
+- id: COIL-4
+  endpoint: COIL-4
+  what: Ignition coil 4 (ACDelco D510C)
+  status: decided
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - 0.097
+  - -1.556
+  - 1.023
+  colour: '#353535'
+  colour_basis: GM catalogue photo of D510C
+  position_basis: twin v3 engine anchor
+  mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '10'
+  - COIL4_GND
+  - COIL4_PWR
+  - COIL4_SGND
+  checks: []
+- id: COIL-5
+  endpoint: COIL-5
+  what: Ignition coil 5 (ACDelco D510C)
+  status: decided
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - -0.097
+  - -1.464
+  - 1.023
+  colour: '#353535'
+  colour_basis: GM catalogue photo of D510C
+  position_basis: twin v3 engine anchor
+  mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '7'
+  - COIL5_GND
+  - COIL5_PWR
+  - COIL5_SGND
+  checks: []
+- id: COIL-6
+  endpoint: COIL-6
+  what: Ignition coil 6 (ACDelco D510C)
+  status: decided
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - -0.032
+  - -1.464
+  - 1.023
+  colour: '#353535'
+  colour_basis: GM catalogue photo of D510C
+  position_basis: twin v3 engine anchor
+  mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '11'
+  - COIL6_GND
+  - COIL6_PWR
+  - COIL6_SGND
+  checks: []
+- id: COIL-7
+  endpoint: COIL-7
+  what: Ignition coil 7 (ACDelco D510C)
+  status: decided
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - 0.032
+  - -1.464
+  - 1.023
+  colour: '#353535'
+  colour_basis: GM catalogue photo of D510C
+  position_basis: twin v3 engine anchor
+  mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '8'
+  - COIL7_GND
+  - COIL7_PWR
+  - COIL7_SGND
+  checks: []
+- id: COIL-8
+  endpoint: COIL-8
+  what: Ignition coil 8 (ACDelco D510C)
+  status: decided
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - 0.097
+  - -1.464
+  - 1.023
+  colour: '#353535'
+  colour_basis: GM catalogue photo of D510C
+  position_basis: twin v3 engine anchor
+  mounts_where: On the DEL-Stributor bracket at the rear centre of the intake, with the other seven
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '12'
+  - COIL8_GND
+  - COIL8_PWR
+  - COIL8_SGND
+  checks: []
+- id: COIL-GROUND-RINGS
+  endpoint: COIL-GROUND-RINGS
+  what: Ring terminals for the coil grounds
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 60
+  - 60
+  - 40
+  centre:
+  - 0.15
+  - -1.468
+  - 1.0
+  aabb:
+  - - 0.12
+    - -1.498
+    - 0.98
+  - - 0.18
+    - -1.438
+    - 1.02
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 'back of the driver head beside the coil cluster (mounts.yaml: back of the cylinder heads, one bolt on each)'
+  mounts_where: Back of the cylinder heads, one bolt position on each
+  zone: engine
+  sources:
+  - 'size not sourced: a 60 x 60 x 40 mm envelope for a power, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - COIL1_GND
+  - COIL1_SGND
+  - COIL2_GND
+  - COIL2_SGND
+  - COIL3_GND
+  - COIL3_SGND
+  - COIL4_GND
+  - COIL4_SGND
+  - COIL5_GND
+  - COIL5_SGND
+  - COIL6_GND
+  - COIL6_SGND
+  - COIL7_GND
+  - COIL7_SGND
+  - COIL8_GND
+  - COIL8_SGND
+  - ECU_GND1
+  - ECU_GND2
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Under_Main_Blazer (5 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 165 mm from the twin's headers/collectors/tails
+- id: FUELP
+  endpoint: FUELP
+  what: Fuel pressure sensor (AEM 30-2131-100, 1/8 NPT)
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - 0.0
+  - -2.052
+  - 0.983
+  aabb:
+  - - -0.015
+    - -2.067
+    - 0.963
+  - - 0.015
+    - -2.037
+    - 1.003
+  colour: '#bc9d48'
+  colour_basis: product photo k-means (https://static.summitracing.com/global/images/prod/xlarge/avm-30-2131-100_xl.jpg)
+  position_basis: 'fuel-system lane 2026-09-30 (docs/wiring/research/2026-09-30_fuel-system-and-regulator.md s7, PR #423): AEM 30-2131-100 in the Aeromotive 13139''s
+    1/8 NPT gauge port on its front face; plug face at (0.000, -2.052, 0.983), wires leave -y'
+  mounts_where: 'Not placed: a 1/8 NPT port on the fuel rail or the regulator'
+  zone: engine
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '112'
+  - 112g
+  - 112r
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 292 mm from the twin's headers/collectors/tails
+- id: ALTERNATOR-SENSE
+  endpoint: ALTERNATOR-SENSE
+  what: Alternator (Holley 197-302), sense plug
+  status: decided
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - 0.28
+  - -2.005
+  - 1.02
+  colour: '#c9c7c0'
+  colour_basis: natural finish (owner photos 2024-10-03)
+  position_basis: twin v3 engine anchor
+  mounts_where: Driver side of the engine, on the Holley mid-mount bracket
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '59'
+  - ALT_L
+  checks: []
+- id: STARTER-S
+  endpoint: STARTER-S
+  what: Starter (trigger terminal)
+  status: fixed_by_engine
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - -0.22
+  - -1.44
+  - 0.68
+  colour: '#3d3d40'
+  colour_basis: 'not read: drawn dark'
+  position_basis: twin v3 engine anchor
+  mounts_where: Passenger side of the block
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '6'
+  - START_TRIG
+  checks: []
+- id: AC-CLUTCH
+  endpoint: AC-CLUTCH
+  what: A/C compressor clutch (Sanden SD7)
+  status: open
+  model: twin v3 object (twin lane, built from published dimensions)
+  kind: twin
+  centre:
+  - -0.26
+  - -2.1
+  - 0.8
+  colour: '#bdc2c0'
+  colour_basis: eBay photo of the bought Sanden SD7
+  position_basis: placed from the sourced spot (Holley's A/C bracket is the passenger side; the twin anchor has it on the driver side)
+  mounts_where: Passenger side of the engine, on the Holley mid-mount A/C bracket
+  zone: engine
+  sources:
+  - docs/wiring/twin/build_engine_v3.py
+  wires_landing:
+  - '23'
+  checks: []
+- id: AC-HP-SW
+  endpoint: AC-HP-SW
+  what: A/C high-pressure switch
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - -0.62
+  - -2.08
+  - 1.05
+  aabb:
+  - - -0.635
+    - -2.095
+    - 1.03
+  - - -0.605
+    - -2.065
+    - 1.07
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 'candidate spot (not decided): on the liquid line (not plumbed), on the passenger inner-fender shelf behind the Odyssey; positions_v3 put it inside
+    the Odyssey'
+  mounts_where: On the A/C liquid line
+  zone: engine
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '111'
+  - AC_HP_0V
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: AC-LP-SW
+  endpoint: AC-LP-SW
+  what: A/C low-pressure switch
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - -0.62
+  - -1.75
+  - 1.05
+  aabb:
+  - - -0.635
+    - -1.765
+    - 1.03
+  - - -0.605
+    - -1.735
+    - 1.07
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided) (accumulator, not placed)
+  mounts_where: On the accumulator
+  zone: engine
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '105'
+  - AC_LP_0V
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: FAN
+  endpoint: FAN
+  what: Radiator fan (SPAL 30107090, 16 in brushless puller)
+  status: decided
+  model: stand-in (true size)
+  kind: disc_y
+  size_mm:
+  - 406
+  - 79
+  centre:
+  - 0.0
+  - -2.3
+  - 0.955
+  aabb:
+  - - -0.203
+    - -2.3395
+    - 0.752
+  - - 0.203
+    - -2.2605
+    - 1.158
+  colour: '#212223'
+  colour_basis: Wizard Cooling photo of a sibling fan
+  position_basis: the fan motor hub on the engine side of the radiator core (mounts.yaml FAN)
+  mounts_where: On the engine side of the radiator core
+  zone: engine
+  sources:
+  - 'SPAL 30107090: 16 in fan, 3.10 in thick (reference_documents/web_snapshots/www.kartek.com__spal-30107090-plus-series-16-brushless-puller-fan-300w-2053-peak-cfm-drop-in-mount-sits-in-shroud.md)'
+  wires_landing:
+  - '21'
+  - FAN_GND
+  - FAN_PWM
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Under_Frame_Blazer (226 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+- id: IBST-DIAG
+  endpoint: IBST-DIAG
+  what: iBooster diagnostic port (DTM 4-way)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 35
+  - 35
+  - 35
+  centre:
+  - 0.55
+  - -1.56
+  - 1.14
+  aabb:
+  - - 0.5325
+    - -1.5775
+    - 1.1225
+  - - 0.5675
+    - -1.5425
+    - 1.1575
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided)
+  mounts_where: Beside the booster, reachable with the hood up
+  zone: engine
+  sources:
+  - 'size not sourced: a 35 x 35 x 35 mm envelope for a connector, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - IBST_CAN_H
+  - IBST_CAN_L
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: BRAKE-FLUID-LVL
+  endpoint: BRAKE-FLUID-LVL
+  what: Brake-fluid level sensor (candidate)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - 0.4
+  - -1.62
+  - 1.18
+  aabb:
+  - - 0.385
+    - -1.635
+    - 1.16
+  - - 0.415
+    - -1.605
+    - 1.2
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (in the booster's reservoir)
+  mounts_where: In the iBooster's fluid reservoir
+  zone: engine
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - BFL_0V
+  - BFL_SIG
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: clear of neighbouring parts
+    source: part envelopes in this scene
+    result: flag
+    why: envelope overlaps IBOOSTER
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 291 mm from the twin's headers/collectors/tails
+- id: WIDEBAND
+  endpoint: WIDEBAND
+  what: Lambda controller (MoTeC LTCD) and two sensors
+  status: proposed
+  model: stand-in (true size)
+  kind: box
+  size_mm:
+  - 26
+  - 38
+  - 14
+  centre:
+  - -0.4
+  - -1.38
+  - 0.62
+  aabb:
+  - - -0.413
+    - -1.399
+    - 0.613
+  - - -0.387
+    - -1.361
+    - 0.627
+  colour: '#2a2b2c'
+  colour_basis: MoTeC product photo
+  position_basis: twin v3 engine anchor (LTCD candidate B)
+  mounts_where: Under the truck, on the inside of a frame rail near the two O2 bungs
+  zone: underbody
+  sources:
+  - 'MoTeC LTCD: 38 x 26 x 14 mm without looms (LTCD user manual p.31)'
+  wires_landing:
+  - '64'
+  - CAN_LTCD_H
+  - CAN_LTCD_L
+  - LTCD_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: flag
+    why: '56 mm from the twin''s headers/collectors/tails; within 150 mm: heat shield or move'
+- id: HEADLIGHT-L
+  endpoint: HEADLIGHT-L
+  what: Left headlight (Truck-Lite 27270C, 7 in round)
+  status: decided
+  model: stand-in (true size)
+  kind: disc_y
+  size_mm:
+  - 178
+  - 80
+  centre:
+  - 0.73
+  - -2.52
+  - 1.05
+  aabb:
+  - - 0.641
+    - -2.56
+    - 0.961
+  - - 0.819
+    - -2.48
+    - 1.139
+  colour: '#403d3c'
+  colour_basis: Truck-Lite photo
+  position_basis: 1978 Blazer body model
+  mounts_where: Front, left headlamp bucket; the plug is at the back of the lamp, engine side
+  zone: engine
+  sources:
+  - Truck-Lite 27270C 7 in round (reference_documents/web_snapshots/a1truckparts.net__truck-lite-27270c-clear-7-round-high-low-beam-headlight-hardwired-h4-connectors.md);
+    depth not read, drawn 80
+  wires_landing:
+  - 85a
+  - 85b
+  - HL_L_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: HEADLIGHT-R
+  endpoint: HEADLIGHT-R
+  what: Right headlight (Truck-Lite 27270C)
+  status: decided
+  model: stand-in (true size)
+  kind: disc_y
+  size_mm:
+  - 178
+  - 80
+  centre:
+  - -0.73
+  - -2.52
+  - 1.05
+  aabb:
+  - - -0.819
+    - -2.56
+    - 0.961
+  - - -0.641
+    - -2.48
+    - 1.139
+  colour: '#403d3c'
+  colour_basis: Truck-Lite photo
+  position_basis: 1978 Blazer body model
+  mounts_where: Front, right headlamp bucket; the plug is at the back of the lamp, engine side
+  zone: engine
+  sources:
+  - as HEADLIGHT-L
+  wires_landing:
+  - 86a
+  - 86b
+  - HL_R_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: PARK-TURN-LF
+  endpoint: PARK-TURN-LF
+  what: Left front park/turn lamp (1157)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - 0.75
+  - -2.555
+  - 0.853
+  aabb:
+  - - 0.71
+    - -2.575
+    - 0.823
+  - - 0.79
+    - -2.535
+    - 0.883
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 1978 Blazer body model
+  mounts_where: Front, left, the rectangular parking lamp below the headlamp
+  zone: engine
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '80'
+  - '83'
+  - PT_LF_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: MARKER-LF
+  endpoint: MARKER-LF
+  what: Left front side marker
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - 0.986
+  - -2.386
+  - 0.92
+  aabb:
+  - - 0.946
+    - -2.406
+    - 0.89
+  - - 1.026
+    - -2.366
+    - 0.95
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 1978 Blazer body model
+  mounts_where: Front fender, left side, the side marker lamp
+  zone: engine
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '87'
+  - MK_LF_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: PARK-TURN-RF
+  endpoint: PARK-TURN-RF
+  what: Right front park/turn lamp (1157)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - -0.75
+  - -2.555
+  - 0.853
+  aabb:
+  - - -0.79
+    - -2.575
+    - 0.823
+  - - -0.71
+    - -2.535
+    - 0.883
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 1978 Blazer body model
+  mounts_where: Front, right, the rectangular parking lamp below the headlamp
+  zone: engine
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '82'
+  - '84'
+  - PT_RF_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: MARKER-RF
+  endpoint: MARKER-RF
+  what: Right front side marker
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - -0.986
+  - -2.386
+  - 0.92
+  aabb:
+  - - -1.026
+    - -2.406
+    - 0.89
+  - - -0.946
+    - -2.366
+    - 0.95
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 1978 Blazer body model
+  mounts_where: Front fender, right side, the side marker lamp
+  zone: engine
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '88'
+  - MK_RF_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: HORN
+  endpoint: HORN
+  what: Horn (factory)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 90
+  - 90
+  - 90
+  centre:
+  - 0.55
+  - -2.5
+  - 0.9
+  aabb:
+  - - 0.505
+    - -2.545
+    - 0.855
+  - - 0.595
+    - -2.455
+    - 0.945
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (radiator support; which side is not read)
+  mounts_where: On the radiator support
+  zone: engine
+  sources:
+  - 'size not sourced: a 90 x 90 x 90 mm envelope for a actuator, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '48'
+  - HORN_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Under_Main_Blazer
+- id: WIPER-MOTOR
+  endpoint: WIPER-MOTOR
+  what: Wiper motor (factory 2-speed)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 90
+  - 90
+  - 90
+  centre:
+  - 0.0
+  - -1.47
+  - 1.22
+  aabb:
+  - - -0.045
+    - -1.515
+    - 1.175
+  - - 0.045
+    - -1.425
+    - 1.265
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: factory wiper hole on the cowl, engine side (mounts.yaml); z lowered from 1.30 to below the twin cowl skin (z 1.25)
+  mounts_where: On the cowl, engine side of the firewall, at the factory wiper hole
+  zone: engine
+  sources:
+  - 'size not sourced: a 90 x 90 x 90 mm envelope for a actuator, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '49'
+  - WIPER_GND
+  - WIPER_T1
+  - WIPER_T3
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Under_Main_Blazer
+  - rule: clear of neighbouring parts
+    source: part envelopes in this scene
+    result: flag
+    why: envelope overlaps WASHER-PUMP
+- id: WASHER-PUMP
+  endpoint: WASHER-PUMP
+  what: Washer pump (Hella 8TW 004 223-031) in its tank
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 90
+  - 90
+  - 90
+  centre:
+  - 0.03
+  - -1.482
+  - 1.2
+  aabb:
+  - - -0.015
+    - -1.527
+    - 1.155
+  - - 0.075
+    - -1.437
+    - 1.245
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 'pieces lane 2026-09-29 / 1977 LTSM p.803 Fig. 8-16: the factory pump rides on the wiper motor'
+  mounts_where: 'Not placed: the Hella tank''s spot is not picked'
+  zone: engine
+  sources:
+  - 'size not sourced: a 90 x 90 x 90 mm envelope for a actuator, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '50'
+  - WASH_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: clear of neighbouring parts
+    source: part envelopes in this scene
+    result: flag
+    why: envelope overlaps WIPER-MOTOR
+- id: BLOWER-MOTOR
+  endpoint: BLOWER-MOTOR
+  what: Blower motor (4 Seasons 35587)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 90
+  - 90
+  - 90
+  centre:
+  - -0.55
+  - -1.56
+  - 1.1
+  aabb:
+  - - -0.595
+    - -1.605
+    - 1.055
+  - - -0.505
+    - -1.515
+    - 1.145
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (Four-Season case, passenger firewall)
+  mounts_where: In the Four-Season blower-evaporator case, engine side of the passenger firewall
+  zone: engine
+  sources:
+  - 'size not sourced: a 90 x 90 x 90 mm envelope for a actuator, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - BLOWER_GND
+  - BLOWER_HI
+  - BLOWER_MOT
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 256 mm from the twin's headers/collectors/tails
+- id: BLOWER-RES
+  endpoint: BLOWER-RES
+  what: Blower resistor (factory)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 90
+  - 90
+  - 90
+  centre:
+  - -0.42
+  - -1.52
+  - 1.18
+  aabb:
+  - - -0.465
+    - -1.565
+    - 1.135
+  - - -0.375
+    - -1.475
+    - 1.225
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (on the Four-Season case)
+  mounts_where: On the blower-evaporator case, engine side of the passenger firewall
+  zone: engine
+  sources:
+  - 'size not sourced: a 90 x 90 x 90 mm envelope for a actuator, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - BLOWER_BAT
+  - BLOWER_M2
+  - BLOWER_MED
+  - BLOWER_MOT
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 264 mm from the twin's headers/collectors/tails
+- id: UNDERHOOD-LAMP
+  endpoint: UNDERHOOD-LAMP
+  what: Underhood lamp
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - 0.0
+  - -2.0
+  - 1.3
+  aabb:
+  - - -0.04
+    - -2.02
+    - 1.27
+  - - 0.04
+    - -1.98
+    - 1.33
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided) (under the hood)
+  mounts_where: 'Not placed: the factory spot was not found in the 1977 manual text'
+  zone: engine
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '73'
+  - UH_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: DCDC
+  endpoint: DCDC
+  what: DC-DC charger (Victron Orion-Tr 12/12-30)
+  status: proposed
+  model: parts-lane model (docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art))
+  kind: glb
+  dims_mm:
+    l: 186.0
+    w: 132.3
+    h: 84.2
+  centre:
+  - 0.4679
+  - -2.0
+  - 0.955
+  origin:
+  - 0.51
+  - -2.0
+  - 0.955
+  rot:
+  - - 0
+    - -1
+    - 0
+  - - 0
+    - 0
+    - 1
+  - - -1
+    - 0
+    - 0
+  aabb:
+  - - 0.4258
+    - -2.093
+    - 0.8888
+  - - 0.51
+    - -1.907
+    - 1.0212
+  colour_basis: the parts lane's model colours (docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art))
+  position_basis: 'PROPOSED: base on the engine side of the driver inner-fender wall (twin wall x 0.513, z 0.77..1.04), behind the YellowTop, terminals down; positions_v3
+    (0.66, -2.0, 1.06) was inside the fender well'
+  mounts_where: By the batteries in the current design, which breaks Victron's rule
+  zone: engine
+  sources:
+  - 'docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art): maker drawing; 186 over the base flanges x 132.3 over the heatsink lip x 84.2 tall (Victron''s
+    drawing); the terminal block and the remote plug stand a few mm proud of the housing front'
+  ports:
+    DCDC.in_pos:
+      at:
+      - 0.4575
+      - -1.9899
+      - 0.8904
+      dir:
+      - 0.0
+      - 0.0
+      - -1.0
+    DCDC.gnd:
+      at:
+      - 0.4575
+      - -2.0
+      - 0.8904
+      dir:
+      - 0.0
+      - 0.0
+      - -1.0
+    DCDC.out_pos:
+      at:
+      - 0.4575
+      - -2.0101
+      - 0.8904
+      dir:
+      - 0.0
+      - 0.0
+      - -1.0
+    DCDC.remote:
+      at:
+      - 0.4633
+      - -1.9566
+      - 0.8896
+      dir:
+      - 0.0
+      - 0.0
+      - -1.0
+  wires_landing:
+  - DCDC_GND
+  - DCDC_IN
+  - DCDC_OUT
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: flag
+    why: '83 mm from the twin''s headers/collectors/tails; within 150 mm: heat shield or move'
+- id: M130-A
+  endpoint: M130-A
+  what: Engine computer (MoTeC M130), plug A
+  status: proposed
+  model: parts-lane model (docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art))
+  kind: glb
+  dims_mm:
+    l: 107.5
+    w: 133.1
+    h: 38.7
+  centre:
+  - 0.655
+  - -1.4326
+  - 1.0225
+  origin:
+  - 0.655
+  - -1.452
+  - 1.04
+  rot:
+  - - -1
+    - 0
+    - 0
+  - - 0
+    - 0
+    - 1
+  - - 0
+    - 1
+    - 0
+  aabb:
+  - - 0.6013
+    - -1.452
+    - 0.9385
+  - - 0.7087
+    - -1.4133
+    - 1.1065
+  colour_basis: the parts lane's model colours (docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art))
+  position_basis: 'PROPOSED: the firewall''s cab face just outboard of the 61-pin plate, plugs down, 9 mm off the face. The twin leaves only 130 mm of vertical firewall
+    between the toe board (z 0.90) and the dash''s modelled lower panel (z 1.03), so the case rises behind the dash (the twin''s panel is a closure, not structure:
+    tape T-04). Assumes the 90-degree boots (HELD in part_models.yaml) so the wires turn at the plugs; a straight boot needs 60-80 mm under them. The parking-brake
+    pedal sits outboard on the real truck: its keep-out is not modelled'
+  mounts_where: Cab side, close to the 61-pin
+  zone: cab
+  sources:
+  - 'docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art): maker drawing; 107.5 wide x 127.5 tall x 38.7 deep; the plug headers stand 5.6 below
+    the bottom edge (133.1 overall)'
+  ports:
+    M130-A:
+      at:
+      - 0.6713
+      - -1.4308
+      - 0.9414
+      dir:
+      - 0.0
+      - 0.0
+      - -1.0
+    M130-B:
+      at:
+      - 0.6358
+      - -1.4308
+      - 0.9414
+      dir:
+      - 0.0
+      - 0.0
+      - -1.0
+  wires_landing:
+  - '10'
+  - '102'
+  - 102r
+  - '108'
+  - 108r
+  - '11'
+  - '112'
+  - 112r
+  - '116'
+  - '12'
+  - '13'
+  - '14'
+  - '15'
+  - '16'
+  - '17'
+  - '18'
+  - '19'
+  - '20'
+  - '24'
+  - 4a
+  - 4b
+  - 4e
+  - '5'
+  - '7'
+  - '8'
+  - '9'
+  - APS_T1_5V
+  - APS_T2_5V
+  - DAK_CEL
+  - ECU_GND1
+  - ECU_GND2
+  - ECU_PWR
+  - FAN_PWM
+  - PCS_RPM
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Dash_Main (14 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 277 mm from the twin's headers/collectors/tails
+- id: PDM30-A
+  endpoint: PDM30-A
+  what: Body power box (MoTeC PDM30), plug A
+  status: proposed
+  model: parts-lane model (docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art))
+  kind: glb
+  dims_mm:
+    l: 107.5
+    w: 133.1
+    h: 38.7
+  centre:
+  - 0.085
+  - -1.3527
+  - 0.9925
+  origin:
+  - 0.085
+  - -1.372
+  - 1.01
+  rot:
+  - - -1
+    - 0
+    - 0
+  - - 0
+    - 0
+    - 1
+  - - 0
+    - 1
+    - 0
+  aabb:
+  - - 0.0313
+    - -1.372
+    - 0.9084
+  - - 0.1388
+    - -1.3333
+    - 1.0766
+  colour_basis: the parts lane's model colours (docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art))
+  position_basis: 'PROPOSED: its own plate on the tunnel bulge of the firewall (the cab face runs y -1.378..-1.405 across the case, so the plate bridges it), open
+    air round the case (MoTeC), ~0.5 m from the M130. Same 90-degree-boot assumption; the case top rises 43 mm behind the twin''s dash panel (T-04)'
+  mounts_where: Cab, in open air on its own plate near the M130
+  zone: cab
+  sources:
+  - 'docs/wiring/calc-data/catalog/part_models.yaml (branch wiring/part-art): maker drawing; 107.5 wide x 127.5 tall x 38.7 deep (the M130''s case); headers 5.6 below
+    the bottom edge (133.1 overall, the manual''s 133); the M6 stud stands 17.9 out of the flat case front'
+  ports:
+    PDM30-A:
+      at:
+      - 0.1013
+      - -1.3509
+      - 0.9113
+      dir:
+      - 0.0
+      - 0.0
+      - -1.0
+    PDM30-B:
+      at:
+      - 0.0658
+      - -1.3509
+      - 0.9113
+      dir:
+      - 0.0
+      - 0.0
+      - -1.0
+    PDM30-STUD:
+      at:
+      - 0.085
+      - -1.3386
+      - 1.0206
+      dir:
+      - 0.0
+      - 0.0
+      - 1.0
+  wires_landing:
+  - '31'
+  - '33'
+  - '34'
+  - '35'
+  - '39'
+  - '45'
+  - '46'
+  - '51'
+  - 51_PT1
+  - 51_PT2
+  - '54'
+  - 54_PT1
+  - 54_PT2
+  - '72'
+  - 72_PT1
+  - 72_PT2
+  - '75'
+  - '76'
+  - '77'
+  - '78'
+  - '79'
+  - '81'
+  - '85'
+  - '86'
+  - '89'
+  - '90'
+  - '91'
+  - '92'
+  - '93'
+  - '97'
+  - BRK_SW_0V
+  - DAK_CONST
+  - DAK_CONST_FH
+  - ESTOPP_IGN
+  - HL_SW_0V
+  - HL_SW_HEAD
+  - HL_SW_PARK
+  - HORN_SW
+  - IGN_RUN_B
+  - IGN_START
+  - IGN_SW_0V
+  - MIRROR_TRIG
+  - PCS_BATT
+  - PCS_BATT_FH
+  - PCS_BRK
+  - PCS_IGN
+  - PDM_GND1
+  - RADIO_CONST
+  - REAR_ST_L
+  - TG_FEED
+  - TRANS_BATT
+  - TRANS_BATT_FH
+  - TRANS_BRK
+  - TURN_SW_0V
+  - TURN_SW_R
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Interior_Main (108 pts), Dash_Main (30 pts), Under_Main_Blazer (4 pts) - re-check at the mock-up (or the twin is off there:
+      tapes)'
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 211 mm from the twin's headers/collectors/tails
+- id: GND-BANK-CAB
+  endpoint: GND-BANK-CAB
+  what: Cab ground bank (insulated stud bus)
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 60
+  - 40
+  - 60
+  centre:
+  - -0.075
+  - -1.362
+  - 0.985
+  aabb:
+  - - -0.105
+    - -1.382
+    - 0.955
+  - - -0.045
+    - -1.342
+    - 1.015
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 'PROPOSED: beside the PDM30 on the tunnel bulge of the firewall, passenger side of it (mounts.yaml: beside the PDM30); keeps the 2 AWG return short
+    to H3 and clear of the pedals'
+  mounts_where: Beside the PDM30
+  zone: cab
+  sources:
+  - 'size not sourced: a 60 x 40 x 60 mm envelope for a power, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '123'
+  - CL_C_GND
+  - CL_L_GND
+  - CL_R_GND
+  - DOME_GND
+  - FW_GND
+  - GND_RET_CAB
+  - GND_RET_REAR
+  - GSS_GND
+  - LOCK_GND_L
+  - LOCK_GND_R
+  - MIRROR_GND
+  - OUT12V_GND
+  - PCS_GND
+  - RADIO_GND
+  - TCASE_SW_GND
+  - TGR_M_GND
+  - UD_GND
+  - USB_GND
+  - WIN_GND_L
+  - WIN_GND_R
+  - WIPER_SW_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Under_Main_Blazer (13 pts), Interior_Main (4 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 232 mm from the twin's headers/collectors/tails
+- id: PORT-ETH
+  endpoint: PORT-ETH
+  what: M130 laptop port (panel RJ45)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 35
+  - 35
+  - 35
+  centre:
+  - -0.5
+  - -1.06
+  - 1.08
+  aabb:
+  - - -0.5175
+    - -1.0775
+    - 1.0625
+  - - -0.4825
+    - -1.0425
+    - 1.0975
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: glovebox (mounts.yaml), inside the dash (twin Dash_Main)
+  mounts_where: Cab, under the dash or in the glovebox
+  zone: cab
+  sources:
+  - 'size not sourced: a 35 x 35 x 35 mm envelope for a connector, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - ETH_RX+
+  - ETH_RX-
+  - ETH_TX+
+  - ETH_TX-
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: PORT-UTC
+  endpoint: PORT-UTC
+  what: PDM config port (5-pin XLR)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 35
+  - 35
+  - 35
+  centre:
+  - -0.56
+  - -1.06
+  - 1.08
+  aabb:
+  - - -0.5775
+    - -1.0775
+    - 1.0625
+  - - -0.5425
+    - -1.0425
+    - 1.0975
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: glovebox (mounts.yaml), inside the dash (twin Dash_Main)
+  mounts_where: Cab, under the dash or in the glovebox
+  zone: cab
+  sources:
+  - 'size not sourced: a 35 x 35 x 35 mm envelope for a connector, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - UTC_0V
+  - UTC_CANH
+  - UTC_CANL
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: ISO-SWITCH
+  endpoint: ISO-SWITCH
+  what: Isolator dash switch (Blue Sea 2145)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.28
+  - -1.03
+  - 1.05
+  aabb:
+  - - 0.265
+    - -1.0425
+    - 1.035
+  - - 0.295
+    - -1.0175
+    - 1.065
+  colour: '#543b39'
+  colour_basis: product photo k-means (https://dh778tpvmt77t.cloudfront.net/images/products/2145.jpg)
+  position_basis: candidate spot (not decided) (dash)
+  mounts_where: Cab, on the dash
+  zone: cab
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - ISO_CLOSE
+  - ISO_KILL
+  - ISO_LED
+  - ISO_OPEN
+  - ISO_SW_PWR
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: APS
+  endpoint: APS
+  what: Accelerator pedal (DBW)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - 0.3
+  - -1.36
+  - 0.82
+  aabb:
+  - - 0.285
+    - -1.375
+    - 0.8
+  - - 0.315
+    - -1.345
+    - 0.84
+  colour: '#708392'
+  colour_basis: product photo k-means (https://i.ebayimg.com/images/g/zycAAOSwI2lmXXQv/s-l1600.jpg)
+  position_basis: placed from the sourced spot (driver footwell)
+  mounts_where: Driver footwell, on the firewall where the factory pedal was
+  zone: cab
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - APS_T1_5V
+  - APS_T1_GND
+  - APS_T1_SIG
+  - APS_T2_5V
+  - APS_T2_GND
+  - APS_T2_SIG
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 154 mm from the twin's headers/collectors/tails
+- id: BRAKE-SW
+  endpoint: BRAKE-SW
+  what: Brake light switch (factory)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.44
+  - -1.3
+  - 0.98
+  aabb:
+  - - 0.425
+    - -1.3125
+    - 0.965
+  - - 0.455
+    - -1.2875
+    - 0.995
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (brake pedal bracket)
+  mounts_where: At the brake pedal, on the pedal bracket
+  zone: cab
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '53'
+  - BRK_SW_0V
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 260 mm from the twin's headers/collectors/tails
+- id: FLOOR-DIMMER
+  endpoint: FLOOR-DIMMER
+  what: Headlamp dimmer switch (factory floor switch)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.66
+  - -1.26
+  - 0.68
+  aabb:
+  - - 0.645
+    - -1.2725
+    - 0.665
+  - - 0.675
+    - -1.2475
+    - 0.695
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (floor, driver's left foot)
+  mounts_where: On the floor under the upper left corner of the floor mat, at the driver's left foot
+  zone: cab
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '121'
+  - '85'
+  - 85a
+  - 85b
+  - '86'
+  - 86a
+  - 86b
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Under_Main_Blazer (2 pts), Interior_Main (2 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 300 mm from the twin's headers/collectors/tails
+- id: HL-SW
+  endpoint: HL-SW
+  what: Headlight switch (factory push-pull)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.74
+  - -1.02
+  - 1.18
+  aabb:
+  - - 0.725
+    - -1.0325
+    - 1.165
+  - - 0.755
+    - -1.0075
+    - 1.195
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (instrument panel, left of the cluster)
+  mounts_where: Instrument panel, behind the cluster, knob through the dash
+  zone: cab
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - HL_SW_0V
+  - HL_SW_HEAD
+  - HL_SW_PARK
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: TURN-SW
+  endpoint: TURN-SW
+  what: Turn and hazard switch (factory)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.465
+  - -0.95
+  - 1.27
+  aabb:
+  - - 0.45
+    - -0.9625
+    - 1.255
+  - - 0.48
+    - -0.9375
+    - 1.285
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 1978 Blazer body model (in the column under the wheel)
+  mounts_where: In the steering column; its plug is at the column connector under the dash
+  zone: cab
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '33'
+  - TURN_SW_0V
+  - TURN_SW_R
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: HORN-SW
+  endpoint: HORN-SW
+  what: Horn button (factory)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.465
+  - -0.78
+  - 1.34
+  aabb:
+  - - 0.45
+    - -0.7925
+    - 1.325
+  - - 0.48
+    - -0.7675
+    - 1.355
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 1978 Blazer body model (wheel centre)
+  mounts_where: Steering wheel centre, grounding through the column
+  zone: cab
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - HORN_SW
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: IGN-SWITCH
+  endpoint: IGN-SWITCH
+  what: Ignition switch (factory)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.465
+  - -1.24
+  - 1.06
+  aabb:
+  - - 0.45
+    - -1.2525
+    - 1.045
+  - - 0.48
+    - -1.2275
+    - 1.075
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (top of the column jacket, near the front of the dash)
+  mounts_where: On top of the steering column jacket, near the front of the dash
+  zone: cab
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - IGN_RUN_B
+  - IGN_START
+  - IGN_SW_0V
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: WIPER-SW
+  endpoint: WIPER-SW
+  what: Wiper and washer switch (factory)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.7
+  - -1.02
+  - 1.12
+  aabb:
+  - - 0.685
+    - -1.0325
+    - 1.105
+  - - 0.715
+    - -1.0075
+    - 1.135
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (instrument panel)
+  mounts_where: Instrument panel
+  zone: cab
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '46'
+  - WIPER_SW_GND
+  - WIPER_T1
+  - WIPER_T3
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: BLOWER-SW
+  endpoint: BLOWER-SW
+  what: Blower switch (factory Four-Season control head)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.1
+  - -1.03
+  - 1.22
+  aabb:
+  - - 0.085
+    - -1.0425
+    - 1.205
+  - - 0.115
+    - -1.0175
+    - 1.235
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (control head)
+  mounts_where: Instrument panel, in the heater and A/C control head
+  zone: cab
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '45'
+  - '51'
+  - BLOWER_BAT
+  - BLOWER_M2
+  - BLOWER_MED
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Dash_Main
+- id: DAKOTA-VHX
+  endpoint: DAKOTA-VHX
+  what: Gauge control box (Dakota VHX)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 120
+  - 40
+  - 90
+  centre:
+  - 0.6
+  - -1.16
+  - 1.0
+  aabb:
+  - - 0.54
+    - -1.18
+    - 0.955
+  - - 0.66
+    - -1.14
+    - 1.045
+  colour: '#4e4f50'
+  colour_basis: product photo k-means (https://static.summitracing.com/global/images/prod/xlarge/dak-vhx-73c-pu_xl.jpg)
+  position_basis: placed from the sourced spot (driver side under the dash, within 3 ft of the cluster)
+  mounts_where: Cab, driver side under the dash, within 3 ft of the cluster
+  zone: cab
+  sources:
+  - 'size not sourced: a 120 x 40 x 90 mm envelope for a module, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '114'
+  - '115'
+  - '116'
+  - '117'
+  - '119'
+  - '120'
+  - '121'
+  - '123'
+  - '39'
+  - '55'
+  - '71'
+  - DAK_BRAKE
+  - DAK_CEL
+  - DAK_CONST
+  - DAK_CTS_RET
+  - DAK_GEAR
+  - DAK_OILP_5V
+  - DAK_OILP_GND
+  - FUEL_SND_GND
+  - VSS_DAK
+  - VSS_GND
+  - VSS_PWR
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Dash_Main
+- id: RADIO
+  endpoint: RADIO
+  what: Radio (RetroSound Motor 2B)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 120
+  - 40
+  - 90
+  centre:
+  - 0.0
+  - -1.03
+  - 1.12
+  aabb:
+  - - -0.06
+    - -1.05
+    - 1.075
+  - - 0.06
+    - -1.01
+    - 1.165
+  colour: '#d0d1d1'
+  colour_basis: product photo k-means (https://cdn.shopify.com/s/files/1/0932/8664/products/B-116-03-73_a3f66b26-a268-4a22-b316-45189a60fd9e.jpg?v=1741101152)
+  position_basis: placed from the sourced spot (factory radio opening)
+  mounts_where: Instrument panel, in the factory radio opening
+  zone: cab
+  sources:
+  - 'size not sourced: a 120 x 40 x 90 mm envelope for a module, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '31'
+  - RADIO_CONST
+  - RADIO_GND
+  - RADIO_REM
+  - RCA_FRONT
+  - RCA_REAR
+  - RCA_SUB
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: GSS-3000
+  endpoint: GSS-3000
+  what: Gear shift sender decoder (Dakota GSS-3000)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 120
+  - 40
+  - 90
+  centre:
+  - 0.2
+  - -1.16
+  - 0.96
+  aabb:
+  - - 0.14
+    - -1.18
+    - 0.915
+  - - 0.26
+    - -1.14
+    - 1.005
+  colour: '#1e1e20'
+  colour_basis: product photo k-means (https://static.summitracing.com/global/images/prod/xlarge/dak-gss-3000_xl.jpg)
+  position_basis: placed from the sourced spot (under the dash)
+  mounts_where: Under the dash
+  zone: cab
+  sources:
+  - 'size not sourced: a 120 x 40 x 90 mm envelope for a module, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - DAK_GEAR
+  - GSS_GND
+  - GSS_PWR
+  - GSS_SENS_B
+  - GSS_SENS_G
+  - GSS_SENS_R
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: PCS-TCM
+  endpoint: PCS-TCM
+  what: Transmission controller (PCS TCM-2650)
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 120
+  - 40
+  - 90
+  centre:
+  - -0.3
+  - -1.16
+  - 0.92
+  aabb:
+  - - -0.36
+    - -1.18
+    - 0.875
+  - - -0.24
+    - -1.14
+    - 0.965
+  colour: '#bebcbc'
+  colour_basis: product photo k-means (https://www.zerogravityperformance.com/wp-content/uploads/2017/02/tcm2650_hanress.jpg)
+  position_basis: candidate spot (not decided) (under the dash, passenger side)
+  mounts_where: Cab, under the dash (spot not picked)
+  zone: cab
+  sources:
+  - 'size not sourced: a 120 x 40 x 90 mm envelope for a module, centred on the end; the parts lane''s model replaces it'
+  wires_landing: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: PCS-HARNESS-4610
+  endpoint: PCS-HARNESS-4610
+  what: Transmission controller harness (PCS TCM-4610 kit)
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 35
+  - 35
+  - 35
+  centre:
+  - -0.2
+  - -1.2
+  - 0.85
+  aabb:
+  - - -0.2175
+    - -1.2175
+    - 0.8325
+  - - -0.1825
+    - -1.1825
+    - 0.8675
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided)
+  mounts_where: From the controller in the cab to the 6L90 case connector
+  zone: cab
+  sources:
+  - 'size not sourced: a 35 x 35 x 35 mm envelope for a connector, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - PCS_BATT
+  - PCS_BRK
+  - PCS_GND
+  - PCS_IGN
+  - PCS_NS
+  - PCS_REV
+  - PCS_RPM
+  - PCS_TPS
+  - TRANS_BATT
+  - TRANS_BRK
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 281 mm from the twin's headers/collectors/tails
+- id: MIRROR-MON
+  endpoint: MIRROR-MON
+  what: Mirror monitor (Rear View Safety kit)
+  status: decided
+  model: stand-in (true size)
+  kind: box
+  size_mm:
+  - 268
+  - 25
+  - 80
+  centre:
+  - 0.0
+  - -0.95
+  - 1.78
+  aabb:
+  - - -0.134
+    - -0.9625
+    - 1.74
+  - - 0.134
+    - -0.9375
+    - 1.82
+  colour: '#42413f'
+  colour_basis: Rear View Safety photo
+  position_basis: 1978 Blazer body model (windshield header)
+  mounts_where: Windshield, in place of the rear-view mirror
+  zone: cab
+  sources:
+  - Rear View Safety mirror monitor 10.55 x 3.15 x 1 in (reference_documents/web_snapshots/www.rearviewsafety.com__license-plate-backup-camera-system-rvs-7180355-ir.md)
+  wires_landing:
+  - CAM_VIDEO
+  - MIRROR_GND
+  - MIRROR_PWR
+  - MIRROR_TRIG
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: OUTLET-12V
+  endpoint: OUTLET-12V
+  what: 12 V outlet
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 60
+  - 60
+  - 40
+  centre:
+  - -0.06
+  - -0.92
+  - 0.95
+  aabb:
+  - - -0.09
+    - -0.95
+    - 0.93
+  - - -0.03
+    - -0.89
+    - 0.97
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided) (dash or console)
+  mounts_where: 'Not placed: dash or console'
+  zone: cab
+  sources:
+  - 'size not sourced: a 60 x 60 x 40 mm envelope for a power, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '72'
+  - OUT12V_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: USB-PORT
+  endpoint: USB-PORT
+  what: USB charging port
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 60
+  - 60
+  - 40
+  centre:
+  - 0.06
+  - -0.92
+  - 0.95
+  aabb:
+  - - 0.03
+    - -0.95
+    - 0.93
+  - - 0.09
+    - -0.89
+    - 0.97
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided) (dash or console)
+  mounts_where: 'Not placed: dash or console'
+  zone: cab
+  sources:
+  - 'size not sourced: a 60 x 60 x 40 mm envelope for a power, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '70'
+  - USB_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: CLEARANCE-L
+  endpoint: CLEARANCE-L
+  what: Roof clearance lamp, left
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - 0.55
+  - -0.86
+  - 1.9
+  aabb:
+  - - 0.51
+    - -0.88
+    - 1.87
+  - - 0.59
+    - -0.84
+    - 1.93
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided) (roof front edge)
+  mounts_where: Cab roof, left
+  zone: cab
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '79'
+  - CL_L_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Exterior_Body_Blazer
+- id: CLEARANCE-C
+  endpoint: CLEARANCE-C
+  what: Roof clearance lamp, centre
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - 0.0
+  - -0.86
+  - 1.9
+  aabb:
+  - - -0.04
+    - -0.88
+    - 1.87
+  - - 0.04
+    - -0.84
+    - 1.93
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided) (roof front edge)
+  mounts_where: Cab roof, centre
+  zone: cab
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '90'
+  - CL_C_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Exterior_Body_Blazer
+- id: CLEARANCE-R
+  endpoint: CLEARANCE-R
+  what: Roof clearance lamp, right
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - -0.55
+  - -0.86
+  - 1.9
+  aabb:
+  - - -0.59
+    - -0.88
+    - 1.87
+  - - -0.51
+    - -0.84
+    - 1.93
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided) (roof front edge)
+  mounts_where: Cab roof, right
+  zone: cab
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '91'
+  - CL_R_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Exterior_Body_Blazer
+- id: DOME-LAMP
+  endpoint: DOME-LAMP
+  what: Dome lamp
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - 0.0
+  - -0.4
+  - 1.88
+  aabb:
+  - - -0.04
+    - -0.42
+    - 1.85
+  - - 0.04
+    - -0.38
+    - 1.91
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 1978 Blazer body model (cab roof)
+  mounts_where: Roof, inside
+  zone: cab
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '67'
+  - DOME_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Interior_Main
+- id: DOOR-JAMB-L
+  endpoint: DOOR-JAMB-L
+  what: Door jamb switch, driver (factory pin switch)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.82
+  - -1.15
+  - 0.86
+  aabb:
+  - - 0.805
+    - -1.1625
+    - 0.845
+  - - 0.835
+    - -1.1375
+    - 0.875
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (front door jamb)
+  mounts_where: In the driver front door jamb
+  zone: cab
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '42'
+  - STEP_DOOR_L
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Interior_Main
+- id: DOOR-JAMB-R
+  endpoint: DOOR-JAMB-R
+  what: Door jamb switch, passenger (factory pin switch)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - -0.82
+  - -1.15
+  - 0.86
+  aabb:
+  - - -0.835
+    - -1.1625
+    - 0.845
+  - - -0.805
+    - -1.1375
+    - 0.875
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (front door jamb)
+  mounts_where: In the passenger front door jamb
+  zone: cab
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '43'
+  - STEP_DOOR_R
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Interior_Main
+- id: FOOTWELL-LAMPS
+  endpoint: FOOTWELL-LAMPS
+  what: Footwell lamps (Lumitec Mini Rail2)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - 0.55
+  - -1.22
+  - 0.92
+  aabb:
+  - - 0.51
+    - -1.24
+    - 0.89
+  - - 0.59
+    - -1.2
+    - 0.95
+  colour: '#a1a2a2'
+  colour_basis: product photo k-means (https://www.lumiteclighting.com/media/catalog/product/r/a/rail2_mini_3.png)
+  position_basis: candidate spot (not decided)
+  mounts_where: Under the dash, one in each footwell
+  zone: cab
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '69'
+  - FW_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: UNDERDASH-LAMPS
+  endpoint: UNDERDASH-LAMPS
+  what: Under-dash lamps (Lumitec Mini Rail2)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - -0.4
+  - -1.2
+  - 0.98
+  aabb:
+  - - -0.44
+    - -1.22
+    - 0.95
+  - - -0.36
+    - -1.18
+    - 1.01
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided)
+  mounts_where: Under the dash
+  zone: cab
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '68'
+  - UD_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 298 mm from the twin's headers/collectors/tails
+- id: TG-SW-DASH
+  endpoint: TG-SW-DASH
+  what: Tailgate window switch (factory dash switch)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.38
+  - -1.03
+  - 1.02
+  aabb:
+  - - 0.365
+    - -1.0425
+    - 1.005
+  - - 0.395
+    - -1.0175
+    - 1.035
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (instrument panel)
+  mounts_where: Instrument panel
+  zone: cab
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - TG_BUS_DN
+  - TG_BUS_UP
+  - TG_FEED
+  - TG_KEY_FEED
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: TG-SW-MASTER
+  endpoint: TG-SW-MASTER
+  what: 'Tailgate window master switch (Nu-Relics #121)'
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.44
+  - -1.03
+  - 1.02
+  aabb:
+  - - 0.425
+    - -1.0425
+    - 1.005
+  - - 0.455
+    - -1.0175
+    - 1.035
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (instrument panel)
+  mounts_where: Instrument panel
+  zone: cab
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - TGR_DN
+  - TGR_KEY_FEED
+  - TGR_M_GND
+  - TGR_UP
+  - TG_FEED
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: DOOR-L-PASS
+  endpoint: DOOR-L-PASS
+  what: Driver door pass-through (locks and speaker, DT 8-way)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 35
+  - 35
+  - 35
+  centre:
+  - 0.86
+  - -1.12
+  - 1.02
+  aabb:
+  - - 0.8425
+    - -1.1375
+    - 1.0025
+  - - 0.8775
+    - -1.1025
+    - 1.0375
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided) (hinge side)
+  mounts_where: At the driver door's hinge side, body to door
+  zone: doors
+  sources:
+  - 'size not sourced: a 35 x 35 x 35 mm envelope for a connector, centred on the end; the parts lane''s model replaces it'
+  wires_landing: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Interior_Body
+- id: DOOR-L-PASS-P
+  endpoint: DOOR-L-PASS-P
+  what: Driver door pass-through (window power, DTP 4-way)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 35
+  - 35
+  - 35
+  centre:
+  - 0.86
+  - -1.12
+  - 0.92
+  aabb:
+  - - 0.8425
+    - -1.1375
+    - 0.9025
+  - - 0.8775
+    - -1.1025
+    - 0.9375
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided) (hinge side)
+  mounts_where: At the driver door's hinge side, body to door
+  zone: doors
+  sources:
+  - 'size not sourced: a 35 x 35 x 35 mm envelope for a connector, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '34'
+  - WIN_GND_L
+  - WIN_R_DN
+  - WIN_R_UP
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Interior_Body
+- id: LOCK-SW-L
+  endpoint: LOCK-SW-L
+  what: Driver lock rocker
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.8
+  - -0.47
+  - 1.06
+  aabb:
+  - - 0.785
+    - -0.4825
+    - 1.045
+  - - 0.815
+    - -0.4575
+    - 1.075
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (door panel)
+  mounts_where: In the driver door panel
+  zone: doors
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '38'
+  - LOCK_BUS_A
+  - LOCK_BUS_B
+  - LOCK_GND_L
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: WIN-SW-L
+  endpoint: WIN-SW-L
+  what: Driver window switch panel (Nu-Relics 17383-2)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.8
+  - -0.55
+  - 1.06
+  aabb:
+  - - 0.785
+    - -0.5625
+    - 1.045
+  - - 0.815
+    - -0.5375
+    - 1.075
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (door panel)
+  mounts_where: In the driver door panel
+  zone: doors
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '34'
+  - WIN_GND_L
+  - WIN_MOT_L_A
+  - WIN_MOT_L_B
+  - WIN_R_DN
+  - WIN_R_UP
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: lock_actuator_DS
+  endpoint: lock_actuator_DS
+  what: Driver door lock actuator (AutoLoc AUTZT2000)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 90
+  - 90
+  - 90
+  centre:
+  - 0.87
+  - -0.2
+  - 1.05
+  aabb:
+  - - 0.825
+    - -0.245
+    - 1.005
+  - - 0.915
+    - -0.155
+    - 1.095
+  colour: '#383e3f'
+  colour_basis: product photo k-means (https://shop.autoloc.com/cdn/shop/files/2048_abcded99-9b45-4114-983b-9872425e0bc4.jpg?v=1739641298)
+  position_basis: placed from the sourced spot (inside the door, at the latch)
+  mounts_where: Inside the driver door, on the lock rod
+  zone: doors
+  sources:
+  - 'size not sourced: a 90 x 90 x 90 mm envelope for a actuator, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - LOCK_BUS_A
+  - LOCK_BUS_B
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Door_Left_Main, Interior_Body, Interior_Panels_Rear
+- id: window_motor_DS
+  endpoint: window_motor_DS
+  what: Driver window motor (Nu-Relics 17383-2)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 90
+  - 90
+  - 90
+  centre:
+  - 0.87
+  - -0.62
+  - 1.0
+  aabb:
+  - - 0.825
+    - -0.665
+    - 0.955
+  - - 0.915
+    - -0.575
+    - 1.045
+  colour: '#282726'
+  colour_basis: product photo k-means (https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-2-2.jpg)
+  position_basis: placed from the sourced spot (inside the door)
+  mounts_where: Inside the driver door, on the regulator
+  zone: doors
+  sources:
+  - 'size not sourced: a 90 x 90 x 90 mm envelope for a actuator, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - WIN_MOT_L_A
+  - WIN_MOT_L_B
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: SPK-FL
+  endpoint: SPK-FL
+  what: Driver door speaker (JL Audio C2-650X)
+  status: proposed
+  model: stand-in (true size)
+  kind: disc_x
+  size_mm:
+  - 165
+  - 65
+  centre:
+  - 0.86
+  - -0.95
+  - 0.8
+  aabb:
+  - - 0.8275
+    - -1.0325
+    - 0.7175
+  - - 0.8925
+    - -0.8675
+    - 0.8825
+  colour: '#2c2c2c'
+  colour_basis: Crutchfield product photo
+  position_basis: candidate spot (not decided) (door panel, low front)
+  mounts_where: In the driver door
+  zone: doors
+  sources:
+  - 'JL Audio C2-650X: 6.5 in, 2-9/16 in mounting depth (reference_documents/web_snapshots/www.crutchfield.com__JL-Audio-C2-650X.md)'
+  wires_landing:
+  - 26a
+  - 26b
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Door_Left_Main
+- id: DOOR-R-PASS
+  endpoint: DOOR-R-PASS
+  what: Passenger door pass-through (locks and speaker, DT 8-way)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 35
+  - 35
+  - 35
+  centre:
+  - -0.86
+  - -1.12
+  - 1.02
+  aabb:
+  - - -0.8775
+    - -1.1375
+    - 1.0025
+  - - -0.8425
+    - -1.1025
+    - 1.0375
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided) (hinge side)
+  mounts_where: At the passenger door's hinge side, body to door
+  zone: doors
+  sources:
+  - 'size not sourced: a 35 x 35 x 35 mm envelope for a connector, centred on the end; the parts lane''s model replaces it'
+  wires_landing: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Interior_Body
+- id: DOOR-R-PASS-P
+  endpoint: DOOR-R-PASS-P
+  what: Passenger door pass-through (window power, DTP 4-way)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 35
+  - 35
+  - 35
+  centre:
+  - -0.86
+  - -1.12
+  - 0.92
+  aabb:
+  - - -0.8775
+    - -1.1375
+    - 0.9025
+  - - -0.8425
+    - -1.1025
+    - 0.9375
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided) (hinge side)
+  mounts_where: At the passenger door's hinge side, body to door
+  zone: doors
+  sources:
+  - 'size not sourced: a 35 x 35 x 35 mm envelope for a connector, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '35'
+  - WIN_GND_R
+  - WIN_R_DN
+  - WIN_R_UP
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Interior_Body
+- id: LOCK-SW-R
+  endpoint: LOCK-SW-R
+  what: Passenger lock rocker
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - -0.8
+  - -0.47
+  - 1.06
+  aabb:
+  - - -0.815
+    - -0.4825
+    - 1.045
+  - - -0.785
+    - -0.4575
+    - 1.075
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (door panel)
+  mounts_where: In the passenger door panel
+  zone: doors
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - LOCK_BUS_A
+  - LOCK_BUS_B
+  - LOCK_FEED_R
+  - LOCK_GND_R
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: WIN-SW-R
+  endpoint: WIN-SW-R
+  what: Passenger window switch panel (Nu-Relics 17383-2)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - -0.8
+  - -0.55
+  - 1.06
+  aabb:
+  - - -0.815
+    - -0.5625
+    - 1.045
+  - - -0.785
+    - -0.5375
+    - 1.075
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (door panel)
+  mounts_where: In the passenger door panel
+  zone: doors
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '35'
+  - WIN_GND_R
+  - WIN_MOT_R_A
+  - WIN_MOT_R_B
+  - WIN_R_DN
+  - WIN_R_UP
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: lock_actuator_PS
+  endpoint: lock_actuator_PS
+  what: Passenger door lock actuator (AutoLoc AUTZT2000)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 90
+  - 90
+  - 90
+  centre:
+  - -0.87
+  - -0.2
+  - 1.05
+  aabb:
+  - - -0.915
+    - -0.245
+    - 1.005
+  - - -0.825
+    - -0.155
+    - 1.095
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (inside the door, at the latch)
+  mounts_where: Inside the passenger door, on the lock rod
+  zone: doors
+  sources:
+  - 'size not sourced: a 90 x 90 x 90 mm envelope for a actuator, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - LOCK_BUS_A
+  - LOCK_BUS_B
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Door_Right_Main, Interior_Body, Interior_Panels_Rear
+- id: window_motor_PS
+  endpoint: window_motor_PS
+  what: Passenger window motor (Nu-Relics 17383-2)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 90
+  - 90
+  - 90
+  centre:
+  - -0.87
+  - -0.62
+  - 1.0
+  aabb:
+  - - -0.915
+    - -0.665
+    - 0.955
+  - - -0.825
+    - -0.575
+    - 1.045
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (inside the door)
+  mounts_where: Inside the passenger door, on the regulator
+  zone: doors
+  sources:
+  - 'size not sourced: a 90 x 90 x 90 mm envelope for a actuator, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - WIN_MOT_R_A
+  - WIN_MOT_R_B
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: SPK-FR
+  endpoint: SPK-FR
+  what: Passenger door speaker (JL Audio C2-650X)
+  status: proposed
+  model: stand-in (true size)
+  kind: disc_x
+  size_mm:
+  - 165
+  - 65
+  centre:
+  - -0.86
+  - -0.95
+  - 0.8
+  aabb:
+  - - -0.8925
+    - -1.0325
+    - 0.7175
+  - - -0.8275
+    - -0.8675
+    - 0.8825
+  colour: '#2c2c2c'
+  colour_basis: Crutchfield product photo
+  position_basis: candidate spot (not decided) (door panel, low front)
+  mounts_where: In the passenger door
+  zone: doors
+  sources:
+  - as SPK-FL
+  wires_landing:
+  - 27a
+  - 27b
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Door_Right_Main
+- id: Tail_Light_Left
+  endpoint: Tail_Light_Left
+  what: Left tail lamp (1157)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - 0.95
+  - 1.78
+  - 1.0
+  aabb:
+  - - 0.91
+    - 1.76
+    - 0.97
+  - - 0.99
+    - 1.8
+    - 1.03
+  colour: '#d5cfbf'
+  colour_basis: product photo k-means (https://upcarparts.com/cdn/shop/files/111157_01.jpg?v=1735798033&width=1200)
+  position_basis: 1978 Blazer body model
+  mounts_where: 'Rear corner, left: the tail combination lamp (grey plug)'
+  zone: rear
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '81'
+  - REAR_ST_L
+  - TL_L_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: Backup_Light_Left
+  endpoint: Backup_Light_Left
+  what: Left backup lamp
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - 0.95
+  - 1.78
+  - 0.92
+  aabb:
+  - - 0.91
+    - 1.76
+    - 0.89
+  - - 0.99
+    - 1.8
+    - 0.95
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 1978 Blazer body model (lower lens of the tail lamp)
+  mounts_where: 'Rear corner, left: the back-up lamp (white plug)'
+  zone: rear
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '89'
+  - BU_L_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Exterior_Body_Blazer
+- id: MARKER-LR
+  endpoint: MARKER-LR
+  what: Left rear side marker
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - 0.997
+  - 1.6
+  - 0.97
+  aabb:
+  - - 0.957
+    - 1.58
+    - 0.94
+  - - 1.037
+    - 1.62
+    - 1.0
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 1978 Blazer body model (rear quarter)
+  mounts_where: 'Rear quarter, left: the marker lamp (cream plug)'
+  zone: rear
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '77'
+  - MK_LR_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Exterior_Body_Blazer
+- id: Tail_Light_Right
+  endpoint: Tail_Light_Right
+  what: Right tail lamp (1157)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - -0.95
+  - 1.78
+  - 1.0
+  aabb:
+  - - -0.99
+    - 1.76
+    - 0.97
+  - - -0.91
+    - 1.8
+    - 1.03
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 1978 Blazer body model
+  mounts_where: 'Rear corner, right: the tail combination lamp (grey plug)'
+  zone: rear
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '75'
+  - REAR_ST_R
+  - TL_R_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: Backup_Light_Right
+  endpoint: Backup_Light_Right
+  what: Right backup lamp
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - -0.95
+  - 1.78
+  - 0.92
+  aabb:
+  - - -0.99
+    - 1.76
+    - 0.89
+  - - -0.91
+    - 1.8
+    - 0.95
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 1978 Blazer body model (lower lens of the tail lamp)
+  mounts_where: 'Rear corner, right: the back-up lamp (white plug)'
+  zone: rear
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '76'
+  - BU_R_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Exterior_Body_Blazer
+- id: MARKER-RR
+  endpoint: MARKER-RR
+  what: Right rear side marker
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - -0.997
+  - 1.6
+  - 0.97
+  aabb:
+  - - -1.037
+    - 1.58
+    - 0.94
+  - - -0.957
+    - 1.62
+    - 1.0
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 1978 Blazer body model (rear quarter)
+  mounts_where: 'Rear quarter, right: the marker lamp (cream plug)'
+  zone: rear
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '78'
+  - MK_RR_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Exterior_Body_Blazer
+- id: LICENSE-LAMP
+  endpoint: LICENSE-LAMP
+  what: License plate lamp (factory)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 40
+  - 60
+  centre:
+  - 0.0
+  - 1.96
+  - 0.68
+  aabb:
+  - - -0.04
+    - 1.94
+    - 0.65
+  - - 0.04
+    - 1.98
+    - 0.71
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 'candidate spot (not decided) (plate on the bumper or the tailgate: not read)'
+  mounts_where: At the rear license plate
+  zone: rear
+  sources:
+  - 'size not sourced: a 80 x 40 x 60 mm envelope for a lamp, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '92'
+  - LIC_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: Backup_Camera
+  endpoint: Backup_Camera
+  what: Backup camera (Rear View Safety RVS-7180355-IR)
+  status: decided
+  model: stand-in (true size)
+  kind: box
+  size_mm:
+  - 190
+  - 25
+  - 25
+  centre:
+  - 0.0
+  - 1.96
+  - 0.74
+  aabb:
+  - - -0.095
+    - 1.9475
+    - 0.7275
+  - - 0.095
+    - 1.9725
+    - 0.7525
+  colour: '#252729'
+  colour_basis: Rear View Safety photo
+  position_basis: candidate spot (not decided) (at the plate)
+  mounts_where: At the rear license plate
+  zone: rear
+  sources:
+  - Rear View Safety camera 1 x 7.5 x 1 in (same snapshot)
+  wires_landing:
+  - '97'
+  - CAM_GND
+  - CAM_VIDEO
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: CHMSL
+  endpoint: CHMSL
+  what: Third brake light (ORACLE 4514-003, 7 in)
+  status: open
+  model: stand-in (true size)
+  kind: box
+  size_mm:
+  - 178
+  - 25
+  - 25
+  centre:
+  - 0.0
+  - 1.8
+  - 1.86
+  aabb:
+  - - -0.089
+    - 1.7875
+    - 1.8475
+  - - 0.089
+    - 1.8125
+    - 1.8725
+  colour: '#893532'
+  colour_basis: ORACLE photo (red lens)
+  position_basis: candidate spot (not decided) (rear edge of the top)
+  mounts_where: 'Not placed: top of the tailgate or rear edge of the top'
+  zone: rear
+  sources:
+  - ORACLE 4514-003 7 in long (registry text); height and depth not read
+  wires_landing:
+  - '93'
+  - CHMSL_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: CARGO-LAMP
+  endpoint: CARGO-LAMP
+  what: Cargo lamp (Truck-Lite 80251C)
+  status: open
+  model: stand-in (true size)
+  kind: box
+  size_mm:
+  - 51
+  - 330
+  - 27
+  centre:
+  - 0.0
+  - 1.3
+  - 1.86
+  aabb:
+  - - -0.0255
+    - 1.135
+    - 1.8465
+  - - 0.0255
+    - 1.465
+    - 1.8735
+  colour: '#b9c2c5'
+  colour_basis: Truck-Lite photo
+  position_basis: candidate spot (not decided) (cargo roof)
+  mounts_where: 'Not placed: cargo area'
+  zone: rear
+  sources:
+  - 'Truck-Lite 80251C ''2 x 13 in rectangular'', 1.08 in deep (reference_documents/web_snapshots/www.truck-lite.com__80251c-1.md); the top-design lane reads 462
+    x 146 x 27.4 overall: unreconciled'
+  wires_landing: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: FUEL-PUMP
+  endpoint: FUEL-PUMP
+  what: Fuel pump (QFS-H882 hanger, P367 pump)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 80
+  - 80
+  - 12
+  centre:
+  - 0.1
+  - 1.3
+  - 0.83
+  aabb:
+  - - 0.06
+    - 1.26
+    - 0.824
+  - - 0.14
+    - 1.34
+    - 0.836
+  colour: '#3c464a'
+  colour_basis: product photo k-means (https://cdn11.bigcommerce.com/s-f5wn3qdqza/images/stencil/2560w/products/43676/663874/qfs-ls-swap-fuel-pump-hanger-for-1973-1991-blazer-jimmy-suburban-performance-fuel-pump-system-qfs-h882-qfs__62292.1777427078.jpg?c=1)
+  position_basis: 'pieces lane 2026-09-29: pump hanger on the tank top, tank centre (-0.03, 1.33, 0.67), 840 x 750 x 320 mm'
+  mounts_where: In the fuel tank, on the hanger
+  zone: rear
+  sources:
+  - 'size not sourced: a 80 x 80 x 12 mm envelope for a actuator, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '66'
+  - PUMP_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Exterior_Body_Blazer_Rear (55 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+  - rule: clear of neighbouring parts
+    source: part envelopes in this scene
+    result: flag
+    why: envelope overlaps FUEL-LEVEL, SPL-FUEL-SND
+- id: FUEL-LEVEL
+  endpoint: FUEL-LEVEL
+  what: Fuel level sender (on the QFS-H882 hanger)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 40
+  - 40
+  - 12
+  centre:
+  - 0.05
+  - 1.3
+  - 0.83
+  aabb:
+  - - 0.03
+    - 1.28
+    - 0.824
+  - - 0.07
+    - 1.32
+    - 0.836
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: on the hanger (mounts.yaml), tank per the pieces lane
+  mounts_where: In the fuel tank, on the hanger
+  zone: rear
+  sources:
+  - 'size not sourced: a 40 x 40 x 12 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - FUEL_SND_GND
+  - FUEL_SND_LEAD
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Exterior_Body_Blazer_Rear (18 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+  - rule: clear of neighbouring parts
+    source: part envelopes in this scene
+    result: flag
+    why: envelope overlaps FUEL-PUMP
+- id: SPL-FUEL-SND
+  endpoint: SPL-FUEL-SND
+  what: Fuel sender signal splice
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 20
+  centre:
+  - 0.15
+  - 1.3
+  - 0.84
+  aabb:
+  - - 0.135
+    - 1.285
+    - 0.83
+  - - 0.165
+    - 1.315
+    - 0.85
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: above the tank lid (mounts.yaml)
+  mounts_where: Above the tank lid
+  zone: rear
+  sources:
+  - 'size not sourced: a 30 x 30 x 20 mm envelope for a connector, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '117'
+  - '98'
+  - FUEL_SND_LEAD
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Exterior_Body_Blazer_Rear (8 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+  - rule: clear of neighbouring parts
+    source: part envelopes in this scene
+    result: flag
+    why: envelope overlaps FUEL-PUMP
+- id: VSS-SENDER
+  endpoint: VSS-SENDER
+  what: Speed sender (Dakota SEN-01-5)
+  status: fixed_by_engine
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - 0.0
+  - -0.66
+  - 0.55
+  aabb:
+  - - -0.015
+    - -0.675
+    - 0.53
+  - - 0.015
+    - -0.645
+    - 0.57
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (NP205 speedometer drive; twin object K5H_VSS)
+  mounts_where: On the NP205 transfer case's speedometer drive
+  zone: underbody
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '100'
+  - VSS_DAK
+  - VSS_GND
+  - VSS_PWR
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: TG-SW-KEY
+  endpoint: TG-SW-KEY
+  what: Tailgate key switch (factory 8900713)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.0
+  - 1.87
+  - 1.1
+  aabb:
+  - - -0.015
+    - 1.8575
+    - 1.085
+  - - 0.015
+    - 1.8825
+    - 1.115
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (tailgate key lock)
+  mounts_where: In the tailgate, at the key lock
+  zone: rear
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - TG_BUS_DN
+  - TG_BUS_UP
+  - TG_CUT_IN
+  - TG_KEY_FEED
+  - TG_MOT_B
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Tailgate_Main
+- id: TG-SW-KEY-REV
+  endpoint: TG-SW-KEY-REV
+  what: Tailgate key switch as the second reversing switch
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.04
+  - 1.87
+  - 1.1
+  aabb:
+  - - 0.025
+    - 1.8575
+    - 1.085
+  - - 0.055
+    - 1.8825
+    - 1.115
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot
+  mounts_where: In the tailgate, at the key lock
+  zone: rear
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - TGR_CUT_IN
+  - TGR_DN
+  - TGR_KEY_FEED
+  - TGR_KEY_GND
+  - TGR_MOT_B
+  - TGR_UP
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Tailgate_Main
+- id: TG-CUTOUT
+  endpoint: TG-CUTOUT
+  what: Tailgate-closed cutout switch
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.8
+  - 1.86
+  - 0.74
+  aabb:
+  - - 0.785
+    - 1.8475
+    - 0.725
+  - - 0.815
+    - 1.8725
+    - 0.755
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot (tailgate edge)
+  mounts_where: At the tailgate
+  zone: rear
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - TGR_CUT_IN
+  - TGR_MOT_A
+  - TG_CUT_IN
+  - TG_MOT_A
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: TG-MOTOR-ACI
+  endpoint: TG-MOTOR-ACI
+  what: Tailgate window motor (Nu-Relics 17383-1, ACI)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 90
+  - 90
+  - 90
+  centre:
+  - 0.0
+  - 1.84
+  - 0.95
+  aabb:
+  - - -0.045
+    - 1.795
+    - 0.905
+  - - 0.045
+    - 1.885
+    - 0.995
+  colour: '#28282b'
+  colour_basis: product photo k-means (https://cdn4.volusion.store/aport-qgqvw/v/vspfiles/photos/17383-1-2.jpg)
+  position_basis: placed from the sourced spot (inside the tailgate)
+  mounts_where: Inside the tailgate, on the window regulator
+  zone: rear
+  sources:
+  - 'size not sourced: a 90 x 90 x 90 mm envelope for a actuator, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - TGR_MOT_A
+  - TGR_MOT_B
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Tailgate_Main
+  - rule: clear of neighbouring parts
+    source: part envelopes in this scene
+    result: flag
+    why: envelope overlaps rear_window_motor
+- id: rear_window_motor
+  endpoint: rear_window_motor
+  what: Tailgate window motor (factory position)
+  status: decided
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 90
+  - 90
+  - 90
+  centre:
+  - -0.04
+  - 1.84
+  - 0.95
+  aabb:
+  - - -0.085
+    - 1.795
+    - 0.905
+  - - 0.005
+    - 1.885
+    - 0.995
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot
+  mounts_where: Inside the tailgate, on the window regulator
+  zone: rear
+  sources:
+  - 'size not sourced: a 90 x 90 x 90 mm envelope for a actuator, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - TG_MOT_A
+  - TG_MOT_B
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Tailgate_Main
+  - rule: clear of neighbouring parts
+    source: part envelopes in this scene
+    result: flag
+    why: envelope overlaps TG-MOTOR-ACI
+- id: AMP
+  endpoint: AMP
+  what: Amplifier (JL Audio VX700/5i)
+  status: open
+  model: stand-in (true size)
+  kind: box
+  size_mm:
+  - 54
+  - 249
+  - 171
+  centre:
+  - 0.78
+  - 1.2
+  - 1.18
+  aabb:
+  - - 0.753
+    - 1.0755
+    - 1.0945
+  - - 0.807
+    - 1.3245
+    - 1.2655
+  colour: '#858991'
+  colour_basis: Crutchfield product photo
+  position_basis: candidate spot (not decided) (above the left wheel well, sharing the left sub's structure)
+  mounts_where: Rear cargo area (spot not picked)
+  zone: rear
+  sources:
+  - 'JL Audio VX700/5i: 9-13/16 x 2-1/8 x 6-3/4 in (reference_documents/web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md), upright on the side panel'
+  wires_landing:
+  - 26a
+  - 26b
+  - 27a
+  - 27b
+  - 28a
+  - 28b
+  - 29a
+  - 29b
+  - 30a
+  - 30b
+  - AMP_GND_TAIL
+  - AMP_PWR_TAIL
+  - RADIO_REM
+  - RCA_FRONT
+  - RCA_REAR
+  - RCA_SUB
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: AMP-BLOCK
+  endpoint: AMP-BLOCK
+  what: Amplifier power block
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 60
+  - 60
+  - 40
+  centre:
+  - 0.74
+  - 1.4
+  - 1.14
+  aabb:
+  - - 0.71
+    - 1.37
+    - 1.12
+  - - 0.77
+    - 1.43
+    - 1.16
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: 'PROPOSED: on the driver side panel behind the amp''s rear end (mounts.yaml: beside the amp); positions_v3 put it inside the amp''s case'
+  mounts_where: Rear cargo area (spot not picked)
+  zone: rear
+  sources:
+  - 'size not sourced: a 60 x 60 x 40 mm envelope for a power, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '32'
+  - AMP_GND
+  - AMP_GND_TAIL
+  - AMP_PWR_TAIL
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: clear of neighbouring parts
+    source: part envelopes in this scene
+    result: flag
+    why: envelope overlaps SUB
+- id: SPK-RL
+  endpoint: SPK-RL
+  what: Left rear speaker
+  status: open
+  model: stand-in (true size)
+  kind: disc_x
+  size_mm:
+  - 165
+  - 65
+  centre:
+  - 0.84
+  - 0.1
+  - 1.12
+  aabb:
+  - - 0.8075
+    - 0.0175
+    - 1.0375
+  - - 0.8725
+    - 0.1825
+    - 1.2025
+  colour: '#2c2c2c'
+  colour_basis: Crutchfield product photo
+  position_basis: candidate spot (not decided) (rear side panel beside the rear seat)
+  mounts_where: Rear cargo area (spot not picked)
+  zone: rear
+  sources:
+  - as SPK-FL
+  wires_landing:
+  - 28a
+  - 28b
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Interior_Panels_Rear
+- id: SPK-RR
+  endpoint: SPK-RR
+  what: Right rear speaker
+  status: open
+  model: stand-in (true size)
+  kind: disc_x
+  size_mm:
+  - 165
+  - 65
+  centre:
+  - -0.84
+  - 0.1
+  - 1.12
+  aabb:
+  - - -0.8725
+    - 0.0175
+    - 1.0375
+  - - -0.8075
+    - 0.1825
+    - 1.2025
+  colour: '#2c2c2c'
+  colour_basis: Crutchfield product photo
+  position_basis: candidate spot (not decided) (rear side panel beside the rear seat)
+  mounts_where: Rear cargo area (spot not picked)
+  zone: rear
+  sources:
+  - as SPK-FL
+  wires_landing:
+  - 29a
+  - 29b
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Interior_Panels_Rear
+- id: SUB
+  endpoint: SUB
+  what: Woofer 1 (JBL Club 102SL)
+  status: open
+  model: stand-in (true size)
+  kind: disc_x
+  size_mm:
+  - 254
+  - 83
+  centre:
+  - 0.8
+  - 1.48
+  - 1.0
+  aabb:
+  - - 0.7585
+    - 1.353
+    - 0.873
+  - - 0.8415
+    - 1.607
+    - 1.127
+  colour: '#353337'
+  colour_basis: Crutchfield product photo
+  position_basis: 'placed from the sourced spot (owner: behind the rear wheel well, in the side panel, on a built structure)'
+  mounts_where: Rear cargo area (spot not picked)
+  zone: rear
+  sources:
+  - 'JBL Club 102SL: 10 in nominal, 3.25 in mounting depth (reference_documents/web_snapshots/www.crutchfield.com__JBL-Club-102SL.md); the enclosure is not designed'
+  wires_landing:
+  - 30a
+  - 30b
+  - SUB_JMP_N
+  - SUB_JMP_P
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Interior_Panels_Rear
+  - rule: clear of the spare tire and its carrier
+    source: owner call 2026-09-29 (subs behind the rear wheel wells on a built structure; flag the spare-tire carrier in the right rear corner); twin Interior_Spare_Tire_Carrier,
+      Wheel_Spare_Tire
+    result: pass
+    why: 'driver alone: Interior_Spare_Tire_Carrier 1295 mm, Wheel_Spare_Tire 1046 mm'
+  - rule: clear of neighbouring parts
+    source: part envelopes in this scene
+    result: flag
+    why: envelope overlaps AMP-BLOCK
+- id: SUB-2
+  endpoint: SUB-2
+  what: Woofer 2 (JBL Club 102SL)
+  status: open
+  model: stand-in (true size)
+  kind: disc_x
+  size_mm:
+  - 254
+  - 83
+  centre:
+  - -0.8
+  - 1.48
+  - 1.0
+  aabb:
+  - - -0.8415
+    - 1.353
+    - 0.873
+  - - -0.7585
+    - 1.607
+    - 1.127
+  colour: '#353337'
+  colour_basis: Crutchfield product photo
+  position_basis: 'placed from the sourced spot (owner: behind the rear wheel well, in the side panel; the factory spare carrier sits here)'
+  mounts_where: Rear cargo area (spot not picked)
+  zone: rear
+  sources:
+  - JBL Club 102SL (as SUB)
+  wires_landing:
+  - SUB_JMP_N
+  - SUB_JMP_P
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Interior_Panels_Rear
+  - rule: clear of the spare tire and its carrier
+    source: owner call 2026-09-29 (subs behind the rear wheel wells on a built structure; flag the spare-tire carrier in the right rear corner); twin Interior_Spare_Tire_Carrier,
+      Wheel_Spare_Tire
+    result: pass
+    why: 'driver alone: Interior_Spare_Tire_Carrier 105 mm, Wheel_Spare_Tire 135 mm'
+- id: GND-SPLICE-REAR
+  endpoint: GND-SPLICE-REAR
+  what: Rear ground bus
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 60
+  - 60
+  - 40
+  centre:
+  - 0.6
+  - 1.5
+  - 0.88
+  aabb:
+  - - 0.57
+    - 1.47
+    - 0.86
+  - - 0.63
+    - 1.53
+    - 0.9
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: inside the rear body (mounts.yaml); positions_v3 had it under the floor
+  mounts_where: Inside the rear body, where the rear harness branches
+  zone: rear
+  sources:
+  - 'size not sourced: a 60 x 60 x 40 mm envelope for a power, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - BU_L_GND
+  - BU_R_GND
+  - CAM_GND
+  - CARGO_GND
+  - CHMSL_GND
+  - ESTOPP_GND
+  - GND_RET_REAR
+  - LIC_GND
+  - MK_LR_GND
+  - MK_RR_GND
+  - TGR_KEY_GND
+  - TL_L_GND
+  - TL_R_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: AMP-PASS
+  endpoint: AMP-PASS
+  what: Amplifier cable pass-through (one CableClam per 2 AWG cable)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 60
+  - 60
+  - 30
+  centre:
+  - 0.55
+  - 1.3
+  - 0.85
+  aabb:
+  - - 0.52
+    - 1.27
+    - 0.835
+  - - 0.58
+    - 1.33
+    - 0.865
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: rear floor near the amplifier (mounts.yaml); on the twin's cargo floor, z 0.845
+  mounts_where: Rear floor, near the amplifier
+  zone: rear
+  sources:
+  - 'size not sourced: a 60 x 60 x 30 mm envelope for a connector, centred on the end; the parts lane''s model replaces it'
+  wires_landing: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Exterior_Body_Blazer_Rear, Interior_Main
+- id: AMP-STEP-CTRL
+  endpoint: AMP-STEP-CTRL
+  what: Power step controller (AMP Research kit)
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 120
+  - 40
+  - 90
+  centre:
+  - 0.8
+  - -0.6
+  - 0.45
+  aabb:
+  - - 0.74
+    - -0.62
+    - 0.405
+  - - 0.86
+    - -0.58
+    - 0.495
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided) (by a step motor)
+  mounts_where: 'Not placed: under the body near a step motor'
+  zone: underbody
+  sources:
+  - 'size not sourced: a 120 x 40 x 90 mm envelope for a module, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '3'
+  - STEP_DOOR_L
+  - STEP_DOOR_R
+  - STEP_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: E-STOPP
+  endpoint: E-STOPP
+  what: Electric parking brake (E-Stopp ESK001)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 90
+  - 90
+  - 90
+  centre:
+  - 0.3
+  - 0.95
+  - 0.62
+  aabb:
+  - - 0.255
+    - 0.905
+    - 0.575
+  - - 0.345
+    - 0.995
+    - 0.665
+  colour: '#cccdcf'
+  colour_basis: product photo k-means (https://static.summitracing.com/global/images/prod/xlarge/esc-esk001_xl.jpg)
+  position_basis: placed from the sourced spot (on the parking-brake cable; twin object K5H_EStopp_Actuator)
+  mounts_where: Under the body on the parking-brake cable; dash button in the cab
+  zone: underbody
+  sources:
+  - 'size not sourced: a 90 x 90 x 90 mm envelope for a actuator, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '54'
+  - DAK_BRAKE
+  - ESTOPP_GND
+  - ESTOPP_IGN
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: GSS-SENSOR
+  endpoint: GSS-SENSOR
+  what: Gear position sensor (GSS-3000)
+  status: fixed_by_engine
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 30
+  - 40
+  centre:
+  - 0.15
+  - -0.95
+  - 0.55
+  aabb:
+  - - 0.135
+    - -0.965
+    - 0.53
+  - - 0.165
+    - -0.935
+    - 0.57
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: candidate spot (not decided) (detent shaft)
+  mounts_where: 'On the transmission''s detent shaft: a plate on the pan, a rod to the shift arm'
+  zone: underbody
+  sources:
+  - 'size not sourced: a 30 x 30 x 40 mm envelope for a sensor, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - GSS_SENS_B
+  - GSS_SENS_G
+  - GSS_SENS_R
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+  - rule: '>= 1 in from the exhaust (heat)'
+    source: 'nuke_frontend/src/components/wiring/objectTraits.ts (Under_Engine_Simple notes): headers reach 800 F+, wires need 1 in clearance + DR-25 when crossing;
+      spine study s1.4 item 4: reflective heat sleeve within a few inches of the manifold'
+    result: pass
+    why: 171 mm from the twin's headers/collectors/tails
+- id: PCS-HARNESS-4610-CASE
+  endpoint: PCS-HARNESS-4610-CASE
+  what: Transmission harness case ground
+  status: fixed_by_engine
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 35
+  - 35
+  - 35
+  centre:
+  - -0.1
+  - -0.8
+  - 0.6
+  aabb:
+  - - -0.1175
+    - -0.8175
+    - 0.5825
+  - - -0.0825
+    - -0.7825
+    - 0.6175
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: placed from the sourced spot
+  mounts_where: At the 6L90 case
+  zone: underbody
+  sources:
+  - 'size not sourced: a 35 x 35 x 35 mm envelope for a connector, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - TRANS_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: TCASE-4WD-SW
+  endpoint: TCASE-4WD-SW
+  what: 4WD indicator switch (fabricated plunger switch)
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 30
+  - 25
+  - 30
+  centre:
+  - 0.2
+  - -0.55
+  - 0.76
+  aabb:
+  - - 0.185
+    - -0.5625
+    - 0.745
+  - - 0.215
+    - -0.5375
+    - 0.775
+  colour: '#d3be7b'
+  colour_basis: product photo k-means (https://torqueking.com/cdn/shop/files/qu30048__08146_8788__76476.1707875361.1280.1280.jpg?v=1786090930)
+  position_basis: candidate spot (not decided) (at the shift lever)
+  mounts_where: At the transfer-case shift lever, on a bracket
+  zone: underbody
+  sources:
+  - 'size not sourced: a 30 x 25 x 30 mm envelope for a switch, centred on the end; the parts lane''s model replaces it'
+  wires_landing:
+  - '55'
+  - TCASE_SW_GND
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: TRANS-CASE
+  endpoint: TRANS-CASE
+  what: 6L90 case connector (Kostal 16-way)
+  status: fixed_by_engine
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 35
+  - 35
+  - 35
+  centre:
+  - -0.135
+  - -0.7
+  - 0.75
+  aabb:
+  - - -0.1525
+    - -0.7175
+    - 0.7325
+  - - -0.1175
+    - -0.6825
+    - 0.7675
+  colour: '#9aa0a6'
+  colour_basis: not read (neutral grey)
+  position_basis: twin v3 engine anchor (6L90 case)
+  mounts_where: 'On the 6L90 case: its only external connector'
+  zone: underbody
+  sources:
+  - 'size not sourced: a 35 x 35 x 35 mm envelope for a connector, centred on the end; the parts lane''s model replaces it'
+  wires_landing: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: flag
+    why: 'its envelope holds twin surface: Interior_Main (1 pts) - re-check at the mock-up (or the twin is off there: tapes)'
+- id: REAR-CONN
+  what: Proposed round rear-floor connector (the rear loom's one unplug)
+  status: open
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 45
+  - 45
+  - 30
+  centre:
+  - 0.55
+  - 0.05
+  - 0.645
+  aabb:
+  - - 0.5275
+    - 0.0275
+    - 0.63
+  - - 0.5725
+    - 0.0725
+    - 0.66
+  colour: '#5b5d3f'
+  colour_basis: marker (olive like the 61-pin)
+  sources:
+  - 'mounts.yaml box REAR-CONN (open): ''rear floor, driver side, so the body comes off the frame with one unplug''; the task''s rear loom ends here before the frame
+    rail'
+  wires_landing: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope; sits in its host panel Under_Main_Blazer
+- id: FUSE-BATT
+  what: 'Battery-corner inline fuses: FUSE-IBOOST_PERM, FUSE-ISO_PWR, FUSE-ISO_SW_PWR (Blue Sea 5065 holders per the registry)'
+  status: proposed
+  model: dashed (size not sourced)
+  kind: box
+  size_mm:
+  - 60
+  - 40
+  - 30
+  centre:
+  - -0.455
+  - -2.2
+  - 1.15
+  aabb:
+  - - -0.485
+    - -2.22
+    - 1.135
+  - - -0.425
+    - -2.18
+    - 1.165
+  colour: '#d8c9a0'
+  colour_basis: not read
+  sources:
+  - 'mounts.yaml: ''at the battery end of its feed, in the battery corner''; positions_v3 put them inside the Odyssey'
+  wires_landing: []
+  checks:
+  - rule: clear of the body (twin)
+    source: twin meshes (TurboSquid body; margins.yaml tolerance per zone)
+    result: pass
+    why: no twin body surface inside its envelope
+- id: CTX-FUEL-TANK
+  what: Fuel tank (the body model's own)
+  status: context
+  model: context
+  kind: context_box
+  size_mm:
+  - 840
+  - 750
+  - 320
+  centre:
+  - -0.03
+  - 1.33
+  - 0.67
+  aabb:
+  - - -0.45
+    - 0.955
+    - 0.51
+  - - 0.39
+    - 1.705
+    - 0.83
+  colour: '#7c8387'
+  colour_basis: neutral steel (not read)
+  sources:
+  - 'pieces lane 2026-09-29: the body model''s own tank, probed (Under_Engine_Simple x -0.453..0.39, y 0.954..1.705, z 0.505..0.829)'
+  wires_landing: []
+  checks: []
