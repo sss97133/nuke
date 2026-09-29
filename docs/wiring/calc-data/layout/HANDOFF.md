@@ -1,6 +1,6 @@
 # K5 Harness Layout: the workspace builder
 
-**Live:** https://claude.ai/artifact/QVLCDvWkF2XJ6DABBodakh, version 12 (2026-09-29), private to the owner.
+**Live:** https://claude.ai/artifact/QVLCDvWkF2XJ6DABBodakh, version 15 (2026-09-29, the v14 manual build; version 14 was the same page with only part of its files), private to the owner.
 The Parts Library, M130 Sample Review and K5 Engine Bay Sample pages are now one-line pointers to it.
 
 **Lane:** layout-ui. **Paused 2026-09-29:** the slot went to the BaT data audit. The pieces lane resumes this lane, first in line.
@@ -32,7 +32,7 @@ The Parts Library, M130 Sample Review and K5 Engine Bay Sample pages are now one
   - the component legend;
   - connector identification: end view, then a CAV/CKT/WIRE/FUNCTION/TO table;
   - the circuit tabulation.
-- **v14 (built, waiting on the pieces lane's go):** the wiring diagram, power feeds (pdm_settings), splices, harness specifications per bundle, connector service (terminals, seals, tools by family) and a special-tools plate, plus contents with real page numbers.
+- **v14 (live as version 15, published by the pieces lane):** diagram boxes now size to their text (capped per column), labels and box titles wrap to two lines instead of being cut, a label still longer than two lines shows in full on hover, a cavity named in words is written into its label, and the power-feed circuits carry wire names. Plus, as built by this lane: the wiring diagram, power feeds (pdm_settings), splices, harness specifications per bundle, connector service (terminals, seals, tools by family) and a special-tools plate, plus contents with real page numbers.
 - **Still to add:** procedure pages. These are the service steps for each system, from the records: build, test and diagnosis. Where no record exists yet, the procedure is left out rather than written up.
 - **One click-through pattern, everywhere:** a click selects. The selection is filled; what links to it is outlined.
 - **Photos** show only when they are the exact part.

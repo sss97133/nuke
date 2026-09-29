@@ -825,9 +825,17 @@ function schLayout(sysId) {
   const cols = [[], [], []];
   devs.forEach(d => cols[isPassDev(d) ? 1 : (score[d] || 0) > 0 ? 0 : 2].push(d));
   if (!cols[0].length && cols[2].length) { cols[2].sort((a, b) => Object.keys(rows[b]).length - Object.keys(rows[a]).length); cols[0].push(cols[2].shift()); }
-  const ROW = 17, HDR = 34, GAP = 22, BW = [236, 168, 236], laneW = 6;
+  const ROW = 17, HDR = 34, GAP = 22, laneW = 6;
+  // each column is as wide as the longest name, connector list or pin label it holds (the figure scrolls, so nothing is cut)
+  const pinText = (r, ci) => { const pin = pinByKey[[...r.eps][0] + '|' + r.c] || {}, base = pin.n || (ci === 1 ? r.wires.join(' ') : (W[r.wires[0]] || {}).label || ''), c = String(r.c || '');
+    if (c.length <= 9) return base; const cc = c.replace(/\s*\([^)]*\)?/g, ' ').replace(/\s+/g, ' ').trim();
+    return !base ? cc : base.toLowerCase().startsWith(cc.toLowerCase()) ? base : cc + ' — ' + base; };   // a cavity named in words is written out in the label, not cut in the code column
+  const needW = (d, ci) => { const rs = Object.values(rows[d]), conns = uniq(rs.flatMap(r => [...r.eps])).join(' ');
+    return Math.max(16 + boxName(d).length * 7.8, 16 + conns.length * 6.4, 80 + Math.max(0, ...rs.map(r => pinText(r, ci).length)) * 6.1); };
+  const BW = [236, 168, 236].map((min, ci) => Math.round(Math.min([330, 250, 330][ci], Math.max(min, ...cols[ci].map(d => needW(d, ci))))));
+  const perLine = ci => Math.floor((BW[ci] - 80) / 6.1), perTitle = ci => Math.floor((BW[ci] - 16) / 7.8);
   const place = {};
-  const layCol = (ci, order) => { let yy = 40; order.forEach(d => { const rs = Object.values(rows[d]).sort((a, b) => natCmp(a.key, b.key)); const h = HDR + rs.length * ROW + 6; place[d] = {ci, y: yy, h, rows: rs}; rs.forEach((r, ix) => { r.y = yy + HDR + ix * ROW + ROW / 2; r.dev = d; }); yy += h + GAP; }); return yy; };
+  const layCol = (ci, order) => { let yy = 40; order.forEach(d => { const rs = Object.values(rows[d]).sort((a, b) => natCmp(a.key, b.key)); const tl = wrap2(boxName(d), perTitle(ci)), hdr = HDR + (tl.length - 1) * 12; let acc = 0; rs.forEach(r => { r.full = pinText(r, ci); r.lines = wrap2(r.full, perLine(ci)); r.h = r.lines.length > 1 ? 2 * ROW - 4 : ROW; r.y = yy + hdr + acc + r.h / 2; acc += r.h; r.dev = d; }); const h = hdr + acc + 6; place[d] = {ci, y: yy, h, rows: rs, hdr, tl}; yy += h + GAP; }); return yy; };
   const bary = d => { const ys = []; Object.values(rows[d]).forEach(r => r.wires.forEach(wid => (W[wid].ch || []).forEach(([ep, c]) => { const od = devOf(ep); if (od !== d && place[od]) { const rr = place[od].rows.find(x => x.key === rowKey(ep, c)); if (rr) ys.push(rr.y); } }))); return ys.length ? ys.reduce((p, q) => p + q, 0) / ys.length : 1e9; };
   cols[0].sort((a, b) => Object.keys(rows[b]).length - Object.keys(rows[a]).length);
   const hL = layCol(0, cols[0]);
@@ -884,7 +892,7 @@ function schLayout(sysId) {
   // one label per pin row and side: the wires that leave it there
   const labels = {};
   hops.forEach(h => { const key = h.a.key + '|' + h.side + '|' + h.a.dev; const L = labels[key] = labels[key] || {x: h.ax + (h.side === 'r' ? 4 : -4), y: h.a.y - 3, anchor: h.side === 'r' ? 'start' : 'end', wires: []}; if (!L.wires.includes(h.wid)) L.wires.push(h.wid); });
-  const width = (has2 ? X[2] + BW[2] : X[1] + (has1 ? BW[1] : 0)) + 40 + chC.length * laneW;
+  const width = (has2 ? X[2] + BW[2] : X[1] + (has1 ? BW[1] : 0)) + 100 + chC.length * laneW;   // room for the wire labels right of the last column
   const height = bottom + 20 + over.length * laneW + 10;
   const L = {sysId, place, hops, labels: Object.values(labels), cols, X, BW, width, height, ROW, HDR};
   SCH.cache[sysId] = L;
@@ -906,18 +914,22 @@ function schSvg(L) {
   Object.entries(L.place).forEach(([dev, p]) => {
     const conns = uniq(p.rows.flatMap(r => [...r.eps]));
     const relBox = has && (conns.some(c => R.c.has(c)) || R.d.has(dev));
-    o += `<g class="sbox${relBox ? ' rel' : ''}${has && !relBox ? ' dim' : ''}" data-dev="${esc(dev)}"><rect class="bd" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}"/><rect class="hdr" x="${p.x}" y="${p.y}" width="${p.w}" height="${L.HDR - 4}"/>`
-      + `<text class="t" x="${p.x + 7}" y="${p.y + 14}">${esc(trunc(devName(dev), p.w > 200 ? 34 : 24))}</text><text class="i" x="${p.x + 7}" y="${p.y + 26}">${esc(trunc(conns.join(' '), p.w > 200 ? 38 : 26))}</text>`;
+    o += `<g class="sbox${relBox ? ' rel' : ''}${has && !relBox ? ' dim' : ''}" data-dev="${esc(dev)}"><rect class="bd" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}"/><rect class="hdr" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.hdr - 4}"/>`
+      + `${p.tl.map((t, k) => `<text class="t" x="${p.x + 7}" y="${p.y + 14 + k * 12}">${k ? '' : `<title>${esc(devName(dev))}</title>`}${esc(t)}</text>`).join('')}<text class="i" x="${p.x + 7}" y="${p.y + p.hdr - 8}">${esc(trunc(conns.join(' '), Math.floor((p.w - 16) / 6.4)))}</text>`;
     p.rows.forEach(r => {
       const ep = [...r.eps][0], key = ep + '|' + r.c, pin = pinByKey[key] || {};
       const rc = !has ? '' : ([...r.eps].some(e => e + '|' + r.c === selPin) ? ' pri' : r.wires.some(x => R.w.has(x)) ? ' rel' : '');
-      o += `<g class="prow${rc}" data-pin="${esc(key)}"><rect x="${p.x + 1}" y="${r.y - L.ROW / 2}" width="${p.w - 2}" height="${L.ROW}"/><text class="p" x="${p.x + 7}" y="${r.y + 3.5}">${esc(trunc(r.c || '—', 9))}</text><text class="pn" x="${p.x + 70}" y="${r.y + 3.5}">${esc(trunc(pin.n || (p.ci === 1 ? r.wires.join(' ') : (W[r.wires[0]] || {}).label || ''), p.w > 200 ? 26 : 15))}</text></g>`;
+      o += `<g class="prow${rc}" data-pin="${esc(key)}">${r.lines.some(t => t.endsWith('…')) ? `<title>${esc(r.full)}</title>` : ''}<rect x="${p.x + 1}" y="${r.y - r.h / 2}" width="${p.w - 2}" height="${r.h}"/><text class="p" x="${p.x + 7}" y="${r.y + 3.5 - (r.lines.length - 1) * 5.5}">${esc(String(r.c || '—').length > 9 ? '' : (r.c || '—'))}</text>${r.lines.map((t, k) => `<text class="pn" x="${p.x + 70}" y="${r.y + 3.5 + (k - (r.lines.length - 1) / 2) * 11}">${esc(t)}</text>`).join('')}</g>`;
     });
     o += '</g>';
   });
   return o;
 }
 const trunc = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+// a box title is the device's name without its parenthetical (the part number and notes are one hover or click away)
+const boxName = d => String(devName(d)).replace(/\s*\([^)]*\)?/g, ' ').replace(/\s+/g, ' ').replace(/[\s,;:.-]+$/, '').trim() || String(devName(d));
+// a label wraps at a word onto a second line; only a label longer than two lines is cut, and never mid-word unless one word is longer than a line
+const wrap2 = (s, n) => { s = String(s || ''); if (s.length <= n) return [s]; let k = s.lastIndexOf(' ', n); if (k < n * 0.4) k = n; const a = s.slice(0, k).trim(); let b = s.slice(k).trim(); if (b.length > n) { let j = b.lastIndexOf(' ', n - 1); if (j < n * 0.4) j = n - 1; b = b.slice(0, j).trim() + '…'; } return [a, b]; };
 function renderSch() {
   if (!S.sch || !SYS[S.sch]) S.sch = focusSys(S.sel) || (D.sys[0] || {}).id;
   const sel = $('#schsel'); if (sel && sel.value !== S.sch) sel.value = S.sch;
@@ -1056,9 +1068,9 @@ function manualWiring(sysId) {
     o += `<text x="${lb.x}" y="${lb.y}" text-anchor="${lb.anchor}" style="font:9px Arial;fill:#111">${esc(txt.trim())}</text>`; });
   Object.entries(L.place).forEach(([dev, pl]) => {
     const conns = uniq(pl.rows.flatMap(r => [...r.eps]));
-    o += `<g class="mbox" data-dev="${esc(dev)}"><rect x="${pl.x}" y="${pl.y}" width="${pl.w}" height="${pl.h}" fill="#fff" stroke="#111" stroke-width="1.2"/><line x1="${pl.x}" y1="${pl.y + L.HDR - 4}" x2="${pl.x + pl.w}" y2="${pl.y + L.HDR - 4}" stroke="#111"/>`
-      + `<text x="${pl.x + 7}" y="${pl.y + 14}" data-go="${esc(DEVS[dev] && DEVS[dev].conns.length > 1 ? 'd:' + dev : 'c:' + conns[0])}" style="font:700 11px Arial;fill:#111;cursor:pointer">${esc(trunc(upper(devName(dev)), pl.w > 200 ? 34 : 24))}</text><text x="${pl.x + 7}" y="${pl.y + 26}" style="font:9.5px 'Courier New';fill:#111">${esc(trunc(conns.join(' '), pl.w > 200 ? 38 : 26))}</text>`;
-    pl.rows.forEach(r => { const ep = [...r.eps][0], pin = pinByKey[ep + '|' + r.c] || {}; o += `<g data-go="p:${esc(ep + '|' + r.c)}" style="cursor:pointer"><text x="${pl.x + 7}" y="${r.y + 3.5}" style="font:9.5px 'Courier New';fill:#111">${esc(trunc(r.c || '—', 9))}</text><text x="${pl.x + 70}" y="${r.y + 3.5}" style="font:9px Arial;fill:#111">${esc(trunc(upper(pin.n || (pl.ci === 1 ? r.wires.join(' ') : (W[r.wires[0]] || {}).label || '')), pl.w > 200 ? 26 : 15))}</text></g>`; });
+    o += `<g class="mbox" data-dev="${esc(dev)}"><rect x="${pl.x}" y="${pl.y}" width="${pl.w}" height="${pl.h}" fill="#fff" stroke="#111" stroke-width="1.2"/><line x1="${pl.x}" y1="${pl.y + pl.hdr - 4}" x2="${pl.x + pl.w}" y2="${pl.y + pl.hdr - 4}" stroke="#111"/>`
+      + pl.tl.map((t, k) => `<text x="${pl.x + 7}" y="${pl.y + 14 + k * 12}" data-go="${esc(DEVS[dev] && DEVS[dev].conns.length > 1 ? 'd:' + dev : 'c:' + conns[0])}" style="font:700 11px Arial;fill:#111;cursor:pointer">${k ? '' : `<title>${esc(devName(dev))}</title>`}${esc(upper(t))}</text>`).join('') + `<text x="${pl.x + 7}" y="${pl.y + pl.hdr - 8}" style="font:9.5px 'Courier New';fill:#111">${esc(trunc(conns.join(' '), Math.floor((pl.w - 16) / 6.4)))}</text>`;
+    pl.rows.forEach(r => { const ep = [...r.eps][0], pin = pinByKey[ep + '|' + r.c] || {}; o += `<g data-go="p:${esc(ep + '|' + r.c)}" style="cursor:pointer">${r.lines.some(t => t.endsWith('…')) ? `<title>${esc(r.full)}</title>` : ''}<text x="${pl.x + 7}" y="${r.y + 3.5 - (r.lines.length - 1) * 5.5}" style="font:9.5px 'Courier New';fill:#111">${esc(String(r.c || '—').length > 9 ? '' : (r.c || '—'))}</text>${r.lines.map((t, k) => `<text x="${pl.x + 70}" y="${r.y + 3.5 + (k - (r.lines.length - 1) / 2) * 11}" style="font:9px Arial;fill:#111">${esc(upper(t))}</text>`).join('')}</g>`; });
     o += '</g>';
   });
   return `<svg viewBox="0 0 ${L.width} ${L.height}" width="${L.width}" height="${L.height}" style="display:block">${o}</svg>`;
@@ -1119,7 +1131,7 @@ function renderManual() {
   const wd = manualWiring(S.sch);
   if (wd) extra.push(['Wiring Diagram', `<h3>WIRING DIAGRAM</h3><div class="mdiag">${wd}</div><div class="mcap">Fig. ${n}-${M.conns.length + 2}—${esc(y.name)} wiring diagram. Sources and controllers left, pass-throughs and splices centre, loads right. Dashed wires are required by decisions made after cut list v4.2.</div>`]);
   const feeds = (D.pdm_out || []).filter(o => o.loads.some(x => wset.has(x)));
-  if (feeds.length) extra.push(['Power Feeds', `<h3>POWER FEEDS</h3><table class="mt"><thead><tr><th>PDM Output</th><th>Circuit</th><th>Load A</th><th>Wire A</th><th>Limit A</th><th>Setting</th></tr></thead><tbody>${feeds.map(o => `<tr${o.loads[0] ? ` data-go="w:${esc(o.loads[0])}" data-w="${esc(o.loads[0])}"` : ''}><td class="m">${esc(o.output)}</td><td class="m">${esc(o.loads.join(' '))}</td><td class="c">${esc(o.load_a == null ? '—' : o.load_a)}</td><td class="c">${esc(o.wire_a == null ? '—' : o.wire_a)}</td><td class="c">${esc(o.limit_a == null ? '—' : o.limit_a)}</td><td>${esc(upper(o.status || ''))}</td></tr>`).join('')}</tbody></table><div class="mlater"><b>NOTE:</b> Load A is the device's draw, Wire A what the wire carries, Limit A the PDM output's current limit.</div>`]);
+  if (feeds.length) extra.push(['Power Feeds', `<h3>POWER FEEDS</h3><table class="mt"><thead><tr><th>PDM Output</th><th>Circuit</th><th>Load A</th><th>Wire A</th><th>Limit A</th><th>Setting</th></tr></thead><tbody>${feeds.map(o => `<tr${o.loads[0] ? ` data-go="w:${esc(o.loads[0])}" data-w="${esc(o.loads[0])}"` : ''}><td class="m">${esc(o.output)}</td><td>${o.loads.map(id => `<div><span class="m">${esc(id)}</span> ${esc((W[id] || {}).label || '')}</div>`).join('')}</td><td class="c">${esc(o.load_a == null ? '—' : o.load_a)}</td><td class="c">${esc(o.wire_a == null ? '—' : o.wire_a)}</td><td class="c">${esc(o.limit_a == null ? '—' : o.limit_a)}</td><td>${esc(upper(o.status || ''))}</td></tr>`).join('')}</tbody></table><div class="mlater"><b>NOTE:</b> Load A is the device's draw, Wire A what the wire carries, Limit A the PDM output's current limit.</div>`]);
   const splRows = (D.splices || []).filter(x => x.wires.some(w => wset.has(w)));
   if (splRows.length) extra.push(['Splices', `<h3>SPLICES</h3><table class="mt"><thead><tr><th>Location</th><th>Splice</th><th>Equiv. AWG</th><th>Wires</th></tr></thead><tbody>${splRows.map(x => `<tr><td class="m">${esc(x.at)}</td><td class="m">${esc(x.pn || '')}</td><td class="c">${esc(x.awg || '')}</td><td class="m">${x.wires.map(w => `<span class="go" data-go="w:${esc(w)}" style="cursor:pointer">${esc(w)}</span>`).join(' ')}</td></tr>`).join('')}</tbody></table>`]);
   if (routes && M.segs.length) {
